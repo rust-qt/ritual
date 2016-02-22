@@ -47,13 +47,19 @@ impl CppFunctionArgument {
 }
 
 impl CppMethod {
-  fn from_json(value: &serde_json::Value) -> Self {
+  fn from_json(value: &serde_json::Value, class_name: &Option<String>) -> Self {
+    //println!("{:?} {:?}", value, class_name);
     let value = value.as_object().unwrap();
     CppMethod {
       name: value.get("name").unwrap().as_string().unwrap().to_string(),
       scope: match value.get("scope").unwrap().as_string().unwrap() {
         "global" => CppMethodScope::Global,
-        "class" => CppMethodScope::Class,
+        "class" => {
+          match class_name {
+            &Some(ref class_name) => CppMethodScope::Class(class_name.clone()),
+            &None => panic!("invalid scope for global functions file"),
+          }
+        }
         _ => panic!("invalid scope"),
       },
       is_virtual: match value.get("virtual") {
@@ -106,13 +112,22 @@ impl CppMethod {
 
 impl CppHeaderData {
   fn from_json(value: &serde_json::Value) -> Self {
+
     let value = value.as_object().unwrap();
+    let class_name = match value.get("class") {
+      Some(s) => Some(s.as_string().unwrap().to_string()),
+      None => None,
+    };
+    let methods = value.get("methods")
+                       .unwrap()
+                       .as_array()
+                       .unwrap()
+                       .into_iter()
+                       .map(|x| CppMethod::from_json(x, &class_name))
+                       .collect();
     CppHeaderData {
       include_file: value.get("include_file").unwrap().as_string().unwrap().to_string(),
-      class_name: match value.get("class_name") {
-        Some(s) => Some(s.as_string().unwrap().to_string()),
-        None => None,
-      },
+      class_name: class_name,
       macros: match value.get("macros") {
         Some(data) => {
           data.as_array()
@@ -123,13 +138,7 @@ impl CppHeaderData {
         }
         None => vec![],
       },
-      methods: value.get("methods")
-                    .unwrap()
-                    .as_array()
-                    .unwrap()
-                    .into_iter()
-                    .map(|x| CppMethod::from_json(x))
-                    .collect(),
+      methods: methods,
     }
   }
 }
