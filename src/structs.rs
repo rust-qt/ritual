@@ -83,7 +83,7 @@ pub fn operator_c_name(cpp_name: &String, arguments_count: i32) -> String {
   } else if cpp_name == "," && arguments_count == 2 {
     return "comma".to_string();
   } else {
-    panic!("unsupported operator");
+    panic!("unsupported operator: {}, {}", cpp_name, arguments_count);
   }
 }
 
@@ -91,7 +91,7 @@ pub fn operator_c_name(cpp_name: &String, arguments_count: i32) -> String {
 
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppType {
   pub is_template: bool,
   pub is_const: bool,
@@ -100,7 +100,7 @@ pub struct CppType {
   pub base: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CType {
   pub is_pointer: bool,
   pub base: String,
@@ -142,30 +142,29 @@ impl CType {
     if self.is_pointer {
       return None;
     }
-    if self.base == "int" {
-      Some(CType::new("int".to_string(), false))
-    } else if self.base == "float" {
-      Some(CType::new("float".to_string(), false))
+    let types = vec!["void", "int", "float", "double", "bool"];
+    if types.iter().find(|&&x| x == self.base).is_some() {
+      Some(CType::new(self.base.clone(), false))
     } else {
       None
     }
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppFunctionArgument {
   pub name: String,
   pub argument_type: CppType,
   pub default_value: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CppMethodScope {
   Global,
   Class(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppMethod {
   pub name: String,
   pub scope: CppMethodScope,
@@ -181,21 +180,21 @@ pub struct CppMethod {
   pub allows_variable_arguments: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CFunctionArgumentCppEquivalent {
   This,
   Argument(i8),
   ReturnValue,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CFunctionArgument {
   pub name: String,
   pub argument_type: CType,
   pub cpp_equivalent: CFunctionArgumentCppEquivalent,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CFunctionSignature {
   pub arguments: Vec<CFunctionArgument>,
   pub return_type: Option<CType>,
@@ -238,8 +237,8 @@ impl CppMethodWithCSignature {
 
   pub fn c_base_name(&self) -> String {
     let scope_prefix = match self.cpp_method.scope {
-      CppMethodScope::Class(ref class_name) => class_name.clone() + &("_".to_string()),
-      CppMethodScope::Global => "".to_string(),
+      CppMethodScope::Class(..) => "".to_string(),
+      CppMethodScope::Global => "G_".to_string(),
     };
     let method_name = if self.cpp_method.is_constructor {
       match self.allocation_place {
@@ -252,7 +251,7 @@ impl CppMethodWithCSignature {
         AllocationPlace::Heap => "delete".to_string(),
       }
     } else if let Some(ref operator) = self.cpp_method.operator {
-      operator_c_name(operator, self.c_signature.arguments.len() as i32)
+      operator_c_name(operator, self.cpp_method.real_arguments_count())
     } else {
       self.cpp_method.name.clone()
     };
@@ -289,6 +288,16 @@ impl CppMethod {
     } else {
       return self.return_type.clone();
     }
+  }
+
+  fn real_arguments_count(&self) -> i32 {
+    let mut result = self.arguments.len() as i32;
+    if let CppMethodScope::Class(..) = self.scope {
+      if !self.is_static {
+        result += 1;
+      }
+    }
+    result
   }
 
 
@@ -363,9 +372,36 @@ pub struct CppHeaderData {
 
 impl CppHeaderData {
   pub fn process_methods(&self) -> Vec<CppAndCMethod> {
+    println!("Processing header <{}>", self.include_file);
+    let mut vec1 = Vec::new();
+    for ref method in &self.methods {
+      if let Some(result_stack) = CppMethodWithCSignature::from_cpp_method(&method, AllocationPlace::Stack) {
+        if let Some(result_heap) = CppMethodWithCSignature::from_cpp_method(&method, AllocationPlace::Heap) {
+          if result_stack.c_signature == result_heap.c_signature {
+            let c_base_name = result_stack.c_base_name();
+            vec1.push(CppAndCMethod::new(result_stack, c_base_name));
+          } else {
+            let mut stack_name = result_stack.c_base_name();
+            let mut heap_name = result_heap.c_base_name();
+            if stack_name == heap_name {
+              stack_name = stack_name + &("_stack".to_string());
+              heap_name = heap_name + &("_heap".to_string());
+            }
+            vec1.push(CppAndCMethod::new(result_stack, stack_name));
+            vec1.push(CppAndCMethod::new(result_heap, heap_name));
+          }
+        } else {
+          panic!("unexpected error: stack strategy success but heap strategy fail");
+        }
+      } else {
+        println!("Unable to produce C function for method: {:?}", method);
+      }
+    }
     let mut r = Vec::new();
 
-
+    for value in vec1 {
+      println!("name: {}", value.c_name);
+    }
 
     r
   }

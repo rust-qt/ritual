@@ -60,17 +60,19 @@ fn main() {
   for data in parse_result {
 
     // white list for now
-    if let Some(class_name) = data.class_name {
+    if let Some(ref class_name) = data.class_name {
       if class_name != "QPoint" { continue; }
     } else {
       continue;
     }
 
-    for method in data.methods {
+    /*for method in data.methods {
       println!("\nmethod: {:?}", method);
       println!("\nsignature stack: {:?}", method.c_signature(AllocationPlace::Stack));
       println!("\nsignature heap: {:?}\n\n-------------", method.c_signature(AllocationPlace::Heap));
-    }
+    }*/
+
+    data.process_methods();
 
   }
 
