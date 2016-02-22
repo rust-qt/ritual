@@ -70,6 +70,10 @@ impl CppMethod {
         Some(v) => v.as_boolean().unwrap(),
         None => false,
       },
+      is_static: match value.get("static") {
+        Some(v) => v.as_boolean().unwrap(),
+        None => false,
+      },
       return_type: match value.get("return_type") {
         Some(v) => Some(CppType::from_json(v)),
         None => None,

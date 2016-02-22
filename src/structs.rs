@@ -1,5 +1,96 @@
 
 
+
+pub fn operator_c_name(cpp_name: &String, arguments_count: i32) -> String {
+  if cpp_name == "=" && arguments_count == 2 {
+    return "assign".to_string();
+  } else if cpp_name == "+" && arguments_count == 2 {
+    return "add".to_string();
+  } else if cpp_name == "-" && arguments_count == 2 {
+    return "sub".to_string();
+  } else if cpp_name == "+" && arguments_count == 1 {
+    return "unary_plus".to_string();
+  } else if cpp_name == "-" && arguments_count == 1 {
+    return "neg".to_string();
+  } else if cpp_name == "*" && arguments_count == 2 {
+    return "mul".to_string();
+  } else if cpp_name == "/" && arguments_count == 2 {
+    return "div".to_string();
+  } else if cpp_name == "%" && arguments_count == 2 {
+    return "rem".to_string();
+  } else if cpp_name == "++" && arguments_count == 1 {
+    return "inc".to_string();
+  } else if cpp_name == "++" && arguments_count == 2 {
+    return "inc_postfix".to_string();
+  } else if cpp_name == "--" && arguments_count == 1 {
+    return "dec".to_string();
+  } else if cpp_name == "--" && arguments_count == 2 {
+    return "dec_postfix".to_string();
+  } else if cpp_name == "==" && arguments_count == 2 {
+    return "eq".to_string();
+  } else if cpp_name == "!=" && arguments_count == 2 {
+    return "neq".to_string();
+  } else if cpp_name == ">" && arguments_count == 2 {
+    return "gt".to_string();
+  } else if cpp_name == "<" && arguments_count == 2 {
+    return "lt".to_string();
+  } else if cpp_name == ">=" && arguments_count == 2 {
+    return "ge".to_string();
+  } else if cpp_name == "<=" && arguments_count == 2 {
+    return "le".to_string();
+  } else if cpp_name == "!" && arguments_count == 1 {
+    return "not".to_string();
+  } else if cpp_name == "&&" && arguments_count == 2 {
+    return "and".to_string();
+  } else if cpp_name == "||" && arguments_count == 2 {
+    return "or".to_string();
+  } else if cpp_name == "~" && arguments_count == 1 {
+    return "bit_not".to_string();
+  } else if cpp_name == "&" && arguments_count == 2 {
+    return "bit_and".to_string();
+  } else if cpp_name == "|" && arguments_count == 2 {
+    return "bit_or".to_string();
+  } else if cpp_name == "^" && arguments_count == 2 {
+    return "bit_xor".to_string();
+  } else if cpp_name == "<<" && arguments_count == 2 {
+    return "shl".to_string();
+  } else if cpp_name == ">>" && arguments_count == 2 {
+    return "shr".to_string();
+  } else if cpp_name == "+=" && arguments_count == 2 {
+    return "add_assign".to_string();
+  } else if cpp_name == "-=" && arguments_count == 2 {
+    return "sub_assign".to_string();
+  } else if cpp_name == "*=" && arguments_count == 2 {
+    return "mul_assign".to_string();
+  } else if cpp_name == "/=" && arguments_count == 2 {
+    return "div_assign".to_string();
+  } else if cpp_name == "%=" && arguments_count == 2 {
+    return "rem_assign".to_string();
+  } else if cpp_name == "&=" && arguments_count == 2 {
+    return "bit_and_assign".to_string();
+  } else if cpp_name == "|=" && arguments_count == 2 {
+    return "bit_or_assign".to_string();
+  } else if cpp_name == "^=" && arguments_count == 2 {
+    return "bit_xor_assign".to_string();
+  } else if cpp_name == "<<=" && arguments_count == 2 {
+    return "shl_assign".to_string();
+  } else if cpp_name == ">>=" && arguments_count == 2 {
+    return "shr_assign".to_string();
+  } else if cpp_name == "[]" && arguments_count == 2 {
+    return "index".to_string();
+  } else if cpp_name == "()" && arguments_count == 1 {
+    return "call".to_string();
+  } else if cpp_name == "," && arguments_count == 2 {
+    return "comma".to_string();
+  } else {
+    panic!("unsupported operator");
+  }
+}
+
+
+
+
+
 #[derive(Debug, Clone)]
 pub struct CppType {
   pub is_template: bool,
@@ -9,7 +100,7 @@ pub struct CppType {
   pub base: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CType {
   pub is_pointer: bool,
   pub base: String,
@@ -23,7 +114,7 @@ impl CppType {
     let is_pointer = self.is_pointer || self.is_reference;
     if !is_pointer {
       if CType::new(self.base.clone(), false).to_primitive_c_type().is_none() {
-        //need to convert to pointer anyway
+        // need to convert to pointer anyway
         return Some(CType::new(self.base.clone(), true));
       }
     }
@@ -61,25 +152,26 @@ impl CType {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CppFunctionArgument {
   pub name: String,
   pub argument_type: CppType,
   pub default_value: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum CppMethodScope {
   Global,
   Class(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CppMethod {
   pub name: String,
   pub scope: CppMethodScope,
   pub is_virtual: bool,
   pub is_const: bool,
+  pub is_static: bool,
   pub return_type: Option<CppType>,
   pub is_constructor: bool,
   pub is_destructor: bool,
@@ -89,30 +181,95 @@ pub struct CppMethod {
   pub allows_variable_arguments: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum CFunctionArgumentCppEquivalent {
   This,
   Argument(i8),
   ReturnValue,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CFunctionArgument {
   pub name: String,
   pub argument_type: CType,
   pub cpp_equivalent: CFunctionArgumentCppEquivalent,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CFunctionSignature {
   pub arguments: Vec<CFunctionArgument>,
   pub return_type: Option<CType>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum AllocationPlace {
   Stack,
   Heap,
+}
+
+pub struct CppMethodWithCSignature {
+  cpp_method: CppMethod,
+  allocation_place: AllocationPlace,
+  c_signature: CFunctionSignature,
+}
+
+pub struct CppAndCMethod {
+  cpp_method: CppMethod,
+  allocation_place: AllocationPlace,
+  c_signature: CFunctionSignature,
+  c_name: String,
+}
+
+impl CppMethodWithCSignature {
+  fn from_cpp_method(cpp_method: &CppMethod,
+                     allocation_place: AllocationPlace)
+                     -> Option<CppMethodWithCSignature> {
+    match cpp_method.c_signature(allocation_place.clone()) {
+      Some(c_signature) => {
+        Some(CppMethodWithCSignature {
+          cpp_method: cpp_method.clone(),
+          allocation_place: allocation_place,
+          c_signature: c_signature,
+        })
+      }
+      None => None,
+    }
+  }
+
+  pub fn c_base_name(&self) -> String {
+    let scope_prefix = match self.cpp_method.scope {
+      CppMethodScope::Class(ref class_name) => class_name.clone() + &("_".to_string()),
+      CppMethodScope::Global => "".to_string(),
+    };
+    let method_name = if self.cpp_method.is_constructor {
+      match self.allocation_place {
+        AllocationPlace::Stack => "constructor".to_string(),
+        AllocationPlace::Heap => "new".to_string(),
+      }
+    } else if self.cpp_method.is_destructor {
+      match self.allocation_place {
+        AllocationPlace::Stack => "destructor".to_string(),
+        AllocationPlace::Heap => "delete".to_string(),
+      }
+    } else if let Some(ref operator) = self.cpp_method.operator {
+      operator_c_name(operator, self.c_signature.arguments.len() as i32)
+    } else {
+      self.cpp_method.name.clone()
+    };
+    scope_prefix + &method_name
+  }
+
+}
+
+impl CppAndCMethod {
+  fn new(data: CppMethodWithCSignature, c_name: String) -> CppAndCMethod {
+    CppAndCMethod {
+      cpp_method: data.cpp_method,
+      allocation_place: data.allocation_place,
+      c_signature: data.c_signature,
+      c_name: c_name,
+    }
+  }
 }
 
 impl CppMethod {
@@ -145,14 +302,16 @@ impl CppMethod {
       return_type: None,
     };
     if let CppMethodScope::Class(ref class_name) = self.scope {
-      r.arguments.push(CFunctionArgument {
-        name: "self".to_string(),
-        argument_type: CType {
-          base: class_name.clone(),
-          is_pointer: true,
-        },
-        cpp_equivalent: CFunctionArgumentCppEquivalent::This,
-      });
+      if !self.is_static {
+        r.arguments.push(CFunctionArgument {
+          name: "self".to_string(),
+          argument_type: CType {
+            base: class_name.clone(),
+            is_pointer: true,
+          },
+          cpp_equivalent: CFunctionArgumentCppEquivalent::This,
+        });
+      }
     }
     for (index, arg) in self.arguments.iter().enumerate() {
       match arg.argument_type.to_c_type() {
@@ -184,6 +343,8 @@ impl CppMethod {
     }
     Some(r)
   }
+
+
 }
 
 
@@ -198,4 +359,15 @@ pub struct CppHeaderData {
   pub class_name: Option<String>,
   pub methods: Vec<CppMethod>,
   pub macros: Vec<String>,
+}
+
+impl CppHeaderData {
+  pub fn process_methods(&self) -> Vec<CppAndCMethod> {
+    let mut r = Vec::new();
+
+
+
+    r
+  }
+
 }
