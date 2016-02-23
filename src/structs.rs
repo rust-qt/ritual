@@ -186,6 +186,15 @@ pub enum CFunctionArgumentCppEquivalent {
   ReturnValue,
 }
 
+impl CFunctionArgumentCppEquivalent {
+  fn is_argument(&self) -> bool {
+    match self {
+      &CFunctionArgumentCppEquivalent::Argument(..) => true,
+      _ => false,
+    }
+  }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CFunctionArgument {
   pub name: String,
@@ -220,17 +229,24 @@ pub struct CFunctionSignature {
 
 impl CFunctionSignature {
   fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
-    if self.arguments.len() == 0 {
-      return "no_args".to_string();
+    let r = self.arguments
+        .iter()
+        .filter(|x| x.cpp_equivalent.is_argument())
+        .map(|x| x.caption(strategy.clone()))
+        .fold("".to_string(), |a, b| {
+          let m = if a.len() > 0 {
+            a + "_"
+          } else {
+            a
+          };
+          m + &b
+        });
+    if r.len() == 0 {
+      "no_args".to_string()
+    } else {
+      r
     }
-    self.arguments.iter().map(|x| x.caption(strategy.clone())).fold("".to_string(), |a, b| {
-      let m = if a.len() > 0 {
-        a + "_"
-      } else {
-        a
-      };
-      m + &b
-    })
+
   }
 }
 
@@ -287,7 +303,7 @@ impl CppMethodWithCSignature {
         AllocationPlace::Heap => "delete".to_string(),
       }
     } else if let Some(ref operator) = self.cpp_method.operator {
-      operator_c_name(operator, self.cpp_method.real_arguments_count())
+      "OP_".to_string() + &operator_c_name(operator, self.cpp_method.real_arguments_count())
     } else {
       self.cpp_method.name.clone()
     };
@@ -428,8 +444,8 @@ impl CppHeaderData {
               let mut stack_name = result_stack.c_base_name();
               let mut heap_name = result_heap.c_base_name();
               if stack_name == heap_name {
-                stack_name = stack_name + &("_stack".to_string());
-                heap_name = heap_name + &("_heap".to_string());
+                stack_name = "SA_".to_string() + &stack_name;
+                heap_name = "HA_".to_string() + &heap_name;
               }
               insert_into_hash(&mut hash1, stack_name, result_stack);
               insert_into_hash(&mut hash1, heap_name, result_heap);
@@ -445,19 +461,39 @@ impl CppHeaderData {
     let mut r = Vec::new();
     for (key, mut values) in hash1.into_iter() {
       if values.len() == 1 {
-        r.push(CppAndCMethod::new(values.remove(0), key.clone()));
+        r.push(CppAndCMethod::new(values.remove(0),
+                                  self.include_file.clone() + &("_".to_string()) + &key));
         continue;
       }
-
+      let mut found_strategy = None;
       for strategy in vec![ArgumentCaptionStrategy::NameOnly,
-                       ArgumentCaptionStrategy::TypeOnly,
-                       ArgumentCaptionStrategy::TypeAndName] {
-
-
-
+                           ArgumentCaptionStrategy::TypeOnly,
+                           ArgumentCaptionStrategy::TypeAndName] {
+        let mut type_captions: Vec<_> = values.iter()
+                                              .map(|x| x.c_signature.caption(strategy.clone()))
+                                              .collect();
+        type_captions.sort();
+        type_captions.dedup();
+        if type_captions.len() == values.len() {
+          found_strategy = Some(strategy);
+          break;
+        }
       }
+      if let Some(strategy) = found_strategy {
+        for x in values {
+          let caption = x.c_signature.caption(strategy.clone());
+          r.push(CppAndCMethod::new(x,
+                                    self.include_file.clone() + &("_".to_string()) + &key +
+                                    &("_".to_string()) +
+                                    &caption));
+        }
+      } else {
+        panic!("all type caption strategies have failed!");
+      }
+    }
 
-      println!("{} # {}", key, values.len());
+    for x in &r {
+      println!("{}", x.c_name);
     }
 
     r
