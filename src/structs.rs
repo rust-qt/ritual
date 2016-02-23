@@ -1,5 +1,4 @@
-
-
+use std::collections::HashMap;
 
 pub fn operator_c_name(cpp_name: &String, arguments_count: i32) -> String {
   if cpp_name == "=" && arguments_count == 2 {
@@ -132,9 +131,9 @@ impl CType {
 
   fn caption(&self) -> String {
     let mut r = self.base.clone();
-    if self.is_pointer {
-      r = r + &("_ptr".to_string());
-    }
+    // if self.is_pointer {
+    //  r = r + &("_ptr".to_string());
+    // }
     r
   }
 
@@ -195,9 +194,44 @@ pub struct CFunctionArgument {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+enum ArgumentCaptionStrategy {
+  NameOnly,
+  TypeOnly,
+  TypeAndName,
+}
+
+impl CFunctionArgument {
+  fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
+    match strategy {
+      ArgumentCaptionStrategy::NameOnly => self.name.clone(),
+      ArgumentCaptionStrategy::TypeOnly => self.argument_type.caption(),
+      ArgumentCaptionStrategy::TypeAndName => {
+        self.argument_type.caption() + &("_".to_string()) + &self.name
+      }
+    }
+  }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CFunctionSignature {
   pub arguments: Vec<CFunctionArgument>,
   pub return_type: Option<CType>,
+}
+
+impl CFunctionSignature {
+  fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
+    if self.arguments.len() == 0 {
+      return "no_args".to_string();
+    }
+    self.arguments.iter().map(|x| x.caption(strategy.clone())).fold("".to_string(), |a, b| {
+      let m = if a.len() > 0 {
+        a + "_"
+      } else {
+        a
+      };
+      m + &b
+    })
+  }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -206,12 +240,14 @@ pub enum AllocationPlace {
   Heap,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppMethodWithCSignature {
   cpp_method: CppMethod,
   allocation_place: AllocationPlace,
   c_signature: CFunctionSignature,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppAndCMethod {
   cpp_method: CppMethod,
   allocation_place: AllocationPlace,
@@ -257,7 +293,6 @@ impl CppMethodWithCSignature {
     };
     scope_prefix + &method_name
   }
-
 }
 
 impl CppAndCMethod {
@@ -352,8 +387,6 @@ impl CppMethod {
     }
     Some(r)
   }
-
-
 }
 
 
@@ -373,37 +406,60 @@ pub struct CppHeaderData {
 impl CppHeaderData {
   pub fn process_methods(&self) -> Vec<CppAndCMethod> {
     println!("Processing header <{}>", self.include_file);
-    let mut vec1 = Vec::new();
-    for ref method in &self.methods {
-      if let Some(result_stack) = CppMethodWithCSignature::from_cpp_method(&method, AllocationPlace::Stack) {
-        if let Some(result_heap) = CppMethodWithCSignature::from_cpp_method(&method, AllocationPlace::Heap) {
-          if result_stack.c_signature == result_heap.c_signature {
-            let c_base_name = result_stack.c_base_name();
-            vec1.push(CppAndCMethod::new(result_stack, c_base_name));
-          } else {
-            let mut stack_name = result_stack.c_base_name();
-            let mut heap_name = result_heap.c_base_name();
-            if stack_name == heap_name {
-              stack_name = stack_name + &("_stack".to_string());
-              heap_name = heap_name + &("_heap".to_string());
+    let mut hash1 = HashMap::new();
+    {
+      let insert_into_hash = |hash: &mut HashMap<String, Vec<_>>, key: String, value| {
+        if let Some(values) = hash.get_mut(&key) {
+          values.push(value);
+          return;
+        }
+        hash.insert(key, vec![value]);
+      };
+
+      for ref method in &self.methods {
+        if let Some(result_stack) =
+               CppMethodWithCSignature::from_cpp_method(&method, AllocationPlace::Stack) {
+          if let Some(result_heap) =
+                 CppMethodWithCSignature::from_cpp_method(&method, AllocationPlace::Heap) {
+            if result_stack.c_signature == result_heap.c_signature {
+              let c_base_name = result_stack.c_base_name();
+              insert_into_hash(&mut hash1, c_base_name, result_stack);
+            } else {
+              let mut stack_name = result_stack.c_base_name();
+              let mut heap_name = result_heap.c_base_name();
+              if stack_name == heap_name {
+                stack_name = stack_name + &("_stack".to_string());
+                heap_name = heap_name + &("_heap".to_string());
+              }
+              insert_into_hash(&mut hash1, stack_name, result_stack);
+              insert_into_hash(&mut hash1, heap_name, result_heap);
             }
-            vec1.push(CppAndCMethod::new(result_stack, stack_name));
-            vec1.push(CppAndCMethod::new(result_heap, heap_name));
+          } else {
+            panic!("unexpected error: stack strategy success but heap strategy fail");
           }
         } else {
-          panic!("unexpected error: stack strategy success but heap strategy fail");
+          println!("Unable to produce C function for method: {:?}", method);
         }
-      } else {
-        println!("Unable to produce C function for method: {:?}", method);
       }
     }
     let mut r = Vec::new();
+    for (key, mut values) in hash1.into_iter() {
+      if values.len() == 1 {
+        r.push(CppAndCMethod::new(values.remove(0), key.clone()));
+        continue;
+      }
 
-    for value in vec1 {
-      println!("name: {}", value.c_name);
+      for strategy in vec![ArgumentCaptionStrategy::NameOnly,
+                       ArgumentCaptionStrategy::TypeOnly,
+                       ArgumentCaptionStrategy::TypeAndName] {
+
+
+
+      }
+
+      println!("{} # {}", key, values.len());
     }
 
     r
   }
-
 }
