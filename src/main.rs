@@ -1,6 +1,7 @@
 
 mod structs;
 use structs::*;
+mod c_generator;
 
 mod read_parse_result;
 use std::fs;
@@ -52,9 +53,6 @@ fn main() {
     r
   };
   remove_dir(&qtcw_path);
-  /*println!("copy {:?} to {:?}",
-           qtcw_template_dir.as_os_str(),
-           qtcw_path.as_os_str());*/
   copy_dir(&qtcw_template_dir, &qtcw_path);
 
 
@@ -66,14 +64,8 @@ fn main() {
     } else {
       continue;
     }
+    c_generator::generate_one(&data, &qtcw_path);
 
-    /*for method in data.methods {
-      println!("\nmethod: {:?}", method);
-      println!("\nsignature stack: {:?}", method.c_signature(AllocationPlace::Stack));
-      println!("\nsignature heap: {:?}\n\n-------------", method.c_signature(AllocationPlace::Heap));
-    }*/
-
-    data.process_methods();
 
   }
 
