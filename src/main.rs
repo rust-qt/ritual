@@ -55,6 +55,7 @@ fn main() {
   remove_dir(&qtcw_path);
   copy_dir(&qtcw_template_dir, &qtcw_path);
 
+  c_generator::generate_size_definer_class_list(&parse_result, &qtcw_path);
 
   for data in parse_result {
 

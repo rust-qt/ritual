@@ -2,6 +2,7 @@
 #include <QCoreApplication>
 #include <QFile>
 
+//include everything
 #include <QtCore>
 
 void add(QFile* file, QString name, int value) {
@@ -23,9 +24,8 @@ int main(int argc, char *argv[]) {
     qFatal("size_definer: can't open file.");
     return 2;
   }
-  //file.write(QString("#define QTCW_sizeof_%1 %2\n").arg("QRect").arg(sizeof(QRect)).toLatin1());
-  ADD(QPoint);
-  ADD(QRect);
+
+  #include "classes_list.h"
 
   return 0;
 }

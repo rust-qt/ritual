@@ -212,10 +212,11 @@ def parse():
     #pp.pprint(result)
   return all_data
 
-#if len(sys.argv) < 2:
-#  print "No file name specified."
-#else:
-#  print "Parsing documentation..."
-#  parse_result = parse()
-#  with open(sys.argv[1], "w") as f:
-#    json.dump(parse_result, f, indent=2)
+if len(sys.argv) < 2:
+  print "No file name specified."
+else:
+  print "Parsing documentation..."
+  parse_result = parse()
+  with open(sys.argv[1], "w") as f:
+    json.dump(parse_result, f, indent=2)
+
