@@ -5,8 +5,8 @@
   #include <stdbool.h>
 #endif
 
-#include "exports.h"
-#include "sizes.h"
+#include "qtcw_exports.h"
+#include "qtcw_sizes.h"
 
 
 #define QTCW_DECLARE_TYPE(name) \

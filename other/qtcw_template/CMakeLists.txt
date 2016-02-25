@@ -11,5 +11,5 @@ add_subdirectory(size_definer)
 
 add_custom_target(
     run_size_definer
-    COMMAND size_definer ${CMAKE_CURRENT_BINARY_DIR}/sizes.h)
+    COMMAND size_definer ${CMAKE_CURRENT_BINARY_DIR}/qtcw_sizes.h)
 add_dependencies(qtcw run_size_definer)
