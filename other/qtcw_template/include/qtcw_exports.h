@@ -3,12 +3,12 @@
 
 #ifdef _WIN32
     #ifdef QTCW_LIBRARY
-        #define QTCWSHARED_EXPORT __declspec(dllexport)
+        #define QTCW_EXPORT __declspec(dllexport)
     #else
-        #define QTCWSHARED_EXPORT __declspec(dllimport)
+        #define QTCW_EXPORT __declspec(dllimport)
     #endif
 #else
-    #define QTCWSHARED_EXPORT
+    #define QTCW_EXPORT
 #endif
 
 #ifdef __cplusplus

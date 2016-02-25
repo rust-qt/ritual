@@ -110,14 +110,24 @@ impl CppType {
     if self.is_template {
       return None;
     }
-    let is_pointer = self.is_pointer || self.is_reference;
-    if !is_pointer {
-      if CType::new(self.base.clone(), false).to_primitive_c_type().is_none() {
+    if self.is_pointer || self.is_reference {
+      return Some(CType::new(self.base.clone(), true));
+    } else {
+      if self.base == "void" || self.base == "int" || self.base == "float" ||
+         self.base == "double" || self.base == "bool" {
+        return Some(CType::new(self.base.clone(), false));
+      } else if self.base == "quint8" {
+        return Some(CType::new("int8_t".to_string(), false));
+        // TODO: more type conversions
+      } else {
         // need to convert to pointer anyway
         return Some(CType::new(self.base.clone(), true));
       }
     }
-    Some(CType::new(self.base.clone(), is_pointer))
+  }
+
+  fn is_stack_allocated_struct(&self) -> bool {
+    !self.is_pointer && !self.is_reference && self.base.starts_with("Q")
   }
 }
 
@@ -137,16 +147,12 @@ impl CType {
     r
   }
 
-  fn to_primitive_c_type(&self) -> Option<CType> {
+  pub fn to_c_code(&self) -> String {
+    let mut r = self.base.clone();
     if self.is_pointer {
-      return None;
+      r = r + &("*".to_string());
     }
-    let types = vec!["void", "int", "float", "double", "bool"];
-    if types.iter().find(|&&x| x == self.base).is_some() {
-      Some(CType::new(self.base.clone(), false))
-    } else {
-      None
-    }
+    r
   }
 }
 
@@ -219,34 +225,52 @@ impl CFunctionArgument {
       }
     }
   }
+
+  pub fn to_c_code(&self) -> String {
+    self.argument_type.to_c_code() + &(" ".to_string()) + &self.name
+  }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CFunctionSignature {
   pub arguments: Vec<CFunctionArgument>,
-  pub return_type: Option<CType>,
+  pub return_type: CType,
 }
 
 impl CFunctionSignature {
   fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
     let r = self.arguments
-        .iter()
-        .filter(|x| x.cpp_equivalent.is_argument())
-        .map(|x| x.caption(strategy.clone()))
-        .fold("".to_string(), |a, b| {
-          let m = if a.len() > 0 {
-            a + "_"
-          } else {
-            a
-          };
-          m + &b
-        });
+                .iter()
+                .filter(|x| x.cpp_equivalent.is_argument())
+                .map(|x| x.caption(strategy.clone()))
+                .fold("".to_string(), |a, b| {
+                  let m = if a.len() > 0 {
+                    a + "_"
+                  } else {
+                    a
+                  };
+                  m + &b
+                });
     if r.len() == 0 {
       "no_args".to_string()
     } else {
       r
     }
 
+  }
+
+  pub fn arguments_to_c_code(&self) -> String {
+    self.arguments
+        .iter()
+        .map(|x| x.to_c_code())
+        .fold("".to_string(), |a, b| {
+          let m = if a.len() > 0 {
+            a + ", "
+          } else {
+            a
+          };
+          m + &b
+        })
   }
 }
 
@@ -258,17 +282,17 @@ pub enum AllocationPlace {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppMethodWithCSignature {
-  cpp_method: CppMethod,
-  allocation_place: AllocationPlace,
-  c_signature: CFunctionSignature,
+  pub cpp_method: CppMethod,
+  pub allocation_place: AllocationPlace,
+  pub c_signature: CFunctionSignature,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppAndCMethod {
-  cpp_method: CppMethod,
-  allocation_place: AllocationPlace,
-  c_signature: CFunctionSignature,
-  c_name: String,
+  pub cpp_method: CppMethod,
+  pub allocation_place: AllocationPlace,
+  pub c_signature: CFunctionSignature,
+  pub c_name: String,
 }
 
 impl CppMethodWithCSignature {
@@ -359,7 +383,7 @@ impl CppMethod {
     }
     let mut r = CFunctionSignature {
       arguments: Vec::new(),
-      return_type: None,
+      return_type: CType { base: "void".to_string(), is_pointer: false },
     };
     if let CppMethodScope::Class(ref class_name) = self.scope {
       if !self.is_static {
@@ -388,14 +412,14 @@ impl CppMethod {
     if let Some(return_type) = self.real_return_type() {
       match return_type.to_c_type() {
         Some(c_type) => {
-          if allocation_place == AllocationPlace::Stack && c_type.to_primitive_c_type().is_none() {
+          if allocation_place == AllocationPlace::Stack && return_type.is_stack_allocated_struct() {
             r.arguments.push(CFunctionArgument {
               name: "output".to_string(),
               argument_type: c_type,
               cpp_equivalent: CFunctionArgumentCppEquivalent::ReturnValue,
             });
           } else {
-            r.return_type = Some(c_type);
+            r.return_type = c_type;
           }
         }
         None => return None,

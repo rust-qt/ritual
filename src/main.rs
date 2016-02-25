@@ -67,7 +67,6 @@ fn main() {
     }
     c_generator::generate_one(&data, &qtcw_path, &sized_classes);
 
-
   }
 
 

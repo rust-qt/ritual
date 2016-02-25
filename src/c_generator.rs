@@ -96,8 +96,27 @@ pub fn generate_one(data: &CppHeaderData, qtcw_path: &PathBuf, sized_classes: &V
     write!(h_file, "#endif\n\n").unwrap();
 
   } else {
-    println!("Not a class header. Wrapper structs are not generated.");
+    println!("Not a class header. Wrapper struct is not generated.");
   }
+
+  write!(h_file, "QTCW_EXTERN_C_BEGIN\n\n").unwrap();
+
+  for method in data.process_methods() {
+    println!("method:\n{:?}\n\n", method);
+    write!(h_file,
+           "{} QTCW_EXPORT {}({});\n",
+           method.c_signature.return_type.to_c_code(),
+           method.c_name,
+           method.c_signature.arguments_to_c_code())
+      .unwrap();
+
+
+
+
+
+  }
+
+  write!(h_file, "\nQTCW_EXTERN_C_END\n\n").unwrap();
 
 
 
