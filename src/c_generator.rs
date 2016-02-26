@@ -105,7 +105,7 @@ pub fn generate_one(data: &CppHeaderData, qtcw_path: &PathBuf, sized_classes: &V
     println!("method:\n{:?}\n\n", method);
     write!(h_file,
            "{} QTCW_EXPORT {}({});\n",
-           method.c_signature.return_type.to_c_code(),
+           method.c_signature.return_type.c_type.to_c_code(),
            method.c_name,
            method.c_signature.arguments_to_c_code())
       .unwrap();

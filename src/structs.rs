@@ -105,27 +105,64 @@ pub struct CType {
   pub base: String,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CppToCTypeConversion {
+  NoConversion,
+  ValueToPointer,
+  ReferenceToPointer,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CTypeExtended {
+  pub c_type: CType,
+  pub is_primitive: bool,
+  pub conversion: CppToCTypeConversion,
+}
+
+impl CTypeExtended {
+  pub fn void() -> Self {
+    CTypeExtended {
+      c_type: CType::void(),
+      is_primitive: true,
+      conversion: CppToCTypeConversion::NoConversion,
+    }
+  }
+}
+
 impl CppType {
-  fn to_c_type(&self) -> Option<CType> {
+  fn to_c_type(&self) -> Option<CTypeExtended> {
     if self.is_template {
       return None;
     }
-    if self.is_pointer || self.is_reference {
-      return Some(CType::new(self.base.clone(), true));
+    let mut result = CTypeExtended::void();
+    if self.is_pointer {
+      result.c_type.is_pointer = true;
+    }
+    if self.is_reference {
+      result.c_type.is_pointer = true;
+      result.conversion = CppToCTypeConversion::ReferenceToPointer;
+    }
+
+    if self.base == "void" || self.base == "int" || self.base == "float" ||
+       self.base == "double" || self.base == "bool" {
+      result.is_primitive = true;
+      result.c_type.base = self.base.clone();
+    } else if self.base == "quint8" {
+      result.is_primitive = true;
+      result.c_type.base = "int8_t".to_string();
+    } else if self.base == "qreal" {
+      result.is_primitive = true;
+      result.c_type.base = "double".to_string();
     } else {
-      if self.base == "void" || self.base == "int" || self.base == "float" ||
-         self.base == "double" || self.base == "bool" {
-        return Some(CType::new(self.base.clone(), false));
-      } else if self.base == "quint8" {
-        return Some(CType::new("int8_t".to_string(), false));
-        // TODO: more type conversions
-      } else if self.base == "qreal" {
-        return Some(CType::new("double".to_string(), false));
-      } else {
-        // need to convert to pointer anyway
-        return Some(CType::new(self.base.clone(), true));
+      // TODO: more type conversions
+      result.is_primitive = false;
+      result.c_type.base = self.base.clone();
+      result.c_type.is_pointer = true;
+      if !self.is_pointer && !self.is_reference {
+        result.conversion = CppToCTypeConversion::ValueToPointer;
       }
     }
+    Some(result)
   }
 
   fn is_stack_allocated_struct(&self) -> bool {
@@ -134,6 +171,12 @@ impl CppType {
 }
 
 impl CType {
+  pub fn void() -> Self {
+    CType {
+      base: "void".to_string(),
+      is_pointer: false,
+    }
+  }
   fn new(base: String, is_pointer: bool) -> CType {
     CType {
       base: base,
@@ -206,7 +249,7 @@ impl CFunctionArgumentCppEquivalent {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CFunctionArgument {
   pub name: String,
-  pub argument_type: CType,
+  pub argument_type: CTypeExtended,
   pub cpp_equivalent: CFunctionArgumentCppEquivalent,
 }
 
@@ -221,22 +264,22 @@ impl CFunctionArgument {
   fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
     match strategy {
       ArgumentCaptionStrategy::NameOnly => self.name.clone(),
-      ArgumentCaptionStrategy::TypeOnly => self.argument_type.caption(),
+      ArgumentCaptionStrategy::TypeOnly => self.argument_type.c_type.caption(),
       ArgumentCaptionStrategy::TypeAndName => {
-        self.argument_type.caption() + &("_".to_string()) + &self.name
+        self.argument_type.c_type.caption() + &("_".to_string()) + &self.name
       }
     }
   }
 
   pub fn to_c_code(&self) -> String {
-    self.argument_type.to_c_code() + &(" ".to_string()) + &self.name
+    self.argument_type.c_type.to_c_code() + &(" ".to_string()) + &self.name
   }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CFunctionSignature {
   pub arguments: Vec<CFunctionArgument>,
-  pub return_type: CType,
+  pub return_type: CTypeExtended,
 }
 
 impl CFunctionSignature {
@@ -385,15 +428,19 @@ impl CppMethod {
     }
     let mut r = CFunctionSignature {
       arguments: Vec::new(),
-      return_type: CType { base: "void".to_string(), is_pointer: false },
+      return_type: CTypeExtended::void(),
     };
     if let CppMethodScope::Class(ref class_name) = self.scope {
       if !self.is_static {
         r.arguments.push(CFunctionArgument {
           name: "self".to_string(),
-          argument_type: CType {
-            base: class_name.clone(),
-            is_pointer: true,
+          argument_type: CTypeExtended {
+            c_type: CType {
+              base: class_name.clone(),
+              is_pointer: true,
+            },
+            is_primitive: false,
+            conversion: CppToCTypeConversion::NoConversion,
           },
           cpp_equivalent: CFunctionArgumentCppEquivalent::This,
         });
