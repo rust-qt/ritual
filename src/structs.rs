@@ -1,5 +1,143 @@
 use std::collections::HashMap;
 
+
+pub trait JoinWithString {
+  fn join(self, separator: &'static str) -> String;
+}
+
+impl<X> JoinWithString for X
+  where X: Iterator<Item = String>
+{
+  fn join(self, separator: &'static str) -> String {
+    self.fold("".to_string(), |a, b| {
+      let m = if a.len() > 0 {
+        a + separator
+      } else {
+        a
+      };
+      m + &b
+    })
+  }
+}
+
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CppType {
+  pub is_template: bool,
+  pub is_const: bool,
+  pub is_reference: bool,
+  pub is_pointer: bool,
+  pub base: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CType {
+  pub is_pointer: bool,
+  pub base: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CppToCTypeConversion {
+  NoConversion,
+  ValueToPointer,
+  ReferenceToPointer,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CTypeExtended {
+  pub c_type: CType,
+  pub is_primitive: bool,
+  pub conversion: CppToCTypeConversion,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CppFunctionArgument {
+  pub name: String,
+  pub argument_type: CppType,
+  pub default_value: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CppMethodScope {
+  Global,
+  Class(String),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CppMethod {
+  pub name: String,
+  pub scope: CppMethodScope,
+  pub is_virtual: bool,
+  pub is_const: bool,
+  pub is_static: bool,
+  pub return_type: Option<CppType>,
+  pub is_constructor: bool,
+  pub is_destructor: bool,
+  pub operator: Option<String>,
+  pub is_variable: bool,
+  pub arguments: Vec<CppFunctionArgument>,
+  pub allows_variable_arguments: bool,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CFunctionArgumentCppEquivalent {
+  This,
+  Argument(i8),
+  ReturnValue,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CFunctionArgument {
+  pub name: String,
+  pub argument_type: CTypeExtended,
+  pub cpp_equivalent: CFunctionArgumentCppEquivalent,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+enum ArgumentCaptionStrategy {
+  NameOnly,
+  TypeOnly,
+  TypeAndName,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CFunctionSignature {
+  pub arguments: Vec<CFunctionArgument>,
+  pub return_type: CTypeExtended,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum AllocationPlace {
+  Stack,
+  Heap,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CppMethodWithCSignature {
+  pub cpp_method: CppMethod,
+  pub allocation_place: AllocationPlace,
+  pub c_signature: CFunctionSignature,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CppAndCMethod {
+  pub cpp_method: CppMethod,
+  pub allocation_place: AllocationPlace,
+  pub c_signature: CFunctionSignature,
+  pub c_name: String,
+}
+
+
+
+#[derive(Debug)]
+pub struct CppHeaderData {
+  pub include_file: String,
+  pub class_name: Option<String>,
+  pub methods: Vec<CppMethod>,
+  pub macros: Vec<String>,
+}
+
+
 pub fn operator_c_name(cpp_name: &String, arguments_count: i32) -> String {
   if cpp_name == "=" && arguments_count == 2 {
     return "assign".to_string();
@@ -90,34 +228,6 @@ pub fn operator_c_name(cpp_name: &String, arguments_count: i32) -> String {
 
 
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CppType {
-  pub is_template: bool,
-  pub is_const: bool,
-  pub is_reference: bool,
-  pub is_pointer: bool,
-  pub base: String,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CType {
-  pub is_pointer: bool,
-  pub base: String,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum CppToCTypeConversion {
-  NoConversion,
-  ValueToPointer,
-  ReferenceToPointer,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CTypeExtended {
-  pub c_type: CType,
-  pub is_primitive: bool,
-  pub conversion: CppToCTypeConversion,
-}
 
 impl CTypeExtended {
   pub fn void() -> Self {
@@ -201,42 +311,6 @@ impl CType {
   }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CppFunctionArgument {
-  pub name: String,
-  pub argument_type: CppType,
-  pub default_value: Option<String>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum CppMethodScope {
-  Global,
-  Class(String),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CppMethod {
-  pub name: String,
-  pub scope: CppMethodScope,
-  pub is_virtual: bool,
-  pub is_const: bool,
-  pub is_static: bool,
-  pub return_type: Option<CppType>,
-  pub is_constructor: bool,
-  pub is_destructor: bool,
-  pub operator: Option<String>,
-  pub is_variable: bool,
-  pub arguments: Vec<CppFunctionArgument>,
-  pub allows_variable_arguments: bool,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum CFunctionArgumentCppEquivalent {
-  This,
-  Argument(i8),
-  ReturnValue,
-}
-
 impl CFunctionArgumentCppEquivalent {
   fn is_argument(&self) -> bool {
     match self {
@@ -244,20 +318,6 @@ impl CFunctionArgumentCppEquivalent {
       _ => false,
     }
   }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CFunctionArgument {
-  pub name: String,
-  pub argument_type: CTypeExtended,
-  pub cpp_equivalent: CFunctionArgumentCppEquivalent,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-enum ArgumentCaptionStrategy {
-  NameOnly,
-  TypeOnly,
-  TypeAndName,
 }
 
 impl CFunctionArgument {
@@ -276,26 +336,13 @@ impl CFunctionArgument {
   }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CFunctionSignature {
-  pub arguments: Vec<CFunctionArgument>,
-  pub return_type: CTypeExtended,
-}
-
 impl CFunctionSignature {
   fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
     let r = self.arguments
                 .iter()
                 .filter(|x| x.cpp_equivalent.is_argument())
                 .map(|x| x.caption(strategy.clone()))
-                .fold("".to_string(), |a, b| {
-                  let m = if a.len() > 0 {
-                    a + "_"
-                  } else {
-                    a
-                  };
-                  m + &b
-                });
+                .join("_");
     if r.len() == 0 {
       "no_args".to_string()
     } else {
@@ -308,37 +355,10 @@ impl CFunctionSignature {
     self.arguments
         .iter()
         .map(|x| x.to_c_code())
-        .fold("".to_string(), |a, b| {
-          let m = if a.len() > 0 {
-            a + ", "
-          } else {
-            a
-          };
-          m + &b
-        })
+        .join(", ")
   }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum AllocationPlace {
-  Stack,
-  Heap,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CppMethodWithCSignature {
-  pub cpp_method: CppMethod,
-  pub allocation_place: AllocationPlace,
-  pub c_signature: CFunctionSignature,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CppAndCMethod {
-  pub cpp_method: CppMethod,
-  pub allocation_place: AllocationPlace,
-  pub c_signature: CFunctionSignature,
-  pub c_name: String,
-}
 
 impl CppMethodWithCSignature {
   fn from_cpp_method(cpp_method: &CppMethod,
@@ -478,20 +498,6 @@ impl CppMethod {
   }
 }
 
-
-
-
-
-
-
-#[derive(Debug)]
-pub struct CppHeaderData {
-  pub include_file: String,
-  pub class_name: Option<String>,
-  pub methods: Vec<CppMethod>,
-  pub macros: Vec<String>,
-}
-
 impl CppHeaderData {
   pub fn involves_templates(&self) -> bool {
     for method in &self.methods {
@@ -580,10 +586,6 @@ impl CppHeaderData {
       } else {
         panic!("all type caption strategies have failed!");
       }
-    }
-
-    for x in &r {
-      println!("{}", x.c_name);
     }
 
     r

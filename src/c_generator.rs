@@ -109,7 +109,6 @@ impl CGenerator {
 
 
   pub fn generate_one(&self, data: &CppHeaderData) {
-    println!("test {}", data.process_methods().len());
     let mut cpp_path = self.qtcw_path.clone();
     cpp_path.push("src");
     cpp_path.push(format!("qtcw_{}.cpp", data.include_file));
@@ -123,7 +122,7 @@ impl CGenerator {
     let mut cpp_file = File::create(&cpp_path).unwrap();
     let mut h_file = File::create(&h_path).unwrap();
 
-    write!(cpp_file, "#include \"qtcw_{}.h\"\n", data.include_file).unwrap();
+    write!(cpp_file, "#include \"qtcw_{}.h\"\n\n", data.include_file).unwrap();
     let include_guard_name = format!("QTCW_{}_H", data.include_file.to_uppercase());
     write!(h_file,
            "#ifndef {}\n#define {}\n\n",
@@ -179,7 +178,6 @@ impl CGenerator {
 
 
     for method in &methods {
-      println!("method:\n{:?}\n\n", method);
       write!(h_file,
              "{} QTCW_EXPORT {}({});\n",
              method.c_signature.return_type.c_type.to_c_code(),
@@ -188,11 +186,79 @@ impl CGenerator {
         .unwrap();
 
       write!(cpp_file,
-             "{} {}({}) {{\n",
+             "{} {}({}) {{\n  ",
              method.c_signature.return_type.c_type.to_c_code(),
              method.c_name,
              method.c_signature.arguments_to_c_code())
         .unwrap();
+
+
+      if method.c_signature.return_type != CTypeExtended::void() {
+        write!(cpp_file, "return ");
+      }
+      let mut return_type_conversion_prefix = "".to_string();
+      let mut return_type_conversion_suffix = "".to_string();
+      match method.c_signature.return_type.conversion {
+        CppToCTypeConversion::NoConversion => {}
+        CppToCTypeConversion::ValueToPointer => {
+          match method.allocation_place {
+            AllocationPlace::Stack => {
+              panic!("stack allocated wrappers are expected to return void!")
+            }
+            AllocationPlace::Heap => {
+              return_type_conversion_prefix = format!("new {}(", method.c_signature.return_type.c_type.base);
+              return_type_conversion_suffix = ")".to_string();
+            }
+          }
+        }
+        CppToCTypeConversion::ReferenceToPointer => {
+          return_type_conversion_prefix = "&".to_string();
+        }
+      }
+      write!(cpp_file, "{}", return_type_conversion_prefix);
+      if let CppMethodScope::Class(ref class_name) = method.cpp_method.scope {
+        if method.cpp_method.is_static {
+          write!(cpp_file, "{}::", class_name);
+        } else {
+          let mut this_found = false;
+          for arg in &method.c_signature.arguments {
+            if arg.cpp_equivalent == CFunctionArgumentCppEquivalent::This {
+              write!(cpp_file, "{}->", arg.name);
+              this_found = true;
+              break;
+            }
+          }
+          if !this_found {
+            panic!("Error: no this argument found\n{:?}", method);
+          }
+        }
+      }
+      write!(cpp_file, "{}(", method.cpp_method.name);
+
+      let mut filled_arguments = vec![];
+      for i in 0..method.cpp_method.arguments.len() as i8 {
+        let mut c_argument = None;
+        for arg in &method.c_signature.arguments {
+          if let CFunctionArgumentCppEquivalent::Argument(index) = arg.cpp_equivalent {
+            if index == i {
+              c_argument = Some(arg.clone());
+              break;
+            }
+          }
+        }
+        if let Some(c_argument) = c_argument {
+          let conversion_prefix = match c_argument.argument_type.conversion {
+            CppToCTypeConversion::ValueToPointer | CppToCTypeConversion::ReferenceToPointer => "*",
+            CppToCTypeConversion::NoConversion => "",
+          };
+          filled_arguments.push(format!("{}{}", conversion_prefix, c_argument.name));
+        } else {
+          panic!("Error: no positional argument found\n{:?}", method);
+        }
+      }
+
+
+      write!(cpp_file, "{}){};\n", filled_arguments.into_iter().join(", "), return_type_conversion_suffix);
 
       write!(cpp_file, "}}\n\n"); // method end
 
