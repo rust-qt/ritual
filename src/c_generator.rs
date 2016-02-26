@@ -4,7 +4,6 @@ use std::fs::File;
 use std::io::Write;
 
 pub struct CGenerator {
-
   qtcw_path: PathBuf,
   all_data: Vec<CppHeaderData>,
   sized_classes: Vec<String>,
@@ -14,7 +13,11 @@ pub struct CGenerator {
 
 impl CGenerator {
   pub fn new(all_data: Vec<CppHeaderData>, qtcw_path: PathBuf) -> Self {
-    CGenerator { all_data: all_data, qtcw_path: qtcw_path, sized_classes: Vec::new() }
+    CGenerator {
+      all_data: all_data,
+      qtcw_path: qtcw_path,
+      sized_classes: Vec::new(),
+    }
   }
 
   pub fn generate_all(&mut self) {
@@ -24,7 +27,9 @@ impl CGenerator {
 
       // white list for now
       if let Some(ref class_name) = data.class_name {
-        if class_name != "QPoint" { continue; }
+        if class_name != "QPoint" {
+          continue;
+        }
       } else {
         continue;
       }
@@ -41,8 +46,7 @@ impl CGenerator {
 
 
 
-  pub fn generate_size_definer_class_list(&self)
-  -> Vec<String> {
+  pub fn generate_size_definer_class_list(&self) -> Vec<String> {
     let mut sized_classes = Vec::new();
     // TODO: black magic happens here
     let blacklist = vec!["QFlags", "QWinEventNotifier", "QPair", "QGlobalStatic"];
@@ -56,14 +60,14 @@ impl CGenerator {
       if item.involves_templates() {
         // TODO: support template classes!
         println!("Ignoring {} because it involves templates.",
-        item.include_file);
+                 item.include_file);
         continue;
       }
       if let Some(ref class_name) = item.class_name {
         if class_name.contains("::") {
           // TODO: support nested classes!
           println!("Ignoring {} because it is a nested class.",
-          item.include_file);
+                   item.include_file);
           continue;
         }
         if blacklist.iter().find(|&&x| x == class_name.as_ref() as &str).is_some() {
@@ -78,6 +82,29 @@ impl CGenerator {
     }
     println!("Done.\n");
     sized_classes
+  }
+
+  fn write_struct_declaration(&self,
+                              h_file: &mut File,
+                              class_name: &String,
+                              full_declaration: bool) {
+    // write C struct definition
+    write!(h_file, "#ifndef __cplusplus // if C\n").unwrap();
+    if full_declaration && self.sized_classes.iter().find(|x| *x == class_name).is_some() {
+      write!(h_file,
+             "struct QTCW_{} {{ char space[QTCW_sizeof_{}]; }};\n",
+             class_name,
+             class_name)
+        .unwrap();
+    } else {
+      write!(h_file, "struct QTCW_{};\n", class_name).unwrap();
+    }
+    write!(h_file,
+           "typedef struct QTCW_{} {};\n",
+           class_name,
+           class_name)
+      .unwrap();
+    write!(h_file, "#endif\n\n").unwrap();
   }
 
 
@@ -99,10 +126,10 @@ impl CGenerator {
     write!(cpp_file, "#include \"qtcw_{}.h\"\n", data.include_file).unwrap();
     let include_guard_name = format!("QTCW_{}_H", data.include_file.to_uppercase());
     write!(h_file,
-    "#ifndef {}\n#define {}\n\n",
-    include_guard_name,
-    include_guard_name)
-    .unwrap();
+           "#ifndef {}\n#define {}\n\n",
+           include_guard_name,
+           include_guard_name)
+      .unwrap();
 
     write!(h_file, "#include \"qtcw_global.h\"\n\n").unwrap();
 
@@ -112,39 +139,62 @@ impl CGenerator {
     write!(h_file, "#endif\n\n").unwrap();
 
     if let Some(ref class_name) = data.class_name {
-      // write C struct definition
-      write!(h_file, "#ifndef __cplusplus // if C\n").unwrap();
-      if self.sized_classes.iter().find(|&x| x == class_name).is_some() {
-        write!(h_file,
-        "struct QTCW_{} {{ char space[QTCW_sizeof_{}]; }};\n",
-        class_name,
-        class_name)
-        .unwrap();
-      } else {
-        write!(h_file, "struct QTCW_{};\n", class_name).unwrap();
-
-      }
-      write!(h_file,
-      "typedef struct QTCW_{} {};\n",
-      class_name,
-      class_name)
-      .unwrap();
-      write!(h_file, "#endif\n\n").unwrap();
+      self.write_struct_declaration(&mut h_file, class_name, true);
 
     } else {
       println!("Not a class header. Wrapper struct is not generated.");
     }
 
     write!(h_file, "QTCW_EXTERN_C_BEGIN\n\n").unwrap();
+    let methods = data.process_methods();
+    {
+      let mut forward_declared_classes = vec![];
+      let mut check_type_for_forward_declaration = |t: &CTypeExtended| {
+        if t.is_primitive {
+          return; //it's built-in type
+        }
+        if let Some(ref class_name) = data.class_name {
+          if &t.c_type.base == class_name {
+            return; //it's main type for this header
+          }
+        }
+        if forward_declared_classes.iter().find(|&x| x == &t.c_type.base).is_some() {
+          return; //already declared
+        }
+        if !t.c_type.is_pointer {
+          println!("Warning: value of non-primitive type encountered ({:?})",
+                   t.c_type);
+        }
+        self.write_struct_declaration(&mut h_file, &t.c_type.base, false);
+        forward_declared_classes.push(t.c_type.base.clone());
+      };
 
-    for method in data.process_methods() {
+      for method in &methods {
+        check_type_for_forward_declaration(&method.c_signature.return_type);
+        for arg in &method.c_signature.arguments {
+          check_type_for_forward_declaration(&arg.argument_type);
+        }
+      }
+    }
+
+
+    for method in &methods {
       println!("method:\n{:?}\n\n", method);
       write!(h_file,
-      "{} QTCW_EXPORT {}({});\n",
-      method.c_signature.return_type.c_type.to_c_code(),
-      method.c_name,
-      method.c_signature.arguments_to_c_code())
-      .unwrap();
+             "{} QTCW_EXPORT {}({});\n",
+             method.c_signature.return_type.c_type.to_c_code(),
+             method.c_name,
+             method.c_signature.arguments_to_c_code())
+        .unwrap();
+
+      write!(cpp_file,
+             "{} {}({}) {{\n",
+             method.c_signature.return_type.c_type.to_c_code(),
+             method.c_name,
+             method.c_signature.arguments_to_c_code())
+        .unwrap();
+
+      write!(cpp_file, "}}\n\n"); // method end
 
 
 

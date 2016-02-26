@@ -20,3 +20,7 @@ install(TARGETS qtcw LIBRARY DESTINATION lib)
 
 INSTALL(FILES ${headers} DESTINATION "include")
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/qtcw_sizes.h DESTINATION "include")
+
+if(${CMAKE_COMPILER_IS_GNUCXX})
+  set(CMAKE_CXX_FLAGS "-Wall -Wextra -Werror=return-type")
+endif()
