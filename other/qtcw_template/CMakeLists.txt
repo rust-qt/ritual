@@ -4,6 +4,7 @@ find_package(Qt5Core REQUIRED)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_BINARY_DIR})
 
 file(GLOB sources src/*.cpp)
+file(GLOB headers include/*.h)
 add_library(qtcw SHARED ${sources})
 target_link_libraries(qtcw Qt5::Core)
 
@@ -15,3 +16,7 @@ add_custom_target(
 add_dependencies(qtcw run_size_definer)
 add_definitions(-DQTCW_LIBRARY)
 
+install(TARGETS qtcw LIBRARY DESTINATION lib)
+
+INSTALL(FILES ${headers} DESTINATION "include")
+INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/qtcw_sizes.h DESTINATION "include")

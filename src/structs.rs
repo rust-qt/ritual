@@ -119,6 +119,8 @@ impl CppType {
       } else if self.base == "quint8" {
         return Some(CType::new("int8_t".to_string(), false));
         // TODO: more type conversions
+      } else if self.base == "qreal" {
+        return Some(CType::new("double".to_string(), false));
       } else {
         // need to convert to pointer anyway
         return Some(CType::new(self.base.clone(), true));
