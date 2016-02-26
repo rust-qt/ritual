@@ -440,7 +440,8 @@ impl CppMethod {
     result
   }
 
-
+  //TODO: store flag to indicate whether allocation_place is a significant factor
+  //(signatures are the same for destructor)
   pub fn c_signature(&self, allocation_place: AllocationPlace) -> Option<CFunctionSignature> {
     if self.is_variable || self.allows_variable_arguments {
       // no complicated cases support for now
@@ -451,7 +452,7 @@ impl CppMethod {
       return_type: CTypeExtended::void(),
     };
     if let CppMethodScope::Class(ref class_name) = self.scope {
-      if !self.is_static {
+      if !self.is_static && !self.is_constructor {
         r.arguments.push(CFunctionArgument {
           name: "self".to_string(),
           argument_type: CTypeExtended {
@@ -499,6 +500,29 @@ impl CppMethod {
 }
 
 impl CppHeaderData {
+
+  pub fn ensure_explicit_destructor(&mut self) {
+    if let Some(ref class_name) = self.class_name {
+      if self.methods.iter().find(|x| x.is_destructor).is_none() {
+        self.methods.push(CppMethod {
+          name: format!("~{}", class_name),
+          scope: CppMethodScope::Class(class_name.clone()),
+          is_virtual: false, //TODO: destructors may be virtual
+          is_const: false,
+          is_static: false,
+          return_type: None,
+          is_constructor: false,
+          is_destructor: true,
+          operator: None,
+          is_variable: false,
+          arguments: vec![],
+          allows_variable_arguments: false,
+        });
+      }
+    }
+  }
+
+
   pub fn involves_templates(&self) -> bool {
     for method in &self.methods {
       if let Some(ref t) = method.return_type {
@@ -587,7 +611,6 @@ impl CppHeaderData {
         panic!("all type caption strategies have failed!");
       }
     }
-
     r
   }
 }

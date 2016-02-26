@@ -45,7 +45,10 @@ fn main() {
     r.push("doc_parse_result.json");
     r
   };
-  let parse_result = read_parse_result::do_it(&parse_result_path);
+  let mut parse_result = read_parse_result::do_it(&parse_result_path);
+  for data in &mut parse_result {
+    data.ensure_explicit_destructor();
+  }
 
   let qtcw_path = {
     let mut r = output_dir.clone();
