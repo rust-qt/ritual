@@ -55,25 +55,8 @@ fn main() {
   remove_dir(&qtcw_path);
   copy_dir(&qtcw_template_dir, &qtcw_path);
 
-  let sized_classes = c_generator::generate_size_definer_class_list(&parse_result, &qtcw_path);
-
-  for data in parse_result {
-
-    // white list for now
-    if let Some(ref class_name) = data.class_name {
-      if class_name != "QPoint" { continue; }
-    } else {
-      continue;
-    }
-    c_generator::generate_one(&data, &qtcw_path, &sized_classes);
-
-  }
-
-
-
-
-
-
+  let mut g = c_generator::CGenerator::new(parse_result, qtcw_path);
+  g.generate_all();
 
   // println!("data: {:?}", parse_result);
 }
