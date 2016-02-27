@@ -192,105 +192,122 @@ impl CGenerator {
              method.c_signature.arguments_to_c_code())
         .unwrap();
 
-
-      if method.c_signature.return_type != CTypeExtended::void() {
-        write!(cpp_file, "return ");
-      }
-      let mut return_type_conversion_prefix = "".to_string();
-      let mut return_type_conversion_suffix = "".to_string();
-      match method.c_signature.return_type.conversion {
-        CppToCTypeConversion::NoConversion => {}
-        CppToCTypeConversion::ValueToPointer => {
-          match method.allocation_place {
-            AllocationPlace::Stack => {
-              panic!("stack allocated wrappers are expected to return void!")
-            }
-            AllocationPlace::Heap => {
-              // constructors are said to return values in parse result,
-              // but in reality we use `new` which returns a pointer,
-              // so no conversion is necessary for constructors.
-              if !method.cpp_method.is_constructor {
-                return_type_conversion_prefix = format!("new {}(",
-                                                        method.c_signature.return_type.c_type.base);
-                return_type_conversion_suffix = ")".to_string();
-              }
-            }
-          }
-        }
-        CppToCTypeConversion::ReferenceToPointer => {
-          return_type_conversion_prefix = "&".to_string();
-        }
-      }
-      if method.allocation_place == AllocationPlace::Stack && !method.cpp_method.is_constructor {
+      if method.cpp_method.is_destructor && method.allocation_place == AllocationPlace::Heap {
         if let Some(arg) = method.c_signature.arguments.iter().find(|x| {
-          x.cpp_equivalent == CFunctionArgumentCppEquivalent::ReturnValue
+          x.cpp_equivalent == CFunctionArgumentCppEquivalent::This
         }) {
-          return_type_conversion_prefix = format!("new({}) {}(", arg.name, arg.argument_type.c_type.base);
-          return_type_conversion_suffix = ")".to_string();
-
+          write!(cpp_file, "delete {};\n", arg.name);
+        } else {
+          panic!("Error: no this argument found\n{:?}", method);
         }
-      }
+      } else {
 
-      write!(cpp_file, "{}", return_type_conversion_prefix);
-
-      if method.cpp_method.is_constructor {
-        if let CppMethodScope::Class(ref class_name) = method.cpp_method.scope {
-          match method.allocation_place {
-            AllocationPlace::Stack => {
-              if let Some(arg) = method.c_signature.arguments.iter().find(|x| {
-                x.cpp_equivalent == CFunctionArgumentCppEquivalent::ReturnValue
-              }) {
-                write!(cpp_file, "new({}) {}", arg.name, class_name);
-              } else {
-                panic!("no return value equivalent argument found");
+        if method.c_signature.return_type != CTypeExtended::void() {
+          write!(cpp_file, "return ");
+        }
+        let mut return_type_conversion_prefix = "".to_string();
+        let mut return_type_conversion_suffix = "".to_string();
+        match method.c_signature.return_type.conversion {
+          CppToCTypeConversion::NoConversion => {}
+          CppToCTypeConversion::ValueToPointer => {
+            match method.allocation_place {
+              AllocationPlace::Stack => {
+                panic!("stack allocated wrappers are expected to return void!")
+              }
+              AllocationPlace::Heap => {
+                // constructors are said to return values in parse result,
+                // but in reality we use `new` which returns a pointer,
+                // so no conversion is necessary for constructors.
+                if !method.cpp_method.is_constructor {
+                  return_type_conversion_prefix = format!("new {}(",
+                                                          method.c_signature
+                                                                .return_type
+                                                                .c_type
+                                                                .base);
+                  return_type_conversion_suffix = ")".to_string();
+                }
               }
             }
-            AllocationPlace::Heap => {
-              write!(cpp_file, "new {}", class_name);
-            }
           }
-        } else {
-          panic!("constructor not in class scope");
+          CppToCTypeConversion::ReferenceToPointer => {
+            return_type_conversion_prefix = "&".to_string();
+          }
+        }
+        if method.allocation_place == AllocationPlace::Stack && !method.cpp_method.is_constructor {
+          if let Some(arg) = method.c_signature.arguments.iter().find(|x| {
+            x.cpp_equivalent == CFunctionArgumentCppEquivalent::ReturnValue
+          }) {
+            return_type_conversion_prefix = format!("new({}) {}(",
+                                                    arg.name,
+                                                    arg.argument_type.c_type.base);
+            return_type_conversion_suffix = ")".to_string();
+
+          }
         }
 
+        write!(cpp_file, "{}", return_type_conversion_prefix);
 
-      } else {
-        if let CppMethodScope::Class(ref class_name) = method.cpp_method.scope {
-          if method.cpp_method.is_static {
-            write!(cpp_file, "{}::", class_name);
+        if method.cpp_method.is_constructor {
+          if let CppMethodScope::Class(ref class_name) = method.cpp_method.scope {
+            match method.allocation_place {
+              AllocationPlace::Stack => {
+                if let Some(arg) = method.c_signature.arguments.iter().find(|x| {
+                  x.cpp_equivalent == CFunctionArgumentCppEquivalent::ReturnValue
+                }) {
+                  write!(cpp_file, "new({}) {}", arg.name, class_name);
+                } else {
+                  panic!("no return value equivalent argument found");
+                }
+              }
+              AllocationPlace::Heap => {
+                write!(cpp_file, "new {}", class_name);
+              }
+            }
           } else {
-            if let Some(arg) = method.c_signature.arguments.iter().find(|x| {
-              x.cpp_equivalent == CFunctionArgumentCppEquivalent::This
-            }) {
-              write!(cpp_file, "{}->", arg.name);
+            panic!("constructor not in class scope");
+          }
+
+
+        } else {
+          if let CppMethodScope::Class(ref class_name) = method.cpp_method.scope {
+            if method.cpp_method.is_static {
+              write!(cpp_file, "{}::", class_name);
             } else {
-              panic!("Error: no this argument found\n{:?}", method);
+              if let Some(arg) = method.c_signature.arguments.iter().find(|x| {
+                x.cpp_equivalent == CFunctionArgumentCppEquivalent::This
+              }) {
+                write!(cpp_file, "{}->", arg.name);
+              } else {
+                panic!("Error: no this argument found\n{:?}", method);
+              }
             }
           }
+          write!(cpp_file, "{}", method.cpp_method.name);
         }
-        write!(cpp_file, "{}", method.cpp_method.name);
-      }
 
-      let mut filled_arguments = vec![];
-      for i in 0..method.cpp_method.arguments.len() as i8 {
-        if let Some(c_argument) = method.c_signature.arguments.iter().find(|x| {
-          x.cpp_equivalent == CFunctionArgumentCppEquivalent::Argument(i)
-        }) {
-          let conversion_prefix = match c_argument.argument_type.conversion {
-            CppToCTypeConversion::ValueToPointer | CppToCTypeConversion::ReferenceToPointer => "*",
-            CppToCTypeConversion::NoConversion => "",
-          };
-          filled_arguments.push(format!("{}{}", conversion_prefix, c_argument.name));
-        } else {
-          panic!("Error: no positional argument found\n{:?}", method);
+        let mut filled_arguments = vec![];
+        for i in 0..method.cpp_method.arguments.len() as i8 {
+          if let Some(c_argument) = method.c_signature.arguments.iter().find(|x| {
+            x.cpp_equivalent == CFunctionArgumentCppEquivalent::Argument(i)
+          }) {
+            let conversion_prefix = match c_argument.argument_type.conversion {
+              CppToCTypeConversion::ValueToPointer | CppToCTypeConversion::ReferenceToPointer => {
+                "*"
+              }
+              CppToCTypeConversion::NoConversion => "",
+            };
+            filled_arguments.push(format!("{}{}", conversion_prefix, c_argument.name));
+          } else {
+            panic!("Error: no positional argument found\n{:?}", method);
+          }
         }
+
+
+        write!(cpp_file,
+               "({}){};\n",
+               filled_arguments.into_iter().join(", "),
+               return_type_conversion_suffix);
       }
-
-
-      write!(cpp_file,
-             "({}){};\n",
-             filled_arguments.into_iter().join(", "),
-             return_type_conversion_suffix);
 
       write!(cpp_file, "}}\n\n"); // method end
 

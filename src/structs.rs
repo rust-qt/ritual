@@ -113,6 +113,13 @@ pub enum AllocationPlace {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum AllocationPlaceImportance {
+  Important,
+  NotImportant,
+}
+
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppMethodWithCSignature {
   pub cpp_method: CppMethod,
   pub allocation_place: AllocationPlace,
@@ -361,18 +368,34 @@ impl CFunctionSignature {
 
 
 impl CppMethodWithCSignature {
-  fn from_cpp_method(cpp_method: &CppMethod,
-                     allocation_place: AllocationPlace)
-                     -> Option<CppMethodWithCSignature> {
-    match cpp_method.c_signature(allocation_place.clone()) {
-      Some(c_signature) => {
-        Some(CppMethodWithCSignature {
+  fn from_cpp_method(cpp_method: &CppMethod)
+                     -> (Option<CppMethodWithCSignature>,
+                         Option<CppMethodWithCSignature>) {
+    match cpp_method.c_signature(AllocationPlace::Heap) {
+      Some((c_signature, importance)) => {
+        let result1 = Some(CppMethodWithCSignature {
           cpp_method: cpp_method.clone(),
-          allocation_place: allocation_place,
+          allocation_place: AllocationPlace::Heap,
           c_signature: c_signature,
-        })
+        });
+        match importance {
+          AllocationPlaceImportance::Important => {
+            let result2 = match cpp_method.c_signature(AllocationPlace::Stack) {
+              Some((c_signature2, _)) => {
+                Some(CppMethodWithCSignature {
+                  cpp_method: cpp_method.clone(),
+                  allocation_place: AllocationPlace::Stack,
+                  c_signature: c_signature2,
+                })
+              }
+              None => None,
+            };
+            (result1, result2)
+          }
+          AllocationPlaceImportance::NotImportant => (result1, None),
+        }
       }
-      None => None,
+      None => (None, None),
     }
   }
 
@@ -440,13 +463,16 @@ impl CppMethod {
     result
   }
 
-  //TODO: store flag to indicate whether allocation_place is a significant factor
-  //(signatures are the same for destructor)
-  pub fn c_signature(&self, allocation_place: AllocationPlace) -> Option<CFunctionSignature> {
+  // TODO: store flag to indicate whether allocation_place is a significant factor
+  // (signatures are the same for destructor)
+  pub fn c_signature(&self,
+                     allocation_place: AllocationPlace)
+                     -> Option<(CFunctionSignature, AllocationPlaceImportance)> {
     if self.is_variable || self.allows_variable_arguments {
       // no complicated cases support for now
       return None;
     }
+    let mut allocation_place_importance = AllocationPlaceImportance::NotImportant;
     let mut r = CFunctionSignature {
       arguments: Vec::new(),
       return_type: CTypeExtended::void(),
@@ -482,12 +508,15 @@ impl CppMethod {
     if let Some(return_type) = self.real_return_type() {
       match return_type.to_c_type() {
         Some(c_type) => {
-          if allocation_place == AllocationPlace::Stack && return_type.is_stack_allocated_struct() {
-            r.arguments.push(CFunctionArgument {
-              name: "output".to_string(),
-              argument_type: c_type,
-              cpp_equivalent: CFunctionArgumentCppEquivalent::ReturnValue,
-            });
+          if return_type.is_stack_allocated_struct() {
+            allocation_place_importance = AllocationPlaceImportance::Important;
+            if allocation_place == AllocationPlace::Stack {
+              r.arguments.push(CFunctionArgument {
+                name: "output".to_string(),
+                argument_type: c_type,
+                cpp_equivalent: CFunctionArgumentCppEquivalent::ReturnValue,
+              });
+            }
           } else {
             r.return_type = c_type;
           }
@@ -495,19 +524,21 @@ impl CppMethod {
         None => return None,
       }
     }
-    Some(r)
+    if self.is_destructor {
+      allocation_place_importance = AllocationPlaceImportance::Important;
+    }
+    Some((r, allocation_place_importance))
   }
 }
 
 impl CppHeaderData {
-
   pub fn ensure_explicit_destructor(&mut self) {
     if let Some(ref class_name) = self.class_name {
       if self.methods.iter().find(|x| x.is_destructor).is_none() {
         self.methods.push(CppMethod {
           name: format!("~{}", class_name),
           scope: CppMethodScope::Class(class_name.clone()),
-          is_virtual: false, //TODO: destructors may be virtual
+          is_virtual: false, // TODO: destructors may be virtual
           is_const: false,
           is_static: false,
           return_type: None,
@@ -553,25 +584,20 @@ impl CppHeaderData {
       };
 
       for ref method in &self.methods {
-        if let Some(result_stack) =
-               CppMethodWithCSignature::from_cpp_method(&method, AllocationPlace::Stack) {
-          if let Some(result_heap) =
-                 CppMethodWithCSignature::from_cpp_method(&method, AllocationPlace::Heap) {
-            if result_stack.c_signature == result_heap.c_signature {
-              let c_base_name = result_stack.c_base_name();
-              insert_into_hash(&mut hash1, c_base_name, result_stack);
-            } else {
-              let mut stack_name = result_stack.c_base_name();
-              let mut heap_name = result_heap.c_base_name();
-              if stack_name == heap_name {
-                stack_name = "SA_".to_string() + &stack_name;
-                heap_name = "HA_".to_string() + &heap_name;
-              }
-              insert_into_hash(&mut hash1, stack_name, result_stack);
-              insert_into_hash(&mut hash1, heap_name, result_heap);
+        let (result_heap, result_stack) = CppMethodWithCSignature::from_cpp_method(&method);
+        if let Some(result_heap) = result_heap {
+          if let Some(result_stack) = result_stack {
+            let mut stack_name = result_stack.c_base_name();
+            let mut heap_name = result_heap.c_base_name();
+            if stack_name == heap_name {
+              stack_name = "SA_".to_string() + &stack_name;
+              heap_name = "HA_".to_string() + &heap_name;
             }
+            insert_into_hash(&mut hash1, stack_name, result_stack);
+            insert_into_hash(&mut hash1, heap_name, result_heap);
           } else {
-            panic!("unexpected error: stack strategy success but heap strategy fail");
+            let c_base_name = result_heap.c_base_name();
+            insert_into_hash(&mut hash1, c_base_name, result_heap);
           }
         } else {
           println!("Unable to produce C function for method: {:?}", method);
