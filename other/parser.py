@@ -6,6 +6,12 @@ import glob
 import sys
 import json
 
+
+def fix_nested_types(class_name, t):
+  for name in ["iterator", "const_iterator"]:
+    if t["base"] == name:
+      t["base"] = class_name + "::" + t["base"]
+
 def strip_tags(soup):
   return u' '.join(soup.findAll(text=True))
 
@@ -26,9 +32,9 @@ def parse_type(string):
   elif string.endswith("&"):
     result["reference"] = True
     string = string[:-1].strip()
-  if string.startswith("const"):
+  if string.startswith("const "):
     result["const"] = True
-    string = string[len("const"):].strip()
+    string = string[len("const "):].strip()
   result["base"] = string
   if result["base"] == "T":
     result["template"] = True
@@ -84,6 +90,8 @@ def parse_methods(table, class_name, section_attrs):
       if not data["return_type"]:
         print "Unsupported type encountered. Method is skipped:\n%s\n" % signature_string
         continue
+      if class_name:
+        fix_nested_types(class_name, data["return_type"])
     if re.match("^\\w+$", signature_string):
       data["name"] = signature_string
       data["variable"] = True
@@ -110,6 +118,9 @@ def parse_methods(table, class_name, section_attrs):
           if not arg:
             argument_failed = True
             break
+
+          if class_name and arg["type"]:
+            fix_nested_types(class_name, arg["type"])
           data["arguments"].append(arg)
       if argument_failed:
         print "Unsupported type encountered. Method is skipped:\n%s\n" % signature_string

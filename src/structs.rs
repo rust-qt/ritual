@@ -33,14 +33,23 @@ pub struct CppType {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CType {
   pub is_pointer: bool,
+  pub is_const: bool,
   pub base: String,
 }
 
+
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum CppToCTypeConversion {
-  NoConversion,
+pub enum IndirectionChange {
+  NoChange,
   ValueToPointer,
   ReferenceToPointer,
+}
+
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CppToCTypeConversion {
+  pub indirection_change: IndirectionChange,
+  pub renamed: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -100,6 +109,36 @@ enum ArgumentCaptionStrategy {
   TypeOnly,
   TypeAndName,
 }
+
+impl ArgumentCaptionStrategy {
+  fn all() -> Vec<Self> {
+    vec![ArgumentCaptionStrategy::NameOnly,
+         ArgumentCaptionStrategy::TypeOnly,
+         ArgumentCaptionStrategy::TypeAndName]
+  }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+enum MethodCaptionStrategy {
+  ArgumentsOnly(ArgumentCaptionStrategy),
+  ConstOnly,
+  ConstAndArguments(ArgumentCaptionStrategy),
+}
+
+impl MethodCaptionStrategy {
+  fn all() -> Vec<Self> {
+    let mut r = vec![];
+    for i in ArgumentCaptionStrategy::all() {
+      r.push(MethodCaptionStrategy::ArgumentsOnly(i));
+    }
+    r.push(MethodCaptionStrategy::ConstOnly);
+    for i in ArgumentCaptionStrategy::all() {
+      r.push(MethodCaptionStrategy::ConstAndArguments(i));
+    }
+    r
+  }
+}
+
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CFunctionSignature {
@@ -242,7 +281,7 @@ impl CTypeExtended {
     CTypeExtended {
       c_type: CType::void(),
       is_primitive: true,
-      conversion: CppToCTypeConversion::NoConversion,
+      conversion: CppToCTypeConversion { indirection_change: IndirectionChange::NoChange, renamed: false }
     }
   }
 }
@@ -253,31 +292,67 @@ impl CppType {
       return None;
     }
     let mut result = CTypeExtended::void();
+    result.c_type.is_const = self.is_const;
+    if !self.is_pointer && !self.is_reference {
+      // "const Rect" return type should not be translated to const pointer
+      result.c_type.is_const = false;
+    }
     if self.is_pointer {
       result.c_type.is_pointer = true;
     }
     if self.is_reference {
       result.c_type.is_pointer = true;
-      result.conversion = CppToCTypeConversion::ReferenceToPointer;
+      result.conversion.indirection_change = IndirectionChange::ReferenceToPointer;
     }
 
-    if self.base == "void" || self.base == "int" || self.base == "float" ||
-       self.base == "double" || self.base == "bool" {
+    let good_primitive_types = vec!["void", "float", "double", "bool", "int8_t", "uint8_t", "int16_t", "uint16_t", "int32_t", "uint32_t", "int64_t", "uint64_t"];
+    let mut aliased_primitive_types = HashMap::new();
+
+    aliased_primitive_types.insert("qint8", "int8_t");
+    aliased_primitive_types.insert("quint8", "uint8_t");
+    aliased_primitive_types.insert("qint16", "int16_t");
+    aliased_primitive_types.insert("quint16", "uint16_t");
+    aliased_primitive_types.insert("qint32", "int32_t");
+    aliased_primitive_types.insert("quint32", "uint32_t");
+    aliased_primitive_types.insert("qint64", "int64_t");
+    aliased_primitive_types.insert("quint64", "uint64_t");
+
+    aliased_primitive_types.insert("char", "int8_t");
+    aliased_primitive_types.insert("unsigned char", "uint8_t");
+    aliased_primitive_types.insert("uchar", "uint8_t");
+
+    aliased_primitive_types.insert("short", "int16_t");
+    aliased_primitive_types.insert("unsigned short", "uint16_t");
+    aliased_primitive_types.insert("ushort", "uint16_t");
+
+    aliased_primitive_types.insert("int", "int32_t");
+    aliased_primitive_types.insert("unsigned int", "uint32_t");
+    aliased_primitive_types.insert("uint", "uint32_t");
+
+    aliased_primitive_types.insert("qlonglong", "int64_t");
+    aliased_primitive_types.insert("qulonglong", "uint64_t");
+    aliased_primitive_types.insert("long", "int64_t");
+    aliased_primitive_types.insert("unsigned long", "int64_t");
+    aliased_primitive_types.insert("ulong", "uint64_t");
+    // TODO: more type conversions
+
+
+    if good_primitive_types.iter().find(|&x| x == &self.base).is_some() {
       result.is_primitive = true;
       result.c_type.base = self.base.clone();
-    } else if self.base == "quint8" {
+    } else if let Some(found) = aliased_primitive_types.get(self.base.as_ref() as &str) {
       result.is_primitive = true;
-      result.c_type.base = "int8_t".to_string();
-    } else if self.base == "qreal" {
-      result.is_primitive = true;
-      result.c_type.base = "double".to_string();
+      result.c_type.base = found.to_string();
     } else {
-      // TODO: more type conversions
       result.is_primitive = false;
       result.c_type.base = self.base.clone();
+      if result.c_type.base.find("::").is_some() {
+        result.c_type.base = result.c_type.base.replace("::", "_");
+        result.conversion.renamed = true;
+      }
       result.c_type.is_pointer = true;
       if !self.is_pointer && !self.is_reference {
-        result.conversion = CppToCTypeConversion::ValueToPointer;
+        result.conversion.indirection_change = IndirectionChange::ValueToPointer;
       }
     }
     Some(result)
@@ -293,20 +368,25 @@ impl CType {
     CType {
       base: "void".to_string(),
       is_pointer: false,
+      is_const: false,
     }
   }
-  fn new(base: String, is_pointer: bool) -> CType {
+  fn new(base: String, is_pointer: bool, is_const: bool) -> CType {
     CType {
       base: base,
       is_pointer: is_pointer,
+      is_const: is_const,
     }
   }
 
   fn caption(&self) -> String {
     let mut r = self.base.clone();
-    // if self.is_pointer {
-    //  r = r + &("_ptr".to_string());
-    // }
+    if self.is_pointer {
+      r = r + &("_ptr".to_string());
+    }
+    if self.is_const {
+      r = "const_".to_string() + &r;
+    }
     r
   }
 
@@ -314,6 +394,9 @@ impl CType {
     let mut r = self.base.clone();
     if self.is_pointer {
       r = r + &("*".to_string());
+    }
+    if self.is_const {
+      r = "const ".to_string() + &r;
     }
     r
   }
@@ -422,6 +505,30 @@ impl CppMethodWithCSignature {
     };
     scope_prefix + &method_name
   }
+
+  fn caption(&self, strategy: MethodCaptionStrategy) -> String {
+    match strategy {
+      MethodCaptionStrategy::ArgumentsOnly(s) => self.c_signature.caption(s),
+      MethodCaptionStrategy::ConstOnly => {
+        if self.cpp_method.is_const {
+          "const".to_string()
+        } else {
+          "".to_string()
+        }
+      }
+      MethodCaptionStrategy::ConstAndArguments(s) => {
+        let r = if self.cpp_method.is_const {
+          "const_".to_string()
+        } else {
+          "".to_string()
+        };
+        r + &self.c_signature.caption(s)
+      }
+    }
+
+
+
+  }
 }
 
 impl CppAndCMethod {
@@ -464,13 +571,13 @@ impl CppMethod {
     result
   }
 
-  // TODO: store flag to indicate whether allocation_place is a significant factor
-  // (signatures are the same for destructor)
   pub fn c_signature(&self,
                      allocation_place: AllocationPlace)
                      -> Option<(CFunctionSignature, AllocationPlaceImportance)> {
     if self.is_variable || self.allows_variable_arguments {
       // no complicated cases support for now
+      // TODO: return Err
+      println!("Variable arguments are not supported");
       return None;
     }
     let mut allocation_place_importance = AllocationPlaceImportance::NotImportant;
@@ -486,9 +593,10 @@ impl CppMethod {
             c_type: CType {
               base: class_name.clone(),
               is_pointer: true,
+              is_const: self.is_const,
             },
             is_primitive: false,
-            conversion: CppToCTypeConversion::NoConversion,
+            conversion: CppToCTypeConversion { indirection_change: IndirectionChange::NoChange, renamed: false }
           },
           cpp_equivalent: CFunctionArgumentCppEquivalent::This,
         });
@@ -503,7 +611,10 @@ impl CppMethod {
             cpp_equivalent: CFunctionArgumentCppEquivalent::Argument(index as i8),
           });
         }
-        None => return None,
+        None => {
+          println!("Can't convert type to C: {:?}", arg.argument_type);
+          return None;
+        }
       }
     }
     if let Some(return_type) = self.real_return_type() {
@@ -616,12 +727,11 @@ impl CppHeaderData {
         continue;
       }
       let mut found_strategy = None;
-      for strategy in vec![ArgumentCaptionStrategy::NameOnly,
-                           ArgumentCaptionStrategy::TypeOnly,
-                           ArgumentCaptionStrategy::TypeAndName] {
+      for strategy in MethodCaptionStrategy::all() {
         let mut type_captions: Vec<_> = values.iter()
-                                              .map(|x| x.c_signature.caption(strategy.clone()))
+                                              .map(|x| x.caption(strategy.clone()))
                                               .collect();
+        // println!("test1 {:?}", type_captions);
         type_captions.sort();
         type_captions.dedup();
         if type_captions.len() == values.len() {
@@ -631,14 +741,20 @@ impl CppHeaderData {
       }
       if let Some(strategy) = found_strategy {
         for x in values {
-          let caption = x.c_signature.caption(strategy.clone());
+          let caption = x.caption(strategy.clone());
           r.push(CppAndCMethod::new(x,
                                     self.include_file.clone() + &("_".to_string()) + &key +
-                                    &("_".to_string()) +
+                                    &((if caption.is_empty() {
+                                        ""
+                                      } else {
+                                        "_"
+                                      })
+                                      .to_string()) +
                                     &caption));
         }
       } else {
-        panic!("all type caption strategies have failed!");
+        panic!("all type caption strategies have failed! Involved functions: \n{:?}",
+               values);
       }
     }
     r.sort_by(|a, b| a.cpp_method.original_index.cmp(&b.cpp_method.original_index));

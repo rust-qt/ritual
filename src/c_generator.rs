@@ -41,6 +41,8 @@ impl CGenerator {
 
 
   pub fn generate_size_definer_class_list(&self) -> Vec<String> {
+    let show_output = false;
+
     let mut sized_classes = Vec::new();
     // TODO: black magic happens here
     let blacklist = vec!["QFlags", "QWinEventNotifier", "QPair", "QGlobalStatic"];
@@ -53,23 +55,31 @@ impl CGenerator {
     for item in &self.all_data {
       if item.involves_templates() {
         // TODO: support template classes!
-        println!("Ignoring {} because it involves templates.",
-                 item.include_file);
+        if show_output {
+          println!("Ignoring {} because it involves templates.",
+                   item.include_file);
+        }
         continue;
       }
       if let Some(ref class_name) = item.class_name {
         if class_name.contains("::") {
           // TODO: support nested classes!
-          println!("Ignoring {} because it is a nested class.",
-                   item.include_file);
+          if show_output {
+            println!("Ignoring {} because it is a nested class.",
+                     item.include_file);
+          }
           continue;
         }
         if blacklist.iter().find(|&&x| x == class_name.as_ref() as &str).is_some() {
-          println!("Ignoring {} because it is blacklisted.", item.include_file);
+          if show_output {
+            println!("Ignoring {} because it is blacklisted.", item.include_file);
+          }
           continue;
 
         }
-        println!("Requesting size definition for {}.", class_name);
+        if show_output {
+          println!("Requesting size definition for {}.", class_name);
+        }
         write!(h_file, "ADD({});\n", class_name).unwrap();
         sized_classes.push(class_name.clone());
       }
@@ -81,9 +91,9 @@ impl CGenerator {
   fn write_struct_declaration(&self,
                               h_file: &mut File,
                               class_name: &String,
-                              full_declaration: bool) {
+                              full_declaration: bool, only_c: bool) {
     // write C struct definition
-    write!(h_file, "#ifndef __cplusplus // if C\n").unwrap();
+    if only_c { write!(h_file, "#ifndef __cplusplus // if C\n").unwrap(); }
     if full_declaration && self.sized_classes.iter().find(|x| *x == class_name).is_some() {
       write!(h_file,
              "struct QTCW_{} {{ char space[QTCW_sizeof_{}]; }};\n",
@@ -98,7 +108,8 @@ impl CGenerator {
            class_name,
            class_name)
       .unwrap();
-    write!(h_file, "#endif\n\n").unwrap();
+    if only_c { write!(h_file, "#endif\n").unwrap() };
+    write!(h_file, "\n").unwrap();
   }
 
 
@@ -132,7 +143,7 @@ impl CGenerator {
     write!(h_file, "#endif\n\n").unwrap();
 
     if let Some(ref class_name) = data.class_name {
-      self.write_struct_declaration(&mut h_file, class_name, true);
+      self.write_struct_declaration(&mut h_file, class_name, true, true);
 
     } else {
       println!("Not a class header. Wrapper struct is not generated.");
@@ -158,7 +169,8 @@ impl CGenerator {
           println!("Warning: value of non-primitive type encountered ({:?})",
                    t.c_type);
         }
-        self.write_struct_declaration(&mut h_file, &t.c_type.base, false);
+        let only_c = !t.conversion.renamed;
+        self.write_struct_declaration(&mut h_file, &t.c_type.base, false, only_c);
         forward_declared_classes.push(t.c_type.base.clone());
       };
 
@@ -201,9 +213,9 @@ impl CGenerator {
         }
         let mut return_type_conversion_prefix = "".to_string();
         let mut return_type_conversion_suffix = "".to_string();
-        match method.c_signature.return_type.conversion {
-          CppToCTypeConversion::NoConversion => {}
-          CppToCTypeConversion::ValueToPointer => {
+        match method.c_signature.return_type.conversion.indirection_change {
+          IndirectionChange::NoChange => {}
+          IndirectionChange::ValueToPointer => {
             match method.allocation_place {
               AllocationPlace::Stack => {
                 panic!("stack allocated wrappers are expected to return void!")
@@ -223,7 +235,7 @@ impl CGenerator {
               }
             }
           }
-          CppToCTypeConversion::ReferenceToPointer => {
+          IndirectionChange::ReferenceToPointer => {
             return_type_conversion_prefix = "&".to_string();
           }
         }
@@ -284,11 +296,11 @@ impl CGenerator {
           if let Some(c_argument) = method.c_signature.arguments.iter().find(|x| {
             x.cpp_equivalent == CFunctionArgumentCppEquivalent::Argument(i)
           }) {
-            let conversion_prefix = match c_argument.argument_type.conversion {
-              CppToCTypeConversion::ValueToPointer | CppToCTypeConversion::ReferenceToPointer => {
+            let conversion_prefix = match c_argument.argument_type.conversion.indirection_change {
+              IndirectionChange::ValueToPointer | IndirectionChange::ReferenceToPointer => {
                 "*"
               }
-              CppToCTypeConversion::NoConversion => "",
+              IndirectionChange::NoChange => "",
             };
             filled_arguments.push(format!("{}{}", conversion_prefix, c_argument.name));
           } else {
