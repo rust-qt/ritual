@@ -47,7 +47,7 @@ impl CppFunctionArgument {
 }
 
 impl CppMethod {
-  fn from_json(value: &serde_json::Value, class_name: &Option<String>) -> Self {
+  fn from_json(value: &serde_json::Value, class_name: &Option<String>, index: i32) -> Self {
     //println!("{:?} {:?}", value, class_name);
     let value = value.as_object().unwrap();
     CppMethod {
@@ -108,6 +108,7 @@ impl CppMethod {
         Some(v) => v.as_boolean().unwrap(),
         None => false,
       },
+      original_index: index
     }
   }
 }
@@ -127,7 +128,8 @@ impl CppHeaderData {
                        .as_array()
                        .unwrap()
                        .into_iter()
-                       .map(|x| CppMethod::from_json(x, &class_name))
+                      .enumerate()
+                       .map(|(index, x)| CppMethod::from_json(x, &class_name, index as i32))
                        .collect();
     CppHeaderData {
       include_file: value.get("include_file").unwrap().as_string().unwrap().to_string(),

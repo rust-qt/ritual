@@ -77,6 +77,7 @@ pub struct CppMethod {
   pub is_variable: bool,
   pub arguments: Vec<CppFunctionArgument>,
   pub allows_variable_arguments: bool,
+  pub original_index: i32,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -548,6 +549,7 @@ impl CppHeaderData {
           is_variable: false,
           arguments: vec![],
           allows_variable_arguments: false,
+          original_index: 1000,
         });
       }
     }
@@ -637,6 +639,7 @@ impl CppHeaderData {
         panic!("all type caption strategies have failed!");
       }
     }
+    r.sort_by(|a, b| a.cpp_method.original_index.cmp(&b.cpp_method.original_index));
     r
   }
 }
