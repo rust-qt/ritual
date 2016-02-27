@@ -517,6 +517,8 @@ impl CppMethod {
                 argument_type: c_type,
                 cpp_equivalent: CFunctionArgumentCppEquivalent::ReturnValue,
               });
+            } else {
+              r.return_type = c_type;
             }
           } else {
             r.return_type = c_type;

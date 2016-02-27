@@ -22,18 +22,12 @@ impl CGenerator {
 
   pub fn generate_all(&mut self) {
     self.sized_classes = self.generate_size_definer_class_list();
+    let white_list = vec!["QPoint", "QRect", "QBitArray"];
+
     for data in &self.all_data {
-
-
-      // white list for now
-      if let Some(ref class_name) = data.class_name {
-        if class_name != "QPoint" {
-          continue;
-        }
-      } else {
+      if white_list.iter().find(|&&x| x == data.include_file).is_none() {
         continue;
       }
-
 
       self.generate_one(data);
 

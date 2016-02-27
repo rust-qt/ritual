@@ -20,6 +20,9 @@ def parse_type(string):
   if string.endswith("*"):
     result["pointer"] = True
     string = string[:-1].strip() # no, it's not a smile
+  elif string.endswith("&&"):
+    print "Double reference type encountered!"
+    return False
   elif string.endswith("&"):
     result["reference"] = True
     string = string[:-1].strip()
@@ -54,6 +57,8 @@ def parse_argument(string):
   result["name"] = re1[0]
   type_string = other_part[0:len(other_part)-len(result["name"])]
   result["type"] = parse_type(type_string)
+  if not result["type"]:
+    return False
   return result
 
 
@@ -76,6 +81,9 @@ def parse_methods(table, class_name, section_attrs):
       return_type_string = return_type_string[len("virtual"):].strip()
     if return_type_string:
       data["return_type"] = parse_type(return_type_string)
+      if not data["return_type"]:
+        print "Unsupported type encountered. Method is skipped:\n%s\n" % signature_string
+        continue
     if re.match("^\\w+$", signature_string):
       data["name"] = signature_string
       data["variable"] = True
@@ -91,13 +99,21 @@ def parse_methods(table, class_name, section_attrs):
       signature_string_parts2 = signature_string[name_end_index+1:].strip().rsplit(")", 1)
       if len(signature_string_parts2) != 2: raise Exception("Invalid signature syntax")
       data["arguments"] = []
+      argument_failed = False
       for part in signature_string_parts2[0].strip().split(','):
         if not part: continue
         part = part.strip()
         if part == "...":
           data["variable_arguments"] = True
         else:
-          data["arguments"].append(parse_argument(part))
+          arg = parse_argument(part)
+          if not arg:
+            argument_failed = True
+            break
+          data["arguments"].append(arg)
+      if argument_failed:
+        print "Unsupported type encountered. Method is skipped:\n%s\n" % signature_string
+        continue
       if signature_string_parts2[1].strip() == "const":
         data["const"] = True
 
@@ -193,10 +209,10 @@ def parse_doc(filename):
 #pp = pprint.PrettyPrinter()
 
 
-def parse():
+def parse(input_folder):
   all_data = []
   #for filename in ['../qt-doc/html/qtendian.html']:
-  for filename in glob.iglob('../qt-doc/html/*.html'):
+  for filename in glob.iglob(input_folder + '/*.html'):
     bad_endings = "members", "obsolete", "compat", "example", "pro", "cpp", "h", "ui"
     bad = False
     for ending in bad_endings:
@@ -212,11 +228,11 @@ def parse():
     #pp.pprint(result)
   return all_data
 
-if len(sys.argv) < 2:
-  print "No file name specified."
+if len(sys.argv) < 3:
+  print "Usage: parser doc_html_folder output_filename"
 else:
   print "Parsing documentation..."
-  parse_result = parse()
-  with open(sys.argv[1], "w") as f:
+  parse_result = parse(sys.argv[1])
+  with open(sys.argv[2], "w") as f:
     json.dump(parse_result, f, indent=2)
 
