@@ -281,12 +281,29 @@ impl CTypeExtended {
     CTypeExtended {
       c_type: CType::void(),
       is_primitive: true,
-      conversion: CppToCTypeConversion { indirection_change: IndirectionChange::NoChange, renamed: false }
+      conversion: CppToCTypeConversion {
+        indirection_change: IndirectionChange::NoChange,
+        renamed: false,
+      },
     }
   }
 }
 
 impl CppType {
+  pub fn to_cpp_code(&self) -> String {
+    let mut r = self.base.clone();
+    if self.is_pointer {
+      r = r + &("*".to_string());
+    }
+    if self.is_reference {
+      r = r + &("&".to_string());
+    }
+    if self.is_const {
+      r = "const ".to_string() + &r;
+    }
+    r
+  }
+
   fn to_c_type(&self) -> Option<CTypeExtended> {
     if self.is_template {
       return None;
@@ -305,44 +322,25 @@ impl CppType {
       result.conversion.indirection_change = IndirectionChange::ReferenceToPointer;
     }
 
-    let good_primitive_types = vec!["void", "float", "double", "bool", "int8_t", "uint8_t", "int16_t", "uint16_t", "int32_t", "uint32_t", "int64_t", "uint64_t"];
-    let mut aliased_primitive_types = HashMap::new();
+    let good_primitive_types = vec![
+      "void", "float", "double", "bool", "char",
+      "qint8", "quint8", "qint16", "quint16", "qint32", "quint32", "qint64", "quint64",
+      "qlonglong","qulonglong",
+      "signed char", "unsigned char", "uchar",
+      "short", "unsigned short", "ushort",
+      "int", "unsigned int", "uint",
+      "long", "unsigned long", "ulong"
+    ];
 
-    aliased_primitive_types.insert("qint8", "int8_t");
-    aliased_primitive_types.insert("quint8", "uint8_t");
-    aliased_primitive_types.insert("qint16", "int16_t");
-    aliased_primitive_types.insert("quint16", "uint16_t");
-    aliased_primitive_types.insert("qint32", "int32_t");
-    aliased_primitive_types.insert("quint32", "uint32_t");
-    aliased_primitive_types.insert("qint64", "int64_t");
-    aliased_primitive_types.insert("quint64", "uint64_t");
-
-    aliased_primitive_types.insert("char", "int8_t");
-    aliased_primitive_types.insert("unsigned char", "uint8_t");
-    aliased_primitive_types.insert("uchar", "uint8_t");
-
-    aliased_primitive_types.insert("short", "int16_t");
-    aliased_primitive_types.insert("unsigned short", "uint16_t");
-    aliased_primitive_types.insert("ushort", "uint16_t");
-
-    aliased_primitive_types.insert("int", "int32_t");
-    aliased_primitive_types.insert("unsigned int", "uint32_t");
-    aliased_primitive_types.insert("uint", "uint32_t");
-
-    aliased_primitive_types.insert("qlonglong", "int64_t");
-    aliased_primitive_types.insert("qulonglong", "uint64_t");
-    aliased_primitive_types.insert("long", "int64_t");
-    aliased_primitive_types.insert("unsigned long", "int64_t");
-    aliased_primitive_types.insert("ulong", "uint64_t");
-    // TODO: more type conversions
-
+    //let mut aliased_primitive_types = HashMap::new();
+    //aliased_primitive_types.insert("qint8", "int8_t");
 
     if good_primitive_types.iter().find(|&x| x == &self.base).is_some() {
       result.is_primitive = true;
       result.c_type.base = self.base.clone();
-    } else if let Some(found) = aliased_primitive_types.get(self.base.as_ref() as &str) {
-      result.is_primitive = true;
-      result.c_type.base = found.to_string();
+    //} else if let Some(found) = aliased_primitive_types.get(self.base.as_ref() as &str) {
+    //  result.is_primitive = true;
+    //  result.c_type.base = found.to_string();
     } else {
       result.is_primitive = false;
       result.c_type.base = self.base.clone();
@@ -596,7 +594,10 @@ impl CppMethod {
               is_const: self.is_const,
             },
             is_primitive: false,
-            conversion: CppToCTypeConversion { indirection_change: IndirectionChange::NoChange, renamed: false }
+            conversion: CppToCTypeConversion {
+              indirection_change: IndirectionChange::NoChange,
+              renamed: false,
+            },
           },
           cpp_equivalent: CFunctionArgumentCppEquivalent::This,
         });

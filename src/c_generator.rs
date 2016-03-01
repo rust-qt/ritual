@@ -91,9 +91,12 @@ impl CGenerator {
   fn write_struct_declaration(&self,
                               h_file: &mut File,
                               class_name: &String,
-                              full_declaration: bool, only_c: bool) {
+                              full_declaration: bool,
+                              only_c: bool) {
     // write C struct definition
-    if only_c { write!(h_file, "#ifndef __cplusplus // if C\n").unwrap(); }
+    if only_c {
+      write!(h_file, "#ifndef __cplusplus // if C\n").unwrap();
+    }
     if full_declaration && self.sized_classes.iter().find(|x| *x == class_name).is_some() {
       write!(h_file,
              "struct QTCW_{} {{ char space[QTCW_sizeof_{}]; }};\n",
@@ -108,7 +111,9 @@ impl CGenerator {
            class_name,
            class_name)
       .unwrap();
-    if only_c { write!(h_file, "#endif\n").unwrap() };
+    if only_c {
+      write!(h_file, "#endif\n").unwrap()
+    };
     write!(h_file, "\n").unwrap();
   }
 
@@ -155,7 +160,7 @@ impl CGenerator {
     {
       let mut check_type_for_forward_declaration = |t: &CTypeExtended| {
         if t.is_primitive {
-          //println!("Type {:?} doesn't need a forward declaration because it's built-in type", t);
+          // println!("Type {:?} doesn't need a forward declaration because it's built-in type", t);
           return; //it's built-in type
         }
         if forward_declared_classes.iter().find(|&x| x == &t.c_type.base).is_some() {
@@ -168,7 +173,7 @@ impl CGenerator {
         let only_c = !t.conversion.renamed;
         self.write_struct_declaration(&mut h_file, &t.c_type.base, false, only_c);
         forward_declared_classes.push(t.c_type.base.clone());
-        //println!("Type {:?} is forward-declared.", t);
+        // println!("Type {:?} is forward-declared.", t);
       };
 
       for method in &methods {
@@ -222,11 +227,11 @@ impl CGenerator {
                 // but in reality we use `new` which returns a pointer,
                 // so no conversion is necessary for constructors.
                 if !method.cpp_method.is_constructor {
-                  return_type_conversion_prefix = format!("new {}(",
-                                                          method.c_signature
-                                                                .return_type
-                                                                .c_type
-                                                                .base);
+                  if let Some(ref return_type) = method.cpp_method.return_type {
+                    return_type_conversion_prefix = format!("new {}(", return_type.base);
+                  } else {
+                    panic!("cpp method unexpectedly doesn't have return type");
+                  }
                   return_type_conversion_suffix = ")".to_string();
                 }
               }
@@ -236,13 +241,25 @@ impl CGenerator {
             return_type_conversion_prefix = "&".to_string();
           }
         }
+        if method.c_signature.return_type.conversion.renamed {
+          return_type_conversion_prefix = format!("reinterpret_cast<{}>({}",
+                                                  method.c_signature
+                                                        .return_type
+                                                        .c_type
+                                                        .to_c_code(),
+                                                  return_type_conversion_prefix);
+          return_type_conversion_suffix = return_type_conversion_suffix + ")";
+
+        }
         if method.allocation_place == AllocationPlace::Stack && !method.cpp_method.is_constructor {
           if let Some(arg) = method.c_signature.arguments.iter().find(|x| {
             x.cpp_equivalent == CFunctionArgumentCppEquivalent::ReturnValue
           }) {
-            return_type_conversion_prefix = format!("new({}) {}(",
-                                                    arg.name,
-                                                    arg.argument_type.c_type.base);
+            if let Some(ref return_type) = method.cpp_method.return_type {
+              return_type_conversion_prefix = format!("new({}) {}(", arg.name, return_type.base);
+            } else {
+              panic!("cpp method unexpectedly doesn't have return type");
+            }
             return_type_conversion_suffix = ")".to_string();
 
           }
@@ -289,17 +306,29 @@ impl CGenerator {
         }
 
         let mut filled_arguments = vec![];
-        for i in 0..method.cpp_method.arguments.len() as i8 {
+        for (i, cpp_argument) in method.cpp_method.arguments.iter().enumerate() {
           if let Some(c_argument) = method.c_signature.arguments.iter().find(|x| {
-            x.cpp_equivalent == CFunctionArgumentCppEquivalent::Argument(i)
+            x.cpp_equivalent == CFunctionArgumentCppEquivalent::Argument(i as i8)
           }) {
-            let conversion_prefix = match c_argument.argument_type.conversion.indirection_change {
-              IndirectionChange::ValueToPointer | IndirectionChange::ReferenceToPointer => {
-                "*"
-              }
-              IndirectionChange::NoChange => "",
-            };
-            filled_arguments.push(format!("{}{}", conversion_prefix, c_argument.name));
+            let mut conversion_prefix = match c_argument.argument_type
+                                                        .conversion
+                                                        .indirection_change {
+                                          IndirectionChange::ValueToPointer |
+                                          IndirectionChange::ReferenceToPointer => "*",
+                                          IndirectionChange::NoChange => "",
+                                        }
+                                        .to_string();
+            let mut conversion_suffix = "";
+            if c_argument.argument_type.conversion.renamed {
+              conversion_prefix = format!("reinterpret_cast<{}>({}",
+                                          cpp_argument.argument_type.to_cpp_code(),
+                                          conversion_prefix);
+              conversion_suffix = ")";
+            }
+            filled_arguments.push(format!("{}{}{}",
+                                          conversion_prefix,
+                                          c_argument.name,
+                                          conversion_suffix));
           } else {
             panic!("Error: no positional argument found\n{:?}", method);
           }

@@ -48,6 +48,11 @@ def parse_type(string):
   result["base"] = string
   if result["base"] == "T":
     result["template"] = True
+  if result["base"] in ["CFDataRef", "NSData"]:
+    print result["base"] + " is blacklisted because it is only available on Mac OS."
+    # TODO: re-enable when implementing Mac OS support
+    return False
+
   return result
 
 
