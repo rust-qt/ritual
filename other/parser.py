@@ -5,12 +5,22 @@ import pprint
 import glob
 import sys
 import json
+import pprint
+
+pp = pprint.PrettyPrinter()
 
 
-def fix_nested_types(class_name, t):
-  for name in ["iterator", "const_iterator"]:
-    if t["base"] == name:
-      t["base"] = class_name + "::" + t["base"]
+
+
+def fix_nested_types(class_name, t, nested_types):
+  def is_nested(name):
+    for t in nested_types:
+      if t["name"] == name:
+        return True
+    return False
+
+  if is_nested(t["base"]):
+    t["base"] = class_name + "::" + t["base"]
 
 def strip_tags(soup):
   return u' '.join(soup.findAll(text=True))
@@ -68,7 +78,7 @@ def parse_argument(string):
   return result
 
 
-def parse_methods(table, class_name, section_attrs):
+def parse_methods(table, class_name, section_attrs, nested_types):
   result = []
   for row in table.findAll("tr"):
     tds = row.findAll("td")
@@ -91,7 +101,7 @@ def parse_methods(table, class_name, section_attrs):
         print "Unsupported type encountered. Method is skipped:\n%s\n" % signature_string
         continue
       if class_name:
-        fix_nested_types(class_name, data["return_type"])
+        fix_nested_types(class_name, data["return_type"], nested_types)
     if re.match("^\\w+$", signature_string):
       data["name"] = signature_string
       data["variable"] = True
@@ -120,7 +130,7 @@ def parse_methods(table, class_name, section_attrs):
             break
 
           if class_name and arg["type"]:
-            fix_nested_types(class_name, arg["type"])
+            fix_nested_types(class_name, arg["type"], nested_types)
           data["arguments"].append(arg)
       if argument_failed:
         print "Unsupported type encountered. Method is skipped:\n%s\n" % signature_string
@@ -151,10 +161,10 @@ def parse_methods(table, class_name, section_attrs):
 
 
 
-def parse_section(soup, class_name, id, attrs):
+def parse_section(soup, class_name, id, attrs, nested_types):
   header = soup.find("h2", id=id)
   if not header: return []
-  return parse_methods(header.findNext("table"), class_name, attrs)
+  return parse_methods(header.findNext("table"), class_name, attrs, nested_types)
 
 
 def parse_macros(soup, id):
@@ -166,23 +176,131 @@ def parse_macros(soup, id):
   return macros
 
 
+#test1 = {}
+
+
+
+def parse_nested_types(soup, class_name_or_namespace):
+  all_values = {}
+  for table in soup.findAll("table", { "class": "valuelist" }):
+    if class_name_or_namespace == "QJsonValue":
+      h3 = table.findPrevious("h3")
+      if h3 and h3.get("id", "") == "toVariant":
+        print "This table is blacklisted!"
+        continue
+
+    values = []
+    for tr in table.findAll("tr"):
+      if len(tr.findAll("th")) > 0: continue # skip header
+      tds = tr.findAll("td")
+      if not len(tds) in [2, 3]: raise Exception("Unknown HTML layout")
+      value = { "name": tds[0].text.strip(), "value": tds[1].text.strip(), "description": strip_tags(tds[2]) if len(tds) > 2 else "" }
+      if not value["name"].startswith(class_name_or_namespace + "::"):
+        raise Exception("enum item without namespace")
+      value["name"] = value["name"][len(class_name_or_namespace + "::"):]
+      values.append(value)
+    current_pos = table
+    found_name = None
+    while current_pos:
+      current_pos = current_pos.findPrevious("a")
+      if current_pos and current_pos.get("name") and current_pos["name"].endswith("-enum"):
+        found_name = current_pos["name"]
+        break
+    if not found_name:
+      raise Exception("Can't find anchor for values table!")
+    all_values[found_name] = all_values.get(found_name, []) +  values
+
+  all_types = []
+  link_href_to_enum = {}
+
+  types_header = soup.find("h2", { "id": "Typesx" })
+  if not types_header:
+    types_header = soup.find("h2", { "id": "public-types" })
+  if not types_header:
+    types_header = soup.find("h2", { "id": "types" })
+  if not types_header:
+    print "no types header"
+    return []
+  for row in types_header.findNext("table").findAll("tr"):
+    tds = row.findAll("td")
+    if len(tds) != 2: raise Exception("Unknown HTML layout")
+    kind_of_type = tds[0].text
+    if kind_of_type == "enum":
+      link = tds[1].find("a")
+      if not link: raise Exception("enum without link")
+      if not link.get("href"): raise Exception("enum link without href")
+      if not "#" in link["href"]: raise Exception("enum link href without anchor")
+      anchor = link["href"].split("#")[1]
+      name = tds[1].text.split("{")[0].strip()
+      if not anchor in all_values:
+        raise Exception("values table not found for enum")
+      all_types.append({
+        "kind": "enum",
+        "name": name,
+        "values": all_values[anchor]})
+      link_href_to_enum[link["href"]] = name
+
+  for row in types_header.findNext("table").findAll("tr"):
+    tds = row.findAll("td")
+    if len(tds) != 2: raise Exception("Unknown HTML layout")
+    kind_of_type = tds[0].text
+    if kind_of_type == "enum": continue
+    name = tds[1].text.strip()
+    if kind_of_type == "flags":
+      link = tds[1].find("a")
+      if not link: raise Exception("flags without link")
+      if not link.get("href"): raise Exception("flags link without href")
+      if not link["href"] in link_href_to_enum:
+        raise Exception("no enum found for flags")
+      enum = link_href_to_enum[link["href"]]
+      all_types.append({
+        "kind": "flags",
+        "name": name,
+        "enum": enum})
+    else:
+      all_types.append({
+        "kind": kind_of_type,
+        "name": name})
+
+  if class_name_or_namespace == "QByteArray":
+    # they forgot to document this!
+    all_types.append({ "kind": "typedef", "name": "iterator" })
+    all_types.append({ "kind": "typedef", "name": "const_iterator" })
+
+
+
+  return all_types
+
+
+
+
+
+
+
 
 def parse_doc(filename):
+  print "Parsing " + filename
   data = open(filename,'r').read()
   soup = BeautifulSoup(data, convertEntities=BeautifulSoup.HTML_ENTITIES)
   result = {}
   title = soup.find("h1", { "class": "title" })
   if not title: raise Exception("Unknown HTML layout")
 
-  if title.text.startswith("<Qt"):
+
+  if title.text.startswith("<Qt") or title.text == "Qt Namespace":
     result["type"] = "global"
     macros = parse_macros(soup, "Macrosx")
     if macros: result["macros"] = macros
-    end_index = title.text.find(">")
-    if not end_index:
-      raise Exception("Invalid global header title")
-    result["include_file"] = title.text[1:end_index]
-    result["methods"] = parse_section(soup, None, "Functions", {})
+    if title.text == "Qt Namespace":
+      result["include_file"] = "Qt"
+      result["nested_types"] = parse_nested_types(soup, "Qt")
+    else:
+      end_index = title.text.find(">")
+      if not end_index:
+        raise Exception("Invalid global header title")
+      result["include_file"] = title.text[1:end_index]
+
+    result["methods"] = parse_section(soup, None, "Functions", {}, result.get("nested_types", []))
     return result
 
   title_parts = title.text.split(' ')
@@ -195,6 +313,7 @@ def parse_doc(filename):
       result["class"] = full_class_tag.text.strip(" ()")
     else:
       result["class"] = class_without_namespace
+    result["nested_types"] = parse_nested_types(soup, result["class"])
 
     if not result["class"].startswith("Q"):
       print "Warning: %s: class %s doesn't start with Q" % (filename, result["class"])
@@ -204,14 +323,19 @@ def parse_doc(filename):
 
 
   result["methods"] = []
-  result["methods"] += parse_section(soup, class_without_namespace, "public-functions", {})
-  result["methods"] += parse_section(soup, class_without_namespace, "protected-functions", { "protected": True })
-  result["methods"] += parse_section(soup, class_without_namespace, "public-slots", { "slot": True })
-  result["methods"] += parse_section(soup, class_without_namespace, "protected-slots", { "slot": True, "protected": True })
-  result["methods"] += parse_section(soup, class_without_namespace, "static-public-members", { "static": True })
-  result["methods"] += parse_section(soup, class_without_namespace, "static-protected-members", { "static": True, "protected": True })
-  result["methods"] += parse_section(soup, class_without_namespace, "signals", { "signal": True })
-  result["methods"] += parse_section(soup, None, "related-non-members", {})
+
+  for section_name, attrs in [
+    ("public-functions", {}),
+    ("protected-functions", { "protected": True }),
+    ("public-slots", { "slot": True }),
+    ("protected-slots", { "slot": True, "protected": True }),
+    ("static-public-members", { "static": True }),
+    ("static-protected-members", { "static": True, "protected": True }),
+    ("signals", { "signal": True }),
+    ("related-non-members", {})
+  ]:
+    cl = None if section_name == "related-non-members" else class_without_namespace
+    result["methods"] += parse_section(soup, cl, section_name, attrs, result["nested_types"])
   macros = parse_macros(soup, "macros")
   if macros: result["macros"] = macros
 
@@ -246,4 +370,8 @@ else:
   parse_result = parse(sys.argv[1])
   with open(sys.argv[2], "w") as f:
     json.dump(parse_result, f, indent=2)
+
+  print "Done."
+
+  #print test1
 

@@ -22,7 +22,7 @@ impl CGenerator {
 
   pub fn generate_all(&mut self) {
     self.sized_classes = self.generate_size_definer_class_list();
-    let white_list = vec!["QPoint", "QRect", "QBitArray"];
+    let white_list = vec!["QPoint", "QRect", "QBitArray", "QByteArray"];
 
     for data in &self.all_data {
       if white_list.iter().find(|&&x| x == data.include_file).is_none() {
@@ -142,9 +142,10 @@ impl CGenerator {
     write!(h_file, "#include <{}>\n", data.include_file).unwrap();
     write!(h_file, "#endif\n\n").unwrap();
 
+    let mut forward_declared_classes = vec![];
     if let Some(ref class_name) = data.class_name {
       self.write_struct_declaration(&mut h_file, class_name, true, true);
-
+      forward_declared_classes.push(class_name.clone());
     } else {
       println!("Not a class header. Wrapper struct is not generated.");
     }
@@ -152,15 +153,10 @@ impl CGenerator {
     write!(h_file, "QTCW_EXTERN_C_BEGIN\n\n").unwrap();
     let methods = data.process_methods();
     {
-      let mut forward_declared_classes = vec![];
       let mut check_type_for_forward_declaration = |t: &CTypeExtended| {
         if t.is_primitive {
+          //println!("Type {:?} doesn't need a forward declaration because it's built-in type", t);
           return; //it's built-in type
-        }
-        if let Some(ref class_name) = data.class_name {
-          if &t.c_type.base == class_name {
-            return; //it's main type for this header
-          }
         }
         if forward_declared_classes.iter().find(|&x| x == &t.c_type.base).is_some() {
           return; //already declared
@@ -172,6 +168,7 @@ impl CGenerator {
         let only_c = !t.conversion.renamed;
         self.write_struct_declaration(&mut h_file, &t.c_type.base, false, only_c);
         forward_declared_classes.push(t.c_type.base.clone());
+        //println!("Type {:?} is forward-declared.", t);
       };
 
       for method in &methods {
