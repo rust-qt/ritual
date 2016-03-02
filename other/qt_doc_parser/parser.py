@@ -46,7 +46,7 @@ class ColorLogger:
 
 pp = pprint.PrettyPrinter()
 real_logger = logging.getLogger("qt_doc_parser")
-logging_level = logging.INFO
+logging_level = logging.DEBUG
 stream_handler = logging.StreamHandler(sys.stderr)
 stream_handler.setLevel(logging_level)
 real_logger.setLevel(logging_level)
@@ -90,19 +90,26 @@ def parse_type(string):
   if not string:
     raise ParseException("Type is missing")
   result = {}
-  if "<T>" in string:
-    result["template"] = True
   if string.endswith("*"):
     result["pointer"] = True
     string = string[:-1].strip() # no, it's not a smile
-  elif string.endswith("&&"):
-    return False
   elif string.endswith("&"):
     result["reference"] = True
     string = string[:-1].strip()
   if string.startswith("const "):
     result["const"] = True
     string = string[len("const "):].strip()
+
+  template_match = re.match('^(\w+)\s*<([^>]+)>$', string)
+  if template_match:
+    result["template"] = True
+    string = template_match.group(1).strip()
+    result["template_arguments"] = []
+    for arg in template_match.group(2).split(","):
+      arg = arg.strip()
+      if arg:
+        result["template_arguments"].append(arg)
+
   if "&" in string or "*" in string:
     raise TypeParseException("Invalid type: '%s': double indirection" % initial_string)
 
@@ -113,6 +120,7 @@ def parse_type(string):
     raise TypeParseException("Invalid type: '%s': %s is blacklisted because it is only available on Mac OS." % (string, result["base"]))
     # TODO: re-enable when implementing Mac OS support
 
+  logger.debug("parse_type result: %s" % unicode(result))
   return result
 
 
@@ -430,6 +438,3 @@ else:
     json.dump(parse_result, f, indent=2)
 
   logger.info("Done.")
-
-  #print test1
-
