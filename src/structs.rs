@@ -110,6 +110,28 @@ enum ArgumentCaptionStrategy {
   TypeAndName,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct EnumValue {
+  pub name: String,
+  pub value: String,
+  pub description: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum KindOfType {
+  Enum{ values: Vec<EnumValue> },
+  Flags{ enum_name: String },
+  TypeDef{ original_type: Option<String> },
+  Class
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CppTypeInfo {
+  pub name: String,
+  pub kind: KindOfType,
+}
+
+
 impl ArgumentCaptionStrategy {
   fn all() -> Vec<Self> {
     vec![ArgumentCaptionStrategy::NameOnly,
@@ -184,6 +206,11 @@ pub struct CppHeaderData {
   pub macros: Vec<String>,
 }
 
+#[derive(Debug)]
+pub struct CppData {
+  pub headers: Vec<CppHeaderData>,
+  pub type_info: Vec<CppTypeInfo>,
+}
 
 pub fn operator_c_name(cpp_name: &String, arguments_count: i32) -> String {
   if cpp_name == "=" && arguments_count == 2 {
@@ -288,6 +315,11 @@ impl CTypeExtended {
     }
   }
 }
+
+//struct CppPrimitivesInfo {
+//  primitive_types: Vec<String>,
+//  enums:
+//}
 
 impl CppType {
   pub fn to_cpp_code(&self) -> String {
