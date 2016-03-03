@@ -10,6 +10,8 @@ import logging
 import subprocess
 import os
 
+pp = pprint.PrettyPrinter()
+
 def color_red(prt): return ("\033[91m {}\033[00m" .format(prt))
 def color_green(prt): return ("\033[92m {}\033[00m" .format(prt))
 def color_yellow(prt): return ("\033[93m {}\033[00m" .format(prt))
@@ -26,6 +28,9 @@ class ColorLogger:
   def debug(self, text, *args, **kwargs):
     text = color_light_purple(text)
     apply(self.real_logger.debug, (text,) + args, kwargs)
+
+  def debug_pp(self, obj):
+    self.debug(pp.pformat(obj))
 
   def info(self, text, *args, **kwargs):
     text = color_green(text)
@@ -44,9 +49,8 @@ class ColorLogger:
     apply(self.real_logger.critical, (text,) + args, kwargs)
 
 
-pp = pprint.PrettyPrinter()
 real_logger = logging.getLogger("qt_doc_parser")
-logging_level = logging.DEBUG
+logging_level = logging.INFO
 stream_handler = logging.StreamHandler(sys.stderr)
 stream_handler.setLevel(logging_level)
 real_logger.setLevel(logging_level)
@@ -63,6 +67,9 @@ class TypeParseException(ParseException):
 
 
 class InvalidLayoutException(ParseException):
+  pass
+
+class NoTypeOriginException(ParseException):
   pass
 
 
@@ -93,6 +100,9 @@ def parse_type(string):
   if string.endswith("*"):
     result["pointer"] = True
     string = string[:-1].strip() # no, it's not a smile
+  elif string.endswith("&&"):
+    result["double_reference"] = True
+    string = string[:-2].strip()
   elif string.endswith("&"):
     result["reference"] = True
     string = string[:-1].strip()
@@ -100,7 +110,7 @@ def parse_type(string):
     result["const"] = True
     string = string[len("const "):].strip()
 
-  template_match = re.match('^(\w+)\s*<([^>]+)>$', string)
+  template_match = re.match('^([\w:]+)\s*<(.*)>$', string)
   if template_match:
     result["template"] = True
     string = template_match.group(1).strip()
@@ -108,20 +118,37 @@ def parse_type(string):
     for arg in template_match.group(2).split(","):
       arg = arg.strip()
       if arg:
-        result["template_arguments"].append(arg)
+        result["template_arguments"].append(parse_type(arg))
 
   if "&" in string or "*" in string:
     raise TypeParseException("Invalid type: '%s': double indirection" % initial_string)
 
   result["base"] = string
-  if result["base"] == "T":
-    result["template"] = True
-  if result["base"] in ["CFDataRef", "NSData"]:
-    raise TypeParseException("Invalid type: '%s': %s is blacklisted because it is only available on Mac OS." % (string, result["base"]))
-    # TODO: re-enable when implementing Mac OS support
 
   logger.debug("parse_type result: %s" % unicode(result))
   return result
+
+
+def argument_list_template_dirty_fix(arg_list):
+  while True:
+    error_found = False
+    for i in range(0, len(arg_list)):
+      if arg_list[i].count('<') != arg_list[i].count('>'):
+        if i + 1 < len(arg_list):
+          #print arg_list
+          #print i
+          r = []
+          if i > 0:
+            r += arg_list[:i]
+          r.append(arg_list[i]+", " + arg_list[i+1])
+          if i + 2 < len(arg_list):
+            r += arg_list[i+2:]
+          arg_list = r
+          #print arg_list
+          error_found = True
+          break
+    if not error_found: break
+  return arg_list
 
 
 def parse_argument(string):
@@ -147,6 +174,19 @@ def parse_argument(string):
   result["type"] = parse_type(type_string)
   return result
 
+
+def parse_methods_for_typedefs(table):
+  result = []
+  for row in table.findAll("tr"):
+    tds = row.findAll("td")
+    if len(tds) != 2: raise InvalidLayoutException()
+    #print "test 3 ", tds
+    return_type_string = tds[0].text.strip()
+    signature_string = strip_tags(tds[1]).strip()
+    #print "test 4 ", return_type_string
+    if return_type_string == "typedef":
+      result.append(signature_string)
+  return result
 
 def parse_methods(table, class_name, section_attrs, nested_types):
   result = []
@@ -186,7 +226,9 @@ def parse_methods(table, class_name, section_attrs, nested_types):
         signature_string_parts2 = signature_string[name_end_index+1:].strip().rsplit(")", 1)
         if len(signature_string_parts2) != 2: raise ParseException("Invalid signature syntax")
         data["arguments"] = []
-        for part in signature_string_parts2[0].strip().split(','):
+        arg_list = signature_string_parts2[0].strip().split(',')
+        arg_list = argument_list_template_dirty_fix(arg_list)
+        for part in arg_list:
           if not part: continue
           part = part.strip()
           if part == "...":
@@ -229,6 +271,14 @@ def parse_section(soup, class_name, id, attrs, nested_types):
   header = soup.find("h2", id=id)
   if not header: return []
   return parse_methods(header.findNext("table"), class_name, attrs, nested_types)
+
+def parse_section_for_typedefs(soup, id):
+  header = soup.find("h2", id=id)
+  #print "test 1"
+  if not header: return []
+  #print "test 2"
+  return parse_methods_for_typedefs(header.findNext("table"))
+
 
 
 def parse_macros(soup, id):
@@ -326,6 +376,8 @@ def parse_nested_types(soup, class_name_or_namespace):
     all_types.append({ "kind": "typedef", "name": "iterator" })
     all_types.append({ "kind": "typedef", "name": "const_iterator" })
 
+  logger.debug("nested types found: %s" % pp.pformat(all_types))
+
   return all_types
 
 
@@ -345,12 +397,14 @@ def parse_doc(filename):
     if title.text == "Qt Namespace":
       result["include_file"] = "Qt"
       result["nested_types"] = parse_nested_types(soup, "Qt")
+      result["nested_types_namespace"] = "Qt"
     else:
       end_index = title.text.find(">")
       if not end_index:
         raise ParseException("Invalid global header title")
       result["include_file"] = title.text[1:end_index]
 
+    logger.info("Include file: %s" % result["include_file"])
     result["methods"] = parse_section(soup, None, "Functions", {}, result.get("nested_types", []))
     return result
 
@@ -359,12 +413,14 @@ def parse_doc(filename):
     result["type"] = "class"
     class_without_namespace = title_parts[0].strip()
     result["include_file"] = class_without_namespace
+    logger.info("Include file: %s" % result["include_file"])
     full_class_tag = soup.find("span", { "class": "small-subtitle" })
     if full_class_tag:
       result["class"] = full_class_tag.text.strip(" ()")
     else:
       result["class"] = class_without_namespace
     result["nested_types"] = parse_nested_types(soup, result["class"])
+    result["nested_types_namespace"] = result["class"]
 
     if not result["class"].startswith("Q"):
       print "Warning: %s: class %s doesn't start with Q" % (filename, result["class"])
@@ -373,6 +429,13 @@ def parse_doc(filename):
     raise ParseException("Unsupported title value in %s" % filename)
 
   result["methods"] = []
+
+  found_typedefs = parse_section_for_typedefs(soup, "related-non-members")
+  if found_typedefs:
+    result["not_nested_types"] = []
+    for t in found_typedefs:
+      logger.info("Found typedef: %s" % t)
+      result["not_nested_types"].append({ "kind": "typedef", "name": t })
 
   for section_name, attrs in [
     ("public-functions", {}),
@@ -389,6 +452,17 @@ def parse_doc(filename):
   macros = parse_macros(soup, "macros")
   if macros:
     result["macros"] = macros
+
+
+  for include_file, extra_type in [
+    ("QByteArray", { "kind": "class", "name": "QByteRef" }),
+    ("QBitArray", { "kind": "class", "name": "QBitRef" }),
+    ("QJsonValue", { "kind": "class", "name": "QJsonValueRef" }),
+    ("QHashIterator", { "kind": "typedef", "name": "Item" })
+  ]:
+    if result["include_file"] == include_file:
+      result["not_nested_types"] = result.get("not_nested_types", [])
+      result["not_nested_types"].append(extra_type)
 
   return result
 
@@ -426,6 +500,62 @@ def parse(input_folder):
       all_data.append(result)
     except ParseException as e:
       logger.error("Parse error: %s: %s" % (filename, e.message))
+
+  type_origins = {}
+
+  for t in [
+    "void", "float", "double", "bool",
+    "qint8", "quint8", "qint16", "quint16", "qint32", "quint32", "qint64", "quint64",
+    "qlonglong","qulonglong", "qreal", "quintptr", "qintptr", "qptrdiff",
+    "char", "signed char", "unsigned char", "uchar",
+    "short", "signed short", "unsigned short", "ushort",
+    "int", "signed int", "unsigned int", "uint",
+    "long", "signed long", "unsigned long", "ulong",
+    "wchar_t"
+  ]:
+    type_origins[t] = "primitive"
+
+  for t in ["CFDataRef", "CFURLRef", "NSData", "NSString", "CFStringRef", "NSURL", "NSDate", "CFDateRef"]:
+    type_origins[t] = "mac_os_native"
+
+  for t in ["std::string", "std::u16string", "std::u32string", "std::list", "std::wstring", "std::initializer_list"]:
+    type_origins[t] = "cpp_std"
+
+  for t in ["T", "T1", "T2", "X", "Key"]:
+    type_origins[t] = "template_argument"
+
+  for header_data in all_data:
+    if "class" in header_data:
+      type_origins[ header_data["class"] ] = {"qt_header": header_data["include_file"] }
+    for t in header_data.get("nested_types", []):
+      name = header_data["nested_types_namespace"] + "::" + t["name"]
+      type_origins[name] = {"qt_header": header_data["include_file"] }
+    for t in header_data.get("not_nested_types", []):
+      name = t["name"]
+      type_origins[name] = {"qt_header": header_data["include_file"] }
+
+
+  def check_type_recursive(t):
+    if not t["base"] in type_origins:
+      raise NoTypeOriginException("Unknown type origin: '%s'" % t["base"])
+    for tt in t.get("template_arguments", []):
+      check_type_recursive(tt)
+
+
+  for header_data in all_data:
+    methods = header_data.get("methods", [])
+    if "class" in header_data and not methods:
+      logger.warning("Class %s doesn't have any methods" % header_data["class"])
+    for m in methods:
+      try:
+        if "return_type" in m:
+          check_type_recursive(m["return_type"])
+        for arg in m.get("arguments", []):
+          check_type_recursive(arg["type"])
+      except NoTypeOriginException as e:
+        logger.warning("%s (#include <%s>)\n%s\n" % (e.message, header_data["include_file"], pp.pformat(m)))
+
+
   return all_data
 
 if len(sys.argv) < 3:
