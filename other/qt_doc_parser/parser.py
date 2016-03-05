@@ -73,15 +73,25 @@ class NoTypeOriginException(ParseException):
   pass
 
 
-def fix_nested_types(class_name, t, nested_types):
-  def is_nested(name):
-    for t in nested_types:
-      if t["name"] == name:
-        return True
-    return False
+def fix_nested_types(t, known_types, current_namespace):
+  #print "test1 ", current_namespace, t
+  namespace_parts = []
+  if current_namespace:
+    namespace_parts = current_namespace.split("::")
+  #print "test2 ", namespace_parts
+  for i in sorted(range(1+len(namespace_parts)), reverse=True):
+    candidate = "::".join(namespace_parts[:i] + [t["base"]])
+    #print "test3 candidate ", candidate
+    if candidate in known_types:
+      t["base"] = candidate
+      #print "test4 ok"
+      break
 
-  if is_nested(t["base"]):
-    t["base"] = class_name + "::" + t["base"]
+  if not t["base"] in known_types:
+    #print "test5 not ok!"
+    raise NoTypeOriginException("Unknown type: %s" % t["base"])
+  for subtype in t.get("template_arguments", []):
+    fix_nested_types(subtype, known_types, current_namespace)
 
 
 # soup.text sometimes deletes spaces between words.
@@ -97,15 +107,12 @@ def parse_type(string):
   if not string:
     raise ParseException("Type is missing")
   result = {}
-  if string.endswith("*"):
-    result["pointer"] = True
-    string = string[:-1].strip() # no, it's not a smile
-  elif string.endswith("&&"):
-    result["double_reference"] = True
-    string = string[:-2].strip()
-  elif string.endswith("&"):
-    result["reference"] = True
-    string = string[:-1].strip()
+  for suf in ["&&", "**", "*&", "&", "*"]:
+    if string.endswith(suf):
+      result["indirection"] = suf
+      string = string[0:len(string) - len(suf)].strip()
+      break
+
   if string.startswith("const "):
     result["const"] = True
     string = string[len("const "):].strip()
@@ -115,13 +122,15 @@ def parse_type(string):
     result["template"] = True
     string = template_match.group(1).strip()
     result["template_arguments"] = []
-    for arg in template_match.group(2).split(","):
+    args = template_match.group(2).split(",")
+    args = argument_list_template_dirty_fix(args)
+    for arg in args:
       arg = arg.strip()
       if arg:
         result["template_arguments"].append(parse_type(arg))
 
   if "&" in string or "*" in string:
-    raise TypeParseException("Invalid type: '%s': double indirection" % initial_string)
+    raise TypeParseException("Invalid type: '%s': too much indirection" % initial_string)
 
   result["base"] = string
 
@@ -202,15 +211,13 @@ def parse_methods(table, class_name, section_attrs, nested_types):
       else:
         data["scope"] = "global"
       if return_type_string == "typedef":
-        logger.warning("Method is skipped: '%s': typedef encountered" % signature_string)
+        logger.debug("Method is skipped: '%s': typedef encountered" % signature_string)
         continue
       if return_type_string.startswith("virtual"):
         data["virtual"] = True
         return_type_string = return_type_string[len("virtual"):].strip()
       if return_type_string:
         data["return_type"] = parse_type(return_type_string)
-        if class_name:
-          fix_nested_types(class_name, data["return_type"], nested_types)
       if re.match("^\\w+$", signature_string):
         data["name"] = signature_string
         data["variable"] = True
@@ -235,8 +242,6 @@ def parse_methods(table, class_name, section_attrs, nested_types):
             data["variable_arguments"] = True
           else:
             arg = parse_argument(part)
-            if class_name and arg["type"]:
-              fix_nested_types(class_name, arg["type"], nested_types)
             data["arguments"].append(arg)
         if signature_string_parts2[1].strip() == "const":
           data["const"] = True
@@ -304,9 +309,10 @@ def parse_nested_types(soup, class_name_or_namespace):
       tds = tr.findAll("td")
       if not len(tds) in [2, 3]: raise Exception("Unknown HTML layout")
       value = { "name": tds[0].text.strip(), "value": tds[1].text.strip(), "description": strip_tags(tds[2]) if len(tds) > 2 else "" }
-      if not value["name"].startswith(class_name_or_namespace + "::"):
-        raise ParseException("enum item without namespace")
-      value["name"] = value["name"][len(class_name_or_namespace + "::"):]
+      if class_name_or_namespace:
+        if not value["name"].startswith(class_name_or_namespace + "::"):
+          raise ParseException("enum item without namespace")
+        value["name"] = value["name"][len(class_name_or_namespace + "::"):]
       values.append(value)
     current_pos = table
     found_name = None
@@ -399,6 +405,7 @@ def parse_doc(filename):
       result["nested_types"] = parse_nested_types(soup, "Qt")
       result["nested_types_namespace"] = "Qt"
     else:
+      result["nested_types"] = parse_nested_types(soup, None)
       end_index = title.text.find(">")
       if not end_index:
         raise ParseException("Invalid global header title")
@@ -434,7 +441,7 @@ def parse_doc(filename):
   if found_typedefs:
     result["not_nested_types"] = []
     for t in found_typedefs:
-      logger.info("Found typedef: %s" % t)
+      logger.debug("Found typedef: %s" % t)
       result["not_nested_types"].append({ "kind": "typedef", "name": t })
 
   for section_name, attrs in [
@@ -457,12 +464,39 @@ def parse_doc(filename):
   for include_file, extra_type in [
     ("QByteArray", { "kind": "class", "name": "QByteRef" }),
     ("QBitArray", { "kind": "class", "name": "QBitRef" }),
+    ("QString", { "kind": "class", "name": "QCharRef" }),
     ("QJsonValue", { "kind": "class", "name": "QJsonValueRef" }),
-    ("QHashIterator", { "kind": "typedef", "name": "Item" })
+    ("QTextStream", { "kind": "class", "name": "QTextStreamManipulator" }),
+
   ]:
     if result["include_file"] == include_file:
       result["not_nested_types"] = result.get("not_nested_types", [])
       result["not_nested_types"].append(extra_type)
+
+  for include_file, extra_type in [
+    ("QHashIterator", { "kind": "template_type", "name": "Item" }),
+    ("QMutableHashIterator", { "kind": "template_type", "name": "Item" }),
+    ("QMapIterator", { "kind": "template_type", "name": "Item" }),
+    ("QMutableMapIterator", { "kind": "template_type", "name": "Item" }),
+
+    ("QFlags", { "kind": "template_type", "name": "Enum" }),
+    ("QFlags", { "kind": "template_type", "name": "Zero" }),
+
+    ("QSharedPointer", { "kind": "template_type", "name": "Deleter" }),
+    ("QScopedPointer", { "kind": "template_type", "name": "Cleanup" }),
+    ("QVarLengthArray", { "kind": "template_type", "name": "Prealloc" }),
+    ("QVarLengthArray", { "kind": "template_type", "name": "Prealloc1" }),
+    ("QVarLengthArray", { "kind": "template_type", "name": "Prealloc2" }),
+    ("QPair", { "kind": "template_type", "name": "TT1" }),
+    ("QPair", { "kind": "template_type", "name": "TT2" }),
+    ("QHash", { "kind": "template_type", "name": "InputIterator" }),
+
+    ("QVariant", { "kind": "enum", "name": "Type" }), #TODO: add enum values
+  ]:
+    if result["include_file"] == include_file:
+      result["nested_types"] = result.get("nested_types", [])
+      result["nested_types"].append(extra_type)
+
 
   return result
 
@@ -511,47 +545,69 @@ def parse(input_folder):
     "short", "signed short", "unsigned short", "ushort",
     "int", "signed int", "unsigned int", "uint",
     "long", "signed long", "unsigned long", "ulong",
-    "wchar_t"
+    "wchar_t", "size_t"
   ]:
     type_origins[t] = "primitive"
 
   for t in ["CFDataRef", "CFURLRef", "NSData", "NSString", "CFStringRef", "NSURL", "NSDate", "CFDateRef"]:
     type_origins[t] = "mac_os_native"
 
-  for t in ["std::string", "std::u16string", "std::u32string", "std::list", "std::wstring", "std::initializer_list"]:
+  for t in ["GUID", "HANDLE"]:
+    type_origins[t] = "windows_native"
+
+  for t in [
+    "va_list", "FILE",
+    "std::string", "std::u16string", "std::u32string", "std::list", "std::wstring", "std::initializer_list",
+    "std::pair", "std::map", "std::vector",
+  ]:
     type_origins[t] = "cpp_std"
 
-  for t in ["T", "T1", "T2", "X", "Key"]:
+  for t in ["T", "T1", "T2", "X", "Key", "ForwardIterator", "Container"]:
     type_origins[t] = "template_argument"
+
+  for t in ["PointerToMemberFunction", "MemberFunction", "MemberFunctionOk", "UnaryFunction", "Functor", "QtCleanUpFunction"]:
+    type_origins[t] = "function_pointer"
+
+  for t in ["QWidget"]: #TODO: change when QtWidgets support comes
+    type_origins[t] = "fake"
+
+  for t in ["QVersionNumber"]: #TODO: change this when updating to Qt 5.6
+    type_origins[t] = "fake"
+
 
   for header_data in all_data:
     if "class" in header_data:
       type_origins[ header_data["class"] ] = {"qt_header": header_data["include_file"] }
     for t in header_data.get("nested_types", []):
-      name = header_data["nested_types_namespace"] + "::" + t["name"]
+      if "nested_types_namespace" in header_data:
+        name = header_data["nested_types_namespace"] + "::" + t["name"]
+      else:
+        name = t["name"]
       type_origins[name] = {"qt_header": header_data["include_file"] }
     for t in header_data.get("not_nested_types", []):
       name = t["name"]
       type_origins[name] = {"qt_header": header_data["include_file"] }
 
-
-  def check_type_recursive(t):
-    if not t["base"] in type_origins:
-      raise NoTypeOriginException("Unknown type origin: '%s'" % t["base"])
-    for tt in t.get("template_arguments", []):
-      check_type_recursive(tt)
-
+  known_types = type_origins.keys()
+  print "test0 ", known_types
 
   for header_data in all_data:
+    current_namespace = None
     methods = header_data.get("methods", [])
-    if "class" in header_data and not methods:
-      logger.warning("Class %s doesn't have any methods" % header_data["class"])
+    logger.info("Checking include file: " + header_data["include_file"])
+    if "class" in header_data:
+      current_namespace = header_data["class"]
+      #logger.warning("Class: " + header_data["class"])
+      if not methods:
+        logger.warning("Class %s doesn't have any methods" % header_data["class"])
+
+    #logger.warning("Namespace: " + unicode(current_namespace))
     for m in methods:
       try:
         if "return_type" in m:
-          check_type_recursive(m["return_type"])
+          fix_nested_types(m["return_type"], known_types, current_namespace)
         for arg in m.get("arguments", []):
-          check_type_recursive(arg["type"])
+          fix_nested_types(arg["type"], known_types, current_namespace)
       except NoTypeOriginException as e:
         logger.warning("%s (#include <%s>)\n%s\n" % (e.message, header_data["include_file"], pp.pformat(m)))
 
