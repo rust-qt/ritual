@@ -67,7 +67,8 @@ class TypeParseException(ParseException):
 
 
 class InvalidLayoutException(ParseException):
-  pass
+  def __init__(self):
+    ParseException.__init__(self, "Invalid layout")
 
 class NoTypeOriginException(ParseException):
   pass
@@ -294,6 +295,28 @@ def parse_macros(soup, id):
     macros.append(row.text)
   return macros
 
+def parse_inherits(soup):
+  h1 = soup.find("h1")
+  if not h1:
+    raise InvalidLayoutException()
+  table = h1.findNext("table", { "class": "alignedsummary" })
+  if not table:
+    raise InvalidLayoutException()
+  for tr in table.findAll("tr"):
+    tds = tr.findAll("td")
+    if not len(tds) == 2:
+      continue
+    if tds[0].text.strip() == "Inherits:":
+      a = tds[1].find("a")
+      if not a:
+        return None
+      t = parse_type(a.text)
+      logger.debug("Found inherits: %s", t)
+      return t
+  logger.debug("no inherits")
+  return None
+
+
 def parse_nested_types(soup, class_name_or_namespace):
   all_values = {}
   for table in soup.findAll("table", { "class": "valuelist" }):
@@ -307,7 +330,7 @@ def parse_nested_types(soup, class_name_or_namespace):
     for tr in table.findAll("tr"):
       if len(tr.findAll("th")) > 0: continue # skip header
       tds = tr.findAll("td")
-      if not len(tds) in [2, 3]: raise Exception("Unknown HTML layout")
+      if not len(tds) in [2, 3]: raise InvalidLayoutException()
       value = { "name": tds[0].text.strip(), "value": tds[1].text.strip(), "description": strip_tags(tds[2]) if len(tds) > 2 else "" }
       if class_name_or_namespace:
         if not value["name"].startswith(class_name_or_namespace + "::"):
@@ -428,6 +451,7 @@ def parse_doc(filename):
       result["class"] = class_without_namespace
     result["nested_types"] = parse_nested_types(soup, result["class"])
     result["nested_types_namespace"] = result["class"]
+    result["inherits"] = parse_inherits(soup)
 
     if not result["class"].startswith("Q"):
       print "Warning: %s: class %s doesn't start with Q" % (filename, result["class"])
@@ -483,7 +507,6 @@ def parse_doc(filename):
     ("QFlags", { "kind": "template_type", "name": "Zero" }),
 
     ("QSharedPointer", { "kind": "template_type", "name": "Deleter" }),
-    ("QScopedPointer", { "kind": "template_type", "name": "Cleanup" }),
     ("QVarLengthArray", { "kind": "template_type", "name": "Prealloc" }),
     ("QVarLengthArray", { "kind": "template_type", "name": "Prealloc1" }),
     ("QVarLengthArray", { "kind": "template_type", "name": "Prealloc2" }),
@@ -558,11 +581,11 @@ def parse(input_folder):
   for t in [
     "va_list", "FILE",
     "std::string", "std::u16string", "std::u32string", "std::list", "std::wstring", "std::initializer_list",
-    "std::pair", "std::map", "std::vector",
+    "std::pair", "std::map", "std::vector"
   ]:
     type_origins[t] = "cpp_std"
 
-  for t in ["T", "T1", "T2", "X", "Key", "ForwardIterator", "Container"]:
+  for t in ["T", "T1", "T2", "X", "Key", "ForwardIterator", "Container", "Cleanup"]:
     type_origins[t] = "template_argument"
 
   for t in ["PointerToMemberFunction", "MemberFunction", "MemberFunctionOk", "UnaryFunction", "Functor", "QtCleanUpFunction"]:
@@ -600,6 +623,9 @@ def parse(input_folder):
       #logger.warning("Class: " + header_data["class"])
       if not methods:
         logger.warning("Class %s doesn't have any methods" % header_data["class"])
+
+    if header_data.get("inherits", None):
+      fix_nested_types(header_data["inherits"], known_types, current_namespace)
 
     #logger.warning("Namespace: " + unicode(current_namespace))
     for m in methods:
