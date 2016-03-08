@@ -73,39 +73,6 @@ class InvalidLayoutException(ParseException):
 class NoTypeOriginException(ParseException):
   pass
 
-
-def fix_nested_types(t, type_origins, current_namespace):
-  for subtype in t.get("template_arguments", []):
-    fix_nested_types(subtype, type_origins, current_namespace)
-
-  if t["base"] == "QFile::Permissions":
-    # upcasting everything is too much for me!
-    t["base"] = "QIoDevice::Permissions"
-  #print "test1 ", current_namespace, t
-  namespace_parts = []
-  while True:
-    if current_namespace:
-      namespace_parts = current_namespace.split("::")
-    #print "test2 ", namespace_parts
-    for i in sorted(range(1+len(namespace_parts)), reverse=True):
-      candidate = "::".join(namespace_parts[:i] + [t["base"]])
-      #print "test3 candidate ", candidate
-      if candidate in type_origins:
-        t["base"] = candidate
-        return
-    if current_namespace and current_namespace in type_origins:
-      n = type_origins[current_namespace]["inherits"]
-      if n:
-        logger.debug("Switching namespace from %s to %s", current_namespace, n["base"])
-        current_namespace = n["base"]
-      else:
-        break
-    else:
-      break
-
-  raise NoTypeOriginException("Unknown type: %s" % t["base"])
-
-
 # soup.text sometimes deletes spaces between words.
 # this is a space-preserving alternative
 def strip_tags(soup):
@@ -126,12 +93,11 @@ def parse_type(string):
       break
 
   if string.startswith("const "):
-    result["const"] = True
+    result["is_const"] = True
     string = string[len("const "):].strip()
 
   template_match = re.match('^([\w:]+)\s*<(.*)>$', string)
   if template_match:
-    result["template"] = True
     string = template_match.group(1).strip()
     result["template_arguments"] = []
     args = template_match.group(2).split(",")
@@ -176,8 +142,7 @@ def parse_argument(string):
   logger.debug("parse_argument %s" % string)
   if string in ["int", "bool"]:
     # there are a few places in the documentation
-    # where arguments don't have a name
-
+    # where arguments don't have a name.
     # TODO: this is probably better to detect using lack of space character
     return { "type": parse_type(string), "name": "value" }
 
@@ -334,7 +299,7 @@ def parse_nested_types(soup, class_name_or_namespace):
     if class_name_or_namespace == "QJsonValue":
       h3 = table.findPrevious("h3")
       if h3 and h3.get("id", "") == "toVariant":
-        logger.warning("Enum values table is skipped because it is blacklisted.")
+        logger.debug("Enum values table is skipped because it is blacklisted.")
         continue
 
     values = []
@@ -454,10 +419,12 @@ def parse_doc(filename):
     result["type"] = "class"
     class_without_namespace = title_parts[0].strip()
     result["include_file"] = class_without_namespace
-    logger.info("Include file: %s" % result["include_file"])
+    logger.debug("Include file: %s" % result["include_file"])
     full_class_tag = soup.find("span", { "class": "small-subtitle" })
     if full_class_tag:
       result["class"] = full_class_tag.text.strip(" ()")
+      result["include_file"] = result["class"].split("::")[0]
+      logger.debug("Real include file is believed to be: %s" % result["include_file"])
     else:
       result["class"] = class_without_namespace
     result["nested_types"] = parse_nested_types(soup, result["class"])
@@ -477,7 +444,10 @@ def parse_doc(filename):
     result["not_nested_types"] = []
     for t in found_typedefs:
       logger.debug("Found typedef: %s" % t)
-      result["not_nested_types"].append({ "kind": "typedef", "name": t })
+      if result["class"] == "QTimeZone" and t == "OffsetDataList":
+        logger.debug("This typedef is blacklisted here because it is in fact nested.")
+      else:
+        result["not_nested_types"].append({ "kind": "typedef", "name": t })
 
   for section_name, attrs in [
     ("public-functions", {}),
@@ -536,7 +506,7 @@ def parse_doc(filename):
 
 
 def parse(input_folder):
-  all_data = []
+  headers_data = []
   # some files don't contain anything useful
   bad_endings = "members", "obsolete", "compat", "example", "pro", "cpp", "h", "ui"
 
@@ -565,74 +535,247 @@ def parse(input_folder):
 
     try:
       result = parse_doc(filename)
-      all_data.append(result)
+      headers_data.append(result)
     except ParseException as e:
       logger.error("Parse error: %s: %s" % (filename, e.message))
+  return headers_data
 
-  type_origins = {}
+
+def known_basic_types():
+  types_data = {}
+  def add_known_type(name, origin):
+    if name in types_data:
+      logger.warning("Type data is overwritten for %s", name)
+    types_data[name] = { "origin": origin }
 
   for t in [
     "void", "float", "double", "bool",
-    "qint8", "quint8", "qint16", "quint16", "qint32", "quint32", "qint64", "quint64",
-    "qlonglong","qulonglong", "qreal", "quintptr", "qintptr", "qptrdiff",
-    "char", "signed char", "unsigned char", "uchar",
-    "short", "signed short", "unsigned short", "ushort",
-    "int", "signed int", "unsigned int", "uint",
-    "long", "signed long", "unsigned long", "ulong",
+    #"qint8", "quint8", "qint16", "quint16", "qint32", "quint32", "qint64", "quint64",
+    #"qlonglong","qulonglong", "qreal", "quintptr", "qintptr", "qptrdiff",
+    "char", "signed char", "unsigned char",
+    "short", "signed short", "unsigned short",
+    "int", "signed int", "unsigned int",
+    "long", "signed long", "unsigned long",
+    "long long int", "unsigned long long int",
     "wchar_t", "size_t"
   ]:
-    type_origins[t] = "primitive"
+    add_known_type(t, "c_built_in")
 
   for t in ["CFDataRef", "CFURLRef", "NSData", "NSString", "CFStringRef", "NSURL", "NSDate", "CFDateRef"]:
-    type_origins[t] = "mac_os_native"
+    add_known_type(t, "mac_os_native")
 
   for t in ["GUID", "HANDLE"]:
-    type_origins[t] = "windows_native"
+    add_known_type(t, "windows_native")
 
   for t in [
     "va_list", "FILE",
     "std::string", "std::u16string", "std::u32string", "std::list", "std::wstring", "std::initializer_list",
     "std::pair", "std::map", "std::vector"
   ]:
-    type_origins[t] = "cpp_std"
+    add_known_type(t, "cpp_std")
 
   for t in ["T", "T1", "T2", "X", "Key", "ForwardIterator", "Container", "Cleanup"]:
-    type_origins[t] = "template_argument"
+    add_known_type(t, "template_argument")
 
   for t in ["PointerToMemberFunction", "MemberFunction", "MemberFunctionOk", "UnaryFunction", "Functor", "QtCleanUpFunction"]:
-    type_origins[t] = "function_pointer"
+    add_known_type(t, "function_pointer")
 
   for t in ["QWidget"]: #TODO: change when QtWidgets support comes
-    type_origins[t] = "fake"
+    add_known_type(t, "fake")
 
   for t in ["QVersionNumber"]: #TODO: change this when updating to Qt 5.6
-    type_origins[t] = "fake"
+    add_known_type(t, "fake")
 
-  for t in ["QMap<Key, T>::const_iterator", "QMap<Key, T>::iterator", "QHash<Key, T>::const_iterator", "QHash<Key, T>::iterator"]:
+  for t in ["QMap<Key, T>::const_iterator", "QMap<Key, T>::iterator", "QHash<Key, T>::const_iterator",
+            "QHash<Key, T>::iterator", "QMap<Key,  T>::const_iterator"]:
     #TODO: do something with these types
-    type_origins[t] = "fake"
+    add_known_type(t, "fake")
 
+  return types_data
+  
 
-  for header_data in all_data:
+def add_qt_types(headers_data, types_data):
+  def doc_page_exists_for_class(name):
+    for header_data in headers_data:
+      if header_data.get("class", "") == name:
+        return True
+    return False
+
+  for header_data in headers_data:
     if "class" in header_data:
-      type_origins[ header_data["class"] ] = {"qt_header": header_data["include_file"], "inherits": header_data["inherits"] }
+      type_data = {"kind": "class", "origin": "qt", "qt_header": header_data["include_file"] }
+      if header_data.get("inherits", None):
+        type_data["inherits"] = header_data["inherits"]
+      name = header_data["class"]
+      if name in types_data:
+        logger.warning("Type data is overwritten for %s", name)
+      types_data[name] = type_data
     for t in header_data.get("nested_types", []):
+      type_data = t.copy()
+      type_data["origin"] = "qt"
+      type_data["qt_header"] = header_data["include_file"]
+      name = type_data.pop("name")
       if "nested_types_namespace" in header_data:
-        name = header_data["nested_types_namespace"] + "::" + t["name"]
+        name = header_data["nested_types_namespace"] + "::" + name
+        if "enum" in type_data:
+          type_data["enum"] = header_data["nested_types_namespace"] + "::" + type_data["enum"]
+      if doc_page_exists_for_class(name):
+        logger.debug("Data for nested type (%s) is not added because it has separate doc page", name)
       else:
-        name = t["name"]
-      type_origins[name] = {"qt_header": header_data["include_file"] }
+        if name in types_data:
+          logger.warning("Type data is overwritten for %s", name)
+        types_data[name] = type_data
     for t in header_data.get("not_nested_types", []):
-      name = t["name"]
-      type_origins[name] = {"qt_header": header_data["include_file"] }
+      type_data = t.copy()
+      name = type_data.pop("name")
+      type_data["origin"] = "qt"
+      type_data["qt_header"] = header_data["include_file"]
+      if name in types_data:
+        logger.warning("Type data is overwritten for %s", name)
+      types_data[name] = type_data
+    header_data.pop("nested_types_namespace", None)
+    header_data.pop("nested_types", None)
+    header_data.pop("not_nested_types", None)
+    
+def add_typedef_data(types_data):
+  def check_type(t):
+    if not t["base"] in types_data:
+      raise ParseException("Unknown type: %s" % t["base"])
+    for arg in t.get("template_arguments", []):
+      check_type(arg)
 
-  #known_types = type_origins.keys()
-  #print "test0 ", known_types
+  def add_meaning(name, meaning):
+    meaning_parsed = parse_type(meaning)
+    if not name in types_data:
+      raise ParseException("Unknown type: %s" % name)
+    check_type(meaning_parsed)
+    if not meaning_parsed["base"] in types_data:
+      raise ParseException("Unknown type: %s" % meaning)
+    types_data[name]["meaning"] = meaning_parsed
 
-  for header_data in all_data:
+  # these types are not used anywhere, so
+  # we should just forget about them
+  bad_names = []
+  for name, data in types_data.iteritems():
+    if data.get("kind", None) == "typedef":
+      if name.endswith("::ConstIterator") or \
+         name.endswith("::Iterator") or \
+         name.endswith("::iterator_category"):
+        bad_names.append(name)
+
+  for name in bad_names:
+    types_data.pop(name)
+
+
+
+  add_meaning("qint8", "signed char")
+  add_meaning("quint8", "unsigned char")
+  add_meaning("qint16", "signed short")
+  add_meaning("quint16", "unsigned short")
+  add_meaning("qint32", "signed int")
+  add_meaning("quint32", "unsigned int")
+  add_meaning("qint64", "long long int") # todo: __int64 on Windows
+  add_meaning("quint64", "unsigned long long int") # todo: unsigned __int64 on Windows
+  add_meaning("qlonglong", "long long int") # todo: __int64 on Windows
+  add_meaning("qulonglong", "unsigned long long int") # todo: unsigned __int64 on Windows
+  add_meaning("qintptr", "long long int") # todo: can be qint64 or qint32
+  add_meaning("quintptr", "unsigned long long int") # todo: can be quint64 or quint32
+  add_meaning("qptrdiff", "long long int") # todo: can be qint64 or qint32
+  add_meaning("QList::difference_type", "long long int") # todo: can be qint64 or qint32
+  add_meaning("qreal", "double")
+  add_meaning("uchar", "unsigned char")
+  add_meaning("uint", "unsigned int")
+  add_meaning("ulong", "unsigned long")
+  add_meaning("ushort", "unsigned short")
+
+  add_meaning("Qt::HANDLE", "void*")
+
+  add_meaning("QByteArray::const_iterator", "const char*")
+  add_meaning("QByteArray::iterator", "char*")
+  add_meaning("QString::const_iterator", "const QChar*")
+  add_meaning("QString::iterator", "QChar*")
+
+  add_meaning("QFileInfoList", "QList<QFileInfo>")
+  add_meaning("QModelIndexList", "QList<QModelIndex>")
+  add_meaning("QObjectList", "QList<QObject>")
+  add_meaning("QTimeZone::OffsetDataList", "QList<QTimeZone::OffsetData>")
+  add_meaning("QVariantHash", "QHash<QString, QVariant>")
+  add_meaning("QVariantMap", "QMap<QString, QVariant>")
+  add_meaning("QVariantList", "QList<QVariant>")
+
+  add_meaning("QVariantAnimation::KeyValues", "QVector<QPair<qreal, QVariant>>")
+  add_meaning("QXmlStreamEntityDeclarations", "QVector<QXmlStreamEntityDeclaration>")
+  add_meaning("QXmlStreamNamespaceDeclarations", "QVector<QXmlStreamNamespaceDeclaration>")
+  add_meaning("QXmlStreamNotationDeclarations", "QVector<QXmlStreamNotationDeclaration>")
+
+  # these types can't be automatically processed
+  blacklist = [
+    "QFunctionPointer",
+    "QGlobalStatic::Type",
+    "QEasingCurve::EasingFunction",
+    "QLoggingCategory::CategoryFilter",
+    "QMessageLogger::CategoryFunction",
+    "QSettings::ReadFunc",
+    "QSettings::WriteFunc",
+    "QVarLengthArray::const_iterator",
+    "QVarLengthArray::iterator",
+    "QVector::const_iterator",
+    "QVector::const_reference",
+    "QVector::iterator",
+    "QVector::reference",
+    "QtMessageHandler"
+  ]
+
+  unknown_typedefs = []
+  for name, data in types_data.iteritems():
+    if data.get("kind", None) == "typedef":
+      if not "meaning" in data:
+        if not name in blacklist:
+          unknown_typedefs.append(name)
+  if unknown_typedefs:
+    unknown_typedefs.sort()
+    logger.warning("Unknown typedefs: \n%s", "\n".join(unknown_typedefs))
+
+
+def fix_method_types(headers_data, types_data):
+  used_types = set()
+  def fix_nested_types(t, current_namespace):
+    for subtype in t.get("template_arguments", []):
+      fix_nested_types(subtype, current_namespace)
+
+    if t["base"] == "QFile::Permissions":
+      # upcasting everything is too much for me!
+      t["base"] = "QFileDevice::Permissions"
+    #print "test1 ", current_namespace, t
+    namespace_parts = []
+    while True:
+      if current_namespace:
+        namespace_parts = current_namespace.split("::")
+      #print "test2 ", namespace_parts
+      for i in sorted(range(1+len(namespace_parts)), reverse=True):
+        candidate = "::".join(namespace_parts[:i] + [t["base"]])
+        #print "test3 candidate ", candidate
+        if candidate in types_data:
+          t["base"] = candidate
+          used_types.add(candidate)
+          return
+      if current_namespace and current_namespace in types_data:
+        n = types_data[current_namespace]["inherits"]
+        if n:
+          logger.debug("Switching namespace from %s to %s", current_namespace, n["base"])
+          current_namespace = n["base"]
+        else:
+          break
+      else:
+        break
+
+    raise NoTypeOriginException("Unknown type: %s" % t["base"])
+
+
+  for header_data in headers_data:
     current_namespace = None
     methods = header_data.get("methods", [])
-    logger.info("Checking include file: " + header_data["include_file"])
+    logger.debug("Checking include file: " + header_data["include_file"])
     if "class" in header_data:
       current_namespace = header_data["class"]
       #logger.warning("Class: " + header_data["class"])
@@ -640,28 +783,41 @@ def parse(input_folder):
         logger.warning("Class %s doesn't have any methods" % header_data["class"])
 
     if header_data.get("inherits", None):
-      fix_nested_types(header_data["inherits"], type_origins, current_namespace)
+      fix_nested_types(header_data["inherits"], current_namespace)
 
     #logger.warning("Namespace: " + unicode(current_namespace))
     for m in methods:
       try:
         if "return_type" in m:
-          fix_nested_types(m["return_type"], type_origins, current_namespace)
+          fix_nested_types(m["return_type"], current_namespace)
         for arg in m.get("arguments", []):
-          fix_nested_types(arg["type"], type_origins, current_namespace)
+          fix_nested_types(arg["type"], current_namespace)
       except NoTypeOriginException as e:
         logger.warning("%s (#include <%s>)\n%s\n" % (e.message, header_data["include_file"], pp.pformat(m)))
 
+  bad_names = []
+  for name, data in types_data.iteritems():
+    if data.get("kind", "") == "typedef" and not name in used_types:
+      logger.info("Removing unused typedef: %s", name)
+      bad_names.append(name)
+  for name in bad_names:
+    types_data.pop(name)
 
-  return all_data
+def process(input_folder):
+  headers_data = parse(input_folder)
+  types_data = known_basic_types()
+  add_qt_types(headers_data, types_data)
+  fix_method_types(headers_data, types_data)
+  add_typedef_data(types_data)
+  return { "headers_data": headers_data, "type_info": types_data }
 
 if len(sys.argv) < 3:
   print "Usage: parser doc_html_folder output_filename"
 else:
   logger.info("Parsing documentation...")
-  parse_result = parse(sys.argv[1])
+  parse_result = process(sys.argv[1])
   logger.info("Writing JSON result...")
   with open(sys.argv[2], "w") as f:
-    json.dump(parse_result, f, indent=2)
+    json.dump(parse_result, f, indent=2, sort_keys=True)
 
   logger.info("Done.")

@@ -118,16 +118,24 @@ pub struct EnumValue {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum TypeOrigin {
+  CBuiltIn,
+  Qt{ include_file: String },
+  Unsupported(String),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum KindOfType {
   Enum{ values: Vec<EnumValue> },
   Flags{ enum_name: String },
   TypeDef{ original_type: Option<String> },
-  Class
+  Class{ inherits: Option<String>, }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppTypeInfo {
   pub name: String,
+  pub origin: TypeOrigin,
   pub kind: KindOfType,
 }
 
