@@ -74,25 +74,36 @@ class NoTypeOriginException(ParseException):
   pass
 
 
-def fix_nested_types(t, known_types, current_namespace):
+def fix_nested_types(t, type_origins, current_namespace):
+  for subtype in t.get("template_arguments", []):
+    fix_nested_types(subtype, type_origins, current_namespace)
+
+  if t["base"] == "QFile::Permissions":
+    # upcasting everything is too much for me!
+    t["base"] = "QIoDevice::Permissions"
   #print "test1 ", current_namespace, t
   namespace_parts = []
-  if current_namespace:
-    namespace_parts = current_namespace.split("::")
-  #print "test2 ", namespace_parts
-  for i in sorted(range(1+len(namespace_parts)), reverse=True):
-    candidate = "::".join(namespace_parts[:i] + [t["base"]])
-    #print "test3 candidate ", candidate
-    if candidate in known_types:
-      t["base"] = candidate
-      #print "test4 ok"
+  while True:
+    if current_namespace:
+      namespace_parts = current_namespace.split("::")
+    #print "test2 ", namespace_parts
+    for i in sorted(range(1+len(namespace_parts)), reverse=True):
+      candidate = "::".join(namespace_parts[:i] + [t["base"]])
+      #print "test3 candidate ", candidate
+      if candidate in type_origins:
+        t["base"] = candidate
+        return
+    if current_namespace and current_namespace in type_origins:
+      n = type_origins[current_namespace]["inherits"]
+      if n:
+        logger.debug("Switching namespace from %s to %s", current_namespace, n["base"])
+        current_namespace = n["base"]
+      else:
+        break
+    else:
       break
 
-  if not t["base"] in known_types:
-    #print "test5 not ok!"
-    raise NoTypeOriginException("Unknown type: %s" % t["base"])
-  for subtype in t.get("template_arguments", []):
-    fix_nested_types(subtype, known_types, current_namespace)
+  raise NoTypeOriginException("Unknown type: %s" % t["base"])
 
 
 # soup.text sometimes deletes spaces between words.
@@ -597,10 +608,14 @@ def parse(input_folder):
   for t in ["QVersionNumber"]: #TODO: change this when updating to Qt 5.6
     type_origins[t] = "fake"
 
+  for t in ["QMap<Key, T>::const_iterator", "QMap<Key, T>::iterator", "QHash<Key, T>::const_iterator", "QHash<Key, T>::iterator"]:
+    #TODO: do something with these types
+    type_origins[t] = "fake"
+
 
   for header_data in all_data:
     if "class" in header_data:
-      type_origins[ header_data["class"] ] = {"qt_header": header_data["include_file"] }
+      type_origins[ header_data["class"] ] = {"qt_header": header_data["include_file"], "inherits": header_data["inherits"] }
     for t in header_data.get("nested_types", []):
       if "nested_types_namespace" in header_data:
         name = header_data["nested_types_namespace"] + "::" + t["name"]
@@ -611,8 +626,8 @@ def parse(input_folder):
       name = t["name"]
       type_origins[name] = {"qt_header": header_data["include_file"] }
 
-  known_types = type_origins.keys()
-  print "test0 ", known_types
+  #known_types = type_origins.keys()
+  #print "test0 ", known_types
 
   for header_data in all_data:
     current_namespace = None
@@ -625,15 +640,15 @@ def parse(input_folder):
         logger.warning("Class %s doesn't have any methods" % header_data["class"])
 
     if header_data.get("inherits", None):
-      fix_nested_types(header_data["inherits"], known_types, current_namespace)
+      fix_nested_types(header_data["inherits"], type_origins, current_namespace)
 
     #logger.warning("Namespace: " + unicode(current_namespace))
     for m in methods:
       try:
         if "return_type" in m:
-          fix_nested_types(m["return_type"], known_types, current_namespace)
+          fix_nested_types(m["return_type"], type_origins, current_namespace)
         for arg in m.get("arguments", []):
-          fix_nested_types(arg["type"], known_types, current_namespace)
+          fix_nested_types(arg["type"], type_origins, current_namespace)
       except NoTypeOriginException as e:
         logger.warning("%s (#include <%s>)\n%s\n" % (e.message, header_data["include_file"], pp.pformat(m)))
 
