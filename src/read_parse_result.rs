@@ -1,4 +1,5 @@
-use structs::*;
+
+
 use std::fs::File;
 extern crate serde;
 extern crate serde_json;
@@ -48,7 +49,7 @@ impl CppFunctionArgument {
 
 impl CppMethod {
   fn from_json(value: &serde_json::Value, class_name: &Option<String>, index: i32) -> Self {
-    //println!("{:?} {:?}", value, class_name);
+    // println!("{:?} {:?}", value, class_name);
     let value = value.as_object().unwrap();
     CppMethod {
       name: value.get("name").unwrap().as_string().unwrap().to_string(),
@@ -108,7 +109,7 @@ impl CppMethod {
         Some(v) => v.as_boolean().unwrap(),
         None => false,
       },
-      original_index: index
+      original_index: index,
     }
   }
 }
@@ -128,7 +129,7 @@ impl CppHeaderData {
                        .as_array()
                        .unwrap()
                        .into_iter()
-                      .enumerate()
+                       .enumerate()
                        .map(|(index, x)| CppMethod::from_json(x, &class_name, index as i32))
                        .collect();
     CppHeaderData {
@@ -149,14 +150,75 @@ impl CppHeaderData {
   }
 }
 
+impl EnumValue {
+  fn from_json(value: &serde_json::Value, name: String) -> Self {
 
-pub fn do_it(file_name: &std::path::PathBuf) -> Vec<CppHeaderData> {
+  }
+}
+
+impl CppTypeInfo {
+  fn from_json(value: &serde_json::Value, name: String) -> Self {
+    let value = value.as_object().unwrap();
+    CppTypeInfo {
+      name: name,
+      origin: match value.get("origin").unwrap().as_string().unwrap() {
+        "c_built_in" => CppTypeOrigin::CBuiltIn,
+        "qt" => {
+          CppTypeOrigin::Qt {
+            include_file: value.get("qt_header").unwrap().as_string().unwrap().to_string(),
+          }
+        }
+        other => CppTypeOrigin::Unsupported(other),
+      },
+      kind: match value.get("kind").unwrap().as_string().unwrap() {
+        "enum" => {
+          CppTypeKind::Enum {
+            values: value.get("values")
+                         .unwrap()
+                         .as_array()
+                         .unwrap()
+                         .into_iter()
+                         .map(|x| EnumValue::from_json(x))
+                         .collect(),
+          }
+        }
+        "flags" => {
+          CppTypeKind::Flags {
+            enum_name: value.get("enum").unwrap().as_string().unwrap().to_string(),
+          }
+        }
+        "typedef" => {
+          CppTypeKind::TypeDef { meaning: CppType::from_json(value.get("meaning").unwrap()) }
+        }
+        "class" => CppTypeKind::Class { inherits: match value.get("inherits") {
+          Some(inherits) => CppType::from_json(inherits),
+          None => None
+        } },
+        _ => panic!("invalid kind of type")
+      },
+    }
+  }
+}
+
+impl CppTypeMap {
+  fn from_json(value: &serde_json::Value) -> Self {
+    let value = value.as_object().unwrap();
+    // ...
+  }
+}
+
+pub fn do_it(file_name: &std::path::PathBuf) -> CppData {
   let mut f = File::open(file_name).unwrap();
   let data: serde_json::Value = serde_json::from_reader(f).unwrap();
-  data.as_array().unwrap().into_iter().map(|x| CppHeaderData::from_json(x)).collect()
-  // for header in data.as_array().unwrap() {
-  //  let header = header.as_object().unwrap();
-  //  println!("test: {}", header.get("include_file").unwrap().as_string().unwrap());
-  // }
-
+  let data_object = data.as_object().unwrap();
+  CppData {
+    headers: object.get("headers_data")
+                   .unwrap()
+                   .as_array()
+                   .unwrap()
+                   .into_iter()
+                   .map(|x| CppHeaderData::from_json(x))
+                   .collect(),
+    types: CppTypeMap::from_json(object.get("type_info").unwrap()),
+  }
 }

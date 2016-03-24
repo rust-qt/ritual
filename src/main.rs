@@ -1,9 +1,19 @@
 
-mod structs;
-use structs::*;
+mod c_function_argument;
+mod c_function_signature;
 mod c_generator;
-
+mod c_type;
+mod caption_strategy;
+mod cpp_and_c_method;
+mod cpp_data;
+mod cpp_header_data;
+mod cpp_method;
+mod cpp_type;
+mod cpp_type_map;
+mod enums;
 mod read_parse_result;
+mod utils;
+
 use std::fs;
 use std::path::{PathBuf, Path};
 use std::io;

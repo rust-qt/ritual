@@ -1,5 +1,8 @@
+use cpp_header_data::CppHeaderData;
+use c_type::CTypeExtended;
+use enums::{AllocationPlace, CFunctionArgumentCppEquivalent, IndirectionChange, CppMethodScope};
+
 use std::path::PathBuf;
-use structs::*;
 use std::fs::File;
 use std::io::Write;
 
