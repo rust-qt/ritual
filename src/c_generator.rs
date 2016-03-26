@@ -1,23 +1,193 @@
 use cpp_header_data::CppHeaderData;
+use cpp_data::CppData;
 use c_type::CTypeExtended;
-use enums::{AllocationPlace, CFunctionArgumentCppEquivalent, IndirectionChange, CppMethodScope};
-
+use enums::{AllocationPlace, CFunctionArgumentCppEquivalent, IndirectionChange, CppMethodScope, CppTypeOrigin, CppTypeKind};
+use cpp_and_c_method::CppAndCMethod;
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::Write;
+use utils::JoinWithString;
 
 pub struct CGenerator {
   qtcw_path: PathBuf,
-  all_data: Vec<CppHeaderData>,
+  cpp_data: CppData,
   sized_classes: Vec<String>,
 }
 
+fn only_c_code(code: String) -> String {
+  format!("#ifndef __cplusplus // if C\n{}#endif // if C\n\n", code)
+}
+fn only_cpp_code(code: String) -> String {
+  format!("#ifdef __cplusplus // if C++\n{}#endif // if C++\n\n", code)
+}
+
+
+impl CppAndCMethod {
+  fn header_code(&self) -> String {
+    format!("{} QTCW_EXPORT {}({});\n",
+            self.c_signature.return_type.c_type.to_c_code(),
+            self.c_name,
+            self.c_signature.arguments_to_c_code())
+  }
+
+  fn convert_return_type(&self, expression: String) -> String {
+    let mut result = expression;
+    match self.c_signature.return_type.conversion.indirection_change {
+      IndirectionChange::NoChange => {}
+      IndirectionChange::ValueToPointer => {
+        match self.allocation_place {
+          AllocationPlace::Stack => panic!("stack allocated wrappers are expected to return void!"),
+          AllocationPlace::Heap => {
+            // constructors are said to return values in parse result,
+            // but in reality we use `new` which returns a pointer,
+            // so no conversion is necessary for constructors.
+            if !self.cpp_method.is_constructor {
+              if let Some(ref return_type) = self.cpp_method.return_type {
+                result = format!("new {}({})", return_type.base, result);
+              } else {
+                panic!("cpp self unexpectedly doesn't have return type");
+              }
+            }
+          }
+        }
+      }
+      IndirectionChange::ReferenceToPointer => {
+        result = format!("&{}", result);
+      }
+    }
+    if self.c_signature.return_type.conversion.renamed {
+      result = format!("reinterpret_cast<{}>({})",
+                       self.c_signature
+                           .return_type
+                           .c_type
+                           .to_c_code(),
+                       result);
+
+    }
+    if self.allocation_place == AllocationPlace::Stack && !self.cpp_method.is_constructor {
+      if let Some(arg) = self.c_signature.arguments.iter().find(|x| {
+        x.cpp_equivalent == CFunctionArgumentCppEquivalent::ReturnValue
+      }) {
+        if let Some(ref return_type) = self.cpp_method.return_type {
+          result = format!("new({}) {}({})", arg.name, return_type.base, result);
+        } else {
+          panic!("cpp self unexpectedly doesn't have return type");
+        }
+      }
+    }
+    result
+  }
+
+  fn arguments_values(&self) -> String {
+    let mut filled_arguments = vec![];
+    for (i, cpp_argument) in self.cpp_method.arguments.iter().enumerate() {
+      if let Some(c_argument) = self.c_signature.arguments.iter().find(|x| {
+        x.cpp_equivalent == CFunctionArgumentCppEquivalent::Argument(i as i8)
+      }) {
+        let mut result = c_argument.name;
+        match c_argument.argument_type
+                        .conversion
+                        .indirection_change {
+          IndirectionChange::ValueToPointer |
+          IndirectionChange::ReferenceToPointer => result = format!("*{}", result),
+          IndirectionChange::NoChange => {}
+        }
+        if c_argument.argument_type.conversion.renamed {
+          result = format!("reinterpret_cast<{}>({})",
+                           cpp_argument.argument_type.to_cpp_code(),
+                           result);
+        }
+        filled_arguments.push(result);
+      } else {
+        panic!("Error: no positional argument found\n{:?}", self);
+      }
+    }
+
+    filled_arguments.into_iter().join(", ")
+  }
+
+  fn returned_expression(&self) -> String {
+    let mut result = if self.cpp_method.is_constructor {
+      if let CppMethodScope::Class(ref class_name) = self.cpp_method.scope {
+        match self.allocation_place {
+          AllocationPlace::Stack => {
+            if let Some(arg) = self.c_signature.arguments.iter().find(|x| {
+              x.cpp_equivalent == CFunctionArgumentCppEquivalent::ReturnValue
+            }) {
+              format!("new({}) {}", arg.name, class_name)
+            } else {
+              panic!("no return value equivalent argument found");
+            }
+          }
+          AllocationPlace::Heap => format!("new {}", class_name),
+        }
+      } else {
+        panic!("constructor not in class scope");
+      }
+    } else {
+      let scope_specifier = if let CppMethodScope::Class(ref class_name) = self.cpp_method.scope {
+        if self.cpp_method.is_static {
+          format!("{}::", class_name)
+        } else {
+          if let Some(arg) = self.c_signature.arguments.iter().find(|x| {
+            x.cpp_equivalent == CFunctionArgumentCppEquivalent::This
+          }) {
+            format!("{}->", arg.name)
+          } else {
+            panic!("Error: no this argument found\n{:?}", self);
+          }
+        }
+      } else {
+        "".to_string()
+      };
+      format!("{}{}", scope_specifier, self.cpp_method.name)
+    };
+    result = format!("{}({})", result, self.arguments_values());
+    self.convert_return_type(result)
+  }
+
+
+  fn source_body(&self) -> String {
+    if self.cpp_method.is_destructor && self.allocation_place == AllocationPlace::Heap {
+      if let Some(arg) = self.c_signature
+                             .arguments
+                             .iter()
+                             .find(|x| x.cpp_equivalent == CFunctionArgumentCppEquivalent::This) {
+        format!("delete {};\n", arg.name)
+      } else {
+        panic!("Error: no this argument found\n{:?}", self);
+      }
+    } else {
+      format!("{}{};\n",
+              if self.c_signature.return_type == CTypeExtended::void() {
+                ""
+              } else {
+                "return "
+              },
+              self.returned_expression())
+    }
+
+  }
+
+  fn source_code(&self) -> String {
+    format!("{} {}({}) {{\n  {}}}\n\n",
+            self.c_signature.return_type.c_type.to_c_code(),
+            self.c_name,
+            self.c_signature.arguments_to_c_code(),
+            self.source_body())
+  }
+}
+
+// struct CppAndCCode {
+//  cpp_code: String,
+//  c_code: String,
+// }
 
 
 impl CGenerator {
-  pub fn new(all_data: Vec<CppHeaderData>, qtcw_path: PathBuf) -> Self {
+  pub fn new(cpp_data: CppData, qtcw_path: PathBuf) -> Self {
     CGenerator {
-      all_data: all_data,
+      cpp_data: cpp_data,
       qtcw_path: qtcw_path,
       sized_classes: Vec::new(),
     }
@@ -27,7 +197,7 @@ impl CGenerator {
     self.sized_classes = self.generate_size_definer_class_list();
     let white_list = vec!["QPoint", "QRect", "QBitArray", "QByteArray"];
 
-    for data in &self.all_data {
+    for data in &self.cpp_data.headers {
       if white_list.iter().find(|&&x| x == data.include_file).is_none() {
         continue;
       }
@@ -39,6 +209,11 @@ impl CGenerator {
 
 
   }
+
+  //  pub fn generate_type_declaration(&self, cpp_type: &CppType, c_type: &CTypeExtended) -> CppAndCCode {
+  //    let type_info = self.cpp_data.value(cpp_type.base).unwrap();
+  //    match
+  //  }
 
 
 
@@ -55,7 +230,7 @@ impl CGenerator {
     h_path.push("classes_list.h");
     println!("Generating file: {:?}", h_path);
     let mut h_file = File::create(&h_path).unwrap();
-    for item in &self.all_data {
+    for item in &self.cpp_data.headers {
       if item.involves_templates() {
         // TODO: support template classes!
         if show_output {
@@ -65,14 +240,6 @@ impl CGenerator {
         continue;
       }
       if let Some(ref class_name) = item.class_name {
-        if class_name.contains("::") {
-          // TODO: support nested classes!
-          if show_output {
-            println!("Ignoring {} because it is a nested class.",
-                     item.include_file);
-          }
-          continue;
-        }
         if blacklist.iter().find(|&&x| x == class_name.as_ref() as &str).is_some() {
           if show_output {
             println!("Ignoring {} because it is blacklisted.", item.include_file);
@@ -80,10 +247,11 @@ impl CGenerator {
           continue;
 
         }
+        let define_name = class_name.replace("::", "_");
         if show_output {
           println!("Requesting size definition for {}.", class_name);
         }
-        write!(h_file, "ADD({});\n", class_name).unwrap();
+        write!(h_file, "ADD({}, {});\n", define_name, class_name).unwrap();
         sized_classes.push(class_name.clone());
       }
     }
@@ -91,33 +259,20 @@ impl CGenerator {
     sized_classes
   }
 
-  fn write_struct_declaration(&self,
-                              h_file: &mut File,
-                              class_name: &String,
-                              full_declaration: bool,
-                              only_c: bool) {
+  fn struct_declaration(&self, c_struct_name: &String, full_declaration: bool) -> String {
     // write C struct definition
-    if only_c {
-      write!(h_file, "#ifndef __cplusplus // if C\n").unwrap();
-    }
-    if full_declaration && self.sized_classes.iter().find(|x| *x == class_name).is_some() {
-      write!(h_file,
-             "struct QTCW_{} {{ char space[QTCW_sizeof_{}]; }};\n",
-             class_name,
-             class_name)
-        .unwrap();
+    let mut result = if full_declaration &&
+                        self.sized_classes.iter().find(|x| *x == c_struct_name).is_some() {
+      format!("struct QTCW_{} {{ char space[QTCW_sizeof_{}]; }};\n",
+              c_struct_name,
+              c_struct_name)
     } else {
-      write!(h_file, "struct QTCW_{};\n", class_name).unwrap();
-    }
-    write!(h_file,
-           "typedef struct QTCW_{} {};\n",
-           class_name,
-           class_name)
-      .unwrap();
-    if only_c {
-      write!(h_file, "#endif\n").unwrap()
+      format!("struct QTCW_{};\n", c_struct_name)
     };
-    write!(h_file, "\n").unwrap();
+    format!("{}typedef struct QTCW_{} {};\n\n",
+            result,
+            c_struct_name,
+            c_struct_name)
   }
 
 
@@ -147,204 +302,77 @@ impl CGenerator {
 
 
     write!(h_file, "#ifdef __cplusplus\n").unwrap();
-    write!(h_file, "#include <{}>\n", data.include_file).unwrap();
+    // write!(h_file, "#include <{}>\n", data.include_file).unwrap();
+    write!(h_file, "#include <QtCore>\n").unwrap();
     write!(h_file, "#endif\n\n").unwrap();
 
     let mut forward_declared_classes = vec![];
-    if let Some(ref class_name) = data.class_name {
-      self.write_struct_declaration(&mut h_file, class_name, true, true);
-      forward_declared_classes.push(class_name.clone());
-    } else {
-      println!("Not a class header. Wrapper struct is not generated.");
-    }
+//    if let Some(ref class_name) = data.class_name {
+//      self.write_struct_declaration(&mut h_file, class_name, true, true);
+//      forward_declared_classes.push(class_name.clone());
+//    } else {
+//      println!("Not a class header. Wrapper struct is not generated.");
+//    }
 
     write!(h_file, "QTCW_EXTERN_C_BEGIN\n\n").unwrap();
-    let methods = data.process_methods();
+    let methods = data.process_methods(&self.cpp_data.types);
     {
-      let mut check_type_for_forward_declaration = |t: &CTypeExtended| {
-        if t.is_primitive {
-          // println!("Type {:?} doesn't need a forward declaration because it's built-in type", t);
-          return; //it's built-in type
-        }
-        if forward_declared_classes.iter().find(|&x| x == &t.c_type.base).is_some() {
+      let mut check_type_for_declaration = |c_type_extended: &CTypeExtended| {
+        let c_type = c_type_extended.c_type;
+        let cpp_type = c_type_extended.cpp_type;
+        if forward_declared_classes.iter().find(|&x| x == &c_type.base).is_some() {
           return; //already declared
         }
-        if !t.c_type.is_pointer {
-          println!("Warning: value of non-primitive type encountered ({:?})",
-                   t.c_type);
+        let type_info = self.cpp_data.types.get_info(&cpp_type.base).unwrap();
+        let mut full_declaration = false;
+        match type_info.origin {
+          CppTypeOrigin::CBuiltIn => return,
+          CppTypeOrigin::Qt { include_file } => {
+            full_declaration = data.include_file == include_file
+          }
+          CppTypeOrigin::Unsupported(..) => panic!("this type should have been filtered previously"),
         }
-        let only_c = !t.conversion.renamed;
-        self.write_struct_declaration(&mut h_file, &t.c_type.base, false, only_c);
-        forward_declared_classes.push(t.c_type.base.clone());
+        let mut declaration = match type_info.kind {
+          CppTypeKind::CPrimitive => {
+            panic!("this type should have been filtered in previous match")
+          }
+          CppTypeKind::Enum { values } => {
+            only_c_code(if full_declaration {
+              format!("enum {} {{\n{}}};\n",
+                      c_type.base,
+                      values.iter().map(|x| format!("  {} = {},", x.name, x.value)).join("\n"))
+            } else {
+              format!("enum {};\n", c_type.base)
+            })
+          }
+          CppTypeKind::Flags { .. } => format!("typedef uint {};\n", c_type.base),
+          CppTypeKind::TypeDef { .. } => panic!("get_info can't return TypeDef"),
+          CppTypeKind::Class { .. } => {
+            only_c_code(self.struct_declaration(&c_type.base, full_declaration))
+          }
+        };
+
+        forward_declared_classes.push(c_type.base.clone());
         // println!("Type {:?} is forward-declared.", t);
+        if c_type_extended.conversion.renamed {
+          h_file.write(&only_cpp_code(format!("typedef {} {};\n", cpp_type.base, c_type.base)).into_bytes());
+        }
       };
 
       for method in &methods {
-        check_type_for_forward_declaration(&method.c_signature.return_type);
+        check_type_for_declaration(&method.c_signature.return_type);
         for arg in &method.c_signature.arguments {
-          check_type_for_forward_declaration(&arg.argument_type);
+          check_type_for_declaration(&arg.argument_type);
         }
       }
     }
 
 
     for method in &methods {
-      write!(h_file,
-             "{} QTCW_EXPORT {}({});\n",
-             method.c_signature.return_type.c_type.to_c_code(),
-             method.c_name,
-             method.c_signature.arguments_to_c_code())
-        .unwrap();
-
-      write!(cpp_file,
-             "{} {}({}) {{\n  ",
-             method.c_signature.return_type.c_type.to_c_code(),
-             method.c_name,
-             method.c_signature.arguments_to_c_code())
-        .unwrap();
-
-      if method.cpp_method.is_destructor && method.allocation_place == AllocationPlace::Heap {
-        if let Some(arg) = method.c_signature.arguments.iter().find(|x| {
-          x.cpp_equivalent == CFunctionArgumentCppEquivalent::This
-        }) {
-          write!(cpp_file, "delete {};\n", arg.name);
-        } else {
-          panic!("Error: no this argument found\n{:?}", method);
-        }
-      } else {
-
-        if method.c_signature.return_type != CTypeExtended::void() {
-          write!(cpp_file, "return ");
-        }
-        let mut return_type_conversion_prefix = "".to_string();
-        let mut return_type_conversion_suffix = "".to_string();
-        match method.c_signature.return_type.conversion.indirection_change {
-          IndirectionChange::NoChange => {}
-          IndirectionChange::ValueToPointer => {
-            match method.allocation_place {
-              AllocationPlace::Stack => {
-                panic!("stack allocated wrappers are expected to return void!")
-              }
-              AllocationPlace::Heap => {
-                // constructors are said to return values in parse result,
-                // but in reality we use `new` which returns a pointer,
-                // so no conversion is necessary for constructors.
-                if !method.cpp_method.is_constructor {
-                  if let Some(ref return_type) = method.cpp_method.return_type {
-                    return_type_conversion_prefix = format!("new {}(", return_type.base);
-                  } else {
-                    panic!("cpp method unexpectedly doesn't have return type");
-                  }
-                  return_type_conversion_suffix = ")".to_string();
-                }
-              }
-            }
-          }
-          IndirectionChange::ReferenceToPointer => {
-            return_type_conversion_prefix = "&".to_string();
-          }
-        }
-        if method.c_signature.return_type.conversion.renamed {
-          return_type_conversion_prefix = format!("reinterpret_cast<{}>({}",
-                                                  method.c_signature
-                                                        .return_type
-                                                        .c_type
-                                                        .to_c_code(),
-                                                  return_type_conversion_prefix);
-          return_type_conversion_suffix = return_type_conversion_suffix + ")";
-
-        }
-        if method.allocation_place == AllocationPlace::Stack && !method.cpp_method.is_constructor {
-          if let Some(arg) = method.c_signature.arguments.iter().find(|x| {
-            x.cpp_equivalent == CFunctionArgumentCppEquivalent::ReturnValue
-          }) {
-            if let Some(ref return_type) = method.cpp_method.return_type {
-              return_type_conversion_prefix = format!("new({}) {}(", arg.name, return_type.base);
-            } else {
-              panic!("cpp method unexpectedly doesn't have return type");
-            }
-            return_type_conversion_suffix = ")".to_string();
-
-          }
-        }
-
-        write!(cpp_file, "{}", return_type_conversion_prefix);
-
-        if method.cpp_method.is_constructor {
-          if let CppMethodScope::Class(ref class_name) = method.cpp_method.scope {
-            match method.allocation_place {
-              AllocationPlace::Stack => {
-                if let Some(arg) = method.c_signature.arguments.iter().find(|x| {
-                  x.cpp_equivalent == CFunctionArgumentCppEquivalent::ReturnValue
-                }) {
-                  write!(cpp_file, "new({}) {}", arg.name, class_name);
-                } else {
-                  panic!("no return value equivalent argument found");
-                }
-              }
-              AllocationPlace::Heap => {
-                write!(cpp_file, "new {}", class_name);
-              }
-            }
-          } else {
-            panic!("constructor not in class scope");
-          }
+      h_file.write(&method.header_code().into_bytes());
+      cpp_file.write(&method.source_code().into_bytes());
 
 
-        } else {
-          if let CppMethodScope::Class(ref class_name) = method.cpp_method.scope {
-            if method.cpp_method.is_static {
-              write!(cpp_file, "{}::", class_name);
-            } else {
-              if let Some(arg) = method.c_signature.arguments.iter().find(|x| {
-                x.cpp_equivalent == CFunctionArgumentCppEquivalent::This
-              }) {
-                write!(cpp_file, "{}->", arg.name);
-              } else {
-                panic!("Error: no this argument found\n{:?}", method);
-              }
-            }
-          }
-          write!(cpp_file, "{}", method.cpp_method.name);
-        }
-
-        let mut filled_arguments = vec![];
-        for (i, cpp_argument) in method.cpp_method.arguments.iter().enumerate() {
-          if let Some(c_argument) = method.c_signature.arguments.iter().find(|x| {
-            x.cpp_equivalent == CFunctionArgumentCppEquivalent::Argument(i as i8)
-          }) {
-            let mut conversion_prefix = match c_argument.argument_type
-                                                        .conversion
-                                                        .indirection_change {
-                                          IndirectionChange::ValueToPointer |
-                                          IndirectionChange::ReferenceToPointer => "*",
-                                          IndirectionChange::NoChange => "",
-                                        }
-                                        .to_string();
-            let mut conversion_suffix = "";
-            if c_argument.argument_type.conversion.renamed {
-              conversion_prefix = format!("reinterpret_cast<{}>({}",
-                                          cpp_argument.argument_type.to_cpp_code(),
-                                          conversion_prefix);
-              conversion_suffix = ")";
-            }
-            filled_arguments.push(format!("{}{}{}",
-                                          conversion_prefix,
-                                          c_argument.name,
-                                          conversion_suffix));
-          } else {
-            panic!("Error: no positional argument found\n{:?}", method);
-          }
-        }
-
-
-        write!(cpp_file,
-               "({}){};\n",
-               filled_arguments.into_iter().join(", "),
-               return_type_conversion_suffix);
-      }
-
-      write!(cpp_file, "}}\n\n"); // method end
 
 
 

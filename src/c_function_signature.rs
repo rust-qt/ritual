@@ -1,6 +1,7 @@
 use c_function_argument::CFunctionArgument;
 use c_type::CTypeExtended;
 use caption_strategy::ArgumentCaptionStrategy;
+use utils::JoinWithString;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CFunctionSignature {

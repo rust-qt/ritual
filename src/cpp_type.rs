@@ -1,6 +1,6 @@
 use enums::CppTypeIndirection;
 use c_type::CTypeExtended;
-use enums::IndirectionChange;
+use enums::{IndirectionChange, CppTypeKind};
 use cpp_type_map::CppTypeMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -12,34 +12,48 @@ pub struct CppType {
 }
 
 impl CppType {
-  pub fn is_template(&self) {
+  pub fn void() -> Self {
+    CppType {
+      is_const: false,
+      indirection: CppTypeIndirection::None,
+      base: "void".to_string(),
+      template_arguments: None,
+    }
+  }
+
+  pub fn is_template(&self) -> bool {
     self.template_arguments.is_some()
   }
 
   pub fn to_cpp_code(&self) -> String {
+    if self.is_template() {
+      panic!("template types are not supported yet")
+    }
     format!("{}{}{}",
-    if self.is_const {
-      "const "
-    } else {
-      ""
-    },
-    self.base,
-    match self.indirection {
-      CppTypeIndirection::None => "",
-      CppTypeIndirection::Ptr => "*",
-      CppTypeIndirection::Ref => "&",
-      CppTypeIndirection::Ptr_ref => "*&",
-      CppTypeIndirection::Ptr_ptr => "**",
-      CppTypeIndirection::Ref_ref => "&&",
-    })
+            if self.is_const {
+              "const "
+            } else {
+              ""
+            },
+            self.base,
+            match self.indirection {
+              CppTypeIndirection::None => "",
+              CppTypeIndirection::Ptr => "*",
+              CppTypeIndirection::Ref => "&",
+              CppTypeIndirection::Ptr_ref => "*&",
+              CppTypeIndirection::Ptr_ptr => "**",
+              CppTypeIndirection::Ref_ref => "&&",
+            })
   }
 
-  fn to_c_type(&self, cpp_type_map: &CppTypeMap) -> Option<CTypeExtended> {
-    if self.is_template {
-      return None;
+  fn to_c_type(&self, cpp_type_map: &CppTypeMap) -> Result<CTypeExtended, String> {
+    if self.is_template() {
+      return Err("Template types are not supported yet".to_string());
     }
+    // todo: refactor this (it's easy to forgot initialization of result fields)
     let mut result = CTypeExtended::void();
     result.c_type.is_const = self.is_const;
+    result.cpp_type = self.clone();
     match self.indirection {
       CppTypeIndirection::None => {
         // "const Rect" return type should not be translated to const pointer
@@ -53,34 +67,35 @@ impl CppType {
         result.c_type.is_pointer = true;
         result.conversion.indirection_change = IndirectionChange::ReferenceToPointer;
       }
+      _ => return Err("Unsupported level of indirection".to_string()),
     }
 
-
-    // let mut aliased_primitive_types = HashMap::new();
-    // aliased_primitive_types.insert("qint8", "int8_t");
-
-    if let Some(info) = cpp_type_map.get_info(&self.base) {
-
-    }
-
-    if good_primitive_types.iter().find(|&x| x == &self.base).is_some() {
-      result.is_primitive = true;
-      result.c_type.base = self.base.clone();
-    } else {
-      result.c_type.base = self.base.clone();
-      if result.c_type.base.find("::").is_some() {
-        result.c_type.base = result.c_type.base.replace("::", "_");
-        result.conversion.renamed = true;
+    match cpp_type_map.get_info(&self.base) {
+      Ok(info) => {
+        match info.kind {
+          CppTypeKind::TypeDef { .. } => panic!("cpp_type_map.get_info should not return typedef"),
+          CppTypeKind::CPrimitive | CppTypeKind::Enum { .. } => {
+            result.c_type.base = self.base.clone();
+          }
+          CppTypeKind::Flags { .. } => {
+            result.c_type.base = format!("QTCW_{}", self.base.replace("::", "_"));
+            result.conversion.qflags_to_uint = true;
+          }
+          CppTypeKind::Class { .. } => {
+            result.c_type.base = self.base.clone();
+            result.c_type.is_pointer = true;
+            if self.indirection == CppTypeIndirection::None {
+              result.conversion.indirection_change = IndirectionChange::ValueToPointer;
+            }
+          }
+        }
       }
-      result.c_type.is_pointer = true;
-      if !self.is_pointer && !self.is_reference {
-        result.conversion.indirection_change = IndirectionChange::ValueToPointer;
-      }
+      Err(msg) => return Err(format!("Type info error for {:?}: {}", self, msg)),
     }
-    Some(result)
-  }
-
-  fn is_stack_allocated_struct(&self) -> bool {
-    !self.is_pointer && !self.is_reference && self.base.starts_with("Q")
+    if result.c_type.base.find("::").is_some() {
+      result.c_type.base = result.c_type.base.replace("::", "_");
+      result.conversion.renamed = true;
+    }
+    Ok(result)
   }
 }

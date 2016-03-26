@@ -1,5 +1,5 @@
-use enums::{IndirectionChange};
-
+use enums::IndirectionChange;
+use cpp_type::CppType;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CType {
@@ -13,11 +13,13 @@ pub struct CType {
 pub struct CppToCTypeConversion {
   pub indirection_change: IndirectionChange,
   pub renamed: bool,
+  pub qflags_to_uint: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CTypeExtended {
   pub c_type: CType,
+  pub cpp_type: CppType,
   pub conversion: CppToCTypeConversion,
 }
 
@@ -25,9 +27,11 @@ impl CTypeExtended {
   pub fn void() -> Self {
     CTypeExtended {
       c_type: CType::void(),
+      cpp_type: CppType::void(),
       conversion: CppToCTypeConversion {
         indirection_change: IndirectionChange::NoChange,
         renamed: false,
+        qflags_to_uint: false,
       },
     }
   }

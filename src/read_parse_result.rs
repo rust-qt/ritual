@@ -1,4 +1,9 @@
-
+use cpp_type::CppType;
+use cpp_type_map::{EnumValue, CppTypeInfo, CppTypeMap};
+use cpp_method::{CppFunctionArgument, CppMethod};
+use cpp_header_data::CppHeaderData;
+use cpp_data::CppData;
+use enums::{CppMethodScope, CppTypeOrigin, CppTypeKind, CppTypeIndirection};
 
 use std::fs::File;
 extern crate serde;
@@ -12,21 +17,30 @@ impl CppType {
   fn from_json(value: &serde_json::Value) -> Self {
     let value = value.as_object().unwrap();
     CppType {
-      is_template: match value.get("template") {
-        Some(v) => v.as_boolean().unwrap(),
-        None => false,
+      template_arguments: match value.get("template_arguments") {
+        Some(v) => {
+          Some(v.as_array()
+                .unwrap()
+                .into_iter()
+                .map(|x| CppType::from_json(x))
+                .collect())
+        }
+        None => None,
       },
       is_const: match value.get("const") {
         Some(v) => v.as_boolean().unwrap(),
         None => false,
       },
-      is_reference: match value.get("reference") {
-        Some(v) => v.as_boolean().unwrap(),
-        None => false,
-      },
-      is_pointer: match value.get("pointer") {
-        Some(v) => v.as_boolean().unwrap(),
-        None => false,
+      indirection: match value.get("indirection") {
+        Some(v) => match v.as_string().unwrap() {
+          "*" => CppTypeIndirection::Ptr,
+          "&" => CppTypeIndirection::Ref,
+          "&&" => CppTypeIndirection::Ref_ref,
+          "*&" => CppTypeIndirection::Ptr_ref,
+          "**" => CppTypeIndirection::Ptr_ptr,
+          _ => panic!("unknown indirection string")
+        },
+        None => CppTypeIndirection::None,
       },
       base: value.get("base").unwrap().as_string().unwrap().to_string(),
     }
@@ -151,50 +165,57 @@ impl CppHeaderData {
 }
 
 impl EnumValue {
-  fn from_json(value: &serde_json::Value, name: String) -> Self {
-
-  }
+  fn from_json(value: &serde_json::Value, name: String) -> Self {}
 }
 
 impl CppTypeInfo {
   fn from_json(value: &serde_json::Value, name: String) -> Self {
     let value = value.as_object().unwrap();
+    let origin = match value.get("origin").unwrap().as_string().unwrap() {
+      "c_built_in" => CppTypeOrigin::CBuiltIn,
+      "qt" => {
+        CppTypeOrigin::Qt {
+          include_file: value.get("qt_header").unwrap().as_string().unwrap().to_string(),
+        }
+      }
+      other => CppTypeOrigin::Unsupported(other.to_string()),
+    };
     CppTypeInfo {
       name: name,
-      origin: match value.get("origin").unwrap().as_string().unwrap() {
-        "c_built_in" => CppTypeOrigin::CBuiltIn,
-        "qt" => {
-          CppTypeOrigin::Qt {
-            include_file: value.get("qt_header").unwrap().as_string().unwrap().to_string(),
+      origin: origin,
+      kind: if origin == CppTypeOrigin::CBuiltIn {
+        CppTypeKind::CPrimitive
+      } else {
+        match value.get("kind").unwrap().as_string().unwrap() {
+          "enum" => {
+            CppTypeKind::Enum {
+              values: value.get("values")
+                           .unwrap()
+                           .as_array()
+                           .unwrap()
+                           .into_iter()
+                           .map(|x| EnumValue::from_json(x))
+                           .collect(),
+            }
           }
-        }
-        other => CppTypeOrigin::Unsupported(other),
-      },
-      kind: match value.get("kind").unwrap().as_string().unwrap() {
-        "enum" => {
-          CppTypeKind::Enum {
-            values: value.get("values")
-                         .unwrap()
-                         .as_array()
-                         .unwrap()
-                         .into_iter()
-                         .map(|x| EnumValue::from_json(x))
-                         .collect(),
+          "flags" => {
+            CppTypeKind::Flags {
+              enum_name: value.get("enum").unwrap().as_string().unwrap().to_string(),
+            }
           }
-        }
-        "flags" => {
-          CppTypeKind::Flags {
-            enum_name: value.get("enum").unwrap().as_string().unwrap().to_string(),
+          "typedef" => {
+            CppTypeKind::TypeDef { meaning: CppType::from_json(value.get("meaning").unwrap()) }
           }
+          "class" => {
+            CppTypeKind::Class {
+              inherits: match value.get("inherits") {
+                Some(inherits) => CppType::from_json(inherits),
+                None => None,
+              },
+            }
+          }
+          _ => panic!("invalid kind of type"),
         }
-        "typedef" => {
-          CppTypeKind::TypeDef { meaning: CppType::from_json(value.get("meaning").unwrap()) }
-        }
-        "class" => CppTypeKind::Class { inherits: match value.get("inherits") {
-          Some(inherits) => CppType::from_json(inherits),
-          None => None
-        } },
-        _ => panic!("invalid kind of type")
       },
     }
   }
@@ -210,7 +231,7 @@ impl CppTypeMap {
 pub fn do_it(file_name: &std::path::PathBuf) -> CppData {
   let mut f = File::open(file_name).unwrap();
   let data: serde_json::Value = serde_json::from_reader(f).unwrap();
-  let data_object = data.as_object().unwrap();
+  let object = data.as_object().unwrap();
   CppData {
     headers: object.get("headers_data")
                    .unwrap()

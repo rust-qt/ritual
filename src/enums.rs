@@ -1,3 +1,5 @@
+use cpp_type_map::EnumValue;
+use cpp_type::CppType;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CppTypeIndirection {

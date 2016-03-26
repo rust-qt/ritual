@@ -1,4 +1,6 @@
-use enums::CppTypeKind;
+use enums::{CppTypeKind, CppTypeOrigin};
+
+use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EnumValue {
@@ -19,19 +21,19 @@ pub struct CppTypeInfo {
 pub struct CppTypeMap(HashMap<String, CppTypeInfo>);
 
 impl CppTypeMap {
-  fn get_info(&self, name: &String) -> Option<&CppTypeInfo> {
-    if let Some(ref r) = self.value(name) {
-      if let KindOfType::TypeDef { ref meaning } = r.kind {
-        if let Some(ref meaning) = meaning {
-          self.get_info(meaning)
+  fn get_info(&self, name: &String) -> Result<&CppTypeInfo, String> {
+    if let Some(ref r) = self.0.get(name) {
+      if let CppTypeKind::TypeDef { ref meaning } = r.kind {
+        if meaning.is_template() {
+          Err("Template typedefs are not supported".to_string())
         } else {
-          None
+          self.get_info(&meaning.base)
         }
       } else {
-        Some(r)
+        Ok(r)
       }
     } else {
-      None
+      Err("No type info".to_string())
     }
   }
 }

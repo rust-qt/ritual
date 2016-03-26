@@ -9,7 +9,7 @@ void add(QFile* file, QString name, int value) {
   file->write(QString("#define QTCW_sizeof_%1 %2\n").arg(name).arg(value).toLatin1());
 }
 
-#define ADD(name) add(&file, #name, sizeof(name))
+#define ADD(define_name, class_name) add(&file, #define_name, sizeof(class_name))
 
 int main(int argc, char *argv[]) {
   QCoreApplication app(argc, argv);

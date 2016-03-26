@@ -2,7 +2,7 @@ use cpp_method::CppMethod;
 use enums::CppMethodScope;
 use cpp_and_c_method::{CppAndCMethod, CppMethodWithCSignature};
 use caption_strategy::MethodCaptionStrategy;
-
+use cpp_type_map::CppTypeMap;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -41,12 +41,12 @@ impl CppHeaderData {
   pub fn involves_templates(&self) -> bool {
     for method in &self.methods {
       if let Some(ref t) = method.return_type {
-        if t.is_template {
+        if t.is_template() {
           return true;
         }
       }
       for arg in &method.arguments {
-        if arg.argument_type.is_template {
+        if arg.argument_type.is_template() {
           return true;
         }
       }
@@ -55,7 +55,7 @@ impl CppHeaderData {
   }
 
 
-  pub fn process_methods(&self) -> Vec<CppAndCMethod> {
+  pub fn process_methods(&self, cpp_type_map: &CppTypeMap) -> Vec<CppAndCMethod> {
     println!("Processing header <{}>", self.include_file);
     let mut hash1 = HashMap::new();
     {
@@ -68,23 +68,27 @@ impl CppHeaderData {
       };
 
       for ref method in &self.methods {
-        let (result_heap, result_stack) = CppMethodWithCSignature::from_cpp_method(&method);
-        if let Some(result_heap) = result_heap {
-          if let Some(result_stack) = result_stack {
-            let mut stack_name = result_stack.c_base_name();
-            let mut heap_name = result_heap.c_base_name();
-            if stack_name == heap_name {
-              stack_name = "SA_".to_string() + &stack_name;
-              heap_name = "HA_".to_string() + &heap_name;
-            }
-            insert_into_hash(&mut hash1, stack_name, result_stack);
-            insert_into_hash(&mut hash1, heap_name, result_heap);
-          } else {
-            let c_base_name = result_heap.c_base_name();
-            insert_into_hash(&mut hash1, c_base_name, result_heap);
+        match method.add_c_signatures(cpp_type_map) {
+          Err(msg) => {
+            println!("Unable to produce C function for method:\n{:?}\nError:{}",
+                     method,
+                     msg)
           }
-        } else {
-          println!("Unable to produce C function for method: {:?}", method);
+          Ok((result_heap, result_stack)) => {
+            if let Some(result_stack) = result_stack {
+              let mut stack_name = result_stack.c_base_name();
+              let mut heap_name = result_heap.c_base_name();
+              if stack_name == heap_name {
+                stack_name = "SA_".to_string() + &stack_name;
+                heap_name = "HA_".to_string() + &heap_name;
+              }
+              insert_into_hash(&mut hash1, stack_name, result_stack);
+              insert_into_hash(&mut hash1, heap_name, result_heap);
+            } else {
+              let c_base_name = result_heap.c_base_name();
+              insert_into_hash(&mut hash1, c_base_name, result_heap);
+            }
+          }
         }
       }
     }
@@ -98,8 +102,8 @@ impl CppHeaderData {
       let mut found_strategy = None;
       for strategy in MethodCaptionStrategy::all() {
         let mut type_captions: Vec<_> = values.iter()
-        .map(|x| x.caption(strategy.clone()))
-        .collect();
+                                              .map(|x| x.caption(strategy.clone()))
+                                              .collect();
         // println!("test1 {:?}", type_captions);
         type_captions.sort();
         type_captions.dedup();
@@ -114,16 +118,16 @@ impl CppHeaderData {
           r.push(CppAndCMethod::new(x,
                                     self.include_file.clone() + &("_".to_string()) + &key +
                                     &((if caption.is_empty() {
-                                      ""
-                                    } else {
-                                      "_"
-                                    })
-                                    .to_string()) +
+                                        ""
+                                      } else {
+                                        "_"
+                                      })
+                                      .to_string()) +
                                     &caption));
         }
       } else {
         panic!("all type caption strategies have failed! Involved functions: \n{:?}",
-        values);
+               values);
       }
     }
     r.sort_by(|a, b| a.cpp_method.original_index.cmp(&b.cpp_method.original_index));
