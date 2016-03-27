@@ -191,35 +191,42 @@ impl CppTypeInfo {
       kind: if origin == CppTypeOrigin::CBuiltIn {
         CppTypeKind::CPrimitive
       } else {
-        match value.get("kind").unwrap().as_string().unwrap() {
-          "enum" => {
-            CppTypeKind::Enum {
-              values: value.get("values")
-                           .unwrap()
-                           .as_array()
-                           .unwrap()
-                           .into_iter()
-                           .map(|x| EnumValue::from_json(x))
-                           .collect(),
+        match value.get("kind") {
+          Some(v) => match v.as_string().unwrap() {
+            "enum" => {
+              CppTypeKind::Enum {
+                values: value.get("values")
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .into_iter()
+                .map(|x| EnumValue::from_json(x))
+                .collect(),
+              }
             }
-          }
-          "flags" => {
-            CppTypeKind::Flags {
-              enum_name: value.get("enum").unwrap().as_string().unwrap().to_string(),
+            "flags" => {
+              CppTypeKind::Flags {
+                enum_name: value.get("enum").unwrap().as_string().unwrap().to_string(),
+              }
             }
-          }
-          "typedef" => {
-            CppTypeKind::TypeDef { meaning: CppType::from_json(value.get("meaning").unwrap()) }
-          }
-          "class" => {
-            CppTypeKind::Class {
-              inherits: match value.get("inherits") {
-                Some(inherits) => Some(CppType::from_json(inherits)),
-                None => None,
-              },
+            "typedef" => {
+              match value.get("meaning") {
+                Some(v) => CppTypeKind::TypeDef { meaning: CppType::from_json(v) },
+                None => CppTypeKind::Unknown
+              }
             }
-          }
-          _ => panic!("invalid kind of type"),
+            "class" => {
+              CppTypeKind::Class {
+                inherits: match value.get("inherits") {
+                  Some(inherits) => Some(CppType::from_json(inherits)),
+                  None => None,
+                },
+              }
+            }
+            "template_type" => CppTypeKind::Unknown,
+            _ => panic!("invalid kind of type"),
+          },
+          None => CppTypeKind::Unknown
         }
       },
     }

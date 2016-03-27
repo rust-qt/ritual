@@ -1,7 +1,9 @@
 use cpp_header_data::CppHeaderData;
 use cpp_data::CppData;
 use c_type::CTypeExtended;
-use enums::{AllocationPlace, CFunctionArgumentCppEquivalent, IndirectionChange, CppMethodScope, CppTypeOrigin, CppTypeKind};
+use cpp_type::CppType;
+use enums::{AllocationPlace, CFunctionArgumentCppEquivalent, IndirectionChange, CppMethodScope,
+            CppTypeOrigin, CppTypeKind};
 use cpp_and_c_method::CppAndCMethod;
 use std::path::PathBuf;
 use std::fs::File;
@@ -215,15 +217,84 @@ impl CGenerator {
   //    match
   //  }
 
+  fn type_contains_template_arguments(&self, cpp_type: &CppType) -> Result<bool, String> {
+    match self.cpp_data.types.get_info(&cpp_type.base) {
+      Ok(ref info) => {
+        if let CppTypeOrigin::Unsupported(ref v) = info.origin {
+          if v == "template_argument" {
+            return Ok(true);
+          }
+        }
+      }
+      Err(msg) => return Err(msg),
+    }
+    if let Some(ref args) = cpp_type.template_arguments {
+      for arg in args {
+        match self.type_contains_template_arguments(&arg) {
+          Ok(r) => {
+            if r {
+              return Ok(true);
+            }
+          }
+          Err(msg) => return Err(msg),
+        }
+      }
+    }
+    Ok(false)
+  }
 
+  fn is_template_class(&self, class_name: &String) -> Result<bool, String> {
+    for item in &self.cpp_data.headers {
+      if let Some(ref item_class_name) = item.class_name {
+        if item_class_name == class_name {
+          for method in &item.methods {
+            if let CppMethodScope::Class(..) = method.scope {
+              if let Some(ref return_type) = method.return_type {
+                match self.type_contains_template_arguments(return_type) {
+                  Ok(r) => {
+                    if r {
+                      return Ok(true);
+                    }
+                  }
+                  Err(msg) => return Err(msg),
+                }
+              }
+              for arg in &method.arguments {
+                match self.type_contains_template_arguments(&arg.argument_type) {
+                  Ok(r) => {
+                    if r {
+                      return Ok(true);
+                    }
+                  }
+                  Err(msg) => return Err(msg),
+                }
+              }
+            }
+          }
+          if let Some(index) = class_name.rfind("::") {
+            match self.is_template_class(&class_name[0..index].to_string()) {
+              Ok(r) => {
+                if r {
+                  return Ok(true);
+                }
+              }
+              Err(msg) => return Err(msg),
+            }
+          }
+          return Ok(false);
+        }
+      }
+    }
+    Err("Corresponding header not found".to_string())
+  }
 
 
   pub fn generate_size_definer_class_list(&self) -> Vec<String> {
-    let show_output = false;
+    let show_output = true;
 
     let mut sized_classes = Vec::new();
     // TODO: black magic happens here
-    let blacklist = vec!["QFlags", "QWinEventNotifier", "QPair", "QGlobalStatic"];
+    let blacklist = vec!["QFlags", "QWinEventNotifier", "QGlobalStatic"];
 
     let mut h_path = self.qtcw_path.clone();
     h_path.push("size_definer");
@@ -231,21 +302,29 @@ impl CGenerator {
     println!("Generating file: {:?}", h_path);
     let mut h_file = File::create(&h_path).unwrap();
     for item in &self.cpp_data.headers {
-      if item.involves_templates() {
-        // TODO: support template classes!
-        if show_output {
-          println!("Ignoring {} because it involves templates.",
-                   item.include_file);
-        }
-        continue;
-      }
       if let Some(ref class_name) = item.class_name {
         if blacklist.iter().find(|&&x| x == class_name.as_ref() as &str).is_some() {
           if show_output {
             println!("Ignoring {} because it is blacklisted.", item.include_file);
           }
           continue;
-
+        }
+        match self.is_template_class(class_name) {
+          Err(msg) => {
+            if show_output {
+              println!("Ignoring {}: {}", class_name, msg);
+            }
+            continue;
+          }
+          Ok(is_template_class) => {
+            if is_template_class {
+              // TODO: support template classes!
+              if show_output {
+                println!("Ignoring {} because it is a template class.", class_name);
+              }
+              continue;
+            }
+          }
         }
         let define_name = class_name.replace("::", "_");
         if show_output {
@@ -262,7 +341,7 @@ impl CGenerator {
   fn struct_declaration(&self, c_struct_name: &String, full_declaration: bool) -> String {
     // write C struct definition
     let result = if full_declaration &&
-                        self.sized_classes.iter().find(|x| *x == c_struct_name).is_some() {
+                    self.sized_classes.iter().find(|x| *x == c_struct_name).is_some() {
       format!("struct QTCW_{} {{ char space[QTCW_sizeof_{}]; }};\n",
               c_struct_name,
               c_struct_name)
@@ -307,12 +386,12 @@ impl CGenerator {
     write!(h_file, "#endif\n\n").unwrap();
 
     let mut forward_declared_classes = vec![];
-//    if let Some(ref class_name) = data.class_name {
-//      self.write_struct_declaration(&mut h_file, class_name, true, true);
-//      forward_declared_classes.push(class_name.clone());
-//    } else {
-//      println!("Not a class header. Wrapper struct is not generated.");
-//    }
+    //    if let Some(ref class_name) = data.class_name {
+    //      self.write_struct_declaration(&mut h_file, class_name, true, true);
+    //      forward_declared_classes.push(class_name.clone());
+    //    } else {
+    //      println!("Not a class header. Wrapper struct is not generated.");
+    //    }
 
     write!(h_file, "QTCW_EXTERN_C_BEGIN\n\n").unwrap();
     let methods = data.process_methods(&self.cpp_data.types);
@@ -330,9 +409,12 @@ impl CGenerator {
           &CppTypeOrigin::Qt { ref include_file } => {
             needs_full_declaration = &data.include_file == include_file
           }
-          &CppTypeOrigin::Unsupported(..) => panic!("this type should have been filtered previously"),
+          &CppTypeOrigin::Unsupported(..) => {
+            panic!("this type should have been filtered previously")
+          }
         }
         let declaration = match &type_info.kind {
+          &CppTypeKind::Unknown => panic!("this type should have been filtered previously"),
           &CppTypeKind::CPrimitive => {
             panic!("this type should have been filtered in previous match")
           }
@@ -356,7 +438,9 @@ impl CGenerator {
         forward_declared_classes.push(c_type.base.clone());
         // println!("Type {:?} is forward-declared.", t);
         if c_type_extended.conversion.renamed {
-          h_file.write(&only_cpp_code(format!("typedef {} {};\n", cpp_type.base, c_type.base)).into_bytes()).unwrap();
+          h_file.write(&only_cpp_code(format!("typedef {} {};\n", cpp_type.base, c_type.base))
+                          .into_bytes())
+                .unwrap();
         }
       };
 

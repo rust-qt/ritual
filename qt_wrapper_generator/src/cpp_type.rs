@@ -88,6 +88,9 @@ impl CppType {
               result.conversion.indirection_change = IndirectionChange::ValueToPointer;
             }
           }
+          CppTypeKind::Unknown => {
+            return Err("Unknown kind of type".to_string())
+          }
         }
       }
       Err(msg) => return Err(format!("Type info error for {:?}: {}", self, msg)),

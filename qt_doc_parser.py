@@ -592,7 +592,7 @@ def known_basic_types():
     add_known_type(t, "fake")
 
   return types_data
-  
+
 
 def add_qt_types(headers_data, types_data):
   def doc_page_exists_for_class(name):
@@ -636,7 +636,7 @@ def add_qt_types(headers_data, types_data):
     header_data.pop("nested_types_namespace", None)
     header_data.pop("nested_types", None)
     header_data.pop("not_nested_types", None)
-    
+
 def add_typedef_data(types_data):
   def check_type(t):
     if not t["base"] in types_data:
@@ -735,6 +735,9 @@ def add_typedef_data(types_data):
   if unknown_typedefs:
     unknown_typedefs.sort()
     logger.warning("Unknown typedefs: \n%s", "\n".join(unknown_typedefs))
+
+  types_data["QVariant::Type"]["values"] = types_data["QMetaType::Type"]["values"]
+
 
 
 def fix_method_types(headers_data, types_data):

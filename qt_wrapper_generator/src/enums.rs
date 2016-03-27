@@ -65,6 +65,7 @@ pub enum CppTypeKind {
   Class {
     inherits: Option<CppType>,
   },
+  Unknown
 }
 
 

@@ -37,24 +37,6 @@ impl CppHeaderData {
     }
   }
 
-
-  pub fn involves_templates(&self) -> bool {
-    for method in &self.methods {
-      if let Some(ref t) = method.return_type {
-        if t.is_template() {
-          return true;
-        }
-      }
-      for arg in &method.arguments {
-        if arg.argument_type.is_template() {
-          return true;
-        }
-      }
-    }
-    false
-  }
-
-
   pub fn process_methods(&self, cpp_type_map: &CppTypeMap) -> Vec<CppAndCMethod> {
     println!("Processing header <{}>", self.include_file);
     let mut hash1 = HashMap::new();
