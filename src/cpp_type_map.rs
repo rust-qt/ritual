@@ -18,10 +18,10 @@ pub struct CppTypeInfo {
 }
 
 #[derive(Debug)]
-pub struct CppTypeMap(HashMap<String, CppTypeInfo>);
+pub struct CppTypeMap(pub HashMap<String, CppTypeInfo>);
 
 impl CppTypeMap {
-  fn get_info(&self, name: &String) -> Result<&CppTypeInfo, String> {
+  pub fn get_info(&self, name: &String) -> Result<&CppTypeInfo, String> {
     if let Some(ref r) = self.0.get(name) {
       if let CppTypeKind::TypeDef { ref meaning } = r.kind {
         if meaning.is_template() {

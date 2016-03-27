@@ -40,13 +40,13 @@ impl CppType {
               CppTypeIndirection::None => "",
               CppTypeIndirection::Ptr => "*",
               CppTypeIndirection::Ref => "&",
-              CppTypeIndirection::Ptr_ref => "*&",
-              CppTypeIndirection::Ptr_ptr => "**",
-              CppTypeIndirection::Ref_ref => "&&",
+              CppTypeIndirection::PtrRef => "*&",
+              CppTypeIndirection::PtrPtr => "**",
+              CppTypeIndirection::RefRef => "&&",
             })
   }
 
-  fn to_c_type(&self, cpp_type_map: &CppTypeMap) -> Result<CTypeExtended, String> {
+  pub fn to_c_type(&self, cpp_type_map: &CppTypeMap) -> Result<CTypeExtended, String> {
     if self.is_template() {
       return Err("Template types are not supported yet".to_string());
     }

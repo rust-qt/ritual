@@ -16,8 +16,8 @@ mod utils;
 
 use std::fs;
 use std::path::{PathBuf, Path};
-use std::io;
 use std::process::Command;
+use std::env;
 
 extern crate find_folder;
 
@@ -46,17 +46,20 @@ fn remove_dir(path: &PathBuf) {
 }
 
 fn main() {
-  let output_dir = PathBuf::from("../generated_output");
-  let qtcw_template_dir = find_folder::Search::ParentsThenKids(3, 3)
-                            .for_folder("qtcw_template")
-                            .unwrap();
+  let arguments: Vec<_> = env::args().collect();
+  if arguments.len() != 3 {
+    print!("Usage: qt_wrapper_generator qtcw_template_dir output_dir");
+  }
+
+  let output_dir = PathBuf::from(arguments[2].clone());
+  let qtcw_template_dir = PathBuf::from(arguments[1].clone());
   let parse_result_path = {
     let mut r = output_dir.clone();
     r.push("doc_parse_result.json");
     r
   };
   let mut parse_result = read_parse_result::do_it(&parse_result_path);
-  for data in &mut parse_result {
+  for data in &mut parse_result.headers {
     data.ensure_explicit_destructor();
   }
 

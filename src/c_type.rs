@@ -46,15 +46,15 @@ impl CType {
       is_const: false,
     }
   }
-  fn new(base: String, is_pointer: bool, is_const: bool) -> CType {
-    CType {
-      base: base,
-      is_pointer: is_pointer,
-      is_const: is_const,
-    }
-  }
+//  pub fn new(base: String, is_pointer: bool, is_const: bool) -> CType {
+//    CType {
+//      base: base,
+//      is_pointer: is_pointer,
+//      is_const: is_const,
+//    }
+//  }
 
-  fn caption(&self) -> String {
+  pub fn caption(&self) -> String {
     let mut r = self.base.clone();
     if self.is_pointer {
       r = r + &("_ptr".to_string());

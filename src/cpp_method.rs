@@ -5,8 +5,6 @@ use c_function_signature::CFunctionSignature;
 use c_type::{CType, CTypeExtended, CppToCTypeConversion};
 use c_function_argument::CFunctionArgument;
 use cpp_and_c_method::CppMethodWithCSignature;
-use utils::operator_c_name;
-use caption_strategy::MethodCaptionStrategy;
 use cpp_type_map::CppTypeMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -34,7 +32,7 @@ pub struct CppMethod {
 }
 
 impl CppMethod {
-  fn real_return_type(&self) -> Option<CppType> {
+  pub fn real_return_type(&self) -> Option<CppType> {
     if self.is_constructor {
       if let CppMethodScope::Class(ref class_name) = self.scope {
         return Some(CppType {
@@ -51,7 +49,7 @@ impl CppMethod {
     }
   }
 
-  fn real_arguments_count(&self) -> i32 {
+  pub fn real_arguments_count(&self) -> i32 {
     let mut result = self.arguments.len() as i32;
     if let CppMethodScope::Class(..) = self.scope {
       if !self.is_static {
@@ -155,7 +153,7 @@ impl CppMethod {
     Ok((r, allocation_place_importance))
   }
 
-  fn add_c_signatures
+  pub fn add_c_signatures
     (&self,
      cpp_type_map: &CppTypeMap)
      -> Result<(CppMethodWithCSignature, Option<CppMethodWithCSignature>), String> {

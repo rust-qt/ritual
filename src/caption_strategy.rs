@@ -1,13 +1,13 @@
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-enum ArgumentCaptionStrategy {
+pub enum ArgumentCaptionStrategy {
   NameOnly,
   TypeOnly,
   TypeAndName,
 }
 
 impl ArgumentCaptionStrategy {
-  fn all() -> Vec<Self> {
+  pub fn all() -> Vec<Self> {
     vec![ArgumentCaptionStrategy::NameOnly,
          ArgumentCaptionStrategy::TypeOnly,
          ArgumentCaptionStrategy::TypeAndName]
@@ -16,14 +16,14 @@ impl ArgumentCaptionStrategy {
 
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-enum MethodCaptionStrategy {
+pub enum MethodCaptionStrategy {
   ArgumentsOnly(ArgumentCaptionStrategy),
   ConstOnly,
   ConstAndArguments(ArgumentCaptionStrategy),
 }
 
 impl MethodCaptionStrategy {
-  fn all() -> Vec<Self> {
+  pub fn all() -> Vec<Self> {
     let mut r = vec![];
     for i in ArgumentCaptionStrategy::all() {
       r.push(MethodCaptionStrategy::ArgumentsOnly(i));

@@ -45,7 +45,7 @@ impl CppMethodWithCSignature {
     scope_prefix + &method_name
   }
 
-  fn caption(&self, strategy: MethodCaptionStrategy) -> String {
+  pub fn caption(&self, strategy: MethodCaptionStrategy) -> String {
     match strategy {
       MethodCaptionStrategy::ArgumentsOnly(s) => self.c_signature.caption(s),
       MethodCaptionStrategy::ConstOnly => {
@@ -73,7 +73,7 @@ impl CppMethodWithCSignature {
 }
 
 impl CppAndCMethod {
-  fn new(data: CppMethodWithCSignature, c_name: String) -> CppAndCMethod {
+  pub fn new(data: CppMethodWithCSignature, c_name: String) -> CppAndCMethod {
     CppAndCMethod {
       cpp_method: data.cpp_method,
       allocation_place: data.allocation_place,

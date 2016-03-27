@@ -10,7 +10,7 @@ pub struct CFunctionArgument {
 }
 
 impl CFunctionArgument {
-  fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
+  pub fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
     match strategy {
       ArgumentCaptionStrategy::NameOnly => self.name.clone(),
       ArgumentCaptionStrategy::TypeOnly => self.argument_type.c_type.caption(),

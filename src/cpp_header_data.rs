@@ -1,6 +1,6 @@
 use cpp_method::CppMethod;
 use enums::CppMethodScope;
-use cpp_and_c_method::{CppAndCMethod, CppMethodWithCSignature};
+use cpp_and_c_method::{CppAndCMethod};
 use caption_strategy::MethodCaptionStrategy;
 use cpp_type_map::CppTypeMap;
 use std::collections::HashMap;

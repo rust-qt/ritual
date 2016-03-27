@@ -8,8 +8,6 @@ use enums::{CppMethodScope, CppTypeOrigin, CppTypeKind, CppTypeIndirection};
 use std::fs::File;
 extern crate serde;
 extern crate serde_json;
-use self::serde::de::{Deserialize, Deserializer};
-use self::serde::de::impls::BTreeMapVisitor;
 use std;
 
 
@@ -35,9 +33,9 @@ impl CppType {
         Some(v) => match v.as_string().unwrap() {
           "*" => CppTypeIndirection::Ptr,
           "&" => CppTypeIndirection::Ref,
-          "&&" => CppTypeIndirection::Ref_ref,
-          "*&" => CppTypeIndirection::Ptr_ref,
-          "**" => CppTypeIndirection::Ptr_ptr,
+          "&&" => CppTypeIndirection::RefRef,
+          "*&" => CppTypeIndirection::PtrRef,
+          "**" => CppTypeIndirection::PtrPtr,
           _ => panic!("unknown indirection string")
         },
         None => CppTypeIndirection::None,
@@ -165,7 +163,14 @@ impl CppHeaderData {
 }
 
 impl EnumValue {
-  fn from_json(value: &serde_json::Value, name: String) -> Self {}
+  fn from_json(value: &serde_json::Value) -> Self {
+    let value = value.as_object().unwrap();
+    EnumValue {
+      name: value.get("name").unwrap().as_string().unwrap().to_string(),
+      value: value.get("value").unwrap().as_string().unwrap().to_string(),
+      description: value.get("description").unwrap().as_string().unwrap().to_string()
+    }
+  }
 }
 
 impl CppTypeInfo {
@@ -182,7 +187,7 @@ impl CppTypeInfo {
     };
     CppTypeInfo {
       name: name,
-      origin: origin,
+      origin: origin.clone(),
       kind: if origin == CppTypeOrigin::CBuiltIn {
         CppTypeKind::CPrimitive
       } else {
@@ -209,7 +214,7 @@ impl CppTypeInfo {
           "class" => {
             CppTypeKind::Class {
               inherits: match value.get("inherits") {
-                Some(inherits) => CppType::from_json(inherits),
+                Some(inherits) => Some(CppType::from_json(inherits)),
                 None => None,
               },
             }
@@ -224,12 +229,12 @@ impl CppTypeInfo {
 impl CppTypeMap {
   fn from_json(value: &serde_json::Value) -> Self {
     let value = value.as_object().unwrap();
-    // ...
+    CppTypeMap(value.into_iter().map(|(k, v)| (k.clone(), CppTypeInfo::from_json(v, k.clone()))).collect())
   }
 }
 
 pub fn do_it(file_name: &std::path::PathBuf) -> CppData {
-  let mut f = File::open(file_name).unwrap();
+  let f = File::open(file_name).unwrap();
   let data: serde_json::Value = serde_json::from_reader(f).unwrap();
   let object = data.as_object().unwrap();
   CppData {

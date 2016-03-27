@@ -10,7 +10,7 @@ pub struct CFunctionSignature {
 }
 
 impl CFunctionSignature {
-  fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
+  pub fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
     let r = self.arguments
     .iter()
     .filter(|x| x.cpp_equivalent.is_argument())

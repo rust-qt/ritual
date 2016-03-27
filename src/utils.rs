@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-use cpp_header_data::CppHeaderData;
 
 pub trait JoinWithString {
   fn join(self, separator: &'static str) -> String;
@@ -19,11 +17,6 @@ impl<X> JoinWithString for X
     })
   }
 }
-
-
-
-
-
 
 pub fn operator_c_name(cpp_name: &String, arguments_count: i32) -> String {
   if cpp_name == "=" && arguments_count == 2 {

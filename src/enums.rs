@@ -6,9 +6,9 @@ pub enum CppTypeIndirection {
   None,
   Ptr,
   Ref,
-  Ptr_ref,
-  Ptr_ptr,
-  Ref_ref,
+  PtrRef,
+  PtrPtr,
+  RefRef,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -32,7 +32,7 @@ pub enum CFunctionArgumentCppEquivalent {
 }
 
 impl CFunctionArgumentCppEquivalent {
-  fn is_argument(&self) -> bool {
+  pub fn is_argument(&self) -> bool {
     match self {
       &CFunctionArgumentCppEquivalent::Argument(..) => true,
       _ => false,

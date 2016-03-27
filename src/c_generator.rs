@@ -84,7 +84,7 @@ impl CppAndCMethod {
       if let Some(c_argument) = self.c_signature.arguments.iter().find(|x| {
         x.cpp_equivalent == CFunctionArgumentCppEquivalent::Argument(i as i8)
       }) {
-        let mut result = c_argument.name;
+        let mut result = c_argument.name.clone();
         match c_argument.argument_type
                         .conversion
                         .indirection_change {
@@ -261,7 +261,7 @@ impl CGenerator {
 
   fn struct_declaration(&self, c_struct_name: &String, full_declaration: bool) -> String {
     // write C struct definition
-    let mut result = if full_declaration &&
+    let result = if full_declaration &&
                         self.sized_classes.iter().find(|x| *x == c_struct_name).is_some() {
       format!("struct QTCW_{} {{ char space[QTCW_sizeof_{}]; }};\n",
               c_struct_name,
@@ -318,26 +318,26 @@ impl CGenerator {
     let methods = data.process_methods(&self.cpp_data.types);
     {
       let mut check_type_for_declaration = |c_type_extended: &CTypeExtended| {
-        let c_type = c_type_extended.c_type;
-        let cpp_type = c_type_extended.cpp_type;
+        let c_type = &c_type_extended.c_type;
+        let cpp_type = &c_type_extended.cpp_type;
         if forward_declared_classes.iter().find(|&x| x == &c_type.base).is_some() {
           return; //already declared
         }
         let type_info = self.cpp_data.types.get_info(&cpp_type.base).unwrap();
-        let mut full_declaration = false;
-        match type_info.origin {
-          CppTypeOrigin::CBuiltIn => return,
-          CppTypeOrigin::Qt { include_file } => {
-            full_declaration = data.include_file == include_file
+        let needs_full_declaration;
+        match &type_info.origin {
+          &CppTypeOrigin::CBuiltIn => return,
+          &CppTypeOrigin::Qt { ref include_file } => {
+            needs_full_declaration = &data.include_file == include_file
           }
-          CppTypeOrigin::Unsupported(..) => panic!("this type should have been filtered previously"),
+          &CppTypeOrigin::Unsupported(..) => panic!("this type should have been filtered previously"),
         }
-        let mut declaration = match type_info.kind {
-          CppTypeKind::CPrimitive => {
+        let declaration = match &type_info.kind {
+          &CppTypeKind::CPrimitive => {
             panic!("this type should have been filtered in previous match")
           }
-          CppTypeKind::Enum { values } => {
-            only_c_code(if full_declaration {
+          &CppTypeKind::Enum { ref values } => {
+            only_c_code(if needs_full_declaration {
               format!("enum {} {{\n{}}};\n",
                       c_type.base,
                       values.iter().map(|x| format!("  {} = {},", x.name, x.value)).join("\n"))
@@ -345,17 +345,18 @@ impl CGenerator {
               format!("enum {};\n", c_type.base)
             })
           }
-          CppTypeKind::Flags { .. } => format!("typedef uint {};\n", c_type.base),
-          CppTypeKind::TypeDef { .. } => panic!("get_info can't return TypeDef"),
-          CppTypeKind::Class { .. } => {
-            only_c_code(self.struct_declaration(&c_type.base, full_declaration))
+          &CppTypeKind::Flags { .. } => format!("typedef uint {};\n", c_type.base),
+          &CppTypeKind::TypeDef { .. } => panic!("get_info can't return TypeDef"),
+          &CppTypeKind::Class { .. } => {
+            only_c_code(self.struct_declaration(&c_type.base, needs_full_declaration))
           }
         };
+        h_file.write(&only_c_code(declaration).into_bytes()).unwrap();
 
         forward_declared_classes.push(c_type.base.clone());
         // println!("Type {:?} is forward-declared.", t);
         if c_type_extended.conversion.renamed {
-          h_file.write(&only_cpp_code(format!("typedef {} {};\n", cpp_type.base, c_type.base)).into_bytes());
+          h_file.write(&only_cpp_code(format!("typedef {} {};\n", cpp_type.base, c_type.base)).into_bytes()).unwrap();
         }
       };
 
@@ -369,8 +370,8 @@ impl CGenerator {
 
 
     for method in &methods {
-      h_file.write(&method.header_code().into_bytes());
-      cpp_file.write(&method.source_code().into_bytes());
+      h_file.write(&method.header_code().into_bytes()).unwrap();
+      cpp_file.write(&method.source_code().into_bytes()).unwrap();
 
 
 
