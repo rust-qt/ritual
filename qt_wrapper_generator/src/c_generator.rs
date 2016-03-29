@@ -397,54 +397,74 @@ impl CGenerator {
     let methods = data.process_methods(&self.cpp_data.types);
     {
       let mut check_type_for_declaration = |c_type_extended: &CTypeExtended| {
+        println!("check_type_for_declaration {:?}", c_type_extended);
         let c_type = &c_type_extended.c_type;
         let cpp_type = &c_type_extended.cpp_type;
         if forward_declared_classes.iter().find(|&x| x == &c_type.base).is_some() {
+          println!("already declared");
           return; //already declared
         }
+
         let type_info = self.cpp_data.types.get_info(&cpp_type.base).unwrap();
-        let needs_full_declaration;
         match &type_info.origin {
-          &CppTypeOrigin::CBuiltIn => return,
-          &CppTypeOrigin::Qt { ref include_file } => {
-            needs_full_declaration = &data.include_file == include_file
+          &CppTypeOrigin::CBuiltIn => {
+            println!("CBuiltIn");
           }
           &CppTypeOrigin::Unsupported(..) => {
             panic!("this type should have been filtered previously")
           }
-        }
-        let declaration = match &type_info.kind {
-          &CppTypeKind::Unknown => panic!("this type should have been filtered previously"),
-          &CppTypeKind::CPrimitive => {
-            panic!("this type should have been filtered in previous match")
-          }
-          &CppTypeKind::Enum { ref values } => {
-            only_c_code(if needs_full_declaration {
-              format!("enum {} {{\n{}}};\n",
-                      c_type.base,
-                      values.iter().map(|x| format!("  {} = {},", x.name, x.value)).join("\n"))
-            } else {
-              format!("enum {};\n", c_type.base)
-            })
-          }
-          &CppTypeKind::Flags { .. } => format!("typedef uint {};\n", c_type.base),
-          &CppTypeKind::TypeDef { .. } => panic!("get_info can't return TypeDef"),
-          &CppTypeKind::Class { .. } => {
-            only_c_code(self.struct_declaration(&c_type.base, needs_full_declaration))
-          }
-        };
-        h_file.write(&only_c_code(declaration).into_bytes()).unwrap();
+          &CppTypeOrigin::Qt { ref include_file } => {
+            let needs_full_declaration = &data.include_file == include_file;
 
-        forward_declared_classes.push(c_type.base.clone());
-        // println!("Type {:?} is forward-declared.", t);
-        if c_type_extended.conversion.renamed {
-          h_file.write(&only_cpp_code(format!("typedef {} {};\n", cpp_type.base, c_type.base))
+            let declaration = match &type_info.kind {
+              &CppTypeKind::Unknown => panic!("this type should have been filtered previously"),
+              &CppTypeKind::CPrimitive => "".to_string(),
+              &CppTypeKind::Enum { ref values } => {
+                only_c_code(if needs_full_declaration {
+                  format!("enum {} {{\n{}}};\n",
+                          c_type.base,
+                          values.iter().map(|x| format!("  {} = {},", x.name, x.value)).join("\n"))
+                } else {
+                  format!("enum {};\n", c_type.base)
+                })
+              }
+              &CppTypeKind::Flags { .. } => format!("typedef uint {};\n", c_type.base),
+              &CppTypeKind::TypeDef { .. } => panic!("get_info can't return TypeDef"),
+              &CppTypeKind::Class { .. } => {
+                only_c_code(self.struct_declaration(&c_type.base, needs_full_declaration))
+              }
+            };
+            println!("declaration: {}", declaration);
+            h_file.write(&declaration.into_bytes()).unwrap();
+
+            forward_declared_classes.push(c_type.base.clone());
+            println!("Type {:?} is forward-declared.", c_type.base);
+          }
+        }
+        if let CppTypeKind::TypeDef { ref meaning } = self.cpp_data
+                                                          .types
+                                                          .0
+                                                          .get(&cpp_type.base)
+                                                          .unwrap()
+                                                          .kind {
+          let c_meaning = meaning.to_c_type(&self.cpp_data.types).unwrap().c_type;
+          println!("typedef meaning: {:?}", c_meaning);
+          h_file.write(&only_c_code(format!("typedef {} {};\n",
+                                            c_meaning.to_c_code(),
+                                            c_type.base))
                           .into_bytes())
                 .unwrap();
         }
+        if c_type_extended.conversion.renamed {
+          h_file.write(&only_cpp_code(format!("typedef {} {};\n", cpp_type.base, c_type.base))
+          .into_bytes())
+          .unwrap();
+        }
+
       };
 
       for method in &methods {
+        println!("Generating code for method: {:?}", method);
         check_type_for_declaration(&method.c_signature.return_type);
         for arg in &method.c_signature.arguments {
           check_type_for_declaration(&arg.argument_type);

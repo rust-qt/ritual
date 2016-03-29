@@ -25,7 +25,7 @@ impl CppType {
         }
         None => None,
       },
-      is_const: match value.get("const") {
+      is_const: match value.get("is_const") {
         Some(v) => v.as_boolean().unwrap(),
         None => false,
       },
@@ -79,7 +79,7 @@ impl CppMethod {
         Some(v) => v.as_boolean().unwrap(),
         None => false,
       },
-      is_const: match value.get("const") {
+      is_const: match value.get("is_const") {
         Some(v) => v.as_boolean().unwrap(),
         None => false,
       },

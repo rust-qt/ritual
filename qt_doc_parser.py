@@ -221,7 +221,7 @@ def parse_methods(table, class_name, section_attrs, nested_types):
             arg = parse_argument(part)
             data["arguments"].append(arg)
         if signature_string_parts2[1].strip() == "const":
-          data["const"] = True
+          data["is_const"] = True
 
         if data["name"].startswith("operator"):
           data["operator"] = data["name"][len("operator"):].strip()

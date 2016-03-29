@@ -68,10 +68,10 @@ impl CType {
   pub fn to_c_code(&self) -> String {
     let mut r = self.base.clone();
     if self.is_pointer {
-      r = r + &("*".to_string());
+      r = format!("{}*", r);
     }
     if self.is_const {
-      r = "const ".to_string() + &r;
+      r = format!("const {}", r);
     }
     r
   }
