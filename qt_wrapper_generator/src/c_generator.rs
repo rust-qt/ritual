@@ -66,7 +66,7 @@ impl CppAndCMethod {
                        result);
     }
     if self.c_signature.return_type.conversion.qflags_to_uint {
-      result = format!("uint({})", result);
+      result = format!("unsigned int({})", result);
     }
 
     if self.allocation_place == AllocationPlace::Stack && !self.cpp_method.is_constructor {
@@ -203,16 +203,28 @@ impl CGenerator {
 
   pub fn generate_all(&mut self) {
     self.sized_classes = self.generate_size_definer_class_list();
-    let white_list = vec!["QPoint", "QRect", "QBitArray", "QByteArray"];
+    let white_list = vec!["QPoint", "QRect", "QBitArray", "QByteArray", "QString", "Qt"];
+
+    let mut h_path = self.qtcw_path.clone();
+    h_path.push("include");
+    h_path.push("qtcw.h");
+    let mut all_header_file = File::create(&h_path).unwrap();
+    write!(all_header_file, "#ifndef QTCW_H\n#define QTCW_H\n\n").unwrap();
 
     for data in &self.cpp_data.headers {
       if white_list.iter().find(|&&x| x == data.include_file).is_none() {
         continue;
       }
-
       self.generate_one(data);
+      write!(all_header_file,
+             "#include \"qtcw_{}.h\"\n",
+             data.include_file)
+        .unwrap();
 
     }
+
+    write!(all_header_file, "#endif // QTCW_H\n").unwrap();
+
 
 
 
@@ -360,6 +372,69 @@ impl CGenerator {
             c_struct_name)
   }
 
+  fn generate_type_declaration(&self,
+                               c_type_extended: &CTypeExtended,
+                               current_include_file: &String,
+                               already_declared: &mut Vec<String>)
+                               -> String {
+    println!("check_type_for_declaration {:?}", c_type_extended);
+    let c_type = &c_type_extended.c_type;
+    let cpp_type = &c_type_extended.cpp_type;
+    if already_declared.iter().find(|&x| x == &c_type.base).is_some() {
+      println!("already declared");
+      return String::new(); //already declared
+    }
+
+    let type_info = self.cpp_data.types.0.get(&cpp_type.base).unwrap();
+    println!("type info: {:?}", type_info);
+    let mut result = match &type_info.origin {
+      &CppTypeOrigin::CBuiltIn => {
+        println!("CBuiltIn");
+        String::new()
+      }
+      &CppTypeOrigin::Unsupported(..) => panic!("this type should have been filtered previously"),
+      &CppTypeOrigin::Qt { ref include_file } => {
+        let needs_full_declaration = current_include_file == include_file;
+
+        let declaration = match &type_info.kind {
+          &CppTypeKind::Unknown => panic!("this type should have been filtered previously"),
+          &CppTypeKind::CPrimitive => "".to_string(),
+          &CppTypeKind::Enum { ref values } => {
+            only_c_code(if needs_full_declaration {
+              format!("typedef enum QTCW_{0} {{\n{1}\n}} {0};\n",
+                      c_type.base,
+                      values.iter().map(|x| format!("  {} = {}", x.name, x.value)).join(", \n"))
+            } else {
+              format!("typedef enum QTCW_{0} {0};\n", c_type.base)
+            })
+          }
+          &CppTypeKind::Flags { .. } => format!("typedef unsigned int {};\n", c_type.base),
+          &CppTypeKind::TypeDef { ref meaning } => {
+            let c_meaning = meaning.to_c_type(&self.cpp_data.types).unwrap();
+            println!("typedef meaning: {:?}", c_meaning.c_type);
+            self.generate_type_declaration(&c_meaning, current_include_file, already_declared) +
+            &only_c_code(format!("typedef {} {};\n",
+                                 c_meaning.c_type.to_c_code(),
+                                 c_type.base))
+          }
+          &CppTypeKind::Class { .. } => {
+            only_c_code(self.struct_declaration(&c_type.base, needs_full_declaration))
+          }
+        };
+        already_declared.push(c_type.base.clone());
+        println!("declaration: {}", declaration);
+        println!("Type {:?} is forward-declared.", c_type.base);
+        declaration
+      }
+    };
+    if c_type_extended.conversion.renamed {
+      println!("write renaming typedef cpp={} c={}",
+               cpp_type.base,
+               c_type.base);
+      result = result + &only_cpp_code(format!("typedef {} {};\n", cpp_type.base, c_type.base));
+    }
+    result
+  }
 
   pub fn generate_one(&self, data: &CppHeaderData) {
     let mut cpp_path = self.qtcw_path.clone();
@@ -401,93 +476,35 @@ impl CGenerator {
 
     write!(h_file, "QTCW_EXTERN_C_BEGIN\n\n").unwrap();
     let methods = data.process_methods(&self.cpp_data.types);
-    {
-      let mut check_type_for_declaration = |c_type_extended: &CTypeExtended| {
-        //println!("check_type_for_declaration {:?}", c_type_extended);
-        let c_type = &c_type_extended.c_type;
-        let cpp_type = &c_type_extended.cpp_type;
-        if forward_declared_classes.iter().find(|&x| x == &c_type.base).is_some() {
-          //println!("already declared");
-          return; //already declared
-        }
-
-        let type_info = self.cpp_data.types.get_info(&cpp_type.base).unwrap();
-        match &type_info.origin {
-          &CppTypeOrigin::CBuiltIn => {
-            //println!("CBuiltIn");
-          }
-          &CppTypeOrigin::Unsupported(..) => {
-            panic!("this type should have been filtered previously")
-          }
-          &CppTypeOrigin::Qt { ref include_file } => {
-            let needs_full_declaration = &data.include_file == include_file;
-
-            let declaration = match &type_info.kind {
-              &CppTypeKind::Unknown => panic!("this type should have been filtered previously"),
-              &CppTypeKind::CPrimitive => "".to_string(),
-              &CppTypeKind::Enum { ref values } => {
-                only_c_code(if needs_full_declaration {
-                  format!("enum {} {{\n{}\n}};\n",
-                          c_type.base,
-                          values.iter().map(|x| format!("  {} = {}", x.name, x.value)).join(", \n"))
-                } else {
-                  format!("enum {};\n", c_type.base)
-                })
-              }
-              &CppTypeKind::Flags { .. } => format!("typedef uint {};\n", c_type.base),
-              &CppTypeKind::TypeDef { .. } => panic!("get_info can't return TypeDef"),
-              &CppTypeKind::Class { .. } => {
-                only_c_code(self.struct_declaration(&c_type.base, needs_full_declaration))
-              }
-            };
-            //println!("declaration: {}", declaration);
-            h_file.write(&declaration.into_bytes()).unwrap();
-
-            forward_declared_classes.push(c_type.base.clone());
-            //println!("Type {:?} is forward-declared.", c_type.base);
-          }
-        }
-        if let CppTypeKind::TypeDef { ref meaning } = self.cpp_data
-                                                          .types
-                                                          .0
-                                                          .get(&cpp_type.base)
-                                                          .unwrap()
-                                                          .kind {
-          let c_meaning = meaning.to_c_type(&self.cpp_data.types).unwrap().c_type;
-          //println!("typedef meaning: {:?}", c_meaning);
-          h_file.write(&only_c_code(format!("typedef {} {};\n",
-                                            c_meaning.to_c_code(),
-                                            c_type.base))
-                          .into_bytes())
-                .unwrap();
-        }
-        if c_type_extended.conversion.renamed {
-          h_file.write(&only_cpp_code(format!("typedef {} {};\n", cpp_type.base, c_type.base))
-          .into_bytes())
-          .unwrap();
-        }
-
+    for name in self.cpp_data.types.get_types_from_include_file(&data.include_file) {
+      let cpp_type = CppType {
+        is_const: false,
+        indirection: CppTypeIndirection::None,
+        base: name,
+        template_arguments: None,
       };
-
-
-      for name in self.cpp_data.types.get_types_from_include_file(&data.include_file) {
-        let cpp_type = CppType {
-          is_const: false,
-          indirection: CppTypeIndirection::None,
-          base: name,
-          template_arguments: None
-        };
-        if let Ok(c_type_ex) = cpp_type.to_c_type(&self.cpp_data.types) {
-          check_type_for_declaration(&c_type_ex);
-        }
+      if let Ok(c_type_ex) = cpp_type.to_c_type(&self.cpp_data.types) {
+        h_file.write(&self.generate_type_declaration(&c_type_ex,
+                                                     &data.include_file,
+                                                     &mut forward_declared_classes)
+                          .into_bytes())
+              .unwrap();
       }
+    }
 
-      for method in &methods {
-        //println!("Generating code for method: {:?}", method);
-        check_type_for_declaration(&method.c_signature.return_type);
-        for arg in &method.c_signature.arguments {
-          check_type_for_declaration(&arg.argument_type);
-        }
+    for method in &methods {
+      // println!("Generating code for method: {:?}", method);
+      h_file.write(&self.generate_type_declaration(&method.c_signature.return_type,
+                                                   &data.include_file,
+                                                   &mut forward_declared_classes)
+                        .into_bytes())
+            .unwrap();
+      for arg in &method.c_signature.arguments {
+        h_file.write(&self.generate_type_declaration(&arg.argument_type,
+                                                     &data.include_file,
+                                                     &mut forward_declared_classes)
+                          .into_bytes())
+              .unwrap();
       }
     }
 

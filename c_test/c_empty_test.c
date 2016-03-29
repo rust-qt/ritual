@@ -1,4 +1,4 @@
-#include "qtcw_QPoint.h"
+#include "qtcw.h"
 
 int main() {
   return 0;

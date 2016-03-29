@@ -22,7 +22,7 @@ pub struct CppAndCMethod {
 
 impl CppMethodWithCSignature {
 
-  pub fn c_base_name(&self) -> String {
+  pub fn c_base_name(&self) -> Result<String, String> {
     let scope_prefix = match self.cpp_method.scope {
       CppMethodScope::Class(..) => "".to_string(),
       CppMethodScope::Global => "G_".to_string(),
@@ -38,11 +38,14 @@ impl CppMethodWithCSignature {
         AllocationPlace::Heap => "delete".to_string(),
       }
     } else if let Some(ref operator) = self.cpp_method.operator {
-      "OP_".to_string() + &operator_c_name(operator, self.cpp_method.real_arguments_count())
+      match operator_c_name(operator, self.cpp_method.real_arguments_count()) {
+        Ok(op) => format!("OP_{}", op),
+        Err(msg) => return Err(msg)
+      }
     } else {
       self.cpp_method.name.clone()
     };
-    scope_prefix + &method_name
+    Ok(scope_prefix + &method_name)
   }
 
   pub fn caption(&self, strategy: MethodCaptionStrategy) -> String {

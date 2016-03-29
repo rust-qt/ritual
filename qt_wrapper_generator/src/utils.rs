@@ -18,90 +18,91 @@ impl<X> JoinWithString for X
   }
 }
 
-pub fn operator_c_name(cpp_name: &String, arguments_count: i32) -> String {
-  if cpp_name == "=" && arguments_count == 2 {
-    return "assign".to_string();
+pub fn operator_c_name(cpp_name: &String, arguments_count: i32) -> Result<String, String> {
+  let result = if cpp_name == "=" && arguments_count == 2 {
+    "assign"
   } else if cpp_name == "+" && arguments_count == 2 {
-    return "add".to_string();
+    "add"
   } else if cpp_name == "-" && arguments_count == 2 {
-    return "sub".to_string();
+    "sub"
   } else if cpp_name == "+" && arguments_count == 1 {
-    return "unary_plus".to_string();
+    "unary_plus"
   } else if cpp_name == "-" && arguments_count == 1 {
-    return "neg".to_string();
+    "neg"
   } else if cpp_name == "*" && arguments_count == 2 {
-    return "mul".to_string();
+    "mul"
   } else if cpp_name == "/" && arguments_count == 2 {
-    return "div".to_string();
+    "div"
   } else if cpp_name == "%" && arguments_count == 2 {
-    return "rem".to_string();
+    "rem"
   } else if cpp_name == "++" && arguments_count == 1 {
-    return "inc".to_string();
+    "inc"
   } else if cpp_name == "++" && arguments_count == 2 {
-    return "inc_postfix".to_string();
+    "inc_postfix"
   } else if cpp_name == "--" && arguments_count == 1 {
-    return "dec".to_string();
+    "dec"
   } else if cpp_name == "--" && arguments_count == 2 {
-    return "dec_postfix".to_string();
+    "dec_postfix"
   } else if cpp_name == "==" && arguments_count == 2 {
-    return "eq".to_string();
+    "eq"
   } else if cpp_name == "!=" && arguments_count == 2 {
-    return "neq".to_string();
+    "neq"
   } else if cpp_name == ">" && arguments_count == 2 {
-    return "gt".to_string();
+    "gt"
   } else if cpp_name == "<" && arguments_count == 2 {
-    return "lt".to_string();
+    "lt"
   } else if cpp_name == ">=" && arguments_count == 2 {
-    return "ge".to_string();
+    "ge"
   } else if cpp_name == "<=" && arguments_count == 2 {
-    return "le".to_string();
+    "le"
   } else if cpp_name == "!" && arguments_count == 1 {
-    return "not".to_string();
+    "not"
   } else if cpp_name == "&&" && arguments_count == 2 {
-    return "and".to_string();
+    "and"
   } else if cpp_name == "||" && arguments_count == 2 {
-    return "or".to_string();
+    "or"
   } else if cpp_name == "~" && arguments_count == 1 {
-    return "bit_not".to_string();
+    "bit_not"
   } else if cpp_name == "&" && arguments_count == 2 {
-    return "bit_and".to_string();
+    "bit_and"
   } else if cpp_name == "|" && arguments_count == 2 {
-    return "bit_or".to_string();
+    "bit_or"
   } else if cpp_name == "^" && arguments_count == 2 {
-    return "bit_xor".to_string();
+    "bit_xor"
   } else if cpp_name == "<<" && arguments_count == 2 {
-    return "shl".to_string();
+    "shl"
   } else if cpp_name == ">>" && arguments_count == 2 {
-    return "shr".to_string();
+    "shr"
   } else if cpp_name == "+=" && arguments_count == 2 {
-    return "add_assign".to_string();
+    "add_assign"
   } else if cpp_name == "-=" && arguments_count == 2 {
-    return "sub_assign".to_string();
+    "sub_assign"
   } else if cpp_name == "*=" && arguments_count == 2 {
-    return "mul_assign".to_string();
+    "mul_assign"
   } else if cpp_name == "/=" && arguments_count == 2 {
-    return "div_assign".to_string();
+    "div_assign"
   } else if cpp_name == "%=" && arguments_count == 2 {
-    return "rem_assign".to_string();
+    "rem_assign"
   } else if cpp_name == "&=" && arguments_count == 2 {
-    return "bit_and_assign".to_string();
+    "bit_and_assign"
   } else if cpp_name == "|=" && arguments_count == 2 {
-    return "bit_or_assign".to_string();
+    "bit_or_assign"
   } else if cpp_name == "^=" && arguments_count == 2 {
-    return "bit_xor_assign".to_string();
+    "bit_xor_assign"
   } else if cpp_name == "<<=" && arguments_count == 2 {
-    return "shl_assign".to_string();
+    "shl_assign"
   } else if cpp_name == ">>=" && arguments_count == 2 {
-    return "shr_assign".to_string();
+    "shr_assign"
   } else if cpp_name == "[]" && arguments_count == 2 {
-    return "index".to_string();
+    "index"
   } else if cpp_name == "()" && arguments_count == 1 {
-    return "call".to_string();
+    "call"
   } else if cpp_name == "," && arguments_count == 2 {
-    return "comma".to_string();
+    "comma"
   } else {
-    panic!("unsupported operator: {}, {}", cpp_name, arguments_count);
-  }
+    return Err(format!("unsupported operator {} (arguments count: {})", cpp_name, arguments_count));
+  };
+  return Ok(result.to_string());
 }
 
 

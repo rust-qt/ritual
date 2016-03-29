@@ -1,6 +1,6 @@
 use cpp_method::CppMethod;
 use enums::CppMethodScope;
-use cpp_and_c_method::{CppAndCMethod};
+use cpp_and_c_method::CppAndCMethod;
 use caption_strategy::MethodCaptionStrategy;
 use cpp_type_map::CppTypeMap;
 use std::collections::HashMap;
@@ -52,23 +52,30 @@ impl CppHeaderData {
       for ref method in &self.methods {
         match method.add_c_signatures(cpp_type_map) {
           Err(msg) => {
-            println!("Unable to produce C function for method:\n{:?}\nError:{}",
+            println!("Unable to produce C function for method:\n{:?}\nError:{}\n",
                      method,
                      msg)
           }
           Ok((result_heap, result_stack)) => {
-            if let Some(result_stack) = result_stack {
-              let mut stack_name = result_stack.c_base_name();
-              let mut heap_name = result_heap.c_base_name();
-              if stack_name == heap_name {
-                stack_name = "SA_".to_string() + &stack_name;
-                heap_name = "HA_".to_string() + &heap_name;
+            match result_heap.c_base_name() {
+              Err(msg) => {
+                println!("Unable to produce C function for method:\n{:?}\nError:{}\n",
+                         method,
+                         msg)
               }
-              insert_into_hash(&mut hash1, stack_name, result_stack);
-              insert_into_hash(&mut hash1, heap_name, result_heap);
-            } else {
-              let c_base_name = result_heap.c_base_name();
-              insert_into_hash(&mut hash1, c_base_name, result_heap);
+              Ok(mut heap_name) => {
+                if let Some(result_stack) = result_stack {
+                  let mut stack_name = result_stack.c_base_name().unwrap();
+                  if stack_name == heap_name {
+                    stack_name = "SA_".to_string() + &stack_name;
+                    heap_name = "HA_".to_string() + &heap_name;
+                  }
+                  insert_into_hash(&mut hash1, stack_name, result_stack);
+                  insert_into_hash(&mut hash1, heap_name, result_heap);
+                } else {
+                  insert_into_hash(&mut hash1, heap_name, result_heap);
+                }
+              } 
             }
           }
         }

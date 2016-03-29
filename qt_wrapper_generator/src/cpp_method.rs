@@ -50,9 +50,12 @@ impl CppMethod {
   }
 
   pub fn real_arguments_count(&self) -> i32 {
+    //println!("real_arguments_count called for {:?}", self);
     let mut result = self.arguments.len() as i32;
     if let CppMethodScope::Class(..) = self.scope {
+      //println!("ok1");
       if !self.is_static {
+        //println!("ok2");
         result += 1;
       }
     }
