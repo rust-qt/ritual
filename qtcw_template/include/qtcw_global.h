@@ -9,6 +9,7 @@
 
 #include "qtcw_exports.h"
 #include "qtcw_sizes.h"
+#include "qtcw_enum_values.h"
 
 #ifdef __cplusplus // if C++
   #define QTCW_EXTERN_C_BEGIN extern "C" {

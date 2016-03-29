@@ -1,7 +1,9 @@
 
 OUTPUT_DIR ?= $(realpath ../generated_output)
 QT_DOC_DIR ?= $(realpath ../qt-doc/html)
-CMAKE_PREFIX_PATH ?= /home/ri/bin/Qt/5.5/gcc_64/lib/cmake
+QT_LIB_DIR ?= /home/ri/bin/Qt/5.5/gcc_64/lib
+
+CMAKE_PREFIX_PATH = $(QT_LIB_DIR)/cmake
 
 all: $(OUTPUT_DIR)/build_c_test
 
@@ -22,8 +24,8 @@ $(OUTPUT_DIR)/install_qtcw: $(OUTPUT_DIR)/qtcw
 .PHONY: $(OUTPUT_DIR)/build_c_test
 $(OUTPUT_DIR)/build_c_test: $(OUTPUT_DIR)/install_qtcw
 	mkdir -p $(OUTPUT_DIR)/build_c_test
-	export LIBRARY_PATH=$(OUTPUT_DIR)/install_qtcw/lib && \
-	export LD_LIBRARY_PATH=$(OUTPUT_DIR)/install_qtcw/lib && \
+	export LIBRARY_PATH=$(OUTPUT_DIR)/install_qtcw/lib:$(QT_LIB_DIR) && \
+	export LD_LIBRARY_PATH=$(OUTPUT_DIR)/install_qtcw/lib:$(QT_LIB_DIR) && \
 	export C_TEST_OUTPUT_DIR=$(OUTPUT_DIR)/build_c_test && \
 	export OUTPUT_DIR=$(OUTPUT_DIR) && \
 	$(MAKE) -C c_test

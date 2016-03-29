@@ -202,6 +202,7 @@ impl CGenerator {
   }
 
   pub fn generate_all(&mut self) {
+    self.generate_enum_values_list();
     self.sized_classes = self.generate_size_definer_class_list();
     let white_list = vec!["QPoint", "QRect", "QBitArray", "QByteArray", "QString", "Qt"];
 
@@ -306,8 +307,30 @@ impl CGenerator {
     Err("Corresponding header not found".to_string())
   }
 
+  pub fn generate_enum_values_list(&self) {
+    let mut h_path = self.qtcw_path.clone();
+    h_path.push("enum_values_definer");
+    h_path.push("values_list.h");
+    println!("Generating file: {:?}", h_path);
+    let mut h_file = File::create(&h_path).unwrap();
+    for (_, type_info) in &self.cpp_data.types.0 {
+      if let CppTypeKind::Enum{ ref values } = type_info.kind {
+        let enum_c_name = type_info.name.replace("::", "_");
+        println!("enum {:?}", type_info.name);
+        let enum_cpp_namespace = match type_info.name.rfind("::") {
+          Some(enum_last_part_index) => type_info.name[0..enum_last_part_index+2].to_string(),
+          None => String::new()
+        };
+        for value in values {
+          write!(h_file, "ADD(\"{}_{}\", {}{});\n", enum_c_name, value.name, enum_cpp_namespace, value.name).unwrap();
+        }
+      }
+    }
+    println!("Done.");
+  }
 
-  pub fn generate_size_definer_class_list(&self) -> Vec<String> {
+
+    pub fn generate_size_definer_class_list(&self) -> Vec<String> {
     let show_output = true;
 
     let mut sized_classes = Vec::new();
@@ -403,7 +426,7 @@ impl CGenerator {
             only_c_code(if needs_full_declaration {
               format!("typedef enum QTCW_{0} {{\n{1}\n}} {0};\n",
                       c_type.base,
-                      values.iter().map(|x| format!("  {} = {}", x.name, x.value)).join(", \n"))
+                      values.iter().map(|x| format!("  {0} = QTCW_EV_{1}_{0}", x.name, c_type.base)).join(", \n"))
             } else {
               format!("typedef enum QTCW_{0} {0};\n", c_type.base)
             })

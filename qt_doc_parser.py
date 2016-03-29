@@ -736,8 +736,17 @@ def add_typedef_data(types_data):
     unknown_typedefs.sort()
     logger.warning("Unknown typedefs: \n%s", "\n".join(unknown_typedefs))
 
-  types_data["QVariant::Type"]["values"] = types_data["QMetaType::Type"]["values"]
-
+  #types_data["QVariant::Type"]["values"] = []
+  #for value in types_data["QMetaType::Type"]["values"]:
+  #  new_value = value.copy()
+  #  if new_value["name"].startswith("Q"):
+  #    new_value["name"] = new_value["name"][1:]
+  #    types_data["QVariant::Type"]["values"].append(new_value)
+  types_data["QVariant::Type"] = { "origin": "fake" }
+  types_data["QEvent::Type"]["values"] = [
+    v for v in types_data["QEvent::Type"]["values"]
+    if v["name"] != "EnterEditFocus" and v["name"] != "LeaveEditFocus"
+  ]
 
 
 def fix_method_types(headers_data, types_data):
