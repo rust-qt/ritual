@@ -1,7 +1,9 @@
+CC = gcc
+
 all: $(patsubst %.c, run_$(C_TEST_OUTPUT_DIR)/%, $(wildcard *.c))
 
 $(C_TEST_OUTPUT_DIR)/%: %.c
-	$(CC) $< -o $@ -I$(OUTPUT_DIR)/install_qtcw/include -lqtcw
+	$(CC) $< -o $@ $(OUTPUT_DIR)/install_qtcw/lib/libqtcw.a -I$(OUTPUT_DIR)/install_qtcw/include -lQtCore -lstdc++
 
 .PHONY:run_$(C_TEST_OUTPUT_DIR)/%
 run_$(C_TEST_OUTPUT_DIR)/%: $(C_TEST_OUTPUT_DIR)/%

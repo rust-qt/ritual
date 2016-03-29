@@ -24,8 +24,8 @@ $(OUTPUT_DIR)/install_qtcw: $(OUTPUT_DIR)/qtcw
 .PHONY: $(OUTPUT_DIR)/build_c_test
 $(OUTPUT_DIR)/build_c_test: $(OUTPUT_DIR)/install_qtcw
 	mkdir -p $(OUTPUT_DIR)/build_c_test
-	export LIBRARY_PATH=$(OUTPUT_DIR)/install_qtcw/lib:$(QT_LIB_DIR) && \
-	export LD_LIBRARY_PATH=$(OUTPUT_DIR)/install_qtcw/lib:$(QT_LIB_DIR) && \
+	export LIBRARY_PATH=$(QT_LIB_DIR) && \
+	export LD_LIBRARY_PATH=$(QT_LIB_DIR) && \
 	export C_TEST_OUTPUT_DIR=$(OUTPUT_DIR)/build_c_test && \
 	export OUTPUT_DIR=$(OUTPUT_DIR) && \
 	$(MAKE) -C c_test
