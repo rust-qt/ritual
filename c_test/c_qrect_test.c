@@ -1,18 +1,19 @@
-#include "../c_qrect.h"
+#include "qtcw_QRect.h"
 #include <stdio.h>
 #include <malloc.h>
+#include <assert.h>
 
 int main() {
-  C_QRect rect1;
-  c_qrect_construct(&rect1, 1, 2, 3, 4);
-  printf("test1 %d\n", c_qrect_height(&rect1));
-  c_qrect_destruct(&rect1);
+  QRect rect1;
+  QRect_constructor_x_y_width_height(1, 2, 3, 4, &rect1);
+  assert(QRect_height(&rect1) == 4);
+  QRect_destructor(&rect1);
 
-  C_QRect* rect2 = malloc(sizeof(C_QRect));
+  QRect* rect2 = malloc(sizeof(QRect));
 
-  c_qrect_construct(rect2, 5, 6, 7, 8);
-  printf("test2 %d\n", c_qrect_height(rect2));
-  c_qrect_destruct(rect2);
+  QRect_constructor_x_y_width_height(5, 6, 7, 8, rect2);
+  assert(QRect_height(rect2) == 8);
+  QRect_destructor(rect2);
 
   free(rect2);
 

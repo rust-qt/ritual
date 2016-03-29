@@ -19,14 +19,19 @@ $(OUTPUT_DIR)/install_qtcw: $(OUTPUT_DIR)/qtcw
 	cmake ../qtcw -DCMAKE_PREFIX_PATH=$(CMAKE_PREFIX_PATH) -DCMAKE_INSTALL_PREFIX=$(OUTPUT_DIR)/install_qtcw && \
 	make install
 
+.PHONY: $(OUTPUT_DIR)/build_c_test
 $(OUTPUT_DIR)/build_c_test: $(OUTPUT_DIR)/install_qtcw
+	mkdir -p $(OUTPUT_DIR)/build_c_test
 	export LIBRARY_PATH=$(OUTPUT_DIR)/install_qtcw/lib && \
 	export LD_LIBRARY_PATH=$(OUTPUT_DIR)/install_qtcw/lib && \
 	export C_TEST_OUTPUT_DIR=$(OUTPUT_DIR)/build_c_test && \
-	mkdir -p $(OUTPUT_DIR)/build_c_test && \
-	cd c_test && \
-	make 
+	export OUTPUT_DIR=$(OUTPUT_DIR) && \
+	$(MAKE) -C c_test
 
 clean: 
 	rm -rv $(OUTPUT_DIR)/*
+
+clean_rust:
+	rm -rv $(OUTPUT_DIR)/qtcw
+	rm -rv $(OUTPUT_DIR)/install_qtcw
 

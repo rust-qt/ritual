@@ -3,7 +3,7 @@ use cpp_data::CppData;
 use c_type::CTypeExtended;
 use cpp_type::CppType;
 use enums::{AllocationPlace, CFunctionArgumentCppEquivalent, IndirectionChange, CppMethodScope,
-            CppTypeOrigin, CppTypeKind};
+            CppTypeOrigin, CppTypeKind, CppTypeIndirection};
 use cpp_and_c_method::CppAndCMethod;
 use std::path::PathBuf;
 use std::fs::File;
@@ -64,8 +64,11 @@ impl CppAndCMethod {
                            .c_type
                            .to_c_code(),
                        result);
-
     }
+    if self.c_signature.return_type.conversion.qflags_to_uint {
+      result = format!("uint({})", result);
+    }
+
     if self.allocation_place == AllocationPlace::Stack && !self.cpp_method.is_constructor {
       if let Some(arg) = self.c_signature.arguments.iter().find(|x| {
         x.cpp_equivalent == CFunctionArgumentCppEquivalent::ReturnValue
@@ -98,6 +101,9 @@ impl CppAndCMethod {
           result = format!("reinterpret_cast<{}>({})",
                            cpp_argument.argument_type.to_cpp_code(),
                            result);
+        }
+        if c_argument.argument_type.conversion.qflags_to_uint {
+          result = format!("{}({})", cpp_argument.argument_type.base, result);
         }
         filled_arguments.push(result);
       } else {
@@ -397,18 +403,18 @@ impl CGenerator {
     let methods = data.process_methods(&self.cpp_data.types);
     {
       let mut check_type_for_declaration = |c_type_extended: &CTypeExtended| {
-        println!("check_type_for_declaration {:?}", c_type_extended);
+        //println!("check_type_for_declaration {:?}", c_type_extended);
         let c_type = &c_type_extended.c_type;
         let cpp_type = &c_type_extended.cpp_type;
         if forward_declared_classes.iter().find(|&x| x == &c_type.base).is_some() {
-          println!("already declared");
+          //println!("already declared");
           return; //already declared
         }
 
         let type_info = self.cpp_data.types.get_info(&cpp_type.base).unwrap();
         match &type_info.origin {
           &CppTypeOrigin::CBuiltIn => {
-            println!("CBuiltIn");
+            //println!("CBuiltIn");
           }
           &CppTypeOrigin::Unsupported(..) => {
             panic!("this type should have been filtered previously")
@@ -421,9 +427,9 @@ impl CGenerator {
               &CppTypeKind::CPrimitive => "".to_string(),
               &CppTypeKind::Enum { ref values } => {
                 only_c_code(if needs_full_declaration {
-                  format!("enum {} {{\n{}}};\n",
+                  format!("enum {} {{\n{}\n}};\n",
                           c_type.base,
-                          values.iter().map(|x| format!("  {} = {},", x.name, x.value)).join("\n"))
+                          values.iter().map(|x| format!("  {} = {}", x.name, x.value)).join(", \n"))
                 } else {
                   format!("enum {};\n", c_type.base)
                 })
@@ -434,11 +440,11 @@ impl CGenerator {
                 only_c_code(self.struct_declaration(&c_type.base, needs_full_declaration))
               }
             };
-            println!("declaration: {}", declaration);
+            //println!("declaration: {}", declaration);
             h_file.write(&declaration.into_bytes()).unwrap();
 
             forward_declared_classes.push(c_type.base.clone());
-            println!("Type {:?} is forward-declared.", c_type.base);
+            //println!("Type {:?} is forward-declared.", c_type.base);
           }
         }
         if let CppTypeKind::TypeDef { ref meaning } = self.cpp_data
@@ -448,7 +454,7 @@ impl CGenerator {
                                                           .unwrap()
                                                           .kind {
           let c_meaning = meaning.to_c_type(&self.cpp_data.types).unwrap().c_type;
-          println!("typedef meaning: {:?}", c_meaning);
+          //println!("typedef meaning: {:?}", c_meaning);
           h_file.write(&only_c_code(format!("typedef {} {};\n",
                                             c_meaning.to_c_code(),
                                             c_type.base))
@@ -463,8 +469,21 @@ impl CGenerator {
 
       };
 
+
+      for name in self.cpp_data.types.get_types_from_include_file(&data.include_file) {
+        let cpp_type = CppType {
+          is_const: false,
+          indirection: CppTypeIndirection::None,
+          base: name,
+          template_arguments: None
+        };
+        if let Ok(c_type_ex) = cpp_type.to_c_type(&self.cpp_data.types) {
+          check_type_for_declaration(&c_type_ex);
+        }
+      }
+
       for method in &methods {
-        println!("Generating code for method: {:?}", method);
+        //println!("Generating code for method: {:?}", method);
         check_type_for_declaration(&method.c_signature.return_type);
         for arg in &method.c_signature.arguments {
           check_type_for_declaration(&arg.argument_type);
@@ -476,19 +495,9 @@ impl CGenerator {
     for method in &methods {
       h_file.write(&method.header_code().into_bytes()).unwrap();
       cpp_file.write(&method.source_code().into_bytes()).unwrap();
-
-
-
-
-
-
-
     }
 
     write!(h_file, "\nQTCW_EXTERN_C_END\n\n").unwrap();
-
-
-
 
     write!(h_file, "#endif // {}\n", include_guard_name).unwrap();
     println!("Done.\n")

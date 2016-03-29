@@ -36,4 +36,16 @@ impl CppTypeMap {
       Err("No type info".to_string())
     }
   }
+
+  pub fn get_types_from_include_file(&self, include: &String) -> Vec<String> {
+    let mut r = vec![];
+    for (_, type_info) in &self.0 {
+      if let CppTypeOrigin::Qt{ ref include_file } = type_info.origin {
+        if include_file == include {
+          r.push(type_info.name.clone());
+        }
+      }
+    }
+    r
+  }
 }
