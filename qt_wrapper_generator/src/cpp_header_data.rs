@@ -5,7 +5,7 @@ use caption_strategy::MethodCaptionStrategy;
 use cpp_type_map::CppTypeMap;
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CppHeaderData {
   pub include_file: String,
   pub class_name: Option<String>,
@@ -17,6 +17,10 @@ pub struct CppHeaderData {
 impl CppHeaderData {
   pub fn ensure_explicit_destructor(&mut self) {
     if let Some(ref class_name) = self.class_name {
+      if class_name == "QStandardPaths" {
+        // destructor is private
+        return;
+      }
       if self.methods.iter().find(|x| x.is_destructor).is_none() {
         self.methods.push(CppMethod {
           name: format!("~{}", class_name),
@@ -49,7 +53,7 @@ impl CppHeaderData {
         break;
       }
     }
-    if vec!["QAnimationGroup", "QAbstractListModel"]
+    if vec!["QAnimationGroup", "QAbstractListModel", "QAbstractTableModel"]
          .iter()
          .find(|&&x| x == self.include_file)
          .is_some() {
@@ -97,11 +101,24 @@ impl CppHeaderData {
                    method);
           continue;
         }
+        if self.include_file == "QRectF" && method.scope == CppMethodScope::Global &&
+           (method.name == "marginsAdded" || method.name == "marginsRemoved") {
+          println!("Method is skipped:\n{:?}\nThis method is blacklisted because it does not \
+                    really exist.\n",
+                   method);
+          continue;
+        }
         // TODO: unblock on Windows
         if self.include_file == "QProcess" &&
            (method.name == "nativeArguments" || method.name == "setNativeArguments") {
           println!("Method is skipped:\n{:?}\nThis method is Windows-only.\n",
                    method);
+          continue;
+        }
+        if self.include_file == "QAbstractEventDispatcher" &&
+        (method.name == "registerEventNotifier" || method.name == "unregisterEventNotifier") {
+          println!("Method is skipped:\n{:?}\nThis method is Windows-only.\n",
+          method);
           continue;
         }
 
@@ -137,10 +154,13 @@ impl CppHeaderData {
       }
     }
     let mut r = Vec::new();
+    let name_prefix = match self.class_name {
+      Some(ref class_name) => class_name.replace("::", "_"),
+      None => self.include_file.clone(),
+    };
     for (key, mut values) in hash1.into_iter() {
       if values.len() == 1 {
-        r.push(CppAndCMethod::new(values.remove(0),
-                                  self.include_file.clone() + &("_".to_string()) + &key));
+        r.push(CppAndCMethod::new(values.remove(0), format!("{}_{}", name_prefix, key)));
         continue;
       }
       let mut found_strategy = None;
@@ -160,14 +180,15 @@ impl CppHeaderData {
         for x in values {
           let caption = x.caption(strategy.clone());
           r.push(CppAndCMethod::new(x,
-                                    self.include_file.clone() + &("_".to_string()) + &key +
-                                    &((if caption.is_empty() {
-                                        ""
-                                      } else {
-                                        "_"
-                                      })
-                                      .to_string()) +
-                                    &caption));
+                                    format!("{}_{}{}{}",
+                                            name_prefix,
+                                            key,
+                                            if caption.is_empty() {
+                                              ""
+                                            } else {
+                                              "_"
+                                            },
+                                            caption)));
         }
       } else {
         panic!("all type caption strategies have failed! Involved functions: \n{:?}",

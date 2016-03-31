@@ -53,12 +53,12 @@ impl CppMethod {
   }
 
   pub fn real_arguments_count(&self) -> i32 {
-    //println!("real_arguments_count called for {:?}", self);
+    // println!("real_arguments_count called for {:?}", self);
     let mut result = self.arguments.len() as i32;
     if let CppMethodScope::Class(..) = self.scope {
-      //println!("ok1");
+      // println!("ok1");
       if !self.is_static {
-        //println!("ok2");
+        // println!("ok2");
         result += 1;
       }
     }
@@ -86,24 +86,13 @@ impl CppMethod {
       if !self.is_static && !self.is_constructor {
         r.arguments.push(CFunctionArgument {
           name: "self".to_string(),
-          argument_type: CTypeExtended {
-            c_type: CType {
-              base: class_name.clone(),
-              is_pointer: true,
-              is_const: self.is_const,
-            },
-            cpp_type: CppType {
-              base: class_name.clone(),
-              template_arguments: None, // TODO: figure out template arguments
-              is_const: self.is_const,
-              indirection: CppTypeIndirection::Ptr,
-            },
-            conversion: CppToCTypeConversion {
-              indirection_change: IndirectionChange::NoChange,
-              renamed: false,
-              qflags_to_uint: false,
-            },
-          },
+          argument_type: CppType {
+                           base: class_name.clone(),
+                           template_arguments: None, // TODO: figure out template arguments
+                           is_const: self.is_const,
+                           indirection: CppTypeIndirection::Ptr,
+                         }
+                         .to_c_type(cpp_type_map).unwrap(),
           cpp_equivalent: CFunctionArgumentCppEquivalent::This,
         });
       }
@@ -128,7 +117,7 @@ impl CppMethod {
           let is_stack_allocated_struct = if return_type.indirection == CppTypeIndirection::None {
             match cpp_type_map.get_info(&return_type.base).unwrap().kind {
               CppTypeKind::Class { .. } => true,
-              _ => false
+              _ => false,
             }
           } else {
             false

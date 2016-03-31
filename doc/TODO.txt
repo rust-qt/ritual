@@ -1,0 +1,18 @@
+Missing critical features:
+
+- Wrap template classes with each used instantiation
+- Access to classes' public variables (example: QAbstractEventDispatcher::TimerInfo)
+- Wrap methods with function arguments
+- Provide a way for connecting and disconnecting signals
+- Provide a way to subclass Qt classes
+- Create QObject subclasses with properties, signals, slots
+- Support Linux, Windows and MacOS-specific methods and types
+
+
+Extra features:
+- Sort classes and methods to reduce randomness
+
+
+
+
+

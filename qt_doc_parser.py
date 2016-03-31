@@ -310,6 +310,7 @@ def parse_nested_types(soup, class_name_or_namespace):
         continue
 
     values = []
+    values_dict = {} # for uniqueness check
     for tr in table.findAll("tr"):
       if len(tr.findAll("th")) > 0: continue # skip header
       tds = tr.findAll("td")
@@ -319,7 +320,13 @@ def parse_nested_types(soup, class_name_or_namespace):
         if not value["name"].startswith(class_name_or_namespace + "::"):
           raise ParseException("enum item without namespace")
         value["name"] = value["name"][len(class_name_or_namespace + "::"):]
-      values.append(value)
+      if value["name"] in values_dict:
+        logger.error("Enum value %s is encountered multiple times." % value["name"])
+        if value["value"] != values_dict[value["name"]]["value"]:
+          logger.error("And values are not the same. Nuff said.")
+      else:
+        values.append(value)
+        values_dict[value["name"]] = value
     current_pos = table
     found_name = None
     while current_pos:

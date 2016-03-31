@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::fs::File;
 use std::io::Write;
 use utils::JoinWithString;
+use std::collections::HashMap;
 
 pub struct CGenerator {
   qtcw_path: PathBuf,
@@ -116,43 +117,53 @@ impl CppAndCMethod {
   }
 
   fn returned_expression(&self) -> String {
-    let mut result = if self.cpp_method.is_constructor {
-      if let CppMethodScope::Class(ref class_name) = self.cpp_method.scope {
-        match self.allocation_place {
-          AllocationPlace::Stack => {
-            if let Some(arg) = self.c_signature.arguments.iter().find(|x| {
-              x.cpp_equivalent == CFunctionArgumentCppEquivalent::ReturnValue
-            }) {
-              format!("new({}) {}", arg.name, class_name)
-            } else {
-              panic!("no return value equivalent argument found");
-            }
-          }
-          AllocationPlace::Heap => format!("new {}", class_name),
-        }
+    self.convert_return_type(if self.cpp_method.is_destructor {
+      if let Some(arg) = self.c_signature.arguments.iter().find(|x| {
+        x.cpp_equivalent == CFunctionArgumentCppEquivalent::This
+      }) {
+        format!("qtcw_call_destructor({})", arg.name)
       } else {
-        panic!("constructor not in class scope");
+        panic!("Error: no this argument found\n{:?}", self);
       }
     } else {
-      let scope_specifier = if let CppMethodScope::Class(ref class_name) = self.cpp_method.scope {
-        if self.cpp_method.is_static {
-          format!("{}::", class_name)
-        } else {
-          if let Some(arg) = self.c_signature.arguments.iter().find(|x| {
-            x.cpp_equivalent == CFunctionArgumentCppEquivalent::This
-          }) {
-            format!("{}->", arg.name)
-          } else {
-            panic!("Error: no this argument found\n{:?}", self);
+      let result_without_args = if self.cpp_method.is_constructor {
+        if let CppMethodScope::Class(ref class_name) = self.cpp_method.scope {
+          match self.allocation_place {
+            AllocationPlace::Stack => {
+              if let Some(arg) = self.c_signature.arguments.iter().find(|x| {
+                x.cpp_equivalent == CFunctionArgumentCppEquivalent::ReturnValue
+              }) {
+                format!("new({}) {}", arg.name, class_name)
+              } else {
+                panic!("no return value equivalent argument found");
+              }
+            }
+            AllocationPlace::Heap => format!("new {}", class_name),
           }
+        } else {
+          panic!("constructor not in class scope");
         }
       } else {
-        "".to_string()
+        let scope_specifier = if let CppMethodScope::Class(ref class_name) = self.cpp_method
+                                                                                 .scope {
+          if self.cpp_method.is_static {
+            format!("{}::", class_name)
+          } else {
+            if let Some(arg) = self.c_signature.arguments.iter().find(|x| {
+              x.cpp_equivalent == CFunctionArgumentCppEquivalent::This
+            }) {
+              format!("{}->", arg.name)
+            } else {
+              panic!("Error: no this argument found\n{:?}", self);
+            }
+          }
+        } else {
+          "".to_string()
+        };
+        format!("{}{}", scope_specifier, self.cpp_method.name)
       };
-      format!("{}{}", scope_specifier, self.cpp_method.name)
-    };
-    result = format!("{}({})", result, self.arguments_values());
-    self.convert_return_type(result)
+      format!("{}({})", result_without_args, self.arguments_values())
+    })
   }
 
 
@@ -199,8 +210,8 @@ impl CGenerator {
       cpp_data: cpp_data,
       qtcw_path: qtcw_path,
       sized_classes: Vec::new(),
-      //TODO: unblock for Windows
-      classes_blacklist: vec!["QWinEventNotifier"]
+      // TODO: unblock for Windows
+      classes_blacklist: vec!["QWinEventNotifier"],
     }
   }
 
@@ -214,6 +225,8 @@ impl CGenerator {
     h_path.push("qtcw.h");
     let mut all_header_file = File::create(&h_path).unwrap();
     write!(all_header_file, "#ifndef QTCW_H\n#define QTCW_H\n\n").unwrap();
+
+    let mut include_file_to_header_data: HashMap<String, Vec<CppHeaderData>> = HashMap::new();
 
     for data in &self.cpp_data.headers {
       // if white_list.iter().find(|&&x| x == data.include_file).is_none() {
@@ -235,19 +248,26 @@ impl CGenerator {
           }
           Err(msg) => {
             println!("Skipping code generation for header {} because of error: {}.\n",
-                     data.include_file, msg);
+                     data.include_file,
+                     msg);
             continue;
           }
         }
       }
+      if !match include_file_to_header_data.get_mut(&data.include_file) {
+        Some(mut vec) => {
+          vec.push(data.clone());
+          true
+        }
+        None => false,
+      } {
+        include_file_to_header_data.insert(data.include_file.clone(), vec![data.clone()]);
+      }
+    }
 
-
-
-      self.generate_one(data);
-      write!(all_header_file,
-             "#include \"qtcw_{}.h\"\n",
-             data.include_file)
-        .unwrap();
+    for (include_file, data) in &include_file_to_header_data {
+      self.generate_one(include_file, data);
+      write!(all_header_file, "#include \"qtcw_{}.h\"\n", include_file).unwrap();
 
     }
 
@@ -414,6 +434,9 @@ impl CGenerator {
   }
 
   fn struct_declaration(&self, c_struct_name: &String, full_declaration: bool) -> String {
+    if c_struct_name.find("::").is_some() {
+      panic!("struct_declaration called for invalid struct name {}", c_struct_name);
+    }
     // write C struct definition
     let result = if full_declaration &&
                     self.sized_classes.iter().find(|x| *x == c_struct_name).is_some() {
@@ -461,7 +484,7 @@ impl CGenerator {
               format!("typedef enum QTCW_{0} {{\n{1}\n}} {0};\n",
                       c_type.base,
                       values.iter()
-                            .map(|x| format!("  {0} = QTCW_EV_{1}_{0}", x.name, c_type.base))
+                            .map(|x| format!("  {1}_{0} = QTCW_EV_{1}_{0}", x.name, c_type.base))
                             .join(", \n"))
             } else {
               format!("typedef enum QTCW_{0} {0};\n", c_type.base)
@@ -495,22 +518,22 @@ impl CGenerator {
     result
   }
 
-  pub fn generate_one(&self, data: &CppHeaderData) {
+  pub fn generate_one(&self, include_file: &String, data_vec: &Vec<CppHeaderData>) {
     let mut cpp_path = self.qtcw_path.clone();
     cpp_path.push("src");
-    cpp_path.push(format!("qtcw_{}.cpp", data.include_file));
+    cpp_path.push(format!("qtcw_{}.cpp", include_file));
     println!("Generating source file: {:?}", cpp_path);
 
     let mut h_path = self.qtcw_path.clone();
     h_path.push("include");
-    h_path.push(format!("qtcw_{}.h", data.include_file));
+    h_path.push(format!("qtcw_{}.h", include_file));
     println!("Generating header file: {:?}", h_path);
 
     let mut cpp_file = File::create(&cpp_path).unwrap();
     let mut h_file = File::create(&h_path).unwrap();
 
-    write!(cpp_file, "#include \"qtcw_{}.h\"\n\n", data.include_file).unwrap();
-    let include_guard_name = format!("QTCW_{}_H", data.include_file.to_uppercase());
+    write!(cpp_file, "#include \"qtcw_{}.h\"\n\n", include_file).unwrap();
+    let include_guard_name = format!("QTCW_{}_H", include_file.to_uppercase());
     write!(h_file,
            "#ifndef {}\n#define {}\n\n",
            include_guard_name,
@@ -521,7 +544,7 @@ impl CGenerator {
 
 
     write!(h_file, "#ifdef __cplusplus\n").unwrap();
-    // write!(h_file, "#include <{}>\n", data.include_file).unwrap();
+    // write!(h_file, "#include <{}>\n", include_file).unwrap();
     write!(h_file, "#include <QtCore>\n").unwrap();
     write!(h_file, "#endif\n\n").unwrap();
 
@@ -534,22 +557,7 @@ impl CGenerator {
     //    }
 
     write!(h_file, "QTCW_EXTERN_C_BEGIN\n\n").unwrap();
-    let methods: Vec<CppAndCMethod> = data.process_methods(&self.cpp_data.types)
-                                          .into_iter()
-                                          .filter(|method| {
-                                            if method.cpp_method.is_protected {
-                                              println!("Skipping protected method: \n{:?}\n",
-                                                       method);
-                                              return false;
-                                            }
-                                            if method.cpp_method.is_signal {
-                                              println!("Skipping signal: \n{:?}\n", method);
-                                              return false;
-                                            }
-                                            true
-                                          })
-                                          .collect();
-    for name in self.cpp_data.types.get_types_from_include_file(&data.include_file) {
+    for name in self.cpp_data.types.get_types_from_include_file(&include_file) {
       let cpp_type = CppType {
         is_const: false,
         indirection: CppTypeIndirection::None,
@@ -558,24 +566,41 @@ impl CGenerator {
       };
       if let Ok(c_type_ex) = cpp_type.to_c_type(&self.cpp_data.types) {
         h_file.write(&self.generate_type_declaration(&c_type_ex,
-                                                     &data.include_file,
+                                                     &include_file,
                                                      &mut forward_declared_classes)
                           .into_bytes())
               .unwrap();
       }
     }
 
+    let mut methods: Vec<CppAndCMethod> = vec![];
+    for data in data_vec {
+      methods.append(&mut data.process_methods(&self.cpp_data.types)
+                              .into_iter()
+                              .filter(|method| {
+                                if method.cpp_method.is_protected {
+                                  println!("Skipping protected method: \n{:?}\n", method);
+                                  return false;
+                                }
+                                if method.cpp_method.is_signal {
+                                  println!("Skipping signal: \n{:?}\n", method);
+                                  return false;
+                                }
+                                true
+                              })
+                              .collect());
+    }
     for method in &methods {
 
-      // println!("Generating code for method: {:?}", method);
+      //println!("Generating code for method: {:?}", method);
       h_file.write(&self.generate_type_declaration(&method.c_signature.return_type,
-                                                   &data.include_file,
+                                                   &include_file,
                                                    &mut forward_declared_classes)
                         .into_bytes())
             .unwrap();
       for arg in &method.c_signature.arguments {
         h_file.write(&self.generate_type_declaration(&arg.argument_type,
-                                                     &data.include_file,
+                                                     &include_file,
                                                      &mut forward_declared_classes)
                           .into_bytes())
               .unwrap();
