@@ -1,5 +1,5 @@
 use cpp_method::CppMethod;
-use enums::{CppMethodScope};
+use enums::CppMethodScope;
 use cpp_and_c_method::CppAndCMethod;
 use caption_strategy::MethodCaptionStrategy;
 use cpp_type_map::CppTypeMap;
@@ -49,7 +49,10 @@ impl CppHeaderData {
         break;
       }
     }
-    if vec!["QAnimationGroup"].iter().find(|&&x| x == self.include_file).is_some() {
+    if vec!["QAnimationGroup", "QAbstractListModel"]
+         .iter()
+         .find(|&&x| x == self.include_file)
+         .is_some() {
       // these class are abstract despite they don't have pure virtual methods!
       is_abstract_class = true;
     }
@@ -66,8 +69,39 @@ impl CppHeaderData {
 
       for ref method in &self.methods {
         if is_abstract_class && method.is_constructor {
-          println!("Method is skipped:\n{:?}\nConstructors are not allowed for abstract classes.\n",
-          method);
+          println!("Method is skipped:\n{:?}\nConstructors are not allowed for abstract \
+                    classes.\n",
+                   method);
+          continue;
+        }
+        if self.include_file == "QMetaType" &&
+           (method.name == "qRegisterMetaType" ||
+            method.name == "qRegisterMetaTypeStreamOperators" ||
+            ((method.name == "hasRegisteredComparators" ||
+              method.name == "hasRegisteredConverterFunction" ||
+              method.name == "isRegistered" || method.name == "registerComparators" ||
+              method.name == "registerConverter" ||
+              method.name == "registerDebugStreamOperator" ||
+              method.name == "registerEqualsComparator" ||
+              method.name == "qMetaTypeId" ||
+              method.name == "hasRegisteredDebugStreamOperator") &&
+             method.arguments.len() == 0)) {
+          println!("Method is skipped:\n{:?}\nThis method is blacklisted because it is a \
+                    template method.\n",
+                   method);
+          continue;
+        }
+        if self.include_file == "QMetaEnum" && method.name == "fromType" {
+          println!("Method is skipped:\n{:?}\nThis method is blacklisted because it is a \
+                    template method.\n",
+                   method);
+          continue;
+        }
+        // TODO: unblock on Windows
+        if self.include_file == "QProcess" &&
+           (method.name == "nativeArguments" || method.name == "setNativeArguments") {
+          println!("Method is skipped:\n{:?}\nThis method is Windows-only.\n",
+                   method);
           continue;
         }
 

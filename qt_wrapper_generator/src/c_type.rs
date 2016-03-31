@@ -41,7 +41,7 @@ impl CTypeExtended {
     match strategy {
       TypeCaptionStrategy::Short => self.c_type.caption(),
       TypeCaptionStrategy::Full => {
-        let mut r = self.c_type.base.clone();
+        let mut r = self.c_type.base.replace(" ", "_");
         if self.c_type.is_pointer {
           match self.conversion.indirection_change {
             IndirectionChange::NoChange => r = format!("{}_ptr", r),
@@ -76,7 +76,7 @@ impl CType {
   //  }
 
   pub fn caption(&self) -> String {
-    let mut r = self.base.clone();
+    let mut r = self.base.replace(" ", "_");
     if self.is_pointer {
       r = format!("{}_ptr", r);
     }

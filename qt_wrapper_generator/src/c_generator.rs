@@ -199,6 +199,7 @@ impl CGenerator {
       cpp_data: cpp_data,
       qtcw_path: qtcw_path,
       sized_classes: Vec::new(),
+      //TODO: unblock for Windows
       classes_blacklist: vec!["QWinEventNotifier"]
     }
   }
