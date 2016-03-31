@@ -1,16 +1,24 @@
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum TypeCaptionStrategy {
+  Short,
+  Full,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ArgumentCaptionStrategy {
   NameOnly,
-  TypeOnly,
-  TypeAndName,
+  TypeOnly(TypeCaptionStrategy),
+  TypeAndName(TypeCaptionStrategy),
 }
 
 impl ArgumentCaptionStrategy {
   pub fn all() -> Vec<Self> {
     vec![ArgumentCaptionStrategy::NameOnly,
-         ArgumentCaptionStrategy::TypeOnly,
-         ArgumentCaptionStrategy::TypeAndName]
+         ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short),
+         ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short),
+         ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full),
+         ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full)]
   }
 }
 

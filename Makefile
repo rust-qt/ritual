@@ -18,6 +18,8 @@ $(OUTPUT_DIR)/qtcw: $(OUTPUT_DIR)/doc_parse_result.json $(wildcard qt_wrapper_ge
 $(OUTPUT_DIR)/install_qtcw: $(OUTPUT_DIR)/qtcw
 	mkdir -p $(OUTPUT_DIR)/build_qtcw
 	cd $(OUTPUT_DIR)/build_qtcw && \
+	export LIBRARY_PATH=$(QT_LIB_DIR) && \
+	export LD_LIBRARY_PATH=$(QT_LIB_DIR) && \
 	cmake ../qtcw -DCMAKE_PREFIX_PATH=$(CMAKE_PREFIX_PATH) -DCMAKE_INSTALL_PREFIX=$(OUTPUT_DIR)/install_qtcw && \
 	make install
 

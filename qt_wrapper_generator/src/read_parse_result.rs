@@ -79,6 +79,18 @@ impl CppMethod {
         Some(v) => v.as_boolean().unwrap(),
         None => false,
       },
+      is_pure_virtual: match value.get("pure_virtual") {
+        Some(v) => v.as_boolean().unwrap(),
+        None => false,
+      },
+      is_protected: match value.get("protected") {
+        Some(v) => v.as_boolean().unwrap(),
+        None => false,
+      },
+      is_signal: match value.get("signal") {
+        Some(v) => v.as_boolean().unwrap(),
+        None => false,
+      },
       is_const: match value.get("is_const") {
         Some(v) => v.as_boolean().unwrap(),
         None => false,

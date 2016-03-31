@@ -220,8 +220,15 @@ def parse_methods(table, class_name, section_attrs, nested_types):
           else:
             arg = parse_argument(part)
             data["arguments"].append(arg)
-        if signature_string_parts2[1].strip() == "const":
+        const_or_pure_suffix = signature_string_parts2[1]
+        if const_or_pure_suffix.endswith(" = 0"):
+          data["pure_virtual"] = True
+          const_or_pure_suffix = const_or_pure_suffix[0:len(const_or_pure_suffix) - len(" = 0")]
+        if const_or_pure_suffix.endswith(" const"):
           data["is_const"] = True
+          const_or_pure_suffix = const_or_pure_suffix[0:len(const_or_pure_suffix) - len(" const")]
+        if const_or_pure_suffix:
+          raise ParseException("Unprocessed suffix: '%s'" % const_or_pure_suffix)
 
         if data["name"].startswith("operator"):
           data["operator"] = data["name"][len("operator"):].strip()

@@ -13,9 +13,9 @@ impl CFunctionArgument {
   pub fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
     match strategy {
       ArgumentCaptionStrategy::NameOnly => self.name.clone(),
-      ArgumentCaptionStrategy::TypeOnly => self.argument_type.c_type.caption(),
-      ArgumentCaptionStrategy::TypeAndName => {
-        self.argument_type.c_type.caption() + &("_".to_string()) + &self.name
+      ArgumentCaptionStrategy::TypeOnly(type_strategy) => self.argument_type.caption(type_strategy),
+      ArgumentCaptionStrategy::TypeAndName(type_strategy) => {
+        self.argument_type.caption(type_strategy) + &("_".to_string()) + &self.name
       }
     }
   }

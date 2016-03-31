@@ -14,6 +14,7 @@ pub struct CGenerator {
   qtcw_path: PathBuf,
   cpp_data: CppData,
   sized_classes: Vec<String>,
+  classes_blacklist: Vec<&'static str>,
 }
 
 fn only_c_code(code: String) -> String {
@@ -66,7 +67,7 @@ impl CppAndCMethod {
                        result);
     }
     if self.c_signature.return_type.conversion.qflags_to_uint {
-      result = format!("unsigned int({})", result);
+      result = format!("uint({})", result);
     }
 
     if self.allocation_place == AllocationPlace::Stack && !self.cpp_method.is_constructor {
@@ -198,13 +199,14 @@ impl CGenerator {
       cpp_data: cpp_data,
       qtcw_path: qtcw_path,
       sized_classes: Vec::new(),
+      classes_blacklist: vec!["QWinEventNotifier"]
     }
   }
 
   pub fn generate_all(&mut self) {
     self.generate_enum_values_list();
     self.sized_classes = self.generate_size_definer_class_list();
-    let white_list = vec!["QPoint", "QRect", "QBitArray", "QByteArray", "QString", "Qt"];
+    // let white_list = vec!["QPoint", "QRect", "QBitArray", "QByteArray", "QString", "Qt"];
 
     let mut h_path = self.qtcw_path.clone();
     h_path.push("include");
@@ -213,9 +215,33 @@ impl CGenerator {
     write!(all_header_file, "#ifndef QTCW_H\n#define QTCW_H\n\n").unwrap();
 
     for data in &self.cpp_data.headers {
-      if white_list.iter().find(|&&x| x == data.include_file).is_none() {
-        continue;
+      // if white_list.iter().find(|&&x| x == data.include_file).is_none() {
+      //  continue;
+      // }
+      if let Some(ref class_name) = data.class_name {
+        if self.classes_blacklist.iter().find(|&&x| x == class_name.as_ref() as &str).is_some() {
+          println!("Ignoring {} because it is blacklisted.", data.include_file);
+          continue;
+        }
+        match self.is_template_class(class_name) {
+          Ok(is_template_class) => {
+            if is_template_class {
+              println!("Skipping code generation for header {} because it contains a template \
+                        class.\n",
+                       data.include_file);
+              continue;
+            }
+          }
+          Err(msg) => {
+            println!("Skipping code generation for header {} because of error: {}.\n",
+                     data.include_file, msg);
+            continue;
+          }
+        }
       }
+
+
+
       self.generate_one(data);
       write!(all_header_file,
              "#include \"qtcw_{}.h\"\n",
@@ -263,6 +289,9 @@ impl CGenerator {
   }
 
   fn is_template_class(&self, class_name: &String) -> Result<bool, String> {
+    if class_name == "QGlobalStatic" || class_name == "QFlags" {
+      return Ok(true);
+    }
     for item in &self.cpp_data.headers {
       if let Some(ref item_class_name) = item.class_name {
         if item_class_name == class_name {
@@ -314,15 +343,21 @@ impl CGenerator {
     println!("Generating file: {:?}", h_path);
     let mut h_file = File::create(&h_path).unwrap();
     for (_, type_info) in &self.cpp_data.types.0 {
-      if let CppTypeKind::Enum{ ref values } = type_info.kind {
+      if let CppTypeKind::Enum { ref values } = type_info.kind {
         let enum_c_name = type_info.name.replace("::", "_");
         println!("enum {:?}", type_info.name);
         let enum_cpp_namespace = match type_info.name.rfind("::") {
-          Some(enum_last_part_index) => type_info.name[0..enum_last_part_index+2].to_string(),
-          None => String::new()
+          Some(enum_last_part_index) => type_info.name[0..enum_last_part_index + 2].to_string(),
+          None => String::new(),
         };
         for value in values {
-          write!(h_file, "ADD(\"{}_{}\", {}{});\n", enum_c_name, value.name, enum_cpp_namespace, value.name).unwrap();
+          write!(h_file,
+                 "ADD(\"{}_{}\", {}{});\n",
+                 enum_c_name,
+                 value.name,
+                 enum_cpp_namespace,
+                 value.name)
+            .unwrap();
         }
       }
     }
@@ -330,12 +365,10 @@ impl CGenerator {
   }
 
 
-    pub fn generate_size_definer_class_list(&self) -> Vec<String> {
+  pub fn generate_size_definer_class_list(&self) -> Vec<String> {
     let show_output = true;
 
     let mut sized_classes = Vec::new();
-    // TODO: black magic happens here
-    let blacklist = vec!["QFlags", "QWinEventNotifier", "QGlobalStatic"];
 
     let mut h_path = self.qtcw_path.clone();
     h_path.push("size_definer");
@@ -344,7 +377,7 @@ impl CGenerator {
     let mut h_file = File::create(&h_path).unwrap();
     for item in &self.cpp_data.headers {
       if let Some(ref class_name) = item.class_name {
-        if blacklist.iter().find(|&&x| x == class_name.as_ref() as &str).is_some() {
+        if self.classes_blacklist.iter().find(|&&x| x == class_name.as_ref() as &str).is_some() {
           if show_output {
             println!("Ignoring {} because it is blacklisted.", item.include_file);
           }
@@ -400,19 +433,19 @@ impl CGenerator {
                                current_include_file: &String,
                                already_declared: &mut Vec<String>)
                                -> String {
-    println!("check_type_for_declaration {:?}", c_type_extended);
+    // println!("check_type_for_declaration {:?}", c_type_extended);
     let c_type = &c_type_extended.c_type;
     let cpp_type = &c_type_extended.cpp_type;
     if already_declared.iter().find(|&x| x == &c_type.base).is_some() {
-      println!("already declared");
+      // println!("already declared");
       return String::new(); //already declared
     }
 
     let type_info = self.cpp_data.types.0.get(&cpp_type.base).unwrap();
-    println!("type info: {:?}", type_info);
+    // println!("type info: {:?}", type_info);
     let mut result = match &type_info.origin {
       &CppTypeOrigin::CBuiltIn => {
-        println!("CBuiltIn");
+        // println!("CBuiltIn");
         String::new()
       }
       &CppTypeOrigin::Unsupported(..) => panic!("this type should have been filtered previously"),
@@ -426,7 +459,9 @@ impl CGenerator {
             only_c_code(if needs_full_declaration {
               format!("typedef enum QTCW_{0} {{\n{1}\n}} {0};\n",
                       c_type.base,
-                      values.iter().map(|x| format!("  {0} = QTCW_EV_{1}_{0}", x.name, c_type.base)).join(", \n"))
+                      values.iter()
+                            .map(|x| format!("  {0} = QTCW_EV_{1}_{0}", x.name, c_type.base))
+                            .join(", \n"))
             } else {
               format!("typedef enum QTCW_{0} {0};\n", c_type.base)
             })
@@ -434,7 +469,7 @@ impl CGenerator {
           &CppTypeKind::Flags { .. } => format!("typedef unsigned int {};\n", c_type.base),
           &CppTypeKind::TypeDef { ref meaning } => {
             let c_meaning = meaning.to_c_type(&self.cpp_data.types).unwrap();
-            println!("typedef meaning: {:?}", c_meaning.c_type);
+            // println!("typedef meaning: {:?}", c_meaning.c_type);
             self.generate_type_declaration(&c_meaning, current_include_file, already_declared) +
             &only_c_code(format!("typedef {} {};\n",
                                  c_meaning.c_type.to_c_code(),
@@ -445,15 +480,15 @@ impl CGenerator {
           }
         };
         already_declared.push(c_type.base.clone());
-        println!("declaration: {}", declaration);
-        println!("Type {:?} is forward-declared.", c_type.base);
+        // println!("declaration: {}", declaration);
+        // println!("Type {:?} is forward-declared.", c_type.base);
         declaration
       }
     };
     if c_type_extended.conversion.renamed {
-      println!("write renaming typedef cpp={} c={}",
-               cpp_type.base,
-               c_type.base);
+      //      println!("write renaming typedef cpp={} c={}",
+      //               cpp_type.base,
+      //               c_type.base);
       result = result + &only_cpp_code(format!("typedef {} {};\n", cpp_type.base, c_type.base));
     }
     result
@@ -498,7 +533,21 @@ impl CGenerator {
     //    }
 
     write!(h_file, "QTCW_EXTERN_C_BEGIN\n\n").unwrap();
-    let methods = data.process_methods(&self.cpp_data.types);
+    let methods: Vec<CppAndCMethod> = data.process_methods(&self.cpp_data.types)
+                                          .into_iter()
+                                          .filter(|method| {
+                                            if method.cpp_method.is_protected {
+                                              println!("Skipping protected method: \n{:?}\n",
+                                                       method);
+                                              return false;
+                                            }
+                                            if method.cpp_method.is_signal {
+                                              println!("Skipping signal: \n{:?}\n", method);
+                                              return false;
+                                            }
+                                            true
+                                          })
+                                          .collect();
     for name in self.cpp_data.types.get_types_from_include_file(&data.include_file) {
       let cpp_type = CppType {
         is_const: false,
@@ -516,6 +565,7 @@ impl CGenerator {
     }
 
     for method in &methods {
+
       // println!("Generating code for method: {:?}", method);
       h_file.write(&self.generate_type_declaration(&method.c_signature.return_type,
                                                    &data.include_file,

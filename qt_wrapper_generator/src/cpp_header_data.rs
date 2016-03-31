@@ -1,5 +1,5 @@
 use cpp_method::CppMethod;
-use enums::CppMethodScope;
+use enums::{CppMethodScope};
 use cpp_and_c_method::CppAndCMethod;
 use caption_strategy::MethodCaptionStrategy;
 use cpp_type_map::CppTypeMap;
@@ -22,8 +22,11 @@ impl CppHeaderData {
           name: format!("~{}", class_name),
           scope: CppMethodScope::Class(class_name.clone()),
           is_virtual: false, // TODO: destructors may be virtual
+          is_pure_virtual: false,
           is_const: false,
           is_static: false,
+          is_protected: false,
+          is_signal: false,
           return_type: None,
           is_constructor: false,
           is_destructor: true,
@@ -39,6 +42,18 @@ impl CppHeaderData {
 
   pub fn process_methods(&self, cpp_type_map: &CppTypeMap) -> Vec<CppAndCMethod> {
     println!("Processing header <{}>", self.include_file);
+    let mut is_abstract_class = false;
+    for ref method in &self.methods {
+      if method.is_pure_virtual {
+        is_abstract_class = true;
+        break;
+      }
+    }
+    if vec!["QAnimationGroup"].iter().find(|&&x| x == self.include_file).is_some() {
+      // these class are abstract despite they don't have pure virtual methods!
+      is_abstract_class = true;
+    }
+
     let mut hash1 = HashMap::new();
     {
       let insert_into_hash = |hash: &mut HashMap<String, Vec<_>>, key: String, value| {
@@ -50,6 +65,12 @@ impl CppHeaderData {
       };
 
       for ref method in &self.methods {
+        if is_abstract_class && method.is_constructor {
+          println!("Method is skipped:\n{:?}\nConstructors are not allowed for abstract classes.\n",
+          method);
+          continue;
+        }
+
         match method.add_c_signatures(cpp_type_map) {
           Err(msg) => {
             println!("Unable to produce C function for method:\n{:?}\nError:{}\n",

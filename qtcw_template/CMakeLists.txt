@@ -6,7 +6,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_BINARY_D
 file(GLOB sources src/*.cpp)
 file(GLOB headers include/*.h)
 add_library(qtcw STATIC ${sources})
-target_link_libraries(qtcw Qt5::Core)
+target_link_libraries(qtcw Qt5::Core icui18n icuuc icudata)
 
 add_subdirectory(size_definer)
 add_custom_target(
