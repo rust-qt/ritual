@@ -1,8 +1,8 @@
 use cpp_type::CppType;
-use enums::{CppMethodScope, AllocationPlace, AllocationPlaceImportance, IndirectionChange,
+use enums::{CppMethodScope, AllocationPlace, AllocationPlaceImportance,
             CFunctionArgumentCppEquivalent, CppTypeIndirection, CppTypeKind};
 use c_function_signature::CFunctionSignature;
-use c_type::{CType, CTypeExtended, CppToCTypeConversion};
+use c_type::{CTypeExtended};
 use c_function_argument::CFunctionArgument;
 use cpp_and_c_method::CppMethodWithCSignature;
 use cpp_type_map::CppTypeMap;

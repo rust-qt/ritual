@@ -464,6 +464,9 @@ impl CGenerator {
       // println!("already declared");
       return String::new(); //already declared
     }
+    if c_type.base == "wchar_t" {
+      return only_c_code("#include <wchar.h>\n".to_string());
+    }
 
     let type_info = self.cpp_data.types.0.get(&cpp_type.base).unwrap();
     // println!("type info: {:?}", type_info);
