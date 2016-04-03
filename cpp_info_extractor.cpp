@@ -1,5 +1,6 @@
 //include everything
 #include <QtCore>
+#include <QJsonObject>
 
 class Extractor {
 public:
@@ -22,7 +23,24 @@ public:
       qFatal("cpp_info_extractor: can't open file.");
       qApp->exit(2);
     }
-    file.write("test output\n");
+    QJsonObject enum_values;
+    foreach(QString key, m_enum_values.keys()) {
+      QJsonObject v;
+      foreach(QString key2, m_enum_values[key].keys()) {
+        v[key2] = m_enum_values[key][key2];
+      }
+      enum_values[key] = v;
+    }
+
+    QJsonObject class_sizes;
+    foreach(QString key, m_class_sizes.keys()) {
+      class_sizes[key] = m_class_sizes[key];
+    }
+
+    QJsonObject root;
+    root["enum_values"] = enum_values;
+    root["class_sizes"] = class_sizes;
+    file.write(QJsonDocument(root).toJson());
   }
 
 private:

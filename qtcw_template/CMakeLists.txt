@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.0.0 FATAL_ERROR)
 project (qtcw)
 find_package(Qt5Core REQUIRED)
+message("Qt version: ${Qt5Core_VERSION}")
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_BINARY_DIR})
 
 file(GLOB sources src/*.cpp)
