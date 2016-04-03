@@ -26,6 +26,7 @@ $(OUTPUT_DIR)/qtcw: $(OUTPUT_DIR)/doc_parse_result.json $(wildcard qt_wrapper_ge
 $(OUTPUT_DIR)/install_qtcw: $(OUTPUT_DIR)/qtcw
 	echo "TARGET3"
 	mkdir -p $(OUTPUT_DIR)/build_qtcw
+	rm -rf $(OUTPUT_DIR)/install_qtcw
 	cd $(OUTPUT_DIR)/build_qtcw && \
 	export LIBRARY_PATH=$(QT_LIB_DIR) && \
 	export LD_LIBRARY_PATH=$(QT_LIB_DIR) && \
