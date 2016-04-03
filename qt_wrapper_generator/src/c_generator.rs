@@ -10,12 +10,13 @@ use std::fs::File;
 use std::io::Write;
 use utils::JoinWithString;
 use std::collections::HashMap;
+use read_extracted_info::CppExtractedInfo;
 
 pub struct CGenerator {
   qtcw_path: PathBuf,
   cpp_data: CppData,
+  cpp_extracted_info: CppExtractedInfo,
   sized_classes: Vec<String>,
-  classes_blacklist: Vec<&'static str>,
 }
 
 fn only_c_code(code: String) -> String {
@@ -205,13 +206,12 @@ impl CppAndCMethod {
 
 
 impl CGenerator {
-  pub fn new(cpp_data: CppData, qtcw_path: PathBuf) -> Self {
+  pub fn new(cpp_data: CppData, cpp_extracted_info: CppExtractedInfo, qtcw_path: PathBuf) -> Self {
     CGenerator {
       cpp_data: cpp_data,
+      cpp_extracted_info: cpp_extracted_info,
       qtcw_path: qtcw_path,
       sized_classes: Vec::new(),
-      // TODO: unblock for Windows
-      classes_blacklist: vec!["QWinEventNotifier"],
     }
   }
 
@@ -233,11 +233,11 @@ impl CGenerator {
       //  continue;
       // }
       if let Some(ref class_name) = data.class_name {
-        if self.classes_blacklist.iter().find(|&&x| x == class_name.as_ref() as &str).is_some() {
+        if self.cpp_data.classes_blacklist.iter().find(|&x| x == class_name.as_ref() as &str).is_some() {
           println!("Ignoring {} because it is blacklisted.", data.include_file);
           continue;
         }
-        match self.is_template_class(class_name) {
+        match self.cpp_data.is_template_class(class_name) {
           Ok(is_template_class) => {
             if is_template_class {
               println!("Skipping code generation for header {} because it contains a template \
@@ -283,79 +283,6 @@ impl CGenerator {
   //    match
   //  }
 
-  fn type_contains_template_arguments(&self, cpp_type: &CppType) -> Result<bool, String> {
-    match self.cpp_data.types.get_info(&cpp_type.base) {
-      Ok(ref info) => {
-        if let CppTypeOrigin::Unsupported(ref v) = info.origin {
-          if v == "template_argument" {
-            return Ok(true);
-          }
-        }
-      }
-      Err(msg) => return Err(msg),
-    }
-    if let Some(ref args) = cpp_type.template_arguments {
-      for arg in args {
-        match self.type_contains_template_arguments(&arg) {
-          Ok(r) => {
-            if r {
-              return Ok(true);
-            }
-          }
-          Err(msg) => return Err(msg),
-        }
-      }
-    }
-    Ok(false)
-  }
-
-  fn is_template_class(&self, class_name: &String) -> Result<bool, String> {
-    if class_name == "QGlobalStatic" || class_name == "QFlags" {
-      return Ok(true);
-    }
-    for item in &self.cpp_data.headers {
-      if let Some(ref item_class_name) = item.class_name {
-        if item_class_name == class_name {
-          for method in &item.methods {
-            if let CppMethodScope::Class(..) = method.scope {
-              if let Some(ref return_type) = method.return_type {
-                match self.type_contains_template_arguments(return_type) {
-                  Ok(r) => {
-                    if r {
-                      return Ok(true);
-                    }
-                  }
-                  Err(msg) => return Err(msg),
-                }
-              }
-              for arg in &method.arguments {
-                match self.type_contains_template_arguments(&arg.argument_type) {
-                  Ok(r) => {
-                    if r {
-                      return Ok(true);
-                    }
-                  }
-                  Err(msg) => return Err(msg),
-                }
-              }
-            }
-          }
-          if let Some(index) = class_name.rfind("::") {
-            match self.is_template_class(&class_name[0..index].to_string()) {
-              Ok(r) => {
-                if r {
-                  return Ok(true);
-                }
-              }
-              Err(msg) => return Err(msg),
-            }
-          }
-          return Ok(false);
-        }
-      }
-    }
-    Err("Corresponding header not found".to_string())
-  }
 
   pub fn generate_enum_values_list(&self) {
     let mut h_path = self.qtcw_path.clone();
@@ -398,13 +325,13 @@ impl CGenerator {
     let mut h_file = File::create(&h_path).unwrap();
     for item in &self.cpp_data.headers {
       if let Some(ref class_name) = item.class_name {
-        if self.classes_blacklist.iter().find(|&&x| x == class_name.as_ref() as &str).is_some() {
+        if self.cpp_data.classes_blacklist.iter().find(|&x| x == class_name.as_ref() as &str).is_some() {
           if show_output {
             println!("Ignoring {} because it is blacklisted.", item.include_file);
           }
           continue;
         }
-        match self.is_template_class(class_name) {
+        match self.cpp_data.is_template_class(class_name) {
           Err(msg) => {
             if show_output {
               println!("Ignoring {}: {}", class_name, msg);

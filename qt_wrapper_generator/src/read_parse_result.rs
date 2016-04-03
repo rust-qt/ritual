@@ -265,5 +265,6 @@ pub fn do_it(file_name: &std::path::PathBuf) -> CppData {
                    .map(|x| CppHeaderData::from_json(x))
                    .collect(),
     types: CppTypeMap::from_json(object.get("type_info").unwrap()),
+    classes_blacklist: vec![]
   }
 }
