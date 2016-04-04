@@ -16,7 +16,6 @@ pub struct CGenerator {
   qtcw_path: PathBuf,
   cpp_data: CppData,
   cpp_extracted_info: CppExtractedInfo,
-  sized_classes: Vec<String>,
 }
 
 fn only_c_code(code: String) -> String {
@@ -119,9 +118,10 @@ impl CppAndCMethod {
 
   fn returned_expression(&self) -> String {
     self.convert_return_type(if self.cpp_method.is_destructor {
-      if let Some(arg) = self.c_signature.arguments.iter().find(|x| {
-        x.cpp_equivalent == CFunctionArgumentCppEquivalent::This
-      }) {
+      if let Some(arg) = self.c_signature
+                             .arguments
+                             .iter()
+                             .find(|x| x.cpp_equivalent == CFunctionArgumentCppEquivalent::This) {
         format!("qtcw_call_destructor({})", arg.name)
       } else {
         panic!("Error: no this argument found\n{:?}", self);
@@ -211,15 +211,10 @@ impl CGenerator {
       cpp_data: cpp_data,
       cpp_extracted_info: cpp_extracted_info,
       qtcw_path: qtcw_path,
-      sized_classes: Vec::new(),
     }
   }
 
   pub fn generate_all(&mut self) {
-    self.generate_enum_values_list();
-    self.sized_classes = self.generate_size_definer_class_list();
-    // let white_list = vec!["QPoint", "QRect", "QBitArray", "QByteArray", "QString", "Qt"];
-
     let mut h_path = self.qtcw_path.clone();
     h_path.push("include");
     h_path.push("qtcw.h");
@@ -233,7 +228,11 @@ impl CGenerator {
       //  continue;
       // }
       if let Some(ref class_name) = data.class_name {
-        if self.cpp_data.classes_blacklist.iter().find(|&x| x == class_name.as_ref() as &str).is_some() {
+        if self.cpp_data
+               .classes_blacklist
+               .iter()
+               .find(|&x| x == class_name.as_ref() as &str)
+               .is_some() {
           println!("Ignoring {} because it is blacklisted.", data.include_file);
           continue;
         }
@@ -284,92 +283,18 @@ impl CGenerator {
   //  }
 
 
-  pub fn generate_enum_values_list(&self) {
-    let mut h_path = self.qtcw_path.clone();
-    h_path.push("enum_values_definer");
-    h_path.push("values_list.h");
-    println!("Generating file: {:?}", h_path);
-    let mut h_file = File::create(&h_path).unwrap();
-    for (_, type_info) in &self.cpp_data.types.0 {
-      if let CppTypeKind::Enum { ref values } = type_info.kind {
-        let enum_c_name = type_info.name.replace("::", "_");
-        println!("enum {:?}", type_info.name);
-        let enum_cpp_namespace = match type_info.name.rfind("::") {
-          Some(enum_last_part_index) => type_info.name[0..enum_last_part_index + 2].to_string(),
-          None => String::new(),
-        };
-        for value in values {
-          write!(h_file,
-                 "ADD(\"{}_{}\", {}{});\n",
-                 enum_c_name,
-                 value.name,
-                 enum_cpp_namespace,
-                 value.name)
-            .unwrap();
-        }
-      }
-    }
-    println!("Done.");
-  }
-
-
-  pub fn generate_size_definer_class_list(&self) -> Vec<String> {
-    let show_output = true;
-
-    let mut sized_classes = Vec::new();
-
-    let mut h_path = self.qtcw_path.clone();
-    h_path.push("size_definer");
-    h_path.push("classes_list.h");
-    println!("Generating file: {:?}", h_path);
-    let mut h_file = File::create(&h_path).unwrap();
-    for item in &self.cpp_data.headers {
-      if let Some(ref class_name) = item.class_name {
-        if self.cpp_data.classes_blacklist.iter().find(|&x| x == class_name.as_ref() as &str).is_some() {
-          if show_output {
-            println!("Ignoring {} because it is blacklisted.", item.include_file);
-          }
-          continue;
-        }
-        match self.cpp_data.is_template_class(class_name) {
-          Err(msg) => {
-            if show_output {
-              println!("Ignoring {}: {}", class_name, msg);
-            }
-            continue;
-          }
-          Ok(is_template_class) => {
-            if is_template_class {
-              // TODO: support template classes!
-              if show_output {
-                println!("Ignoring {} because it is a template class.", class_name);
-              }
-              continue;
-            }
-          }
-        }
-        let define_name = class_name.replace("::", "_");
-        if show_output {
-          println!("Requesting size definition for {}.", class_name);
-        }
-        write!(h_file, "ADD({}, {});\n", define_name, class_name).unwrap();
-        sized_classes.push(class_name.clone());
-      }
-    }
-    println!("Done.\n");
-    sized_classes
-  }
 
   fn struct_declaration(&self, c_struct_name: &String, full_declaration: bool) -> String {
     if c_struct_name.find("::").is_some() {
-      panic!("struct_declaration called for invalid struct name {}", c_struct_name);
+      panic!("struct_declaration called for invalid struct name {}",
+             c_struct_name);
     }
     // write C struct definition
     let result = if full_declaration &&
-                    self.sized_classes.iter().find(|x| *x == c_struct_name).is_some() {
-      format!("struct QTCW_{} {{ char space[QTCW_sizeof_{}]; }};\n",
+                    self.cpp_extracted_info.class_sizes.contains_key(c_struct_name) {
+      format!("struct QTCW_{} {{ char space[{}]; }};\n",
               c_struct_name,
-              c_struct_name)
+              self.cpp_extracted_info.class_sizes.get(c_struct_name).unwrap())
     } else {
       format!("struct QTCW_{};\n", c_struct_name)
     };
@@ -414,7 +339,17 @@ impl CGenerator {
               format!("typedef enum QTCW_{0} {{\n{1}\n}} {0};\n",
                       c_type.base,
                       values.iter()
-                            .map(|x| format!("  {1}_{0} = QTCW_EV_{1}_{0}", x.name, c_type.base))
+                            .map(|x| {
+                              format!("  {}_{} = {}",
+                                      c_type.base,
+                                      x.name,
+                                      self.cpp_extracted_info
+                                          .enum_values
+                                          .get(&cpp_type.base) 
+                                          .unwrap()
+                                          .get(&x.name)
+                                          .unwrap())
+                            })
                             .join(", \n"))
             } else {
               format!("typedef enum QTCW_{0} {0};\n", c_type.base)
@@ -522,7 +457,7 @@ impl CGenerator {
     }
     for method in &methods {
 
-      //println!("Generating code for method: {:?}", method);
+      // println!("Generating code for method: {:?}", method);
       h_file.write(&self.generate_type_declaration(&method.c_signature.return_type,
                                                    &include_file,
                                                    &mut forward_declared_classes)

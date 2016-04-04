@@ -7,6 +7,8 @@ Missing critical features:
 - Provide a way to subclass Qt classes
 - Create QObject subclasses with properties, signals, slots
 - Support Linux, Windows and MacOS-specific methods and types
+- Static, Dynamic and QObject cast of pointers
+- Access to inherited methods
 
 
 Extra features:

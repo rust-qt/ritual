@@ -73,6 +73,7 @@ add_custom_command(
 file(MAKE_DIRECTORY ${QTCW_BUILD_DIR})
 add_custom_command(
   COMMAND
+    ${CMAKE_COMMAND} -E remove_directory ${QTCW_INSTALL_DIR} &&
     ${CMAKE_COMMAND} ${QTCW_GENERATED_SOURCE_DIR}
       -DCMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}
       -DCMAKE_INSTALL_PREFIX=${QTCW_INSTALL_DIR} &&

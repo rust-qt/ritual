@@ -9,25 +9,10 @@ file(GLOB headers include/*.h)
 add_library(qtcw STATIC ${sources})
 target_link_libraries(qtcw Qt5::Core icui18n icuuc icudata)
 
-add_subdirectory(size_definer)
-add_custom_target(
-    run_size_definer
-    COMMAND size_definer ${CMAKE_CURRENT_BINARY_DIR}/qtcw_sizes.h)
-add_dependencies(qtcw run_size_definer)
-
-add_subdirectory(enum_values_definer)
-add_custom_target(
-    run_enum_values_definer
-    COMMAND enum_values_definer ${CMAKE_CURRENT_BINARY_DIR}/qtcw_enum_values.h)
-add_dependencies(qtcw run_enum_values_definer)
-
-
 add_definitions(-DQTCW_LIBRARY)
 
 install(TARGETS qtcw ARCHIVE DESTINATION lib)
-
-INSTALL(FILES ${headers} DESTINATION "include")
-INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/qtcw_sizes.h ${CMAKE_CURRENT_BINARY_DIR}/qtcw_enum_values.h DESTINATION "include")
+install(FILES ${headers} DESTINATION include)
 
 if(${CMAKE_COMPILER_IS_GNUCXX})
   set(CMAKE_CXX_FLAGS "-Wall -Wextra -Werror=return-type")
