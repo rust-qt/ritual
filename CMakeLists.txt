@@ -3,8 +3,6 @@ project (rust_qt_generator)
 find_package(Qt5Core REQUIRED)
 message("Qt version: ${Qt5Core_VERSION}")
 
-set(QT_LINK_LIBS Qt5::Core icui18n icuuc icudata)
-
 set(QT_DOC_DIR
   CACHE PATH "Path to Qt documentation HTML files")
 SET(QTCW_MAKE_OPTIONS
@@ -27,40 +25,49 @@ set(QTCW_INSTALL_DIR ${CMAKE_BINARY_DIR}/install_qtcw)
 file(GLOB_RECURSE QT_DOC_FILES ${QT_DOC_DIR}/*.html)
 file(GLOB_RECURSE RUST_GENERATOR_FILES ${CMAKE_SOURCE_DIR}/qt_wrapper_generator/*.rs)
 file(GLOB_RECURSE QTCW_TEMPLATE_FILES ${CMAKE_SOURCE_DIR}/qtcw_template/*)
+file(GLOB_RECURSE QTCW_TEST_FILES ${CMAKE_SOURCE_DIR}/c_test/*)
 
+# phantom target for setting final output files
 add_custom_target(${PROJECT_NAME}
   ALL
-  DEPENDS ${QTCW_INSTALL_DIR})
+  DEPENDS build_rust_qt)
 
+# run python parser
 add_custom_command(
   OUTPUT ${DOC_PARSE_RESULT_PATH}
-  COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/qt_doc_parser.py ${QT_DOC_DIR} ${DOC_PARSE_RESULT_PATH}
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/qt_doc_parser.py ${QT_DOC_FILES}
+  COMMAND ${CMAKE_SOURCE_DIR}/qt_doc_parser.py ${QT_DOC_DIR} ${DOC_PARSE_RESULT_PATH}
+  DEPENDS ${CMAKE_SOURCE_DIR}/qt_doc_parser.py ${QT_DOC_FILES}
 )
 
+# cargo config file for changing build directory
 CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/qt_wrapper_generator/cargo_config_template ${CMAKE_BINARY_DIR}/.cargo/config)
 
+# building main generator
 add_custom_command(
   OUTPUT ${RUST_GENERATOR_EXE}
   COMMAND cargo build --manifest-path ${CMAKE_SOURCE_DIR}/qt_wrapper_generator/Cargo.toml
   DEPENDS ${CMAKE_BINARY_DIR}/.cargo/config ${RUST_GENERATOR_FILES}
 )
 
+# running main generator for generating cpp extractor actions
 add_custom_command(
   OUTPUT ${CPP_INFO_EXTRACTOR_ACTIONS_PATH}
   COMMAND ${RUST_GENERATOR_EXE} stage1 ${DOC_PARSE_RESULT_PATH} ${CPP_INFO_EXTRACTOR_ACTIONS_PATH}
   DEPENDS ${RUST_GENERATOR_EXE} ${DOC_PARSE_RESULT_PATH}
 )
 
+# building cpp extractor
 add_executable(cpp_info_extractor cpp_info_extractor.cpp ${CPP_INFO_EXTRACTOR_ACTIONS_PATH})
 include_directories(${CMAKE_BINARY_DIR})
-target_link_libraries(cpp_info_extractor ${QT_LINK_LIBS})
+target_link_libraries(cpp_info_extractor ${Qt5Core_LIBRARIES})
 
+# running cpp extractor
 add_custom_command(
   OUTPUT ${CPP_EXTRACTED_INFO_PATH}
   COMMAND cpp_info_extractor ${CPP_EXTRACTED_INFO_PATH}
 )
 
+# running main generator for generating C and Rust wrappers
 add_custom_command(
   OUTPUT ${QTCW_GENERATED_SOURCE_DIR} ${RUST_QT_GENERATED_SOURCE_DIR}
   COMMAND
@@ -70,6 +77,7 @@ add_custom_command(
   DEPENDS ${RUST_GENERATOR_EXE} ${QTCW_TEMPLATE_FILES} ${CPP_EXTRACTED_INFO_PATH}
 )
 
+# building generated C wrapper
 file(MAKE_DIRECTORY ${QTCW_BUILD_DIR})
 add_custom_command(
   COMMAND
@@ -81,4 +89,29 @@ add_custom_command(
   OUTPUT ${QTCW_INSTALL_DIR}
   DEPENDS ${QTCW_GENERATED_SOURCE_DIR}
   WORKING_DIRECTORY ${QTCW_BUILD_DIR}
+)
+add_custom_target(qtcw_installed DEPENDS ${QTCW_INSTALL_DIR})
+
+# building and running C tests
+include_directories(${QTCW_INSTALL_DIR}/include)
+foreach(QTCW_TEST_FILE ${QTCW_TEST_FILES})
+  get_filename_component(TEST_NAME ${QTCW_TEST_FILE} NAME_WE)
+  set(TEST_TARGET "c_test_${TEST_NAME}")
+  add_executable(${TEST_TARGET} ${QTCW_TEST_FILE})
+  add_dependencies(${TEST_TARGET} qtcw_installed)
+  target_link_libraries(${TEST_TARGET} ${QTCW_INSTALL_DIR}/lib/libqtcw.a ${Qt5Core_LIBRARIES} -lstdc++)
+  add_custom_command(
+    TARGET ${TEST_TARGET}
+    POST_BUILD
+    COMMAND ${TEST_TARGET}
+  )
+  set(TEST_TARGETS ${TEST_TARGETS} ${TEST_TARGET})
+
+endforeach()
+
+# building and testing rust_qt crates
+add_custom_target(build_rust_qt
+  COMMAND cargo test
+  WORKING_DIRECTORY ${RUST_QT_GENERATED_SOURCE_DIR}/qt_core
+  DEPENDS ${RUST_QT_GENERATED_SOURCE_DIR} ${TEST_TARGETS}
 )

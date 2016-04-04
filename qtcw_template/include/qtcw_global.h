@@ -3,9 +3,6 @@
 
 #ifndef __cplusplus // if C
   #include <stdbool.h>
-  #include "qtcw_sizes.h"
-  #include "qtcw_enum_values.h"
-
 #endif
 #include <stdint.h>
 
