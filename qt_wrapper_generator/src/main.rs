@@ -62,7 +62,7 @@ fn main() {
     let c_gen = c_generator::CGenerator::new(parse_result, extracted_info, qtcw_path);
     let c_data = c_gen.generate_all();
     let mut rust_gen = rust_generator::RustGenerator::new(c_data, rust_qt_path);
-
+    rust_gen.generate_all();
   } else {
     print_usage();
     return;

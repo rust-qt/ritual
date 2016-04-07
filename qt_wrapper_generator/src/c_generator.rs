@@ -199,6 +199,7 @@ impl CppAndCMethod {
   }
 }
 
+#[derive(Debug, Clone)]
 pub struct CHeaderData {
   pub include_file: String,
   pub methods: Vec<CppAndCMethod>,
