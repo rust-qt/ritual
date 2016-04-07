@@ -9,7 +9,8 @@ Missing critical features:
 - Support Linux, Windows and MacOS-specific methods and types
 - Static, Dynamic and QObject cast of pointers
 - Access to inherited methods
-
+- Catch all C++ exceptions in any wrapper function
+- Convert Qt documentation to Rust documentation
 
 Extra features:
 - Sort classes and methods to reduce randomness
@@ -18,3 +19,19 @@ Extra features:
 
 
 
+Primitive types
+---------------
+
+- Void is its own type.
+- Default C types (int, short) etc:
+  - already available in C
+  - translate to libc::c_... in Rust
+- fixed size types (qint8, ..., qlonglong):
+  - define manually using C fixed types
+  - translate to i8, ..., i64 in Rust
+- pointer types (qintptr, quintptr, qptrdiff, QList::difference_type):
+  - define manually in C: http://stackoverflow.com/a/5273354/344347
+  - translate to isize, usize in Rust
+- qreal:
+  - define as double in C (will define as float on some archs in future)
+  - "pub type qreal = f64" in Rust

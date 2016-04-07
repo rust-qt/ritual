@@ -14,6 +14,7 @@ mod enums;
 mod extractor_actions_generator;
 mod read_extracted_info;
 mod read_parse_result;
+mod rust_generator;
 mod utils;
 
 use std::path::{PathBuf};
@@ -58,8 +59,10 @@ fn main() {
     let extracted_info = read_extracted_info::do_it(extracted_info_path);
     let qtcw_path = PathBuf::from(arguments[4].clone());
     let rust_qt_path = PathBuf::from(arguments[5].clone());
-    let mut g = c_generator::CGenerator::new(parse_result, extracted_info, qtcw_path);
-    g.generate_all();
+    let c_gen = c_generator::CGenerator::new(parse_result, extracted_info, qtcw_path);
+    let c_data = c_gen.generate_all();
+    let mut rust_gen = rust_generator::RustGenerator::new(c_data, rust_qt_path);
+
   } else {
     print_usage();
     return;

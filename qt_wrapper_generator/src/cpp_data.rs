@@ -3,7 +3,7 @@ use cpp_type_map::CppTypeMap;
 use cpp_type::CppType;
 use enums::{CppTypeOrigin, CppMethodScope};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CppData {
   pub headers: Vec<CppHeaderData>,
   pub types: CppTypeMap,

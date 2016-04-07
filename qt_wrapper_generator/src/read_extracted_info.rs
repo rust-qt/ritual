@@ -5,6 +5,7 @@ use std::fs::File;
 extern crate serde;
 extern crate serde_json;
 
+#[derive(Debug, Clone)]
 pub struct CppExtractedInfo {
   pub class_sizes: HashMap<String, i32>,
   pub enum_values: HashMap<String, HashMap<String, i32>>,

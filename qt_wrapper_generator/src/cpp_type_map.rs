@@ -17,7 +17,7 @@ pub struct CppTypeInfo {
   pub kind: CppTypeKind,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CppTypeMap(pub HashMap<String, CppTypeInfo>);
 
 impl CppTypeMap {

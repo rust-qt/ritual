@@ -199,11 +199,16 @@ impl CppAndCMethod {
   }
 }
 
-// struct CppAndCCode {
-//  cpp_code: String,
-//  c_code: String,
-// }
+pub struct CHeaderData {
+  pub include_file: String,
+  pub methods: Vec<CppAndCMethod>,
+}
 
+pub struct CppAndCData {
+  pub cpp_data: CppData,
+  pub cpp_extracted_info: CppExtractedInfo,
+  pub c_headers: Vec<CHeaderData>,
+}
 
 impl CGenerator {
   pub fn new(cpp_data: CppData, cpp_extracted_info: CppExtractedInfo, qtcw_path: PathBuf) -> Self {
@@ -214,7 +219,7 @@ impl CGenerator {
     }
   }
 
-  pub fn generate_all(&mut self) {
+  pub fn generate_all(self) -> CppAndCData {
     let mut h_path = self.qtcw_path.clone();
     h_path.push("include");
     h_path.push("qtcw.h");
@@ -222,6 +227,8 @@ impl CGenerator {
     write!(all_header_file, "#ifndef QTCW_H\n#define QTCW_H\n\n").unwrap();
 
     let mut include_file_to_header_data: HashMap<String, Vec<CppHeaderData>> = HashMap::new();
+
+    let mut c_headers = Vec::new();
 
     for data in &self.cpp_data.headers {
       // if white_list.iter().find(|&&x| x == data.include_file).is_none() {
@@ -265,15 +272,17 @@ impl CGenerator {
     }
 
     for (include_file, data) in &include_file_to_header_data {
-      self.generate_one(include_file, data);
+      c_headers.push(self.generate_one(include_file, data));
       write!(all_header_file, "#include \"qtcw_{}.h\"\n", include_file).unwrap();
 
     }
 
     write!(all_header_file, "#endif // QTCW_H\n").unwrap();
-
-
-
+    CppAndCData {
+      cpp_data: self.cpp_data,
+      cpp_extracted_info: self.cpp_extracted_info,
+      c_headers: c_headers,
+    }
 
   }
 
@@ -345,7 +354,7 @@ impl CGenerator {
                                       x.name,
                                       self.cpp_extracted_info
                                           .enum_values
-                                          .get(&cpp_type.base) 
+                                          .get(&cpp_type.base)
                                           .unwrap()
                                           .get(&x.name)
                                           .unwrap())
@@ -383,7 +392,7 @@ impl CGenerator {
     result
   }
 
-  pub fn generate_one(&self, include_file: &String, data_vec: &Vec<CppHeaderData>) {
+  fn generate_one(&self, include_file: &String, data_vec: &Vec<CppHeaderData>) -> CHeaderData {
     let mut cpp_path = self.qtcw_path.clone();
     cpp_path.push("src");
     cpp_path.push(format!("qtcw_{}.cpp", include_file));
@@ -481,6 +490,10 @@ impl CGenerator {
     write!(h_file, "\nQTCW_EXTERN_C_END\n\n").unwrap();
 
     write!(h_file, "#endif // {}\n", include_guard_name).unwrap();
-    println!("Done.\n")
+    println!("Done.\n");
+    CHeaderData {
+      include_file: include_file.clone(),
+      methods: methods,
+    }
   }
 }
