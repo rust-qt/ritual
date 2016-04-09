@@ -15,6 +15,7 @@ mod extractor_actions_generator;
 mod read_extracted_info;
 mod read_parse_result;
 mod rust_generator;
+mod rust_type;
 mod utils;
 
 use std::path::{PathBuf};

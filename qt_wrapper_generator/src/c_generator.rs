@@ -294,17 +294,17 @@ impl CGenerator {
 
 
 
-  fn struct_declaration(&self, c_struct_name: &String, full_declaration: bool) -> String {
+  fn struct_declaration(&self, c_struct_name: &String, cpp_class_name: &String, full_declaration: bool) -> String {
     if c_struct_name.find("::").is_some() {
       panic!("struct_declaration called for invalid struct name {}",
              c_struct_name);
     }
     // write C struct definition
     let result = if full_declaration &&
-                    self.cpp_extracted_info.class_sizes.contains_key(c_struct_name) {
+                    self.cpp_extracted_info.class_sizes.contains_key(cpp_class_name) {
       format!("struct QTCW_{} {{ char space[{}]; }};\n",
               c_struct_name,
-              self.cpp_extracted_info.class_sizes.get(c_struct_name).unwrap())
+              self.cpp_extracted_info.class_sizes.get(cpp_class_name).unwrap())
     } else {
       format!("struct QTCW_{};\n", c_struct_name)
     };
@@ -375,7 +375,7 @@ impl CGenerator {
                                  c_type.base))
           }
           &CppTypeKind::Class { .. } => {
-            only_c_code(self.struct_declaration(&c_type.base, needs_full_declaration))
+            only_c_code(self.struct_declaration(&c_type.base, &cpp_type.base, needs_full_declaration))
           }
         };
         already_declared.push(c_type.base.clone());
