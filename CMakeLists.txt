@@ -7,6 +7,8 @@ set(QT_DOC_DIR
   CACHE PATH "Path to Qt documentation HTML files")
 SET(QTCW_MAKE_OPTIONS
   CACHE STRING "Options for building QTCW (e.g. '-j8'")
+SET(QTCW_COMPILE_BLOCKED
+  CACHE BOOL "Block recompilation of QTCW library")
 message("QT_DOC_DIR = ${QT_DOC_DIR}")
 if(NOT IS_DIRECTORY ${QT_DOC_DIR})
   message(FATAL_ERROR "Invalid QT_DOC_DIR")
@@ -78,37 +80,41 @@ add_custom_command(
   DEPENDS ${RUST_GENERATOR_EXE} ${QTCW_TEMPLATE_FILES} ${RUST_QT_TEMPLATE_FILES} ${CPP_EXTRACTED_INFO_PATH}
 )
 
-# building generated C wrapper
-file(MAKE_DIRECTORY ${QTCW_BUILD_DIR})
-add_custom_command(
-  COMMAND
-    ${CMAKE_COMMAND} -E remove_directory ${QTCW_INSTALL_DIR} &&
-    ${CMAKE_COMMAND} ${QTCW_GENERATED_SOURCE_DIR}
-      -DCMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}
-      -DCMAKE_INSTALL_PREFIX=${QTCW_INSTALL_DIR} &&
-    make ${QTCW_MAKE_OPTIONS} install
-  OUTPUT ${QTCW_INSTALL_DIR}
-  DEPENDS ${QTCW_GENERATED_SOURCE_DIR}
-  WORKING_DIRECTORY ${QTCW_BUILD_DIR}
-)
-add_custom_target(qtcw_installed DEPENDS ${QTCW_INSTALL_DIR})
+if(NOT ${QTCW_COMPILE_BLOCKED})
 
-# building and running C tests
-include_directories(${QTCW_INSTALL_DIR}/include)
-foreach(QTCW_TEST_FILE ${QTCW_TEST_FILES})
-  get_filename_component(TEST_NAME ${QTCW_TEST_FILE} NAME_WE)
-  set(TEST_TARGET "c_test_${TEST_NAME}")
-  add_executable(${TEST_TARGET} ${QTCW_TEST_FILE})
-  add_dependencies(${TEST_TARGET} qtcw_installed)
-  target_link_libraries(${TEST_TARGET} ${QTCW_INSTALL_DIR}/lib/libqtcw.a ${Qt5Core_LIBRARIES} -lstdc++)
+  # building generated C wrapper
+  file(MAKE_DIRECTORY ${QTCW_BUILD_DIR})
   add_custom_command(
-    TARGET ${TEST_TARGET}
-    POST_BUILD
-    COMMAND ${TEST_TARGET}
+    COMMAND
+      ${CMAKE_COMMAND} -E remove_directory ${QTCW_INSTALL_DIR} &&
+      ${CMAKE_COMMAND} ${QTCW_GENERATED_SOURCE_DIR}
+        -DCMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}
+        -DCMAKE_INSTALL_PREFIX=${QTCW_INSTALL_DIR} &&
+      make ${QTCW_MAKE_OPTIONS} install
+    OUTPUT ${QTCW_INSTALL_DIR}
+    DEPENDS ${QTCW_GENERATED_SOURCE_DIR}
+    WORKING_DIRECTORY ${QTCW_BUILD_DIR}
   )
-  set(TEST_TARGETS ${TEST_TARGETS} ${TEST_TARGET})
+  add_custom_target(qtcw_installed DEPENDS ${QTCW_INSTALL_DIR})
 
-endforeach()
+  # building and running C tests
+  include_directories(${QTCW_INSTALL_DIR}/include)
+  foreach(QTCW_TEST_FILE ${QTCW_TEST_FILES})
+    get_filename_component(TEST_NAME ${QTCW_TEST_FILE} NAME_WE)
+    set(TEST_TARGET "c_test_${TEST_NAME}")
+    add_executable(${TEST_TARGET} ${QTCW_TEST_FILE})
+    add_dependencies(${TEST_TARGET} qtcw_installed)
+    target_link_libraries(${TEST_TARGET} ${QTCW_INSTALL_DIR}/lib/libqtcw.a ${Qt5Core_LIBRARIES} -lstdc++)
+    add_custom_command(
+      TARGET ${TEST_TARGET}
+      POST_BUILD
+      COMMAND ${TEST_TARGET}
+    )
+    set(TEST_TARGETS ${TEST_TARGETS} ${TEST_TARGET})
+
+  endforeach()
+
+endif()
 
 # building and testing rust_qt crates
 add_custom_target(build_rust_qt
