@@ -1,8 +1,5 @@
-use c_type::{CType, CTypeExtended, CppToCTypeConversion};
+use c_type::{CType, CppToCTypeConversion};
 use cpp_type::CppType;
-
-extern crate inflector;
-use self::inflector::Inflector;
 
 #[derive(Debug, Clone)]
 pub enum RustTypeIndirection {
@@ -12,13 +9,13 @@ pub enum RustTypeIndirection {
 }
 
 #[derive(Debug, Clone)]
-pub struct RustTypeName {
+pub struct RustName {
   pub crate_name: String,
   pub module_name: String,
   pub own_name: String,
 }
 
-impl RustTypeName {
+impl RustName {
   pub fn full_name(&self, current_crate: &String) -> String {
     format!("{}{}{}",
             if self.crate_name.is_empty() {
@@ -43,7 +40,7 @@ impl RustTypeName {
 pub enum RustType {
   Void,
   NonVoid {
-    base: RustTypeName,
+    base: RustName,
     is_const: bool,
     indirection: RustTypeIndirection,
     is_option: bool,
@@ -64,4 +61,15 @@ pub struct CompleteType {
   pub cpp_to_c_conversion: CppToCTypeConversion,
   pub rust_ffi_type: RustType, /* pub rust_api_type: RustType,
                                 * pub rust_api_to_c_conversion: RustToCTypeConversion, */
+}
+
+pub struct RustFFIArgument {
+  pub name: String,
+  pub argument_type: RustType,
+}
+
+pub struct RustFFIFunction {
+  pub return_type: RustType,
+  pub name: RustName,
+  pub arguments: Vec<RustFFIArgument>,
 }

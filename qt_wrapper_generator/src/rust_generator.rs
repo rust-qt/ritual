@@ -1,9 +1,10 @@
-use c_generator::CppAndCData;
+use c_generator::{CppAndCData, CHeaderData};
 use cpp_and_c_method::CppAndCMethod;
 use cpp_type_map::EnumValue;
 use enums::{CppTypeKind, CppTypeOrigin};
 use utils::JoinWithString;
-use rust_type::{RustTypeName, RustType, CompleteType, RustTypeIndirection};
+use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
+                RustFFIArgument};
 use c_type::CTypeExtended;
 
 use std::path::PathBuf;
@@ -24,6 +25,21 @@ fn include_file_to_module_name(include_file: &String) -> String {
   include_without_prefix.to_snake_case()
 }
 
+#[cfg_attr(rustfmt, rustfmt_skip)]
+fn sanitize_rust_var_name(name: &String) -> String {
+  match name.as_ref() {
+    "abstract" | "alignof" | "as" | "become" | "box" | "break" | "const" |
+    "continue" | "crate" | "do" | "else" | "enum" | "extern" | "false" |
+    "final" | "fn" | "for" | "if" | "impl" | "in" | "let" | "loop" |
+    "macro" | "match" | "mod" | "move" | "mut" | "offsetof" | "override" |
+    "priv" | "proc" | "pub" | "pure" | "ref" | "return" | "Self" | "self" |
+    "sizeof" | "static" | "struct" | "super" | "trait" | "true" | "type" |
+    "typeof" | "unsafe" | "unsized" | "use" | "virtual" | "where" | "while"
+    | "yield" => format!("{}_", name),
+    _ => name.clone()
+  }
+}
+
 extern crate inflector;
 use self::inflector::Inflector;
 
@@ -42,13 +58,12 @@ impl CaseFix for String {
   }
 }
 
-
 pub struct RustGenerator {
   input_data: CppAndCData,
   output_path: PathBuf,
   modules: Vec<String>,
   crate_name: String,
-  cpp_to_rust_type_map: HashMap<String, RustTypeName>,
+  cpp_to_rust_type_map: HashMap<String, RustName>,
 }
 
 impl RustGenerator {
@@ -102,6 +117,78 @@ impl RustGenerator {
 
   }
 
+
+  fn generate_rust_ffi_function(&self,
+                                data: &CppAndCMethod,
+                                module_name: &String)
+                                -> Result<RustFFIFunction, String> {
+    let mut args = Vec::new();
+    for arg in &data.c_signature.arguments {
+      let rust_type = try!(self.c_type_to_complete_type(&arg.argument_type)).rust_ffi_type;
+      args.push(RustFFIArgument {
+        name: sanitize_rust_var_name(&arg.name),
+        argument_type: rust_type,
+      });
+    }
+    Ok(RustFFIFunction {
+      return_type: try!(self.c_type_to_complete_type(&data.c_signature.return_type)).rust_ffi_type,
+      name: RustName {
+        crate_name: self.crate_name.clone(),
+        module_name: module_name.clone(),
+        own_name: data.c_name.clone(),
+      },
+      arguments: args,
+    })
+  }
+
+  fn rust_type_to_code(&self, rust_type: &RustType) -> String {
+    match rust_type {
+      &RustType::Void => panic!("rust void can't be converted to code"),
+      &RustType::NonVoid { ref base, ref is_const, ref indirection, ref is_option } => {
+        let base_s = base.full_name(&self.crate_name);
+        let s = match indirection {
+          &RustTypeIndirection::None => base_s,
+          &RustTypeIndirection::Ref => {
+            if *is_const {
+              format!("&{}", base_s)
+            } else {
+              format!("&mut {}", base_s)
+            }
+          }
+          &RustTypeIndirection::Ptr => {
+            if *is_const {
+              format!("*const {}", base_s)
+            } else {
+              format!("*mut {}", base_s)
+            }
+          }
+        };
+        if *is_option {
+          format!("Option<{}>", s)
+        } else {
+          s
+        }
+      }
+    }
+  }
+
+  fn rust_ffi_function_to_code(&self, func: &RustFFIFunction) -> String {
+    let args = func.arguments.iter().map(|arg| {
+      format!("{}: {}",
+              arg.name,
+              self.rust_type_to_code(&arg.argument_type))
+    });
+    format!("  pub fn {}({}){};\n",
+            func.name.own_name,
+            args.join(", "),
+            match func.return_type {
+              RustType::Void => String::new(),
+              RustType::NonVoid { .. } => {
+                format!(" -> {}", self.rust_type_to_code(&func.return_type))
+              }
+            })
+  }
+
   fn generate_type_map(&mut self) {
     for (cpp_name, type_info) in &self.input_data.cpp_data.types.0 {
       let rust_type_name = {
@@ -122,7 +209,7 @@ impl RustGenerator {
           _ => "",
         };
         if !primitive_type_name.is_empty() {
-          Ok(RustTypeName {
+          Ok(RustName {
             crate_name: String::new(),
             module_name: String::new(),
             own_name: primitive_type_name.to_string(),
@@ -147,7 +234,7 @@ impl RustGenerator {
             _ => "",
           };
           if !type_name.is_empty() {
-            Ok(RustTypeName {
+            Ok(RustName {
               crate_name: "qt_core".to_string(),
               module_name: "types".to_string(),
               own_name: type_name.to_string(),
@@ -160,7 +247,7 @@ impl RustGenerator {
                 new_name = new_name[eliminated_name_prefix.len()..].to_string();
               }
               new_name = new_name.replace("::", "_").to_class_case1();
-              Ok(RustTypeName {
+              Ok(RustName {
                 crate_name: self.crate_name.clone(),
                 module_name: include_file_to_module_name(include_file),
                 own_name: new_name,
@@ -177,7 +264,7 @@ impl RustGenerator {
       }
     }
     self.cpp_to_rust_type_map.insert("QFlags".to_string(),
-                                     RustTypeName {
+                                     RustName {
                                        crate_name: "qt_core".to_string(),
                                        module_name: "flags".to_string(),
                                        own_name: "QFlags".to_string(),
@@ -186,8 +273,8 @@ impl RustGenerator {
 
   pub fn generate_all(&mut self) {
     self.generate_type_map();
-    for header in self.input_data.c_headers.clone() {
-      self.generate_one(header.include_file, header.methods);
+    for header in &self.input_data.c_headers.clone() {
+      self.generate_one(header);
     }
 
     let mut lib_file_path = self.output_path.clone();
@@ -195,14 +282,25 @@ impl RustGenerator {
     lib_file_path.push("src");
     lib_file_path.push("lib.rs");
     let mut lib_file = File::create(&lib_file_path).unwrap();
-    write!(lib_file, "pub mod types;\npub mod flags;\n").unwrap();
+    write!(lib_file, "pub mod types;\npub mod flags;\nmod ffi;\n\n").unwrap();
     for module in &self.modules {
       write!(lib_file, "pub mod {};\n", module).unwrap();
     }
+
+    let mut ffi_lib_file_path = self.output_path.clone();
+    ffi_lib_file_path.push("qt_core");
+    ffi_lib_file_path.push("src");
+    ffi_lib_file_path.push("ffi");
+    ffi_lib_file_path.push("mod.rs");
+    let mut ffi_lib_file = File::create(&ffi_lib_file_path).unwrap();
+    for module in &self.modules {
+      write!(ffi_lib_file, "pub mod {};\n", module).unwrap();
+    }
+
   }
 
-  pub fn generate_one(&mut self, include_file: String, methods: Vec<CppAndCMethod>) {
-    let module_name = include_file_to_module_name(&include_file);
+  pub fn generate_types(&mut self, c_header: &CHeaderData) {
+    let module_name = include_file_to_module_name(&c_header.include_file);
     println!("MODULE: {}", module_name);
     let mut file_path = self.output_path.clone();
     file_path.push("qt_core");
@@ -210,8 +308,10 @@ impl RustGenerator {
     file_path.push(format!("{}.rs", module_name));
     let mut file = File::create(&file_path).unwrap();
 
-    let eliminated_name_prefix = format!("{}::", include_file);
-    for type_name in self.input_data.cpp_data.types.get_types_from_include_file(&include_file) {
+    for type_name in self.input_data
+                         .cpp_data
+                         .types
+                         .get_types_from_include_file(&c_header.include_file) {
       let item = self.input_data.cpp_data.types.0.get(&type_name).unwrap();
       println!("type: {:?}", item);
       if let Some(rust_type_name) = self.cpp_to_rust_type_map.get(&type_name) {
@@ -306,9 +406,34 @@ impl RustGenerator {
         // type is skipped: no rust name
       }
     }
-
-    // ...
-
     self.modules.push(module_name);
+  }
+
+  pub fn generate_ffi(&mut self, c_header: &CHeaderData) {
+    let module_name = include_file_to_module_name(&c_header.include_file);
+    let mut file_path = self.output_path.clone();
+    file_path.push("qt_core");
+    file_path.push("src");
+    file_path.push("ffi");
+    file_path.push(format!("{}.rs", module_name));
+    let mut file = File::create(&file_path).unwrap();
+    write!(file,
+           "#[link(name = \"qtcw\", kind = \"static\")]\nextern \"C\" {{\n")
+      .unwrap();
+
+    for method in &c_header.methods {
+      if let Ok(function) = self.generate_rust_ffi_function(method, &module_name) {
+        file.write(self.rust_ffi_function_to_code(&function).as_bytes()).unwrap();
+      } else {
+        println!("Can't generate Rust FFI function for method:\n{:?}\n",
+                 method);
+      }
+    }
+    write!(file, "}}\n").unwrap();
+  }
+
+  pub fn generate_one(&mut self, c_header: &CHeaderData) {
+    self.generate_types(c_header);
+    self.generate_ffi(c_header);
   }
 }
