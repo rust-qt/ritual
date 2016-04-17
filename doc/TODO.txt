@@ -11,6 +11,8 @@ Missing critical features:
 - Access to inherited methods
 - Catch all C++ exceptions in any wrapper function
 - Convert Qt documentation to Rust documentation
+- Some enums need to be converted to int (like Qt::Key)
+- QVariant::Type ?
 
 Extra features:
 - Sort classes and methods to reduce randomness

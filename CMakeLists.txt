@@ -13,6 +13,7 @@ message("QT_DOC_DIR = ${QT_DOC_DIR}")
 if(NOT IS_DIRECTORY ${QT_DOC_DIR})
   message(FATAL_ERROR "Invalid QT_DOC_DIR")
 endif()
+message("QTCW_COMPILE_BLOCKED = ${QTCW_COMPILE_BLOCKED}")
 
 set(DOC_PARSE_RESULT_PATH ${CMAKE_BINARY_DIR}/doc_parse_result.json)
 set(CPP_INFO_EXTRACTOR_ACTIONS_PATH ${CMAKE_BINARY_DIR}/cpp_info_extractor_actions.h)
@@ -118,7 +119,7 @@ endif()
 
 # building and testing rust_qt crates
 add_custom_target(build_rust_qt
-  COMMAND cargo test
+  COMMAND QTCW_LIB_DIR=${QTCW_INSTALL_DIR}/lib cargo test
   WORKING_DIRECTORY ${RUST_QT_GENERATED_SOURCE_DIR}/qt_core
   DEPENDS ${RUST_QT_GENERATED_SOURCE_DIR} ${TEST_TARGETS}
 )

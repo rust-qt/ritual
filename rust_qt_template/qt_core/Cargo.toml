@@ -2,6 +2,7 @@
 name = "qt_core"
 version = "0.1.0"
 authors = ["Ri <ri@idzaaus.org>"]
+build = "build.rs"
 
 [dependencies]
 libc = "0.2"
