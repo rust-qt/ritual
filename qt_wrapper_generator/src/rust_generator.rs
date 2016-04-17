@@ -455,9 +455,13 @@ impl RustGenerator {
     file_path.push("src");
     file_path.push("ffi.rs");
     let mut file = File::create(&file_path).unwrap();
-    write!(file,
-           "#[link(name = \"qtcw\", kind = \"static\")]\nextern \"C\" {{\n")
-      .unwrap();
+    write!(file, "#[link(name = \"Qt5Core\")]\n").unwrap();
+    write!(file, "#[link(name = \"icui18n\")]\n").unwrap();
+    write!(file, "#[link(name = \"icuuc\")]\n").unwrap();
+    write!(file, "#[link(name = \"icudata\")]\n").unwrap();
+    write!(file, "#[link(name = \"stdc++\")]\n").unwrap();
+    write!(file, "#[link(name = \"qtcw\", kind = \"static\")]\n").unwrap();
+    write!(file, "extern \"C\" {{\n").unwrap();
 
     for header in &self.input_data.c_headers.clone() {
       let module_name = include_file_to_module_name(&header.include_file);
