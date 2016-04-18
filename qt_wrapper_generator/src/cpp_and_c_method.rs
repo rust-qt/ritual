@@ -84,4 +84,8 @@ impl CppAndCMethod {
       c_name: c_name,
     }
   }
+
+  pub fn short_text(&self) -> String {
+    self.cpp_method.short_text()
+  }
 }

@@ -4,6 +4,7 @@ use cpp_and_c_method::CppAndCMethod;
 use caption_strategy::MethodCaptionStrategy;
 use cpp_type_map::CppTypeMap;
 use std::collections::HashMap;
+use log;
 
 #[derive(Debug, Clone)]
 pub struct CppHeaderData {
@@ -45,7 +46,8 @@ impl CppHeaderData {
   }
 
   pub fn process_methods(&self, cpp_type_map: &CppTypeMap) -> Vec<CppAndCMethod> {
-    println!("Processing header <{}>", self.include_file);
+    log::info(format!("Converting methods from C++ to C: header <{}>",
+                      self.include_file));
     let mut is_abstract_class = false;
     for ref method in &self.methods {
       if method.is_pure_virtual {
@@ -73,9 +75,9 @@ impl CppHeaderData {
 
       for ref method in &self.methods {
         if is_abstract_class && method.is_constructor {
-          println!("Method is skipped:\n{:?}\nConstructors are not allowed for abstract \
-                    classes.\n",
-                   method);
+          log::debug(format!("Method is skipped:\n{}\nConstructors are not allowed for \
+                              abstract classes.\n",
+                             method.short_text()));
           continue;
         }
         if self.include_file == "QMetaType" &&
@@ -90,50 +92,50 @@ impl CppHeaderData {
               method.name == "qMetaTypeId" ||
               method.name == "hasRegisteredDebugStreamOperator") &&
              method.arguments.len() == 0)) {
-          println!("Method is skipped:\n{:?}\nThis method is blacklisted because it is a \
-                    template method.\n",
-                   method);
+          log::warning(format!("Method is skipped:\n{}\nThis method is blacklisted because it \
+                                is a template method.\n",
+                               method.short_text()));
           continue;
         }
         if self.include_file == "QMetaEnum" && method.name == "fromType" {
-          println!("Method is skipped:\n{:?}\nThis method is blacklisted because it is a \
-                    template method.\n",
-                   method);
+          log::warning(format!("Method is skipped:\n{}\nThis method is blacklisted because it \
+                                is a template method.\n",
+                               method.short_text()));
           continue;
         }
         if self.include_file == "QRectF" && method.scope == CppMethodScope::Global &&
            (method.name == "marginsAdded" || method.name == "marginsRemoved") {
-          println!("Method is skipped:\n{:?}\nThis method is blacklisted because it does not \
-                    really exist.\n",
-                   method);
+          log::debug(format!("Method is skipped:\n{}\nThis method is blacklisted because it \
+                              does not really exist.\n",
+                             method.short_text()));
           continue;
         }
         // TODO: unblock on Windows
         if self.include_file == "QProcess" &&
            (method.name == "nativeArguments" || method.name == "setNativeArguments") {
-          println!("Method is skipped:\n{:?}\nThis method is Windows-only.\n",
-                   method);
+          log::warning(format!("Method is skipped:\n{}\nThis method is Windows-only.\n",
+                               method.short_text()));
           continue;
         }
         if self.include_file == "QAbstractEventDispatcher" &&
-        (method.name == "registerEventNotifier" || method.name == "unregisterEventNotifier") {
-          println!("Method is skipped:\n{:?}\nThis method is Windows-only.\n",
-          method);
+           (method.name == "registerEventNotifier" || method.name == "unregisterEventNotifier") {
+          log::warning(format!("Method is skipped:\n{}\nThis method is Windows-only.\n",
+                               method.short_text()));
           continue;
         }
 
         match method.add_c_signatures(cpp_type_map) {
           Err(msg) => {
-            println!("Unable to produce C function for method:\n{:?}\nError:{}\n",
-                     method,
-                     msg)
+            log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
+                                 method.short_text(),
+                                 msg));
           }
           Ok((result_heap, result_stack)) => {
             match result_heap.c_base_name() {
               Err(msg) => {
-                println!("Unable to produce C function for method:\n{:?}\nError:{}\n",
-                         method,
-                         msg)
+                log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
+                                     method.short_text(),
+                                     msg));
               }
               Ok(mut heap_name) => {
                 if let Some(result_stack) = result_stack {

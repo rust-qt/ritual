@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use std::fs::File;
 use std::io::Write;
 use std::collections::{HashMap, HashSet};
+use log;
 
 fn include_file_to_module_name(include_file: &String) -> String {
   let include_without_prefix = if include_file == "Qt" {
@@ -286,7 +287,7 @@ impl RustGenerator {
                 own_name: new_name,
               })
             } else {
-              println!("warning: type is skipped: {:?}", type_info);
+              log::warning(format!("warning: type is skipped: {:?}", type_info));
               Err(())
             }
           }
@@ -318,28 +319,30 @@ impl RustGenerator {
     let mut lib_file = File::create(&lib_file_path).unwrap();
     write!(lib_file, "pub mod types;\n\n").unwrap();
     write!(lib_file, "pub mod flags;\n\n").unwrap();
-    //TODO: remove allow directive
-    //TODO: ffi should be a private mod
+    // TODO: remove allow directive
+    // TODO: ffi should be a private mod
     write!(lib_file, "#[allow(dead_code)]\npub mod ffi;\n\n").unwrap();
     for module in &self.modules {
       write!(lib_file, "pub mod {};\n", module).unwrap();
     }
 
-//    let mut ffi_lib_file_path = self.output_path.clone();
-//    ffi_lib_file_path.push("qt_core");
-//    ffi_lib_file_path.push("src");
-//    ffi_lib_file_path.push("ffi");
-//    ffi_lib_file_path.push("mod.rs");
-//    let mut ffi_lib_file = File::create(&ffi_lib_file_path).unwrap();
-//    for module in &self.modules {
-//      write!(ffi_lib_file, "pub mod {};\n", module).unwrap();
-//    }
+    //    let mut ffi_lib_file_path = self.output_path.clone();
+    //    ffi_lib_file_path.push("qt_core");
+    //    ffi_lib_file_path.push("src");
+    //    ffi_lib_file_path.push("ffi");
+    //    ffi_lib_file_path.push("mod.rs");
+    //    let mut ffi_lib_file = File::create(&ffi_lib_file_path).unwrap();
+    //    for module in &self.modules {
+    //      write!(ffi_lib_file, "pub mod {};\n", module).unwrap();
+    //    }
 
   }
 
   pub fn generate_types(&mut self, c_header: &CHeaderData) {
     let module_name = include_file_to_module_name(&c_header.include_file);
-    println!("MODULE: {}", module_name);
+    log::info(format!("Generating Rust types in module {}::{}",
+                      self.crate_name,
+                      module_name));
     let mut file_path = self.output_path.clone();
     file_path.push("qt_core");
     file_path.push("src");
@@ -351,7 +354,6 @@ impl RustGenerator {
                          .types
                          .get_types_from_include_file(&c_header.include_file) {
       let item = self.input_data.cpp_data.types.0.get(&type_name).unwrap();
-      println!("type: {:?}", item);
       if let Some(rust_type_name) = self.cpp_to_rust_type_map.get(&type_name) {
         if module_name == rust_type_name.module_name {
           let code = match item.kind {
@@ -368,11 +370,11 @@ impl RustGenerator {
                                 .get(&variant.name)
                                 .unwrap();
                 if value_to_variant.contains_key(value) {
-                  println!("warning: {}: duplicated enum variant removed: {} (previous variant: \
-                            {})",
-                           item.name,
-                           variant.name,
-                           value_to_variant.get(value).unwrap().name);
+                  log::warning(format!("warning: {}: duplicated enum variant removed: {} \
+                                        (previous variant: {})",
+                                       item.name,
+                                       variant.name,
+                                       value_to_variant.get(value).unwrap().name));
                 } else {
                   value_to_variant.insert(*value, variant.clone());
                 }
@@ -434,7 +436,7 @@ impl RustGenerator {
               self.processed_cpp_types.insert(type_name);
             }
             Err(msg) => {
-              println!("warning: {}: {}", type_name, msg);
+              log::warning(format!("Can't generate Rust type for {}: {}", type_name, msg));
             }
           }
         } else if rust_type_name.module_name != "types" && !rust_type_name.module_name.is_empty() {
@@ -450,6 +452,7 @@ impl RustGenerator {
   }
 
   pub fn generate_ffi(&mut self) {
+    log::info("Generating Rust FFI functions.");
     let mut file_path = self.output_path.clone();
     file_path.push("qt_core");
     file_path.push("src");
@@ -471,9 +474,9 @@ impl RustGenerator {
             file.write(self.rust_ffi_function_to_code(&function).as_bytes()).unwrap();
           }
           Err(msg) => {
-            println!("Can't generate Rust FFI function for method:\n{:?}\n{}\n",
-            method,
-            msg);
+            log::warning(format!("Can't generate Rust FFI function for method:\n{}\n{}\n",
+                     method.short_text(),
+                     msg));
           }
         }
       }

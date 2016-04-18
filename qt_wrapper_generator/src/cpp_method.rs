@@ -2,10 +2,11 @@ use cpp_type::CppType;
 use enums::{CppMethodScope, AllocationPlace, AllocationPlaceImportance,
             CFunctionArgumentCppEquivalent, CppTypeIndirection, CppTypeKind};
 use c_function_signature::CFunctionSignature;
-use c_type::{CTypeExtended};
+use c_type::CTypeExtended;
 use c_function_argument::CFunctionArgument;
 use cpp_and_c_method::CppMethodWithCSignature;
 use cpp_type_map::CppTypeMap;
+use utils::JoinWithString;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppFunctionArgument {
@@ -92,7 +93,8 @@ impl CppMethod {
                            is_const: self.is_const,
                            indirection: CppTypeIndirection::Ptr,
                          }
-                         .to_c_type(cpp_type_map).unwrap(),
+                         .to_c_type(cpp_type_map)
+                         .unwrap(),
           cpp_equivalent: CFunctionArgumentCppEquivalent::This,
         });
       }
@@ -178,5 +180,77 @@ impl CppMethod {
       }
       Err(msg) => Err(msg),
     }
+  }
+
+  pub fn short_text(&self) -> String {
+    let mut s = String::new();
+    if self.is_virtual {
+      s = format!("{} virtual", s);
+    }
+    if self.is_static {
+      s = format!("{} static", s);
+    }
+    if self.is_protected {
+      s = format!("{} protected", s);
+    }
+    if self.is_signal {
+      s = format!("{} [signal]", s);
+    }
+    if self.allows_variable_arguments {
+      s = format!("{} [var args]", s);
+    }
+    if self.is_variable {
+      s = format!("{} [variable]", s);
+    }
+    if self.is_constructor {
+      s = format!("{} [constructor]", s);
+    }
+    if self.is_destructor {
+      s = format!("{} [destructor]", s);
+    }
+    if let Some(ref op) = self.operator {
+      s = format!("{} [operator \"{}\"]", s, op);
+    }
+    if let Some(ref cpp_type) = self.return_type {
+      s = format!("{} {}",
+                  s,
+                  if cpp_type.is_template() {
+                    "[template type]".to_string()
+                  } else {
+                    cpp_type.to_cpp_code()
+                  });
+    }
+    if let CppMethodScope::Class(ref name) = self.scope {
+      s = format!("{} {}::", s, name);
+    }
+    s = format!("{}{}", s, self.name);
+    if !self.is_variable {
+      s = format!("{}({})",
+                  s,
+                  self.arguments
+                      .iter()
+                      .map(|arg| {
+                        format!("{} {}{}",
+                                if arg.argument_type.is_template() {
+                                  "[template type]".to_string()
+                                } else {
+                                  arg.argument_type.to_cpp_code()
+                                },
+                                arg.name,
+                                if let Some(ref dv) = arg.default_value {
+                                  format!(" = {}", dv)
+                                } else {
+                                  String::new()
+                                })
+                      })
+                      .join(", "));
+    }
+    if self.is_pure_virtual {
+      s = format!("{} = 0", s);
+    }
+    if self.is_const {
+      s = format!("{} const", s);
+    }
+    s.trim().to_string()
   }
 }

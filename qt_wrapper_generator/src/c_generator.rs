@@ -11,6 +11,7 @@ use std::io::Write;
 use utils::JoinWithString;
 use std::collections::HashMap;
 use read_extracted_info::CppExtractedInfo;
+use log;
 
 pub struct CGenerator {
   qtcw_path: PathBuf,
@@ -241,22 +242,22 @@ impl CGenerator {
                .iter()
                .find(|&x| x == class_name.as_ref() as &str)
                .is_some() {
-          println!("Ignoring {} because it is blacklisted.", data.include_file);
+          log::warning(format!("Ignoring {} because it is blacklisted.", data.include_file));
           continue;
         }
         match self.cpp_data.is_template_class(class_name) {
           Ok(is_template_class) => {
             if is_template_class {
-              println!("Skipping code generation for header {} because it contains a template \
-                        class.\n",
-                       data.include_file);
+              log::warning(format!("Skipping code generation for header {} because it contains \
+                                    a template class.\n",
+                                   data.include_file));
               continue;
             }
           }
           Err(msg) => {
-            println!("Skipping code generation for header {} because of error: {}.\n",
-                     data.include_file,
-                     msg);
+            log::warning(format!("Skipping code generation for header {}: {}.\n",
+                                 data.include_file,
+                                 msg));
             continue;
           }
         }
@@ -294,7 +295,11 @@ impl CGenerator {
 
 
 
-  fn struct_declaration(&self, c_struct_name: &String, cpp_class_name: &String, full_declaration: bool) -> String {
+  fn struct_declaration(&self,
+                        c_struct_name: &String,
+                        cpp_class_name: &String,
+                        full_declaration: bool)
+                        -> String {
     if c_struct_name.find("::").is_some() {
       panic!("struct_declaration called for invalid struct name {}",
              c_struct_name);
@@ -375,7 +380,9 @@ impl CGenerator {
                                  c_type.base))
           }
           &CppTypeKind::Class { .. } => {
-            only_c_code(self.struct_declaration(&c_type.base, &cpp_type.base, needs_full_declaration))
+            only_c_code(self.struct_declaration(&c_type.base,
+                                                &cpp_type.base,
+                                                needs_full_declaration))
           }
         };
         already_declared.push(c_type.base.clone());
@@ -397,12 +404,12 @@ impl CGenerator {
     let mut cpp_path = self.qtcw_path.clone();
     cpp_path.push("src");
     cpp_path.push(format!("qtcw_{}.cpp", include_file));
-    println!("Generating source file: {:?}", cpp_path);
+    log::info(format!("Generating source file: {:?}", cpp_path));
 
     let mut h_path = self.qtcw_path.clone();
     h_path.push("include");
     h_path.push(format!("qtcw_{}.h", include_file));
-    println!("Generating header file: {:?}", h_path);
+    log::info(format!("Generating header file: {:?}", h_path));
 
     let mut cpp_file = File::create(&cpp_path).unwrap();
     let mut h_file = File::create(&h_path).unwrap();
@@ -454,11 +461,12 @@ impl CGenerator {
                               .into_iter()
                               .filter(|method| {
                                 if method.cpp_method.is_protected {
-                                  println!("Skipping protected method: \n{:?}\n", method);
+                                  log::debug(format!("Skipping protected method: \n{}\n",
+                                                     method.short_text()));
                                   return false;
                                 }
                                 if method.cpp_method.is_signal {
-                                  println!("Skipping signal: \n{:?}\n", method);
+                                  log::warning(format!("Skipping signal: \n{}\n", method.short_text()));
                                   return false;
                                 }
                                 true
@@ -491,7 +499,6 @@ impl CGenerator {
     write!(h_file, "\nQTCW_EXTERN_C_END\n\n").unwrap();
 
     write!(h_file, "#endif // {}\n", include_guard_name).unwrap();
-    println!("Done.\n");
     CHeaderData {
       include_file: include_file.clone(),
       methods: methods,

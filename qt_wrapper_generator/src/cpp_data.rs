@@ -41,6 +41,9 @@ impl CppData {
     if class_name == "QGlobalStatic" || class_name == "QFlags" {
       return Ok(true);
     }
+    if class_name == "QVariant" || class_name == "QObject" {
+      return Ok(false);
+    }
     for item in &self.headers {
       if let Some(ref item_class_name) = item.class_name {
         if item_class_name == class_name {
