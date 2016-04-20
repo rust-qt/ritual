@@ -9,3 +9,4 @@ serde_json = "0.6.0"
 find_folder = "0.3.0"
 Inflector = "0.2.0"
 ansi_term = "0.7"
+clang = { git = "https://github.com/KyleMayes/clang-rs" }

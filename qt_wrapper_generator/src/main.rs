@@ -18,6 +18,7 @@ mod read_parse_result;
 mod rust_generator;
 mod rust_type;
 mod utils;
+mod cpp_parser;
 
 use std::path::{PathBuf};
 use std::env;
@@ -33,6 +34,10 @@ fn print_usage() {
 
 fn main() {
   let arguments: Vec<_> = env::args().collect();
+  if arguments.len() == 2 && arguments[1] == "cpp_parser" {
+    cpp_parser::CppParser::new().run();
+    return;
+  }
   if arguments.len() < 4 {
     print_usage();
     return;
