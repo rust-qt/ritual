@@ -11,10 +11,26 @@ pub struct CppParser {
   files: HashSet<String>,
 }
 
+fn inspect_method(entity: Entity) {
+  println!("{:?}", entity.get_display_name());
+//  println!("children:");
+//  for c in entity.get_children() {
+//    println!("child {:?}", c);
+//  }
+  println!("type: {:?}", entity.get_type());
+  println!("return type: {:?}", entity.get_type().unwrap().get_result_type());
+  println!("args:");
+  for c in entity.get_arguments().unwrap() {
+    //println!("arg: {:?}", c);
+    println!("arg: name={} type={:?}", c.get_name().unwrap_or("[no name]".to_string()), c.get_type());
+  }
+}
+
+
 fn get_full_name(entity: Entity) -> String {
   let mut current_entity = entity;
   let mut s = entity.get_name().unwrap();
-  while true {
+  loop {
     if let Some(p) = current_entity.get_semantic_parent() {
       if p.get_kind() == EntityKind::ClassDecl || p.get_kind() == EntityKind::ClassTemplate ||
          p.get_kind() == EntityKind::StructDecl || p.get_kind() == EntityKind::Namespace ||
@@ -61,17 +77,17 @@ impl CppParser {
       self.files.insert(file_name);
     } else {
       if entity.get_kind() == EntityKind::TranslationUnit {
-
       } else {
         log::warning(format!("skipped: {:?} (no source file detected)", entity));
         return;
       }
     }
-    if entity.get_kind() == EntityKind::EnumConstantDecl {
+    if entity.get_kind() == EntityKind::Method {
       //      for _ in 0..level {
       //        print!("> ");
       //      }
       println!("{}", get_full_name(entity));
+      inspect_method(entity);
       //      if let Some(p) = entity.get_lexical_parent() {
       //        println!("parent {:?}", p.get_name());
       //      }
@@ -85,7 +101,7 @@ impl CppParser {
     log::info("Initializing clang...");
     let clang = Clang::new().unwrap_or_else(|err| panic!("clang init failed: {:?}", err));
     let index = Index::new(&clang, false, false);
-    let tu = index.parser("/tmp/1.cpp")
+    let tu = index.parser("/home/ri/tmp/1.cpp")
                   .arguments(&["-fPIC",
                                "-I",
                                "/home/ri/bin/Qt/5.5/gcc_64/include",

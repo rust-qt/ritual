@@ -2,6 +2,7 @@ use c_type::{CType, CppToCTypeConversion};
 use cpp_type::CppType;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum RustTypeIndirection {
   None,
   Ptr,
@@ -48,6 +49,7 @@ pub enum RustType {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum RustToCTypeConversion {
   None,
   RefToPtr,
