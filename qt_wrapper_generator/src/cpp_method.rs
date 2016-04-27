@@ -1,6 +1,6 @@
 use cpp_type::CppType;
 use enums::{CppMethodScope, AllocationPlace, AllocationPlaceImportance,
-            CFunctionArgumentCppEquivalent, CppTypeIndirection, CppTypeKind};
+            CFunctionArgumentCppEquivalent, CppTypeIndirection, CppTypeKind, CppTypeOrigin};
 use c_function_signature::CFunctionSignature;
 use c_type::CTypeExtended;
 use c_function_argument::CFunctionArgument;
@@ -33,6 +33,7 @@ pub struct CppMethod {
   pub arguments: Vec<CppFunctionArgument>,
   pub allows_variable_arguments: bool,
   pub original_index: i32,
+  pub origin: CppTypeOrigin
 }
 
 impl CppMethod {

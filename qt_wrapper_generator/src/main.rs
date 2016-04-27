@@ -4,6 +4,7 @@ mod c_function_signature;
 mod c_generator;
 mod c_type;
 mod caption_strategy;
+mod clang_cpp_data;
 mod cpp_and_c_method;
 mod cpp_data;
 mod cpp_header_data;

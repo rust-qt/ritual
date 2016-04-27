@@ -60,10 +60,11 @@ impl CppFunctionArgument {
 }
 
 impl CppMethod {
-  fn from_json(value: &serde_json::Value, class_name: &Option<String>, index: i32) -> Self {
+  fn from_json(value: &serde_json::Value, include_file: &String, class_name: &Option<String>, index: i32) -> Self {
     // println!("{:?} {:?}", value, class_name);
     let value = value.as_object().unwrap();
     CppMethod {
+      origin: CppTypeOrigin::Qt { include_file: include_file.clone() },
       name: value.get("name").unwrap().as_string().unwrap().to_string(),
       scope: match value.get("scope").unwrap().as_string().unwrap() {
         "global" => CppMethodScope::Global,
@@ -148,16 +149,17 @@ impl CppHeaderData {
       Some(s) => Some(s.as_string().unwrap().to_string()),
       None => None,
     };
+    let include_file = value.get("include_file").unwrap().as_string().unwrap().to_string();
     let methods = value.get("methods")
                        .unwrap()
                        .as_array()
                        .unwrap()
                        .into_iter()
                        .enumerate()
-                       .map(|(index, x)| CppMethod::from_json(x, &class_name, index as i32))
+                       .map(|(index, x)| CppMethod::from_json(x, &include_file, &class_name, index as i32))
                        .collect();
     CppHeaderData {
-      include_file: value.get("include_file").unwrap().as_string().unwrap().to_string(),
+      include_file: include_file,
       class_name: class_name,
       macros: match value.get("macros") {
         Some(data) => {

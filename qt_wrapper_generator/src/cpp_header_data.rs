@@ -1,5 +1,5 @@
 use cpp_method::CppMethod;
-use enums::CppMethodScope;
+use enums::{CppMethodScope, CppTypeOrigin};
 use cpp_and_c_method::CppAndCMethod;
 use caption_strategy::MethodCaptionStrategy;
 use cpp_type_map::CppTypeMap;
@@ -40,6 +40,7 @@ impl CppHeaderData {
           arguments: vec![],
           allows_variable_arguments: false,
           original_index: 1000,
+          origin: CppTypeOrigin::Qt { include_file: self.include_file.clone() },
         });
       }
     }

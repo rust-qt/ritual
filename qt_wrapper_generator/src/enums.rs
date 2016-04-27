@@ -48,6 +48,9 @@ pub enum CppTypeOrigin {
     include_file: String,
   },
   Unsupported(String),
+  CLang {
+    include_file: String,
+  }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
