@@ -42,7 +42,7 @@ impl CppType {
               CppTypeIndirection::Ref => "&",
               CppTypeIndirection::PtrRef => "*&",
               CppTypeIndirection::PtrPtr => "**",
-              CppTypeIndirection::RefRef => "&&",
+              CppTypeIndirection::RValueRef => "&&",
             })
   }
 

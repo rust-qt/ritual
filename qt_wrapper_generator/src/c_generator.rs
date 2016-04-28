@@ -342,7 +342,7 @@ impl CGenerator {
         // println!("CBuiltIn");
         String::new()
       }
-      &CppTypeOrigin::Unsupported(..) => panic!("this type should have been filtered previously"),
+      &CppTypeOrigin::Unsupported(..) | &CppTypeOrigin::Unknown => panic!("this type should have been filtered previously"),
       &CppTypeOrigin::CLang{..} => unimplemented!(),
       &CppTypeOrigin::Qt { ref include_file } => {
         let needs_full_declaration = current_include_file == include_file;

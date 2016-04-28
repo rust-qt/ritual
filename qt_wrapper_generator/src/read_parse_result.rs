@@ -33,7 +33,7 @@ impl CppType {
         Some(v) => match v.as_string().unwrap() {
           "*" => CppTypeIndirection::Ptr,
           "&" => CppTypeIndirection::Ref,
-          "&&" => CppTypeIndirection::RefRef,
+          "&&" => CppTypeIndirection::RValueRef,
           "*&" => CppTypeIndirection::PtrRef,
           "**" => CppTypeIndirection::PtrPtr,
           _ => panic!("unknown indirection string")

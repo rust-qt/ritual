@@ -8,7 +8,7 @@ pub enum CppTypeIndirection {
   Ref,
   PtrRef,
   PtrPtr,
-  RefRef,
+  RValueRef,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -50,7 +50,8 @@ pub enum CppTypeOrigin {
   Unsupported(String),
   CLang {
     include_file: String,
-  }
+  },
+  Unknown
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

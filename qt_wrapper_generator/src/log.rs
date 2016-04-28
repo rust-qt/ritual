@@ -15,3 +15,7 @@ pub fn debug<T: Borrow<str>>(text: T) {
   println!("{}", text.borrow());
 }
 
+#[allow(unused_variables)]
+pub fn noisy<T: Borrow<str>>(text: T) {
+}
+
