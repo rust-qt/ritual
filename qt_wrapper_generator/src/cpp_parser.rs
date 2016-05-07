@@ -11,7 +11,7 @@ use std::path::PathBuf;
 
 use clang_cpp_data::CLangCppData;
 use cpp_type_map::CppTypeInfo;
-use cpp_method::CppMethod;
+use cpp_method::{CppMethod, CppFunctionArgument};
 use enums::{CppMethodScope, CppTypeOrigin, CppTypeIndirection};
 use cpp_type::CppType;
 
@@ -30,7 +30,7 @@ pub struct CppParser {
   entity_kinds: HashSet<EntityKind>,
   files: HashSet<String>,
   data: CLangCppData,
-  stats: CppParserStats
+  stats: CppParserStats,
 }
 
 fn inspect_method(entity: Entity) {
@@ -114,7 +114,7 @@ impl CppParser {
         methods: Vec::new(),
         types: Vec::new(),
       },
-      stats: Default::default()
+      stats: Default::default(),
     }
   }
 
@@ -141,12 +141,18 @@ impl CppParser {
       TypeKind::UInt128 |
       TypeKind::Float |
       TypeKind::Double |
-      TypeKind::LongDouble |
-      TypeKind::Enum |
-      TypeKind::Record |
-      TypeKind::Typedef => {
+      TypeKind::LongDouble => {
         Ok(CppType {
-          base: type1.get_display_name(),
+          base: type1.get_display_name(), // TODO: remove const
+          is_const: type1.is_const_qualified(),
+          indirection: CppTypeIndirection::None,
+          template_arguments: None,
+        })
+      }
+      TypeKind::Enum |
+      TypeKind::Record => {
+        Ok(CppType {
+          base: get_full_name(type1.get_declaration().unwrap()).unwrap(),
           is_const: type1.is_const_qualified(),
           indirection: CppTypeIndirection::None,
           template_arguments: None, // TODO: get template arguments
@@ -164,7 +170,6 @@ impl CppParser {
                     match result.indirection {
                       CppTypeIndirection::None => Ok(CppTypeIndirection::Ptr),
                       CppTypeIndirection::Ptr => Ok(CppTypeIndirection::PtrPtr),
-                      CppTypeIndirection::Ref => Ok(CppTypeIndirection::PtrRef),
                       _ => {
                         Err(format!("Unsupported level of indirection: pointer to {:?}",
                                     result.indirection))
@@ -172,11 +177,13 @@ impl CppParser {
                     }
                   }
                   TypeKind::LValueReference => {
-                    if result.indirection == CppTypeIndirection::None {
-                      Ok(CppTypeIndirection::Ref)
-                    } else {
-                      Err(format!("Unsupported level of indirection: reference to {:?}",
-                                  result.indirection))
+                    match result.indirection {
+                      CppTypeIndirection::None => Ok(CppTypeIndirection::Ref),
+                      CppTypeIndirection::Ptr => Ok(CppTypeIndirection::PtrRef),
+                      _ => {
+                        Err(format!("Unsupported level of indirection: reference to {:?}",
+                                    result.indirection))
+                      }
                     }
                   }
                   TypeKind::RValueReference => {
@@ -239,7 +246,10 @@ impl CppParser {
                     entity: Entity,
                     include_file: &Option<String>)
                     -> Result<CppMethod, String> {
-    log::noisy(format!("Parsing function: {:?}", get_full_name(entity)));
+//    log::debug(format!("Parsing function: {:?}", get_full_name(entity).unwrap()));
+    //    let allow_debug_print = get_full_name(entity).unwrap().find("QString::").is_some();
+    //    if allow_debug_print {
+    //    }
     let scope = if let Some(p) = entity.get_semantic_parent() {
       match p.get_kind() {
         EntityKind::ClassDecl |
@@ -279,11 +289,40 @@ impl CppParser {
       }
     };
 
-    for c in entity.get_arguments().unwrap() {
-      //c.get_name().unwrap_or("[no name]".to_string()),
-      //c.get_type()
-    }
+    let mut arguments = Vec::new();
+    for (argument_number, argument_entity) in entity.get_arguments()
+                                                    .unwrap()
+                                                    .into_iter()
+                                                    .enumerate() {
+      //println!("argument {:?}", argument_entity);
+      let name = argument_entity.get_name().unwrap_or(format!("arg{}", argument_number + 1));
+      let type1 = self.parse_type(argument_entity.get_type().unwrap().get_canonical_type());
 
+      match type1 {
+        Ok(argument_type) => {
+          arguments.push(CppFunctionArgument {
+            name: name,
+            argument_type: argument_type,
+            default_value: if argument_entity.get_range()
+                                             .unwrap()
+                                             .tokenize()
+                                             .iter()
+                                             .find(|t| t.get_spelling() == "=")
+                                             .is_some() {
+              Some("?".to_string())
+            } else {
+              None
+            },
+          });
+        }
+        Err(msg) => {
+          return Err(format!("Can't parse argument type: {}: {:?}: {}",
+                             name,
+                             argument_entity.get_type().unwrap(),
+                             msg));
+        }
+      }
+    }
 
     Ok(CppMethod {
       name: get_full_name(entity).unwrap_or_else(|_| panic!("failed to get function name")),
@@ -295,7 +334,7 @@ impl CppParser {
       is_protected: entity.get_accessibility().unwrap_or(Accessibility::Public) ==
                     Accessibility::Protected,
       is_signal: false, // TODO: somehow get this information
-      arguments: vec![], // TODO: arguments
+      arguments: arguments,
       allows_variable_arguments: entity.is_variadic(),
       return_type: Some(return_type_parsed),
       is_constructor: entity.get_kind() == EntityKind::Constructor,
@@ -379,7 +418,7 @@ impl CppParser {
                                  get_full_name(entity).unwrap(),
                                  entity,
                                  msg));
-            dump_entity(&entity, 0);
+            //dump_entity(&entity, 0);
           }
         }
       }
@@ -417,7 +456,11 @@ impl CppParser {
     self.process_entity(translation_unit, &EntityContext::new());
     println!("Entity kinds: {:?}", self.entity_kinds);
     println!("Files: {:?}", self.files);
-    println!("{}/{} METHODS UNHARMED", self.stats.success_methods, self.stats.total_methods);
-    println!("{}/{} METHODS DESTROYED", self.stats.failed_methods, self.stats.total_methods);
+    println!("{}/{} METHODS UNHARMED",
+             self.stats.success_methods,
+             self.stats.total_methods);
+    println!("{}/{} METHODS DESTROYED",
+             self.stats.failed_methods,
+             self.stats.total_methods);
   }
 }
