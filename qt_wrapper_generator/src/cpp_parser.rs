@@ -149,13 +149,44 @@ impl CppParser {
           template_arguments: None,
         })
       }
-      TypeKind::Enum |
-      TypeKind::Record => {
+      TypeKind::Enum => {
         Ok(CppType {
           base: get_full_name(type1.get_declaration().unwrap()).unwrap(),
           is_const: type1.is_const_qualified(),
           indirection: CppTypeIndirection::None,
-          template_arguments: None, // TODO: get template arguments
+          template_arguments: None,
+        })
+      }
+      TypeKind::Record => {
+        let template_arguments = match type1.get_template_argument_types() {
+          None => None,
+          Some(arg_types) => {
+            let mut r = Vec::new();
+            if arg_types.is_empty() {
+              panic!("arg_types is empty");
+            }
+            for arg_type in arg_types {
+              match arg_type {
+                None => return Err(format!("Template argument is None")),
+                Some(arg_type) => {
+                  match self.parse_type(arg_type.get_canonical_type()) {
+                    Ok(parsed_type) => r.push(parsed_type),
+                    Err(msg) => {
+                      return Err(format!("Invalid template argument: {:?}: {}", arg_type, msg))
+                    }
+                  }
+                }
+              }
+            }
+            Some(r)
+          }
+        };
+
+        Ok(CppType {
+          base: get_full_name(type1.get_declaration().unwrap()).unwrap(),
+          is_const: type1.is_const_qualified(),
+          indirection: CppTypeIndirection::None,
+          template_arguments: template_arguments,
         })
       }
       TypeKind::Pointer |
@@ -246,7 +277,7 @@ impl CppParser {
                     entity: Entity,
                     include_file: &Option<String>)
                     -> Result<CppMethod, String> {
-//    log::debug(format!("Parsing function: {:?}", get_full_name(entity).unwrap()));
+    //    log::debug(format!("Parsing function: {:?}", get_full_name(entity).unwrap()));
     //    let allow_debug_print = get_full_name(entity).unwrap().find("QString::").is_some();
     //    if allow_debug_print {
     //    }
@@ -288,13 +319,16 @@ impl CppParser {
         return Err(format!("Can't parse return type: {:?}: {}", return_type, msg));
       }
     };
+    if get_full_name(entity).unwrap() == "QByteArray::split" {
+      println!("TEST1: {:?}", return_type_parsed);
+    }
 
     let mut arguments = Vec::new();
     for (argument_number, argument_entity) in entity.get_arguments()
                                                     .unwrap()
                                                     .into_iter()
                                                     .enumerate() {
-      //println!("argument {:?}", argument_entity);
+      // println!("argument {:?}", argument_entity);
       let name = argument_entity.get_name().unwrap_or(format!("arg{}", argument_number + 1));
       let type1 = self.parse_type(argument_entity.get_type().unwrap().get_canonical_type());
 
@@ -322,6 +356,10 @@ impl CppParser {
                              msg));
         }
       }
+    }
+
+    if get_full_name(entity).unwrap() == "QStringList::QStringList" {
+      println!("TEST2: {:?}", arguments);
     }
 
     Ok(CppMethod {
@@ -418,7 +456,7 @@ impl CppParser {
                                  get_full_name(entity).unwrap(),
                                  entity,
                                  msg));
-            //dump_entity(&entity, 0);
+            // dump_entity(&entity, 0);
           }
         }
       }
