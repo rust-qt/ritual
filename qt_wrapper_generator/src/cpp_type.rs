@@ -4,11 +4,55 @@ use enums::{IndirectionChange, CppTypeKind};
 use cpp_type_map::CppTypeMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CppBuiltInNumericType {
+  Bool,
+  CharS,
+  CharU,
+  SChar,
+  UChar,
+  WChar,
+  Char16,
+  Char32,
+  Short,
+  UShort,
+  Int,
+  UInt,
+  Long,
+  ULong,
+  LongLong,
+  ULongLong,
+  Int128,
+  UInt128,
+  Float,
+  Double,
+  LongDouble,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CppTypeBase {
+  Void,
+  BuiltInNumeric(CppBuiltInNumericType),
+  Enum {
+    name: String,
+  },
+  Class {
+    name: String,
+    template_arguments: Option<Vec<CppType>>,
+  },
+  TemplateParameter {
+    index: i32,
+  },
+  Unspecified {
+    name: String,
+    template_arguments: Option<Vec<CppType>>,
+  },
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppType {
   pub is_const: bool,
   pub indirection: CppTypeIndirection,
-  pub base: String,
-  pub template_arguments: Option<Vec<CppType>>,
+  pub base: CppTypeBase,
 }
 
 impl CppType {
@@ -16,26 +60,36 @@ impl CppType {
     CppType {
       is_const: false,
       indirection: CppTypeIndirection::None,
-      base: "void".to_string(),
-      template_arguments: None,
+      base: CppTypeBase::Unspecified {
+        name: "void".to_string(),
+        template_arguments: None,
+      },
     }
   }
 
   pub fn is_template(&self) -> bool {
-    self.template_arguments.is_some()
+    match self.base {
+      CppTypeBase::Unspecified { ref template_arguments, .. } => template_arguments.is_some(),
+      CppTypeBase::Class { ref template_arguments, .. } => template_arguments.is_some(),
+      _ => false,
+    }
   }
 
   pub fn to_cpp_code(&self) -> String {
     if self.is_template() {
       panic!("template types are not supported yet")
     }
+    let name = match self.base {
+      CppTypeBase::Unspecified { ref name, .. } => name.clone(),
+      _ => panic!("new cpp types are not supported here yet"),
+    };
     format!("{}{}{}",
             if self.is_const {
               "const "
             } else {
               ""
             },
-            self.base,
+            name,
             match self.indirection {
               CppTypeIndirection::None => "",
               CppTypeIndirection::Ptr => "*",
@@ -69,28 +123,30 @@ impl CppType {
       }
       _ => return Err("Unsupported level of indirection".to_string()),
     }
+    let name = match self.base {
+      CppTypeBase::Unspecified { ref name, .. } => name.clone(),
+      _ => panic!("new cpp types are not supported here yet"),
+    };
 
-    match cpp_type_map.get_info(&self.base) {
+    match cpp_type_map.get_info(&name) {
       Ok(info) => {
         match info.kind {
           CppTypeKind::TypeDef { .. } => panic!("cpp_type_map.get_info should not return typedef"),
           CppTypeKind::CPrimitive | CppTypeKind::Enum { .. } => {
-            result.c_type.base = self.base.clone();
+            result.c_type.base = name.clone();
           }
           CppTypeKind::Flags { .. } => {
-            result.c_type.base = format!("QTCW_{}", self.base.replace("::", "_"));
+            result.c_type.base = format!("QTCW_{}", name.replace("::", "_"));
             result.conversion.qflags_to_uint = true;
           }
           CppTypeKind::Class { .. } => {
-            result.c_type.base = self.base.clone();
+            result.c_type.base = name.clone();
             result.c_type.is_pointer = true;
             if self.indirection == CppTypeIndirection::None {
               result.conversion.indirection_change = IndirectionChange::ValueToPointer;
             }
           }
-          CppTypeKind::Unknown => {
-            return Err("Unknown kind of type".to_string())
-          }
+          CppTypeKind::Unknown => return Err("Unknown kind of type".to_string()),
         }
       }
       Err(msg) => return Err(format!("Type info error for {:?}: {}", self, msg)),

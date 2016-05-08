@@ -1,6 +1,6 @@
 use cpp_header_data::CppHeaderData;
 use cpp_type_map::CppTypeMap;
-use cpp_type::CppType;
+use cpp_type::{CppType, CppTypeBase};
 use enums::{CppTypeOrigin, CppMethodScope};
 
 #[derive(Debug, Clone)]
@@ -12,29 +12,35 @@ pub struct CppData {
 
 impl CppData {
   fn type_contains_template_arguments(&self, cpp_type: &CppType) -> Result<bool, String> {
-    match self.types.get_info(&cpp_type.base) {
-      Ok(ref info) => {
-        if let CppTypeOrigin::Unsupported(ref v) = info.origin {
-          if v == "template_argument" {
-            return Ok(true);
-          }
-        }
-      }
-      Err(msg) => return Err(msg),
-    }
-    if let Some(ref args) = cpp_type.template_arguments {
-      for arg in args {
-        match self.type_contains_template_arguments(&arg) {
-          Ok(r) => {
-            if r {
-              return Ok(true);
+    match cpp_type.base {
+      CppTypeBase::Unspecified { ref name, ref template_arguments } => {
+        match self.types.get_info(name) {
+          Ok(ref info) => {
+            if let CppTypeOrigin::Unsupported(ref v) = info.origin {
+              if v == "template_argument" {
+                return Ok(true);
+              }
             }
           }
           Err(msg) => return Err(msg),
         }
+        if let &Some(ref args) = template_arguments {
+          for arg in args {
+            match self.type_contains_template_arguments(&arg) {
+              Ok(r) => {
+                if r {
+                  return Ok(true);
+                }
+              }
+              Err(msg) => return Err(msg),
+            }
+          }
+        }
+        Ok(false)
+
       }
+      _ => panic!("new cpp types are not supported here yet")
     }
-    Ok(false)
   }
 
   pub fn is_template_class(&self, class_name: &String) -> Result<bool, String> {

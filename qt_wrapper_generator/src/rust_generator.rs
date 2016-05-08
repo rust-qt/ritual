@@ -1,6 +1,7 @@
 use c_generator::{CppAndCData, CHeaderData};
 use cpp_and_c_method::CppAndCMethod;
 use cpp_type_map::EnumValue;
+use cpp_type::CppTypeBase;
 use enums::{CppTypeKind, CppTypeOrigin};
 use utils::JoinWithString;
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
@@ -81,13 +82,17 @@ impl RustGenerator {
   }
 
   fn c_type_to_complete_type(&self, c_type_ex: &CTypeExtended) -> Result<CompleteType, String> {
-    if !self.cpp_to_rust_type_map.contains_key(&c_type_ex.cpp_type.base) {
-      return Err(format!("Type has no Rust equivalent: {}", c_type_ex.cpp_type.base));
+    let cpp_type_name = match c_type_ex.cpp_type.base {
+      CppTypeBase::Unspecified { ref name, .. } => name.clone(),
+      _ => panic!("new cpp types are not supported here yet"),
+    };
+    if !self.cpp_to_rust_type_map.contains_key(&cpp_type_name) {
+      return Err(format!("Type has no Rust equivalent: {}", cpp_type_name));
     }
-    if !self.is_cpp_type_processed(&c_type_ex.cpp_type.base) {
-      return Err(format!("Type is not processed: {}", c_type_ex.cpp_type.base));
+    if !self.is_cpp_type_processed(&cpp_type_name) {
+      return Err(format!("Type is not processed: {}", cpp_type_name));
     }
-    let rust_name = self.cpp_to_rust_type_map.get(&c_type_ex.cpp_type.base).unwrap();
+    let rust_name = self.cpp_to_rust_type_map.get(&cpp_type_name).unwrap();
 
     let rust_ffi_type = if c_type_ex.c_type.base == "void" {
       if c_type_ex.c_type.is_pointer {

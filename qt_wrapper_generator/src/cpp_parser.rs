@@ -13,7 +13,7 @@ use clang_cpp_data::CLangCppData;
 use cpp_type_map::CppTypeInfo;
 use cpp_method::{CppMethod, CppFunctionArgument};
 use enums::{CppMethodScope, CppTypeOrigin, CppTypeIndirection};
-use cpp_type::CppType;
+use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType};
 
 #[derive(Default)]
 pub struct CppParserStats {
@@ -119,8 +119,15 @@ impl CppParser {
   }
 
   fn parse_type(&mut self, type1: Type) -> Result<CppType, String> {
+    let is_const = type1.is_const_qualified();
     match type1.get_kind() {
-      TypeKind::Void |
+      TypeKind::Void => {
+        Ok(CppType {
+          base: CppTypeBase::Void,
+          is_const: is_const,
+          indirection: CppTypeIndirection::None,
+        })
+      }
       TypeKind::Bool |
       TypeKind::CharS |
       TypeKind::CharU |
@@ -143,18 +150,41 @@ impl CppParser {
       TypeKind::Double |
       TypeKind::LongDouble => {
         Ok(CppType {
-          base: type1.get_display_name(), // TODO: remove const
-          is_const: type1.is_const_qualified(),
+          base: CppTypeBase::BuiltInNumeric(match type1.get_kind() {
+            TypeKind::Bool => CppBuiltInNumericType::Bool,
+            TypeKind::CharS => CppBuiltInNumericType::CharS,
+            TypeKind::CharU => CppBuiltInNumericType::CharU,
+            TypeKind::SChar => CppBuiltInNumericType::SChar,
+            TypeKind::UChar => CppBuiltInNumericType::UChar,
+            TypeKind::WChar => CppBuiltInNumericType::WChar,
+            TypeKind::Char16 => CppBuiltInNumericType::Char16,
+            TypeKind::Char32 => CppBuiltInNumericType::Char32,
+            TypeKind::Short => CppBuiltInNumericType::Short,
+            TypeKind::UShort => CppBuiltInNumericType::UShort,
+            TypeKind::Int => CppBuiltInNumericType::Int,
+            TypeKind::UInt => CppBuiltInNumericType::UInt,
+            TypeKind::Long => CppBuiltInNumericType::Long,
+            TypeKind::ULong => CppBuiltInNumericType::ULong,
+            TypeKind::LongLong => CppBuiltInNumericType::LongLong,
+            TypeKind::ULongLong => CppBuiltInNumericType::ULongLong,
+            TypeKind::Int128 => CppBuiltInNumericType::Int128,
+            TypeKind::UInt128 => CppBuiltInNumericType::UInt128,
+            TypeKind::Float => CppBuiltInNumericType::Float,
+            TypeKind::Double => CppBuiltInNumericType::Double,
+            TypeKind::LongDouble => CppBuiltInNumericType::LongDouble,
+            _ => unreachable!(),
+          }),
+          is_const: is_const,
           indirection: CppTypeIndirection::None,
-          template_arguments: None,
         })
       }
       TypeKind::Enum => {
         Ok(CppType {
-          base: get_full_name(type1.get_declaration().unwrap()).unwrap(),
-          is_const: type1.is_const_qualified(),
+          base: CppTypeBase::Enum {
+            name: get_full_name(type1.get_declaration().unwrap()).unwrap(),
+          },
+          is_const: is_const,
           indirection: CppTypeIndirection::None,
-          template_arguments: None,
         })
       }
       TypeKind::Record => {
@@ -183,10 +213,12 @@ impl CppParser {
         };
 
         Ok(CppType {
-          base: get_full_name(type1.get_declaration().unwrap()).unwrap(),
-          is_const: type1.is_const_qualified(),
+          base: CppTypeBase::Class {
+            name: get_full_name(type1.get_declaration().unwrap()).unwrap(),
+            template_arguments: template_arguments,
+          },
+          is_const: is_const,
           indirection: CppTypeIndirection::None,
-          template_arguments: template_arguments,
         })
       }
       TypeKind::Pointer |
@@ -243,23 +275,27 @@ impl CppParser {
           if let Some(declaration) = type1.get_declaration() {
             if declaration.get_kind() == EntityKind::ClassDecl {
               return Ok(CppType {
-                base: declaration.get_display_name().unwrap(),
-                is_const: type1.is_const_qualified(),
+                base: CppTypeBase::Class {
+                  name: get_full_name(declaration).unwrap(),
+                  // TODO: get template arguments
+                  // TODO: (well, that's probably not gonna happen)
+                  template_arguments: None,
+                },
+                is_const: is_const,
                 indirection: CppTypeIndirection::None,
-                template_arguments: None, /* TODO: get template arguments
-                                           * TODO: (well, that's probably not gonna happen) */
               });
             }
           }
           let name = type1.get_display_name();
-          let re = Regex::new(r"^(const ){0,1}(type-parameter-0-(\d+))$").unwrap();
+          let re = Regex::new(r"^(const ){0,1}type-parameter-0-(\d+)$").unwrap();
           if let Some(matches) = re.captures(name.as_ref()) {
             // TODO: capture and use type parameter index
             return Ok(CppType {
-              base: matches.at(2).unwrap().to_string(),
-              is_const: type1.is_const_qualified(),
+              base: CppTypeBase::TemplateParameter {
+                index: matches.at(2).unwrap().parse().unwrap(),
+              },
+              is_const: is_const,
               indirection: CppTypeIndirection::None,
-              template_arguments: None,
             });
           }
         }
@@ -322,12 +358,30 @@ impl CppParser {
     if get_full_name(entity).unwrap() == "QByteArray::split" {
       println!("TEST1: {:?}", return_type_parsed);
     }
-
     let mut arguments = Vec::new();
-    for (argument_number, argument_entity) in entity.get_arguments()
-                                                    .unwrap()
-                                                    .into_iter()
-                                                    .enumerate() {
+    let argument_entities = match entity.get_kind() {
+      EntityKind::FunctionTemplate => {
+        entity.get_children().into_iter().filter(|c| c.get_kind() == EntityKind::ParmDecl).collect()
+      }
+      _ => entity.get_arguments().unwrap(),
+    };
+    let template_arguments = match entity.get_kind() {
+      EntityKind::FunctionTemplate => {
+        Some(entity.get_children()
+                   .into_iter()
+                   .filter(|c| c.get_kind() == EntityKind::TemplateTypeParameter)
+                   .map(|c| c.get_display_name().unwrap())
+                   .collect())
+      }
+      _ => None,
+    };
+
+    //    if entity.get_arguments().is_none() {
+    //      dump_entity(&entity, 0);
+    //      return Err("Arguments is None".to_string());
+    //    }
+    for (argument_number, argument_entity) in argument_entities.into_iter()
+                                                               .enumerate() {
       // println!("argument {:?}", argument_entity);
       let name = argument_entity.get_name().unwrap_or(format!("arg{}", argument_number + 1));
       let type1 = self.parse_type(argument_entity.get_type().unwrap().get_canonical_type());
@@ -384,6 +438,7 @@ impl CppParser {
         &Some(ref include_file) => CppTypeOrigin::CLang { include_file: include_file.clone() },
         &None => CppTypeOrigin::Unknown,
       },
+      template_arguments: template_arguments,
     })
   }
 
@@ -443,10 +498,15 @@ impl CppParser {
       EntityKind::FunctionDecl |
       EntityKind::Method |
       EntityKind::Constructor |
-      EntityKind::Destructor => {
+      EntityKind::ConversionFunction |
+      EntityKind::FunctionTemplate => {
         self.stats.total_methods = self.stats.total_methods + 1;
         match self.parse_function(entity, &include_file) {
           Ok(r) => {
+            if r.name == "QVariant::value" {
+              println!("TEST1 {:?}", r);
+              dump_entity(&entity, 0);
+            }
             self.stats.success_methods = self.stats.success_methods + 1;
             self.data.methods.push(r);
           }

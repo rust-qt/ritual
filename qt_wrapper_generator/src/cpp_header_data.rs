@@ -41,6 +41,7 @@ impl CppHeaderData {
           allows_variable_arguments: false,
           original_index: 1000,
           origin: CppTypeOrigin::Qt { include_file: self.include_file.clone() },
+          template_arguments: None,
         });
       }
     }

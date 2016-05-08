@@ -1,4 +1,4 @@
-use cpp_type::CppType;
+use cpp_type::{CppType, CppTypeBase};
 use enums::{CppMethodScope, AllocationPlace, AllocationPlaceImportance,
             CFunctionArgumentCppEquivalent, CppTypeIndirection, CppTypeKind, CppTypeOrigin};
 use c_function_signature::CFunctionSignature;
@@ -33,7 +33,8 @@ pub struct CppMethod {
   pub arguments: Vec<CppFunctionArgument>,
   pub allows_variable_arguments: bool,
   pub original_index: i32,
-  pub origin: CppTypeOrigin
+  pub origin: CppTypeOrigin,
+  pub template_arguments: Option<Vec<String>>,
 }
 
 impl CppMethod {
@@ -41,10 +42,13 @@ impl CppMethod {
     if self.is_constructor {
       if let CppMethodScope::Class(ref class_name) = self.scope {
         return Some(CppType {
-          template_arguments: None, // TODO: figure out template arguments
           is_const: false,
           indirection: CppTypeIndirection::None,
-          base: class_name.clone(),
+          // TODO: figure out template arguments
+          base: CppTypeBase::Unspecified {
+            name: class_name.clone(),
+            template_arguments: None,
+          },
         });
       } else {
         panic!("constructor encountered with no class scope");
@@ -89,8 +93,10 @@ impl CppMethod {
         r.arguments.push(CFunctionArgument {
           name: "self".to_string(),
           argument_type: CppType {
-                           base: class_name.clone(),
-                           template_arguments: None, // TODO: figure out template arguments
+                           base: CppTypeBase::Unspecified {
+                             name: class_name.clone(),
+                             template_arguments: None, // TODO: figure out template arguments
+                           },
                            is_const: self.is_const,
                            indirection: CppTypeIndirection::Ptr,
                          }
@@ -118,9 +124,14 @@ impl CppMethod {
       match return_type.to_c_type(cpp_type_map) {
         Ok(c_type) => {
           let is_stack_allocated_struct = if return_type.indirection == CppTypeIndirection::None {
-            match cpp_type_map.get_info(&return_type.base).unwrap().kind {
-              CppTypeKind::Class { .. } => true,
-              _ => false,
+            match return_type.base {
+              CppTypeBase::Unspecified { ref name, .. } => {
+                match cpp_type_map.get_info(name).unwrap().kind {
+                  CppTypeKind::Class { .. } => true,
+                  _ => false,
+                }
+              }
+              _ => panic!("new cpp types are not supported here yet"),
             }
           } else {
             false

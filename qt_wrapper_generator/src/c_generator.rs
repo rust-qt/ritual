@@ -1,7 +1,7 @@
 use cpp_header_data::CppHeaderData;
 use cpp_data::CppData;
 use c_type::CTypeExtended;
-use cpp_type::CppType;
+use cpp_type::{CppType, CppTypeBase};
 use enums::{AllocationPlace, CFunctionArgumentCppEquivalent, IndirectionChange, CppMethodScope,
             CppTypeOrigin, CppTypeKind, CppTypeIndirection};
 use cpp_and_c_method::CppAndCMethod;
@@ -48,7 +48,12 @@ impl CppAndCMethod {
             // so no conversion is necessary for constructors.
             if !self.cpp_method.is_constructor {
               if let Some(ref return_type) = self.cpp_method.return_type {
-                result = format!("new {}({})", return_type.base, result);
+                match return_type.base {
+                  CppTypeBase::Unspecified { ref name, .. } => {
+                    result = format!("new {}({})", name, result)
+                  }
+                  _ => panic!("new cpp types are not supported here yet"),
+                }
               } else {
                 panic!("cpp self unexpectedly doesn't have return type");
               }
@@ -77,7 +82,12 @@ impl CppAndCMethod {
         x.cpp_equivalent == CFunctionArgumentCppEquivalent::ReturnValue
       }) {
         if let Some(ref return_type) = self.cpp_method.return_type {
-          result = format!("new({}) {}({})", arg.name, return_type.base, result);
+          match return_type.base {
+            CppTypeBase::Unspecified { ref name, .. } => {
+              result = format!("new({}) {}({})", arg.name, name, result);
+            }
+            _ => panic!("new cpp types are not supported here yet"),
+          }
         } else {
           panic!("cpp self unexpectedly doesn't have return type");
         }
@@ -106,7 +116,12 @@ impl CppAndCMethod {
                            result);
         }
         if c_argument.argument_type.conversion.qflags_to_uint {
-          result = format!("{}({})", cpp_argument.argument_type.base, result);
+          match cpp_argument.argument_type.base {
+            CppTypeBase::Unspecified { ref name, .. } => {
+              result = format!("{}({})", name, result);
+            }
+            _ => panic!("new cpp types are not supported here yet"),
+          }
         }
         filled_arguments.push(result);
       } else {
@@ -335,15 +350,21 @@ impl CGenerator {
       return only_c_code("#include <wchar.h>\n".to_string());
     }
 
-    let type_info = self.cpp_data.types.0.get(&cpp_type.base).unwrap();
+    let cpp_type_base = match cpp_type.base {
+      CppTypeBase::Unspecified { ref name, .. } => name.clone(),
+      _ => panic!("new cpp types are not supported here yet"),
+    };
+    let type_info = self.cpp_data.types.0.get(&cpp_type_base).unwrap();
     // println!("type info: {:?}", type_info);
     let mut result = match &type_info.origin {
       &CppTypeOrigin::CBuiltIn => {
         // println!("CBuiltIn");
         String::new()
       }
-      &CppTypeOrigin::Unsupported(..) | &CppTypeOrigin::Unknown => panic!("this type should have been filtered previously"),
-      &CppTypeOrigin::CLang{..} => unimplemented!(),
+      &CppTypeOrigin::Unsupported(..) | &CppTypeOrigin::Unknown => {
+        panic!("this type should have been filtered previously")
+      }
+      &CppTypeOrigin::CLang { .. } => unimplemented!(),
       &CppTypeOrigin::Qt { ref include_file } => {
         let needs_full_declaration = current_include_file == include_file;
 
@@ -361,7 +382,7 @@ impl CGenerator {
                                       x.name,
                                       self.cpp_extracted_info
                                           .enum_values
-                                          .get(&cpp_type.base)
+                                          .get(&cpp_type_base)
                                           .unwrap()
                                           .get(&x.name)
                                           .unwrap())
@@ -382,7 +403,7 @@ impl CGenerator {
           }
           &CppTypeKind::Class { .. } => {
             only_c_code(self.struct_declaration(&c_type.base,
-                                                &cpp_type.base,
+                                                &cpp_type_base,
                                                 needs_full_declaration))
           }
         };
@@ -396,7 +417,7 @@ impl CGenerator {
       //      println!("write renaming typedef cpp={} c={}",
       //               cpp_type.base,
       //               c_type.base);
-      result = result + &only_cpp_code(format!("typedef {} {};\n", cpp_type.base, c_type.base));
+      result = result + &only_cpp_code(format!("typedef {} {};\n", cpp_type_base, c_type.base));
     }
     result
   }
@@ -444,8 +465,7 @@ impl CGenerator {
       let cpp_type = CppType {
         is_const: false,
         indirection: CppTypeIndirection::None,
-        base: name,
-        template_arguments: None,
+        base: CppTypeBase::Unspecified { name: name, template_arguments: None }
       };
       if let Ok(c_type_ex) = cpp_type.to_c_type(&self.cpp_data.types) {
         h_file.write(&self.generate_type_declaration(&c_type_ex,
@@ -467,7 +487,8 @@ impl CGenerator {
                                   return false;
                                 }
                                 if method.cpp_method.is_signal {
-                                  log::warning(format!("Skipping signal: \n{}\n", method.short_text()));
+                                  log::warning(format!("Skipping signal: \n{}\n",
+                                                       method.short_text()));
                                   return false;
                                 }
                                 true

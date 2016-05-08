@@ -1,4 +1,4 @@
-use cpp_type::CppType;
+use cpp_type::{CppType, CppTypeBase};
 use cpp_type_map::{EnumValue, CppTypeInfo, CppTypeMap};
 use cpp_method::{CppFunctionArgument, CppMethod};
 use cpp_header_data::CppHeaderData;
@@ -15,32 +15,36 @@ impl CppType {
   fn from_json(value: &serde_json::Value) -> Self {
     let value = value.as_object().unwrap();
     CppType {
-      template_arguments: match value.get("template_arguments") {
-        Some(v) => {
-          Some(v.as_array()
-                .unwrap()
-                .into_iter()
-                .map(|x| CppType::from_json(x))
-                .collect())
-        }
-        None => None,
-      },
       is_const: match value.get("is_const") {
         Some(v) => v.as_boolean().unwrap(),
         None => false,
       },
       indirection: match value.get("indirection") {
-        Some(v) => match v.as_string().unwrap() {
-          "*" => CppTypeIndirection::Ptr,
-          "&" => CppTypeIndirection::Ref,
-          "&&" => CppTypeIndirection::RValueRef,
-          "*&" => CppTypeIndirection::PtrRef,
-          "**" => CppTypeIndirection::PtrPtr,
-          _ => panic!("unknown indirection string")
-        },
+        Some(v) => {
+          match v.as_string().unwrap() {
+            "*" => CppTypeIndirection::Ptr,
+            "&" => CppTypeIndirection::Ref,
+            "&&" => CppTypeIndirection::RValueRef,
+            "*&" => CppTypeIndirection::PtrRef,
+            "**" => CppTypeIndirection::PtrPtr,
+            _ => panic!("unknown indirection string"),
+          }
+        }
         None => CppTypeIndirection::None,
       },
-      base: value.get("base").unwrap().as_string().unwrap().to_string(),
+      base: CppTypeBase::Unspecified {
+        name: value.get("base").unwrap().as_string().unwrap().to_string(),
+        template_arguments: match value.get("template_arguments") {
+          Some(v) => {
+            Some(v.as_array()
+                  .unwrap()
+                  .into_iter()
+                  .map(|x| CppType::from_json(x))
+                  .collect())
+          }
+          None => None,
+        },
+      },
     }
   }
 }
@@ -60,7 +64,11 @@ impl CppFunctionArgument {
 }
 
 impl CppMethod {
-  fn from_json(value: &serde_json::Value, include_file: &String, class_name: &Option<String>, index: i32) -> Self {
+  fn from_json(value: &serde_json::Value,
+               include_file: &String,
+               class_name: &Option<String>,
+               index: i32)
+               -> Self {
     // println!("{:?} {:?}", value, class_name);
     let value = value.as_object().unwrap();
     CppMethod {
@@ -135,6 +143,7 @@ impl CppMethod {
         None => false,
       },
       original_index: index,
+      template_arguments: None,
     }
   }
 }
@@ -156,7 +165,9 @@ impl CppHeaderData {
                        .unwrap()
                        .into_iter()
                        .enumerate()
-                       .map(|(index, x)| CppMethod::from_json(x, &include_file, &class_name, index as i32))
+                       .map(|(index, x)| {
+                         CppMethod::from_json(x, &include_file, &class_name, index as i32)
+                       })
                        .collect();
     CppHeaderData {
       include_file: include_file,
@@ -182,7 +193,7 @@ impl EnumValue {
     EnumValue {
       name: value.get("name").unwrap().as_string().unwrap().to_string(),
       value: value.get("value").unwrap().as_string().unwrap().to_string(),
-      description: value.get("description").unwrap().as_string().unwrap().to_string()
+      description: value.get("description").unwrap().as_string().unwrap().to_string(),
     }
   }
 }
@@ -206,41 +217,43 @@ impl CppTypeInfo {
         CppTypeKind::CPrimitive
       } else {
         match value.get("kind") {
-          Some(v) => match v.as_string().unwrap() {
-            "enum" => {
-              CppTypeKind::Enum {
-                values: value.get("values")
-                .unwrap()
-                .as_array()
-                .unwrap()
-                .into_iter()
-                .map(|x| EnumValue::from_json(x))
-                .collect(),
+          Some(v) => {
+            match v.as_string().unwrap() {
+              "enum" => {
+                CppTypeKind::Enum {
+                  values: value.get("values")
+                               .unwrap()
+                               .as_array()
+                               .unwrap()
+                               .into_iter()
+                               .map(|x| EnumValue::from_json(x))
+                               .collect(),
+                }
               }
-            }
-            "flags" => {
-              CppTypeKind::Flags {
-                enum_name: value.get("enum").unwrap().as_string().unwrap().to_string(),
+              "flags" => {
+                CppTypeKind::Flags {
+                  enum_name: value.get("enum").unwrap().as_string().unwrap().to_string(),
+                }
               }
-            }
-            "typedef" => {
-              match value.get("meaning") {
-                Some(v) => CppTypeKind::TypeDef { meaning: CppType::from_json(v) },
-                None => CppTypeKind::Unknown
+              "typedef" => {
+                match value.get("meaning") {
+                  Some(v) => CppTypeKind::TypeDef { meaning: CppType::from_json(v) },
+                  None => CppTypeKind::Unknown,
+                }
               }
-            }
-            "class" => {
-              CppTypeKind::Class {
-                inherits: match value.get("inherits") {
-                  Some(inherits) => Some(CppType::from_json(inherits)),
-                  None => None,
-                },
+              "class" => {
+                CppTypeKind::Class {
+                  inherits: match value.get("inherits") {
+                    Some(inherits) => Some(CppType::from_json(inherits)),
+                    None => None,
+                  },
+                }
               }
+              "template_type" => CppTypeKind::Unknown,
+              _ => panic!("invalid kind of type"),
             }
-            "template_type" => CppTypeKind::Unknown,
-            _ => panic!("invalid kind of type"),
-          },
-          None => CppTypeKind::Unknown
+          }
+          None => CppTypeKind::Unknown,
         }
       },
     }
@@ -250,7 +263,9 @@ impl CppTypeInfo {
 impl CppTypeMap {
   fn from_json(value: &serde_json::Value) -> Self {
     let value = value.as_object().unwrap();
-    CppTypeMap(value.into_iter().map(|(k, v)| (k.clone(), CppTypeInfo::from_json(v, k.clone()))).collect())
+    CppTypeMap(value.into_iter()
+                    .map(|(k, v)| (k.clone(), CppTypeInfo::from_json(v, k.clone())))
+                    .collect())
   }
 }
 
@@ -267,6 +282,6 @@ pub fn do_it(file_name: &std::path::PathBuf) -> CppData {
                    .map(|x| CppHeaderData::from_json(x))
                    .collect(),
     types: CppTypeMap::from_json(object.get("type_info").unwrap()),
-    classes_blacklist: vec![]
+    classes_blacklist: vec![],
   }
 }

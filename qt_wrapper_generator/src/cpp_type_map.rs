@@ -1,5 +1,5 @@
 use enums::{CppTypeKind, CppTypeOrigin};
-
+use cpp_type::CppTypeBase;
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -27,7 +27,11 @@ impl CppTypeMap {
         if meaning.is_template() {
           Err("Template typedefs are not supported".to_string())
         } else {
-          self.get_info(&meaning.base)
+          let name = match meaning.base {
+            CppTypeBase::Unspecified { ref name, .. } => name.clone(),
+            _ => panic!("new cpp types are not supported here yet"),
+          };
+          self.get_info(&name)
         }
       } else {
         Ok(r)
