@@ -67,6 +67,15 @@ fn dump_entity(entity: &Entity, level: i32) {
   }
 }
 
+fn get_template_arguments(entity: Entity) -> Vec<String> {
+  entity.get_children()
+        .into_iter()
+        .filter(|c| c.get_kind() == EntityKind::TemplateTypeParameter)
+        .enumerate()
+        .map(|(i, c)| c.get_name().unwrap_or_else(|| format!("Type{}", i+1)))
+        .collect()
+}
+
 
 fn get_full_name(entity: Entity) -> Result<String, String> {
   let mut current_entity = entity;
@@ -124,43 +133,116 @@ impl CppParser {
     }
   }
 
-  fn parse_unexposed_type(&mut self, type1: Type) -> Result<CppType, String> {
-    let is_const = type1.is_const_qualified();
-    if let Some(declaration) = type1.get_declaration() {
-      // TODO: detect classes, structs and parse template parameters
-      if declaration.get_kind() == EntityKind::ClassDecl {
+  fn parse_unexposed_type(&mut self,
+                          type1: Option<Type>,
+                          string: Option<String>,
+                          context_class: Option<Entity>,
+                          context_method: Option<Entity>)
+                          -> Result<CppType, String> {
+    let (is_const, name) = match type1 {
+      Some(type1) => {
+        let is_const = type1.is_const_qualified();
+        let mut name = type1.get_display_name();
+        let is_const_in_name = name.starts_with("const ");
+        if is_const != is_const_in_name {
+          panic!("const inconsistency: {}, {:?}", is_const, type1);
+        }
+        if is_const_in_name {
+          name = name[6..].to_string();
+        }
+        if let Some(declaration) = type1.get_declaration() {
+          // TODO: detect classes, structs and parse template parameters
+          //println!("declaration: {:?}", type1.get_declaration());
+          if declaration.get_kind() == EntityKind::ClassDecl ||
+             declaration.get_kind() == EntityKind::ClassTemplate ||
+             declaration.get_kind() == EntityKind::StructDecl {
+            let re1 = Regex::new(r"^[\w:]+<([^<>]+)>$").unwrap();
+            if let Some(matches) = re1.captures(name.as_ref()) {
+              let mut arg_types = Vec::new();
+              for arg in matches.at(1).unwrap().split(",") {
+                match self.parse_unexposed_type(None,
+                                                Some(arg.trim().to_string()),
+                                                context_class,
+                                                context_method) {
+                  Ok(arg_type) => arg_types.push(arg_type),
+                  Err(msg) => {
+                    return Err(format!("Template argument of unexposed type is not parsed: {}: {}",
+                                       arg,
+                                       msg))
+                  }
+                }
+              }
+              return Ok(CppType {
+                base: CppTypeBase::Class {
+                  name: get_full_name(declaration).unwrap(),
+                  template_arguments: Some(arg_types),
+                },
+                is_const: is_const,
+                indirection: CppTypeIndirection::None,
+              });
+            } else {
+              return Err(format!("Unexposed type has a declaration but is too complex: {}",
+                                 name));
+            }
+          }
+        }
+        (is_const, name)
+      }
+      None => {
+        let mut name = string.unwrap();
+        let is_const_in_name = name.starts_with("const ");
+        if is_const_in_name {
+          name = name[6..].to_string();
+        }
+        (is_const_in_name, name)
+      }
+    };
+    let re = Regex::new(r"^type-parameter-(\d+)-(\d+)$").unwrap();
+    if let Some(matches) = re.captures(name.as_ref()) {
+      return Ok(CppType {
+        base: CppTypeBase::TemplateParameter {
+          index1: matches.at(1).unwrap().parse().unwrap(),
+          index2: matches.at(2).unwrap().parse().unwrap(),
+        },
+        is_const: is_const,
+        indirection: CppTypeIndirection::None,
+      });
+    }
+    if let Some(e) = context_class {
+      if let Some(index) = get_template_arguments(e).iter().position(|x| *x == name) {
         return Ok(CppType {
-          base: CppTypeBase::Class {
-            name: get_full_name(declaration).unwrap(),
-            template_arguments: None,
+          base: CppTypeBase::TemplateParameter {
+            index1: 0, //TODO: not sure what this index means
+            index2: index as i32,
           },
           is_const: is_const,
           indirection: CppTypeIndirection::None,
         });
       }
     }
-    let name = type1.get_display_name();
-    let re = Regex::new(r"^(const ){0,1}type-parameter-(\d+)-(\d+)$").unwrap();
-    if let Some(matches) = re.captures(name.as_ref()) {
-      return Ok(CppType {
-        base: CppTypeBase::TemplateParameter {
-          index1: matches.at(2).unwrap().parse().unwrap(),
-          index2: matches.at(3).unwrap().parse().unwrap(),
-        },
-        is_const: is_const,
-        indirection: CppTypeIndirection::None,
-      });
+    if let Some(e) = context_method {
+      if let Some(index) = get_template_arguments(e).iter().position(|x| *x == name) {
+        return Ok(CppType {
+          base: CppTypeBase::TemplateParameter {
+            index1: 0, //TODO: not sure what this index means
+            index2: index as i32,
+          },
+          is_const: is_const,
+          indirection: CppTypeIndirection::None,
+        });
+      }
     }
-    println!("unexposed: {:?}", type1);
-
-    println!("canonical: {:?}", type1.get_canonical_type());
-    println!("declaration: {:?}", type1.get_declaration());
+    //println!("type is unexposed: {:?}", type1);
 
     return Err(format!("Unrecognized unexposed type: {}", name));
   }
 
 
-  fn parse_type(&mut self, type1: Type) -> Result<CppType, String> {
+  fn parse_type(&mut self,
+                type1: Type,
+                context_class: Option<Entity>,
+                context_method: Option<Entity>)
+                -> Result<CppType, String> {
     let is_const = type1.is_const_qualified();
     match type1.get_kind() {
       TypeKind::Void => {
@@ -230,45 +312,53 @@ impl CppParser {
         })
       }
       TypeKind::Record => {
-        let template_arguments = match type1.get_template_argument_types() {
-          None => None,
-          Some(arg_types) => {
-            let mut r = Vec::new();
-            if arg_types.is_empty() {
-              panic!("arg_types is empty");
-            }
-            for arg_type in arg_types {
-              match arg_type {
-                None => return Err(format!("Template argument is None")),
-                Some(arg_type) => {
-                  match self.parse_type(arg_type.get_canonical_type()) {
-                    Ok(parsed_type) => r.push(parsed_type),
-                    Err(msg) => {
-                      return Err(format!("Invalid template argument: {:?}: {}", arg_type, msg))
+        match get_full_name(type1.get_declaration().unwrap()) {
+          Ok(declaration_name) => {
+            let template_arguments = match type1.get_template_argument_types() {
+              None => None,
+              Some(arg_types) => {
+                let mut r = Vec::new();
+                if arg_types.is_empty() {
+                  panic!("arg_types is empty");
+                }
+                for arg_type in arg_types {
+                  match arg_type {
+                    None => return Err(format!("Template argument is None")),
+                    Some(arg_type) => {
+                      match self.parse_type(arg_type.get_canonical_type(),
+                                            context_class,
+                                            context_method) {
+                        Ok(parsed_type) => r.push(parsed_type),
+                        Err(msg) => {
+                          return Err(format!("Invalid template argument: {:?}: {}", arg_type, msg))
+                        }
+                      }
                     }
                   }
                 }
+                Some(r)
               }
-            }
-            Some(r)
-          }
-        };
+            };
 
-        Ok(CppType {
-          base: CppTypeBase::Class {
-            name: get_full_name(type1.get_declaration().unwrap()).unwrap(),
-            template_arguments: template_arguments,
-          },
-          is_const: is_const,
-          indirection: CppTypeIndirection::None,
-        })
+            Ok(CppType {
+              base: CppTypeBase::Class {
+                name: declaration_name,
+                template_arguments: template_arguments,
+              },
+              is_const: is_const,
+              indirection: CppTypeIndirection::None,
+            })
+
+          }
+          Err(msg) => Err(format!("get_full_name failed: {}", msg)),
+        }
       }
       TypeKind::Pointer |
       TypeKind::LValueReference |
       TypeKind::RValueReference => {
         match type1.get_pointee_type() {
           Some(pointee) => {
-            match self.parse_type(pointee.get_canonical_type()) {
+            match self.parse_type(pointee.get_canonical_type(), context_class, context_method) {
               Ok(result) => {
                 let new_indirection = match type1.get_kind() {
                   TypeKind::Pointer => {
@@ -313,11 +403,9 @@ impl CppParser {
         }
       }
       TypeKind::Unexposed => {
-        self.parse_unexposed_type(type1)
+        self.parse_unexposed_type(Some(type1), None, context_class, context_method)
       }
-      _ => {
-        Err(format!("Unsupported kind of type: {:?}", type1.get_kind()))
-      }
+      _ => Err(format!("Unsupported kind of type: {:?}", type1.get_kind())),
     }
   }
 
@@ -329,24 +417,25 @@ impl CppParser {
     //    let allow_debug_print = get_full_name(entity).unwrap().find("QString::").is_some();
     //    if allow_debug_print {
     //    }
-    let scope = if let Some(p) = entity.get_semantic_parent() {
-      match p.get_kind() {
-        EntityKind::ClassDecl |
-        EntityKind::ClassTemplate |
-        EntityKind::StructDecl |
-        EntityKind::ClassTemplatePartialSpecialization => {
-          match get_full_name(p) {
-            Ok(class_name) => CppMethodScope::Class(class_name),
-            Err(msg) => {
-              panic!("function parent is a class but it doesn't have a name: {}",
-                     msg)
+    let (scope, class_entity) = match entity.get_semantic_parent() {
+      Some(p) => {
+        match p.get_kind() {
+          EntityKind::ClassDecl |
+          EntityKind::ClassTemplate |
+          EntityKind::StructDecl |
+          EntityKind::ClassTemplatePartialSpecialization => {
+            match get_full_name(p) {
+              Ok(class_name) => (CppMethodScope::Class(class_name), Some(p)),
+              Err(msg) => {
+                panic!("function parent is a class but it doesn't have a name: {}",
+                       msg)
+              }
             }
           }
+          _ => (CppMethodScope::Global, None),
         }
-        _ => CppMethodScope::Global,
       }
-    } else {
-      CppMethodScope::Global
+      None => (CppMethodScope::Global, None),
     };
     if let CppMethodScope::Class(..) = scope {
       if let Some(accessibility) = entity.get_accessibility() {
@@ -361,9 +450,13 @@ impl CppParser {
                             .unwrap_or_else(|| panic!("failed to get function type"))
                             .get_result_type()
                             .unwrap_or_else(|| panic!("failed to get function return type"));
-    let return_type_parsed = match self.parse_type(return_type.get_canonical_type()) {
+    let return_type_parsed = match self.parse_type(return_type.get_canonical_type(),
+                                                   class_entity,
+                                                   Some(entity)) {
       Ok(x) => x,
       Err(msg) => {
+        //        dump_entity(&entity, 0);
+        //        println!("first child's type: {:?}", entity.get_children()[0].get_type());
         return Err(format!("Can't parse return type: {:?}: {}", return_type, msg));
       }
     };
@@ -382,11 +475,7 @@ impl CppParser {
                  .is_some() {
           return Err(format!("Non-type template parameter is not supported"));
         }
-        Some(entity.get_children()
-                   .into_iter()
-                   .filter(|c| c.get_kind() == EntityKind::TemplateTypeParameter)
-                   .map(|c| c.get_display_name().unwrap())
-                   .collect())
+        Some(get_template_arguments(entity))
       }
       _ => None,
     };
@@ -394,7 +483,9 @@ impl CppParser {
     for (argument_number, argument_entity) in argument_entities.into_iter()
                                                                .enumerate() {
       let name = argument_entity.get_name().unwrap_or(format!("arg{}", argument_number + 1));
-      let type1 = self.parse_type(argument_entity.get_type().unwrap().get_canonical_type());
+      let type1 = self.parse_type(argument_entity.get_type().unwrap().get_canonical_type(),
+                                  class_entity,
+                                  Some(entity));
 
       match type1 {
         Ok(argument_type) => {
@@ -474,7 +565,7 @@ impl CppParser {
                  -> Result<CLangCppTypeData, String> {
     let mut fields = Vec::new();
     let mut bases = Vec::new();
-    let mut template_arguments = Vec::new();
+    let template_arguments = get_template_arguments(entity);
     for child in entity.get_children() {
       if child.get_kind() == EntityKind::FieldDecl {
         let is_protected = match child.get_accessibility().unwrap() {
@@ -482,7 +573,9 @@ impl CppParser {
           Accessibility::Protected => true,
           Accessibility::Public => false,
         };
-        let field_type = match self.parse_type(child.get_type().unwrap().get_canonical_type()) {
+        let field_type = match self.parse_type(child.get_type().unwrap().get_canonical_type(),
+                                               Some(entity),
+                                               None) {
           Ok(r) => r,
           Err(msg) => return Err(format!("Can't parse field type: {}", msg)),
         };
@@ -493,15 +586,13 @@ impl CppParser {
         });
       }
       if child.get_kind() == EntityKind::BaseSpecifier {
-        let base_type = match self.parse_type(child.get_type().unwrap().get_canonical_type()) {
+        let base_type = match self.parse_type(child.get_type().unwrap().get_canonical_type(),
+                                              None,
+                                              None) {
           Ok(r) => r,
           Err(msg) => return Err(format!("Can't parse base class type: {}", msg)),
         };
         bases.push(base_type);
-      }
-      if child.get_kind() == EntityKind::TemplateTypeParameter {
-        let argument_number = template_arguments.len() + 1;
-        template_arguments.push(child.get_name().unwrap_or(format!("Type{}", argument_number)));
       }
       if child.get_kind() == EntityKind::NonTypeTemplateParameter {
         return Err(format!("Non-type template parameter is not supported"));
@@ -616,7 +707,7 @@ impl CppParser {
           }
         }
       }
-      EntityKind::ClassDecl | EntityKind::ClassTemplate => {
+      EntityKind::ClassDecl | EntityKind::ClassTemplate | EntityKind::StructDecl => {
         if entity.get_name().is_some() && entity.is_definition() {
           self.stats.total_types = self.stats.total_types + 1;
           if let Some(include_file) = include_file {
