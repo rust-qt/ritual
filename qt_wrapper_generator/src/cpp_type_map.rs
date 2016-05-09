@@ -5,10 +5,8 @@ use std::collections::HashMap;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EnumValue {
   pub name: String,
-  pub value: String,
-  pub description: String,
+  pub value: i64,
 }
-
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppTypeInfo {

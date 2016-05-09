@@ -192,8 +192,7 @@ impl EnumValue {
     let value = value.as_object().unwrap();
     EnumValue {
       name: value.get("name").unwrap().as_string().unwrap().to_string(),
-      value: value.get("value").unwrap().as_string().unwrap().to_string(),
-      description: value.get("description").unwrap().as_string().unwrap().to_string(),
+      value: 0,
     }
   }
 }

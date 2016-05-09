@@ -9,7 +9,8 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 // use std::ffi::OsStr;
 
-use clang_cpp_data::CLangCppData;
+use clang_cpp_data::{CLangCppData, CLangCppTypeData, CLangCppTypeKind};
+use cpp_type_map::EnumValue;
 use cpp_type_map::CppTypeInfo;
 use cpp_method::{CppMethod, CppFunctionArgument};
 use enums::{CppMethodScope, CppTypeOrigin, CppTypeIndirection};
@@ -20,6 +21,9 @@ pub struct CppParserStats {
   pub total_methods: i32,
   pub failed_methods: i32,
   pub success_methods: i32,
+  pub total_types: i32,
+  pub failed_types: i32,
+  pub success_types: i32,
 }
 
 
@@ -355,9 +359,6 @@ impl CppParser {
         return Err(format!("Can't parse return type: {:?}: {}", return_type, msg));
       }
     };
-    if get_full_name(entity).unwrap() == "QByteArray::split" {
-      println!("TEST1: {:?}", return_type_parsed);
-    }
     let mut arguments = Vec::new();
     let argument_entities = match entity.get_kind() {
       EntityKind::FunctionTemplate => {
@@ -412,10 +413,6 @@ impl CppParser {
       }
     }
 
-    if get_full_name(entity).unwrap() == "QStringList::QStringList" {
-      println!("TEST2: {:?}", arguments);
-    }
-
     Ok(CppMethod {
       name: get_full_name(entity).unwrap_or_else(|_| panic!("failed to get function name")),
       scope: scope,
@@ -441,6 +438,28 @@ impl CppParser {
       template_arguments: template_arguments,
     })
   }
+
+  fn parse_enum(&mut self,
+                entity: Entity,
+                include_file: &String)
+                -> Result<CLangCppTypeData, String> {
+    let mut values = Vec::new();
+    for child in entity.get_children() {
+      if child.get_kind() == EntityKind::EnumConstantDecl {
+        values.push(EnumValue {
+          name: child.get_name().unwrap(),
+          value: child.get_enum_constant_value().unwrap().0,
+        });
+      }
+    }
+    println!("TEST1 {:?}", entity);
+    Ok(CLangCppTypeData {
+      name: get_full_name(entity).unwrap(),
+      header: include_file.clone(),
+      kind: CLangCppTypeKind::Enum { values: values },
+    })
+  }
+
 
   fn process_entity(&mut self, entity: Entity, context: &EntityContext) {
     let mut child_context = context.clone();
@@ -503,7 +522,7 @@ impl CppParser {
         self.stats.total_methods = self.stats.total_methods + 1;
         match self.parse_function(entity, &include_file) {
           Ok(r) => {
-            if r.name == "QVariant::value" {
+            if r.name == "QString::section" {
               println!("TEST1 {:?}", r);
               dump_entity(&entity, 0);
             }
@@ -512,13 +531,42 @@ impl CppParser {
           }
           Err(msg) => {
             self.stats.failed_methods = self.stats.failed_methods + 1;
-            log::warning(format!("Failed to parse method: {}\nentity: {:?}\nerror: {}",
+            log::warning(format!("Failed to parse method: {}\nentity: {:?}\nerror: {}\n",
                                  get_full_name(entity).unwrap(),
                                  entity,
                                  msg));
             // dump_entity(&entity, 0);
           }
         }
+      }
+      EntityKind::EnumDecl => {
+        if entity.get_name().is_some() {
+          self.stats.total_types = self.stats.total_types + 1;
+          if let Some(include_file) = include_file {
+            match self.parse_enum(entity, &include_file) {
+              Ok(r) => {
+                println!("SUCCESS: {:?}", r);
+                self.stats.success_types = self.stats.success_types + 1;
+                self.data.types.push(r);
+              }
+              Err(msg) => {
+                self.stats.failed_types = self.stats.failed_types + 1;
+                log::warning(format!("Failed to parse enum: {}\nentity: {:?}\nerror: {}\n",
+                                     get_full_name(entity).unwrap(),
+                                     entity,
+                                     msg));
+                // dump_entity(&entity, 0);
+              }
+            }
+          } else {
+            self.stats.failed_types = self.stats.failed_types + 1;
+            log::warning(format!("Origin of type is unknown: {}\nentity: {:?}\n",
+                                 get_full_name(entity).unwrap(),
+                                 entity));
+          }
+        }
+
+
       }
       _ => {}
     }
@@ -560,5 +608,14 @@ impl CppParser {
     println!("{}/{} METHODS DESTROYED",
              self.stats.failed_methods,
              self.stats.total_methods);
+
+    println!("{}/{} TYPES UNHARMED",
+             self.stats.success_types,
+             self.stats.total_types);
+    println!("{}/{} TYPES DESTROYED",
+             self.stats.failed_types,
+             self.stats.total_types);
+
+
   }
 }

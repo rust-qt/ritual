@@ -393,8 +393,7 @@ impl RustGenerator {
                 value_to_variant.insert(dummy_value,
                                         EnumValue {
                                           name: "_Invalid".to_string(),
-                                          value: format!("{}", dummy_value),
-                                          description: String::new(),
+                                          value: dummy_value as i64,
                                         });
               }
               Ok(format!("#[repr(C)]\npub enum {} {{\n{}\n}}\n\n",
