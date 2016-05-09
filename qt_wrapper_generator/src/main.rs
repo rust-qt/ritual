@@ -41,7 +41,7 @@ fn main() {
     parser1.run();
     let parse_result_path = PathBuf::from(arguments[2].clone());
     log::info("Reading parse result...");
-    let mut parse_result = read_parse_result::do_it(&parse_result_path);
+    let parse_result = read_parse_result::do_it(&parse_result_path);
     parsers_consistency_checker::check(&parser1.get_data(), &parse_result);
     return;
   }

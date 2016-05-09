@@ -72,6 +72,7 @@ impl CppType {
     match self.base {
       CppTypeBase::Unspecified { ref template_arguments, .. } => template_arguments.is_some(),
       CppTypeBase::Class { ref template_arguments, .. } => template_arguments.is_some(),
+      CppTypeBase::TemplateParameter { .. } => true,
       _ => false,
     }
   }
@@ -82,7 +83,38 @@ impl CppType {
     }
     let name = match self.base {
       CppTypeBase::Unspecified { ref name, .. } => name.clone(),
-      _ => panic!("new cpp types are not supported here yet"),
+      CppTypeBase::Void => "void".to_string(),
+      CppTypeBase::Enum { ref name } => name.clone(),
+      CppTypeBase::Class { ref name, .. } => name.clone(),
+      CppTypeBase::TemplateParameter { .. } => {
+        panic!("template parameters are not supported here yet")
+      }
+      CppTypeBase::BuiltInNumeric(ref t) => {
+        match *t {
+          CppBuiltInNumericType::Bool => "bool",
+          CppBuiltInNumericType::CharS => "char",
+          CppBuiltInNumericType::CharU => "char",
+          CppBuiltInNumericType::SChar => "signed char",
+          CppBuiltInNumericType::UChar => "unsigned char",
+          CppBuiltInNumericType::WChar => "wchar_t",
+          CppBuiltInNumericType::Char16 => "char16_t",
+          CppBuiltInNumericType::Char32 => "char32_t",
+          CppBuiltInNumericType::Short => "short",
+          CppBuiltInNumericType::UShort => "unsigned short",
+          CppBuiltInNumericType::Int => "int",
+          CppBuiltInNumericType::UInt => "unsigned int",
+          CppBuiltInNumericType::Long => "long",
+          CppBuiltInNumericType::ULong => "unsigned long",
+          CppBuiltInNumericType::LongLong => "long long",
+          CppBuiltInNumericType::ULongLong => "unsigned long long",
+          CppBuiltInNumericType::Int128 => "__int128_t",
+          CppBuiltInNumericType::UInt128 => "__uint128_t",
+          CppBuiltInNumericType::Float => "float",
+          CppBuiltInNumericType::Double => "double",
+          CppBuiltInNumericType::LongDouble => "long double",
+        }
+        .to_string()
+      }
     };
     format!("{}{}{}",
             if self.is_const {

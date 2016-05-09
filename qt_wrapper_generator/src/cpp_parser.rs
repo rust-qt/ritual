@@ -155,11 +155,15 @@ impl CppParser {
           name = name[6..].to_string();
         }
         if let Some(declaration) = type1.get_declaration() {
-          // TODO: detect classes, structs and parse template parameters
           // println!("declaration: {:?}", type1.get_declaration());
           if declaration.get_kind() == EntityKind::ClassDecl ||
              declaration.get_kind() == EntityKind::ClassTemplate ||
              declaration.get_kind() == EntityKind::StructDecl {
+            if declaration.get_accessibility().unwrap_or(Accessibility::Public) ==
+               Accessibility::Private {
+              return Err(format!("Type uses private class ({})",
+                                 get_full_name(declaration).unwrap()));
+            }
             let re1 = Regex::new(r"^[\w:]+<([^<>]+)>$").unwrap();
             if let Some(matches) = re1.captures(name.as_ref()) {
               let mut arg_types = Vec::new();
@@ -316,7 +320,13 @@ impl CppParser {
         })
       }
       TypeKind::Record => {
-        match get_full_name(type1.get_declaration().unwrap()) {
+        let declaration = type1.get_declaration().unwrap();
+        if declaration.get_accessibility().unwrap_or(Accessibility::Public) ==
+           Accessibility::Private {
+          return Err(format!("Type uses private class ({})",
+                             get_full_name(declaration).unwrap_or("unnamed".to_string())));
+        }
+        match get_full_name(declaration) {
           Ok(declaration_name) => {
             let template_arguments = match type1.get_template_argument_types() {
               None => None,
@@ -720,8 +730,7 @@ impl CppParser {
         }
       }
       EntityKind::ClassDecl | EntityKind::ClassTemplate | EntityKind::StructDecl => {
-        let ok =
-          entity.get_name().is_some() && // not an anonymous struct
+        let ok = entity.get_name().is_some() && // not an anonymous struct
           entity.is_definition() && // not a forward declaration
           entity.get_template().is_none(); // not a template specialization
         if ok {
@@ -783,6 +792,7 @@ impl CppParser {
     }
     log::info("Found entities:");
     self.process_entity(translation_unit, &EntityContext::new());
+    self.check_integrity();
     log::info(format!("Entity kinds: {:?}", self.entity_kinds));
     log::info(format!("Files: {:?}", self.files));
     log::info(format!("{}/{} METHODS UNHARMED",
@@ -800,5 +810,69 @@ impl CppParser {
                       self.stats.total_types));
 
 
+  }
+
+  fn check_type_integrity(&mut self, type1: &CppType) -> Result<(), String> {
+    match type1.base {
+      CppTypeBase::Void | CppTypeBase::BuiltInNumeric(..) => {}
+      CppTypeBase::Unspecified { .. } => unreachable!(),
+      CppTypeBase::Enum { ref name } => {
+        if self.data.types.iter().find(|x| &x.name == name).is_none() {
+          return Err(format!("unknown type: {}", name));
+        }
+      }
+      CppTypeBase::Class { ref name, ref template_arguments } => {
+        if self.data.types.iter().find(|x| &x.name == name).is_none() {
+          return Err(format!("unknown type: {}", name));
+        }
+        if let &Some(ref args) = template_arguments {
+          for arg in args {
+            if let Err(msg) = self.check_type_integrity(&arg) {
+              return Err(msg);
+            }
+          }
+        }
+      }
+      CppTypeBase::TemplateParameter { ref index1, ref index2 } => {
+        // TODO: check template parameters
+      }
+    }
+    Ok(())
+  }
+
+  fn check_integrity(&mut self) {
+    self.data.methods = self.data
+                            .methods
+                            .clone()
+                            .into_iter()
+                            .filter(|method| {
+                              if let Err(msg) = self.check_type_integrity(&method.return_type
+                                                                                 .clone()
+                                                                                 .unwrap()) {
+                                log::warning(format!("Method is removed: {}: {}",
+                                                     method.short_text(),
+                                                     msg));
+                                return false;
+                              }
+                              for arg in &method.arguments {
+                                if let Err(msg) = self.check_type_integrity(&arg.argument_type) {
+                                  log::warning(format!("Method is removed: {}: {}",
+                                                       method.short_text(),
+                                                       msg));
+                                  return false;
+                                }
+                              }
+                              true
+                            })
+                            .collect();
+    for t in self.data.types.clone() {
+      if let CLangCppTypeKind::Class { bases, .. } = t.kind {
+        for base in bases {
+          if let Err(msg) = self.check_type_integrity(&base) {
+            log::warning(format!("Class {}: base class type {:?}: {}", t.name, base, msg));
+          }
+        }
+      }
+    }
   }
 }
