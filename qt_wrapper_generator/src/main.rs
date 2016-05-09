@@ -14,6 +14,7 @@ mod cpp_type_map;
 mod enums;
 mod extractor_actions_generator;
 mod log;
+mod parsers_consistency_checker;
 mod read_extracted_info;
 mod read_parse_result;
 mod rust_generator;
@@ -35,8 +36,13 @@ fn print_usage() {
 
 fn main() {
   let arguments: Vec<_> = env::args().collect();
-  if arguments.len() == 2 && arguments[1] == "cpp_parser" {
-    cpp_parser::CppParser::new().run();
+  if arguments.len() == 3 && arguments[1] == "cpp_parser" {
+    let mut parser1 = cpp_parser::CppParser::new();
+    parser1.run();
+    let parse_result_path = PathBuf::from(arguments[2].clone());
+    log::info("Reading parse result...");
+    let mut parse_result = read_parse_result::do_it(&parse_result_path);
+    parsers_consistency_checker::check(&parser1.get_data(), &parse_result);
     return;
   }
   if arguments.len() < 4 {

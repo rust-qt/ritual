@@ -72,7 +72,7 @@ fn get_template_arguments(entity: Entity) -> Vec<String> {
         .into_iter()
         .filter(|c| c.get_kind() == EntityKind::TemplateTypeParameter)
         .enumerate()
-        .map(|(i, c)| c.get_name().unwrap_or_else(|| format!("Type{}", i+1)))
+        .map(|(i, c)| c.get_name().unwrap_or_else(|| format!("Type{}", i + 1)))
         .collect()
 }
 
@@ -133,6 +133,10 @@ impl CppParser {
     }
   }
 
+  pub fn get_data(self) -> CLangCppData {
+    self.data
+  }
+
   fn parse_unexposed_type(&mut self,
                           type1: Option<Type>,
                           string: Option<String>,
@@ -152,7 +156,7 @@ impl CppParser {
         }
         if let Some(declaration) = type1.get_declaration() {
           // TODO: detect classes, structs and parse template parameters
-          //println!("declaration: {:?}", type1.get_declaration());
+          // println!("declaration: {:?}", type1.get_declaration());
           if declaration.get_kind() == EntityKind::ClassDecl ||
              declaration.get_kind() == EntityKind::ClassTemplate ||
              declaration.get_kind() == EntityKind::StructDecl {
@@ -212,7 +216,7 @@ impl CppParser {
       if let Some(index) = get_template_arguments(e).iter().position(|x| *x == name) {
         return Ok(CppType {
           base: CppTypeBase::TemplateParameter {
-            index1: 0, //TODO: not sure what this index means
+            index1: 0, // TODO: not sure what this index means
             index2: index as i32,
           },
           is_const: is_const,
@@ -224,7 +228,7 @@ impl CppParser {
       if let Some(index) = get_template_arguments(e).iter().position(|x| *x == name) {
         return Ok(CppType {
           base: CppTypeBase::TemplateParameter {
-            index1: 0, //TODO: not sure what this index means
+            index1: 0, // TODO: not sure what this index means
             index2: index as i32,
           },
           is_const: is_const,
@@ -232,7 +236,7 @@ impl CppParser {
         });
       }
     }
-    //println!("type is unexposed: {:?}", type1);
+    // println!("type is unexposed: {:?}", type1);
 
     return Err(format!("Unrecognized unexposed type: {}", name));
   }
@@ -422,8 +426,7 @@ impl CppParser {
         match p.get_kind() {
           EntityKind::ClassDecl |
           EntityKind::ClassTemplate |
-          EntityKind::StructDecl |
-          EntityKind::ClassTemplatePartialSpecialization => {
+          EntityKind::StructDecl => {
             match get_full_name(p) {
               Ok(class_name) => (CppMethodScope::Class(class_name), Some(p)),
               Err(msg) => {
@@ -573,17 +576,23 @@ impl CppParser {
           Accessibility::Protected => true,
           Accessibility::Public => false,
         };
-        let field_type = match self.parse_type(child.get_type().unwrap().get_canonical_type(),
-                                               Some(entity),
-                                               None) {
-          Ok(r) => r,
-          Err(msg) => return Err(format!("Can't parse field type: {}", msg)),
+        match self.parse_type(child.get_type().unwrap().get_canonical_type(),
+                              Some(entity),
+                              None) {
+          Ok(field_type) => {
+            fields.push(CLangClassField {
+              name: child.get_name().unwrap(),
+              field_type: field_type,
+              is_protected: is_protected,
+            });
+          }
+          Err(msg) => {
+            log::warning(format!("Can't parse field type: {}::{}: {}",
+                                 get_full_name(entity).unwrap(),
+                                 child.get_name().unwrap(),
+                                 msg))
+          }
         };
-        fields.push(CLangClassField {
-          name: child.get_name().unwrap(),
-          field_type: field_type,
-          is_protected: is_protected,
-        });
       }
       if child.get_kind() == EntityKind::BaseSpecifier {
         let base_type = match self.parse_type(child.get_type().unwrap().get_canonical_type(),
@@ -689,6 +698,9 @@ impl CppParser {
             match self.parse_enum(entity, &include_file) {
               Ok(r) => {
                 self.stats.success_types = self.stats.success_types + 1;
+                if self.data.types.iter().find(|x| x.name == r.name).is_some() {
+                  panic!("repeating class declaration: {:?}", entity);
+                }
                 self.data.types.push(r);
               }
               Err(msg) => {
@@ -708,12 +720,19 @@ impl CppParser {
         }
       }
       EntityKind::ClassDecl | EntityKind::ClassTemplate | EntityKind::StructDecl => {
-        if entity.get_name().is_some() && entity.is_definition() {
+        let ok =
+          entity.get_name().is_some() && // not an anonymous struct
+          entity.is_definition() && // not a forward declaration
+          entity.get_template().is_none(); // not a template specialization
+        if ok {
           self.stats.total_types = self.stats.total_types + 1;
           if let Some(include_file) = include_file {
             match self.parse_class(entity, &include_file) {
               Ok(r) => {
                 self.stats.success_types = self.stats.success_types + 1;
+                if self.data.types.iter().find(|x| x.name == r.name).is_some() {
+                  panic!("repeating class declaration: {:?}", entity);
+                }
                 self.data.types.push(r);
               }
               Err(msg) => {
