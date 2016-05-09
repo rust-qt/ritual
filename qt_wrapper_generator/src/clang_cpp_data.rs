@@ -1,5 +1,5 @@
 
-use cpp_type_map::CppTypeInfo;
+// use cpp_type_map::CppTypeInfo;
 use cpp_method::CppMethod;
 use cpp_type::CppType;
 use cpp_type_map::EnumValue;
@@ -8,7 +8,7 @@ use cpp_type_map::EnumValue;
 pub struct CLangClassField {
   pub name: String,
   pub field_type: CppType,
-  pub is_protected: bool
+  pub is_protected: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -17,8 +17,9 @@ pub enum CLangCppTypeKind {
     values: Vec<EnumValue>,
   },
   Class {
-    inherits: Option<CppType>,
-    fields: Vec<CLangClassField>
+    bases: Vec<CppType>,
+    fields: Vec<CLangClassField>,
+    template_arguments: Option<Vec<String>>,
   },
 }
 
@@ -26,7 +27,7 @@ pub enum CLangCppTypeKind {
 pub struct CLangCppTypeData {
   pub name: String,
   pub header: String,
-  pub kind: CLangCppTypeKind
+  pub kind: CLangCppTypeKind,
 }
 
 

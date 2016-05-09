@@ -17,7 +17,8 @@ Missing critical features:
 Extra features:
 - Sort classes and methods to reduce randomness
 
-
+CLang parser:
+- crazy fake subclasses like QByteArrayList
 
 
 

@@ -9,9 +9,9 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 // use std::ffi::OsStr;
 
-use clang_cpp_data::{CLangCppData, CLangCppTypeData, CLangCppTypeKind};
+use clang_cpp_data::{CLangCppData, CLangCppTypeData, CLangCppTypeKind, CLangClassField};
 use cpp_type_map::EnumValue;
-use cpp_type_map::CppTypeInfo;
+// use cpp_type_map::CppTypeInfo;
 use cpp_method::{CppMethod, CppFunctionArgument};
 use enums::{CppMethodScope, CppTypeOrigin, CppTypeIndirection};
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType};
@@ -37,6 +37,7 @@ pub struct CppParser {
   stats: CppParserStats,
 }
 
+#[allow(dead_code)]
 fn inspect_method(entity: Entity) {
   println!("{:?}", entity.get_display_name());
   //  println!("children:");
@@ -55,6 +56,7 @@ fn inspect_method(entity: Entity) {
   }
 }
 
+#[allow(dead_code)]
 fn dump_entity(entity: &Entity, level: i32) {
   for _ in 0..level {
     print!(". ");
@@ -121,6 +123,42 @@ impl CppParser {
       stats: Default::default(),
     }
   }
+
+  fn parse_unexposed_type(&mut self, type1: Type) -> Result<CppType, String> {
+    let is_const = type1.is_const_qualified();
+    if let Some(declaration) = type1.get_declaration() {
+      // TODO: detect classes, structs and parse template parameters
+      if declaration.get_kind() == EntityKind::ClassDecl {
+        return Ok(CppType {
+          base: CppTypeBase::Class {
+            name: get_full_name(declaration).unwrap(),
+            template_arguments: None,
+          },
+          is_const: is_const,
+          indirection: CppTypeIndirection::None,
+        });
+      }
+    }
+    let name = type1.get_display_name();
+    let re = Regex::new(r"^(const ){0,1}type-parameter-(\d+)-(\d+)$").unwrap();
+    if let Some(matches) = re.captures(name.as_ref()) {
+      return Ok(CppType {
+        base: CppTypeBase::TemplateParameter {
+          index1: matches.at(2).unwrap().parse().unwrap(),
+          index2: matches.at(3).unwrap().parse().unwrap(),
+        },
+        is_const: is_const,
+        indirection: CppTypeIndirection::None,
+      });
+    }
+    println!("unexposed: {:?}", type1);
+
+    println!("canonical: {:?}", type1.get_canonical_type());
+    println!("declaration: {:?}", type1.get_declaration());
+
+    return Err(format!("Unrecognized unexposed type: {}", name));
+  }
+
 
   fn parse_type(&mut self, type1: Type) -> Result<CppType, String> {
     let is_const = type1.is_const_qualified();
@@ -274,40 +312,10 @@ impl CppParser {
           None => Err("can't get pointee type".to_string()),
         }
       }
+      TypeKind::Unexposed => {
+        self.parse_unexposed_type(type1)
+      }
       _ => {
-        if type1.get_kind() == TypeKind::Unexposed {
-          if let Some(declaration) = type1.get_declaration() {
-            if declaration.get_kind() == EntityKind::ClassDecl {
-              return Ok(CppType {
-                base: CppTypeBase::Class {
-                  name: get_full_name(declaration).unwrap(),
-                  // TODO: get template arguments
-                  // TODO: (well, that's probably not gonna happen)
-                  template_arguments: None,
-                },
-                is_const: is_const,
-                indirection: CppTypeIndirection::None,
-              });
-            }
-          }
-          let name = type1.get_display_name();
-          let re = Regex::new(r"^(const ){0,1}type-parameter-0-(\d+)$").unwrap();
-          if let Some(matches) = re.captures(name.as_ref()) {
-            // TODO: capture and use type parameter index
-            return Ok(CppType {
-              base: CppTypeBase::TemplateParameter {
-                index: matches.at(2).unwrap().parse().unwrap(),
-              },
-              is_const: is_const,
-              indirection: CppTypeIndirection::None,
-            });
-          }
-        }
-        println!("unsupported kind of type: {:?}", type1);
-        println!("canonical: {:?}", type1.get_canonical_type());
-        println!("declaration: {:?}", type1.get_declaration());
-        println!("template arguments: {:?}",
-                 type1.get_template_argument_types());
         Err(format!("Unsupported kind of type: {:?}", type1.get_kind()))
       }
     }
@@ -368,6 +376,12 @@ impl CppParser {
     };
     let template_arguments = match entity.get_kind() {
       EntityKind::FunctionTemplate => {
+        if entity.get_children()
+                 .into_iter()
+                 .find(|c| c.get_kind() == EntityKind::NonTypeTemplateParameter)
+                 .is_some() {
+          return Err(format!("Non-type template parameter is not supported"));
+        }
         Some(entity.get_children()
                    .into_iter()
                    .filter(|c| c.get_kind() == EntityKind::TemplateTypeParameter)
@@ -377,13 +391,8 @@ impl CppParser {
       _ => None,
     };
 
-    //    if entity.get_arguments().is_none() {
-    //      dump_entity(&entity, 0);
-    //      return Err("Arguments is None".to_string());
-    //    }
     for (argument_number, argument_entity) in argument_entities.into_iter()
                                                                .enumerate() {
-      // println!("argument {:?}", argument_entity);
       let name = argument_entity.get_name().unwrap_or(format!("arg{}", argument_number + 1));
       let type1 = self.parse_type(argument_entity.get_type().unwrap().get_canonical_type());
 
@@ -452,11 +461,70 @@ impl CppParser {
         });
       }
     }
-    println!("TEST1 {:?}", entity);
     Ok(CLangCppTypeData {
       name: get_full_name(entity).unwrap(),
       header: include_file.clone(),
       kind: CLangCppTypeKind::Enum { values: values },
+    })
+  }
+
+  fn parse_class(&mut self,
+                 entity: Entity,
+                 include_file: &String)
+                 -> Result<CLangCppTypeData, String> {
+    let mut fields = Vec::new();
+    let mut bases = Vec::new();
+    let mut template_arguments = Vec::new();
+    for child in entity.get_children() {
+      if child.get_kind() == EntityKind::FieldDecl {
+        let is_protected = match child.get_accessibility().unwrap() {
+          Accessibility::Private => continue,
+          Accessibility::Protected => true,
+          Accessibility::Public => false,
+        };
+        let field_type = match self.parse_type(child.get_type().unwrap().get_canonical_type()) {
+          Ok(r) => r,
+          Err(msg) => return Err(format!("Can't parse field type: {}", msg)),
+        };
+        fields.push(CLangClassField {
+          name: child.get_name().unwrap(),
+          field_type: field_type,
+          is_protected: is_protected,
+        });
+      }
+      if child.get_kind() == EntityKind::BaseSpecifier {
+        let base_type = match self.parse_type(child.get_type().unwrap().get_canonical_type()) {
+          Ok(r) => r,
+          Err(msg) => return Err(format!("Can't parse base class type: {}", msg)),
+        };
+        bases.push(base_type);
+      }
+      if child.get_kind() == EntityKind::TemplateTypeParameter {
+        let argument_number = template_arguments.len() + 1;
+        template_arguments.push(child.get_name().unwrap_or(format!("Type{}", argument_number)));
+      }
+      if child.get_kind() == EntityKind::NonTypeTemplateParameter {
+        return Err(format!("Non-type template parameter is not supported"));
+      }
+    }
+    Ok(CLangCppTypeData {
+      name: get_full_name(entity).unwrap(),
+      header: include_file.clone(),
+      kind: CLangCppTypeKind::Class {
+        bases: bases,
+        fields: fields,
+        template_arguments: if entity.get_kind() == EntityKind::ClassTemplate {
+          if template_arguments.is_empty() {
+            panic!("missing template arguments");
+          }
+          Some(template_arguments)
+        } else {
+          if !template_arguments.is_empty() {
+            panic!("unexpected template arguments");
+          }
+          None
+        },
+      },
     })
   }
 
@@ -474,21 +542,14 @@ impl CppParser {
     let include_file = if let Some(location) = entity.get_location() {
       let file_path = location.get_presumed_location().0;
       if file_path.is_empty() {
-        println!("empty file path: {:?}", entity.get_kind());
+        log::noisy(format!("empty file path: {:?}", entity.get_kind()));
         None
       } else {
         let file_path_buf = PathBuf::from(file_path.clone());
-        // println!("file path {}", file_path);
         if !file_path_buf.starts_with(&self.library_include_dir) {
           log::noisy(format!("skipping entities from {}", file_path));
           return;
         }
-        //        let file_name = PathBuf::from(file_path.clone())
-        //                          .file_name()
-        //                          .unwrap_or(OsStr::new(&file_path))
-        //                          .to_str()
-        //                          .unwrap()
-        //                          .to_string();
         let file_name = file_path_buf.strip_prefix(&self.library_include_dir)
                                      .unwrap()
                                      .to_str()
@@ -500,19 +561,11 @@ impl CppParser {
     } else {
       None
     };
-    // else if entity.get_kind() != EntityKind::TranslationUnit {
-    // log::warning(format!("skipped: {:?} (no source file detected)", entity));
-    // return;
-    // }
-    //    if entity.get_kind() == EntityKind::InclusionDirective {
-    //      println!("include: {:?}", entity);
-    //      child_context.includes.push(entity.get_display_name().unwrap_or(String::new()));
-    //    }
-    //    if entity.get_kind() == EntityKind::ClassDecl {
-    //      println!("class: {} (from {:?})",
-    //               entity.get_display_name().unwrap_or(String::new()),
-    //               context.includes);
-    //    }
+    if entity.get_kind() == EntityKind::Namespace {
+      if entity.get_name().unwrap() == "QtPrivate" {
+        return;
+      }
+    }
     match entity.get_kind() {
       EntityKind::FunctionDecl |
       EntityKind::Method |
@@ -522,10 +575,10 @@ impl CppParser {
         self.stats.total_methods = self.stats.total_methods + 1;
         match self.parse_function(entity, &include_file) {
           Ok(r) => {
-            if r.name == "QString::section" {
-              println!("TEST1 {:?}", r);
-              dump_entity(&entity, 0);
-            }
+            //            if r.name == "QString::section" {
+            //              println!("TEST1 {:?}", r);
+            //              dump_entity(&entity, 0);
+            //            }
             self.stats.success_methods = self.stats.success_methods + 1;
             self.data.methods.push(r);
           }
@@ -535,17 +588,15 @@ impl CppParser {
                                  get_full_name(entity).unwrap(),
                                  entity,
                                  msg));
-            // dump_entity(&entity, 0);
           }
         }
       }
       EntityKind::EnumDecl => {
-        if entity.get_name().is_some() {
+        if entity.get_name().is_some() && entity.is_definition() {
           self.stats.total_types = self.stats.total_types + 1;
           if let Some(include_file) = include_file {
             match self.parse_enum(entity, &include_file) {
               Ok(r) => {
-                println!("SUCCESS: {:?}", r);
                 self.stats.success_types = self.stats.success_types + 1;
                 self.data.types.push(r);
               }
@@ -555,7 +606,6 @@ impl CppParser {
                                      get_full_name(entity).unwrap(),
                                      entity,
                                      msg));
-                // dump_entity(&entity, 0);
               }
             }
           } else {
@@ -565,8 +615,31 @@ impl CppParser {
                                  entity));
           }
         }
-
-
+      }
+      EntityKind::ClassDecl | EntityKind::ClassTemplate => {
+        if entity.get_name().is_some() && entity.is_definition() {
+          self.stats.total_types = self.stats.total_types + 1;
+          if let Some(include_file) = include_file {
+            match self.parse_class(entity, &include_file) {
+              Ok(r) => {
+                self.stats.success_types = self.stats.success_types + 1;
+                self.data.types.push(r);
+              }
+              Err(msg) => {
+                self.stats.failed_types = self.stats.failed_types + 1;
+                log::warning(format!("Failed to parse class: {}\nentity: {:?}\nerror: {}\n",
+                                     get_full_name(entity).unwrap(),
+                                     entity,
+                                     msg));
+              }
+            }
+          } else {
+            self.stats.failed_types = self.stats.failed_types + 1;
+            log::warning(format!("Origin of class is unknown: {}\nentity: {:?}\n",
+                                 get_full_name(entity).unwrap(),
+                                 entity));
+          }
+        }
       }
       _ => {}
     }
@@ -600,21 +673,21 @@ impl CppParser {
     }
     log::info("Found entities:");
     self.process_entity(translation_unit, &EntityContext::new());
-    println!("Entity kinds: {:?}", self.entity_kinds);
-    println!("Files: {:?}", self.files);
-    println!("{}/{} METHODS UNHARMED",
-             self.stats.success_methods,
-             self.stats.total_methods);
-    println!("{}/{} METHODS DESTROYED",
-             self.stats.failed_methods,
-             self.stats.total_methods);
+    log::info(format!("Entity kinds: {:?}", self.entity_kinds));
+    log::info(format!("Files: {:?}", self.files));
+    log::info(format!("{}/{} METHODS UNHARMED",
+                      self.stats.success_methods,
+                      self.stats.total_methods));
+    log::info(format!("{}/{} METHODS DESTROYED",
+                      self.stats.failed_methods,
+                      self.stats.total_methods));
 
-    println!("{}/{} TYPES UNHARMED",
-             self.stats.success_types,
-             self.stats.total_types);
-    println!("{}/{} TYPES DESTROYED",
-             self.stats.failed_types,
-             self.stats.total_types);
+    log::info(format!("{}/{} TYPES UNHARMED",
+                      self.stats.success_types,
+                      self.stats.total_types));
+    log::info(format!("{}/{} TYPES DESTROYED",
+                      self.stats.failed_types,
+                      self.stats.total_types));
 
 
   }

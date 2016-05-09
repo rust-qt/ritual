@@ -40,7 +40,8 @@ pub enum CppTypeBase {
     template_arguments: Option<Vec<CppType>>,
   },
   TemplateParameter {
-    index: i32,
+    index1: i32,
+    index2: i32,
   },
   Unspecified {
     name: String,
