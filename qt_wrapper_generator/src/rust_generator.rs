@@ -479,8 +479,8 @@ impl RustGenerator {
           }
           Err(msg) => {
             log::warning(format!("Can't generate Rust FFI function for method:\n{}\n{}\n",
-                     method.short_text(),
-                     msg));
+                                 method.short_text(),
+                                 msg));
           }
         }
       }

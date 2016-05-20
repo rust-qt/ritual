@@ -465,7 +465,10 @@ impl CGenerator {
       let cpp_type = CppType {
         is_const: false,
         indirection: CppTypeIndirection::None,
-        base: CppTypeBase::Unspecified { name: name, template_arguments: None }
+        base: CppTypeBase::Unspecified {
+          name: name,
+          template_arguments: None,
+        },
       };
       if let Ok(c_type_ex) = cpp_type.to_c_type(&self.cpp_data.types) {
         h_file.write(&self.generate_type_declaration(&c_type_ex,

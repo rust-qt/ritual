@@ -12,11 +12,18 @@ pub fn check(result1: &CLangCppData, result2: &CppData) {
   let mut missing_types2 = Vec::new();
   for (_, ref type_info2) in &result2.types.0 {
     if let CppTypeOrigin::Qt { ref include_file } = type_info2.origin {
+      let include_file2 = include_file;
       match type_info2.kind {
         // typedefs are not supposed to be in result1
         CppTypeKind::TypeDef { .. } | CppTypeKind::Flags { .. } | CppTypeKind::Unknown { .. } => {}
         _ => {
           if let Some(type_info1) = result1.types.iter().find(|x| x.name == type_info2.name) {
+            if &type_info1.header != include_file2 {
+              log::warning(format!("Header mismatch for {}: {} vs {}",
+                                   type_info2.name,
+                                   type_info1.header,
+                                   include_file2));
+            }
             match type_info2.kind {
               CppTypeKind::Enum { ref values } => {
                 let values2 = values.iter().map(|x| x.name.clone()).collect::<Vec<_>>();

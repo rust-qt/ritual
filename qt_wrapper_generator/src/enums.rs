@@ -51,7 +51,7 @@ pub enum CppTypeOrigin {
   CLang {
     include_file: String,
   },
-  Unknown
+  Unknown,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -69,7 +69,7 @@ pub enum CppTypeKind {
   Class {
     inherits: Option<CppType>,
   },
-  Unknown
+  Unknown,
 }
 
 

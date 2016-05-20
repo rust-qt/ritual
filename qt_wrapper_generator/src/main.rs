@@ -14,6 +14,7 @@ mod cpp_type_map;
 mod enums;
 mod extractor_actions_generator;
 mod log;
+mod qt_specific;
 mod parsers_consistency_checker;
 mod read_extracted_info;
 mod read_parse_result;
@@ -22,7 +23,7 @@ mod rust_type;
 mod utils;
 mod cpp_parser;
 
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::env;
 
 extern crate find_folder;
@@ -30,19 +31,24 @@ extern crate find_folder;
 fn print_usage() {
   log::error("Usage:");
   log::error("\tqt_wrapper_generator stage1 parse_result_path extractor_actions_path");
-  log::error("\tqt_wrapper_generator stage2 parse_result_path extracted_info_path qtcw_path rust_qt_path");
+  log::error("\tqt_wrapper_generator stage2 parse_result_path extracted_info_path qtcw_path \
+              rust_qt_path");
   std::process::exit(1);
 }
 
 fn main() {
   let arguments: Vec<_> = env::args().collect();
   if arguments.len() == 3 && arguments[1] == "cpp_parser" {
+    let mut headers_dir = PathBuf::from("/home/ri/bin/Qt/5.5/gcc_64/include/QtCore");
+    // qt_specific::fix_header_names(&headers_dir);
     let mut parser1 = cpp_parser::CppParser::new();
     parser1.run();
+    let mut parse_result1 = parser1.get_data();
     let parse_result_path = PathBuf::from(arguments[2].clone());
     log::info("Reading parse result...");
-    let parse_result = read_parse_result::do_it(&parse_result_path);
-    parsers_consistency_checker::check(&parser1.get_data(), &parse_result);
+    let parse_result2 = read_parse_result::do_it(&parse_result_path);
+    qt_specific::fix_header_names(&mut parse_result1, &headers_dir);
+    parsers_consistency_checker::check(&parse_result1, &parse_result2);
     return;
   }
   if arguments.len() < 4 {
@@ -55,7 +61,7 @@ fn main() {
   for data in &mut parse_result.headers {
     data.ensure_explicit_destructor();
   }
-  //TODO: unblock on Windows
+  // TODO: unblock on Windows
   parse_result.classes_blacklist = vec!["QWinEventNotifier".to_string()];
 
   if arguments[1] == "stage1" {

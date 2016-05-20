@@ -39,7 +39,7 @@ impl CppData {
         Ok(false)
 
       }
-      _ => panic!("new cpp types are not supported here yet")
+      _ => panic!("new cpp types are not supported here yet"),
     }
   }
 

@@ -12,10 +12,10 @@ pub struct CFunctionSignature {
 impl CFunctionSignature {
   pub fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
     let r = self.arguments
-    .iter()
-    .filter(|x| x.cpp_equivalent.is_argument())
-    .map(|x| x.caption(strategy.clone()))
-    .join("_");
+                .iter()
+                .filter(|x| x.cpp_equivalent.is_argument())
+                .map(|x| x.caption(strategy.clone()))
+                .join("_");
     if r.len() == 0 {
       "no_args".to_string()
     } else {
@@ -26,8 +26,8 @@ impl CFunctionSignature {
 
   pub fn arguments_to_c_code(&self) -> String {
     self.arguments
-    .iter()
-    .map(|x| x.to_c_code())
-    .join(", ")
+        .iter()
+        .map(|x| x.to_c_code())
+        .join(", ")
   }
 }

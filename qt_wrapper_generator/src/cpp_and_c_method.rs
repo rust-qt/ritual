@@ -21,7 +21,6 @@ pub struct CppAndCMethod {
 
 
 impl CppMethodWithCSignature {
-
   pub fn c_base_name(&self) -> Result<String, String> {
     let scope_prefix = match self.cpp_method.scope {
       CppMethodScope::Class(..) => "".to_string(),
@@ -40,7 +39,7 @@ impl CppMethodWithCSignature {
     } else if let Some(ref operator) = self.cpp_method.operator {
       match operator_c_name(operator, self.cpp_method.real_arguments_count()) {
         Ok(op) => format!("OP_{}", op),
-        Err(msg) => return Err(msg)
+        Err(msg) => return Err(msg),
       }
     } else {
       self.cpp_method.name.clone()
@@ -71,8 +70,6 @@ impl CppMethodWithCSignature {
 
 
   }
-
-
 }
 
 impl CppAndCMethod {

@@ -100,19 +100,9 @@ pub fn operator_c_name(cpp_name: &String, arguments_count: i32) -> Result<String
   } else if cpp_name == "," && arguments_count == 2 {
     "comma"
   } else {
-    return Err(format!("unsupported operator {} (arguments count: {})", cpp_name, arguments_count));
+    return Err(format!("unsupported operator {} (arguments count: {})",
+                       cpp_name,
+                       arguments_count));
   };
   return Ok(result.to_string());
 }
-
-
-
-
-
-
-
-
-
-
-
-
