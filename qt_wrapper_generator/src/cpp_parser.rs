@@ -527,7 +527,7 @@ impl CppParser {
     }
 
     Ok(CppMethod {
-      name: get_full_name(entity).unwrap_or_else(|_| panic!("failed to get function name")),
+      name: entity.get_name().unwrap_or_else(|| panic!("failed to get function name")),
       scope: scope,
       is_virtual: entity.is_virtual_method(),
       is_pure_virtual: entity.is_pure_virtual_method(),

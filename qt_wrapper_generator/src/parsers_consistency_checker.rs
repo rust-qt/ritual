@@ -3,6 +3,8 @@ use clang_cpp_data::{CLangCppData, CLangCppTypeKind};
 use log;
 use enums::{CppTypeOrigin, CppTypeKind};
 use std::collections::HashMap;
+extern crate core;
+use self::core::ops::AddAssign;
 
 pub fn check(result1: &CLangCppData, result2: &CppData) {
   log::info("Checking parsers consistency...");
@@ -77,7 +79,7 @@ pub fn check(result1: &CLangCppData, result2: &CppData) {
   if !missing_enum_values1.is_empty() {
     log::warning(format!("Result 1 misses enum values:"));
     for (enu, values) in missing_enum_values1 {
-      log::warning(format!("  {}: {:?}", enu, values));
+      log::warning(format!("    {}: {:?}", enu, values));
     }
   }
 
@@ -88,7 +90,57 @@ pub fn check(result1: &CLangCppData, result2: &CppData) {
   if !missing_enum_values2.is_empty() {
     log::warning(format!("Result 2 misses enum values:"));
     for (enu, values) in missing_enum_values2 {
-      log::warning(format!("  {}: {:?}", enu, values));
+      log::warning(format!("    {}: {:?}", enu, values));
+    }
+  }
+
+  let mut method_counts1: HashMap<String, i32> = HashMap::new();
+  let mut method_counts2: HashMap<String, i32> = HashMap::new();
+  for method in &result1.methods {
+    let name = method.full_name();
+    if !method_counts1.contains_key(&name) {
+      method_counts1.insert(name.clone(), 0);
+    }
+    method_counts1.get_mut(&name).unwrap().add_assign(1);
+  }
+  for header in &result2.headers {
+    for method in &header.methods {
+      let name = method.full_name();
+      if !method_counts2.contains_key(&name) {
+        method_counts2.insert(name.clone(), 0);
+      }
+      method_counts2.get_mut(&name).unwrap().add_assign(1);
+    }
+  }
+
+  let mut missing_methods1 = Vec::new();
+  for (method, count2) in &method_counts2 {
+    let count1 = method_counts1.get(method).unwrap_or(&0).clone();
+    if count1 < *count2 {
+      //log::warning(format!("{} (count: {} vs {})", method, count1, count2));
+      missing_methods1.push(method.clone());
+    }
+  }
+  if !missing_methods1.is_empty() {
+    missing_methods1.sort();
+    log::warning(format!("Missing methods in result 1 (total {}):", missing_methods1.len()));
+    for method in missing_methods1 {
+      log::warning(format!("    {}", method));
+    }
+  }
+
+  let mut missing_methods2 = Vec::new();
+  for (method, count1) in &method_counts1 {
+    let count2 = method_counts2.get(method).unwrap_or(&0).clone();
+    if count2 < *count1 {
+      missing_methods2.push(method.clone());
+    }
+  }
+  if !missing_methods2.is_empty() {
+    missing_methods2.sort();
+    log::warning(format!("Missing methods in result 2 (total {}):", missing_methods2.len()));
+    for method in missing_methods2 {
+      log::warning(format!("    {}", method));
     }
   }
 }

@@ -39,7 +39,7 @@ fn print_usage() {
 fn main() {
   let arguments: Vec<_> = env::args().collect();
   if arguments.len() == 3 && arguments[1] == "cpp_parser" {
-    let mut headers_dir = PathBuf::from("/home/ri/bin/Qt/5.5/gcc_64/include/QtCore");
+    let headers_dir = PathBuf::from("/home/ri/bin/Qt/5.5/gcc_64/include/QtCore");
     // qt_specific::fix_header_names(&headers_dir);
     let mut parser1 = cpp_parser::CppParser::new();
     parser1.run();

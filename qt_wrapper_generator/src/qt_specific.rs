@@ -36,7 +36,7 @@ pub fn fix_header_names(data: &mut CLangCppData, headers_dir: &PathBuf) {
     map.insert("qsharedpointer_impl.h".to_string(), v);
   }
   let mut map2 = HashMap::new();
-  for (real_header, mut fancy_headers) in &map {
+  for (real_header, fancy_headers) in &map {
     let fancy_header = if fancy_headers.len() == 1 {
       fancy_headers[0].clone()
     } else {
@@ -70,4 +70,5 @@ pub fn fix_header_names(data: &mut CLangCppData, headers_dir: &PathBuf) {
       t.header = fancy_header.clone();
     }
   }
+
 }

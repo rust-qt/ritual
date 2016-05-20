@@ -194,6 +194,14 @@ impl CppMethod {
     }
   }
 
+  pub fn full_name(&self) -> String {
+    if let CppMethodScope::Class(ref name) = self.scope {
+      format!("{}::{}", name, self.name)
+    } else {
+      self.name.clone()
+    }
+  }
+
   pub fn short_text(&self) -> String {
     let mut s = String::new();
     if self.is_virtual {
