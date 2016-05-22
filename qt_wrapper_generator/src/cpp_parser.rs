@@ -690,22 +690,24 @@ impl CppParser {
       EntityKind::Destructor |
       EntityKind::ConversionFunction |
       EntityKind::FunctionTemplate => {
-        self.stats.total_methods = self.stats.total_methods + 1;
-        match self.parse_function(entity, &include_file) {
-          Ok(r) => {
-            //            if r.name == "QString::section" {
-            //              println!("TEST1 {:?}", r);
-            //              dump_entity(&entity, 0);
-            //            }
-            self.stats.success_methods = self.stats.success_methods + 1;
-            self.data.methods.push(r);
-          }
-          Err(msg) => {
-            self.stats.failed_methods = self.stats.failed_methods + 1;
-            log::warning(format!("Failed to parse method: {}\nentity: {:?}\nerror: {}\n",
-                                 get_full_name(entity).unwrap(),
-                                 entity,
-                                 msg));
+        if entity.get_canonical_entity() == entity {
+          self.stats.total_methods = self.stats.total_methods + 1;
+          match self.parse_function(entity, &include_file) {
+            Ok(r) => {
+              if r.full_name() == "QSizeF::isEmpty" {
+                println!("test {:?}", r);
+                dump_entity(&entity, 0);
+              }
+              self.stats.success_methods = self.stats.success_methods + 1;
+              self.data.methods.push(r);
+            }
+            Err(msg) => {
+              self.stats.failed_methods = self.stats.failed_methods + 1;
+              log::warning(format!("Failed to parse method: {}\nentity: {:?}\nerror: {}\n",
+                                   get_full_name(entity).unwrap(),
+                                   entity,
+                                   msg));
+            }
           }
         }
       }
