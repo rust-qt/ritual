@@ -525,9 +525,16 @@ impl CppParser {
         }
       }
     }
-
+    let mut name = entity.get_name().unwrap_or_else(|| panic!("failed to get function name"));
+    if name.contains('<') {
+      let regex = Regex::new(r"^([\w~]+)<[^<>]+>$").unwrap();
+      if let Some(matches) = regex.captures(name.clone().as_ref()) {
+        log::warning(format!("Fixing malformed method name: {}", name));
+        name = matches.at(1).unwrap().to_string();
+      }
+    }
     Ok(CppMethod {
-      name: entity.get_name().unwrap_or_else(|| panic!("failed to get function name")),
+      name: name,
       scope: scope,
       is_virtual: entity.is_virtual_method(),
       is_pure_virtual: entity.is_pure_virtual_method(),
@@ -680,6 +687,7 @@ impl CppParser {
       EntityKind::FunctionDecl |
       EntityKind::Method |
       EntityKind::Constructor |
+      EntityKind::Destructor |
       EntityKind::ConversionFunction |
       EntityKind::FunctionTemplate => {
         self.stats.total_methods = self.stats.total_methods + 1;

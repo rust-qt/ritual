@@ -1,7 +1,7 @@
 use cpp_data::CppData;
 use clang_cpp_data::{CLangCppData, CLangCppTypeKind};
 use log;
-use enums::{CppTypeOrigin, CppTypeKind};
+use enums::{CppTypeOrigin, CppTypeKind, CppMethodScope};
 use std::collections::HashMap;
 extern crate core;
 use self::core::ops::AddAssign;
@@ -79,7 +79,7 @@ pub fn check(result1: &CLangCppData, result2: &CppData) {
   if !missing_enum_values1.is_empty() {
     log::warning(format!("Result 1 misses enum values:"));
     for (enu, values) in missing_enum_values1 {
-      log::warning(format!("    {}: {:?}", enu, values));
+      log::debug(format!("    {}: {:?}", enu, values));
     }
   }
 
@@ -90,7 +90,7 @@ pub fn check(result1: &CLangCppData, result2: &CppData) {
   if !missing_enum_values2.is_empty() {
     log::warning(format!("Result 2 misses enum values:"));
     for (enu, values) in missing_enum_values2 {
-      log::warning(format!("    {}: {:?}", enu, values));
+      log::debug(format!("    {}: {:?}", enu, values));
     }
   }
 
@@ -110,6 +110,23 @@ pub fn check(result1: &CLangCppData, result2: &CppData) {
         method_counts2.insert(name.clone(), 0);
       }
       method_counts2.get_mut(&name).unwrap().add_assign(1);
+      if method.is_signal {
+        method_counts1.remove(&name);
+        method_counts2.remove(&name);
+      }
+    }
+  }
+  for method in &result1.methods {
+    if let CppMethodScope::Class(ref class_name) = method.scope {
+      for class_type in result1.types.iter().filter(|x| x.inherits(class_name)) {
+        let base_method = format!("{}::{}", class_type.name, method.name);
+        if method_counts2.contains_key(&base_method) {
+          if !method_counts1.contains_key(&base_method) {
+            method_counts1.insert(base_method.clone(), 0);
+            method_counts1.get_mut(&base_method).unwrap().add_assign(1);
+          }
+        }
+      }
     }
   }
 
@@ -117,15 +134,18 @@ pub fn check(result1: &CLangCppData, result2: &CppData) {
   for (method, count2) in &method_counts2 {
     let count1 = method_counts1.get(method).unwrap_or(&0).clone();
     if count1 < *count2 {
-      //log::warning(format!("{} (count: {} vs {})", method, count1, count2));
+      // log::warning(format!("{} (count: {} vs {})", method, count1, count2));
       missing_methods1.push(method.clone());
     }
   }
   if !missing_methods1.is_empty() {
     missing_methods1.sort();
-    log::warning(format!("Missing methods in result 1 (total {}):", missing_methods1.len()));
+    log::warning(format!("Missing methods in result 1 (total {}):",
+                         missing_methods1.len()));
     for method in missing_methods1 {
-      log::warning(format!("    {}", method));
+      let count1 = method_counts1.get(&method).unwrap_or(&0).clone();
+      let count2 = method_counts2.get(&method).unwrap_or(&0).clone();
+      log::debug(format!("    {} (count: {} vs {})", method, count1, count2));
     }
   }
 
@@ -138,9 +158,13 @@ pub fn check(result1: &CLangCppData, result2: &CppData) {
   }
   if !missing_methods2.is_empty() {
     missing_methods2.sort();
-    log::warning(format!("Missing methods in result 2 (total {}):", missing_methods2.len()));
+    log::warning(format!("Missing methods in result 2 (total {}):",
+                         missing_methods2.len()));
     for method in missing_methods2 {
-      log::warning(format!("    {}", method));
+      //log::debug(format!("    {}", method));
+      let count1 = method_counts1.get(&method).unwrap_or(&0).clone();
+      let count2 = method_counts2.get(&method).unwrap_or(&0).clone();
+      log::debug(format!("    {} (count: {} vs {})", method, count1, count2));
     }
   }
 }
