@@ -50,11 +50,11 @@ pub fn fix_header_names(data: &mut CLangCppData, headers_dir: &PathBuf) {
         }
       }
       if !ok {
-        log::info(format!("{} -> {:?} (detect failed)", real_header, fancy_headers));
+        log::noisy(format!("{} -> {:?} (detect failed)", real_header, fancy_headers));
       }
       result
     };
-    log::info(format!("{} -> {}", real_header, fancy_header));
+    log::noisy(format!("{} -> {}", real_header, fancy_header));
     map2.insert(real_header, fancy_header);
   }
   for t in &mut data.types {

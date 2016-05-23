@@ -40,8 +40,8 @@ pub enum CppTypeBase {
     template_arguments: Option<Vec<CppType>>,
   },
   TemplateParameter {
-    index1: i32,
-    index2: i32,
+    nested_level: i32,
+    index: i32,
   },
   FunctionPointer {
     return_type: Box<CppType>,

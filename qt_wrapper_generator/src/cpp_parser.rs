@@ -106,22 +106,6 @@ fn get_full_name(entity: Entity) -> Result<String, String> {
   }
 }
 
-#[derive(Clone)]
-struct EntityContext {
-  includes: Vec<String>,
-  level: i32,
-}
-
-impl EntityContext {
-  fn new() -> Self {
-    EntityContext {
-      level: 0,
-      includes: Vec::new(),
-    }
-  }
-}
-
-
 impl CppParser {
   pub fn new() -> Self {
     CppParser {
@@ -217,31 +201,36 @@ impl CppParser {
     if let Some(matches) = re.captures(name.as_ref()) {
       return Ok(CppType {
         base: CppTypeBase::TemplateParameter {
-          index1: matches.at(1).unwrap().parse().unwrap(),
-          index2: matches.at(2).unwrap().parse().unwrap(),
+          nested_level: matches.at(1).unwrap().parse().unwrap(),
+          index: matches.at(2).unwrap().parse().unwrap(),
         },
         is_const: is_const,
         indirection: CppTypeIndirection::None,
       });
     }
+    let mut method_has_template_arguments = false;
+    if let Some(e) = context_method {
+      let args = get_template_arguments(e);
+      if !args.is_empty() {
+        if let Some(index) = args.iter().position(|x| *x == name) {
+          return Ok(CppType {
+            base: CppTypeBase::TemplateParameter {
+              nested_level: 0,
+              index: index as i32,
+            },
+            is_const: is_const,
+            indirection: CppTypeIndirection::None,
+          });
+        }
+        method_has_template_arguments = true;
+      }
+    }
     if let Some(e) = context_class {
       if let Some(index) = get_template_arguments(e).iter().position(|x| *x == name) {
         return Ok(CppType {
           base: CppTypeBase::TemplateParameter {
-            index1: 0, // TODO: not sure what this index means
-            index2: index as i32,
-          },
-          is_const: is_const,
-          indirection: CppTypeIndirection::None,
-        });
-      }
-    }
-    if let Some(e) = context_method {
-      if let Some(index) = get_template_arguments(e).iter().position(|x| *x == name) {
-        return Ok(CppType {
-          base: CppTypeBase::TemplateParameter {
-            index1: 0, // TODO: not sure what this index means
-            index2: index as i32,
+            nested_level: if method_has_template_arguments { 1 } else { 0 },
+            index: index as i32,
           },
           is_const: is_const,
           indirection: CppTypeIndirection::None,
@@ -686,9 +675,7 @@ impl CppParser {
   }
 
 
-  fn process_entity(&mut self, entity: Entity, context: &EntityContext) {
-    let mut child_context = context.clone();
-    child_context.level = child_context.level + 1;
+  fn process_entity(&mut self, entity: Entity) {
     self.entity_kinds.insert(entity.get_kind());
     if let Some(accessibility) = entity.get_accessibility() {
       if accessibility == Accessibility::Private {
@@ -824,7 +811,7 @@ impl CppParser {
       _ => {}
     }
     for c in entity.get_children() {
-      self.process_entity(c, &child_context);
+      self.process_entity(c);
     }
   }
 
@@ -851,22 +838,12 @@ impl CppParser {
         log::warning(format!("{}", diag));
       }
     }
-    log::info("Found entities:");
-    self.process_entity(translation_unit, &EntityContext::new());
+    self.process_entity(translation_unit);
     self.check_integrity();
     self.find_template_instantiations();
-    log::info(format!("Entity kinds: {:?}", self.entity_kinds));
-    log::info(format!("Files: {:?}", self.files));
-    log::info(format!("{}/{} METHODS UNHARMED",
-                      self.stats.success_methods,
-                      self.stats.total_methods));
     log::info(format!("{}/{} METHODS DESTROYED",
                       self.stats.failed_methods,
                       self.stats.total_methods));
-
-    log::info(format!("{}/{} TYPES UNHARMED",
-                      self.stats.success_types,
-                      self.stats.total_types));
     log::info(format!("{}/{} TYPES DESTROYED",
                       self.stats.failed_types,
                       self.stats.total_types));
@@ -905,9 +882,7 @@ impl CppParser {
           }
         }
       }
-      CppTypeBase::TemplateParameter { ref index1, ref index2 } => {
-        // TODO: check template parameters
-      }
+      CppTypeBase::TemplateParameter { .. } => {}
     }
     Ok(())
   }
