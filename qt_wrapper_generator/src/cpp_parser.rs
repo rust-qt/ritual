@@ -5,7 +5,7 @@ extern crate regex;
 use self::regex::Regex;
 
 use log;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::path::PathBuf;
 // use std::ffi::OsStr;
 
@@ -16,7 +16,7 @@ use cpp_method::{CppMethod, CppFunctionArgument};
 use enums::{CppMethodScope, CppTypeOrigin, CppTypeIndirection};
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct CppParserStats {
   pub total_methods: i32,
   pub failed_methods: i32,
@@ -24,6 +24,7 @@ pub struct CppParserStats {
   pub total_types: i32,
   pub failed_types: i32,
   pub success_types: i32,
+  pub method_messages: HashMap<String, String>,
 }
 
 
@@ -131,6 +132,10 @@ impl CppParser {
       },
       stats: Default::default(),
     }
+  }
+
+  pub fn get_stats(&self) -> CppParserStats {
+    self.stats.clone()
   }
 
   pub fn get_data(self) -> CLangCppData {
@@ -366,6 +371,38 @@ impl CppParser {
           }
           Err(msg) => Err(format!("get_full_name failed: {}", msg)),
         }
+      }
+      TypeKind::FunctionPrototype => {
+        let mut arguments = Vec::new();
+        for arg_type in type1.get_argument_types().unwrap() {
+          match self.parse_type(arg_type, context_class, context_method) {
+            Ok(t) => arguments.push(t),
+            Err(msg) => {
+              return Err(format!("Failed to parse function type's argument type: {:?}: {}",
+                                 arg_type,
+                                 msg))
+            }
+          }
+        }
+        let return_type = match self.parse_type(type1.get_result_type().unwrap(),
+                                                context_class,
+                                                context_method) {
+          Ok(t) => Box::new(t),
+          Err(msg) => {
+            return Err(format!("Failed to parse function type's argument type: {:?}: {}",
+                               type1.get_result_type().unwrap(),
+                               msg))
+          }
+        };
+        Ok(CppType {
+          base: CppTypeBase::FunctionPointer {
+            return_type: return_type,
+            arguments: arguments,
+            allows_variable_arguments: type1.is_variadic(),
+          },
+          is_const: is_const,
+          indirection: CppTypeIndirection::None,
+        })
       }
       TypeKind::Pointer |
       TypeKind::LValueReference |
@@ -703,10 +740,17 @@ impl CppParser {
             }
             Err(msg) => {
               self.stats.failed_methods = self.stats.failed_methods + 1;
-              log::warning(format!("Failed to parse method: {}\nentity: {:?}\nerror: {}\n",
-                                   get_full_name(entity).unwrap(),
-                                   entity,
-                                   msg));
+              let full_name = get_full_name(entity).unwrap();
+              let message = format!("Failed to parse method: {}\nentity: {:?}\nerror: {}\n",
+                                    full_name,
+                                    entity,
+                                    msg);
+              log::warning(message.as_ref());
+              if self.stats.method_messages.contains_key(&full_name) {
+                self.stats.method_messages.get_mut(&full_name).unwrap().push_str(format!("\n{}", message).as_ref());
+              } else {
+                self.stats.method_messages.insert(full_name, message);
+              }
             }
           }
         }
@@ -840,6 +884,16 @@ impl CppParser {
             if let Err(msg) = self.check_type_integrity(&arg) {
               return Err(msg);
             }
+          }
+        }
+      }
+      CppTypeBase::FunctionPointer { ref return_type, ref arguments, .. } => {
+        if let Err(msg) = self.check_type_integrity(return_type) {
+          return Err(msg);
+        }
+        for arg in arguments {
+          if let Err(msg) = self.check_type_integrity(arg) {
+            return Err(msg);
           }
         }
       }

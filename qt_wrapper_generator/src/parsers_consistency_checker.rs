@@ -1,12 +1,13 @@
 use cpp_data::CppData;
 use clang_cpp_data::{CLangCppData, CLangCppTypeKind};
+use cpp_parser::CppParserStats;
 use log;
 use enums::{CppTypeOrigin, CppTypeKind, CppMethodScope};
 use std::collections::HashMap;
 extern crate core;
 use self::core::ops::AddAssign;
 
-pub fn check(result1: &CLangCppData, result2: &CppData) {
+pub fn check(result1: &CLangCppData, result1_stats: &CppParserStats, result2: &CppData) {
   log::info("Checking parsers consistency...");
   let mut missing_enum_values1: HashMap<String, Vec<String>> = HashMap::new();
   let mut missing_enum_values2: HashMap<String, Vec<String>> = HashMap::new();
@@ -146,6 +147,9 @@ pub fn check(result1: &CLangCppData, result2: &CppData) {
       let count1 = method_counts1.get(&method).unwrap_or(&0).clone();
       let count2 = method_counts2.get(&method).unwrap_or(&0).clone();
       log::debug(format!("    {} (count: {} vs {})", method, count1, count2));
+      if let Some(message) = result1_stats.method_messages.get(&method) {
+        log::debug(message.as_ref());
+      }
     }
   }
 

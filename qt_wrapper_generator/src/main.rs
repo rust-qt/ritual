@@ -30,6 +30,8 @@ extern crate find_folder;
 
 fn print_usage() {
   log::error("Usage:");
+  log::error("\tqt_wrapper_generator check_parsers_consistency parse_result_path");
+  log::error("\tqt_wrapper_generator cpp_parser");
   log::error("\tqt_wrapper_generator stage1 parse_result_path extractor_actions_path");
   log::error("\tqt_wrapper_generator stage2 parse_result_path extracted_info_path qtcw_path \
               rust_qt_path");
@@ -38,17 +40,25 @@ fn print_usage() {
 
 fn main() {
   let arguments: Vec<_> = env::args().collect();
-  if arguments.len() == 3 && arguments[1] == "cpp_parser" {
+  if arguments.len() == 3 && arguments[1] == "check_parsers_consistency" {
     let headers_dir = PathBuf::from("/home/ri/bin/Qt/5.5/gcc_64/include/QtCore");
-    // qt_specific::fix_header_names(&headers_dir);
     let mut parser1 = cpp_parser::CppParser::new();
     parser1.run();
+    let stats = parser1.get_stats();
     let mut parse_result1 = parser1.get_data();
     let parse_result_path = PathBuf::from(arguments[2].clone());
     log::info("Reading parse result...");
     let parse_result2 = read_parse_result::do_it(&parse_result_path);
     qt_specific::fix_header_names(&mut parse_result1, &headers_dir);
-    parsers_consistency_checker::check(&parse_result1, &parse_result2);
+    parsers_consistency_checker::check(&parse_result1, &stats, &parse_result2);
+    return;
+  }
+  if arguments.len() == 2 && arguments[1] == "cpp_parser" {
+    let headers_dir = PathBuf::from("/home/ri/bin/Qt/5.5/gcc_64/include/QtCore");
+    let mut parser1 = cpp_parser::CppParser::new();
+    parser1.run();
+    let mut parse_result1 = parser1.get_data();
+    qt_specific::fix_header_names(&mut parse_result1, &headers_dir);
     return;
   }
   if arguments.len() < 4 {

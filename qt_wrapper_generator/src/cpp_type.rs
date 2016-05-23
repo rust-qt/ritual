@@ -43,6 +43,11 @@ pub enum CppTypeBase {
     index1: i32,
     index2: i32,
   },
+  FunctionPointer {
+    return_type: Box<CppType>,
+    arguments: Vec<CppType>,
+    allows_variable_arguments: bool,
+  },
   Unspecified {
     name: String,
     template_arguments: Option<Vec<CppType>>,
@@ -88,6 +93,9 @@ impl CppType {
       CppTypeBase::Class { ref name, .. } => name.clone(),
       CppTypeBase::TemplateParameter { .. } => {
         panic!("template parameters are not supported here yet")
+      }
+      CppTypeBase::FunctionPointer { .. } => {
+        panic!("function pointers are not supported here yet")
       }
       CppTypeBase::BuiltInNumeric(ref t) => {
         match *t {
