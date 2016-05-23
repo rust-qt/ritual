@@ -234,11 +234,7 @@ impl CppMethod {
     if let Some(ref cpp_type) = self.return_type {
       s = format!("{} {}",
                   s,
-                  if cpp_type.is_template() {
-                    "[template type]".to_string()
-                  } else {
-                    cpp_type.to_cpp_code()
-                  });
+                  cpp_type.to_cpp_code().unwrap_or("[?]".to_string()));
     }
     if let CppMethodScope::Class(ref name) = self.scope {
       s = format!("{} {}::", s, name);
@@ -251,11 +247,7 @@ impl CppMethod {
                       .iter()
                       .map(|arg| {
                         format!("{} {}{}",
-                                if arg.argument_type.is_template() {
-                                  "[template type]".to_string()
-                                } else {
-                                  arg.argument_type.to_cpp_code()
-                                },
+                                arg.argument_type.to_cpp_code().unwrap_or("[?]".to_string()),
                                 arg.name,
                                 if let Some(ref dv) = arg.default_value {
                                   format!(" = {}", dv)

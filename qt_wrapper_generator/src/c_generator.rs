@@ -112,7 +112,7 @@ impl CppAndCMethod {
         }
         if c_argument.argument_type.conversion.renamed {
           result = format!("reinterpret_cast<{}>({})",
-                           cpp_argument.argument_type.to_cpp_code(),
+                           cpp_argument.argument_type.to_cpp_code().unwrap(),
                            result);
         }
         if c_argument.argument_type.conversion.qflags_to_uint {

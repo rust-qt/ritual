@@ -9,6 +9,8 @@ use std::collections::{HashSet, HashMap};
 use std::path::PathBuf;
 // use std::ffi::OsStr;
 
+use utils::JoinWithString;
+
 use clang_cpp_data::{CLangCppData, CLangCppTypeData, CLangCppTypeKind, CLangClassField};
 use cpp_type_map::EnumValue;
 // use cpp_type_map::CppTypeInfo;
@@ -129,6 +131,7 @@ impl CppParser {
       data: CLangCppData {
         methods: Vec::new(),
         types: Vec::new(),
+        template_instantiations: HashMap::new(),
       },
       stats: Default::default(),
     }
@@ -747,7 +750,11 @@ impl CppParser {
                                     msg);
               log::warning(message.as_ref());
               if self.stats.method_messages.contains_key(&full_name) {
-                self.stats.method_messages.get_mut(&full_name).unwrap().push_str(format!("\n{}", message).as_ref());
+                self.stats
+                    .method_messages
+                    .get_mut(&full_name)
+                    .unwrap()
+                    .push_str(format!("\n{}", message).as_ref());
               } else {
                 self.stats.method_messages.insert(full_name, message);
               }
@@ -847,6 +854,7 @@ impl CppParser {
     log::info("Found entities:");
     self.process_entity(translation_unit, &EntityContext::new());
     self.check_integrity();
+    self.find_template_instantiations();
     log::info(format!("Entity kinds: {:?}", self.entity_kinds));
     log::info(format!("Files: {:?}", self.files));
     log::info(format!("{}/{} METHODS UNHARMED",
@@ -936,6 +944,80 @@ impl CppParser {
             log::warning(format!("Class {}: base class type {:?}: {}", t.name, base, msg));
           }
         }
+      }
+    }
+  }
+
+  fn find_template_instantiations_in_type(&mut self, type1: &CppType) {
+    if let CppTypeBase::Class { ref name, ref template_arguments } = type1.base {
+      if let &Some(ref template_arguments) = template_arguments {
+        if template_arguments.iter().find(|x| !x.base.is_template_parameter()).is_some() {
+          if !self.data.template_instantiations.contains_key(name) {
+            self.data.template_instantiations.insert(name.clone(), Vec::new());
+          }
+          if self.data
+                 .template_instantiations
+                 .get(name)
+                 .unwrap()
+                 .iter()
+                 .find(|x| x == &template_arguments)
+                 .is_none() {
+            self.data
+                .template_instantiations
+                .get_mut(name)
+                .unwrap()
+                .push(template_arguments.clone());
+          }
+          for arg in template_arguments {
+            self.find_template_instantiations_in_type(arg);
+          }
+        }
+      }
+    }
+  }
+
+  fn find_template_instantiations(&mut self) {
+    for m in self.data.methods.clone() {
+      self.find_template_instantiations_in_type(&m.return_type.unwrap());
+      for arg in &m.arguments {
+        self.find_template_instantiations_in_type(&arg.argument_type);
+      }
+    }
+    for t in self.data.types.clone() {
+      if let CLangCppTypeKind::Class { bases, .. } = t.kind {
+        for base in bases {
+          self.find_template_instantiations_in_type(&base);
+        }
+      }
+    }
+    log::info("Detected template instantiations:");
+    for (class_name, instantiations) in &self.data.template_instantiations {
+      println!("Class: {}", class_name);
+      if let Some(ref type_info) = self.data.types.iter().find(|x| &x.name == class_name) {
+        if let CLangCppTypeKind::Class { ref template_arguments, .. } = type_info.kind {
+          if let &Some(ref template_arguments) = template_arguments {
+            let valid_length = template_arguments.len();
+            for ins in instantiations {
+              println!("    {}<{}>",
+              class_name,
+                       ins.iter()
+                          .map(|t| t.to_cpp_code().unwrap_or_else(|_| format!("{:?}", t)))
+                          .join(", "));
+              if ins.len() != valid_length {
+                panic!("template arguments count mismatch: {}: {:?} vs {:?}",
+                       class_name,
+                       template_arguments,
+                       ins);
+              }
+            }
+          } else {
+            panic!("template class is not a template class: {}", class_name);
+          }
+        } else {
+          panic!("template class is not a class: {}", class_name);
+        }
+      } else {
+        panic!("template class is not available: {}", class_name);
       }
     }
   }

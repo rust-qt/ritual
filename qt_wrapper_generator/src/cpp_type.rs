@@ -54,6 +54,15 @@ pub enum CppTypeBase {
   },
 }
 
+impl CppTypeBase {
+  pub fn is_template_parameter(&self) -> bool {
+    match self {
+      &CppTypeBase::TemplateParameter { .. } => true,
+      _ => false,
+    }
+  }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppType {
   pub is_const: bool,
@@ -82,9 +91,9 @@ impl CppType {
     }
   }
 
-  pub fn to_cpp_code(&self) -> String {
+  pub fn to_cpp_code(&self) -> Result<String, String> {
     if self.is_template() {
-      panic!("template types are not supported yet")
+      return Err(format!("template types are not supported yet"));
     }
     let name = match self.base {
       CppTypeBase::Unspecified { ref name, .. } => name.clone(),
@@ -92,10 +101,10 @@ impl CppType {
       CppTypeBase::Enum { ref name } => name.clone(),
       CppTypeBase::Class { ref name, .. } => name.clone(),
       CppTypeBase::TemplateParameter { .. } => {
-        panic!("template parameters are not supported here yet")
+        return Err(format!("template parameters are not supported here yet"));
       }
       CppTypeBase::FunctionPointer { .. } => {
-        panic!("function pointers are not supported here yet")
+        return Err(format!("function pointers are not supported here yet"));
       }
       CppTypeBase::BuiltInNumeric(ref t) => {
         match *t {
@@ -124,21 +133,21 @@ impl CppType {
         .to_string()
       }
     };
-    format!("{}{}{}",
-            if self.is_const {
-              "const "
-            } else {
-              ""
-            },
-            name,
-            match self.indirection {
-              CppTypeIndirection::None => "",
-              CppTypeIndirection::Ptr => "*",
-              CppTypeIndirection::Ref => "&",
-              CppTypeIndirection::PtrRef => "*&",
-              CppTypeIndirection::PtrPtr => "**",
-              CppTypeIndirection::RValueRef => "&&",
-            })
+    Ok(format!("{}{}{}",
+               if self.is_const {
+                 "const "
+               } else {
+                 ""
+               },
+               name,
+               match self.indirection {
+                 CppTypeIndirection::None => "",
+                 CppTypeIndirection::Ptr => "*",
+                 CppTypeIndirection::Ref => "&",
+                 CppTypeIndirection::PtrRef => "*&",
+                 CppTypeIndirection::PtrPtr => "**",
+                 CppTypeIndirection::RValueRef => "&&",
+               }))
   }
 
   pub fn to_c_type(&self, cpp_type_map: &CppTypeMap) -> Result<CTypeExtended, String> {

@@ -3,6 +3,7 @@
 use cpp_method::CppMethod;
 use cpp_type::{CppType, CppTypeBase};
 use cpp_type_map::EnumValue;
+use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CLangClassField {
@@ -34,6 +35,7 @@ pub struct CLangCppTypeData {
 pub struct CLangCppData {
   pub types: Vec<CLangCppTypeData>,
   pub methods: Vec<CppMethod>,
+  pub template_instantiations: HashMap<String, Vec<Vec<CppType>>>,
 }
 
 impl CLangCppTypeData {
