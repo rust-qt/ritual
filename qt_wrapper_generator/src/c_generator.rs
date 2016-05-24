@@ -12,11 +12,11 @@ use utils::JoinWithString;
 use std::collections::HashMap;
 use read_extracted_info::CppExtractedInfo;
 use log;
+use clang_cpp_data::{CLangCppData, CLangCppTypeData, CLangCppTypeKind};
 
 pub struct CGenerator {
   qtcw_path: PathBuf,
-  cpp_data: CppData,
-  cpp_extracted_info: CppExtractedInfo,
+  cpp_data: CLangCppData,
 }
 
 fn only_c_code(code: String) -> String {
@@ -222,16 +222,14 @@ pub struct CHeaderData {
 }
 
 pub struct CppAndCData {
-  pub cpp_data: CppData,
-  pub cpp_extracted_info: CppExtractedInfo,
+  pub cpp_data: CLangCppData,
   pub c_headers: Vec<CHeaderData>,
 }
 
 impl CGenerator {
-  pub fn new(cpp_data: CppData, cpp_extracted_info: CppExtractedInfo, qtcw_path: PathBuf) -> Self {
+  pub fn new(cpp_data: CLangCppData, qtcw_path: PathBuf) -> Self {
     CGenerator {
       cpp_data: cpp_data,
-      cpp_extracted_info: cpp_extracted_info,
       qtcw_path: qtcw_path,
     }
   }
@@ -243,53 +241,10 @@ impl CGenerator {
     let mut all_header_file = File::create(&h_path).unwrap();
     write!(all_header_file, "#ifndef QTCW_H\n#define QTCW_H\n\n").unwrap();
 
-    let mut include_file_to_header_data: HashMap<String, Vec<CppHeaderData>> = HashMap::new();
-
     let mut c_headers = Vec::new();
 
-    for data in &self.cpp_data.headers {
-      // if white_list.iter().find(|&&x| x == data.include_file).is_none() {
-      //  continue;
-      // }
-      if let Some(ref class_name) = data.class_name {
-        if self.cpp_data
-               .classes_blacklist
-               .iter()
-               .find(|&x| x == class_name.as_ref() as &str)
-               .is_some() {
-          log::warning(format!("Ignoring {} because it is blacklisted.", data.include_file));
-          continue;
-        }
-        match self.cpp_data.is_template_class(class_name) {
-          Ok(is_template_class) => {
-            if is_template_class {
-              log::warning(format!("Skipping code generation for header {} because it contains \
-                                    a template class.\n",
-                                   data.include_file));
-              continue;
-            }
-          }
-          Err(msg) => {
-            log::warning(format!("Skipping code generation for header {}: {}.\n",
-                                 data.include_file,
-                                 msg));
-            continue;
-          }
-        }
-      }
-      if !match include_file_to_header_data.get_mut(&data.include_file) {
-        Some(mut vec) => {
-          vec.push(data.clone());
-          true
-        }
-        None => false,
-      } {
-        include_file_to_header_data.insert(data.include_file.clone(), vec![data.clone()]);
-      }
-    }
-
-    for (include_file, data) in &include_file_to_header_data {
-      c_headers.push(self.generate_one(include_file, data));
+    for (include_file, data) in self.cpp_data.split_by_headers() {
+      c_headers.push(self.generate_one(&include_file, data));
       write!(all_header_file, "#include \"qtcw_{}.h\"\n", include_file).unwrap();
 
     }
@@ -297,7 +252,6 @@ impl CGenerator {
     write!(all_header_file, "#endif // QTCW_H\n").unwrap();
     CppAndCData {
       cpp_data: self.cpp_data,
-      cpp_extracted_info: self.cpp_extracted_info,
       c_headers: c_headers,
     }
 
@@ -312,26 +266,30 @@ impl CGenerator {
 
   fn struct_declaration(&self,
                         c_struct_name: &String,
-                        cpp_class_name: &String,
+                        cpp_type_info: &CLangCppTypeData,
                         full_declaration: bool)
                         -> String {
     if c_struct_name.find("::").is_some() {
       panic!("struct_declaration called for invalid struct name {}",
              c_struct_name);
     }
-    // write C struct definition
-    let result = if full_declaration &&
-                    self.cpp_extracted_info.class_sizes.contains_key(cpp_class_name) {
-      format!("struct QTCW_{} {{ char space[{}]; }};\n",
-              c_struct_name,
-              self.cpp_extracted_info.class_sizes.get(cpp_class_name).unwrap())
-    } else {
-      format!("struct QTCW_{};\n", c_struct_name)
-    };
-    format!("{}typedef struct QTCW_{} {};\n\n",
-            result,
-            c_struct_name,
-            c_struct_name)
+    match cpp_type_info.kind {
+      CLangCppTypeKind::Class { size, .. } => {
+        let result = if full_declaration && size.is_some() {
+          format!("struct QTCW_{} {{ char space[{}]; }};\n",
+                  c_struct_name,
+                  size.unwrap())
+        } else {
+          format!("struct QTCW_{};\n", c_struct_name)
+        };
+        format!("{}typedef struct QTCW_{} {};\n\n",
+                result,
+                c_struct_name,
+                c_struct_name)
+
+      }
+      _ => panic!("struct_declaration(): cpp type is not a class"),
+    }
   }
 
   fn generate_type_declaration(&self,
@@ -422,7 +380,7 @@ impl CGenerator {
     result
   }
 
-  fn generate_one(&self, include_file: &String, data_vec: &Vec<CppHeaderData>) -> CHeaderData {
+  fn generate_one(&self, include_file: &String, data_vec: CLangCppData) -> CHeaderData {
     let mut cpp_path = self.qtcw_path.clone();
     cpp_path.push("src");
     cpp_path.push(format!("qtcw_{}.cpp", include_file));

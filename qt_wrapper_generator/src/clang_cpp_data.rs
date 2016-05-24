@@ -4,6 +4,7 @@ use cpp_method::CppMethod;
 use cpp_type::{CppType, CppTypeBase};
 use cpp_type_map::EnumValue;
 use std::collections::HashMap;
+use enums::{CppMethodScope, CppTypeOrigin};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CLangClassField {
@@ -18,6 +19,7 @@ pub enum CLangCppTypeKind {
     values: Vec<EnumValue>,
   },
   Class {
+    size: Option<i32>,
     bases: Vec<CppType>,
     fields: Vec<CLangClassField>,
     template_arguments: Option<Vec<String>>,
@@ -31,7 +33,7 @@ pub struct CLangCppTypeData {
   pub kind: CLangCppTypeKind,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct CLangCppData {
   pub types: Vec<CLangCppTypeData>,
   pub methods: Vec<CppMethod>,
@@ -50,5 +52,75 @@ impl CLangCppTypeData {
       }
     }
     false
+  }
+}
+
+impl CLangCppData {
+  pub fn ensure_explicit_destructors(&mut self) {
+    for type1 in self.types {
+      if let CLangCppTypeKind::Class { .. } = type1.kind {
+        let class_name = type1.name;
+        let mut found_destructor = false;
+        for method in self.methods {
+          if method.is_destructor {
+            if let CppMethodScope::Class(name) = method.scope {
+              if name == class_name {
+                found_destructor = true;
+                break;
+              }
+            }
+          }
+        }
+        if !found_destructor {
+          self.methods.push(CppMethod {
+            name: format!("~{}", class_name),
+            scope: CppMethodScope::Class(class_name.clone()),
+            is_virtual: false, // TODO: destructors may be virtual
+            is_pure_virtual: false,
+            is_const: false,
+            is_static: false,
+            is_protected: false,
+            is_signal: false,
+            return_type: None,
+            is_constructor: false,
+            is_destructor: true,
+            operator: None,
+            is_variable: false,
+            arguments: vec![],
+            allows_variable_arguments: false,
+            original_index: 1000,
+            origin: CppTypeOrigin::Qt { include_file: type1.header.clone() },
+            template_arguments: None,
+          });
+        }
+      }
+    }
+  }
+
+  pub fn split_by_headers(&self) -> HashMap<String, CLangCppData> {
+    let mut result = HashMap::new();
+    for method in self.methods {
+      if let CppTypeOrigin::Qt { ref include_file } = method.origin {
+        if !result.contains_key(include_file) {
+          result.insert(include_file.clone(), CLangCppData::default());
+        }
+        result.get_mut(include_file).unwrap().methods.push(method.clone());
+      }
+    }
+    for tp in self.types {
+      if result.find(|x| x == tp.header).is_none() {
+        result.insert(tp.header.clone(), CLangCppData::default());
+      }
+      result.get_mut(&tp.header).unwrap().types.push(tp.clone());
+      if let CLangCppTypeKind::Class { .. } = tp.kind {
+        if let Some(ins) = self.template_instantiations.get(tp.name) {
+          result.get_mut(&tp.header)
+                .unwrap()
+                .template_instantiations
+                .insert(tp.name.clone(), ins.clone());
+        }
+      }
+    }
+    result
   }
 }

@@ -664,10 +664,15 @@ impl CppParser {
         return Err(format!("Non-type template parameter is not supported"));
       }
     }
+    let size = match entity.get_type() {
+      Some(type1) => type1.get_sizeof().ok().map(|x| x as i32),
+      None => None
+    };
     Ok(CLangCppTypeData {
       name: get_full_name(entity).unwrap(),
       header: include_file.clone(),
       kind: CLangCppTypeKind::Class {
+        size: size, //entity.get_type().unwrap().get_sizeof().ok().map(|x| x as i32),
         bases: bases,
         fields: fields,
         template_arguments: if entity.get_kind() == EntityKind::ClassTemplate {
