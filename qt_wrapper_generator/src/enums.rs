@@ -25,16 +25,16 @@ pub enum CppMethodScope {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum CFunctionArgumentCppEquivalent {
+pub enum CppFfiArgumentMeaning {
   This,
   Argument(i8),
   ReturnValue,
 }
 
-impl CFunctionArgumentCppEquivalent {
+impl CppFfiArgumentMeaning {
   pub fn is_argument(&self) -> bool {
     match self {
-      &CFunctionArgumentCppEquivalent::Argument(..) => true,
+      &CppFfiArgumentMeaning::Argument(..) => true,
       _ => false,
     }
   }
@@ -42,14 +42,18 @@ impl CFunctionArgumentCppEquivalent {
 
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CppTypeOriginLocation {
+  pub include_file_path: String,
+  pub line: u32,
+  pub column: u32,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CppTypeOrigin {
   CBuiltIn,
-  Qt {
+  IncludeFile {
     include_file: String,
-  },
-  Unsupported(String),
-  CLang {
-    include_file: String,
+    location: Option<CppTypeOriginLocation>,
   },
   Unknown,
 }

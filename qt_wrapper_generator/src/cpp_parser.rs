@@ -15,8 +15,16 @@ use clang_cpp_data::{CLangCppData, CLangCppTypeData, CLangCppTypeKind, CLangClas
 use cpp_type_map::EnumValue;
 // use cpp_type_map::CppTypeInfo;
 use cpp_method::{CppMethod, CppFunctionArgument};
-use enums::{CppMethodScope, CppTypeOrigin, CppTypeIndirection};
+use enums::{CppMethodScope, CppTypeOrigin, CppTypeIndirection, CppTypeOriginLocation};
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType};
+
+static VALID_OPERATOR_SYMBOLS: &'static [&'static str] = &["=", "+", "-", "+", "-", "*", "/", "%",
+                                                           "++", "++", "--", "--", "==", "!=",
+                                                           ">", "<", ">=", "<=", "!", "&&", "||",
+                                                           "~", "&", "|", "^", "<<", ">>", "+=",
+                                                           "-=", "*=", "/=", "%=", "&=", "|=",
+                                                           "^=", "<<=", ">>=", "[]", "()", ",",
+                                                           "->"];
 
 #[derive(Default, Clone)]
 pub struct CppParserStats {
@@ -476,7 +484,8 @@ impl CppParser {
         match p.get_kind() {
           EntityKind::ClassDecl |
           EntityKind::ClassTemplate |
-          EntityKind::StructDecl => {
+          EntityKind::StructDecl |
+          EntityKind::ClassTemplatePartialSpecialization => {
             match get_full_name(p) {
               Ok(class_name) => (CppMethodScope::Class(class_name), Some(p)),
               Err(msg) => {
@@ -573,6 +582,21 @@ impl CppParser {
         name = matches.at(1).unwrap().to_string();
       }
     }
+    let operator = if name.starts_with("operator") {
+      let op = name["operator".len()..].trim();
+      if VALID_OPERATOR_SYMBOLS.iter().find(|&x| x == &op).is_some() {
+        Some(op.to_string())
+      } else {
+        None
+      }
+    } else {
+      None
+    };
+    //    if name == "name" {
+    //      println!("TEST {:?}", entity.get_semantic_parent());
+    //      println!("TEST2 {:?}", entity.get_lexical_parent());
+    //      dump_entity(&entity, 0);
+    //    }
     Ok(CppMethod {
       name: name,
       scope: scope,
@@ -588,11 +612,21 @@ impl CppParser {
       return_type: Some(return_type_parsed),
       is_constructor: entity.get_kind() == EntityKind::Constructor,
       is_destructor: entity.get_kind() == EntityKind::Destructor,
-      operator: None, // TODO: operator
+      operator: operator,
       is_variable: false, // TODO: move variables into CppTypeInfo
       original_index: -1,
       origin: match include_file {
-        &Some(ref include_file) => CppTypeOrigin::CLang { include_file: include_file.clone() },
+        &Some(ref include_file) => {
+          let location = entity.get_location().unwrap().get_presumed_location();
+          CppTypeOrigin::IncludeFile {
+            include_file: include_file.clone(),
+            location: Some(CppTypeOriginLocation {
+              include_file_path: location.0,
+              line: location.1,
+              column: location.2,
+            }),
+          }
+        }
         &None => CppTypeOrigin::Unknown,
       },
       template_arguments: template_arguments,
@@ -626,6 +660,13 @@ impl CppParser {
     let mut fields = Vec::new();
     let mut bases = Vec::new();
     let template_arguments = get_template_arguments(entity);
+    let has_private_destructor = entity.get_children()
+                                       .iter()
+                                       .find(|c| {
+                                         c.get_kind() == EntityKind::Destructor &&
+                                         c.get_accessibility().unwrap() == Accessibility::Private
+                                       })
+                                       .is_some();
     for child in entity.get_children() {
       if child.get_kind() == EntityKind::FieldDecl {
         let is_protected = match child.get_accessibility().unwrap() {
@@ -666,13 +707,13 @@ impl CppParser {
     }
     let size = match entity.get_type() {
       Some(type1) => type1.get_sizeof().ok().map(|x| x as i32),
-      None => None
+      None => None,
     };
     Ok(CLangCppTypeData {
       name: get_full_name(entity).unwrap(),
       header: include_file.clone(),
       kind: CLangCppTypeKind::Class {
-        size: size, //entity.get_type().unwrap().get_sizeof().ok().map(|x| x as i32),
+        size: size, // entity.get_type().unwrap().get_sizeof().ok().map(|x| x as i32),
         bases: bases,
         fields: fields,
         template_arguments: if entity.get_kind() == EntityKind::ClassTemplate {
@@ -686,6 +727,7 @@ impl CppParser {
           }
           None
         },
+        has_private_destructor: has_private_destructor,
       },
     })
   }
@@ -910,7 +952,7 @@ impl CppParser {
           }
         }
       }
-      CppTypeBase::TemplateParameter { ref index1, ref index2 } => {
+      CppTypeBase::TemplateParameter { .. } => {
         // TODO: check template parameters
       }
     }
@@ -936,6 +978,18 @@ impl CppParser {
                                   log::warning(format!("Method is removed: {}: {}",
                                                        method.short_text(),
                                                        msg));
+                                  return false;
+                                }
+                              }
+                              if let CppMethodScope::Class(ref class_name) = method.scope {
+                                if self.data
+                                       .types
+                                       .iter()
+                                       .find(|x| &x.name == class_name)
+                                       .is_none() {
+                                  log::warning(format!("Method is removed: {}: {}",
+                                                       method.short_text(),
+                                                       "class name is unavailable"));
                                   return false;
                                 }
                               }
@@ -1004,7 +1058,7 @@ impl CppParser {
             let valid_length = template_arguments.len();
             for ins in instantiations {
               println!("    {}<{}>",
-              class_name,
+                       class_name,
                        ins.iter()
                           .map(|t| t.to_cpp_code().unwrap_or_else(|_| format!("{:?}", t)))
                           .join(", "));

@@ -1,7 +1,9 @@
 use enums::CppTypeIndirection;
-use c_type::CTypeExtended;
-use enums::{IndirectionChange, CppTypeKind};
-use cpp_type_map::CppTypeMap;
+use enums::IndirectionChange;
+use caption_strategy::TypeCaptionStrategy;
+
+extern crate regex;
+use self::regex::Regex;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CppBuiltInNumericType {
@@ -26,6 +28,34 @@ pub enum CppBuiltInNumericType {
   Float,
   Double,
   LongDouble,
+}
+
+impl CppBuiltInNumericType {
+  pub fn to_cpp_code(&self) -> &'static str {
+    match *self {
+      CppBuiltInNumericType::Bool => "bool",
+      CppBuiltInNumericType::CharS => "char",
+      CppBuiltInNumericType::CharU => "char",
+      CppBuiltInNumericType::SChar => "signed char",
+      CppBuiltInNumericType::UChar => "unsigned char",
+      CppBuiltInNumericType::WChar => "wchar_t",
+      CppBuiltInNumericType::Char16 => "char16_t",
+      CppBuiltInNumericType::Char32 => "char32_t",
+      CppBuiltInNumericType::Short => "short",
+      CppBuiltInNumericType::UShort => "unsigned short",
+      CppBuiltInNumericType::Int => "int",
+      CppBuiltInNumericType::UInt => "unsigned int",
+      CppBuiltInNumericType::Long => "long",
+      CppBuiltInNumericType::ULong => "unsigned long",
+      CppBuiltInNumericType::LongLong => "long long",
+      CppBuiltInNumericType::ULongLong => "unsigned long long",
+      CppBuiltInNumericType::Int128 => "__int128_t",
+      CppBuiltInNumericType::UInt128 => "__uint128_t",
+      CppBuiltInNumericType::Float => "float",
+      CppBuiltInNumericType::Double => "double",
+      CppBuiltInNumericType::LongDouble => "long double",
+    }
+  }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -55,10 +85,49 @@ pub enum CppTypeBase {
 }
 
 impl CppTypeBase {
+  #[allow(dead_code)]
+  pub fn is_void(&self) -> bool {
+    match self {
+      &CppTypeBase::Void => true,
+      _ => false,
+    }
+  }
+  pub fn is_class(&self) -> bool {
+    match self {
+      &CppTypeBase::Class { .. } => true,
+      _ => false,
+    }
+  }
   pub fn is_template_parameter(&self) -> bool {
     match self {
       &CppTypeBase::TemplateParameter { .. } => true,
       _ => false,
+    }
+  }
+  pub fn to_cpp_code(&self) -> Result<String, String> {
+    match *self {
+      CppTypeBase::Void => Ok("void".to_string()),
+      CppTypeBase::BuiltInNumeric(ref t) => Ok(t.to_cpp_code().to_string()),
+      CppTypeBase::Enum { ref name } => Ok(name.clone()),
+      CppTypeBase::Class { ref name, ref template_arguments } => {
+        match *template_arguments {
+          Some(ref args) => {
+            let mut arg_texts = Vec::new();
+            for arg in args {
+              arg_texts.push(try!(arg.to_cpp_code()));
+            }
+            Ok(format!("{}<{}>", name, arg_texts.join(", ")))
+          }
+          None => Ok(name.clone()),
+        }
+      }
+      CppTypeBase::TemplateParameter { .. } => {
+        return Err(format!("template parameters are not supported here yet"));
+      }
+      CppTypeBase::FunctionPointer { .. } => {
+        return Err(format!("function pointers are not supported here yet"));
+      }
+      CppTypeBase::Unspecified { .. } => Err(format!("Unspecified is not allowed")),
     }
   }
 }
@@ -70,16 +139,43 @@ pub struct CppType {
   pub base: CppTypeBase,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CppToFfiTypeConversion {
+  pub indirection_change: IndirectionChange,
+  pub qflags_to_uint: bool,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CppFfiType {
+  pub original_type: CppType,
+  pub ffi_type: CppType,
+  pub conversion: CppToFfiTypeConversion,
+}
+
+impl CppFfiType {
+  pub fn void() -> Self {
+    CppFfiType {
+      original_type: CppType::void(),
+      ffi_type: CppType::void(),
+      conversion: CppToFfiTypeConversion {
+        indirection_change: IndirectionChange::NoChange,
+        qflags_to_uint: false,
+      },
+    }
+  }
+}
+
 impl CppType {
   pub fn void() -> Self {
     CppType {
       is_const: false,
       indirection: CppTypeIndirection::None,
-      base: CppTypeBase::Unspecified {
-        name: "void".to_string(),
-        template_arguments: None,
-      },
+      base: CppTypeBase::Void,
     }
+  }
+
+  pub fn is_void(&self) -> bool {
+    !self.is_const && self.indirection == CppTypeIndirection::None && self.base == CppTypeBase::Void
   }
 
   pub fn is_template(&self) -> bool {
@@ -92,47 +188,7 @@ impl CppType {
   }
 
   pub fn to_cpp_code(&self) -> Result<String, String> {
-    if self.is_template() {
-      return Err(format!("template types are not supported yet"));
-    }
-    let name = match self.base {
-      CppTypeBase::Unspecified { ref name, .. } => name.clone(),
-      CppTypeBase::Void => "void".to_string(),
-      CppTypeBase::Enum { ref name } => name.clone(),
-      CppTypeBase::Class { ref name, .. } => name.clone(),
-      CppTypeBase::TemplateParameter { .. } => {
-        return Err(format!("template parameters are not supported here yet"));
-      }
-      CppTypeBase::FunctionPointer { .. } => {
-        return Err(format!("function pointers are not supported here yet"));
-      }
-      CppTypeBase::BuiltInNumeric(ref t) => {
-        match *t {
-          CppBuiltInNumericType::Bool => "bool",
-          CppBuiltInNumericType::CharS => "char",
-          CppBuiltInNumericType::CharU => "char",
-          CppBuiltInNumericType::SChar => "signed char",
-          CppBuiltInNumericType::UChar => "unsigned char",
-          CppBuiltInNumericType::WChar => "wchar_t",
-          CppBuiltInNumericType::Char16 => "char16_t",
-          CppBuiltInNumericType::Char32 => "char32_t",
-          CppBuiltInNumericType::Short => "short",
-          CppBuiltInNumericType::UShort => "unsigned short",
-          CppBuiltInNumericType::Int => "int",
-          CppBuiltInNumericType::UInt => "unsigned int",
-          CppBuiltInNumericType::Long => "long",
-          CppBuiltInNumericType::ULong => "unsigned long",
-          CppBuiltInNumericType::LongLong => "long long",
-          CppBuiltInNumericType::ULongLong => "unsigned long long",
-          CppBuiltInNumericType::Int128 => "__int128_t",
-          CppBuiltInNumericType::UInt128 => "__uint128_t",
-          CppBuiltInNumericType::Float => "float",
-          CppBuiltInNumericType::Double => "double",
-          CppBuiltInNumericType::LongDouble => "long double",
-        }
-        .to_string()
-      }
-    };
+    let name = try!(self.base.to_cpp_code());
     Ok(format!("{}{}{}",
                if self.is_const {
                  "const "
@@ -150,61 +206,77 @@ impl CppType {
                }))
   }
 
-  pub fn to_c_type(&self, cpp_type_map: &CppTypeMap) -> Result<CTypeExtended, String> {
-    if self.is_template() {
-      return Err("Template types are not supported yet".to_string());
-    }
-    // todo: refactor this (it's easy to forgot initialization of result fields)
-    let mut result = CTypeExtended::void();
-    result.c_type.is_const = self.is_const;
-    result.cpp_type = self.clone();
-    match self.indirection {
-      CppTypeIndirection::None => {
-        // "const Rect" return type should not be translated to const pointer
-        result.c_type.is_const = false;
+  pub fn to_cpp_ffi_type(&self) -> Result<CppFfiType, String> {
+    match self.base {
+      CppTypeBase::TemplateParameter { .. } | CppTypeBase::Unspecified { .. } => {
+        return Err(format!("Unsupported type"));
       }
-      CppTypeIndirection::Ptr => {
-        result.c_type.is_pointer = true;
-
+      CppTypeBase::FunctionPointer { .. } => {
+        // TODO: support function pointers
+        return Err(format!("Function pointers are not supported yet"));
+      }
+      _ => {}
+    }
+    let mut result = self.clone();
+    let mut conversion = CppToFfiTypeConversion {
+      indirection_change: IndirectionChange::NoChange,
+      qflags_to_uint: false,
+    };
+    match self.indirection {
+      CppTypeIndirection::None | CppTypeIndirection::Ptr | CppTypeIndirection::PtrPtr => {
+        // no change needed
       }
       CppTypeIndirection::Ref => {
-        result.c_type.is_pointer = true;
-        result.conversion.indirection_change = IndirectionChange::ReferenceToPointer;
+        result.indirection = CppTypeIndirection::Ptr;
+        conversion.indirection_change = IndirectionChange::ReferenceToPointer;
       }
       _ => return Err("Unsupported level of indirection".to_string()),
     }
-    let name = match self.base {
-      CppTypeBase::Unspecified { ref name, .. } => name.clone(),
-      _ => panic!("new cpp types are not supported here yet"),
-    };
+    if let CppTypeBase::Class { ref name, .. } = self.base {
+      if name == "QFlags" {
+        println!("test {:?}", self);
+        assert!(self.indirection == CppTypeIndirection::None);
+        conversion.qflags_to_uint = true;
+        result.base = CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::UInt);
+      } else {
+        // structs can't be passed by value
+        if self.indirection == CppTypeIndirection::None {
+          result.indirection = CppTypeIndirection::Ptr;
+          conversion.indirection_change = IndirectionChange::ValueToPointer;
 
-    match cpp_type_map.get_info(&name) {
-      Ok(info) => {
-        match info.kind {
-          CppTypeKind::TypeDef { .. } => panic!("cpp_type_map.get_info should not return typedef"),
-          CppTypeKind::CPrimitive | CppTypeKind::Enum { .. } => {
-            result.c_type.base = name.clone();
-          }
-          CppTypeKind::Flags { .. } => {
-            result.c_type.base = format!("QTCW_{}", name.replace("::", "_"));
-            result.conversion.qflags_to_uint = true;
-          }
-          CppTypeKind::Class { .. } => {
-            result.c_type.base = name.clone();
-            result.c_type.is_pointer = true;
-            if self.indirection == CppTypeIndirection::None {
-              result.conversion.indirection_change = IndirectionChange::ValueToPointer;
-            }
-          }
-          CppTypeKind::Unknown => return Err("Unknown kind of type".to_string()),
+          // "const Rect" return type should not be translated to const pointer
+          result.is_const = false;
         }
       }
-      Err(msg) => return Err(format!("Type info error for {:?}: {}", self, msg)),
     }
-    if result.c_type.base.find("::").is_some() {
-      result.c_type.base = result.c_type.base.replace("::", "_");
-      result.conversion.renamed = true;
+    Ok(CppFfiType {
+      ffi_type: result,
+      conversion: conversion,
+      original_type: self.clone(),
+    })
+  }
+
+  pub fn caption(&self, strategy: TypeCaptionStrategy) -> String {
+    let short_caption = Regex::new(r"[ <>:]")
+                          .unwrap()
+                          .replace_all(&self.base.to_cpp_code().unwrap(), "");
+    match strategy {
+      TypeCaptionStrategy::Short => short_caption,
+      TypeCaptionStrategy::Full => {
+        let mut r = short_caption;
+        match self.indirection {
+          CppTypeIndirection::None => {}
+          CppTypeIndirection::Ptr => r = format!("{}_ptr", r),
+          CppTypeIndirection::Ref => r = format!("{}_ref", r),
+          CppTypeIndirection::PtrRef => r = format!("{}_ptr_ref", r),
+          CppTypeIndirection::PtrPtr => r = format!("{}_ptr_ptr", r),
+          CppTypeIndirection::RValueRef => r = format!("{}_rvalue_ref", r),
+        }
+        if self.is_const {
+          r = format!("const_{}", r);
+        }
+        r
+      }
     }
-    Ok(result)
   }
 }

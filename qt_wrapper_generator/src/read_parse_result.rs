@@ -72,7 +72,7 @@ impl CppMethod {
     // println!("{:?} {:?}", value, class_name);
     let value = value.as_object().unwrap();
     CppMethod {
-      origin: CppTypeOrigin::Qt { include_file: include_file.clone() },
+      origin: CppTypeOrigin::IncludeFile { include_file: include_file.clone(), location: None },
       name: value.get("name").unwrap().as_string().unwrap().to_string(),
       scope: match value.get("scope").unwrap().as_string().unwrap() {
         "global" => CppMethodScope::Global,
@@ -203,11 +203,9 @@ impl CppTypeInfo {
     let origin = match value.get("origin").unwrap().as_string().unwrap() {
       "c_built_in" => CppTypeOrigin::CBuiltIn,
       "qt" => {
-        CppTypeOrigin::Qt {
-          include_file: value.get("qt_header").unwrap().as_string().unwrap().to_string(),
-        }
+        CppTypeOrigin::IncludeFile { include_file: value.get("qt_header").unwrap().as_string().unwrap().to_string(), location: None }
       }
-      other => CppTypeOrigin::Unsupported(other.to_string()),
+      _ => CppTypeOrigin::Unknown,
     };
     CppTypeInfo {
       name: name,

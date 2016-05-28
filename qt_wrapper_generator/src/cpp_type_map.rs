@@ -19,6 +19,7 @@ pub struct CppTypeInfo {
 pub struct CppTypeMap(pub HashMap<String, CppTypeInfo>);
 
 impl CppTypeMap {
+  #[allow(dead_code)]
   pub fn get_info(&self, name: &String) -> Result<&CppTypeInfo, String> {
     if let Some(ref r) = self.0.get(name) {
       if let CppTypeKind::TypeDef { ref meaning } = r.kind {
@@ -39,10 +40,11 @@ impl CppTypeMap {
     }
   }
 
+  #[allow(dead_code)]
   pub fn get_types_from_include_file(&self, include: &String) -> Vec<String> {
     let mut r = vec![];
     for (_, type_info) in &self.0 {
-      if let CppTypeOrigin::Qt { ref include_file } = type_info.origin {
+      if let CppTypeOrigin::IncludeFile { ref include_file, .. } = type_info.origin {
         if include_file == include {
           r.push(type_info.name.clone());
         }

@@ -1,5 +1,4 @@
-use c_type::{CType, CppToCTypeConversion};
-use cpp_type::CppType;
+use cpp_type::{CppType, CppToFfiTypeConversion};
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -58,9 +57,9 @@ pub enum RustToCTypeConversion {
 
 #[derive(Debug, Clone)]
 pub struct CompleteType {
-  pub c_type: CType,
   pub cpp_type: CppType,
-  pub cpp_to_c_conversion: CppToCTypeConversion,
+  pub cpp_ffi_type: CppType,
+  pub cpp_to_ffi_conversion: CppToFfiTypeConversion,
   pub rust_ffi_type: RustType, /* pub rust_api_type: RustType,
                                 * pub rust_api_to_c_conversion: RustToCTypeConversion, */
 }

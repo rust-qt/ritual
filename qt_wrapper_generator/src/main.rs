@@ -1,22 +1,21 @@
 
-mod c_function_argument;
-mod c_function_signature;
-mod c_generator;
-mod c_type;
+mod cpp_ffi_function_argument;
+mod cpp_ffi_function_signature;
+mod cpp_ffi_generator;
 mod caption_strategy;
 mod clang_cpp_data;
-mod cpp_and_c_method;
+mod cpp_and_ffi_method;
 mod cpp_data;
 mod cpp_header_data;
 mod cpp_method;
 mod cpp_type;
 mod cpp_type_map;
 mod enums;
-mod extractor_actions_generator;
+//mod extractor_actions_generator;
 mod log;
 mod qt_specific;
 mod parsers_consistency_checker;
-mod read_extracted_info;
+//mod read_extracted_info;
 mod read_parse_result;
 mod rust_generator;
 mod rust_type;
@@ -67,7 +66,7 @@ fn main() {
     let qtcw_path = PathBuf::from(arguments[2].clone());
     let rust_qt_path = PathBuf::from(arguments[3].clone());
 
-    let c_gen = c_generator::CGenerator::new(parse_result, qtcw_path);
+    let c_gen = cpp_ffi_generator::CGenerator::new(parse_result, qtcw_path);
     log::info("Stage 2. Generating QTCW (Qt C wrapper) library.");
     let c_data = c_gen.generate_all();
     let mut rust_gen = rust_generator::RustGenerator::new(c_data, rust_qt_path);

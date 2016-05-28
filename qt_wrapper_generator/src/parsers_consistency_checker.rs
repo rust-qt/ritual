@@ -14,7 +14,7 @@ pub fn check(result1: &CLangCppData, result1_stats: &CppParserStats, result2: &C
   let mut missing_types1 = Vec::new();
   let mut missing_types2 = Vec::new();
   for (_, ref type_info2) in &result2.types.0 {
-    if let CppTypeOrigin::Qt { ref include_file } = type_info2.origin {
+    if let CppTypeOrigin::IncludeFile { ref include_file, .. } = type_info2.origin {
       let include_file2 = include_file;
       match type_info2.kind {
         // typedefs are not supposed to be in result1

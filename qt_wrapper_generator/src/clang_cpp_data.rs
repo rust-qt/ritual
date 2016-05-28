@@ -23,6 +23,7 @@ pub enum CLangCppTypeKind {
     bases: Vec<CppType>,
     fields: Vec<CLangClassField>,
     template_arguments: Option<Vec<String>>,
+    has_private_destructor: bool,
   },
 }
 
@@ -57,13 +58,16 @@ impl CLangCppTypeData {
 
 impl CLangCppData {
   pub fn ensure_explicit_destructors(&mut self) {
-    for type1 in self.types {
-      if let CLangCppTypeKind::Class { .. } = type1.kind {
-        let class_name = type1.name;
+    for type1 in &self.types {
+      if let CLangCppTypeKind::Class { ref has_private_destructor, .. } = type1.kind {
+        if *has_private_destructor {
+          continue;
+        }
+        let class_name = &type1.name;
         let mut found_destructor = false;
-        for method in self.methods {
+        for method in &self.methods {
           if method.is_destructor {
-            if let CppMethodScope::Class(name) = method.scope {
+            if let CppMethodScope::Class(ref name) = method.scope {
               if name == class_name {
                 found_destructor = true;
                 break;
@@ -89,7 +93,10 @@ impl CLangCppData {
             arguments: vec![],
             allows_variable_arguments: false,
             original_index: 1000,
-            origin: CppTypeOrigin::Qt { include_file: type1.header.clone() },
+            origin: CppTypeOrigin::IncludeFile {
+              include_file: type1.header.clone(),
+              location: None,
+            },
             template_arguments: None,
           });
         }
@@ -99,21 +106,21 @@ impl CLangCppData {
 
   pub fn split_by_headers(&self) -> HashMap<String, CLangCppData> {
     let mut result = HashMap::new();
-    for method in self.methods {
-      if let CppTypeOrigin::Qt { ref include_file } = method.origin {
+    for method in &self.methods {
+      if let CppTypeOrigin::IncludeFile { ref include_file, .. } = method.origin {
         if !result.contains_key(include_file) {
           result.insert(include_file.clone(), CLangCppData::default());
         }
         result.get_mut(include_file).unwrap().methods.push(method.clone());
       }
     }
-    for tp in self.types {
-      if result.find(|x| x == tp.header).is_none() {
+    for tp in &self.types {
+      if !result.contains_key(&tp.header) {
         result.insert(tp.header.clone(), CLangCppData::default());
       }
       result.get_mut(&tp.header).unwrap().types.push(tp.clone());
       if let CLangCppTypeKind::Class { .. } = tp.kind {
-        if let Some(ins) = self.template_instantiations.get(tp.name) {
+        if let Some(ins) = self.template_instantiations.get(&tp.name) {
           result.get_mut(&tp.header)
                 .unwrap()
                 .template_instantiations
