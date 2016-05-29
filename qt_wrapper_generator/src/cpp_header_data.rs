@@ -1,5 +1,5 @@
 use cpp_method::CppMethod;
-use enums::{CppMethodScope, CppTypeOrigin};
+use enums::{CppMethodScope, CppTypeOrigin, CppVisibility};
 
 #[derive(Debug, Clone)]
 pub struct CppHeaderData {
@@ -26,12 +26,13 @@ impl CppHeaderData {
           is_pure_virtual: false,
           is_const: false,
           is_static: false,
-          is_protected: false,
+          visibility: CppVisibility::Public,
           is_signal: false,
           return_type: None,
           is_constructor: false,
           is_destructor: true,
           operator: None,
+          conversion_operator: None,
           is_variable: false,
           arguments: vec![],
           allows_variable_arguments: false,

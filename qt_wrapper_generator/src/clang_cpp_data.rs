@@ -4,13 +4,13 @@ use cpp_method::CppMethod;
 use cpp_type::{CppType, CppTypeBase};
 use cpp_type_map::EnumValue;
 use std::collections::HashMap;
-use enums::{CppMethodScope, CppTypeOrigin};
+use enums::{CppMethodScope, CppTypeOrigin, CppVisibility};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CLangClassField {
   pub name: String,
   pub field_type: CppType,
-  pub is_protected: bool,
+  pub visibility: CppVisibility,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -23,7 +23,6 @@ pub enum CLangCppTypeKind {
     bases: Vec<CppType>,
     fields: Vec<CLangClassField>,
     template_arguments: Option<Vec<String>>,
-    has_private_destructor: bool,
   },
 }
 
@@ -59,10 +58,7 @@ impl CLangCppTypeData {
 impl CLangCppData {
   pub fn ensure_explicit_destructors(&mut self) {
     for type1 in &self.types {
-      if let CLangCppTypeKind::Class { ref has_private_destructor, .. } = type1.kind {
-        if *has_private_destructor {
-          continue;
-        }
+      if let CLangCppTypeKind::Class { .. } = type1.kind {
         let class_name = &type1.name;
         let mut found_destructor = false;
         for method in &self.methods {
@@ -83,12 +79,13 @@ impl CLangCppData {
             is_pure_virtual: false,
             is_const: false,
             is_static: false,
-            is_protected: false,
+            visibility: CppVisibility::Public,
             is_signal: false,
             return_type: None,
             is_constructor: false,
             is_destructor: true,
             operator: None,
+            conversion_operator: None,
             is_variable: false,
             arguments: vec![],
             allows_variable_arguments: false,

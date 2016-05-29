@@ -15,7 +15,8 @@ use clang_cpp_data::{CLangCppData, CLangCppTypeData, CLangCppTypeKind, CLangClas
 use cpp_type_map::EnumValue;
 // use cpp_type_map::CppTypeInfo;
 use cpp_method::{CppMethod, CppFunctionArgument};
-use enums::{CppMethodScope, CppTypeOrigin, CppTypeIndirection, CppTypeOriginLocation};
+use enums::{CppMethodScope, CppTypeOrigin, CppTypeIndirection, CppTypeOriginLocation,
+            CppVisibility};
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType};
 
 static VALID_OPERATOR_SYMBOLS: &'static [&'static str] = &["=", "+", "-", "+", "-", "*", "/", "%",
@@ -175,12 +176,12 @@ impl CppParser {
           if declaration.get_kind() == EntityKind::ClassDecl ||
              declaration.get_kind() == EntityKind::ClassTemplate ||
              declaration.get_kind() == EntityKind::StructDecl {
-            if declaration.get_accessibility().unwrap_or(Accessibility::Public) ==
-               Accessibility::Private {
+            if declaration.get_accessibility().unwrap_or(Accessibility::Public) !=
+               Accessibility::Public {
               return Err(format!("Type uses private class ({})",
                                  get_full_name(declaration).unwrap()));
             }
-            let re1 = Regex::new(r"^[\w:]+<([^<>]+)>$").unwrap();
+            let re1 = Regex::new(r"^[\w:]+<(.+)>$").unwrap();
             if let Some(matches) = re1.captures(name.as_ref()) {
               let mut arg_types = Vec::new();
               for arg in matches.at(1).unwrap().split(",") {
@@ -256,6 +257,39 @@ impl CppParser {
         });
       }
     }
+    let mut remaining_name: &str = name.as_ref();
+    let mut type1 = CppType {
+      is_const: is_const,
+      indirection: CppTypeIndirection::None,
+      base: CppTypeBase::Void,
+    };
+    if remaining_name.ends_with(" *") {
+      type1.indirection = CppTypeIndirection::Ptr;
+      remaining_name = remaining_name[0..remaining_name.len() - " *".len()].trim();
+    }
+    if remaining_name == "void" {
+      return Ok(type1);
+    }
+    if let Some(x) = CppBuiltInNumericType::all()
+                       .iter()
+                       .find(|x| x.to_cpp_code() == remaining_name) {
+      type1.base = CppTypeBase::BuiltInNumeric(x.clone());
+      return Ok(type1);
+    }
+    if type1.indirection == CppTypeIndirection::Ptr {
+      if let Ok(subtype) = self.parse_unexposed_type(None, Some(remaining_name.to_string()), context_class, context_method) {
+        return Ok(CppType {
+          base: subtype.base,
+          is_const: is_const,
+          indirection: match subtype.indirection {
+            CppTypeIndirection::None => CppTypeIndirection::Ptr,
+            CppTypeIndirection::Ptr => CppTypeIndirection::PtrPtr,
+            _ => panic!("too much indirection"),
+          }
+        });
+      }
+    }
+
     // println!("type is unexposed: {:?}", type1);
 
     return Err(format!("Unrecognized unexposed type: {}", name));
@@ -337,8 +371,8 @@ impl CppParser {
       }
       TypeKind::Record => {
         let declaration = type1.get_declaration().unwrap();
-        if declaration.get_accessibility().unwrap_or(Accessibility::Public) ==
-           Accessibility::Private {
+        if declaration.get_accessibility().unwrap_or(Accessibility::Public) !=
+           Accessibility::Public {
           return Err(format!("Type uses private class ({})",
                              get_full_name(declaration).unwrap_or("unnamed".to_string())));
         }
@@ -499,15 +533,6 @@ impl CppParser {
       }
       None => (CppMethodScope::Global, None),
     };
-    if let CppMethodScope::Class(..) = scope {
-      if let Some(accessibility) = entity.get_accessibility() {
-        if accessibility == Accessibility::Private {
-          return Err("Private method".to_string());
-        }
-      } else {
-        panic!("class method without accessibility");
-      }
-    }
     let return_type = entity.get_type()
                             .unwrap_or_else(|| panic!("failed to get function type"))
                             .get_result_type()
@@ -592,6 +617,20 @@ impl CppParser {
     } else {
       None
     };
+    let conversion_operator = if name.starts_with("operator ") {
+      let mut op = name["operator ".len()..].trim();
+      match self.parse_unexposed_type(None, Some(op.to_string()), class_entity, Some(entity)) {
+        Ok(t) => Some(t),
+        Err(msg) => {
+          panic!("Unknown operator: '{}' (method name: {}); error: {}",
+                 op,
+                 name,
+                 msg)
+        }
+      }
+    } else {
+      None
+    };
     //    if name == "name" {
     //      println!("TEST {:?}", entity.get_semantic_parent());
     //      println!("TEST2 {:?}", entity.get_lexical_parent());
@@ -604,8 +643,11 @@ impl CppParser {
       is_pure_virtual: entity.is_pure_virtual_method(),
       is_const: entity.is_const_method(),
       is_static: entity.is_static_method(),
-      is_protected: entity.get_accessibility().unwrap_or(Accessibility::Public) ==
-                    Accessibility::Protected,
+      visibility: match entity.get_accessibility().unwrap_or(Accessibility::Public) {
+        Accessibility::Public => CppVisibility::Public,
+        Accessibility::Protected => CppVisibility::Protected,
+        Accessibility::Private => CppVisibility::Private,
+      },
       is_signal: false, // TODO: somehow get this information
       arguments: arguments,
       allows_variable_arguments: entity.is_variadic(),
@@ -613,6 +655,7 @@ impl CppParser {
       is_constructor: entity.get_kind() == EntityKind::Constructor,
       is_destructor: entity.get_kind() == EntityKind::Destructor,
       operator: operator,
+      conversion_operator: conversion_operator,
       is_variable: false, // TODO: move variables into CppTypeInfo
       original_index: -1,
       origin: match include_file {
@@ -660,20 +703,8 @@ impl CppParser {
     let mut fields = Vec::new();
     let mut bases = Vec::new();
     let template_arguments = get_template_arguments(entity);
-    let has_private_destructor = entity.get_children()
-                                       .iter()
-                                       .find(|c| {
-                                         c.get_kind() == EntityKind::Destructor &&
-                                         c.get_accessibility().unwrap() == Accessibility::Private
-                                       })
-                                       .is_some();
     for child in entity.get_children() {
       if child.get_kind() == EntityKind::FieldDecl {
-        let is_protected = match child.get_accessibility().unwrap() {
-          Accessibility::Private => continue,
-          Accessibility::Protected => true,
-          Accessibility::Public => false,
-        };
         match self.parse_type(child.get_type().unwrap().get_canonical_type(),
                               Some(entity),
                               None) {
@@ -681,7 +712,11 @@ impl CppParser {
             fields.push(CLangClassField {
               name: child.get_name().unwrap(),
               field_type: field_type,
-              is_protected: is_protected,
+              visibility: match entity.get_accessibility().unwrap_or(Accessibility::Public) {
+                Accessibility::Public => CppVisibility::Public,
+                Accessibility::Protected => CppVisibility::Protected,
+                Accessibility::Private => CppVisibility::Private,
+              },
             });
           }
           Err(msg) => {
@@ -727,7 +762,6 @@ impl CppParser {
           }
           None
         },
-        has_private_destructor: has_private_destructor,
       },
     })
   }
@@ -737,12 +771,6 @@ impl CppParser {
     let mut child_context = context.clone();
     child_context.level = child_context.level + 1;
     self.entity_kinds.insert(entity.get_kind());
-    if let Some(accessibility) = entity.get_accessibility() {
-      if accessibility == Accessibility::Private {
-        return; // skipping private stuff
-      }
-    }
-
     let include_file = if let Some(location) = entity.get_location() {
       let file_path = location.get_presumed_location().0;
       if file_path.is_empty() {
@@ -810,6 +838,9 @@ impl CppParser {
         }
       }
       EntityKind::EnumDecl => {
+        if entity.get_accessibility() == Some(Accessibility::Private) {
+          return; // skipping private stuff
+        }
         if entity.get_name().is_some() && entity.is_definition() {
           self.stats.total_types = self.stats.total_types + 1;
           if let Some(include_file) = include_file {
@@ -838,6 +869,9 @@ impl CppParser {
         }
       }
       EntityKind::ClassDecl | EntityKind::ClassTemplate | EntityKind::StructDecl => {
+        if entity.get_accessibility() == Some(Accessibility::Private) {
+          return; // skipping private stuff
+        }
         let ok = entity.get_name().is_some() && // not an anonymous struct
           entity.is_definition() && // not a forward declaration
           entity.get_template().is_none(); // not a template specialization

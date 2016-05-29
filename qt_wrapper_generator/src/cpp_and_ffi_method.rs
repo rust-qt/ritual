@@ -2,7 +2,7 @@ use cpp_method::CppMethod;
 use enums::{AllocationPlace, CppMethodScope};
 use cpp_ffi_function_signature::CppFfiFunctionSignature;
 use utils::operator_c_name;
-use caption_strategy::MethodCaptionStrategy;
+use caption_strategy::{MethodCaptionStrategy, TypeCaptionStrategy};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppMethodWithFfiSignature {
@@ -41,9 +41,11 @@ impl CppMethodWithFfiSignature {
         Ok(op) => format!("OP_{}", op),
         Err(msg) => return Err(msg),
       }
-    } else {
+    } else if let Some(ref operator_type) = self.cpp_method.conversion_operator {
       //TODO: support conversion operators in rust
-      self.cpp_method.name.replace("operator ", "operator_")
+      format!("operator_{}", operator_type.caption(TypeCaptionStrategy::Full))
+    } else {
+      self.cpp_method.name.clone() //.replace("operator ", "operator_")
     };
     Ok(scope_prefix + &method_name)
   }

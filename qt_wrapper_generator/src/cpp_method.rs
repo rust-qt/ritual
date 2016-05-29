@@ -1,6 +1,6 @@
 use cpp_type::{CppType, CppTypeBase, CppFfiType};
 use enums::{CppMethodScope, AllocationPlace, AllocationPlaceImportance, CppFfiArgumentMeaning,
-            CppTypeIndirection, CppTypeOrigin};
+            CppTypeIndirection, CppTypeOrigin, CppVisibility};
 use cpp_ffi_function_signature::CppFfiFunctionSignature;
 use cpp_ffi_function_argument::CppFfiFunctionArgument;
 use cpp_and_ffi_method::CppMethodWithFfiSignature;
@@ -21,12 +21,13 @@ pub struct CppMethod {
   pub is_pure_virtual: bool,
   pub is_const: bool,
   pub is_static: bool,
-  pub is_protected: bool,
+  pub visibility: CppVisibility,
   pub is_signal: bool,
   pub return_type: Option<CppType>,
   pub is_constructor: bool,
   pub is_destructor: bool,
   pub operator: Option<String>,
+  pub conversion_operator: Option<CppType>,
   pub is_variable: bool,
   pub arguments: Vec<CppFunctionArgument>,
   pub allows_variable_arguments: bool,
@@ -36,6 +37,19 @@ pub struct CppMethod {
 }
 
 impl CppMethod {
+  pub fn argument_types_equal(&self, other: &CppMethod) -> bool {
+    if self.arguments.len() != other.arguments.len() {
+      return false;
+    }
+    for i in 0..self.arguments.len() {
+      if self.arguments.get(i).unwrap().argument_type !=
+         other.arguments.get(i).unwrap().argument_type {
+        return false;
+      }
+    }
+    true
+  }
+
   pub fn real_return_type(&self) -> Option<CppType> {
     if self.is_constructor {
       if let CppMethodScope::Class(ref class_name) = self.scope {
@@ -195,8 +209,11 @@ impl CppMethod {
     if self.is_static {
       s = format!("{} static", s);
     }
-    if self.is_protected {
+    if self.visibility == CppVisibility::Protected {
       s = format!("{} protected", s);
+    }
+    if self.visibility == CppVisibility::Private {
+      s = format!("{} private", s);
     }
     if self.is_signal {
       s = format!("{} [signal]", s);

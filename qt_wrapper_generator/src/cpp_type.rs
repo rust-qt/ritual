@@ -56,6 +56,30 @@ impl CppBuiltInNumericType {
       CppBuiltInNumericType::LongDouble => "long double",
     }
   }
+
+  pub fn all() -> [CppBuiltInNumericType; 21] {
+    [CppBuiltInNumericType::Bool,
+     CppBuiltInNumericType::CharS,
+     CppBuiltInNumericType::CharU,
+     CppBuiltInNumericType::SChar,
+     CppBuiltInNumericType::UChar,
+     CppBuiltInNumericType::WChar,
+     CppBuiltInNumericType::Char16,
+     CppBuiltInNumericType::Char32,
+     CppBuiltInNumericType::Short,
+     CppBuiltInNumericType::UShort,
+     CppBuiltInNumericType::Int,
+     CppBuiltInNumericType::UInt,
+     CppBuiltInNumericType::Long,
+     CppBuiltInNumericType::ULong,
+     CppBuiltInNumericType::LongLong,
+     CppBuiltInNumericType::ULongLong,
+     CppBuiltInNumericType::Int128,
+     CppBuiltInNumericType::UInt128,
+     CppBuiltInNumericType::Float,
+     CppBuiltInNumericType::Double,
+     CppBuiltInNumericType::LongDouble]
+  }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -128,6 +152,33 @@ impl CppTypeBase {
         return Err(format!("function pointers are not supported here yet"));
       }
       CppTypeBase::Unspecified { .. } => Err(format!("Unspecified is not allowed")),
+    }
+  }
+  pub fn caption(&self) -> String {
+    match *self {
+      CppTypeBase::Void => "void".to_string(),
+      CppTypeBase::BuiltInNumeric(ref t) => t.to_cpp_code().to_string().replace(" ", "_"),
+      CppTypeBase::Enum { ref name } => name.replace("::", "_"),
+      CppTypeBase::Class { ref name, ref template_arguments } => {
+        let name_caption = name.replace("::", "_");
+        match *template_arguments {
+          Some(ref args) => {
+            let mut arg_texts = Vec::new();
+            for arg in args {
+              arg_texts.push(arg.caption(TypeCaptionStrategy::Full));
+            }
+            format!("{}_{}", name_caption, arg_texts.join("_"))
+          }
+          None => name_caption,
+        }
+      }
+      CppTypeBase::TemplateParameter { .. } => {
+        panic!("template parameters are not supported here yet");
+      }
+      CppTypeBase::FunctionPointer { .. } => {
+        panic!("function pointers are not supported here yet");
+      }
+      CppTypeBase::Unspecified { .. } => panic!("Unspecified is not allowed"),
     }
   }
 }
@@ -257,13 +308,10 @@ impl CppType {
   }
 
   pub fn caption(&self, strategy: TypeCaptionStrategy) -> String {
-    let short_caption = Regex::new(r"[ <>:]")
-                          .unwrap()
-                          .replace_all(&self.base.to_cpp_code().unwrap(), "");
     match strategy {
-      TypeCaptionStrategy::Short => short_caption,
+      TypeCaptionStrategy::Short => self.base.caption(),
       TypeCaptionStrategy::Full => {
-        let mut r = short_caption;
+        let mut r = self.base.caption();
         match self.indirection {
           CppTypeIndirection::None => {}
           CppTypeIndirection::Ptr => r = format!("{}_ptr", r),

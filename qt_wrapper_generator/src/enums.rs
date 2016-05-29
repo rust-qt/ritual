@@ -24,6 +24,15 @@ pub enum CppMethodScope {
   Class(String),
 }
 
+impl CppMethodScope {
+  pub fn class_name(&self) -> Option<&String> {
+    match *self {
+      CppMethodScope::Global => None,
+      CppMethodScope::Class(ref s) => Some(s)
+    }
+  }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CppFfiArgumentMeaning {
   This,
@@ -87,4 +96,11 @@ pub enum AllocationPlace {
 pub enum AllocationPlaceImportance {
   Important,
   NotImportant,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CppVisibility {
+  Public,
+  Protected,
+  Private
 }

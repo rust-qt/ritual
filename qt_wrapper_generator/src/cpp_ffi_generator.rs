@@ -1,4 +1,5 @@
-use enums::{AllocationPlace, CppFfiArgumentMeaning, IndirectionChange, CppMethodScope};
+use enums::{AllocationPlace, CppFfiArgumentMeaning, IndirectionChange, CppMethodScope,
+            CppVisibility};
 use cpp_and_ffi_method::CppAndFfiMethod;
 use std::path::PathBuf;
 use std::fs::File;
@@ -9,11 +10,13 @@ use log;
 use clang_cpp_data::{CLangCppData, CLangCppTypeKind};
 use caption_strategy::MethodCaptionStrategy;
 use cpp_method::CppMethod;
+use cpp_type::CppTypeBase;
 
 pub struct CGenerator {
   qtcw_path: PathBuf,
   cpp_data: CLangCppData,
   template_classes: Vec<String>,
+  abstract_classes: Vec<String>,
 }
 
 impl CppAndFfiMethod {
@@ -217,10 +220,27 @@ impl CGenerator {
                                 })
                                 .collect(),
       cpp_data: cpp_data,
+      abstract_classes: Vec::new(),
     }
   }
 
-  pub fn generate_all(self) -> CppAndFfiData {
+  pub fn generate_all(mut self) -> CppAndFfiData {
+    self.abstract_classes = self.cpp_data
+                                .types
+                                .iter()
+                                .filter_map(|t| {
+                                  if let CLangCppTypeKind::Class { .. } = t.kind {
+                                    if self.get_pure_virtual_methods(&t.name).len() > 0 {
+                                      Some(t.name.clone())
+                                    } else {
+                                      None
+                                    }
+                                  } else {
+                                    None
+                                  }
+                                })
+                                .collect();
+    log::info(format!("Abstract classes: {:?}", self.abstract_classes));
     let mut h_path = self.qtcw_path.clone();
     h_path.push("include");
     h_path.push("qtcw.h");
@@ -300,6 +320,84 @@ impl CGenerator {
     }
   }
 
+  fn get_all_methods(&self, class_name: &String) -> Vec<CppMethod> {
+    let own_methods: Vec<_> = self.cpp_data
+                                  .methods
+                                  .iter()
+                                  .filter(|m| m.scope.class_name() == Some(class_name))
+                                  .collect();
+    let mut inherited_methods = Vec::new();
+    if let Some(type_info) = self.cpp_data.types.iter().find(|t| &t.name == class_name) {
+      if let CLangCppTypeKind::Class { ref bases, .. } = type_info.kind {
+        for base in bases {
+          if let CppTypeBase::Class { ref name, .. } = base.base {
+            for method in self.get_all_methods(name) {
+              if own_methods.iter()
+                            .find(|m| m.name == method.name && m.argument_types_equal(&method))
+                            .is_none() {
+                inherited_methods.push(method.clone());
+              }
+            }
+          }
+        }
+      } else {
+        panic!("get_all_methods: not a class");
+      }
+    } else {
+      log::warning(format!("get_all_methods: no type info for {:?}", class_name));
+    }
+    for m in own_methods {
+      inherited_methods.push((*m).clone());
+    }
+    inherited_methods
+  }
+
+  fn get_pure_virtual_methods(&self, class_name: &String) -> Vec<CppMethod> {
+
+    let own_methods: Vec<_> = self.cpp_data
+                                  .methods
+                                  .iter()
+                                  .filter(|m| m.scope.class_name() == Some(class_name))
+                                  .collect();
+    let own_pure_virtual_methods: Vec<_> = own_methods.iter()
+                                                      .filter(|m| m.is_pure_virtual)
+                                                      .collect();
+    if class_name == "QStringListModel" {
+      println!("OWN: {:?}", own_methods);
+    }
+    let mut inherited_methods = Vec::new();
+    if let Some(type_info) = self.cpp_data.types.iter().find(|t| &t.name == class_name) {
+      if let CLangCppTypeKind::Class { ref bases, .. } = type_info.kind {
+        for base in bases {
+          if let CppTypeBase::Class { ref name, .. } = base.base {
+            for method in self.get_pure_virtual_methods(name) {
+              if class_name == "QStringListModel" {
+                println!("INHERITED: {:?}", method);
+              }
+              if own_methods.iter()
+                            .find(|m| m.name == method.name && m.argument_types_equal(&method))
+                            .is_none() {
+                if class_name == "QStringListModel" {
+                  println!("not overriden!");
+                }
+                inherited_methods.push(method.clone());
+              }
+            }
+          }
+        }
+      } else {
+        panic!("get_pure_virtual_methods: not a class");
+      }
+    } else {
+      log::warning(format!("get_pure_virtual_methods: no type info for {:?}",
+                           class_name));
+    }
+    for m in own_pure_virtual_methods {
+      inherited_methods.push((*m).clone());
+    }
+    inherited_methods
+  }
+
   pub fn process_methods(&self,
                          include_file_base_name: &String,
                          methods: &Vec<CppMethod>)
@@ -327,28 +425,18 @@ impl CGenerator {
 //        if include_file == "QRect" { println!("process_methods test1 {:?}", method); }
         if method.is_constructor {
           if let CppMethodScope::Class(ref class_name) = method.scope {
-            if methods.iter().find(|m|
-                                   if let CppMethodScope::Class(ref m_class_name) = m.scope {
-                                     if m_class_name == class_name && m.is_pure_virtual {
-                                       true
-                                     } else {
-                                       false
-                                     }
-                                   } else {
-                                     false
-                                   }).is_some() {
-
+            if self.abstract_classes.iter().find(|x| x == &class_name).is_some() {
               log::debug(format!("Method is skipped:\n{}\nConstructors are not allowed for abstract \
                             classes.\n",
               method.short_text()));
               continue;
             }
           }
-
-
         }
-
-        if method.is_protected {
+        if method.visibility == CppVisibility::Private {
+          continue;
+        }
+        if method.visibility == CppVisibility::Protected {
           log::debug(format!("Skipping protected method: \n{}\n",
           method.short_text()));
           continue;
