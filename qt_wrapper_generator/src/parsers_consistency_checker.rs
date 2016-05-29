@@ -2,7 +2,7 @@ use cpp_data::CppData;
 use clang_cpp_data::{CLangCppData, CLangCppTypeKind};
 use cpp_parser::CppParserStats;
 use log;
-use enums::{CppTypeOrigin, CppTypeKind, CppMethodScope};
+use enums::{CppTypeOrigin, CppTypeKind, CppMethodScope, CppVisibility};
 use std::collections::HashMap;
 extern crate core;
 use self::core::ops::AddAssign;
@@ -14,7 +14,7 @@ pub fn check(result1: &CLangCppData, result1_stats: &CppParserStats, result2: &C
   let mut missing_types1 = Vec::new();
   let mut missing_types2 = Vec::new();
   for (_, ref type_info2) in &result2.types.0 {
-    if let CppTypeOrigin::Qt { ref include_file } = type_info2.origin {
+    if let CppTypeOrigin::IncludeFile { ref include_file, .. } = type_info2.origin {
       let include_file2 = include_file;
       match type_info2.kind {
         // typedefs are not supposed to be in result1
@@ -98,6 +98,7 @@ pub fn check(result1: &CLangCppData, result1_stats: &CppParserStats, result2: &C
   let mut method_counts1: HashMap<String, i32> = HashMap::new();
   let mut method_counts2: HashMap<String, i32> = HashMap::new();
   for method in &result1.methods {
+    if method.visibility == CppVisibility::Private { continue; }
     let name = method.full_name();
     if !method_counts1.contains_key(&name) {
       method_counts1.insert(name.clone(), 0);
@@ -106,6 +107,7 @@ pub fn check(result1: &CLangCppData, result1_stats: &CppParserStats, result2: &C
   }
   for header in &result2.headers {
     for method in &header.methods {
+      if method.visibility == CppVisibility::Private { continue; }
       let name = method.full_name();
       if !method_counts2.contains_key(&name) {
         method_counts2.insert(name.clone(), 0);
@@ -118,6 +120,7 @@ pub fn check(result1: &CLangCppData, result1_stats: &CppParserStats, result2: &C
     }
   }
   for method in &result1.methods {
+    if method.visibility == CppVisibility::Private { continue; }
     if let CppMethodScope::Class(ref class_name) = method.scope {
       for class_type in result1.types.iter().filter(|x| x.inherits(class_name)) {
         let base_method = format!("{}::{}", class_type.name, method.name);

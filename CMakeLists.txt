@@ -37,11 +37,12 @@ add_custom_target(${PROJECT_NAME}
   DEPENDS build_rust_qt)
 
 # run python parser
-add_custom_command(
-  OUTPUT ${DOC_PARSE_RESULT_PATH}
-  COMMAND ${CMAKE_SOURCE_DIR}/qt_doc_parser.py ${QT_DOC_DIR} ${DOC_PARSE_RESULT_PATH}
-  DEPENDS ${CMAKE_SOURCE_DIR}/qt_doc_parser.py ${QT_DOC_FILES}
-)
+
+#add_custom_command(
+#  OUTPUT ${DOC_PARSE_RESULT_PATH}
+#  COMMAND ${CMAKE_SOURCE_DIR}/qt_doc_parser.py ${QT_DOC_DIR} ${DOC_PARSE_RESULT_PATH}
+#  DEPENDS ${CMAKE_SOURCE_DIR}/qt_doc_parser.py ${QT_DOC_FILES}
+#)
 
 # cargo config file for changing build directory
 CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/qt_wrapper_generator/cargo_config_template ${CMAKE_BINARY_DIR}/.cargo/config)
@@ -54,22 +55,25 @@ add_custom_command(
 )
 
 # running main generator for generating cpp extractor actions
-add_custom_command(
-  OUTPUT ${CPP_INFO_EXTRACTOR_ACTIONS_PATH}
-  COMMAND ${RUST_GENERATOR_EXE} stage1 ${DOC_PARSE_RESULT_PATH} ${CPP_INFO_EXTRACTOR_ACTIONS_PATH}
-  DEPENDS ${RUST_GENERATOR_EXE} ${DOC_PARSE_RESULT_PATH}
-)
+
+#add_custom_command(
+#  OUTPUT ${CPP_INFO_EXTRACTOR_ACTIONS_PATH}
+#  COMMAND ${RUST_GENERATOR_EXE} stage1 ${DOC_PARSE_RESULT_PATH} ${CPP_INFO_EXTRACTOR_ACTIONS_PATH}
+#  DEPENDS ${RUST_GENERATOR_EXE} ${DOC_PARSE_RESULT_PATH}
+#)
 
 # building cpp extractor
-add_executable(cpp_info_extractor cpp_info_extractor.cpp ${CPP_INFO_EXTRACTOR_ACTIONS_PATH})
-include_directories(${CMAKE_BINARY_DIR})
-target_link_libraries(cpp_info_extractor ${Qt5Core_LIBRARIES})
+
+#add_executable(cpp_info_extractor cpp_info_extractor.cpp ${CPP_INFO_EXTRACTOR_ACTIONS_PATH})
+#include_directories(${CMAKE_BINARY_DIR})
+#target_link_libraries(cpp_info_extractor ${Qt5Core_LIBRARIES})
 
 # running cpp extractor
-add_custom_command(
-  OUTPUT ${CPP_EXTRACTED_INFO_PATH}
-  COMMAND cpp_info_extractor ${CPP_EXTRACTED_INFO_PATH}
-)
+
+#add_custom_command(
+#  OUTPUT ${CPP_EXTRACTED_INFO_PATH}
+#  COMMAND cpp_info_extractor ${CPP_EXTRACTED_INFO_PATH}
+#)
 
 # running main generator for generating C and Rust wrappers
 add_custom_command(
@@ -77,8 +81,10 @@ add_custom_command(
   COMMAND
     ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/qtcw_template ${QTCW_GENERATED_SOURCE_DIR} &&
     ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/rust_qt_template ${RUST_QT_GENERATED_SOURCE_DIR} &&
-    ${RUST_GENERATOR_EXE} stage2 ${DOC_PARSE_RESULT_PATH} ${CPP_EXTRACTED_INFO_PATH} ${QTCW_GENERATED_SOURCE_DIR} ${RUST_QT_GENERATED_SOURCE_DIR}
-  DEPENDS ${RUST_GENERATOR_EXE} ${QTCW_TEMPLATE_FILES} ${RUST_QT_TEMPLATE_FILES} ${CPP_EXTRACTED_INFO_PATH}
+    ${RUST_GENERATOR_EXE} stage0 ${QTCW_GENERATED_SOURCE_DIR} ${RUST_QT_GENERATED_SOURCE_DIR}
+    #${RUST_GENERATOR_EXE} stage2 ${DOC_PARSE_RESULT_PATH} ${CPP_EXTRACTED_INFO_PATH} ${QTCW_GENERATED_SOURCE_DIR} ${RUST_QT_GENERATED_SOURCE_DIR}
+  DEPENDS ${RUST_GENERATOR_EXE} ${QTCW_TEMPLATE_FILES} ${RUST_QT_TEMPLATE_FILES}
+  #${CPP_EXTRACTED_INFO_PATH}
 )
 
 if(NOT ${QTCW_COMPILE_BLOCKED})
@@ -99,21 +105,21 @@ if(NOT ${QTCW_COMPILE_BLOCKED})
   add_custom_target(qtcw_installed DEPENDS ${QTCW_INSTALL_DIR})
 
   # building and running C tests
-  include_directories(${QTCW_INSTALL_DIR}/include)
-  foreach(QTCW_TEST_FILE ${QTCW_TEST_FILES})
-    get_filename_component(TEST_NAME ${QTCW_TEST_FILE} NAME_WE)
-    set(TEST_TARGET "c_test_${TEST_NAME}")
-    add_executable(${TEST_TARGET} ${QTCW_TEST_FILE})
-    add_dependencies(${TEST_TARGET} qtcw_installed)
-    target_link_libraries(${TEST_TARGET} ${QTCW_INSTALL_DIR}/lib/libqtcw.a ${Qt5Core_LIBRARIES} -lstdc++)
-    add_custom_command(
-      TARGET ${TEST_TARGET}
-      POST_BUILD
-      COMMAND ${TEST_TARGET}
-    )
-    set(TEST_TARGETS ${TEST_TARGETS} ${TEST_TARGET})
 
-  endforeach()
+  #include_directories(${QTCW_INSTALL_DIR}/include)
+  #foreach(QTCW_TEST_FILE ${QTCW_TEST_FILES})
+  #  get_filename_component(TEST_NAME ${QTCW_TEST_FILE} NAME_WE)
+  #  set(TEST_TARGET "c_test_${TEST_NAME}")
+  #  add_executable(${TEST_TARGET} ${QTCW_TEST_FILE})
+  #  add_dependencies(${TEST_TARGET} qtcw_installed)
+  #  target_link_libraries(${TEST_TARGET} ${QTCW_INSTALL_DIR}/lib/libqtcw.a ${Qt5Core_LIBRARIES} -lstdc++)
+  #  add_custom_command(
+  #    TARGET ${TEST_TARGET}
+  #    POST_BUILD
+  #    COMMAND ${TEST_TARGET}
+  #  )
+  #  set(TEST_TARGETS ${TEST_TARGETS} ${TEST_TARGET})
+  #endforeach()
 
 endif()
 
@@ -121,5 +127,6 @@ endif()
 add_custom_target(build_rust_qt
   COMMAND QTCW_LIB_DIR=${QTCW_INSTALL_DIR}/lib cargo test
   WORKING_DIRECTORY ${RUST_QT_GENERATED_SOURCE_DIR}/qt_core
-  DEPENDS ${RUST_QT_GENERATED_SOURCE_DIR} ${TEST_TARGETS}
+  DEPENDS ${RUST_QT_GENERATED_SOURCE_DIR} ${QTCW_INSTALL_DIR}
+  #${TEST_TARGETS}
 )

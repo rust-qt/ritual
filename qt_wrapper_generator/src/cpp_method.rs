@@ -1,11 +1,9 @@
-use cpp_type::{CppType, CppTypeBase};
-use enums::{CppMethodScope, AllocationPlace, AllocationPlaceImportance,
-            CFunctionArgumentCppEquivalent, CppTypeIndirection, CppTypeKind, CppTypeOrigin};
-use c_function_signature::CFunctionSignature;
-use c_type::CTypeExtended;
-use c_function_argument::CFunctionArgument;
-use cpp_and_c_method::CppMethodWithCSignature;
-use cpp_type_map::CppTypeMap;
+use cpp_type::{CppType, CppTypeBase, CppFfiType};
+use enums::{CppMethodScope, AllocationPlace, AllocationPlaceImportance, CppFfiArgumentMeaning,
+            CppTypeIndirection, CppTypeOrigin, CppVisibility};
+use cpp_ffi_function_signature::CppFfiFunctionSignature;
+use cpp_ffi_function_argument::CppFfiFunctionArgument;
+use cpp_and_ffi_method::CppMethodWithFfiSignature;
 use utils::JoinWithString;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -23,12 +21,13 @@ pub struct CppMethod {
   pub is_pure_virtual: bool,
   pub is_const: bool,
   pub is_static: bool,
-  pub is_protected: bool,
+  pub visibility: CppVisibility,
   pub is_signal: bool,
   pub return_type: Option<CppType>,
   pub is_constructor: bool,
   pub is_destructor: bool,
   pub operator: Option<String>,
+  pub conversion_operator: Option<CppType>,
   pub is_variable: bool,
   pub arguments: Vec<CppFunctionArgument>,
   pub allows_variable_arguments: bool,
@@ -38,16 +37,28 @@ pub struct CppMethod {
 }
 
 impl CppMethod {
+  pub fn argument_types_equal(&self, other: &CppMethod) -> bool {
+    if self.arguments.len() != other.arguments.len() {
+      return false;
+    }
+    for i in 0..self.arguments.len() {
+      if self.arguments.get(i).unwrap().argument_type !=
+         other.arguments.get(i).unwrap().argument_type {
+        return false;
+      }
+    }
+    true
+  }
+
   pub fn real_return_type(&self) -> Option<CppType> {
     if self.is_constructor {
       if let CppMethodScope::Class(ref class_name) = self.scope {
         return Some(CppType {
           is_const: false,
           indirection: CppTypeIndirection::None,
-          // TODO: figure out template arguments
-          base: CppTypeBase::Unspecified {
+          base: CppTypeBase::Class {
             name: class_name.clone(),
-            template_arguments: None,
+            template_arguments: None, // TODO: report template arguments
           },
         });
       } else {
@@ -72,9 +83,8 @@ impl CppMethod {
   }
 
   pub fn c_signature(&self,
-                     cpp_type_map: &CppTypeMap,
                      allocation_place: AllocationPlace)
-                     -> Result<(CFunctionSignature, AllocationPlaceImportance), String> {
+                     -> Result<(CppFfiFunctionSignature, AllocationPlaceImportance), String> {
 
     // no complicated cases support for now
     if self.is_variable {
@@ -84,35 +94,35 @@ impl CppMethod {
       return Err("Variable arguments are not supported".to_string());
     }
     let mut allocation_place_importance = AllocationPlaceImportance::NotImportant;
-    let mut r = CFunctionSignature {
+    let mut r = CppFfiFunctionSignature {
       arguments: Vec::new(),
-      return_type: CTypeExtended::void(),
+      return_type: CppFfiType::void(),
     };
     if let CppMethodScope::Class(ref class_name) = self.scope {
       if !self.is_static && !self.is_constructor {
-        r.arguments.push(CFunctionArgument {
-          name: "self".to_string(),
+        r.arguments.push(CppFfiFunctionArgument {
+          name: "this_ptr".to_string(),
           argument_type: CppType {
-                           base: CppTypeBase::Unspecified {
+                           base: CppTypeBase::Class {
                              name: class_name.clone(),
-                             template_arguments: None, // TODO: figure out template arguments
+                             template_arguments: None, // TODO: report template arguments
                            },
                            is_const: self.is_const,
                            indirection: CppTypeIndirection::Ptr,
                          }
-                         .to_c_type(cpp_type_map)
+                         .to_cpp_ffi_type()
                          .unwrap(),
-          cpp_equivalent: CFunctionArgumentCppEquivalent::This,
+          cpp_equivalent: CppFfiArgumentMeaning::This,
         });
       }
     }
     for (index, arg) in self.arguments.iter().enumerate() {
-      match arg.argument_type.to_c_type(cpp_type_map) {
+      match arg.argument_type.to_cpp_ffi_type() {
         Ok(c_type) => {
-          r.arguments.push(CFunctionArgument {
+          r.arguments.push(CppFfiFunctionArgument {
             name: arg.name.clone(),
             argument_type: c_type,
-            cpp_equivalent: CFunctionArgumentCppEquivalent::Argument(index as i8),
+            cpp_equivalent: CppFfiArgumentMeaning::Argument(index as i8),
           });
         }
         Err(msg) => {
@@ -121,28 +131,18 @@ impl CppMethod {
       }
     }
     if let Some(return_type) = self.real_return_type() {
-      match return_type.to_c_type(cpp_type_map) {
+      match return_type.to_cpp_ffi_type() {
         Ok(c_type) => {
-          let is_stack_allocated_struct = if return_type.indirection == CppTypeIndirection::None {
-            match return_type.base {
-              CppTypeBase::Unspecified { ref name, .. } => {
-                match cpp_type_map.get_info(name).unwrap().kind {
-                  CppTypeKind::Class { .. } => true,
-                  _ => false,
-                }
-              }
-              _ => panic!("new cpp types are not supported here yet"),
-            }
-          } else {
-            false
-          };
+          let is_stack_allocated_struct = return_type.indirection == CppTypeIndirection::None &&
+                                          return_type.base.is_class() &&
+                                          !c_type.conversion.qflags_to_uint;
           if is_stack_allocated_struct {
             allocation_place_importance = AllocationPlaceImportance::Important;
             if allocation_place == AllocationPlace::Stack {
-              r.arguments.push(CFunctionArgument {
+              r.arguments.push(CppFfiFunctionArgument {
                 name: "output".to_string(),
                 argument_type: c_type,
-                cpp_equivalent: CFunctionArgumentCppEquivalent::ReturnValue,
+                cpp_equivalent: CppFfiArgumentMeaning::ReturnValue,
               });
             } else {
               r.return_type = c_type;
@@ -163,22 +163,21 @@ impl CppMethod {
   }
 
   pub fn add_c_signatures
-    (&self,
-     cpp_type_map: &CppTypeMap)
-     -> Result<(CppMethodWithCSignature, Option<CppMethodWithCSignature>), String> {
-    match self.c_signature(cpp_type_map, AllocationPlace::Heap) {
+    (&self)
+     -> Result<(CppMethodWithFfiSignature, Option<CppMethodWithFfiSignature>), String> {
+    match self.c_signature(AllocationPlace::Heap) {
       Ok((c_signature, importance)) => {
-        let result1 = CppMethodWithCSignature {
+        let result1 = CppMethodWithFfiSignature {
           cpp_method: self.clone(),
           allocation_place: AllocationPlace::Heap,
           c_signature: c_signature,
         };
         match importance {
           AllocationPlaceImportance::Important => {
-            match self.c_signature(cpp_type_map, AllocationPlace::Stack) {
+            match self.c_signature(AllocationPlace::Stack) {
               Ok((c_signature2, _)) => {
                 Ok((result1,
-                    Some(CppMethodWithCSignature {
+                    Some(CppMethodWithFfiSignature {
                   cpp_method: self.clone(),
                   allocation_place: AllocationPlace::Stack,
                   c_signature: c_signature2,
@@ -210,8 +209,11 @@ impl CppMethod {
     if self.is_static {
       s = format!("{} static", s);
     }
-    if self.is_protected {
+    if self.visibility == CppVisibility::Protected {
       s = format!("{} protected", s);
+    }
+    if self.visibility == CppVisibility::Private {
+      s = format!("{} private", s);
     }
     if self.is_signal {
       s = format!("{} [signal]", s);

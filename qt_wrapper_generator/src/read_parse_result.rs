@@ -3,7 +3,7 @@ use cpp_type_map::{EnumValue, CppTypeInfo, CppTypeMap};
 use cpp_method::{CppFunctionArgument, CppMethod};
 use cpp_header_data::CppHeaderData;
 use cpp_data::CppData;
-use enums::{CppMethodScope, CppTypeOrigin, CppTypeKind, CppTypeIndirection};
+use enums::{CppMethodScope, CppTypeOrigin, CppTypeKind, CppTypeIndirection, CppVisibility};
 
 use std::fs::File;
 extern crate serde;
@@ -72,7 +72,10 @@ impl CppMethod {
     // println!("{:?} {:?}", value, class_name);
     let value = value.as_object().unwrap();
     CppMethod {
-      origin: CppTypeOrigin::Qt { include_file: include_file.clone() },
+      origin: CppTypeOrigin::IncludeFile {
+        include_file: include_file.clone(),
+        location: None,
+      },
       name: value.get("name").unwrap().as_string().unwrap().to_string(),
       scope: match value.get("scope").unwrap().as_string().unwrap() {
         "global" => CppMethodScope::Global,
@@ -92,9 +95,15 @@ impl CppMethod {
         Some(v) => v.as_boolean().unwrap(),
         None => false,
       },
-      is_protected: match value.get("protected") {
-        Some(v) => v.as_boolean().unwrap(),
-        None => false,
+      visibility: match value.get("protected") {
+        Some(v) => {
+          if v.as_boolean().unwrap() {
+            CppVisibility::Protected
+          } else {
+            CppVisibility::Public
+          }
+        }
+        None => CppVisibility::Public,
       },
       is_signal: match value.get("signal") {
         Some(v) => v.as_boolean().unwrap(),
@@ -124,6 +133,7 @@ impl CppMethod {
         Some(v) => Some(v.as_string().unwrap().to_string()),
         None => None,
       },
+      conversion_operator: None,
       is_variable: match value.get("variable") {
         Some(v) => v.as_boolean().unwrap(),
         None => false,
@@ -203,11 +213,12 @@ impl CppTypeInfo {
     let origin = match value.get("origin").unwrap().as_string().unwrap() {
       "c_built_in" => CppTypeOrigin::CBuiltIn,
       "qt" => {
-        CppTypeOrigin::Qt {
+        CppTypeOrigin::IncludeFile {
           include_file: value.get("qt_header").unwrap().as_string().unwrap().to_string(),
+          location: None,
         }
       }
-      other => CppTypeOrigin::Unsupported(other.to_string()),
+      _ => CppTypeOrigin::Unknown,
     };
     CppTypeInfo {
       name: name,

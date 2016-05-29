@@ -1,30 +1,30 @@
 use cpp_method::CppMethod;
 use enums::{AllocationPlace, CppMethodScope};
-use c_function_signature::CFunctionSignature;
+use cpp_ffi_function_signature::CppFfiFunctionSignature;
 use utils::operator_c_name;
-use caption_strategy::MethodCaptionStrategy;
+use caption_strategy::{MethodCaptionStrategy, TypeCaptionStrategy};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CppMethodWithCSignature {
+pub struct CppMethodWithFfiSignature {
   pub cpp_method: CppMethod,
   pub allocation_place: AllocationPlace,
-  pub c_signature: CFunctionSignature,
+  pub c_signature: CppFfiFunctionSignature,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CppAndCMethod {
+pub struct CppAndFfiMethod {
   pub cpp_method: CppMethod,
   pub allocation_place: AllocationPlace,
-  pub c_signature: CFunctionSignature,
+  pub c_signature: CppFfiFunctionSignature,
   pub c_name: String,
 }
 
 
-impl CppMethodWithCSignature {
-  pub fn c_base_name(&self) -> Result<String, String> {
+impl CppMethodWithFfiSignature {
+  pub fn c_base_name(&self, include_file: &String) -> Result<String, String> {
     let scope_prefix = match self.cpp_method.scope {
-      CppMethodScope::Class(..) => "".to_string(),
-      CppMethodScope::Global => "G_".to_string(),
+      CppMethodScope::Class(ref class_name) => format!("{}_", class_name.replace("::", "_")),
+      CppMethodScope::Global => format!("{}_G_", include_file),
     };
     let method_name = if self.cpp_method.is_constructor {
       match self.allocation_place {
@@ -41,8 +41,11 @@ impl CppMethodWithCSignature {
         Ok(op) => format!("OP_{}", op),
         Err(msg) => return Err(msg),
       }
+    } else if let Some(ref operator_type) = self.cpp_method.conversion_operator {
+      //TODO: support conversion operators in rust
+      format!("operator_{}", operator_type.caption(TypeCaptionStrategy::Full))
     } else {
-      self.cpp_method.name.clone()
+      self.cpp_method.name.clone() //.replace("operator ", "operator_")
     };
     Ok(scope_prefix + &method_name)
   }
@@ -72,9 +75,9 @@ impl CppMethodWithCSignature {
   }
 }
 
-impl CppAndCMethod {
-  pub fn new(data: CppMethodWithCSignature, c_name: String) -> CppAndCMethod {
-    CppAndCMethod {
+impl CppAndFfiMethod {
+  pub fn new(data: CppMethodWithFfiSignature, c_name: String) -> CppAndFfiMethod {
+    CppAndFfiMethod {
       cpp_method: data.cpp_method,
       allocation_place: data.allocation_place,
       c_signature: data.c_signature,
