@@ -3,6 +3,10 @@ project (rust_qt_generator)
 find_package(Qt5Core REQUIRED)
 message("Qt version: ${Qt5Core_VERSION}")
 
+get_target_property(QT_CORE_LOCATION Qt5::Core LOCATION)
+get_filename_component(CPP_LIB_DIR ${QT_CORE_LOCATION} DIRECTORY)
+message("Qt library path: ${CPP_LIB_DIR}")
+
 set(QT_DOC_DIR
   CACHE PATH "Path to Qt documentation HTML files")
 SET(QTCW_MAKE_OPTIONS
@@ -125,7 +129,11 @@ endif()
 
 # building and testing rust_qt crates
 add_custom_target(build_rust_qt
-  COMMAND QTCW_LIB_DIR=${QTCW_INSTALL_DIR}/lib cargo test
+  COMMAND
+    QTCW_LIB_DIR=${QTCW_INSTALL_DIR}/lib
+    LIBRARY_PATH=${CPP_LIB_DIR}
+    LD_LIBRARY_PATH=${CPP_LIB_DIR}
+    cargo test
   WORKING_DIRECTORY ${RUST_QT_GENERATED_SOURCE_DIR}/qt_core
   DEPENDS ${RUST_QT_GENERATED_SOURCE_DIR} ${QTCW_INSTALL_DIR}
   #${TEST_TARGETS}
