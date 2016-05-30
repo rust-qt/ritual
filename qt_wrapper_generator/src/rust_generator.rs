@@ -402,6 +402,7 @@ impl RustGenerator {
     file_path.push("src");
     file_path.push("ffi.rs");
     let mut file = File::create(&file_path).unwrap();
+    write!(file, "extern crate libc;\n\n").unwrap();
     write!(file, "#[link(name = \"Qt5Core\")]\n").unwrap();
     write!(file, "#[link(name = \"icui18n\")]\n").unwrap();
     write!(file, "#[link(name = \"icuuc\")]\n").unwrap();

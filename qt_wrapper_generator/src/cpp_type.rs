@@ -140,7 +140,7 @@ impl CppTypeBase {
             for arg in args {
               arg_texts.push(try!(arg.to_cpp_code()));
             }
-            Ok(format!("{}<{}>", name, arg_texts.join(", ")))
+            Ok(format!("{}< {} >", name, arg_texts.join(", ")))
           }
           None => Ok(name.clone()),
         }

@@ -45,7 +45,7 @@ impl CppMethodWithFfiSignature {
       //TODO: support conversion operators in rust
       format!("operator_{}", operator_type.caption(TypeCaptionStrategy::Full))
     } else {
-      self.cpp_method.name.clone() //.replace("operator ", "operator_")
+      self.cpp_method.name.replace("::", "_")
     };
     Ok(scope_prefix + &method_name)
   }

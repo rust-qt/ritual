@@ -41,6 +41,13 @@ pub struct CLangCppData {
 }
 
 impl CLangCppTypeData {
+  pub fn is_class(&self) -> bool {
+    match self.kind {
+      CLangCppTypeKind::Class { .. } => true,
+      _ => false,
+    }
+  }
+
   pub fn inherits(&self, class_name: &String) -> bool {
     if let CLangCppTypeKind::Class { ref bases, .. } = self.kind {
       for base in bases {
