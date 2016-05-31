@@ -1,12 +1,21 @@
 use doc_parser_support::enums::DocCppTypeKind;
-use enums::CppTypeOrigin;
 use cpp_type::CppTypeBase;
 use std::collections::HashMap;
+
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum DocCppTypeOrigin {
+  CBuiltIn,
+  IncludeFile {
+    include_file: String,
+  },
+  Unknown,
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppTypeInfo {
   pub name: String,
-  pub origin: CppTypeOrigin,
+  pub origin: DocCppTypeOrigin,
   pub kind: DocCppTypeKind,
 }
 
@@ -39,7 +48,7 @@ impl CppTypeMap {
   pub fn get_types_from_include_file(&self, include: &String) -> Vec<String> {
     let mut r = vec![];
     for (_, type_info) in &self.0 {
-      if let CppTypeOrigin::IncludeFile { ref include_file, .. } = type_info.origin {
+      if let DocCppTypeOrigin::IncludeFile { ref include_file, .. } = type_info.origin {
         if include_file == include {
           r.push(type_info.name.clone());
         }

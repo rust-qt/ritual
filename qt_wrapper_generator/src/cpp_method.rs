@@ -1,17 +1,47 @@
-use cpp_type::{CppType, CppTypeBase, CppFfiType};
-use enums::{CppMethodScope, AllocationPlace, AllocationPlaceImportance, CppFfiArgumentMeaning,
-            CppTypeIndirection, CppTypeOrigin, CppVisibility};
+use cpp_type::{CppType, CppTypeBase, CppTypeIndirection};
+use cpp_ffi_type::CppFfiType;
 use cpp_ffi_function_signature::CppFfiFunctionSignature;
-use cpp_ffi_function_argument::CppFfiFunctionArgument;
+use cpp_ffi_function_argument::{CppFfiFunctionArgument, CppFfiArgumentMeaning};
 use cpp_and_ffi_method::CppMethodWithFfiSignature;
+use cpp_data::{CppVisibility, CppOriginLocation};
 use utils::JoinWithString;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum AllocationPlace {
+  Stack,
+  Heap,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum AllocationPlaceImportance {
+  Important,
+  NotImportant,
+}
+
+
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppFunctionArgument {
   pub name: String,
   pub argument_type: CppType,
-  pub default_value: Option<String>,
+  pub has_default_value: bool,
 }
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CppMethodScope {
+  Global,
+  Class(String),
+}
+
+impl CppMethodScope {
+  pub fn class_name(&self) -> Option<&String> {
+    match *self {
+      CppMethodScope::Global => None,
+      CppMethodScope::Class(ref s) => Some(s)
+    }
+  }
+}
+
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppMethod {
@@ -31,8 +61,8 @@ pub struct CppMethod {
   pub is_variable: bool,
   pub arguments: Vec<CppFunctionArgument>,
   pub allows_variable_arguments: bool,
-  pub original_index: i32,
-  pub origin: CppTypeOrigin,
+  pub include_file: String,
+  pub origin_location: Option<CppOriginLocation>,
   pub template_arguments: Option<Vec<String>>,
 }
 
@@ -112,7 +142,7 @@ impl CppMethod {
                          }
                          .to_cpp_ffi_type()
                          .unwrap(),
-          cpp_equivalent: CppFfiArgumentMeaning::This,
+          meaning: CppFfiArgumentMeaning::This,
         });
       }
     }
@@ -122,7 +152,7 @@ impl CppMethod {
           r.arguments.push(CppFfiFunctionArgument {
             name: arg.name.clone(),
             argument_type: c_type,
-            cpp_equivalent: CppFfiArgumentMeaning::Argument(index as i8),
+            meaning: CppFfiArgumentMeaning::Argument(index as i8),
           });
         }
         Err(msg) => {
@@ -142,7 +172,7 @@ impl CppMethod {
               r.arguments.push(CppFfiFunctionArgument {
                 name: "output".to_string(),
                 argument_type: c_type,
-                cpp_equivalent: CppFfiArgumentMeaning::ReturnValue,
+                meaning: CppFfiArgumentMeaning::ReturnValue,
               });
             } else {
               r.return_type = c_type;
@@ -251,8 +281,8 @@ impl CppMethod {
                         format!("{} {}{}",
                                 arg.argument_type.to_cpp_code().unwrap_or("[?]".to_string()),
                                 arg.name,
-                                if let Some(ref dv) = arg.default_value {
-                                  format!(" = {}", dv)
+                                if arg.has_default_value {
+                                  format!(" = ?")
                                 } else {
                                   String::new()
                                 })

@@ -1,7 +1,7 @@
 use cpp_ffi_generator::{CppAndFfiData, CppFfiHeaderData};
 use cpp_and_ffi_method::CppAndFfiMethod;
-use cpp_type::{CppTypeBase, CppFfiType, CppBuiltInNumericType};
-use enums::CppTypeIndirection;
+use cpp_type::{CppTypeBase, CppBuiltInNumericType, CppTypeIndirection};
+use cpp_ffi_type::{CppFfiType};
 use utils::JoinWithString;
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument};
@@ -256,7 +256,7 @@ impl RustGenerator {
 
   fn generate_type_map(&mut self) {
     for type_info in &self.input_data.cpp_data.types {
-      let eliminated_name_prefix = format!("{}::", type_info.header);
+      let eliminated_name_prefix = format!("{}::", type_info.include_file);
       let mut new_name = type_info.name.clone();
       if new_name.starts_with(&eliminated_name_prefix) {
         new_name = new_name[eliminated_name_prefix.len()..].to_string();
@@ -266,7 +266,7 @@ impl RustGenerator {
                                        RustName {
                                          crate_name: self.crate_name.clone(),
                                          module_name:
-                                           include_file_to_module_name(&type_info.header),
+                                           include_file_to_module_name(&type_info.include_file),
                                          own_name: new_name,
                                        });
     }
@@ -292,6 +292,7 @@ impl RustGenerator {
     let mut lib_file = File::create(&lib_file_path).unwrap();
     write!(lib_file, "pub mod types;\n\n").unwrap();
     write!(lib_file, "pub mod flags;\n\n").unwrap();
+    write!(lib_file, "pub mod extra;\n\n").unwrap();
     // TODO: remove allow directive
     // TODO: ffi should be a private mod
     write!(lib_file, "#[allow(dead_code)]\npub mod ffi;\n\n").unwrap();

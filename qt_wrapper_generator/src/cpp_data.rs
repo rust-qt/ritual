@@ -1,9 +1,8 @@
 
 // use cpp_type_map::CppTypeInfo;
-use cpp_method::CppMethod;
+use cpp_method::{CppMethod, CppMethodScope};
 use cpp_type::{CppType, CppTypeBase};
 use std::collections::HashMap;
-use enums::{CppMethodScope, CppTypeOrigin, CppVisibility};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EnumValue {
@@ -32,9 +31,24 @@ pub enum CppTypeKind {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CppOriginLocation {
+  pub include_file_path: String,
+  pub line: u32,
+  pub column: u32,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CppVisibility {
+  Public,
+  Protected,
+  Private
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppTypeData {
   pub name: String,
-  pub header: String,
+  pub include_file: String,
+  pub origin_location: CppOriginLocation,
   pub kind: CppTypeKind,
 }
 
@@ -101,11 +115,8 @@ impl CppData {
             is_variable: false,
             arguments: vec![],
             allows_variable_arguments: false,
-            original_index: 1000,
-            origin: CppTypeOrigin::IncludeFile {
-              include_file: type1.header.clone(),
-              location: None,
-            },
+            include_file: type1.include_file.clone(),
+            origin_location: None,
             template_arguments: None,
           });
         }
@@ -116,21 +127,19 @@ impl CppData {
   pub fn split_by_headers(&self) -> HashMap<String, CppData> {
     let mut result = HashMap::new();
     for method in &self.methods {
-      if let CppTypeOrigin::IncludeFile { ref include_file, .. } = method.origin {
-        if !result.contains_key(include_file) {
-          result.insert(include_file.clone(), CppData::default());
-        }
-        result.get_mut(include_file).unwrap().methods.push(method.clone());
+      if !result.contains_key(&method.include_file) {
+        result.insert(method.include_file.clone(), CppData::default());
       }
+      result.get_mut(&method.include_file).unwrap().methods.push(method.clone());
     }
     for tp in &self.types {
-      if !result.contains_key(&tp.header) {
-        result.insert(tp.header.clone(), CppData::default());
+      if !result.contains_key(&tp.include_file) {
+        result.insert(tp.include_file.clone(), CppData::default());
       }
-      result.get_mut(&tp.header).unwrap().types.push(tp.clone());
+      result.get_mut(&tp.include_file).unwrap().types.push(tp.clone());
       if let CppTypeKind::Class { .. } = tp.kind {
         if let Some(ins) = self.template_instantiations.get(&tp.name) {
-          result.get_mut(&tp.header)
+          result.get_mut(&tp.include_file)
                 .unwrap()
                 .template_instantiations
                 .insert(tp.name.clone(), ins.clone());

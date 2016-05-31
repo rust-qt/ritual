@@ -1,5 +1,5 @@
-use cpp_method::CppMethod;
-use enums::{CppMethodScope, CppTypeOrigin, CppVisibility};
+use cpp_method::{CppMethod, CppMethodScope};
+use cpp_data::CppVisibility;
 
 #[derive(Debug, Clone)]
 pub struct CppHeaderData {
@@ -36,11 +36,8 @@ impl CppHeaderData {
           is_variable: false,
           arguments: vec![],
           allows_variable_arguments: false,
-          original_index: 1000,
-          origin: CppTypeOrigin::IncludeFile {
-            include_file: self.include_file.clone(),
-            location: None,
-          },
+          include_file: self.include_file.clone(),
+          origin_location: None,
           template_arguments: None,
         });
       }

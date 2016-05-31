@@ -11,12 +11,12 @@ use std::path::PathBuf;
 
 use utils::JoinWithString;
 
-use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue};
+use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppOriginLocation,
+               CppVisibility};
 // use cpp_type_map::CppTypeInfo;
 use cpp_method::{CppMethod, CppFunctionArgument};
-use enums::{CppMethodScope, CppTypeOrigin, CppTypeIndirection, CppTypeOriginLocation,
-            CppVisibility};
-use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType};
+use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection};
+use cpp_method::CppMethodScope;
 
 static VALID_OPERATOR_SYMBOLS: &'static [&'static str] = &["=", "+", "-", "+", "-", "*", "/", "%",
                                                            "++", "++", "--", "--", "==", "!=",
@@ -80,6 +80,20 @@ fn dump_entity(entity: &Entity, level: i32) {
   println!("{:?}", entity);
   for child in entity.get_children() {
     dump_entity(&child, level + 1);
+  }
+}
+
+fn get_origin_location(entity: Entity) -> Result<CppOriginLocation, String> {
+  match entity.get_location() {
+    Some(loc) => {
+      let location = loc.get_presumed_location();
+      Ok(CppOriginLocation {
+        include_file_path: location.0,
+        line: location.1,
+        column: location.2,
+      })
+    }
+    None => Err(format!("No info about location."))
   }
 }
 
@@ -293,11 +307,13 @@ impl CppParser {
                 _ => return Err(format!("too much indirection")),
               }
             }
-            CppTypeIndirection::Ref => match subtype.indirection {
-              CppTypeIndirection::None => CppTypeIndirection::Ref,
-              CppTypeIndirection::Ptr => CppTypeIndirection::PtrRef,
-              _ => return Err(format!("too much indirection")),
-            },
+            CppTypeIndirection::Ref => {
+              match subtype.indirection {
+                CppTypeIndirection::None => CppTypeIndirection::Ref,
+                CppTypeIndirection::Ptr => CppTypeIndirection::PtrRef,
+                _ => return Err(format!("too much indirection")),
+              }
+            }
             _ => unreachable!(),
           },
         });
@@ -633,16 +649,12 @@ impl CppParser {
           arguments.push(CppFunctionArgument {
             name: name,
             argument_type: argument_type,
-            default_value: if argument_entity.get_range()
-                                             .unwrap()
-                                             .tokenize()
-                                             .iter()
-                                             .find(|t| t.get_spelling() == "=")
-                                             .is_some() {
-              Some("?".to_string())
-            } else {
-              None
-            },
+            has_default_value: argument_entity.get_range()
+                                              .unwrap()
+                                              .tokenize()
+                                              .iter()
+                                              .find(|t| t.get_spelling() == "=")
+                                              .is_some(),
           });
         }
         Err(msg) => {
@@ -720,21 +732,8 @@ impl CppParser {
       operator: operator,
       conversion_operator: conversion_operator,
       is_variable: false, // TODO: move variables into CppTypeInfo
-      original_index: -1,
-      origin: match self.entity_include_file(entity) {
-        Some(include_file) => {
-          let location = entity.get_location().unwrap().get_presumed_location();
-          CppTypeOrigin::IncludeFile {
-            include_file: include_file.clone(),
-            location: Some(CppTypeOriginLocation {
-              include_file_path: location.0,
-              line: location.1,
-              column: location.2,
-            }),
-          }
-        }
-        None => CppTypeOrigin::Unknown,
-      },
+      include_file: self.entity_include_file(entity).unwrap(),
+      origin_location: Some(get_origin_location(entity).unwrap()),
       template_arguments: template_arguments,
     })
   }
@@ -751,7 +750,7 @@ impl CppParser {
     }
     Ok(CppTypeData {
       name: get_full_name(entity).unwrap(),
-      header: match self.entity_include_file(entity) {
+      include_file: match self.entity_include_file(entity) {
         Some(x) => x.clone(),
         None => {
           return Err(format!("Origin of type is unknown: {}\nentity: {:?}\n",
@@ -759,6 +758,7 @@ impl CppParser {
                              entity))
         }
       },
+      origin_location: get_origin_location(entity).unwrap(),
       kind: CppTypeKind::Enum { values: values },
     })
   }
@@ -810,7 +810,7 @@ impl CppParser {
     };
     Ok(CppTypeData {
       name: get_full_name(entity).unwrap(),
-      header: match self.entity_include_file(entity) {
+      include_file: match self.entity_include_file(entity) {
         Some(x) => x.clone(),
         None => {
           return Err(format!("Origin of type is unknown: {}\nentity: {:?}\n",
@@ -818,6 +818,7 @@ impl CppParser {
                              entity))
         }
       },
+      origin_location: get_origin_location(entity).unwrap(),
       kind: CppTypeKind::Class {
         size: size, // entity.get_type().unwrap().get_sizeof().ok().map(|x| x as i32),
         bases: bases,

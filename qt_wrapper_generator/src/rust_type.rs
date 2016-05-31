@@ -1,4 +1,5 @@
-use cpp_type::{CppType, CppToFfiTypeConversion};
+use cpp_type::{CppType};
+use cpp_ffi_type::CppToFfiTypeConversion;
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]

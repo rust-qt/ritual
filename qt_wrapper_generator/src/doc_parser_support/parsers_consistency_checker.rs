@@ -1,8 +1,9 @@
 use doc_parser_support::cpp_data::DocCppData;
-use cpp_data::{CppData, CppTypeKind};
+use doc_parser_support::cpp_type_map::DocCppTypeOrigin;
+use cpp_data::{CppData, CppTypeKind, CppVisibility};
 use cpp_parser::CppParserStats;
 use log;
-use enums::{CppTypeOrigin, CppMethodScope, CppVisibility};
+use cpp_method::CppMethodScope;
 use doc_parser_support::enums::DocCppTypeKind;
 use std::collections::HashMap;
 extern crate core;
@@ -15,17 +16,17 @@ pub fn check(result1: &CppData, result1_stats: &CppParserStats, result2: &DocCpp
   let mut missing_types1 = Vec::new();
   let mut missing_types2 = Vec::new();
   for (_, ref type_info2) in &result2.types.0 {
-    if let CppTypeOrigin::IncludeFile { ref include_file, .. } = type_info2.origin {
+    if let DocCppTypeOrigin::IncludeFile { ref include_file, .. } = type_info2.origin {
       let include_file2 = include_file;
       match type_info2.kind {
         // typedefs are not supposed to be in result1
         DocCppTypeKind::TypeDef { .. } | DocCppTypeKind::Flags { .. } | DocCppTypeKind::Unknown { .. } => {}
         _ => {
           if let Some(type_info1) = result1.types.iter().find(|x| x.name == type_info2.name) {
-            if &type_info1.header != include_file2 {
+            if &type_info1.include_file != include_file2 {
               log::warning(format!("Header mismatch for {}: {} vs {}",
                                    type_info2.name,
-                                   type_info1.header,
+                                   type_info1.include_file,
                                    include_file2));
             }
             match type_info2.kind {

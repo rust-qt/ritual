@@ -1,12 +1,27 @@
-use enums::CppFfiArgumentMeaning;
 use caption_strategy::ArgumentCaptionStrategy;
-use cpp_type::CppFfiType;
+use cpp_ffi_type::CppFfiType;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CppFfiArgumentMeaning {
+  This,
+  Argument(i8),
+  ReturnValue,
+}
+
+impl CppFfiArgumentMeaning {
+  pub fn is_argument(&self) -> bool {
+    match self {
+      &CppFfiArgumentMeaning::Argument(..) => true,
+      _ => false,
+    }
+  }
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppFfiFunctionArgument {
   pub name: String,
   pub argument_type: CppFfiType,
-  pub cpp_equivalent: CppFfiArgumentMeaning,
+  pub meaning: CppFfiArgumentMeaning,
 }
 
 impl CppFfiFunctionArgument {

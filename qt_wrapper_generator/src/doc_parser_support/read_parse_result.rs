@@ -1,10 +1,10 @@
-use cpp_type::{CppType, CppTypeBase};
+use cpp_type::{CppType, CppTypeBase, CppTypeIndirection};
+use doc_parser_support::cpp_type_map::DocCppTypeOrigin;
 use doc_parser_support::cpp_type_map::{CppTypeInfo, CppTypeMap};
-use cpp_data::EnumValue;
-use cpp_method::{CppFunctionArgument, CppMethod};
+use cpp_data::{EnumValue, CppVisibility};
+use cpp_method::{CppFunctionArgument, CppMethod, CppMethodScope};
 use doc_parser_support::cpp_header_data::CppHeaderData;
 use doc_parser_support::cpp_data::DocCppData;
-use enums::{CppMethodScope, CppTypeOrigin, CppTypeIndirection, CppVisibility};
 use doc_parser_support::enums::DocCppTypeKind;
 
 
@@ -58,15 +58,13 @@ impl CppFunctionArgument {
     CppFunctionArgument {
       name: value.get("name").unwrap().as_string().unwrap().to_string(),
       argument_type: CppType::from_json(value.get("type").unwrap()),
-      default_value: match value.get("default_value") {
-        Some(v) => Some(v.as_string().unwrap().to_string()),
-        None => None,
-      },
+      has_default_value: value.get("default_value").is_some(),
     }
   }
 }
 
 impl CppMethod {
+  #[allow(unused_variables)]
   fn from_json(value: &serde_json::Value,
                include_file: &String,
                class_name: &Option<String>,
@@ -75,10 +73,8 @@ impl CppMethod {
     // println!("{:?} {:?}", value, class_name);
     let value = value.as_object().unwrap();
     CppMethod {
-      origin: CppTypeOrigin::IncludeFile {
-        include_file: include_file.clone(),
-        location: None,
-      },
+      include_file: include_file.clone(),
+      origin_location: None,
       name: value.get("name").unwrap().as_string().unwrap().to_string(),
       scope: match value.get("scope").unwrap().as_string().unwrap() {
         "global" => CppMethodScope::Global,
@@ -155,7 +151,6 @@ impl CppMethod {
         Some(v) => v.as_boolean().unwrap(),
         None => false,
       },
-      original_index: index,
       template_arguments: None,
     }
   }
@@ -214,19 +209,18 @@ impl CppTypeInfo {
   fn from_json(value: &serde_json::Value, name: String) -> Self {
     let value = value.as_object().unwrap();
     let origin = match value.get("origin").unwrap().as_string().unwrap() {
-      "c_built_in" => CppTypeOrigin::CBuiltIn,
+      "c_built_in" => DocCppTypeOrigin::CBuiltIn,
       "qt" => {
-        CppTypeOrigin::IncludeFile {
+        DocCppTypeOrigin::IncludeFile {
           include_file: value.get("qt_header").unwrap().as_string().unwrap().to_string(),
-          location: None,
         }
       }
-      _ => CppTypeOrigin::Unknown,
+      _ => DocCppTypeOrigin::Unknown,
     };
     CppTypeInfo {
       name: name,
       origin: origin.clone(),
-      kind: if origin == CppTypeOrigin::CBuiltIn {
+      kind: if origin == DocCppTypeOrigin::CBuiltIn {
         DocCppTypeKind::CPrimitive
       } else {
         match value.get("kind") {

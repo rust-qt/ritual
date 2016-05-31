@@ -1,5 +1,4 @@
-use cpp_method::CppMethod;
-use enums::{AllocationPlace, CppMethodScope};
+use cpp_method::{CppMethod, CppMethodScope, AllocationPlace};
 use cpp_ffi_function_signature::CppFfiFunctionSignature;
 use utils::operator_c_name;
 use caption_strategy::{MethodCaptionStrategy, TypeCaptionStrategy};
@@ -69,9 +68,6 @@ impl CppMethodWithFfiSignature {
         r + &self.c_signature.caption(s)
       }
     }
-
-
-
   }
 }
 

@@ -6,7 +6,6 @@ use cpp_data::CppData;
 use std::io::Read;
 use std::collections::HashMap;
 use log;
-use enums::CppTypeOrigin;
 
 pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) {
   let re = self::regex::Regex::new(r#"^#include "([a-zA-Z._]+)"$"#).unwrap();
@@ -75,13 +74,12 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) {
   };
 
   for t in &mut data.types {
-    t.header = get_header(&t.header, Some(&t.name));
+    t.include_file = get_header(&t.include_file, Some(&t.name));
   }
   for m in &mut data.methods {
-    if let CppTypeOrigin::IncludeFile { ref mut include_file, .. } = m.origin {
-      let x = get_header(include_file, m.scope.class_name());
-      include_file.clear();
-      include_file.push_str(&x);
-    }
+    let x = get_header(&m.include_file, m.scope.class_name());
+    m.include_file = x;
+//    m.include_file.clear();
+//    m.include_file.push_str(&x);
   }
 }

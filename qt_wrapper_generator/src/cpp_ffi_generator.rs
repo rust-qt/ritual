@@ -1,5 +1,3 @@
-use enums::{AllocationPlace, CppFfiArgumentMeaning, IndirectionChange, CppMethodScope,
-            CppVisibility};
 use cpp_and_ffi_method::CppAndFfiMethod;
 use std::path::PathBuf;
 use std::fs::File;
@@ -7,9 +5,11 @@ use std::io::Write;
 use utils::JoinWithString;
 use std::collections::HashMap;
 use log;
-use cpp_data::{CppData, CppTypeKind};
+use cpp_data::{CppData, CppTypeKind, CppVisibility};
 use caption_strategy::MethodCaptionStrategy;
-use cpp_method::CppMethod;
+use cpp_method::{CppMethod, AllocationPlace, CppMethodScope};
+use cpp_ffi_type::{IndirectionChange};
+use cpp_ffi_function_argument::CppFfiArgumentMeaning;
 use cpp_type::CppTypeBase;
 
 pub struct CGenerator {
@@ -62,7 +62,7 @@ impl CppAndFfiMethod {
       if let Some(arg) = self.c_signature
                              .arguments
                              .iter()
-                             .find(|x| x.cpp_equivalent == CppFfiArgumentMeaning::ReturnValue) {
+                             .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
         if let Some(ref return_type) = self.cpp_method.return_type {
           result = format!("new({}) {}({})",
                            arg.name,
@@ -80,7 +80,7 @@ impl CppAndFfiMethod {
     let mut filled_arguments = vec![];
     for (i, cpp_argument) in self.cpp_method.arguments.iter().enumerate() {
       if let Some(c_argument) = self.c_signature.arguments.iter().find(|x| {
-        x.cpp_equivalent == CppFfiArgumentMeaning::Argument(i as i8)
+        x.meaning == CppFfiArgumentMeaning::Argument(i as i8)
       }) {
         let mut result = c_argument.name.clone();
         match c_argument.argument_type
@@ -109,7 +109,7 @@ impl CppAndFfiMethod {
       if let Some(arg) = self.c_signature
                              .arguments
                              .iter()
-                             .find(|x| x.cpp_equivalent == CppFfiArgumentMeaning::This) {
+                             .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
         format!("qtcw_call_destructor({})", arg.name)
       } else {
         panic!("Error: no this argument found\n{:?}", self);
@@ -120,7 +120,7 @@ impl CppAndFfiMethod {
           match self.allocation_place {
             AllocationPlace::Stack => {
               if let Some(arg) = self.c_signature.arguments.iter().find(|x| {
-                x.cpp_equivalent == CppFfiArgumentMeaning::ReturnValue
+                x.meaning == CppFfiArgumentMeaning::ReturnValue
               }) {
                 format!("new({}) {}", arg.name, class_name)
               } else {
@@ -141,7 +141,7 @@ impl CppAndFfiMethod {
             if let Some(arg) = self.c_signature
                                    .arguments
                                    .iter()
-                                   .find(|x| x.cpp_equivalent == CppFfiArgumentMeaning::This) {
+                                   .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
               format!("{}->", arg.name)
             } else {
               panic!("Error: no this argument found\n{:?}", self);
@@ -162,7 +162,7 @@ impl CppAndFfiMethod {
       if let Some(arg) = self.c_signature
                              .arguments
                              .iter()
-                             .find(|x| x.cpp_equivalent == CppFfiArgumentMeaning::This) {
+                             .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
         format!("delete {};\n", arg.name)
       } else {
         panic!("Error: no this argument found\n{:?}", self);
@@ -574,7 +574,8 @@ impl CGenerator {
                values);
       }
     }
-    r.sort_by(|a, b| a.cpp_method.original_index.cmp(&b.cpp_method.original_index));
+    //TODO: make sorting
+    //r.sort_by(|a, b| a.cpp_method.original_index.cmp(&b.cpp_method.original_index));
     // if include_file == "QRect" { println!("process_methods test2 {:?}", r); }
     r
   }

@@ -1,7 +1,7 @@
 use cpp_ffi_function_argument::CppFfiFunctionArgument;
 use caption_strategy::ArgumentCaptionStrategy;
 use utils::JoinWithString;
-use cpp_type::CppFfiType;
+use cpp_ffi_type::CppFfiType;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppFfiFunctionSignature {
@@ -13,7 +13,7 @@ impl CppFfiFunctionSignature {
   pub fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
     let r = self.arguments
                 .iter()
-                .filter(|x| x.cpp_equivalent.is_argument())
+                .filter(|x| x.meaning.is_argument())
                 .map(|x| x.caption(strategy.clone()))
                 .join("_");
     if r.len() == 0 {
