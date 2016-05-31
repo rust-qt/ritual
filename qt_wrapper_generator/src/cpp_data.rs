@@ -12,49 +12,49 @@ pub struct EnumValue {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CLangClassField {
+pub struct CppClassField {
   pub name: String,
   pub field_type: CppType,
   pub visibility: CppVisibility,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum CLangCppTypeKind {
+pub enum CppTypeKind {
   Enum {
     values: Vec<EnumValue>,
   },
   Class {
     size: Option<i32>,
     bases: Vec<CppType>,
-    fields: Vec<CLangClassField>,
+    fields: Vec<CppClassField>,
     template_arguments: Option<Vec<String>>,
   },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CLangCppTypeData {
+pub struct CppTypeData {
   pub name: String,
   pub header: String,
-  pub kind: CLangCppTypeKind,
+  pub kind: CppTypeKind,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
-pub struct CLangCppData {
-  pub types: Vec<CLangCppTypeData>,
+pub struct CppData {
+  pub types: Vec<CppTypeData>,
   pub methods: Vec<CppMethod>,
   pub template_instantiations: HashMap<String, Vec<Vec<CppType>>>,
 }
 
-impl CLangCppTypeData {
+impl CppTypeData {
   pub fn is_class(&self) -> bool {
     match self.kind {
-      CLangCppTypeKind::Class { .. } => true,
+      CppTypeKind::Class { .. } => true,
       _ => false,
     }
   }
 
   pub fn inherits(&self, class_name: &String) -> bool {
-    if let CLangCppTypeKind::Class { ref bases, .. } = self.kind {
+    if let CppTypeKind::Class { ref bases, .. } = self.kind {
       for base in bases {
         if let CppTypeBase::Class { ref name, .. } = base.base {
           if name == class_name {
@@ -67,10 +67,10 @@ impl CLangCppTypeData {
   }
 }
 
-impl CLangCppData {
+impl CppData {
   pub fn ensure_explicit_destructors(&mut self) {
     for type1 in &self.types {
-      if let CLangCppTypeKind::Class { .. } = type1.kind {
+      if let CppTypeKind::Class { .. } = type1.kind {
         let class_name = &type1.name;
         let mut found_destructor = false;
         for method in &self.methods {
@@ -113,22 +113,22 @@ impl CLangCppData {
     }
   }
 
-  pub fn split_by_headers(&self) -> HashMap<String, CLangCppData> {
+  pub fn split_by_headers(&self) -> HashMap<String, CppData> {
     let mut result = HashMap::new();
     for method in &self.methods {
       if let CppTypeOrigin::IncludeFile { ref include_file, .. } = method.origin {
         if !result.contains_key(include_file) {
-          result.insert(include_file.clone(), CLangCppData::default());
+          result.insert(include_file.clone(), CppData::default());
         }
         result.get_mut(include_file).unwrap().methods.push(method.clone());
       }
     }
     for tp in &self.types {
       if !result.contains_key(&tp.header) {
-        result.insert(tp.header.clone(), CLangCppData::default());
+        result.insert(tp.header.clone(), CppData::default());
       }
       result.get_mut(&tp.header).unwrap().types.push(tp.clone());
-      if let CLangCppTypeKind::Class { .. } = tp.kind {
+      if let CppTypeKind::Class { .. } = tp.kind {
         if let Some(ins) = self.template_instantiations.get(&tp.name) {
           result.get_mut(&tp.header)
                 .unwrap()

@@ -5,7 +5,7 @@ use enums::CppTypeIndirection;
 use utils::JoinWithString;
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument};
-use clang_cpp_data::{CLangCppTypeKind, EnumValue};
+use cpp_data::{CppTypeKind, EnumValue};
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::Write;
@@ -334,7 +334,7 @@ impl RustGenerator {
       if let Some(rust_type_name) = self.cpp_to_rust_type_map.get(&type_data.name) {
         if module_name == rust_type_name.module_name {
           let code = match type_data.kind {
-            CLangCppTypeKind::Enum { ref values } => {
+            CppTypeKind::Enum { ref values } => {
               let mut value_to_variant: HashMap<i64, EnumValue> = HashMap::new();
               for variant in values {
                 let value = variant.value;
@@ -368,7 +368,7 @@ impl RustGenerator {
                                       })
                                       .join(", \n"))
             }
-            CLangCppTypeKind::Class { ref size, .. } => {
+            CppTypeKind::Class { ref size, .. } => {
               match *size {
                 Some(ref size) => {
                   format!("#[repr(C)]\npub struct {} {{\n  _buffer: [u8; {}],\n}}\n\n",

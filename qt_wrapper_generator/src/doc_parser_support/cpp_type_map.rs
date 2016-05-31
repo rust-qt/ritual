@@ -1,4 +1,4 @@
-use doc_parser_support::enums::CppTypeKind;
+use doc_parser_support::enums::DocCppTypeKind;
 use enums::CppTypeOrigin;
 use cpp_type::CppTypeBase;
 use std::collections::HashMap;
@@ -7,7 +7,7 @@ use std::collections::HashMap;
 pub struct CppTypeInfo {
   pub name: String,
   pub origin: CppTypeOrigin,
-  pub kind: CppTypeKind,
+  pub kind: DocCppTypeKind,
 }
 
 #[derive(Debug, Clone)]
@@ -17,7 +17,7 @@ impl CppTypeMap {
   #[allow(dead_code)]
   pub fn get_info(&self, name: &String) -> Result<&CppTypeInfo, String> {
     if let Some(ref r) = self.0.get(name) {
-      if let CppTypeKind::TypeDef { ref meaning } = r.kind {
+      if let DocCppTypeKind::TypeDef { ref meaning } = r.kind {
         if meaning.is_template() {
           Err("Template typedefs are not supported".to_string())
         } else {

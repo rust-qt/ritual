@@ -2,13 +2,13 @@ extern crate regex;
 
 use std;
 use std::path::PathBuf;
-use clang_cpp_data::CLangCppData;
+use cpp_data::CppData;
 use std::io::Read;
 use std::collections::HashMap;
 use log;
 use enums::CppTypeOrigin;
 
-pub fn fix_header_names(data: &mut CLangCppData, headers_dir: &PathBuf) {
+pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) {
   let re = self::regex::Regex::new(r#"^#include "([a-zA-Z._]+)"$"#).unwrap();
   let mut map = HashMap::new();
   log::info("Detecting fancy Qt header names.");

@@ -1,11 +1,11 @@
 use cpp_type::{CppType, CppTypeBase};
 use doc_parser_support::cpp_type_map::{CppTypeInfo, CppTypeMap};
-use clang_cpp_data::EnumValue;
+use cpp_data::EnumValue;
 use cpp_method::{CppFunctionArgument, CppMethod};
 use doc_parser_support::cpp_header_data::CppHeaderData;
-use doc_parser_support::cpp_data::CppData;
+use doc_parser_support::cpp_data::DocCppData;
 use enums::{CppMethodScope, CppTypeOrigin, CppTypeIndirection, CppVisibility};
-use doc_parser_support::enums::CppTypeKind;
+use doc_parser_support::enums::DocCppTypeKind;
 
 
 use std::fs::File;
@@ -227,13 +227,13 @@ impl CppTypeInfo {
       name: name,
       origin: origin.clone(),
       kind: if origin == CppTypeOrigin::CBuiltIn {
-        CppTypeKind::CPrimitive
+        DocCppTypeKind::CPrimitive
       } else {
         match value.get("kind") {
           Some(v) => {
             match v.as_string().unwrap() {
               "enum" => {
-                CppTypeKind::Enum {
+                DocCppTypeKind::Enum {
                   values: value.get("values")
                                .unwrap()
                                .as_array()
@@ -244,29 +244,29 @@ impl CppTypeInfo {
                 }
               }
               "flags" => {
-                CppTypeKind::Flags {
+                DocCppTypeKind::Flags {
                   enum_name: value.get("enum").unwrap().as_string().unwrap().to_string(),
                 }
               }
               "typedef" => {
                 match value.get("meaning") {
-                  Some(v) => CppTypeKind::TypeDef { meaning: CppType::from_json(v) },
-                  None => CppTypeKind::Unknown,
+                  Some(v) => DocCppTypeKind::TypeDef { meaning: CppType::from_json(v) },
+                  None => DocCppTypeKind::Unknown,
                 }
               }
               "class" => {
-                CppTypeKind::Class {
+                DocCppTypeKind::Class {
                   inherits: match value.get("inherits") {
                     Some(inherits) => Some(CppType::from_json(inherits)),
                     None => None,
                   },
                 }
               }
-              "template_type" => CppTypeKind::Unknown,
+              "template_type" => DocCppTypeKind::Unknown,
               _ => panic!("invalid kind of type"),
             }
           }
-          None => CppTypeKind::Unknown,
+          None => DocCppTypeKind::Unknown,
         }
       },
     }
@@ -282,11 +282,11 @@ impl CppTypeMap {
   }
 }
 
-pub fn do_it(file_name: &std::path::PathBuf) -> CppData {
+pub fn do_it(file_name: &std::path::PathBuf) -> DocCppData {
   let f = File::open(file_name).unwrap();
   let data: serde_json::Value = serde_json::from_reader(f).unwrap();
   let object = data.as_object().unwrap();
-  CppData {
+  DocCppData {
     headers: object.get("headers_data")
                    .unwrap()
                    .as_array()

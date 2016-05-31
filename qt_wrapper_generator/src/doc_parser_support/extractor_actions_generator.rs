@@ -1,5 +1,5 @@
-use doc_parser_support::cpp_data::CppData;
-use doc_parser_support::enums::CppTypeKind;
+use doc_parser_support::cpp_data::DocCppData;
+use doc_parser_support::enums::DocCppTypeKind;
 use log;
 
 use std::path::PathBuf;
@@ -7,7 +7,7 @@ use std::fs::File;
 use std::io::Write;
 
 #[allow(dead_code)]
-pub fn do_it(cpp_data: CppData, extractor_actions_path: PathBuf) {
+pub fn do_it(cpp_data: DocCppData, extractor_actions_path: PathBuf) {
   let show_output = true;
   log::info(format!("Generating file: {:?}", extractor_actions_path));
   let mut h_file = File::create(&extractor_actions_path).unwrap();
@@ -27,7 +27,7 @@ pub fn do_it(cpp_data: CppData, extractor_actions_path: PathBuf) {
   }
 
   for (_, type_info) in &cpp_data.types.0 {
-    if let CppTypeKind::Enum { ref values } = type_info.kind {
+    if let DocCppTypeKind::Enum { ref values } = type_info.kind {
       log::debug(format!("Requesting enum values for {:?}.", type_info.name));
       let enum_cpp_namespace = match type_info.name.rfind("::") {
         Some(enum_last_part_index) => type_info.name[0..enum_last_part_index + 2].to_string(),

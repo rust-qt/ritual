@@ -11,7 +11,7 @@ use std::path::PathBuf;
 
 use utils::JoinWithString;
 
-use clang_cpp_data::{CLangCppData, CLangCppTypeData, CLangCppTypeKind, CLangClassField, EnumValue};
+use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue};
 // use cpp_type_map::CppTypeInfo;
 use cpp_method::{CppMethod, CppFunctionArgument};
 use enums::{CppMethodScope, CppTypeOrigin, CppTypeIndirection, CppTypeOriginLocation,
@@ -49,7 +49,7 @@ pub struct CppParserStats {
 pub struct CppParser {
   library_include_dir: PathBuf,
   entity_kinds: HashSet<EntityKind>,
-  data: CLangCppData,
+  data: CppData,
   stats: CppParserStats,
 }
 
@@ -124,7 +124,7 @@ impl CppParser {
     CppParser {
       library_include_dir: PathBuf::from("/home/ri/bin/Qt/5.5/gcc_64/include/QtCore"),
       entity_kinds: HashSet::new(),
-      data: CLangCppData {
+      data: CppData {
         methods: Vec::new(),
         types: Vec::new(),
         template_instantiations: HashMap::new(),
@@ -137,7 +137,7 @@ impl CppParser {
     self.stats.clone()
   }
 
-  pub fn get_data(self) -> CLangCppData {
+  pub fn get_data(self) -> CppData {
     self.data
   }
 
@@ -305,10 +305,10 @@ impl CppParser {
     }
     if let Some(ref type_data) = self.data.types.iter().find(|x| &x.name == remaining_name) {
       match type_data.kind {
-        CLangCppTypeKind::Enum { .. } => {
+        CppTypeKind::Enum { .. } => {
           type1.base = CppTypeBase::Enum { name: remaining_name.to_string() }
         }
-        CLangCppTypeKind::Class { .. } => {
+        CppTypeKind::Class { .. } => {
           type1.base = CppTypeBase::Class {
             name: remaining_name.to_string(),
             template_arguments: None,
@@ -739,7 +739,7 @@ impl CppParser {
     })
   }
 
-  fn parse_enum(&mut self, entity: Entity) -> Result<CLangCppTypeData, String> {
+  fn parse_enum(&mut self, entity: Entity) -> Result<CppTypeData, String> {
     let mut values = Vec::new();
     for child in entity.get_children() {
       if child.get_kind() == EntityKind::EnumConstantDecl {
@@ -749,7 +749,7 @@ impl CppParser {
         });
       }
     }
-    Ok(CLangCppTypeData {
+    Ok(CppTypeData {
       name: get_full_name(entity).unwrap(),
       header: match self.entity_include_file(entity) {
         Some(x) => x.clone(),
@@ -759,11 +759,11 @@ impl CppParser {
                              entity))
         }
       },
-      kind: CLangCppTypeKind::Enum { values: values },
+      kind: CppTypeKind::Enum { values: values },
     })
   }
 
-  fn parse_class(&mut self, entity: Entity) -> Result<CLangCppTypeData, String> {
+  fn parse_class(&mut self, entity: Entity) -> Result<CppTypeData, String> {
     let mut fields = Vec::new();
     let mut bases = Vec::new();
     let template_arguments = get_template_arguments(entity);
@@ -773,7 +773,7 @@ impl CppParser {
                               Some(entity),
                               None) {
           Ok(field_type) => {
-            fields.push(CLangClassField {
+            fields.push(CppClassField {
               name: child.get_name().unwrap(),
               field_type: field_type,
               visibility: match entity.get_accessibility().unwrap_or(Accessibility::Public) {
@@ -808,7 +808,7 @@ impl CppParser {
       Some(type1) => type1.get_sizeof().ok().map(|x| x as i32),
       None => None,
     };
-    Ok(CLangCppTypeData {
+    Ok(CppTypeData {
       name: get_full_name(entity).unwrap(),
       header: match self.entity_include_file(entity) {
         Some(x) => x.clone(),
@@ -818,7 +818,7 @@ impl CppParser {
                              entity))
         }
       },
-      kind: CLangCppTypeKind::Class {
+      kind: CppTypeKind::Class {
         size: size, // entity.get_type().unwrap().get_sizeof().ok().map(|x| x as i32),
         bases: bases,
         fields: fields,
@@ -1094,7 +1094,7 @@ impl CppParser {
                             })
                             .collect();
     for t in self.data.types.clone() {
-      if let CLangCppTypeKind::Class { bases, .. } = t.kind {
+      if let CppTypeKind::Class { bases, .. } = t.kind {
         for base in bases {
           if let Err(msg) = self.check_type_integrity(&base) {
             log::warning(format!("Class {}: base class type {:?}: {}", t.name, base, msg));
@@ -1140,7 +1140,7 @@ impl CppParser {
       }
     }
     for t in self.data.types.clone() {
-      if let CLangCppTypeKind::Class { bases, .. } = t.kind {
+      if let CppTypeKind::Class { bases, .. } = t.kind {
         for base in bases {
           self.find_template_instantiations_in_type(&base);
         }
@@ -1150,7 +1150,7 @@ impl CppParser {
     for (class_name, instantiations) in &self.data.template_instantiations {
       println!("Class: {}", class_name);
       if let Some(ref type_info) = self.data.types.iter().find(|x| &x.name == class_name) {
-        if let CLangCppTypeKind::Class { ref template_arguments, .. } = type_info.kind {
+        if let CppTypeKind::Class { ref template_arguments, .. } = type_info.kind {
           if let &Some(ref template_arguments) = template_arguments {
             let valid_length = template_arguments.len();
             for ins in instantiations {

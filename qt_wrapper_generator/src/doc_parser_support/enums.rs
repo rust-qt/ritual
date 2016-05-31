@@ -1,8 +1,8 @@
-use clang_cpp_data::EnumValue;
+use cpp_data::EnumValue;
 use cpp_type::CppType;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum CppTypeKind {
+pub enum DocCppTypeKind {
   CPrimitive,
   Enum {
     values: Vec<EnumValue>,

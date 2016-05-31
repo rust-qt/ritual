@@ -7,14 +7,14 @@ use std::io::Write;
 use utils::JoinWithString;
 use std::collections::HashMap;
 use log;
-use clang_cpp_data::{CLangCppData, CLangCppTypeKind};
+use cpp_data::{CppData, CppTypeKind};
 use caption_strategy::MethodCaptionStrategy;
 use cpp_method::CppMethod;
 use cpp_type::CppTypeBase;
 
 pub struct CGenerator {
   qtcw_path: PathBuf,
-  cpp_data: CLangCppData,
+  cpp_data: CppData,
   template_classes: Vec<String>,
   abstract_classes: Vec<String>,
 }
@@ -195,19 +195,19 @@ pub struct CppFfiHeaderData {
 }
 
 pub struct CppAndFfiData {
-  pub cpp_data: CLangCppData,
-  pub cpp_data_by_headers: HashMap<String, CLangCppData>,
+  pub cpp_data: CppData,
+  pub cpp_data_by_headers: HashMap<String, CppData>,
   pub cpp_ffi_headers: Vec<CppFfiHeaderData>,
 }
 
 impl CGenerator {
-  pub fn new(cpp_data: CLangCppData, qtcw_path: PathBuf) -> Self {
+  pub fn new(cpp_data: CppData, qtcw_path: PathBuf) -> Self {
     CGenerator {
       qtcw_path: qtcw_path,
       template_classes: cpp_data.types
                                 .iter()
                                 .filter_map(|t| {
-                                  if let CLangCppTypeKind::Class { ref template_arguments, .. } =
+                                  if let CppTypeKind::Class { ref template_arguments, .. } =
                                          t.kind {
                                     if template_arguments.is_some() {
                                       Some(t.name.clone())
@@ -229,7 +229,7 @@ impl CGenerator {
                                 .types
                                 .iter()
                                 .filter_map(|t| {
-                                  if let CLangCppTypeKind::Class { .. } = t.kind {
+                                  if let CppTypeKind::Class { .. } = t.kind {
                                     if self.get_pure_virtual_methods(&t.name).len() > 0 {
                                       Some(t.name.clone())
                                     } else {
@@ -264,7 +264,7 @@ impl CGenerator {
 
   }
 
-  fn generate_one(&self, include_file: &String, data: &CLangCppData) -> CppFfiHeaderData {
+  fn generate_one(&self, include_file: &String, data: &CppData) -> CppFfiHeaderData {
     log::info(format!("Generating C++ FFI methods for header: <{}>", include_file));
     let mut include_file_base_name = include_file.clone();
     if include_file_base_name.ends_with(".h") {
@@ -329,7 +329,7 @@ impl CGenerator {
                                   .collect();
     let mut inherited_methods = Vec::new();
     if let Some(type_info) = self.cpp_data.types.iter().find(|t| &t.name == class_name) {
-      if let CLangCppTypeKind::Class { ref bases, .. } = type_info.kind {
+      if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
         for base in bases {
           if let CppTypeBase::Class { ref name, .. } = base.base {
             for method in self.get_all_methods(name) {
@@ -368,7 +368,7 @@ impl CGenerator {
     }
     let mut inherited_methods = Vec::new();
     if let Some(type_info) = self.cpp_data.types.iter().find(|t| &t.name == class_name) {
-      if let CLangCppTypeKind::Class { ref bases, .. } = type_info.kind {
+      if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
         for base in bases {
           if let CppTypeBase::Class { ref name, .. } = base.base {
             for method in self.get_pure_virtual_methods(name) {

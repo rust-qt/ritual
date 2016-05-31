@@ -3,7 +3,7 @@ mod cpp_ffi_function_argument;
 mod cpp_ffi_function_signature;
 mod cpp_ffi_generator;
 mod caption_strategy;
-mod clang_cpp_data;
+mod cpp_data;
 mod cpp_and_ffi_method;
 mod cpp_method;
 mod cpp_type;

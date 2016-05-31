@@ -1,14 +1,14 @@
-use doc_parser_support::cpp_data::CppData;
-use clang_cpp_data::{CLangCppData, CLangCppTypeKind};
+use doc_parser_support::cpp_data::DocCppData;
+use cpp_data::{CppData, CppTypeKind};
 use cpp_parser::CppParserStats;
 use log;
 use enums::{CppTypeOrigin, CppMethodScope, CppVisibility};
-use doc_parser_support::enums::CppTypeKind;
+use doc_parser_support::enums::DocCppTypeKind;
 use std::collections::HashMap;
 extern crate core;
 use self::core::ops::AddAssign;
 
-pub fn check(result1: &CLangCppData, result1_stats: &CppParserStats, result2: &CppData) {
+pub fn check(result1: &CppData, result1_stats: &CppParserStats, result2: &DocCppData) {
   log::info("Checking parsers consistency...");
   let mut missing_enum_values1: HashMap<String, Vec<String>> = HashMap::new();
   let mut missing_enum_values2: HashMap<String, Vec<String>> = HashMap::new();
@@ -19,7 +19,7 @@ pub fn check(result1: &CLangCppData, result1_stats: &CppParserStats, result2: &C
       let include_file2 = include_file;
       match type_info2.kind {
         // typedefs are not supposed to be in result1
-        CppTypeKind::TypeDef { .. } | CppTypeKind::Flags { .. } | CppTypeKind::Unknown { .. } => {}
+        DocCppTypeKind::TypeDef { .. } | DocCppTypeKind::Flags { .. } | DocCppTypeKind::Unknown { .. } => {}
         _ => {
           if let Some(type_info1) = result1.types.iter().find(|x| x.name == type_info2.name) {
             if &type_info1.header != include_file2 {
@@ -29,9 +29,9 @@ pub fn check(result1: &CLangCppData, result1_stats: &CppParserStats, result2: &C
                                    include_file2));
             }
             match type_info2.kind {
-              CppTypeKind::Enum { ref values } => {
+              DocCppTypeKind::Enum { ref values } => {
                 let values2 = values.iter().map(|x| x.name.clone()).collect::<Vec<_>>();
-                if let CLangCppTypeKind::Enum { ref values } = type_info1.kind {
+                if let CppTypeKind::Enum { ref values } = type_info1.kind {
                   let values1 = values.iter().map(|x| x.name.clone()).collect::<Vec<_>>();
                   for val1 in &values1 {
                     if values2.iter().find(|&x| x == val1).is_none() {
