@@ -1,5 +1,5 @@
-use cpp_header_data::CppHeaderData;
-use cpp_type_map::CppTypeMap;
+use doc_parser_support::cpp_header_data::CppHeaderData;
+use doc_parser_support::cpp_type_map::CppTypeMap;
 
 #[derive(Debug, Clone)]
 pub struct CppData {

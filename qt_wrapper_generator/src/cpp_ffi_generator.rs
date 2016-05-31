@@ -320,6 +320,7 @@ impl CGenerator {
     }
   }
 
+  #[allow(dead_code)]
   fn get_all_methods(&self, class_name: &String) -> Vec<CppMethod> {
     let own_methods: Vec<_> = self.cpp_data
                                   .methods

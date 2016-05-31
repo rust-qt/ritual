@@ -11,8 +11,7 @@ use std::path::PathBuf;
 
 use utils::JoinWithString;
 
-use clang_cpp_data::{CLangCppData, CLangCppTypeData, CLangCppTypeKind, CLangClassField};
-use cpp_type_map::EnumValue;
+use clang_cpp_data::{CLangCppData, CLangCppTypeData, CLangCppTypeKind, CLangClassField, EnumValue};
 // use cpp_type_map::CppTypeInfo;
 use cpp_method::{CppMethod, CppFunctionArgument};
 use enums::{CppMethodScope, CppTypeOrigin, CppTypeIndirection, CppTypeOriginLocation,

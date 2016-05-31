@@ -2,9 +2,14 @@
 // use cpp_type_map::CppTypeInfo;
 use cpp_method::CppMethod;
 use cpp_type::{CppType, CppTypeBase};
-use cpp_type_map::EnumValue;
 use std::collections::HashMap;
 use enums::{CppMethodScope, CppTypeOrigin, CppVisibility};
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct EnumValue {
+  pub name: String,
+  pub value: i64,
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CLangClassField {

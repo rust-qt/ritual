@@ -5,22 +5,16 @@ mod cpp_ffi_generator;
 mod caption_strategy;
 mod clang_cpp_data;
 mod cpp_and_ffi_method;
-mod cpp_data;
-mod cpp_header_data;
 mod cpp_method;
 mod cpp_type;
-mod cpp_type_map;
 mod enums;
-//mod extractor_actions_generator;
 mod log;
 mod qt_specific;
-mod parsers_consistency_checker;
-//mod read_extracted_info;
-mod read_parse_result;
 mod rust_generator;
 mod rust_type;
 mod utils;
 mod cpp_parser;
+mod doc_parser_support;
 
 use std::path::PathBuf;
 use std::env;
@@ -48,9 +42,9 @@ fn main() {
     let mut parse_result1 = parser1.get_data();
     let parse_result_path = PathBuf::from(arguments[2].clone());
     log::info("Reading parse result...");
-    let parse_result2 = read_parse_result::do_it(&parse_result_path);
+    let parse_result2 = doc_parser_support::read_parse_result::do_it(&parse_result_path);
     qt_specific::fix_header_names(&mut parse_result1, &headers_dir);
-    parsers_consistency_checker::check(&parse_result1, &stats, &parse_result2);
+    doc_parser_support::parsers_consistency_checker::check(&parse_result1, &stats, &parse_result2);
     return;
   }
   if arguments.len() == 4 && arguments[1] == "stage0" {

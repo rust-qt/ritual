@@ -3,7 +3,6 @@ use enums::IndirectionChange;
 use caption_strategy::TypeCaptionStrategy;
 
 extern crate regex;
-use self::regex::Regex;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CppBuiltInNumericType {

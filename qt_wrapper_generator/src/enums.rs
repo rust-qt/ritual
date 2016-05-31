@@ -1,5 +1,3 @@
-use cpp_type_map::EnumValue;
-use cpp_type::CppType;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CppTypeIndirection {
@@ -66,25 +64,6 @@ pub enum CppTypeOrigin {
   },
   Unknown,
 }
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum CppTypeKind {
-  CPrimitive,
-  Enum {
-    values: Vec<EnumValue>,
-  },
-  Flags {
-    enum_name: String,
-  },
-  TypeDef {
-    meaning: CppType,
-  },
-  Class {
-    inherits: Option<CppType>,
-  },
-  Unknown,
-}
-
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum AllocationPlace {

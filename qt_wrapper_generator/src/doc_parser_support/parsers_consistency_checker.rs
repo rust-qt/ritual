@@ -1,8 +1,9 @@
-use cpp_data::CppData;
+use doc_parser_support::cpp_data::CppData;
 use clang_cpp_data::{CLangCppData, CLangCppTypeKind};
 use cpp_parser::CppParserStats;
 use log;
-use enums::{CppTypeOrigin, CppTypeKind, CppMethodScope, CppVisibility};
+use enums::{CppTypeOrigin, CppMethodScope, CppVisibility};
+use doc_parser_support::enums::CppTypeKind;
 use std::collections::HashMap;
 extern crate core;
 use self::core::ops::AddAssign;

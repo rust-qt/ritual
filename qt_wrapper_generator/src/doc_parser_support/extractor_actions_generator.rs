@@ -1,11 +1,12 @@
-use cpp_data::CppData;
-use enums::CppTypeKind;
+use doc_parser_support::cpp_data::CppData;
+use doc_parser_support::enums::CppTypeKind;
 use log;
 
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::Write;
 
+#[allow(dead_code)]
 pub fn do_it(cpp_data: CppData, extractor_actions_path: PathBuf) {
   let show_output = true;
   log::info(format!("Generating file: {:?}", extractor_actions_path));
@@ -17,23 +18,6 @@ pub fn do_it(cpp_data: CppData, extractor_actions_path: PathBuf) {
           log::warning(format!("Ignoring {} because it is blacklisted.", item.include_file));
         }
         continue;
-      }
-      match cpp_data.is_template_class(class_name) {
-        Err(msg) => {
-          if show_output {
-            log::warning(format!("Ignoring {}: {}", class_name, msg));
-          }
-          continue;
-        }
-        Ok(is_template_class) => {
-          if is_template_class {
-            // TODO: support template classes!
-            if show_output {
-              log::warning(format!("Ignoring {} because it is a template class.", class_name));
-            }
-            continue;
-          }
-        }
       }
       if show_output {
         log::debug(format!("Requesting size definition for {}.", class_name));

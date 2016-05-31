@@ -11,6 +11,7 @@ pub struct CppExtractedInfo {
   pub enum_values: HashMap<String, HashMap<String, i32>>,
 }
 
+#[allow(dead_code)]
 pub fn do_it(file_name: PathBuf) -> CppExtractedInfo {
   let f = File::open(file_name).unwrap();
   let data_value: serde_json::Value = serde_json::from_reader(f).unwrap();

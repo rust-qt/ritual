@@ -1,12 +1,7 @@
-use enums::{CppTypeKind, CppTypeOrigin};
+use doc_parser_support::enums::CppTypeKind;
+use enums::CppTypeOrigin;
 use cpp_type::CppTypeBase;
 use std::collections::HashMap;
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct EnumValue {
-  pub name: String,
-  pub value: i64,
-}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppTypeInfo {

@@ -1,12 +1,11 @@
 use cpp_ffi_generator::{CppAndFfiData, CppFfiHeaderData};
 use cpp_and_ffi_method::CppAndFfiMethod;
-use cpp_type_map::EnumValue;
 use cpp_type::{CppTypeBase, CppFfiType, CppBuiltInNumericType};
 use enums::CppTypeIndirection;
 use utils::JoinWithString;
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument};
-use clang_cpp_data::CLangCppTypeKind;
+use clang_cpp_data::{CLangCppTypeKind, EnumValue};
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::Write;

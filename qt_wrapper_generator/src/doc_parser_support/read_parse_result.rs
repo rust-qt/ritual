@@ -1,9 +1,12 @@
 use cpp_type::{CppType, CppTypeBase};
-use cpp_type_map::{EnumValue, CppTypeInfo, CppTypeMap};
+use doc_parser_support::cpp_type_map::{CppTypeInfo, CppTypeMap};
+use clang_cpp_data::EnumValue;
 use cpp_method::{CppFunctionArgument, CppMethod};
-use cpp_header_data::CppHeaderData;
-use cpp_data::CppData;
-use enums::{CppMethodScope, CppTypeOrigin, CppTypeKind, CppTypeIndirection, CppVisibility};
+use doc_parser_support::cpp_header_data::CppHeaderData;
+use doc_parser_support::cpp_data::CppData;
+use enums::{CppMethodScope, CppTypeOrigin, CppTypeIndirection, CppVisibility};
+use doc_parser_support::enums::CppTypeKind;
+
 
 use std::fs::File;
 extern crate serde;
