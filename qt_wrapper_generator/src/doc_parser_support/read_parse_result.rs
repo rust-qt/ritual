@@ -2,7 +2,7 @@ use cpp_type::{CppType, CppTypeBase, CppTypeIndirection};
 use doc_parser_support::cpp_type_map::DocCppTypeOrigin;
 use doc_parser_support::cpp_type_map::{CppTypeInfo, CppTypeMap};
 use cpp_data::{EnumValue, CppVisibility};
-use cpp_method::{CppFunctionArgument, CppMethod, CppMethodScope};
+use cpp_method::{CppFunctionArgument, CppMethod, CppMethodScope, CppMethodKind};
 use doc_parser_support::cpp_header_data::CppHeaderData;
 use doc_parser_support::cpp_data::DocCppData;
 use doc_parser_support::enums::DocCppTypeKind;
@@ -120,23 +120,24 @@ impl CppMethod {
         Some(v) => Some(CppType::from_json(v)),
         None => None,
       },
-      is_constructor: match value.get("constructor") {
-        Some(v) => v.as_boolean().unwrap(),
-        None => false,
-      },
-      is_destructor: match value.get("destructor") {
-        Some(v) => v.as_boolean().unwrap(),
-        None => false,
-      },
-      operator: match value.get("operator") {
-        Some(v) => Some(v.as_string().unwrap().to_string()),
-        None => None,
-      },
-      conversion_operator: None,
-      is_variable: match value.get("variable") {
-        Some(v) => v.as_boolean().unwrap(),
-        None => false,
-      },
+      kind: CppMethodKind::Regular,
+//      is_constructor: match value.get("constructor") {
+//        Some(v) => v.as_boolean().unwrap(),
+//        None => false,
+//      },
+//      is_destructor: match value.get("destructor") {
+//        Some(v) => v.as_boolean().unwrap(),
+//        None => false,
+//      },
+//      operator: match value.get("operator") {
+//        Some(v) => Some(v.as_string().unwrap().to_string()),
+//        None => None,
+//      },
+//      conversion_operator: None,
+//      is_variable: match value.get("variable") {
+//        Some(v) => v.as_boolean().unwrap(),
+//        None => false,
+//      },
       arguments: match value.get("arguments") {
         Some(v) => {
           v.as_array()

@@ -1,6 +1,6 @@
 
 // use cpp_type_map::CppTypeInfo;
-use cpp_method::{CppMethod, CppMethodScope};
+use cpp_method::{CppMethod, CppMethodScope, CppMethodKind};
 use cpp_type::{CppType, CppTypeBase};
 use std::collections::HashMap;
 
@@ -88,7 +88,7 @@ impl CppData {
         let class_name = &type1.name;
         let mut found_destructor = false;
         for method in &self.methods {
-          if method.is_destructor {
+          if method.kind == CppMethodKind::Destructor {
             if let CppMethodScope::Class(ref name) = method.scope {
               if name == class_name {
                 found_destructor = true;
@@ -108,11 +108,7 @@ impl CppData {
             visibility: CppVisibility::Public,
             is_signal: false,
             return_type: None,
-            is_constructor: false,
-            is_destructor: true,
-            operator: None,
-            conversion_operator: None,
-            is_variable: false,
+            kind: CppMethodKind::Destructor,
             arguments: vec![],
             allows_variable_arguments: false,
             include_file: type1.include_file.clone(),

@@ -4,6 +4,7 @@ use cpp_ffi_function_signature::CppFfiFunctionSignature;
 use cpp_ffi_function_argument::{CppFfiFunctionArgument, CppFfiArgumentMeaning};
 use cpp_and_ffi_method::CppMethodWithFfiSignature;
 use cpp_data::{CppVisibility, CppOriginLocation};
+use cpp_operators::CppOperator;
 use utils::JoinWithString;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -37,15 +38,23 @@ impl CppMethodScope {
   pub fn class_name(&self) -> Option<&String> {
     match *self {
       CppMethodScope::Global => None,
-      CppMethodScope::Class(ref s) => Some(s)
+      CppMethodScope::Class(ref s) => Some(s),
     }
   }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CppMethodKind {
+  Regular,
+  Constructor,
+  Destructor,
+  Operator(CppOperator),
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppMethod {
   pub name: String,
+  pub kind: CppMethodKind,
   pub scope: CppMethodScope,
   pub is_virtual: bool,
   pub is_pure_virtual: bool,
@@ -54,11 +63,6 @@ pub struct CppMethod {
   pub visibility: CppVisibility,
   pub is_signal: bool,
   pub return_type: Option<CppType>,
-  pub is_constructor: bool,
-  pub is_destructor: bool,
-  pub operator: Option<String>,
-  pub conversion_operator: Option<CppType>,
-  pub is_variable: bool,
   pub arguments: Vec<CppFunctionArgument>,
   pub allows_variable_arguments: bool,
   pub include_file: String,
@@ -81,7 +85,7 @@ impl CppMethod {
   }
 
   pub fn real_return_type(&self) -> Option<CppType> {
-    if self.is_constructor {
+    if self.kind == CppMethodKind::Constructor {
       if let CppMethodScope::Class(ref class_name) = self.scope {
         return Some(CppType {
           is_const: false,
@@ -117,9 +121,6 @@ impl CppMethod {
                      -> Result<(CppFfiFunctionSignature, AllocationPlaceImportance), String> {
 
     // no complicated cases support for now
-    if self.is_variable {
-      return Err("Variables are not supported".to_string());
-    }
     if self.allows_variable_arguments {
       return Err("Variable arguments are not supported".to_string());
     }
@@ -129,7 +130,7 @@ impl CppMethod {
       return_type: CppFfiType::void(),
     };
     if let CppMethodScope::Class(ref class_name) = self.scope {
-      if !self.is_static && !self.is_constructor {
+      if !self.is_static && self.kind != CppMethodKind::Constructor {
         r.arguments.push(CppFfiFunctionArgument {
           name: "this_ptr".to_string(),
           argument_type: CppType {
@@ -186,7 +187,7 @@ impl CppMethod {
         }
       }
     }
-    if self.is_destructor {
+    if self.kind == CppMethodKind::Destructor {
       allocation_place_importance = AllocationPlaceImportance::Important;
     }
     Ok((r, allocation_place_importance))
@@ -251,17 +252,11 @@ impl CppMethod {
     if self.allows_variable_arguments {
       s = format!("{} [var args]", s);
     }
-    if self.is_variable {
-      s = format!("{} [variable]", s);
-    }
-    if self.is_constructor {
-      s = format!("{} [constructor]", s);
-    }
-    if self.is_destructor {
-      s = format!("{} [destructor]", s);
-    }
-    if let Some(ref op) = self.operator {
-      s = format!("{} [operator \"{}\"]", s, op);
+    match self.kind {
+      CppMethodKind::Constructor => s = format!("{} [constructor]", s),
+      CppMethodKind::Destructor => s = format!("{} [destructor]", s),
+      CppMethodKind::Operator(ref op) => s = format!("{} [{:?}]", s, op),
+      CppMethodKind::Regular => {}
     }
     if let Some(ref cpp_type) = self.return_type {
       s = format!("{} {}",
@@ -272,23 +267,21 @@ impl CppMethod {
       s = format!("{} {}::", s, name);
     }
     s = format!("{}{}", s, self.name);
-    if !self.is_variable {
-      s = format!("{}({})",
-                  s,
-                  self.arguments
-                      .iter()
-                      .map(|arg| {
-                        format!("{} {}{}",
-                                arg.argument_type.to_cpp_code().unwrap_or("[?]".to_string()),
-                                arg.name,
-                                if arg.has_default_value {
-                                  format!(" = ?")
-                                } else {
-                                  String::new()
-                                })
-                      })
-                      .join(", "));
-    }
+    s = format!("{}({})",
+                s,
+                self.arguments
+                    .iter()
+                    .map(|arg| {
+                      format!("{} {}{}",
+                              arg.argument_type.to_cpp_code().unwrap_or("[?]".to_string()),
+                              arg.name,
+                              if arg.has_default_value {
+                                format!(" = ?")
+                              } else {
+                                String::new()
+                              })
+                    })
+                    .join(", "));
     if self.is_pure_virtual {
       s = format!("{} = 0", s);
     }

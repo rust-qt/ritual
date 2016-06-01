@@ -14,7 +14,7 @@ use utils::JoinWithString;
 use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppOriginLocation,
                CppVisibility};
 // use cpp_type_map::CppTypeInfo;
-use cpp_method::{CppMethod, CppFunctionArgument};
+use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind};
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection};
 use cpp_method::CppMethodScope;
 
@@ -93,7 +93,7 @@ fn get_origin_location(entity: Entity) -> Result<CppOriginLocation, String> {
         column: location.2,
       })
     }
-    None => Err(format!("No info about location."))
+    None => Err(format!("No info about location.")),
   }
 }
 
@@ -678,6 +678,12 @@ impl CppParser {
         name = format!("{}::{}", get_full_name(parent).unwrap(), name);
       }
     }
+    let mut kind = match entity.get_kind() {
+      EntityKind::Constructor => CppMethodKind::Constructor,
+      EntityKind::Destructor => CppMethodKind::Destructor,
+      _ => CppMethodKind::Regular,
+    };
+    unimplemented!();
     let operator = if name.starts_with("operator") {
       let op = name["operator".len()..].trim();
       if VALID_OPERATOR_SYMBOLS.iter().find(|&x| x == &op).is_some() {
@@ -713,6 +719,7 @@ impl CppParser {
     //    }
     Ok(CppMethod {
       name: name,
+      kind: kind,
       scope: scope,
       is_virtual: entity.is_virtual_method(),
       is_pure_virtual: entity.is_pure_virtual_method(),
@@ -727,11 +734,6 @@ impl CppParser {
       arguments: arguments,
       allows_variable_arguments: entity.is_variadic(),
       return_type: Some(return_type_parsed),
-      is_constructor: entity.get_kind() == EntityKind::Constructor,
-      is_destructor: entity.get_kind() == EntityKind::Destructor,
-      operator: operator,
-      conversion_operator: conversion_operator,
-      is_variable: false, // TODO: move variables into CppTypeInfo
       include_file: self.entity_include_file(entity).unwrap(),
       origin_location: Some(get_origin_location(entity).unwrap()),
       template_arguments: template_arguments,

@@ -1,7 +1,7 @@
-use cpp_method::{CppMethod, CppMethodScope, AllocationPlace};
+use cpp_method::{CppMethod, CppMethodScope, AllocationPlace, CppMethodKind};
 use cpp_ffi_function_signature::CppFfiFunctionSignature;
-use utils::operator_c_name;
 use caption_strategy::{MethodCaptionStrategy, TypeCaptionStrategy};
+use cpp_operators::CppOperator;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppMethodWithFfiSignature {
@@ -25,26 +25,29 @@ impl CppMethodWithFfiSignature {
       CppMethodScope::Class(ref class_name) => format!("{}_", class_name.replace("::", "_")),
       CppMethodScope::Global => format!("{}_G_", include_file),
     };
-    let method_name = if self.cpp_method.is_constructor {
-      match self.allocation_place {
-        AllocationPlace::Stack => "constructor".to_string(),
-        AllocationPlace::Heap => "new".to_string(),
+    let method_name = match self.cpp_method.kind {
+      CppMethodKind::Constructor => {
+        match self.allocation_place {
+          AllocationPlace::Stack => "constructor".to_string(),
+          AllocationPlace::Heap => "new".to_string(),
+        }
       }
-    } else if self.cpp_method.is_destructor {
-      match self.allocation_place {
-        AllocationPlace::Stack => "destructor".to_string(),
-        AllocationPlace::Heap => "delete".to_string(),
+      CppMethodKind::Destructor => {
+        match self.allocation_place {
+          AllocationPlace::Stack => "destructor".to_string(),
+          AllocationPlace::Heap => "delete".to_string(),
+        }
       }
-    } else if let Some(ref operator) = self.cpp_method.operator {
-      match operator_c_name(operator, self.cpp_method.real_arguments_count()) {
-        Ok(op) => format!("OP_{}", op),
-        Err(msg) => return Err(msg),
+      CppMethodKind::Operator(ref operator) => {
+        match *operator {
+          CppOperator::Conversion(ref cpp_type) => {
+            format!("operator_{}", cpp_type.caption(TypeCaptionStrategy::Full))
+          }
+          _ => format!("OP_{}", operator.c_name()),
+        }
       }
-    } else if let Some(ref operator_type) = self.cpp_method.conversion_operator {
-      //TODO: support conversion operators in rust
-      format!("operator_{}", operator_type.caption(TypeCaptionStrategy::Full))
-    } else {
-      self.cpp_method.name.replace("::", "_")
+      CppMethodKind::Regular => self.cpp_method.name.replace("::", "_"),
+
     };
     Ok(scope_prefix + &method_name)
   }

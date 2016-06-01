@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use log;
 use cpp_data::{CppData, CppTypeKind, CppVisibility};
 use caption_strategy::MethodCaptionStrategy;
-use cpp_method::{CppMethod, AllocationPlace, CppMethodScope};
-use cpp_ffi_type::{IndirectionChange};
+use cpp_method::{CppMethod, AllocationPlace, CppMethodScope, CppMethodKind};
+use cpp_ffi_type::IndirectionChange;
 use cpp_ffi_function_argument::CppFfiArgumentMeaning;
 use cpp_type::CppTypeBase;
 
@@ -38,7 +38,7 @@ impl CppAndFfiMethod {
             // constructors are said to return values in parse result,
             // but in reality we use `new` which returns a pointer,
             // so no conversion is necessary for constructors.
-            if !self.cpp_method.is_constructor {
+            if self.cpp_method.kind != CppMethodKind::Constructor {
               if let Some(ref return_type) = self.cpp_method.return_type {
                 result = format!("new {}({})",
                                  return_type.base.to_cpp_code().unwrap(),
@@ -58,7 +58,8 @@ impl CppAndFfiMethod {
       result = format!("uint({})", result);
     }
 
-    if self.allocation_place == AllocationPlace::Stack && !self.cpp_method.is_constructor {
+    if self.allocation_place == AllocationPlace::Stack &&
+       self.cpp_method.kind != CppMethodKind::Constructor {
       if let Some(arg) = self.c_signature
                              .arguments
                              .iter()
@@ -105,7 +106,7 @@ impl CppAndFfiMethod {
   }
 
   fn returned_expression(&self) -> String {
-    self.convert_return_type(if self.cpp_method.is_destructor {
+    self.convert_return_type(if self.cpp_method.kind == CppMethodKind::Destructor {
       if let Some(arg) = self.c_signature
                              .arguments
                              .iter()
@@ -115,13 +116,14 @@ impl CppAndFfiMethod {
         panic!("Error: no this argument found\n{:?}", self);
       }
     } else {
-      let result_without_args = if self.cpp_method.is_constructor {
+      let result_without_args = if self.cpp_method.kind == CppMethodKind::Constructor {
         if let CppMethodScope::Class(ref class_name) = self.cpp_method.scope {
           match self.allocation_place {
             AllocationPlace::Stack => {
-              if let Some(arg) = self.c_signature.arguments.iter().find(|x| {
-                x.meaning == CppFfiArgumentMeaning::ReturnValue
-              }) {
+              if let Some(arg) = self.c_signature
+                                     .arguments
+                                     .iter()
+                                     .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
                 format!("new({}) {}", arg.name, class_name)
               } else {
                 panic!("no return value equivalent argument found");
@@ -158,7 +160,7 @@ impl CppAndFfiMethod {
 
 
   fn source_body(&self) -> String {
-    if self.cpp_method.is_destructor && self.allocation_place == AllocationPlace::Heap {
+    if self.cpp_method.kind == CppMethodKind::Destructor && self.allocation_place == AllocationPlace::Heap {
       if let Some(arg) = self.c_signature
                              .arguments
                              .iter()
@@ -424,7 +426,7 @@ impl CGenerator {
 
       for ref method in methods {
 //        if include_file == "QRect" { println!("process_methods test1 {:?}", method); }
-        if method.is_constructor {
+        if method.kind == CppMethodKind::Constructor {
           if let CppMethodScope::Class(ref class_name) = method.scope {
             if self.abstract_classes.iter().find(|x| x == &class_name).is_some() {
               log::debug(format!("Method is skipped:\n{}\nConstructors are not allowed for abstract \
@@ -574,8 +576,8 @@ impl CGenerator {
                values);
       }
     }
-    //TODO: make sorting
-    //r.sort_by(|a, b| a.cpp_method.original_index.cmp(&b.cpp_method.original_index));
+    // TODO: make sorting
+    // r.sort_by(|a, b| a.cpp_method.original_index.cmp(&b.cpp_method.original_index));
     // if include_file == "QRect" { println!("process_methods test2 {:?}", r); }
     r
   }

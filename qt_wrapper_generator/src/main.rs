@@ -8,6 +8,7 @@ mod cpp_and_ffi_method;
 mod cpp_method;
 mod cpp_type;
 mod cpp_ffi_type;
+mod cpp_operators;
 mod enums;
 mod log;
 mod qt_specific;

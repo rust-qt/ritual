@@ -1,4 +1,4 @@
-use cpp_method::{CppMethod, CppMethodScope};
+use cpp_method::{CppMethod, CppMethodScope, CppMethodKind};
 use cpp_data::CppVisibility;
 
 #[derive(Debug, Clone)]
@@ -18,7 +18,7 @@ impl CppHeaderData {
         // destructor is private
         return;
       }
-      if self.methods.iter().find(|x| x.is_destructor).is_none() {
+      if self.methods.iter().find(|x| x.kind == CppMethodKind::Destructor).is_none() {
         self.methods.push(CppMethod {
           name: format!("~{}", class_name),
           scope: CppMethodScope::Class(class_name.clone()),
@@ -29,11 +29,7 @@ impl CppHeaderData {
           visibility: CppVisibility::Public,
           is_signal: false,
           return_type: None,
-          is_constructor: false,
-          is_destructor: true,
-          operator: None,
-          conversion_operator: None,
-          is_variable: false,
+          kind: CppMethodKind::Destructor,
           arguments: vec![],
           allows_variable_arguments: false,
           include_file: self.include_file.clone(),
