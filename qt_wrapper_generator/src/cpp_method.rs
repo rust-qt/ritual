@@ -51,6 +51,33 @@ pub enum CppMethodKind {
   Operator(CppOperator),
 }
 
+impl CppMethodKind {
+  pub fn is_operator(&self) -> bool {
+    match *self {
+      CppMethodKind::Operator(..) => true,
+      _ => false,
+    }
+  }
+  pub fn is_constructor(&self) -> bool {
+    match *self {
+      CppMethodKind::Constructor => true,
+      _ => false,
+    }
+  }
+  pub fn is_destructor(&self) -> bool {
+    match *self {
+      CppMethodKind::Destructor => true,
+      _ => false,
+    }
+  }
+  pub fn is_regular(&self) -> bool {
+    match *self {
+      CppMethodKind::Regular => true,
+      _ => false,
+    }
+  }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppMethod {
   pub name: String,
@@ -101,19 +128,6 @@ impl CppMethod {
     } else {
       return self.return_type.clone();
     }
-  }
-
-  pub fn real_arguments_count(&self) -> i32 {
-    // println!("real_arguments_count called for {:?}", self);
-    let mut result = self.arguments.len() as i32;
-    if let CppMethodScope::Class(..) = self.scope {
-      // println!("ok1");
-      if !self.is_static {
-        // println!("ok2");
-        result += 1;
-      }
-    }
-    result
   }
 
   pub fn c_signature(&self,

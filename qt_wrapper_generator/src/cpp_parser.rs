@@ -17,14 +17,8 @@ use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppO
 use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind};
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection};
 use cpp_method::CppMethodScope;
+use cpp_operators::CppOperator;
 
-static VALID_OPERATOR_SYMBOLS: &'static [&'static str] = &["=", "+", "-", "+", "-", "*", "/", "%",
-                                                           "++", "++", "--", "--", "==", "!=",
-                                                           ">", "<", ">=", "<=", "!", "&&", "||",
-                                                           "~", "&", "|", "^", "<<", ">>", "+=",
-                                                           "-=", "*=", "/=", "%=", "&=", "|=",
-                                                           "^=", "<<=", ">>=", "[]", "()", ",",
-                                                           "->"];
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 enum Stage {
@@ -683,25 +677,43 @@ impl CppParser {
       EntityKind::Destructor => CppMethodKind::Destructor,
       _ => CppMethodKind::Regular,
     };
-    unimplemented!();
-    let operator = if name.starts_with("operator") {
-      let op = name["operator".len()..].trim();
-      if VALID_OPERATOR_SYMBOLS.iter().find(|&x| x == &op).is_some() {
-        Some(op.to_string())
-      } else if name == "operator new" {
-        Some("new".to_string())
-      } else if name == "operator delete" {
-        Some("delete".to_string())
-      } else {
-        None
-      }
+    let allows_variable_arguments = entity.is_variadic();
+    let has_this_argument = scope.class_name().is_some() && !entity.is_static_method();
+    let real_arguments_count = arguments.len() as i32 +
+                               if has_this_argument {
+      1
     } else {
-      None
+      0
     };
-    let conversion_operator = if operator.is_none() && name.starts_with("operator ") {
+    if name.starts_with("operator") {
+      let name_suffix = name["operator".len()..].trim();
+      if name_suffix == "delete" {
+        println!("TEST {} {}",
+                 allows_variable_arguments,
+                 real_arguments_count);
+        dump_entity(&entity, 0);
+      }
+      let mut name_matches = false;
+      for operator in CppOperator::all() {
+        let info = operator.info();
+        if let Some(s) = info.function_name_suffix {
+          if s == name_suffix {
+            name_matches = true;
+            if info.allows_variable_arguments || info.arguments_count == real_arguments_count {
+              kind = CppMethodKind::Operator(operator.clone());
+              break;
+            }
+          }
+        }
+      }
+      if !kind.is_operator() && name_matches {
+        return Err(format!("This method is recognized as operator but arguments do not match its signature."));
+      }
+    }
+    if !kind.is_operator() && name.starts_with("operator ") {
       let op = name["operator ".len()..].trim();
       match self.parse_unexposed_type(None, Some(op.to_string()), class_entity, Some(entity)) {
-        Ok(t) => Some(t),
+        Ok(t) => kind = CppMethodKind::Operator(CppOperator::Conversion(t)),
         Err(msg) => {
           panic!("Unknown operator: '{}' (method name: {}); error: {}",
                  op,
@@ -709,14 +721,8 @@ impl CppParser {
                  msg)
         }
       }
-    } else {
-      None
-    };
-    //    if name == "name" {
-    //      println!("TEST {:?}", entity.get_semantic_parent());
-    //      println!("TEST2 {:?}", entity.get_lexical_parent());
-    //      dump_entity(&entity, 0);
-    //    }
+    }
+
     Ok(CppMethod {
       name: name,
       kind: kind,
@@ -732,7 +738,7 @@ impl CppParser {
       },
       is_signal: false, // TODO: somehow get this information
       arguments: arguments,
-      allows_variable_arguments: entity.is_variadic(),
+      allows_variable_arguments: allows_variable_arguments,
       return_type: Some(return_type_parsed),
       include_file: self.entity_include_file(entity).unwrap(),
       origin_location: Some(get_origin_location(entity).unwrap()),
