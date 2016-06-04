@@ -256,6 +256,7 @@ impl CGenerator {
       c_headers.push(self.generate_one(include_file, data));
       write!(all_header_file, "#include \"qtcw_{}.h\"\n", include_file).unwrap();
     }
+    c_headers.sort_by(|a, b| a.include_file.cmp(&b.include_file));
 
     write!(all_header_file, "#endif // QTCW_H\n").unwrap();
     CppAndFfiData {
