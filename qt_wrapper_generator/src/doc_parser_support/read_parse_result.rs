@@ -70,7 +70,6 @@ impl CppMethod {
                class_name: &Option<String>,
                index: i32)
                -> Self {
-    // println!("{:?} {:?}", value, class_name);
     let value = value.as_object().unwrap();
     CppMethod {
       include_file: include_file.clone(),
@@ -121,23 +120,6 @@ impl CppMethod {
         None => None,
       },
       kind: CppMethodKind::Regular,
-//      is_constructor: match value.get("constructor") {
-//        Some(v) => v.as_boolean().unwrap(),
-//        None => false,
-//      },
-//      is_destructor: match value.get("destructor") {
-//        Some(v) => v.as_boolean().unwrap(),
-//        None => false,
-//      },
-//      operator: match value.get("operator") {
-//        Some(v) => Some(v.as_string().unwrap().to_string()),
-//        None => None,
-//      },
-//      conversion_operator: None,
-//      is_variable: match value.get("variable") {
-//        Some(v) => v.as_boolean().unwrap(),
-//        None => false,
-//      },
       arguments: match value.get("arguments") {
         Some(v) => {
           v.as_array()

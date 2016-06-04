@@ -26,10 +26,6 @@ extern crate find_folder;
 fn print_usage() {
   log::error("Usage:");
   log::error("\tqt_wrapper_generator check_parsers_consistency parse_result_path");
-//  log::error("\tqt_wrapper_generator cpp_parser");
-//  log::error("\tqt_wrapper_generator stage1 parse_result_path extractor_actions_path");
-//  log::error("\tqt_wrapper_generator stage2 parse_result_path extracted_info_path qtcw_path \
-//              rust_qt_path");
   log::error("\tqt_wrapper_generator stage0 qtcw_path rust_qt_path");
   std::process::exit(1);
 }

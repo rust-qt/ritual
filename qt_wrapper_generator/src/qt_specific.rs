@@ -12,7 +12,6 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) {
   let mut map = HashMap::new();
   log::info("Detecting fancy Qt header names.");
   for header in std::fs::read_dir(headers_dir).unwrap() {
-    // println!("Name: {}", header.unwrap().path().display());
     let header = header.unwrap();
     let header_path = header.path();
     if std::fs::metadata(&header_path).unwrap().len() < 100 {
@@ -26,7 +25,6 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) {
         if !map.contains_key(&real_header) {
           map.insert(real_header.clone(), Vec::new());
         }
-        // if format!("{}.h", fancy_header.to_lowercase()) != map[&real_header] {
         map.get_mut(&real_header).unwrap().push(fancy_header);
       }
     }
@@ -79,7 +77,5 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) {
   for m in &mut data.methods {
     let x = get_header(&m.include_file, m.scope.class_name());
     m.include_file = x;
-//    m.include_file.clear();
-//    m.include_file.push_str(&x);
   }
 }

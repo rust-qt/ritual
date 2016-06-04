@@ -223,20 +223,6 @@ impl RustGenerator {
     }
   }
 
-  //  fn is_cpp_type_processed(&self, cpp_type: &String) -> bool {
-  // if let Some(rust_name) = self.cpp_to_rust_type_map.get(cpp_type) {
-  // if rust_name.crate_name == "qt_core" && rust_name.module_name == "types" {
-  // true
-  // } else if rust_name.crate_name == "" && rust_name.module_name == "" {
-  // true
-  // } else {
-  // self.processed_cpp_types.contains(cpp_type)
-  // }
-  // } else {
-  // false
-  // }
-  // }
-
   fn rust_ffi_function_to_code(&self, func: &RustFFIFunction) -> String {
     let args = func.arguments.iter().map(|arg| {
       format!("{}: {}",
@@ -270,12 +256,6 @@ impl RustGenerator {
                                          own_name: new_name,
                                        });
     }
-    //    self.cpp_to_rust_type_map.insert("QFlags".to_string(),
-    //                                     RustName {
-    //                                       crate_name: "qt_core".to_string(),
-    //                                       module_name: "flags".to_string(),
-    //                                       own_name: "QFlags".to_string(),
-    //                                     });
   }
 
   pub fn generate_all(&mut self) {
@@ -299,17 +279,6 @@ impl RustGenerator {
     for module in &self.modules {
       write!(lib_file, "pub mod {};\n", module).unwrap();
     }
-
-    //    let mut ffi_lib_file_path = self.output_path.clone();
-    //    ffi_lib_file_path.push("qt_core");
-    //    ffi_lib_file_path.push("src");
-    //    ffi_lib_file_path.push("ffi");
-    //    ffi_lib_file_path.push("mod.rs");
-    //    let mut ffi_lib_file = File::create(&ffi_lib_file_path).unwrap();
-    //    for module in &self.modules {
-    //      write!(ffi_lib_file, "pub mod {};\n", module).unwrap();
-    //    }
-
   }
 
   pub fn generate_types(&mut self, c_header: &CppFfiHeaderData) {

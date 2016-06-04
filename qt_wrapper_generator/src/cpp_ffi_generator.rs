@@ -300,7 +300,6 @@ impl CGenerator {
 
 
     write!(h_file, "#ifdef __cplusplus\n").unwrap();
-    // write!(h_file, "#include <{}>\n", include_file).unwrap();
     write!(h_file, "#include <QtCore>\n").unwrap();
     write!(h_file, "#endif\n\n").unwrap();
 
@@ -405,15 +404,6 @@ impl CGenerator {
                          include_file_base_name: &String,
                          methods: &Vec<CppMethod>)
                          -> Vec<CppAndFfiMethod> {
-
-    //  if vec!["QAnimationGroup", "QAbstractListModel", "QAbstractTableModel"]
-    //       .iter()
-    //       .find(|&&x| x == self.include_file)
-    //       .is_some() {
-    //    // these class are abstract despite they don't have pure virtual methods!
-    //    is_abstract_class = true;
-    //  }
-
     let mut hash1 = HashMap::new();
     {
       let insert_into_hash = |hash: &mut HashMap<String, Vec<_>>, key: String, value| {
@@ -425,7 +415,6 @@ impl CGenerator {
       };
 
       for ref method in methods {
-//        if include_file == "QRect" { println!("process_methods test1 {:?}", method); }
         if method.kind == CppMethodKind::Constructor {
           if let CppMethodScope::Class(ref class_name) = method.scope {
             if self.abstract_classes.iter().find(|x| x == &class_name).is_some() {
@@ -465,49 +454,6 @@ impl CGenerator {
           }
         }
 
-        /*
-        if self.include_file == "QMetaType" &&
-           (method.name == "qRegisterMetaType" || method.name == "qRegisterMetaTypeStreamOperators" ||
-            ((method.name == "hasRegisteredComparators" ||
-              method.name == "hasRegisteredConverterFunction" ||
-              method.name == "isRegistered" || method.name == "registerComparators" ||
-              method.name == "registerConverter" ||
-              method.name == "registerDebugStreamOperator" ||
-              method.name == "registerEqualsComparator" || method.name == "qMetaTypeId" ||
-              method.name == "hasRegisteredDebugStreamOperator") &&
-             method.arguments.len() == 0)) {
-          log::warning(format!("Method is skipped:\n{}\nThis method is blacklisted because it is \
-                                a template method.\n",
-                               method.short_text()));
-          continue;
-        }
-        if self.include_file == "QMetaEnum" && method.name == "fromType" {
-          log::warning(format!("Method is skipped:\n{}\nThis method is blacklisted because it is \
-                                a template method.\n",
-                               method.short_text()));
-          continue;
-        }
-        if self.include_file == "QRectF" && method.scope == CppMethodScope::Global &&
-           (method.name == "marginsAdded" || method.name == "marginsRemoved") {
-          log::debug(format!("Method is skipped:\n{}\nThis method is blacklisted because it does \
-                              not really exist.\n",
-                             method.short_text()));
-          continue;
-        }
-        // TODO: unblock on Windows
-        if self.include_file == "QProcess" &&
-           (method.name == "nativeArguments" || method.name == "setNativeArguments") {
-          log::warning(format!("Method is skipped:\n{}\nThis method is Windows-only.\n",
-                               method.short_text()));
-          continue;
-        }
-        if self.include_file == "QAbstractEventDispatcher" &&
-           (method.name == "registerEventNotifier" || method.name == "unregisterEventNotifier") {
-          log::warning(format!("Method is skipped:\n{}\nThis method is Windows-only.\n",
-                               method.short_text()));
-          continue;
-        }*/
-
         match method.add_c_signatures() {
           Err(msg) => {
             log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
@@ -525,8 +471,8 @@ impl CGenerator {
                 if let Some(result_stack) = result_stack {
                   let mut stack_name = result_stack.c_base_name(include_file_base_name).unwrap();
                   if stack_name == heap_name {
-                    stack_name = "SA_".to_string() + &stack_name;
-                    heap_name = "HA_".to_string() + &heap_name;
+                    stack_name = format!("{}_SA", stack_name);
+                    heap_name = format!("{}_HA", heap_name);
                   }
                   insert_into_hash(&mut hash1, stack_name, result_stack);
                   insert_into_hash(&mut hash1, heap_name, result_heap);
@@ -550,7 +496,6 @@ impl CGenerator {
         let mut type_captions: Vec<_> = values.iter()
                                               .map(|x| x.caption(strategy.clone()))
                                               .collect();
-        // println!("test1 {:?}", type_captions);
         type_captions.sort();
         type_captions.dedup();
         if type_captions.len() == values.len() {
@@ -576,9 +521,7 @@ impl CGenerator {
                values);
       }
     }
-    // TODO: make sorting
-    // r.sort_by(|a, b| a.cpp_method.original_index.cmp(&b.cpp_method.original_index));
-    // if include_file == "QRect" { println!("process_methods test2 {:?}", r); }
+    r.sort_by(|a, b| a.c_name.cmp(&b.c_name));
     r
   }
 }

@@ -1,5 +1,4 @@
 
-// use cpp_type_map::CppTypeInfo;
 use cpp_method::{CppMethod, CppMethodScope, CppMethodKind};
 use cpp_type::{CppType, CppTypeBase};
 use std::collections::HashMap;

@@ -7,13 +7,11 @@ use self::regex::Regex;
 use log;
 use std::collections::{HashSet, HashMap};
 use std::path::PathBuf;
-// use std::ffi::OsStr;
 
 use utils::JoinWithString;
 
 use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppOriginLocation,
                CppVisibility};
-// use cpp_type_map::CppTypeInfo;
 use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind};
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection};
 use cpp_method::CppMethodScope;
@@ -50,16 +48,11 @@ pub struct CppParser {
 #[allow(dead_code)]
 fn inspect_method(entity: Entity) {
   println!("{:?}", entity.get_display_name());
-  //  println!("children:");
-  //  for c in entity.get_children() {
-  //    println!("child {:?}", c);
-  //  }
   println!("type: {:?}", entity.get_type());
   println!("return type: {:?}",
            entity.get_type().unwrap().get_result_type());
   println!("args:");
   for c in entity.get_arguments().unwrap() {
-    // println!("arg: {:?}", c);
     println!("arg: name={} type={:?}",
              c.get_name().unwrap_or("[no name]".to_string()),
              c.get_type());
@@ -168,7 +161,6 @@ impl CppParser {
           name = name[6..].to_string();
         }
         if let Some(declaration) = type1.get_declaration() {
-          // println!("declaration: {:?}", type1.get_declaration());
           if declaration.get_kind() == EntityKind::ClassDecl ||
              declaration.get_kind() == EntityKind::ClassTemplate ||
              declaration.get_kind() == EntityKind::StructDecl {
@@ -355,9 +347,6 @@ impl CppParser {
       return Err(format!("Unexposed type has a declaration but is too complex: {}",
                          name));
     }
-
-
-    // println!("type is unexposed: {:?}", type1);
 
     return Err(format!("Unrecognized unexposed type: {}", name));
   }
@@ -573,10 +562,6 @@ impl CppParser {
   }
 
   fn parse_function(&mut self, entity: Entity) -> Result<CppMethod, String> {
-    //    log::debug(format!("Parsing function: {:?}", get_full_name(entity).unwrap()));
-    //    let allow_debug_print = get_full_name(entity).unwrap().find("QString::").is_some();
-    //    if allow_debug_print {
-    //    }
     let (scope, class_entity) = match entity.get_semantic_parent() {
       Some(p) => {
         match p.get_kind() {
@@ -606,8 +591,6 @@ impl CppParser {
                                                    Some(entity)) {
       Ok(x) => x,
       Err(msg) => {
-        //        dump_entity(&entity, 0);
-        //        println!("first child's type: {:?}", entity.get_children()[0].get_type());
         return Err(format!("Can't parse return type: {:?}: {}", return_type, msg));
       }
     };
@@ -736,7 +719,7 @@ impl CppParser {
         Accessibility::Protected => CppVisibility::Protected,
         Accessibility::Private => CppVisibility::Private,
       },
-      is_signal: false, // TODO: somehow get this information
+      is_signal: false, // TODO: get list of signals and slots at runtime
       arguments: arguments,
       allows_variable_arguments: allows_variable_arguments,
       return_type: Some(return_type_parsed),
@@ -828,7 +811,7 @@ impl CppParser {
       },
       origin_location: get_origin_location(entity).unwrap(),
       kind: CppTypeKind::Class {
-        size: size, // entity.get_type().unwrap().get_sizeof().ok().map(|x| x as i32),
+        size: size,
         bases: bases,
         fields: fields,
         template_arguments: if entity.get_kind() == EntityKind::ClassTemplate {

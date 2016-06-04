@@ -140,7 +140,6 @@ pub fn check(result1: &CppData, result1_stats: &CppParserStats, result2: &DocCpp
   for (method, count2) in &method_counts2 {
     let count1 = method_counts1.get(method).unwrap_or(&0).clone();
     if count1 < *count2 {
-      // log::warning(format!("{} (count: {} vs {})", method, count1, count2));
       missing_methods1.push(method.clone());
     }
   }
@@ -170,7 +169,6 @@ pub fn check(result1: &CppData, result1_stats: &CppParserStats, result2: &DocCpp
     log::warning(format!("Missing methods in result 2 (total {}):",
                          missing_methods2.len()));
     for method in missing_methods2 {
-      //log::debug(format!("    {}", method));
       let count1 = method_counts1.get(&method).unwrap_or(&0).clone();
       let count2 = method_counts2.get(&method).unwrap_or(&0).clone();
       log::debug(format!("    {} (count: {} vs {})", method, count1, count2));
