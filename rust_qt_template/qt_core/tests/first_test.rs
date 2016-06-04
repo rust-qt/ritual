@@ -18,5 +18,5 @@ fn test1() {
 
 #[test]
 fn test2() {
-  assert!(qt_core::rect::QRect::test1() == 42);
+  assert!(qt_core::q_rect::QRect::test1() == 42);
 }

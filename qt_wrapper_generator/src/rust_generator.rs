@@ -13,15 +13,7 @@ use std::collections::{HashMap, HashSet};
 use log;
 
 fn include_file_to_module_name(include_file: &String) -> String {
-  let mut r = if include_file == "Qt" {
-    "qt".to_string()
-  } else if include_file.starts_with("Qt") {
-    include_file[2..].to_string()
-  } else if include_file.starts_with("Q") {
-    include_file[1..].to_string()
-  } else {
-    include_file.clone()
-  };
+  let mut r = include_file.clone();
   if r.ends_with(".h") {
     r = r[0..r.len() - 2].to_string();
   }
@@ -381,6 +373,7 @@ impl RustGenerator {
     write!(file, "extern \"C\" {{\n").unwrap();
 
     for header in &self.input_data.cpp_ffi_headers.clone() {
+      write!(file, "  // Header: {}\n", header.include_file).unwrap();
       let module_name = include_file_to_module_name(&header.include_file);
       for method in &header.methods {
         match self.generate_rust_ffi_function(method, &module_name) {
@@ -394,7 +387,7 @@ impl RustGenerator {
           }
         }
       }
-
+      write!(file, "\n").unwrap();
     }
 
     write!(file, "}}\n").unwrap();
