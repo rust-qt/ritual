@@ -29,6 +29,14 @@ pub enum CppBuiltInNumericType {
   LongDouble,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CppSpecificNumericTypeKind {
+  Integer {
+    is_signed: bool,
+  },
+  FloatingPoint,
+}
+
 impl CppBuiltInNumericType {
   pub fn to_cpp_code(&self) -> &'static str {
     match *self {
@@ -95,6 +103,15 @@ pub enum CppTypeIndirection {
 pub enum CppTypeBase {
   Void,
   BuiltInNumeric(CppBuiltInNumericType),
+  SpecificNumeric {
+    name: String,
+    bits: i32,
+    kind: CppSpecificNumericTypeKind,
+  },
+  PointerSizedInteger {
+    name: String,
+    is_signed: bool,
+  },
   Enum {
     name: String,
   },
@@ -111,10 +128,10 @@ pub enum CppTypeBase {
     arguments: Vec<CppType>,
     allows_variable_arguments: bool,
   },
-  Unspecified {
-    name: String,
-    template_arguments: Option<Vec<CppType>>,
-  },
+//  Unspecified {
+//    name: String,
+//    template_arguments: Option<Vec<CppType>>,
+//  },
 }
 
 impl CppTypeBase {
@@ -142,6 +159,8 @@ impl CppTypeBase {
       CppTypeBase::Void => Ok("void".to_string()),
       CppTypeBase::BuiltInNumeric(ref t) => Ok(t.to_cpp_code().to_string()),
       CppTypeBase::Enum { ref name } => Ok(name.clone()),
+      CppTypeBase::SpecificNumeric { ref name, .. } => Ok(name.clone()),
+      CppTypeBase::PointerSizedInteger { ref name, .. } => Ok(name.clone()),
       CppTypeBase::Class { ref name, ref template_arguments } => {
         match *template_arguments {
           Some(ref args) => {
@@ -160,13 +179,14 @@ impl CppTypeBase {
       CppTypeBase::FunctionPointer { .. } => {
         return Err(format!("function pointers are not supported here yet"));
       }
-      CppTypeBase::Unspecified { .. } => Err(format!("Unspecified is not allowed")),
     }
   }
   pub fn caption(&self) -> String {
     match *self {
       CppTypeBase::Void => "void".to_string(),
       CppTypeBase::BuiltInNumeric(ref t) => t.to_cpp_code().to_string().replace(" ", "_"),
+      CppTypeBase::SpecificNumeric { ref name, .. } => name.clone(),
+      CppTypeBase::PointerSizedInteger { ref name, .. } => name.clone(),
       CppTypeBase::Enum { ref name } => name.replace("::", "_"),
       CppTypeBase::Class { ref name, ref template_arguments } => {
         let name_caption = name.replace("::", "_");
@@ -187,7 +207,6 @@ impl CppTypeBase {
       CppTypeBase::FunctionPointer { .. } => {
         panic!("function pointers are not supported here yet");
       }
-      CppTypeBase::Unspecified { .. } => panic!("Unspecified is not allowed"),
     }
   }
 }
@@ -215,7 +234,6 @@ impl CppType {
 
   pub fn is_template(&self) -> bool {
     match self.base {
-      CppTypeBase::Unspecified { ref template_arguments, .. } => template_arguments.is_some(),
       CppTypeBase::Class { ref template_arguments, .. } => template_arguments.is_some(),
       CppTypeBase::TemplateParameter { .. } => true,
       _ => false,
@@ -243,7 +261,7 @@ impl CppType {
 
   pub fn to_cpp_ffi_type(&self) -> Result<CppFfiType, String> {
     match self.base {
-      CppTypeBase::TemplateParameter { .. } | CppTypeBase::Unspecified { .. } => {
+      CppTypeBase::TemplateParameter { .. } => {
         return Err(format!("Unsupported type"));
       }
       CppTypeBase::FunctionPointer { .. } => {

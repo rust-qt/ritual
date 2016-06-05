@@ -16,7 +16,7 @@ mod rust_generator;
 mod rust_type;
 mod utils;
 mod cpp_parser;
-mod doc_parser_support;
+//mod doc_parser_support;
 
 use std::path::PathBuf;
 use std::env;
@@ -32,19 +32,19 @@ fn print_usage() {
 
 fn main() {
   let arguments: Vec<_> = env::args().collect();
-  if arguments.len() == 3 && arguments[1] == "check_parsers_consistency" {
-    let headers_dir = PathBuf::from("/home/ri/bin/Qt/5.5/gcc_64/include/QtCore");
-    let mut parser1 = cpp_parser::CppParser::new();
-    parser1.run();
-    let stats = parser1.get_stats();
-    let mut parse_result1 = parser1.get_data();
-    let parse_result_path = PathBuf::from(arguments[2].clone());
-    log::info("Reading parse result...");
-    let parse_result2 = doc_parser_support::read_parse_result::do_it(&parse_result_path);
-    qt_specific::fix_header_names(&mut parse_result1, &headers_dir);
-    doc_parser_support::parsers_consistency_checker::check(&parse_result1, &stats, &parse_result2);
-    return;
-  }
+//  if arguments.len() == 3 && arguments[1] == "check_parsers_consistency" {
+//    let headers_dir = PathBuf::from("/home/ri/bin/Qt/5.5/gcc_64/include/QtCore");
+//    let mut parser1 = cpp_parser::CppParser::new();
+//    parser1.run();
+//    let stats = parser1.get_stats();
+//    let mut parse_result1 = parser1.get_data();
+//    let parse_result_path = PathBuf::from(arguments[2].clone());
+//    log::info("Reading parse result...");
+//    let parse_result2 = doc_parser_support::read_parse_result::do_it(&parse_result_path);
+//    qt_specific::fix_header_names(&mut parse_result1, &headers_dir);
+//    doc_parser_support::parsers_consistency_checker::check(&parse_result1, &stats, &parse_result2);
+//    return;
+//  }
   if arguments.len() == 4 && arguments[1] == "stage0" {
     let headers_dir = PathBuf::from("/home/ri/bin/Qt/5.5/gcc_64/include/QtCore");
     log::info("Stage 1. Parsing Qt headers.");

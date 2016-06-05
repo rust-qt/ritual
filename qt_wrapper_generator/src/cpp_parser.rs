@@ -13,7 +13,8 @@ use utils::JoinWithString;
 use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppOriginLocation,
                CppVisibility};
 use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind};
-use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection};
+use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
+               CppSpecificNumericTypeKind};
 use cpp_method::CppMethodScope;
 use cpp_operators::CppOperator;
 
@@ -351,12 +352,109 @@ impl CppParser {
     return Err(format!("Unrecognized unexposed type: {}", name));
   }
 
-
   fn parse_type(&mut self,
                 type1: Type,
                 context_class: Option<Entity>,
                 context_method: Option<Entity>)
                 -> Result<CppType, String> {
+    let parsed = try!(self.parse_canonical_type(type1.get_canonical_type(),
+                                                context_class,
+                                                context_method));
+    if let CppTypeBase::BuiltInNumeric(..) = parsed.base {
+      if parsed.indirection == CppTypeIndirection::None {
+        let mut name = type1.get_display_name();
+        if name.starts_with("const ") {
+          name = name[6..].trim().to_string();
+        }
+        let real_type = match name.as_ref() {
+          "qint8" => {
+            Some(CppTypeBase::SpecificNumeric {
+              name: name.to_string(),
+              bits: 8,
+              kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
+            })
+          }
+          "quint8" => {
+            Some(CppTypeBase::SpecificNumeric {
+              name: name.to_string(),
+              bits: 8,
+              kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
+            })
+          }
+          "qint16" => {
+            Some(CppTypeBase::SpecificNumeric {
+              name: name.to_string(),
+              bits: 16,
+              kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
+            })
+          }
+          "quint16" => {
+            Some(CppTypeBase::SpecificNumeric {
+              name: name.to_string(),
+              bits: 16,
+              kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
+            })
+          }
+          "qint32" => {
+            Some(CppTypeBase::SpecificNumeric {
+              name: name.to_string(),
+              bits: 32,
+              kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
+            })
+          }
+          "quint32" => {
+            Some(CppTypeBase::SpecificNumeric {
+              name: name.to_string(),
+              bits: 32,
+              kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
+            })
+          }
+          "qint64" | "qlonglong" => {
+            Some(CppTypeBase::SpecificNumeric {
+              name: name.to_string(),
+              bits: 64,
+              kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
+            })
+          }
+          "quint64" | "qulonglong" => {
+            Some(CppTypeBase::SpecificNumeric {
+              name: name.to_string(),
+              bits: 64,
+              kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
+            })
+          }
+          "qintptr" | "qptrdiff" | "QList_difference_type" => {
+            Some(CppTypeBase::PointerSizedInteger {
+              name: name.to_string(),
+              is_signed: true,
+            })
+          }
+          "quintptr" => {
+            Some(CppTypeBase::PointerSizedInteger {
+              name: name.to_string(),
+              is_signed: false,
+            })
+          }
+          _ => None,
+        };
+        if let Some(real_type) = real_type {
+          return Ok(CppType {
+            base: real_type,
+            indirection: parsed.indirection,
+            is_const: parsed.is_const,
+          });
+        }
+      }
+    }
+    return Ok(parsed);
+  }
+
+
+  fn parse_canonical_type(&mut self,
+                          type1: Type,
+                          context_class: Option<Entity>,
+                          context_method: Option<Entity>)
+                          -> Result<CppType, String> {
     let is_const = type1.is_const_qualified();
     match type1.get_kind() {
       TypeKind::Void => {
@@ -445,9 +543,7 @@ impl CppParser {
                   match arg_type {
                     None => return Err(format!("Template argument is None")),
                     Some(arg_type) => {
-                      match self.parse_type(arg_type.get_canonical_type(),
-                                            context_class,
-                                            context_method) {
+                      match self.parse_type(arg_type, context_class, context_method) {
                         Ok(parsed_type) => r.push(parsed_type),
                         Err(msg) => {
                           return Err(format!("Invalid template argument: {:?}: {}", arg_type, msg))
@@ -510,7 +606,7 @@ impl CppParser {
       TypeKind::RValueReference => {
         match type1.get_pointee_type() {
           Some(pointee) => {
-            match self.parse_type(pointee.get_canonical_type(), context_class, context_method) {
+            match self.parse_type(pointee, context_class, context_method) {
               Ok(result) => {
                 let new_indirection = match type1.get_kind() {
                   TypeKind::Pointer => {
@@ -586,9 +682,7 @@ impl CppParser {
                             .unwrap_or_else(|| panic!("failed to get function type"))
                             .get_result_type()
                             .unwrap_or_else(|| panic!("failed to get function return type"));
-    let return_type_parsed = match self.parse_type(return_type.get_canonical_type(),
-                                                   class_entity,
-                                                   Some(entity)) {
+    let return_type_parsed = match self.parse_type(return_type, class_entity, Some(entity)) {
       Ok(x) => x,
       Err(msg) => {
         return Err(format!("Can't parse return type: {:?}: {}", return_type, msg));
@@ -617,7 +711,7 @@ impl CppParser {
     for (argument_number, argument_entity) in argument_entities.into_iter()
                                                                .enumerate() {
       let name = argument_entity.get_name().unwrap_or(format!("arg{}", argument_number + 1));
-      let type1 = self.parse_type(argument_entity.get_type().unwrap().get_canonical_type(),
+      let type1 = self.parse_type(argument_entity.get_type().unwrap(),
                                   class_entity,
                                   Some(entity));
 
@@ -690,7 +784,8 @@ impl CppParser {
         }
       }
       if !kind.is_operator() && name_matches {
-        return Err(format!("This method is recognized as operator but arguments do not match its signature."));
+        return Err(format!("This method is recognized as operator but arguments do not match \
+                            its signature."));
       }
     }
     if !kind.is_operator() && name.starts_with("operator ") {
@@ -760,9 +855,7 @@ impl CppParser {
     let template_arguments = get_template_arguments(entity);
     for child in entity.get_children() {
       if child.get_kind() == EntityKind::FieldDecl {
-        match self.parse_type(child.get_type().unwrap().get_canonical_type(),
-                              Some(entity),
-                              None) {
+        match self.parse_type(child.get_type().unwrap(), Some(entity), None) {
           Ok(field_type) => {
             fields.push(CppClassField {
               name: child.get_name().unwrap(),
@@ -783,9 +876,7 @@ impl CppParser {
         };
       }
       if child.get_kind() == EntityKind::BaseSpecifier {
-        let base_type = match self.parse_type(child.get_type().unwrap().get_canonical_type(),
-                                              None,
-                                              None) {
+        let base_type = match self.parse_type(child.get_type().unwrap(), None, None) {
           Ok(r) => r,
           Err(msg) => return Err(format!("Can't parse base class type: {}", msg)),
         };
@@ -1014,8 +1105,10 @@ impl CppParser {
 
   fn check_type_integrity(&mut self, type1: &CppType) -> Result<(), String> {
     match type1.base {
-      CppTypeBase::Void | CppTypeBase::BuiltInNumeric(..) => {}
-      CppTypeBase::Unspecified { .. } => unreachable!(),
+      CppTypeBase::Void |
+      CppTypeBase::BuiltInNumeric(..) |
+      CppTypeBase::SpecificNumeric { .. } |
+      CppTypeBase::PointerSizedInteger { .. } => {}
       CppTypeBase::Enum { ref name } => {
         if self.data.types.iter().find(|x| &x.name == name).is_none() {
           return Err(format!("unknown type: {}", name));

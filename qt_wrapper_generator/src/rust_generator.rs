@@ -1,7 +1,7 @@
 use cpp_ffi_generator::{CppAndFfiData, CppFfiHeaderData};
 use cpp_and_ffi_method::CppAndFfiMethod;
-use cpp_type::{CppTypeBase, CppBuiltInNumericType, CppTypeIndirection};
-use cpp_ffi_type::{CppFfiType};
+use cpp_type::{CppTypeBase, CppBuiltInNumericType, CppTypeIndirection, CppSpecificNumericTypeKind};
+use cpp_ffi_type::CppFfiType;
 use utils::JoinWithString;
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument};
@@ -101,27 +101,64 @@ impl RustGenerator {
         }
       }
       CppTypeBase::BuiltInNumeric(ref numeric) => {
+        if numeric == &CppBuiltInNumericType::Bool {
+          RustName {
+            crate_name: "".to_string(),
+            module_name: "".to_string(),
+            own_name: "bool".to_string(),
+          }
+        } else {
+          RustName {
+            crate_name: "libc".to_string(),
+            module_name: "".to_string(),
+            own_name: match *numeric {
+                        CppBuiltInNumericType::Bool => "c_schar", // TODO: get real type of bool
+                        CppBuiltInNumericType::CharS => "c_char",
+                        CppBuiltInNumericType::CharU => "c_char",
+                        CppBuiltInNumericType::SChar => "c_schar",
+                        CppBuiltInNumericType::UChar => "c_uchar",
+                        CppBuiltInNumericType::WChar => "wchar_t",
+                        CppBuiltInNumericType::Short => "c_short",
+                        CppBuiltInNumericType::UShort => "c_ushort",
+                        CppBuiltInNumericType::Int => "c_int",
+                        CppBuiltInNumericType::UInt => "c_uint",
+                        CppBuiltInNumericType::Long => "c_long",
+                        CppBuiltInNumericType::ULong => "c_ulong",
+                        CppBuiltInNumericType::LongLong => "c_longlong",
+                        CppBuiltInNumericType::ULongLong => "c_ulonglong",
+                        CppBuiltInNumericType::Float => "c_float",
+                        CppBuiltInNumericType::Double => "c_double",
+                        _ => return Err(format!("unsupported numeric type: {:?}", numeric)),
+                      }
+                      .to_string(),
+          }
+        }
+      }
+      CppTypeBase::SpecificNumeric { ref bits, ref kind, .. } => {
+        let letter = match *kind {
+          CppSpecificNumericTypeKind::Integer { ref is_signed } => {
+            if *is_signed {
+              "i"
+            } else {
+              "u"
+            }
+          }
+          CppSpecificNumericTypeKind::FloatingPoint => "f",
+        };
         RustName {
-          crate_name: "libc".to_string(),
+          crate_name: "".to_string(),
           module_name: "".to_string(),
-          own_name: match *numeric {
-                      CppBuiltInNumericType::Bool => "c_schar", // TODO: get real type of bool
-                      CppBuiltInNumericType::CharS => "c_char",
-                      CppBuiltInNumericType::CharU => "c_char",
-                      CppBuiltInNumericType::SChar => "c_schar",
-                      CppBuiltInNumericType::UChar => "c_uchar",
-                      CppBuiltInNumericType::WChar => "wchar_t",
-                      CppBuiltInNumericType::Short => "c_short",
-                      CppBuiltInNumericType::UShort => "c_ushort",
-                      CppBuiltInNumericType::Int => "c_int",
-                      CppBuiltInNumericType::UInt => "c_uint",
-                      CppBuiltInNumericType::Long => "c_long",
-                      CppBuiltInNumericType::ULong => "c_ulong",
-                      CppBuiltInNumericType::LongLong => "c_longlong",
-                      CppBuiltInNumericType::ULongLong => "c_ulonglong",
-                      CppBuiltInNumericType::Float => "c_float",
-                      CppBuiltInNumericType::Double => "c_double",
-                      _ => return Err(format!("unsupported numeric type: {:?}", numeric)),
+          own_name: format!("{}{}", letter, bits),
+        }
+      }
+      CppTypeBase::PointerSizedInteger { ref is_signed, .. } => {
+        RustName {
+          crate_name: "".to_string(),
+          module_name: "".to_string(),
+          own_name: if *is_signed {
+                      "isize"
+                    } else {
+                      "usize"
                     }
                     .to_string(),
         }
@@ -144,8 +181,7 @@ impl RustGenerator {
       CppTypeBase::FunctionPointer { .. } => {
         return Err(format!("function pointers are not supported here yet"))
       }
-      CppTypeBase::TemplateParameter { .. } |
-      CppTypeBase::Unspecified { .. } => panic!("invalid cpp type"),
+      CppTypeBase::TemplateParameter { .. } => panic!("invalid cpp type"),
     };
     return Ok(RustType::NonVoid {
       base: rust_name,
