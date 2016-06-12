@@ -13,6 +13,7 @@ mod cpp_operators;
 mod log;
 mod qt_specific;
 mod rust_generator;
+mod rust_code_generator;
 mod rust_info;
 mod rust_type;
 mod utils;

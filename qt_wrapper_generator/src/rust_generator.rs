@@ -7,10 +7,10 @@ use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFu
                 RustFFIArgument, RustToCTypeConversion};
 use cpp_data::{CppTypeKind, EnumValue};
 use std::path::PathBuf;
-use std::fs::File;
-use std::io::Write;
 use std::collections::{HashMap, HashSet};
 use log;
+use rust_code_generator;
+use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind};
 
 fn include_file_to_module_name(include_file: &String) -> String {
   let mut r = include_file.clone();
@@ -279,53 +279,6 @@ impl RustGenerator {
     })
   }
 
-  fn rust_type_to_code(&self, rust_type: &RustType) -> String {
-    match rust_type {
-      &RustType::Void => panic!("rust void can't be converted to code"),
-      &RustType::NonVoid { ref base, ref is_const, ref indirection, ref is_option, .. } => {
-        let base_s = base.full_name(&self.crate_name);
-        let s = match indirection {
-          &RustTypeIndirection::None => base_s,
-          &RustTypeIndirection::Ref => {
-            if *is_const {
-              format!("&{}", base_s)
-            } else {
-              format!("&mut {}", base_s)
-            }
-          }
-          &RustTypeIndirection::Ptr => {
-            if *is_const {
-              format!("*const {}", base_s)
-            } else {
-              format!("*mut {}", base_s)
-            }
-          }
-        };
-        if *is_option {
-          format!("Option<{}>", s)
-        } else {
-          s
-        }
-      }
-    }
-  }
-
-  fn rust_ffi_function_to_code(&self, func: &RustFFIFunction) -> String {
-    let args = func.arguments.iter().map(|arg| {
-      format!("{}: {}",
-              arg.name,
-              self.rust_type_to_code(&arg.argument_type))
-    });
-    format!("  pub fn {}({}){};\n",
-            func.name.own_name,
-            args.join(", "),
-            match func.return_type {
-              RustType::Void => String::new(),
-              RustType::NonVoid { .. } => {
-                format!(" -> {}", self.rust_type_to_code(&func.return_type))
-              }
-            })
-  }
 
   fn generate_type_map(&mut self) {
     for type_info in &self.input_data.cpp_data.types {
@@ -351,21 +304,7 @@ impl RustGenerator {
       self.generate_types(header);
     }
     self.generate_ffi();
-
-    let mut lib_file_path = self.output_path.clone();
-    lib_file_path.push("qt_core");
-    lib_file_path.push("src");
-    lib_file_path.push("lib.rs");
-    let mut lib_file = File::create(&lib_file_path).unwrap();
-    write!(lib_file, "pub mod types;\n\n").unwrap();
-    write!(lib_file, "pub mod flags;\n\n").unwrap();
-    write!(lib_file, "pub mod extra;\n\n").unwrap();
-    // TODO: remove allow directive
-    // TODO: ffi should be a private mod
-    write!(lib_file, "#[allow(dead_code)]\npub mod ffi;\n\n").unwrap();
-    for module in &self.modules {
-      write!(lib_file, "pub mod {};\n", module).unwrap();
-    }
+    rust_code_generator::generate_lib_file(&self.output_path, &self.modules);
   }
 
   pub fn generate_types(&mut self, c_header: &CppFfiHeaderData) {
@@ -377,11 +316,7 @@ impl RustGenerator {
     log::info(format!("Generating Rust types in module {}::{}",
                       self.crate_name,
                       module_name));
-    let mut file_path = self.output_path.clone();
-    file_path.push("qt_core");
-    file_path.push("src");
-    file_path.push(format!("{}.rs", module_name));
-    let mut file = File::create(&file_path).unwrap();
+    let mut types = Vec::new();
 
     for type_data in &self.input_data
                           .cpp_data_by_headers
@@ -402,7 +337,11 @@ impl RustGenerator {
                                        variant.name,
                                        value_to_variant.get(&value).unwrap().name));
                 } else {
-                  value_to_variant.insert(value, variant.clone());
+                  value_to_variant.insert(value,
+                                          EnumValue {
+                                            name: variant.name.to_class_case1(),
+                                            value: variant.value,
+                                          });
                 }
               }
               if value_to_variant.len() == 1 {
@@ -417,27 +356,44 @@ impl RustGenerator {
                                           value: dummy_value as i64,
                                         });
               }
-              format!("#[repr(C)]\npub enum {} {{\n{}\n}}\n\n",
-                      rust_type_name.own_name,
-                      value_to_variant.iter()
-                                      .map(|(value, variant)| {
-                                        format!("  {} = {}", variant.name.to_class_case1(), value)
-                                      })
-                                      .join(", \n"))
+              let mut values: Vec<_> = value_to_variant.into_iter().map(|(val, variant)| variant).collect();
+              values.sort_by(|a, b| a.value.cmp(&b.value));
+              types.push(RustTypeDeclaration {
+                name: rust_type_name.own_name.clone(),
+                kind: RustTypeDeclarationKind::CppTypeWrapper {
+                  kind: RustTypeWrapperKind::Enum { values: values },
+                  cpp_type_name: type_data.name.clone(),
+                  cpp_template_arguments: None,
+                },
+                methods: Vec::new(),
+                traits: Vec::new(),
+              });
             }
             CppTypeKind::Class { ref size, .. } => {
               match *size {
                 Some(ref size) => {
-                  format!("#[repr(C)]\npub struct {} {{\n  _buffer: [u8; {}],\n}}\n\n",
-                          rust_type_name.own_name,
-                          size)
+                  types.push(RustTypeDeclaration {
+                    name: rust_type_name.own_name.clone(),
+                    kind: RustTypeDeclarationKind::CppTypeWrapper {
+                      kind: RustTypeWrapperKind::Struct { size: *size },
+                      cpp_type_name: type_data.name.clone(),
+                      cpp_template_arguments: None,
+                    },
+                    methods: Vec::new(),
+                    traits: Vec::new(),
+                  });
                 }
-                None => format!("pub enum {} {{}}\n\n", rust_type_name.own_name),
+                None => {
+                  log::warning(format!("Rust type is not generated for a struct with unknown \
+                                        size: {}",
+                                       type_data.name));
+                  // format!("pub enum {} {{}}\n\n", rust_type_name.own_name)
+                }
 
               }
             }
           };
-          file.write(code.as_bytes()).unwrap();
+          // TODO: save RustTypeDeclaration vector instead of processed_cpp_types
           self.processed_cpp_types.insert(type_data.name.clone());
         } else {
           panic!("unexpected module name mismatch: {}, {:?}",
@@ -448,32 +404,24 @@ impl RustGenerator {
         // type is skipped: no rust name
       }
     }
+    rust_code_generator::generate_module_file(&self.crate_name,
+                                              &module_name,
+                                              &self.output_path,
+                                              &types);
     self.modules.push(module_name);
   }
 
   pub fn generate_ffi(&mut self) {
     log::info("Generating Rust FFI functions.");
-    let mut file_path = self.output_path.clone();
-    file_path.push("qt_core");
-    file_path.push("src");
-    file_path.push("ffi.rs");
-    let mut file = File::create(&file_path).unwrap();
-    write!(file, "extern crate libc;\n\n").unwrap();
-    write!(file, "#[link(name = \"Qt5Core\")]\n").unwrap();
-    write!(file, "#[link(name = \"icui18n\")]\n").unwrap();
-    write!(file, "#[link(name = \"icuuc\")]\n").unwrap();
-    write!(file, "#[link(name = \"icudata\")]\n").unwrap();
-    write!(file, "#[link(name = \"stdc++\")]\n").unwrap();
-    write!(file, "#[link(name = \"qtcw\", kind = \"static\")]\n").unwrap();
-    write!(file, "extern \"C\" {{\n").unwrap();
+    let mut ffi_functions = HashMap::new();
 
     for header in &self.input_data.cpp_ffi_headers.clone() {
-      write!(file, "  // Header: {}\n", header.include_file).unwrap();
       let module_name = include_file_to_module_name(&header.include_file);
+      let mut functions = Vec::new();
       for method in &header.methods {
         match self.generate_rust_ffi_function(method, &module_name) {
           Ok(function) => {
-            file.write(self.rust_ffi_function_to_code(&function).as_bytes()).unwrap();
+            functions.push(function);
           }
           Err(msg) => {
             log::warning(format!("Can't generate Rust FFI function for method:\n{}\n{}\n",
@@ -482,9 +430,8 @@ impl RustGenerator {
           }
         }
       }
-      write!(file, "\n").unwrap();
+      ffi_functions.insert(header.include_file.clone(), functions);
     }
-
-    write!(file, "}}\n").unwrap();
+    rust_code_generator::generate_ffi_file(&self.crate_name, &self.output_path, &ffi_functions);
   }
 }

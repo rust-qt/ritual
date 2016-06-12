@@ -109,10 +109,10 @@ pub enum RustTypeDeclarationKind {
 }
 
 pub struct RustTypeDeclaration {
-  name: String,
-  kind: RustTypeDeclarationKind,
-  methods: Vec<RustMethod>,
-  traits: Vec<TraitImpl>,
+  pub name: String,
+  pub kind: RustTypeDeclarationKind,
+  pub methods: Vec<RustMethod>,
+  pub traits: Vec<TraitImpl>,
 }
 
 pub struct RustModule {

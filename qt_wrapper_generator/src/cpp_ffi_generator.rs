@@ -10,7 +10,7 @@ use cpp_ffi_function_argument::CppFfiArgumentMeaning;
 use cpp_type::CppTypeBase;
 use cpp_code_generator;
 
-pub struct CGenerator {
+pub struct CGenerator {  
   qtcw_path: PathBuf,
   cpp_data: CppData,
   template_classes: Vec<String>,
