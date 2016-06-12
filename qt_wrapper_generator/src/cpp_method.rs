@@ -1,5 +1,5 @@
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection};
-use cpp_ffi_type::CppFfiType;
+use cpp_ffi_type::{CppFfiType, IndirectionChange};
 use cpp_ffi_function_signature::CppFfiFunctionSignature;
 use cpp_ffi_function_argument::{CppFfiFunctionArgument, CppFfiArgumentMeaning};
 use cpp_and_ffi_method::CppMethodWithFfiSignature;
@@ -180,7 +180,8 @@ impl CppMethod {
         Ok(c_type) => {
           let is_stack_allocated_struct = return_type.indirection == CppTypeIndirection::None &&
                                           return_type.base.is_class() &&
-                                          !c_type.conversion.qflags_to_uint;
+                                          c_type.conversion.indirection_change !=
+                                          IndirectionChange::QFlagsToUInt;
           if is_stack_allocated_struct {
             allocation_place_importance = AllocationPlaceImportance::Important;
             if allocation_place == AllocationPlace::Stack {

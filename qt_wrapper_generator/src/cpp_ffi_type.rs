@@ -5,12 +5,12 @@ pub enum IndirectionChange {
   NoChange,
   ValueToPointer,
   ReferenceToPointer,
+  QFlagsToUInt,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppToFfiTypeConversion {
   pub indirection_change: IndirectionChange,
-  pub qflags_to_uint: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -27,7 +27,6 @@ impl CppFfiType {
       ffi_type: CppType::void(),
       conversion: CppToFfiTypeConversion {
         indirection_change: IndirectionChange::NoChange,
-        qflags_to_uint: false,
       },
     }
   }

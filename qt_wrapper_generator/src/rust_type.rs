@@ -1,7 +1,7 @@
 use cpp_type::{CppType};
 use cpp_ffi_type::CppToFfiTypeConversion;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 #[allow(dead_code)]
 pub enum RustTypeIndirection {
   None,
@@ -9,7 +9,7 @@ pub enum RustTypeIndirection {
   Ref,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RustName {
   pub crate_name: String,
   pub module_name: String,
@@ -37,39 +37,44 @@ impl RustName {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum RustType {
   Void,
   NonVoid {
     base: RustName,
+    generic_arguments: Option<Vec<RustType>>,
     is_const: bool,
     indirection: RustTypeIndirection,
     is_option: bool,
   },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 #[allow(dead_code)]
 pub enum RustToCTypeConversion {
   None,
   RefToPtr,
   ValueToPtr,
+  QFlagsToUInt,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CompleteType {
   pub cpp_type: CppType,
   pub cpp_ffi_type: CppType,
   pub cpp_to_ffi_conversion: CppToFfiTypeConversion,
-  pub rust_ffi_type: RustType, /* pub rust_api_type: RustType,
-                                * pub rust_api_to_c_conversion: RustToCTypeConversion, */
+  pub rust_ffi_type: RustType,
+  pub rust_api_type: RustType,
+  pub rust_api_to_c_conversion: RustToCTypeConversion,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RustFFIArgument {
   pub name: String,
   pub argument_type: RustType,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RustFFIFunction {
   pub return_type: RustType,
   pub name: RustName,

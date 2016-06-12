@@ -1,8 +1,5 @@
 use cpp_and_ffi_method::CppAndFfiMethod;
 use std::path::PathBuf;
-use std::fs::File;
-use std::io::Write;
-use utils::JoinWithString;
 use std::collections::HashMap;
 use log;
 use cpp_data::{CppData, CppTypeKind, CppVisibility};
@@ -11,6 +8,7 @@ use cpp_method::{CppMethod, AllocationPlace, CppMethodScope, CppMethodKind};
 use cpp_ffi_type::IndirectionChange;
 use cpp_ffi_function_argument::CppFfiArgumentMeaning;
 use cpp_type::CppTypeBase;
+use cpp_code_generator;
 
 pub struct CGenerator {
   qtcw_path: PathBuf,
@@ -19,180 +17,10 @@ pub struct CGenerator {
   abstract_classes: Vec<String>,
 }
 
-impl CppAndFfiMethod {
-  fn header_code(&self) -> String {
-    format!("{} QTCW_EXPORT {}({});\n",
-            self.c_signature.return_type.ffi_type.to_cpp_code().unwrap(),
-            self.c_name,
-            self.c_signature.arguments_to_cpp_code().unwrap())
-  }
-
-  fn convert_return_type(&self, expression: String) -> String {
-    let mut result = expression;
-    match self.c_signature.return_type.conversion.indirection_change {
-      IndirectionChange::NoChange => {}
-      IndirectionChange::ValueToPointer => {
-        match self.allocation_place {
-          AllocationPlace::Stack => panic!("stack allocated wrappers are expected to return void!"),
-          AllocationPlace::Heap => {
-            // constructors are said to return values in parse result,
-            // but in reality we use `new` which returns a pointer,
-            // so no conversion is necessary for constructors.
-            if self.cpp_method.kind != CppMethodKind::Constructor {
-              if let Some(ref return_type) = self.cpp_method.return_type {
-                result = format!("new {}({})",
-                                 return_type.base.to_cpp_code().unwrap(),
-                                 result)
-              } else {
-                panic!("cpp self unexpectedly doesn't have return type");
-              }
-            }
-          }
-        }
-      }
-      IndirectionChange::ReferenceToPointer => {
-        result = format!("&{}", result);
-      }
-    }
-    if self.c_signature.return_type.conversion.qflags_to_uint {
-      result = format!("uint({})", result);
-    }
-
-    if self.allocation_place == AllocationPlace::Stack &&
-       self.cpp_method.kind != CppMethodKind::Constructor {
-      if let Some(arg) = self.c_signature
-                             .arguments
-                             .iter()
-                             .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
-        if let Some(ref return_type) = self.cpp_method.return_type {
-          result = format!("new({}) {}({})",
-                           arg.name,
-                           return_type.base.to_cpp_code().unwrap(),
-                           result);
-        } else {
-          panic!("cpp self unexpectedly doesn't have return type");
-        }
-      }
-    }
-    result
-  }
-
-  fn arguments_values(&self) -> String {
-    let mut filled_arguments = vec![];
-    for (i, cpp_argument) in self.cpp_method.arguments.iter().enumerate() {
-      if let Some(c_argument) = self.c_signature.arguments.iter().find(|x| {
-        x.meaning == CppFfiArgumentMeaning::Argument(i as i8)
-      }) {
-        let mut result = c_argument.name.clone();
-        match c_argument.argument_type
-                        .conversion
-                        .indirection_change {
-          IndirectionChange::ValueToPointer |
-          IndirectionChange::ReferenceToPointer => result = format!("*{}", result),
-          IndirectionChange::NoChange => {}
-        }
-        if c_argument.argument_type.conversion.qflags_to_uint {
-          result = format!("{}({})",
-                           cpp_argument.argument_type.to_cpp_code().unwrap(),
-                           result);
-        }
-        filled_arguments.push(result);
-      } else {
-        panic!("Error: no positional argument found\n{:?}", self);
-      }
-    }
-
-    filled_arguments.into_iter().join(", ")
-  }
-
-  fn returned_expression(&self) -> String {
-    self.convert_return_type(if self.cpp_method.kind == CppMethodKind::Destructor {
-      if let Some(arg) = self.c_signature
-                             .arguments
-                             .iter()
-                             .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
-        format!("qtcw_call_destructor({})", arg.name)
-      } else {
-        panic!("Error: no this argument found\n{:?}", self);
-      }
-    } else {
-      let result_without_args = if self.cpp_method.kind == CppMethodKind::Constructor {
-        if let CppMethodScope::Class(ref class_name) = self.cpp_method.scope {
-          match self.allocation_place {
-            AllocationPlace::Stack => {
-              if let Some(arg) = self.c_signature
-                                     .arguments
-                                     .iter()
-                                     .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
-                format!("new({}) {}", arg.name, class_name)
-              } else {
-                panic!("no return value equivalent argument found");
-              }
-            }
-            AllocationPlace::Heap => format!("new {}", class_name),
-          }
-        } else {
-          panic!("constructor not in class scope");
-        }
-      } else {
-        let scope_specifier = if let CppMethodScope::Class(ref class_name) = self.cpp_method
-                                                                                 .scope {
-          if self.cpp_method.is_static {
-            format!("{}::", class_name)
-          } else {
-            if let Some(arg) = self.c_signature
-                                   .arguments
-                                   .iter()
-                                   .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
-              format!("{}->", arg.name)
-            } else {
-              panic!("Error: no this argument found\n{:?}", self);
-            }
-          }
-        } else {
-          "".to_string()
-        };
-        format!("{}{}", scope_specifier, self.cpp_method.name)
-      };
-      format!("{}({})", result_without_args, self.arguments_values())
-    })
-  }
-
-
-  fn source_body(&self) -> String {
-    if self.cpp_method.kind == CppMethodKind::Destructor && self.allocation_place == AllocationPlace::Heap {
-      if let Some(arg) = self.c_signature
-                             .arguments
-                             .iter()
-                             .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
-        format!("delete {};\n", arg.name)
-      } else {
-        panic!("Error: no this argument found\n{:?}", self);
-      }
-    } else {
-      format!("{}{};\n",
-              if self.c_signature.return_type.ffi_type.is_void() {
-                ""
-              } else {
-                "return "
-              },
-              self.returned_expression())
-    }
-
-  }
-
-  fn source_code(&self) -> String {
-    format!("{} {}({}) {{\n  {}}}\n\n",
-            self.c_signature.return_type.ffi_type.to_cpp_code().unwrap(),
-            self.c_name,
-            self.c_signature.arguments_to_cpp_code().unwrap(),
-            self.source_body())
-  }
-}
-
 #[derive(Debug, Clone)]
 pub struct CppFfiHeaderData {
   pub include_file: String,
+  pub include_file_base_name: String,
   pub methods: Vec<CppAndFfiMethod>,
 }
 
@@ -243,22 +71,35 @@ impl CGenerator {
                                 })
                                 .collect();
     log::info(format!("Abstract classes: {:?}", self.abstract_classes));
-    let mut h_path = self.qtcw_path.clone();
-    h_path.push("include");
-    h_path.push("qtcw.h");
-    let mut all_header_file = File::create(&h_path).unwrap();
-    write!(all_header_file, "#ifndef QTCW_H\n#define QTCW_H\n\n").unwrap();
 
     let mut c_headers = Vec::new();
     let cpp_data_by_headers = self.cpp_data.split_by_headers();
+    let mut include_name_list = Vec::new();
 
     for (ref include_file, ref data) in &cpp_data_by_headers {
-      c_headers.push(self.generate_one(include_file, data));
-      write!(all_header_file, "#include \"qtcw_{}.h\"\n", include_file).unwrap();
+      if include_file == &"QFlags" || include_file == &"QFlag" {
+        log::info(format!("Skipping include file {}", include_file));
+        continue;
+      }
+      let mut include_file_base_name = (*include_file).clone();
+      if include_file_base_name.ends_with(".h") {
+        include_file_base_name = include_file_base_name[0..include_file_base_name.len() - 2]
+                                   .to_string();
+      }
+      let methods = self.process_methods(&include_file, &include_file_base_name, &data.methods);
+      c_headers.push(CppFfiHeaderData {
+        include_file: (*include_file).clone(),
+        include_file_base_name: include_file_base_name,
+        methods: methods,
+      });
+      include_name_list.push((*include_file).clone());
     }
     c_headers.sort_by(|a, b| a.include_file.cmp(&b.include_file));
+    cpp_code_generator::generate_all_headers_file(&self.qtcw_path, &include_name_list);
+    for data in &c_headers {
+      cpp_code_generator::generate_one(&self.qtcw_path, data);
+    }
 
-    write!(all_header_file, "#endif // QTCW_H\n").unwrap();
     CppAndFfiData {
       cpp_data: self.cpp_data,
       cpp_data_by_headers: cpp_data_by_headers,
@@ -267,60 +108,6 @@ impl CGenerator {
 
   }
 
-  fn generate_one(&self, include_file: &String, data: &CppData) -> CppFfiHeaderData {
-    log::info(format!("Generating C++ FFI methods for header: <{}>", include_file));
-    let mut include_file_base_name = include_file.clone();
-    if include_file_base_name.ends_with(".h") {
-      include_file_base_name = include_file_base_name[0..include_file_base_name.len() - 2]
-                                 .to_string();
-    }
-    let ffi_include_file = format!("qtcw_{}.h", include_file_base_name);
-
-    let mut cpp_path = self.qtcw_path.clone();
-    cpp_path.push("src");
-    cpp_path.push(format!("qtcw_{}.cpp", include_file_base_name));
-    log::info(format!("Generating source file: {:?}", cpp_path));
-
-    let mut h_path = self.qtcw_path.clone();
-    h_path.push("include");
-    h_path.push(&ffi_include_file);
-    log::info(format!("Generating header file: {:?}", h_path));
-
-    let mut cpp_file = File::create(&cpp_path).unwrap();
-    let mut h_file = File::create(&h_path).unwrap();
-
-    write!(cpp_file, "#include \"{}\"\n\n", ffi_include_file).unwrap();
-    let include_guard_name = ffi_include_file.replace(".", "_").to_uppercase();
-    write!(h_file,
-           "#ifndef {}\n#define {}\n\n",
-           include_guard_name,
-           include_guard_name)
-      .unwrap();
-
-    write!(h_file, "#include \"qtcw_global.h\"\n\n").unwrap();
-
-
-    write!(h_file, "#ifdef __cplusplus\n").unwrap();
-    write!(h_file, "#include <QtCore>\n").unwrap();
-    write!(h_file, "#endif\n\n").unwrap();
-
-    write!(h_file, "QTCW_EXTERN_C_BEGIN\n\n").unwrap();
-
-    let methods: Vec<CppAndFfiMethod> = self.process_methods(&include_file_base_name,
-                                                             &data.methods);
-    for method in &methods {
-      h_file.write(&method.header_code().into_bytes()).unwrap();
-      cpp_file.write(&method.source_code().into_bytes()).unwrap();
-    }
-
-    write!(h_file, "\nQTCW_EXTERN_C_END\n\n").unwrap();
-
-    write!(h_file, "#endif // {}\n", include_guard_name).unwrap();
-    CppFfiHeaderData {
-      include_file: include_file.clone(),
-      methods: methods,
-    }
-  }
 
   #[allow(dead_code)]
   fn get_all_methods(&self, class_name: &String) -> Vec<CppMethod> {
@@ -402,9 +189,11 @@ impl CGenerator {
   }
 
   pub fn process_methods(&self,
+                         include_file: &String,
                          include_file_base_name: &String,
                          methods: &Vec<CppMethod>)
                          -> Vec<CppAndFfiMethod> {
+    log::info(format!("Generating C++ FFI methods for header: <{}>", include_file));
     let mut hash1 = HashMap::new();
     {
       let insert_into_hash = |hash: &mut HashMap<String, Vec<_>>, key: String, value| {
@@ -419,9 +208,9 @@ impl CGenerator {
         if method.kind == CppMethodKind::Constructor {
           if let CppMethodScope::Class(ref class_name) = method.scope {
             if self.abstract_classes.iter().find(|x| x == &class_name).is_some() {
-              log::debug(format!("Method is skipped:\n{}\nConstructors are not allowed for abstract \
-                            classes.\n",
-              method.short_text()));
+              log::debug(format!("Method is skipped:\n{}\nConstructors are not allowed for \
+                                  abstract classes.\n",
+                                 method.short_text()));
               continue;
             }
           }
@@ -430,27 +219,24 @@ impl CGenerator {
           continue;
         }
         if method.visibility == CppVisibility::Protected {
-          log::debug(format!("Skipping protected method: \n{}\n",
-          method.short_text()));
+          log::debug(format!("Skipping protected method: \n{}\n", method.short_text()));
           continue;
         }
         if method.is_signal {
-          log::warning(format!("Skipping signal: \n{}\n",
-          method.short_text()));
+          log::warning(format!("Skipping signal: \n{}\n", method.short_text()));
           continue;
         }
         if method.template_arguments.is_some() {
-          log::warning(format!("Skipping template method: \n{}\n",
-          method.short_text()));
+          log::warning(format!("Skipping template method: \n{}\n", method.short_text()));
           continue;
         }
         if let CppMethodScope::Class(ref class_name) = method.scope {
           if self.template_classes
-          .iter()
-          .find(|x| x == &class_name || class_name.starts_with(&format!("{}::", x)))
-          .is_some() {
+                 .iter()
+                 .find(|x| x == &class_name || class_name.starts_with(&format!("{}::", x)))
+                 .is_some() {
             log::warning(format!("Skipping method of template class: \n{}\n",
-            method.short_text()));
+                                 method.short_text()));
             continue;
           }
         }
@@ -458,15 +244,15 @@ impl CGenerator {
         match method.add_c_signatures() {
           Err(msg) => {
             log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
-            method.short_text(),
-            msg));
+                                 method.short_text(),
+                                 msg));
           }
           Ok((result_heap, result_stack)) => {
             match result_heap.c_base_name(include_file_base_name) {
               Err(msg) => {
                 log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
-                method.short_text(),
-                msg));
+                                     method.short_text(),
+                                     msg));
               }
               Ok(mut heap_name) => {
                 if let Some(result_stack) = result_stack {

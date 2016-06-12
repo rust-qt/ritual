@@ -273,7 +273,6 @@ impl CppType {
     let mut result = self.clone();
     let mut conversion = CppToFfiTypeConversion {
       indirection_change: IndirectionChange::NoChange,
-      qflags_to_uint: false,
     };
     match self.indirection {
       CppTypeIndirection::None | CppTypeIndirection::Ptr | CppTypeIndirection::PtrPtr => {
@@ -287,9 +286,8 @@ impl CppType {
     }
     if let CppTypeBase::Class { ref name, .. } = self.base {
       if name == "QFlags" {
-        println!("test {:?}", self);
         assert!(self.indirection == CppTypeIndirection::None);
-        conversion.qflags_to_uint = true;
+        conversion.indirection_change = IndirectionChange::QFlagsToUInt;
         result.base = CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::UInt);
       } else {
         // structs can't be passed by value

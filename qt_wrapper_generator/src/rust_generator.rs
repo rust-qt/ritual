@@ -1,10 +1,10 @@
 use cpp_ffi_generator::{CppAndFfiData, CppFfiHeaderData};
 use cpp_and_ffi_method::CppAndFfiMethod;
 use cpp_type::{CppTypeBase, CppBuiltInNumericType, CppTypeIndirection, CppSpecificNumericTypeKind};
-use cpp_ffi_type::CppFfiType;
+use cpp_ffi_type::{CppFfiType, IndirectionChange};
 use utils::JoinWithString;
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
-                RustFFIArgument};
+                RustFFIArgument, RustToCTypeConversion};
 use cpp_data::{CppTypeKind, EnumValue};
 use std::path::PathBuf;
 use std::fs::File;
@@ -75,12 +75,70 @@ impl RustGenerator {
   }
 
   fn cpp_type_to_complete_type(&self, cpp_ffi_type: &CppFfiType) -> Result<CompleteType, String> {
+    let rust_ffi_type = try!(self.cpp_type_to_rust_ffi_type(cpp_ffi_type));
+
+    // TODO: convert pointers back to references or values
+    let mut rust_api_type = rust_ffi_type.clone();
+    let mut rust_api_to_c_conversion = RustToCTypeConversion::None;
+    if let RustType::NonVoid { ref mut indirection, .. } = rust_api_type {
+      match cpp_ffi_type.conversion.indirection_change {
+        IndirectionChange::NoChange => {}
+        IndirectionChange::ValueToPointer => {
+          assert!(indirection == &RustTypeIndirection::Ptr);
+          *indirection = RustTypeIndirection::None;
+          rust_api_to_c_conversion = RustToCTypeConversion::ValueToPtr;
+        }
+        IndirectionChange::ReferenceToPointer => {
+          assert!(indirection == &RustTypeIndirection::Ptr);
+          *indirection = RustTypeIndirection::Ref;
+          rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
+        }
+        IndirectionChange::QFlagsToUInt => {}
+      }
+    }
+    if cpp_ffi_type.conversion.indirection_change == IndirectionChange::QFlagsToUInt {
+      rust_api_to_c_conversion = RustToCTypeConversion::QFlagsToUInt;
+      let enum_type = if let CppTypeBase::Class { ref template_arguments, .. } =
+                             cpp_ffi_type.original_type.base {
+        let args = template_arguments.as_ref().unwrap();
+        assert!(args.len() == 1);
+        if let CppTypeBase::Enum { ref name } = args[0].base {
+          match self.cpp_to_rust_type_map.get(name) {
+            None => return Err(format!("Type has no Rust equivalent: {}", name)),
+            Some(rust_name) => rust_name.clone(),
+          }
+        } else {
+          panic!("invalid original type for QFlags");
+        }
+      } else {
+        panic!("invalid original type for QFlags");
+      };
+      rust_api_type = RustType::NonVoid {
+        base: RustName {
+          crate_name: "qt_core".to_string(),
+          module_name: "q_flags".to_string(),
+          own_name: "QFlags".to_string(),
+        },
+        generic_arguments: Some(vec![RustType::NonVoid {
+                                       base: enum_type,
+                                       generic_arguments: None,
+                                       indirection: RustTypeIndirection::None,
+                                       is_option: false,
+                                       is_const: false,
+                                     }]),
+        indirection: RustTypeIndirection::None,
+        is_option: false,
+        is_const: false,
+      }
+    }
+
     Ok(CompleteType {
       cpp_ffi_type: cpp_ffi_type.ffi_type.clone(),
       cpp_type: cpp_ffi_type.original_type.clone(),
       cpp_to_ffi_conversion: cpp_ffi_type.conversion.clone(),
-      rust_ffi_type: try!(self.cpp_type_to_rust_ffi_type(cpp_ffi_type)), /* rust_api_type: rust_api_type,
-                                                                          * rust_api_to_c_conversion: rust_api_to_c_conversion, */
+      rust_ffi_type: rust_ffi_type,
+      rust_api_type: rust_api_type,
+      rust_api_to_c_conversion: rust_api_to_c_conversion,
     })
 
   }
@@ -192,6 +250,7 @@ impl RustGenerator {
         _ => return Err(format!("unsupported level of indirection: {:?}", cpp_ffi_type)),
       },
       is_option: false,
+      generic_arguments: None,
     });
   }
 
@@ -223,7 +282,7 @@ impl RustGenerator {
   fn rust_type_to_code(&self, rust_type: &RustType) -> String {
     match rust_type {
       &RustType::Void => panic!("rust void can't be converted to code"),
-      &RustType::NonVoid { ref base, ref is_const, ref indirection, ref is_option } => {
+      &RustType::NonVoid { ref base, ref is_const, ref indirection, ref is_option, .. } => {
         let base_s = base.full_name(&self.crate_name);
         let s = match indirection {
           &RustTypeIndirection::None => base_s,
