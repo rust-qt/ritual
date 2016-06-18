@@ -10,7 +10,9 @@ use std::path::PathBuf;
 use std::collections::{HashMap, HashSet};
 use log;
 use rust_code_generator;
-use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind};
+use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
+                RustMethod};
+use cpp_method::{CppMethod, CppMethodScope};
 
 fn include_file_to_module_name(include_file: &String) -> String {
   let mut r = include_file.clone();
@@ -56,7 +58,7 @@ impl CaseFix for String {
 pub struct RustGenerator {
   input_data: CppAndFfiData,
   output_path: PathBuf,
-  modules: Vec<String>,
+  modules: Vec<RustModule>,
   crate_name: String,
   cpp_to_rust_type_map: HashMap<String, RustName>,
   processed_cpp_types: HashSet<String>,
@@ -288,6 +290,14 @@ impl RustGenerator {
         new_name = new_name[eliminated_name_prefix.len()..].to_string();
       }
       new_name = new_name.replace("::", "_").to_class_case1();
+      if let CppTypeKind::Class { size, .. } = type_info.kind {
+        if size.is_none() {
+          log::warning(format!("Rust type is not generated for a struct with unknown \
+                                        size: {}",
+                               type_info.name));
+          continue;
+        }
+      }
       self.cpp_to_rust_type_map.insert(type_info.name.clone(),
                                        RustName {
                                          crate_name: self.crate_name.clone(),
@@ -301,13 +311,14 @@ impl RustGenerator {
   pub fn generate_all(&mut self) {
     self.generate_type_map();
     for header in &self.input_data.cpp_ffi_headers.clone() {
-      self.generate_types(header);
+      self.generate_modules(header);
     }
     self.generate_ffi();
-    rust_code_generator::generate_lib_file(&self.output_path, &self.modules);
+    rust_code_generator::generate_lib_file(&self.output_path,
+                                           &self.modules.iter().map(|x| x.name.clone()).collect());
   }
 
-  pub fn generate_types(&mut self, c_header: &CppFfiHeaderData) {
+  pub fn generate_modules(&mut self, c_header: &CppFfiHeaderData) {
     let module_name = include_file_to_module_name(&c_header.include_file);
     if module_name == "flags" && self.crate_name == "qt_core" {
       log::info(format!("Skipping module {}::{}", self.crate_name, module_name));
@@ -356,7 +367,9 @@ impl RustGenerator {
                                           value: dummy_value as i64,
                                         });
               }
-              let mut values: Vec<_> = value_to_variant.into_iter().map(|(val, variant)| variant).collect();
+              let mut values: Vec<_> = value_to_variant.into_iter()
+                                                       .map(|(val, variant)| variant)
+                                                       .collect();
               values.sort_by(|a, b| a.value.cmp(&b.value));
               types.push(RustTypeDeclaration {
                 name: rust_type_name.own_name.clone(),
@@ -379,14 +392,20 @@ impl RustGenerator {
                       cpp_type_name: type_data.name.clone(),
                       cpp_template_arguments: None,
                     },
-                    methods: Vec::new(),
+                    methods: RustGenerator::generate_functions(c_header.methods
+                                                                       .iter()
+                                                                       .filter(|&x| {
+                                                                         x.cpp_method
+                                                                          .scope
+                                                                          .class_name() ==
+                                                                         Some(&type_data.name)
+                                                                       })
+                                                                       .collect()),
                     traits: Vec::new(),
                   });
                 }
                 None => {
-                  log::warning(format!("Rust type is not generated for a struct with unknown \
-                                        size: {}",
-                                       type_data.name));
+                  unreachable!()
                   // format!("pub enum {} {{}}\n\n", rust_type_name.own_name)
                 }
 
@@ -404,11 +423,45 @@ impl RustGenerator {
         // type is skipped: no rust name
       }
     }
-    rust_code_generator::generate_module_file(&self.crate_name,
-                                              &module_name,
-                                              &self.output_path,
-                                              &types);
-    self.modules.push(module_name);
+    let module = RustModule {
+      name: module_name,
+      crate_name: self.crate_name.clone(),
+      types: types,
+      functions: RustGenerator::generate_functions(c_header.methods
+                                                           .iter()
+                                                           .filter(|&x| {
+                                                             x.cpp_method
+                                                              .scope ==
+                                                             CppMethodScope::Global
+                                                           })
+                                                           .collect()),
+    };
+    rust_code_generator::generate_module_file(&self.output_path, &module);
+    self.modules.push(module);
+  }
+
+  pub fn generate_functions(methods: Vec<&CppAndFfiMethod>) -> Vec<RustMethod> {
+    let mut r = Vec::new();
+    let mut method_names = HashSet::new();
+    for method in &methods {
+      if !method_names.contains(&method.c_method_name) {
+        method_names.insert(method.c_method_name.clone());
+      }
+    }
+    for method_name in method_names {
+      let current_methods: Vec<_> = methods.clone()
+                                           .into_iter()
+                                           .filter(|m| &m.c_method_name == &method_name)
+                                           .collect();
+      if current_methods.len() == 1 {
+//        r.push(RustMethod {
+//
+//        });
+      } else {
+
+      }
+    }
+    return r;
   }
 
   pub fn generate_ffi(&mut self) {

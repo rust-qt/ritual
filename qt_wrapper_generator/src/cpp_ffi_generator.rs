@@ -10,7 +10,7 @@ use cpp_ffi_function_argument::CppFfiArgumentMeaning;
 use cpp_type::CppTypeBase;
 use cpp_code_generator;
 
-pub struct CGenerator {  
+pub struct CGenerator {
   qtcw_path: PathBuf,
   cpp_data: CppData,
   template_classes: Vec<String>,
@@ -275,7 +275,7 @@ impl CGenerator {
     let mut r = Vec::new();
     for (key, mut values) in hash1.into_iter() {
       if values.len() == 1 {
-        r.push(CppAndFfiMethod::new(values.remove(0), key.clone()));
+        r.push(CppAndFfiMethod::new(values.remove(0), key.clone(), key.clone()));
         continue;
       }
       let mut found_strategy = None;
@@ -301,7 +301,8 @@ impl CGenerator {
                                               } else {
                                                 "_"
                                               },
-                                              caption)));
+                                              caption),
+                                      key.clone()));
         }
       } else {
         panic!("all type caption strategies have failed! Involved functions: \n{:?}",

@@ -116,10 +116,10 @@ pub struct RustTypeDeclaration {
 }
 
 pub struct RustModule {
-  name: String,
-  crate_name: String,
-  types: Vec<RustTypeDeclaration>,
-  functions: Vec<RustMethod>,
+  pub name: String,
+  pub crate_name: String,
+  pub types: Vec<RustTypeDeclaration>,
+  pub functions: Vec<RustMethod>,
 }
 
 //pub struct Package {

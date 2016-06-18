@@ -3,7 +3,7 @@ use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFu
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::Write;
-use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind};
+use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule};
 use std::collections::{HashMap, HashSet};
 use utils::JoinWithString;
 
@@ -41,13 +41,19 @@ fn rust_type_to_code(crate_name: &String, rust_type: &RustType) -> String {
 fn rust_ffi_function_to_code(crate_name: &String, func: &RustFFIFunction) -> String {
   let args = func.arguments
                  .iter()
-                 .map(|arg| format!("{}: {}", arg.name, rust_type_to_code(crate_name, &arg.argument_type)));
+                 .map(|arg| {
+                   format!("{}: {}",
+                           arg.name,
+                           rust_type_to_code(crate_name, &arg.argument_type))
+                 });
   format!("  pub fn {}({}){};\n",
           func.name.own_name,
           args.join(", "),
           match func.return_type {
             RustType::Void => String::new(),
-            RustType::NonVoid { .. } => format!(" -> {}", rust_type_to_code(crate_name, &func.return_type)),
+            RustType::NonVoid { .. } => {
+              format!(" -> {}", rust_type_to_code(crate_name, &func.return_type))
+            }
           })
 }
 
@@ -74,16 +80,13 @@ pub fn generate_lib_file(output_path: &PathBuf, modules: &Vec<String>) {
   }
 }
 
-pub fn generate_module_file(crate_name: &String,
-                            module_name: &String,
-                            output_path: &PathBuf,
-                            types: &Vec<RustTypeDeclaration>) {
+pub fn generate_module_file(output_path: &PathBuf, data: &RustModule) {
   let mut file_path = output_path.clone();
-  file_path.push(crate_name);
+  file_path.push(&data.crate_name);
   file_path.push("src");
-  file_path.push(format!("{}.rs", module_name));
+  file_path.push(format!("{}.rs", &data.name));
   let mut file = File::create(&file_path).unwrap();
-  for type1 in types {
+  for type1 in &data.types {
     match type1.kind {
       RustTypeDeclarationKind::CppTypeWrapper { ref kind, .. } => {
         match *kind {
