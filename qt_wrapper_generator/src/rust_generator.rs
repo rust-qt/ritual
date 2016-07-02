@@ -11,8 +11,10 @@ use std::collections::{HashMap, HashSet};
 use log;
 use rust_code_generator;
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
-                RustMethod};
+                RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
+                RustMethodArguments};
 use cpp_method::{CppMethod, CppMethodScope};
+use cpp_ffi_function_argument::CppFfiArgumentMeaning;
 
 fn include_file_to_module_name(include_file: &String) -> String {
   let mut r = include_file.clone();
@@ -385,6 +387,7 @@ impl RustGenerator {
             CppTypeKind::Class { ref size, .. } => {
               match *size {
                 Some(ref size) => {
+                  let methods_scope = RustMethodScope::Impl { type_name: rust_type_name.clone() };
                   types.push(RustTypeDeclaration {
                     name: rust_type_name.own_name.clone(),
                     kind: RustTypeDeclarationKind::CppTypeWrapper {
@@ -392,15 +395,16 @@ impl RustGenerator {
                       cpp_type_name: type_data.name.clone(),
                       cpp_template_arguments: None,
                     },
-                    methods: RustGenerator::generate_functions(c_header.methods
-                                                                       .iter()
-                                                                       .filter(|&x| {
-                                                                         x.cpp_method
-                                                                          .scope
-                                                                          .class_name() ==
-                                                                         Some(&type_data.name)
-                                                                       })
-                                                                       .collect()),
+                    methods: self.generate_functions(c_header.methods
+                                                             .iter()
+                                                             .filter(|&x| {
+                                                               x.cpp_method
+                                                                .scope
+                                                                .class_name() ==
+                                                               Some(&type_data.name)
+                                                             })
+                                                             .collect(),
+                                                     &methods_scope),
                     traits: Vec::new(),
                   });
                 }
@@ -427,23 +431,28 @@ impl RustGenerator {
       name: module_name,
       crate_name: self.crate_name.clone(),
       types: types,
-      functions: RustGenerator::generate_functions(c_header.methods
-                                                           .iter()
-                                                           .filter(|&x| {
-                                                             x.cpp_method
-                                                              .scope ==
-                                                             CppMethodScope::Global
-                                                           })
-                                                           .collect()),
+      functions: self.generate_functions(c_header.methods
+                                                 .iter()
+                                                 .filter(|&x| {
+                                                   x.cpp_method
+                                                    .scope ==
+                                                   CppMethodScope::Global
+                                                 })
+                                                 .collect(),
+                                         &RustMethodScope::Free),
     };
     rust_code_generator::generate_module_file(&self.output_path, &module);
     self.modules.push(module);
   }
 
-  pub fn generate_functions(methods: Vec<&CppAndFfiMethod>) -> Vec<RustMethod> {
+  pub fn generate_functions(&self,
+                            methods: Vec<&CppAndFfiMethod>,
+                            scope: &RustMethodScope)
+                            -> Vec<RustMethod> {
     let mut r = Vec::new();
     let mut method_names = HashSet::new();
     for method in &methods {
+      //TODO: use cpp name instead?
       if !method_names.contains(&method.c_method_name) {
         method_names.insert(method.c_method_name.clone());
       }
@@ -454,11 +463,73 @@ impl RustGenerator {
                                            .filter(|m| &m.c_method_name == &method_name)
                                            .collect();
       if current_methods.len() == 1 {
-//        r.push(RustMethod {
-//
-//        });
+        let method = current_methods[0];
+        if method.cpp_method.kind.is_destructor() || method.cpp_method.kind.is_operator() {
+          //TODO: implement Drop trait or other traits
+          continue;
+        }
+        let mut arguments = Vec::new();
+        let mut return_type_info = None;
+        let mut fail = false;
+        for (arg_index, arg) in method.c_signature.arguments.iter().enumerate() {
+          match self.cpp_type_to_complete_type(&arg.argument_type) {
+            Ok(complete_type) => {
+              if arg.meaning == CppFfiArgumentMeaning::ReturnValue {
+                assert!(return_type_info.is_none());
+                return_type_info = Some((complete_type, Some(arg_index as i32)));
+              } else {
+                arguments.push(RustMethodArgument {
+                  ffi_index: arg_index as i32,
+                  argument_type: complete_type,
+                  name: if arg.meaning == CppFfiArgumentMeaning::This {
+                    "self".to_string()
+                  } else {
+                    sanitize_rust_var_name(&arg.name)
+                  },
+                });
+              }
+            }
+            Err(msg) => {
+              log::warning(format!("Can't generate Rust method for method:\n{}\n{}\n",
+                                   method.short_text(),
+                                   msg));
+              fail = true;
+              break;
+            }
+          }
+        }
+        if return_type_info.is_none() {
+          match self.cpp_type_to_complete_type(&method.c_signature.return_type) {
+            Ok(r) => {
+              return_type_info = Some((r, None));
+            }
+            Err(msg) => {
+              log::warning(format!("Can't generate Rust method for method:\n{}\n{}\n",
+                                   method.short_text(),
+                                   msg));
+              fail = true;
+              break;
+            }
+          }
+        } else {
+          assert!(method.c_signature.return_type == CppFfiType::void());
+        }
+        if fail {
+          continue;
+        }
+        let return_type_info1 = return_type_info.unwrap();
+        r.push(RustMethod {
+          name: sanitize_rust_var_name(&method.cpp_method.name.to_snake_case()),
+          scope: scope.clone(),
+          return_type: return_type_info1.0,
+          return_type_ffi_index: return_type_info1.1,
+          arguments: RustMethodArguments::SingleVariant(RustMethodArgumentsVariant {
+            arguments: arguments,
+            cpp_method: method.clone(),
+          }),
+        });
       } else {
-
+        // TODO: generate overloaded functions
       }
     }
     return r;

@@ -3,7 +3,8 @@ use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFu
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::Write;
-use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule};
+use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
+                RustMethod, RustMethodArguments};
 use std::collections::{HashMap, HashSet};
 use utils::JoinWithString;
 
@@ -55,6 +56,36 @@ fn rust_ffi_function_to_code(crate_name: &String, func: &RustFFIFunction) -> Str
               format!(" -> {}", rust_type_to_code(crate_name, &func.return_type))
             }
           })
+}
+
+fn generate_rust_final_function(crate_name: &String, func: &RustMethod) -> String {
+  match func.arguments {
+    RustMethodArguments::SingleVariant(ref variant) => {
+      let body = "unimplemented!()\n".to_string();
+
+      let args = variant.arguments
+                        .iter()
+                        .map(|arg| {
+                          format!("{}: {}",
+                                  arg.name,
+                                  rust_type_to_code(crate_name, &arg.argument_type.rust_api_type))
+                        });
+      format!("pub fn {}({}){} {{\n{}}}\n\n",
+              func.name,
+              args.join(", "),
+              match func.return_type.rust_api_type {
+                RustType::Void => String::new(),
+                RustType::NonVoid { .. } => {
+                  format!(" -> {}",
+                          rust_type_to_code(crate_name, &func.return_type.rust_api_type))
+                }
+              },
+              body)
+    }
+    RustMethodArguments::MultipleVariants { .. } => {
+      unimplemented!();
+    }
+  }
 }
 
 pub fn generate_lib_file(output_path: &PathBuf, modules: &Vec<String>) {
@@ -110,6 +141,16 @@ pub fn generate_module_file(output_path: &PathBuf, data: &RustModule) {
       }
       _ => unimplemented!(),
     }
+    if !type1.methods.is_empty() {
+      write!(file, "impl {} {{\n", type1.name);
+      for method in &type1.methods {
+        file.write(generate_rust_final_function(&data.crate_name, method).as_bytes()).unwrap();
+      }
+      write!(file, "}}\n\n");
+    }
+  }
+  for method in &data.functions {
+    file.write(generate_rust_final_function(&data.crate_name, method).as_bytes()).unwrap();
   }
 
 }

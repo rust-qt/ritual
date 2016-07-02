@@ -4,26 +4,28 @@ use cpp_and_ffi_method::CppAndFfiMethod;
 use cpp_data::{EnumValue};
 use cpp_type::{CppType};
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RustMethodScope {
   Impl {
     type_name: RustName,
-    method_name: String,
   },
-  Free {
-    method_name: RustName,
-  },
+  Free
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustMethodArgument {
-  argument_type: CompleteType,
-  name: String,
+  pub argument_type: CompleteType,
+  pub name: String,
+  pub ffi_index: i32,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustMethodArgumentsVariant {
-  arguments: Vec<RustMethodArgument>,
-  cpp_method: CppAndFfiMethod,
+  pub arguments: Vec<RustMethodArgument>,
+  pub cpp_method: CppAndFfiMethod,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RustMethodArguments {
   SingleVariant(RustMethodArgumentsVariant),
   MultipleVariants {
@@ -34,12 +36,16 @@ pub enum RustMethodArguments {
   }
 }
 
-
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustMethod {
-  scope: RustMethodScope,
-  return_type: CompleteType,
+  pub scope: RustMethodScope,
+  pub return_type: CompleteType,
+  pub return_type_ffi_index: Option<i32>,
+  pub name: String,
+  pub arguments: RustMethodArguments,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TraitName {
   Clone,
   Debug,
@@ -83,12 +89,14 @@ pub enum TraitName {
   Iterator,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TraitImpl {
-  target_type: RustName,
-  trait_name: TraitName,
-  methods: Vec<RustMethod>,
+  pub target_type: RustName,
+  pub trait_name: TraitName,
+  pub methods: Vec<RustMethod>,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RustTypeWrapperKind {
   Enum {
     values: Vec<EnumValue>,
@@ -98,6 +106,7 @@ pub enum RustTypeWrapperKind {
   }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RustTypeDeclarationKind {
   CppTypeWrapper {
     kind: RustTypeWrapperKind,
@@ -108,6 +117,7 @@ pub enum RustTypeDeclarationKind {
   MethodParametersTrait
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustTypeDeclaration {
   pub name: String,
   pub kind: RustTypeDeclarationKind,
@@ -115,6 +125,7 @@ pub struct RustTypeDeclaration {
   pub traits: Vec<TraitImpl>,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustModule {
   pub name: String,
   pub crate_name: String,
