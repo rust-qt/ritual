@@ -12,3 +12,4 @@ ansi_term = "0.7"
 #clang = { git = "https://github.com/KyleMayes/clang-rs", features = ["clang_3_8"] }
 clang = { git = "https://github.com/KyleMayes/clang-rs" }
 regex = "0.1"
+rustfmt = "0.5.0"

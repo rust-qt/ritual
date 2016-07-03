@@ -5,11 +5,11 @@ use cpp_ffi_type::{CppFfiType, IndirectionChange};
 use utils::JoinWithString;
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
-use cpp_data::{CppTypeKind, EnumValue};
+use cpp_data::{CppTypeKind, EnumValue, CppTypeData};
 use std::path::PathBuf;
 use std::collections::{HashMap, HashSet};
 use log;
-use rust_code_generator;
+use rust_code_generator::RustCodeGenerator;
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
                 RustMethodArguments};
@@ -64,17 +64,20 @@ pub struct RustGenerator {
   crate_name: String,
   cpp_to_rust_type_map: HashMap<String, RustName>,
   processed_cpp_types: HashSet<String>,
+  code_generator: RustCodeGenerator,
 }
 
 impl RustGenerator {
   pub fn new(input_data: CppAndFfiData, output_path: PathBuf) -> Self {
+    let crate_name = "qt_core".to_string();
     RustGenerator {
       input_data: input_data,
-      output_path: output_path,
+      output_path: output_path.clone(),
       modules: Vec::new(),
-      crate_name: "qt_core".to_string(),
+      crate_name: crate_name.clone(),
       cpp_to_rust_type_map: HashMap::new(),
       processed_cpp_types: HashSet::new(),
+      code_generator: RustCodeGenerator::new(crate_name, output_path),
     }
   }
 
@@ -310,114 +313,108 @@ impl RustGenerator {
     }
   }
 
+  fn process_type(&self,
+                  type_info: &CppTypeData,
+                  methods: &Vec<CppAndFfiMethod>)
+                  -> Option<RustTypeDeclaration> {
+    let rust_type_name = self.cpp_to_rust_type_map.get(&type_info.name).unwrap();
+    match type_info.kind {
+      CppTypeKind::Enum { ref values } => {
+        let mut value_to_variant: HashMap<i64, EnumValue> = HashMap::new();
+        for variant in values {
+          let value = variant.value;
+          if value_to_variant.contains_key(&value) {
+            log::warning(format!("warning: {}: duplicated enum variant removed: {} \
+                                  (previous variant: {})",
+                                 type_info.name,
+                                 variant.name,
+                                 value_to_variant.get(&value).unwrap().name));
+          } else {
+            value_to_variant.insert(value,
+                                    EnumValue {
+                                      name: variant.name.to_class_case1(),
+                                      value: variant.value,
+                                    });
+          }
+        }
+        if value_to_variant.len() == 1 {
+          let dummy_value = if value_to_variant.contains_key(&0) {
+            1
+          } else {
+            0
+          };
+          value_to_variant.insert(dummy_value,
+                                  EnumValue {
+                                    name: "_Invalid".to_string(),
+                                    value: dummy_value as i64,
+                                  });
+        }
+        let mut values: Vec<_> = value_to_variant.into_iter()
+                                                 .map(|(val, variant)| variant)
+                                                 .collect();
+        values.sort_by(|a, b| a.value.cmp(&b.value));
+        return Some(RustTypeDeclaration {
+          name: rust_type_name.own_name.clone(),
+          kind: RustTypeDeclarationKind::CppTypeWrapper {
+            kind: RustTypeWrapperKind::Enum { values: values },
+            cpp_type_name: type_info.name.clone(),
+            cpp_template_arguments: None,
+          },
+          methods: Vec::new(),
+          traits: Vec::new(),
+        });
+      }
+      CppTypeKind::Class { ref size, .. } => {
+        let methods_scope = RustMethodScope::Impl { type_name: rust_type_name.clone() };
+        return Some(RustTypeDeclaration {
+          name: rust_type_name.own_name.clone(),
+          kind: RustTypeDeclarationKind::CppTypeWrapper {
+            kind: RustTypeWrapperKind::Struct { size: size.unwrap() },
+            cpp_type_name: type_info.name.clone(),
+            cpp_template_arguments: None,
+          },
+          methods: self.generate_functions(methods.iter()
+                                                  .filter(|&x| {
+                                                    x.cpp_method
+                                                     .scope
+                                                     .class_name() ==
+                                                    Some(&type_info.name)
+                                                  })
+                                                  .collect(),
+                                           &methods_scope),
+          traits: Vec::new(),
+        });
+      }
+    };
+
+
+  }
+
   pub fn generate_all(&mut self) {
     self.generate_type_map();
     for header in &self.input_data.cpp_ffi_headers.clone() {
-      self.generate_modules(header);
+      self.generate_modules_from_header(header);
     }
     self.generate_ffi();
-    rust_code_generator::generate_lib_file(&self.output_path,
+    self.code_generator.generate_lib_file(&self.output_path,
                                            &self.modules.iter().map(|x| x.name.clone()).collect());
   }
 
-  pub fn generate_modules(&mut self, c_header: &CppFfiHeaderData) {
+  pub fn generate_modules_from_header(&mut self, c_header: &CppFfiHeaderData) {
     let module_name = include_file_to_module_name(&c_header.include_file);
     if module_name == "flags" && self.crate_name == "qt_core" {
       log::info(format!("Skipping module {}::{}", self.crate_name, module_name));
       return;
     }
-    log::info(format!("Generating Rust types in module {}::{}",
-                      self.crate_name,
-                      module_name));
     let mut types = Vec::new();
-
-    for type_data in &self.input_data
+    for type_info in &self.input_data
                           .cpp_data_by_headers
                           .get(&c_header.include_file)
                           .unwrap()
                           .types {
-      if let Some(rust_type_name) = self.cpp_to_rust_type_map.get(&type_data.name) {
+      if let Some(rust_type_name) = self.cpp_to_rust_type_map.get(&type_info.name) {
         if module_name == rust_type_name.module_name {
-          let code = match type_data.kind {
-            CppTypeKind::Enum { ref values } => {
-              let mut value_to_variant: HashMap<i64, EnumValue> = HashMap::new();
-              for variant in values {
-                let value = variant.value;
-                if value_to_variant.contains_key(&value) {
-                  log::warning(format!("warning: {}: duplicated enum variant removed: {} \
-                                      (previous variant: {})",
-                                       type_data.name,
-                                       variant.name,
-                                       value_to_variant.get(&value).unwrap().name));
-                } else {
-                  value_to_variant.insert(value,
-                                          EnumValue {
-                                            name: variant.name.to_class_case1(),
-                                            value: variant.value,
-                                          });
-                }
-              }
-              if value_to_variant.len() == 1 {
-                let dummy_value = if value_to_variant.contains_key(&0) {
-                  1
-                } else {
-                  0
-                };
-                value_to_variant.insert(dummy_value,
-                                        EnumValue {
-                                          name: "_Invalid".to_string(),
-                                          value: dummy_value as i64,
-                                        });
-              }
-              let mut values: Vec<_> = value_to_variant.into_iter()
-                                                       .map(|(val, variant)| variant)
-                                                       .collect();
-              values.sort_by(|a, b| a.value.cmp(&b.value));
-              types.push(RustTypeDeclaration {
-                name: rust_type_name.own_name.clone(),
-                kind: RustTypeDeclarationKind::CppTypeWrapper {
-                  kind: RustTypeWrapperKind::Enum { values: values },
-                  cpp_type_name: type_data.name.clone(),
-                  cpp_template_arguments: None,
-                },
-                methods: Vec::new(),
-                traits: Vec::new(),
-              });
-            }
-            CppTypeKind::Class { ref size, .. } => {
-              match *size {
-                Some(ref size) => {
-                  let methods_scope = RustMethodScope::Impl { type_name: rust_type_name.clone() };
-                  types.push(RustTypeDeclaration {
-                    name: rust_type_name.own_name.clone(),
-                    kind: RustTypeDeclarationKind::CppTypeWrapper {
-                      kind: RustTypeWrapperKind::Struct { size: *size },
-                      cpp_type_name: type_data.name.clone(),
-                      cpp_template_arguments: None,
-                    },
-                    methods: self.generate_functions(c_header.methods
-                                                             .iter()
-                                                             .filter(|&x| {
-                                                               x.cpp_method
-                                                                .scope
-                                                                .class_name() ==
-                                                               Some(&type_data.name)
-                                                             })
-                                                             .collect(),
-                                                     &methods_scope),
-                    traits: Vec::new(),
-                  });
-                }
-                None => {
-                  unreachable!()
-                  // format!("pub enum {} {{}}\n\n", rust_type_name.own_name)
-                }
-
-              }
-            }
-          };
-          // TODO: save RustTypeDeclaration vector instead of processed_cpp_types
-          self.processed_cpp_types.insert(type_data.name.clone());
+          types.push(type_info.clone());
         } else {
           panic!("unexpected module name mismatch: {}, {:?}",
                  module_name,
@@ -427,22 +424,118 @@ impl RustGenerator {
         // type is skipped: no rust name
       }
     }
+    if let Some(module) = self.generate_module(&types,
+                                               &c_header.methods,
+                                               &module_name,
+                                               &module_name,
+                                               &String::new()) {
+      self.code_generator.generate_module_file(&module);
+      self.modules.push(module);
+    }
+  }
+
+  pub fn generate_module(&mut self,
+                         types: &Vec<CppTypeData>,
+                         methods: &Vec<CppAndFfiMethod>,
+                         module_name: &String,
+                         full_modules_name: &String,
+                         cpp_namespace_prefix: &String)
+                         -> Option<RustModule> {
+    log::info(format!("Generating Rust module {}::{}",
+                      self.crate_name,
+                      full_modules_name));
+
+    struct SubModuleData {
+      rust_name: String,
+      types: Vec<CppTypeData>,
+      methods: Vec<CppAndFfiMethod>,
+    }
+
+    let mut cpp_namespace_to_sub_module = HashMap::new();
+    let mut good_types = Vec::new();
+    let mut good_methods = Vec::new();
+    {
+      let mut check_namespace_name = |x: &String,
+                                      t: Option<&CppTypeData>,
+                                      m: Option<&CppAndFfiMethod>| {
+        let cpp_name = x[cpp_namespace_prefix.len()..].to_string();
+        if let Some(index) = cpp_name.find("::") {
+          let new_namespace = cpp_name[0..index].to_string();
+          if !cpp_namespace_to_sub_module.contains_key(&new_namespace) {
+            let rust_name = new_namespace.to_snake_case();
+            if &rust_name == module_name {
+              //special case
+              return true;
+            }
+            cpp_namespace_to_sub_module.insert(new_namespace.clone(),
+                                               SubModuleData {
+                                                 rust_name: rust_name,
+                                                 types: Vec::new(),
+                                                 methods: Vec::new(),
+                                               });
+            if let Some(t) = t {
+              cpp_namespace_to_sub_module.get_mut(&new_namespace).unwrap().types.push(t.clone());
+            }
+            if let Some(m) = m {
+              cpp_namespace_to_sub_module.get_mut(&new_namespace).unwrap().methods.push(m.clone());
+            }
+          }
+          return false;
+        }
+        return true;
+      };
+      for type_data in types {
+        if check_namespace_name(&type_data.name, Some(type_data), None) {
+          good_types.push(type_data.clone());
+        }
+      }
+      for method in methods {
+        if method.cpp_method.scope == CppMethodScope::Global {
+          if check_namespace_name(&method.cpp_method.name, None, Some(method)) {
+            good_methods.push(method.clone());
+          }
+        }
+      }
+    }
+    let mut submodules = Vec::new();
+    for (cpp_namespace, submodule) in cpp_namespace_to_sub_module {
+      let cpp_prefix = format!("{}{}::", cpp_namespace_prefix, cpp_namespace);
+      if let Some(module) = self.generate_module(&submodule.types,
+                                                 &submodule.methods,
+                                                 &submodule.rust_name,
+                                                 &format!("{}::{}",
+                                                          full_modules_name,
+                                                          submodule.rust_name),
+                                                 &cpp_prefix) {
+        submodules.push(module);
+      }
+    }
+
+    let mut rust_types = Vec::new();
+
+    for type_data in &good_types {
+      if let Some(result) = self.process_type(type_data, &good_methods) {
+        rust_types.push(result);
+        // TODO: save RustTypeDeclaration vector instead of processed_cpp_types
+        self.processed_cpp_types.insert(type_data.name.clone());
+      }
+    }
     let module = RustModule {
-      name: module_name,
+      name: module_name.clone(),
+      full_modules_name: full_modules_name.clone(),
       crate_name: self.crate_name.clone(),
-      types: types,
-      functions: self.generate_functions(c_header.methods
-                                                 .iter()
-                                                 .filter(|&x| {
-                                                   x.cpp_method
-                                                    .scope ==
-                                                   CppMethodScope::Global
-                                                 })
-                                                 .collect(),
+      types: rust_types,
+      functions: self.generate_functions(good_methods.iter()
+                                                     .filter(|&x| {
+                                                       x.cpp_method
+                                                        .scope ==
+                                                       CppMethodScope::Global
+                                                     })
+                                                     .collect(),
                                          &RustMethodScope::Free),
+      submodules: submodules,
     };
-    rust_code_generator::generate_module_file(&self.output_path, &module);
-    self.modules.push(module);
+    return Some(module);
   }
 
   pub fn generate_functions(&self,
@@ -452,7 +545,7 @@ impl RustGenerator {
     let mut r = Vec::new();
     let mut method_names = HashSet::new();
     for method in &methods {
-      //TODO: use cpp name instead?
+      // TODO: use cpp name instead?
       if !method_names.contains(&method.c_method_name) {
         method_names.insert(method.c_method_name.clone());
       }
@@ -465,7 +558,7 @@ impl RustGenerator {
       if current_methods.len() == 1 {
         let method = current_methods[0];
         if method.cpp_method.kind.is_destructor() || method.cpp_method.kind.is_operator() {
-          //TODO: implement Drop trait or other traits
+          // TODO: implement Drop trait or other traits
           continue;
         }
         let mut arguments = Vec::new();
@@ -556,6 +649,6 @@ impl RustGenerator {
       }
       ffi_functions.insert(header.include_file.clone(), functions);
     }
-    rust_code_generator::generate_ffi_file(&self.crate_name, &self.output_path, &ffi_functions);
+    self.code_generator.generate_ffi_file(&ffi_functions);
   }
 }

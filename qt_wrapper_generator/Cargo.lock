@@ -7,6 +7,7 @@ dependencies = [
  "clang 0.7.3 (git+https://github.com/KyleMayes/clang-rs)",
  "find_folder 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.1.68 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustfmt 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.6.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -58,8 +59,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "diff"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "env_logger"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "regex 0.1.68 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "find_folder"
 version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "getopts"
+version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -79,6 +99,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "libc"
 version = "0.2.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "log"
+version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -194,6 +219,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustfmt"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "diff 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "env_logger 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "getopts 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "regex 0.1.68 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc-serialize 0.3.19 (registry+https://github.com/rust-lang/crates.io-index)",
+ "strings 0.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syntex_syntax 0.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "term 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "toml 0.1.30 (registry+https://github.com/rust-lang/crates.io-index)",
+ "unicode-segmentation 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "semver"
 version = "0.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -216,6 +259,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "strings"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "syntex_syntax"
+version = "0.32.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bitflags 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc-serialize 0.3.19 (registry+https://github.com/rust-lang/crates.io-index)",
+ "term 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "unicode-xid 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "term"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "term"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "thread-id"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -231,6 +313,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "thread-id 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "toml"
+version = "0.1.30"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "rustc-serialize 0.3.19 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "unicode-segmentation"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "unicode-xid"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "utf8-ranges"

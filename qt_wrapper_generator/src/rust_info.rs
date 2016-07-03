@@ -128,9 +128,11 @@ pub struct RustTypeDeclaration {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustModule {
   pub name: String,
+  pub full_modules_name: String,
   pub crate_name: String,
   pub types: Vec<RustTypeDeclaration>,
   pub functions: Vec<RustMethod>,
+  pub submodules: Vec<RustModule>,
 }
 
 //pub struct Package {
