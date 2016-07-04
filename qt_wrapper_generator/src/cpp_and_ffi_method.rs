@@ -1,4 +1,4 @@
-use cpp_method::{CppMethod, CppMethodScope, AllocationPlace, CppMethodKind};
+use cpp_method::{CppMethod, CppMethodScope, ReturnValueAllocationPlace, CppMethodKind};
 use cpp_ffi_function_signature::CppFfiFunctionSignature;
 use caption_strategy::{MethodCaptionStrategy, TypeCaptionStrategy};
 use cpp_operators::CppOperator;
@@ -6,14 +6,14 @@ use cpp_operators::CppOperator;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppMethodWithFfiSignature {
   pub cpp_method: CppMethod,
-  pub allocation_place: AllocationPlace,
+  pub allocation_place: ReturnValueAllocationPlace,
   pub c_signature: CppFfiFunctionSignature,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppAndFfiMethod {
   pub cpp_method: CppMethod,
-  pub allocation_place: AllocationPlace,
+  pub allocation_place: ReturnValueAllocationPlace,
   pub c_signature: CppFfiFunctionSignature,
   pub c_name: String,
   pub c_method_name: String,
@@ -29,14 +29,16 @@ impl CppMethodWithFfiSignature {
     let method_name = match self.cpp_method.kind {
       CppMethodKind::Constructor => {
         match self.allocation_place {
-          AllocationPlace::Stack => "constructor".to_string(),
-          AllocationPlace::Heap => "new".to_string(),
+          ReturnValueAllocationPlace::Stack => "constructor".to_string(),
+          ReturnValueAllocationPlace::Heap => "new".to_string(),
+          ReturnValueAllocationPlace::NotApplicable => unreachable!(),
         }
       }
       CppMethodKind::Destructor => {
         match self.allocation_place {
-          AllocationPlace::Stack => "destructor".to_string(),
-          AllocationPlace::Heap => "delete".to_string(),
+          ReturnValueAllocationPlace::Stack => "destructor".to_string(),
+          ReturnValueAllocationPlace::Heap => "delete".to_string(),
+          ReturnValueAllocationPlace::NotApplicable => unreachable!(),
         }
       }
       CppMethodKind::Operator(ref operator) => {

@@ -8,9 +8,10 @@ use cpp_operators::CppOperator;
 use utils::JoinWithString;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum AllocationPlace {
+pub enum ReturnValueAllocationPlace {
   Stack,
   Heap,
+  NotApplicable,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -131,7 +132,7 @@ impl CppMethod {
   }
 
   pub fn c_signature(&self,
-                     allocation_place: AllocationPlace)
+                     allocation_place: ReturnValueAllocationPlace)
                      -> Result<(CppFfiFunctionSignature, AllocationPlaceImportance), String> {
 
     // no complicated cases support for now
@@ -184,7 +185,7 @@ impl CppMethod {
                                           IndirectionChange::QFlagsToUInt;
           if is_stack_allocated_struct {
             allocation_place_importance = AllocationPlaceImportance::Important;
-            if allocation_place == AllocationPlace::Stack {
+            if allocation_place == ReturnValueAllocationPlace::Stack {
               r.arguments.push(CppFfiFunctionArgument {
                 name: "output".to_string(),
                 argument_type: c_type,
@@ -211,21 +212,24 @@ impl CppMethod {
   pub fn add_c_signatures
     (&self)
      -> Result<(CppMethodWithFfiSignature, Option<CppMethodWithFfiSignature>), String> {
-    match self.c_signature(AllocationPlace::Heap) {
+    match self.c_signature(ReturnValueAllocationPlace::Heap) {
       Ok((c_signature, importance)) => {
         let result1 = CppMethodWithFfiSignature {
           cpp_method: self.clone(),
-          allocation_place: AllocationPlace::Heap,
+          allocation_place: match importance {
+            AllocationPlaceImportance::Important => ReturnValueAllocationPlace::Heap,
+            AllocationPlaceImportance::NotImportant => ReturnValueAllocationPlace::NotApplicable,
+          },
           c_signature: c_signature,
         };
         match importance {
           AllocationPlaceImportance::Important => {
-            match self.c_signature(AllocationPlace::Stack) {
+            match self.c_signature(ReturnValueAllocationPlace::Stack) {
               Ok((c_signature2, _)) => {
                 Ok((result1,
                     Some(CppMethodWithFfiSignature {
                   cpp_method: self.clone(),
-                  allocation_place: AllocationPlace::Stack,
+                  allocation_place: ReturnValueAllocationPlace::Stack,
                   c_signature: c_signature2,
                 })))
               }

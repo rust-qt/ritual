@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use log;
 use cpp_data::{CppData, CppTypeKind, CppVisibility};
 use caption_strategy::MethodCaptionStrategy;
-use cpp_method::{CppMethod, AllocationPlace, CppMethodScope, CppMethodKind};
+use cpp_method::{CppMethod, ReturnValueAllocationPlace, CppMethodScope, CppMethodKind};
 use cpp_ffi_type::IndirectionChange;
 use cpp_ffi_function_argument::CppFfiArgumentMeaning;
 use cpp_type::CppTypeBase;

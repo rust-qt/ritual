@@ -7,7 +7,7 @@ use cpp_type::{CppType};
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RustMethodScope {
   Impl {
-    type_name: RustName,
+    type_name: String,
   },
   Free
 }
@@ -129,7 +129,6 @@ pub struct RustTypeDeclaration {
 pub struct RustModule {
   pub name: String,
   pub full_modules_name: String,
-  pub crate_name: String,
   pub types: Vec<RustTypeDeclaration>,
   pub functions: Vec<RustMethod>,
   pub submodules: Vec<RustModule>,

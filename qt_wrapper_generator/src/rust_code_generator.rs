@@ -85,6 +85,9 @@ impl RustCodeGenerator {
   }
 
   fn generate_rust_final_function(&self, func: &RustMethod) -> String {
+//    if func.name == "q_uncompress" {
+//      println!("TEST: {:?}", func);
+//    }
     match func.arguments {
       RustMethodArguments::SingleVariant(ref variant) => {
         let body = "unimplemented!()\n".to_string();
@@ -187,10 +190,10 @@ impl RustCodeGenerator {
   }
 
   fn call_rustfmt(&self, path: &PathBuf) {
-    let rustfmt_result = rustfmt::run(rustfmt::Input::File(path.clone()), &self.rustfmt_config);
-    if !rustfmt_result.has_no_errors() {
-      log::warning(format!("rustfmt failed to format file: {:?}", path));
-    }
+//    let rustfmt_result = rustfmt::run(rustfmt::Input::File(path.clone()), &self.rustfmt_config);
+//    if !rustfmt_result.has_no_errors() {
+//      log::warning(format!("rustfmt failed to format file: {:?}", path));
+//    }
   }
 
   pub fn generate_module_file(&self, data: &RustModule) {
