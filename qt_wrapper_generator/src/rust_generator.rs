@@ -121,11 +121,9 @@ impl RustGenerator {
         panic!("invalid original type for QFlags");
       };
       rust_api_type = RustType::NonVoid {
-        base: RustName {
-          crate_name: "qt_core".to_string(),
-          module_name: "q_flags".to_string(),
-          own_name: "QFlags".to_string(),
-        },
+        base: RustName::new(vec!["qt_core".to_string(),
+                                 "q_flags".to_string(),
+                                 "QFlags".to_string()]),
         generic_arguments: Some(vec![RustType::NonVoid {
                                        base: enum_type,
                                        generic_arguments: None,
@@ -156,47 +154,33 @@ impl RustGenerator {
       CppTypeBase::Void => {
         match cpp_ffi_type.ffi_type.indirection {
           CppTypeIndirection::None => return Ok(RustType::Void),
-          _ => {
-            RustName {
-              crate_name: "libc".to_string(),
-              module_name: "".to_string(),
-              own_name: "c_void".to_string(),
-            }
-          }
+          _ => RustName::new(vec!["libc".to_string(), "c_void".to_string()]),
         }
       }
       CppTypeBase::BuiltInNumeric(ref numeric) => {
         if numeric == &CppBuiltInNumericType::Bool {
-          RustName {
-            crate_name: "".to_string(),
-            module_name: "".to_string(),
-            own_name: "bool".to_string(),
-          }
+          RustName::new(vec!["bool".to_string()])
         } else {
-          RustName {
-            crate_name: "libc".to_string(),
-            module_name: "".to_string(),
-            own_name: match *numeric {
-                        CppBuiltInNumericType::Bool => "c_schar", // TODO: get real type of bool
-                        CppBuiltInNumericType::CharS => "c_char",
-                        CppBuiltInNumericType::CharU => "c_char",
-                        CppBuiltInNumericType::SChar => "c_schar",
-                        CppBuiltInNumericType::UChar => "c_uchar",
-                        CppBuiltInNumericType::WChar => "wchar_t",
-                        CppBuiltInNumericType::Short => "c_short",
-                        CppBuiltInNumericType::UShort => "c_ushort",
-                        CppBuiltInNumericType::Int => "c_int",
-                        CppBuiltInNumericType::UInt => "c_uint",
-                        CppBuiltInNumericType::Long => "c_long",
-                        CppBuiltInNumericType::ULong => "c_ulong",
-                        CppBuiltInNumericType::LongLong => "c_longlong",
-                        CppBuiltInNumericType::ULongLong => "c_ulonglong",
-                        CppBuiltInNumericType::Float => "c_float",
-                        CppBuiltInNumericType::Double => "c_double",
-                        _ => return Err(format!("unsupported numeric type: {:?}", numeric)),
-                      }
-                      .to_string(),
-          }
+          let own_name = match *numeric {
+            CppBuiltInNumericType::Bool => "c_schar", // TODO: get real type of bool
+            CppBuiltInNumericType::CharS => "c_char",
+            CppBuiltInNumericType::CharU => "c_char",
+            CppBuiltInNumericType::SChar => "c_schar",
+            CppBuiltInNumericType::UChar => "c_uchar",
+            CppBuiltInNumericType::WChar => "wchar_t",
+            CppBuiltInNumericType::Short => "c_short",
+            CppBuiltInNumericType::UShort => "c_ushort",
+            CppBuiltInNumericType::Int => "c_int",
+            CppBuiltInNumericType::UInt => "c_uint",
+            CppBuiltInNumericType::Long => "c_long",
+            CppBuiltInNumericType::ULong => "c_ulong",
+            CppBuiltInNumericType::LongLong => "c_longlong",
+            CppBuiltInNumericType::ULongLong => "c_ulonglong",
+            CppBuiltInNumericType::Float => "c_float",
+            CppBuiltInNumericType::Double => "c_double",
+            _ => return Err(format!("unsupported numeric type: {:?}", numeric)),
+          };
+          RustName::new(vec!["libc".to_string(), own_name.to_string()])
         }
       }
       CppTypeBase::SpecificNumeric { ref bits, ref kind, .. } => {
@@ -210,23 +194,15 @@ impl RustGenerator {
           }
           CppSpecificNumericTypeKind::FloatingPoint => "f",
         };
-        RustName {
-          crate_name: "".to_string(),
-          module_name: "".to_string(),
-          own_name: format!("{}{}", letter, bits),
-        }
+        RustName::new(vec![format!("{}{}", letter, bits)])
       }
       CppTypeBase::PointerSizedInteger { ref is_signed, .. } => {
-        RustName {
-          crate_name: "".to_string(),
-          module_name: "".to_string(),
-          own_name: if *is_signed {
-                      "isize"
-                    } else {
-                      "usize"
-                    }
-                    .to_string(),
-        }
+        RustName::new(vec![if *is_signed {
+                             "isize"
+                           } else {
+                             "usize"
+                           }
+                           .to_string()])
       }
       CppTypeBase::Enum { ref name } => {
         match self.cpp_to_rust_type_map.get(name) {
@@ -277,39 +253,61 @@ impl RustGenerator {
     Ok(RustFFIFunction {
       return_type: try!(self.cpp_type_to_complete_type(&data.c_signature.return_type))
                      .rust_ffi_type,
-      name: RustName {
-        crate_name: self.crate_name.clone(),
-        module_name: module_name.clone(),
-        own_name: data.c_name.clone(),
-      },
+      name: data.c_name.clone(),
       arguments: args,
     })
   }
 
 
+
+
   fn generate_type_map(&mut self) {
-    for type_info in &self.input_data.cpp_data.types {
-      let eliminated_name_prefix = format!("{}::", type_info.include_file);
-      let mut new_name = type_info.name.clone();
-      if new_name.starts_with(&eliminated_name_prefix) {
-        new_name = new_name[eliminated_name_prefix.len()..].to_string();
+
+    fn add_one_to_type_map(crate_name: &String,
+                           map: &mut HashMap<String, RustName>,
+                           name: &String,
+                           include_file: &String,
+                           is_function: bool) {
+      let mut split_parts: Vec<_> = name.split("::").collect();
+      let last_part = split_parts.pop().unwrap().to_string();
+      let last_part_final = if is_function {
+        last_part.to_snake_case()
+      } else {
+        last_part.to_class_case1()
+      };
+
+      let mut parts = Vec::new();
+      parts.push(crate_name.clone());
+      parts.push(include_file_to_module_name(&include_file));
+      for part in split_parts {
+        parts.push(part.to_string().to_snake_case());
       }
-      new_name = new_name.replace("::", "_").to_class_case1();
-      if let CppTypeKind::Class { size, .. } = type_info.kind {
-        if size.is_none() {
-          log::warning(format!("Rust type is not generated for a struct with unknown \
-                                        size: {}",
-                               type_info.name));
-          continue;
+
+      if parts.len() > 2 && parts[1] == parts[2] {
+        // special case
+        parts.remove(2);
+      }
+      parts.push(last_part_final);
+
+      map.insert(name.clone(), RustName::new(parts));
+    }
+    for type_info in &self.input_data.cpp_data.types {
+      add_one_to_type_map(&self.crate_name,
+                          &mut self.cpp_to_rust_type_map,
+                          &type_info.name,
+                          &type_info.include_file,
+                          false);
+    }
+    for header in &self.input_data.cpp_ffi_headers {
+      for method in &header.methods {
+        if method.cpp_method.scope == CppMethodScope::Global {
+          add_one_to_type_map(&self.crate_name,
+                              &mut self.cpp_to_rust_type_map,
+                              &method.cpp_method.name,
+                              &header.include_file,
+                              true);
         }
       }
-      self.cpp_to_rust_type_map.insert(type_info.name.clone(),
-                                       RustName {
-                                         crate_name: self.crate_name.clone(),
-                                         module_name:
-                                           include_file_to_module_name(&type_info.include_file),
-                                         own_name: new_name,
-                                       });
     }
   }
 
@@ -320,8 +318,8 @@ impl RustGenerator {
                   -> Option<RustTypeDeclaration> {
     // let rust_type_name = self.cpp_to_rust_type_map.get(&type_info.name).unwrap();
     let rust_name = sanitize_rust_var_name(&type_info.name[cpp_namespace_prefix.len()..]
-                                             .to_string()
-                                             .to_class_case1());
+                                              .to_string()
+                                              .to_class_case1());
     match type_info.kind {
       CppTypeKind::Enum { ref values } => {
         let mut value_to_variant: HashMap<i64, EnumValue> = HashMap::new();
@@ -385,7 +383,8 @@ impl RustGenerator {
                                                     Some(&type_info.name)
                                                   })
                                                   .collect(),
-                                           &methods_scope, &String::new()),
+                                           &methods_scope,
+                                           &String::new()),
           traits: Vec::new(),
         });
       }
@@ -417,13 +416,13 @@ impl RustGenerator {
                           .unwrap()
                           .types {
       if let Some(rust_type_name) = self.cpp_to_rust_type_map.get(&type_info.name) {
-        if module_name == rust_type_name.module_name {
-          types.push(type_info.clone());
-        } else {
-          panic!("unexpected module name mismatch: {}, {:?}",
-                 module_name,
-                 rust_type_name);
-        }
+        // if module_name == rust_type_name.module_name {
+        types.push(type_info.clone());
+        //        } else {
+        //          panic!("unexpected module name mismatch: {}, {:?}",
+        //                 module_name,
+        //                 rust_type_name);
+        //        }
       } else {
         // type is skipped: no rust name
       }
@@ -475,13 +474,13 @@ impl RustGenerator {
           let new_namespace = cpp_name[0..index].to_string();
           if !cpp_namespace_to_sub_module.contains_key(&new_namespace) {
             let rust_name = new_namespace.to_snake_case();
-//            if &rust_name == module_name {
-//              // special case
-//              if enable_debug {
-//                println!("goes to global (special case)");
-//              }
-//              return true;
-//            }
+            //            if &rust_name == module_name {
+            //              // special case
+            //              if enable_debug {
+            //                println!("goes to global (special case)");
+            //              }
+            //              return true;
+            //            }
             cpp_namespace_to_sub_module.insert(new_namespace.clone(),
                                                SubModuleData {
                                                  rust_name: rust_name,
@@ -524,14 +523,14 @@ impl RustGenerator {
     for (cpp_namespace, submodule) in cpp_namespace_to_sub_module {
       let cpp_prefix = format!("{}{}::", cpp_namespace_prefix, cpp_namespace);
       if let Some(mut module) = self.generate_module(&submodule.types,
-                                                 &submodule.methods,
-                                                 &submodule.rust_name,
-                                                 &format!("{}::{}",
-                                                          full_modules_name,
-                                                          submodule.rust_name),
-                                                 &cpp_prefix) {
+                                                     &submodule.methods,
+                                                     &submodule.rust_name,
+                                                     &format!("{}::{}",
+                                                              full_modules_name,
+                                                              submodule.rust_name),
+                                                     &cpp_prefix) {
         if &module.name == module_name {
-          //special case
+          // special case
           functions.append(&mut module.functions);
           rust_types.append(&mut module.types);
           submodules.append(&mut module.submodules);
@@ -550,14 +549,14 @@ impl RustGenerator {
       }
     }
     functions.append(&mut self.generate_functions(good_methods.iter()
-                                                 .filter(|&x| {
-                                                   x.cpp_method
-                                                       .scope ==
-                                                       CppMethodScope::Global
-                                                 })
-                                                 .collect(),
-                                             &RustMethodScope::Free,
-                                             cpp_namespace_prefix));
+                                                              .filter(|&x| {
+                                                                x.cpp_method
+                                                                 .scope ==
+                                                                CppMethodScope::Global
+                                                              })
+                                                              .collect(),
+                                                  &RustMethodScope::Free,
+                                                  cpp_namespace_prefix));
     let module = RustModule {
       name: module_name.clone(),
       full_modules_name: full_modules_name.clone(),

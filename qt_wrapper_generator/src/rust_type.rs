@@ -11,29 +11,29 @@ pub enum RustTypeIndirection {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RustName {
-  pub crate_name: String,
-  pub module_name: String,
-  pub own_name: String,
+  pub parts: Vec<String>,
 }
 
 impl RustName {
+  pub fn new(parts: Vec<String>) -> RustName {
+    assert!(parts.len() > 0);
+    RustName { parts: parts }
+  }
+
+  pub fn crate_name(&self) -> Option<&String> {
+    assert!(self.parts.len() > 0);
+    if self.parts.len() > 1 {
+      Some(&self.parts[0])
+    } else {
+      None
+    }
+  }
   pub fn full_name(&self, current_crate: &String) -> String {
-    format!("{}{}{}",
-            if self.crate_name.is_empty() {
-              String::new()
-            } else {
-              if current_crate == &self.crate_name {
-                "::".to_string()
-              } else {
-                format!("{}::", self.crate_name)
-              }
-            },
-            if self.module_name.is_empty() {
-              String::new()
-            } else {
-              format!("{}::", self.module_name)
-            },
-            self.own_name)
+    if Some(current_crate) == self.crate_name() {
+      format!("::{}", self.parts[1..].join("::"))
+    } else {
+      self.parts.join("::")
+    }
   }
 }
 
@@ -77,6 +77,6 @@ pub struct RustFFIArgument {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RustFFIFunction {
   pub return_type: RustType,
-  pub name: RustName,
+  pub name: String,
   pub arguments: Vec<RustFFIArgument>,
 }

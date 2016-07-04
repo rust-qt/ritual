@@ -74,7 +74,7 @@ impl RustCodeGenerator {
                   self.rust_type_to_code(&arg.argument_type))
         });
     format!("  pub fn {}({}){};\n",
-            func.name.own_name,
+            func.name,
             args.join(", "),
             match func.return_type {
               RustType::Void => String::new(),
