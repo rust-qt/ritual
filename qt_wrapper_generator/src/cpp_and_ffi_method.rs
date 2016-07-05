@@ -16,7 +16,7 @@ pub struct CppAndFfiMethod {
   pub allocation_place: ReturnValueAllocationPlace,
   pub c_signature: CppFfiFunctionSignature,
   pub c_name: String,
-  pub c_method_name: String,
+  pub args_caption: Option<String>,
 }
 
 
@@ -78,13 +78,14 @@ impl CppMethodWithFfiSignature {
 }
 
 impl CppAndFfiMethod {
-  pub fn new(data: CppMethodWithFfiSignature, c_name: String, c_method_name: String) -> CppAndFfiMethod {
+  pub fn new(data: CppMethodWithFfiSignature, c_name: String, args_caption: Option<String>) -> CppAndFfiMethod {
+
     CppAndFfiMethod {
       cpp_method: data.cpp_method,
       allocation_place: data.allocation_place,
       c_signature: data.c_signature,
       c_name: c_name,
-      c_method_name: c_method_name,
+      args_caption: args_caption,
     }
   }
 

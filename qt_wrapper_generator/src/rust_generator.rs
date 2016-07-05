@@ -495,12 +495,102 @@ impl RustGenerator {
     return Some(module);
   }
 
-  fn method_rust_name(&self, method: &CppAndFfiMethod) -> RustName {
+  fn generate_function(&self,
+                       method: &CppAndFfiMethod,
+                       scope: &RustMethodScope,
+                       use_args_caption: bool)
+                       -> Option<RustMethod> {
+    if method.cpp_method.kind.is_destructor() || method.cpp_method.kind.is_operator() {
+      // TODO: implement Drop trait or other traits
+      return None;
+    }
+    let mut arguments = Vec::new();
+    let mut return_type_info = None;
+    for (arg_index, arg) in method.c_signature.arguments.iter().enumerate() {
+      match self.cpp_type_to_complete_type(&arg.argument_type, &arg.meaning) {
+        Ok(complete_type) => {
+          if arg.meaning == CppFfiArgumentMeaning::ReturnValue {
+            assert!(return_type_info.is_none());
+            return_type_info = Some((complete_type, Some(arg_index as i32)));
+          } else {
+            arguments.push(RustMethodArgument {
+              ffi_index: arg_index as i32,
+              argument_type: complete_type,
+              name: if arg.meaning == CppFfiArgumentMeaning::This {
+                "self".to_string()
+              } else {
+                sanitize_rust_var_name(&arg.name)
+              },
+            });
+          }
+        }
+        Err(msg) => {
+          log::warning(format!("Can't generate Rust method for method:\n{}\n{}\n",
+                               method.short_text(),
+                               msg));
+          return None;
+        }
+      }
+    }
+    if return_type_info.is_none() {
+      match self.cpp_type_to_complete_type(&method.c_signature.return_type,
+                                           &CppFfiArgumentMeaning::ReturnValue) {
+        Ok(mut r) => {
+          if method.allocation_place == ReturnValueAllocationPlace::Heap {
+            if let RustType::NonVoid { ref mut indirection, .. } = r.rust_api_type {
+              assert!(*indirection == RustTypeIndirection::None);
+              *indirection = RustTypeIndirection::Ptr;
+            } else {
+              panic!("unexpected void type");
+            }
+            assert!(r.cpp_type.indirection == CppTypeIndirection::None);
+            assert!(r.cpp_to_ffi_conversion.indirection_change ==
+                    IndirectionChange::ValueToPointer);
+            assert!(r.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr);
+            r.rust_api_to_c_conversion = RustToCTypeConversion::None;
+
+          }
+          return_type_info = Some((r, None));
+        }
+        Err(msg) => {
+          log::warning(format!("Can't generate Rust method for method:\n{}\n{}\n",
+                               method.short_text(),
+                               msg));
+          return None;
+        }
+      }
+    } else {
+      assert!(method.c_signature.return_type == CppFfiType::void());
+    }
+    let return_type_info1 = return_type_info.unwrap();
+
+    Some(RustMethod {
+      name: self.method_rust_name(method, use_args_caption),
+      scope: scope.clone(),
+      return_type: return_type_info1.0,
+      return_type_ffi_index: return_type_info1.1,
+      arguments: RustMethodArguments::SingleVariant(RustMethodArgumentsVariant {
+        arguments: arguments,
+        cpp_method: method.clone(),
+      }),
+    })
+  }
+
+  fn method_rust_name(&self, method: &CppAndFfiMethod, use_args_caption: bool) -> RustName {
     let mut name = if method.cpp_method.scope == CppMethodScope::Global {
       self.cpp_to_rust_type_map.get(&method.cpp_method.name).unwrap().clone()
     } else {
       RustName::new(vec![sanitize_rust_var_name(&method.cpp_method.name.to_snake_case())])
     };
+    if use_args_caption {
+      if let Some(ref args_caption) = method.args_caption {
+        let x = name.parts.pop().unwrap();
+        name.parts.push(format!("{}_args_{}", x, args_caption.to_snake_case()));
+      } else {
+        panic!("unexpected lack of args_caption: {:?}", method);
+
+      }
+    }
     match method.allocation_place {
       ReturnValueAllocationPlace::Heap => {
         let x = name.parts.pop().unwrap();
@@ -511,122 +601,48 @@ impl RustGenerator {
     name
   }
 
-  pub fn generate_functions(&self,
-                            methods: Vec<&CppAndFfiMethod>,
-                            scope: &RustMethodScope)
-                            -> Vec<RustMethod> {
-    let mut r = Vec::new();
+  fn generate_functions(&self,
+                        methods: Vec<&CppAndFfiMethod>,
+                        scope: &RustMethodScope)
+                        -> Vec<RustMethod> {
+    let mut rust_methods = Vec::new();
     let mut method_names = HashSet::new();
     for method in &methods {
-      let name = self.method_rust_name(method);
+      let name = self.method_rust_name(method, false);
       if !method_names.contains(name.last_name()) {
         method_names.insert(name.last_name().clone());
       }
     }
+    let mut name_counters = HashMap::new();
     for method_name in method_names {
       let current_methods: Vec<_> = methods.clone()
                                            .into_iter()
-                                           .filter(|m| self.method_rust_name(m).last_name() == &method_name)
+                                           .filter(|m| {
+                                             self.method_rust_name(m, false).last_name() == &method_name
+                                           })
                                            .collect();
-      if current_methods.len() == 1 {
-        let method = current_methods[0];
-        if method.cpp_method.kind.is_destructor() || method.cpp_method.kind.is_operator() {
-          // TODO: implement Drop trait or other traits
-          continue;
-        }
-        let mut arguments = Vec::new();
-        let mut return_type_info = None;
-        let mut fail = false;
-        for (arg_index, arg) in method.c_signature.arguments.iter().enumerate() {
-          match self.cpp_type_to_complete_type(&arg.argument_type, &arg.meaning) {
-            Ok(complete_type) => {
-              if arg.meaning == CppFfiArgumentMeaning::ReturnValue {
-                assert!(return_type_info.is_none());
-                return_type_info = Some((complete_type, Some(arg_index as i32)));
-              } else {
-                arguments.push(RustMethodArgument {
-                  ffi_index: arg_index as i32,
-                  argument_type: complete_type,
-                  name: if arg.meaning == CppFfiArgumentMeaning::This {
-                    "self".to_string()
-                  } else {
-                    sanitize_rust_var_name(&arg.name)
-                  },
-                });
-              }
-            }
-            Err(msg) => {
-              log::warning(format!("Can't generate Rust method for method:\n{}\n{}\n",
-                                   method.short_text(),
-                                   msg));
-              fail = true;
-              break;
-            }
+      let methods_count = current_methods.len();
+      for method in current_methods {
+        if let Some(mut rust_method) = self.generate_function(method, scope, methods_count > 1) {
+          if name_counters.contains_key(rust_method.name.last_name()) {
+            let x = name_counters.get_mut(rust_method.name.last_name()).unwrap();
+            *x += 1;
+            log::warning(format!("Name conflict is resolved in a numeric way for {}", rust_method.name.full_name(None)));
+            let mut last_name = rust_method.name.parts.pop().unwrap();
+            last_name = format!("{}{}", last_name, x);
+            rust_method.name.parts.push(last_name);
+          } else {
+            name_counters.insert(rust_method.name.last_name().clone(), 1);
           }
+          rust_methods.push(rust_method);
         }
-        if return_type_info.is_none() {
-          match self.cpp_type_to_complete_type(&method.c_signature.return_type,
-                                               &CppFfiArgumentMeaning::ReturnValue) {
-            Ok(mut r) => {
-              if method.allocation_place == ReturnValueAllocationPlace::Heap {
-                if let RustType::NonVoid { ref mut indirection, .. } = r.rust_api_type {
-                  assert!(*indirection == RustTypeIndirection::None);
-                  *indirection = RustTypeIndirection::Ptr;
-                } else {
-                  panic!("unexpected void type");
-                }
-                assert!(r.cpp_type.indirection == CppTypeIndirection::None);
-                assert!(r.cpp_to_ffi_conversion.indirection_change ==
-                        IndirectionChange::ValueToPointer);
-                assert!(r.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr);
-                r.rust_api_to_c_conversion = RustToCTypeConversion::None;
-
-              }
-              return_type_info = Some((r, None));
-            }
-            Err(msg) => {
-              log::warning(format!("Can't generate Rust method for method:\n{}\n{}\n",
-                                   method.short_text(),
-                                   msg));
-              fail = true;
-              break;
-            }
-          }
-        } else {
-          assert!(method.c_signature.return_type == CppFfiType::void());
-        }
-        if fail {
-          continue;
-        }
-        let return_type_info1 = return_type_info.unwrap();
-        let mut name = if method.cpp_method.scope == CppMethodScope::Global {
-          self.cpp_to_rust_type_map.get(&method.cpp_method.name).unwrap().clone()
-        } else {
-          RustName::new(vec![sanitize_rust_var_name(&method.cpp_method.name.to_snake_case())])
-        };
-        match method.allocation_place {
-          ReturnValueAllocationPlace::Heap => {
-            let x = name.parts.pop().unwrap();
-            name.parts.push(format!("{}_as_ptr", x));
-          }
-          ReturnValueAllocationPlace::Stack | ReturnValueAllocationPlace::NotApplicable => {}
-        }
-        r.push(RustMethod {
-          name: name,
-          scope: scope.clone(),
-          return_type: return_type_info1.0,
-          return_type_ffi_index: return_type_info1.1,
-          arguments: RustMethodArguments::SingleVariant(RustMethodArgumentsVariant {
-            arguments: arguments,
-            cpp_method: method.clone(),
-          }),
-        });
-      } else {
-        println!("TEST: {} methods for name: {}", current_methods.len(), method_name);
-        // TODO: generate overloaded functions
       }
+      //        println!("TEST: {} methods for name: {}",
+      //                 current_methods.len(),
+      //                 method_name);
+      // TODO: generate overloaded functions
     }
-    return r;
+    return rust_methods;
   }
 
   pub fn generate_ffi(&mut self) {

@@ -257,9 +257,12 @@ impl CGenerator {
               Ok(mut heap_name) => {
                 if let Some(result_stack) = result_stack {
                   let mut stack_name = result_stack.c_base_name(include_file_base_name).unwrap();
+//                  if result_heap.allocation_place == ReturnValueAllocationPlace::Heap {
+//                  }
                   if stack_name == heap_name {
-                    stack_name = format!("{}_SA", stack_name);
-                    heap_name = format!("{}_HA", heap_name);
+                    heap_name = format!("{}_as_ptr", heap_name);
+//                    stack_name = format!("{}_SA", stack_name);
+//                    heap_name = format!("{}_HA", heap_name);
                   }
                   insert_into_hash(&mut hash1, stack_name, result_stack);
                   insert_into_hash(&mut hash1, heap_name, result_heap);
@@ -275,7 +278,7 @@ impl CGenerator {
     let mut r = Vec::new();
     for (key, mut values) in hash1.into_iter() {
       if values.len() == 1 {
-        r.push(CppAndFfiMethod::new(values.remove(0), key.clone(), key.clone()));
+        r.push(CppAndFfiMethod::new(values.remove(0), key.clone(), None));
         continue;
       }
       let mut found_strategy = None;
@@ -302,7 +305,7 @@ impl CGenerator {
                                                 "_"
                                               },
                                               caption),
-                                      key.clone()));
+                                      Some(caption)));
         }
       } else {
         panic!("all type caption strategies have failed! Involved functions: \n{:?}",
