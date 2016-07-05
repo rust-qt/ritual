@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::fs::File;
 use std::io::{Write, Read};
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
-                RustMethod, RustMethodArguments};
+                RustMethod, RustMethodArguments, RustMethodArgumentsVariant};
 use std::collections::{HashMap, HashSet};
 use utils::JoinWithString;
 use log;
@@ -94,13 +94,69 @@ impl RustCodeGenerator {
             })
   }
 
+  fn generate_ffi_call(&self, func: &RustMethod, variant: &RustMethodArgumentsVariant) -> String {
+    let mut final_args = Vec::new();
+    final_args.resize(variant.cpp_method.c_signature.arguments.len(), None);
+    for arg in &variant.arguments {
+      assert!(arg.ffi_index >= 0 && arg.ffi_index < final_args.len() as i32);
+      let mut code = arg.name.clone();
+      match arg.argument_type.rust_api_to_c_conversion {
+        RustToCTypeConversion::None => {}
+        RustToCTypeConversion::RefToPtr => {
+          code = format!("{} as {}",
+                         code,
+                         self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
+
+        }
+        RustToCTypeConversion::ValueToPtr => {
+          let is_const = if let RustType::NonVoid { ref is_const, .. } = arg.argument_type
+                                                                            .rust_ffi_type {
+            *is_const
+          } else {
+            panic!("void is not expected here at all!")
+          };
+          code = format!("{}{} as {}",
+                         if is_const {
+                           "&"
+                         } else {
+                           "&mut "
+                         },
+                         code,
+                         self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
+        }
+        RustToCTypeConversion::QFlagsToUInt => {
+          code = format!("{}.to_int() as libc::c_uint", code);
+        }
+      }
+      final_args[arg.ffi_index as usize] = Some(code);
+    }
+
+    let mut result = Vec::new();
+    if let Some(ref i) = func.return_type_ffi_index {
+      result.push(format!("let mut object = {} {{ _buffer: unsafe {{ std::mem::uninitialized() }} }};\n"
+                        , self.rust_type_to_code(&func.return_type.rust_api_type)));
+      final_args[*i as usize] = Some("&mut object".to_string());
+    }
+    for arg in &final_args {
+      if arg.is_none() {
+        println!("func: {:?}", func);
+        panic!("ffi argument is missing");
+      }
+    }
+    result.push(format!("::ffi::{}({})",
+            variant.cpp_method.c_name,
+            final_args.into_iter().map(|x| x.unwrap()).join(", ")));
+    return result.join("");
+  }
+
   fn generate_rust_final_function(&self, func: &RustMethod) -> String {
     //    if func.name == "q_uncompress" {
     //      println!("TEST: {:?}", func);
     //    }
     match func.arguments {
       RustMethodArguments::SingleVariant(ref variant) => {
-        let body = "unimplemented!()\n".to_string();
+        let body = format!("{};\nunimplemented!()\n",
+                           self.generate_ffi_call(func, variant));
 
         let args = variant.arguments
                           .iter()
@@ -155,7 +211,7 @@ impl RustCodeGenerator {
 
   fn generate_module_code(&self, data: &RustModule) -> String {
     let mut results = Vec::new();
-    results.push("extern crate libc;\n\n".to_string());
+    results.push("extern crate libc;\nuse std;\n\n".to_string());
 
     for type1 in &data.types {
       let r = match type1.kind {
