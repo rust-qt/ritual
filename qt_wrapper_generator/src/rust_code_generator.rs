@@ -37,8 +37,18 @@ impl RustCodeGenerator {
   fn rust_type_to_code(&self, rust_type: &RustType) -> String {
     match rust_type {
       &RustType::Void => panic!("rust void can't be converted to code"),
-      &RustType::NonVoid { ref base, ref is_const, ref indirection, ref is_option, .. } => {
-        let base_s = base.full_name(&self.crate_name);
+      &RustType::NonVoid { ref base,
+                           ref is_const,
+                           ref indirection,
+                           ref is_option,
+                           ref generic_arguments,
+                           .. } => {
+        let mut base_s = base.full_name(Some(&self.crate_name));
+        if let &Some(ref args) = generic_arguments {
+          base_s = format!("{}<{}>",
+                           base_s,
+                           args.iter().map(|x| self.rust_type_to_code(x)).join(", "));
+        }
         let s = match indirection {
           &RustTypeIndirection::None => base_s,
           &RustTypeIndirection::Ref => {
@@ -67,12 +77,12 @@ impl RustCodeGenerator {
 
   fn rust_ffi_function_to_code(&self, func: &RustFFIFunction) -> String {
     let args = func.arguments
-        .iter()
-        .map(|arg| {
-          format!("{}: {}",
-                  arg.name,
-                  self.rust_type_to_code(&arg.argument_type))
-        });
+                   .iter()
+                   .map(|arg| {
+                     format!("{}: {}",
+                             arg.name,
+                             self.rust_type_to_code(&arg.argument_type))
+                   });
     format!("  pub fn {}({}){};\n",
             func.name,
             args.join(", "),
@@ -85,22 +95,22 @@ impl RustCodeGenerator {
   }
 
   fn generate_rust_final_function(&self, func: &RustMethod) -> String {
-//    if func.name == "q_uncompress" {
-//      println!("TEST: {:?}", func);
-//    }
+    //    if func.name == "q_uncompress" {
+    //      println!("TEST: {:?}", func);
+    //    }
     match func.arguments {
       RustMethodArguments::SingleVariant(ref variant) => {
         let body = "unimplemented!()\n".to_string();
 
         let args = variant.arguments
-            .iter()
-            .map(|arg| {
-              format!("{}: {}",
-                      arg.name,
-                      self.rust_type_to_code(&arg.argument_type.rust_api_type))
-            });
+                          .iter()
+                          .map(|arg| {
+                            format!("{}: {}",
+                                    arg.name,
+                                    self.rust_type_to_code(&arg.argument_type.rust_api_type))
+                          });
         format!("pub fn {}({}){} {{\n{}}}\n\n",
-                func.name,
+                func.name.last_name(),
                 args.join(", "),
                 match func.return_type.rust_api_type {
                   RustType::Void => String::new(),
@@ -145,20 +155,22 @@ impl RustCodeGenerator {
 
   fn generate_module_code(&self, data: &RustModule) -> String {
     let mut results = Vec::new();
+    results.push("extern crate libc;\n\n".to_string());
+
     for type1 in &data.types {
       let r = match type1.kind {
         RustTypeDeclarationKind::CppTypeWrapper { ref kind, .. } => {
           match *kind {
             RustTypeWrapperKind::Enum { ref values } => {
               format!("#[repr(C)]\npub enum {} {{\n{}\n}}\n\n",
-                      type1.name,
+                      type1.name.last_name(),
                       values.iter()
-                          .map(|item| format!("  {} = {}", item.name, item.value))
-                          .join(", \n"))
+                            .map(|item| format!("  {} = {}", item.name, item.value))
+                            .join(", \n"))
             }
             RustTypeWrapperKind::Struct { ref size } => {
               format!("#[repr(C)]\npub struct {} {{\n  _buffer: [u8; {}],\n}}\n\n",
-                      type1.name,
+                      type1.name.last_name(),
                       size)
             }
           }
@@ -168,13 +180,11 @@ impl RustCodeGenerator {
       results.push(r);
       if !type1.methods.is_empty() {
         results.push(format!("impl {} {{\n{}}}\n\n",
-                             type1.name,
+                             type1.name.last_name(),
                              type1.methods
-                                 .iter()
-                                 .map(|method| {
-                                   self.generate_rust_final_function(method)
-                                 })
-                                 .join("")));
+                                  .iter()
+                                  .map(|method| self.generate_rust_final_function(method))
+                                  .join("")));
       }
     }
     for method in &data.functions {
@@ -182,36 +192,34 @@ impl RustCodeGenerator {
     }
 
     for submodule in &data.submodules {
-      results.push(format!("mod {} {{\n{}}}\n\n",
-                           submodule.name,
+      results.push(format!("pub mod {} {{\n{}}}\n\n",
+                           submodule.name.last_name(),
                            self.generate_module_code(submodule)));
     }
     return results.join("");
   }
 
   fn call_rustfmt(&self, path: &PathBuf) {
-//    let rustfmt_result = rustfmt::run(rustfmt::Input::File(path.clone()), &self.rustfmt_config);
-//    if !rustfmt_result.has_no_errors() {
-//      log::warning(format!("rustfmt failed to format file: {:?}", path));
-//    }
+    let rustfmt_result = rustfmt::run(rustfmt::Input::File(path.clone()), &self.rustfmt_config);
+    if !rustfmt_result.has_no_errors() {
+      log::warning(format!("rustfmt failed to format file: {:?}", path));
+    }
   }
 
   pub fn generate_module_file(&self, data: &RustModule) {
     let mut file_path = self.output_path.clone();
     file_path.push(&self.crate_name);
     file_path.push("src");
-    file_path.push(format!("{}.rs", &data.name));
+    file_path.push(format!("{}.rs", &data.name.last_name()));
     {
       let mut file = File::create(&file_path).unwrap();
-      write!(file, "extern crate libc;\n\n").unwrap();
       file.write(self.generate_module_code(data).as_bytes()).unwrap();
     }
     self.call_rustfmt(&file_path);
 
   }
 
-  pub fn generate_ffi_file(&self,
-                           functions: &HashMap<String, Vec<RustFFIFunction>>) {
+  pub fn generate_ffi_file(&self, functions: &HashMap<String, Vec<RustFFIFunction>>) {
     let mut file_path = self.output_path.clone();
     file_path.push(&self.crate_name);
     file_path.push("src");
@@ -236,6 +244,6 @@ impl RustCodeGenerator {
       }
       write!(file, "}}\n").unwrap();
     }
-    //self.call_rustfmt(&file_path);
+    // self.call_rustfmt(&file_path);
   }
 }

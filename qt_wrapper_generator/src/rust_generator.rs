@@ -63,7 +63,6 @@ pub struct RustGenerator {
   modules: Vec<RustModule>,
   crate_name: String,
   cpp_to_rust_type_map: HashMap<String, RustName>,
-  processed_cpp_types: HashSet<String>,
   code_generator: RustCodeGenerator,
 }
 
@@ -76,20 +75,26 @@ impl RustGenerator {
       modules: Vec::new(),
       crate_name: crate_name.clone(),
       cpp_to_rust_type_map: HashMap::new(),
-      processed_cpp_types: HashSet::new(),
       code_generator: RustCodeGenerator::new(crate_name, output_path),
     }
   }
 
-  fn cpp_type_to_complete_type(&self, cpp_ffi_type: &CppFfiType) -> Result<CompleteType, String> {
+  fn cpp_type_to_complete_type(&self,
+                               cpp_ffi_type: &CppFfiType,
+                               argument_meaning: &CppFfiArgumentMeaning)
+                               -> Result<CompleteType, String> {
     let rust_ffi_type = try!(self.cpp_type_to_rust_ffi_type(cpp_ffi_type));
-
-    // TODO: convert pointers back to references or values
     let mut rust_api_type = rust_ffi_type.clone();
     let mut rust_api_to_c_conversion = RustToCTypeConversion::None;
     if let RustType::NonVoid { ref mut indirection, .. } = rust_api_type {
       match cpp_ffi_type.conversion.indirection_change {
-        IndirectionChange::NoChange => {}
+        IndirectionChange::NoChange => {
+          if argument_meaning == &CppFfiArgumentMeaning::This {
+            assert!(indirection == &RustTypeIndirection::Ptr);
+            *indirection = RustTypeIndirection::Ref;
+            rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
+          }
+        }
         IndirectionChange::ValueToPointer => {
           assert!(indirection == &RustTypeIndirection::Ptr);
           *indirection = RustTypeIndirection::None;
@@ -121,9 +126,7 @@ impl RustGenerator {
         panic!("invalid original type for QFlags");
       };
       rust_api_type = RustType::NonVoid {
-        base: RustName::new(vec!["qt_core".to_string(),
-                                 "q_flags".to_string(),
-                                 "QFlags".to_string()]),
+        base: RustName::new(vec!["qt_core".to_string(), "flags".to_string(), "QFlags".to_string()]),
         generic_arguments: Some(vec![RustType::NonVoid {
                                        base: enum_type,
                                        generic_arguments: None,
@@ -244,14 +247,16 @@ impl RustGenerator {
                                 -> Result<RustFFIFunction, String> {
     let mut args = Vec::new();
     for arg in &data.c_signature.arguments {
-      let rust_type = try!(self.cpp_type_to_complete_type(&arg.argument_type)).rust_ffi_type;
+      let rust_type = try!(self.cpp_type_to_complete_type(&arg.argument_type, &arg.meaning))
+                        .rust_ffi_type;
       args.push(RustFFIArgument {
         name: sanitize_rust_var_name(&arg.name),
         argument_type: rust_type,
       });
     }
     Ok(RustFFIFunction {
-      return_type: try!(self.cpp_type_to_complete_type(&data.c_signature.return_type))
+      return_type: try!(self.cpp_type_to_complete_type(&data.c_signature.return_type,
+                                                       &CppFfiArgumentMeaning::ReturnValue))
                      .rust_ffi_type,
       name: data.c_name.clone(),
       arguments: args,
@@ -292,6 +297,15 @@ impl RustGenerator {
       map.insert(name.clone(), RustName::new(parts));
     }
     for type_info in &self.input_data.cpp_data.types {
+      if let CppTypeKind::Class { size, .. } = type_info.kind {
+        if size.is_none() {
+          log::warning(format!("Rust type is not generated for a struct with unknown \
+                                        size: {}",
+                               type_info.name));
+          continue;
+        }
+      }
+
       add_one_to_type_map(&self.crate_name,
                           &mut self.cpp_to_rust_type_map,
                           &type_info.name,
@@ -313,13 +327,9 @@ impl RustGenerator {
 
   fn process_type(&self,
                   type_info: &CppTypeData,
-                  methods: &Vec<CppAndFfiMethod>,
-                  cpp_namespace_prefix: &String)
+                  c_header: &CppFfiHeaderData)
                   -> Option<RustTypeDeclaration> {
-    // let rust_type_name = self.cpp_to_rust_type_map.get(&type_info.name).unwrap();
-    let rust_name = sanitize_rust_var_name(&type_info.name[cpp_namespace_prefix.len()..]
-                                              .to_string()
-                                              .to_class_case1());
+    let rust_name = self.cpp_to_rust_type_map.get(&type_info.name).unwrap();
     match type_info.kind {
       CppTypeKind::Enum { ref values } => {
         let mut value_to_variant: HashMap<i64, EnumValue> = HashMap::new();
@@ -369,22 +379,22 @@ impl RustGenerator {
       CppTypeKind::Class { ref size, .. } => {
         let methods_scope = RustMethodScope::Impl { type_name: rust_name.clone() };
         return Some(RustTypeDeclaration {
-          name: rust_name,
+          name: rust_name.clone(),
           kind: RustTypeDeclarationKind::CppTypeWrapper {
             kind: RustTypeWrapperKind::Struct { size: size.unwrap() },
             cpp_type_name: type_info.name.clone(),
             cpp_template_arguments: None,
           },
-          methods: self.generate_functions(methods.iter()
-                                                  .filter(|&x| {
-                                                    x.cpp_method
-                                                     .scope
-                                                     .class_name() ==
-                                                    Some(&type_info.name)
-                                                  })
-                                                  .collect(),
-                                           &methods_scope,
-                                           &String::new()),
+          methods: self.generate_functions(c_header.methods
+                                                   .iter()
+                                                   .filter(|&x| {
+                                                     x.cpp_method
+                                                      .scope
+                                                      .class_name() ==
+                                                     Some(&type_info.name)
+                                                   })
+                                                   .collect(),
+                                           &methods_scope),
           traits: Vec::new(),
         });
       }
@@ -400,7 +410,10 @@ impl RustGenerator {
     }
     self.generate_ffi();
     self.code_generator.generate_lib_file(&self.output_path,
-                                          &self.modules.iter().map(|x| x.name.clone()).collect());
+                                          &self.modules
+                                               .iter()
+                                               .map(|x| x.name.last_name().clone())
+                                               .collect());
   }
 
   pub fn generate_modules_from_header(&mut self, c_header: &CppFfiHeaderData) {
@@ -409,181 +422,111 @@ impl RustGenerator {
       log::info(format!("Skipping module {}::{}", self.crate_name, module_name));
       return;
     }
-    let mut types = Vec::new();
-    for type_info in &self.input_data
-                          .cpp_data_by_headers
-                          .get(&c_header.include_file)
-                          .unwrap()
-                          .types {
-      if let Some(rust_type_name) = self.cpp_to_rust_type_map.get(&type_info.name) {
-        // if module_name == rust_type_name.module_name {
-        types.push(type_info.clone());
-        //        } else {
-        //          panic!("unexpected module name mismatch: {}, {:?}",
-        //                 module_name,
-        //                 rust_type_name);
-        //        }
-      } else {
-        // type is skipped: no rust name
-      }
-    }
-    if let Some(module) = self.generate_module(&types,
-                                               &c_header.methods,
-                                               &module_name,
-                                               &module_name,
-                                               &String::new()) {
+    let module_name1 = RustName::new(vec![self.crate_name.clone(), module_name]);
+    if let Some(module) = self.generate_module(c_header, &module_name1) {
       self.code_generator.generate_module_file(&module);
       self.modules.push(module);
     }
   }
 
   pub fn generate_module(&mut self,
-                         types: &Vec<CppTypeData>,
-                         methods: &Vec<CppAndFfiMethod>,
-                         module_name: &String,
-                         full_modules_name: &String,
-                         cpp_namespace_prefix: &String)
+                         c_header: &CppFfiHeaderData,
+                         module_name: &RustName)
                          -> Option<RustModule> {
-    log::info(format!("Generating Rust module {}::{}",
-                      self.crate_name,
-                      full_modules_name));
+    log::info(format!("Generating Rust module {}", module_name.full_name(None)));
 
-    let enable_debug = full_modules_name.starts_with("q_meta_type");
-    if enable_debug {
-      println!("generate_module {}", full_modules_name);
-    }
+    let enable_debug = false; //module_name.full_name(None).starts_with("q_meta_type");
 
-    struct SubModuleData {
-      rust_name: String,
-      types: Vec<CppTypeData>,
-      methods: Vec<CppAndFfiMethod>,
-    }
-
-    let mut cpp_namespace_to_sub_module = HashMap::new();
-    let mut good_types = Vec::new();
+    let mut direct_submodules = HashSet::new();
+    let mut rust_types = Vec::new();
     let mut good_methods = Vec::new();
     {
-      let mut check_namespace_name = |x: &String,
-                                      t: Option<&CppTypeData>,
-                                      m: Option<&CppAndFfiMethod>| {
-        if enable_debug {
-          println!("TEST: check_namespace_name: {}", x);
+      let mut check_name = |name| {
+        if let Some(rust_name) = self.cpp_to_rust_type_map.get(name) {
+          let extra_modules_count = rust_name.parts.len() - module_name.parts.len();
+          if extra_modules_count > 0 {
+            if rust_name.parts[0..module_name.parts.len()] != module_name.parts[..] {
+              return false; // not in this module
+            }
+          }
+          if extra_modules_count == 2 {
+            let direct_submodule = &rust_name.parts[module_name.parts.len()];
+            if !direct_submodules.contains(direct_submodule) {
+              direct_submodules.insert(direct_submodule.clone());
+            }
+          }
+          if extra_modules_count == 1 {
+            return true;
+          }
+          // this type is in nested submodule
         }
-        let cpp_name = x[cpp_namespace_prefix.len()..].to_string();
-        if let Some(index) = cpp_name.find("::") {
-          let new_namespace = cpp_name[0..index].to_string();
-          if !cpp_namespace_to_sub_module.contains_key(&new_namespace) {
-            let rust_name = new_namespace.to_snake_case();
-            //            if &rust_name == module_name {
-            //              // special case
-            //              if enable_debug {
-            //                println!("goes to global (special case)");
-            //              }
-            //              return true;
-            //            }
-            cpp_namespace_to_sub_module.insert(new_namespace.clone(),
-                                               SubModuleData {
-                                                 rust_name: rust_name,
-                                                 types: Vec::new(),
-                                                 methods: Vec::new(),
-                                               });
-          }
-          if let Some(t) = t {
-            cpp_namespace_to_sub_module.get_mut(&new_namespace).unwrap().types.push(t.clone());
-          }
-          if let Some(m) = m {
-            cpp_namespace_to_sub_module.get_mut(&new_namespace).unwrap().methods.push(m.clone());
-          }
-          if enable_debug {
-            println!("goes to {}", new_namespace);
-          }
-          return false;
-        }
-        if enable_debug {
-          println!("goes to global");
-        }
-        return true;
+        false
       };
-      for type_data in types {
-        if check_namespace_name(&type_data.name, Some(type_data), None) {
-          good_types.push(type_data.clone());
+      for type_data in &self.input_data.cpp_data.types {
+        if check_name(&type_data.name) {
+          if let Some(result) = self.process_type(type_data, c_header) {
+            rust_types.push(result);
+          }
         }
       }
-      for method in methods {
+      for method in &c_header.methods {
         if method.cpp_method.scope == CppMethodScope::Global {
-          if check_namespace_name(&method.cpp_method.name, None, Some(method)) {
-            good_methods.push(method.clone());
+          if check_name(&method.cpp_method.name) {
+            good_methods.push(method);
           }
         }
       }
     }
     let mut submodules = Vec::new();
-    let mut rust_types = Vec::new();
-    let mut functions = Vec::new();
-    for (cpp_namespace, submodule) in cpp_namespace_to_sub_module {
-      let cpp_prefix = format!("{}{}::", cpp_namespace_prefix, cpp_namespace);
-      if let Some(mut module) = self.generate_module(&submodule.types,
-                                                     &submodule.methods,
-                                                     &submodule.rust_name,
-                                                     &format!("{}::{}",
-                                                              full_modules_name,
-                                                              submodule.rust_name),
-                                                     &cpp_prefix) {
-        if &module.name == module_name {
-          // special case
-          functions.append(&mut module.functions);
-          rust_types.append(&mut module.types);
-          submodules.append(&mut module.submodules);
-        } else {
-          submodules.push(module);
-        }
+    for name in direct_submodules {
+      let mut new_name = module_name.clone();
+      new_name.parts.push(name);
+      if let Some(m) = self.generate_module(c_header, &new_name) {
+        submodules.push(m);
       }
     }
 
-
-    for type_data in &good_types {
-      if let Some(result) = self.process_type(type_data, &good_methods, cpp_namespace_prefix) {
-        rust_types.push(result);
-        // TODO: save RustTypeDeclaration vector instead of processed_cpp_types
-        self.processed_cpp_types.insert(type_data.name.clone());
-      }
-    }
-    functions.append(&mut self.generate_functions(good_methods.iter()
-                                                              .filter(|&x| {
-                                                                x.cpp_method
-                                                                 .scope ==
-                                                                CppMethodScope::Global
-                                                              })
-                                                              .collect(),
-                                                  &RustMethodScope::Free,
-                                                  cpp_namespace_prefix));
     let module = RustModule {
       name: module_name.clone(),
-      full_modules_name: full_modules_name.clone(),
       types: rust_types,
-      functions: functions,
+      functions: self.generate_functions(good_methods, &RustMethodScope::Free),
       submodules: submodules,
     };
     return Some(module);
   }
 
+  fn method_rust_name(&self, method: &CppAndFfiMethod) -> RustName {
+    let mut name = if method.cpp_method.scope == CppMethodScope::Global {
+      self.cpp_to_rust_type_map.get(&method.cpp_method.name).unwrap().clone()
+    } else {
+      RustName::new(vec![sanitize_rust_var_name(&method.cpp_method.name.to_snake_case())])
+    };
+    match method.allocation_place {
+      ReturnValueAllocationPlace::Heap => {
+        let x = name.parts.pop().unwrap();
+        name.parts.push(format!("{}_as_ptr", x));
+      }
+      ReturnValueAllocationPlace::Stack | ReturnValueAllocationPlace::NotApplicable => {}
+    }
+    name
+  }
+
   pub fn generate_functions(&self,
                             methods: Vec<&CppAndFfiMethod>,
-                            scope: &RustMethodScope,
-                            cpp_namespace_prefix: &String)
+                            scope: &RustMethodScope)
                             -> Vec<RustMethod> {
     let mut r = Vec::new();
     let mut method_names = HashSet::new();
     for method in &methods {
-      // TODO: use cpp name instead?
-      if !method_names.contains(&method.c_method_name) {
-        method_names.insert(method.c_method_name.clone());
+      let name = self.method_rust_name(method);
+      if !method_names.contains(name.last_name()) {
+        method_names.insert(name.last_name().clone());
       }
     }
     for method_name in method_names {
       let current_methods: Vec<_> = methods.clone()
                                            .into_iter()
-                                           .filter(|m| &m.c_method_name == &method_name)
+                                           .filter(|m| self.method_rust_name(m).last_name() == &method_name)
                                            .collect();
       if current_methods.len() == 1 {
         let method = current_methods[0];
@@ -595,7 +538,7 @@ impl RustGenerator {
         let mut return_type_info = None;
         let mut fail = false;
         for (arg_index, arg) in method.c_signature.arguments.iter().enumerate() {
-          match self.cpp_type_to_complete_type(&arg.argument_type) {
+          match self.cpp_type_to_complete_type(&arg.argument_type, &arg.meaning) {
             Ok(complete_type) => {
               if arg.meaning == CppFfiArgumentMeaning::ReturnValue {
                 assert!(return_type_info.is_none());
@@ -622,7 +565,8 @@ impl RustGenerator {
           }
         }
         if return_type_info.is_none() {
-          match self.cpp_type_to_complete_type(&method.c_signature.return_type) {
+          match self.cpp_type_to_complete_type(&method.c_signature.return_type,
+                                               &CppFfiArgumentMeaning::ReturnValue) {
             Ok(mut r) => {
               if method.allocation_place == ReturnValueAllocationPlace::Heap {
                 if let RustType::NonVoid { ref mut indirection, .. } = r.rust_api_type {
@@ -655,15 +599,20 @@ impl RustGenerator {
           continue;
         }
         let return_type_info1 = return_type_info.unwrap();
-        let mut name = method.cpp_method.name[cpp_namespace_prefix.len()..]
-                         .to_string()
-                         .to_snake_case();
+        let mut name = if method.cpp_method.scope == CppMethodScope::Global {
+          self.cpp_to_rust_type_map.get(&method.cpp_method.name).unwrap().clone()
+        } else {
+          RustName::new(vec![sanitize_rust_var_name(&method.cpp_method.name.to_snake_case())])
+        };
         match method.allocation_place {
-          ReturnValueAllocationPlace::Heap => name = format!("{}_as_ptr", name),
+          ReturnValueAllocationPlace::Heap => {
+            let x = name.parts.pop().unwrap();
+            name.parts.push(format!("{}_as_ptr", x));
+          }
           ReturnValueAllocationPlace::Stack | ReturnValueAllocationPlace::NotApplicable => {}
         }
         r.push(RustMethod {
-          name: sanitize_rust_var_name(&name),
+          name: name,
           scope: scope.clone(),
           return_type: return_type_info1.0,
           return_type_ffi_index: return_type_info1.1,
@@ -673,6 +622,7 @@ impl RustGenerator {
           }),
         });
       } else {
+        println!("TEST: {} methods for name: {}", current_methods.len(), method_name);
         // TODO: generate overloaded functions
       }
     }

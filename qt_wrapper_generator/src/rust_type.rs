@@ -1,4 +1,4 @@
-use cpp_type::{CppType};
+use cpp_type::CppType;
 use cpp_ffi_type::CppToFfiTypeConversion;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -28,8 +28,12 @@ impl RustName {
       None
     }
   }
-  pub fn full_name(&self, current_crate: &String) -> String {
-    if Some(current_crate) == self.crate_name() {
+  pub fn last_name(&self) -> &String {
+    self.parts.last().unwrap()
+  }
+  pub fn full_name(&self, current_crate: Option<&String>) -> String {
+    if current_crate.is_some() && self.crate_name().is_some() &&
+       current_crate.unwrap() == self.crate_name().unwrap() {
       format!("::{}", self.parts[1..].join("::"))
     } else {
       self.parts.join("::")
