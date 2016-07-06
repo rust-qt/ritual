@@ -64,6 +64,12 @@ impl RustCodeGenerator {
             } else {
               format!("*mut {}", base_s)
             }
+          }&RustTypeIndirection::PtrPtr => {
+            if *is_const {
+              format!("*const *const {}", base_s)
+            } else {
+              format!("*mut *mut {}", base_s)
+            }
           }
         };
         if *is_option {
@@ -132,6 +138,7 @@ impl RustCodeGenerator {
     }
 
     let mut result = Vec::new();
+    let mut maybe_result_var_name = None;
     if let Some(ref i) = func.return_type_ffi_index {
       let mut return_var_name = "object".to_string();
       let mut ii = 1;
@@ -139,10 +146,11 @@ impl RustCodeGenerator {
         ii += 1;
         return_var_name = format!("object{}", ii);
       }
-      result.push(format!("let mut {} = unsafe {{ {}::new_uninitialized() }};\n",
+      result.push(format!("{{\nlet mut {} = unsafe {{ {}::new_uninitialized() }};\n",
                           return_var_name,
                           self.rust_type_to_code(&func.return_type.rust_api_type)));
       final_args[*i as usize] = Some(format!("&mut {}", return_var_name));
+      maybe_result_var_name = Some(return_var_name);
     }
     for arg in &final_args {
       if arg.is_none() {
@@ -153,7 +161,45 @@ impl RustCodeGenerator {
     result.push(format!("unsafe {{ ::ffi::{}({}) }}",
                         variant.cpp_method.c_name,
                         final_args.into_iter().map(|x| x.unwrap()).join(", ")));
-    return result.join("");
+    if let Some(ref name) = maybe_result_var_name {
+      result.push(format!("{}\n}}", name));
+    }
+    let mut code = result.join("");
+    match func.return_type.rust_api_to_c_conversion {
+      RustToCTypeConversion::None => {}
+      RustToCTypeConversion::RefToPtr => {
+        let is_const = if let RustType::NonVoid { ref is_const, .. } = func.return_type
+                                                                           .rust_ffi_type {
+          *is_const
+        } else {
+          panic!("void is not expected here at all!")
+        };
+        code = format!("let ffi_result = {};\nunsafe {{ {}*ffi_result }}",
+                       code,
+                       if is_const {
+                         "& "
+                       } else {
+                         "&mut "
+                       });
+      }
+      RustToCTypeConversion::ValueToPtr => {
+        if maybe_result_var_name.is_none() {
+          code = format!("let ffi_result = {};\nunsafe {{ *ffi_result }}", code);
+        }
+      }
+      RustToCTypeConversion::QFlagsToUInt => {
+        let mut qflags_type = func.return_type.rust_api_type.clone();
+        if let RustType::NonVoid { ref mut generic_arguments, .. } = qflags_type {
+          *generic_arguments = None;
+        } else {
+          unreachable!();
+        }
+        code = format!("let ffi_result = {};\n{}::from_int(ffi_result as i32)",
+                       code,
+                       self.rust_type_to_code(&qflags_type));
+      }
+    }
+    return code;
   }
 
   fn generate_rust_final_function(&self, func: &RustMethod) -> String {
@@ -162,8 +208,7 @@ impl RustCodeGenerator {
     //    }
     match func.arguments {
       RustMethodArguments::SingleVariant(ref variant) => {
-        let body = format!("{};\nunimplemented!()\n",
-                           self.generate_ffi_call(func, variant));
+        let body = self.generate_ffi_call(func, variant);
 
         let args = variant.arguments
                           .iter()
@@ -197,7 +242,7 @@ impl RustCodeGenerator {
     lib_file_path.push("lib.rs");
     {
       let mut lib_file = File::create(&lib_file_path).unwrap();
-      let built_in_modules = vec!["types", "flags", "extra", "ffi"];
+      let built_in_modules = vec!["types", "flags", "ffi"];
       for module in built_in_modules {
         if modules.iter().find(|x| x.as_ref() as &str == module).is_some() {
           panic!("module name conflict");
@@ -249,7 +294,7 @@ impl RustCodeGenerator {
               format!("#[repr(C)]\npub struct {name} {{\n  _buffer: [u8; {size}],\n}}\n\n
                        impl {name} {{ pub unsafe fn new_uninitialized() -> {name} {{
                          {name} {{ _buffer: std::mem::uninitialized() }}
-                      }} }}",
+                      }} }}\n\n",
                       name = type1.name.last_name(),
                       size = size)
             }
@@ -280,10 +325,10 @@ impl RustCodeGenerator {
   }
 
   fn call_rustfmt(&self, path: &PathBuf) {
-//    let rustfmt_result = rustfmt::run(rustfmt::Input::File(path.clone()), &self.rustfmt_config);
-//    if !rustfmt_result.has_no_errors() {
-//      log::warning(format!("rustfmt failed to format file: {:?}", path));
-//    }
+    let rustfmt_result = rustfmt::run(rustfmt::Input::File(path.clone()), &self.rustfmt_config);
+    if !rustfmt_result.has_no_errors() {
+      log::warning(format!("rustfmt failed to format file: {:?}", path));
+    }
   }
 
   pub fn generate_module_file(&self, data: &RustModule) {

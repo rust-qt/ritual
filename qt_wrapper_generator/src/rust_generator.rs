@@ -22,6 +22,11 @@ fn include_file_to_module_name(include_file: &String) -> String {
   if r.ends_with(".h") {
     r = r[0..r.len() - 2].to_string();
   }
+  if r == "Qt" {
+    r = "global".to_string();
+  } else if r.starts_with("Q") {
+    r = r[1..].to_string();
+  }
   r.to_snake_case()
 }
 
@@ -234,6 +239,7 @@ impl RustGenerator {
       indirection: match cpp_ffi_type.ffi_type.indirection {
         CppTypeIndirection::None => RustTypeIndirection::None,
         CppTypeIndirection::Ptr => RustTypeIndirection::Ptr,
+        CppTypeIndirection::PtrPtr => RustTypeIndirection::PtrPtr,
         _ => return Err(format!("unsupported level of indirection: {:?}", cpp_ffi_type)),
       },
       is_option: false,
@@ -294,6 +300,15 @@ impl RustGenerator {
         parts.remove(2);
       }
       parts.push(last_part_final);
+
+      //TODO: this is Qt-specific
+      for part in &mut parts {
+        if part.starts_with("q_") {
+          *part = part[2..].to_string();
+        } else if part.starts_with("Q") {
+          *part = part[1..].to_string();
+        }
+      }
 
       map.insert(name.clone(), RustName::new(parts));
     }
@@ -598,7 +613,12 @@ impl RustGenerator {
     let mut name = if method.cpp_method.scope == CppMethodScope::Global {
       self.cpp_to_rust_type_map.get(&method.cpp_method.name).unwrap().clone()
     } else {
-      RustName::new(vec![method.cpp_method.name.to_snake_case()])
+      let x = if method.cpp_method.kind.is_constructor() {
+        "new".to_string()
+      } else {
+        method.cpp_method.name.to_snake_case()
+      };
+      RustName::new(vec![x])
     };
     if use_args_caption {
       if let Some(ref args_caption) = method.args_caption {
