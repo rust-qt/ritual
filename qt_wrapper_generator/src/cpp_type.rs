@@ -259,7 +259,7 @@ impl CppType {
                }))
   }
 
-  pub fn to_cpp_ffi_type(&self) -> Result<CppFfiType, String> {
+  pub fn to_cpp_ffi_type(&self, is_return_type: bool) -> Result<CppFfiType, String> {
     match self.base {
       CppTypeBase::TemplateParameter { .. } => {
         return Err(format!("Unsupported type"));
@@ -296,7 +296,7 @@ impl CppType {
           conversion.indirection_change = IndirectionChange::ValueToPointer;
 
           // "const Rect" return type should not be translated to const pointer
-          result.is_const = false;
+          result.is_const = !is_return_type;
         }
       }
     }

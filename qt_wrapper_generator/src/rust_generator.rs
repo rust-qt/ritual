@@ -537,7 +537,7 @@ impl RustGenerator {
               name: if arg.meaning == CppFfiArgumentMeaning::This {
                 "self".to_string()
               } else {
-                sanitize_rust_var_name(&arg.name)
+                sanitize_rust_var_name(&arg.name.to_snake_case())
               },
             });
           }
@@ -598,12 +598,14 @@ impl RustGenerator {
     let mut name = if method.cpp_method.scope == CppMethodScope::Global {
       self.cpp_to_rust_type_map.get(&method.cpp_method.name).unwrap().clone()
     } else {
-      RustName::new(vec![sanitize_rust_var_name(&method.cpp_method.name.to_snake_case())])
+      RustName::new(vec![method.cpp_method.name.to_snake_case()])
     };
     if use_args_caption {
       if let Some(ref args_caption) = method.args_caption {
-        let x = name.parts.pop().unwrap();
-        name.parts.push(format!("{}_args_{}", x, args_caption.to_snake_case()));
+        if !args_caption.is_empty() {
+          let x = name.parts.pop().unwrap();
+          name.parts.push(format!("{}_args_{}", x, args_caption.to_snake_case()));
+        }
       } else {
         panic!("unexpected lack of args_caption: {:?}", method);
 
@@ -615,6 +617,11 @@ impl RustGenerator {
         name.parts.push(format!("{}_as_ptr", x));
       }
       ReturnValueAllocationPlace::Stack | ReturnValueAllocationPlace::NotApplicable => {}
+    }
+    let sanitized = sanitize_rust_var_name(name.last_name());
+    if &sanitized != name.last_name() {
+      name.parts.pop().unwrap();
+      name.parts.push(sanitized);
     }
     name
   }

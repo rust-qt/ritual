@@ -218,7 +218,7 @@ impl RustCodeGenerator {
 
   fn generate_module_code(&self, data: &RustModule) -> String {
     let mut results = Vec::new();
-    results.push("extern crate libc;\nuse std;\n\n".to_string());
+    results.push("extern crate libc;\n#[allow(unused_imports)]\nuse std;\n\n".to_string());
 
     for type1 in &data.types {
       let r = match type1.kind {

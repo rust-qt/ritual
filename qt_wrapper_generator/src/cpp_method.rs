@@ -156,14 +156,14 @@ impl CppMethod {
                            is_const: self.is_const,
                            indirection: CppTypeIndirection::Ptr,
                          }
-                         .to_cpp_ffi_type()
+                         .to_cpp_ffi_type(false)
                          .unwrap(),
           meaning: CppFfiArgumentMeaning::This,
         });
       }
     }
     for (index, arg) in self.arguments.iter().enumerate() {
-      match arg.argument_type.to_cpp_ffi_type() {
+      match arg.argument_type.to_cpp_ffi_type(false) {
         Ok(c_type) => {
           r.arguments.push(CppFfiFunctionArgument {
             name: arg.name.clone(),
@@ -177,7 +177,7 @@ impl CppMethod {
       }
     }
     if let Some(return_type) = self.real_return_type() {
-      match return_type.to_cpp_ffi_type() {
+      match return_type.to_cpp_ffi_type(true) {
         Ok(c_type) => {
           let is_stack_allocated_struct = return_type.indirection == CppTypeIndirection::None &&
                                           return_type.base.is_class() &&
