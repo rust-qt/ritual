@@ -1,6 +1,7 @@
 use cpp_ffi_generator::{CppAndFfiData, CppFfiHeaderData};
 use cpp_and_ffi_method::CppAndFfiMethod;
-use cpp_type::{CppTypeBase, CppBuiltInNumericType, CppTypeIndirection, CppSpecificNumericTypeKind};
+use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
+               CppSpecificNumericTypeKind};
 use cpp_ffi_type::{CppFfiType, IndirectionChange};
 use utils::JoinWithString;
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
@@ -365,10 +366,27 @@ impl RustGenerator {
                                                  .map(|(val, variant)| variant)
                                                  .collect();
         values.sort_by(|a, b| a.value.cmp(&b.value));
+        let mut is_flaggable = false;
+        if let Some(instantiations) = self.input_data
+                                          .cpp_data
+                                          .template_instantiations
+                                          .get(&"QFlags".to_string()) {
+          let cpp_type_sample = CppType {
+            is_const: false,
+            indirection: CppTypeIndirection::None,
+            base: CppTypeBase::Enum { name: type_info.name.clone() },
+          };
+          if instantiations.iter().find(|x| x.len() == 1 && &x[0] == &cpp_type_sample).is_some() {
+            is_flaggable = true;
+          }
+        }
         return Some(RustTypeDeclaration {
           name: rust_name.clone(),
           kind: RustTypeDeclarationKind::CppTypeWrapper {
-            kind: RustTypeWrapperKind::Enum { values: values },
+            kind: RustTypeWrapperKind::Enum {
+              values: values,
+              is_flaggable: is_flaggable,
+            },
             cpp_type_name: type_info.name.clone(),
             cpp_template_arguments: None,
           },
@@ -618,7 +636,8 @@ impl RustGenerator {
       let current_methods: Vec<_> = methods.clone()
                                            .into_iter()
                                            .filter(|m| {
-                                             self.method_rust_name(m, false).last_name() == &method_name
+                                             self.method_rust_name(m, false).last_name() ==
+                                             &method_name
                                            })
                                            .collect();
       let methods_count = current_methods.len();
@@ -627,7 +646,8 @@ impl RustGenerator {
           if name_counters.contains_key(rust_method.name.last_name()) {
             let x = name_counters.get_mut(rust_method.name.last_name()).unwrap();
             *x += 1;
-            log::warning(format!("Name conflict is resolved in a numeric way for {}", rust_method.name.full_name(None)));
+            log::warning(format!("Name conflict is resolved in a numeric way for {}",
+                                 rust_method.name.full_name(None)));
             let mut last_name = rust_method.name.parts.pop().unwrap();
             last_name = format!("{}{}", last_name, x);
             rust_method.name.parts.push(last_name);

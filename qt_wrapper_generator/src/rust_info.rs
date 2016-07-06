@@ -100,6 +100,7 @@ pub struct TraitImpl {
 pub enum RustTypeWrapperKind {
   Enum {
     values: Vec<EnumValue>,
+    is_flaggable: bool,
   },
   Struct {
     size: i32,

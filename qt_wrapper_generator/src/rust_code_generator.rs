@@ -133,9 +133,16 @@ impl RustCodeGenerator {
 
     let mut result = Vec::new();
     if let Some(ref i) = func.return_type_ffi_index {
-      result.push(format!("let mut object = {} {{ _buffer: unsafe {{ std::mem::uninitialized() }} }};\n"
-                        , self.rust_type_to_code(&func.return_type.rust_api_type)));
-      final_args[*i as usize] = Some("&mut object".to_string());
+      let mut return_var_name = "object".to_string();
+      let mut ii = 1;
+      while variant.arguments.iter().find(|x| &x.name == &return_var_name).is_some() {
+        ii += 1;
+        return_var_name = format!("object{}", ii);
+      }
+      result.push(format!("let mut {} = unsafe {{ {}::new_uninitialized() }};\n",
+                          return_var_name,
+                          self.rust_type_to_code(&func.return_type.rust_api_type)));
+      final_args[*i as usize] = Some(format!("&mut {}", return_var_name));
     }
     for arg in &final_args {
       if arg.is_none() {
@@ -143,9 +150,9 @@ impl RustCodeGenerator {
         panic!("ffi argument is missing");
       }
     }
-    result.push(format!("::ffi::{}({})",
-            variant.cpp_method.c_name,
-            final_args.into_iter().map(|x| x.unwrap()).join(", ")));
+    result.push(format!("unsafe {{ ::ffi::{}({}) }}",
+                        variant.cpp_method.c_name,
+                        final_args.into_iter().map(|x| x.unwrap()).join(", ")));
     return result.join("");
   }
 
@@ -217,17 +224,34 @@ impl RustCodeGenerator {
       let r = match type1.kind {
         RustTypeDeclarationKind::CppTypeWrapper { ref kind, .. } => {
           match *kind {
-            RustTypeWrapperKind::Enum { ref values } => {
-              format!("#[repr(C)]\npub enum {} {{\n{}\n}}\n\n",
-                      type1.name.last_name(),
-                      values.iter()
-                            .map(|item| format!("  {} = {}", item.name, item.value))
-                            .join(", \n"))
+            RustTypeWrapperKind::Enum { ref values, ref is_flaggable } => {
+              let mut r = format!("#[derive(Debug, PartialEq, Eq, Clone)]\n#[repr(C)]\npub enum \
+                                   {} {{\n{}\n}}\n\n",
+                                  type1.name.last_name(),
+                                  values.iter()
+                                        .map(|item| format!("  {} = {}", item.name, item.value))
+                                        .join(", \n"));
+              if *is_flaggable {
+                r = format!("{}impl ::flags::FlaggableEnum for {} {{\n
+                           \
+                             fn to_int(self) -> libc::c_int {{ unsafe {{ \
+                             std::mem::transmute(self) }} }}\n
+                           fn \
+                             enum_name() -> &'static str {{ unimplemented!() }}\n
+                        \
+                             }}\n\n",
+                            r,
+                            type1.name.last_name());
+              }
+              r
             }
             RustTypeWrapperKind::Struct { ref size } => {
-              format!("#[repr(C)]\npub struct {} {{\n  _buffer: [u8; {}],\n}}\n\n",
-                      type1.name.last_name(),
-                      size)
+              format!("#[repr(C)]\npub struct {name} {{\n  _buffer: [u8; {size}],\n}}\n\n
+                       impl {name} {{ pub unsafe fn new_uninitialized() -> {name} {{
+                         {name} {{ _buffer: std::mem::uninitialized() }}
+                      }} }}",
+                      name = type1.name.last_name(),
+                      size = size)
             }
           }
         }
@@ -256,10 +280,10 @@ impl RustCodeGenerator {
   }
 
   fn call_rustfmt(&self, path: &PathBuf) {
-    let rustfmt_result = rustfmt::run(rustfmt::Input::File(path.clone()), &self.rustfmt_config);
-    if !rustfmt_result.has_no_errors() {
-      log::warning(format!("rustfmt failed to format file: {:?}", path));
-    }
+//    let rustfmt_result = rustfmt::run(rustfmt::Input::File(path.clone()), &self.rustfmt_config);
+//    if !rustfmt_result.has_no_errors() {
+//      log::warning(format!("rustfmt failed to format file: {:?}", path));
+//    }
   }
 
   pub fn generate_module_file(&self, data: &RustModule) {
