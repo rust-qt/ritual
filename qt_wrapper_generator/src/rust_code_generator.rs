@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::fs::File;
 use std::io::{Write, Read};
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
-                RustMethod, RustMethodArguments, RustMethodArgumentsVariant};
+                RustMethod, RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope};
 use std::collections::{HashMap, HashSet};
 use utils::JoinWithString;
 use log;
@@ -64,7 +64,8 @@ impl RustCodeGenerator {
             } else {
               format!("*mut {}", base_s)
             }
-          }&RustTypeIndirection::PtrPtr => {
+          }
+          &RustTypeIndirection::PtrPtr => {
             if *is_const {
               format!("*const *const {}", base_s)
             } else {
@@ -213,11 +214,32 @@ impl RustCodeGenerator {
         let args = variant.arguments
                           .iter()
                           .map(|arg| {
-                            format!("{}: {}",
+                            let mut maybe_mut_declaration = "";
+                            if let RustType::NonVoid { ref indirection, .. } = arg.argument_type
+                                                                                  .rust_api_type {
+                              if *indirection == RustTypeIndirection::None &&
+                                 arg.argument_type.rust_api_to_c_conversion ==
+                                 RustToCTypeConversion::ValueToPtr {
+                                if let RustType::NonVoid { ref indirection, ref is_const, .. } =
+                                       arg.argument_type.rust_ffi_type {
+                                  if !is_const {
+                                    maybe_mut_declaration = "mut ";
+                                  }
+                                }
+                              }
+                            }
+
+                            format!("{}{}: {}",
+                                    maybe_mut_declaration,
                                     arg.name,
                                     self.rust_type_to_code(&arg.argument_type.rust_api_type))
                           });
-        format!("pub fn {}({}){} {{\n{}}}\n\n",
+        let public_qualifier = match func.scope {
+          RustMethodScope::TraitImpl { .. } => "",
+          _ => "pub ",
+        };
+        format!("{}fn {}({}){} {{\n{}}}\n\n",
+                public_qualifier,
                 func.name.last_name(),
                 args.join(", "),
                 match func.return_type.rust_api_type {
@@ -310,6 +332,15 @@ impl RustCodeGenerator {
                                   .iter()
                                   .map(|method| self.generate_rust_final_function(method))
                                   .join("")));
+      }
+      for trait1 in &type1.traits {
+        results.push(format!("impl {} for {} {{\n{}}}\n\n",
+                             trait1.trait_name.to_string(),
+                             type1.name.last_name(),
+                             trait1.methods
+                                   .iter()
+                                   .map(|method| self.generate_rust_final_function(method))
+                                   .join("")));
       }
     }
     for method in &data.functions {

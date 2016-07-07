@@ -9,6 +9,10 @@ pub enum RustMethodScope {
   Impl {
     type_name: RustName,
   },
+  TraitImpl {
+    type_name: RustName,
+    trait_name: TraitName,
+  },
   Free
 }
 
@@ -87,6 +91,11 @@ pub enum TraitName {
   FromIterator,
   IntoIterator,
   Iterator,
+}
+impl TraitName {
+  pub fn to_string(&self) -> String {
+    format!("{:?}", self)
+  }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
