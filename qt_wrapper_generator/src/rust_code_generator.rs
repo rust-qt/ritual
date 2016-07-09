@@ -264,6 +264,8 @@ impl RustCodeGenerator {
     lib_file_path.push("lib.rs");
     {
       let mut lib_file = File::create(&lib_file_path).unwrap();
+      write!(lib_file, "#![allow(drop_with_repr_extern)]\n", module).unwrap();
+
       let built_in_modules = vec!["types", "flags", "ffi"];
       for module in built_in_modules {
         if modules.iter().find(|x| x.as_ref() as &str == module).is_some() {
