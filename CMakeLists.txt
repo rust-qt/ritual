@@ -13,10 +13,11 @@ SET(QTCW_MAKE_OPTIONS
   CACHE STRING "Options for building QTCW (e.g. '-j8'")
 SET(QTCW_COMPILE_BLOCKED
   CACHE BOOL "Block recompilation of QTCW library")
-message("QT_DOC_DIR = ${QT_DOC_DIR}")
-if(NOT IS_DIRECTORY ${QT_DOC_DIR})
-  message(FATAL_ERROR "Invalid QT_DOC_DIR")
-endif()
+
+#message("QT_DOC_DIR = ${QT_DOC_DIR}")
+#if(NOT IS_DIRECTORY ${QT_DOC_DIR})
+#  message(FATAL_ERROR "Invalid QT_DOC_DIR")
+#endif()
 message("QTCW_COMPILE_BLOCKED = ${QTCW_COMPILE_BLOCKED}")
 
 set(DOC_PARSE_RESULT_PATH ${CMAKE_BINARY_DIR}/doc_parse_result.json)
