@@ -1,8 +1,8 @@
 
 use rust_type::{RustName, CompleteType};
 use cpp_and_ffi_method::CppAndFfiMethod;
-use cpp_data::{EnumValue};
-use cpp_type::{CppType};
+use cpp_data::EnumValue;
+use cpp_type::CppType;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RustMethodScope {
@@ -13,7 +13,7 @@ pub enum RustMethodScope {
     type_name: RustName,
     trait_name: TraitName,
   },
-  Free
+  Free,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -30,6 +30,7 @@ pub struct RustMethodArgumentsVariant {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[allow(dead_code)]
 pub enum RustMethodArguments {
   SingleVariant(RustMethodArgumentsVariant),
   MultipleVariants {
@@ -37,7 +38,7 @@ pub enum RustMethodArguments {
     params_trait_name: String,
     argument_name: String,
     variants: Vec<RustMethodArgumentsVariant>,
-  }
+  },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -50,6 +51,7 @@ pub struct RustMethod {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[allow(dead_code)]
 pub enum TraitName {
   Clone,
   Debug,
@@ -113,10 +115,11 @@ pub enum RustTypeWrapperKind {
   },
   Struct {
     size: i32,
-  }
+  },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[allow(dead_code)]
 pub enum RustTypeDeclarationKind {
   CppTypeWrapper {
     kind: RustTypeWrapperKind,
@@ -124,7 +127,7 @@ pub enum RustTypeDeclarationKind {
     cpp_template_arguments: Option<Vec<CppType>>,
   },
   MethodParametersEnum,
-  MethodParametersTrait
+  MethodParametersTrait,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -143,8 +146,8 @@ pub struct RustModule {
   pub submodules: Vec<RustModule>,
 }
 
-//pub struct Package {
+// pub struct Package {
 //  modules: Vec<RustModule>,
 //  cpp_data: CppAndFfiData,
 //
-//}
+// }

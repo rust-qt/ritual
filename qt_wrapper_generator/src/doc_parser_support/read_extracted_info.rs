@@ -18,25 +18,25 @@ pub fn do_it(file_name: PathBuf) -> CppExtractedInfo {
   let data = data_value.as_object().unwrap();
   CppExtractedInfo {
     class_sizes: data.get("class_sizes")
-                     .unwrap()
-                     .as_object()
-                     .unwrap()
-                     .into_iter()
-                     .map(|(k, v)| (k.clone(), v.as_i64().unwrap() as i32))
-                     .collect(),
+      .unwrap()
+      .as_object()
+      .unwrap()
+      .into_iter()
+      .map(|(k, v)| (k.clone(), v.as_i64().unwrap() as i32))
+      .collect(),
     enum_values: data.get("enum_values")
-                     .unwrap()
-                     .as_object()
-                     .unwrap()
-                     .into_iter()
-                     .map(|(k, v)| {
-                       (k.clone(),
-                        v.as_object()
-                         .unwrap()
-                         .into_iter()
-                         .map(|(k, v)| (k.clone(), v.as_i64().unwrap() as i32))
-                         .collect())
-                     })
-                     .collect(),
+      .unwrap()
+      .as_object()
+      .unwrap()
+      .into_iter()
+      .map(|(k, v)| {
+        (k.clone(),
+         v.as_object()
+          .unwrap()
+          .into_iter()
+          .map(|(k, v)| (k.clone(), v.as_i64().unwrap() as i32))
+          .collect())
+      })
+      .collect(),
   }
 }

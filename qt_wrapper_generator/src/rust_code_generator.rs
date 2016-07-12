@@ -1,11 +1,10 @@
-use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
-                RustFFIArgument, RustToCTypeConversion};
+use rust_type::{RustType, RustTypeIndirection, RustFFIFunction, RustToCTypeConversion};
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::{Write, Read};
-use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
-                RustMethod, RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope};
-use std::collections::{HashMap, HashSet};
+use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
+                RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope};
+use std::collections::HashMap;
 use utils::JoinWithString;
 use log;
 
@@ -84,12 +83,12 @@ impl RustCodeGenerator {
 
   fn rust_ffi_function_to_code(&self, func: &RustFFIFunction) -> String {
     let args = func.arguments
-                   .iter()
-                   .map(|arg| {
-                     format!("{}: {}",
-                             arg.name,
-                             self.rust_type_to_code(&arg.argument_type))
-                   });
+      .iter()
+      .map(|arg| {
+        format!("{}: {}",
+                arg.name,
+                self.rust_type_to_code(&arg.argument_type))
+      });
     format!("  pub fn {}({}){};\n",
             func.name,
             args.join(", "),
@@ -117,7 +116,7 @@ impl RustCodeGenerator {
         }
         RustToCTypeConversion::ValueToPtr => {
           let is_const = if let RustType::NonVoid { ref is_const, .. } = arg.argument_type
-                                                                            .rust_ffi_type {
+            .rust_ffi_type {
             *is_const
           } else {
             panic!("void is not expected here at all!")
@@ -170,7 +169,7 @@ impl RustCodeGenerator {
       RustToCTypeConversion::None => {}
       RustToCTypeConversion::RefToPtr => {
         let is_const = if let RustType::NonVoid { ref is_const, .. } = func.return_type
-                                                                           .rust_ffi_type {
+          .rust_ffi_type {
           *is_const
         } else {
           panic!("void is not expected here at all!")
@@ -212,28 +211,27 @@ impl RustCodeGenerator {
         let body = self.generate_ffi_call(func, variant);
 
         let args = variant.arguments
-                          .iter()
-                          .map(|arg| {
-                            let mut maybe_mut_declaration = "";
-                            if let RustType::NonVoid { ref indirection, .. } = arg.argument_type
-                                                                                  .rust_api_type {
-                              if *indirection == RustTypeIndirection::None &&
-                                 arg.argument_type.rust_api_to_c_conversion ==
-                                 RustToCTypeConversion::ValueToPtr {
-                                if let RustType::NonVoid { ref indirection, ref is_const, .. } =
-                                       arg.argument_type.rust_ffi_type {
-                                  if !is_const {
-                                    maybe_mut_declaration = "mut ";
-                                  }
-                                }
-                              }
-                            }
+          .iter()
+          .map(|arg| {
+            let mut maybe_mut_declaration = "";
+            if let RustType::NonVoid { ref indirection, .. } = arg.argument_type
+              .rust_api_type {
+              if *indirection == RustTypeIndirection::None &&
+                 arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr {
+                if let RustType::NonVoid { ref is_const, .. } = arg.argument_type
+                  .rust_ffi_type {
+                  if !is_const {
+                    maybe_mut_declaration = "mut ";
+                  }
+                }
+              }
+            }
 
-                            format!("{}{}: {}",
-                                    maybe_mut_declaration,
-                                    arg.name,
-                                    self.rust_type_to_code(&arg.argument_type.rust_api_type))
-                          });
+            format!("{}{}: {}",
+                    maybe_mut_declaration,
+                    arg.name,
+                    self.rust_type_to_code(&arg.argument_type.rust_api_type))
+          });
         let public_qualifier = match func.scope {
           RustMethodScope::TraitImpl { .. } => "",
           _ => "pub ",
@@ -264,7 +262,7 @@ impl RustCodeGenerator {
     lib_file_path.push("lib.rs");
     {
       let mut lib_file = File::create(&lib_file_path).unwrap();
-      write!(lib_file, "#![allow(drop_with_repr_extern)]\n", module).unwrap();
+      write!(lib_file, "#![allow(drop_with_repr_extern)]\n").unwrap();
 
       let built_in_modules = vec!["types", "flags", "ffi"];
       for module in built_in_modules {
@@ -298,8 +296,8 @@ impl RustCodeGenerator {
                                    {} {{\n{}\n}}\n\n",
                                   type1.name.last_name(),
                                   values.iter()
-                                        .map(|item| format!("  {} = {}", item.name, item.value))
-                                        .join(", \n"));
+                                    .map(|item| format!("  {} = {}", item.name, item.value))
+                                    .join(", \n"));
               if *is_flaggable {
                 r = format!("{}impl ::flags::FlaggableEnum for {} {{\n
                            \
@@ -331,18 +329,18 @@ impl RustCodeGenerator {
         results.push(format!("impl {} {{\n{}}}\n\n",
                              type1.name.last_name(),
                              type1.methods
-                                  .iter()
-                                  .map(|method| self.generate_rust_final_function(method))
-                                  .join("")));
+                               .iter()
+                               .map(|method| self.generate_rust_final_function(method))
+                               .join("")));
       }
       for trait1 in &type1.traits {
         results.push(format!("impl {} for {} {{\n{}}}\n\n",
                              trait1.trait_name.to_string(),
                              type1.name.last_name(),
                              trait1.methods
-                                   .iter()
-                                   .map(|method| self.generate_rust_final_function(method))
-                                   .join("")));
+                               .iter()
+                               .map(|method| self.generate_rust_final_function(method))
+                               .join("")));
       }
     }
     for method in &data.functions {
@@ -386,9 +384,9 @@ impl RustCodeGenerator {
       let mut file = File::create(&file_path).unwrap();
       write!(file, "extern crate libc;\n\n").unwrap();
       write!(file, "#[link(name = \"Qt5Core\")]\n").unwrap();
-      write!(file, "#[link(name = \"icui18n\")]\n").unwrap();
-      write!(file, "#[link(name = \"icuuc\")]\n").unwrap();
-      write!(file, "#[link(name = \"icudata\")]\n").unwrap();
+      //      write!(file, "#[link(name = \"icui18n\")]\n").unwrap();
+      //      write!(file, "#[link(name = \"icuuc\")]\n").unwrap();
+      //      write!(file, "#[link(name = \"icudata\")]\n").unwrap();
       write!(file, "#[link(name = \"stdc++\")]\n").unwrap();
       write!(file, "#[link(name = \"qtcw\", kind = \"static\")]\n").unwrap();
       write!(file, "extern \"C\" {{\n").unwrap();

@@ -40,10 +40,10 @@ impl CppType {
         template_arguments: match value.get("template_arguments") {
           Some(v) => {
             Some(v.as_array()
-                  .unwrap()
-                  .into_iter()
-                  .map(|x| CppType::from_json(x))
-                  .collect())
+              .unwrap()
+              .into_iter()
+              .map(|x| CppType::from_json(x))
+              .collect())
           }
           None => None,
         },
@@ -123,10 +123,10 @@ impl CppMethod {
       arguments: match value.get("arguments") {
         Some(v) => {
           v.as_array()
-           .unwrap()
-           .into_iter()
-           .map(|x| CppFunctionArgument::from_json(x))
-           .collect()
+            .unwrap()
+            .into_iter()
+            .map(|x| CppFunctionArgument::from_json(x))
+            .collect()
         }
         None => vec![],
       },
@@ -151,25 +151,23 @@ impl CppHeaderData {
     };
     let include_file = value.get("include_file").unwrap().as_string().unwrap().to_string();
     let methods = value.get("methods")
-                       .unwrap()
-                       .as_array()
-                       .unwrap()
-                       .into_iter()
-                       .enumerate()
-                       .map(|(index, x)| {
-                         CppMethod::from_json(x, &include_file, &class_name, index as i32)
-                       })
-                       .collect();
+      .unwrap()
+      .as_array()
+      .unwrap()
+      .into_iter()
+      .enumerate()
+      .map(|(index, x)| CppMethod::from_json(x, &include_file, &class_name, index as i32))
+      .collect();
     CppHeaderData {
       include_file: include_file,
       class_name: class_name,
       macros: match value.get("macros") {
         Some(data) => {
           data.as_array()
-              .unwrap()
-              .into_iter()
-              .map(|x| x.as_string().unwrap().to_string())
-              .collect()
+            .unwrap()
+            .into_iter()
+            .map(|x| x.as_string().unwrap().to_string())
+            .collect()
         }
         None => vec![],
       },
@@ -212,12 +210,12 @@ impl CppTypeInfo {
               "enum" => {
                 DocCppTypeKind::Enum {
                   values: value.get("values")
-                               .unwrap()
-                               .as_array()
-                               .unwrap()
-                               .into_iter()
-                               .map(|x| EnumValue::from_json(x))
-                               .collect(),
+                    .unwrap()
+                    .as_array()
+                    .unwrap()
+                    .into_iter()
+                    .map(|x| EnumValue::from_json(x))
+                    .collect(),
                 }
               }
               "flags" => {
@@ -254,8 +252,8 @@ impl CppTypeMap {
   fn from_json(value: &serde_json::Value) -> Self {
     let value = value.as_object().unwrap();
     CppTypeMap(value.into_iter()
-                    .map(|(k, v)| (k.clone(), CppTypeInfo::from_json(v, k.clone())))
-                    .collect())
+      .map(|(k, v)| (k.clone(), CppTypeInfo::from_json(v, k.clone())))
+      .collect())
   }
 }
 
@@ -265,12 +263,12 @@ pub fn do_it(file_name: &std::path::PathBuf) -> DocCppData {
   let object = data.as_object().unwrap();
   DocCppData {
     headers: object.get("headers_data")
-                   .unwrap()
-                   .as_array()
-                   .unwrap()
-                   .into_iter()
-                   .map(|x| CppHeaderData::from_json(x))
-                   .collect(),
+      .unwrap()
+      .as_array()
+      .unwrap()
+      .into_iter()
+      .map(|x| CppHeaderData::from_json(x))
+      .collect(),
     types: CppTypeMap::from_json(object.get("type_info").unwrap()),
     classes_blacklist: vec![],
   }

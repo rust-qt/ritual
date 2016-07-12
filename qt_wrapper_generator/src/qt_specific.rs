@@ -58,9 +58,8 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) {
   let get_header = |real_header: &String, class_name: Option<&String>| -> String {
     if let Some(class_name) = class_name {
       if let Some(fancy_headers) = map.get(real_header) {
-        if let Some(x) = fancy_headers.iter().find(|&x| {
-          x == class_name || class_name.starts_with(&format!("{}::", x))
-        }) {
+        if let Some(x) = fancy_headers.iter()
+          .find(|&x| x == class_name || class_name.starts_with(&format!("{}::", x))) {
           return x.clone();
         }
       }

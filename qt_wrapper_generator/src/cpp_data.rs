@@ -40,7 +40,7 @@ pub struct CppOriginLocation {
 pub enum CppVisibility {
   Public,
   Protected,
-  Private
+  Private,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -66,6 +66,7 @@ impl CppTypeData {
     }
   }
 
+  #[allow(dead_code)]
   pub fn inherits(&self, class_name: &String) -> bool {
     if let CppTypeKind::Class { ref bases, .. } = self.kind {
       for base in bases {
@@ -135,9 +136,9 @@ impl CppData {
       if let CppTypeKind::Class { .. } = tp.kind {
         if let Some(ins) = self.template_instantiations.get(&tp.name) {
           result.get_mut(&tp.include_file)
-                .unwrap()
-                .template_instantiations
-                .insert(tp.name.clone(), ins.clone());
+            .unwrap()
+            .template_instantiations
+            .insert(tp.name.clone(), ins.clone());
         }
       }
     }

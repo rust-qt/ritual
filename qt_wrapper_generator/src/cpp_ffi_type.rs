@@ -25,9 +25,7 @@ impl CppFfiType {
     CppFfiType {
       original_type: CppType::void(),
       ffi_type: CppType::void(),
-      conversion: CppToFfiTypeConversion {
-        indirection_change: IndirectionChange::NoChange,
-      },
+      conversion: CppToFfiTypeConversion { indirection_change: IndirectionChange::NoChange },
     }
   }
 }

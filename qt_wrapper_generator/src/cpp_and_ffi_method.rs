@@ -78,7 +78,10 @@ impl CppMethodWithFfiSignature {
 }
 
 impl CppAndFfiMethod {
-  pub fn new(data: CppMethodWithFfiSignature, c_name: String, args_caption: Option<String>) -> CppAndFfiMethod {
+  pub fn new(data: CppMethodWithFfiSignature,
+             c_name: String,
+             args_caption: Option<String>)
+             -> CppAndFfiMethod {
 
     CppAndFfiMethod {
       cpp_method: data.cpp_method,

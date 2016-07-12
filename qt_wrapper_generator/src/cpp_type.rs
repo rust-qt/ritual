@@ -30,6 +30,7 @@ pub enum CppBuiltInNumericType {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[allow(dead_code)]
 pub enum CppSpecificNumericTypeKind {
   Integer {
     is_signed: bool,
@@ -90,6 +91,7 @@ impl CppBuiltInNumericType {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[allow(dead_code)]
 pub enum CppTypeIndirection {
   None,
   Ptr,
@@ -127,11 +129,10 @@ pub enum CppTypeBase {
     return_type: Box<CppType>,
     arguments: Vec<CppType>,
     allows_variable_arguments: bool,
-  },
-//  Unspecified {
-//    name: String,
-//    template_arguments: Option<Vec<CppType>>,
-//  },
+  }, /*  Unspecified {
+      *    name: String,
+      *    template_arguments: Option<Vec<CppType>>,
+      *  }, */
 }
 
 impl CppTypeBase {
@@ -271,11 +272,11 @@ impl CppType {
       _ => {}
     }
     let mut result = self.clone();
-    let mut conversion = CppToFfiTypeConversion {
-      indirection_change: IndirectionChange::NoChange,
-    };
+    let mut conversion = CppToFfiTypeConversion { indirection_change: IndirectionChange::NoChange };
     match self.indirection {
-      CppTypeIndirection::None | CppTypeIndirection::Ptr | CppTypeIndirection::PtrPtr => {
+      CppTypeIndirection::None |
+      CppTypeIndirection::Ptr |
+      CppTypeIndirection::PtrPtr => {
         // no change needed
       }
       CppTypeIndirection::Ref => {

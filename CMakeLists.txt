@@ -4,7 +4,12 @@ find_package(Qt5Core REQUIRED)
 message("Qt version: ${Qt5Core_VERSION}")
 
 get_target_property(QT_CORE_LOCATION Qt5::Core LOCATION)
-get_filename_component(CPP_LIB_DIR ${QT_CORE_LOCATION} DIRECTORY)
+# get_filename_component(CPP_LIB_DIR ${QT_CORE_LOCATION} DIRECTORY)
+
+execute_process(
+  COMMAND qmake -query QT_INSTALL_LIBS
+  OUTPUT_VARIABLE CPP_LIB_DIR)
+string(STRIP "${CPP_LIB_DIR}" CPP_LIB_DIR)
 message("Qt library path: ${CPP_LIB_DIR}")
 
 set(QT_DOC_DIR
@@ -92,8 +97,9 @@ add_custom_command(
   #${CPP_EXTRACTED_INFO_PATH}
 )
 
-if(NOT ${QTCW_COMPILE_BLOCKED})
-
+if(${QTCW_COMPILE_BLOCKED})
+  message("qtcw compilation is blocked.")
+else()
   # building generated C wrapper
   file(MAKE_DIRECTORY ${QTCW_BUILD_DIR})
   add_custom_command(

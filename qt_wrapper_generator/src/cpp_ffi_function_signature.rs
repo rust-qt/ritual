@@ -12,10 +12,10 @@ pub struct CppFfiFunctionSignature {
 impl CppFfiFunctionSignature {
   pub fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
     let r = self.arguments
-                .iter()
-                .filter(|x| x.meaning.is_argument())
-                .map(|x| x.caption(strategy.clone()))
-                .join("_");
+      .iter()
+      .filter(|x| x.meaning.is_argument())
+      .map(|x| x.caption(strategy.clone()))
+      .join("_");
     if r.len() == 0 {
       "no_args".to_string()
     } else {
@@ -28,7 +28,7 @@ impl CppFfiFunctionSignature {
     for arg in &self.arguments {
       match arg.to_cpp_code() {
         Ok(c) => code.push(c),
-        Err(msg) => return Err(msg)
+        Err(msg) => return Err(msg),
       }
     }
     Ok(code.join(", "))

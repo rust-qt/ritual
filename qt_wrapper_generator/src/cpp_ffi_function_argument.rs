@@ -40,6 +40,8 @@ impl CppFfiFunctionArgument {
   }
 
   pub fn to_cpp_code(&self) -> Result<String, String> {
-    Ok(format!("{} {}", try!(self.argument_type.ffi_type.to_cpp_code()), self.name))
+    Ok(format!("{} {}",
+               try!(self.argument_type.ffi_type.to_cpp_code()),
+               self.name))
   }
 }

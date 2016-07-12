@@ -7,7 +7,7 @@ pub enum RustTypeIndirection {
   None,
   Ptr,
   Ref,
-  PtrPtr
+  PtrPtr,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

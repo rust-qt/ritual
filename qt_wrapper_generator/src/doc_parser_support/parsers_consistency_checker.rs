@@ -20,7 +20,9 @@ pub fn check(result1: &CppData, result1_stats: &CppParserStats, result2: &DocCpp
       let include_file2 = include_file;
       match type_info2.kind {
         // typedefs are not supposed to be in result1
-        DocCppTypeKind::TypeDef { .. } | DocCppTypeKind::Flags { .. } | DocCppTypeKind::Unknown { .. } => {}
+        DocCppTypeKind::TypeDef { .. } |
+        DocCppTypeKind::Flags { .. } |
+        DocCppTypeKind::Unknown { .. } => {}
         _ => {
           if let Some(type_info1) = result1.types.iter().find(|x| x.name == type_info2.name) {
             if &type_info1.include_file != include_file2 {
@@ -100,7 +102,9 @@ pub fn check(result1: &CppData, result1_stats: &CppParserStats, result2: &DocCpp
   let mut method_counts1: HashMap<String, i32> = HashMap::new();
   let mut method_counts2: HashMap<String, i32> = HashMap::new();
   for method in &result1.methods {
-    if method.visibility == CppVisibility::Private { continue; }
+    if method.visibility == CppVisibility::Private {
+      continue;
+    }
     let name = method.full_name();
     if !method_counts1.contains_key(&name) {
       method_counts1.insert(name.clone(), 0);
@@ -109,7 +113,9 @@ pub fn check(result1: &CppData, result1_stats: &CppParserStats, result2: &DocCpp
   }
   for header in &result2.headers {
     for method in &header.methods {
-      if method.visibility == CppVisibility::Private { continue; }
+      if method.visibility == CppVisibility::Private {
+        continue;
+      }
       let name = method.full_name();
       if !method_counts2.contains_key(&name) {
         method_counts2.insert(name.clone(), 0);
@@ -122,7 +128,9 @@ pub fn check(result1: &CppData, result1_stats: &CppParserStats, result2: &DocCpp
     }
   }
   for method in &result1.methods {
-    if method.visibility == CppVisibility::Private { continue; }
+    if method.visibility == CppVisibility::Private {
+      continue;
+    }
     if let CppMethodScope::Class(ref class_name) = method.scope {
       for class_type in result1.types.iter().filter(|x| x.inherits(class_name)) {
         let base_method = format!("{}::{}", class_type.name, method.name);
