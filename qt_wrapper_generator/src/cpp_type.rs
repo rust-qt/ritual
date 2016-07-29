@@ -5,6 +5,7 @@ use caption_strategy::TypeCaptionStrategy;
 extern crate regex;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
 pub enum CppBuiltInNumericType {
   Bool,
   CharS,
@@ -30,6 +31,7 @@ pub enum CppBuiltInNumericType {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
 #[allow(dead_code)]
 pub enum CppSpecificNumericTypeKind {
   Integer {
@@ -91,6 +93,7 @@ impl CppBuiltInNumericType {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
 #[allow(dead_code)]
 pub enum CppTypeIndirection {
   None,
@@ -102,6 +105,7 @@ pub enum CppTypeIndirection {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
 pub enum CppTypeBase {
   Void,
   BuiltInNumeric(CppBuiltInNumericType),
@@ -213,6 +217,7 @@ impl CppTypeBase {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct CppType {
   pub is_const: bool,
   pub indirection: CppTypeIndirection,

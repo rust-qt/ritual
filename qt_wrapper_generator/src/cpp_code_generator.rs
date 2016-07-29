@@ -53,9 +53,9 @@ fn convert_return_type(method: &CppAndFfiMethod, expression: String) -> String {
   if method.allocation_place == ReturnValueAllocationPlace::Stack &&
      method.cpp_method.kind != CppMethodKind::Constructor {
     if let Some(arg) = method.c_signature
-      .arguments
-      .iter()
-      .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
+                             .arguments
+                             .iter()
+                             .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
       if let Some(ref return_type) = method.cpp_method.return_type {
         result = format!("new({}) {}({})",
                          arg.name,
@@ -73,13 +73,15 @@ fn arguments_values(method: &CppAndFfiMethod) -> String {
   let mut filled_arguments = vec![];
   for (i, cpp_argument) in method.cpp_method.arguments.iter().enumerate() {
     if let Some(c_argument) = method.c_signature
-      .arguments
-      .iter()
-      .find(|x| x.meaning == CppFfiArgumentMeaning::Argument(i as i8)) {
+                                    .arguments
+                                    .iter()
+                                    .find(|x| {
+                                      x.meaning == CppFfiArgumentMeaning::Argument(i as i8)
+                                    }) {
       let mut result = c_argument.name.clone();
       match c_argument.argument_type
-        .conversion
-        .indirection_change {
+                      .conversion
+                      .indirection_change {
         IndirectionChange::ValueToPointer |
         IndirectionChange::ReferenceToPointer => result = format!("*{}", result),
         IndirectionChange::NoChange => {}
@@ -102,9 +104,11 @@ fn returned_expression(method: &CppAndFfiMethod) -> String {
   convert_return_type(&method,
                       if method.cpp_method.kind == CppMethodKind::Destructor {
                         if let Some(arg) = method.c_signature
-                          .arguments
-                          .iter()
-                          .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
+                                                 .arguments
+                                                 .iter()
+                                                 .find(|x| {
+                                                   x.meaning == CppFfiArgumentMeaning::This
+                                                 }) {
                           format!("qtcw_call_destructor({})", arg.name)
                         } else {
                           panic!("Error: no this argument found\n{:?}", method);
@@ -116,9 +120,12 @@ fn returned_expression(method: &CppAndFfiMethod) -> String {
                             match method.allocation_place {
                               ReturnValueAllocationPlace::Stack => {
                                 if let Some(arg) = method.c_signature
-                                  .arguments
-                                  .iter()
-                                  .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
+                                                         .arguments
+                                                         .iter()
+                                                         .find(|x| {
+                                                           x.meaning ==
+                                                           CppFfiArgumentMeaning::ReturnValue
+                                                         }) {
                                   format!("new({}) {}", arg.name, class_name)
                                 } else {
                                   panic!("no return value equivalent argument found");
@@ -133,14 +140,16 @@ fn returned_expression(method: &CppAndFfiMethod) -> String {
                         } else {
                           let scope_specifier = if let CppMethodScope::Class(ref class_name) =
                                                        method.cpp_method
-                            .scope {
+                                                             .scope {
                             if method.cpp_method.is_static {
                               format!("{}::", class_name)
                             } else {
                               if let Some(arg) = method.c_signature
-                                .arguments
-                                .iter()
-                                .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
+                                                       .arguments
+                                                       .iter()
+                                                       .find(|x| {
+                                                         x.meaning == CppFfiArgumentMeaning::This
+                                                       }) {
                                 format!("{}->", arg.name)
                               } else {
                                 panic!("Error: no this argument found\n{:?}", method);
@@ -160,9 +169,9 @@ fn source_body(method: &CppAndFfiMethod) -> String {
   if method.cpp_method.kind == CppMethodKind::Destructor &&
      method.allocation_place == ReturnValueAllocationPlace::Heap {
     if let Some(arg) = method.c_signature
-      .arguments
-      .iter()
-      .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
+                             .arguments
+                             .iter()
+                             .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
       format!("delete {};\n", arg.name)
     } else {
       panic!("Error: no this argument found\n{:?}", method);

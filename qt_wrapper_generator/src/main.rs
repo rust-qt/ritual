@@ -1,3 +1,7 @@
+#![feature(custom_derive, plugin)]
+#![plugin(serde_macros)]
+
+extern crate serde_json;
 
 mod cpp_ffi_function_argument;
 mod cpp_ffi_function_signature;
@@ -18,6 +22,11 @@ mod rust_info;
 mod rust_type;
 mod utils;
 mod cpp_parser;
+
+use std::fs::File;
+use std::io::Write;
+
+
 // mod doc_parser_support;
 
 use std::path::PathBuf;
@@ -53,35 +62,57 @@ fn main() {
     let rust_qt_path = PathBuf::from(arguments[3].clone());
 
     let qt_install_headers_path = PathBuf::from(String::from_utf8(Command::new("qmake")
-        .arg("-query")
-        .arg("QT_INSTALL_HEADERS")
-        .output()
-        .expect("Failed to execute qmake query.")
-        .stdout)
-      .unwrap()
-      .trim());
+                                                                    .arg("-query")
+                                                                    .arg("QT_INSTALL_HEADERS")
+                                                                    .output()
+                                                                    .expect("Failed to execute \
+                                                                             qmake query.")
+                                                                    .stdout)
+                                                  .unwrap()
+                                                  .trim());
     let qt_install_libs_path = PathBuf::from(String::from_utf8(Command::new("qmake")
-        .arg("-query")
-        .arg("QT_INSTALL_LIBS")
-        .output()
-        .expect("Failed to execute qmake query.")
-        .stdout)
-      .unwrap()
-      .trim());
+                                                                 .arg("-query")
+                                                                 .arg("QT_INSTALL_LIBS")
+                                                                 .output()
+                                                                 .expect("Failed to execute \
+                                                                          qmake query.")
+                                                                 .stdout)
+                                               .unwrap()
+                                               .trim());
 
     let mut qt_core_headers_path = qt_install_headers_path.clone();
     qt_core_headers_path.push("QtCore");
 
-    log::info("Stage 1. Parsing Qt headers.");
-    let mut parser = cpp_parser::CppParser::new(vec![qt_install_headers_path.clone(),
-                                                     qt_core_headers_path.clone()],
-                                                "QtCore".to_string(),
-                                                rust_qt_path.clone());
-    parser.run();
-    let mut parse_result = parser.get_data();
-    qt_specific::fix_header_names(&mut parse_result, &qt_core_headers_path);
+    log::info(format!("Qt headers path: {}",
+                      qt_install_headers_path.to_str().unwrap()));
 
-    parse_result.ensure_explicit_destructors();
+
+    let parse_result_cache_file_path = PathBuf::from("/tmp/1.json");
+    let parse_result = if parse_result_cache_file_path.as_path().is_file() {
+      log::info(format!("Header parse result is loaded from file: {}",
+                        parse_result_cache_file_path.to_str().unwrap()));
+      let file = File::open(&parse_result_cache_file_path).unwrap();
+      serde_json::from_reader(file).unwrap()
+    } else { 
+      log::info("Stage 1. Parsing Qt headers.");
+      let mut parser = cpp_parser::CppParser::new(vec![qt_install_headers_path.clone(),
+                                                     qt_core_headers_path.clone()],
+                                                  "QtCore".to_string(),
+                                                  rust_qt_path.clone());
+      parser.run();
+      let mut parse_result = parser.get_data();
+      qt_specific::fix_header_names(&mut parse_result, &qt_core_headers_path);
+
+      parse_result.ensure_explicit_destructors();
+
+      //let serialized_parse_result = serde_json::to_vec(&parse_result).unwrap();
+      let mut file = File::create(&parse_result_cache_file_path).unwrap();
+      //file.write(serialized_parse_result);
+      serde_json::to_writer(&mut file, &parse_result).unwrap();
+      log::info(format!("Header parse result is saved to file: {}",
+                        parse_result_cache_file_path.to_str().unwrap()));
+      parse_result
+    };
 
 
     let c_gen = cpp_ffi_generator::CGenerator::new(parse_result, qtcw_path);

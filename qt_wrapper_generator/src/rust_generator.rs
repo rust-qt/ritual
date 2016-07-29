@@ -206,11 +206,11 @@ impl RustGenerator {
       }
       CppTypeBase::PointerSizedInteger { ref is_signed, .. } => {
         RustName::new(vec![if *is_signed {
-                               "isize"
-                             } else {
-                               "usize"
-                             }
-                             .to_string()])
+                             "isize"
+                           } else {
+                             "usize"
+                           }
+                           .to_string()])
       }
       CppTypeBase::Enum { ref name } => {
         match self.cpp_to_rust_type_map.get(name) {
@@ -251,7 +251,7 @@ impl RustGenerator {
     let mut args = Vec::new();
     for arg in &data.c_signature.arguments {
       let rust_type = try!(self.cpp_type_to_complete_type(&arg.argument_type, &arg.meaning))
-        .rust_ffi_type;
+                        .rust_ffi_type;
       args.push(RustFFIArgument {
         name: sanitize_rust_var_name(&arg.name),
         argument_type: rust_type,
@@ -260,7 +260,7 @@ impl RustGenerator {
     Ok(RustFFIFunction {
       return_type: try!(self.cpp_type_to_complete_type(&data.c_signature.return_type,
                                                        &CppFfiArgumentMeaning::ReturnValue))
-        .rust_ffi_type,
+                     .rust_ffi_type,
       name: data.c_name.clone(),
       arguments: args,
     })
@@ -374,14 +374,14 @@ impl RustGenerator {
                                   });
         }
         let mut values: Vec<_> = value_to_variant.into_iter()
-          .map(|(_val, variant)| variant)
-          .collect();
+                                                 .map(|(_val, variant)| variant)
+                                                 .collect();
         values.sort_by(|a, b| a.value.cmp(&b.value));
         let mut is_flaggable = false;
         if let Some(instantiations) = self.input_data
-          .cpp_data
-          .template_instantiations
-          .get(&"QFlags".to_string()) {
+                                          .cpp_data
+                                          .template_instantiations
+                                          .get(&"QFlags".to_string()) {
           let cpp_type_sample = CppType {
             is_const: false,
             indirection: CppTypeIndirection::None,
@@ -408,14 +408,14 @@ impl RustGenerator {
       CppTypeKind::Class { ref size, .. } => {
         let methods_scope = RustMethodScope::Impl { type_name: rust_name.clone() };
         let (methods, traits) = self.generate_functions(c_header.methods
-                                                          .iter()
-                                                          .filter(|&x| {
-                                                            x.cpp_method
-                                                              .scope
-                                                              .class_name() ==
-                                                            Some(&type_info.name)
-                                                          })
-                                                          .collect(),
+                                                                .iter()
+                                                                .filter(|&x| {
+                                                                  x.cpp_method
+                                                                   .scope
+                                                                   .class_name() ==
+                                                                  Some(&type_info.name)
+                                                                })
+                                                                .collect(),
                                                         &methods_scope);
         return Some(RustTypeDeclaration {
           name: rust_name.clone(),
@@ -441,9 +441,9 @@ impl RustGenerator {
     self.generate_ffi();
     self.code_generator.generate_lib_file(&self.output_path,
                                           &self.modules
-                                            .iter()
-                                            .map(|x| x.name.last_name().clone())
-                                            .collect());
+                                               .iter()
+                                               .map(|x| x.name.last_name().clone())
+                                               .collect());
   }
 
   pub fn generate_modules_from_header(&mut self, c_header: &CppFfiHeaderData) {
@@ -701,9 +701,12 @@ impl RustGenerator {
     let mut name_counters = HashMap::new();
     for method_name in method_names {
       let current_methods: Vec<_> = methods.clone()
-        .into_iter()
-        .filter(|m| self.method_rust_name(m, false).last_name() == &method_name)
-        .collect();
+                                           .into_iter()
+                                           .filter(|m| {
+                                             self.method_rust_name(m, false).last_name() ==
+                                             &method_name
+                                           })
+                                           .collect();
       let methods_count = current_methods.len();
       for method in current_methods {
         match self.generate_function(method, scope, methods_count > 1) {

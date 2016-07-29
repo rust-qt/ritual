@@ -4,8 +4,9 @@ version = "0.1.0"
 authors = ["Ri <ri@idzaaus.org>"]
 
 [dependencies]
-serde = "0.6.14"
-serde_json = "0.6.0"
+serde = "0.8"
+serde_json = "0.8"
+serde_macros = "0.8"
 find_folder = "0.3.0"
 Inflector = "0.2.0"
 ansi_term = "0.7"

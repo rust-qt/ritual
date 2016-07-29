@@ -4,12 +4,14 @@ use cpp_type::{CppType, CppTypeBase};
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct EnumValue {
   pub name: String,
   pub value: i64,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct CppClassField {
   pub name: String,
   pub field_type: CppType,
@@ -17,6 +19,7 @@ pub struct CppClassField {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
 pub enum CppTypeKind {
   Enum {
     values: Vec<EnumValue>,
@@ -30,6 +33,7 @@ pub enum CppTypeKind {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct CppOriginLocation {
   pub include_file_path: String,
   pub line: u32,
@@ -37,6 +41,7 @@ pub struct CppOriginLocation {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
 pub enum CppVisibility {
   Public,
   Protected,
@@ -44,6 +49,7 @@ pub enum CppVisibility {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct CppTypeData {
   pub name: String,
   pub include_file: String,
@@ -52,6 +58,7 @@ pub struct CppTypeData {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(Serialize, Deserialize)]
 pub struct CppData {
   pub types: Vec<CppTypeData>,
   pub methods: Vec<CppMethod>,
@@ -136,9 +143,9 @@ impl CppData {
       if let CppTypeKind::Class { .. } = tp.kind {
         if let Some(ins) = self.template_instantiations.get(&tp.name) {
           result.get_mut(&tp.include_file)
-            .unwrap()
-            .template_instantiations
-            .insert(tp.name.clone(), ins.clone());
+                .unwrap()
+                .template_instantiations
+                .insert(tp.name.clone(), ins.clone());
         }
       }
     }

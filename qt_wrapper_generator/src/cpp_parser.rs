@@ -92,11 +92,11 @@ fn get_origin_location(entity: Entity) -> Result<CppOriginLocation, String> {
 
 fn get_template_arguments(entity: Entity) -> Vec<String> {
   entity.get_children()
-    .into_iter()
-    .filter(|c| c.get_kind() == EntityKind::TemplateTypeParameter)
-    .enumerate()
-    .map(|(i, c)| c.get_name().unwrap_or_else(|| format!("Type{}", i + 1)))
-    .collect()
+        .into_iter()
+        .filter(|c| c.get_kind() == EntityKind::TemplateTypeParameter)
+        .enumerate()
+        .map(|(i, c)| c.get_name().unwrap_or_else(|| format!("Type{}", i + 1)))
+        .collect()
 }
 
 
@@ -280,8 +280,8 @@ impl CppParser {
       return Ok(type1);
     }
     if let Some(x) = CppBuiltInNumericType::all()
-      .iter()
-      .find(|x| x.to_cpp_code() == remaining_name) {
+                       .iter()
+                       .find(|x| x.to_cpp_code() == remaining_name) {
       type1.base = CppTypeBase::BuiltInNumeric(x.clone());
       return Ok(type1);
     }
@@ -365,8 +365,9 @@ impl CppParser {
                 context_class: Option<Entity>,
                 context_method: Option<Entity>)
                 -> Result<CppType, String> {
-    let parsed =
-      try!(self.parse_canonical_type(type1.get_canonical_type(), context_class, context_method));
+    let parsed = try!(self.parse_canonical_type(type1.get_canonical_type(),
+                                                context_class,
+                                                context_method));
     if let CppTypeBase::BuiltInNumeric(..) = parsed.base {
       if parsed.indirection == CppTypeIndirection::None {
         let mut name = type1.get_display_name();
@@ -688,9 +689,9 @@ impl CppParser {
       None => (CppMethodScope::Global, None),
     };
     let return_type = entity.get_type()
-      .unwrap_or_else(|| panic!("failed to get function type"))
-      .get_result_type()
-      .unwrap_or_else(|| panic!("failed to get function return type"));
+                            .unwrap_or_else(|| panic!("failed to get function type"))
+                            .get_result_type()
+                            .unwrap_or_else(|| panic!("failed to get function return type"));
     let return_type_parsed = match self.parse_type(return_type, class_entity, Some(entity)) {
       Ok(x) => x,
       Err(msg) => {
@@ -707,9 +708,9 @@ impl CppParser {
     let template_arguments = match entity.get_kind() {
       EntityKind::FunctionTemplate => {
         if entity.get_children()
-          .into_iter()
-          .find(|c| c.get_kind() == EntityKind::NonTypeTemplateParameter)
-          .is_some() {
+                 .into_iter()
+                 .find(|c| c.get_kind() == EntityKind::NonTypeTemplateParameter)
+                 .is_some() {
           return Err(format!("Non-type template parameter is not supported"));
         }
         Some(get_template_arguments(entity))
@@ -718,7 +719,7 @@ impl CppParser {
     };
 
     for (argument_number, argument_entity) in argument_entities.into_iter()
-      .enumerate() {
+                                                               .enumerate() {
       let name = argument_entity.get_name().unwrap_or(format!("arg{}", argument_number + 1));
       let type1 = self.parse_type(argument_entity.get_type().unwrap(),
                                   class_entity,
@@ -730,11 +731,11 @@ impl CppParser {
             name: name,
             argument_type: argument_type,
             has_default_value: argument_entity.get_range()
-              .unwrap()
-              .tokenize()
-              .iter()
-              .find(|t| t.get_spelling() == "=")
-              .is_some(),
+                                              .unwrap()
+                                              .tokenize()
+                                              .iter()
+                                              .find(|t| t.get_spelling() == "=")
+                                              .is_some(),
           });
         }
         Err(msg) => {
@@ -948,10 +949,10 @@ impl CppParser {
       Some(file_path) => {
         let file_path_buf = PathBuf::from(file_path.clone());
         Some(file_path_buf.file_name()
-          .unwrap()
-          .to_str()
-          .unwrap()
-          .to_string())
+                          .unwrap()
+                          .to_str()
+                          .unwrap()
+                          .to_string())
       }
       None => None,
     }
@@ -1001,10 +1002,10 @@ impl CppParser {
                 log::warning(message.as_ref());
                 if self.stats.method_messages.contains_key(&full_name) {
                   self.stats
-                    .method_messages
-                    .get_mut(&full_name)
-                    .unwrap()
-                    .push_str(format!("\n{}", message).as_ref());
+                      .method_messages
+                      .get_mut(&full_name)
+                      .unwrap()
+                      .push_str(format!("\n{}", message).as_ref());
                 } else {
                   self.stats.method_messages.insert(full_name, message);
                 }
@@ -1091,16 +1092,16 @@ impl CppParser {
     let mut args = vec!["-fPIC".to_string(),
                         "-Xclang".to_string(),
                         "-detailed-preprocessing-record".to_string()];
-    //    let include_dirs_as_str = self.include_dirs.iter().map(|x| x.to_str().unwrap().to_string());
+    // let include_dirs_as_str = self.include_dirs.iter().map(|x| x.to_str().unwrap().to_string());
     for dir in &self.include_dirs {
       args.push("-I".to_string());
       args.push(dir.to_str().unwrap().to_string());
     }
 
     let tu = index.parser(&tmp_file_path)
-      .arguments(&args)
-      .parse()
-      .unwrap_or_else(|err| panic!("clang parse failed: {:?}", err));
+                  .arguments(&args)
+                  .parse()
+                  .unwrap_or_else(|err| panic!("clang parse failed: {:?}", err));
     let translation_unit = tu.get_entity();
     assert!(translation_unit.get_kind() == EntityKind::TranslationUnit);
     if !tu.get_diagnostics().is_empty() {
@@ -1164,37 +1165,41 @@ impl CppParser {
 
   fn check_integrity(&mut self) {
     self.data.methods = self.data
-      .methods
-      .clone()
-      .into_iter()
-      .filter(|method| {
-        if let Err(msg) = self.check_type_integrity(&method.return_type
-          .clone()
-          .unwrap()) {
-          log::warning(format!("Method is removed: {}: {}", method.short_text(), msg));
-          return false;
-        }
-        for arg in &method.arguments {
-          if let Err(msg) = self.check_type_integrity(&arg.argument_type) {
-            log::warning(format!("Method is removed: {}: {}", method.short_text(), msg));
-            return false;
-          }
-        }
-        if let CppMethodScope::Class(ref class_name) = method.scope {
-          if self.data
-            .types
-            .iter()
-            .find(|x| &x.name == class_name)
-            .is_none() {
-            log::warning(format!("Method is removed: {}: {}",
-                                 method.short_text(),
-                                 "class name is unavailable"));
-            return false;
-          }
-        }
-        true
-      })
-      .collect();
+                            .methods
+                            .clone()
+                            .into_iter()
+                            .filter(|method| {
+                              if let Err(msg) = self.check_type_integrity(&method.return_type
+                                                                                 .clone()
+                                                                                 .unwrap()) {
+                                log::warning(format!("Method is removed: {}: {}",
+                                                     method.short_text(),
+                                                     msg));
+                                return false;
+                              }
+                              for arg in &method.arguments {
+                                if let Err(msg) = self.check_type_integrity(&arg.argument_type) {
+                                  log::warning(format!("Method is removed: {}: {}",
+                                                       method.short_text(),
+                                                       msg));
+                                  return false;
+                                }
+                              }
+                              if let CppMethodScope::Class(ref class_name) = method.scope {
+                                if self.data
+                                       .types
+                                       .iter()
+                                       .find(|x| &x.name == class_name)
+                                       .is_none() {
+                                  log::warning(format!("Method is removed: {}: {}",
+                                                       method.short_text(),
+                                                       "class name is unavailable"));
+                                  return false;
+                                }
+                              }
+                              true
+                            })
+                            .collect();
     for t in self.data.types.clone() {
       if let CppTypeKind::Class { bases, .. } = t.kind {
         for base in bases {
@@ -1214,17 +1219,17 @@ impl CppParser {
             self.data.template_instantiations.insert(name.clone(), Vec::new());
           }
           if self.data
-            .template_instantiations
-            .get(name)
-            .unwrap()
-            .iter()
-            .find(|x| x == &template_arguments)
-            .is_none() {
+                 .template_instantiations
+                 .get(name)
+                 .unwrap()
+                 .iter()
+                 .find(|x| x == &template_arguments)
+                 .is_none() {
             self.data
-              .template_instantiations
-              .get_mut(name)
-              .unwrap()
-              .push(template_arguments.clone());
+                .template_instantiations
+                .get_mut(name)
+                .unwrap()
+                .push(template_arguments.clone());
           }
           for arg in template_arguments {
             self.find_template_instantiations_in_type(arg);
@@ -1259,8 +1264,8 @@ impl CppParser {
               println!("    {}<{}>",
                        class_name,
                        ins.iter()
-                         .map(|t| t.to_cpp_code().unwrap_or_else(|_| format!("{:?}", t)))
-                         .join(", "));
+                          .map(|t| t.to_cpp_code().unwrap_or_else(|_| format!("{:?}", t)))
+                          .join(", "));
               if ins.len() != valid_length {
                 panic!("template arguments count mismatch: {}: {:?} vs {:?}",
                        class_name,

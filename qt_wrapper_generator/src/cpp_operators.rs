@@ -1,6 +1,7 @@
 use cpp_type::CppType;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
 pub enum CppOperator {
   /// (type) a
   Conversion(CppType),
