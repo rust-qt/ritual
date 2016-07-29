@@ -6,10 +6,12 @@ use cpp_data::{CppData, CppTypeKind, CppVisibility};
 use caption_strategy::MethodCaptionStrategy;
 use cpp_method::{CppMethod, CppMethodScope, CppMethodKind};
 use cpp_type::CppTypeBase;
-use cpp_code_generator;
+use cpp_code_generator::CppCodeGenerator;
 
 pub struct CGenerator {
-  qtcw_path: PathBuf,
+  lib_path: PathBuf,
+  lib_name: String,
+  link_libraries: String,
   cpp_data: CppData,
   template_classes: Vec<String>,
   abstract_classes: Vec<String>,
@@ -29,9 +31,15 @@ pub struct CppAndFfiData {
 }
 
 impl CGenerator {
-  pub fn new(cpp_data: CppData, qtcw_path: PathBuf) -> Self {
+  pub fn new(cpp_data: CppData,
+             lib_name: String,
+             link_libraries: String,
+             lib_path: PathBuf)
+             -> Self {
     CGenerator {
-      qtcw_path: qtcw_path,
+      lib_path: lib_path,
+      lib_name: lib_name,
+      link_libraries: link_libraries,
       template_classes: cpp_data.types
                                 .iter()
                                 .filter_map(|t| {
@@ -53,6 +61,7 @@ impl CGenerator {
   }
 
   pub fn generate_all(mut self) -> CppAndFfiData {
+    let code_gen = CppCodeGenerator::new(self.lib_name.clone(), self.lib_path.clone());
     self.abstract_classes = self.cpp_data
                                 .types
                                 .iter()
@@ -93,9 +102,9 @@ impl CGenerator {
       include_name_list.push((*include_file).clone());
     }
     c_headers.sort_by(|a, b| a.include_file.cmp(&b.include_file));
-    cpp_code_generator::generate_all_headers_file(&self.qtcw_path, &include_name_list);
+    code_gen.generate_all_headers_file(&include_name_list);
     for data in &c_headers {
-      cpp_code_generator::generate_one(&self.qtcw_path, data);
+      code_gen.generate_one(data);
     }
 
     CppAndFfiData {
