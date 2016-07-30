@@ -9,6 +9,7 @@ use std::fs::File;
 use std::io::Write;
 use utils::JoinWithString;
 use std::path::PathBuf;
+use tweaked_file::TweakedFile;
 
 pub struct CppCodeGenerator {
   lib_name: String,
@@ -224,7 +225,7 @@ impl CppCodeGenerator {
                                  cpp_lib_include_file: &String,
                                  include_directories: &Vec<String>) {
     let name_upper = self.lib_name.to_uppercase();
-    let mut cmakelists_file = File::create({
+    let mut cmakelists_file = TweakedFile::create({
                                 let mut path = self.lib_path.clone();
                                 path.push("CMakeLists.txt");
                                 path
@@ -253,7 +254,7 @@ impl CppCodeGenerator {
     };
     fs::create_dir_all(&include_dir).unwrap();
 
-    let mut exports_file = File::create({
+    let mut exports_file = TweakedFile::create({
                              let mut path = include_dir.clone();
                              path.push(format!("{}_exports.h", &self.lib_name));
                              path
@@ -264,7 +265,7 @@ impl CppCodeGenerator {
            lib_name_uppercase = name_upper)
       .unwrap();
 
-    let mut global_file = File::create({
+    let mut global_file = TweakedFile::create({
                             let mut path = include_dir.clone();
                             path.push(format!("{}_global.h", &self.lib_name));
                             path
@@ -282,7 +283,7 @@ impl CppCodeGenerator {
     let mut h_path = self.lib_path.clone();
     h_path.push("include");
     h_path.push(format!("{}.h", &self.lib_name));
-    let mut all_header_file = File::create(&h_path).unwrap();
+    let mut all_header_file = TweakedFile::create(&h_path).unwrap();
     write!(all_header_file,
            "#ifndef {0}_H\n#define {0}_H\n\n",
            &self.lib_name_upper)
@@ -310,8 +311,8 @@ impl CppCodeGenerator {
     h_path.push(&ffi_include_file);
     log::info(format!("Generating header file: {:?}", h_path));
 
-    let mut cpp_file = File::create(&cpp_path).unwrap();
-    let mut h_file = File::create(&h_path).unwrap();
+    let mut cpp_file = TweakedFile::create(&cpp_path).unwrap();
+    let mut h_file = TweakedFile::create(&h_path).unwrap();
 
     write!(cpp_file, "#include \"{}\"\n\n", ffi_include_file).unwrap();
     let include_guard_name = ffi_include_file.replace(".", "_").to_uppercase();

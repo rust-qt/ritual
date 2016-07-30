@@ -10,7 +10,7 @@ use std::io::Write;
 pub fn do_it(cpp_data: DocCppData, extractor_actions_path: PathBuf) {
   let show_output = true;
   log::info(format!("Generating file: {:?}", extractor_actions_path));
-  let mut h_file = File::create(&extractor_actions_path).unwrap();
+  let mut h_file = TweakedFile::create(&extractor_actions_path).unwrap();
   for item in &cpp_data.headers {
     if let Some(ref class_name) = item.class_name {
       if cpp_data.classes_blacklist.iter().find(|&x| x == class_name.as_ref() as &str).is_some() {

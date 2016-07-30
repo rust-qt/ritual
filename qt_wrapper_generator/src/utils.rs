@@ -1,3 +1,4 @@
+use std::path::{Path, PathBuf};
 
 pub trait JoinWithString {
   fn join(self, separator: &'static str) -> String;
@@ -15,5 +16,17 @@ impl<X> JoinWithString for X
       };
       m + &b
     })
+  }
+}
+
+pub trait PathBufPushTweak {
+  fn with_added<P: AsRef<Path>>(&self, path: P) -> Self;
+}
+
+impl PathBufPushTweak for PathBuf {
+  fn with_added<P: AsRef<Path>>(&self, path: P) -> Self {
+    let mut p = self.clone();
+    p.push(path);
+    p
   }
 }

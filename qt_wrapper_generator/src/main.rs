@@ -23,10 +23,12 @@ mod rust_info;
 mod rust_type;
 mod utils;
 mod cpp_parser;
+mod tweaked_file;
 
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
+use utils::PathBufPushTweak;
 
 
 // mod doc_parser_support;
@@ -35,6 +37,7 @@ use std::path::PathBuf;
 use std::env;
 use std::process::Command;
 use cpp_code_generator::CppCodeGenerator;
+use tweaked_file::TweakedFile;
 
 extern crate find_folder;
 
@@ -98,7 +101,12 @@ fn main() {
   }
   log::info("Reading lib spec...");
   let lib_spec_path = PathBuf::from(arguments[1].clone());
-  let output_dir_path = PathBuf::from(arguments[2].clone());
+  let mut output_dir_path = PathBuf::from(arguments[2].clone());
+  if output_dir_path.is_relative() {
+    let mut p = std::env::current_dir().unwrap();
+    p.push(&output_dir_path);
+    output_dir_path = p;
+  }
   let file = File::open(&lib_spec_path).unwrap();
   let lib_spec: LibSpec = serde_json::from_reader(file).unwrap();
   log::info("Lib spec is valid.");
@@ -116,7 +124,7 @@ fn main() {
     serde_json::from_reader(file).unwrap()
   } else {
     let r = LocalOverrides::default();
-    let mut file = File::create(&local_overrides_path).unwrap();
+    let mut file = TweakedFile::create(&local_overrides_path).unwrap();
     serde_json::to_writer(&mut file, &r).unwrap();
     log::info(format!("Local overrides file created: {}",
                       local_overrides_path.to_str().unwrap()));
@@ -179,7 +187,7 @@ fn main() {
     parse_result.ensure_explicit_destructors();
 
     // let serialized_parse_result = serde_json::to_vec(&parse_result).unwrap();
-    let mut file = File::create(&parse_result_cache_file_path).unwrap();
+    let mut file = TweakedFile::create(&parse_result_cache_file_path).unwrap();
     // file.write(serialized_parse_result);
     serde_json::to_writer(&mut file, &parse_result).unwrap();
     log::info(format!("Header parse result is saved to file: {}",
@@ -202,31 +210,52 @@ fn main() {
   //  }
 
   let c_lib_name = format!("{}_c_lib", &lib_spec.rust.name);
-  let c_lib_path = {
-    let mut p = output_dir_path.clone();
-    p.push(&c_lib_name);
-    p
-  };
-  if c_lib_path.as_path().is_dir() {
-    log::info(format!("Skipping C library generation because directory already exists: {}",
-                      c_lib_path.to_str().unwrap()));
-  } else {
-    fs::create_dir_all(&c_lib_path).unwrap();
+  let c_lib_parent_path = output_dir_path.with_added(&c_lib_name);
+  let c_lib_path = c_lib_parent_path.with_added("src");
 
-    let code_gen = CppCodeGenerator::new(c_lib_name.clone(), c_lib_path.clone());
-    code_gen.generate_template_files(&vec![lib_spec.cpp.name.clone()],
-                                     &lib_spec.cpp.include_file,
-                                     &include_dirs.iter()
-                                                  .map(|x| x.to_str().unwrap().to_string())
-                                                  .collect());
+  //  if c_lib_path.as_path().is_dir() {
+  //    log::info(format!("Skipping C library generation because directory already exists: {}",
+  //                      c_lib_path.to_str().unwrap()));
+  //  } else {
+  log::info(format!("Generating C wrapper library ({}).", c_lib_name));
+  fs::create_dir_all(&c_lib_path).unwrap();
+  let code_gen = CppCodeGenerator::new(c_lib_name.clone(), c_lib_path.clone());
+  code_gen.generate_template_files(&vec![lib_spec.cpp.name.clone()],
+                                   &lib_spec.cpp.include_file,
+                                   &include_dirs.iter()
+                                                .map(|x| x.to_str().unwrap().to_string())
+                                                .collect());
 
-    let c_gen = cpp_ffi_generator::CGenerator::new(parse_result,
-                                                   c_lib_name.clone(),
-                                                   lib_spec.cpp.name.clone(),
-                                                   c_lib_path);
-    log::info(format!("Generating C wrapper library ({}).", c_lib_name));
-    let c_data = c_gen.generate_all();
-  }
+  let c_gen = cpp_ffi_generator::CGenerator::new(parse_result,
+                                                 c_lib_name.clone(),
+                                                 lib_spec.cpp.name.clone(),
+                                                 c_lib_path.clone());
+  let c_data = c_gen.generate_all();
+
+  log::info(format!("Building C wrapper library."));
+  let c_lib_build_path = c_lib_parent_path.with_added("build");
+  fs::create_dir_all(&c_lib_build_path).unwrap();
+  let c_lib_install_path = c_lib_parent_path.with_added("install");
+  fs::create_dir_all(&c_lib_install_path).unwrap();
+
+  assert!(Command::new("cmake")
+            .arg(&c_lib_path)
+            .arg(format!("-DCMAKE_INSTALL_PREFIX={}", c_lib_install_path.to_str().unwrap()))
+            .current_dir(&c_lib_build_path)
+            .status()
+            .expect("Failed to execute cmake command")
+            .success());
+
+  //TODO: move make command and args to local overrides
+  assert!(Command::new("make")
+            .arg("-j8")
+            .arg("install")
+            .current_dir(&c_lib_build_path)
+            .status()
+            .expect("Failed to execute make command")
+            .success());
+
+  // }
 
   //  let crate_path = {
   //    let mut p = output_dir_path.clone(); p.push(&lib_spec.rust.name); p

@@ -7,6 +7,7 @@ use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMe
 use std::collections::HashMap;
 use utils::JoinWithString;
 use log;
+use tweaked_file::TweakedFile;
 
 extern crate rustfmt;
 
@@ -262,7 +263,7 @@ impl RustCodeGenerator {
     lib_file_path.push("src");
     lib_file_path.push("lib.rs");
     {
-      let mut lib_file = File::create(&lib_file_path).unwrap();
+      let mut lib_file = TweakedFile::create(&lib_file_path).unwrap();
       write!(lib_file, "#![allow(drop_with_repr_extern)]\n").unwrap();
 
       let built_in_modules = vec!["types", "flags", "ffi"];
@@ -369,7 +370,7 @@ impl RustCodeGenerator {
     file_path.push("src");
     file_path.push(format!("{}.rs", &data.name.last_name()));
     {
-      let mut file = File::create(&file_path).unwrap();
+      let mut file = TweakedFile::create(&file_path).unwrap();
       file.write(self.generate_module_code(data).as_bytes()).unwrap();
     }
     self.call_rustfmt(&file_path);
@@ -382,7 +383,7 @@ impl RustCodeGenerator {
     file_path.push("src");
     file_path.push("ffi.rs");
     {
-      let mut file = File::create(&file_path).unwrap();
+      let mut file = TweakedFile::create(&file_path).unwrap();
       write!(file, "extern crate libc;\n\n").unwrap();
       write!(file, "#[link(name = \"Qt5Core\")]\n").unwrap();
       //      write!(file, "#[link(name = \"icui18n\")]\n").unwrap();
