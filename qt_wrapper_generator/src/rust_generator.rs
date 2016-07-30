@@ -64,7 +64,6 @@ impl CaseFix for String {
 
 pub struct RustGenerator {
   input_data: CppAndFfiData,
-  output_path: PathBuf,
   modules: Vec<RustModule>,
   crate_name: String,
   cpp_to_rust_type_map: HashMap<String, RustName>,
@@ -72,15 +71,14 @@ pub struct RustGenerator {
 }
 
 impl RustGenerator {
-  pub fn new(input_data: CppAndFfiData, output_path: PathBuf) -> Self {
+  pub fn new(input_data: CppAndFfiData, output_path: PathBuf, template_path: PathBuf) -> Self {
     let crate_name = "qt_core".to_string();
     RustGenerator {
       input_data: input_data,
-      output_path: output_path.clone(),
       modules: Vec::new(),
       crate_name: crate_name.clone(),
       cpp_to_rust_type_map: HashMap::new(),
-      code_generator: RustCodeGenerator::new(crate_name, output_path),
+      code_generator: RustCodeGenerator::new(crate_name, output_path, template_path),
     }
   }
 
@@ -439,8 +437,7 @@ impl RustGenerator {
       self.generate_modules_from_header(header);
     }
     self.generate_ffi();
-    self.code_generator.generate_lib_file(&self.output_path,
-                                          &self.modules
+    self.code_generator.generate_lib_file(&self.modules
                                                .iter()
                                                .map(|x| x.name.last_name().clone())
                                                .collect());
@@ -464,8 +461,6 @@ impl RustGenerator {
                          module_name: &RustName)
                          -> Option<RustModule> {
     log::info(format!("Generating Rust module {}", module_name.full_name(None)));
-
-    let enable_debug = false; //module_name.full_name(None).starts_with("q_meta_type");
 
     let mut direct_submodules = HashSet::new();
     let mut rust_types = Vec::new();
@@ -740,7 +735,6 @@ impl RustGenerator {
     let mut ffi_functions = HashMap::new();
 
     for header in &self.input_data.cpp_ffi_headers.clone() {
-      let module_name = include_file_to_module_name(&header.include_file);
       let mut functions = Vec::new();
       for method in &header.methods {
         match self.generate_rust_ffi_function(method) {

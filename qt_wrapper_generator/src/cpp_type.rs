@@ -238,13 +238,13 @@ impl CppType {
     !self.is_const && self.indirection == CppTypeIndirection::None && self.base == CppTypeBase::Void
   }
 
-  pub fn is_template(&self) -> bool {
-    match self.base {
-      CppTypeBase::Class { ref template_arguments, .. } => template_arguments.is_some(),
-      CppTypeBase::TemplateParameter { .. } => true,
-      _ => false,
-    }
-  }
+  //  pub fn is_template(&self) -> bool {
+  //    match self.base {
+  //      CppTypeBase::Class { ref template_arguments, .. } => template_arguments.is_some(),
+  //      CppTypeBase::TemplateParameter { .. } => true,
+  //      _ => false,
+  //    }
+  //  }
 
   pub fn to_cpp_code(&self) -> Result<String, String> {
     let name = try!(self.base.to_cpp_code());

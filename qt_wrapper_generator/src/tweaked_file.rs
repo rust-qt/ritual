@@ -27,13 +27,13 @@ impl TweakedFile {
 
 impl Drop for TweakedFile {
   fn drop(&mut self) {
-    self.file.as_ref().unwrap().flush();
+    self.file.as_ref().unwrap().flush().unwrap();
     self.file = None;
     let is_changed = if self.original_path.as_path().is_file() {
       let mut string1 = String::new();
       let mut string2 = String::new();
-      File::open(&self.tmp_path).unwrap().read_to_string(&mut string1);
-      File::open(&self.original_path).unwrap().read_to_string(&mut string2);
+      File::open(&self.tmp_path).unwrap().read_to_string(&mut string1).unwrap();
+      File::open(&self.original_path).unwrap().read_to_string(&mut string2).unwrap();
       string1 != string2
     } else {
       true

@@ -5,11 +5,11 @@ use cpp_ffi_function_argument::CppFfiArgumentMeaning;
 use cpp_ffi_generator::CppFfiHeaderData;
 use log;
 use std::fs;
-use std::fs::File;
 use std::io::Write;
 use utils::JoinWithString;
 use std::path::PathBuf;
 use tweaked_file::TweakedFile;
+use utils::PathBufPushTweak;
 
 pub struct CppCodeGenerator {
   lib_name: String,
@@ -225,11 +225,7 @@ impl CppCodeGenerator {
                                  cpp_lib_include_file: &String,
                                  include_directories: &Vec<String>) {
     let name_upper = self.lib_name.to_uppercase();
-    let mut cmakelists_file = TweakedFile::create({
-                                let mut path = self.lib_path.clone();
-                                path.push("CMakeLists.txt");
-                                path
-                              })
+    let mut cmakelists_file = TweakedFile::create(self.lib_path.with_added("CMakeLists.txt"))
                                 .unwrap();
     write!(cmakelists_file,
            include_str!("../templates/c_lib/CMakeLists.txt"),
@@ -247,11 +243,7 @@ impl CppCodeGenerator {
     };
     fs::create_dir_all(&src_dir).unwrap();
 
-    let include_dir = {
-      let mut path = self.lib_path.clone();
-      path.push("include");
-      path
-    };
+    let include_dir = self.lib_path.with_added("include");
     fs::create_dir_all(&include_dir).unwrap();
 
     let mut exports_file = TweakedFile::create({
@@ -265,11 +257,8 @@ impl CppCodeGenerator {
            lib_name_uppercase = name_upper)
       .unwrap();
 
-    let mut global_file = TweakedFile::create({
-                            let mut path = include_dir.clone();
-                            path.push(format!("{}_global.h", &self.lib_name));
-                            path
-                          })
+    let mut global_file = TweakedFile::create(include_dir.with_added(format!("{}_global.h",
+                                                                             &self.lib_name)))
                             .unwrap();
     write!(global_file,
            include_str!("../templates/c_lib/global.h"),
@@ -301,14 +290,12 @@ impl CppCodeGenerator {
   pub fn generate_one(&self, data: &CppFfiHeaderData) {
     let ffi_include_file = format!("{}_{}.h", &self.lib_name, data.include_file_base_name);
 
-    let mut cpp_path = self.lib_path.clone();
-    cpp_path.push("src");
-    cpp_path.push(format!("{}_{}.cpp", &self.lib_name, data.include_file_base_name));
+    let cpp_path = self.lib_path.with_added("src").with_added(format!("{}_{}.cpp",
+                                                                      &self.lib_name,
+                                                                      data.include_file_base_name));
     log::info(format!("Generating source file: {:?}", cpp_path));
 
-    let mut h_path = self.lib_path.clone();
-    h_path.push("include");
-    h_path.push(&ffi_include_file);
+    let h_path = self.lib_path.with_added("include").with_added(&ffi_include_file);
     log::info(format!("Generating header file: {:?}", h_path));
 
     let mut cpp_file = TweakedFile::create(&cpp_path).unwrap();

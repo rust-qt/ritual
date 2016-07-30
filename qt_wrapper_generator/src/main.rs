@@ -27,7 +27,6 @@ mod tweaked_file;
 
 use std::fs;
 use std::fs::File;
-use std::io::{Read, Write};
 use utils::PathBufPushTweak;
 
 
@@ -102,11 +101,16 @@ fn main() {
   log::info("Reading lib spec...");
   let lib_spec_path = PathBuf::from(arguments[1].clone());
   let mut output_dir_path = PathBuf::from(arguments[2].clone());
+  let current_dir = std::env::current_dir().unwrap();
   if output_dir_path.is_relative() {
-    let mut p = std::env::current_dir().unwrap();
-    p.push(&output_dir_path);
-    output_dir_path = p;
+    output_dir_path = current_dir.with_added(&output_dir_path);
   }
+  let mut lib_spec_dir_path = output_dir_path.clone();
+  assert!(lib_spec_dir_path.pop());
+  if lib_spec_dir_path.is_relative() {
+    lib_spec_dir_path = current_dir.with_added(&lib_spec_dir_path);
+  }
+
   let file = File::open(&lib_spec_path).unwrap();
   let lib_spec: LibSpec = serde_json::from_reader(file).unwrap();
   log::info("Lib spec is valid.");
@@ -228,7 +232,6 @@ fn main() {
 
   let c_gen = cpp_ffi_generator::CGenerator::new(parse_result,
                                                  c_lib_name.clone(),
-                                                 lib_spec.cpp.name.clone(),
                                                  c_lib_path.clone());
   let c_data = c_gen.generate_all();
 
@@ -240,13 +243,14 @@ fn main() {
 
   assert!(Command::new("cmake")
             .arg(&c_lib_path)
-            .arg(format!("-DCMAKE_INSTALL_PREFIX={}", c_lib_install_path.to_str().unwrap()))
+            .arg(format!("-DCMAKE_INSTALL_PREFIX={}",
+                         c_lib_install_path.to_str().unwrap()))
             .current_dir(&c_lib_build_path)
             .status()
             .expect("Failed to execute cmake command")
             .success());
 
-  //TODO: move make command and args to local overrides
+  // TODO: move make command and args to local overrides
   assert!(Command::new("make")
             .arg("-j8")
             .arg("install")
@@ -257,14 +261,21 @@ fn main() {
 
   // }
 
-  //  let crate_path = {
-  //    let mut p = output_dir_path.clone(); p.push(&lib_spec.rust.name); p
-  //  };
-  //  let mut rust_gen = rust_generator::RustGenerator::new(c_data, crate_path);
-  //  log::info(format!("Generating Rust crate ({}).", &lib_spec.rust.name));
-  //  rust_gen.generate_all();
-  //
-  //  log::info(format!("Source files for C library and Rust crate have been generated."));
+  let crate_path = output_dir_path.with_added(&lib_spec.rust.name);
+  fs::create_dir_all(&crate_path).unwrap();
+  let mut rust_gen = rust_generator::RustGenerator::new(c_data,
+                                                        crate_path.clone(),
+                                                        lib_spec_dir_path.with_added("rust"));
+  log::info(format!("Generating Rust crate ({}).", &lib_spec.rust.name));
+  rust_gen.generate_all();
+
+  log::info(format!("Compiling Rust crate."));
+  assert!(Command::new("cargo")
+            .arg("test")
+            .current_dir(&crate_path)
+            .status()
+            .expect("Failed to execute cargo command")
+            .success());
 
   return;
 }

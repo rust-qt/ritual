@@ -8,19 +8,20 @@ use std::collections::HashMap;
 use utils::JoinWithString;
 use log;
 use tweaked_file::TweakedFile;
+use utils::PathBufPushTweak;
 
 extern crate rustfmt;
 
 pub struct RustCodeGenerator {
   crate_name: String,
   output_path: PathBuf,
+  template_path: PathBuf,
   rustfmt_config: rustfmt::config::Config,
 }
 
 impl RustCodeGenerator {
-  pub fn new(crate_name: String, output_path: PathBuf) -> RustCodeGenerator {
-    let mut rustfmt_config_path = output_path.clone();
-    rustfmt_config_path.push("rustfmt.toml");
+  pub fn new(crate_name: String, output_path: PathBuf, template_path: PathBuf) -> RustCodeGenerator {
+    let rustfmt_config_path = output_path.with_added("rustfmt.toml");
     log::info(format!("Using rustfmt config file: {:?}", rustfmt_config_path));
     let mut rustfmt_config_file = File::open(rustfmt_config_path).unwrap();
     let mut rustfmt_config_toml = String::new();
@@ -30,6 +31,7 @@ impl RustCodeGenerator {
     RustCodeGenerator {
       crate_name: crate_name,
       output_path: output_path,
+      template_path: template_path,
       rustfmt_config: rustfmt_config,
     }
   }
@@ -257,8 +259,8 @@ impl RustCodeGenerator {
     }
   }
 
-  pub fn generate_lib_file(&self, output_path: &PathBuf, modules: &Vec<String>) {
-    let mut lib_file_path = output_path.clone();
+  pub fn generate_lib_file(&self, modules: &Vec<String>) {
+    let mut lib_file_path = self.output_path.clone();
     lib_file_path.push("qt_core");
     lib_file_path.push("src");
     lib_file_path.push("lib.rs");

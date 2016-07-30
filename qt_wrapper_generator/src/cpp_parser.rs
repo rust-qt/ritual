@@ -19,7 +19,6 @@ use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
                CppSpecificNumericTypeKind};
 use cpp_method::CppMethodScope;
 use cpp_operators::CppOperator;
-use std::fs::File;
 use std::io::Write;
 
 

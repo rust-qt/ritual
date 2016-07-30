@@ -11,7 +11,6 @@ use cpp_code_generator::CppCodeGenerator;
 pub struct CGenerator {
   lib_path: PathBuf,
   lib_name: String,
-  link_libraries: String,
   cpp_data: CppData,
   template_classes: Vec<String>,
   abstract_classes: Vec<String>,
@@ -31,15 +30,10 @@ pub struct CppAndFfiData {
 }
 
 impl CGenerator {
-  pub fn new(cpp_data: CppData,
-             lib_name: String,
-             link_libraries: String,
-             lib_path: PathBuf)
-             -> Self {
+  pub fn new(cpp_data: CppData, lib_name: String, lib_path: PathBuf) -> Self {
     CGenerator {
       lib_path: lib_path,
       lib_name: lib_name,
-      link_libraries: link_libraries,
       template_classes: cpp_data.types
                                 .iter()
                                 .filter_map(|t| {
