@@ -104,6 +104,9 @@ fn main() {
   if output_dir_path.is_relative() {
     output_dir_path = current_dir.with_added(&output_dir_path);
   }
+  if !output_dir_path.as_path().exists() {
+    fs::create_dir(&output_dir_path).unwrap();
+  }
   output_dir_path = fs::canonicalize(&output_dir_path).unwrap();
   let mut lib_spec_dir_path = lib_spec_path.clone();
   assert!(lib_spec_dir_path.pop());
@@ -224,8 +227,7 @@ fn main() {
   fs::create_dir_all(&c_lib_tmp_path).unwrap();
   log::info(format!("Generating C wrapper library ({}).", c_lib_name));
   let code_gen = CppCodeGenerator::new(c_lib_name.clone(), c_lib_tmp_path.clone());
-  code_gen.generate_template_files(&vec![lib_spec.cpp.name.clone()],
-                                   &lib_spec.cpp.include_file,
+  code_gen.generate_template_files(&lib_spec.cpp.include_file,
                                    &include_dirs.iter()
                                                 .map(|x| x.to_str().unwrap().to_string())
                                                 .collect());

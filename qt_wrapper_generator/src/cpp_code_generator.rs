@@ -221,7 +221,6 @@ impl CppCodeGenerator {
   }
 
   pub fn generate_template_files(&self,
-                                 link_libraries: &Vec<String>,
                                  cpp_lib_include_file: &String,
                                  include_directories: &Vec<String>) {
     let name_upper = self.lib_name.to_uppercase();
@@ -230,7 +229,6 @@ impl CppCodeGenerator {
            include_str!("../templates/c_lib/CMakeLists.txt"),
            lib_name_lowercase = &self.lib_name,
            lib_name_uppercase = name_upper,
-           link_libraries = link_libraries.join(" "),
            include_directories = include_directories.into_iter()
                                                     .map(|x| format!("\"{}\"", x))
                                                     .join(" "))

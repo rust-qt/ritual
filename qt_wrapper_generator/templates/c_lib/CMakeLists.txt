@@ -6,7 +6,6 @@ include_directories(${{CMAKE_CURRENT_SOURCE_DIR}}/include ${{CMAKE_CURRENT_BINAR
 file(GLOB sources src/*.cpp)
 file(GLOB headers include/*.h)
 add_library({lib_name_lowercase} STATIC ${{sources}})
-target_link_libraries({lib_name_lowercase} {link_libraries})
 include_directories({include_directories})
 
 add_definitions(-D{lib_name_uppercase}_LIBRARY)

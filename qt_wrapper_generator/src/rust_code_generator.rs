@@ -56,6 +56,8 @@ impl RustCodeGenerator {
     let mut rustfmt_file = File::create(self.output_path.with_added("rustfmt.toml")).unwrap();
     rustfmt_file.write(include_bytes!("../templates/crate/rustfmt.toml")).unwrap();
 
+    // TODO: maybe put c library inside crate sources and
+    // TODO: determine c_lib_path automatically in build script
     let mut build_rs_file = File::create(self.output_path.with_added("build.rs")).unwrap();
     write!(build_rs_file,
            include_str!("../templates/crate/build.rs"),
