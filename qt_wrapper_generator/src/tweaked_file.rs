@@ -1,10 +1,10 @@
-use std::fs;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use log;
 use std::io;
-use std::io::{Read, Write};
+use std::io::Write;
+use utils::move_one_file;
 
+#[allow(dead_code)]
 pub struct TweakedFile {
   file: Option<File>,
   original_path: PathBuf,
@@ -12,6 +12,7 @@ pub struct TweakedFile {
 }
 
 impl TweakedFile {
+  #[allow(dead_code)]
   pub fn create<P: AsRef<Path>>(path: P) -> io::Result<Self> {
     let original_path = path.as_ref().to_path_buf();
     let mut tmp_path = original_path.clone();
@@ -25,31 +26,12 @@ impl TweakedFile {
   }
 }
 
+
 impl Drop for TweakedFile {
   fn drop(&mut self) {
     self.file.as_ref().unwrap().flush().unwrap();
     self.file = None;
-    let is_changed = if self.original_path.as_path().is_file() {
-      let mut string1 = String::new();
-      let mut string2 = String::new();
-      File::open(&self.tmp_path).unwrap().read_to_string(&mut string1).unwrap();
-      File::open(&self.original_path).unwrap().read_to_string(&mut string2).unwrap();
-      string1 != string2
-    } else {
-      true
-    };
-
-    if is_changed {
-      if self.original_path.as_path().exists() {
-        fs::remove_file(&self.original_path).unwrap();
-      }
-      fs::rename(&self.tmp_path, &self.original_path).unwrap();
-      log::info(format!("File changed: {}", &self.original_path.to_str().unwrap()));
-    } else {
-      fs::remove_file(&self.tmp_path).unwrap();
-      log::info(format!("File not changed: {}",
-                        &self.original_path.to_str().unwrap()));
-    }
+    move_one_file(&self.original_path, &self.tmp_path).unwrap();
   }
 }
 

@@ -71,14 +71,25 @@ pub struct RustGenerator {
 }
 
 impl RustGenerator {
-  pub fn new(input_data: CppAndFfiData, output_path: PathBuf, template_path: PathBuf) -> Self {
+  pub fn new(input_data: CppAndFfiData,
+             output_path: PathBuf,
+             template_path: PathBuf,
+             c_lib_name: String,
+             cpp_lib_name: String,
+             c_lib_path: PathBuf)
+             -> Self {
     let crate_name = "qt_core".to_string();
     RustGenerator {
       input_data: input_data,
       modules: Vec::new(),
       crate_name: crate_name.clone(),
       cpp_to_rust_type_map: HashMap::new(),
-      code_generator: RustCodeGenerator::new(crate_name, output_path, template_path),
+      code_generator: RustCodeGenerator::new(crate_name,
+                                             output_path,
+                                             template_path,
+                                             c_lib_name,
+                                             cpp_lib_name,
+                                             c_lib_path),
     }
   }
 
@@ -432,6 +443,7 @@ impl RustGenerator {
   }
 
   pub fn generate_all(&mut self) {
+    self.code_generator.generate_template();
     self.generate_type_map();
     for header in &self.input_data.cpp_ffi_headers.clone() {
       self.generate_modules_from_header(header);

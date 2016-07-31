@@ -36,7 +36,6 @@ use std::path::PathBuf;
 use std::env;
 use std::process::Command;
 use cpp_code_generator::CppCodeGenerator;
-use tweaked_file::TweakedFile;
 
 extern crate find_folder;
 
@@ -105,11 +104,13 @@ fn main() {
   if output_dir_path.is_relative() {
     output_dir_path = current_dir.with_added(&output_dir_path);
   }
-  let mut lib_spec_dir_path = output_dir_path.clone();
+  output_dir_path = fs::canonicalize(&output_dir_path).unwrap();
+  let mut lib_spec_dir_path = lib_spec_path.clone();
   assert!(lib_spec_dir_path.pop());
   if lib_spec_dir_path.is_relative() {
     lib_spec_dir_path = current_dir.with_added(&lib_spec_dir_path);
   }
+  lib_spec_dir_path = fs::canonicalize(&lib_spec_dir_path).unwrap();
 
   let file = File::open(&lib_spec_path).unwrap();
   let lib_spec: LibSpec = serde_json::from_reader(file).unwrap();
@@ -128,7 +129,7 @@ fn main() {
     serde_json::from_reader(file).unwrap()
   } else {
     let r = LocalOverrides::default();
-    let mut file = TweakedFile::create(&local_overrides_path).unwrap();
+    let mut file = File::create(&local_overrides_path).unwrap();
     serde_json::to_writer(&mut file, &r).unwrap();
     log::info(format!("Local overrides file created: {}",
                       local_overrides_path.to_str().unwrap()));
@@ -191,7 +192,7 @@ fn main() {
     parse_result.ensure_explicit_destructors();
 
     // let serialized_parse_result = serde_json::to_vec(&parse_result).unwrap();
-    let mut file = TweakedFile::create(&parse_result_cache_file_path).unwrap();
+    let mut file = File::create(&parse_result_cache_file_path).unwrap();
     // file.write(serialized_parse_result);
     serde_json::to_writer(&mut file, &parse_result).unwrap();
     log::info(format!("Header parse result is saved to file: {}",
@@ -216,14 +217,13 @@ fn main() {
   let c_lib_name = format!("{}_c_lib", &lib_spec.rust.name);
   let c_lib_parent_path = output_dir_path.with_added(&c_lib_name);
   let c_lib_path = c_lib_parent_path.with_added("src");
-
-  //  if c_lib_path.as_path().is_dir() {
-  //    log::info(format!("Skipping C library generation because directory already exists: {}",
-  //                      c_lib_path.to_str().unwrap()));
-  //  } else {
+  let c_lib_tmp_path = c_lib_parent_path.with_added("src.new");
+  if c_lib_tmp_path.as_path().exists() {
+    fs::remove_dir_all(&c_lib_tmp_path).unwrap();
+  }
+  fs::create_dir_all(&c_lib_tmp_path).unwrap();
   log::info(format!("Generating C wrapper library ({}).", c_lib_name));
-  fs::create_dir_all(&c_lib_path).unwrap();
-  let code_gen = CppCodeGenerator::new(c_lib_name.clone(), c_lib_path.clone());
+  let code_gen = CppCodeGenerator::new(c_lib_name.clone(), c_lib_tmp_path.clone());
   code_gen.generate_template_files(&vec![lib_spec.cpp.name.clone()],
                                    &lib_spec.cpp.include_file,
                                    &include_dirs.iter()
@@ -232,8 +232,9 @@ fn main() {
 
   let c_gen = cpp_ffi_generator::CGenerator::new(parse_result,
                                                  c_lib_name.clone(),
-                                                 c_lib_path.clone());
+                                                 c_lib_tmp_path.clone());
   let c_data = c_gen.generate_all();
+  utils::move_files(&c_lib_tmp_path, &c_lib_path).unwrap();
 
   log::info(format!("Building C wrapper library."));
   let c_lib_build_path = c_lib_parent_path.with_added("build");
@@ -262,17 +263,28 @@ fn main() {
   // }
 
   let crate_path = output_dir_path.with_added(&lib_spec.rust.name);
-  fs::create_dir_all(&crate_path).unwrap();
+  let crate_new_path = output_dir_path.with_added(format!("{}.new", &lib_spec.rust.name));
+  if crate_new_path.as_path().exists() {
+    fs::remove_dir_all(&crate_new_path).unwrap();
+  }
+  fs::create_dir_all(&crate_new_path).unwrap();
   let mut rust_gen = rust_generator::RustGenerator::new(c_data,
-                                                        crate_path.clone(),
-                                                        lib_spec_dir_path.with_added("rust"));
+                                                        crate_new_path.clone(),
+                                                        lib_spec_dir_path.with_added("crate"),
+                                                        c_lib_name,
+                                                        lib_spec.cpp.name.clone(),
+                                                        c_lib_install_path.with_added("lib"));
+
   log::info(format!("Generating Rust crate ({}).", &lib_spec.rust.name));
   rust_gen.generate_all();
+  utils::move_files(&crate_new_path, &crate_path).unwrap();
 
   log::info(format!("Compiling Rust crate."));
   assert!(Command::new("cargo")
             .arg("test")
             .current_dir(&crate_path)
+            .env("LIBRARY_PATH", qt_install_libs_path.to_str().unwrap())
+            .env("LD_LIBRARY_PATH", qt_install_libs_path.to_str().unwrap())
             .status()
             .expect("Failed to execute cargo command")
             .success());

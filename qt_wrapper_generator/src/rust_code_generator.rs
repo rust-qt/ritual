@@ -1,14 +1,15 @@
 use rust_type::{RustType, RustTypeIndirection, RustFFIFunction, RustToCTypeConversion};
 use std::path::PathBuf;
+use std::fs;
 use std::fs::File;
-use std::io::{Write, Read};
+use std::io::Write;
 use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
                 RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope};
 use std::collections::HashMap;
-use utils::JoinWithString;
+use utils::{JoinWithString, copy_recursively};
 use log;
-use tweaked_file::TweakedFile;
 use utils::PathBufPushTweak;
+use std::panic;
 
 extern crate rustfmt;
 
@@ -16,23 +17,66 @@ pub struct RustCodeGenerator {
   crate_name: String,
   output_path: PathBuf,
   template_path: PathBuf,
+  c_lib_name: String,
+  cpp_lib_name: String,
+  c_lib_path: PathBuf,
   rustfmt_config: rustfmt::config::Config,
 }
 
 impl RustCodeGenerator {
-  pub fn new(crate_name: String, output_path: PathBuf, template_path: PathBuf) -> RustCodeGenerator {
-    let rustfmt_config_path = output_path.with_added("rustfmt.toml");
-    log::info(format!("Using rustfmt config file: {:?}", rustfmt_config_path));
-    let mut rustfmt_config_file = File::open(rustfmt_config_path).unwrap();
-    let mut rustfmt_config_toml = String::new();
-    rustfmt_config_file.read_to_string(&mut rustfmt_config_toml).unwrap();
+  pub fn new(crate_name: String,
+             output_path: PathBuf,
+             template_path: PathBuf,
+             c_lib_name: String,
+             cpp_lib_name: String,
+             c_lib_path: PathBuf)
+             -> RustCodeGenerator {
+    // TODO: allow overriding rustfmt.toml file
+    // let rustfmt_config_path = output_path.with_added("rustfmt.toml");
+    // log::info(format!("Using rustfmt config file: {:?}", rustfmt_config_path));
+    // let mut rustfmt_config_file = File::open(rustfmt_config_path).unwrap();
+    // let mut rustfmt_config_toml = String::new();
+    // rustfmt_config_file.read_to_string(&mut rustfmt_config_toml).unwrap();
 
-    let rustfmt_config = rustfmt::config::Config::from_toml(&rustfmt_config_toml);
+
+    let rustfmt_config = rustfmt::config::Config::from_toml(&include_str!("../templates/crate/ru\
+                                                                           stfmt.toml"));
     RustCodeGenerator {
       crate_name: crate_name,
       output_path: output_path,
       template_path: template_path,
+      c_lib_name: c_lib_name,
+      cpp_lib_name: cpp_lib_name,
+      c_lib_path: c_lib_path,
       rustfmt_config: rustfmt_config,
+    }
+  }
+
+  pub fn generate_template(&self) {
+    let mut rustfmt_file = File::create(self.output_path.with_added("rustfmt.toml")).unwrap();
+    rustfmt_file.write(include_bytes!("../templates/crate/rustfmt.toml")).unwrap();
+
+    let mut build_rs_file = File::create(self.output_path.with_added("build.rs")).unwrap();
+    write!(build_rs_file,
+           include_str!("../templates/crate/build.rs"),
+           self.c_lib_path.to_str().unwrap())
+      .unwrap();
+
+    let mut cargo_file = File::create(self.output_path.with_added("Cargo.toml")).unwrap();
+    // TODO: use supplied version and authors
+    write!(cargo_file,
+           "[package]\nname = \"{}\"\nversion = \"{}\"\nauthors = {}\nbuild = \"build.rs\"\n\n",
+           &self.crate_name,
+           "0.0.0",
+           "[\"Riateche <ri@idzaaus.org>\"]")
+      .unwrap();
+    write!(cargo_file, "[dependencies]\nlibc = \"0.2\"\n\n").unwrap();
+    println!("template_path = {:?}", self.template_path);
+    for item in fs::read_dir(&self.template_path).unwrap() {
+      let item = item.unwrap();
+      copy_recursively(&item.path().to_path_buf(),
+                       &self.output_path.with_added(item.file_name()))
+        .unwrap();
     }
   }
 
@@ -261,14 +305,14 @@ impl RustCodeGenerator {
 
   pub fn generate_lib_file(&self, modules: &Vec<String>) {
     let mut lib_file_path = self.output_path.clone();
-    lib_file_path.push("qt_core");
     lib_file_path.push("src");
     lib_file_path.push("lib.rs");
     {
-      let mut lib_file = TweakedFile::create(&lib_file_path).unwrap();
+      let mut lib_file = File::create(&lib_file_path).unwrap();
       write!(lib_file, "#![allow(drop_with_repr_extern)]\n").unwrap();
 
-      let built_in_modules = vec!["types", "flags", "ffi"];
+      // TODO: get list of modules copied from template
+      let built_in_modules = vec!["flags", "ffi"];
       for module in built_in_modules {
         if modules.iter().find(|x| x.as_ref() as &str == module).is_some() {
           panic!("module name conflict");
@@ -360,19 +404,29 @@ impl RustCodeGenerator {
   }
 
   fn call_rustfmt(&self, path: &PathBuf) {
-    let rustfmt_result = rustfmt::run(rustfmt::Input::File(path.clone()), &self.rustfmt_config);
-    if !rustfmt_result.has_no_errors() {
-      log::warning(format!("rustfmt failed to format file: {:?}", path));
+    let result = panic::catch_unwind(|| {
+      rustfmt::run(rustfmt::Input::File(path.clone()), &self.rustfmt_config)
+    });
+    match result {
+      Ok(rustfmt_result) => {
+        if !rustfmt_result.has_no_errors() {
+          log::warning(format!("rustfmt failed to format file: {:?}", path));
+        }
+      }
+      Err(cause) => {
+        log::warning(format!("rustfmt failed to format file: {:?} (panic: {:?})",
+                             path,
+                             cause));
+      }
     }
   }
 
   pub fn generate_module_file(&self, data: &RustModule) {
     let mut file_path = self.output_path.clone();
-    file_path.push(&self.crate_name);
     file_path.push("src");
     file_path.push(format!("{}.rs", &data.name.last_name()));
     {
-      let mut file = TweakedFile::create(&file_path).unwrap();
+      let mut file = File::create(&file_path).unwrap();
       file.write(self.generate_module_code(data).as_bytes()).unwrap();
     }
     self.call_rustfmt(&file_path);
@@ -381,18 +435,20 @@ impl RustCodeGenerator {
 
   pub fn generate_ffi_file(&self, functions: &HashMap<String, Vec<RustFFIFunction>>) {
     let mut file_path = self.output_path.clone();
-    file_path.push(&self.crate_name);
     file_path.push("src");
     file_path.push("ffi.rs");
     {
-      let mut file = TweakedFile::create(&file_path).unwrap();
+      let mut file = File::create(&file_path).unwrap();
       write!(file, "extern crate libc;\n\n").unwrap();
-      write!(file, "#[link(name = \"Qt5Core\")]\n").unwrap();
+      write!(file, "#[link(name = \"{}\")]\n", &self.cpp_lib_name).unwrap();
       //      write!(file, "#[link(name = \"icui18n\")]\n").unwrap();
       //      write!(file, "#[link(name = \"icuuc\")]\n").unwrap();
       //      write!(file, "#[link(name = \"icudata\")]\n").unwrap();
       write!(file, "#[link(name = \"stdc++\")]\n").unwrap();
-      write!(file, "#[link(name = \"qtcw\", kind = \"static\")]\n").unwrap();
+      write!(file,
+             "#[link(name = \"{}\", kind = \"static\")]\n",
+             &self.c_lib_name)
+        .unwrap();
       write!(file, "extern \"C\" {{\n").unwrap();
 
       for (include_file, functions) in functions {

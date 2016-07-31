@@ -8,7 +8,7 @@ use log;
 use std;
 use std::collections::{HashSet, HashMap};
 use std::path::PathBuf;
-use tweaked_file::TweakedFile;
+use std::fs::File;
 
 use utils::JoinWithString;
 
@@ -1086,7 +1086,7 @@ impl CppParser {
     let mut tmp_file_path = self.tmp_dir.clone();
     tmp_file_path.push("1.cpp");
     {
-      let mut tmp_file = TweakedFile::create(&tmp_file_path).unwrap();
+      let mut tmp_file = File::create(&tmp_file_path).unwrap();
       write!(tmp_file, "#include <{}>\n", self.header_name).unwrap();
     }
     let mut args = vec!["-fPIC".to_string(),
