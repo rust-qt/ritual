@@ -374,7 +374,7 @@ impl CppParser {
         if name.starts_with("const ") {
           name = name[6..].trim().to_string();
         }
-        // TODO: support int8_t and silimar types
+        // TODO: support int8_t and similar types
         let real_type = match name.as_ref() {
           "qint8" => {
             Some(CppTypeBase::SpecificNumeric {
