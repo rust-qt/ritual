@@ -17,7 +17,7 @@ The converter parses C++ headers of the library and generates a wrapper library 
 
 How to run
 ----------
-To start the process, you need a library specification folder. You can clone it from [this repository](.....). It contains data that is exclusive for the target library. Then execute in this project's folder:
+To start the process, you need a library specification folder. You can clone it from [this repository](https://github.com/rust-qt/qt_core_spec). It contains data that is exclusive for the target library. Then execute in this project's folder:
 
     cargo run path/to/spec.json path/to/output
 
