@@ -1,3 +1,0 @@
-[build]
-target-dir = "@RUST_GENERATOR_BUILD_DIR@"
-
