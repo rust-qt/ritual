@@ -1,7 +1,8 @@
 use cpp_type::CppType;
 use cpp_ffi_type::CppToFfiTypeConversion;
+use utils::JoinWithString;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[allow(dead_code)]
 pub enum RustTypeIndirection {
   None,
@@ -10,7 +11,7 @@ pub enum RustTypeIndirection {
   PtrPtr,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct RustName {
   pub parts: Vec<String>,
 }
@@ -42,7 +43,7 @@ impl RustName {
   }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum RustType {
   Void,
   NonVoid {
@@ -52,6 +53,21 @@ pub enum RustType {
     indirection: RustTypeIndirection,
     is_option: bool,
   },
+}
+
+impl RustType {
+  pub fn caption(&self) -> Option<String> {
+    match *self {
+      RustType::Void => None,
+      RustType::NonVoid { ref base, ref generic_arguments, .. } => {
+        let mut name = base.last_name().clone();
+        if let &Some(ref args) = generic_arguments {
+          name = format!("{}_{}", name, args.iter().map(|x| x.caption().unwrap_or(String::new())).join("_"));
+        }
+        Some(name)
+      }
+    }
+  }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

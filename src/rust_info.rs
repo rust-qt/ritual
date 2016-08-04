@@ -1,5 +1,5 @@
 
-use rust_type::{RustName, CompleteType};
+use rust_type::{RustName, CompleteType, RustType};
 use cpp_and_ffi_method::CppAndFfiMethod;
 use cpp_data::EnumValue;
 use cpp_type::CppType;
@@ -27,6 +27,7 @@ pub struct RustMethodArgument {
 pub struct RustMethodArgumentsVariant {
   pub arguments: Vec<RustMethodArgument>,
   pub cpp_method: CppAndFfiMethod,
+  pub return_type_ffi_index: Option<i32>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -36,7 +37,8 @@ pub enum RustMethodArguments {
   MultipleVariants {
     params_enum_name: String,
     params_trait_name: String,
-    argument_name: String,
+    shared_arguments: Vec<RustMethodArgument>,
+    variant_argument_name: String,
     variants: Vec<RustMethodArgumentsVariant>,
   },
 }
@@ -45,7 +47,6 @@ pub enum RustMethodArguments {
 pub struct RustMethod {
   pub scope: RustMethodScope,
   pub return_type: CompleteType,
-  pub return_type_ffi_index: Option<i32>,
   pub name: RustName,
   pub arguments: RustMethodArguments,
 }
@@ -125,17 +126,22 @@ pub enum RustTypeDeclarationKind {
     kind: RustTypeWrapperKind,
     cpp_type_name: String,
     cpp_template_arguments: Option<Vec<CppType>>,
+    methods: Vec<RustMethod>,
+    traits: Vec<TraitImpl>,
   },
-  MethodParametersEnum,
-  MethodParametersTrait,
+  MethodParametersEnum {
+    variants: Vec<Vec<RustType>>,
+    trait_name: RustName,
+  },
+  MethodParametersTrait {
+    enum_name: RustName,
+  }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustTypeDeclaration {
   pub name: RustName,
   pub kind: RustTypeDeclarationKind,
-  pub methods: Vec<RustMethod>,
-  pub traits: Vec<TraitImpl>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

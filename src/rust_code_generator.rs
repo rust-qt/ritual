@@ -4,12 +4,14 @@ use std::fs;
 use std::fs::File;
 use std::io::Write;
 use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
-                RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope};
+                RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope,
+                RustMethodArgument};
 use std::collections::HashMap;
 use utils::{JoinWithString, copy_recursively};
 use log;
 use utils::PathBufPushTweak;
 use std::panic;
+use utils::CaseOperations;
 
 extern crate rustfmt;
 
@@ -132,12 +134,12 @@ impl RustCodeGenerator {
 
   fn rust_ffi_function_to_code(&self, func: &RustFFIFunction) -> String {
     let args = func.arguments
-                   .iter()
-                   .map(|arg| {
-                     format!("{}: {}",
-                             arg.name,
-                             self.rust_type_to_code(&arg.argument_type))
-                   });
+      .iter()
+      .map(|arg| {
+        format!("{}: {}",
+                arg.name,
+                self.rust_type_to_code(&arg.argument_type))
+      });
     format!("  pub fn {}({}){};\n",
             func.name,
             args.join(", "),
@@ -149,10 +151,18 @@ impl RustCodeGenerator {
             })
   }
 
-  fn generate_ffi_call(&self, func: &RustMethod, variant: &RustMethodArgumentsVariant) -> String {
+  fn generate_ffi_call(&self,
+                       func: &RustMethod,
+                       variant: &RustMethodArgumentsVariant,
+                       shared_arguments: &Vec<RustMethodArgument>)
+                       -> String {
     let mut final_args = Vec::new();
     final_args.resize(variant.cpp_method.c_signature.arguments.len(), None);
+    let mut all_args = shared_arguments.clone();
     for arg in &variant.arguments {
+      all_args.push(arg.clone());
+    }
+    for arg in &all_args {
       assert!(arg.ffi_index >= 0 && arg.ffi_index < final_args.len() as i32);
       let mut code = arg.name.clone();
       match arg.argument_type.rust_api_to_c_conversion {
@@ -165,7 +175,7 @@ impl RustCodeGenerator {
         }
         RustToCTypeConversion::ValueToPtr => {
           let is_const = if let RustType::NonVoid { ref is_const, .. } = arg.argument_type
-                                                                            .rust_ffi_type {
+            .rust_ffi_type {
             *is_const
           } else {
             panic!("void is not expected here at all!")
@@ -188,7 +198,7 @@ impl RustCodeGenerator {
 
     let mut result = Vec::new();
     let mut maybe_result_var_name = None;
-    if let Some(ref i) = func.return_type_ffi_index {
+    if let Some(ref i) = variant.return_type_ffi_index {
       let mut return_var_name = "object".to_string();
       let mut ii = 1;
       while variant.arguments.iter().find(|x| &x.name == &return_var_name).is_some() {
@@ -218,7 +228,7 @@ impl RustCodeGenerator {
       RustToCTypeConversion::None => {}
       RustToCTypeConversion::RefToPtr => {
         let is_const = if let RustType::NonVoid { ref is_const, .. } = func.return_type
-                                                                           .rust_ffi_type {
+          .rust_ffi_type {
           *is_const
         } else {
           panic!("void is not expected here at all!")
@@ -252,55 +262,86 @@ impl RustCodeGenerator {
   }
 
   fn generate_rust_final_function(&self, func: &RustMethod) -> String {
+    //    println!("TEST1 {:?}", func);
     //    if func.name == "q_uncompress" {
     //      println!("TEST: {:?}", func);
     //    }
+    let public_qualifier = match func.scope {
+      RustMethodScope::TraitImpl { .. } => "",
+      _ => "pub ",
+    };
+    let return_type_for_signature = match func.return_type.rust_api_type {
+      RustType::Void => String::new(),
+      RustType::NonVoid { .. } => {
+        format!(" -> {}",
+                self.rust_type_to_code(&func.return_type.rust_api_type))
+      }
+    };
+    let arg_texts = |args: &Vec<RustMethodArgument>| -> Vec<String> {
+      args.iter()
+        .map(|arg| {
+          let mut maybe_mut_declaration = "";
+          if let RustType::NonVoid { ref indirection, .. } = arg.argument_type
+            .rust_api_type {
+            if *indirection == RustTypeIndirection::None &&
+               arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr {
+              if let RustType::NonVoid { ref is_const, .. } = arg.argument_type
+                .rust_ffi_type {
+                if !is_const {
+                  maybe_mut_declaration = "mut ";
+                }
+              }
+            }
+          }
+
+          format!("{}{}: {}",
+                  maybe_mut_declaration,
+                  arg.name,
+                  self.rust_type_to_code(&arg.argument_type.rust_api_type))
+        })
+        .collect()
+    };
     match func.arguments {
       RustMethodArguments::SingleVariant(ref variant) => {
-        let body = self.generate_ffi_call(func, variant);
+        let body = self.generate_ffi_call(func, variant, &Vec::new());
 
-        let args = variant.arguments
-                          .iter()
-                          .map(|arg| {
-                            let mut maybe_mut_declaration = "";
-                            if let RustType::NonVoid { ref indirection, .. } = arg.argument_type
-                                                                                  .rust_api_type {
-                              if *indirection == RustTypeIndirection::None &&
-                                 arg.argument_type.rust_api_to_c_conversion ==
-                                 RustToCTypeConversion::ValueToPtr {
-                                if let RustType::NonVoid { ref is_const, .. } = arg.argument_type
-                                                                                   .rust_ffi_type {
-                                  if !is_const {
-                                    maybe_mut_declaration = "mut ";
-                                  }
-                                }
-                              }
-                            }
-
-                            format!("{}{}: {}",
-                                    maybe_mut_declaration,
-                                    arg.name,
-                                    self.rust_type_to_code(&arg.argument_type.rust_api_type))
-                          });
-        let public_qualifier = match func.scope {
-          RustMethodScope::TraitImpl { .. } => "",
-          _ => "pub ",
-        };
-        format!("{}fn {}({}){} {{\n{}}}\n\n",
-                public_qualifier,
-                func.name.last_name(),
-                args.join(", "),
-                match func.return_type.rust_api_type {
-                  RustType::Void => String::new(),
-                  RustType::NonVoid { .. } => {
-                    format!(" -> {}",
-                            self.rust_type_to_code(&func.return_type.rust_api_type))
-                  }
-                },
-                body)
+        format!("{pubq}fn {name}({args}){ret} {{\n{body}}}\n\n",
+                pubq = public_qualifier,
+                name = func.name.last_name(),
+                args = arg_texts(&variant.arguments).join(", "),
+                ret = return_type_for_signature,
+                body = body)
       }
-      RustMethodArguments::MultipleVariants { .. } => {
-        unimplemented!();
+      RustMethodArguments::MultipleVariants { ref params_enum_name,
+                                              ref params_trait_name,
+                                              ref shared_arguments,
+                                              ref variant_argument_name,
+                                              ref variants } => {
+        let tpl_type = variant_argument_name.to_class_case();
+        let mut args = arg_texts(shared_arguments);
+        args.push(format!("{}: {}", variant_argument_name, tpl_type));
+        let body = format!("match {}.as_enum() {{\n{}\n}}",
+                           variant_argument_name,
+                           variants.iter()
+                             .enumerate()
+                             .map(|(num, variant)| {
+            //                               let mut all_args = shared_arguments.clone();
+            //                               all_args.append(&mut variant.arguments.clone());
+
+            format!("{}::Variant{} => {{ {} }},",
+                    params_enum_name,
+                    num,
+                    self.generate_ffi_call(func, variant, shared_arguments))
+          })
+                             .join("\n"));
+        format!("{pubq}fn {name}<{tpl_type}: {trt}>({args}){ret} {{\n{body}}}\n\n",
+                pubq = public_qualifier,
+                name = func.name.last_name(),
+                trt = params_trait_name,
+                tpl_type = tpl_type,
+                args = args.join(", "),
+                ret = return_type_for_signature,
+                body = body)
       }
     }
   }
@@ -338,16 +379,16 @@ impl RustCodeGenerator {
     results.push("extern crate libc;\n#[allow(unused_imports)]\nuse std;\n\n".to_string());
 
     for type1 in &data.types {
-      let r = match type1.kind {
-        RustTypeDeclarationKind::CppTypeWrapper { ref kind, .. } => {
-          match *kind {
+      match type1.kind {
+        RustTypeDeclarationKind::CppTypeWrapper { ref kind, ref methods, ref traits, .. } => {
+          let r = match *kind {
             RustTypeWrapperKind::Enum { ref values, ref is_flaggable } => {
               let mut r = format!("#[derive(Debug, PartialEq, Eq, Clone)]\n#[repr(C)]\npub enum \
                                    {} {{\n{}\n}}\n\n",
                                   type1.name.last_name(),
                                   values.iter()
-                                        .map(|item| format!("  {} = {}", item.name, item.value))
-                                        .join(", \n"));
+                                    .map(|item| format!("  {} = {}", item.name, item.value))
+                                    .join(", \n"));
               if *is_flaggable {
                 r = format!("{}impl ::flags::FlaggableEnum for {} {{\n
                            \
@@ -370,28 +411,54 @@ impl RustCodeGenerator {
                       name = type1.name.last_name(),
                       size = size)
             }
+          };
+          results.push(r);
+          if !methods.is_empty() {
+            results.push(format!("impl {} {{\n{}}}\n\n",
+                                 type1.name.last_name(),
+                                 methods.iter()
+                                   .map(|method| self.generate_rust_final_function(method))
+                                   .join("")));
           }
-        }
-        _ => unimplemented!(),
-      };
-      results.push(r);
-      if !type1.methods.is_empty() {
-        results.push(format!("impl {} {{\n{}}}\n\n",
-                             type1.name.last_name(),
-                             type1.methods
-                                  .iter()
-                                  .map(|method| self.generate_rust_final_function(method))
-                                  .join("")));
-      }
-      for trait1 in &type1.traits {
-        results.push(format!("impl {} for {} {{\n{}}}\n\n",
-                             trait1.trait_name.to_string(),
-                             type1.name.last_name(),
-                             trait1.methods
+          for trait1 in traits {
+            results.push(format!("impl {} for {} {{\n{}}}\n\n",
+                                 trait1.trait_name.to_string(),
+                                 type1.name.last_name(),
+                                 trait1.methods
                                    .iter()
                                    .map(|method| self.generate_rust_final_function(method))
                                    .join("")));
-      }
+          }
+        }
+        RustTypeDeclarationKind::MethodParametersEnum { ref variants, ref trait_name } => {
+          let var_texts = variants.iter()
+            .enumerate()
+            .map(|(num, variant)| {
+              let tuple_text = variant.iter().map(|t| self.rust_type_to_code(t)).join(",");
+              format!("Variant{}({}),", num, tuple_text)
+            });
+          results.push(format!("pub enum {} {{\n{}\n}}\n\n",
+                               type1.name.last_name(),
+                               var_texts.join("\n")));
+
+          for (num, variant) in variants.iter().enumerate() {
+            results.push(format!("impl {trt} for ({tuple_type}) {{\n\
+              fn as_enum(self) -> {enm} {{\n{enm}::Variant{num}({tuple_val})\n}}\n}}\n\n",
+                trt = trait_name.last_name(),
+                tuple_type = variant.iter().map(|t| self.rust_type_to_code(t)).join(","),
+                enm = type1.name.last_name(),
+                num = num,
+                tuple_val = variant.iter().enumerate().map(|(num2, _)| format!("self.{}", num2)).join(", ")
+            ));
+          }
+        }
+        RustTypeDeclarationKind::MethodParametersTrait { ref enum_name } => {
+          results.push(format!("pub trait {} {{\nfn as_enum(self) -> {};\n}}",
+                               type1.name.last_name(),
+                               enum_name.last_name()));
+
+        }
+      };
     }
     for method in &data.functions {
       results.push(self.generate_rust_final_function(method));

@@ -109,3 +109,24 @@ pub fn move_one_file(old_path: &PathBuf, new_path: &PathBuf) -> io::Result<()> {
   }
   Ok(())
 }
+
+extern crate inflector;
+
+pub trait CaseOperations {
+  fn to_class_case(&self) -> Self;
+  fn to_snake_case(&self) -> Self;
+}
+impl CaseOperations for String {
+  fn to_class_case(&self) -> Self {
+    let mut x = inflector::Inflector::to_camel_case(self);
+    if x.len() > 0 {
+      let c = x.remove(0);
+      let cu: String = c.to_uppercase().collect();
+      x = cu + &x;
+    }
+    x
+  }
+  fn to_snake_case(&self) -> Self {
+    inflector::Inflector::to_snake_case(self)
+  }
+}
