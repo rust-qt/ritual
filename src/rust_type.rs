@@ -7,7 +7,7 @@ use utils::JoinWithString;
 pub enum RustTypeIndirection {
   None,
   Ptr,
-  Ref,
+  Ref { lifetime: Option<String>, },
   PtrPtr,
 }
 
@@ -67,6 +67,17 @@ impl RustType {
         Some(name)
       }
     }
+  }
+
+  pub fn with_lifetime(&self, new_lifetime: String) -> RustType {
+    let mut r = self.clone();
+    if let RustType::NonVoid { ref mut indirection, .. } = r {
+      if let RustTypeIndirection::Ref { ref mut lifetime } = *indirection {
+        assert!(lifetime.is_none());
+        *lifetime = Some(new_lifetime);
+      }
+    }
+    r
   }
 }
 

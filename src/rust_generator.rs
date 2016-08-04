@@ -88,7 +88,7 @@ impl RustGenerator {
         IndirectionChange::NoChange => {
           if argument_meaning == &CppFfiArgumentMeaning::This {
             assert!(indirection == &RustTypeIndirection::Ptr);
-            *indirection = RustTypeIndirection::Ref;
+            *indirection = RustTypeIndirection::Ref { lifetime: None };
             rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
           }
         }
@@ -99,7 +99,7 @@ impl RustGenerator {
         }
         IndirectionChange::ReferenceToPointer => {
           assert!(indirection == &RustTypeIndirection::Ptr);
-          *indirection = RustTypeIndirection::Ref;
+          *indirection = RustTypeIndirection::Ref { lifetime: None };
           rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
         }
         IndirectionChange::QFlagsToUInt => {}
@@ -534,7 +534,7 @@ impl RustGenerator {
             if method.allocation_place == ReturnValueAllocationPlace::Heap &&
                method.cpp_method.kind.is_destructor() {
               if let RustType::NonVoid { ref mut indirection, .. } = complete_type.rust_api_type {
-                assert!(*indirection == RustTypeIndirection::Ref);
+                assert!(*indirection == RustTypeIndirection::Ref { lifetime: None });
                 *indirection = RustTypeIndirection::None;
               } else {
                 panic!("unexpected void type");
