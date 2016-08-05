@@ -12,7 +12,7 @@ use log;
 use rust_code_generator::RustCodeGenerator;
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
-                RustMethodArguments, TraitImpl, TraitName};
+                RustMethodArguments, TraitImpl, TraitName, RustMethodSelfArg};
 use cpp_method::{CppMethodScope, ReturnValueAllocationPlace};
 use cpp_ffi_function_argument::CppFfiArgumentMeaning;
 use utils::CaseOperations;
@@ -24,6 +24,8 @@ fn include_file_to_module_name(include_file: &String) -> String {
   }
   if r == "Qt" {
     r = "global".to_string();
+  } else if r.starts_with("Qt") {
+    r = r[2..].to_string();
   } else if r.starts_with("Q") {
     r = r[1..].to_string();
   }
@@ -128,11 +130,9 @@ impl RustGenerator {
                                        base: enum_type,
                                        generic_arguments: None,
                                        indirection: RustTypeIndirection::None,
-                                       is_option: false,
                                        is_const: false,
                                      }]),
         indirection: RustTypeIndirection::None,
-        is_option: false,
         is_const: false,
       }
     }
@@ -233,7 +233,6 @@ impl RustGenerator {
         CppTypeIndirection::PtrPtr => RustTypeIndirection::PtrPtr,
         _ => return Err(format!("unsupported level of indirection: {:?}", cpp_ffi_type)),
       },
-      is_option: false,
       generic_arguments: None,
     });
   }
@@ -384,18 +383,18 @@ impl RustGenerator {
           }
         }
         vec![RustTypeDeclaration {
-                      name: rust_name.clone(),
-                      kind: RustTypeDeclarationKind::CppTypeWrapper {
-                        kind: RustTypeWrapperKind::Enum {
-                          values: values,
-                          is_flaggable: is_flaggable,
-                        },
-                        cpp_type_name: type_info.name.clone(),
-                        cpp_template_arguments: None,
-                        methods: Vec::new(),
-                        traits: Vec::new(),
-                      },
-                    }]
+               name: rust_name.clone(),
+               kind: RustTypeDeclarationKind::CppTypeWrapper {
+                 kind: RustTypeWrapperKind::Enum {
+                   values: values,
+                   is_flaggable: is_flaggable,
+                 },
+                 cpp_type_name: type_info.name.clone(),
+                 cpp_template_arguments: None,
+                 methods: Vec::new(),
+                 traits: Vec::new(),
+               },
+             }]
       }
       CppTypeKind::Class { ref size, .. } => {
         let methods_scope = RustMethodScope::Impl { type_name: rust_name.clone() };
@@ -504,10 +503,15 @@ impl RustGenerator {
       }
     }
 
+    let (free_methods, free_traits, mut free_types) =
+      self.generate_functions(good_methods, &RustMethodScope::Free);
+    assert!(free_traits.is_empty());
+    rust_types.append(&mut free_types);
+
     let module = RustModule {
       name: module_name.clone(),
       types: rust_types,
-      functions: self.generate_functions(good_methods, &RustMethodScope::Free).0,
+      functions: free_methods,
       submodules: submodules,
     };
     return Some(module);
@@ -692,7 +696,7 @@ impl RustGenerator {
         Err(msg) => log::warning(msg),
       }
     }
-    //let mut name_counters = HashMap::new();
+    // let mut name_counters = HashMap::new();
     for method_name in method_names {
       let current_methods: Vec<_> = single_rust_methods.clone()
         .into_iter()
@@ -701,36 +705,98 @@ impl RustGenerator {
       let mut return_type_to_methods = HashMap::new();
       assert!(!current_methods.is_empty());
       for method in current_methods {
-        let self_argument = if let RustMethodArguments::SingleVariant(ref args) = method.arguments {
-          if args.arguments.len() > 0 && args.arguments[0].name == "self" {
-            Some(args.arguments[0].argument_type.rust_api_type.clone())
-          } else {
-            None
-          }
-        } else {
-          unreachable!()
-        };
-        let t = (method.return_type.rust_api_type.clone(), self_argument);
+        let t = (method.return_type.rust_api_type.clone(), method.self_arg());
         if !return_type_to_methods.contains_key(&t) {
           return_type_to_methods.insert(t.clone(), Vec::new());
         }
         return_type_to_methods.get_mut(&t).unwrap().push(method);
       }
-      let use_return_type_caption = return_type_to_methods.len() > 1;
-      for ((return_type, _has_self), mut overloaded_methods) in return_type_to_methods {
-        let return_type_caption = return_type.caption();
-        let mut enum_name_base = method_name.to_class_case();
-        if use_return_type_caption {
-          if let Some(ref return_type_caption) = return_type_caption {
-            enum_name_base += return_type_caption.to_class_case().as_ref();
+      let use_additional_caption = return_type_to_methods.len() > 1;
+      #[derive(Clone)]
+      enum CaptionStrategy {
+        ReturnType,
+        SelfArg,
+        Both,
+        None,
+      }
+      let generate_caption = |a: &RustType, b: &RustMethodSelfArg, s| {
+        match s {
+          CaptionStrategy::ReturnType => a.caption(),
+          CaptionStrategy::SelfArg => b.caption().to_string(),
+          CaptionStrategy::Both => format!("{}_{}", a.caption(), b.caption()),
+          CaptionStrategy::None => String::new(),
+        }
+      };
+      let caption_strategy = if use_additional_caption {
+        let mut maybe_caption_strategy = None;
+        for s in vec![CaptionStrategy::ReturnType,
+                      CaptionStrategy::SelfArg,
+                      CaptionStrategy::Both] {
+          let mut set = HashSet::new();
+          let mut ok = true;
+          for (&(ref return_type, ref self_arg), _methods) in &return_type_to_methods {
+            let caption = generate_caption(return_type, self_arg, s.clone());
+            if set.contains(&caption) {
+              ok = false;
+              break;
+            }
+            set.insert(caption);
+          }
+          if ok {
+            maybe_caption_strategy = Some(s);
+            break;
           }
         }
+        if maybe_caption_strategy.is_none() {
+          println!("failed on methods: {:?}", return_type_to_methods);
+          panic!("all caption strategies have failed!");
+        }
+        maybe_caption_strategy.unwrap()
+      } else {
+        CaptionStrategy::None // unused
+      };
+
+      for ((return_type, self_arg), overloaded_methods) in return_type_to_methods {
+        let additional_caption =
+          generate_caption(&return_type, &self_arg, caption_strategy.clone());
+
+        let mut enum_name_base = method_name.to_class_case();
+        if let &RustMethodScope::Impl { ref type_name } = scope {
+          enum_name_base = format!("{}{}", type_name.last_name(), enum_name_base);
+        }
+        if use_additional_caption {
+          enum_name_base = format!("{}As{}", enum_name_base, additional_caption.to_class_case());
+        }
         assert!(!overloaded_methods.is_empty());
-        let methods_count = overloaded_methods.len();
-        let enum_name = RustName::new(vec![format!("{}ParamsVariants", enum_name_base)]);
-        let trait_name = RustName::new(vec![format!("{}Params", enum_name_base)]);
+
+        let mut all_real_args = HashSet::new();
+        let mut filtered_methods = Vec::new();
+        for method in overloaded_methods {
+          let ok = if let RustMethodArguments::SingleVariant(ref args) = method.arguments {
+            let real_args: Vec<_> =
+              args.arguments.iter().map(|x| x.argument_type.rust_api_type.dealias_libc()).collect();
+            if all_real_args.contains(&real_args) {
+              log::warning(format!("Removing method because another method with the same \
+                                    argument types exists:\n{:?}",
+                                   method));
+              false
+            } else {
+              all_real_args.insert(real_args);
+              true
+            }
+          } else {
+            unreachable!()
+          };
+          if ok {
+            filtered_methods.push(method);
+          }
+        }
+
+        let methods_count = filtered_methods.len();
         let mut method = if methods_count > 1 {
-          let first_method = overloaded_methods[0].clone();
+          let enum_name = RustName::new(vec![format!("{}ParamsVariants", enum_name_base)]);
+          let trait_name = RustName::new(vec![format!("{}Params", enum_name_base)]);
+          let first_method = filtered_methods[0].clone();
           let self_argument = if let RustMethodArguments::SingleVariant(ref args) =
                                      first_method.arguments {
             if args.arguments.len() > 0 && args.arguments[0].name == "self" {
@@ -743,7 +809,7 @@ impl RustGenerator {
           };
           let mut args_variants = Vec::new();
           let mut enum_variants = Vec::new();
-          for method in overloaded_methods {
+          for method in filtered_methods {
             assert!(method.name == first_method.name);
             assert!(method.scope == first_method.scope);
             assert!(method.return_type == first_method.return_type);
@@ -795,13 +861,11 @@ impl RustGenerator {
             },
           }
         } else {
-          overloaded_methods.pop().unwrap()
+          filtered_methods.pop().unwrap()
         };
-        if use_return_type_caption {
-          if let Some(ref return_type_caption) = return_type_caption {
-            let name = method.name.parts.pop().unwrap();
-            method.name.parts.push(format!("{}_{}", name, return_type_caption.to_snake_case()));
-          }
+        if use_additional_caption {
+          let name = method.name.parts.pop().unwrap();
+          method.name.parts.push(format!("{}_as_{}", name, additional_caption.to_snake_case()));
         }
         rust_methods.push(method);
       }

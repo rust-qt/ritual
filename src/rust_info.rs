@@ -1,5 +1,5 @@
 
-use rust_type::{RustName, CompleteType, RustType};
+use rust_type::{RustName, CompleteType, RustType, RustTypeIndirection};
 use cpp_and_ffi_method::CppAndFfiMethod;
 use cpp_data::EnumValue;
 use cpp_type::CppType;
@@ -49,6 +49,59 @@ pub struct RustMethod {
   pub return_type: CompleteType,
   pub name: RustName,
   pub arguments: RustMethodArguments,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum RustMethodSelfArg {
+  Static,
+  ConstRef,
+  MutRef,
+  Value,
+}
+
+impl RustMethodSelfArg {
+  pub fn caption(&self) -> &'static str {
+    match *self {
+      RustMethodSelfArg::Static => "static",
+      RustMethodSelfArg::ConstRef => "from_const",
+      RustMethodSelfArg::MutRef => "from_mut",
+      RustMethodSelfArg::Value => "from_value",
+    }
+  }
+}
+
+impl RustMethod {
+  pub fn self_arg(&self) -> RustMethodSelfArg {
+    let args = match self.arguments {
+      RustMethodArguments::SingleVariant(ref var) => &var.arguments,
+      RustMethodArguments::MultipleVariants { ref shared_arguments, .. } => shared_arguments,
+    };
+    if args.len() == 0 {
+      RustMethodSelfArg::Static
+    } else {
+      let arg = args.get(0).unwrap();
+      if arg.name == "self" {
+        if let RustType::NonVoid { ref indirection, ref is_const, .. } = arg.argument_type
+          .rust_api_type {
+          match *indirection {
+            RustTypeIndirection::Ref { .. } => {
+              if *is_const {
+                RustMethodSelfArg::ConstRef
+              } else {
+                RustMethodSelfArg::MutRef
+              }
+            }
+            RustTypeIndirection::None => RustMethodSelfArg::Value,
+            _ => panic!("invalid self argument type"),
+          }
+        } else {
+          panic!("invalid self argument type")
+        }
+      } else {
+        RustMethodSelfArg::Static
+      }
+    }
+  }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -135,7 +188,7 @@ pub enum RustTypeDeclarationKind {
   },
   MethodParametersTrait {
     enum_name: RustName,
-  }
+  },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

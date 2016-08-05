@@ -116,6 +116,8 @@ pub trait CaseOperations {
   fn to_class_case(&self) -> Self;
   fn to_snake_case(&self) -> Self;
 }
+// TODO: fix snake case problems:
+// TODO: base_6_4, is_na_n
 impl CaseOperations for String {
   fn to_class_case(&self) -> Self {
     let mut x = inflector::Inflector::to_camel_case(self);

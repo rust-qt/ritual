@@ -2,12 +2,16 @@ use cpp_type::CppType;
 use cpp_ffi_type::CppToFfiTypeConversion;
 use utils::JoinWithString;
 
+extern crate libc;
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[allow(dead_code)]
 pub enum RustTypeIndirection {
   None,
   Ptr,
-  Ref { lifetime: Option<String>, },
+  Ref {
+    lifetime: Option<String>,
+  },
   PtrPtr,
 }
 
@@ -43,6 +47,65 @@ impl RustName {
   }
 }
 
+trait ToRustName {
+  fn to_rust_name() -> RustName;
+}
+
+impl ToRustName for u8 {
+  fn to_rust_name() -> RustName {
+    RustName::new(vec!["u8".to_string()])
+  }
+}
+impl ToRustName for i8 {
+  fn to_rust_name() -> RustName {
+    RustName::new(vec!["i8".to_string()])
+  }
+}
+impl ToRustName for u16 {
+  fn to_rust_name() -> RustName {
+    RustName::new(vec!["u16".to_string()])
+  }
+}
+impl ToRustName for i16 {
+  fn to_rust_name() -> RustName {
+    RustName::new(vec!["i16".to_string()])
+  }
+}
+impl ToRustName for u32 {
+  fn to_rust_name() -> RustName {
+    RustName::new(vec!["u32".to_string()])
+  }
+}
+impl ToRustName for i32 {
+  fn to_rust_name() -> RustName {
+    RustName::new(vec!["i32".to_string()])
+  }
+}
+impl ToRustName for u64 {
+  fn to_rust_name() -> RustName {
+    RustName::new(vec!["u64".to_string()])
+  }
+}
+impl ToRustName for i64 {
+  fn to_rust_name() -> RustName {
+    RustName::new(vec!["i64".to_string()])
+  }
+}
+impl ToRustName for f32 {
+  fn to_rust_name() -> RustName {
+    RustName::new(vec!["f32".to_string()])
+  }
+}
+impl ToRustName for f64 {
+  fn to_rust_name() -> RustName {
+    RustName::new(vec!["f64".to_string()])
+  }
+}
+
+
+
+
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum RustType {
   Void,
@@ -51,21 +114,49 @@ pub enum RustType {
     generic_arguments: Option<Vec<RustType>>,
     is_const: bool,
     indirection: RustTypeIndirection,
-    is_option: bool,
   },
 }
 
 impl RustType {
-  pub fn caption(&self) -> Option<String> {
+  pub fn caption(&self) -> String {
     match *self {
-      RustType::Void => None,
-      RustType::NonVoid { ref base, ref generic_arguments, .. } => {
+      RustType::Void => "void".to_string(),
+      RustType::NonVoid { ref base, ref generic_arguments, ref is_const, ref indirection } => {
         let mut name = base.last_name().clone();
         if let &Some(ref args) = generic_arguments {
-          name = format!("{}_{}", name, args.iter().map(|x| x.caption().unwrap_or(String::new())).join("_"));
+          name = format!("{}_{}", name, args.iter().map(|x| x.caption()).join("_"));
         }
-        Some(name)
+        let mut_text = if *is_const {
+          ""
+        } else {
+          "mut_"
+        };
+        match *indirection {
+          RustTypeIndirection::None => {}
+          RustTypeIndirection::Ref { .. } => {
+            name = format!("{}{}_ref", name, mut_text);
+          }
+          RustTypeIndirection::Ptr => {
+            name = format!("{}{}_ptr", name, mut_text);
+          }
+          RustTypeIndirection::PtrPtr => {
+            name = format!("{}{}_ptr_ptr", name, mut_text);
+          }
+        }
+        name
       }
+    }
+  }
+
+  pub fn is_ref(&self) -> bool {
+    match *self {
+      RustType::NonVoid { ref indirection, .. } => {
+        match *indirection {
+          RustTypeIndirection::Ref { .. } => true,
+          _ => false,
+        }
+      }
+      RustType::Void => false
     }
   }
 
@@ -78,6 +169,42 @@ impl RustType {
       }
     }
     r
+  }
+
+  pub fn dealias_libc(&self) -> RustType {
+    match *self {
+      RustType::Void => self.clone(),
+      RustType::NonVoid { ref base, ref generic_arguments, ref is_const, ref indirection } => {
+        if base.parts.len() == 2 && &base.parts[0] == "libc" {
+          let real_name = match base.parts[1].as_ref() {
+            "c_void" => return self.clone(),
+            "c_schar" => libc::c_schar::to_rust_name(),
+            "c_char" => libc::c_char::to_rust_name(),
+            "c_uchar" => libc::c_uchar::to_rust_name(),
+            "wchar_t" => libc::wchar_t::to_rust_name(),
+            "c_short" => libc::c_short::to_rust_name(),
+            "c_ushort" => libc::c_ushort::to_rust_name(),
+            "c_int" => libc::c_int::to_rust_name(),
+            "c_uint" => libc::c_uint::to_rust_name(),
+            "c_long" => libc::c_long::to_rust_name(),
+            "c_ulong" => libc::c_ulong::to_rust_name(),
+            "c_longlong" => libc::c_longlong::to_rust_name(),
+            "c_ulonglong" => libc::c_ulonglong::to_rust_name(),
+            "c_float" => libc::c_float::to_rust_name(),
+            "c_double" => libc::c_double::to_rust_name(),
+            _ => panic!("unknown libc type: {:?}", base),
+          };
+          RustType::NonVoid {
+            base: real_name,
+            generic_arguments: generic_arguments.clone(),
+            is_const: is_const.clone(),
+            indirection: indirection.clone(),
+          }
+        } else {
+          self.clone()
+        }
+      }
+    }
   }
 }
 

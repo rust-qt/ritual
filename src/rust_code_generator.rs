@@ -87,12 +87,7 @@ impl RustCodeGenerator {
   fn rust_type_to_code(&self, rust_type: &RustType) -> String {
     match rust_type {
       &RustType::Void => panic!("rust void can't be converted to code"),
-      &RustType::NonVoid { ref base,
-                           ref is_const,
-                           ref indirection,
-                           ref is_option,
-                           ref generic_arguments,
-                           .. } => {
+      &RustType::NonVoid { ref base, ref is_const, ref indirection, ref generic_arguments, .. } => {
         let mut base_s = base.full_name(Some(&self.crate_name));
         if let &Some(ref args) = generic_arguments {
           base_s = format!("{}<{}>",
@@ -127,11 +122,7 @@ impl RustCodeGenerator {
             }
           }
         };
-        if *is_option {
-          format!("Option<{}>", s)
-        } else {
-          s
-        }
+        s
       }
     }
   }
@@ -344,8 +335,10 @@ impl RustCodeGenerator {
                     self.generate_ffi_call(func, variant, shared_arguments))
           })
                              .join("\n"));
-        format!("{pubq}fn {name}<{tpl_type}: {trt}>({args}){ret} {{\n{body}}}\n\n",
+        let lifetime = "a";
+        format!("{pubq}fn {name}<'{lf}, {tpl_type}: {trt}<'{lf}>>({args}){ret} {{\n{body}}}\n\n",
                 pubq = public_qualifier,
+                lf = lifetime,
                 name = func.name.last_name(),
                 trt = params_trait_name,
                 tpl_type = tpl_type,
@@ -441,41 +434,75 @@ impl RustCodeGenerator {
           }
         }
         RustTypeDeclarationKind::MethodParametersEnum { ref variants, ref trait_name } => {
-          let lifetime = "a";
+          let lifetime =
+            if variants.iter().find(|var| var.iter().find(|x| x.is_ref()).is_some()).is_some() {
+              Some("a")
+            } else {
+              None
+            };
           let var_texts = variants.iter()
             .enumerate()
             .map(|(num, variant)| {
               let mut tuple_text = variant.iter()
-                .map(|t| self.rust_type_to_code(&t.with_lifetime(lifetime.to_string())))
+                .map(|t| {
+                  match lifetime {
+                    Some(lifetime) => {
+                      self.rust_type_to_code(&t.with_lifetime(lifetime.to_string()))
+                    }
+                    None => self.rust_type_to_code(t),
+                  }
+                })
                 .join(",");
               if !tuple_text.is_empty() {
                 tuple_text = format!("({})", tuple_text);
               }
               format!("Variant{}{},", num, tuple_text)
             });
-          results.push(format!("pub enum {}<'{}> {{\n{}\n}}\n\n",
+          results.push(format!("pub enum {}{} {{\n{}\n}}\n\n",
                                type1.name.last_name(),
-                               lifetime,
+                               match lifetime {
+                                 Some(lifetime) => format!("<'{}>", lifetime),
+                                 None => String::new(),
+                               },
                                var_texts.join("\n")));
 
           for (num, variant) in variants.iter().enumerate() {
-            results.push(format!("impl {trt} for ({tuple_type}) {{\n\
-              fn as_enum(self) -> {enm} {{\n{enm}::Variant{num}({tuple_val})\n}}\n}}\n\n",
-                                 trt = trait_name.last_name(),
-                                 tuple_type =
-                                   variant.iter().map(|t| self.rust_type_to_code(t)).join(","),
-                                 enm = type1.name.last_name(),
-                                 num = num,
-                                 tuple_val = variant.iter()
-                                   .enumerate()
-                                   .map(|(num2, _)| format!("self.{}", num2))
-                                   .join(", ")));
+            let mut tuple_val = variant.iter()
+              .enumerate()
+              .map(|(num2, _)| format!("self.{}", num2))
+              .join(", ");
+            if !tuple_val.is_empty() {
+              tuple_val = format!("({})", tuple_val);
+            }
+            results.push(format!("impl{lf} {trt}{lf} for ({tuple_type}) {{\nfn as_enum(self) -> \
+                             {enm}{lf} {{\n{enm}::Variant{num}{tuple_val}\n}}\n}}\n\n",
+                            lf = match lifetime {
+                              Some(lifetime) => format!("<'{}>", lifetime),
+                              None => String::new(),
+                            },
+                            trt = trait_name.last_name(),
+                            tuple_type = variant.iter()
+                              .map(|t| {
+                  match lifetime {
+                    Some(lifetime) => {
+                      self.rust_type_to_code(&t.with_lifetime(lifetime.to_string()))
+                    }
+                    None => self.rust_type_to_code(t),
+                  }
+                })
+                              .join(","),
+                            enm = type1.name.last_name(),
+                            num = num,
+                            tuple_val = tuple_val));
           }
         }
         RustTypeDeclarationKind::MethodParametersTrait { ref enum_name } => {
-          results.push(format!("pub trait {} {{\nfn as_enum(self) -> {};\n}}",
-                               type1.name.last_name(),
-                               enum_name.last_name()));
+          let lifetime = "a";
+          results.push(format!("pub trait {name}<'{lf}> {{\nfn as_enum(self) -> \
+                                {enm}<'{lf}>;\n}}",
+                               name = type1.name.last_name(),
+                               enm = enum_name.last_name(),
+                               lf = lifetime));
 
         }
       };
