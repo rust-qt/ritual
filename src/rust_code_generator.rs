@@ -331,10 +331,16 @@ impl RustCodeGenerator {
                              .map(|(num, variant)| {
             //                               let mut all_args = shared_arguments.clone();
             //                               all_args.append(&mut variant.arguments.clone());
-
-            format!("{}::Variant{} => {{ {} }},",
+            let var_names: Vec<_> = variant.arguments.iter().map(|x| x.name.clone()).collect();
+            let pattern = if var_names.is_empty() {
+              String::new()
+            } else {
+              format!("({})", var_names.join(", "))
+            };
+            format!("{}::Variant{}{} => {{ {} }},",
                     params_enum_name,
                     num,
+                    pattern,
                     self.generate_ffi_call(func, variant, shared_arguments))
           })
                              .join("\n"));
