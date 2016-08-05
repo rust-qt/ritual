@@ -808,7 +808,7 @@ impl RustGenerator {
             unreachable!()
           };
           let mut args_variants = Vec::new();
-          let mut enum_variants = Vec::new();
+          let mut enum_variants: Vec<Vec<RustType>> = Vec::new();
           for method in filtered_methods {
             assert!(method.name == first_method.name);
             assert!(method.scope == first_method.scope);
@@ -833,17 +833,24 @@ impl RustGenerator {
             }
           }
 
+          let enum_has_lifetime =
+            enum_variants.iter().find(|var| var.iter().find(|x| x.is_ref()).is_some()).is_some();
+
           // overloaded methods
           types.push(RustTypeDeclaration {
             name: enum_name.clone(),
             kind: RustTypeDeclarationKind::MethodParametersEnum {
               variants: enum_variants,
               trait_name: trait_name.clone(),
+              enum_has_lifetime: enum_has_lifetime,
             },
           });
           types.push(RustTypeDeclaration {
             name: trait_name.clone(),
-            kind: RustTypeDeclarationKind::MethodParametersTrait { enum_name: enum_name.clone() },
+            kind: RustTypeDeclarationKind::MethodParametersTrait {
+              enum_name: enum_name.clone(),
+              enum_has_lifetime: enum_has_lifetime,
+            },
           });
           RustMethod {
             name: first_method.name,
@@ -852,6 +859,7 @@ impl RustGenerator {
             arguments: RustMethodArguments::MultipleVariants {
               params_enum_name: enum_name.last_name().clone(),
               params_trait_name: trait_name.last_name().clone(),
+              enum_has_lifetime: enum_has_lifetime,
               shared_arguments: match self_argument {
                 None => Vec::new(),
                 Some(arg) => vec![arg],

@@ -37,6 +37,7 @@ pub enum RustMethodArguments {
   MultipleVariants {
     params_enum_name: String,
     params_trait_name: String,
+    enum_has_lifetime: bool,
     shared_arguments: Vec<RustMethodArgument>,
     variant_argument_name: String,
     variants: Vec<RustMethodArgumentsVariant>,
@@ -185,9 +186,11 @@ pub enum RustTypeDeclarationKind {
   MethodParametersEnum {
     variants: Vec<Vec<RustType>>,
     trait_name: RustName,
+    enum_has_lifetime: bool,
   },
   MethodParametersTrait {
     enum_name: RustName,
+    enum_has_lifetime: bool,
   },
 }
 

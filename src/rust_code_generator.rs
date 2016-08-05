@@ -309,6 +309,7 @@ impl RustCodeGenerator {
       }
       RustMethodArguments::MultipleVariants { ref params_enum_name,
                                               ref params_trait_name,
+                                              ref enum_has_lifetime,
                                               ref shared_arguments,
                                               ref variant_argument_name,
                                               ref variants } => {
@@ -335,10 +336,20 @@ impl RustCodeGenerator {
                     self.generate_ffi_call(func, variant, shared_arguments))
           })
                              .join("\n"));
-        let lifetime = "a";
-        format!("{pubq}fn {name}<'{lf}, {tpl_type}: {trt}<'{lf}>>({args}){ret} {{\n{body}}}\n\n",
+        let lifetime_arg = if *enum_has_lifetime {
+          "'a, "
+        } else {
+          ""
+        };
+        let lifetime_specifier = if *enum_has_lifetime {
+          "<'a>"
+        } else {
+          ""
+        };
+        format!("{pubq}fn {name}<{lfarg}{tpl_type}: {trt}{lf}>({args}){ret} {{\n{body}}}\n\n",
                 pubq = public_qualifier,
-                lf = lifetime,
+                lfarg = lifetime_arg,
+                lf = lifetime_specifier,
                 name = func.name.last_name(),
                 trt = params_trait_name,
                 tpl_type = tpl_type,
@@ -433,13 +444,14 @@ impl RustCodeGenerator {
                                    .join("")));
           }
         }
-        RustTypeDeclarationKind::MethodParametersEnum { ref variants, ref trait_name } => {
-          let lifetime =
-            if variants.iter().find(|var| var.iter().find(|x| x.is_ref()).is_some()).is_some() {
-              Some("a")
-            } else {
-              None
-            };
+        RustTypeDeclarationKind::MethodParametersEnum { ref variants,
+                                                        ref trait_name,
+                                                        ref enum_has_lifetime } => {
+          let lifetime = if *enum_has_lifetime {
+            Some("a")
+          } else {
+            None
+          };
           let var_texts = variants.iter()
             .enumerate()
             .map(|(num, variant)| {
@@ -467,42 +479,52 @@ impl RustCodeGenerator {
                                var_texts.join("\n")));
 
           for (num, variant) in variants.iter().enumerate() {
-            let mut tuple_val = variant.iter()
-              .enumerate()
-              .map(|(num2, _)| format!("self.{}", num2))
-              .join(", ");
-            if !tuple_val.is_empty() {
-              tuple_val = format!("({})", tuple_val);
-            }
-            results.push(format!("impl{lf} {trt}{lf} for ({tuple_type}) {{\nfn as_enum(self) -> \
-                             {enm}{lf} {{\n{enm}::Variant{num}{tuple_val}\n}}\n}}\n\n",
-                            lf = match lifetime {
-                              Some(lifetime) => format!("<'{}>", lifetime),
-                              None => String::new(),
-                            },
-                            trt = trait_name.last_name(),
-                            tuple_type = variant.iter()
-                              .map(|t| {
+            let tuple_item_types: Vec<_> = variant.iter()
+                .map(|t| {
                   match lifetime {
-                    Some(lifetime) => {
-                      self.rust_type_to_code(&t.with_lifetime(lifetime.to_string()))
-                    }
+                    Some(lifetime) => self.rust_type_to_code(&t.with_lifetime(lifetime.to_string())),
                     None => self.rust_type_to_code(t),
                   }
-                })
-                              .join(","),
-                            enm = type1.name.last_name(),
-                            num = num,
-                            tuple_val = tuple_val));
+                }).collect();
+            let type_text = if tuple_item_types.len() == 1 {
+              tuple_item_types[0].clone()
+            } else {
+              format!("({})", tuple_item_types.join(","))
+            };
+            let variant_value = if tuple_item_types.len() == 0 {
+              String::new()
+            } else if tuple_item_types.len() == 1 {
+              "(self)".to_string()
+            } else {
+              format!("({})", variant.iter()
+                  .enumerate()
+                  .map(|(num2, _)| format!("self.{}", num2))
+                  .join(", "))
+            };
+            results.push(format!("impl{lf} {trt}{lf} for {type_text} {{\nfn as_enum(self) -> \
+                             {enm}{lf} {{\n{enm}::Variant{num}{variant_value}\n}}\n}}\n\n",
+                                 lf = match lifetime {
+                                   Some(lifetime) => format!("<'{}>", lifetime),
+                                   None => String::new(),
+                                 },
+                                 trt = trait_name.last_name(),
+                                 type_text = type_text,
+                                 enm = type1.name.last_name(),
+                                 num = num,
+                                 variant_value = variant_value));
           }
         }
-        RustTypeDeclarationKind::MethodParametersTrait { ref enum_name } => {
-          let lifetime = "a";
-          results.push(format!("pub trait {name}<'{lf}> {{\nfn as_enum(self) -> \
-                                {enm}<'{lf}>;\n}}",
+        RustTypeDeclarationKind::MethodParametersTrait { ref enum_name, ref enum_has_lifetime } => {
+          let lifetime_specifier = if *enum_has_lifetime {
+            "<'a>"
+          } else {
+            ""
+          };
+          results.push(format!("pub trait {name}{lf} {{\nfn as_enum(self) -> \
+                                {enm}{lf};\n}}",
                                name = type1.name.last_name(),
                                enm = enum_name.last_name(),
-                               lf = lifetime));
+                               lf = lifetime_specifier));
 
         }
       };
