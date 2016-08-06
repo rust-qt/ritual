@@ -23,7 +23,7 @@ fn include_file_to_module_name(include_file: &String) -> String {
     r = r[0..r.len() - 2].to_string();
   }
   if r == "Qt" {
-    r = "global".to_string();
+    r = "qt".to_string();
   } else if r.starts_with("Qt") {
     r = r[2..].to_string();
   } else if r.starts_with("Q") {

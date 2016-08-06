@@ -1,69 +1,10 @@
 
 use cpp_method::{CppMethod, CppMethodScope, CppMethodKind};
-use cpp_type::{CppType, CppTypeBase};
+use cpp_type::{CppTypeBase};
 use std::collections::HashMap;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
-pub struct EnumValue {
-  pub name: String,
-  pub value: i64,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
-pub struct CppClassField {
-  pub name: String,
-  pub field_type: CppType,
-  pub visibility: CppVisibility,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
-pub enum CppTypeKind {
-  Enum {
-    values: Vec<EnumValue>,
-  },
-  Class {
-    size: Option<i32>,
-    bases: Vec<CppType>,
-    fields: Vec<CppClassField>,
-    template_arguments: Option<Vec<String>>,
-  },
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
-pub struct CppOriginLocation {
-  pub include_file_path: String,
-  pub line: u32,
-  pub column: u32,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
-pub enum CppVisibility {
-  Public,
-  Protected,
-  Private,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
-pub struct CppTypeData {
-  pub name: String,
-  pub include_file: String,
-  pub origin_location: CppOriginLocation,
-  pub kind: CppTypeKind,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
-#[derive(Serialize, Deserialize)]
-pub struct CppData {
-  pub types: Vec<CppTypeData>,
-  pub methods: Vec<CppMethod>,
-  pub template_instantiations: HashMap<String, Vec<Vec<CppType>>>,
-}
+pub use serializable::{EnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
+                       CppTypeData, CppData};
 
 impl CppTypeData {
   pub fn is_class(&self) -> bool {

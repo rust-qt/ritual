@@ -3,9 +3,9 @@ use cpp_ffi_type::{CppFfiType, IndirectionChange};
 use cpp_ffi_function_signature::CppFfiFunctionSignature;
 use cpp_ffi_function_argument::{CppFfiFunctionArgument, CppFfiArgumentMeaning};
 use cpp_and_ffi_method::CppMethodWithFfiSignature;
-use cpp_data::{CppVisibility, CppOriginLocation};
-use cpp_operators::CppOperator;
+use cpp_data::{CppVisibility};
 use utils::JoinWithString;
+pub use serializable::{CppFunctionArgument, CppMethodScope, CppMethodKind, CppMethod};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ReturnValueAllocationPlace {
@@ -22,20 +22,7 @@ pub enum AllocationPlaceImportance {
 
 
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
-pub struct CppFunctionArgument {
-  pub name: String,
-  pub argument_type: CppType,
-  pub has_default_value: bool,
-}
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
-pub enum CppMethodScope {
-  Global,
-  Class(String),
-}
 
 impl CppMethodScope {
   pub fn class_name(&self) -> Option<&String> {
@@ -46,14 +33,7 @@ impl CppMethodScope {
   }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
-pub enum CppMethodKind {
-  Regular,
-  Constructor,
-  Destructor,
-  Operator(CppOperator),
-}
+
 
 impl CppMethodKind {
   pub fn is_operator(&self) -> bool {
@@ -83,25 +63,7 @@ impl CppMethodKind {
   }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
-pub struct CppMethod {
-  pub name: String,
-  pub kind: CppMethodKind,
-  pub scope: CppMethodScope,
-  pub is_virtual: bool,
-  pub is_pure_virtual: bool,
-  pub is_const: bool,
-  pub is_static: bool,
-  pub visibility: CppVisibility,
-  pub is_signal: bool,
-  pub return_type: Option<CppType>,
-  pub arguments: Vec<CppFunctionArgument>,
-  pub allows_variable_arguments: bool,
-  pub include_file: String,
-  pub origin_location: Option<CppOriginLocation>,
-  pub template_arguments: Option<Vec<String>>,
-}
+
 
 impl CppMethod {
   pub fn argument_types_equal(&self, other: &CppMethod) -> bool {

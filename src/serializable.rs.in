@@ -1,0 +1,344 @@
+use std::collections::HashMap;
+
+// ------------------------------
+// from cpp_data
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct EnumValue {
+  pub name: String,
+  pub value: i64,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct CppClassField {
+  pub name: String,
+  pub field_type: CppType,
+  pub visibility: CppVisibility,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub enum CppTypeKind {
+  Enum {
+    values: Vec<EnumValue>,
+  },
+  Class {
+    size: Option<i32>,
+    bases: Vec<CppType>,
+    fields: Vec<CppClassField>,
+    template_arguments: Option<Vec<String>>,
+  },
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct CppOriginLocation {
+  pub include_file_path: String,
+  pub line: u32,
+  pub column: u32,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub enum CppVisibility {
+  Public,
+  Protected,
+  Private,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct CppTypeData {
+  pub name: String,
+  pub include_file: String,
+  pub origin_location: CppOriginLocation,
+  pub kind: CppTypeKind,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(Serialize, Deserialize)]
+pub struct CppData {
+  pub types: Vec<CppTypeData>,
+  pub methods: Vec<CppMethod>,
+  pub template_instantiations: HashMap<String, Vec<Vec<CppType>>>,
+}
+
+// -----------------------------------
+// from cpp_method
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct CppFunctionArgument {
+  pub name: String,
+  pub argument_type: CppType,
+  pub has_default_value: bool,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub enum CppMethodScope {
+  Global,
+  Class(String),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub enum CppMethodKind {
+  Regular,
+  Constructor,
+  Destructor,
+  Operator(CppOperator),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct CppMethod {
+  pub name: String,
+  pub kind: CppMethodKind,
+  pub scope: CppMethodScope,
+  pub is_virtual: bool,
+  pub is_pure_virtual: bool,
+  pub is_const: bool,
+  pub is_static: bool,
+  pub visibility: CppVisibility,
+  pub is_signal: bool,
+  pub return_type: Option<CppType>,
+  pub arguments: Vec<CppFunctionArgument>,
+  pub allows_variable_arguments: bool,
+  pub include_file: String,
+  pub origin_location: Option<CppOriginLocation>,
+  pub template_arguments: Option<Vec<String>>,
+}
+
+// ------------------------------
+// from cpp_operators
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub enum CppOperator {
+  /// (type) a
+  Conversion(CppType),
+  /// a = b
+  Assignment,
+  /// a + b
+  Addition,
+  /// a - b
+  Subtraction,
+  /// +a
+  UnaryPlus,
+  /// -a
+  UnaryMinus,
+  /// a * b
+  Multiplication,
+  /// a / b
+  Division,
+  /// a % b
+  Modulo,
+  /// ++a
+  PrefixIncrement,
+  /// a++
+  PostfixIncrement,
+  /// --a
+  PrefixDecrement,
+  /// a--
+  PostfixDecrement,
+  /// a == b
+  EqualTo,
+  /// a != b
+  NotEqualTo,
+  /// a > b
+  GreaterThan,
+  /// a < b
+  LessThan,
+  /// a >= b
+  GreaterThanOrEqualTo,
+  /// a <= b
+  LessThanOrEqualTo,
+  /// !a
+  LogicalNot,
+  /// a && b
+  LogicalAnd,
+  /// a || b
+  LogicalOr,
+  /// ~a
+  BitwiseNot,
+  /// a & b
+  BitwiseAnd,
+  /// a | b
+  BitwiseOr,
+  /// a ^ b
+  BitwiseXor,
+  /// a << b
+  BitwiseLeftShift,
+  /// a >> b
+  BitwiseRightShift,
+
+  /// a += b
+  AdditionAssignment,
+  /// a -= b
+  SubtractionAssignment,
+  /// a *= b
+  MultiplicationAssignment,
+  /// a /= b
+  DivisionAssignment,
+  /// a %= b
+  ModuloAssignment,
+  /// a &= b
+  BitwiseAndAssignment,
+  /// a |= b
+  BitwiseOrAssignment,
+  /// a ^= b
+  BitwiseXorAssignment,
+  /// a <<= b
+  BitwiseLeftShiftAssignment,
+  /// a >>= b
+  BitwiseRightShiftAssignment,
+  /// a[b]
+  Subscript,
+  /// *a
+  Indirection,
+  /// &a
+  AddressOf,
+  /// a->b
+  StructureDereference,
+  /// a->*b
+  PointerToMember,
+  /// a(a1, a2)
+  FunctionCall,
+  /// a, b
+  Comma,
+  /// new type
+  New,
+  /// new type[n]
+  NewArray,
+  /// delete a
+  Delete,
+  /// delete[] a
+  DeleteArray,
+}
+
+// -------------------------------
+// from cpp_type
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+#[allow(dead_code)]
+pub enum CppTypeIndirection {
+  None,
+  Ptr,
+  Ref,
+  PtrRef,
+  PtrPtr,
+  RValueRef,
+}
+
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub enum CppBuiltInNumericType {
+  Bool,
+  CharS,
+  CharU,
+  SChar,
+  UChar,
+  WChar,
+  Char16,
+  Char32,
+  Short,
+  UShort,
+  Int,
+  UInt,
+  Long,
+  ULong,
+  LongLong,
+  ULongLong,
+  Int128,
+  UInt128,
+  Float,
+  Double,
+  LongDouble,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+#[allow(dead_code)]
+pub enum CppSpecificNumericTypeKind {
+  Integer {
+    is_signed: bool,
+  },
+  FloatingPoint,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub enum CppTypeBase {
+  Void,
+  BuiltInNumeric(CppBuiltInNumericType),
+  SpecificNumeric {
+    name: String,
+    bits: i32,
+    kind: CppSpecificNumericTypeKind,
+  },
+  PointerSizedInteger {
+    name: String,
+    is_signed: bool,
+  },
+  Enum {
+    name: String,
+  },
+  Class {
+    name: String,
+    template_arguments: Option<Vec<CppType>>,
+  },
+  TemplateParameter {
+    nested_level: i32,
+    index: i32,
+  },
+  FunctionPointer {
+    return_type: Box<CppType>,
+    arguments: Vec<CppType>,
+    allows_variable_arguments: bool,
+  }, /*  Unspecified {
+      *    name: String,
+      *    template_arguments: Option<Vec<CppType>>,
+      *  }, */
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct CppType {
+  pub is_const: bool,
+  pub indirection: CppTypeIndirection,
+  pub base: CppTypeBase,
+}
+
+// -------------------------
+// from main
+
+#[derive(Debug)]
+#[derive(Serialize, Deserialize)]
+pub struct CppLibSpec {
+  pub name: String,
+  pub include_file: String,
+}
+
+#[derive(Debug)]
+#[derive(Serialize, Deserialize)]
+pub struct RustLibSpec {
+  pub name: String,
+}
+
+#[derive(Debug)]
+#[derive(Serialize, Deserialize)]
+pub struct LibSpec {
+  pub cpp: CppLibSpec,
+  pub rust: RustLibSpec,
+}
+
+#[derive(Debug, Default)]
+#[derive(Serialize, Deserialize)]
+pub struct LocalOverrides {
+  pub qmake_path: Option<String>,
+}

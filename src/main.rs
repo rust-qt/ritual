@@ -1,8 +1,4 @@
-#![feature(custom_derive, plugin)]
-#![plugin(serde_macros)]
-
 extern crate serde_json;
-// extern crate toml;
 
 mod cpp_ffi_function_argument;
 mod cpp_ffi_function_signature;
@@ -24,6 +20,7 @@ mod rust_type;
 mod utils;
 mod cpp_parser;
 mod tweaked_file;
+mod serializable;
 
 use std::fs;
 use std::fs::File;
@@ -65,31 +62,7 @@ fn print_usage() {
 // }
 
 
-#[derive(Debug)]
-#[derive(Serialize, Deserialize)]
-struct CppLibSpec {
-  name: String,
-  include_file: String,
-}
-
-#[derive(Debug)]
-#[derive(Serialize, Deserialize)]
-struct RustLibSpec {
-  name: String,
-}
-
-#[derive(Debug)]
-#[derive(Serialize, Deserialize)]
-struct LibSpec {
-  cpp: CppLibSpec,
-  rust: RustLibSpec,
-}
-
-#[derive(Debug, Default)]
-#[derive(Serialize, Deserialize)]
-struct LocalOverrides {
-  qmake_path: Option<String>,
-}
+use serializable::{LibSpec, LocalOverrides};
 
 fn main() {
   let arguments: Vec<_> = env::args().collect();

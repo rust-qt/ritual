@@ -5,7 +5,7 @@ cpp_to_rust project is aimed to create Rust wrappers for C++ libraries automatic
 
 Dependencies
 ------------
-- Nightly Rust. The project aims to support stable Rust, but at the moment it misses custom derives used for serialization.
+- Stable Rust.
 - libclang-dev.
 - cmake.
 - C++ compiler and make.
@@ -62,13 +62,13 @@ Currently implemented features:
 - Free functions are mapped to free functions.
 - Class methods are mapped to structs' implementations.
 - All names are converted to match Rust naming conventions.
+- Method overloading is emulated with wrapping arguments in a tuple and creating a trait describing tuples acceptable by each method.
 
 Not implemented yet but planned:
 
 - Create wrappers for all encountered instantiations of class templates.
 - Implement type information exchange between multiple wrapper crates to reuse type wrappers from dependancy libraries and perform inter-crate template instantiations.   
 - Support function types. Currently any methods containing function types are not wrapped.
-- Emulate method overloading (currently overloaded methods are mapped to Rust methods with different names).
 - Implement operator traits for structs based on C++ operator methods.
 - Implement Debug and Display trait for structs if similar methods exist on C++ side.
 - Implement iterator traits for collections.

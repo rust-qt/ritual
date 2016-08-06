@@ -1,44 +1,10 @@
 
 use cpp_ffi_type::{CppFfiType, IndirectionChange, CppToFfiTypeConversion};
 use caption_strategy::TypeCaptionStrategy;
-
+pub use serializable::{CppBuiltInNumericType, CppSpecificNumericTypeKind, CppTypeBase, CppType,
+                       CppTypeIndirection};
 extern crate regex;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
-pub enum CppBuiltInNumericType {
-  Bool,
-  CharS,
-  CharU,
-  SChar,
-  UChar,
-  WChar,
-  Char16,
-  Char32,
-  Short,
-  UShort,
-  Int,
-  UInt,
-  Long,
-  ULong,
-  LongLong,
-  ULongLong,
-  Int128,
-  UInt128,
-  Float,
-  Double,
-  LongDouble,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
-#[allow(dead_code)]
-pub enum CppSpecificNumericTypeKind {
-  Integer {
-    is_signed: bool,
-  },
-  FloatingPoint,
-}
 
 impl CppBuiltInNumericType {
   pub fn to_cpp_code(&self) -> &'static str {
@@ -92,52 +58,8 @@ impl CppBuiltInNumericType {
   }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
-#[allow(dead_code)]
-pub enum CppTypeIndirection {
-  None,
-  Ptr,
-  Ref,
-  PtrRef,
-  PtrPtr,
-  RValueRef,
-}
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
-pub enum CppTypeBase {
-  Void,
-  BuiltInNumeric(CppBuiltInNumericType),
-  SpecificNumeric {
-    name: String,
-    bits: i32,
-    kind: CppSpecificNumericTypeKind,
-  },
-  PointerSizedInteger {
-    name: String,
-    is_signed: bool,
-  },
-  Enum {
-    name: String,
-  },
-  Class {
-    name: String,
-    template_arguments: Option<Vec<CppType>>,
-  },
-  TemplateParameter {
-    nested_level: i32,
-    index: i32,
-  },
-  FunctionPointer {
-    return_type: Box<CppType>,
-    arguments: Vec<CppType>,
-    allows_variable_arguments: bool,
-  }, /*  Unspecified {
-      *    name: String,
-      *    template_arguments: Option<Vec<CppType>>,
-      *  }, */
-}
+
 
 impl CppTypeBase {
   #[allow(dead_code)]
@@ -216,13 +138,7 @@ impl CppTypeBase {
   }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
-pub struct CppType {
-  pub is_const: bool,
-  pub indirection: CppTypeIndirection,
-  pub base: CppTypeBase,
-}
+
 
 
 impl CppType {

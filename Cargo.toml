@@ -1,18 +1,20 @@
 [package]
 name = "qt_wrapper_generator"
 version = "0.1.0"
-authors = ["Ri <ri@idzaaus.org>"]
+authors = ["Pavel Strakhov <ri@idzaaus.org>"]
+build = "build.rs"
 
 [dependencies]
 serde = "0.8"
 serde_json = "0.8"
-serde_macros = "0.8"
 find_folder = "0.3.0"
 Inflector = "0.2.0"
 ansi_term = "0.7"
-#clang = { git = "https://github.com/KyleMayes/clang-rs", features = ["clang_3_8"] }
 clang = { git = "https://github.com/KyleMayes/clang-rs" }
 regex = "0.1"
 rustfmt = "0.5.0"
 libc = "0.2"
 #toml = "0.1"
+
+[build-dependencies]
+serde_codegen = "0.8"
