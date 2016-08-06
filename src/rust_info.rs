@@ -109,6 +109,7 @@ impl RustMethod {
 #[allow(dead_code)]
 pub enum TraitName {
   Clone,
+  CppDeletable { deleter_name: String, },
   Debug,
   Default,
   Display,
@@ -151,7 +152,10 @@ pub enum TraitName {
 }
 impl TraitName {
   pub fn to_string(&self) -> String {
-    format!("{:?}", self)
+    match *self {
+      TraitName::CppDeletable { .. } => "cpp_box::CppDeletable".to_string(),
+      _ => format!("{:?}", self)
+    }
   }
 }
 

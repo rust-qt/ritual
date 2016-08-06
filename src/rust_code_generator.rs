@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::Write;
 use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
                 RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope,
-                RustMethodArgument};
+                RustMethodArgument, TraitName};
 use std::collections::HashMap;
 use utils::{JoinWithString, copy_recursively};
 use log;
@@ -68,12 +68,19 @@ impl RustCodeGenerator {
     let mut cargo_file = File::create(self.output_path.with_added("Cargo.toml")).unwrap();
     // TODO: use supplied version and authors
     write!(cargo_file,
-           "[package]\nname = \"{}\"\nversion = \"{}\"\nauthors = {}\nbuild = \"build.rs\"\n\n",
+           "[package]
+           name = \"{}\"
+           version = \"{}\"
+           authors = {}
+           build = \"build.rs\"\n\n",
            &self.crate_name,
            "0.0.0",
            "[\"Riateche <ri@idzaaus.org>\"]")
       .unwrap();
-    write!(cargo_file, "[dependencies]\nlibc = \"0.2\"\n\n").unwrap();
+    write!(cargo_file,
+           "[dependencies]
+           libc = \"0.2\"
+           cpp_box = {{ git = \"https://github.com/rust-qt/cpp_box.git\" }}\n\n").unwrap();
     println!("template_path = {:?}", self.template_path);
     for item in fs::read_dir(&self.template_path).unwrap() {
       let item = item.unwrap();
@@ -389,7 +396,11 @@ impl RustCodeGenerator {
 
   fn generate_module_code(&self, data: &RustModule) -> String {
     let mut results = Vec::new();
-    results.push("extern crate libc;\n#[allow(unused_imports)]\nuse std;\n\n".to_string());
+    results.push(
+      "extern crate libc;
+      extern crate cpp_box;
+      #[allow(unused_imports)]
+      use std;\n\n".to_string());
 
     for type1 in &data.types {
       match type1.kind {
@@ -434,13 +445,20 @@ impl RustCodeGenerator {
                                    .join("")));
           }
           for trait1 in traits {
+            let trait_content = match trait1.trait_name {
+              TraitName::CppDeletable { ref deleter_name } => {
+                format!("fn deleter() -> cpp_box::Deleter<Self> {{\n  ::ffi::{}\n}}\n", deleter_name)
+              }
+              _ => trait1.methods
+                  .iter()
+                  .map(|method| self.generate_rust_final_function(method))
+                  .join("")
+            };
+
             results.push(format!("impl {} for {} {{\n{}}}\n\n",
                                  trait1.trait_name.to_string(),
                                  type1.name.last_name(),
-                                 trait1.methods
-                                   .iter()
-                                   .map(|method| self.generate_rust_final_function(method))
-                                   .join("")));
+                                 trait_content));
           }
         }
         RustTypeDeclarationKind::MethodParametersEnum { ref variants,
