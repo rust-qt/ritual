@@ -40,9 +40,8 @@ impl RustCodeGenerator {
     // let mut rustfmt_config_toml = String::new();
     // rustfmt_config_file.read_to_string(&mut rustfmt_config_toml).unwrap();
 
-
-    let rustfmt_config = rustfmt::config::Config::from_toml(&include_str!("../templates/crate/ru\
-                                                                           stfmt.toml"));
+    let rustfmt_config_data = include_str!("../templates/crate/rustfmt.toml");
+    let rustfmt_config = rustfmt::config::Config::from_toml(&rustfmt_config_data);
     RustCodeGenerator {
       crate_name: crate_name,
       output_path: output_path,
@@ -557,6 +556,7 @@ impl RustCodeGenerator {
                              cause));
       }
     }
+    assert!(path.as_path().is_file());
   }
 
   pub fn generate_module_file(&self, data: &RustModule) {
@@ -598,6 +598,6 @@ impl RustCodeGenerator {
       }
       write!(file, "}}\n").unwrap();
     }
-    // self.call_rustfmt(&file_path);
+    // no rustfmt for ffi file
   }
 }
