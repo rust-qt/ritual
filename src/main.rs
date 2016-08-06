@@ -151,7 +151,7 @@ fn main() {
     p.push("cpp_data.json");
     p
   };
-  let parse_result = if parse_result_cache_file_path.as_path().is_file() {
+  let mut parse_result = if parse_result_cache_file_path.as_path().is_file() {
     log::info(format!("Cpp data is loaded from file: {}",
                       parse_result_cache_file_path.to_str().unwrap()));
     let file = File::open(&parse_result_cache_file_path).unwrap();
@@ -162,10 +162,7 @@ fn main() {
                                                 lib_spec.cpp.include_file.clone(),
                                                 output_dir_path.clone());
     parser.run();
-    let mut parse_result = parser.get_data();
-    qt_specific::fix_header_names(&mut parse_result, &qt_core_headers_path);
-
-    parse_result.ensure_explicit_destructors();
+    let parse_result = parser.get_data();
 
     // let serialized_parse_result = serde_json::to_vec(&parse_result).unwrap();
     let mut file = File::create(&parse_result_cache_file_path).unwrap();
@@ -175,6 +172,9 @@ fn main() {
                       parse_result_cache_file_path.to_str().unwrap()));
     parse_result
   };
+  qt_specific::fix_header_names(&mut parse_result, &qt_core_headers_path);
+  parse_result.ensure_explicit_destructors();
+  parse_result.generate_methods_with_omitted_args();
 
   //  if arguments.len() == 3 && arguments[1] == "check_parsers_consistency" {
   //    let headers_dir = ....;

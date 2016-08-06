@@ -1,6 +1,6 @@
 
 use cpp_method::{CppMethod, CppMethodScope, CppMethodKind};
-use cpp_type::{CppTypeBase};
+use cpp_type::CppTypeBase;
 use std::collections::HashMap;
 
 pub use serializable::{EnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
@@ -66,6 +66,21 @@ impl CppData {
         }
       }
     }
+  }
+
+  pub fn generate_methods_with_omitted_args(&mut self) {
+    let mut new_methods = Vec::new();
+    for method in &self.methods {
+      if method.arguments.len() > 0 && method.arguments.last().unwrap().has_default_value {
+        let mut method_copy = method.clone();
+        while method_copy.arguments.len() > 0 &&
+              method_copy.arguments.last().unwrap().has_default_value {
+          method_copy.arguments.pop().unwrap();
+          new_methods.push(method_copy.clone());
+        }
+      }
+    }
+    self.methods.append(&mut new_methods);
   }
 
   pub fn split_by_headers(&self) -> HashMap<String, CppData> {

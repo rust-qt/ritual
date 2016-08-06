@@ -47,8 +47,8 @@ The converter currently works with QtCore library only.
 
 The first priority is to support all of Qt5 libraries. However, most of its code is not Qt-dependent, so it is possible to support arbitrary libraries in the future. 
 
-C++ features coverage
----------------------
+C++/Rust features coverage
+--------------------------
 Currently implemented features:
 
 - All typedefs are replaced by original types.
@@ -62,7 +62,7 @@ Currently implemented features:
 - Free functions are mapped to free functions.
 - Class methods are mapped to structs' implementations.
 - All names are converted to match Rust naming conventions.
-- Method overloading is emulated with wrapping arguments in a tuple and creating a trait describing tuples acceptable by each method.
+- Method overloading is emulated with wrapping arguments in a tuple and creating a trait describing tuples acceptable by each method. Methods with default arguments are treated in the same way.
 
 Not implemented yet but planned:
 
@@ -70,7 +70,7 @@ Not implemented yet but planned:
 - Implement type information exchange between multiple wrapper crates to reuse type wrappers from dependancy libraries and perform inter-crate template instantiations.   
 - Support function types. Currently any methods containing function types are not wrapped.
 - Implement operator traits for structs based on C++ operator methods.
-- Implement Debug and Display trait for structs if similar methods exist on C++ side.
+- Implement Debug and Display traits for structs if applicable methods exist on C++ side.
 - Implement iterator traits for collections.
 - Provide access to Qt specific features (like signals and slots).
 - Provide a way to emulate deriving from C++ classes to call protected functions and reimplement virtual functions.
@@ -78,6 +78,7 @@ Not implemented yet but planned:
 - Provide access to static_cast, dynamic_cast and qobject_cast.
 - Provide access to class's methods inherited from its base classes.
 - Provide conversion from enums to int and back (used in Qt API).
+- Generate meaningful Rust documentation for the crate.
 
 Not planned to support:
 
