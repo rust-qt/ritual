@@ -35,15 +35,11 @@ impl CGenerator {
       lib_path: lib_path,
       lib_name: lib_name,
       template_classes: cpp_data.types
+                                .clone()
                                 .iter()
                                 .filter_map(|t| {
-                                  if let CppTypeKind::Class { ref template_arguments, .. } =
-                                         t.kind {
-                                    if template_arguments.is_some() {
-                                      Some(t.name.clone())
-                                    } else {
-                                      None
-                                    }
+                                  if cpp_data.is_template_class(&t.name) {
+                                    Some(t.name.clone())
                                   } else {
                                     None
                                   }

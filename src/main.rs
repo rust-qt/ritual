@@ -175,6 +175,7 @@ fn main() {
   qt_specific::fix_header_names(&mut parse_result, &qt_core_headers_path);
   parse_result.ensure_explicit_destructors();
   parse_result.generate_methods_with_omitted_args();
+  parse_result.add_inherited_methods();
 
   //  if arguments.len() == 3 && arguments[1] == "check_parsers_consistency" {
   //    let headers_dir = ....;

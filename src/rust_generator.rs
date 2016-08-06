@@ -450,6 +450,7 @@ impl RustGenerator {
     }
   }
 
+  // TODO: check that all methods and types has been processed
   pub fn generate_module(&mut self,
                          c_header: &CppFfiHeaderData,
                          module_name: &RustName)

@@ -27,6 +27,7 @@ impl CppCodeGenerator {
   }
 
   fn header_code(&self, method: &CppAndFfiMethod) -> String {
+    //println!("FAIL TEST: {:?}", method);
     format!("{} {}_EXPORT {}({});\n",
             method.c_signature.return_type.ffi_type.to_cpp_code().unwrap(),
             self.lib_name_upper,

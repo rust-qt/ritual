@@ -1,7 +1,9 @@
 
 use cpp_method::{CppMethod, CppMethodScope, CppMethodKind};
-use cpp_type::CppTypeBase;
+use cpp_operators::CppOperator;
 use std::collections::HashMap;
+use log;
+use cpp_type::{CppType, CppTypeBase, CppTypeIndirection};
 
 pub use serializable::{EnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
                        CppTypeData, CppData};
@@ -68,6 +70,98 @@ impl CppData {
     }
   }
 
+  fn add_inherited_methods_from(&mut self, base_name: &String) {
+    let template_arguments = match self.types.iter().find(|x| &x.name == base_name) {
+      None => None,
+      Some(type_data) => match type_data.kind {
+        CppTypeKind::Class { ref template_arguments, .. } => {
+          match *template_arguments {
+            None => None,
+            Some(ref strings) => {
+              Some(strings.iter()
+                  .enumerate()
+                  .map(|(num, _)| {
+                    CppType {
+                      is_const: false,
+                      indirection: CppTypeIndirection::None,
+                      base: CppTypeBase::TemplateParameter {
+                        nested_level: 0,
+                        index: num as i32,
+                      },
+                    }
+                  })
+                  .collect())
+            }
+          }
+        }
+        _ => None
+      }
+    };
+
+    let mut new_methods = Vec::new();
+    let mut derived_types = Vec::new();
+    {
+      let base_methods: Vec<_> = self.methods.iter().filter(|method| {
+        if method.kind.is_constructor() || method.kind.is_destructor() ||
+            method.kind == CppMethodKind::Operator(CppOperator::Assignment) {
+          return false;
+        }
+        if let CppMethodScope::Class(ref name) = method.scope {
+          name == base_name
+        } else {
+          false
+        }
+      }).collect();
+      for type1 in &self.types {
+        if type1.inherits(base_name) {
+          let derived_name = &type1.name;
+          derived_types.push(derived_name.clone());
+          for base_class_method in base_methods.clone() {
+            let mut ok = true;
+            for method in &self.methods {
+              if let CppMethodScope::Class(ref name) = method.scope {
+                if name == derived_name && method.name == base_class_method.name {
+                  log::info("Method is not added because it's overriden in derived class");
+                  log::info(format!("Base method: {}", base_class_method.short_text()));
+                  log::info(format!("Derived method: {}\n", method.short_text()));
+                  ok = false;
+                  break;
+                }
+              }
+            }
+            if ok {
+              let mut new_method = base_class_method.clone();
+              new_method.scope = CppMethodScope::Class(derived_name.clone());
+              new_method.include_file = type1.include_file.clone();
+              new_method.origin_location = None;
+              if new_method.arguments.len() > 0 && new_method.arguments[0].name == "this" {
+                new_method.arguments[0].argument_type.base = CppTypeBase::Class {
+                  name: derived_name.clone(),
+                  template_arguments: template_arguments.clone(),
+                };
+              }
+              log::info(format!("Method added: {}", new_method.short_text()));
+              new_methods.push(new_method.clone());
+            }
+          }
+        }
+      }
+    }
+    self.methods.append(&mut new_methods);
+    for name in derived_types {
+      self.add_inherited_methods_from(&name);
+    }
+  }
+
+  pub fn add_inherited_methods(&mut self) {
+    log::info("Adding inherited methods");
+    let all_type_names: Vec<_> = self.types.iter().map(|t| t.name.clone()).collect();
+    for name in all_type_names {
+      self.add_inherited_methods_from(&name);
+    }
+    log::info("Finished adding inherited methods");
+  }
+
   pub fn generate_methods_with_omitted_args(&mut self) {
     let mut new_methods = Vec::new();
     for method in &self.methods {
@@ -106,5 +200,28 @@ impl CppData {
       }
     }
     result
+  }
+
+  pub fn is_template_class(&self, name: &String) -> bool {
+    if let Some(type_info) = self.types.iter().find(|t| &t.name == name) {
+      if let CppTypeKind::Class { ref template_arguments, ref bases, .. } = type_info.kind {
+        if template_arguments.is_some() {
+          return true;
+        }
+        for base in bases {
+          if let CppTypeBase::Class { ref name, ref template_arguments } = base.base {
+            if template_arguments.is_some() {
+              return true;
+            }
+            if self.is_template_class(name) {
+              return true;
+            }
+          }
+        }
+      }
+    } else {
+      log::warning(format!("Unknown type assumed to be non-template: {}", name));
+    }
+    false
   }
 }

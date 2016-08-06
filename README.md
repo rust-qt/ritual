@@ -63,6 +63,7 @@ Currently implemented features:
 - Class methods are mapped to structs' implementations.
 - All names are converted to match Rust naming conventions.
 - Method overloading is emulated with wrapping arguments in a tuple and creating a trait describing tuples acceptable by each method. Methods with default arguments are treated in the same way.
+- Methods inherited from base classes are added directly to wrapper struct of the derived class.
 
 Not implemented yet but planned:
 
@@ -76,7 +77,6 @@ Not implemented yet but planned:
 - Provide a way to emulate deriving from C++ classes to call protected functions and reimplement virtual functions.
 - Provide access to a class's public variables.
 - Provide access to static_cast, dynamic_cast and qobject_cast.
-- Provide access to class's methods inherited from its base classes.
 - Provide conversion from enums to int and back (used in Qt API).
 - Generate meaningful Rust documentation for the crate.
 
