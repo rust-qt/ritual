@@ -1,6 +1,7 @@
 use cpp_type::CppType;
 use cpp_ffi_type::CppToFfiTypeConversion;
 use utils::JoinWithString;
+use utils::CaseOperations;
 
 extern crate libc;
 
@@ -122,14 +123,14 @@ impl RustType {
     match *self {
       RustType::Void => "void".to_string(),
       RustType::NonVoid { ref base, ref generic_arguments, ref is_const, ref indirection } => {
-        let mut name = base.last_name().clone();
+        let mut name = base.last_name().to_snake_case();
         if let &Some(ref args) = generic_arguments {
           name = format!("{}_{}", name, args.iter().map(|x| x.caption()).join("_"));
         }
         let mut_text = if *is_const {
           ""
         } else {
-          "mut_"
+          "_mut"
         };
         match *indirection {
           RustTypeIndirection::None => {}
