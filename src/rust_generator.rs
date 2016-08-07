@@ -854,6 +854,7 @@ impl RustGenerator {
                                                  var.iter().find(|x| x.is_ref()).is_some()
                                                })
                                                .is_some();
+          // TODO: move this enum and trait to "overloading" submodule
 
           // overloaded methods
           types.push(RustTypeDeclaration {
