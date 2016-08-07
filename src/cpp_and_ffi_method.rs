@@ -3,24 +3,37 @@ use cpp_ffi_function_signature::CppFfiFunctionSignature;
 use caption_strategy::{MethodCaptionStrategy, TypeCaptionStrategy};
 use cpp_operators::CppOperator;
 
+/// C++ method with arguments and return type
+/// processed for FFI but no FFI function name
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppMethodWithFfiSignature {
+  /// Original C++ method
   pub cpp_method: CppMethod,
+  /// Allocation place method used for converting
+  /// the return type of the method
   pub allocation_place: ReturnValueAllocationPlace,
+  /// FFI method signature
   pub c_signature: CppFfiFunctionSignature,
 }
 
+/// Final result of converting a C++ method
+/// to a FFI method
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppAndFfiMethod {
+  /// Original C++ method
   pub cpp_method: CppMethod,
+  /// Allocation place method used for converting
+  /// the return type of the method
   pub allocation_place: ReturnValueAllocationPlace,
+  /// FFI method signature
   pub c_signature: CppFfiFunctionSignature,
+  /// Final name of FFI method
   pub c_name: String,
-  pub args_caption: Option<String>,
 }
 
 
 impl CppMethodWithFfiSignature {
+  /// Generates initial FFI method name without any captions
   pub fn c_base_name(&self, include_file: &String) -> Result<String, String> {
     let scope_prefix = match self.cpp_method.scope {
       CppMethodScope::Class(ref class_name) => format!("{}_", class_name.replace("::", "_")),
@@ -55,6 +68,8 @@ impl CppMethodWithFfiSignature {
     Ok(scope_prefix + &method_name)
   }
 
+  /// Generates a caption for this method using specified strategy
+  /// to avoid name conflict.
   pub fn caption(&self, strategy: MethodCaptionStrategy) -> String {
     match strategy {
       MethodCaptionStrategy::ArgumentsOnly(s) => self.c_signature.caption(s),
@@ -78,9 +93,9 @@ impl CppMethodWithFfiSignature {
 }
 
 impl CppAndFfiMethod {
+  /// Adds FFI method name to a CppMethodWithFfiSignature object.
   pub fn new(data: CppMethodWithFfiSignature,
-             c_name: String,
-             args_caption: Option<String>)
+             c_name: String)
              -> CppAndFfiMethod {
 
     CppAndFfiMethod {
@@ -88,10 +103,10 @@ impl CppAndFfiMethod {
       allocation_place: data.allocation_place,
       c_signature: data.c_signature,
       c_name: c_name,
-      args_caption: args_caption,
     }
   }
 
+  /// Convenience function to call CppMethod::short_text.
   pub fn short_text(&self) -> String {
     self.cpp_method.short_text()
   }

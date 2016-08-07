@@ -11,13 +11,20 @@ use utils::JoinWithString;
 use std::path::PathBuf;
 use utils::PathBufPushTweak;
 
+/// Generates C++ code for the C wrapper library.
 pub struct CppCodeGenerator {
+  /// Library name
   lib_name: String,
+  /// Uppercase library name (for optimization)
   lib_name_upper: String,
+  /// Path to the directory where the library is generated
   lib_path: PathBuf,
 }
 
 impl CppCodeGenerator {
+  /// Creates a generator for a library.
+  /// lib_name: library name
+  /// lib_path: path to the directory where the library is generated
   pub fn new(lib_name: String, lib_path: PathBuf) -> Self {
     CppCodeGenerator {
       lib_name: lib_name.clone(),
@@ -26,8 +33,8 @@ impl CppCodeGenerator {
     }
   }
 
+  /// Generates method declaration for the header.
   fn header_code(&self, method: &CppAndFfiMethod) -> String {
-    //println!("FAIL TEST: {:?}", method);
     format!("{} {}_EXPORT {}({});\n",
             method.c_signature.return_type.ffi_type.to_cpp_code().unwrap(),
             self.lib_name_upper,
@@ -35,6 +42,8 @@ impl CppCodeGenerator {
             method.c_signature.arguments_to_cpp_code().unwrap())
   }
 
+  /// Wraps expression returned by the original method to
+  /// convert it to return type of the FFI method.
   fn convert_return_type(&self, method: &CppAndFfiMethod, expression: String) -> String {
     let mut result = expression;
     match method.c_signature.return_type.conversion.indirection_change {
@@ -72,9 +81,9 @@ impl CppCodeGenerator {
     if method.allocation_place == ReturnValueAllocationPlace::Stack &&
        method.cpp_method.kind != CppMethodKind::Constructor {
       if let Some(arg) = method.c_signature
-                               .arguments
-                               .iter()
-                               .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
+        .arguments
+        .iter()
+        .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
         if let Some(ref return_type) = method.cpp_method.return_type {
           result = format!("new({}) {}({})",
                            arg.name,
@@ -88,19 +97,18 @@ impl CppCodeGenerator {
     result
   }
 
+  /// Generates code for values passed to the original C++ method.
   fn arguments_values(&self, method: &CppAndFfiMethod) -> String {
     let mut filled_arguments = vec![];
     for (i, cpp_argument) in method.cpp_method.arguments.iter().enumerate() {
       if let Some(c_argument) = method.c_signature
-                                      .arguments
-                                      .iter()
-                                      .find(|x| {
-                                        x.meaning == CppFfiArgumentMeaning::Argument(i as i8)
-                                      }) {
+        .arguments
+        .iter()
+        .find(|x| x.meaning == CppFfiArgumentMeaning::Argument(i as i8)) {
         let mut result = c_argument.name.clone();
         match c_argument.argument_type
-                        .conversion
-                        .indirection_change {
+          .conversion
+          .indirection_change {
           IndirectionChange::ValueToPointer |
           IndirectionChange::ReferenceToPointer => result = format!("*{}", result),
           IndirectionChange::NoChange => {}
@@ -119,85 +127,73 @@ impl CppCodeGenerator {
     filled_arguments.into_iter().join(", ")
   }
 
+  /// Generates code for the value returned by the FFI method.
   fn returned_expression(&self, method: &CppAndFfiMethod) -> String {
-    self.convert_return_type(&method,
-                             if method.cpp_method.kind == CppMethodKind::Destructor {
-                               if let Some(arg) = method.c_signature
-                                                        .arguments
-                                                        .iter()
-                                                        .find(|x| {
-                                                          x.meaning == CppFfiArgumentMeaning::This
-                                                        }) {
-                                 format!("{}_call_destructor({})", self.lib_name, arg.name)
-                               } else {
-                                 panic!("Error: no this argument found\n{:?}", method);
-                               }
-                             } else {
-                               let result_without_args = if method.cpp_method.kind ==
-                                                            CppMethodKind::Constructor {
-                                 if let CppMethodScope::Class(ref class_name) = method.cpp_method
-                                                                                      .scope {
-                                   match method.allocation_place {
-                                     ReturnValueAllocationPlace::Stack => {
-                                       if let Some(arg) = method.c_signature
-                                                                .arguments
-                                                                .iter()
-                                                                .find(|x| {
-                                                                  x.meaning ==
-                                                                  CppFfiArgumentMeaning::ReturnValue
-                                                                }) {
-                                         format!("new({}) {}", arg.name, class_name)
-                                       } else {
-                                         panic!("no return value equivalent argument found");
-                                       }
-                                     }
-                                     ReturnValueAllocationPlace::Heap => {
-                                       format!("new {}", class_name)
-                                     }
-                                     ReturnValueAllocationPlace::NotApplicable => unreachable!(),
-                                   }
-                                 } else {
-                                   panic!("constructor not in class scope");
-                                 }
-                               } else {
-                                 let scope_specifier =
-                                   if let CppMethodScope::Class(ref class_name) =
-                                          method.cpp_method
-                                                .scope {
-                                     if method.cpp_method.is_static {
-                                       format!("{}::", class_name)
-                                     } else {
-                                       if let Some(arg) = method.c_signature
-                                                                .arguments
-                                                                .iter()
-                                                                .find(|x| {
-                                                                  x.meaning ==
-                                                                  CppFfiArgumentMeaning::This
-                                                                }) {
-                                         format!("{}->", arg.name)
-                                       } else {
-                                         panic!("Error: no this argument found\n{:?}", method);
-                                       }
-                                     }
-                                   } else {
-                                     "".to_string()
-                                   };
-                                 format!("{}{}", scope_specifier, method.cpp_method.name)
-                               };
-                               format!("{}({})",
-                                       result_without_args,
-                                       self.arguments_values(&method))
-                             })
+    let result = if method.cpp_method.kind == CppMethodKind::Destructor {
+      if let Some(arg) = method.c_signature
+        .arguments
+        .iter()
+        .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
+        format!("{}_call_destructor({})", self.lib_name, arg.name)
+      } else {
+        panic!("Error: no this argument found\n{:?}", method);
+      }
+    } else {
+      let result_without_args = if method.cpp_method.kind == CppMethodKind::Constructor {
+        if let CppMethodScope::Class(ref class_name) = method.cpp_method
+          .scope {
+          match method.allocation_place {
+            ReturnValueAllocationPlace::Stack => {
+              if let Some(arg) = method.c_signature
+                .arguments
+                .iter()
+                .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
+                format!("new({}) {}", arg.name, class_name)
+              } else {
+                panic!("no return value equivalent argument found");
+              }
+            }
+            ReturnValueAllocationPlace::Heap => format!("new {}", class_name),
+            ReturnValueAllocationPlace::NotApplicable => unreachable!(),
+          }
+        } else {
+          panic!("constructor not in class scope");
+        }
+      } else {
+        let scope_specifier = if let CppMethodScope::Class(ref class_name) = method.cpp_method
+          .scope {
+          if method.cpp_method.is_static {
+            format!("{}::", class_name)
+          } else {
+            if let Some(arg) = method.c_signature
+              .arguments
+              .iter()
+              .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
+              format!("{}->", arg.name)
+            } else {
+              panic!("Error: no this argument found\n{:?}", method);
+            }
+          }
+        } else {
+          "".to_string()
+        };
+        format!("{}{}", scope_specifier, method.cpp_method.name)
+      };
+      format!("{}({})",
+              result_without_args,
+              self.arguments_values(&method))
+    };
+    self.convert_return_type(&method, result)
   }
 
-
+  /// Generates body of the FFI method implementation.
   fn source_body(&self, method: &CppAndFfiMethod) -> String {
     if method.cpp_method.kind == CppMethodKind::Destructor &&
        method.allocation_place == ReturnValueAllocationPlace::Heap {
       if let Some(arg) = method.c_signature
-                               .arguments
-                               .iter()
-                               .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
+        .arguments
+        .iter()
+        .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
         format!("delete {};\n", arg.name)
       } else {
         panic!("Error: no this argument found\n{:?}", method);
@@ -213,6 +209,7 @@ impl CppCodeGenerator {
     }
   }
 
+  /// Generates implementation of the FFI method for the source file.
   fn source_code(&self, method: &CppAndFfiMethod) -> String {
     format!("{} {}({}) {{\n  {}}}\n\n",
             method.c_signature.return_type.ffi_type.to_cpp_code().unwrap(),
@@ -221,6 +218,7 @@ impl CppCodeGenerator {
             self.source_body(&method))
   }
 
+  /// Generates main files and directories of the library.
   pub fn generate_template_files(&self,
                                  cpp_lib_include_file: &String,
                                  include_directories: &Vec<String>) {
@@ -231,8 +229,8 @@ impl CppCodeGenerator {
            lib_name_lowercase = &self.lib_name,
            lib_name_uppercase = name_upper,
            include_directories = include_directories.into_iter()
-                                                    .map(|x| format!("\"{}\"", x))
-                                                    .join(" "))
+             .map(|x| format!("\"{}\"", x))
+             .join(" "))
       .unwrap();
     let src_dir = self.lib_path.with_added("src");
     fs::create_dir_all(&src_dir).unwrap();
@@ -241,19 +239,18 @@ impl CppCodeGenerator {
     fs::create_dir_all(&include_dir).unwrap();
 
     let mut exports_file = File::create({
-                             let mut path = include_dir.clone();
-                             path.push(format!("{}_exports.h", &self.lib_name));
-                             path
-                           })
-                             .unwrap();
+        let mut path = include_dir.clone();
+        path.push(format!("{}_exports.h", &self.lib_name));
+        path
+      })
+      .unwrap();
     write!(exports_file,
            include_str!("../templates/c_lib/exports.h"),
            lib_name_uppercase = name_upper)
       .unwrap();
 
-    let mut global_file = File::create(include_dir.with_added(format!("{}_global.h",
-                                                                      &self.lib_name)))
-                            .unwrap();
+    let mut global_file =
+      File::create(include_dir.with_added(format!("{}_global.h", &self.lib_name))).unwrap();
     write!(global_file,
            include_str!("../templates/c_lib/global.h"),
            lib_name_lowercase = &self.lib_name,
@@ -262,6 +259,7 @@ impl CppCodeGenerator {
       .unwrap();
   }
 
+  /// Generates the header file that includes all other headers of the library.
   pub fn generate_all_headers_file(&self, names: &Vec<String>) {
     let mut h_path = self.lib_path.clone();
     h_path.push("include");
@@ -281,12 +279,14 @@ impl CppCodeGenerator {
     write!(all_header_file, "#endif // {}_H\n", &self.lib_name_upper).unwrap();
   }
 
+  /// Generates a header file and a source file for a portion of data
+  /// corresponding to a header file of original C++ library.
   pub fn generate_one(&self, data: &CppFfiHeaderData) {
     let ffi_include_file = format!("{}_{}.h", &self.lib_name, data.include_file_base_name);
 
-    let cpp_path = self.lib_path.with_added("src").with_added(format!("{}_{}.cpp",
-                                                                      &self.lib_name,
-                                                                      data.include_file_base_name));
+    let cpp_path = self.lib_path
+      .with_added("src")
+      .with_added(format!("{}_{}.cpp", &self.lib_name, data.include_file_base_name));
     log::info(format!("Generating source file: {:?}", cpp_path));
 
     let h_path = self.lib_path.with_added("include").with_added(&ffi_include_file);

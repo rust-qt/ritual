@@ -1,5 +1,5 @@
 [root]
-name = "qt_wrapper_generator"
+name = "cpp_to_rust"
 version = "0.1.0"
 dependencies = [
  "ansi_term 0.7.5 (registry+https://github.com/rust-lang/crates.io-index)",

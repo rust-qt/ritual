@@ -189,7 +189,7 @@ fn main() {
   //    return;
   //  }
 
-  let c_lib_name = format!("{}_c_lib", &lib_spec.rust.name);
+  let c_lib_name = format!("{}_c", &lib_spec.rust.name);
   let c_lib_parent_path = output_dir_path.with_added(&c_lib_name);
   let c_lib_path = c_lib_parent_path.with_added("src");
   let c_lib_tmp_path = c_lib_parent_path.with_added("src.new");

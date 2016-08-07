@@ -520,8 +520,7 @@ impl RustGenerator {
 
   fn generate_function(&self,
                        method: &CppAndFfiMethod,
-                       scope: &RustMethodScope,
-                       use_args_caption: bool)
+                       scope: &RustMethodScope)
                        -> Result<RustMethod, String> {
     if method.cpp_method.kind.is_operator() {
       // TODO: implement operator traits
@@ -599,7 +598,7 @@ impl RustGenerator {
     let return_type_info1 = return_type_info.unwrap();
 
     Ok(RustMethod {
-      name: self.method_rust_name(method, use_args_caption),
+      name: self.method_rust_name(method),
       scope: scope.clone(),
       return_type: return_type_info1.0,
       arguments: RustMethodArguments::SingleVariant(RustMethodArgumentsVariant {
@@ -610,7 +609,7 @@ impl RustGenerator {
     })
   }
 
-  fn method_rust_name(&self, method: &CppAndFfiMethod, use_args_caption: bool) -> RustName {
+  fn method_rust_name(&self, method: &CppAndFfiMethod) -> RustName {
     let mut name = if method.cpp_method.scope == CppMethodScope::Global {
       self.cpp_to_rust_type_map.get(&method.cpp_method.name).unwrap().clone()
     } else {
@@ -623,17 +622,6 @@ impl RustGenerator {
       };
       RustName::new(vec![x])
     };
-    if use_args_caption {
-      if let Some(ref args_caption) = method.args_caption {
-        if !args_caption.is_empty() {
-          let x = name.parts.pop().unwrap();
-          name.parts.push(format!("{}_args_{}", x, args_caption.to_snake_case()));
-        }
-      } else {
-        panic!("unexpected lack of args_caption: {:?}", method);
-
-      }
-    }
     match method.allocation_place {
       ReturnValueAllocationPlace::Heap => {
         let x = name.parts.pop().unwrap();
@@ -664,7 +652,7 @@ impl RustGenerator {
         if let &RustMethodScope::Impl { ref type_name } = scope {
           match method.allocation_place {
             ReturnValueAllocationPlace::Stack => {
-              match self.generate_function(method, scope, false) {
+              match self.generate_function(method, scope) {
                 Ok(mut method) => {
                   method.name = RustName::new(vec!["drop".to_string()]);
                   method.scope = RustMethodScope::TraitImpl {
@@ -700,7 +688,7 @@ impl RustGenerator {
         }
       }
 
-      match self.generate_function(method, scope, false) {
+      match self.generate_function(method, scope) {
         Ok(rust_method) => {
           if !method_names.contains(rust_method.name.last_name()) {
             method_names.insert(rust_method.name.last_name().clone());

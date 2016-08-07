@@ -9,6 +9,7 @@ pub use serializable::{EnumValue, CppClassField, CppTypeKind, CppOriginLocation,
                        CppTypeData, CppData};
 
 impl CppTypeData {
+  /// Checks if the type is a class type.
   pub fn is_class(&self) -> bool {
     match self.kind {
       CppTypeKind::Class { .. } => true,
@@ -16,6 +17,7 @@ impl CppTypeData {
     }
   }
 
+  /// Checks if the type was directly derived from specified type.
   #[allow(dead_code)]
   pub fn inherits(&self, class_name: &String) -> bool {
     if let CppTypeKind::Class { ref bases, .. } = self.kind {
@@ -32,6 +34,9 @@ impl CppTypeData {
 }
 
 impl CppData {
+  /// Adds destructors for every class that does not have explicitly
+  /// defined destructor, allowing to create wrappings for
+  /// destructors implicitly available in C++.
   pub fn ensure_explicit_destructors(&mut self) {
     for type1 in &self.types {
       if let CppTypeKind::Class { .. } = type1.kind {
@@ -70,6 +75,7 @@ impl CppData {
     }
   }
 
+  /// Helper function that performs a portion of add_inherited_methods implementation.
   fn add_inherited_methods_from(&mut self, base_name: &String) {
     let template_arguments = match self.types.iter().find(|x| &x.name == base_name) {
       None => None,
@@ -153,6 +159,10 @@ impl CppData {
     }
   }
 
+  /// Adds methods of derived classes inherited from base classes.
+  /// A method will not be added if there is a method with the same
+  /// name in the derived class. Constructors, destructors and assignment
+  /// operators are also not added. This reflects C++'s method inheritance rules.
   pub fn add_inherited_methods(&mut self) {
     log::info("Adding inherited methods");
     let all_type_names: Vec<_> = self.types.iter().map(|t| t.name.clone()).collect();
@@ -162,6 +172,8 @@ impl CppData {
     log::info("Finished adding inherited methods");
   }
 
+  /// Generates duplicate methods with fewer arguments for
+  /// C++ methods with default argument values.
   pub fn generate_methods_with_omitted_args(&mut self) {
     let mut new_methods = Vec::new();
     for method in &self.methods {
@@ -177,6 +189,7 @@ impl CppData {
     self.methods.append(&mut new_methods);
   }
 
+  /// Creates a copy of all data separated by include file names.
   pub fn split_by_headers(&self) -> HashMap<String, CppData> {
     let mut result = HashMap::new();
     for method in &self.methods {
@@ -202,6 +215,7 @@ impl CppData {
     result
   }
 
+  /// Checks if a class is a template class.
   pub fn is_template_class(&self, name: &String) -> bool {
     if let Some(type_info) = self.types.iter().find(|t| &t.name == name) {
       if let CppTypeKind::Class { ref template_arguments, ref bases, .. } = type_info.kind {

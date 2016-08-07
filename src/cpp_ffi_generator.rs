@@ -275,7 +275,7 @@ impl CGenerator {
     let mut r = Vec::new();
     for (key, mut values) in hash1.into_iter() {
       if values.len() == 1 {
-        r.push(CppAndFfiMethod::new(values.remove(0), key.clone(), None));
+        r.push(CppAndFfiMethod::new(values.remove(0), key.clone()));
         continue;
       }
       let mut found_strategy = None;
@@ -301,8 +301,7 @@ impl CGenerator {
                                               } else {
                                                 "_"
                                               },
-                                              caption),
-                                      Some(caption)));
+                                              caption)));
         }
       } else {
         panic!("all type caption strategies have failed! Involved functions: \n{:?}",

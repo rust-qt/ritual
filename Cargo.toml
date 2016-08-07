@@ -1,5 +1,5 @@
 [package]
-name = "qt_wrapper_generator"
+name = "cpp_to_rust"
 version = "0.1.0"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 build = "build.rs"
