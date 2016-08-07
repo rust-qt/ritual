@@ -34,8 +34,6 @@ use std::env;
 use std::process::Command;
 use cpp_code_generator::CppCodeGenerator;
 
-extern crate find_folder;
-
 fn print_usage() {
   log::error("Usage:");
   log::error("\tcargo run lib_spec_file output_dir");
@@ -256,14 +254,16 @@ fn main() {
   utils::move_files(&crate_new_path, &crate_path).unwrap();
 
   log::info(format!("Compiling Rust crate."));
-  assert!(Command::new("cargo")
-            .arg("test")
+  for cargo_cmd in vec!["test", "doc"] {
+    log::info(format!("Running cargo {}.", cargo_cmd));
+    assert!(Command::new("cargo")
+            .arg(cargo_cmd)
             .current_dir(&crate_path)
             .env("LIBRARY_PATH", qt_install_libs_path.to_str().unwrap())
             .env("LD_LIBRARY_PATH", qt_install_libs_path.to_str().unwrap())
             .status()
             .expect("Failed to execute cargo command")
             .success());
-
-  return;
+  }
+  log::info("Completed successfully.");
 }

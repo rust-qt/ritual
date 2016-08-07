@@ -2,24 +2,14 @@
 name = "qt_wrapper_generator"
 version = "0.1.0"
 dependencies = [
- "Inflector 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "ansi_term 0.7.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "clang 0.12.0 (git+https://github.com/KyleMayes/clang-rs)",
- "find_folder 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.1.73 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustfmt 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_codegen 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "Inflector"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "regex 0.1.73 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -91,11 +81,6 @@ dependencies = [
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.1.73 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
-
-[[package]]
-name = "find_folder"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "getopts"
