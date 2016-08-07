@@ -374,58 +374,57 @@ impl CppParser {
         if name.starts_with("const ") {
           name = name[6..].trim().to_string();
         }
-        // TODO: support int8_t and similar types
         let real_type = match name.as_ref() {
-          "qint8" => {
+          "qint8" | "int8_t" => {
             Some(CppTypeBase::SpecificNumeric {
               name: name.to_string(),
               bits: 8,
               kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
             })
           }
-          "quint8" => {
+          "quint8" | "uint8_t" => {
             Some(CppTypeBase::SpecificNumeric {
               name: name.to_string(),
               bits: 8,
               kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
             })
           }
-          "qint16" => {
+          "qint16" | "int16_t" => {
             Some(CppTypeBase::SpecificNumeric {
               name: name.to_string(),
               bits: 16,
               kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
             })
           }
-          "quint16" => {
+          "quint16" | "uint16_t" => {
             Some(CppTypeBase::SpecificNumeric {
               name: name.to_string(),
               bits: 16,
               kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
             })
           }
-          "qint32" => {
+          "qint32" | "int32_t" => {
             Some(CppTypeBase::SpecificNumeric {
               name: name.to_string(),
               bits: 32,
               kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
             })
           }
-          "quint32" => {
+          "quint32" | "uint32_t" => {
             Some(CppTypeBase::SpecificNumeric {
               name: name.to_string(),
               bits: 32,
               kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
             })
           }
-          "qint64" | "qlonglong" => {
+          "qint64" | "int64_t" | "qlonglong" => {
             Some(CppTypeBase::SpecificNumeric {
               name: name.to_string(),
               bits: 64,
               kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
             })
           }
-          "quint64" | "qulonglong" => {
+          "quint64" | "uint64_t" | "qulonglong" => {
             Some(CppTypeBase::SpecificNumeric {
               name: name.to_string(),
               bits: 64,
