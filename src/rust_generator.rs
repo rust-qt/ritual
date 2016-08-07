@@ -269,7 +269,7 @@ impl RustGenerator {
                            is_function: bool) {
       let mut split_parts: Vec<_> = name.split("::").collect();
       let last_part = split_parts.pop().unwrap().to_string();
-      let last_part_final = if is_function {
+      let mut last_part_final = if is_function {
         last_part.to_snake_case()
       } else {
         last_part.to_class_case()
@@ -282,21 +282,30 @@ impl RustGenerator {
         parts.push(part.to_string().to_snake_case());
       }
 
+      fn remove_qt_prefix(s: &mut String) {
+        //TODO: use WordsIterator to remove Q
+        if s.starts_with("q_") {
+          *s = s[2..].to_string();
+        } else if s.starts_with("Q") {
+          *s = s[1..].to_string();
+        }
+      }
+
+      // TODO: this is Qt-specific
+      for part in &mut parts {
+        remove_qt_prefix(part);
+      }
+      remove_qt_prefix(&mut last_part_final);
+
+//      println!("test: {:?}", parts);
       if parts.len() > 2 && parts[1] == parts[2] {
         // special case
         parts.remove(2);
       }
       parts.push(last_part_final);
 
-      // TODO: this is Qt-specific
-      for part in &mut parts {
-        if part.starts_with("q_") {
-          *part = part[2..].to_string();
-        } else if part.starts_with("Q") {
-          *part = part[1..].to_string();
-        }
-      }
 
+//      println!("mapping added: {} -> {:?}", name, parts);
       map.insert(name.clone(), RustName::new(parts));
     }
     for type_info in &self.input_data.cpp_data.types {
