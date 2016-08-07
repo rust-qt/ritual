@@ -1,9 +1,9 @@
-use cpp_type::{CppType, CppTypeBase, CppTypeIndirection};
+use cpp_type::{CppType, CppTypeIndirection};
 use cpp_ffi_type::{CppFfiType, IndirectionChange};
 use cpp_ffi_function_signature::CppFfiFunctionSignature;
 use cpp_ffi_function_argument::{CppFfiFunctionArgument, CppFfiArgumentMeaning};
 use cpp_and_ffi_method::CppMethodWithFfiSignature;
-use cpp_data::{CppVisibility};
+use cpp_data::CppVisibility;
 use utils::JoinWithString;
 pub use serializable::{CppFunctionArgument, CppMethodScope, CppMethodKind, CppMethod};
 
@@ -92,20 +92,17 @@ impl CppMethod {
       arguments: Vec::new(),
       return_type: CppFfiType::void(),
     };
-    if let CppMethodScope::Class(ref class_name) = self.scope {
+    if let CppMethodScope::Class(..) = self.scope {
       if !self.is_static && self.kind != CppMethodKind::Constructor {
         r.arguments.push(CppFfiFunctionArgument {
           name: "this_ptr".to_string(),
           argument_type: CppType {
-                           base: CppTypeBase::Class {
-                             name: class_name.clone(),
-                             template_arguments: None, // TODO: report template arguments
-                           },
-                           is_const: self.is_const,
-                           indirection: CppTypeIndirection::Ptr,
-                         }
-                         .to_cpp_ffi_type(false)
-                         .unwrap(),
+              base: self.class_type.clone().unwrap(),
+              is_const: self.is_const,
+              indirection: CppTypeIndirection::Ptr,
+            }
+            .to_cpp_ffi_type(false)
+            .unwrap(),
           meaning: CppFfiArgumentMeaning::This,
         });
       }
@@ -124,13 +121,21 @@ impl CppMethod {
         }
       }
     }
-    if let Some(ref return_type) = self.return_type {
+    let real_return_type = if self.kind == CppMethodKind::Constructor {
+      Some(CppType {
+        is_const: false,
+        indirection: CppTypeIndirection::None,
+        base: self.class_type.clone().unwrap(),
+      })
+    } else {
+      self.return_type.clone()
+    };
+    if let Some(return_type) = real_return_type {
       match return_type.to_cpp_ffi_type(true) {
         Ok(c_type) => {
-          let is_stack_allocated_struct = return_type.indirection == CppTypeIndirection::None &&
-                                          return_type.base.is_class() &&
-                                          c_type.conversion.indirection_change !=
-                                          IndirectionChange::QFlagsToUInt;
+          let is_stack_allocated_struct =
+            return_type.indirection == CppTypeIndirection::None && return_type.base.is_class() &&
+            c_type.conversion.indirection_change != IndirectionChange::QFlagsToUInt;
           if is_stack_allocated_struct {
             allocation_place_importance = AllocationPlaceImportance::Important;
             if allocation_place == ReturnValueAllocationPlace::Stack {
@@ -237,18 +242,18 @@ impl CppMethod {
     s = format!("{}({})",
                 s,
                 self.arguments
-                    .iter()
-                    .map(|arg| {
-                      format!("{} {}{}",
-                              arg.argument_type.to_cpp_code().unwrap_or("[?]".to_string()),
-                              arg.name,
-                              if arg.has_default_value {
-                                format!(" = ?")
-                              } else {
-                                String::new()
-                              })
-                    })
-                    .join(", "));
+                  .iter()
+                  .map(|arg| {
+        format!("{} {}{}",
+                arg.argument_type.to_cpp_code().unwrap_or("[?]".to_string()),
+                arg.name,
+                if arg.has_default_value {
+                  format!(" = ?")
+                } else {
+                  String::new()
+                })
+      })
+                  .join(", "));
     if self.is_pure_virtual {
       s = format!("{} = 0", s);
     }

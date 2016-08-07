@@ -10,6 +10,7 @@ use std::io::Write;
 use utils::JoinWithString;
 use std::path::PathBuf;
 use utils::PathBufPushTweak;
+use cpp_type::{CppType, CppTypeIndirection};
 
 /// Generates C++ code for the C wrapper library.
 pub struct CppCodeGenerator {
@@ -140,24 +141,24 @@ impl CppCodeGenerator {
       }
     } else {
       let result_without_args = if method.cpp_method.kind == CppMethodKind::Constructor {
-        if let CppMethodScope::Class(ref class_name) = method.cpp_method
-          .scope {
-          match method.allocation_place {
-            ReturnValueAllocationPlace::Stack => {
-              if let Some(arg) = method.c_signature
-                .arguments
-                .iter()
-                .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
-                format!("new({}) {}", arg.name, class_name)
-              } else {
-                panic!("no return value equivalent argument found");
-              }
+        let class_type = CppType {
+          indirection: CppTypeIndirection::None,
+          is_const: false,
+          base: method.cpp_method.class_type.clone().unwrap(),
+        };
+        match method.allocation_place {
+          ReturnValueAllocationPlace::Stack => {
+            if let Some(arg) = method.c_signature
+              .arguments
+              .iter()
+              .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
+              format!("new({}) {}", arg.name, class_type.to_cpp_code().unwrap())
+            } else {
+              panic!("no return value equivalent argument found");
             }
-            ReturnValueAllocationPlace::Heap => format!("new {}", class_name),
-            ReturnValueAllocationPlace::NotApplicable => unreachable!(),
           }
-        } else {
-          panic!("constructor not in class scope");
+          ReturnValueAllocationPlace::Heap => format!("new {}", class_type.to_cpp_code().unwrap()),
+          ReturnValueAllocationPlace::NotApplicable => unreachable!(),
         }
       } else {
         let scope_specifier = if let CppMethodScope::Class(ref class_name) = method.cpp_method

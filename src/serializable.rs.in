@@ -105,6 +105,7 @@ pub struct CppMethod {
   pub visibility: CppVisibility,
   pub is_signal: bool,
   pub return_type: Option<CppType>,
+  pub class_type: Option<CppTypeBase>,
   pub arguments: Vec<CppFunctionArgument>,
   pub allows_variable_arguments: bool,
   pub include_file: String,

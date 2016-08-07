@@ -811,6 +811,15 @@ impl CppParser {
         }
       }
     }
+    let class_type = match scope {
+      CppMethodScope::Class(ref class_name) => {
+        match self.data.types.iter().find(|x| &x.name == class_name) {
+          Some(info) => Some(info.default_class_type()),
+          None => return Err(format!("Unknown class type: {}", class_name))
+        }
+      }
+      CppMethodScope::Global => None,
+    };
 
     Ok(CppMethod {
       name: name,
@@ -829,6 +838,7 @@ impl CppParser {
       arguments: arguments,
       allows_variable_arguments: allows_variable_arguments,
       return_type: Some(return_type_parsed),
+      class_type: class_type,
       include_file: self.entity_include_file(entity).unwrap(),
       origin_location: Some(get_origin_location(entity).unwrap()),
       template_arguments: template_arguments,

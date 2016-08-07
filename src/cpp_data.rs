@@ -17,6 +17,18 @@ impl CppTypeData {
     }
   }
 
+  pub fn default_class_type(&self) -> CppTypeBase {
+    match self.kind {
+      CppTypeKind::Class { .. } => {
+        CppTypeBase::Class {
+          name: self.name.clone(),
+          template_arguments: self.default_template_parameters()
+        }
+      }
+      _ => panic!("not a class"),
+    }
+  }
+
   pub fn default_template_parameters(&self) -> Option<Vec<CppType>> {
     match self.kind {
       CppTypeKind::Class { ref template_arguments, .. } => {
@@ -90,6 +102,7 @@ impl CppData {
             visibility: CppVisibility::Public,
             is_signal: false,
             return_type: None,
+            class_type: Some(type1.default_class_type()),
             kind: CppMethodKind::Destructor,
             arguments: vec![],
             allows_variable_arguments: false,
@@ -102,16 +115,16 @@ impl CppData {
     }
   }
 
-  pub fn template_parameters_for_class(&self, class_name: &String) -> Option<Vec<CppType>> {
-    match self.types.iter().find(|x| &x.name == class_name) {
-      None => None,
-      Some(type_data) => type_data.default_template_parameters(),
-    }
-  }
+//  pub fn template_parameters_for_class(&self, class_name: &String) -> Option<Vec<CppType>> {
+//    match self.types.iter().find(|x| &x.name == class_name) {
+//      None => None,
+//      Some(type_data) => type_data.default_template_parameters(),
+//    }
+//  }
 
   /// Helper function that performs a portion of add_inherited_methods implementation.
   fn add_inherited_methods_from(&mut self, base_name: &String) {
-    let template_arguments = self.template_parameters_for_class(base_name);
+//    let template_arguments = self.template_parameters_for_class(base_name);
 
     let mut new_methods = Vec::new();
     let mut derived_types = Vec::new();
@@ -152,12 +165,13 @@ impl CppData {
               new_method.scope = CppMethodScope::Class(derived_name.clone());
               new_method.include_file = type1.include_file.clone();
               new_method.origin_location = None;
-              if new_method.arguments.len() > 0 && new_method.arguments[0].name == "this" {
-                new_method.arguments[0].argument_type.base = CppTypeBase::Class {
-                  name: derived_name.clone(),
-                  template_arguments: template_arguments.clone(),
-                };
-              }
+              new_method.class_type = Some(type1.default_class_type());
+//              if new_method.arguments.len() > 0 && new_method.arguments[0].name == "this" {
+//                new_method.arguments[0].argument_type.base = CppTypeBase::Class {
+//                  name: derived_name.clone(),
+//                  template_arguments: template_arguments.clone(),
+//                };
+//              }
 //              log::info(format!("Method added: {}", new_method.short_text()));
               new_methods.push(new_method.clone());
             }
@@ -251,32 +265,6 @@ impl CppData {
     false
   }
 
-  pub fn generate_fake_constructor_return_types(&mut self) {
-    let void_type = Some(CppType::void());
-    for method in &mut self.methods {
-      if method.kind.is_constructor() {
-        if let CppMethodScope::Class(ref name) = method.scope {
-//          if !method.return_type.is_none() {
-//            println!("FAIL! {:?}", method);
-//          }
-          assert_eq!(&method.return_type, &void_type);
-          method.return_type = Some(CppType {
-            is_const: false,
-            indirection: CppTypeIndirection::None,
-            base: CppTypeBase::Class {
-              name: name.clone(),
-              template_arguments: match self.types.iter().find(|x| &x.name == name) {
-                None => None,
-                Some(type_data) => type_data.default_template_parameters(),
-              },
-            },
-          });
-        } else {
-          panic!("constructor must be in class scope");
-        }
-      }
-    }
-  }
 
   pub fn has_virtual_destructor(&self, class_name: &String) -> bool {
     for method in &self.methods {
@@ -303,7 +291,6 @@ impl CppData {
   }
 
   pub fn post_process(&mut self) {
-    self.generate_fake_constructor_return_types();
     self.ensure_explicit_destructors();
     self.generate_methods_with_omitted_args();
     self.add_inherited_methods();
