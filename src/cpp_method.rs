@@ -79,25 +79,6 @@ impl CppMethod {
     true
   }
 
-  pub fn real_return_type(&self) -> Option<CppType> {
-    if self.kind == CppMethodKind::Constructor {
-      if let CppMethodScope::Class(ref class_name) = self.scope {
-        return Some(CppType {
-          is_const: false,
-          indirection: CppTypeIndirection::None,
-          base: CppTypeBase::Class {
-            name: class_name.clone(),
-            template_arguments: None, // TODO: report template arguments
-          },
-        });
-      } else {
-        panic!("constructor encountered with no class scope");
-      }
-    } else {
-      return self.return_type.clone();
-    }
-  }
-
   pub fn c_signature(&self,
                      allocation_place: ReturnValueAllocationPlace)
                      -> Result<(CppFfiFunctionSignature, AllocationPlaceImportance), String> {
@@ -143,7 +124,7 @@ impl CppMethod {
         }
       }
     }
-    if let Some(return_type) = self.real_return_type() {
+    if let Some(ref return_type) = self.return_type {
       match return_type.to_cpp_ffi_type(true) {
         Ok(c_type) => {
           let is_stack_allocated_struct = return_type.indirection == CppTypeIndirection::None &&

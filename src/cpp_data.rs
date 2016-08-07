@@ -17,6 +17,32 @@ impl CppTypeData {
     }
   }
 
+  pub fn default_template_parameters(&self) -> Option<Vec<CppType>> {
+    match self.kind {
+      CppTypeKind::Class { ref template_arguments, .. } => {
+        match *template_arguments {
+          None => None,
+          Some(ref strings) => {
+            Some(strings.iter()
+              .enumerate()
+              .map(|(num, _)| {
+                CppType {
+                  is_const: false,
+                  indirection: CppTypeIndirection::None,
+                  base: CppTypeBase::TemplateParameter {
+                    nested_level: 0,
+                    index: num as i32,
+                  },
+                }
+              })
+              .collect())
+          }
+        }
+      }
+      _ => None,
+    }
+  }
+
   /// Checks if the type was directly derived from specified type.
   #[allow(dead_code)]
   pub fn inherits(&self, class_name: &String) -> bool {
@@ -53,10 +79,11 @@ impl CppData {
           }
         }
         if !found_destructor {
+          let is_virtual = self.has_virtual_destructor(class_name);
           self.methods.push(CppMethod {
             name: format!("~{}", class_name),
             scope: CppMethodScope::Class(class_name.clone()),
-            is_virtual: false, // TODO: destructors may be virtual
+            is_virtual: is_virtual,
             is_pure_virtual: false,
             is_const: false,
             is_static: false,
@@ -75,49 +102,34 @@ impl CppData {
     }
   }
 
+  pub fn template_parameters_for_class(&self, class_name: &String) -> Option<Vec<CppType>> {
+    match self.types.iter().find(|x| &x.name == class_name) {
+      None => None,
+      Some(type_data) => type_data.default_template_parameters(),
+    }
+  }
+
   /// Helper function that performs a portion of add_inherited_methods implementation.
   fn add_inherited_methods_from(&mut self, base_name: &String) {
-    let template_arguments = match self.types.iter().find(|x| &x.name == base_name) {
-      None => None,
-      Some(type_data) => match type_data.kind {
-        CppTypeKind::Class { ref template_arguments, .. } => {
-          match *template_arguments {
-            None => None,
-            Some(ref strings) => {
-              Some(strings.iter()
-                  .enumerate()
-                  .map(|(num, _)| {
-                    CppType {
-                      is_const: false,
-                      indirection: CppTypeIndirection::None,
-                      base: CppTypeBase::TemplateParameter {
-                        nested_level: 0,
-                        index: num as i32,
-                      },
-                    }
-                  })
-                  .collect())
-            }
-          }
-        }
-        _ => None
-      }
-    };
+    let template_arguments = self.template_parameters_for_class(base_name);
 
     let mut new_methods = Vec::new();
     let mut derived_types = Vec::new();
     {
-      let base_methods: Vec<_> = self.methods.iter().filter(|method| {
-        if method.kind.is_constructor() || method.kind.is_destructor() ||
-            method.kind == CppMethodKind::Operator(CppOperator::Assignment) {
-          return false;
-        }
-        if let CppMethodScope::Class(ref name) = method.scope {
-          name == base_name
-        } else {
-          false
-        }
-      }).collect();
+      let base_methods: Vec<_> = self.methods
+        .iter()
+        .filter(|method| {
+          if method.kind.is_constructor() || method.kind.is_destructor() ||
+             method.kind == CppMethodKind::Operator(CppOperator::Assignment) {
+            return false;
+          }
+          if let CppMethodScope::Class(ref name) = method.scope {
+            name == base_name
+          } else {
+            false
+          }
+        })
+        .collect();
       for type1 in &self.types {
         if type1.inherits(base_name) {
           let derived_name = &type1.name;
@@ -127,9 +139,9 @@ impl CppData {
             for method in &self.methods {
               if let CppMethodScope::Class(ref name) = method.scope {
                 if name == derived_name && method.name == base_class_method.name {
-                  log::info("Method is not added because it's overriden in derived class");
-                  log::info(format!("Base method: {}", base_class_method.short_text()));
-                  log::info(format!("Derived method: {}\n", method.short_text()));
+//                  log::info("Method is not added because it's overriden in derived class");
+//                  log::info(format!("Base method: {}", base_class_method.short_text()));
+//                  log::info(format!("Derived method: {}\n", method.short_text()));
                   ok = false;
                   break;
                 }
@@ -146,7 +158,7 @@ impl CppData {
                   template_arguments: template_arguments.clone(),
                 };
               }
-              log::info(format!("Method added: {}", new_method.short_text()));
+//              log::info(format!("Method added: {}", new_method.short_text()));
               new_methods.push(new_method.clone());
             }
           }
@@ -206,9 +218,9 @@ impl CppData {
       if let CppTypeKind::Class { .. } = tp.kind {
         if let Some(ins) = self.template_instantiations.get(&tp.name) {
           result.get_mut(&tp.include_file)
-                .unwrap()
-                .template_instantiations
-                .insert(tp.name.clone(), ins.clone());
+            .unwrap()
+            .template_instantiations
+            .insert(tp.name.clone(), ins.clone());
         }
       }
     }
@@ -237,5 +249,63 @@ impl CppData {
       log::warning(format!("Unknown type assumed to be non-template: {}", name));
     }
     false
+  }
+
+  pub fn generate_fake_constructor_return_types(&mut self) {
+    let void_type = Some(CppType::void());
+    for method in &mut self.methods {
+      if method.kind.is_constructor() {
+        if let CppMethodScope::Class(ref name) = method.scope {
+//          if !method.return_type.is_none() {
+//            println!("FAIL! {:?}", method);
+//          }
+          assert_eq!(&method.return_type, &void_type);
+          method.return_type = Some(CppType {
+            is_const: false,
+            indirection: CppTypeIndirection::None,
+            base: CppTypeBase::Class {
+              name: name.clone(),
+              template_arguments: match self.types.iter().find(|x| &x.name == name) {
+                None => None,
+                Some(type_data) => type_data.default_template_parameters(),
+              },
+            },
+          });
+        } else {
+          panic!("constructor must be in class scope");
+        }
+      }
+    }
+  }
+
+  pub fn has_virtual_destructor(&self, class_name: &String) -> bool {
+    for method in &self.methods {
+      if method.kind.is_destructor() {
+        if let CppMethodScope::Class(ref name) = method.scope {
+          if name == class_name {
+            return method.is_virtual;
+          }
+        }
+      }
+    }
+    if let Some(type_info) = self.types.iter().find(|t| &t.name == class_name) {
+      if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
+        for base in bases {
+          if let CppTypeBase::Class { ref name, .. } = base.base {
+            if self.has_virtual_destructor(name) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  pub fn post_process(&mut self) {
+    self.generate_fake_constructor_return_types();
+    self.ensure_explicit_destructors();
+    self.generate_methods_with_omitted_args();
+    self.add_inherited_methods();
   }
 }
