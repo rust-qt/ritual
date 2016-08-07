@@ -110,19 +110,23 @@ impl ToRustName for f64 {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum RustType {
   Void,
-  NonVoid {
+  Common {
     base: RustName,
     generic_arguments: Option<Vec<RustType>>,
     is_const: bool,
     indirection: RustTypeIndirection,
   },
+  FunctionPointer {
+    return_type: Box<RustType>,
+    arguments: Vec<RustType>,
+  }
 }
 
 impl RustType {
   pub fn caption(&self) -> String {
     match *self {
       RustType::Void => "void".to_string(),
-      RustType::NonVoid { ref base, ref generic_arguments, ref is_const, ref indirection } => {
+      RustType::Common { ref base, ref generic_arguments, ref is_const, ref indirection } => {
         let mut name = base.last_name().to_snake_case();
         if let &Some(ref args) = generic_arguments {
           name = format!("{}_{}", name, args.iter().map(|x| x.caption()).join("_"));
@@ -146,24 +150,25 @@ impl RustType {
         }
         name
       }
+      RustType::FunctionPointer { .. } => "fn".to_string()
     }
   }
 
   pub fn is_ref(&self) -> bool {
     match *self {
-      RustType::NonVoid { ref indirection, .. } => {
+      RustType::Common { ref indirection, .. } => {
         match *indirection {
           RustTypeIndirection::Ref { .. } => true,
           _ => false,
         }
       }
-      RustType::Void => false
+      RustType::Void | RustType::FunctionPointer { .. } => false
     }
   }
 
   pub fn with_lifetime(&self, new_lifetime: String) -> RustType {
     let mut r = self.clone();
-    if let RustType::NonVoid { ref mut indirection, .. } = r {
+    if let RustType::Common { ref mut indirection, .. } = r {
       if let RustTypeIndirection::Ref { ref mut lifetime } = *indirection {
         assert!(lifetime.is_none());
         *lifetime = Some(new_lifetime);
@@ -175,7 +180,7 @@ impl RustType {
   pub fn dealias_libc(&self) -> RustType {
     match *self {
       RustType::Void => self.clone(),
-      RustType::NonVoid { ref base, ref generic_arguments, ref is_const, ref indirection } => {
+      RustType::Common { ref base, ref generic_arguments, ref is_const, ref indirection } => {
         if base.parts.len() == 2 && &base.parts[0] == "libc" {
           let real_name = match base.parts[1].as_ref() {
             "c_void" => return self.clone(),
@@ -195,7 +200,7 @@ impl RustType {
             "c_double" => libc::c_double::to_rust_name(),
             _ => panic!("unknown libc type: {:?}", base),
           };
-          RustType::NonVoid {
+          RustType::Common {
             base: real_name,
             generic_arguments: generic_arguments.clone(),
             is_const: is_const.clone(),
@@ -203,6 +208,12 @@ impl RustType {
           }
         } else {
           self.clone()
+        }
+      }
+      RustType::FunctionPointer { ref return_type, ref arguments } => {
+        RustType::FunctionPointer {
+          return_type: Box::new(return_type.as_ref().dealias_libc()),
+          arguments: arguments.iter().map(|arg| arg.dealias_libc()).collect()
         }
       }
     }

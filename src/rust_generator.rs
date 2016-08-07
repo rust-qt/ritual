@@ -82,10 +82,10 @@ impl RustGenerator {
                                cpp_ffi_type: &CppFfiType,
                                argument_meaning: &CppFfiArgumentMeaning)
                                -> Result<CompleteType, String> {
-    let rust_ffi_type = try!(self.cpp_type_to_rust_ffi_type(cpp_ffi_type));
+    let rust_ffi_type = try!(self.cpp_ffi_type_to_rust_ffi_type(&cpp_ffi_type.ffi_type));
     let mut rust_api_type = rust_ffi_type.clone();
     let mut rust_api_to_c_conversion = RustToCTypeConversion::None;
-    if let RustType::NonVoid { ref mut indirection, .. } = rust_api_type {
+    if let RustType::Common { ref mut indirection, .. } = rust_api_type {
       match cpp_ffi_type.conversion.indirection_change {
         IndirectionChange::NoChange => {
           if argument_meaning == &CppFfiArgumentMeaning::This {
@@ -124,9 +124,9 @@ impl RustGenerator {
       } else {
         panic!("invalid original type for QFlags");
       };
-      rust_api_type = RustType::NonVoid {
+      rust_api_type = RustType::Common {
         base: RustName::new(vec!["qt_core".to_string(), "flags".to_string(), "QFlags".to_string()]),
-        generic_arguments: Some(vec![RustType::NonVoid {
+        generic_arguments: Some(vec![RustType::Common {
                                        base: enum_type,
                                        generic_arguments: None,
                                        indirection: RustTypeIndirection::None,
@@ -149,10 +149,10 @@ impl RustGenerator {
   }
 
 
-  fn cpp_type_to_rust_ffi_type(&self, cpp_ffi_type: &CppFfiType) -> Result<RustType, String> {
-    let rust_name = match cpp_ffi_type.ffi_type.base {
+  fn cpp_ffi_type_to_rust_ffi_type(&self, cpp_ffi_type: &CppType) -> Result<RustType, String> {
+    let rust_name = match cpp_ffi_type.base {
       CppTypeBase::Void => {
-        match cpp_ffi_type.ffi_type.indirection {
+        match cpp_ffi_type.indirection {
           CppTypeIndirection::None => return Ok(RustType::Void),
           _ => RustName::new(vec!["libc".to_string(), "c_void".to_string()]),
         }
@@ -219,15 +219,28 @@ impl RustGenerator {
           Some(rust_name) => rust_name.clone(),
         }
       }
-      CppTypeBase::FunctionPointer { .. } => {
-        return Err(format!("function pointers are not supported here yet"))
+      CppTypeBase::FunctionPointer { ref return_type,
+                                     ref arguments,
+                                     ref allows_variable_arguments } => {
+        if *allows_variable_arguments {
+          return Err(format!("Function pointers with variadic arguments are not supported"));
+        }
+        let mut rust_args = Vec::new();
+        for arg in arguments {
+          rust_args.push(try!(self.cpp_ffi_type_to_rust_ffi_type(arg)));
+        }
+        let rust_return_type = try!(self.cpp_ffi_type_to_rust_ffi_type(return_type));
+        return Ok(RustType::FunctionPointer {
+          arguments: rust_args,
+          return_type: Box::new(rust_return_type),
+        });
       }
       CppTypeBase::TemplateParameter { .. } => panic!("invalid cpp type"),
     };
-    return Ok(RustType::NonVoid {
+    return Ok(RustType::Common {
       base: rust_name,
-      is_const: cpp_ffi_type.ffi_type.is_const,
-      indirection: match cpp_ffi_type.ffi_type.indirection {
+      is_const: cpp_ffi_type.is_const,
+      indirection: match cpp_ffi_type.indirection {
         CppTypeIndirection::None => RustTypeIndirection::None,
         CppTypeIndirection::Ptr => RustTypeIndirection::Ptr,
         CppTypeIndirection::PtrPtr => RustTypeIndirection::PtrPtr,
@@ -283,7 +296,7 @@ impl RustGenerator {
       }
 
       fn remove_qt_prefix(s: &mut String) {
-        //TODO: use WordsIterator to remove Q
+        // TODO: use WordsIterator to remove Q
         if s.starts_with("q_") {
           *s = s[2..].to_string();
         } else if s.starts_with("Q") {
@@ -297,7 +310,7 @@ impl RustGenerator {
       }
       remove_qt_prefix(&mut last_part_final);
 
-//      println!("test: {:?}", parts);
+      // println!("test: {:?}", parts);
       if parts.len() > 2 && parts[1] == parts[2] {
         // special case
         parts.remove(2);
@@ -305,7 +318,7 @@ impl RustGenerator {
       parts.push(last_part_final);
 
 
-//      println!("mapping added: {} -> {:?}", name, parts);
+      // println!("mapping added: {} -> {:?}", name, parts);
       map.insert(name.clone(), RustName::new(parts));
     }
     for type_info in &self.input_data.cpp_data.types {
@@ -546,7 +559,7 @@ impl RustGenerator {
           } else {
             if method.allocation_place == ReturnValueAllocationPlace::Heap &&
                method.cpp_method.kind.is_destructor() {
-              if let RustType::NonVoid { ref mut indirection, .. } = complete_type.rust_api_type {
+              if let RustType::Common { ref mut indirection, .. } = complete_type.rust_api_type {
                 assert!(*indirection == RustTypeIndirection::Ref { lifetime: None });
                 *indirection = RustTypeIndirection::None;
               } else {
@@ -580,7 +593,7 @@ impl RustGenerator {
         Ok(mut r) => {
           if method.allocation_place == ReturnValueAllocationPlace::Heap &&
              !method.cpp_method.kind.is_destructor() {
-            if let RustType::NonVoid { ref mut indirection, .. } = r.rust_api_type {
+            if let RustType::Common { ref mut indirection, .. } = r.rust_api_type {
               assert!(*indirection == RustTypeIndirection::None);
               *indirection = RustTypeIndirection::Ptr;
             } else {

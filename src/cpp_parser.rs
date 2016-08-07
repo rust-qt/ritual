@@ -621,7 +621,12 @@ impl CppParser {
                 let new_indirection = match type1.get_kind() {
                   TypeKind::Pointer => {
                     match result.indirection {
-                      CppTypeIndirection::None => Ok(CppTypeIndirection::Ptr),
+                      CppTypeIndirection::None => {
+                        match result.base {
+                          CppTypeBase::FunctionPointer { .. } => Ok(CppTypeIndirection::None),
+                          _ => Ok(CppTypeIndirection::Ptr)
+                        }
+                      },
                       CppTypeIndirection::Ptr => Ok(CppTypeIndirection::PtrPtr),
                       _ => {
                         Err(format!("Unsupported level of indirection: pointer to {:?}",

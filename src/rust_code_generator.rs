@@ -80,7 +80,8 @@ impl RustCodeGenerator {
     write!(cargo_file,
            "[dependencies]
            libc = \"0.2\"
-           cpp_box = {{ git = \"https://github.com/rust-qt/cpp_box.git\" }}\n\n").unwrap();
+           cpp_box = {{ git = \"https://github.com/rust-qt/cpp_box.git\" }}\n\n")
+      .unwrap();
     println!("template_path = {:?}", self.template_path);
     for item in fs::read_dir(&self.template_path).unwrap() {
       let item = item.unwrap();
@@ -91,9 +92,9 @@ impl RustCodeGenerator {
   }
 
   fn rust_type_to_code(&self, rust_type: &RustType) -> String {
-    match rust_type {
-      &RustType::Void => panic!("rust void can't be converted to code"),
-      &RustType::NonVoid { ref base, ref is_const, ref indirection, ref generic_arguments, .. } => {
+    match *rust_type {
+      RustType::Void => panic!("rust void can't be converted to code"),
+      RustType::Common { ref base, ref is_const, ref indirection, ref generic_arguments, .. } => {
         let mut base_s = base.full_name(Some(&self.crate_name));
         if let &Some(ref args) = generic_arguments {
           base_s = format!("{}<{}>",
@@ -130,25 +131,31 @@ impl RustCodeGenerator {
         };
         s
       }
+      RustType::FunctionPointer { ref return_type, ref arguments } => {
+        format!("extern \"C\" fn({}){}",
+                arguments.iter().map(|arg| self.rust_type_to_code(arg)).join(", "),
+                match return_type.as_ref() {
+                  &RustType::Void => String::new(),
+                  return_type => format!(" -> {}", self.rust_type_to_code(return_type)),
+                })
+      }
     }
   }
 
   fn rust_ffi_function_to_code(&self, func: &RustFFIFunction) -> String {
     let args = func.arguments
-      .iter()
-      .map(|arg| {
-        format!("{}: {}",
-                arg.name,
-                self.rust_type_to_code(&arg.argument_type))
-      });
+                   .iter()
+                   .map(|arg| {
+                     format!("{}: {}",
+                             arg.name,
+                             self.rust_type_to_code(&arg.argument_type))
+                   });
     format!("  pub fn {}({}){};\n",
             func.name,
             args.join(", "),
             match func.return_type {
               RustType::Void => String::new(),
-              RustType::NonVoid { .. } => {
-                format!(" -> {}", self.rust_type_to_code(&func.return_type))
-              }
+              _ => format!(" -> {}", self.rust_type_to_code(&func.return_type)),
             })
   }
 
@@ -175,8 +182,8 @@ impl RustCodeGenerator {
 
         }
         RustToCTypeConversion::ValueToPtr => {
-          let is_const = if let RustType::NonVoid { ref is_const, .. } = arg.argument_type
-            .rust_ffi_type {
+          let is_const = if let RustType::Common { ref is_const, .. } = arg.argument_type
+                                                                           .rust_ffi_type {
             *is_const
           } else {
             panic!("void is not expected here at all!")
@@ -228,8 +235,8 @@ impl RustCodeGenerator {
     match func.return_type.rust_api_to_c_conversion {
       RustToCTypeConversion::None => {}
       RustToCTypeConversion::RefToPtr => {
-        let is_const = if let RustType::NonVoid { ref is_const, .. } = func.return_type
-          .rust_ffi_type {
+        let is_const = if let RustType::Common { ref is_const, .. } = func.return_type
+                                                                          .rust_ffi_type {
           *is_const
         } else {
           panic!("void is not expected here at all!")
@@ -249,7 +256,7 @@ impl RustCodeGenerator {
       }
       RustToCTypeConversion::QFlagsToUInt => {
         let mut qflags_type = func.return_type.rust_api_type.clone();
-        if let RustType::NonVoid { ref mut generic_arguments, .. } = qflags_type {
+        if let RustType::Common { ref mut generic_arguments, .. } = qflags_type {
           *generic_arguments = None;
         } else {
           unreachable!();
@@ -273,34 +280,34 @@ impl RustCodeGenerator {
     };
     let return_type_for_signature = match func.return_type.rust_api_type {
       RustType::Void => String::new(),
-      RustType::NonVoid { .. } => {
+      _ => {
         format!(" -> {}",
                 self.rust_type_to_code(&func.return_type.rust_api_type))
       }
     };
     let arg_texts = |args: &Vec<RustMethodArgument>| -> Vec<String> {
       args.iter()
-        .map(|arg| {
-          let mut maybe_mut_declaration = "";
-          if let RustType::NonVoid { ref indirection, .. } = arg.argument_type
-            .rust_api_type {
-            if *indirection == RustTypeIndirection::None &&
-               arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr {
-              if let RustType::NonVoid { ref is_const, .. } = arg.argument_type
-                .rust_ffi_type {
-                if !is_const {
-                  maybe_mut_declaration = "mut ";
+          .map(|arg| {
+            let mut maybe_mut_declaration = "";
+            if let RustType::Common { ref indirection, .. } = arg.argument_type
+                                                                 .rust_api_type {
+              if *indirection == RustTypeIndirection::None &&
+                 arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr {
+                if let RustType::Common { ref is_const, .. } = arg.argument_type
+                                                                  .rust_ffi_type {
+                  if !is_const {
+                    maybe_mut_declaration = "mut ";
+                  }
                 }
               }
             }
-          }
 
-          format!("{}{}: {}",
-                  maybe_mut_declaration,
-                  arg.name,
-                  self.rust_type_to_code(&arg.argument_type.rust_api_type))
-        })
-        .collect()
+            format!("{}{}: {}",
+                    maybe_mut_declaration,
+                    arg.name,
+                    self.rust_type_to_code(&arg.argument_type.rust_api_type))
+          })
+          .collect()
     };
     match func.arguments {
       RustMethodArguments::SingleVariant(ref variant) => {
@@ -396,11 +403,12 @@ impl RustCodeGenerator {
 
   fn generate_module_code(&self, data: &RustModule) -> String {
     let mut results = Vec::new();
-    results.push(
-      "extern crate libc;
+    results.push("extern crate libc;
       extern crate cpp_box;
       #[allow(unused_imports)]
-      use std;\n\n".to_string());
+      \
+                  use std;\n\n"
+                   .to_string());
 
     for type1 in &data.types {
       match type1.kind {
@@ -411,8 +419,8 @@ impl RustCodeGenerator {
                                    {} {{\n{}\n}}\n\n",
                                   type1.name.last_name(),
                                   values.iter()
-                                    .map(|item| format!("  {} = {}", item.name, item.value))
-                                    .join(", \n"));
+                                        .map(|item| format!("  {} = {}", item.name, item.value))
+                                        .join(", \n"));
               if *is_flaggable {
                 r = format!("{}impl ::flags::FlaggableEnum for {} {{\n
                            \
@@ -441,18 +449,21 @@ impl RustCodeGenerator {
             results.push(format!("impl {} {{\n{}}}\n\n",
                                  type1.name.last_name(),
                                  methods.iter()
-                                   .map(|method| self.generate_rust_final_function(method))
-                                   .join("")));
+                                        .map(|method| self.generate_rust_final_function(method))
+                                        .join("")));
           }
           for trait1 in traits {
             let trait_content = match trait1.trait_name {
               TraitName::CppDeletable { ref deleter_name } => {
-                format!("fn deleter() -> cpp_box::Deleter<Self> {{\n  ::ffi::{}\n}}\n", deleter_name)
+                format!("fn deleter() -> cpp_box::Deleter<Self> {{\n  ::ffi::{}\n}}\n",
+                        deleter_name)
               }
-              _ => trait1.methods
-                  .iter()
-                  .map(|method| self.generate_rust_final_function(method))
-                  .join("")
+              _ => {
+                trait1.methods
+                      .iter()
+                      .map(|method| self.generate_rust_final_function(method))
+                      .join("")
+              }
             };
 
             results.push(format!("impl {} for {} {{\n{}}}\n\n",
@@ -470,23 +481,25 @@ impl RustCodeGenerator {
             None
           };
           let var_texts = variants.iter()
-            .enumerate()
-            .map(|(num, variant)| {
-              let mut tuple_text = variant.iter()
-                .map(|t| {
-                  match lifetime {
-                    Some(lifetime) => {
+                                  .enumerate()
+                                  .map(|(num, variant)| {
+                                    let mut tuple_text = variant.iter()
+                                                                .map(|t| {
+                                                                  match lifetime {
+                                                                    Some(lifetime) => {
                       self.rust_type_to_code(&t.with_lifetime(lifetime.to_string()))
                     }
-                    None => self.rust_type_to_code(t),
-                  }
-                })
-                .join(",");
-              if !tuple_text.is_empty() {
-                tuple_text = format!("({})", tuple_text);
-              }
-              format!("Variant{}{},", num, tuple_text)
-            });
+                                                                    None => {
+                                                                      self.rust_type_to_code(t)
+                                                                    }
+                                                                  }
+                                                                })
+                                                                .join(",");
+                                    if !tuple_text.is_empty() {
+                                      tuple_text = format!("({})", tuple_text);
+                                    }
+                                    format!("Variant{}{},", num, tuple_text)
+                                  });
           results.push(format!("pub enum {}{} {{\n{}\n}}\n\n",
                                type1.name.last_name(),
                                match lifetime {
@@ -497,12 +510,15 @@ impl RustCodeGenerator {
 
           for (num, variant) in variants.iter().enumerate() {
             let tuple_item_types: Vec<_> = variant.iter()
-                .map(|t| {
-                  match lifetime {
-                    Some(lifetime) => self.rust_type_to_code(&t.with_lifetime(lifetime.to_string())),
-                    None => self.rust_type_to_code(t),
-                  }
-                }).collect();
+                                                  .map(|t| {
+                                                    match lifetime {
+                                                      Some(lifetime) => {
+                           self.rust_type_to_code(&t.with_lifetime(lifetime.to_string()))
+                         }
+                                                      None => self.rust_type_to_code(t),
+                                                    }
+                                                  })
+                                                  .collect();
             let type_text = if tuple_item_types.len() == 1 {
               tuple_item_types[0].clone()
             } else {
@@ -513,10 +529,11 @@ impl RustCodeGenerator {
             } else if tuple_item_types.len() == 1 {
               "(self)".to_string()
             } else {
-              format!("({})", variant.iter()
-                  .enumerate()
-                  .map(|(num2, _)| format!("self.{}", num2))
-                  .join(", "))
+              format!("({})",
+                      variant.iter()
+                             .enumerate()
+                             .map(|(num2, _)| format!("self.{}", num2))
+                             .join(", "))
             };
             results.push(format!("impl{lf} {trt}{lf} for {type_text} {{\nfn as_enum(self) -> \
                              {enm}{lf} {{\n{enm}::Variant{num}{variant_value}\n}}\n}}\n\n",
