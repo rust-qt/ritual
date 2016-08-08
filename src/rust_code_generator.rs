@@ -21,7 +21,6 @@ pub struct RustCodeGenerator {
   template_path: PathBuf,
   c_lib_name: String,
   cpp_lib_name: String,
-  c_lib_path: PathBuf,
   rustfmt_config: rustfmt::config::Config,
 }
 
@@ -30,8 +29,7 @@ impl RustCodeGenerator {
              output_path: PathBuf,
              template_path: PathBuf,
              c_lib_name: String,
-             cpp_lib_name: String,
-             c_lib_path: PathBuf)
+             cpp_lib_name: String)
              -> RustCodeGenerator {
     // TODO: allow overriding rustfmt.toml file
     // let rustfmt_config_path = output_path.with_added("rustfmt.toml");
@@ -48,7 +46,6 @@ impl RustCodeGenerator {
       template_path: template_path,
       c_lib_name: c_lib_name,
       cpp_lib_name: cpp_lib_name,
-      c_lib_path: c_lib_path,
       rustfmt_config: rustfmt_config,
     }
   }
@@ -57,13 +54,8 @@ impl RustCodeGenerator {
     let mut rustfmt_file = File::create(self.output_path.with_added("rustfmt.toml")).unwrap();
     rustfmt_file.write(include_bytes!("../templates/crate/rustfmt.toml")).unwrap();
 
-    // TODO: maybe put c library inside crate sources and
-    // TODO: determine c_lib_path automatically in build script
     let mut build_rs_file = File::create(self.output_path.with_added("build.rs")).unwrap();
-    write!(build_rs_file,
-           include_str!("../templates/crate/build.rs"),
-           self.c_lib_path.to_str().unwrap())
-      .unwrap();
+    build_rs_file.write(include_bytes!("../templates/crate/build.rs")).unwrap();
 
     let mut cargo_file = File::create(self.output_path.with_added("Cargo.toml")).unwrap();
     // TODO: use supplied version and authors
@@ -379,7 +371,9 @@ impl RustCodeGenerator {
     lib_file_path.push("lib.rs");
     {
       let mut lib_file = File::create(&lib_file_path).unwrap();
-      write!(lib_file, "#![allow(drop_with_repr_extern)]\n").unwrap();
+      write!(lib_file, "#![allow(drop_with_repr_extern)]\n\n").unwrap();
+      write!(lib_file, "pub extern crate libc;\n").unwrap();
+      write!(lib_file, "pub extern crate cpp_box;\n\n").unwrap();
 
       // TODO: get list of modules copied from template
       let built_in_modules = vec!["flags", "ffi"];
@@ -403,11 +397,8 @@ impl RustCodeGenerator {
 
   fn generate_module_code(&self, data: &RustModule) -> String {
     let mut results = Vec::new();
-    results.push("extern crate libc;
-      extern crate cpp_box;
-      #[allow(unused_imports)]
-      \
-                  use std;\n\n"
+    results.push("#[allow(unused_imports)]
+      use {libc, cpp_box, std};\n\n"
                    .to_string());
 
     for type1 in &data.types {
@@ -612,7 +603,8 @@ impl RustCodeGenerator {
     file_path.push("ffi.rs");
     {
       let mut file = File::create(&file_path).unwrap();
-      write!(file, "extern crate libc;\n\n").unwrap();
+      write!(file, "use libc;\n\n").unwrap();
+
       write!(file, "#[link(name = \"{}\")]\n", &self.cpp_lib_name).unwrap();
       //      write!(file, "#[link(name = \"icui18n\")]\n").unwrap();
       //      write!(file, "#[link(name = \"icuuc\")]\n").unwrap();

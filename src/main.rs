@@ -193,24 +193,13 @@ fn main() {
   log::info("Post-processing parse result.");
   qt_specific::fix_header_names(&mut parse_result, &qt_core_headers_path);
   parse_result.post_process();
-  //  if arguments.len() == 3 && arguments[1] == "check_parsers_consistency" {
-  //    let headers_dir = ....;
-  //    let mut parser1 = cpp_parser::CppParser::new();
-  //    parser1.run();
-  //    let stats = parser1.get_stats();
-  //    let mut parse_result1 = parser1.get_data();
-  //    let parse_result_path = PathBuf::from(arguments[2].clone());
-  //    log::info("Reading parse result...");
-  //    let parse_result2 = doc_parser_support::read_parse_result::do_it(&parse_result_path);
-  //    qt_specific::fix_header_names(&mut parse_result1, &headers_dir);
-  //    doc_parser_support::parsers_consistency_checker::check(&parse_result1, &stats, &parse_result2);
-  //    return;
-  //  }
+
+  let crate_path = output_dir_path.with_added(&lib_spec.rust.name);
 
   let c_lib_name = format!("{}_c", &lib_spec.rust.name);
-  let c_lib_parent_path = output_dir_path.with_added(&c_lib_name);
-  let c_lib_path = c_lib_parent_path.with_added("src");
-  let c_lib_tmp_path = c_lib_parent_path.with_added("src.new");
+  let c_lib_parent_path = crate_path.with_added("c_lib");
+  let c_lib_path = c_lib_parent_path.with_added("source");
+  let c_lib_tmp_path = c_lib_parent_path.with_added("source.new");
   if c_lib_tmp_path.as_path().exists() {
     fs::remove_dir_all(&c_lib_tmp_path).unwrap();
   }
@@ -226,7 +215,7 @@ fn main() {
                                                  c_lib_name.clone(),
                                                  c_lib_tmp_path.clone());
   let c_data = c_gen.generate_all();
-  utils::move_files(&c_lib_tmp_path, &c_lib_path).unwrap();
+  utils::move_files(&c_lib_tmp_path, &c_lib_path, None).unwrap();
 
   log::info(format!("Building C wrapper library."));
   let c_lib_build_path = c_lib_parent_path.with_added("build");
@@ -244,16 +233,16 @@ fn main() {
     Some(cmd) => cmd,
     None => "make".to_string(),
   };
-  let make_args = match local_overrides.make_arguments {
+  let mut make_args = match local_overrides.make_arguments {
     Some(args) => args,
     None => Vec::new(),
   };
+  make_args.push("install".to_string());
   run_command(Command::new(make_command)
                 .args(&make_args)
                 .current_dir(&c_lib_build_path), false);
 
 
-  let crate_path = output_dir_path.with_added(&lib_spec.rust.name);
   let crate_new_path = output_dir_path.with_added(format!("{}.new", &lib_spec.rust.name));
   if crate_new_path.as_path().exists() {
     fs::remove_dir_all(&crate_new_path).unwrap();
@@ -268,7 +257,7 @@ fn main() {
 
   log::info(format!("Generating Rust crate ({}).", &lib_spec.rust.name));
   rust_gen.generate_all();
-  utils::move_files(&crate_new_path, &crate_path).unwrap();
+  utils::move_files(&crate_new_path, &crate_path, Some("c_lib".to_string())).unwrap();
 
   log::info(format!("Compiling Rust crate."));
   for cargo_cmd in vec!["test", "doc"] {

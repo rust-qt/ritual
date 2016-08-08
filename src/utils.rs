@@ -37,7 +37,7 @@ impl PathBufPushTweak for PathBuf {
   }
 }
 
-pub fn move_files(src: &PathBuf, dst: &PathBuf) -> io::Result<()> {
+pub fn move_files(src: &PathBuf, dst: &PathBuf, no_delete_exception: Option<String>) -> io::Result<()> {
   if src.as_path().is_dir() {
     if !dst.as_path().is_dir() {
       log::info(format!("New dir created: {}", dst.to_str().unwrap()));
@@ -48,12 +48,16 @@ pub fn move_files(src: &PathBuf, dst: &PathBuf) -> io::Result<()> {
       let item = try!(item);
       if !src.with_added(item.file_name()).as_path().exists() {
         let path = item.path();
-        if path.as_path().is_dir() {
-          log::info(format!("Old dir removed: {}", path.to_str().unwrap()));
-          try!(fs::remove_dir_all(path));
+        if no_delete_exception == Some(item.file_name().into_string().unwrap()) {
+          log::info(format!("Old item preserved (exceptional): {}", path.to_str().unwrap()));
         } else {
-          log::info(format!("Old file removed: {}", path.to_str().unwrap()));
-          try!(fs::remove_file(path));
+          if path.as_path().is_dir() {
+            log::info(format!("Old dir removed: {}", path.to_str().unwrap()));
+            try!(fs::remove_dir_all(path));
+          } else {
+            log::info(format!("Old file removed: {}", path.to_str().unwrap()));
+            try!(fs::remove_file(path));
+          }
         }
       }
     }
@@ -61,7 +65,8 @@ pub fn move_files(src: &PathBuf, dst: &PathBuf) -> io::Result<()> {
     for item in try!(fs::read_dir(src)) {
       let item = try!(item);
       try!(move_files(&item.path().to_path_buf(),
-                      &dst.with_added(item.file_name())));
+                      &dst.with_added(item.file_name()),
+                      None));
     }
     try!(fs::remove_dir_all(src));
   } else {

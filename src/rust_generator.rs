@@ -73,8 +73,7 @@ impl RustGenerator {
                                              output_path,
                                              template_path,
                                              c_lib_name,
-                                             cpp_lib_name,
-                                             c_lib_path),
+                                             cpp_lib_name),
     }
   }
 
