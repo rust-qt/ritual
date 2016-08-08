@@ -119,7 +119,7 @@ pub enum RustType {
   FunctionPointer {
     return_type: Box<RustType>,
     arguments: Vec<RustType>,
-  }
+  },
 }
 
 impl RustType {
@@ -150,7 +150,7 @@ impl RustType {
         }
         name
       }
-      RustType::FunctionPointer { .. } => "fn".to_string()
+      RustType::FunctionPointer { .. } => "fn".to_string(),
     }
   }
 
@@ -162,7 +162,7 @@ impl RustType {
           _ => false,
         }
       }
-      RustType::Void | RustType::FunctionPointer { .. } => false
+      RustType::Void | RustType::FunctionPointer { .. } => false,
     }
   }
 
@@ -213,7 +213,7 @@ impl RustType {
       RustType::FunctionPointer { ref return_type, ref arguments } => {
         RustType::FunctionPointer {
           return_type: Box::new(return_type.as_ref().dealias_libc()),
-          arguments: arguments.iter().map(|arg| arg.dealias_libc()).collect()
+          arguments: arguments.iter().map(|arg| arg.dealias_libc()).collect(),
         }
       }
     }

@@ -62,6 +62,34 @@ fn print_usage() {
 
 use serializable::{LibSpec, LocalOverrides};
 
+fn run_command(command: &mut Command, fetch_stdout: bool) -> String {
+  log::info(format!("Executing command: {:?}", command));
+  match command.status() {
+    Ok(status) => {
+      if !status.success() {
+        log::error(format!("Command failed: {:?} (status: {})", command, status));
+        std::process::exit(1);
+      }
+      if fetch_stdout {
+        match command.output() {
+          Ok(output) => return String::from_utf8(output.stdout).unwrap(),
+          Err(error) => {
+            log::error(format!("Fetching output failed: {}", error));
+            std::process::exit(1);
+          }
+        }
+      } else {
+        return String::new();
+      }
+    }
+    Err(error) => {
+      log::error(format!("Execution failed: {}", error));
+      std::process::exit(1);
+    }
+  }
+}
+
+
 fn main() {
   let arguments: Vec<_> = env::args().collect();
   if arguments.len() != 3 {
@@ -115,26 +143,18 @@ fn main() {
   };
   log::info(format!("Using qmake path: {}", qmake_path));
   log::info("Detecting Qt directories...");
-  let qt_install_headers_path = PathBuf::from(String::from_utf8(Command::new(&qmake_path)
-                                                                  .arg("-query")
-                                                                  .arg("QT_INSTALL_HEADERS")
-                                                                  .output()
-                                                                  .expect("Failed to execute \
-                                                                           qmake query.")
-                                                                  .stdout)
-                                                .unwrap()
+  let qt_install_headers_path = PathBuf::from(run_command(Command::new(&qmake_path)
+                                                            .arg("-query")
+                                                            .arg("QT_INSTALL_HEADERS"),
+                                                          true)
                                                 .trim());
   log::info(format!("QT_INSTALL_HEADERS = \"{}\"",
                     qt_install_headers_path.to_str().unwrap()));
-  let qt_install_libs_path = PathBuf::from(String::from_utf8(Command::new(&qmake_path)
-                                                               .arg("-query")
-                                                               .arg("QT_INSTALL_LIBS")
-                                                               .output()
-                                                               .expect("Failed to execute \
-                                                                        qmake query.")
-                                                               .stdout)
-                                             .unwrap()
-                                             .trim());
+  let qt_install_libs_path = PathBuf::from(run_command(Command::new(&qmake_path)
+                                                           .arg("-query")
+                                                           .arg("QT_INSTALL_LIBS"),
+                                                       true)
+                                               .trim());
   log::info(format!("QT_INSTALL_LIBS = \"{}\"",
                     qt_install_libs_path.to_str().unwrap()));
   let qt_core_headers_path = {
@@ -214,25 +234,24 @@ fn main() {
   let c_lib_install_path = c_lib_parent_path.with_added("install");
   fs::create_dir_all(&c_lib_install_path).unwrap();
 
-  assert!(Command::new("cmake")
-            .arg(&c_lib_path)
-            .arg(format!("-DCMAKE_INSTALL_PREFIX={}",
-                         c_lib_install_path.to_str().unwrap()))
-            .current_dir(&c_lib_build_path)
-            .status()
-            .expect("Failed to execute cmake command")
-            .success());
+  run_command(Command::new("cmake")
+                .arg(&c_lib_path)
+                .arg(format!("-DCMAKE_INSTALL_PREFIX={}",
+                             c_lib_install_path.to_str().unwrap()))
+                .current_dir(&c_lib_build_path), false);
 
-  // TODO: move make command and args to local overrides
-  assert!(Command::new("make")
-            .arg("-j8")
-            .arg("install")
-            .current_dir(&c_lib_build_path)
-            .status()
-            .expect("Failed to execute make command")
-            .success());
+  let make_command = match local_overrides.make_command {
+    Some(cmd) => cmd,
+    None => "make".to_string(),
+  };
+  let make_args = match local_overrides.make_arguments {
+    Some(args) => args,
+    None => Vec::new(),
+  };
+  run_command(Command::new(make_command)
+                .args(&make_args)
+                .current_dir(&c_lib_build_path), false);
 
-  // }
 
   let crate_path = output_dir_path.with_added(&lib_spec.rust.name);
   let crate_new_path = output_dir_path.with_added(format!("{}.new", &lib_spec.rust.name));
@@ -253,15 +272,11 @@ fn main() {
 
   log::info(format!("Compiling Rust crate."));
   for cargo_cmd in vec!["test", "doc"] {
-    log::info(format!("Running cargo {}.", cargo_cmd));
-    assert!(Command::new("cargo")
-            .arg(cargo_cmd)
-            .current_dir(&crate_path)
-            .env("LIBRARY_PATH", qt_install_libs_path.to_str().unwrap())
-            .env("LD_LIBRARY_PATH", qt_install_libs_path.to_str().unwrap())
-            .status()
-            .expect("Failed to execute cargo command")
-            .success());
+    run_command(Command::new("cargo")
+                  .arg(cargo_cmd)
+                  .current_dir(&crate_path)
+                  .env("LIBRARY_PATH", qt_install_libs_path.to_str().unwrap())
+                  .env("LD_LIBRARY_PATH", qt_install_libs_path.to_str().unwrap()), false);
   }
   log::info("Completed successfully.");
 }

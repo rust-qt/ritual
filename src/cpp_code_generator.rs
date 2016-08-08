@@ -47,7 +47,9 @@ impl CppCodeGenerator {
 
   /// Generates method declaration for the header.
   fn header_code(&self, method: &CppAndFfiMethod) -> String {
-    format!("{}_EXPORT {};\n", self.lib_name_upper, self.function_signature(method))
+    format!("{}_EXPORT {};\n",
+            self.lib_name_upper,
+            self.function_signature(method))
   }
 
   /// Wraps expression returned by the original method to

@@ -342,4 +342,6 @@ pub struct LibSpec {
 #[derive(Serialize, Deserialize)]
 pub struct LocalOverrides {
   pub qmake_path: Option<String>,
+  pub make_command: Option<String>,
+  pub make_arguments: Option<Vec<String>>,
 }

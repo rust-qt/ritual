@@ -624,9 +624,9 @@ impl CppParser {
                       CppTypeIndirection::None => {
                         match result.base {
                           CppTypeBase::FunctionPointer { .. } => Ok(CppTypeIndirection::None),
-                          _ => Ok(CppTypeIndirection::Ptr)
+                          _ => Ok(CppTypeIndirection::Ptr),
                         }
-                      },
+                      }
                       CppTypeIndirection::Ptr => Ok(CppTypeIndirection::PtrPtr),
                       _ => {
                         Err(format!("Unsupported level of indirection: pointer to {:?}",
@@ -819,7 +819,7 @@ impl CppParser {
       CppMethodScope::Class(ref class_name) => {
         match self.data.types.iter().find(|x| &x.name == class_name) {
           Some(info) => Some(info.default_class_type()),
-          None => return Err(format!("Unknown class type: {}", class_name))
+          None => return Err(format!("Unknown class type: {}", class_name)),
         }
       }
       CppMethodScope::Global => None,

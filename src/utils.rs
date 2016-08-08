@@ -110,8 +110,8 @@ pub fn move_one_file(old_path: &PathBuf, new_path: &PathBuf) -> io::Result<()> {
   Ok(())
 }
 
-//extern crate regex;
-//use self::regex::Regex;
+// extern crate regex;
+// use self::regex::Regex;
 
 
 struct WordIterator<'a> {
@@ -133,8 +133,7 @@ impl<'a> WordIterator<'a> {
 impl<'a> Iterator for WordIterator<'a> {
   type Item = &'a str;
   fn next(&mut self) -> Option<&'a str> {
-    while self.index < self.string.len() &&
-          &self.string[self.index..self.index + 1] == "_" {
+    while self.index < self.string.len() && &self.string[self.index..self.index + 1] == "_" {
       self.index = self.index + 1;
     }
     if self.index >= self.string.len() {
@@ -145,10 +144,10 @@ impl<'a> Iterator for WordIterator<'a> {
     loop {
       let ok = if i == self.string.len() {
         true
-      } else if self.nan_snake_hack && i >= 2 && &self.string[i-2..i+1] == "NaN" {
-          false
+      } else if self.nan_snake_hack && i >= 2 && &self.string[i - 2..i + 1] == "NaN" {
+        false
       } else {
-        let current = &self.string[i..i+1].chars().next().unwrap();
+        let current = &self.string[i..i + 1].chars().next().unwrap();
         current == &'_' || current.is_uppercase()
       };
       if ok {
@@ -168,15 +167,15 @@ pub trait CaseOperations {
 
 impl CaseOperations for String {
   fn to_class_case(&self) -> Self {
-    WordIterator::new(self, false).map(|x| {
-      format!("{}{}", x[0..1].to_uppercase(), x[1..].to_lowercase())
-    }).join("")
+    WordIterator::new(self, false)
+      .map(|x| format!("{}{}", x[0..1].to_uppercase(), x[1..].to_lowercase()))
+      .join("")
 
   }
   fn to_snake_case(&self) -> Self {
-    WordIterator::new(self, true).map(|x| {
-      x.to_lowercase()
-    }).join("_")
+    WordIterator::new(self, true)
+      .map(|x| x.to_lowercase())
+      .join("_")
   }
 }
 
@@ -188,33 +187,33 @@ mod tests {
     use utils::CaseOperations;
 
     let s1 = "first_second_last".to_string();
-    assert_eq!(s1.to_class_case() , "FirstSecondLast");
-    assert_eq!(s1.to_snake_case() , "first_second_last");
+    assert_eq!(s1.to_class_case(), "FirstSecondLast");
+    assert_eq!(s1.to_snake_case(), "first_second_last");
 
     let s2 = "FirstSecondLast".to_string();
-    assert_eq!(s2.to_class_case() , "FirstSecondLast");
-    assert_eq!(s2.to_snake_case() , "first_second_last");
+    assert_eq!(s2.to_class_case(), "FirstSecondLast");
+    assert_eq!(s2.to_snake_case(), "first_second_last");
 
     let s3 = "First_Second_last".to_string();
-    assert_eq!(s3.to_class_case() , "FirstSecondLast");
-    assert_eq!(s3.to_snake_case() , "first_second_last");
+    assert_eq!(s3.to_class_case(), "FirstSecondLast");
+    assert_eq!(s3.to_snake_case(), "first_second_last");
 
     let s4 = "isNaN".to_string();
-    assert_eq!(s4.to_class_case() , "IsNaN");
-    assert_eq!(s4.to_snake_case() , "is_nan");
+    assert_eq!(s4.to_class_case(), "IsNaN");
+    assert_eq!(s4.to_snake_case(), "is_nan");
 
     let s5 = "Base64Format".to_string();
-    //println!("test {} {}", s5.to_class_case(), s5.to_snake_case());
-    assert_eq!(s5.to_class_case() , "Base64Format");
-    assert_eq!(s5.to_snake_case() , "base64_format");
+    // println!("test {} {}", s5.to_class_case(), s5.to_snake_case());
+    assert_eq!(s5.to_class_case(), "Base64Format");
+    assert_eq!(s5.to_snake_case(), "base64_format");
 
     let s6 = "toBase64".to_string();
-    assert_eq!(s6.to_class_case() , "ToBase64");
-    assert_eq!(s6.to_snake_case() , "to_base64");
+    assert_eq!(s6.to_class_case(), "ToBase64");
+    assert_eq!(s6.to_snake_case(), "to_base64");
 
     let s7 = "too_many__underscores".to_string();
-    assert_eq!(s7.to_class_case() , "TooManyUnderscores");
-    assert_eq!(s7.to_snake_case() , "too_many_underscores");
+    assert_eq!(s7.to_class_case(), "TooManyUnderscores");
+    assert_eq!(s7.to_snake_case(), "too_many_underscores");
 
   }
 }

@@ -103,7 +103,9 @@ impl CppTypeBase {
       CppTypeBase::TemplateParameter { .. } => {
         return Err(format!("template parameters are not supported here yet"));
       }
-      CppTypeBase::FunctionPointer { ref return_type, ref arguments, ref allows_variable_arguments } => {
+      CppTypeBase::FunctionPointer { ref return_type,
+                                     ref arguments,
+                                     ref allows_variable_arguments } => {
         if *allows_variable_arguments {
           return Err(format!("Function pointers with variadic arguments are not supported"));
         }
@@ -111,7 +113,9 @@ impl CppTypeBase {
         for arg in arguments {
           arg_texts.push(try!(arg.to_cpp_code()));
         }
-        Ok(format!("{} (*FN_PTR)({})", try!(return_type.as_ref().to_cpp_code()), arg_texts.join(", ")))
+        Ok(format!("{} (*FN_PTR)({})",
+                   try!(return_type.as_ref().to_cpp_code()),
+                   arg_texts.join(", ")))
       }
     }
   }
@@ -193,7 +197,9 @@ impl CppType {
       CppTypeBase::TemplateParameter { .. } => {
         return Err(format!("Unsupported type"));
       }
-      CppTypeBase::FunctionPointer { ref return_type, ref arguments, ref allows_variable_arguments } => {
+      CppTypeBase::FunctionPointer { ref return_type,
+                                     ref arguments,
+                                     ref allows_variable_arguments } => {
         if *allows_variable_arguments {
           return Err(format!("Function pointers with variadic arguments are not supported"));
         }
@@ -202,22 +208,27 @@ impl CppType {
         for arg in all_types {
           match arg.base {
             CppTypeBase::TemplateParameter { .. } => {
-              return Err(format!("Function pointers containing template parameters are not supported"));
+              return Err(format!("Function pointers containing template parameters are not \
+                                  supported"));
             }
             CppTypeBase::FunctionPointer { .. } => {
-              return Err(format!("Function pointers containing nested function pointers are not supported"));
+              return Err(format!("Function pointers containing nested function pointers are not \
+                                  supported"));
             }
             _ => {}
           }
           match arg.indirection {
-            CppTypeIndirection::Ref | CppTypeIndirection::PtrRef | CppTypeIndirection::RValueRef => {
+            CppTypeIndirection::Ref |
+            CppTypeIndirection::PtrRef |
+            CppTypeIndirection::RValueRef => {
               return Err(format!("Function pointers containing references are not supported"));
             }
-            CppTypeIndirection::Ptr | CppTypeIndirection::PtrPtr => {},
+            CppTypeIndirection::Ptr | CppTypeIndirection::PtrPtr => {}
             CppTypeIndirection::None => {
               match arg.base {
                 CppTypeBase::Class { .. } => {
-                  return Err(format!("Function pointers containing classes by value are not supported"));
+                  return Err(format!("Function pointers containing classes by value are not \
+                                      supported"));
                 }
                 _ => {}
               }
