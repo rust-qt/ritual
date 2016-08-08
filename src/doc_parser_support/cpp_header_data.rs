@@ -22,7 +22,7 @@ impl CppHeaderData {
         self.methods.push(CppMethod {
           name: format!("~{}", class_name),
           scope: CppMethodScope::Class(class_name.clone()),
-          is_virtual: false, // TODO: destructors may be virtual
+          is_virtual: false,
           is_pure_virtual: false,
           is_const: false,
           is_static: false,

@@ -9,6 +9,20 @@ use std::collections::HashMap;
 extern crate core;
 use self::core::ops::AddAssign;
 
+//  if arguments.len() == 3 && arguments[1] == "check_parsers_consistency" {
+//    let headers_dir = ....;
+//    let mut parser1 = cpp_parser::CppParser::new();
+//    parser1.run();
+//    let stats = parser1.get_stats();
+//    let mut parse_result1 = parser1.get_data();
+//    let parse_result_path = PathBuf::from(arguments[2].clone());
+//    log::info("Reading parse result...");
+//    let parse_result2 = doc_parser_support::read_parse_result::do_it(&parse_result_path);
+//    qt_specific::fix_header_names(&mut parse_result1, &headers_dir);
+//    doc_parser_support::parsers_consistency_checker::check(&parse_result1, &stats, &parse_result2);
+//    return;
+//  }
+
 pub fn check(result1: &CppData, result1_stats: &CppParserStats, result2: &DocCppData) {
   log::info("Checking parsers consistency...");
   let mut missing_enum_values1: HashMap<String, Vec<String>> = HashMap::new();
