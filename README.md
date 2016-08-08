@@ -9,7 +9,7 @@ Dependencies
 - libclang-dev.
 - cmake.
 - C++ compiler and make.
-- Target library (only Qt5 is currently supported). 
+- Target library (only Qt5 is currently supported).
 
 Methodology
 -----------
@@ -33,11 +33,11 @@ Portability issues
 ------------------
 The wrapper code is platform-dependent. The main problem is notion of sizes of structs, but they only matter if Rust-owned structs are used. Platform-dependency of types is generally mitigated by libc crate. However, the C++ library itself also may be platform-dependant. For example, it can use preprocessor directives to declare different types and methods for different platforms and environments. Different versions of the same library may also have different set of methods. Lack of methods will probably be reported by the linker, but type mismatch will not, and it can cause dangerous issues at runtime.
 
-This project does not have a portability solution yet. It is theoretically possible to analyze header parsing result on all supported platforms and generate platform-independent and environment-independent code. The result would look like libc - any type or method always corresponds to the OS in use. However, it is hard to implement such analysis, and it is even harder to organize the process on all supported systems and all versions of all supported libraries. 
+This project does not have a portability solution yet. It is theoretically possible to analyze header parsing result on all supported platforms and generate platform-independent and environment-independent code. The result would look like libc - any type or method always corresponds to the OS in use. However, it is hard to implement such analysis, and it is even harder to organize the process on all supported systems and all versions of all supported libraries.
 
-So the project currently assumes that the user will use the generated wrapper only on the same system and with the same library that were used during its generation. Some library paths are hardcoded into generated source. It is possible that hardcoded paths will be removed in the future and the wrapper will be usable when moved on machines with the same arch, OS, and library version but different directory layout. Beyond that, however, there are no plans to introduce portability at the moment. 
+So the project currently assumes that the user will use the generated wrapper only on the same system and with the same library that were used during its generation. It is possible that the generated crate will be usable when moved to machines with the same arch, OS, and library version but different directory layout. Beyond that, however, there are no plans to introduce portability at the moment.
 
-Environment required to generate wrappers is somewhat heavy (see "Dependencies" section), so it may be troublesome to set it up on the target machine. Cross-compilation may be one solution to this problem, so supporting cross-compilation may become a goal in the future. 
+Environment required to generate wrappers is somewhat heavy (see "Dependencies" section), so it may be troublesome to set it up on the target machine. Cross-compilation may be one solution to this problem, so supporting cross-compilation may become a goal in the future.
 
 On the other side, requirement to perform header parsing on the target system will assure that the wrapper is correct, and any missing methods and mismatched types will be reported by the Rust compiler.
 
@@ -45,7 +45,7 @@ Library coverage
 ----------------
 The converter currently works with QtCore library only.
 
-The first priority is to support all of Qt5 libraries. However, most of its code is not Qt-dependent, so it is possible to support arbitrary libraries in the future. 
+The first priority is to support all of Qt5 libraries. However, most of its code is not Qt-dependent, so it is possible to support arbitrary libraries in the future.
 
 C++/Rust features coverage
 --------------------------
@@ -68,7 +68,7 @@ Currently implemented features:
 Not implemented yet but planned:
 
 - Create wrappers for all encountered instantiations of class templates.
-- Implement type information exchange between multiple wrapper crates to reuse type wrappers from dependancy libraries and perform inter-crate template instantiations.   
+- Implement type information exchange between multiple wrapper crates to reuse type wrappers from dependancy libraries and perform inter-crate template instantiations.
 - Support function types. Currently any methods containing function types are not wrapped.
 - Implement operator traits for structs based on C++ operator methods.
 - Implement Debug and Display traits for structs if applicable methods exist on C++ side.
