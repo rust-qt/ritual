@@ -151,7 +151,7 @@ impl RustGenerator {
           RustName::new(vec!["bool".to_string()])
         } else {
           let own_name = match *numeric {
-            CppBuiltInNumericType::Bool => "c_schar", // TODO: get real type of bool
+            CppBuiltInNumericType::Bool => unreachable!(),
             CppBuiltInNumericType::CharS => "c_char",
             CppBuiltInNumericType::CharU => "c_char",
             CppBuiltInNumericType::SChar => "c_schar",
