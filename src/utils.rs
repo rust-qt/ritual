@@ -123,18 +123,16 @@ pub fn move_one_file(old_path: &PathBuf, new_path: &PathBuf) -> io::Result<()> {
 // use self::regex::Regex;
 
 
-struct WordIterator<'a> {
+pub struct WordIterator<'a> {
   string: &'a String,
   index: usize,
-  nan_snake_hack: bool,
 }
 
 impl<'a> WordIterator<'a> {
-  fn new(string: &String, nan_snake_hack: bool) -> WordIterator {
+  pub fn new(string: &String) -> WordIterator {
     WordIterator {
       string: string,
       index: 0,
-      nan_snake_hack: nan_snake_hack,
     }
   }
 }
@@ -153,8 +151,6 @@ impl<'a> Iterator for WordIterator<'a> {
     loop {
       let ok = if i == self.string.len() {
         true
-      } else if self.nan_snake_hack && i >= 2 && &self.string[i - 2..i + 1] == "NaN" {
-        false
       } else {
         let current = &self.string[i..i + 1].chars().next().unwrap();
         current == &'_' || current.is_uppercase()
@@ -170,23 +166,61 @@ impl<'a> Iterator for WordIterator<'a> {
 }
 
 pub trait CaseOperations {
-  fn to_class_case(&self) -> Self;
-  fn to_snake_case(&self) -> Self;
+  fn to_class_case(&self) -> String;
+  fn to_snake_case(&self) -> String;
 }
+pub trait VecCaseOperations {
+  fn to_class_case(self) -> String;
+  fn to_snake_case(self) -> String;
+}
+
+
+fn iterator_to_class_case<'a, S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {
+  it.map(|x| {
+      format!("{}{}",
+              x.as_ref()[0..1].to_uppercase(),
+              x.as_ref()[1..].to_lowercase())
+    })
+    .join("")
+}
+
+fn iterator_to_snake_case<'a, S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {
+  it.map(|x| x.as_ref().to_lowercase()).join("_")
+}
+
 
 impl CaseOperations for String {
   fn to_class_case(&self) -> Self {
-    WordIterator::new(self, false)
-      .map(|x| format!("{}{}", x[0..1].to_uppercase(), x[1..].to_lowercase()))
-      .join("")
-
+    iterator_to_class_case(WordIterator::new(self))
   }
   fn to_snake_case(&self) -> Self {
-    WordIterator::new(self, true)
-      .map(|x| x.to_lowercase())
-      .join("_")
+    let mut parts: Vec<_> = WordIterator::new(self).map(|x| x.to_lowercase()).collect();
+    let mut any_found = true;
+    while any_found {
+      any_found = false;
+      for i in 0..parts.len() - 1 {
+        if parts[i] == "na" && parts[i + 1] == "n" {
+          parts.remove(i + 1);
+          parts[i] = "nan".to_string();
+          any_found = true;
+          break;
+        }
+      }
+    }
+    parts.join("_")
   }
 }
+
+impl<'a> VecCaseOperations for Vec<&'a str> {
+  fn to_class_case(self) -> String {
+    iterator_to_class_case(self.into_iter())
+  }
+  fn to_snake_case(self) -> String {
+    iterator_to_snake_case(self.into_iter())
+  }
+}
+
+
 
 #[cfg(test)]
 mod tests {

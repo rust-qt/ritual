@@ -14,21 +14,34 @@ use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKin
                 RustMethodArguments, TraitImpl, TraitName, RustMethodSelfArg};
 use cpp_method::{CppMethodScope, ReturnValueAllocationPlace};
 use cpp_ffi_function_argument::CppFfiArgumentMeaning;
-use utils::CaseOperations;
+use utils::{CaseOperations, VecCaseOperations, WordIterator};
+
+enum Case {
+  Class,
+  Snake,
+}
+fn remove_qt_prefix_and_convert_case(s: &String, case: Case) -> String {
+  let mut parts: Vec<_> = WordIterator::new(s).collect();
+  if parts.len() > 1 { // TODO: this is Qt-specific
+    if parts[0] == "Q" || parts[0] == "q" || parts[0] == "Qt" {
+      parts.remove(0);
+    }
+  }
+  let result = match case {
+    Case::Snake => parts.to_snake_case(),
+    Case::Class => parts.to_class_case(),
+  };
+  //println!("TEST: '{}' -> '{}'", s, &result);
+  result
+}
+
 
 fn include_file_to_module_name(include_file: &String) -> String {
   let mut r = include_file.clone();
   if r.ends_with(".h") {
     r = r[0..r.len() - 2].to_string();
   }
-  if r == "Qt" {
-    r = "qt".to_string();
-  } else if r.starts_with("Qt") {
-    r = r[2..].to_string();
-  } else if r.starts_with("Q") {
-    r = r[1..].to_string();
-  }
-  r.to_snake_case()
+  remove_qt_prefix_and_convert_case(&r, Case::Snake)
 }
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -269,42 +282,30 @@ impl RustGenerator {
                            name: &String,
                            include_file: &String,
                            is_function: bool) {
+
+
       let mut split_parts: Vec<_> = name.split("::").collect();
-      let last_part = split_parts.pop().unwrap().to_string();
-      let mut last_part_final = if is_function {
-        last_part.to_snake_case()
-      } else {
-        last_part.to_class_case()
-      };
+
+      let last_part = remove_qt_prefix_and_convert_case(&split_parts.pop().unwrap().to_string(),
+                                                        if is_function {
+                                                          Case::Snake
+                                                        } else {
+                                                          Case::Class
+                                                        });
 
       let mut parts = Vec::new();
       parts.push(crate_name.clone());
       parts.push(include_file_to_module_name(&include_file));
       for part in split_parts {
-        parts.push(part.to_string().to_snake_case());
+        parts.push(remove_qt_prefix_and_convert_case(&part.to_string(), Case::Snake));
       }
-
-      fn remove_qt_prefix(s: &mut String) {
-        // TODO: use WordsIterator to remove Q
-        if s.starts_with("q_") {
-          *s = s[2..].to_string();
-        } else if s.starts_with("Q") {
-          *s = s[1..].to_string();
-        }
-      }
-
-      // TODO: this is Qt-specific
-      for part in &mut parts {
-        remove_qt_prefix(part);
-      }
-      remove_qt_prefix(&mut last_part_final);
 
       // println!("test: {:?}", parts);
       if parts.len() > 2 && parts[1] == parts[2] {
         // special case
         parts.remove(2);
       }
-      parts.push(last_part_final);
+      parts.push(last_part);
 
 
       // println!("mapping added: {} -> {:?}", name, parts);
@@ -921,3 +922,5 @@ impl RustGenerator {
     self.code_generator.generate_ffi_file(&ffi_functions);
   }
 }
+
+//TODO: sort types and methods before generating code
