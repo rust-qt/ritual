@@ -251,17 +251,21 @@ fn main() {
   }
   fs::create_dir_all(&crate_new_path).unwrap();
   let rustfmt_config_path = lib_spec_dir_path.with_added("rustfmt.toml");
-  let mut rust_gen = rust_generator::RustGenerator::new(c_data,
-                                                        crate_new_path.clone(),
-                                                        lib_spec_dir_path.with_added("crate"),
-                                                        c_lib_name,
-                                                        lib_spec.cpp.name.clone(),
-                                                        if rustfmt_config_path.as_path()
-                                                                              .exists() {
-                                                          Some(rustfmt_config_path)
-                                                        } else {
-                                                          None
-                                                        });
+  let rust_config = rust_code_generator::RustCodeGeneratorConfig {
+    crate_name: lib_spec.rust.name.clone(),
+    crate_authors: lib_spec.rust.authors.clone(),
+    crate_version: lib_spec.rust.version.clone(),
+    output_path: crate_new_path.clone(),
+    template_path: lib_spec_dir_path.with_added("crate"),
+    c_lib_name: c_lib_name,
+    cpp_lib_name: lib_spec.cpp.name.clone(),
+    rustfmt_config_path: if rustfmt_config_path.as_path().exists() {
+      Some(rustfmt_config_path)
+    } else {
+      None
+    },
+  };
+  let mut rust_gen = rust_generator::RustGenerator::new(c_data, rust_config);
 
   log::info(format!("Generating Rust crate ({}).", &lib_spec.rust.name));
   rust_gen.generate_all();

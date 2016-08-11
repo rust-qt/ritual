@@ -329,6 +329,8 @@ pub struct CppLibSpec {
 #[derive(Serialize, Deserialize)]
 pub struct RustLibSpec {
   pub name: String,
+  pub version: String,
+  pub authors: Vec<String>,
 }
 
 #[derive(Debug)]

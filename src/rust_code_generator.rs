@@ -14,26 +14,27 @@ use std::panic;
 use utils::CaseOperations;
 
 extern crate rustfmt;
+extern crate toml;
+
+pub struct RustCodeGeneratorConfig {
+  pub crate_name: String,
+  pub crate_version: String,
+  pub crate_authors: Vec<String>,
+  pub output_path: PathBuf,
+  pub template_path: PathBuf,
+  pub c_lib_name: String,
+  pub cpp_lib_name: String,
+  pub rustfmt_config_path: Option<PathBuf>,
+}
 
 pub struct RustCodeGenerator {
-  crate_name: String,
-  output_path: PathBuf,
-  template_path: PathBuf,
-  c_lib_name: String,
-  cpp_lib_name: String,
-  rustfmt_config: rustfmt::config::Config,
-  rustfmt_config_path: Option<PathBuf>,
+  config: RustCodeGeneratorConfig,
+  pub rustfmt_config: rustfmt::config::Config,
 }
 
 impl RustCodeGenerator {
-  pub fn new(crate_name: String,
-             output_path: PathBuf,
-             template_path: PathBuf,
-             rustfmt_config_path: Option<PathBuf>,
-             c_lib_name: String,
-             cpp_lib_name: String)
-             -> RustCodeGenerator {
-    let rustfmt_config_data = match rustfmt_config_path {
+  pub fn new(config: RustCodeGeneratorConfig) -> RustCodeGenerator {
+    let rustfmt_config_data = match config.rustfmt_config_path {
       Some(ref path) => {
         log::info(format!("Using rustfmt config file: {:?}", path));
         let mut rustfmt_config_file = File::open(path).unwrap();
@@ -45,51 +46,73 @@ impl RustCodeGenerator {
     };
     let rustfmt_config = rustfmt::config::Config::from_toml(&rustfmt_config_data);
     RustCodeGenerator {
-      crate_name: crate_name,
-      output_path: output_path,
-      template_path: template_path,
-      c_lib_name: c_lib_name,
-      cpp_lib_name: cpp_lib_name,
+      config: config,
       rustfmt_config: rustfmt_config,
-      rustfmt_config_path: rustfmt_config_path,
     }
   }
 
   pub fn generate_template(&self) {
-    match self.rustfmt_config_path {
+    match self.config.rustfmt_config_path {
       Some(ref path) => {
-        fs::copy(path, self.output_path.with_added("rustfmt.toml")).unwrap();
+        fs::copy(path, self.config.output_path.with_added("rustfmt.toml")).unwrap();
       }
       None => {
-        let mut rustfmt_file = File::create(self.output_path.with_added("rustfmt.toml")).unwrap();
+        let mut rustfmt_file = File::create(self.config.output_path.with_added("rustfmt.toml"))
+                                 .unwrap();
         rustfmt_file.write(include_bytes!("../templates/crate/rustfmt.toml")).unwrap();
       }
     };
 
-    let mut build_rs_file = File::create(self.output_path.with_added("build.rs")).unwrap();
+    let mut build_rs_file = File::create(self.config.output_path.with_added("build.rs")).unwrap();
     build_rs_file.write(include_bytes!("../templates/crate/build.rs")).unwrap();
 
-    let mut cargo_file = File::create(self.output_path.with_added("Cargo.toml")).unwrap();
-    // TODO: use supplied version and authors
-    write!(cargo_file,
-           "[package]
-           name = \"{}\"
-           version = \"{}\"
-           authors = {}
-           build = \"build.rs\"\n\n",
-           &self.crate_name,
-           "0.0.0",
-           "[\"Riateche <ri@idzaaus.org>\"]")
-      .unwrap();
-    write!(cargo_file,
-           "[dependencies]
-           libc = \"0.2\"
-           cpp_box = {{ git = \"https://github.com/rust-qt/cpp_box.git\" }}\n\n")
-      .unwrap();
-    for item in fs::read_dir(&self.template_path).unwrap() {
+    let cargo_toml_data = toml::Value::Table({
+      let mut table = toml::Table::new();
+      table.insert("package".to_string(),
+                   toml::Value::Table({
+                     let mut table = toml::Table::new();
+                     table.insert("name".to_string(),
+                                  toml::Value::String(self.config.crate_name.clone()));
+                     table.insert("version".to_string(),
+                                  toml::Value::String(self.config.crate_version.clone()));
+                     let mut authors: Vec<_> = self.config
+                                                   .crate_authors
+                                                   .iter()
+                                                   .map(|x| toml::Value::String(x.clone()))
+                                                   .collect();
+                     authors.push(toml::Value::String("cpp_to_rust generator \
+                                                       (https://github.com/rust-qt/cpp_to_rust)"
+                                                        .to_string()));
+                     table.insert("authors".to_string(), toml::Value::Array(authors));
+                     table.insert("build".to_string(),
+                                  toml::Value::String("build.rs".to_string()));
+                     table
+                   }));
+      table.insert("dependencies".to_string(),
+                   toml::Value::Table({
+                     let mut table = toml::Table::new();
+                     table.insert("libc".to_string(), toml::Value::String("0.2".to_string()));
+                     table.insert("cpp_box".to_string(),
+                                  toml::Value::Table({
+                                    let mut table = toml::Table::new();
+                                    table.insert("git".to_string(),
+                                                 toml::Value::String("https://github.\
+                                                                      com/rust-qt/cpp_box.git"
+                                                                       .to_string()));
+                                    table
+                                  }));
+                     table
+                   }));
+      table
+    });
+    let mut cargo_toml_file = File::create(self.config.output_path.with_added("Cargo.toml"))
+                                .unwrap();
+    write!(cargo_toml_file, "{}", cargo_toml_data).unwrap();
+
+    for item in fs::read_dir(&self.config.template_path).unwrap() {
       let item = item.unwrap();
       copy_recursively(&item.path().to_path_buf(),
-                       &self.output_path.with_added(item.file_name()))
+                       &self.config.output_path.with_added(item.file_name()))
         .unwrap();
     }
   }
@@ -98,7 +121,7 @@ impl RustCodeGenerator {
     match *rust_type {
       RustType::Void => panic!("rust void can't be converted to code"),
       RustType::Common { ref base, ref is_const, ref indirection, ref generic_arguments, .. } => {
-        let mut base_s = base.full_name(Some(&self.crate_name));
+        let mut base_s = base.full_name(Some(&self.config.crate_name));
         if let &Some(ref args) = generic_arguments {
           base_s = format!("{}<{}>",
                            base_s,
@@ -377,7 +400,7 @@ impl RustCodeGenerator {
   }
 
   pub fn generate_lib_file(&self, modules: &Vec<String>) {
-    let mut lib_file_path = self.output_path.clone();
+    let mut lib_file_path = self.config.output_path.clone();
     lib_file_path.push("src");
     lib_file_path.push("lib.rs");
     {
@@ -597,7 +620,7 @@ impl RustCodeGenerator {
   }
 
   pub fn generate_module_file(&self, data: &RustModule) {
-    let mut file_path = self.output_path.clone();
+    let mut file_path = self.config.output_path.clone();
     file_path.push("src");
     file_path.push(format!("{}.rs", &data.name.last_name()));
     {
@@ -609,21 +632,21 @@ impl RustCodeGenerator {
   }
 
   pub fn generate_ffi_file(&self, functions: &HashMap<String, Vec<RustFFIFunction>>) {
-    let mut file_path = self.output_path.clone();
+    let mut file_path = self.config.output_path.clone();
     file_path.push("src");
     file_path.push("ffi.rs");
     {
       let mut file = File::create(&file_path).unwrap();
       write!(file, "use libc;\n\n").unwrap();
 
-      write!(file, "#[link(name = \"{}\")]\n", &self.cpp_lib_name).unwrap();
+      write!(file, "#[link(name = \"{}\")]\n", &self.config.cpp_lib_name).unwrap();
       //      write!(file, "#[link(name = \"icui18n\")]\n").unwrap();
       //      write!(file, "#[link(name = \"icuuc\")]\n").unwrap();
       //      write!(file, "#[link(name = \"icudata\")]\n").unwrap();
       write!(file, "#[link(name = \"stdc++\")]\n").unwrap();
       write!(file,
              "#[link(name = \"{}\", kind = \"static\")]\n",
-             &self.c_lib_name)
+             &self.config.c_lib_name)
         .unwrap();
       write!(file, "extern \"C\" {{\n").unwrap();
 

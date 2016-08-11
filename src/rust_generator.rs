@@ -6,10 +6,9 @@ use cpp_ffi_type::{CppFfiType, IndirectionChange};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
 use cpp_data::{CppTypeKind, EnumValue, CppTypeData};
-use std::path::PathBuf;
 use std::collections::{HashMap, HashSet};
 use log;
-use rust_code_generator::RustCodeGenerator;
+use rust_code_generator::{RustCodeGenerator, RustCodeGeneratorConfig};
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
                 RustMethodArguments, TraitImpl, TraitName, RustMethodSelfArg};
@@ -47,6 +46,8 @@ fn sanitize_rust_var_name(name: &String) -> String {
   }
 }
 
+
+
 pub struct RustGenerator {
   input_data: CppAndFfiData,
   modules: Vec<RustModule>,
@@ -56,25 +57,13 @@ pub struct RustGenerator {
 }
 
 impl RustGenerator {
-  pub fn new(input_data: CppAndFfiData,
-             output_path: PathBuf,
-             template_path: PathBuf,
-             c_lib_name: String,
-             cpp_lib_name: String,
-             rustfmt_config_path: Option<PathBuf>)
-             -> Self {
-    let crate_name = "qt_core".to_string();
+  pub fn new(input_data: CppAndFfiData, config: RustCodeGeneratorConfig) -> Self {
     RustGenerator {
       input_data: input_data,
       modules: Vec::new(),
-      crate_name: crate_name.clone(),
+      crate_name: config.crate_name.clone(),
       cpp_to_rust_type_map: HashMap::new(),
-      code_generator: RustCodeGenerator::new(crate_name,
-                                             output_path,
-                                             template_path,
-                                             rustfmt_config_path,
-                                             c_lib_name,
-                                             cpp_lib_name),
+      code_generator: RustCodeGenerator::new(config),
     }
   }
 
