@@ -409,14 +409,22 @@ impl RustCodeGenerator {
       write!(lib_file, "pub extern crate libc;\n").unwrap();
       write!(lib_file, "pub extern crate cpp_box;\n\n").unwrap();
 
-      // TODO: get list of modules copied from template
-      let built_in_modules = vec!["flags", "ffi"];
-      for module in built_in_modules {
+      let mut extra_modules = vec!["ffi".to_string()];
+      for item in fs::read_dir(&self.config.template_path.with_added("src")).unwrap() {
+        let item = item.unwrap();
+        if item.path().is_dir() {
+          extra_modules.push(item.file_name().into_string().unwrap());
+        } else if item.path().extension().is_some() && item.path().extension().unwrap() == "rs" {
+          extra_modules.push(item.path().file_stem().unwrap().to_str().unwrap().to_string());
+        }
+      }
+
+      for module in extra_modules {
         if modules.iter().find(|x| x.as_ref() as &str == module).is_some() {
           panic!("module name conflict");
         }
         if module == "ffi" {
-          // TODO: remove allow directive
+          // TODO: remove allow directive for ffi?
           // TODO: ffi should be a private mod
           write!(lib_file, "#[allow(dead_code)]\n").unwrap();
         }
