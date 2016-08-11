@@ -160,10 +160,6 @@ impl CppMethod {
     if self.kind == CppMethodKind::Destructor {
       allocation_place_importance = AllocationPlaceImportance::Important;
     }
-    if &self.name == "registerNormalizedType" {
-      println!("TEST1: {:?}", self);
-      println!("TEST2: {:?}", r);
-    }
     Ok((r, allocation_place_importance))
   }
 

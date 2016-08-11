@@ -779,12 +779,6 @@ impl CppParser {
     };
     if name.starts_with("operator") {
       let name_suffix = name["operator".len()..].trim();
-      if name_suffix == "delete" {
-        println!("TEST {} {}",
-                 allows_variable_arguments,
-                 real_arguments_count);
-        dump_entity(&entity, 0);
-      }
       let mut name_matches = false;
       for operator in CppOperator::all() {
         let info = operator.info();

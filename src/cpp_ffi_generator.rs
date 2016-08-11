@@ -149,24 +149,15 @@ impl CGenerator {
     let own_pure_virtual_methods: Vec<_> = own_methods.iter()
                                                       .filter(|m| m.is_pure_virtual)
                                                       .collect();
-    if class_name == "QStringListModel" {
-      println!("OWN: {:?}", own_methods);
-    }
     let mut inherited_methods = Vec::new();
     if let Some(type_info) = self.cpp_data.types.iter().find(|t| &t.name == class_name) {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
         for base in bases {
           if let CppTypeBase::Class { ref name, .. } = base.base {
             for method in self.get_pure_virtual_methods(name) {
-              if class_name == "QStringListModel" {
-                println!("INHERITED: {:?}", method);
-              }
               if own_methods.iter()
                             .find(|m| m.name == method.name && m.argument_types_equal(&method))
                             .is_none() {
-                if class_name == "QStringListModel" {
-                  println!("not overriden!");
-                }
                 inherited_methods.push(method.clone());
               }
             }
