@@ -61,7 +61,7 @@ impl RustGenerator {
              template_path: PathBuf,
              c_lib_name: String,
              cpp_lib_name: String,
-             c_lib_path: PathBuf)
+             rustfmt_config_path: Option<PathBuf>)
              -> Self {
     let crate_name = "qt_core".to_string();
     RustGenerator {
@@ -72,6 +72,7 @@ impl RustGenerator {
       code_generator: RustCodeGenerator::new(crate_name,
                                              output_path,
                                              template_path,
+                                             rustfmt_config_path,
                                              c_lib_name,
                                              cpp_lib_name),
     }
@@ -841,13 +842,8 @@ impl RustGenerator {
             assert!(method.name == first_method.name);
             assert!(method.scope == first_method.scope);
             assert!(method.return_type == first_method.return_type);
-            let dbg_method = method.clone();
             if let RustMethodArguments::SingleVariant(mut args) = method.arguments {
               if let Some(ref self_argument) = self_argument {
-                if !(args.arguments.len() > 0 && &args.arguments[0] == self_argument) {
-                  println!("FAIL! TEST1: {:?}", &first_method);
-                  println!("TEST2: {:?}", &dbg_method);
-                }
                 assert!(args.arguments.len() > 0 && &args.arguments[0] == self_argument);
                 args.arguments.remove(0);
               }

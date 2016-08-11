@@ -151,10 +151,10 @@ fn main() {
   log::info(format!("QT_INSTALL_HEADERS = \"{}\"",
                     qt_install_headers_path.to_str().unwrap()));
   let qt_install_libs_path = PathBuf::from(run_command(Command::new(&qmake_path)
-                                                           .arg("-query")
-                                                           .arg("QT_INSTALL_LIBS"),
+                                                         .arg("-query")
+                                                         .arg("QT_INSTALL_LIBS"),
                                                        true)
-                                               .trim());
+                                             .trim());
   log::info(format!("QT_INSTALL_LIBS = \"{}\"",
                     qt_install_libs_path.to_str().unwrap()));
   let qt_core_headers_path = {
@@ -227,7 +227,8 @@ fn main() {
                 .arg(&c_lib_path)
                 .arg(format!("-DCMAKE_INSTALL_PREFIX={}",
                              c_lib_install_path.to_str().unwrap()))
-                .current_dir(&c_lib_build_path), false);
+                .current_dir(&c_lib_build_path),
+              false);
 
   let make_command = match local_overrides.make_command {
     Some(cmd) => cmd,
@@ -240,7 +241,8 @@ fn main() {
   make_args.push("install".to_string());
   run_command(Command::new(make_command)
                 .args(&make_args)
-                .current_dir(&c_lib_build_path), false);
+                .current_dir(&c_lib_build_path),
+              false);
 
 
   let crate_new_path = output_dir_path.with_added(format!("{}.new", &lib_spec.rust.name));
@@ -248,12 +250,18 @@ fn main() {
     fs::remove_dir_all(&crate_new_path).unwrap();
   }
   fs::create_dir_all(&crate_new_path).unwrap();
+  let rustfmt_config_path = lib_spec_dir_path.with_added("rustfmt.toml");
   let mut rust_gen = rust_generator::RustGenerator::new(c_data,
                                                         crate_new_path.clone(),
                                                         lib_spec_dir_path.with_added("crate"),
                                                         c_lib_name,
                                                         lib_spec.cpp.name.clone(),
-                                                        c_lib_install_path.with_added("lib"));
+                                                        if rustfmt_config_path.as_path()
+                                                                              .exists() {
+                                                          Some(rustfmt_config_path)
+                                                        } else {
+                                                          None
+                                                        });
 
   log::info(format!("Generating Rust crate ({}).", &lib_spec.rust.name));
   rust_gen.generate_all();
@@ -265,7 +273,8 @@ fn main() {
                   .arg(cargo_cmd)
                   .current_dir(&crate_path)
                   .env("LIBRARY_PATH", qt_install_libs_path.to_str().unwrap())
-                  .env("LD_LIBRARY_PATH", qt_install_libs_path.to_str().unwrap()), false);
+                  .env("LD_LIBRARY_PATH", qt_install_libs_path.to_str().unwrap()),
+                false);
   }
   log::info("Completed successfully.");
 }

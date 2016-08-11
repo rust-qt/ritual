@@ -37,7 +37,10 @@ impl PathBufPushTweak for PathBuf {
   }
 }
 
-pub fn move_files(src: &PathBuf, dst: &PathBuf, no_delete_exception: Option<String>) -> io::Result<()> {
+pub fn move_files(src: &PathBuf,
+                  dst: &PathBuf,
+                  no_delete_exception: Option<String>)
+                  -> io::Result<()> {
   if src.as_path().is_dir() {
     if !dst.as_path().is_dir() {
       log::info(format!("New dir created: {}", dst.to_str().unwrap()));
@@ -49,7 +52,8 @@ pub fn move_files(src: &PathBuf, dst: &PathBuf, no_delete_exception: Option<Stri
       if !src.with_added(item.file_name()).as_path().exists() {
         let path = item.path();
         if no_delete_exception == Some(item.file_name().into_string().unwrap()) {
-          log::info(format!("Old item preserved (exceptional): {}", path.to_str().unwrap()));
+          log::info(format!("Old item preserved (exceptional): {}",
+                            path.to_str().unwrap()));
         } else {
           if path.as_path().is_dir() {
             log::info(format!("Old dir removed: {}", path.to_str().unwrap()));

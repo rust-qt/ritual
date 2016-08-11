@@ -2,7 +2,7 @@ use rust_type::{RustType, RustTypeIndirection, RustFFIFunction, RustToCTypeConve
 use std::path::PathBuf;
 use std::fs;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Write};
 use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
                 RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope,
                 RustMethodArgument, TraitName};
@@ -22,23 +22,27 @@ pub struct RustCodeGenerator {
   c_lib_name: String,
   cpp_lib_name: String,
   rustfmt_config: rustfmt::config::Config,
+  rustfmt_config_path: Option<PathBuf>,
 }
 
 impl RustCodeGenerator {
   pub fn new(crate_name: String,
              output_path: PathBuf,
              template_path: PathBuf,
+             rustfmt_config_path: Option<PathBuf>,
              c_lib_name: String,
              cpp_lib_name: String)
              -> RustCodeGenerator {
-    // TODO: allow overriding rustfmt.toml file
-    // let rustfmt_config_path = output_path.with_added("rustfmt.toml");
-    // log::info(format!("Using rustfmt config file: {:?}", rustfmt_config_path));
-    // let mut rustfmt_config_file = File::open(rustfmt_config_path).unwrap();
-    // let mut rustfmt_config_toml = String::new();
-    // rustfmt_config_file.read_to_string(&mut rustfmt_config_toml).unwrap();
-
-    let rustfmt_config_data = include_str!("../templates/crate/rustfmt.toml");
+    let rustfmt_config_data = match rustfmt_config_path {
+      Some(ref path) => {
+        log::info(format!("Using rustfmt config file: {:?}", path));
+        let mut rustfmt_config_file = File::open(path).unwrap();
+        let mut rustfmt_config_toml = String::new();
+        rustfmt_config_file.read_to_string(&mut rustfmt_config_toml).unwrap();
+        rustfmt_config_toml
+      }
+      None => include_str!("../templates/crate/rustfmt.toml").to_string(),
+    };
     let rustfmt_config = rustfmt::config::Config::from_toml(&rustfmt_config_data);
     RustCodeGenerator {
       crate_name: crate_name,
@@ -47,12 +51,20 @@ impl RustCodeGenerator {
       c_lib_name: c_lib_name,
       cpp_lib_name: cpp_lib_name,
       rustfmt_config: rustfmt_config,
+      rustfmt_config_path: rustfmt_config_path,
     }
   }
 
   pub fn generate_template(&self) {
-    let mut rustfmt_file = File::create(self.output_path.with_added("rustfmt.toml")).unwrap();
-    rustfmt_file.write(include_bytes!("../templates/crate/rustfmt.toml")).unwrap();
+    match self.rustfmt_config_path {
+      Some(ref path) => {
+        fs::copy(path, self.output_path.with_added("rustfmt.toml")).unwrap();
+      }
+      None => {
+        let mut rustfmt_file = File::create(self.output_path.with_added("rustfmt.toml")).unwrap();
+        rustfmt_file.write(include_bytes!("../templates/crate/rustfmt.toml")).unwrap();
+      }
+    };
 
     let mut build_rs_file = File::create(self.output_path.with_added("build.rs")).unwrap();
     build_rs_file.write(include_bytes!("../templates/crate/build.rs")).unwrap();
@@ -74,7 +86,6 @@ impl RustCodeGenerator {
            libc = \"0.2\"
            cpp_box = {{ git = \"https://github.com/rust-qt/cpp_box.git\" }}\n\n")
       .unwrap();
-    println!("template_path = {:?}", self.template_path);
     for item in fs::read_dir(&self.template_path).unwrap() {
       let item = item.unwrap();
       copy_recursively(&item.path().to_path_buf(),
