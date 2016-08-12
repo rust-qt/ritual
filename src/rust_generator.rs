@@ -455,8 +455,8 @@ impl RustGenerator {
   pub fn generate_modules_from_header(&mut self, c_header: &CppFfiHeaderData) {
     let module_name = include_file_to_module_name(&c_header.include_file,
                                                   self.code_generator.config().remove_qt_prefix);
-    if module_name == "flags" && self.crate_name == "qt_core" {
-      log::info(format!("Skipping module {}::{}", self.crate_name, module_name));
+    if self.code_generator.config().module_blacklist.iter().find(|&x| x ==  &module_name).is_some() {
+      log::info(format!("Skipping module {}", module_name));
       return;
     }
     let module_name1 = RustName::new(vec![self.crate_name.clone(), module_name]);

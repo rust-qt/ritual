@@ -46,6 +46,7 @@ pub struct CppParser {
   include_dirs: Vec<PathBuf>,
   header_name: String,
   tmp_dir: PathBuf,
+  name_blacklist: Vec<String>,
   entity_kinds: HashSet<EntityKind>,
   data: CppData,
   stats: CppParserStats,
@@ -118,6 +119,8 @@ fn get_full_name(entity: Entity) -> Result<String, String> {
         } else {
           break;
         }
+      } else {
+        break;
       }
     }
     Ok(s)
@@ -127,11 +130,16 @@ fn get_full_name(entity: Entity) -> Result<String, String> {
 }
 
 impl CppParser {
-  pub fn new(include_dirs: Vec<PathBuf>, header_name: String, tmp_dir: PathBuf) -> Self {
+  pub fn new(include_dirs: Vec<PathBuf>,
+             header_name: String,
+             tmp_dir: PathBuf,
+             name_blacklist: Vec<String>)
+             -> Self {
     CppParser {
       include_dirs: include_dirs,
       header_name: header_name,
       tmp_dir: tmp_dir,
+      name_blacklist: name_blacklist,
       entity_kinds: HashSet::new(),
       data: CppData {
         methods: Vec::new(),
@@ -977,8 +985,9 @@ impl CppParser {
       }
     }
     self.entity_kinds.insert(entity.get_kind());
-    if entity.get_kind() == EntityKind::Namespace {
-      if entity.get_name().unwrap() == "QtPrivate" {
+    if let Ok(full_name) = get_full_name(entity) {
+      if self.name_blacklist.iter().find(|&x| x == &full_name).is_some() {
+        log::info(format!("Skipping blacklisted entity: {}", full_name));
         return;
       }
     }
@@ -1119,6 +1128,7 @@ impl CppParser {
         log::warning(format!("{}", diag));
       }
     }
+    log::info("Processing entities...");
     self.process_entity(translation_unit, &Stage::ParseTypes);
     self.process_entity(translation_unit, &Stage::ParseMethods);
 

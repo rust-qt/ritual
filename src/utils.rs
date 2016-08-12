@@ -39,7 +39,7 @@ impl PathBufPushTweak for PathBuf {
 
 pub fn move_files(src: &PathBuf,
                   dst: &PathBuf,
-                  no_delete_exception: Option<String>)
+                  no_delete_exception: Vec<String>)
                   -> io::Result<()> {
   if src.as_path().is_dir() {
     if !dst.as_path().is_dir() {
@@ -51,7 +51,9 @@ pub fn move_files(src: &PathBuf,
       let item = try!(item);
       if !src.with_added(item.file_name()).as_path().exists() {
         let path = item.path();
-        if no_delete_exception == Some(item.file_name().into_string().unwrap()) {
+        if no_delete_exception.iter()
+                              .find(|&x| x == &item.file_name().into_string().unwrap())
+                              .is_some() {
           log::info(format!("Old item preserved (exceptional): {}",
                             path.to_str().unwrap()));
         } else {
@@ -70,7 +72,7 @@ pub fn move_files(src: &PathBuf,
       let item = try!(item);
       try!(move_files(&item.path().to_path_buf(),
                       &dst.with_added(item.file_name()),
-                      None));
+                      Vec::new()));
     }
     try!(fs::remove_dir_all(src));
   } else {

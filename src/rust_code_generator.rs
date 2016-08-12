@@ -26,6 +26,7 @@ pub struct RustCodeGeneratorConfig {
   pub cpp_lib_name: String,
   pub rustfmt_config_path: Option<PathBuf>,
   pub remove_qt_prefix: bool,
+  pub module_blacklist: Vec<String>,
 }
 
 pub struct RustCodeGenerator {

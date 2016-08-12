@@ -137,32 +137,44 @@ fn main() {
                       local_overrides_path.to_str().unwrap()));
     r
   };
-  let qmake_path = match local_overrides.qmake_path {
-    Some(path) => path.clone(),
-    None => "qmake".to_string(),
-  };
-  log::info(format!("Using qmake path: {}", qmake_path));
-  log::info("Detecting Qt directories...");
-  let qt_install_headers_path = PathBuf::from(run_command(Command::new(&qmake_path)
-                                                            .arg("-query")
-                                                            .arg("QT_INSTALL_HEADERS"),
-                                                          true)
-                                                .trim());
-  log::info(format!("QT_INSTALL_HEADERS = \"{}\"",
-                    qt_install_headers_path.to_str().unwrap()));
-  let qt_install_libs_path = PathBuf::from(run_command(Command::new(&qmake_path)
-                                                         .arg("-query")
-                                                         .arg("QT_INSTALL_LIBS"),
-                                                       true)
-                                             .trim());
-  log::info(format!("QT_INSTALL_LIBS = \"{}\"",
-                    qt_install_libs_path.to_str().unwrap()));
-  let qt_core_headers_path = {
-    let mut p = qt_install_headers_path.clone();
-    p.push("QtCore");
-    p
-  };
-  let include_dirs = vec![qt_install_headers_path.clone(), qt_core_headers_path.clone()];
+
+  let is_qt_library = lib_spec.cpp.name.starts_with("Qt5");
+
+  let mut include_dirs = Vec::new();
+  let mut cpp_lib_path = None;
+  let mut qt_this_lib_headers_dir = None;
+  if is_qt_library {
+
+    let qmake_path = match local_overrides.qmake_path {
+      Some(path) => path.clone(),
+      None => "qmake".to_string(),
+    };
+    log::info(format!("Using qmake path: {}", qmake_path));
+    log::info("Detecting Qt directories...");
+    let qt_install_headers_path = PathBuf::from(run_command(Command::new(&qmake_path)
+                                                              .arg("-query")
+                                                              .arg("QT_INSTALL_HEADERS"),
+                                                            true)
+                                                  .trim());
+    log::info(format!("QT_INSTALL_HEADERS = \"{}\"",
+                      qt_install_headers_path.to_str().unwrap()));
+    let qt_install_libs_path = PathBuf::from(run_command(Command::new(&qmake_path)
+                                                           .arg("-query")
+                                                           .arg("QT_INSTALL_LIBS"),
+                                                         true)
+                                               .trim());
+    log::info(format!("QT_INSTALL_LIBS = \"{}\"",
+                      qt_install_libs_path.to_str().unwrap()));
+    cpp_lib_path = Some(qt_install_libs_path);
+    include_dirs.push(qt_install_headers_path.clone());
+    if &lib_spec.cpp.name == "Qt5Core" {
+      let dir = qt_install_headers_path.with_added("QtCore");
+      qt_this_lib_headers_dir = Some(dir.clone());
+      include_dirs.push(dir);
+    } else {
+      log::warning("This library is not supported yet.");
+    }
+  }
 
   let parse_result_cache_file_path = {
     let mut p = output_dir_path.clone();
@@ -170,15 +182,16 @@ fn main() {
     p
   };
   let mut parse_result = if parse_result_cache_file_path.as_path().is_file() {
-    log::info(format!("Cpp data is loaded from file: {}",
+    log::info(format!("C++ data is loaded from file: {}",
                       parse_result_cache_file_path.to_str().unwrap()));
     let file = File::open(&parse_result_cache_file_path).unwrap();
     serde_json::from_reader(file).unwrap()
   } else {
-    log::info("Parsing Qt headers.");
+    log::info("Parsing C++ headers.");
     let mut parser = cpp_parser::CppParser::new(include_dirs.clone(),
                                                 lib_spec.cpp.include_file.clone(),
-                                                output_dir_path.clone());
+                                                output_dir_path.clone(),
+                                                lib_spec.cpp.name_blacklist.clone());
     parser.run();
     let parse_result = parser.get_data();
 
@@ -191,7 +204,9 @@ fn main() {
     parse_result
   };
   log::info("Post-processing parse result.");
-  qt_specific::fix_header_names(&mut parse_result, &qt_core_headers_path);
+  if is_qt_library {
+    qt_specific::fix_header_names(&mut parse_result, &qt_this_lib_headers_dir.unwrap());
+  }
   parse_result.post_process();
 
   let crate_path = output_dir_path.with_added(&lib_spec.rust.name);
@@ -215,7 +230,7 @@ fn main() {
                                                  c_lib_name.clone(),
                                                  c_lib_tmp_path.clone());
   let c_data = c_gen.generate_all();
-  utils::move_files(&c_lib_tmp_path, &c_lib_path, None).unwrap();
+  utils::move_files(&c_lib_tmp_path, &c_lib_path, Vec::new()).unwrap();
 
   log::info(format!("Building C wrapper library."));
   let c_lib_build_path = c_lib_parent_path.with_added("build");
@@ -264,22 +279,28 @@ fn main() {
     } else {
       None
     },
-    remove_qt_prefix: lib_spec.cpp.name.starts_with("Qt5"),
+    remove_qt_prefix: is_qt_library,
+    module_blacklist: lib_spec.rust.module_blacklist
   };
   let mut rust_gen = rust_generator::RustGenerator::new(c_data, rust_config);
 
   log::info(format!("Generating Rust crate ({}).", &lib_spec.rust.name));
   rust_gen.generate_all();
-  utils::move_files(&crate_new_path, &crate_path, Some("c_lib".to_string())).unwrap();
+  utils::move_files(&crate_new_path,
+                    &crate_path,
+                    vec!["c_lib".to_string(), "target".to_string()])
+    .unwrap();
 
   log::info(format!("Compiling Rust crate."));
   for cargo_cmd in vec!["test", "doc"] {
-    run_command(Command::new("cargo")
-                  .arg(cargo_cmd)
-                  .current_dir(&crate_path)
-                  .env("LIBRARY_PATH", qt_install_libs_path.to_str().unwrap())
-                  .env("LD_LIBRARY_PATH", qt_install_libs_path.to_str().unwrap()),
-                false);
+    let mut command = Command::new("cargo");
+    command.arg(cargo_cmd)
+           .current_dir(&crate_path);
+    if let Some(ref cpp_lib_path) = cpp_lib_path {
+      command.env("LIBRARY_PATH", cpp_lib_path.to_str().unwrap())
+             .env("LD_LIBRARY_PATH", cpp_lib_path.to_str().unwrap());
+    }
+    run_command(&mut command, false);
   }
   log::info("Completed successfully.");
 }

@@ -323,6 +323,7 @@ pub struct CppType {
 pub struct CppLibSpec {
   pub name: String,
   pub include_file: String,
+  pub name_blacklist: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -331,6 +332,7 @@ pub struct RustLibSpec {
   pub name: String,
   pub version: String,
   pub authors: Vec<String>,
+  pub module_blacklist: Vec<String>,
 }
 
 #[derive(Debug)]
