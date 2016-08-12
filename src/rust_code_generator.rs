@@ -25,6 +25,7 @@ pub struct RustCodeGeneratorConfig {
   pub c_lib_name: String,
   pub cpp_lib_name: String,
   pub rustfmt_config_path: Option<PathBuf>,
+  pub remove_qt_prefix: bool,
 }
 
 pub struct RustCodeGenerator {
@@ -49,6 +50,10 @@ impl RustCodeGenerator {
       config: config,
       rustfmt_config: rustfmt_config,
     }
+  }
+
+  pub fn config(&self) -> &RustCodeGeneratorConfig {
+    &self.config
   }
 
   pub fn generate_template(&self) {

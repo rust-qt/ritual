@@ -20,9 +20,9 @@ enum Case {
   Class,
   Snake,
 }
-fn remove_qt_prefix_and_convert_case(s: &String, case: Case) -> String {
+fn remove_qt_prefix_and_convert_case(s: &String, case: Case, remove_qt_prefix: bool) -> String {
   let mut parts: Vec<_> = WordIterator::new(s).collect();
-  if parts.len() > 1 { // TODO: this is Qt-specific
+  if remove_qt_prefix && parts.len() > 1 {
     if parts[0] == "Q" || parts[0] == "q" || parts[0] == "Qt" {
       parts.remove(0);
     }
@@ -31,17 +31,17 @@ fn remove_qt_prefix_and_convert_case(s: &String, case: Case) -> String {
     Case::Snake => parts.to_snake_case(),
     Case::Class => parts.to_class_case(),
   };
-  //println!("TEST: '{}' -> '{}'", s, &result);
+  // println!("TEST: '{}' -> '{}'", s, &result);
   result
 }
 
 
-fn include_file_to_module_name(include_file: &String) -> String {
+fn include_file_to_module_name(include_file: &String, remove_qt_prefix: bool) -> String {
   let mut r = include_file.clone();
   if r.ends_with(".h") {
     r = r[0..r.len() - 2].to_string();
   }
-  remove_qt_prefix_and_convert_case(&r, Case::Snake)
+  remove_qt_prefix_and_convert_case(&r, Case::Snake, remove_qt_prefix)
 }
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -276,12 +276,12 @@ impl RustGenerator {
 
 
   fn generate_type_map(&mut self) {
-
     fn add_one_to_type_map(crate_name: &String,
                            map: &mut HashMap<String, RustName>,
                            name: &String,
                            include_file: &String,
-                           is_function: bool) {
+                           is_function: bool,
+                           remove_qt_prefix: bool) {
 
 
       let mut split_parts: Vec<_> = name.split("::").collect();
@@ -291,26 +291,27 @@ impl RustGenerator {
                                                           Case::Snake
                                                         } else {
                                                           Case::Class
-                                                        });
+                                                        },
+                                                        remove_qt_prefix);
 
       let mut parts = Vec::new();
       parts.push(crate_name.clone());
-      parts.push(include_file_to_module_name(&include_file));
+      parts.push(include_file_to_module_name(&include_file, remove_qt_prefix));
       for part in split_parts {
-        parts.push(remove_qt_prefix_and_convert_case(&part.to_string(), Case::Snake));
+        parts.push(remove_qt_prefix_and_convert_case(&part.to_string(),
+                                                     Case::Snake,
+                                                     remove_qt_prefix));
       }
 
-      // println!("test: {:?}", parts);
       if parts.len() > 2 && parts[1] == parts[2] {
         // special case
         parts.remove(2);
       }
       parts.push(last_part);
 
-
-      // println!("mapping added: {} -> {:?}", name, parts);
       map.insert(name.clone(), RustName::new(parts));
     }
+    let remove_qt_prefix = self.code_generator.config().remove_qt_prefix;
     for type_info in &self.input_data.cpp_data.types {
       if let CppTypeKind::Class { size, .. } = type_info.kind {
         if size.is_none() {
@@ -325,7 +326,8 @@ impl RustGenerator {
                           &mut self.cpp_to_rust_type_map,
                           &type_info.name,
                           &type_info.include_file,
-                          false);
+                          false,
+                          remove_qt_prefix);
     }
     for header in &self.input_data.cpp_ffi_headers {
       for method in &header.methods {
@@ -334,7 +336,8 @@ impl RustGenerator {
                               &mut self.cpp_to_rust_type_map,
                               &method.cpp_method.name,
                               &header.include_file,
-                              true);
+                              true,
+                              remove_qt_prefix);
         }
       }
     }
@@ -450,7 +453,8 @@ impl RustGenerator {
   }
 
   pub fn generate_modules_from_header(&mut self, c_header: &CppFfiHeaderData) {
-    let module_name = include_file_to_module_name(&c_header.include_file);
+    let module_name = include_file_to_module_name(&c_header.include_file,
+                                                  self.code_generator.config().remove_qt_prefix);
     if module_name == "flags" && self.crate_name == "qt_core" {
       log::info(format!("Skipping module {}::{}", self.crate_name, module_name));
       return;
@@ -923,4 +927,4 @@ impl RustGenerator {
   }
 }
 
-//TODO: sort types and methods before generating code
+// TODO: sort types and methods before generating code

@@ -264,6 +264,7 @@ fn main() {
     } else {
       None
     },
+    remove_qt_prefix: lib_spec.cpp.name.starts_with("Qt5"),
   };
   let mut rust_gen = rust_generator::RustGenerator::new(c_data, rust_config);
 
