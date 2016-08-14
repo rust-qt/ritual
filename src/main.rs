@@ -19,7 +19,6 @@ mod rust_info;
 mod rust_type;
 mod utils;
 mod cpp_parser;
-mod tweaked_file;
 mod serializable;
 
 use std::fs;

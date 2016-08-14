@@ -1,4 +1,4 @@
-use cpp_type::{CppType, CppTypeIndirection};
+use cpp_type::{CppType, CppTypeIndirection, CppTypeRole};
 use cpp_ffi_type::{CppFfiType, IndirectionChange};
 use cpp_ffi_function_signature::CppFfiFunctionSignature;
 use cpp_ffi_function_argument::{CppFfiFunctionArgument, CppFfiArgumentMeaning};
@@ -101,14 +101,14 @@ impl CppMethod {
                            is_const: self.is_const,
                            indirection: CppTypeIndirection::Ptr,
                          }
-                         .to_cpp_ffi_type(false)
+                         .to_cpp_ffi_type(CppTypeRole::NotReturnType)
                          .unwrap(),
           meaning: CppFfiArgumentMeaning::This,
         });
       }
     }
     for (index, arg) in self.arguments.iter().enumerate() {
-      match arg.argument_type.to_cpp_ffi_type(false) {
+      match arg.argument_type.to_cpp_ffi_type(CppTypeRole::NotReturnType) {
         Ok(c_type) => {
           r.arguments.push(CppFfiFunctionArgument {
             name: arg.name.clone(),
@@ -131,11 +131,11 @@ impl CppMethod {
       self.return_type.clone()
     };
     if let Some(return_type) = real_return_type {
-      match return_type.to_cpp_ffi_type(true) {
+      match return_type.to_cpp_ffi_type(CppTypeRole::ReturnType) {
         Ok(c_type) => {
           let is_stack_allocated_struct = return_type.indirection == CppTypeIndirection::None &&
                                           return_type.base.is_class() &&
-                                          c_type.conversion.indirection_change !=
+                                          c_type.conversion !=
                                           IndirectionChange::QFlagsToUInt;
           if is_stack_allocated_struct {
             allocation_place_importance = AllocationPlaceImportance::Important;

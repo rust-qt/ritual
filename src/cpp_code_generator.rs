@@ -56,7 +56,7 @@ impl CppCodeGenerator {
   /// convert it to return type of the FFI method.
   fn convert_return_type(&self, method: &CppAndFfiMethod, expression: String) -> String {
     let mut result = expression;
-    match method.c_signature.return_type.conversion.indirection_change {
+    match method.c_signature.return_type.conversion {
       IndirectionChange::NoChange => {}
       IndirectionChange::ValueToPointer => {
         match method.allocation_place {
@@ -119,8 +119,7 @@ impl CppCodeGenerator {
                                       }) {
         let mut result = c_argument.name.clone();
         match c_argument.argument_type
-                        .conversion
-                        .indirection_change {
+                        .conversion {
           IndirectionChange::ValueToPointer |
           IndirectionChange::ReferenceToPointer => result = format!("*{}", result),
           IndirectionChange::NoChange => {}

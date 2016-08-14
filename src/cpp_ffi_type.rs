@@ -9,15 +9,10 @@ pub enum IndirectionChange {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CppToFfiTypeConversion {
-  pub indirection_change: IndirectionChange,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppFfiType {
   pub original_type: CppType,
   pub ffi_type: CppType,
-  pub conversion: CppToFfiTypeConversion,
+  pub conversion: IndirectionChange,
 }
 
 impl CppFfiType {
@@ -25,7 +20,7 @@ impl CppFfiType {
     CppFfiType {
       original_type: CppType::void(),
       ffi_type: CppType::void(),
-      conversion: CppToFfiTypeConversion { indirection_change: IndirectionChange::NoChange },
+      conversion: IndirectionChange::NoChange,
     }
   }
 }

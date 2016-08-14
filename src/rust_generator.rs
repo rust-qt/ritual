@@ -88,7 +88,7 @@ impl RustGenerator {
     let mut rust_api_type = rust_ffi_type.clone();
     let mut rust_api_to_c_conversion = RustToCTypeConversion::None;
     if let RustType::Common { ref mut indirection, .. } = rust_api_type {
-      match cpp_ffi_type.conversion.indirection_change {
+      match cpp_ffi_type.conversion {
         IndirectionChange::NoChange => {
           if argument_meaning == &CppFfiArgumentMeaning::This {
             assert!(indirection == &RustTypeIndirection::Ptr);
@@ -109,7 +109,7 @@ impl RustGenerator {
         IndirectionChange::QFlagsToUInt => {}
       }
     }
-    if cpp_ffi_type.conversion.indirection_change == IndirectionChange::QFlagsToUInt {
+    if cpp_ffi_type.conversion == IndirectionChange::QFlagsToUInt {
       rust_api_to_c_conversion = RustToCTypeConversion::QFlagsToUInt;
       let enum_type = if let CppTypeBase::Class { ref template_arguments, .. } =
                              cpp_ffi_type.original_type.base {
@@ -455,7 +455,7 @@ impl RustGenerator {
   pub fn generate_modules_from_header(&mut self, c_header: &CppFfiHeaderData) {
     let module_name = include_file_to_module_name(&c_header.include_file,
                                                   self.code_generator.config().remove_qt_prefix);
-    if self.code_generator.config().module_blacklist.iter().find(|&x| x ==  &module_name).is_some() {
+    if self.code_generator.config().module_blacklist.iter().find(|&x| x == &module_name).is_some() {
       log::info(format!("Skipping module {}", module_name));
       return;
     }
@@ -594,8 +594,7 @@ impl RustGenerator {
               panic!("unexpected void type");
             }
             assert!(r.cpp_type.indirection == CppTypeIndirection::None);
-            assert!(r.cpp_to_ffi_conversion.indirection_change ==
-                    IndirectionChange::ValueToPointer);
+            assert!(r.cpp_to_ffi_conversion == IndirectionChange::ValueToPointer);
             assert!(r.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr);
             r.rust_api_to_c_conversion = RustToCTypeConversion::None;
 

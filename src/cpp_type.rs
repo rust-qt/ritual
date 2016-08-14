@@ -1,5 +1,5 @@
 
-use cpp_ffi_type::{CppFfiType, IndirectionChange, CppToFfiTypeConversion};
+use cpp_ffi_type::{CppFfiType, IndirectionChange};
 use caption_strategy::TypeCaptionStrategy;
 pub use serializable::{CppBuiltInNumericType, CppSpecificNumericTypeKind, CppTypeBase, CppType,
                        CppTypeIndirection};
@@ -149,7 +149,11 @@ impl CppTypeBase {
   }
 }
 
-
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CppTypeRole {
+  ReturnType,
+  NotReturnType,
+}
 
 
 impl CppType {
@@ -164,14 +168,6 @@ impl CppType {
   pub fn is_void(&self) -> bool {
     !self.is_const && self.indirection == CppTypeIndirection::None && self.base == CppTypeBase::Void
   }
-
-  //  pub fn is_template(&self) -> bool {
-  //    match self.base {
-  //      CppTypeBase::Class { ref template_arguments, .. } => template_arguments.is_some(),
-  //      CppTypeBase::TemplateParameter { .. } => true,
-  //      _ => false,
-  //    }
-  //  }
 
   pub fn to_cpp_code(&self) -> Result<String, String> {
     let name = try!(self.base.to_cpp_code());
@@ -192,7 +188,7 @@ impl CppType {
                }))
   }
 
-  pub fn to_cpp_ffi_type(&self, is_return_type: bool) -> Result<CppFfiType, String> {
+  pub fn to_cpp_ffi_type(&self, role: CppTypeRole) -> Result<CppFfiType, String> {
     match self.base {
       CppTypeBase::TemplateParameter { .. } => {
         return Err(format!("Unsupported type"));
@@ -237,14 +233,14 @@ impl CppType {
         }
         return Ok(CppFfiType {
           ffi_type: self.clone(),
-          conversion: CppToFfiTypeConversion { indirection_change: IndirectionChange::NoChange },
+          conversion: IndirectionChange::NoChange,
           original_type: self.clone(),
         });
       }
       _ => {}
     }
     let mut result = self.clone();
-    let mut conversion = CppToFfiTypeConversion { indirection_change: IndirectionChange::NoChange };
+    let mut conversion = IndirectionChange::NoChange;
     match self.indirection {
       CppTypeIndirection::None |
       CppTypeIndirection::Ptr |
@@ -253,23 +249,23 @@ impl CppType {
       }
       CppTypeIndirection::Ref => {
         result.indirection = CppTypeIndirection::Ptr;
-        conversion.indirection_change = IndirectionChange::ReferenceToPointer;
+        conversion = IndirectionChange::ReferenceToPointer;
       }
       _ => return Err("Unsupported level of indirection".to_string()),
     }
     if let CppTypeBase::Class { ref name, .. } = self.base {
       if name == "QFlags" {
         assert!(self.indirection == CppTypeIndirection::None);
-        conversion.indirection_change = IndirectionChange::QFlagsToUInt;
+        conversion = IndirectionChange::QFlagsToUInt;
         result.base = CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::UInt);
       } else {
         // structs can't be passed by value
         if self.indirection == CppTypeIndirection::None {
           result.indirection = CppTypeIndirection::Ptr;
-          conversion.indirection_change = IndirectionChange::ValueToPointer;
+          conversion = IndirectionChange::ValueToPointer;
 
           // "const Rect" return type should not be translated to const pointer
-          result.is_const = !is_return_type;
+          result.is_const = role != CppTypeRole::ReturnType;
         }
       }
     }
@@ -301,3 +297,39 @@ impl CppType {
     }
   }
 }
+
+
+#[cfg(test)]
+mod tests {
+  use cpp_type::{CppType, CppTypeRole};
+  use caption_strategy::TypeCaptionStrategy;
+  use cpp_ffi_type::IndirectionChange;
+
+  #[test]
+  fn test1() {
+    let type1 = CppType::void();
+    assert_eq!(type1.is_void(), true);
+    assert_eq!(type1.base.is_void(), true);
+    assert_eq!(type1.base.is_class(), false);
+    assert_eq!(type1.base.is_template_parameter(), false);
+    assert_eq!(type1.to_cpp_code().unwrap(), "void");
+    assert_eq!(type1.base.to_cpp_code().unwrap(), "void");
+    assert_eq!(type1.base.caption(), "void");
+
+    let ffi1 = type1.to_cpp_ffi_type(CppTypeRole::NotReturnType).unwrap();
+    assert_eq!(ffi1.original_type, type1);
+    assert_eq!(ffi1.ffi_type, type1);
+    assert_eq!(ffi1.conversion, IndirectionChange::NoChange);
+
+    let ffi2 = type1.to_cpp_ffi_type(CppTypeRole::ReturnType).unwrap();
+    assert_eq!(ffi2.original_type, type1);
+    assert_eq!(ffi2.ffi_type, type1);
+    assert_eq!(ffi2.conversion, IndirectionChange::NoChange);
+
+    assert_eq!(type1.caption(TypeCaptionStrategy::Short), "void");
+    assert_eq!(type1.caption(TypeCaptionStrategy::Full), "void");
+
+  }
+
+}
+

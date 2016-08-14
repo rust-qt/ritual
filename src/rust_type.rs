@@ -1,5 +1,5 @@
 use cpp_type::CppType;
-use cpp_ffi_type::CppToFfiTypeConversion;
+use cpp_ffi_type::IndirectionChange;
 use utils::JoinWithString;
 use utils::CaseOperations;
 
@@ -233,7 +233,7 @@ pub enum RustToCTypeConversion {
 pub struct CompleteType {
   pub cpp_type: CppType,
   pub cpp_ffi_type: CppType,
-  pub cpp_to_ffi_conversion: CppToFfiTypeConversion,
+  pub cpp_to_ffi_conversion: IndirectionChange,
   pub rust_ffi_type: RustType,
   pub rust_api_type: RustType,
   pub rust_api_to_c_conversion: RustToCTypeConversion,

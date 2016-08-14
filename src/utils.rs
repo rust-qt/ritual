@@ -83,9 +83,7 @@ pub fn move_files(src: &PathBuf,
 
 pub fn copy_recursively(src: &PathBuf, dst: &PathBuf) -> io::Result<()> {
   if src.as_path().is_dir() {
-    // if !dst.as_path().is_dir() {
     try!(fs::create_dir(dst));
-    // }
     for item in try!(fs::read_dir(src)) {
       let item = try!(item);
       try!(copy_recursively(&item.path().to_path_buf(),
@@ -120,10 +118,6 @@ pub fn move_one_file(old_path: &PathBuf, new_path: &PathBuf) -> io::Result<()> {
   }
   Ok(())
 }
-
-// extern crate regex;
-// use self::regex::Regex;
-
 
 pub struct WordIterator<'a> {
   string: &'a String,
@@ -226,6 +220,58 @@ impl<'a> VecCaseOperations for Vec<&'a str> {
 
 #[cfg(test)]
 mod tests {
+
+  #[test]
+  fn join() {
+    use utils::JoinWithString;
+    let a1 = vec!["a", "b", "c"];
+    assert_eq!(a1.join(""), "abc");
+    assert_eq!(a1.join("_"), "a_b_c");
+
+    let a2: Vec<String> = vec![];
+    assert_eq!(a2.join(""), "");
+    assert_eq!(a2.join("_"), "");
+
+    let a3 = ["Q", "W", "E"];
+    assert_eq!(a3.join("x"), "QxWxE");
+
+    let a4 = vec!["one", "two"];
+    assert_eq!(a4.iter().map(|x| x.to_uppercase()).join("!"), "ONE!TWO");
+
+  }
+
+  #[test]
+  fn path_buf_with_added() {
+    use utils::PathBufPushTweak;
+    use std::path::PathBuf;
+    let x = PathBuf::from("/tmp");
+    let mut y = x.clone();
+    y.push("name");
+    assert_eq!(x.with_added("name"), y);
+  }
+
+  #[test]
+  fn word_iterator() {
+    use utils::WordIterator;
+    let string = "one_two_three".to_string();
+    let mut a1 = WordIterator::new(&string);
+    assert_eq!(a1.next(), Some("one"));
+    assert_eq!(a1.next(), Some("two"));
+    assert_eq!(a1.next(), Some("three"));
+    assert_eq!(a1.next(), None);
+  }
+
+  #[test]
+  fn word_iterator2() {
+    use utils::WordIterator;
+    let string = "RustIsAwesome".to_string();
+    let mut a1 = WordIterator::new(&string);
+    assert_eq!(a1.next(), Some("Rust"));
+    assert_eq!(a1.next(), Some("Is"));
+    assert_eq!(a1.next(), Some("Awesome"));
+    assert_eq!(a1.next(), None);
+  }
+
 
   #[test]
   fn case_operations() {
