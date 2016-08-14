@@ -421,3 +421,39 @@ fn template_parameter4() {
   let type1 = create_template_parameter_type();
   type1.caption(TypeCaptionStrategy::Full);
 }
+
+#[test]
+fn function1() {
+  let type1 = CppType {
+    is_const: false,
+    indirection: CppTypeIndirection::None,
+    base: CppTypeBase::FunctionPointer {
+      allows_variable_arguments: false,
+      return_type: Box::new(CppType {
+        indirection: CppTypeIndirection::None,
+        is_const: false,
+        base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+      }),
+      arguments: vec![CppType {
+                        indirection: CppTypeIndirection::None,
+                        is_const: false,
+                        base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+                      },
+                      CppType {
+                        indirection: CppTypeIndirection::Ptr,
+                        is_const: false,
+                        base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
+                      }],
+    },
+  };
+  assert_eq!(type1.is_void(), false);
+  assert_eq!(type1.base.is_void(), false);
+  assert_eq!(type1.base.is_class(), false);
+  assert_eq!(type1.base.is_template_parameter(), false);
+  assert_eq!(type1.base.to_cpp_code().unwrap(), "int (*FN_PTR)(int, bool*)");
+  assert_eq!(type1.to_cpp_code().unwrap(), type1.base.to_cpp_code().unwrap());
+  assert_eq!(type1.base.caption(), "func");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Short), "func");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Full), "func");
+  assert_type_to_ffi_unchanged(&type1);
+}

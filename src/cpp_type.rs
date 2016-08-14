@@ -5,7 +5,6 @@ pub use serializable::{CppBuiltInNumericType, CppSpecificNumericTypeKind, CppTyp
                        CppTypeIndirection};
 extern crate regex;
 
-
 impl CppBuiltInNumericType {
   pub fn to_cpp_code(&self) -> &'static str {
     match *self {
@@ -142,9 +141,7 @@ impl CppTypeBase {
       CppTypeBase::TemplateParameter { .. } => {
         panic!("template parameters are not supported here yet");
       }
-      CppTypeBase::FunctionPointer { .. } => {
-        panic!("function pointers are not supported here yet");
-      }
+      CppTypeBase::FunctionPointer { .. } => "func".to_string(),
     }
   }
 }
