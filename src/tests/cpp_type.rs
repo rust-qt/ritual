@@ -1,0 +1,423 @@
+use cpp_type::{CppType, CppTypeRole, CppTypeIndirection, CppTypeBase, CppBuiltInNumericType,
+               CppSpecificNumericTypeKind};
+use caption_strategy::TypeCaptionStrategy;
+use cpp_ffi_type::IndirectionChange;
+
+fn assert_type_to_ffi_unchanged(t: &CppType) {
+  for role in &[CppTypeRole::NotReturnType, CppTypeRole::ReturnType] {
+    let ffi1 = t.to_cpp_ffi_type(role.clone()).unwrap();
+    assert_eq!(&ffi1.original_type, t);
+    assert_eq!(&ffi1.ffi_type, t);
+    assert_eq!(ffi1.conversion, IndirectionChange::NoChange);
+  }
+}
+
+#[test]
+fn void() {
+  let type1 = CppType::void();
+  assert_eq!(type1.is_void(), true);
+  assert_eq!(type1.base.is_void(), true);
+  assert_eq!(type1.base.is_class(), false);
+  assert_eq!(type1.base.is_template_parameter(), false);
+  assert_eq!(type1.to_cpp_code().unwrap(), "void");
+  assert_eq!(type1.base.to_cpp_code().unwrap(), "void");
+  assert_eq!(type1.base.caption(), "void");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Short), "void");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Full), "void");
+  assert_type_to_ffi_unchanged(&type1);
+}
+
+#[test]
+fn void_ptr() {
+  let type1 = CppType {
+    indirection: CppTypeIndirection::Ptr,
+    is_const: false,
+    base: CppTypeBase::Void,
+  };
+  assert_eq!(type1.is_void(), false);
+  assert_eq!(type1.base.is_void(), true);
+  assert_eq!(type1.base.is_class(), false);
+  assert_eq!(type1.base.is_template_parameter(), false);
+  assert_eq!(type1.to_cpp_code().unwrap(), "void*");
+  assert_eq!(type1.base.to_cpp_code().unwrap(), "void");
+  assert_eq!(type1.base.caption(), "void");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Short), "void");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Full), "void_ptr");
+  assert_type_to_ffi_unchanged(&type1);
+}
+
+#[test]
+fn int() {
+  let type1 = CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+  };
+  assert_eq!(type1.is_void(), false);
+  assert_eq!(type1.base.is_void(), false);
+  assert_eq!(type1.base.is_class(), false);
+  assert_eq!(type1.base.is_template_parameter(), false);
+  assert_eq!(type1.to_cpp_code().unwrap(), "int");
+  assert_eq!(type1.base.to_cpp_code().unwrap(), "int");
+  assert_eq!(type1.base.caption(), "int");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Short), "int");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Full), "int");
+  assert_type_to_ffi_unchanged(&type1);
+}
+
+#[test]
+fn bool_ptr() {
+  let type1 = CppType {
+    indirection: CppTypeIndirection::Ptr,
+    is_const: false,
+    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
+  };
+  assert_eq!(type1.is_void(), false);
+  assert_eq!(type1.base.is_void(), false);
+  assert_eq!(type1.base.is_class(), false);
+  assert_eq!(type1.base.is_template_parameter(), false);
+  assert_eq!(type1.to_cpp_code().unwrap(), "bool*");
+  assert_eq!(type1.base.to_cpp_code().unwrap(), "bool");
+  assert_eq!(type1.base.caption(), "bool");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Short), "bool");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Full), "bool_ptr");
+  assert_type_to_ffi_unchanged(&type1);
+}
+
+#[test]
+fn char_ptr_ptr() {
+  let type1 = CppType {
+    indirection: CppTypeIndirection::PtrPtr,
+    is_const: false,
+    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::CharS),
+  };
+  assert_eq!(type1.is_void(), false);
+  assert_eq!(type1.base.is_void(), false);
+  assert_eq!(type1.base.is_class(), false);
+  assert_eq!(type1.base.is_template_parameter(), false);
+  assert_eq!(type1.to_cpp_code().unwrap(), "char**");
+  assert_eq!(type1.base.to_cpp_code().unwrap(), "char");
+  assert_eq!(type1.base.caption(), "char");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Short), "char");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Full), "char_ptr_ptr");
+  assert_type_to_ffi_unchanged(&type1);
+}
+
+#[test]
+fn qint64() {
+  let type1 = CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    base: CppTypeBase::SpecificNumeric {
+      name: "qint64".to_string(),
+      bits: 64,
+      kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
+    },
+  };
+  assert_eq!(type1.is_void(), false);
+  assert_eq!(type1.base.is_void(), false);
+  assert_eq!(type1.base.is_class(), false);
+  assert_eq!(type1.base.is_template_parameter(), false);
+  assert_eq!(type1.to_cpp_code().unwrap(), "qint64");
+  assert_eq!(type1.base.to_cpp_code().unwrap(), "qint64");
+  assert_eq!(type1.base.caption(), "qint64");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Short), "qint64");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Full), "qint64");
+  assert_type_to_ffi_unchanged(&type1);
+}
+
+#[test]
+fn quintptr() {
+  let type1 = CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    base: CppTypeBase::PointerSizedInteger {
+      name: "quintptr".to_string(),
+      is_signed: false,
+    },
+  };
+  assert_eq!(type1.is_void(), false);
+  assert_eq!(type1.base.is_void(), false);
+  assert_eq!(type1.base.is_class(), false);
+  assert_eq!(type1.base.is_template_parameter(), false);
+  assert_eq!(type1.to_cpp_code().unwrap(), "quintptr");
+  assert_eq!(type1.base.to_cpp_code().unwrap(), "quintptr");
+  assert_eq!(type1.base.caption(), "quintptr");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Short), "quintptr");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Full), "quintptr");
+  assert_type_to_ffi_unchanged(&type1);
+}
+
+#[test]
+fn enum1() {
+  let type1 = CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    base: CppTypeBase::Enum { name: "Qt::CaseSensitivity".to_string() },
+  };
+  assert_eq!(type1.is_void(), false);
+  assert_eq!(type1.base.is_void(), false);
+  assert_eq!(type1.base.is_class(), false);
+  assert_eq!(type1.base.is_template_parameter(), false);
+  assert_eq!(type1.to_cpp_code().unwrap(), "Qt::CaseSensitivity");
+  assert_eq!(type1.base.to_cpp_code().unwrap(), "Qt::CaseSensitivity");
+  assert_eq!(type1.base.caption(), "Qt_CaseSensitivity");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Short),
+             "Qt_CaseSensitivity");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Full),
+             "Qt_CaseSensitivity");
+  assert_type_to_ffi_unchanged(&type1);
+}
+
+
+#[test]
+fn class_value() {
+  let type1 = CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    base: CppTypeBase::Class {
+      name: "QPoint".to_string(),
+      template_arguments: None,
+    },
+  };
+  assert_eq!(type1.is_void(), false);
+  assert_eq!(type1.base.is_void(), false);
+  assert_eq!(type1.base.is_class(), true);
+  assert_eq!(type1.base.is_template_parameter(), false);
+  assert_eq!(type1.to_cpp_code().unwrap(), "QPoint");
+  assert_eq!(type1.base.to_cpp_code().unwrap(), "QPoint");
+  assert_eq!(type1.base.caption(), "QPoint");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Short), "QPoint");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Full), "QPoint");
+
+  let ffi_return_type = type1.to_cpp_ffi_type(CppTypeRole::ReturnType).unwrap();
+  assert_eq!(&ffi_return_type.original_type, &type1);
+  assert_eq!(&ffi_return_type.ffi_type,
+             &CppType {
+               indirection: CppTypeIndirection::Ptr,
+               is_const: false,
+               base: CppTypeBase::Class {
+                 name: "QPoint".to_string(),
+                 template_arguments: None,
+               },
+             });
+  assert_eq!(&ffi_return_type.ffi_type.to_cpp_code().unwrap(), "QPoint*");
+  assert_eq!(ffi_return_type.conversion,
+             IndirectionChange::ValueToPointer);
+
+  let ffi_arg = type1.to_cpp_ffi_type(CppTypeRole::NotReturnType).unwrap();
+  assert_eq!(&ffi_arg.original_type, &type1);
+  assert_eq!(&ffi_arg.ffi_type,
+             &CppType {
+               indirection: CppTypeIndirection::Ptr,
+               is_const: true,
+               base: CppTypeBase::Class {
+                 name: "QPoint".to_string(),
+                 template_arguments: None,
+               },
+             });
+  assert_eq!(&ffi_arg.ffi_type.to_cpp_code().unwrap(), "const QPoint*");
+  assert_eq!(ffi_arg.conversion, IndirectionChange::ValueToPointer);
+}
+
+#[test]
+fn class_const_ref() {
+  let type1 = CppType {
+    indirection: CppTypeIndirection::Ref,
+    is_const: true,
+    base: CppTypeBase::Class {
+      name: "QRectF".to_string(),
+      template_arguments: None,
+    },
+  };
+  assert_eq!(type1.is_void(), false);
+  assert_eq!(type1.base.is_void(), false);
+  assert_eq!(type1.base.is_class(), true);
+  assert_eq!(type1.base.is_template_parameter(), false);
+  assert_eq!(type1.to_cpp_code().unwrap(), "const QRectF&");
+  assert_eq!(type1.base.to_cpp_code().unwrap(), "QRectF");
+  assert_eq!(type1.base.caption(), "QRectF");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Short), "QRectF");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Full), "const_QRectF_ref");
+
+  for role in &[CppTypeRole::NotReturnType, CppTypeRole::ReturnType] {
+    let ffi1 = type1.to_cpp_ffi_type(role.clone()).unwrap();
+    assert_eq!(&ffi1.original_type, &type1);
+    assert_eq!(&ffi1.ffi_type,
+               &CppType {
+                 indirection: CppTypeIndirection::Ptr,
+                 is_const: true,
+                 base: CppTypeBase::Class {
+                   name: "QRectF".to_string(),
+                   template_arguments: None,
+                 },
+               });
+    assert_eq!(&ffi1.ffi_type.to_cpp_code().unwrap(), "const QRectF*");
+    assert_eq!(ffi1.conversion, IndirectionChange::ReferenceToPointer);
+  }
+}
+
+#[test]
+fn class_mut_ref() {
+  let type1 = CppType {
+    indirection: CppTypeIndirection::Ref,
+    is_const: false,
+    base: CppTypeBase::Class {
+      name: "QRectF".to_string(),
+      template_arguments: None,
+    },
+  };
+  assert_eq!(type1.is_void(), false);
+  assert_eq!(type1.base.is_void(), false);
+  assert_eq!(type1.base.is_class(), true);
+  assert_eq!(type1.base.is_template_parameter(), false);
+  assert_eq!(type1.to_cpp_code().unwrap(), "QRectF&");
+  assert_eq!(type1.base.to_cpp_code().unwrap(), "QRectF");
+  assert_eq!(type1.base.caption(), "QRectF");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Short), "QRectF");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Full), "QRectF_ref");
+
+  for role in &[CppTypeRole::NotReturnType, CppTypeRole::ReturnType] {
+    let ffi1 = type1.to_cpp_ffi_type(role.clone()).unwrap();
+    assert_eq!(&ffi1.original_type, &type1);
+    assert_eq!(&ffi1.ffi_type,
+               &CppType {
+                 indirection: CppTypeIndirection::Ptr,
+                 is_const: false,
+                 base: CppTypeBase::Class {
+                   name: "QRectF".to_string(),
+                   template_arguments: None,
+                 },
+               });
+    assert_eq!(&ffi1.ffi_type.to_cpp_code().unwrap(), "QRectF*");
+    assert_eq!(ffi1.conversion, IndirectionChange::ReferenceToPointer);
+  }
+}
+
+#[test]
+fn class_mut_ptr() {
+  let type1 = CppType {
+    indirection: CppTypeIndirection::Ptr,
+    is_const: false,
+    base: CppTypeBase::Class {
+      name: "QObject".to_string(),
+      template_arguments: None,
+    },
+  };
+  assert_eq!(type1.is_void(), false);
+  assert_eq!(type1.base.is_void(), false);
+  assert_eq!(type1.base.is_class(), true);
+  assert_eq!(type1.base.is_template_parameter(), false);
+  assert_eq!(type1.to_cpp_code().unwrap(), "QObject*");
+  assert_eq!(type1.base.to_cpp_code().unwrap(), "QObject");
+  assert_eq!(type1.base.caption(), "QObject");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Short), "QObject");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Full), "QObject_ptr");
+  assert_type_to_ffi_unchanged(&type1);
+}
+
+#[test]
+fn class_with_template_args() {
+  let args = Some(vec![CppType {
+                         indirection: CppTypeIndirection::None,
+                         is_const: false,
+                         base: CppTypeBase::Class {
+                           name: "QString".to_string(),
+                           template_arguments: None,
+                         },
+                       }]);
+  let type1 = CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    base: CppTypeBase::Class {
+      name: "QVector".to_string(),
+      template_arguments: args.clone(),
+    },
+  };
+  assert_eq!(type1.is_void(), false);
+  assert_eq!(type1.base.is_void(), false);
+  assert_eq!(type1.base.is_class(), true);
+  assert_eq!(type1.base.is_template_parameter(), false);
+  assert_eq!(type1.to_cpp_code().unwrap(), "QVector< QString >");
+  assert_eq!(type1.base.to_cpp_code().unwrap(), "QVector< QString >");
+  assert_eq!(type1.base.caption(), "QVector_QString");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Short), "QVector_QString");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Full), "QVector_QString");
+
+  let ffi_return_type = type1.to_cpp_ffi_type(CppTypeRole::ReturnType).unwrap();
+  assert_eq!(&ffi_return_type.original_type, &type1);
+  assert_eq!(&ffi_return_type.ffi_type,
+             &CppType {
+               indirection: CppTypeIndirection::Ptr,
+               is_const: false,
+               base: CppTypeBase::Class {
+                 name: "QVector".to_string(),
+                 template_arguments: args.clone(),
+               },
+             });
+  assert_eq!(&ffi_return_type.ffi_type.to_cpp_code().unwrap(),
+             "QVector< QString >*");
+  assert_eq!(ffi_return_type.conversion,
+             IndirectionChange::ValueToPointer);
+
+  let ffi_arg = type1.to_cpp_ffi_type(CppTypeRole::NotReturnType).unwrap();
+  assert_eq!(&ffi_arg.original_type, &type1);
+  assert_eq!(&ffi_arg.ffi_type,
+             &CppType {
+               indirection: CppTypeIndirection::Ptr,
+               is_const: true,
+               base: CppTypeBase::Class {
+                 name: "QVector".to_string(),
+                 template_arguments: args.clone(),
+               },
+             });
+  assert_eq!(&ffi_arg.ffi_type.to_cpp_code().unwrap(),
+             "const QVector< QString >*");
+  assert_eq!(ffi_arg.conversion, IndirectionChange::ValueToPointer);
+
+}
+
+fn create_template_parameter_type() -> CppType {
+  CppType {
+    indirection: CppTypeIndirection::Ptr,
+    is_const: false,
+    base: CppTypeBase::TemplateParameter {
+      nested_level: 0,
+      index: 0,
+    },
+  }
+}
+
+#[test]
+fn template_parameter() {
+  let type1 = create_template_parameter_type();
+  assert_eq!(type1.is_void(), false);
+  assert_eq!(type1.base.is_void(), false);
+  assert_eq!(type1.base.is_class(), false);
+  assert_eq!(type1.base.is_template_parameter(), true);
+  assert!(type1.to_cpp_code().is_err());
+  assert!(type1.base.to_cpp_code().is_err());
+  assert!(type1.to_cpp_ffi_type(CppTypeRole::NotReturnType).is_err());
+  assert!(type1.to_cpp_ffi_type(CppTypeRole::ReturnType).is_err());
+}
+
+#[test]
+#[should_panic]
+fn template_parameter2() {
+  let type1 = create_template_parameter_type();
+  type1.base.caption();
+}
+
+#[test]
+#[should_panic]
+fn template_parameter3() {
+  let type1 = create_template_parameter_type();
+  type1.caption(TypeCaptionStrategy::Short);
+}
+
+#[test]
+#[should_panic]
+fn template_parameter4() {
+  let type1 = create_template_parameter_type();
+  type1.caption(TypeCaptionStrategy::Full);
+}

@@ -301,10 +301,7 @@ pub enum CppTypeBase {
     return_type: Box<CppType>,
     arguments: Vec<CppType>,
     allows_variable_arguments: bool,
-  }, /*  Unspecified {
-      *    name: String,
-      *    template_arguments: Option<Vec<CppType>>,
-      *  }, */
+  },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

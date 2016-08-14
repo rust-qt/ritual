@@ -21,6 +21,9 @@ mod utils;
 mod cpp_parser;
 mod serializable;
 
+#[cfg(test)]
+mod tests;
+
 use std::fs;
 use std::fs::File;
 use utils::PathBufPushTweak;
