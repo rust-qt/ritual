@@ -67,11 +67,13 @@ impl CppMethodKind {
   }
 }
 
-
-
 impl CppMethod {
+  /// Checks if two methods have exactly the same set of input argument types
   pub fn argument_types_equal(&self, other: &CppMethod) -> bool {
     if self.arguments.len() != other.arguments.len() {
+      return false;
+    }
+    if self.allows_variable_arguments != other.allows_variable_arguments {
       return false;
     }
     for i in 0..self.arguments.len() {
@@ -86,8 +88,6 @@ impl CppMethod {
   pub fn c_signature(&self,
                      allocation_place: ReturnValueAllocationPlace)
                      -> Result<(CppFfiFunctionSignature, AllocationPlaceImportance), String> {
-
-    // no complicated cases support for now
     if self.allows_variable_arguments {
       return Err("Variable arguments are not supported".to_string());
     }
@@ -139,8 +139,7 @@ impl CppMethod {
         Ok(c_type) => {
           let is_stack_allocated_struct = return_type.indirection == CppTypeIndirection::None &&
                                           return_type.base.is_class() &&
-                                          c_type.conversion !=
-                                          IndirectionChange::QFlagsToUInt;
+                                          c_type.conversion != IndirectionChange::QFlagsToUInt;
           if is_stack_allocated_struct {
             allocation_place_importance = AllocationPlaceImportance::Important;
             if allocation_place == ReturnValueAllocationPlace::Stack {
