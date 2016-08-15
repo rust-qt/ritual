@@ -27,6 +27,7 @@ fn void() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "void");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "void");
   assert_type_to_ffi_unchanged(&type1);
+  assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -48,6 +49,7 @@ fn void_ptr() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "void");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "void_ptr");
   assert_type_to_ffi_unchanged(&type1);
+  assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -69,6 +71,7 @@ fn int() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "int");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "int");
   assert_type_to_ffi_unchanged(&type1);
+  assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -90,6 +93,7 @@ fn bool_ptr() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "bool");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "bool_ptr");
   assert_type_to_ffi_unchanged(&type1);
+  assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -111,6 +115,7 @@ fn char_ptr_ptr() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "char");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "char_ptr_ptr");
   assert_type_to_ffi_unchanged(&type1);
+  assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -136,6 +141,7 @@ fn qint64() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "qint64");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "qint64");
   assert_type_to_ffi_unchanged(&type1);
+  assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -160,6 +166,7 @@ fn quintptr() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "quintptr");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "quintptr");
   assert_type_to_ffi_unchanged(&type1);
+  assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -183,6 +190,7 @@ fn enum1() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Full),
              "Qt_CaseSensitivity");
   assert_type_to_ffi_unchanged(&type1);
+  assert!(!type1.needs_allocation_place_variants());
 }
 
 
@@ -236,6 +244,7 @@ fn class_value() {
              });
   assert_eq!(&ffi_arg.ffi_type.to_cpp_code(None).unwrap(), "const QPoint*");
   assert_eq!(ffi_arg.conversion, IndirectionChange::ValueToPointer);
+  assert!(type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -275,6 +284,7 @@ fn class_const_ref() {
     assert_eq!(&ffi1.ffi_type.to_cpp_code(None).unwrap(), "const QRectF*");
     assert_eq!(ffi1.conversion, IndirectionChange::ReferenceToPointer);
   }
+  assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -314,6 +324,7 @@ fn class_mut_ref() {
     assert_eq!(&ffi1.ffi_type.to_cpp_code(None).unwrap(), "QRectF*");
     assert_eq!(ffi1.conversion, IndirectionChange::ReferenceToPointer);
   }
+  assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -338,6 +349,7 @@ fn class_mut_ptr() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "QObject");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "QObject_ptr");
   assert_type_to_ffi_unchanged(&type1);
+  assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -400,7 +412,54 @@ fn class_with_template_args() {
   assert_eq!(&ffi_arg.ffi_type.to_cpp_code(None).unwrap(),
              "const QVector< QString >*");
   assert_eq!(ffi_arg.conversion, IndirectionChange::ValueToPointer);
+  assert!(type1.needs_allocation_place_variants());
+}
 
+#[test]
+fn qflags() {
+  let args = Some(vec![CppType {
+                         indirection: CppTypeIndirection::None,
+                         is_const: false,
+                         base: CppTypeBase::Class {
+                           name: "Qt::AlignmentFlag".to_string(),
+                           template_arguments: None,
+                         },
+                       }]);
+  let type1 = CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    base: CppTypeBase::Class {
+      name: "QFlags".to_string(),
+      template_arguments: args.clone(),
+    },
+  };
+  assert_eq!(type1.is_void(), false);
+  assert_eq!(type1.base.is_void(), false);
+  assert_eq!(type1.base.is_class(), true);
+  assert_eq!(type1.base.is_template_parameter(), false);
+  assert_eq!(type1.to_cpp_code(None).unwrap(), "QFlags< Qt::AlignmentFlag >");
+  assert_eq!(type1.base.to_cpp_code(None).unwrap(), "QFlags< Qt::AlignmentFlag >");
+  assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+  assert!(type1.base.to_cpp_code(Some(&String::new())).is_err());
+  assert_eq!(type1.base.caption(), "QFlags_Qt_AlignmentFlag");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Short), "QFlags_Qt_AlignmentFlag");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Full), "QFlags_Qt_AlignmentFlag");
+
+  for role in &[CppTypeRole::NotReturnType, CppTypeRole::ReturnType] {
+  let ffi_type = type1.to_cpp_ffi_type(role.clone()).unwrap();
+  assert_eq!(&ffi_type.original_type, &type1);
+  assert_eq!(&ffi_type.ffi_type,
+             &CppType {
+               indirection: CppTypeIndirection::None,
+               is_const: false,
+               base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::UInt),
+             });
+  assert_eq!(&ffi_type.ffi_type.to_cpp_code(None).unwrap(),
+             "unsigned int");
+  assert_eq!(ffi_type.conversion,
+             IndirectionChange::QFlagsToUInt);
+  }
+  assert!(!type1.needs_allocation_place_variants());
 }
 
 fn create_template_parameter_type() -> CppType {
@@ -427,6 +486,7 @@ fn template_parameter() {
   assert!(type1.base.to_cpp_code(Some(&String::new())).is_err());
   assert!(type1.to_cpp_ffi_type(CppTypeRole::NotReturnType).is_err());
   assert!(type1.to_cpp_ffi_type(CppTypeRole::ReturnType).is_err());
+  assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -487,4 +547,5 @@ fn function1() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "func");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "func");
   assert_type_to_ffi_unchanged(&type1);
+  assert!(!type1.needs_allocation_place_variants());
 }

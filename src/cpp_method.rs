@@ -91,6 +91,10 @@ impl CppMethod {
     false
   }
 
+  /// Creates FFI method signature for this method:
+  /// - converts all types to FFI types;
+  /// - adds "this" argument explicitly if present;
+  /// - adds "output" argument for return value if allocation_place is Stack.
   pub fn c_signature(&self,
                      allocation_place: ReturnValueAllocationPlace)
                      -> Result<CppFfiFunctionSignature, String> {

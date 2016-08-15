@@ -2,6 +2,8 @@ use cpp_method::*;
 use cpp_operators::CppOperator;
 use cpp_data::CppVisibility;
 use cpp_type::*;
+use cpp_ffi_function_argument::CppFfiArgumentMeaning;
+use cpp_ffi_type::IndirectionChange;
 
 #[test]
 fn cpp_method_scope() {
@@ -216,4 +218,124 @@ fn argument_types_equal8() {
   });
   assert!(method1.argument_types_equal(&method2));
   assert!(method2.argument_types_equal(&method1));
+}
+
+#[test]
+fn needs_allocation_place_variants() {
+  let mut method1 = empty_regular_method();
+  assert!(!method1.needs_allocation_place_variants());
+  method1.kind = CppMethodKind::Constructor;
+  assert!(method1.needs_allocation_place_variants());
+  method1.kind = CppMethodKind::Destructor;
+  assert!(method1.needs_allocation_place_variants());
+  method1.kind = CppMethodKind::Operator(CppOperator::Assignment);
+  assert!(!method1.needs_allocation_place_variants());
+  method1.return_type = Some(CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+  });
+  assert!(!method1.needs_allocation_place_variants());
+  method1.return_type = Some(CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    base: CppTypeBase::Class {
+      name: "QRect".to_string(),
+      template_arguments: None,
+    },
+  });
+  assert!(method1.needs_allocation_place_variants());
+  method1.return_type = Some(CppType {
+    indirection: CppTypeIndirection::Ptr,
+    is_const: false,
+    base: CppTypeBase::Class {
+      name: "QRect".to_string(),
+      template_arguments: None,
+    },
+  });
+  assert!(!method1.needs_allocation_place_variants());
+  method1.kind = CppMethodKind::Regular;
+  method1.return_type = None;
+  assert!(!method1.needs_allocation_place_variants());
+}
+
+#[test]
+fn c_signature_empty() {
+  let mut method1 = empty_regular_method();
+  method1.return_type = Some(CppType::void());
+  let r = method1.c_signature(ReturnValueAllocationPlace::NotApplicable).unwrap();
+  assert!(r.arguments.is_empty());
+  assert!(r.return_type.ffi_type.is_void());
+}
+
+#[test]
+fn c_signature_simple_func() {
+  let mut method1 = empty_regular_method();
+  method1.return_type = Some(CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+  });
+  method1.arguments.push(CppFunctionArgument {
+    argument_type: CppType {
+      indirection: CppTypeIndirection::None,
+      is_const: false,
+      base: CppTypeBase::Enum { name: "Enum1".to_string() },
+    },
+    name: "arg1".to_string(),
+    has_default_value: false,
+  });
+  let r = method1.c_signature(ReturnValueAllocationPlace::NotApplicable).unwrap();
+  assert!(r.arguments.len() == 1);
+  assert_eq!(r.arguments[0].name, "arg1");
+  assert_eq!(r.arguments[0].argument_type.ffi_type,
+             method1.arguments[0].argument_type);
+  assert_eq!(r.arguments[0].argument_type.conversion, IndirectionChange::NoChange);
+  assert_eq!(r.arguments[0].meaning, CppFfiArgumentMeaning::Argument(0));
+  assert_eq!(r.return_type.ffi_type, method1.return_type.unwrap());
+}
+
+#[test]
+fn c_signature_method_with_this() {
+  let mut method1 = empty_regular_method();
+  method1.scope = CppMethodScope::Class("MyClass".to_string());
+  method1.class_type = Some(CppTypeBase::Class {
+    name: "MyClass".to_string(),
+    template_arguments: None,
+  });
+  method1.return_type = Some(CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+  });
+  method1.arguments.push(CppFunctionArgument {
+    argument_type: CppType {
+      indirection: CppTypeIndirection::None,
+      is_const: false,
+      base: CppTypeBase::Class {
+        name: "MyClass2".to_string(),
+        template_arguments: None,
+      },
+    },
+    name: "my_arg".to_string(),
+    has_default_value: false,
+  });
+  let r = method1.c_signature(ReturnValueAllocationPlace::NotApplicable).unwrap();
+  assert!(r.arguments.len() == 2);
+  assert_eq!(r.arguments[0].name, "this_ptr");
+  assert_eq!(r.arguments[0].argument_type.ffi_type.base,
+             method1.class_type.unwrap());
+  assert_eq!(r.arguments[0].argument_type.ffi_type.indirection,
+             CppTypeIndirection::Ptr);
+  assert_eq!(r.arguments[0].argument_type.conversion, IndirectionChange::NoChange);
+  assert_eq!(r.arguments[0].meaning, CppFfiArgumentMeaning::This);
+
+  assert_eq!(r.arguments[1].name, "my_arg");
+  assert_eq!(r.arguments[1].argument_type.ffi_type.base,
+             method1.arguments[0].argument_type.base);
+  assert_eq!(r.arguments[1].argument_type.ffi_type.indirection,
+             CppTypeIndirection::Ptr);
+  assert_eq!(r.arguments[1].argument_type.conversion, IndirectionChange::ValueToPointer);
+  assert_eq!(r.arguments[1].meaning, CppFfiArgumentMeaning::Argument(0));
+  assert_eq!(r.return_type.ffi_type, method1.return_type.unwrap());
 }
