@@ -9,19 +9,23 @@ pub use serializable::{CppFunctionArgument, CppMethodScope, CppMethodKind, CppMe
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ReturnValueAllocationPlace {
+  /// the method returns a class object by value (or is a constructor), and
+  /// it's translated to "output" FFI argument and placement new
   Stack,
+  /// the method returns a class object by value (or is a constructor), and
+  /// it's translated to pointer FFI return type and plain new
   Heap,
+  /// the method does not return a class object by value
   NotApplicable,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum AllocationPlaceImportance {
+  /// the method returns a class object by value (or is a constructor)
   Important,
+  /// the method does not return a class object by value
   NotImportant,
 }
-
-
-
 
 
 impl CppMethodScope {
@@ -234,7 +238,7 @@ impl CppMethod {
     if let Some(ref cpp_type) = self.return_type {
       s = format!("{} {}",
                   s,
-                  cpp_type.to_cpp_code().unwrap_or("[?]".to_string()));
+                  cpp_type.to_cpp_code(None).unwrap_or("[?]".to_string()));
     }
     if let CppMethodScope::Class(ref name) = self.scope {
       s = format!("{} {}::", s, name);
@@ -246,7 +250,7 @@ impl CppMethod {
                     .iter()
                     .map(|arg| {
                       format!("{} {}{}",
-                              arg.argument_type.to_cpp_code().unwrap_or("[?]".to_string()),
+                              arg.argument_type.to_cpp_code(None).unwrap_or("[?]".to_string()),
                               arg.name,
                               if arg.has_default_value {
                                 format!(" = ?")

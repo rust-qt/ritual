@@ -41,10 +41,15 @@ impl CppFfiFunctionArgument {
   }
 
   pub fn to_cpp_code(&self) -> Result<String, String> {
-    let type_text = try!(self.argument_type.ffi_type.to_cpp_code());
     match self.argument_type.ffi_type.base {
-      CppTypeBase::FunctionPointer { .. } => Ok(type_text.replace("FN_PTR", &self.name)),
-      _ => Ok(format!("{} {}", type_text, self.name)),
+      CppTypeBase::FunctionPointer { .. } => {
+        Ok(try!(self.argument_type.ffi_type.to_cpp_code(Some(&self.name))))
+      }
+      _ => {
+        Ok(format!("{} {}",
+                   try!(self.argument_type.ffi_type.to_cpp_code(None)),
+                   self.name))
+      }
     }
   }
 }

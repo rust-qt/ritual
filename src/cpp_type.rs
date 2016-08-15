@@ -80,7 +80,15 @@ impl CppTypeBase {
       _ => false,
     }
   }
-  pub fn to_cpp_code(&self) -> Result<String, String> {
+  pub fn to_cpp_code(&self, function_pointer_inner_text: Option<&String>) -> Result<String, String> {
+    match *self {
+      CppTypeBase::FunctionPointer { .. } => {}
+      _ => {
+        if function_pointer_inner_text.is_some() {
+          return Err("unexpected function_pointer_inner_text".to_string());
+        }
+      }
+    }
     match *self {
       CppTypeBase::Void => Ok("void".to_string()),
       CppTypeBase::BuiltInNumeric(ref t) => Ok(t.to_cpp_code().to_string()),
@@ -92,7 +100,7 @@ impl CppTypeBase {
           Some(ref args) => {
             let mut arg_texts = Vec::new();
             for arg in args {
-              arg_texts.push(try!(arg.to_cpp_code()));
+              arg_texts.push(try!(arg.to_cpp_code(None)));
             }
             Ok(format!("{}< {} >", name, arg_texts.join(", ")))
           }
@@ -110,10 +118,14 @@ impl CppTypeBase {
         }
         let mut arg_texts = Vec::new();
         for arg in arguments {
-          arg_texts.push(try!(arg.to_cpp_code()));
+          arg_texts.push(try!(arg.to_cpp_code(None)));
         }
-        Ok(format!("{} (*FN_PTR)({})",
-                   try!(return_type.as_ref().to_cpp_code()),
+        if function_pointer_inner_text.is_none() {
+          return Err("function_pointer_inner_text argument is required".to_string());
+        }
+        Ok(format!("{} (*{})({})",
+                   try!(return_type.as_ref().to_cpp_code(None)),
+                   function_pointer_inner_text.unwrap(),
                    arg_texts.join(", ")))
       }
     }
@@ -166,8 +178,8 @@ impl CppType {
     !self.is_const && self.indirection == CppTypeIndirection::None && self.base == CppTypeBase::Void
   }
 
-  pub fn to_cpp_code(&self) -> Result<String, String> {
-    let name = try!(self.base.to_cpp_code());
+  pub fn to_cpp_code(&self, function_pointer_inner_text: Option<&String>) -> Result<String, String> {
+    let name = try!(self.base.to_cpp_code(function_pointer_inner_text));
     Ok(format!("{}{}{}",
                if self.is_const {
                  "const "

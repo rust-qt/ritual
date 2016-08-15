@@ -1283,7 +1283,7 @@ impl CppParser {
               println!("    {}<{}>",
                        class_name,
                        ins.iter()
-                          .map(|t| t.to_cpp_code().unwrap_or_else(|_| format!("{:?}", t)))
+                          .map(|t| t.to_cpp_code(None).unwrap_or_else(|_| format!("{:?}", t)))
                           .join(", "));
               if ins.len() != valid_length {
                 panic!("template arguments count mismatch: {}: {:?} vs {:?}",

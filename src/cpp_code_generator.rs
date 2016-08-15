@@ -35,13 +35,18 @@ impl CppCodeGenerator {
   }
 
   fn function_signature(&self, method: &CppAndFfiMethod) -> String {
-    let type_text = method.c_signature.return_type.ffi_type.to_cpp_code().unwrap();
     let name_with_args = format!("{}({})",
                                  method.c_name,
                                  method.c_signature.arguments_to_cpp_code().unwrap());
     match method.c_signature.return_type.ffi_type.base {
-      CppTypeBase::FunctionPointer { .. } => type_text.replace("FN_PTR", &name_with_args),
-      _ => format!("{} {}", type_text, name_with_args),
+      CppTypeBase::FunctionPointer { .. } => {
+        method.c_signature.return_type.ffi_type.to_cpp_code(Some(&name_with_args)).unwrap()
+      }
+      _ => {
+        format!("{} {}",
+                method.c_signature.return_type.ffi_type.to_cpp_code(None).unwrap(),
+                name_with_args)
+      }
     }
   }
 
@@ -71,7 +76,7 @@ impl CppCodeGenerator {
             if method.cpp_method.kind != CppMethodKind::Constructor {
               if let Some(ref return_type) = method.cpp_method.return_type {
                 result = format!("new {}({})",
-                                 return_type.base.to_cpp_code().unwrap(),
+                                 return_type.base.to_cpp_code(None).unwrap(),
                                  result)
               } else {
                 panic!("cpp method unexpectedly doesn't have return type");
@@ -97,7 +102,7 @@ impl CppCodeGenerator {
         if let Some(ref return_type) = method.cpp_method.return_type {
           result = format!("new({}) {}({})",
                            arg.name,
-                           return_type.base.to_cpp_code().unwrap(),
+                           return_type.base.to_cpp_code(None).unwrap(),
                            result);
         } else {
           panic!("cpp method unexpectedly doesn't have return type");
@@ -125,7 +130,7 @@ impl CppCodeGenerator {
           IndirectionChange::NoChange => {}
           IndirectionChange::QFlagsToUInt => {
             result = format!("{}({})",
-                             cpp_argument.argument_type.to_cpp_code().unwrap(),
+                             cpp_argument.argument_type.to_cpp_code(None).unwrap(),
                              result);
           }
         }
@@ -162,12 +167,12 @@ impl CppCodeGenerator {
                                      .arguments
                                      .iter()
                                      .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
-              format!("new({}) {}", arg.name, class_type.to_cpp_code().unwrap())
+              format!("new({}) {}", arg.name, class_type.to_cpp_code(None).unwrap())
             } else {
               panic!("no return value equivalent argument found");
             }
           }
-          ReturnValueAllocationPlace::Heap => format!("new {}", class_type.to_cpp_code().unwrap()),
+          ReturnValueAllocationPlace::Heap => format!("new {}", class_type.to_cpp_code(None).unwrap()),
           ReturnValueAllocationPlace::NotApplicable => unreachable!(),
         }
       } else {

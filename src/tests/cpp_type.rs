@@ -19,8 +19,10 @@ fn void() {
   assert_eq!(type1.base.is_void(), true);
   assert_eq!(type1.base.is_class(), false);
   assert_eq!(type1.base.is_template_parameter(), false);
-  assert_eq!(type1.to_cpp_code().unwrap(), "void");
-  assert_eq!(type1.base.to_cpp_code().unwrap(), "void");
+  assert_eq!(type1.to_cpp_code(None).unwrap(), "void");
+  assert_eq!(type1.base.to_cpp_code(None).unwrap(), "void");
+  assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+  assert!(type1.base.to_cpp_code(Some(&String::new())).is_err());
   assert_eq!(type1.base.caption(), "void");
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "void");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "void");
@@ -38,8 +40,10 @@ fn void_ptr() {
   assert_eq!(type1.base.is_void(), true);
   assert_eq!(type1.base.is_class(), false);
   assert_eq!(type1.base.is_template_parameter(), false);
-  assert_eq!(type1.to_cpp_code().unwrap(), "void*");
-  assert_eq!(type1.base.to_cpp_code().unwrap(), "void");
+  assert_eq!(type1.to_cpp_code(None).unwrap(), "void*");
+  assert_eq!(type1.base.to_cpp_code(None).unwrap(), "void");
+  assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+  assert!(type1.base.to_cpp_code(Some(&String::new())).is_err());
   assert_eq!(type1.base.caption(), "void");
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "void");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "void_ptr");
@@ -57,8 +61,10 @@ fn int() {
   assert_eq!(type1.base.is_void(), false);
   assert_eq!(type1.base.is_class(), false);
   assert_eq!(type1.base.is_template_parameter(), false);
-  assert_eq!(type1.to_cpp_code().unwrap(), "int");
-  assert_eq!(type1.base.to_cpp_code().unwrap(), "int");
+  assert_eq!(type1.to_cpp_code(None).unwrap(), "int");
+  assert_eq!(type1.base.to_cpp_code(None).unwrap(), "int");
+  assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+  assert!(type1.base.to_cpp_code(Some(&String::new())).is_err());
   assert_eq!(type1.base.caption(), "int");
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "int");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "int");
@@ -76,8 +82,10 @@ fn bool_ptr() {
   assert_eq!(type1.base.is_void(), false);
   assert_eq!(type1.base.is_class(), false);
   assert_eq!(type1.base.is_template_parameter(), false);
-  assert_eq!(type1.to_cpp_code().unwrap(), "bool*");
-  assert_eq!(type1.base.to_cpp_code().unwrap(), "bool");
+  assert_eq!(type1.to_cpp_code(None).unwrap(), "bool*");
+  assert_eq!(type1.base.to_cpp_code(None).unwrap(), "bool");
+  assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+  assert!(type1.base.to_cpp_code(Some(&String::new())).is_err());
   assert_eq!(type1.base.caption(), "bool");
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "bool");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "bool_ptr");
@@ -95,8 +103,10 @@ fn char_ptr_ptr() {
   assert_eq!(type1.base.is_void(), false);
   assert_eq!(type1.base.is_class(), false);
   assert_eq!(type1.base.is_template_parameter(), false);
-  assert_eq!(type1.to_cpp_code().unwrap(), "char**");
-  assert_eq!(type1.base.to_cpp_code().unwrap(), "char");
+  assert_eq!(type1.to_cpp_code(None).unwrap(), "char**");
+  assert_eq!(type1.base.to_cpp_code(None).unwrap(), "char");
+  assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+  assert!(type1.base.to_cpp_code(Some(&String::new())).is_err());
   assert_eq!(type1.base.caption(), "char");
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "char");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "char_ptr_ptr");
@@ -118,8 +128,10 @@ fn qint64() {
   assert_eq!(type1.base.is_void(), false);
   assert_eq!(type1.base.is_class(), false);
   assert_eq!(type1.base.is_template_parameter(), false);
-  assert_eq!(type1.to_cpp_code().unwrap(), "qint64");
-  assert_eq!(type1.base.to_cpp_code().unwrap(), "qint64");
+  assert_eq!(type1.to_cpp_code(None).unwrap(), "qint64");
+  assert_eq!(type1.base.to_cpp_code(None).unwrap(), "qint64");
+  assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+  assert!(type1.base.to_cpp_code(Some(&String::new())).is_err());
   assert_eq!(type1.base.caption(), "qint64");
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "qint64");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "qint64");
@@ -140,8 +152,10 @@ fn quintptr() {
   assert_eq!(type1.base.is_void(), false);
   assert_eq!(type1.base.is_class(), false);
   assert_eq!(type1.base.is_template_parameter(), false);
-  assert_eq!(type1.to_cpp_code().unwrap(), "quintptr");
-  assert_eq!(type1.base.to_cpp_code().unwrap(), "quintptr");
+  assert_eq!(type1.to_cpp_code(None).unwrap(), "quintptr");
+  assert_eq!(type1.base.to_cpp_code(None).unwrap(), "quintptr");
+  assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+  assert!(type1.base.to_cpp_code(Some(&String::new())).is_err());
   assert_eq!(type1.base.caption(), "quintptr");
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "quintptr");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "quintptr");
@@ -159,8 +173,10 @@ fn enum1() {
   assert_eq!(type1.base.is_void(), false);
   assert_eq!(type1.base.is_class(), false);
   assert_eq!(type1.base.is_template_parameter(), false);
-  assert_eq!(type1.to_cpp_code().unwrap(), "Qt::CaseSensitivity");
-  assert_eq!(type1.base.to_cpp_code().unwrap(), "Qt::CaseSensitivity");
+  assert_eq!(type1.to_cpp_code(None).unwrap(), "Qt::CaseSensitivity");
+  assert_eq!(type1.base.to_cpp_code(None).unwrap(), "Qt::CaseSensitivity");
+  assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+  assert!(type1.base.to_cpp_code(Some(&String::new())).is_err());
   assert_eq!(type1.base.caption(), "Qt_CaseSensitivity");
   assert_eq!(type1.caption(TypeCaptionStrategy::Short),
              "Qt_CaseSensitivity");
@@ -184,8 +200,10 @@ fn class_value() {
   assert_eq!(type1.base.is_void(), false);
   assert_eq!(type1.base.is_class(), true);
   assert_eq!(type1.base.is_template_parameter(), false);
-  assert_eq!(type1.to_cpp_code().unwrap(), "QPoint");
-  assert_eq!(type1.base.to_cpp_code().unwrap(), "QPoint");
+  assert_eq!(type1.to_cpp_code(None).unwrap(), "QPoint");
+  assert_eq!(type1.base.to_cpp_code(None).unwrap(), "QPoint");
+  assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+  assert!(type1.base.to_cpp_code(Some(&String::new())).is_err());
   assert_eq!(type1.base.caption(), "QPoint");
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "QPoint");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "QPoint");
@@ -201,7 +219,7 @@ fn class_value() {
                  template_arguments: None,
                },
              });
-  assert_eq!(&ffi_return_type.ffi_type.to_cpp_code().unwrap(), "QPoint*");
+  assert_eq!(&ffi_return_type.ffi_type.to_cpp_code(None).unwrap(), "QPoint*");
   assert_eq!(ffi_return_type.conversion,
              IndirectionChange::ValueToPointer);
 
@@ -216,7 +234,7 @@ fn class_value() {
                  template_arguments: None,
                },
              });
-  assert_eq!(&ffi_arg.ffi_type.to_cpp_code().unwrap(), "const QPoint*");
+  assert_eq!(&ffi_arg.ffi_type.to_cpp_code(None).unwrap(), "const QPoint*");
   assert_eq!(ffi_arg.conversion, IndirectionChange::ValueToPointer);
 }
 
@@ -234,8 +252,10 @@ fn class_const_ref() {
   assert_eq!(type1.base.is_void(), false);
   assert_eq!(type1.base.is_class(), true);
   assert_eq!(type1.base.is_template_parameter(), false);
-  assert_eq!(type1.to_cpp_code().unwrap(), "const QRectF&");
-  assert_eq!(type1.base.to_cpp_code().unwrap(), "QRectF");
+  assert_eq!(type1.to_cpp_code(None).unwrap(), "const QRectF&");
+  assert_eq!(type1.base.to_cpp_code(None).unwrap(), "QRectF");
+  assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+  assert!(type1.base.to_cpp_code(Some(&String::new())).is_err());
   assert_eq!(type1.base.caption(), "QRectF");
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "QRectF");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "const_QRectF_ref");
@@ -252,7 +272,7 @@ fn class_const_ref() {
                    template_arguments: None,
                  },
                });
-    assert_eq!(&ffi1.ffi_type.to_cpp_code().unwrap(), "const QRectF*");
+    assert_eq!(&ffi1.ffi_type.to_cpp_code(None).unwrap(), "const QRectF*");
     assert_eq!(ffi1.conversion, IndirectionChange::ReferenceToPointer);
   }
 }
@@ -271,8 +291,10 @@ fn class_mut_ref() {
   assert_eq!(type1.base.is_void(), false);
   assert_eq!(type1.base.is_class(), true);
   assert_eq!(type1.base.is_template_parameter(), false);
-  assert_eq!(type1.to_cpp_code().unwrap(), "QRectF&");
-  assert_eq!(type1.base.to_cpp_code().unwrap(), "QRectF");
+  assert_eq!(type1.to_cpp_code(None).unwrap(), "QRectF&");
+  assert_eq!(type1.base.to_cpp_code(None).unwrap(), "QRectF");
+  assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+  assert!(type1.base.to_cpp_code(Some(&String::new())).is_err());
   assert_eq!(type1.base.caption(), "QRectF");
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "QRectF");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "QRectF_ref");
@@ -289,7 +311,7 @@ fn class_mut_ref() {
                    template_arguments: None,
                  },
                });
-    assert_eq!(&ffi1.ffi_type.to_cpp_code().unwrap(), "QRectF*");
+    assert_eq!(&ffi1.ffi_type.to_cpp_code(None).unwrap(), "QRectF*");
     assert_eq!(ffi1.conversion, IndirectionChange::ReferenceToPointer);
   }
 }
@@ -308,8 +330,10 @@ fn class_mut_ptr() {
   assert_eq!(type1.base.is_void(), false);
   assert_eq!(type1.base.is_class(), true);
   assert_eq!(type1.base.is_template_parameter(), false);
-  assert_eq!(type1.to_cpp_code().unwrap(), "QObject*");
-  assert_eq!(type1.base.to_cpp_code().unwrap(), "QObject");
+  assert_eq!(type1.to_cpp_code(None).unwrap(), "QObject*");
+  assert_eq!(type1.base.to_cpp_code(None).unwrap(), "QObject");
+  assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+  assert!(type1.base.to_cpp_code(Some(&String::new())).is_err());
   assert_eq!(type1.base.caption(), "QObject");
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "QObject");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "QObject_ptr");
@@ -338,8 +362,10 @@ fn class_with_template_args() {
   assert_eq!(type1.base.is_void(), false);
   assert_eq!(type1.base.is_class(), true);
   assert_eq!(type1.base.is_template_parameter(), false);
-  assert_eq!(type1.to_cpp_code().unwrap(), "QVector< QString >");
-  assert_eq!(type1.base.to_cpp_code().unwrap(), "QVector< QString >");
+  assert_eq!(type1.to_cpp_code(None).unwrap(), "QVector< QString >");
+  assert_eq!(type1.base.to_cpp_code(None).unwrap(), "QVector< QString >");
+  assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+  assert!(type1.base.to_cpp_code(Some(&String::new())).is_err());
   assert_eq!(type1.base.caption(), "QVector_QString");
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "QVector_QString");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "QVector_QString");
@@ -355,7 +381,7 @@ fn class_with_template_args() {
                  template_arguments: args.clone(),
                },
              });
-  assert_eq!(&ffi_return_type.ffi_type.to_cpp_code().unwrap(),
+  assert_eq!(&ffi_return_type.ffi_type.to_cpp_code(None).unwrap(),
              "QVector< QString >*");
   assert_eq!(ffi_return_type.conversion,
              IndirectionChange::ValueToPointer);
@@ -371,7 +397,7 @@ fn class_with_template_args() {
                  template_arguments: args.clone(),
                },
              });
-  assert_eq!(&ffi_arg.ffi_type.to_cpp_code().unwrap(),
+  assert_eq!(&ffi_arg.ffi_type.to_cpp_code(None).unwrap(),
              "const QVector< QString >*");
   assert_eq!(ffi_arg.conversion, IndirectionChange::ValueToPointer);
 
@@ -395,8 +421,10 @@ fn template_parameter() {
   assert_eq!(type1.base.is_void(), false);
   assert_eq!(type1.base.is_class(), false);
   assert_eq!(type1.base.is_template_parameter(), true);
-  assert!(type1.to_cpp_code().is_err());
-  assert!(type1.base.to_cpp_code().is_err());
+  assert!(type1.to_cpp_code(None).is_err());
+  assert!(type1.base.to_cpp_code(None).is_err());
+  assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+  assert!(type1.base.to_cpp_code(Some(&String::new())).is_err());
   assert!(type1.to_cpp_ffi_type(CppTypeRole::NotReturnType).is_err());
   assert!(type1.to_cpp_ffi_type(CppTypeRole::ReturnType).is_err());
 }
@@ -450,8 +478,11 @@ fn function1() {
   assert_eq!(type1.base.is_void(), false);
   assert_eq!(type1.base.is_class(), false);
   assert_eq!(type1.base.is_template_parameter(), false);
-  assert_eq!(type1.base.to_cpp_code().unwrap(), "int (*FN_PTR)(int, bool*)");
-  assert_eq!(type1.to_cpp_code().unwrap(), type1.base.to_cpp_code().unwrap());
+  let name = "my_name".to_string();
+  assert_eq!(type1.base.to_cpp_code(Some(&name)).unwrap(), "int (*my_name)(int, bool*)");
+  assert_eq!(type1.to_cpp_code(Some(&name)).unwrap(), type1.base.to_cpp_code(Some(&name)).unwrap());
+  assert!(type1.to_cpp_code(None).is_err());
+  assert!(type1.base.to_cpp_code(None).is_err());
   assert_eq!(type1.base.caption(), "func");
   assert_eq!(type1.caption(TypeCaptionStrategy::Short), "func");
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "func");
