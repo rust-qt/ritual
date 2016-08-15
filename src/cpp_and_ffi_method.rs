@@ -39,6 +39,13 @@ impl CppMethodWithFfiSignature {
       CppMethodScope::Class(ref class_name) => format!("{}_", class_name.replace("::", "_")),
       CppMethodScope::Global => format!("{}_G_", include_file),
     };
+    let add_place_note = |name| {
+      match self.allocation_place {
+        ReturnValueAllocationPlace::Stack => format!("{}_to_output", name),
+        ReturnValueAllocationPlace::Heap => format!("{}_as_ptr", name),
+        ReturnValueAllocationPlace::NotApplicable => name,
+      }
+    };
     let method_name = match self.cpp_method.kind {
       CppMethodKind::Constructor => {
         match self.allocation_place {
@@ -55,14 +62,14 @@ impl CppMethodWithFfiSignature {
         }
       }
       CppMethodKind::Operator(ref operator) => {
-        match *operator {
+        add_place_note(match *operator {
           CppOperator::Conversion(ref cpp_type) => {
             format!("operator_{}", cpp_type.caption(TypeCaptionStrategy::Full))
           }
           _ => format!("OP_{}", operator.c_name()),
-        }
+        })
       }
-      CppMethodKind::Regular => self.cpp_method.name.replace("::", "_"),
+      CppMethodKind::Regular => add_place_note(self.cpp_method.name.replace("::", "_")),
 
     };
     Ok(scope_prefix + &method_name)

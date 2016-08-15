@@ -1,5 +1,5 @@
 use cpp_type::{CppType, CppTypeIndirection, CppTypeRole};
-use cpp_ffi_type::{CppFfiType, IndirectionChange};
+use cpp_ffi_type::{CppFfiType};
 use cpp_ffi_function_signature::CppFfiFunctionSignature;
 use cpp_ffi_function_argument::{CppFfiFunctionArgument, CppFfiArgumentMeaning};
 use cpp_and_ffi_method::CppMethodWithFfiSignature;
@@ -15,18 +15,10 @@ pub enum ReturnValueAllocationPlace {
   /// the method returns a class object by value (or is a constructor), and
   /// it's translated to pointer FFI return type and plain new
   Heap,
-  /// the method does not return a class object by value
+  /// the method does not return a class object by value, so
+  /// there is only one FFI wrapper for it
   NotApplicable,
 }
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum AllocationPlaceImportance {
-  /// the method returns a class object by value (or is a constructor)
-  Important,
-  /// the method does not return a class object by value
-  NotImportant,
-}
-
 
 impl CppMethodScope {
   pub fn class_name(&self) -> Option<&String> {
@@ -85,13 +77,26 @@ impl CppMethod {
     true
   }
 
+  /// Checks if this method would need
+  /// to have 2 wrappers with 2 different return value allocation places
+  pub fn needs_allocation_place_variants(&self) -> bool {
+    if self.kind.is_constructor() || self.kind.is_destructor() {
+      return true;
+    }
+    if let Some(ref t) = self.return_type {
+      if t.needs_allocation_place_variants() {
+        return true;
+      }
+    }
+    false
+  }
+
   pub fn c_signature(&self,
                      allocation_place: ReturnValueAllocationPlace)
-                     -> Result<(CppFfiFunctionSignature, AllocationPlaceImportance), String> {
+                     -> Result<CppFfiFunctionSignature, String> {
     if self.allows_variable_arguments {
       return Err("Variable arguments are not supported".to_string());
     }
-    let mut allocation_place_importance = AllocationPlaceImportance::NotImportant;
     let mut r = CppFfiFunctionSignature {
       arguments: Vec::new(),
       return_type: CppFfiType::void(),
@@ -137,19 +142,21 @@ impl CppMethod {
     if let Some(return_type) = real_return_type {
       match return_type.to_cpp_ffi_type(CppTypeRole::ReturnType) {
         Ok(c_type) => {
-          let is_stack_allocated_struct = return_type.indirection == CppTypeIndirection::None &&
-                                          return_type.base.is_class() &&
-                                          c_type.conversion != IndirectionChange::QFlagsToUInt;
-          if is_stack_allocated_struct {
-            allocation_place_importance = AllocationPlaceImportance::Important;
-            if allocation_place == ReturnValueAllocationPlace::Stack {
-              r.arguments.push(CppFfiFunctionArgument {
-                name: "output".to_string(),
-                argument_type: c_type,
-                meaning: CppFfiArgumentMeaning::ReturnValue,
-              });
-            } else {
-              r.return_type = c_type;
+          if return_type.needs_allocation_place_variants() {
+            match allocation_place {
+              ReturnValueAllocationPlace::Stack => {
+                r.arguments.push(CppFfiFunctionArgument {
+                  name: "output".to_string(),
+                  argument_type: c_type,
+                  meaning: CppFfiArgumentMeaning::ReturnValue,
+                });
+              }
+              ReturnValueAllocationPlace::Heap => {
+                r.return_type = c_type;
+              }
+              ReturnValueAllocationPlace::NotApplicable => {
+                panic!("NotApplicable encountered but return value needs allocation_place variants")
+              }
             }
           } else {
             r.return_type = c_type;
@@ -160,44 +167,25 @@ impl CppMethod {
         }
       }
     }
-    if self.kind == CppMethodKind::Destructor {
-      allocation_place_importance = AllocationPlaceImportance::Important;
-    }
-    Ok((r, allocation_place_importance))
+    Ok(r)
   }
 
-  pub fn add_c_signatures
-    (&self)
-     -> Result<(CppMethodWithFfiSignature, Option<CppMethodWithFfiSignature>), String> {
-    match self.c_signature(ReturnValueAllocationPlace::Heap) {
-      Ok((c_signature, importance)) => {
-        let result1 = CppMethodWithFfiSignature {
-          cpp_method: self.clone(),
-          allocation_place: match importance {
-            AllocationPlaceImportance::Important => ReturnValueAllocationPlace::Heap,
-            AllocationPlaceImportance::NotImportant => ReturnValueAllocationPlace::NotApplicable,
-          },
-          c_signature: c_signature,
-        };
-        match importance {
-          AllocationPlaceImportance::Important => {
-            match self.c_signature(ReturnValueAllocationPlace::Stack) {
-              Ok((c_signature2, _)) => {
-                Ok((result1,
-                    Some(CppMethodWithFfiSignature {
-                  cpp_method: self.clone(),
-                  allocation_place: ReturnValueAllocationPlace::Stack,
-                  c_signature: c_signature2,
-                })))
-              }
-              Err(msg) => Err(msg),
-            }
-          }
-          AllocationPlaceImportance::NotImportant => Ok((result1, None)),
-        }
-      }
-      Err(msg) => Err(msg),
+  pub fn to_ffi_signatures(&self) -> Result<Vec<CppMethodWithFfiSignature>, String> {
+    let places = if self.needs_allocation_place_variants() {
+      vec![ReturnValueAllocationPlace::Heap, ReturnValueAllocationPlace::Stack]
+    } else {
+      vec![ReturnValueAllocationPlace::NotApplicable]
+    };
+    let mut results = Vec::new();
+    for place in places {
+      let c_signature = try!(self.c_signature(place.clone()));
+      results.push(CppMethodWithFfiSignature {
+        cpp_method: self.clone(),
+        allocation_place: place,
+        c_signature: c_signature,
+      });
     }
+    Ok(results)
   }
 
   pub fn full_name(&self) -> String {

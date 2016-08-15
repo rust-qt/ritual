@@ -229,33 +229,22 @@ impl CGenerator {
           }
         }
 
-        match method.add_c_signatures() {
+        match method.to_ffi_signatures() {
           Err(msg) => {
             log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
                                  method.short_text(),
                                  msg));
           }
-          Ok((result_heap, result_stack)) => {
-            match result_heap.c_base_name(include_file_base_name) {
-              Err(msg) => {
-                log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
-                                     method.short_text(),
-                                     msg));
-              }
-              Ok(mut heap_name) => {
-                if let Some(result_stack) = result_stack {
-                  let stack_name = result_stack.c_base_name(include_file_base_name).unwrap();
-                  //                  if result_heap.allocation_place == ReturnValueAllocationPlace::Heap {
-                  //                  }
-                  if stack_name == heap_name {
-                    heap_name = format!("{}_as_ptr", heap_name);
-                    //                    stack_name = format!("{}_SA", stack_name);
-                    //                    heap_name = format!("{}_HA", heap_name);
-                  }
-                  insert_into_hash(&mut hash1, stack_name, result_stack);
-                  insert_into_hash(&mut hash1, heap_name, result_heap);
-                } else {
-                  insert_into_hash(&mut hash1, heap_name, result_heap);
+          Ok(results) => {
+            for result in results {
+              match result.c_base_name(include_file_base_name) {
+                Err(msg) => {
+                  log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
+                                       method.short_text(),
+                                       msg));
+                }
+                Ok(name) => {
+                  insert_into_hash(&mut hash1, name, result);
                 }
               }
             }

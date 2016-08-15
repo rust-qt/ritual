@@ -80,7 +80,9 @@ impl CppTypeBase {
       _ => false,
     }
   }
-  pub fn to_cpp_code(&self, function_pointer_inner_text: Option<&String>) -> Result<String, String> {
+  pub fn to_cpp_code(&self,
+                     function_pointer_inner_text: Option<&String>)
+                     -> Result<String, String> {
     match *self {
       CppTypeBase::FunctionPointer { .. } => {}
       _ => {
@@ -130,6 +132,9 @@ impl CppTypeBase {
       }
     }
   }
+
+  /// Generates alphanumeric representation of self
+  /// used to generate FFI function names
   pub fn caption(&self) -> String {
     match *self {
       CppTypeBase::Void => "void".to_string(),
@@ -178,7 +183,9 @@ impl CppType {
     !self.is_const && self.indirection == CppTypeIndirection::None && self.base == CppTypeBase::Void
   }
 
-  pub fn to_cpp_code(&self, function_pointer_inner_text: Option<&String>) -> Result<String, String> {
+  pub fn to_cpp_code(&self,
+                     function_pointer_inner_text: Option<&String>)
+                     -> Result<String, String> {
     let name = try!(self.base.to_cpp_code(function_pointer_inner_text));
     Ok(format!("{}{}{}",
                if self.is_const {
@@ -197,6 +204,9 @@ impl CppType {
                }))
   }
 
+  /// Converts this C++ type to its adaptation for FFI interface,
+  /// removing all features not supported by C ABI
+  /// (e.g. references and passing objects by value)
   pub fn to_cpp_ffi_type(&self, role: CppTypeRole) -> Result<CppFfiType, String> {
     match self.base {
       CppTypeBase::TemplateParameter { .. } => {
@@ -285,6 +295,8 @@ impl CppType {
     })
   }
 
+  /// Generates alphanumeric representation of self
+  /// used to generate FFI function names
   pub fn caption(&self, strategy: TypeCaptionStrategy) -> String {
     match strategy {
       TypeCaptionStrategy::Short => self.base.caption(),
@@ -304,5 +316,16 @@ impl CppType {
         r
       }
     }
+  }
+
+  /// Checks if a function with this return type would need
+  /// to have 2 wrappers with 2 different return value allocation places
+  pub fn needs_allocation_place_variants(&self) -> bool {
+    if let CppTypeBase::Class { ref name, .. } = self.base {
+      if name == "QFlags" {
+        return false; // converted to uint in FFI
+      }
+    }
+    return self.indirection == CppTypeIndirection::None && self.base.is_class();
   }
 }
