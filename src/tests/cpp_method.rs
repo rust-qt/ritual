@@ -290,9 +290,11 @@ fn c_signature_simple_func() {
   assert_eq!(r.arguments[0].name, "arg1");
   assert_eq!(r.arguments[0].argument_type.ffi_type,
              method1.arguments[0].argument_type);
-  assert_eq!(r.arguments[0].argument_type.conversion, IndirectionChange::NoChange);
+  assert_eq!(r.arguments[0].argument_type.conversion,
+             IndirectionChange::NoChange);
   assert_eq!(r.arguments[0].meaning, CppFfiArgumentMeaning::Argument(0));
   assert_eq!(r.return_type.ffi_type, method1.return_type.unwrap());
+  assert_eq!(r.return_type.conversion, IndirectionChange::NoChange);
 }
 
 #[test]
@@ -327,7 +329,8 @@ fn c_signature_method_with_this() {
              method1.class_type.unwrap());
   assert_eq!(r.arguments[0].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
-  assert_eq!(r.arguments[0].argument_type.conversion, IndirectionChange::NoChange);
+  assert_eq!(r.arguments[0].argument_type.conversion,
+             IndirectionChange::NoChange);
   assert_eq!(r.arguments[0].meaning, CppFfiArgumentMeaning::This);
 
   assert_eq!(r.arguments[1].name, "my_arg");
@@ -335,7 +338,120 @@ fn c_signature_method_with_this() {
              method1.arguments[0].argument_type.base);
   assert_eq!(r.arguments[1].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
-  assert_eq!(r.arguments[1].argument_type.conversion, IndirectionChange::ValueToPointer);
+  assert_eq!(r.arguments[1].argument_type.conversion,
+             IndirectionChange::ValueToPointer);
   assert_eq!(r.arguments[1].meaning, CppFfiArgumentMeaning::Argument(0));
   assert_eq!(r.return_type.ffi_type, method1.return_type.unwrap());
 }
+
+#[test]
+fn c_signature_static_method() {
+  let mut method1 = empty_regular_method();
+  method1.scope = CppMethodScope::Class("MyClass".to_string());
+  method1.class_type = Some(CppTypeBase::Class {
+    name: "MyClass".to_string(),
+    template_arguments: None,
+  });
+  method1.is_static = true;
+  method1.return_type = Some(CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+  });
+  method1.arguments.push(CppFunctionArgument {
+    argument_type: CppType {
+      indirection: CppTypeIndirection::None,
+      is_const: false,
+      base: CppTypeBase::Enum { name: "Enum1".to_string() },
+    },
+    name: "arg1".to_string(),
+    has_default_value: false,
+  });
+  let r = method1.c_signature(ReturnValueAllocationPlace::NotApplicable).unwrap();
+  assert!(r.arguments.len() == 1);
+  assert_eq!(r.arguments[0].name, "arg1");
+  assert_eq!(r.arguments[0].argument_type.ffi_type,
+             method1.arguments[0].argument_type);
+  assert_eq!(r.arguments[0].argument_type.conversion,
+             IndirectionChange::NoChange);
+  assert_eq!(r.arguments[0].meaning, CppFfiArgumentMeaning::Argument(0));
+  assert_eq!(r.return_type.ffi_type, method1.return_type.unwrap());
+}
+
+
+#[test]
+fn c_signature_constructor() {
+  let mut method1 = empty_regular_method();
+  method1.kind = CppMethodKind::Constructor;
+  method1.scope = CppMethodScope::Class("MyClass".to_string());
+  method1.class_type = Some(CppTypeBase::Class {
+    name: "MyClass".to_string(),
+    template_arguments: None,
+  });
+  method1.arguments.push(CppFunctionArgument {
+    argument_type: CppType {
+      indirection: CppTypeIndirection::Ref,
+      is_const: true,
+      base: CppTypeBase::Enum { name: "Enum1".to_string() },
+    },
+    name: "arg1".to_string(),
+    has_default_value: true,
+  });
+  let r_stack = method1.c_signature(ReturnValueAllocationPlace::Stack).unwrap();
+  assert!(r_stack.arguments.len() == 2);
+  assert_eq!(r_stack.arguments[0].name, "arg1");
+  assert_eq!(r_stack.arguments[0].argument_type.ffi_type,
+             CppType {
+               indirection: CppTypeIndirection::Ptr,
+               is_const: true,
+               base: CppTypeBase::Enum { name: "Enum1".to_string() },
+             });
+  assert_eq!(r_stack.arguments[0].argument_type.conversion,
+             IndirectionChange::ReferenceToPointer);
+  assert_eq!(r_stack.arguments[0].meaning, CppFfiArgumentMeaning::Argument(0));
+
+  assert_eq!(r_stack.arguments[1].name, "output");
+  assert_eq!(r_stack.arguments[1].argument_type.ffi_type,
+             CppType {
+               indirection: CppTypeIndirection::Ptr,
+               is_const: false,
+               base: CppTypeBase::Class {
+                 name: "MyClass".to_string(),
+                 template_arguments: None,
+               },
+             });
+  assert_eq!(r_stack.arguments[1].argument_type.conversion,
+             IndirectionChange::ValueToPointer);
+  assert_eq!(r_stack.arguments[1].meaning, CppFfiArgumentMeaning::ReturnValue);
+
+  assert!(r_stack.return_type.ffi_type.is_void());
+
+  let r_heap = method1.c_signature(ReturnValueAllocationPlace::Heap).unwrap();
+  assert!(r_heap.arguments.len() == 1);
+  assert_eq!(r_heap.arguments[0].name, "arg1");
+  assert_eq!(r_heap.arguments[0].argument_type.ffi_type,
+             CppType {
+               indirection: CppTypeIndirection::Ptr,
+               is_const: true,
+               base: CppTypeBase::Enum { name: "Enum1".to_string() },
+             });
+  assert_eq!(r_heap.arguments[0].argument_type.conversion,
+             IndirectionChange::ReferenceToPointer);
+  assert_eq!(r_heap.arguments[0].meaning, CppFfiArgumentMeaning::Argument(0));
+  assert_eq!(r_heap.return_type.ffi_type,
+             CppType {
+               indirection: CppTypeIndirection::Ptr,
+               is_const: false,
+               base: CppTypeBase::Class {
+                 name: "MyClass".to_string(),
+                 template_arguments: None,
+               },
+             });
+  assert_eq!(r_heap.return_type.conversion,
+             IndirectionChange::ValueToPointer);
+}
+
+// TODO: add tests for:
+// - destructor
+// - class method returning a class value
+// - class method with a class value argument but int return type
