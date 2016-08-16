@@ -408,7 +408,8 @@ fn c_signature_constructor() {
              });
   assert_eq!(r_stack.arguments[0].argument_type.conversion,
              IndirectionChange::ReferenceToPointer);
-  assert_eq!(r_stack.arguments[0].meaning, CppFfiArgumentMeaning::Argument(0));
+  assert_eq!(r_stack.arguments[0].meaning,
+             CppFfiArgumentMeaning::Argument(0));
 
   assert_eq!(r_stack.arguments[1].name, "output");
   assert_eq!(r_stack.arguments[1].argument_type.ffi_type,
@@ -422,7 +423,8 @@ fn c_signature_constructor() {
              });
   assert_eq!(r_stack.arguments[1].argument_type.conversion,
              IndirectionChange::ValueToPointer);
-  assert_eq!(r_stack.arguments[1].meaning, CppFfiArgumentMeaning::ReturnValue);
+  assert_eq!(r_stack.arguments[1].meaning,
+             CppFfiArgumentMeaning::ReturnValue);
 
   assert!(r_stack.return_type.ffi_type.is_void());
 
@@ -437,7 +439,8 @@ fn c_signature_constructor() {
              });
   assert_eq!(r_heap.arguments[0].argument_type.conversion,
              IndirectionChange::ReferenceToPointer);
-  assert_eq!(r_heap.arguments[0].meaning, CppFfiArgumentMeaning::Argument(0));
+  assert_eq!(r_heap.arguments[0].meaning,
+             CppFfiArgumentMeaning::Argument(0));
   assert_eq!(r_heap.return_type.ffi_type,
              CppType {
                indirection: CppTypeIndirection::Ptr,
@@ -533,7 +536,8 @@ fn c_signature_method_returning_class() {
              CppTypeIndirection::Ptr);
   assert_eq!(r_stack.arguments[1].argument_type.conversion,
              IndirectionChange::ValueToPointer);
-  assert_eq!(r_stack.arguments[1].meaning, CppFfiArgumentMeaning::Argument(0));
+  assert_eq!(r_stack.arguments[1].meaning,
+             CppFfiArgumentMeaning::Argument(0));
 
   assert_eq!(r_stack.arguments[2].name, "output");
   assert_eq!(r_stack.arguments[2].argument_type.ffi_type,
@@ -547,7 +551,8 @@ fn c_signature_method_returning_class() {
              });
   assert_eq!(r_stack.arguments[2].argument_type.conversion,
              IndirectionChange::ValueToPointer);
-  assert_eq!(r_stack.arguments[2].meaning, CppFfiArgumentMeaning::ReturnValue);
+  assert_eq!(r_stack.arguments[2].meaning,
+             CppFfiArgumentMeaning::ReturnValue);
 
   assert!(r_stack.return_type.ffi_type.is_void());
 
@@ -569,7 +574,8 @@ fn c_signature_method_returning_class() {
              CppTypeIndirection::Ptr);
   assert_eq!(r_heap.arguments[1].argument_type.conversion,
              IndirectionChange::ValueToPointer);
-  assert_eq!(r_heap.arguments[1].meaning, CppFfiArgumentMeaning::Argument(0));
+  assert_eq!(r_heap.arguments[1].meaning,
+             CppFfiArgumentMeaning::Argument(0));
 
   assert_eq!(r_heap.return_type.ffi_type,
              CppType {
@@ -583,4 +589,3 @@ fn c_signature_method_returning_class() {
   assert_eq!(r_heap.return_type.conversion,
              IndirectionChange::ValueToPointer);
 }
-

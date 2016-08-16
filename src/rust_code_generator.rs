@@ -64,7 +64,7 @@ impl RustCodeGenerator {
       }
       None => {
         let mut rustfmt_file = File::create(self.config.output_path.with_added("rustfmt.toml"))
-                                 .unwrap();
+          .unwrap();
         rustfmt_file.write(include_bytes!("../templates/crate/rustfmt.toml")).unwrap();
       }
     };
@@ -82,13 +82,13 @@ impl RustCodeGenerator {
                      table.insert("version".to_string(),
                                   toml::Value::String(self.config.crate_version.clone()));
                      let mut authors: Vec<_> = self.config
-                                                   .crate_authors
-                                                   .iter()
-                                                   .map(|x| toml::Value::String(x.clone()))
-                                                   .collect();
+                       .crate_authors
+                       .iter()
+                       .map(|x| toml::Value::String(x.clone()))
+                       .collect();
                      authors.push(toml::Value::String("cpp_to_rust generator \
                                                        (https://github.com/rust-qt/cpp_to_rust)"
-                                                        .to_string()));
+                       .to_string()));
                      table.insert("authors".to_string(), toml::Value::Array(authors));
                      table.insert("build".to_string(),
                                   toml::Value::String("build.rs".to_string()));
@@ -104,7 +104,7 @@ impl RustCodeGenerator {
                                     table.insert("git".to_string(),
                                                  toml::Value::String("https://github.\
                                                                       com/rust-qt/cpp_box.git"
-                                                                       .to_string()));
+                                                   .to_string()));
                                     table
                                   }));
                      table
@@ -112,7 +112,7 @@ impl RustCodeGenerator {
       table
     });
     let mut cargo_toml_file = File::create(self.config.output_path.with_added("Cargo.toml"))
-                                .unwrap();
+      .unwrap();
     write!(cargo_toml_file, "{}", cargo_toml_data).unwrap();
 
     for item in fs::read_dir(&self.config.template_path).unwrap() {
@@ -176,12 +176,12 @@ impl RustCodeGenerator {
 
   fn rust_ffi_function_to_code(&self, func: &RustFFIFunction) -> String {
     let args = func.arguments
-                   .iter()
-                   .map(|arg| {
-                     format!("{}: {}",
-                             arg.name,
-                             self.rust_type_to_code(&arg.argument_type))
-                   });
+      .iter()
+      .map(|arg| {
+        format!("{}: {}",
+                arg.name,
+                self.rust_type_to_code(&arg.argument_type))
+      });
     format!("  pub fn {}({}){};\n",
             func.name,
             args.join(", "),
@@ -215,17 +215,13 @@ impl RustCodeGenerator {
         }
         RustToCTypeConversion::ValueToPtr => {
           let is_const = if let RustType::Common { ref is_const, .. } = arg.argument_type
-                                                                           .rust_ffi_type {
+            .rust_ffi_type {
             *is_const
           } else {
             panic!("void is not expected here at all!")
           };
           code = format!("{}{} as {}",
-                         if is_const {
-                           "&"
-                         } else {
-                           "&mut "
-                         },
+                         if is_const { "&" } else { "&mut " },
                          code,
                          self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
         }
@@ -268,18 +264,14 @@ impl RustCodeGenerator {
       RustToCTypeConversion::None => {}
       RustToCTypeConversion::RefToPtr => {
         let is_const = if let RustType::Common { ref is_const, .. } = func.return_type
-                                                                          .rust_ffi_type {
+          .rust_ffi_type {
           *is_const
         } else {
           panic!("void is not expected here at all!")
         };
         code = format!("let ffi_result = {};\nunsafe {{ {}*ffi_result }}",
                        code,
-                       if is_const {
-                         "& "
-                       } else {
-                         "&mut "
-                       });
+                       if is_const { "& " } else { "&mut " });
       }
       RustToCTypeConversion::ValueToPtr => {
         if maybe_result_var_name.is_none() {
@@ -319,27 +311,27 @@ impl RustCodeGenerator {
     };
     let arg_texts = |args: &Vec<RustMethodArgument>| -> Vec<String> {
       args.iter()
-          .map(|arg| {
-            let mut maybe_mut_declaration = "";
-            if let RustType::Common { ref indirection, .. } = arg.argument_type
-                                                                 .rust_api_type {
-              if *indirection == RustTypeIndirection::None &&
-                 arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr {
-                if let RustType::Common { ref is_const, .. } = arg.argument_type
-                                                                  .rust_ffi_type {
-                  if !is_const {
-                    maybe_mut_declaration = "mut ";
-                  }
+        .map(|arg| {
+          let mut maybe_mut_declaration = "";
+          if let RustType::Common { ref indirection, .. } = arg.argument_type
+            .rust_api_type {
+            if *indirection == RustTypeIndirection::None &&
+               arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr {
+              if let RustType::Common { ref is_const, .. } = arg.argument_type
+                .rust_ffi_type {
+                if !is_const {
+                  maybe_mut_declaration = "mut ";
                 }
               }
             }
+          }
 
-            format!("{}{}: {}",
-                    maybe_mut_declaration,
-                    arg.name,
-                    self.rust_type_to_code(&arg.argument_type.rust_api_type))
-          })
-          .collect()
+          format!("{}{}: {}",
+                  maybe_mut_declaration,
+                  arg.name,
+                  self.rust_type_to_code(&arg.argument_type.rust_api_type))
+        })
+        .collect()
     };
     match func.arguments {
       RustMethodArguments::SingleVariant(ref variant) => {
@@ -381,16 +373,8 @@ impl RustCodeGenerator {
                     self.generate_ffi_call(func, variant, shared_arguments))
           })
                              .join("\n"));
-        let lifetime_arg = if *enum_has_lifetime {
-          "'a, "
-        } else {
-          ""
-        };
-        let lifetime_specifier = if *enum_has_lifetime {
-          "<'a>"
-        } else {
-          ""
-        };
+        let lifetime_arg = if *enum_has_lifetime { "'a, " } else { "" };
+        let lifetime_specifier = if *enum_has_lifetime { "<'a>" } else { "" };
         format!("{pubq}fn {name}<{lfarg}{tpl_type}: {trt}{lf}>({args}){ret} {{\n{body}}}\n\n",
                 pubq = public_qualifier,
                 lfarg = lifetime_arg,
@@ -447,7 +431,7 @@ impl RustCodeGenerator {
     let mut results = Vec::new();
     results.push("#[allow(unused_imports)]
       use {libc, cpp_box, std};\n\n"
-                   .to_string());
+      .to_string());
 
     for type1 in &data.types {
       match type1.kind {
@@ -458,8 +442,8 @@ impl RustCodeGenerator {
                                    {} {{\n{}\n}}\n\n",
                                   type1.name.last_name(),
                                   values.iter()
-                                        .map(|item| format!("  {} = {}", item.name, item.value))
-                                        .join(", \n"));
+                                    .map(|item| format!("  {} = {}", item.name, item.value))
+                                    .join(", \n"));
               if *is_flaggable {
                 r = format!("{}impl ::flags::FlaggableEnum for {} {{\n
                            \
@@ -488,8 +472,8 @@ impl RustCodeGenerator {
             results.push(format!("impl {} {{\n{}}}\n\n",
                                  type1.name.last_name(),
                                  methods.iter()
-                                        .map(|method| self.generate_rust_final_function(method))
-                                        .join("")));
+                                   .map(|method| self.generate_rust_final_function(method))
+                                   .join("")));
           }
           for trait1 in traits {
             let trait_content = match trait1.trait_name {
@@ -499,9 +483,9 @@ impl RustCodeGenerator {
               }
               _ => {
                 trait1.methods
-                      .iter()
-                      .map(|method| self.generate_rust_final_function(method))
-                      .join("")
+                  .iter()
+                  .map(|method| self.generate_rust_final_function(method))
+                  .join("")
               }
             };
 
@@ -514,31 +498,25 @@ impl RustCodeGenerator {
         RustTypeDeclarationKind::MethodParametersEnum { ref variants,
                                                         ref trait_name,
                                                         ref enum_has_lifetime } => {
-          let lifetime = if *enum_has_lifetime {
-            Some("a")
-          } else {
-            None
-          };
+          let lifetime = if *enum_has_lifetime { Some("a") } else { None };
           let var_texts = variants.iter()
-                                  .enumerate()
-                                  .map(|(num, variant)| {
-                                    let mut tuple_text = variant.iter()
-                                                                .map(|t| {
-                                                                  match lifetime {
-                                                                    Some(lifetime) => {
+            .enumerate()
+            .map(|(num, variant)| {
+              let mut tuple_text = variant.iter()
+                .map(|t| {
+                  match lifetime {
+                    Some(lifetime) => {
                       self.rust_type_to_code(&t.with_lifetime(lifetime.to_string()))
                     }
-                                                                    None => {
-                                                                      self.rust_type_to_code(t)
-                                                                    }
-                                                                  }
-                                                                })
-                                                                .join(",");
-                                    if !tuple_text.is_empty() {
-                                      tuple_text = format!("({})", tuple_text);
-                                    }
-                                    format!("Variant{}{},", num, tuple_text)
-                                  });
+                    None => self.rust_type_to_code(t),
+                  }
+                })
+                .join(",");
+              if !tuple_text.is_empty() {
+                tuple_text = format!("({})", tuple_text);
+              }
+              format!("Variant{}{},", num, tuple_text)
+            });
           results.push(format!("pub enum {}{} {{\n{}\n}}\n\n",
                                type1.name.last_name(),
                                match lifetime {
@@ -549,15 +527,13 @@ impl RustCodeGenerator {
 
           for (num, variant) in variants.iter().enumerate() {
             let tuple_item_types: Vec<_> = variant.iter()
-                                                  .map(|t| {
-                                                    match lifetime {
-                                                      Some(lifetime) => {
-                           self.rust_type_to_code(&t.with_lifetime(lifetime.to_string()))
-                         }
-                                                      None => self.rust_type_to_code(t),
-                                                    }
-                                                  })
-                                                  .collect();
+              .map(|t| {
+                match lifetime {
+                  Some(lifetime) => self.rust_type_to_code(&t.with_lifetime(lifetime.to_string())),
+                  None => self.rust_type_to_code(t),
+                }
+              })
+              .collect();
             let type_text = if tuple_item_types.len() == 1 {
               tuple_item_types[0].clone()
             } else {
@@ -570,9 +546,9 @@ impl RustCodeGenerator {
             } else {
               format!("({})",
                       variant.iter()
-                             .enumerate()
-                             .map(|(num2, _)| format!("self.{}", num2))
-                             .join(", "))
+                        .enumerate()
+                        .map(|(num2, _)| format!("self.{}", num2))
+                        .join(", "))
             };
             results.push(format!("impl{lf} {trt}{lf} for {type_text} {{\nfn as_enum(self) -> \
                              {enm}{lf} {{\n{enm}::Variant{num}{variant_value}\n}}\n}}\n\n",
@@ -588,11 +564,7 @@ impl RustCodeGenerator {
           }
         }
         RustTypeDeclarationKind::MethodParametersTrait { ref enum_name, ref enum_has_lifetime } => {
-          let lifetime_specifier = if *enum_has_lifetime {
-            "<'a>"
-          } else {
-            ""
-          };
+          let lifetime_specifier = if *enum_has_lifetime { "<'a>" } else { "" };
           results.push(format!("pub trait {name}{lf} {{\nfn as_enum(self) -> \
                                 {enm}{lf};\n}}",
                                name = type1.name.last_name(),

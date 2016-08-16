@@ -6,9 +6,7 @@ use cpp_type::CppType;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RustMethodScope {
-  Impl {
-    type_name: RustName,
-  },
+  Impl { type_name: RustName },
   TraitImpl {
     type_name: RustName,
     trait_name: TraitName,
@@ -83,7 +81,7 @@ impl RustMethod {
       let arg = args.get(0).unwrap();
       if arg.name == "self" {
         if let RustType::Common { ref indirection, ref is_const, .. } = arg.argument_type
-                                                                           .rust_api_type {
+          .rust_api_type {
           match *indirection {
             RustTypeIndirection::Ref { .. } => {
               if *is_const {
@@ -109,9 +107,7 @@ impl RustMethod {
 #[allow(dead_code)]
 pub enum TraitName {
   Clone,
-  CppDeletable {
-    deleter_name: String,
-  },
+  CppDeletable { deleter_name: String },
   Debug,
   Default,
   Display,
@@ -174,9 +170,7 @@ pub enum RustTypeWrapperKind {
     values: Vec<EnumValue>,
     is_flaggable: bool,
   },
-  Struct {
-    size: i32,
-  },
+  Struct { size: i32 },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

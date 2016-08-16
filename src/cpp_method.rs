@@ -1,5 +1,5 @@
 use cpp_type::{CppType, CppTypeIndirection, CppTypeRole};
-use cpp_ffi_type::{CppFfiType};
+use cpp_ffi_type::CppFfiType;
 use cpp_ffi_function_signature::CppFfiFunctionSignature;
 use cpp_ffi_function_argument::{CppFfiFunctionArgument, CppFfiArgumentMeaning};
 use cpp_and_ffi_method::CppMethodWithFfiSignature;
@@ -110,12 +110,12 @@ impl CppMethod {
         r.arguments.push(CppFfiFunctionArgument {
           name: "this_ptr".to_string(),
           argument_type: CppType {
-                           base: self.class_type.clone().unwrap(),
-                           is_const: self.is_const,
-                           indirection: CppTypeIndirection::Ptr,
-                         }
-                         .to_cpp_ffi_type(CppTypeRole::NotReturnType)
-                         .unwrap(),
+              base: self.class_type.clone().unwrap(),
+              is_const: self.is_const,
+              indirection: CppTypeIndirection::Ptr,
+            }
+            .to_cpp_ffi_type(CppTypeRole::NotReturnType)
+            .unwrap(),
           meaning: CppFfiArgumentMeaning::This,
         });
       }
@@ -238,18 +238,18 @@ impl CppMethod {
     s = format!("{}({})",
                 s,
                 self.arguments
-                    .iter()
-                    .map(|arg| {
-                      format!("{} {}{}",
-                              arg.argument_type.to_cpp_code(None).unwrap_or("[?]".to_string()),
-                              arg.name,
-                              if arg.has_default_value {
-                                format!(" = ?")
-                              } else {
-                                String::new()
-                              })
-                    })
-                    .join(", "));
+                  .iter()
+                  .map(|arg| {
+        format!("{} {}{}",
+                arg.argument_type.to_cpp_code(None).unwrap_or("[?]".to_string()),
+                arg.name,
+                if arg.has_default_value {
+                  format!(" = ?")
+                } else {
+                  String::new()
+                })
+      })
+                  .join(", "));
     if self.is_pure_virtual {
       s = format!("{} = 0", s);
     }

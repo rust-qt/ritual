@@ -157,14 +157,14 @@ fn main() {
                                                               .arg("-query")
                                                               .arg("QT_INSTALL_HEADERS"),
                                                             true)
-                                                  .trim());
+      .trim());
     log::info(format!("QT_INSTALL_HEADERS = \"{}\"",
                       qt_install_headers_path.to_str().unwrap()));
     let qt_install_libs_path = PathBuf::from(run_command(Command::new(&qmake_path)
                                                            .arg("-query")
                                                            .arg("QT_INSTALL_LIBS"),
                                                          true)
-                                               .trim());
+      .trim());
     log::info(format!("QT_INSTALL_LIBS = \"{}\"",
                       qt_install_libs_path.to_str().unwrap()));
     cpp_lib_path = Some(qt_install_libs_path);
@@ -225,12 +225,11 @@ fn main() {
   let code_gen = CppCodeGenerator::new(c_lib_name.clone(), c_lib_tmp_path.clone());
   code_gen.generate_template_files(&lib_spec.cpp.include_file,
                                    &include_dirs.iter()
-                                                .map(|x| x.to_str().unwrap().to_string())
-                                                .collect());
+                                     .map(|x| x.to_str().unwrap().to_string())
+                                     .collect());
 
-  let c_gen = cpp_ffi_generator::CGenerator::new(parse_result,
-                                                 c_lib_name.clone(),
-                                                 c_lib_tmp_path.clone());
+  let c_gen =
+    cpp_ffi_generator::CGenerator::new(parse_result, c_lib_name.clone(), c_lib_tmp_path.clone());
   let c_data = c_gen.generate_all();
   utils::move_files(&c_lib_tmp_path, &c_lib_path, Vec::new()).unwrap();
 
@@ -282,7 +281,7 @@ fn main() {
       None
     },
     remove_qt_prefix: is_qt_library,
-    module_blacklist: lib_spec.rust.module_blacklist
+    module_blacklist: lib_spec.rust.module_blacklist,
   };
   let mut rust_gen = rust_generator::RustGenerator::new(c_data, rust_config);
 
@@ -297,10 +296,10 @@ fn main() {
   for cargo_cmd in vec!["test", "doc"] {
     let mut command = Command::new("cargo");
     command.arg(cargo_cmd)
-           .current_dir(&crate_path);
+      .current_dir(&crate_path);
     if let Some(ref cpp_lib_path) = cpp_lib_path {
       command.env("LIBRARY_PATH", cpp_lib_path.to_str().unwrap())
-             .env("LD_LIBRARY_PATH", cpp_lib_path.to_str().unwrap());
+        .env("LD_LIBRARY_PATH", cpp_lib_path.to_str().unwrap());
     }
     run_command(&mut command, false);
   }

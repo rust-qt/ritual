@@ -10,9 +10,7 @@ extern crate libc;
 pub enum RustTypeIndirection {
   None,
   Ptr,
-  Ref {
-    lifetime: Option<String>,
-  },
+  Ref { lifetime: Option<String> },
   PtrPtr,
 }
 
@@ -131,11 +129,7 @@ impl RustType {
         if let &Some(ref args) = generic_arguments {
           name = format!("{}_{}", name, args.iter().map(|x| x.caption()).join("_"));
         }
-        let mut_text = if *is_const {
-          ""
-        } else {
-          "_mut"
-        };
+        let mut_text = if *is_const { "" } else { "_mut" };
         match *indirection {
           RustTypeIndirection::None => {}
           RustTypeIndirection::Ref { .. } => {
@@ -162,7 +156,8 @@ impl RustType {
           _ => false,
         }
       }
-      RustType::Void | RustType::FunctionPointer { .. } => false,
+      RustType::Void |
+      RustType::FunctionPointer { .. } => false,
     }
   }
 

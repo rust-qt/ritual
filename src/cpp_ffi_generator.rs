@@ -35,16 +35,16 @@ impl CGenerator {
       lib_path: lib_path,
       lib_name: lib_name,
       template_classes: cpp_data.types
-                                .clone()
-                                .iter()
-                                .filter_map(|t| {
-                                  if cpp_data.is_template_class(&t.name) {
-                                    Some(t.name.clone())
-                                  } else {
-                                    None
-                                  }
-                                })
-                                .collect(),
+        .clone()
+        .iter()
+        .filter_map(|t| {
+          if cpp_data.is_template_class(&t.name) {
+            Some(t.name.clone())
+          } else {
+            None
+          }
+        })
+        .collect(),
       cpp_data: cpp_data,
       abstract_classes: Vec::new(),
     }
@@ -53,20 +53,20 @@ impl CGenerator {
   pub fn generate_all(mut self) -> CppAndFfiData {
     let code_gen = CppCodeGenerator::new(self.lib_name.clone(), self.lib_path.clone());
     self.abstract_classes = self.cpp_data
-                                .types
-                                .iter()
-                                .filter_map(|t| {
-                                  if let CppTypeKind::Class { .. } = t.kind {
-                                    if self.get_pure_virtual_methods(&t.name).len() > 0 {
-                                      Some(t.name.clone())
-                                    } else {
-                                      None
-                                    }
-                                  } else {
-                                    None
-                                  }
-                                })
-                                .collect();
+      .types
+      .iter()
+      .filter_map(|t| {
+        if let CppTypeKind::Class { .. } = t.kind {
+          if self.get_pure_virtual_methods(&t.name).len() > 0 {
+            Some(t.name.clone())
+          } else {
+            None
+          }
+        } else {
+          None
+        }
+      })
+      .collect();
     log::info(format!("Abstract classes: {:?}", self.abstract_classes));
 
     let mut c_headers = Vec::new();
@@ -81,7 +81,7 @@ impl CGenerator {
       let mut include_file_base_name = (*include_file).clone();
       if include_file_base_name.ends_with(".h") {
         include_file_base_name = include_file_base_name[0..include_file_base_name.len() - 2]
-                                   .to_string();
+          .to_string();
       }
       let methods = self.process_methods(&include_file, &include_file_base_name, &data.methods);
       c_headers.push(CppFfiHeaderData {
@@ -109,10 +109,10 @@ impl CGenerator {
   #[allow(dead_code)]
   fn get_all_methods(&self, class_name: &String) -> Vec<CppMethod> {
     let own_methods: Vec<_> = self.cpp_data
-                                  .methods
-                                  .iter()
-                                  .filter(|m| m.scope.class_name() == Some(class_name))
-                                  .collect();
+      .methods
+      .iter()
+      .filter(|m| m.scope.class_name() == Some(class_name))
+      .collect();
     let mut inherited_methods = Vec::new();
     if let Some(type_info) = self.cpp_data.types.iter().find(|t| &t.name == class_name) {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
@@ -120,8 +120,8 @@ impl CGenerator {
           if let CppTypeBase::Class { ref name, .. } = base.base {
             for method in self.get_all_methods(name) {
               if own_methods.iter()
-                            .find(|m| m.name == method.name && m.argument_types_equal(&method))
-                            .is_none() {
+                .find(|m| m.name == method.name && m.argument_types_equal(&method))
+                .is_none() {
                 inherited_methods.push(method.clone());
               }
             }
@@ -142,13 +142,13 @@ impl CGenerator {
   fn get_pure_virtual_methods(&self, class_name: &String) -> Vec<CppMethod> {
 
     let own_methods: Vec<_> = self.cpp_data
-                                  .methods
-                                  .iter()
-                                  .filter(|m| m.scope.class_name() == Some(class_name))
-                                  .collect();
+      .methods
+      .iter()
+      .filter(|m| m.scope.class_name() == Some(class_name))
+      .collect();
     let own_pure_virtual_methods: Vec<_> = own_methods.iter()
-                                                      .filter(|m| m.is_pure_virtual)
-                                                      .collect();
+      .filter(|m| m.is_pure_virtual)
+      .collect();
     let mut inherited_methods = Vec::new();
     if let Some(type_info) = self.cpp_data.types.iter().find(|t| &t.name == class_name) {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
@@ -156,8 +156,8 @@ impl CGenerator {
           if let CppTypeBase::Class { ref name, .. } = base.base {
             for method in self.get_pure_virtual_methods(name) {
               if own_methods.iter()
-                            .find(|m| m.name == method.name && m.argument_types_equal(&method))
-                            .is_none() {
+                .find(|m| m.name == method.name && m.argument_types_equal(&method))
+                .is_none() {
                 inherited_methods.push(method.clone());
               }
             }
@@ -220,9 +220,9 @@ impl CGenerator {
         }
         if let CppMethodScope::Class(ref class_name) = method.scope {
           if self.template_classes
-                 .iter()
-                 .find(|x| x == &class_name || class_name.starts_with(&format!("{}::", x)))
-                 .is_some() {
+            .iter()
+            .find(|x| x == &class_name || class_name.starts_with(&format!("{}::", x)))
+            .is_some() {
             log::warning(format!("Skipping method of template class: \n{}\n",
                                  method.short_text()));
             continue;
@@ -261,8 +261,8 @@ impl CGenerator {
       let mut found_strategy = None;
       for strategy in MethodCaptionStrategy::all() {
         let mut type_captions: Vec<_> = values.iter()
-                                              .map(|x| x.caption(strategy.clone()))
-                                              .collect();
+          .map(|x| x.caption(strategy.clone()))
+          .collect();
         type_captions.sort();
         type_captions.dedup();
         if type_captions.len() == values.len() {
@@ -276,11 +276,7 @@ impl CGenerator {
           r.push(CppAndFfiMethod::new(x,
                                       format!("{}{}{}",
                                               key,
-                                              if caption.is_empty() {
-                                                ""
-                                              } else {
-                                                "_"
-                                              },
+                                              if caption.is_empty() { "" } else { "_" },
                                               caption)));
         }
       } else {

@@ -188,11 +188,7 @@ impl CppType {
                      -> Result<String, String> {
     let name = try!(self.base.to_cpp_code(function_pointer_inner_text));
     Ok(format!("{}{}{}",
-               if self.is_const {
-                 "const "
-               } else {
-                 ""
-               },
+               if self.is_const { "const " } else { "" },
                name,
                match self.indirection {
                  CppTypeIndirection::None => "",
@@ -238,7 +234,8 @@ impl CppType {
             CppTypeIndirection::RValueRef => {
               return Err(format!("Function pointers containing references are not supported"));
             }
-            CppTypeIndirection::Ptr | CppTypeIndirection::PtrPtr => {}
+            CppTypeIndirection::Ptr |
+            CppTypeIndirection::PtrPtr => {}
             CppTypeIndirection::None => {
               match arg.base {
                 CppTypeBase::Class { .. } => {

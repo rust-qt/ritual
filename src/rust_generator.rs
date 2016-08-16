@@ -188,23 +188,14 @@ impl RustGenerator {
       CppTypeBase::SpecificNumeric { ref bits, ref kind, .. } => {
         let letter = match *kind {
           CppSpecificNumericTypeKind::Integer { ref is_signed } => {
-            if *is_signed {
-              "i"
-            } else {
-              "u"
-            }
+            if *is_signed { "i" } else { "u" }
           }
           CppSpecificNumericTypeKind::FloatingPoint => "f",
         };
         RustName::new(vec![format!("{}{}", letter, bits)])
       }
       CppTypeBase::PointerSizedInteger { ref is_signed, .. } => {
-        RustName::new(vec![if *is_signed {
-                             "isize"
-                           } else {
-                             "usize"
-                           }
-                           .to_string()])
+        RustName::new(vec![if *is_signed { "isize" } else { "usize" }.to_string()])
       }
       CppTypeBase::Enum { ref name } => {
         match self.cpp_to_rust_type_map.get(name) {
@@ -257,7 +248,7 @@ impl RustGenerator {
     let mut args = Vec::new();
     for arg in &data.c_signature.arguments {
       let rust_type = try!(self.cpp_type_to_complete_type(&arg.argument_type, &arg.meaning))
-                        .rust_ffi_type;
+        .rust_ffi_type;
       args.push(RustFFIArgument {
         name: sanitize_rust_var_name(&arg.name),
         argument_type: rust_type,
@@ -266,7 +257,7 @@ impl RustGenerator {
     Ok(RustFFIFunction {
       return_type: try!(self.cpp_type_to_complete_type(&data.c_signature.return_type,
                                                        &CppFfiArgumentMeaning::ReturnValue))
-                     .rust_ffi_type,
+        .rust_ffi_type,
       name: data.c_name.clone(),
       arguments: args,
     })
@@ -380,14 +371,14 @@ impl RustGenerator {
                                   });
         }
         let mut values: Vec<_> = value_to_variant.into_iter()
-                                                 .map(|(_val, variant)| variant)
-                                                 .collect();
+          .map(|(_val, variant)| variant)
+          .collect();
         values.sort_by(|a, b| a.value.cmp(&b.value));
         let mut is_flaggable = false;
         if let Some(instantiations) = self.input_data
-                                          .cpp_data
-                                          .template_instantiations
-                                          .get(&"QFlags".to_string()) {
+          .cpp_data
+          .template_instantiations
+          .get(&"QFlags".to_string()) {
           let cpp_type_sample = CppType {
             is_const: false,
             indirection: CppTypeIndirection::None,
@@ -414,14 +405,14 @@ impl RustGenerator {
       CppTypeKind::Class { ref size, .. } => {
         let methods_scope = RustMethodScope::Impl { type_name: rust_name.clone() };
         let (methods, traits, types) = self.generate_functions(c_header.methods
-                                                                       .iter()
-                                                                       .filter(|&x| {
-                                                                         x.cpp_method
-                                                                          .scope
-                                                                          .class_name() ==
-                                                                         Some(&type_info.name)
-                                                                       })
-                                                                       .collect(),
+                                                                 .iter()
+                                                                 .filter(|&x| {
+                                                                   x.cpp_method
+                                                                     .scope
+                                                                     .class_name() ==
+                                                                   Some(&type_info.name)
+                                                                 })
+                                                                 .collect(),
                                                                &methods_scope);
         let mut result = types;
         result.push(RustTypeDeclaration {
@@ -447,9 +438,9 @@ impl RustGenerator {
     }
     self.generate_ffi();
     self.code_generator.generate_lib_file(&self.modules
-                                               .iter()
-                                               .map(|x| x.name.last_name().clone())
-                                               .collect());
+      .iter()
+      .map(|x| x.name.last_name().clone())
+      .collect());
   }
 
   pub fn generate_modules_from_header(&mut self, c_header: &CppFfiHeaderData) {
@@ -716,11 +707,9 @@ impl RustGenerator {
     // let mut name_counters = HashMap::new();
     for method_name in method_names {
       let current_methods: Vec<_> = single_rust_methods.clone()
-                                                       .into_iter()
-                                                       .filter(|m| {
-                                                         m.name.last_name() == &method_name
-                                                       })
-                                                       .collect();
+        .into_iter()
+        .filter(|m| m.name.last_name() == &method_name)
+        .collect();
       let mut return_type_to_methods = HashMap::new();
       assert!(!current_methods.is_empty());
       for method in current_methods {
@@ -776,9 +765,8 @@ impl RustGenerator {
       };
 
       for ((return_type, self_arg), overloaded_methods) in return_type_to_methods {
-        let additional_caption = generate_caption(&return_type,
-                                                  &self_arg,
-                                                  caption_strategy.clone());
+        let additional_caption =
+          generate_caption(&return_type, &self_arg, caption_strategy.clone());
 
         let mut enum_name_base = method_name.to_class_case();
         if let &RustMethodScope::Impl { ref type_name } = scope {
@@ -794,9 +782,9 @@ impl RustGenerator {
         for method in overloaded_methods {
           let ok = if let RustMethodArguments::SingleVariant(ref args) = method.arguments {
             let real_args: Vec<_> = args.arguments
-                                        .iter()
-                                        .map(|x| x.argument_type.rust_api_type.dealias_libc())
-                                        .collect();
+              .iter()
+              .map(|x| x.argument_type.rust_api_type.dealias_libc())
+              .collect();
             if all_real_args.contains(&real_args) {
               log::warning(format!("Removing method because another method with the same \
                                     argument types exists:\n{:?}",
@@ -841,9 +829,9 @@ impl RustGenerator {
                 args.arguments.remove(0);
               }
               enum_variants.push(args.arguments
-                                     .iter()
-                                     .map(|x| x.argument_type.rust_api_type.clone())
-                                     .collect());
+                .iter()
+                .map(|x| x.argument_type.rust_api_type.clone())
+                .collect());
               args_variants.push(args);
             } else {
               unreachable!()
@@ -851,10 +839,8 @@ impl RustGenerator {
           }
 
           let enum_has_lifetime = enum_variants.iter()
-                                               .find(|var| {
-                                                 var.iter().find(|x| x.is_ref()).is_some()
-                                               })
-                                               .is_some();
+            .find(|var| var.iter().find(|x| x.is_ref()).is_some())
+            .is_some();
           // TODO: move this enum and trait to "overloading" submodule
 
           // overloaded methods

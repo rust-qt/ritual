@@ -15,11 +15,7 @@ impl<X> JoinWithString for X
 {
   fn join(self, separator: &'static str) -> String {
     self.fold("".to_string(), |a, b| {
-      let m = if a.len() > 0 {
-        a + separator
-      } else {
-        a
-      };
+      let m = if a.len() > 0 { a + separator } else { a };
       m + &b
     })
   }
@@ -52,8 +48,8 @@ pub fn move_files(src: &PathBuf,
       if !src.with_added(item.file_name()).as_path().exists() {
         let path = item.path();
         if no_delete_exception.iter()
-                              .find(|&x| x == &item.file_name().into_string().unwrap())
-                              .is_some() {
+          .find(|&x| x == &item.file_name().into_string().unwrap())
+          .is_some() {
           log::info(format!("Old item preserved (exceptional): {}",
                             path.to_str().unwrap()));
         } else {

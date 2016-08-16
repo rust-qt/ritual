@@ -227,7 +227,8 @@ fn class_value() {
                  template_arguments: None,
                },
              });
-  assert_eq!(&ffi_return_type.ffi_type.to_cpp_code(None).unwrap(), "QPoint*");
+  assert_eq!(&ffi_return_type.ffi_type.to_cpp_code(None).unwrap(),
+             "QPoint*");
   assert_eq!(ffi_return_type.conversion,
              IndirectionChange::ValueToPointer);
 
@@ -242,7 +243,8 @@ fn class_value() {
                  template_arguments: None,
                },
              });
-  assert_eq!(&ffi_arg.ffi_type.to_cpp_code(None).unwrap(), "const QPoint*");
+  assert_eq!(&ffi_arg.ffi_type.to_cpp_code(None).unwrap(),
+             "const QPoint*");
   assert_eq!(ffi_arg.conversion, IndirectionChange::ValueToPointer);
   assert!(type1.needs_allocation_place_variants());
 }
@@ -437,27 +439,30 @@ fn qflags() {
   assert_eq!(type1.base.is_void(), false);
   assert_eq!(type1.base.is_class(), true);
   assert_eq!(type1.base.is_template_parameter(), false);
-  assert_eq!(type1.to_cpp_code(None).unwrap(), "QFlags< Qt::AlignmentFlag >");
-  assert_eq!(type1.base.to_cpp_code(None).unwrap(), "QFlags< Qt::AlignmentFlag >");
+  assert_eq!(type1.to_cpp_code(None).unwrap(),
+             "QFlags< Qt::AlignmentFlag >");
+  assert_eq!(type1.base.to_cpp_code(None).unwrap(),
+             "QFlags< Qt::AlignmentFlag >");
   assert!(type1.to_cpp_code(Some(&String::new())).is_err());
   assert!(type1.base.to_cpp_code(Some(&String::new())).is_err());
   assert_eq!(type1.base.caption(), "QFlags_Qt_AlignmentFlag");
-  assert_eq!(type1.caption(TypeCaptionStrategy::Short), "QFlags_Qt_AlignmentFlag");
-  assert_eq!(type1.caption(TypeCaptionStrategy::Full), "QFlags_Qt_AlignmentFlag");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Short),
+             "QFlags_Qt_AlignmentFlag");
+  assert_eq!(type1.caption(TypeCaptionStrategy::Full),
+             "QFlags_Qt_AlignmentFlag");
 
   for role in &[CppTypeRole::NotReturnType, CppTypeRole::ReturnType] {
-  let ffi_type = type1.to_cpp_ffi_type(role.clone()).unwrap();
-  assert_eq!(&ffi_type.original_type, &type1);
-  assert_eq!(&ffi_type.ffi_type,
-             &CppType {
-               indirection: CppTypeIndirection::None,
-               is_const: false,
-               base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::UInt),
-             });
-  assert_eq!(&ffi_type.ffi_type.to_cpp_code(None).unwrap(),
-             "unsigned int");
-  assert_eq!(ffi_type.conversion,
-             IndirectionChange::QFlagsToUInt);
+    let ffi_type = type1.to_cpp_ffi_type(role.clone()).unwrap();
+    assert_eq!(&ffi_type.original_type, &type1);
+    assert_eq!(&ffi_type.ffi_type,
+               &CppType {
+                 indirection: CppTypeIndirection::None,
+                 is_const: false,
+                 base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::UInt),
+               });
+    assert_eq!(&ffi_type.ffi_type.to_cpp_code(None).unwrap(),
+               "unsigned int");
+    assert_eq!(ffi_type.conversion, IndirectionChange::QFlagsToUInt);
   }
   assert!(!type1.needs_allocation_place_variants());
 }
@@ -539,8 +544,10 @@ fn function1() {
   assert_eq!(type1.base.is_class(), false);
   assert_eq!(type1.base.is_template_parameter(), false);
   let name = "my_name".to_string();
-  assert_eq!(type1.base.to_cpp_code(Some(&name)).unwrap(), "int (*my_name)(int, bool*)");
-  assert_eq!(type1.to_cpp_code(Some(&name)).unwrap(), type1.base.to_cpp_code(Some(&name)).unwrap());
+  assert_eq!(type1.base.to_cpp_code(Some(&name)).unwrap(),
+             "int (*my_name)(int, bool*)");
+  assert_eq!(type1.to_cpp_code(Some(&name)).unwrap(),
+             type1.base.to_cpp_code(Some(&name)).unwrap());
   assert!(type1.to_cpp_code(None).is_err());
   assert!(type1.base.to_cpp_code(None).is_err());
   assert_eq!(type1.base.caption(), "func");
