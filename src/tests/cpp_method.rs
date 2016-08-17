@@ -5,56 +5,49 @@ use cpp_type::*;
 use cpp_ffi_function_argument::CppFfiArgumentMeaning;
 use cpp_ffi_type::IndirectionChange;
 
-#[test]
-fn cpp_method_scope() {
-  let a1 = CppMethodScope::Global;
-  assert!(a1.class_name().is_none());
-
-  let a2 = CppMethodScope::Class("Class1".to_string());
-  assert_eq!(a2.class_name(), Some(&"Class1".to_string()));
-}
 
 #[test]
 fn cpp_method_kind() {
-  assert!(CppMethodKind::Operator(CppOperator::Assignment).is_operator());
-  assert!(!CppMethodKind::Operator(CppOperator::Assignment).is_destructor());
-  assert!(!CppMethodKind::Operator(CppOperator::Assignment).is_constructor());
-  assert!(!CppMethodKind::Operator(CppOperator::Assignment).is_regular());
-
-  assert!(!CppMethodKind::Constructor.is_operator());
   assert!(!CppMethodKind::Constructor.is_destructor());
   assert!(CppMethodKind::Constructor.is_constructor());
   assert!(!CppMethodKind::Constructor.is_regular());
 
-  assert!(!CppMethodKind::Destructor.is_operator());
   assert!(CppMethodKind::Destructor.is_destructor());
   assert!(!CppMethodKind::Destructor.is_constructor());
   assert!(!CppMethodKind::Destructor.is_regular());
 
-  assert!(!CppMethodKind::Regular.is_operator());
   assert!(!CppMethodKind::Regular.is_destructor());
   assert!(!CppMethodKind::Regular.is_constructor());
   assert!(CppMethodKind::Regular.is_regular());
 }
 
-fn empty_regular_method() -> CppMethod {
-  CppMethod {
-    name: String::new(),
-    scope: CppMethodScope::Global,
+fn empty_membership(class_name: &'static str) -> CppMethodClassMembership {
+  CppMethodClassMembership {
+    kind: CppMethodKind::Regular,
     is_virtual: false,
     is_pure_virtual: false,
     is_const: false,
     is_static: false,
     visibility: CppVisibility::Public,
     is_signal: false,
+    class_type: CppTypeBase::Class {
+      name: class_name.to_string(),
+      template_arguments: None,
+    },
+  }
+}
+
+fn empty_regular_method() -> CppMethod {
+  CppMethod {
+    name: String::new(),
+    class_membership: None,
     return_type: None,
-    class_type: None,
-    kind: CppMethodKind::Regular,
     arguments: vec![],
     allows_variable_arguments: false,
     include_file: String::new(),
     origin_location: None,
     template_arguments: None,
+    operator: None,
   }
 }
 
@@ -224,11 +217,19 @@ fn argument_types_equal8() {
 fn needs_allocation_place_variants() {
   let mut method1 = empty_regular_method();
   assert!(!method1.needs_allocation_place_variants());
-  method1.kind = CppMethodKind::Constructor;
+  method1.class_membership = Some(empty_membership("Class1"));
+  if let Some(ref mut info) = method1.class_membership {
+    info.kind = CppMethodKind::Constructor;
+  }
   assert!(method1.needs_allocation_place_variants());
-  method1.kind = CppMethodKind::Destructor;
+  if let Some(ref mut info) = method1.class_membership {
+    info.kind = CppMethodKind::Destructor;
+  }
   assert!(method1.needs_allocation_place_variants());
-  method1.kind = CppMethodKind::Operator(CppOperator::Assignment);
+  if let Some(ref mut info) = method1.class_membership {
+    info.kind = CppMethodKind::Regular;
+  }
+  method1.operator = Some(CppOperator::Assignment);
   assert!(!method1.needs_allocation_place_variants());
   method1.return_type = Some(CppType {
     indirection: CppTypeIndirection::None,
@@ -254,7 +255,10 @@ fn needs_allocation_place_variants() {
     },
   });
   assert!(!method1.needs_allocation_place_variants());
-  method1.kind = CppMethodKind::Regular;
+  if let Some(ref mut info) = method1.class_membership {
+    info.kind = CppMethodKind::Regular;
+  }
+  method1.operator = None;
   method1.return_type = None;
   assert!(!method1.needs_allocation_place_variants());
 }
@@ -263,6 +267,12 @@ fn needs_allocation_place_variants() {
 fn c_signature_empty() {
   let mut method1 = empty_regular_method();
   method1.return_type = Some(CppType::void());
+
+  assert!(!method1.is_constructor());
+  assert!(!method1.is_destructor());
+  assert!(!method1.is_operator());
+  assert_eq!(method1.class_name(), None);
+
   let r = method1.c_signature(ReturnValueAllocationPlace::NotApplicable).unwrap();
   assert!(r.arguments.is_empty());
   assert!(r.return_type.ffi_type.is_void());
@@ -300,11 +310,7 @@ fn c_signature_simple_func() {
 #[test]
 fn c_signature_method_with_this() {
   let mut method1 = empty_regular_method();
-  method1.scope = CppMethodScope::Class("MyClass".to_string());
-  method1.class_type = Some(CppTypeBase::Class {
-    name: "MyClass".to_string(),
-    template_arguments: None,
-  });
+  method1.class_membership = Some(empty_membership("MyClass"));
   method1.return_type = Some(CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
@@ -322,11 +328,17 @@ fn c_signature_method_with_this() {
     name: "my_arg".to_string(),
     has_default_value: false,
   });
+
+  assert!(!method1.is_constructor());
+  assert!(!method1.is_destructor());
+  assert!(!method1.is_operator());
+  assert_eq!(method1.class_name(), Some(&"MyClass".to_string()));
+
   let r = method1.c_signature(ReturnValueAllocationPlace::NotApplicable).unwrap();
   assert!(r.arguments.len() == 2);
   assert_eq!(r.arguments[0].name, "this_ptr");
   assert_eq!(r.arguments[0].argument_type.ffi_type.base,
-             method1.class_type.unwrap());
+             method1.class_membership.as_ref().unwrap().class_type);
   assert_eq!(r.arguments[0].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r.arguments[0].argument_type.conversion,
@@ -347,12 +359,11 @@ fn c_signature_method_with_this() {
 #[test]
 fn c_signature_static_method() {
   let mut method1 = empty_regular_method();
-  method1.scope = CppMethodScope::Class("MyClass".to_string());
-  method1.class_type = Some(CppTypeBase::Class {
-    name: "MyClass".to_string(),
-    template_arguments: None,
+  method1.class_membership = Some({
+    let mut info = empty_membership("MyClass");
+    info.is_static = true;
+    info
   });
-  method1.is_static = true;
   method1.return_type = Some(CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
@@ -382,11 +393,10 @@ fn c_signature_static_method() {
 #[test]
 fn c_signature_constructor() {
   let mut method1 = empty_regular_method();
-  method1.kind = CppMethodKind::Constructor;
-  method1.scope = CppMethodScope::Class("MyClass".to_string());
-  method1.class_type = Some(CppTypeBase::Class {
-    name: "MyClass".to_string(),
-    template_arguments: None,
+  method1.class_membership = Some({
+    let mut info = empty_membership("MyClass");
+    info.kind = CppMethodKind::Constructor;
+    info
   });
   method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
@@ -397,6 +407,12 @@ fn c_signature_constructor() {
     name: "arg1".to_string(),
     has_default_value: true,
   });
+
+  assert!(method1.is_constructor());
+  assert!(!method1.is_destructor());
+  assert!(!method1.is_operator());
+  assert_eq!(method1.class_name(), Some(&"MyClass".to_string()));
+
   let r_stack = method1.c_signature(ReturnValueAllocationPlace::Stack).unwrap();
   assert!(r_stack.arguments.len() == 2);
   assert_eq!(r_stack.arguments[0].name, "arg1");
@@ -457,17 +473,22 @@ fn c_signature_constructor() {
 #[test]
 fn c_signature_destructor() {
   let mut method1 = empty_regular_method();
-  method1.kind = CppMethodKind::Destructor;
-  method1.scope = CppMethodScope::Class("MyClass".to_string());
-  method1.class_type = Some(CppTypeBase::Class {
-    name: "MyClass".to_string(),
-    template_arguments: None,
+  method1.class_membership = Some({
+    let mut info = empty_membership("MyClass");
+    info.kind = CppMethodKind::Destructor;
+    info
   });
+
+  assert!(!method1.is_constructor());
+  assert!(method1.is_destructor());
+  assert!(!method1.is_operator());
+  assert_eq!(method1.class_name(), Some(&"MyClass".to_string()));
+
   let r_stack = method1.c_signature(ReturnValueAllocationPlace::Stack).unwrap();
   assert!(r_stack.arguments.len() == 1);
   assert_eq!(r_stack.arguments[0].name, "this_ptr");
   assert_eq!(&r_stack.arguments[0].argument_type.ffi_type.base,
-             method1.class_type.as_ref().unwrap());
+             &method1.class_membership.as_ref().unwrap().class_type);
   assert_eq!(r_stack.arguments[0].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r_stack.arguments[0].argument_type.conversion,
@@ -480,7 +501,7 @@ fn c_signature_destructor() {
   assert!(r_heap.arguments.len() == 1);
   assert_eq!(r_heap.arguments[0].name, "this_ptr");
   assert_eq!(r_heap.arguments[0].argument_type.ffi_type.base,
-             method1.class_type.unwrap());
+             method1.class_membership.as_ref().unwrap().class_type);
   assert_eq!(r_heap.arguments[0].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r_heap.arguments[0].argument_type.conversion,
@@ -493,11 +514,7 @@ fn c_signature_destructor() {
 #[test]
 fn c_signature_method_returning_class() {
   let mut method1 = empty_regular_method();
-  method1.scope = CppMethodScope::Class("MyClass".to_string());
-  method1.class_type = Some(CppTypeBase::Class {
-    name: "MyClass".to_string(),
-    template_arguments: None,
-  });
+  method1.class_membership = Some(empty_membership("MyClass"));
   method1.return_type = Some(CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
@@ -522,7 +539,7 @@ fn c_signature_method_returning_class() {
   assert!(r_stack.arguments.len() == 3);
   assert_eq!(r_stack.arguments[0].name, "this_ptr");
   assert_eq!(&r_stack.arguments[0].argument_type.ffi_type.base,
-             method1.class_type.as_ref().unwrap());
+             &method1.class_membership.as_ref().unwrap().class_type);
   assert_eq!(r_stack.arguments[0].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r_stack.arguments[0].argument_type.conversion,
@@ -560,7 +577,7 @@ fn c_signature_method_returning_class() {
   assert!(r_heap.arguments.len() == 2);
   assert_eq!(r_heap.arguments[0].name, "this_ptr");
   assert_eq!(r_heap.arguments[0].argument_type.ffi_type.base,
-             method1.class_type.unwrap());
+             method1.class_membership.as_ref().unwrap().class_type);
   assert_eq!(r_heap.arguments[0].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r_heap.arguments[0].argument_type.conversion,
@@ -593,11 +610,10 @@ fn c_signature_method_returning_class() {
 #[test]
 fn to_ffi_signatures_destructor() {
   let mut method1 = empty_regular_method();
-  method1.kind = CppMethodKind::Destructor;
-  method1.scope = CppMethodScope::Class("MyClass".to_string());
-  method1.class_type = Some(CppTypeBase::Class {
-    name: "MyClass".to_string(),
-    template_arguments: None,
+  method1.class_membership = Some({
+    let mut info = empty_membership("MyClass");
+    info.kind = CppMethodKind::Destructor;
+    info
   });
   let result = method1.to_ffi_signatures().unwrap();
   assert_eq!(result.len(), 2);
@@ -650,63 +666,63 @@ fn full_name_free_function_in_namespace() {
   let mut method1 = empty_regular_method();
   method1.name = "ns::func1".to_string();
   assert_eq!(method1.full_name(), "ns::func1");
+  assert_eq!(method1.class_name(), None);
 }
 
 #[test]
 fn full_name_method() {
   let mut method1 = empty_regular_method();
   method1.name = "func1".to_string();
-  method1.scope = CppMethodScope::Class("MyClass".to_string());
-  method1.class_type = Some(CppTypeBase::Class {
-    name: "MyClass".to_string(),
-    template_arguments: None,
-  });
+  method1.class_membership = Some(empty_membership("MyClass"));
   assert_eq!(method1.full_name(), "MyClass::func1");
+  assert_eq!(method1.class_name(), Some(&"MyClass".to_string()));
 }
 
 #[test]
 fn full_name_static_method() {
   let mut method1 = empty_regular_method();
   method1.name = "func1".to_string();
-  method1.scope = CppMethodScope::Class("MyClass".to_string());
-  method1.class_type = Some(CppTypeBase::Class {
-    name: "MyClass".to_string(),
-    template_arguments: None,
+  method1.class_membership = Some({
+    let mut info = empty_membership("MyClass");
+    info.is_static = true;
+    info
   });
-  method1.is_static = true;
   assert_eq!(method1.full_name(), "MyClass::func1");
+  assert_eq!(method1.class_name(), Some(&"MyClass".to_string()));
 }
 
 #[test]
 fn full_name_nested_class_method() {
   let mut method1 = empty_regular_method();
   method1.name = "func1".to_string();
-  method1.scope = CppMethodScope::Class("MyClass::Iterator".to_string());
-  method1.class_type = Some(CppTypeBase::Class {
-    name: "MyClass::Iterator".to_string(),
-    template_arguments: None,
-  });
+  method1.class_membership = Some(empty_membership("MyClass::Iterator"));
   assert_eq!(method1.full_name(), "MyClass::Iterator::func1");
+  assert_eq!(method1.class_name(), Some(&"MyClass::Iterator".to_string()));
 }
 
 #[test]
 fn short_text1() {
   let method = CppMethod {
     name: "method1".to_string(),
-    scope: CppMethodScope::Class("Class1".to_string()),
-    is_virtual: false,
-    is_pure_virtual: false,
-    is_const: true,
-    is_static: false,
-    visibility: CppVisibility::Protected,
-    is_signal: false,
+    class_membership: Some(CppMethodClassMembership {
+      kind: CppMethodKind::Regular,
+      is_virtual: false,
+      is_pure_virtual: false,
+      is_const: true,
+      is_static: false,
+      visibility: CppVisibility::Protected,
+      is_signal: false,
+      class_type: CppTypeBase::Class {
+        name: "Class1".to_string(),
+        template_arguments: None,
+      },
+    }),
+    operator: None,
     return_type: Some(CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
       base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
     }),
-    class_type: None,
-    kind: CppMethodKind::Regular,
     arguments: vec![CppFunctionArgument {
                       argument_type: CppType {
                         indirection: CppTypeIndirection::None,

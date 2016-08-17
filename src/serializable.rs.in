@@ -122,31 +122,39 @@ pub struct CppFunctionArgument {
   pub has_default_value: bool,
 }
 
-/// Scope where a C++ method is available
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
-pub enum CppMethodScope {
-  /// Not a class method. This case includes
-  /// free functions in a namespace.
-  Global,
-  /// A class method. Attached value is full identifier
-  /// of the corresponding class, including namespaces
-  /// and nested classes.
-  Class(String),
-}
-
 /// Enumerator indicating special cases of C++ methods.
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[derive(Serialize, Deserialize)]
 pub enum CppMethodKind {
-  /// Just a class method or a free function
+  /// Just a class method
   Regular,
   /// Constructor
   Constructor,
   /// Destructor
   Destructor,
-  /// Operator
-  Operator(CppOperator),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct CppMethodClassMembership {
+  /// Type of the class where this method belong. This is used to construct
+  /// type of "this" pointer and return type of constructors.
+  pub class_type: CppTypeBase,
+  /// Whether this method is a constructor, a destructor or an operator
+  pub kind: CppMethodKind,
+  /// True if this is a virtual method
+  pub is_virtual: bool,
+  /// True if this is a pure virtual method (requires is_virtual = true)
+  pub is_pure_virtual: bool,
+  /// True if this is a const method, i.e. "this" pointer receives by
+  /// this method has const type
+  pub is_const: bool,
+  /// True if this is a static method, i.e. it doesn't receive "this" pointer at all.
+  pub is_static: bool,
+  /// Method visibility
+  pub visibility: CppVisibility,
+  /// True if the method is a Qt signal
+  pub is_signal: bool, //TODO: implement signal detection or remove this field
 }
 
 /// Information about a C++ method
@@ -157,31 +165,13 @@ pub struct CppMethod {
   /// only the method's own name. For free functions,
   /// this field also includes namespaces (if any).
   pub name: String,
-  /// Whether this method is a constructor, a destructor or an operator
-  pub kind: CppMethodKind,
-  /// Whether this is a class method or a free function
-  pub scope: CppMethodScope,
-  /// True if this is a virtual method. Defaults to false
-  /// when the method can't be virtual at all (like for free functions).
-  pub is_virtual: bool,
-  /// True if this is a pure virtual method (requires is_virtual = true)
-  pub is_pure_virtual: bool,
-  /// True if this is a const method, i.e. "this" pointer receives by
-  /// this method has const type. Defaults to false when not applicable.
-  pub is_const: bool,
-  /// True if this is a static method, i.e. it's a class method but
-  /// it doesn't receive "this" pointer at all.
-  pub is_static: bool,
-  /// Method visibility
-  pub visibility: CppVisibility,
-  /// True if the method is a Qt signal
-  pub is_signal: bool, //TODO: implement signal detection or remove this field
+  /// Additional information about a class member function
+  /// or None for free functions
+  pub class_membership: Option<CppMethodClassMembership>,
+  /// If the method is a C++ operator, indicates its kind
+  pub operator: Option<CppOperator>,
   /// Return type of the method. May be None for constructors and destructors.
   pub return_type: Option<CppType>,
-  /// Type of the class where this method belong. This is used to construct
-  /// type of "this" pointer and return type of constructors. This field is None
-  /// when the method is not a class method.
-  pub class_type: Option<CppTypeBase>, //TODO: move all such fields to CppMethodScope
   /// List of the method's arguments
   pub arguments: Vec<CppFunctionArgument>,
   /// Whether the argument list is terminated with "..."

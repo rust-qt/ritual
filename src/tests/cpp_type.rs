@@ -28,6 +28,7 @@ fn void() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "void");
   assert_type_to_ffi_unchanged(&type1);
   assert!(!type1.needs_allocation_place_variants());
+  assert_eq!(type1.base.maybe_name(), None);
 }
 
 #[test]
@@ -50,6 +51,7 @@ fn void_ptr() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "void_ptr");
   assert_type_to_ffi_unchanged(&type1);
   assert!(!type1.needs_allocation_place_variants());
+  assert_eq!(type1.base.maybe_name(), None);
 }
 
 #[test]
@@ -72,6 +74,7 @@ fn int() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "int");
   assert_type_to_ffi_unchanged(&type1);
   assert!(!type1.needs_allocation_place_variants());
+  assert_eq!(type1.base.maybe_name(), None);
 }
 
 #[test]
@@ -94,6 +97,7 @@ fn bool_ptr() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "bool_ptr");
   assert_type_to_ffi_unchanged(&type1);
   assert!(!type1.needs_allocation_place_variants());
+  assert_eq!(type1.base.maybe_name(), None);
 }
 
 #[test]
@@ -116,6 +120,7 @@ fn char_ptr_ptr() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "char_ptr_ptr");
   assert_type_to_ffi_unchanged(&type1);
   assert!(!type1.needs_allocation_place_variants());
+  assert_eq!(type1.base.maybe_name(), None);
 }
 
 #[test]
@@ -142,6 +147,7 @@ fn qint64() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "qint64");
   assert_type_to_ffi_unchanged(&type1);
   assert!(!type1.needs_allocation_place_variants());
+  assert_eq!(type1.base.maybe_name(), Some(&"qint64".to_string()));
 }
 
 #[test]
@@ -167,6 +173,7 @@ fn quintptr() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "quintptr");
   assert_type_to_ffi_unchanged(&type1);
   assert!(!type1.needs_allocation_place_variants());
+  assert_eq!(type1.base.maybe_name(), Some(&"quintptr".to_string()));
 }
 
 #[test]
@@ -191,6 +198,8 @@ fn enum1() {
              "Qt_CaseSensitivity");
   assert_type_to_ffi_unchanged(&type1);
   assert!(!type1.needs_allocation_place_variants());
+  assert_eq!(type1.base.maybe_name(),
+             Some(&"Qt::CaseSensitivity".to_string()));
 }
 
 
@@ -247,6 +256,7 @@ fn class_value() {
              "const QPoint*");
   assert_eq!(ffi_arg.conversion, IndirectionChange::ValueToPointer);
   assert!(type1.needs_allocation_place_variants());
+  assert_eq!(type1.base.maybe_name(), Some(&"QPoint".to_string()));
 }
 
 #[test]
@@ -287,6 +297,7 @@ fn class_const_ref() {
     assert_eq!(ffi1.conversion, IndirectionChange::ReferenceToPointer);
   }
   assert!(!type1.needs_allocation_place_variants());
+  assert_eq!(type1.base.maybe_name(), Some(&"QRectF".to_string()));
 }
 
 #[test]
@@ -327,6 +338,7 @@ fn class_mut_ref() {
     assert_eq!(ffi1.conversion, IndirectionChange::ReferenceToPointer);
   }
   assert!(!type1.needs_allocation_place_variants());
+  assert_eq!(type1.base.maybe_name(), Some(&"QRectF".to_string()));
 }
 
 #[test]
@@ -352,6 +364,7 @@ fn class_mut_ptr() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "QObject_ptr");
   assert_type_to_ffi_unchanged(&type1);
   assert!(!type1.needs_allocation_place_variants());
+  assert_eq!(type1.base.maybe_name(), Some(&"QObject".to_string()));
 }
 
 #[test]
@@ -415,6 +428,7 @@ fn class_with_template_args() {
              "const QVector< QString >*");
   assert_eq!(ffi_arg.conversion, IndirectionChange::ValueToPointer);
   assert!(type1.needs_allocation_place_variants());
+  assert_eq!(type1.base.maybe_name(), Some(&"QVector".to_string()));
 }
 
 #[test]
@@ -465,6 +479,7 @@ fn qflags() {
     assert_eq!(ffi_type.conversion, IndirectionChange::QFlagsToUInt);
   }
   assert!(!type1.needs_allocation_place_variants());
+  assert_eq!(type1.base.maybe_name(), Some(&"QFlags".to_string()));
 }
 
 fn create_template_parameter_type() -> CppType {
@@ -492,6 +507,7 @@ fn template_parameter() {
   assert!(type1.to_cpp_ffi_type(CppTypeRole::NotReturnType).is_err());
   assert!(type1.to_cpp_ffi_type(CppTypeRole::ReturnType).is_err());
   assert!(!type1.needs_allocation_place_variants());
+  assert_eq!(type1.base.maybe_name(), None);
 }
 
 #[test]
@@ -555,4 +571,5 @@ fn function1() {
   assert_eq!(type1.caption(TypeCaptionStrategy::Full), "func");
   assert_type_to_ffi_unchanged(&type1);
   assert!(!type1.needs_allocation_place_variants());
+  assert_eq!(type1.base.maybe_name(), None);
 }

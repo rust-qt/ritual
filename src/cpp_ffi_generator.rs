@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use log;
 use cpp_data::{CppData, CppTypeKind, CppVisibility};
 use caption_strategy::MethodCaptionStrategy;
-use cpp_method::{CppMethod, CppMethodScope, CppMethodKind};
+use cpp_method::{CppMethod, CppMethodKind};
 use cpp_type::CppTypeBase;
 use cpp_code_generator::CppCodeGenerator;
 
@@ -111,7 +111,7 @@ impl CGenerator {
     let own_methods: Vec<_> = self.cpp_data
       .methods
       .iter()
-      .filter(|m| m.scope.class_name() == Some(class_name))
+      .filter(|m| m.class_name() == Some(class_name))
       .collect();
     let mut inherited_methods = Vec::new();
     if let Some(type_info) = self.cpp_data.types.iter().find(|t| &t.name == class_name) {
@@ -144,10 +144,15 @@ impl CGenerator {
     let own_methods: Vec<_> = self.cpp_data
       .methods
       .iter()
-      .filter(|m| m.scope.class_name() == Some(class_name))
+      .filter(|m| m.class_name() == Some(class_name))
       .collect();
     let own_pure_virtual_methods: Vec<_> = own_methods.iter()
-      .filter(|m| m.is_pure_virtual)
+      .filter(|m| {
+        m.class_membership
+          .as_ref()
+          .unwrap()
+          .is_pure_virtual
+      })
       .collect();
     let mut inherited_methods = Vec::new();
     if let Some(type_info) = self.cpp_data.types.iter().find(|t| &t.name == class_name) {
@@ -193,8 +198,9 @@ impl CGenerator {
       };
 
       for ref method in methods {
-        if method.kind == CppMethodKind::Constructor {
-          if let CppMethodScope::Class(ref class_name) = method.scope {
+        if let Some(ref membership) = method.class_membership {
+          if membership.kind == CppMethodKind::Constructor {
+            let class_name = membership.class_type.maybe_name().unwrap();
             if self.abstract_classes.iter().find(|x| x == &class_name).is_some() {
               log::debug(format!("Method is skipped:\n{}\nConstructors are not allowed for \
                                   abstract classes.\n",
@@ -202,26 +208,26 @@ impl CGenerator {
               continue;
             }
           }
-        }
-        if method.visibility == CppVisibility::Private {
-          continue;
-        }
-        if method.visibility == CppVisibility::Protected {
-          log::debug(format!("Skipping protected method: \n{}\n", method.short_text()));
-          continue;
-        }
-        if method.is_signal {
-          log::warning(format!("Skipping signal: \n{}\n", method.short_text()));
-          continue;
+          if membership.visibility == CppVisibility::Private {
+            continue;
+          }
+          if membership.visibility == CppVisibility::Protected {
+            log::debug(format!("Skipping protected method: \n{}\n", method.short_text()));
+            continue;
+          }
+          if membership.is_signal {
+            log::warning(format!("Skipping signal: \n{}\n", method.short_text()));
+            continue;
+          }
         }
         if method.template_arguments.is_some() {
           log::warning(format!("Skipping template method: \n{}\n", method.short_text()));
           continue;
         }
-        if let CppMethodScope::Class(ref class_name) = method.scope {
+        if let Some(ref class_name) = method.class_name() {
           if self.template_classes
             .iter()
-            .find(|x| x == &class_name || class_name.starts_with(&format!("{}::", x)))
+            .find(|x| x == class_name || class_name.starts_with(&format!("{}::", x)))
             .is_some() {
             log::warning(format!("Skipping method of template class: \n{}\n",
                                  method.short_text()));

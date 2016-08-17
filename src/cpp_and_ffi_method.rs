@@ -1,4 +1,4 @@
-use cpp_method::{CppMethod, CppMethodScope, ReturnValueAllocationPlace, CppMethodKind};
+use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_ffi_function_signature::CppFfiFunctionSignature;
 use caption_strategy::{MethodCaptionStrategy, TypeCaptionStrategy};
 use cpp_operators::CppOperator;
@@ -35,10 +35,11 @@ pub struct CppAndFfiMethod {
 impl CppMethodWithFfiSignature {
   /// Generates initial FFI method name without any captions
   pub fn c_base_name(&self, include_file: &String) -> Result<String, String> {
-    let scope_prefix = match self.cpp_method.scope {
-      CppMethodScope::Class(ref class_name) => format!("{}_", class_name.replace("::", "_")),
-      CppMethodScope::Global => format!("{}_G_", include_file),
+    let scope_prefix = match self.cpp_method.class_membership {
+      Some(ref info) => format!("{}_", info.class_type.caption()),
+      None => format!("{}_G_", include_file),
     };
+
     let add_place_note = |name| {
       match self.allocation_place {
         ReturnValueAllocationPlace::Stack => format!("{}_to_output", name),
@@ -46,31 +47,28 @@ impl CppMethodWithFfiSignature {
         ReturnValueAllocationPlace::NotApplicable => name,
       }
     };
-    let method_name = match self.cpp_method.kind {
-      CppMethodKind::Constructor => {
-        match self.allocation_place {
-          ReturnValueAllocationPlace::Stack => "constructor".to_string(),
-          ReturnValueAllocationPlace::Heap => "new".to_string(),
-          ReturnValueAllocationPlace::NotApplicable => unreachable!(),
-        }
-      }
-      CppMethodKind::Destructor => {
-        match self.allocation_place {
-          ReturnValueAllocationPlace::Stack => "destructor".to_string(),
-          ReturnValueAllocationPlace::Heap => "delete".to_string(),
-          ReturnValueAllocationPlace::NotApplicable => unreachable!(),
-        }
-      }
-      CppMethodKind::Operator(ref operator) => {
-        add_place_note(match *operator {
-          CppOperator::Conversion(ref cpp_type) => {
-            format!("operator_{}", cpp_type.caption(TypeCaptionStrategy::Full))
-          }
-          _ => format!("OP_{}", operator.c_name()),
-        })
-      }
-      CppMethodKind::Regular => add_place_note(self.cpp_method.name.replace("::", "_")),
 
+    let method_name = if self.cpp_method.is_constructor() {
+      match self.allocation_place {
+        ReturnValueAllocationPlace::Stack => "constructor".to_string(),
+        ReturnValueAllocationPlace::Heap => "new".to_string(),
+        ReturnValueAllocationPlace::NotApplicable => unreachable!(),
+      }
+    } else if self.cpp_method.is_destructor() {
+      match self.allocation_place {
+        ReturnValueAllocationPlace::Stack => "destructor".to_string(),
+        ReturnValueAllocationPlace::Heap => "delete".to_string(),
+        ReturnValueAllocationPlace::NotApplicable => unreachable!(),
+      }
+    } else if let Some(ref operator) = self.cpp_method.operator {
+      add_place_note(match *operator {
+        CppOperator::Conversion(ref cpp_type) => {
+          format!("operator_{}", cpp_type.caption(TypeCaptionStrategy::Full))
+        }
+        _ => format!("OP_{}", operator.c_name()),
+      })
+    } else {
+      add_place_note(self.cpp_method.name.replace("::", "_"))
     };
     Ok(scope_prefix + &method_name)
   }
@@ -81,14 +79,14 @@ impl CppMethodWithFfiSignature {
     match strategy {
       MethodCaptionStrategy::ArgumentsOnly(s) => self.c_signature.caption(s),
       MethodCaptionStrategy::ConstOnly => {
-        if self.cpp_method.is_const {
+        if self.cpp_method.class_membership.as_ref().map(|x| x.is_const).unwrap_or(false) {
           "const".to_string()
         } else {
           "".to_string()
         }
       }
       MethodCaptionStrategy::ConstAndArguments(s) => {
-        let r = if self.cpp_method.is_const {
+        let r = if self.cpp_method.class_membership.as_ref().map(|x| x.is_const).unwrap_or(false) {
           "const_".to_string()
         } else {
           "".to_string()

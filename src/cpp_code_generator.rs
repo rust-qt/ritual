@@ -1,6 +1,6 @@
 use cpp_and_ffi_method::CppAndFfiMethod;
 use cpp_ffi_type::IndirectionChange;
-use cpp_method::{ReturnValueAllocationPlace, CppMethodScope, CppMethodKind};
+use cpp_method::ReturnValueAllocationPlace;
 use cpp_ffi_function_argument::CppFfiArgumentMeaning;
 use cpp_ffi_generator::CppFfiHeaderData;
 use log;
@@ -73,7 +73,7 @@ impl CppCodeGenerator {
             // constructors are said to return values in parse result,
             // but in reality we use `new` which returns a pointer,
             // so no conversion is necessary for constructors.
-            if method.cpp_method.kind != CppMethodKind::Constructor {
+            if !method.cpp_method.is_constructor() {
               if let Some(ref return_type) = method.cpp_method.return_type {
                 result = format!("new {}({})",
                                  return_type.base.to_cpp_code(None).unwrap(),
@@ -94,7 +94,7 @@ impl CppCodeGenerator {
     }
 
     if method.allocation_place == ReturnValueAllocationPlace::Stack &&
-       method.cpp_method.kind != CppMethodKind::Constructor {
+       !method.cpp_method.is_constructor() {
       if let Some(arg) = method.c_signature
         .arguments
         .iter()
@@ -143,7 +143,7 @@ impl CppCodeGenerator {
 
   /// Generates code for the value returned by the FFI method.
   fn returned_expression(&self, method: &CppAndFfiMethod) -> String {
-    let result = if method.cpp_method.kind == CppMethodKind::Destructor {
+    let result = if method.cpp_method.is_destructor() {
       if let Some(arg) = method.c_signature
         .arguments
         .iter()
@@ -153,11 +153,11 @@ impl CppCodeGenerator {
         panic!("Error: no this argument found\n{:?}", method);
       }
     } else {
-      let result_without_args = if method.cpp_method.kind == CppMethodKind::Constructor {
+      let result_without_args = if method.cpp_method.is_constructor() {
         let class_type = CppType {
           indirection: CppTypeIndirection::None,
           is_const: false,
-          base: method.cpp_method.class_type.clone().unwrap(),
+          base: method.cpp_method.class_membership.as_ref().unwrap().class_type.clone(),
         };
         match method.allocation_place {
           ReturnValueAllocationPlace::Stack => {
@@ -178,10 +178,11 @@ impl CppCodeGenerator {
           ReturnValueAllocationPlace::NotApplicable => unreachable!(),
         }
       } else {
-        let scope_specifier = if let CppMethodScope::Class(ref class_name) = method.cpp_method
-          .scope {
-          if method.cpp_method.is_static {
-            format!("{}::", class_name)
+        let scope_specifier = if let Some(ref class_membership) = method.cpp_method
+          .class_membership {
+          if class_membership.is_static {
+            format!("{}::",
+                    class_membership.class_type.to_cpp_code(None).unwrap())
           } else {
             if let Some(arg) = method.c_signature
               .arguments
@@ -206,7 +207,7 @@ impl CppCodeGenerator {
 
   /// Generates body of the FFI method implementation.
   fn source_body(&self, method: &CppAndFfiMethod) -> String {
-    if method.cpp_method.kind == CppMethodKind::Destructor &&
+    if method.cpp_method.is_destructor() &&
        method.allocation_place == ReturnValueAllocationPlace::Heap {
       if let Some(arg) = method.c_signature
         .arguments

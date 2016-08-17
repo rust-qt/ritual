@@ -12,7 +12,7 @@ use rust_code_generator::{RustCodeGenerator, RustCodeGeneratorConfig};
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
                 RustMethodArguments, TraitImpl, TraitName, RustMethodSelfArg};
-use cpp_method::{CppMethodScope, ReturnValueAllocationPlace};
+use cpp_method::ReturnValueAllocationPlace;
 use cpp_ffi_function_argument::CppFfiArgumentMeaning;
 use utils::{CaseOperations, VecCaseOperations, WordIterator};
 
@@ -322,7 +322,7 @@ impl RustGenerator {
     }
     for header in &self.input_data.cpp_ffi_headers {
       for method in &header.methods {
-        if method.cpp_method.scope == CppMethodScope::Global {
+        if method.cpp_method.class_membership.is_none() {
           add_one_to_type_map(&self.crate_name,
                               &mut self.cpp_to_rust_type_map,
                               &method.cpp_method.name,
@@ -408,7 +408,6 @@ impl RustGenerator {
                                                                  .iter()
                                                                  .filter(|&x| {
                                                                    x.cpp_method
-                                                                     .scope
                                                                      .class_name() ==
                                                                    Some(&type_info.name)
                                                                  })
@@ -495,7 +494,7 @@ impl RustGenerator {
         }
       }
       for method in &c_header.methods {
-        if method.cpp_method.scope == CppMethodScope::Global {
+        if method.cpp_method.class_membership.is_none() {
           if check_name(&method.cpp_method.name) {
             good_methods.push(method);
           }
@@ -529,7 +528,7 @@ impl RustGenerator {
                        method: &CppAndFfiMethod,
                        scope: &RustMethodScope)
                        -> Result<RustMethod, String> {
-    if method.cpp_method.kind.is_operator() {
+    if method.cpp_method.is_operator() {
       // TODO: implement operator traits
       return Err(format!("operators are not supported yet"));
     }
@@ -543,7 +542,7 @@ impl RustGenerator {
             return_type_info = Some((complete_type, Some(arg_index as i32)));
           } else {
             if method.allocation_place == ReturnValueAllocationPlace::Heap &&
-               method.cpp_method.kind.is_destructor() {
+               method.cpp_method.is_destructor() {
               if let RustType::Common { ref mut indirection, .. } = complete_type.rust_api_type {
                 assert!(*indirection == RustTypeIndirection::Ref { lifetime: None });
                 *indirection = RustTypeIndirection::None;
@@ -577,7 +576,7 @@ impl RustGenerator {
                                            &CppFfiArgumentMeaning::ReturnValue) {
         Ok(mut r) => {
           if method.allocation_place == ReturnValueAllocationPlace::Heap &&
-             !method.cpp_method.kind.is_destructor() {
+             !method.cpp_method.is_destructor() {
             if let RustType::Common { ref mut indirection, .. } = r.rust_api_type {
               assert!(*indirection == RustTypeIndirection::None);
               *indirection = RustTypeIndirection::Ptr;
@@ -616,12 +615,12 @@ impl RustGenerator {
   }
 
   fn method_rust_name(&self, method: &CppAndFfiMethod) -> RustName {
-    let mut name = if method.cpp_method.scope == CppMethodScope::Global {
+    let mut name = if method.cpp_method.class_membership.is_none() {
       self.cpp_to_rust_type_map.get(&method.cpp_method.name).unwrap().clone()
     } else {
-      let x = if method.cpp_method.kind.is_constructor() {
+      let x = if method.cpp_method.is_constructor() {
         "new".to_string()
-      } else if method.cpp_method.kind.is_destructor() {
+      } else if method.cpp_method.is_destructor() {
         "delete".to_string()
       } else {
         method.cpp_method.name.to_snake_case()
@@ -654,7 +653,7 @@ impl RustGenerator {
     let mut types = Vec::new();
     let mut method_names = HashSet::new();
     for method in &methods {
-      if method.cpp_method.kind.is_destructor() {
+      if method.cpp_method.is_destructor() {
         if let &RustMethodScope::Impl { ref type_name } = scope {
           match method.allocation_place {
             ReturnValueAllocationPlace::Stack => {

@@ -5,7 +5,7 @@ use cpp_ffi_function_argument::{CppFfiFunctionArgument, CppFfiArgumentMeaning};
 use cpp_and_ffi_method::CppMethodWithFfiSignature;
 use cpp_data::CppVisibility;
 use utils::JoinWithString;
-pub use serializable::{CppFunctionArgument, CppMethodScope, CppMethodKind, CppMethod};
+pub use serializable::{CppFunctionArgument, CppMethodKind, CppMethod, CppMethodClassMembership};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ReturnValueAllocationPlace {
@@ -20,24 +20,7 @@ pub enum ReturnValueAllocationPlace {
   NotApplicable,
 }
 
-impl CppMethodScope {
-  pub fn class_name(&self) -> Option<&String> {
-    match *self {
-      CppMethodScope::Global => None,
-      CppMethodScope::Class(ref s) => Some(s),
-    }
-  }
-}
-
-
-
 impl CppMethodKind {
-  pub fn is_operator(&self) -> bool {
-    match *self {
-      CppMethodKind::Operator(..) => true,
-      _ => false,
-    }
-  }
   pub fn is_constructor(&self) -> bool {
     match *self {
       CppMethodKind::Constructor => true,
@@ -80,7 +63,7 @@ impl CppMethod {
   /// Checks if this method would need
   /// to have 2 wrappers with 2 different return value allocation places
   pub fn needs_allocation_place_variants(&self) -> bool {
-    if self.kind.is_constructor() || self.kind.is_destructor() {
+    if self.is_constructor() || self.is_destructor() {
       return true;
     }
     if let Some(ref t) = self.return_type {
@@ -105,13 +88,13 @@ impl CppMethod {
       arguments: Vec::new(),
       return_type: CppFfiType::void(),
     };
-    if let CppMethodScope::Class(..) = self.scope {
-      if !self.is_static && self.kind != CppMethodKind::Constructor {
+    if let Some(ref info) = self.class_membership {
+      if !info.is_static && info.kind != CppMethodKind::Constructor {
         r.arguments.push(CppFfiFunctionArgument {
           name: "this_ptr".to_string(),
           argument_type: CppType {
-              base: self.class_type.clone().unwrap(),
-              is_const: self.is_const,
+              base: info.class_type.clone(),
+              is_const: info.is_const,
               indirection: CppTypeIndirection::Ptr,
             }
             .to_cpp_ffi_type(CppTypeRole::NotReturnType)
@@ -134,11 +117,11 @@ impl CppMethod {
         }
       }
     }
-    let real_return_type = if self.kind == CppMethodKind::Constructor {
+    let real_return_type = if self.is_constructor() {
       Some(CppType {
         is_const: false,
         indirection: CppTypeIndirection::None,
-        base: self.class_type.clone().unwrap(),
+        base: self.class_membership.as_ref().unwrap().class_type.clone(),
       })
     } else {
       self.return_type.clone()
@@ -197,7 +180,7 @@ impl CppMethod {
   /// Returns full name of the method, including
   /// class name (if any) and namespace.
   pub fn full_name(&self) -> String {
-    if let CppMethodScope::Class(ref name) = self.scope {
+    if let Some(ref name) = self.class_name() {
       format!("{}::{}", name, self.name)
     } else {
       self.name.clone()
@@ -208,36 +191,40 @@ impl CppMethod {
   /// (only for debug output purposes).
   pub fn short_text(&self) -> String {
     let mut s = String::new();
-    if self.is_virtual {
-      s = format!("{} virtual", s);
+    if let Some(ref info) = self.class_membership {
+      if info.is_virtual {
+        s = format!("{} virtual", s);
+      }
+      if info.is_static {
+        s = format!("{} static", s);
+      }
+      if info.visibility == CppVisibility::Protected {
+        s = format!("{} protected", s);
+      }
+      if info.visibility == CppVisibility::Private {
+        s = format!("{} private", s);
+      }
+      if info.is_signal {
+        s = format!("{} [signal]", s);
+      }
+      match info.kind {
+        CppMethodKind::Constructor => s = format!("{} [constructor]", s),
+        CppMethodKind::Destructor => s = format!("{} [destructor]", s),
+        CppMethodKind::Regular => {}
+      }
     }
-    if self.is_static {
-      s = format!("{} static", s);
-    }
-    if self.visibility == CppVisibility::Protected {
-      s = format!("{} protected", s);
-    }
-    if self.visibility == CppVisibility::Private {
-      s = format!("{} private", s);
-    }
-    if self.is_signal {
-      s = format!("{} [signal]", s);
+    if let Some(ref op) = self.operator {
+      s = format!("{} [{:?}]", s, op);
     }
     if self.allows_variable_arguments {
       s = format!("{} [var args]", s);
-    }
-    match self.kind {
-      CppMethodKind::Constructor => s = format!("{} [constructor]", s),
-      CppMethodKind::Destructor => s = format!("{} [destructor]", s),
-      CppMethodKind::Operator(ref op) => s = format!("{} [{:?}]", s, op),
-      CppMethodKind::Regular => {}
     }
     if let Some(ref cpp_type) = self.return_type {
       s = format!("{} {}",
                   s,
                   cpp_type.to_cpp_code(None).unwrap_or("[?]".to_string()));
     }
-    if let CppMethodScope::Class(ref name) = self.scope {
+    if let Some(ref name) = self.class_name() {
       s = format!("{} {}::", s, name);
     }
     s = format!("{}{}", s, self.name);
@@ -256,12 +243,37 @@ impl CppMethod {
                 })
       })
                   .join(", "));
-    if self.is_pure_virtual {
-      s = format!("{} = 0", s);
-    }
-    if self.is_const {
-      s = format!("{} const", s);
+    if let Some(ref info) = self.class_membership {
+      if info.is_pure_virtual {
+        s = format!("{} = 0", s);
+      }
+      if info.is_const {
+        s = format!("{} const", s);
+      }
     }
     s.trim().to_string()
+  }
+
+  pub fn class_name(&self) -> Option<&String> {
+    match self.class_membership {
+      Some(ref info) => Some(info.class_type.maybe_name().unwrap()),
+      None => None,
+    }
+  }
+
+  pub fn is_constructor(&self) -> bool {
+    match self.class_membership {
+      Some(ref info) => info.kind.is_constructor(),
+      None => false,
+    }
+  }
+  pub fn is_destructor(&self) -> bool {
+    match self.class_membership {
+      Some(ref info) => info.kind.is_destructor(),
+      None => false,
+    }
+  }
+  pub fn is_operator(&self) -> bool {
+    self.operator.is_some()
   }
 }

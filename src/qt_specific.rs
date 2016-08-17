@@ -74,7 +74,7 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) {
     t.include_file = get_header(&t.include_file, Some(&t.name));
   }
   for m in &mut data.methods {
-    let x = get_header(&m.include_file, m.scope.class_name());
+    let x = get_header(&m.include_file, m.class_name());
     m.include_file = x;
   }
 }

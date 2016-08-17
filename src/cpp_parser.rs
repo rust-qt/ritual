@@ -14,10 +14,9 @@ use utils::JoinWithString;
 
 use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppOriginLocation,
                CppVisibility};
-use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind};
+use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind, CppMethodClassMembership};
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
                CppSpecificNumericTypeKind};
-use cpp_method::CppMethodScope;
 use cpp_operators::CppOperator;
 use std::io::Write;
 
@@ -676,7 +675,7 @@ impl CppParser {
   }
 
   fn parse_function(&mut self, entity: Entity) -> Result<CppMethod, String> {
-    let (scope, class_entity) = match entity.get_semantic_parent() {
+    let (class_name, class_entity) = match entity.get_semantic_parent() {
       Some(p) => {
         match p.get_kind() {
           EntityKind::ClassDecl |
@@ -684,17 +683,17 @@ impl CppParser {
           EntityKind::StructDecl |
           EntityKind::ClassTemplatePartialSpecialization => {
             match get_full_name(p) {
-              Ok(class_name) => (CppMethodScope::Class(class_name), Some(p)),
+              Ok(class_name) => (Some(class_name), Some(p)),
               Err(msg) => {
                 panic!("function parent is a class but it doesn't have a name: {}",
                        msg)
               }
             }
           }
-          _ => (CppMethodScope::Global, None),
+          _ => (None, None),
         }
       }
-      None => (CppMethodScope::Global, None),
+      None => (None, None),
     };
     let return_type = entity.get_type()
       .unwrap_or_else(|| panic!("failed to get function type"))
@@ -767,14 +766,10 @@ impl CppParser {
         name = format!("{}::{}", get_full_name(parent).unwrap(), name);
       }
     }
-    let mut kind = match entity.get_kind() {
-      EntityKind::Constructor => CppMethodKind::Constructor,
-      EntityKind::Destructor => CppMethodKind::Destructor,
-      _ => CppMethodKind::Regular,
-    };
     let allows_variable_arguments = entity.is_variadic();
-    let has_this_argument = scope.class_name().is_some() && !entity.is_static_method();
+    let has_this_argument = class_name.is_some() && !entity.is_static_method();
     let real_arguments_count = arguments.len() as i32 + if has_this_argument { 1 } else { 0 };
+    let mut method_operator = None;
     if name.starts_with("operator") {
       let name_suffix = name["operator".len()..].trim();
       let mut name_matches = false;
@@ -784,21 +779,21 @@ impl CppParser {
           if s == name_suffix {
             name_matches = true;
             if info.allows_variable_arguments || info.arguments_count == real_arguments_count {
-              kind = CppMethodKind::Operator(operator.clone());
+              method_operator = Some(operator.clone());
               break;
             }
           }
         }
       }
-      if !kind.is_operator() && name_matches {
+      if method_operator.is_none() && name_matches {
         return Err(format!("This method is recognized as operator but arguments do not match \
                             its signature."));
       }
     }
-    if !kind.is_operator() && name.starts_with("operator ") {
+    if method_operator.is_none() && name.starts_with("operator ") {
       let op = name["operator ".len()..].trim();
       match self.parse_unexposed_type(None, Some(op.to_string()), class_entity, Some(entity)) {
-        Ok(t) => kind = CppMethodKind::Operator(CppOperator::Conversion(t)),
+        Ok(t) => method_operator = Some(CppOperator::Conversion(t)),
         Err(msg) => {
           panic!("Unknown operator: '{}' (method name: {}); error: {}",
                  op,
@@ -807,34 +802,39 @@ impl CppParser {
         }
       }
     }
-    let class_type = match scope {
-      CppMethodScope::Class(ref class_name) => {
-        match self.data.types.iter().find(|x| &x.name == class_name) {
-          Some(info) => Some(info.default_class_type()),
-          None => return Err(format!("Unknown class type: {}", class_name)),
-        }
-      }
-      CppMethodScope::Global => None,
-    };
 
     Ok(CppMethod {
       name: name,
-      kind: kind,
-      scope: scope,
-      is_virtual: entity.is_virtual_method(),
-      is_pure_virtual: entity.is_pure_virtual_method(),
-      is_const: entity.is_const_method(),
-      is_static: entity.is_static_method(),
-      visibility: match entity.get_accessibility().unwrap_or(Accessibility::Public) {
-        Accessibility::Public => CppVisibility::Public,
-        Accessibility::Protected => CppVisibility::Protected,
-        Accessibility::Private => CppVisibility::Private,
+      operator: method_operator,
+      class_membership: match class_name {
+        Some(class_name) => {
+          Some(CppMethodClassMembership {
+            kind: match entity.get_kind() {
+              EntityKind::Constructor => CppMethodKind::Constructor,
+              EntityKind::Destructor => CppMethodKind::Destructor,
+              _ => CppMethodKind::Regular,
+            },
+            is_virtual: entity.is_virtual_method(),
+            is_pure_virtual: entity.is_pure_virtual_method(),
+            is_const: entity.is_const_method(),
+            is_static: entity.is_static_method(),
+            visibility: match entity.get_accessibility().unwrap_or(Accessibility::Public) {
+              Accessibility::Public => CppVisibility::Public,
+              Accessibility::Protected => CppVisibility::Protected,
+              Accessibility::Private => CppVisibility::Private,
+            },
+            is_signal: false, // TODO: get list of signals and slots at runtime
+            class_type: match self.data.types.iter().find(|x| &x.name == &class_name) {
+              Some(info) => info.default_class_type(),
+              None => return Err(format!("Unknown class type: {}", class_name)),
+            },
+          })
+        }
+        None => None,
       },
-      is_signal: false, // TODO: get list of signals and slots at runtime
       arguments: arguments,
       allows_variable_arguments: allows_variable_arguments,
       return_type: Some(return_type_parsed),
-      class_type: class_type,
       include_file: self.entity_include_file(entity).unwrap(),
       origin_location: Some(get_origin_location(entity).unwrap()),
       template_arguments: template_arguments,
@@ -1187,18 +1187,6 @@ impl CppParser {
         for arg in &method.arguments {
           if let Err(msg) = self.check_type_integrity(&arg.argument_type) {
             log::warning(format!("Method is removed: {}: {}", method.short_text(), msg));
-            return false;
-          }
-        }
-        if let CppMethodScope::Class(ref class_name) = method.scope {
-          if self.data
-            .types
-            .iter()
-            .find(|x| &x.name == class_name)
-            .is_none() {
-            log::warning(format!("Method is removed: {}: {}",
-                                 method.short_text(),
-                                 "class name is unavailable"));
             return false;
           }
         }

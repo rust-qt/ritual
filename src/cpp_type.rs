@@ -133,6 +133,16 @@ impl CppTypeBase {
     }
   }
 
+  pub fn maybe_name(&self) -> Option<&String> {
+    match *self {
+      CppTypeBase::SpecificNumeric { ref name, .. } => Some(name),
+      CppTypeBase::PointerSizedInteger { ref name, .. } => Some(name),
+      CppTypeBase::Enum { ref name } => Some(name),
+      CppTypeBase::Class { ref name, .. } => Some(name),
+      _ => None,
+    }
+  }
+
   /// Generates alphanumeric representation of self
   /// used to generate FFI function names
   pub fn caption(&self) -> String {

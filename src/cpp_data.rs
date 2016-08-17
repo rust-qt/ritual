@@ -1,5 +1,5 @@
 
-use cpp_method::{CppMethod, CppMethodScope, CppMethodKind};
+use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership};
 use cpp_operators::CppOperator;
 use std::collections::HashMap;
 use log;
@@ -81,29 +81,27 @@ impl CppData {
         let class_name = &type1.name;
         let mut found_destructor = false;
         for method in &self.methods {
-          if method.kind == CppMethodKind::Destructor {
-            if let CppMethodScope::Class(ref name) = method.scope {
-              if name == class_name {
-                found_destructor = true;
-                break;
-              }
-            }
+          if method.is_destructor() && method.class_name() == Some(class_name) {
+            found_destructor = true;
+            break;
           }
         }
         if !found_destructor {
           let is_virtual = self.has_virtual_destructor(class_name);
           self.methods.push(CppMethod {
             name: format!("~{}", class_name),
-            scope: CppMethodScope::Class(class_name.clone()),
-            is_virtual: is_virtual,
-            is_pure_virtual: false,
-            is_const: false,
-            is_static: false,
-            visibility: CppVisibility::Public,
-            is_signal: false,
+            class_membership: Some(CppMethodClassMembership {
+              class_type: type1.default_class_type(),
+              is_virtual: is_virtual,
+              is_pure_virtual: false,
+              is_const: false,
+              is_static: false,
+              visibility: CppVisibility::Public,
+              is_signal: false,
+              kind: CppMethodKind::Destructor,
+            }),
+            operator: None,
             return_type: None,
-            class_type: Some(type1.default_class_type()),
-            kind: CppMethodKind::Destructor,
             arguments: vec![],
             allows_variable_arguments: false,
             include_file: type1.include_file.clone(),
@@ -132,12 +130,10 @@ impl CppData {
       let base_methods: Vec<_> = self.methods
         .iter()
         .filter(|method| {
-          if method.kind.is_constructor() || method.kind.is_destructor() ||
-             method.kind == CppMethodKind::Operator(CppOperator::Assignment) {
-            return false;
-          }
-          if let CppMethodScope::Class(ref name) = method.scope {
-            name == base_name
+          if let Some(ref info) = method.class_membership {
+            info.class_type.maybe_name().unwrap() == base_name && !info.kind.is_constructor() &&
+            !info.kind.is_destructor() &&
+            method.operator != Some(CppOperator::Assignment)
           } else {
             false
           }
@@ -150,29 +146,24 @@ impl CppData {
           for base_class_method in base_methods.clone() {
             let mut ok = true;
             for method in &self.methods {
-              if let CppMethodScope::Class(ref name) = method.scope {
-                if name == derived_name && method.name == base_class_method.name {
-                  // log::info("Method is not added because it's overriden in derived class");
-                  // log::info(format!("Base method: {}", base_class_method.short_text()));
-                  // log::info(format!("Derived method: {}\n", method.short_text()));
-                  ok = false;
-                  break;
-                }
+              if method.class_name() == Some(derived_name) &&
+                 method.name == base_class_method.name {
+                // log::info("Method is not added because it's overriden in derived class");
+                // log::info(format!("Base method: {}", base_class_method.short_text()));
+                // log::info(format!("Derived method: {}\n", method.short_text()));
+                ok = false;
+                break;
               }
             }
             if ok {
               let mut new_method = base_class_method.clone();
-              new_method.scope = CppMethodScope::Class(derived_name.clone());
+              if let Some(ref mut info) = new_method.class_membership {
+                info.class_type = type1.default_class_type();
+              } else {
+                panic!("class_membership must be present");
+              }
               new_method.include_file = type1.include_file.clone();
               new_method.origin_location = None;
-              new_method.class_type = Some(type1.default_class_type());
-              // if new_method.arguments.len() > 0 && new_method.arguments[0].name == "this" {
-              //   new_method.arguments[0].argument_type.base = CppTypeBase::Class {
-              //     name: derived_name.clone(),
-              //     template_arguments: template_arguments.clone(),
-              //   };
-              // }
-              // log::info(format!("Method added: {}", new_method.short_text()));
               new_methods.push(new_method.clone());
             }
           }
@@ -268,12 +259,8 @@ impl CppData {
 
   pub fn has_virtual_destructor(&self, class_name: &String) -> bool {
     for method in &self.methods {
-      if method.kind.is_destructor() {
-        if let CppMethodScope::Class(ref name) = method.scope {
-          if name == class_name {
-            return method.is_virtual;
-          }
-        }
+      if method.is_destructor() && method.class_name() == Some(class_name) {
+        return method.class_membership.as_ref().unwrap().is_virtual;
       }
     }
     if let Some(type_info) = self.types.iter().find(|t| &t.name == class_name) {
