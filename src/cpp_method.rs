@@ -174,6 +174,8 @@ impl CppMethod {
     Ok(r)
   }
 
+  /// Generates either one or two FFI signatures for this method,
+  /// depending on its return type.
   pub fn to_ffi_signatures(&self) -> Result<Vec<CppMethodWithFfiSignature>, String> {
     let places = if self.needs_allocation_place_variants() {
       vec![ReturnValueAllocationPlace::Heap, ReturnValueAllocationPlace::Stack]
@@ -192,6 +194,8 @@ impl CppMethod {
     Ok(results)
   }
 
+  /// Returns full name of the method, including
+  /// class name (if any) and namespace.
   pub fn full_name(&self) -> String {
     if let CppMethodScope::Class(ref name) = self.scope {
       format!("{}::{}", name, self.name)
@@ -200,6 +204,8 @@ impl CppMethod {
     }
   }
 
+  /// Returns short text representing values in this method
+  /// (only for debug output purposes).
   pub fn short_text(&self) -> String {
     let mut s = String::new();
     if self.is_virtual {

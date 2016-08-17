@@ -102,7 +102,6 @@ impl CppMethodWithFfiSignature {
 impl CppAndFfiMethod {
   /// Adds FFI method name to a CppMethodWithFfiSignature object.
   pub fn new(data: CppMethodWithFfiSignature, c_name: String) -> CppAndFfiMethod {
-
     CppAndFfiMethod {
       cpp_method: data.cpp_method,
       allocation_place: data.allocation_place,

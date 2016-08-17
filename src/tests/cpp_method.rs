@@ -589,3 +589,102 @@ fn c_signature_method_returning_class() {
   assert_eq!(r_heap.return_type.conversion,
              IndirectionChange::ValueToPointer);
 }
+
+#[test]
+fn to_ffi_signatures_destructor() {
+  let mut method1 = empty_regular_method();
+  method1.kind = CppMethodKind::Destructor;
+  method1.scope = CppMethodScope::Class("MyClass".to_string());
+  method1.class_type = Some(CppTypeBase::Class {
+    name: "MyClass".to_string(),
+    template_arguments: None,
+  });
+  let result = method1.to_ffi_signatures().unwrap();
+  assert_eq!(result.len(), 2);
+  assert_eq!(result[0].c_signature,
+             method1.c_signature(ReturnValueAllocationPlace::Heap).unwrap());
+  assert_eq!(result[0].cpp_method, method1);
+  assert_eq!(result[0].allocation_place, ReturnValueAllocationPlace::Heap);
+  assert_eq!(result[1].c_signature,
+             method1.c_signature(ReturnValueAllocationPlace::Stack).unwrap());
+  assert_eq!(result[1].cpp_method, method1);
+  assert_eq!(result[1].allocation_place,
+             ReturnValueAllocationPlace::Stack);
+}
+
+#[test]
+fn to_ffi_signatures_simple_func() {
+  let mut method1 = empty_regular_method();
+  method1.return_type = Some(CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+  });
+  method1.arguments.push(CppFunctionArgument {
+    argument_type: CppType {
+      indirection: CppTypeIndirection::None,
+      is_const: false,
+      base: CppTypeBase::Enum { name: "Enum1".to_string() },
+    },
+    name: "arg1".to_string(),
+    has_default_value: false,
+  });
+  let result = method1.to_ffi_signatures().unwrap();
+  assert_eq!(result.len(), 1);
+  assert_eq!(result[0].c_signature,
+             method1.c_signature(ReturnValueAllocationPlace::NotApplicable).unwrap());
+  assert_eq!(result[0].cpp_method, method1);
+  assert_eq!(result[0].allocation_place,
+             ReturnValueAllocationPlace::NotApplicable);
+}
+
+#[test]
+fn full_name_free_function() {
+  let mut method1 = empty_regular_method();
+  method1.name = "func1".to_string();
+  assert_eq!(method1.full_name(), "func1");
+}
+
+#[test]
+fn full_name_free_function_in_namespace() {
+  let mut method1 = empty_regular_method();
+  method1.name = "ns::func1".to_string();
+  assert_eq!(method1.full_name(), "ns::func1");
+}
+
+#[test]
+fn full_name_method() {
+  let mut method1 = empty_regular_method();
+  method1.name = "func1".to_string();
+  method1.scope = CppMethodScope::Class("MyClass".to_string());
+  method1.class_type = Some(CppTypeBase::Class {
+    name: "MyClass".to_string(),
+    template_arguments: None,
+  });
+  assert_eq!(method1.full_name(), "MyClass::func1");
+}
+
+#[test]
+fn full_name_static_method() {
+  let mut method1 = empty_regular_method();
+  method1.name = "func1".to_string();
+  method1.scope = CppMethodScope::Class("MyClass".to_string());
+  method1.class_type = Some(CppTypeBase::Class {
+    name: "MyClass".to_string(),
+    template_arguments: None,
+  });
+  method1.is_static = true;
+  assert_eq!(method1.full_name(), "MyClass::func1");
+}
+
+#[test]
+fn full_name_nested_class_method() {
+  let mut method1 = empty_regular_method();
+  method1.name = "func1".to_string();
+  method1.scope = CppMethodScope::Class("MyClass::Iterator".to_string());
+  method1.class_type = Some(CppTypeBase::Class {
+    name: "MyClass::Iterator".to_string(),
+    template_arguments: None,
+  });
+  assert_eq!(method1.full_name(), "MyClass::Iterator::func1");
+}
