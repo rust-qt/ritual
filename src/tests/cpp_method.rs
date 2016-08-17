@@ -688,3 +688,48 @@ fn full_name_nested_class_method() {
   });
   assert_eq!(method1.full_name(), "MyClass::Iterator::func1");
 }
+
+#[test]
+fn short_text1() {
+  let method = CppMethod {
+    name: "method1".to_string(),
+    scope: CppMethodScope::Class("Class1".to_string()),
+    is_virtual: false,
+    is_pure_virtual: false,
+    is_const: true,
+    is_static: false,
+    visibility: CppVisibility::Protected,
+    is_signal: false,
+    return_type: Some(CppType {
+      indirection: CppTypeIndirection::None,
+      is_const: false,
+      base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+    }),
+    class_type: None,
+    kind: CppMethodKind::Regular,
+    arguments: vec![CppFunctionArgument {
+                      argument_type: CppType {
+                        indirection: CppTypeIndirection::None,
+                        is_const: false,
+                        base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+                      },
+                      name: "arg1".to_string(),
+                      has_default_value: false,
+                    },
+                    CppFunctionArgument {
+                      argument_type: CppType {
+                        indirection: CppTypeIndirection::None,
+                        is_const: false,
+                        base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+                      },
+                      name: "arg2".to_string(),
+                      has_default_value: true,
+                    }],
+    allows_variable_arguments: false,
+    include_file: String::new(),
+    origin_location: None,
+    template_arguments: None,
+  };
+  assert_eq!(method.short_text(),
+             "protected int Class1::method1(int arg1, double arg2 = ?) const");
+}
