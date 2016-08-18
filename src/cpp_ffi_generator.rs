@@ -6,7 +6,7 @@ use caption_strategy::MethodCaptionStrategy;
 use cpp_method::{CppMethod, CppMethodKind};
 use cpp_type::CppTypeBase;
 use cpp_code_generator::CppCodeGenerator;
-use cpp_ffi_data::CppAndFfiMethod;
+use cpp_ffi_data::{CppAndFfiMethod, c_base_name};
 
 pub struct CGenerator {
   lib_path: PathBuf,
@@ -243,7 +243,9 @@ impl CGenerator {
           }
           Ok(results) => {
             for result in results {
-              match result.c_base_name(include_file_base_name) {
+              match c_base_name(&result.cpp_method,
+                                &result.allocation_place,
+                                include_file_base_name) {
                 Err(msg) => {
                   log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
                                        method.short_text(),

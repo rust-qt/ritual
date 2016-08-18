@@ -186,48 +186,55 @@ pub struct CppAndFfiMethod {
   pub c_name: String,
 }
 
+/// Generates initial FFI method name without any captions
+pub fn c_base_name(cpp_method: &CppMethod,
+                   allocation_place: &ReturnValueAllocationPlace,
+                   include_file: &String)
+                   -> Result<String, String> {
+  let scope_prefix = match cpp_method.class_membership {
+    Some(ref info) => format!("{}_", info.class_type.caption()),
+    None => format!("{}_G_", include_file),
+  };
+
+  let add_place_note = |name| {
+    match *allocation_place {
+      ReturnValueAllocationPlace::Stack => format!("{}_to_output", name),
+      ReturnValueAllocationPlace::Heap => format!("{}_as_ptr", name),
+      ReturnValueAllocationPlace::NotApplicable => name,
+    }
+  };
+
+  let method_name = if cpp_method.is_constructor() {
+    match *allocation_place {
+      ReturnValueAllocationPlace::Stack => "constructor".to_string(),
+      ReturnValueAllocationPlace::Heap => "new".to_string(),
+      ReturnValueAllocationPlace::NotApplicable => {
+        return Err(format!("NotApplicable is not allowed for constructor"))
+      }
+    }
+  } else if cpp_method.is_destructor() {
+    match *allocation_place {
+      ReturnValueAllocationPlace::Stack => "destructor".to_string(),
+      ReturnValueAllocationPlace::Heap => "delete".to_string(),
+      ReturnValueAllocationPlace::NotApplicable => {
+        return Err(format!("NotApplicable is not allowed for constructor"))
+      }
+    }
+  } else if let Some(ref operator) = cpp_method.operator {
+    add_place_note(match *operator {
+      CppOperator::Conversion(ref cpp_type) => {
+        format!("convert_to_{}", cpp_type.caption(TypeCaptionStrategy::Full))
+      }
+      _ => format!("operator_{}", operator.c_name()),
+    })
+  } else {
+    add_place_note(cpp_method.name.replace("::", "_"))
+  };
+  Ok(scope_prefix + &method_name)
+}
+
 
 impl CppMethodWithFfiSignature {
-  /// Generates initial FFI method name without any captions
-  pub fn c_base_name(&self, include_file: &String) -> Result<String, String> {
-    let scope_prefix = match self.cpp_method.class_membership {
-      Some(ref info) => format!("{}_", info.class_type.caption()),
-      None => format!("{}_G_", include_file),
-    };
-
-    let add_place_note = |name| {
-      match self.allocation_place {
-        ReturnValueAllocationPlace::Stack => format!("{}_to_output", name),
-        ReturnValueAllocationPlace::Heap => format!("{}_as_ptr", name),
-        ReturnValueAllocationPlace::NotApplicable => name,
-      }
-    };
-
-    let method_name = if self.cpp_method.is_constructor() {
-      match self.allocation_place {
-        ReturnValueAllocationPlace::Stack => "constructor".to_string(),
-        ReturnValueAllocationPlace::Heap => "new".to_string(),
-        ReturnValueAllocationPlace::NotApplicable => unreachable!(),
-      }
-    } else if self.cpp_method.is_destructor() {
-      match self.allocation_place {
-        ReturnValueAllocationPlace::Stack => "destructor".to_string(),
-        ReturnValueAllocationPlace::Heap => "delete".to_string(),
-        ReturnValueAllocationPlace::NotApplicable => unreachable!(),
-      }
-    } else if let Some(ref operator) = self.cpp_method.operator {
-      add_place_note(match *operator {
-        CppOperator::Conversion(ref cpp_type) => {
-          format!("operator_{}", cpp_type.caption(TypeCaptionStrategy::Full))
-        }
-        _ => format!("OP_{}", operator.c_name()),
-      })
-    } else {
-      add_place_note(self.cpp_method.name.replace("::", "_"))
-    };
-    Ok(scope_prefix + &method_name)
-  }
-
   /// Generates a caption for this method using specified strategy
   /// to avoid name conflict.
   pub fn caption(&self, strategy: MethodCaptionStrategy) -> String {

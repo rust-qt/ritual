@@ -21,7 +21,7 @@ fn cpp_method_kind() {
   assert!(CppMethodKind::Regular.is_regular());
 }
 
-fn empty_membership(class_name: &'static str) -> CppMethodClassMembership {
+pub fn empty_membership(class_name: &'static str) -> CppMethodClassMembership {
   CppMethodClassMembership {
     kind: CppMethodKind::Regular,
     is_virtual: false,
@@ -37,7 +37,7 @@ fn empty_membership(class_name: &'static str) -> CppMethodClassMembership {
   }
 }
 
-fn empty_regular_method() -> CppMethod {
+pub fn empty_regular_method() -> CppMethod {
   CppMethod {
     name: String::new(),
     class_membership: None,

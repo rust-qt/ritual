@@ -457,7 +457,7 @@ fn nested_template_cpp_code() {
                                                                         is_const: false,
                                                                         base: CppTypeBase::Class {
                                                                           name: "QString"
-                                                                                  .to_string(),
+                                                                            .to_string(),
                                                                           template_arguments: None,
                                                                         },
                                                                       }]),

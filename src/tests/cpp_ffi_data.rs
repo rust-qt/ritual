@@ -1,6 +1,9 @@
 use cpp_ffi_data::*;
 use cpp_type::*;
 use caption_strategy::*;
+use tests::cpp_method::{empty_regular_method, empty_membership};
+use cpp_method::{CppMethodKind, ReturnValueAllocationPlace};
+use cpp_operator::CppOperator;
 
 #[test]
 fn argument_meaning() {
@@ -170,23 +173,180 @@ fn signature_two_numbers() {
              "int_arg1_double_arg2");
   assert_eq!(sig.caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full)),
              "int_arg1_double_arg2");
-  assert_eq!(sig.arguments_to_cpp_code().unwrap(), "int arg1, double arg2");
+  assert_eq!(sig.arguments_to_cpp_code().unwrap(),
+             "int arg1, double arg2");
 }
 
 #[test]
 fn cpp_ffi_type_void() {
   let t = CppFfiType::void();
-  assert!(t.cpp_type.is_void());
+  assert!(t.original_type.is_void());
   assert!(t.ffi_type.is_void());
   assert_eq!(t.conversion, IndirectionChange::NoChange);
 }
 
 #[test]
-fn c_base_name1() {
-  let method =
+fn c_base_name_free_func() {
+  let mut method = empty_regular_method();
+  method.name = "func1".to_string();
+  let include_file = "QRect".to_string();
+  assert_eq!(c_base_name(&method,
+                         &ReturnValueAllocationPlace::NotApplicable,
+                         &include_file)
+               .unwrap(),
+             "QRect_G_func1");
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+             "QRect_G_func1_to_output");
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+             "QRect_G_func1_as_ptr");
+}
 
+#[test]
+fn c_base_name_free_func_in_namespace() {
+  let mut method = empty_regular_method();
+  method.name = "ns::func1".to_string();
+  let include_file = "QRect".to_string();
+  assert_eq!(c_base_name(&method,
+                         &ReturnValueAllocationPlace::NotApplicable,
+                         &include_file)
+               .unwrap(),
+             "QRect_G_ns_func1");
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+             "QRect_G_ns_func1_to_output");
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+             "QRect_G_ns_func1_as_ptr");
+}
 
+#[test]
+fn c_base_name_class_method() {
+  let mut method = empty_regular_method();
+  method.name = "func1".to_string();
+  method.class_membership = Some(empty_membership("MyClass"));
+  let include_file = "QRect".to_string();
+  assert_eq!(c_base_name(&method,
+                         &ReturnValueAllocationPlace::NotApplicable,
+                         &include_file)
+               .unwrap(),
+             "MyClass_func1");
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+             "MyClass_func1_to_output");
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+             "MyClass_func1_as_ptr");
+}
 
+#[test]
+fn c_base_name_class_method_in_namespace() {
+  let mut method = empty_regular_method();
+  method.name = "func1".to_string();
+  method.class_membership = Some(empty_membership("ns1::MyClass"));
+  let include_file = "QRect".to_string();
+  assert_eq!(c_base_name(&method,
+                         &ReturnValueAllocationPlace::NotApplicable,
+                         &include_file)
+               .unwrap(),
+             "ns1_MyClass_func1");
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+             "ns1_MyClass_func1_to_output");
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+             "ns1_MyClass_func1_as_ptr");
+}
 
+#[test]
+fn c_base_name_constructor() {
+  let mut method = empty_regular_method();
+  method.name = "QRect".to_string();
+  method.class_membership = Some({
+    let mut info = empty_membership("QRect");
+    info.kind = CppMethodKind::Constructor;
+    info
+  });
+  let include_file = "QtCore".to_string();
+  assert!(c_base_name(&method,
+                      &ReturnValueAllocationPlace::NotApplicable,
+                      &include_file)
+    .is_err());
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+             "QRect_constructor");
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+             "QRect_new");
+}
 
+#[test]
+fn c_base_name_destructor() {
+  let mut method = empty_regular_method();
+  method.name = "QRect".to_string();
+  method.class_membership = Some({
+    let mut info = empty_membership("QRect");
+    info.kind = CppMethodKind::Destructor;
+    info
+  });
+  let include_file = "QtCore".to_string();
+  assert!(c_base_name(&method,
+                      &ReturnValueAllocationPlace::NotApplicable,
+                      &include_file)
+    .is_err());
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+             "QRect_destructor");
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+             "QRect_delete");
+}
+
+#[test]
+fn c_base_name_class_method_operator() {
+  let mut method = empty_regular_method();
+  method.name = "operator>".to_string();
+  method.class_membership = Some(empty_membership("MyClass"));
+  method.operator = Some(CppOperator::GreaterThan);
+  let include_file = "QRect".to_string();
+  assert_eq!(c_base_name(&method,
+                         &ReturnValueAllocationPlace::NotApplicable,
+                         &include_file)
+               .unwrap(),
+             "MyClass_operator_gt");
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+             "MyClass_operator_gt_to_output");
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+             "MyClass_operator_gt_as_ptr");
+}
+
+#[test]
+fn c_base_name_free_func_operator() {
+  let mut method = empty_regular_method();
+  method.name = "operator>".to_string();
+  method.operator = Some(CppOperator::GreaterThan);
+  let include_file = "QRect".to_string();
+  assert_eq!(c_base_name(&method,
+                         &ReturnValueAllocationPlace::NotApplicable,
+                         &include_file)
+               .unwrap(),
+             "QRect_G_operator_gt");
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+             "QRect_G_operator_gt_to_output");
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+             "QRect_G_operator_gt_as_ptr");
+}
+
+#[test]
+fn c_base_name_conversion_operator() {
+  let mut method = empty_regular_method();
+  method.name = "operator const QPoint&".to_string();
+  method.class_membership = Some(empty_membership("MyClass"));
+  method.operator = Some(CppOperator::Conversion(CppType {
+    is_const: true,
+    base: CppTypeBase::Class {
+      name: "QPoint".to_string(),
+      template_arguments: None,
+    },
+    indirection: CppTypeIndirection::Ref,
+  }));
+  let include_file = "QRect".to_string();
+  assert_eq!(c_base_name(&method,
+                         &ReturnValueAllocationPlace::NotApplicable,
+                         &include_file)
+               .unwrap(),
+             "MyClass_convert_to_const_QPoint_ref");
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+             "MyClass_convert_to_const_QPoint_ref_to_output");
+  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+             "MyClass_convert_to_const_QPoint_ref_as_ptr");
 }
