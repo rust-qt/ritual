@@ -6,14 +6,25 @@ use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use caption_strategy::{MethodCaptionStrategy, TypeCaptionStrategy};
 use cpp_operator::CppOperator;
 
+/// Information that indicates how the FFI function argument
+/// should be interpreted
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CppFfiArgumentMeaning {
+  /// This argument contains value for "this" pointer
+  /// used to call C++ class member functions
   This,
+  /// Value of this argument should be passed as an argument to
+  /// the original C++ method. Associated value is index of the
+  /// C++ method's argument (counting from 0).
   Argument(i8),
+  /// This argument receives pointer to the buffer where
+  /// the return value should be transferred to using placement new.
   ReturnValue,
 }
 
 impl CppFfiArgumentMeaning {
+  /// Checks if this argument coresponds to an original
+  /// C++ method's argument
   pub fn is_argument(&self) -> bool {
     match self {
       &CppFfiArgumentMeaning::Argument(..) => true,
@@ -22,14 +33,21 @@ impl CppFfiArgumentMeaning {
   }
 }
 
+/// Representation of an argument of a FFI function
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppFfiFunctionArgument {
+  /// Identifier
   pub name: String,
+  /// Type
   pub argument_type: CppFfiType,
+  /// C++ equivalent
   pub meaning: CppFfiArgumentMeaning,
 }
 
 impl CppFfiFunctionArgument {
+  /// Generates part of caption string for FFI method.
+  /// Used to generate FFI methods with different names
+  /// for overloaded functions.
   pub fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
     match strategy {
       ArgumentCaptionStrategy::NameOnly => self.name.clone(),
@@ -44,6 +62,8 @@ impl CppFfiFunctionArgument {
     }
   }
 
+  /// Generates C++ code for the part of FFI function signature
+  /// corresponding to this argument
   pub fn to_cpp_code(&self) -> Result<String, String> {
     match self.argument_type.ffi_type.base {
       CppTypeBase::FunctionPointer { .. } => {
@@ -58,13 +78,20 @@ impl CppFfiFunctionArgument {
   }
 }
 
+/// Information about arguments and return type of a FFI function
+/// with no final function name
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppFfiFunctionSignature {
+  /// List of arguments
   pub arguments: Vec<CppFfiFunctionArgument>,
+  /// Return type
   pub return_type: CppFfiType,
 }
 
 impl CppFfiFunctionSignature {
+  /// Generates arguments caption string for FFI method.
+  /// Used to generate FFI methods with different names
+  /// for overloaded functions.
   pub fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
     let r = self.arguments
       .iter()
@@ -78,6 +105,7 @@ impl CppFfiFunctionSignature {
     }
   }
 
+  /// Generates C++ code for arguments list in the function signature
   pub fn arguments_to_cpp_code(&self) -> Result<String, String> {
     let mut code = Vec::new();
     for arg in &self.arguments {
@@ -90,23 +118,37 @@ impl CppFfiFunctionSignature {
   }
 }
 
-
+/// Relation between original C++ method's argument value
+/// and corresponding FFI function's argument value
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum IndirectionChange {
+  /// Argument types are identical
   NoChange,
+  /// C++ argument is a class value (like QPoint)
+  /// and FFI argument is a pointer (like QPoint*)
   ValueToPointer,
+  /// C++ argument is a reference (like QPoint&)
+  /// and FFI argument is a pointer (like QPoint*)
   ReferenceToPointer,
+  /// C++ argument is QFlags<T>
+  /// and FFI argument is uint
   QFlagsToUInt,
 }
 
+/// FFI function type with attached information about
+/// corresponding original C++ type and their relation
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppFfiType {
+  /// Original C++ type
   pub original_type: CppType,
+  /// FFI function type
   pub ffi_type: CppType,
+  /// Relation
   pub conversion: IndirectionChange,
 }
 
 impl CppFfiType {
+  /// Generates an object representing the void type
   pub fn void() -> Self {
     CppFfiType {
       original_type: CppType::void(),
@@ -115,7 +157,6 @@ impl CppFfiType {
     }
   }
 }
-
 
 /// C++ method with arguments and return type
 /// processed for FFI but no FFI function name

@@ -1,6 +1,7 @@
 mod utils;
 mod cpp_type;
 mod cpp_method;
+mod cpp_ffi_data;
 
 // Testing plan:
 //

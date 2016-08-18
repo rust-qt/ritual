@@ -432,6 +432,46 @@ fn class_with_template_args() {
 }
 
 #[test]
+fn nested_template_cpp_code() {
+  let type1 = CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    base: CppTypeBase::Class {
+      name: "QHash".to_string(),
+      template_arguments: Some(vec![CppType {
+                                      indirection: CppTypeIndirection::None,
+                                      is_const: false,
+                                      base: CppTypeBase::Class {
+                                        name: "QString".to_string(),
+                                        template_arguments: None,
+                                      },
+                                    },
+                                    CppType {
+                                      indirection: CppTypeIndirection::None,
+                                      is_const: false,
+                                      base: CppTypeBase::Class {
+                                        name: "QList".to_string(),
+                                        template_arguments: Some(vec![CppType {
+                                                                        indirection:
+                                                                          CppTypeIndirection::None,
+                                                                        is_const: false,
+                                                                        base: CppTypeBase::Class {
+                                                                          name: "QString"
+                                                                                  .to_string(),
+                                                                          template_arguments: None,
+                                                                        },
+                                                                      }]),
+                                      },
+                                    }]),
+    },
+  };
+  let code = type1.to_cpp_code(None).unwrap();
+  assert_eq!(&code, "QHash< QString, QList< QString > >");
+  assert!(!code.contains(">>"));
+  assert!(!code.contains("<<"));
+}
+
+#[test]
 fn qflags() {
   let args = Some(vec![CppType {
                          indirection: CppTypeIndirection::None,
