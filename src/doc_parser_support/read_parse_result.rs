@@ -130,7 +130,7 @@ impl CppMethod {
         }
         None => vec![],
       },
-      allows_variable_arguments: match value.get("variable_arguments") {
+      allows_variadic_arguments: match value.get("variable_arguments") {
         Some(v) => v.as_boolean().unwrap(),
         None => false,
       },

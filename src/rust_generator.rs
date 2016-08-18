@@ -215,8 +215,8 @@ impl RustGenerator {
       }
       CppTypeBase::FunctionPointer { ref return_type,
                                      ref arguments,
-                                     ref allows_variable_arguments } => {
-        if *allows_variable_arguments {
+                                     ref allows_variadic_arguments } => {
+        if *allows_variadic_arguments {
           return Err(format!("Function pointers with variadic arguments are not supported"));
         }
         let mut rust_args = Vec::new();

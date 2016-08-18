@@ -103,7 +103,7 @@ impl CppData {
             operator: None,
             return_type: None,
             arguments: vec![],
-            allows_variable_arguments: false,
+            allows_variadic_arguments: false,
             include_file: type1.include_file.clone(),
             origin_location: None,
             template_arguments: None,

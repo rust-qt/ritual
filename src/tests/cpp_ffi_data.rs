@@ -85,7 +85,7 @@ fn argument_func() {
     is_const: false,
     indirection: CppTypeIndirection::None,
     base: CppTypeBase::FunctionPointer {
-      allows_variable_arguments: false,
+      allows_variadic_arguments: false,
       return_type: Box::new(CppType {
         indirection: CppTypeIndirection::None,
         is_const: false,

@@ -1,20 +1,33 @@
 pub use serializable::CppOperator;
 
+/// Constraints applied to a C++ operator method
+/// of a certain kind
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct OperatorInfo {
+  /// String that must appear after "operator" in the method name,
+  /// e.g. ">" for "operator>". "operator" prefix must
+  /// be present for any operator. This field is None for
+  /// conversion operator, as its name includes
+  /// corresponding C++ type instead of a fixed string.
   pub function_name_suffix: Option<&'static str>,
+  /// Total number of arguments, including implicit "this" argument.
+  /// Most operators can be class members or free functions,
+  /// but total number of arguments is the same in both cases.
   pub arguments_count: i32,
-  pub allows_variable_arguments: bool,
+  /// True if this kind of operator can have variadic arguments.
+  /// Only the function call operator has this property.
+  pub allows_variadic_arguments: bool,
 }
 
 impl CppOperator {
+  /// Reports information about this operator
   pub fn info(&self) -> OperatorInfo {
     use self::CppOperator::*;
     fn oi(suffix: &'static str, count: i32) -> OperatorInfo {
       OperatorInfo {
         function_name_suffix: Some(suffix),
         arguments_count: count,
-        allows_variable_arguments: false,
+        allows_variadic_arguments: false,
       }
     }
 
@@ -23,7 +36,7 @@ impl CppOperator {
         OperatorInfo {
           function_name_suffix: None,
           arguments_count: 1,
-          allows_variable_arguments: false,
+          allows_variadic_arguments: false,
         }
       }
       Assignment => oi("=", 2),
@@ -72,7 +85,7 @@ impl CppOperator {
         OperatorInfo {
           function_name_suffix: Some("()"),
           arguments_count: 0,
-          allows_variable_arguments: true,
+          allows_variadic_arguments: true,
         }
       }
       Comma => oi(",", 2),
@@ -83,6 +96,8 @@ impl CppOperator {
     }
   }
 
+  /// Returns alphanumeric identifier for this operator
+  /// used to name FFI functions.
   pub fn c_name(&self) -> &'static str {
     use self::CppOperator::*;
     match *self {
@@ -138,6 +153,8 @@ impl CppOperator {
     }
   }
 
+  /// Returns all existing operator kinds except for
+  /// conversion operator which includes an arbitrary C++ type.
   pub fn all() -> Vec<CppOperator> {
     use self::CppOperator::*;
     vec![Assignment,

@@ -175,7 +175,7 @@ pub struct CppMethod {
   /// List of the method's arguments
   pub arguments: Vec<CppFunctionArgument>,
   /// Whether the argument list is terminated with "..."
-  pub allows_variable_arguments: bool,
+  pub allows_variadic_arguments: bool,
   /// File name of the include file where the method is defined
   /// (without full path)
   pub include_file: String,
@@ -422,7 +422,7 @@ pub enum CppTypeBase {
     /// Arguments of the function
     arguments: Vec<CppType>,
     /// Whether arguments are terminated with "..."
-    allows_variable_arguments: bool,
+    allows_variadic_arguments: bool,
   },
 }
 

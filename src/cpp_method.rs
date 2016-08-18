@@ -48,7 +48,7 @@ impl CppMethod {
     if self.arguments.len() != other.arguments.len() {
       return false;
     }
-    if self.allows_variable_arguments != other.allows_variable_arguments {
+    if self.allows_variadic_arguments != other.allows_variadic_arguments {
       return false;
     }
     for i in 0..self.arguments.len() {
@@ -81,7 +81,7 @@ impl CppMethod {
   pub fn c_signature(&self,
                      allocation_place: ReturnValueAllocationPlace)
                      -> Result<CppFfiFunctionSignature, String> {
-    if self.allows_variable_arguments {
+    if self.allows_variadic_arguments {
       return Err("Variable arguments are not supported".to_string());
     }
     let mut r = CppFfiFunctionSignature {
@@ -216,7 +216,7 @@ impl CppMethod {
     if let Some(ref op) = self.operator {
       s = format!("{} [{:?}]", s, op);
     }
-    if self.allows_variable_arguments {
+    if self.allows_variadic_arguments {
       s = format!("{} [var args]", s);
     }
     if let Some(ref cpp_type) = self.return_type {

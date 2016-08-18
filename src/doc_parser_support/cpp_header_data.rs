@@ -31,7 +31,7 @@ impl CppHeaderData {
           return_type: None,
           kind: CppMethodKind::Destructor,
           arguments: vec![],
-          allows_variable_arguments: false,
+          allows_variadic_arguments: false,
           include_file: self.include_file.clone(),
           origin_location: None,
           template_arguments: None,

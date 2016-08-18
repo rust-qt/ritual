@@ -38,9 +38,6 @@ pub struct CppParserStats {
   pub method_messages: HashMap<String, String>,
 }
 
-
-
-
 pub struct CppParser {
   include_dirs: Vec<PathBuf>,
   header_name: String,
@@ -607,7 +604,7 @@ impl CppParser {
           base: CppTypeBase::FunctionPointer {
             return_type: return_type,
             arguments: arguments,
-            allows_variable_arguments: type1.is_variadic(),
+            allows_variadic_arguments: type1.is_variadic(),
           },
           is_const: is_const,
           indirection: CppTypeIndirection::None,
@@ -766,7 +763,7 @@ impl CppParser {
         name = format!("{}::{}", get_full_name(parent).unwrap(), name);
       }
     }
-    let allows_variable_arguments = entity.is_variadic();
+    let allows_variadic_arguments = entity.is_variadic();
     let has_this_argument = class_name.is_some() && !entity.is_static_method();
     let real_arguments_count = arguments.len() as i32 + if has_this_argument { 1 } else { 0 };
     let mut method_operator = None;
@@ -778,7 +775,7 @@ impl CppParser {
         if let Some(s) = info.function_name_suffix {
           if s == name_suffix {
             name_matches = true;
-            if info.allows_variable_arguments || info.arguments_count == real_arguments_count {
+            if info.allows_variadic_arguments || info.arguments_count == real_arguments_count {
               method_operator = Some(operator.clone());
               break;
             }
@@ -833,7 +830,7 @@ impl CppParser {
         None => None,
       },
       arguments: arguments,
-      allows_variable_arguments: allows_variable_arguments,
+      allows_variadic_arguments: allows_variadic_arguments,
       return_type: Some(return_type_parsed),
       include_file: self.entity_include_file(entity).unwrap(),
       origin_location: Some(get_origin_location(entity).unwrap()),
