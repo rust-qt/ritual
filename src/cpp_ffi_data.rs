@@ -89,10 +89,20 @@ pub struct CppFfiFunctionSignature {
 }
 
 impl CppFfiFunctionSignature {
+  /// Returns true if this signature has const this_ptr argument,
+  /// indicating that original C++ method has const attribute.
+  /// Returns false if there is no this argument or it's not const.
+  pub fn has_const_this(&self) -> bool {
+    self.arguments
+      .iter()
+      .find(|arg| arg.meaning == CppFfiArgumentMeaning::This && arg.argument_type.ffi_type.is_const)
+      .is_some()
+  }
+
   /// Generates arguments caption string for FFI method.
   /// Used to generate FFI methods with different names
   /// for overloaded functions.
-  pub fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
+  pub fn arguments_caption(&self, strategy: ArgumentCaptionStrategy) -> String {
     let r = self.arguments
       .iter()
       .filter(|x| x.meaning.is_argument())
@@ -102,6 +112,29 @@ impl CppFfiFunctionSignature {
       "no_args".to_string()
     } else {
       r
+    }
+  }
+
+  /// Generates a caption for this method using specified strategy
+  /// to avoid name conflict.
+  pub fn caption(&self, strategy: MethodCaptionStrategy) -> String {
+    match strategy {
+      MethodCaptionStrategy::ArgumentsOnly(s) => self.arguments_caption(s),
+      MethodCaptionStrategy::ConstOnly => {
+        if self.has_const_this() {
+          "const".to_string()
+        } else {
+          "".to_string()
+        }
+      }
+      MethodCaptionStrategy::ConstAndArguments(s) => {
+        let r = if self.has_const_this() {
+          "const_".to_string()
+        } else {
+          "".to_string()
+        };
+        r + &self.arguments_caption(s)
+      }
     }
   }
 
@@ -231,32 +264,6 @@ pub fn c_base_name(cpp_method: &CppMethod,
     add_place_note(cpp_method.name.replace("::", "_"))
   };
   Ok(scope_prefix + &method_name)
-}
-
-
-impl CppMethodWithFfiSignature {
-  /// Generates a caption for this method using specified strategy
-  /// to avoid name conflict.
-  pub fn caption(&self, strategy: MethodCaptionStrategy) -> String {
-    match strategy {
-      MethodCaptionStrategy::ArgumentsOnly(s) => self.c_signature.caption(s),
-      MethodCaptionStrategy::ConstOnly => {
-        if self.cpp_method.class_membership.as_ref().map(|x| x.is_const).unwrap_or(false) {
-          "const".to_string()
-        } else {
-          "".to_string()
-        }
-      }
-      MethodCaptionStrategy::ConstAndArguments(s) => {
-        let r = if self.cpp_method.class_membership.as_ref().map(|x| x.is_const).unwrap_or(false) {
-          "const_".to_string()
-        } else {
-          "".to_string()
-        };
-        r + &self.c_signature.caption(s)
-      }
-    }
-  }
 }
 
 impl CppAndFfiMethod {

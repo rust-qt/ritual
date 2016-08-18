@@ -164,18 +164,190 @@ fn signature_two_numbers() {
                     }],
     return_type: CppFfiType::void(),
   };
-  assert_eq!(sig.caption(ArgumentCaptionStrategy::NameOnly), "arg1_arg2");
-  assert_eq!(sig.caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short)),
+
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::NameOnly),
+             "arg1_arg2");
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short)),
              "int_double");
-  assert_eq!(sig.caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full)),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full)),
              "int_double");
-  assert_eq!(sig.caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short)),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short)),
              "int_arg1_double_arg2");
-  assert_eq!(sig.caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full)),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full)),
              "int_arg1_double_arg2");
+
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::NameOnly)),
+             "arg1_arg2");
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))),
+             "int_double");
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))),
+             "int_double");
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))),
+             "int_arg1_double_arg2");
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))),
+             "int_arg1_double_arg2");
+
+  assert_eq!(sig.caption(MethodCaptionStrategy::ConstOnly), "");
+
   assert_eq!(sig.arguments_to_cpp_code().unwrap(),
              "int arg1, double arg2");
+
+  assert!(!sig.has_const_this());
 }
+
+#[test]
+fn signature_class_method() {
+  let sig = CppFfiFunctionSignature {
+    arguments: vec![CppFfiFunctionArgument {
+                      name: "this_ptr".to_string(),
+                      argument_type: CppFfiType {
+                        original_type: CppType {
+                          indirection: CppTypeIndirection::Ptr,
+                          is_const: false,
+                          base: CppTypeBase::Class {
+                            name: "Class1".to_string(),
+                            template_arguments: None,
+                          },
+                        },
+                        ffi_type: CppType {
+                          indirection: CppTypeIndirection::Ptr,
+                          is_const: false,
+                          base: CppTypeBase::Class {
+                            name: "Class1".to_string(),
+                            template_arguments: None,
+                          },
+                        },
+                        conversion: IndirectionChange::NoChange,
+                      },
+                      meaning: CppFfiArgumentMeaning::This,
+                    },
+                    CppFfiFunctionArgument {
+                      name: "arg1".to_string(),
+                      argument_type: CppFfiType {
+                        original_type: CppType {
+                          indirection: CppTypeIndirection::None,
+                          is_const: false,
+                          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+                        },
+                        ffi_type: CppType {
+                          indirection: CppTypeIndirection::None,
+                          is_const: false,
+                          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+                        },
+                        conversion: IndirectionChange::NoChange,
+                      },
+                      meaning: CppFfiArgumentMeaning::Argument(0),
+                    }],
+    return_type: CppFfiType::void(),
+  };
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::NameOnly),
+             "arg1");
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short)),
+             "double");
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full)),
+             "double");
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short)),
+             "double_arg1");
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full)),
+             "double_arg1");
+
+  assert_eq!(sig.caption(MethodCaptionStrategy::ConstOnly), "");
+
+  assert_eq!(sig.arguments_to_cpp_code().unwrap(),
+             "Class1* this_ptr, double arg1");
+
+  assert!(!sig.has_const_this());
+}
+
+#[test]
+fn signature_class_method_const() {
+  let sig = CppFfiFunctionSignature {
+    arguments: vec![CppFfiFunctionArgument {
+                      name: "this_ptr".to_string(),
+                      argument_type: CppFfiType {
+                        original_type: CppType {
+                          indirection: CppTypeIndirection::Ptr,
+                          is_const: true,
+                          base: CppTypeBase::Class {
+                            name: "Class1".to_string(),
+                            template_arguments: None,
+                          },
+                        },
+                        ffi_type: CppType {
+                          indirection: CppTypeIndirection::Ptr,
+                          is_const: true,
+                          base: CppTypeBase::Class {
+                            name: "Class1".to_string(),
+                            template_arguments: None,
+                          },
+                        },
+                        conversion: IndirectionChange::NoChange,
+                      },
+                      meaning: CppFfiArgumentMeaning::This,
+                    },
+                    CppFfiFunctionArgument {
+                      name: "arg1".to_string(),
+                      argument_type: CppFfiType {
+                        original_type: CppType {
+                          indirection: CppTypeIndirection::None,
+                          is_const: false,
+                          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+                        },
+                        ffi_type: CppType {
+                          indirection: CppTypeIndirection::None,
+                          is_const: false,
+                          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+                        },
+                        conversion: IndirectionChange::NoChange,
+                      },
+                      meaning: CppFfiArgumentMeaning::Argument(0),
+                    }],
+    return_type: CppFfiType::void(),
+  };
+
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::NameOnly),
+             "arg1");
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short)),
+             "double");
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full)),
+             "double");
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short)),
+             "double_arg1");
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full)),
+             "double_arg1");
+
+  assert_eq!(sig.caption(MethodCaptionStrategy::ConstOnly), "const");
+
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::NameOnly)),
+             "arg1");
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))),
+             "double");
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))),
+             "double");
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))),
+             "double_arg1");
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))),
+             "double_arg1");
+
+  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::NameOnly)),
+             "const_arg1");
+  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))),
+             "const_double");
+  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))),
+             "const_double");
+  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))),
+             "const_double_arg1");
+  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))),
+             "const_double_arg1");
+
+  assert_eq!(sig.arguments_to_cpp_code().unwrap(),
+             "const Class1* this_ptr, double arg1");
+
+  assert!(sig.has_const_this());
+}
+
+
+
 
 #[test]
 fn cpp_ffi_type_void() {

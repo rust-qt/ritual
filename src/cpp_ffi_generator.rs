@@ -269,7 +269,7 @@ impl CGenerator {
       let mut found_strategy = None;
       for strategy in MethodCaptionStrategy::all() {
         let mut type_captions: Vec<_> = values.iter()
-          .map(|x| x.caption(strategy.clone()))
+          .map(|x| x.c_signature.caption(strategy.clone()))
           .collect();
         type_captions.sort();
         type_captions.dedup();
@@ -280,7 +280,7 @@ impl CGenerator {
       }
       if let Some(strategy) = found_strategy {
         for x in values {
-          let caption = x.caption(strategy.clone());
+          let caption = x.c_signature.caption(strategy.clone());
           r.push(CppAndFfiMethod::new(x,
                                       format!("{}{}{}",
                                               key,
