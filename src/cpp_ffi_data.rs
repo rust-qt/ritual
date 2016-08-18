@@ -1,7 +1,121 @@
+use caption_strategy::ArgumentCaptionStrategy;
+use utils::JoinWithString;
+use cpp_type::CppTypeBase;
+use cpp_type::CppType;
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
-use cpp_ffi_function_signature::CppFfiFunctionSignature;
 use caption_strategy::{MethodCaptionStrategy, TypeCaptionStrategy};
-use cpp_operators::CppOperator;
+use cpp_operator::CppOperator;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CppFfiArgumentMeaning {
+  This,
+  Argument(i8),
+  ReturnValue,
+}
+
+impl CppFfiArgumentMeaning {
+  pub fn is_argument(&self) -> bool {
+    match self {
+      &CppFfiArgumentMeaning::Argument(..) => true,
+      _ => false,
+    }
+  }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CppFfiFunctionArgument {
+  pub name: String,
+  pub argument_type: CppFfiType,
+  pub meaning: CppFfiArgumentMeaning,
+}
+
+impl CppFfiFunctionArgument {
+  pub fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
+    match strategy {
+      ArgumentCaptionStrategy::NameOnly => self.name.clone(),
+      ArgumentCaptionStrategy::TypeOnly(type_strategy) => {
+        self.argument_type.original_type.caption(type_strategy)
+      }
+      ArgumentCaptionStrategy::TypeAndName(type_strategy) => {
+        format!("{}_{}",
+                self.argument_type.original_type.caption(type_strategy),
+                self.name)
+      }
+    }
+  }
+
+  pub fn to_cpp_code(&self) -> Result<String, String> {
+    match self.argument_type.ffi_type.base {
+      CppTypeBase::FunctionPointer { .. } => {
+        Ok(try!(self.argument_type.ffi_type.to_cpp_code(Some(&self.name))))
+      }
+      _ => {
+        Ok(format!("{} {}",
+                   try!(self.argument_type.ffi_type.to_cpp_code(None)),
+                   self.name))
+      }
+    }
+  }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CppFfiFunctionSignature {
+  pub arguments: Vec<CppFfiFunctionArgument>,
+  pub return_type: CppFfiType,
+}
+
+impl CppFfiFunctionSignature {
+  pub fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
+    let r = self.arguments
+      .iter()
+      .filter(|x| x.meaning.is_argument())
+      .map(|x| x.caption(strategy.clone()))
+      .join("_");
+    if r.len() == 0 {
+      "no_args".to_string()
+    } else {
+      r
+    }
+  }
+
+  pub fn arguments_to_cpp_code(&self) -> Result<String, String> {
+    let mut code = Vec::new();
+    for arg in &self.arguments {
+      match arg.to_cpp_code() {
+        Ok(c) => code.push(c),
+        Err(msg) => return Err(msg),
+      }
+    }
+    Ok(code.join(", "))
+  }
+}
+
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum IndirectionChange {
+  NoChange,
+  ValueToPointer,
+  ReferenceToPointer,
+  QFlagsToUInt,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CppFfiType {
+  pub original_type: CppType,
+  pub ffi_type: CppType,
+  pub conversion: IndirectionChange,
+}
+
+impl CppFfiType {
+  pub fn void() -> Self {
+    CppFfiType {
+      original_type: CppType::void(),
+      ffi_type: CppType::void(),
+      conversion: IndirectionChange::NoChange,
+    }
+  }
+}
+
 
 /// C++ method with arguments and return type
 /// processed for FFI but no FFI function name

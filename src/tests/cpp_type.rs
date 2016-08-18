@@ -1,7 +1,7 @@
 use cpp_type::{CppType, CppTypeRole, CppTypeIndirection, CppTypeBase, CppBuiltInNumericType,
                CppSpecificNumericTypeKind};
 use caption_strategy::TypeCaptionStrategy;
-use cpp_ffi_type::IndirectionChange;
+use cpp_ffi_data::IndirectionChange;
 
 fn assert_type_to_ffi_unchanged(t: &CppType) {
   for role in &[CppTypeRole::NotReturnType, CppTypeRole::ReturnType] {

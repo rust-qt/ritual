@@ -1,9 +1,9 @@
 use cpp_method::*;
-use cpp_operators::CppOperator;
+use cpp_operator::CppOperator;
 use cpp_data::CppVisibility;
 use cpp_type::*;
-use cpp_ffi_function_argument::CppFfiArgumentMeaning;
-use cpp_ffi_type::IndirectionChange;
+use cpp_ffi_data::CppFfiArgumentMeaning;
+use cpp_ffi_data::IndirectionChange;
 
 
 #[test]

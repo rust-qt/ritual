@@ -1,20 +1,21 @@
 use cpp_ffi_generator::{CppAndFfiData, CppFfiHeaderData};
-use cpp_and_ffi_method::CppAndFfiMethod;
+use cpp_ffi_data::CppAndFfiMethod;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
                CppSpecificNumericTypeKind};
-use cpp_ffi_type::{CppFfiType, IndirectionChange};
+use cpp_ffi_data::{CppFfiType, IndirectionChange};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
 use cpp_data::{CppTypeKind, EnumValue, CppTypeData};
-use std::collections::{HashMap, HashSet};
-use log;
 use rust_code_generator::{RustCodeGenerator, RustCodeGeneratorConfig};
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
                 RustMethodArguments, TraitImpl, TraitName, RustMethodSelfArg};
 use cpp_method::ReturnValueAllocationPlace;
-use cpp_ffi_function_argument::CppFfiArgumentMeaning;
+use cpp_ffi_data::CppFfiArgumentMeaning;
 use utils::{CaseOperations, VecCaseOperations, WordIterator};
+use log;
+
+use std::collections::{HashMap, HashSet};
 
 enum Case {
   Class,

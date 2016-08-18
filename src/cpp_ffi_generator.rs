@@ -1,4 +1,3 @@
-use cpp_and_ffi_method::CppAndFfiMethod;
 use std::path::PathBuf;
 use std::collections::HashMap;
 use log;
@@ -7,6 +6,7 @@ use caption_strategy::MethodCaptionStrategy;
 use cpp_method::{CppMethod, CppMethodKind};
 use cpp_type::CppTypeBase;
 use cpp_code_generator::CppCodeGenerator;
+use cpp_ffi_data::CppAndFfiMethod;
 
 pub struct CGenerator {
   lib_path: PathBuf,

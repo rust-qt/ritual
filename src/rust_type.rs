@@ -1,5 +1,5 @@
 use cpp_type::CppType;
-use cpp_ffi_type::IndirectionChange;
+use cpp_ffi_data::IndirectionChange;
 use utils::JoinWithString;
 use utils::CaseOperations;
 

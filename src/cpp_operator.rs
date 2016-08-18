@@ -1,6 +1,5 @@
 pub use serializable::CppOperator;
 
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct OperatorInfo {
   pub function_name_suffix: Option<&'static str>,

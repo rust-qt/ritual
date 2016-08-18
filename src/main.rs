@@ -1,16 +1,13 @@
 extern crate serde_json;
 
-mod cpp_ffi_function_argument;
-mod cpp_ffi_function_signature;
 mod cpp_ffi_generator;
 mod cpp_code_generator;
 mod caption_strategy;
 mod cpp_data;
-mod cpp_and_ffi_method;
+mod cpp_ffi_data;
 mod cpp_method;
 mod cpp_type;
-mod cpp_ffi_type;
-mod cpp_operators;
+mod cpp_operator;
 mod log;
 mod qt_specific;
 mod rust_generator;

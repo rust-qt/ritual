@@ -1,5 +1,5 @@
 
-use cpp_ffi_type::{CppFfiType, IndirectionChange};
+use cpp_ffi_data::{CppFfiType, IndirectionChange};
 use caption_strategy::TypeCaptionStrategy;
 pub use serializable::{CppBuiltInNumericType, CppSpecificNumericTypeKind, CppTypeBase, CppType,
                        CppTypeIndirection};

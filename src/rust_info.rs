@@ -1,6 +1,6 @@
 
 use rust_type::{RustName, CompleteType, RustType, RustTypeIndirection};
-use cpp_and_ffi_method::CppAndFfiMethod;
+use cpp_ffi_data::CppAndFfiMethod;
 use cpp_data::EnumValue;
 use cpp_type::CppType;
 

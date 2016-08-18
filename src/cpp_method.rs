@@ -1,8 +1,8 @@
 use cpp_type::{CppType, CppTypeIndirection, CppTypeRole};
-use cpp_ffi_type::CppFfiType;
-use cpp_ffi_function_signature::CppFfiFunctionSignature;
-use cpp_ffi_function_argument::{CppFfiFunctionArgument, CppFfiArgumentMeaning};
-use cpp_and_ffi_method::CppMethodWithFfiSignature;
+use cpp_ffi_data::CppFfiType;
+use cpp_ffi_data::CppFfiFunctionSignature;
+use cpp_ffi_data::{CppFfiFunctionArgument, CppFfiArgumentMeaning};
+use cpp_ffi_data::CppMethodWithFfiSignature;
 use cpp_data::CppVisibility;
 use utils::JoinWithString;
 pub use serializable::{CppFunctionArgument, CppMethodKind, CppMethod, CppMethodClassMembership};

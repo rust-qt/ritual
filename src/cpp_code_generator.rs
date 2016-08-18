@@ -1,7 +1,7 @@
-use cpp_and_ffi_method::CppAndFfiMethod;
-use cpp_ffi_type::IndirectionChange;
+use cpp_ffi_data::CppAndFfiMethod;
+use cpp_ffi_data::IndirectionChange;
 use cpp_method::ReturnValueAllocationPlace;
-use cpp_ffi_function_argument::CppFfiArgumentMeaning;
+use cpp_ffi_data::CppFfiArgumentMeaning;
 use cpp_ffi_generator::CppFfiHeaderData;
 use log;
 use std::fs;

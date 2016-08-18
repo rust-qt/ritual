@@ -1,6 +1,6 @@
 
 use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership};
-use cpp_operators::CppOperator;
+use cpp_operator::CppOperator;
 use std::collections::HashMap;
 use log;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection};

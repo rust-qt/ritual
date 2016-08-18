@@ -17,7 +17,7 @@ use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppO
 use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind, CppMethodClassMembership};
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
                CppSpecificNumericTypeKind};
-use cpp_operators::CppOperator;
+use cpp_operator::CppOperator;
 use std::io::Write;
 
 
