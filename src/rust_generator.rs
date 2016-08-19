@@ -166,8 +166,7 @@ impl RustGenerator {
         } else {
           let own_name = match *numeric {
             CppBuiltInNumericType::Bool => unreachable!(),
-            CppBuiltInNumericType::CharS => "c_char",
-            CppBuiltInNumericType::CharU => "c_char",
+            CppBuiltInNumericType::Char => "c_char",
             CppBuiltInNumericType::SChar => "c_schar",
             CppBuiltInNumericType::UChar => "c_uchar",
             CppBuiltInNumericType::WChar => "wchar_t",

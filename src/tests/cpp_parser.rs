@@ -235,6 +235,38 @@ fn func_with_unknown_type() {
   assert!(data.methods.is_empty());
 }
 
+fn variadic_func() {
+  let data = run_parser("int my_printf ( const char * format, ... );\n");
+  assert!(data.template_instantiations.is_empty());
+  assert!(data.types.is_empty());
+  assert!(data.methods.len() == 1);
+  assert_eq!(data.methods[0],
+             CppMethod {
+               name: "my_printf".to_string(),
+               class_membership: None,
+               operator: None,
+               return_type: Some(CppType {
+                 indirection: CppTypeIndirection::None,
+                 is_const: false,
+                 base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+               }),
+               arguments: vec![CppFunctionArgument {
+                                 name: "format".to_string(),
+                                 argument_type: CppType {
+                                   indirection: CppTypeIndirection::Ptr,
+                                   is_const: true,
+                                   base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Char),
+                                 },
+                                 has_default_value: false,
+                               }],
+               allows_variadic_arguments: true,
+               include_file: "myfakelib.h".to_string(),
+               origin_location: None,
+               template_arguments: None,
+             });
+}
+
+
 #[test]
 fn tests() {
   // clang can't be used from multiple threads, so these checks
@@ -243,4 +275,5 @@ fn tests() {
   simple_func_with_default_value();
   functions_with_class_arg();
   func_with_unknown_type();
+  variadic_func();
 }

@@ -9,8 +9,7 @@ impl CppBuiltInNumericType {
   pub fn to_cpp_code(&self) -> &'static str {
     match *self {
       CppBuiltInNumericType::Bool => "bool",
-      CppBuiltInNumericType::CharS => "char",
-      CppBuiltInNumericType::CharU => "char",
+      CppBuiltInNumericType::Char => "char",
       CppBuiltInNumericType::SChar => "signed char",
       CppBuiltInNumericType::UChar => "unsigned char",
       CppBuiltInNumericType::WChar => "wchar_t",
@@ -32,10 +31,9 @@ impl CppBuiltInNumericType {
     }
   }
 
-  pub fn all() -> [CppBuiltInNumericType; 21] {
+  pub fn all() -> [CppBuiltInNumericType; 20] {
     [CppBuiltInNumericType::Bool,
-     CppBuiltInNumericType::CharS,
-     CppBuiltInNumericType::CharU,
+     CppBuiltInNumericType::Char,
      CppBuiltInNumericType::SChar,
      CppBuiltInNumericType::UChar,
      CppBuiltInNumericType::WChar,

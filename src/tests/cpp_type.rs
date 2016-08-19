@@ -105,7 +105,7 @@ fn char_ptr_ptr() {
   let type1 = CppType {
     indirection: CppTypeIndirection::PtrPtr,
     is_const: false,
-    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::CharS),
+    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Char),
   };
   assert_eq!(type1.is_void(), false);
   assert_eq!(type1.base.is_void(), false);

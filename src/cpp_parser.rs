@@ -516,8 +516,8 @@ impl CppParser {
         Ok(CppType {
           base: CppTypeBase::BuiltInNumeric(match type1.get_kind() {
             TypeKind::Bool => CppBuiltInNumericType::Bool,
-            TypeKind::CharS => CppBuiltInNumericType::CharS,
-            TypeKind::CharU => CppBuiltInNumericType::CharU,
+            TypeKind::CharS => CppBuiltInNumericType::Char,
+            TypeKind::CharU => CppBuiltInNumericType::Char,
             TypeKind::SChar => CppBuiltInNumericType::SChar,
             TypeKind::UChar => CppBuiltInNumericType::UChar,
             TypeKind::WChar => CppBuiltInNumericType::WChar,

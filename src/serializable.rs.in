@@ -322,13 +322,13 @@ pub enum CppTypeIndirection {
 
 /// Available built-in C++ numeric types.
 /// All these types have corresponding
-/// clang::TypeKind values.
+/// clang::TypeKind values (except for CharS and CharU
+/// which map to CppBuiltInNumericType::Char)
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[derive(Serialize, Deserialize)]
 pub enum CppBuiltInNumericType {
   Bool,
-  CharS,
-  CharU,
+  Char,
   SChar,
   UChar,
   WChar,
