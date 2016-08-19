@@ -22,16 +22,25 @@ impl<X> JoinWithString for X
 }
 
 pub trait PathBufPushTweak {
-  fn with_added<P: AsRef<Path>>(&self, path: P) -> Self;
+  fn with_added<P: AsRef<Path>>(&self, path: P) -> PathBuf;
 }
 
 impl PathBufPushTweak for PathBuf {
-  fn with_added<P: AsRef<Path>>(&self, path: P) -> Self {
+  fn with_added<P: AsRef<Path>>(&self, path: P) -> PathBuf {
     let mut p = self.clone();
     p.push(path);
     p
   }
 }
+
+impl PathBufPushTweak for Path {
+  fn with_added<P: AsRef<Path>>(&self, path: P) -> PathBuf {
+    let mut p = self.to_path_buf();
+    p.push(path);
+    p
+  }
+}
+
 
 pub fn move_files(src: &PathBuf,
                   dst: &PathBuf,

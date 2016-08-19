@@ -24,6 +24,7 @@ fn path_buf_with_added() {
   let mut y = x.clone();
   y.push("name");
   assert_eq!(x.with_added("name"), y);
+  assert_eq!(x.as_path().with_added("name"), y);
 }
 
 #[test]
