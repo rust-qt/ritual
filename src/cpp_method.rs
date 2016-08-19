@@ -224,10 +224,7 @@ impl CppMethod {
                   s,
                   cpp_type.to_cpp_code(None).unwrap_or("[?]".to_string()));
     }
-    if let Some(ref name) = self.class_name() {
-      s = format!("{} {}::", s, name);
-    }
-    s = format!("{}{}", s, self.name);
+    s = format!("{} {}", s, self.full_name());
     s = format!("{}({})",
                 s,
                 self.arguments

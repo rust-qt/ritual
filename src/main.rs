@@ -187,12 +187,12 @@ fn main() {
     serde_json::from_reader(file).unwrap()
   } else {
     log::info("Parsing C++ headers.");
-    let mut parser = cpp_parser::CppParser::new(include_dirs.clone(),
-                                                lib_spec.cpp.include_file.clone(),
-                                                output_dir_path.clone(),
-                                                lib_spec.cpp.name_blacklist.clone());
-    parser.run();
-    let parse_result = parser.get_data();
+    let parse_result = cpp_parser::run(cpp_parser::CppParserConfig {
+      include_dirs: include_dirs.clone(),
+      header_name: lib_spec.cpp.include_file.clone(),
+      tmp_cpp_path: output_dir_path.with_added("1.cpp"),
+      name_blacklist: lib_spec.cpp.name_blacklist.clone(),
+    });
 
     // let serialized_parse_result = serde_json::to_vec(&parse_result).unwrap();
     let mut file = File::create(&parse_result_cache_file_path).unwrap();
