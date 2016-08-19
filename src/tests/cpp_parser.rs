@@ -1,3 +1,7 @@
+
+// make sure to add test calls to tests() func
+#![forbid(dead_code)]
+
 extern crate tempdir;
 
 use cpp_parser;
@@ -9,7 +13,9 @@ use std::io::Write;
 use cpp_method::*;
 use cpp_type::*;
 
+
 fn run_parser(code: &'static str) -> CppData {
+  assert!(code.ends_with("\n"));
   let dir = tempdir::TempDir::new("test_cpp_parser_run").unwrap();
   let include_dir = dir.path().with_added("include");
   fs::create_dir(&include_dir).unwrap();
@@ -38,11 +44,10 @@ fn run_parser(code: &'static str) -> CppData {
   result
 }
 
-#[forbid(dead_code)]
 fn simple_func() {
   let data = run_parser("int func1(int x);\n");
-  assert!(data.types.is_empty());
   assert!(data.template_instantiations.is_empty());
+  assert!(data.types.is_empty());
   assert!(data.methods.len() == 1);
   assert_eq!(data.methods[0],
              CppMethod {
@@ -70,11 +75,10 @@ fn simple_func() {
              });
 }
 
-#[forbid(dead_code)]
 fn simple_func_with_default_value() {
   let data = run_parser("bool func1(int x = 42);\n");
-  assert!(data.types.is_empty());
   assert!(data.template_instantiations.is_empty());
+  assert!(data.types.is_empty());
   assert!(data.methods.len() == 1);
   assert_eq!(data.methods[0],
              CppMethod {
@@ -102,13 +106,13 @@ fn simple_func_with_default_value() {
              });
 }
 
-#[forbid(dead_code)]
 fn functions_with_class_arg() {
   let data = run_parser("class Magic { public: int a, b; };
   bool func1(Magic x);
   bool func1(Magic* x);
   bool func2(const Magic&);
   \n");
+  assert!(data.template_instantiations.is_empty());
   assert_eq!(data.types.len(), 1);
   assert_eq!(data.types[0].name, "Magic");
   match data.types[0].kind {
@@ -140,7 +144,6 @@ fn functions_with_class_arg() {
     }
     _ => panic!("invalid type kind"),
   }
-  assert!(data.template_instantiations.is_empty());
   assert!(data.methods.len() == 3);
   assert_eq!(data.methods[0],
              CppMethod {
@@ -225,6 +228,13 @@ fn functions_with_class_arg() {
              });
 }
 
+fn func_with_unknown_type() {
+  let data = run_parser("class SomeClass; \n int func1(SomeClass* x);\n");
+  assert!(data.template_instantiations.is_empty());
+  assert!(data.types.is_empty());
+  assert!(data.methods.is_empty());
+}
+
 #[test]
 fn tests() {
   // clang can't be used from multiple threads, so these checks
@@ -232,5 +242,5 @@ fn tests() {
   simple_func();
   simple_func_with_default_value();
   functions_with_class_arg();
-
+  func_with_unknown_type();
 }

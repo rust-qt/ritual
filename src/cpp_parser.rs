@@ -133,10 +133,21 @@ pub fn run(config: CppParserConfig) -> CppData {
     .unwrap_or_else(|err| panic!("clang parse failed: {:?}", err));
   let translation_unit = tu.get_entity();
   assert!(translation_unit.get_kind() == EntityKind::TranslationUnit);
-  if !tu.get_diagnostics().is_empty() {
-    log::warning("Diagnostics:");
-    for diag in tu.get_diagnostics() {
-      log::warning(format!("{}", diag));
+  {
+    let diagnostics = tu.get_diagnostics();
+    if !diagnostics.is_empty() {
+      log::warning("Diagnostics:");
+      for diag in &diagnostics {
+        log::warning(format!("{}", diag));
+      }
+    }
+    if diagnostics.iter()
+      .find(|d| {
+        d.get_severity() == clang::diagnostic::Severity::Error ||
+        d.get_severity() == clang::diagnostic::Severity::Fatal
+      })
+      .is_some() {
+      panic!("terminated because of clang errors");
     }
   }
   log::info("Processing entities...");
@@ -148,7 +159,12 @@ pub fn run(config: CppParserConfig) -> CppData {
   let methods = parser.parse_methods(translation_unit);
   std::fs::remove_file(&config.tmp_cpp_path).unwrap();
 
+  println!("test1: {:?}", methods);
+
   let good_methods = parser.check_integrity(methods);
+
+  println!("test2: {:?}", good_methods);
+
   let template_instantiations = parser.find_template_instantiations(&good_methods);
   CppData {
     types: parser.types,
@@ -1117,6 +1133,7 @@ impl CppParser {
   }
 
   fn check_integrity(&self, methods: Vec<CppMethod>) -> Vec<CppMethod> {
+    log::info("Checking data integrity");
     let good_methods = methods.into_iter()
       .filter(|method| {
         if let Err(msg) = self.check_type_integrity(&method.return_type
@@ -1181,7 +1198,11 @@ impl CppParser {
         }
       }
     }
-    log::info("Detected template instantiations:");
+    if result.is_empty() {
+      log::info("No template instantiations detected.");
+    } else {
+      log::info("Detected template instantiations:");
+    }
     for (class_name, instantiations) in &result {
       println!("Class: {}", class_name);
       if let Some(ref type_info) = self.types.iter().find(|x| &x.name == class_name) {
