@@ -74,13 +74,9 @@ impl CppCodeGenerator {
             // but in reality we use `new` which returns a pointer,
             // so no conversion is necessary for constructors.
             if !method.cpp_method.is_constructor() {
-              if let Some(ref return_type) = method.cpp_method.return_type {
-                result = format!("new {}({})",
-                                 return_type.base.to_cpp_code(None).unwrap(),
-                                 result)
-              } else {
-                panic!("cpp method unexpectedly doesn't have return type");
-              }
+              result = format!("new {}({})",
+                               method.cpp_method.return_type.base.to_cpp_code(None).unwrap(),
+                               result);
             }
           }
         }
@@ -99,14 +95,10 @@ impl CppCodeGenerator {
         .arguments
         .iter()
         .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
-        if let Some(ref return_type) = method.cpp_method.return_type {
-          result = format!("new({}) {}({})",
-                           arg.name,
-                           return_type.base.to_cpp_code(None).unwrap(),
-                           result);
-        } else {
-          panic!("cpp method unexpectedly doesn't have return type");
-        }
+        result = format!("new({}) {}({})",
+                         arg.name,
+                         method.cpp_method.return_type.base.to_cpp_code(None).unwrap(),
+                         result);
       }
     }
     result

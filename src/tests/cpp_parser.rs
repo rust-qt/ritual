@@ -55,11 +55,11 @@ fn simple_func() {
                name: "func1".to_string(),
                class_membership: None,
                operator: None,
-               return_type: Some(CppType {
+               return_type: CppType {
                  indirection: CppTypeIndirection::None,
                  is_const: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-               }),
+               },
                arguments: vec![CppFunctionArgument {
                                  name: "x".to_string(),
                                  argument_type: CppType {
@@ -86,11 +86,11 @@ fn simple_func_with_default_value() {
                name: "func1".to_string(),
                class_membership: None,
                operator: None,
-               return_type: Some(CppType {
+               return_type: CppType {
                  indirection: CppTypeIndirection::None,
                  is_const: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
-               }),
+               },
                arguments: vec![CppFunctionArgument {
                                  name: "x".to_string(),
                                  argument_type: CppType {
@@ -150,11 +150,11 @@ fn functions_with_class_arg() {
                name: "func1".to_string(),
                class_membership: None,
                operator: None,
-               return_type: Some(CppType {
+               return_type: CppType {
                  indirection: CppTypeIndirection::None,
                  is_const: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
-               }),
+               },
                arguments: vec![CppFunctionArgument {
                                  name: "x".to_string(),
                                  argument_type: CppType {
@@ -177,11 +177,11 @@ fn functions_with_class_arg() {
                name: "func1".to_string(),
                class_membership: None,
                operator: None,
-               return_type: Some(CppType {
+               return_type: CppType {
                  indirection: CppTypeIndirection::None,
                  is_const: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
-               }),
+               },
                arguments: vec![CppFunctionArgument {
                                  name: "x".to_string(),
                                  argument_type: CppType {
@@ -204,11 +204,11 @@ fn functions_with_class_arg() {
                name: "func2".to_string(),
                class_membership: None,
                operator: None,
-               return_type: Some(CppType {
+               return_type: CppType {
                  indirection: CppTypeIndirection::None,
                  is_const: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
-               }),
+               },
                arguments: vec![CppFunctionArgument {
                                  name: "arg1".to_string(),
                                  argument_type: CppType {
@@ -245,11 +245,11 @@ fn variadic_func() {
                name: "my_printf".to_string(),
                class_membership: None,
                operator: None,
-               return_type: Some(CppType {
+               return_type: CppType {
                  indirection: CppTypeIndirection::None,
                  is_const: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-               }),
+               },
                arguments: vec![CppFunctionArgument {
                                  name: "format".to_string(),
                                  argument_type: CppType {
@@ -276,14 +276,14 @@ fn free_template_func() {
                name: "abs".to_string(),
                class_membership: None,
                operator: None,
-               return_type: Some(CppType {
+               return_type: CppType {
                  indirection: CppTypeIndirection::None,
                  is_const: false,
                  base: CppTypeBase::TemplateParameter {
                    nested_level: 0,
                    index: 0,
                  },
-               }),
+               },
                arguments: vec![CppFunctionArgument {
                                  name: "value".to_string(),
                                  argument_type: CppType {
@@ -315,14 +315,14 @@ fn free_func_operator_sub() {
                  name: "operator-".to_string(),
                  class_membership: None,
                  operator: Some(CppOperator::Subtraction),
-                 return_type: Some(CppType {
+                 return_type: CppType {
                    indirection: CppTypeIndirection::None,
                    is_const: false,
                    base: CppTypeBase::Class {
                      name: "C1".to_string(),
                      template_arguments: None,
                    },
-                 }),
+                 },
                  arguments: vec![CppFunctionArgument {
                                    name: "a".to_string(),
                                    argument_type: CppType {
@@ -354,45 +354,6 @@ fn free_func_operator_sub() {
                });
   }
 }
-
-// fn operator_bool() {
-// let data = run_parser("class C1 { operator bool(const C1& a); };");
-// assert!(data.template_instantiations.is_empty());
-// assert!(data.types.len() == 1);
-// assert!(data.methods.len() == 1);
-// assert_eq!(data.methods[0],
-// CppMethod {
-// name: "operator bool".to_string(),
-// class_membership: None,
-// operator: Some(CppOperator::Conversion(CppType {
-// indirection: CppTypeIndirection::None,
-// is_const: false,
-// base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
-// })),
-// return_type: Some(CppType {
-// indirection: CppTypeIndirection::None,
-// is_const: false,
-// base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
-// }),
-// arguments: vec![CppFunctionArgument {
-// name: "a".to_string(),
-// argument_type: CppType {
-// indirection: CppTypeIndirection::Ref,
-// is_const: true,
-// base: CppTypeBase::Class {
-// name: "C1".to_string(),
-// template_arguments: None,
-// },
-// },
-// has_default_value: false,
-// }],
-// allows_variadic_arguments: false,
-// include_file: "myfakelib.h".to_string(),
-// origin_location: None,
-// template_arguments: None,
-// });
-// }
-
 
 fn simple_class_method() {
   let data = run_parser("class MyClass {
@@ -431,11 +392,11 @@ fn simple_class_method() {
                  is_signal: false,
                }),
                operator: None,
-               return_type: Some(CppType {
+               return_type: CppType {
                  indirection: CppTypeIndirection::None,
                  is_const: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-               }),
+               },
                arguments: vec![CppFunctionArgument {
                                  name: "x".to_string(),
                                  argument_type: CppType {
@@ -458,21 +419,202 @@ fn advanced_class_methods() {
       MyClass(bool a, bool b, bool c);
       virtual ~MyClass();
       static int func1(int x);
+      virtual void func2();
+    protected:
+      virtual void func3() = 0;
+    public:
+      int func4() const { return 1; }
+      operator bool() const;
+      template<class K, class V>
+      int func6(V x) const { return 1; }
     };");
-  assert_eq!(data.methods.len(), 3);
+  assert_eq!(data.methods.len(), 8);
   assert_eq!(data.methods[0].name, "MyClass");
   assert!(data.methods[0].class_membership.as_ref().unwrap().kind.is_constructor());
   assert_eq!(data.methods[0].arguments.len(), 3);
-  assert_eq!(data.methods[0].return_type, Some(CppType::void()));
+  assert_eq!(data.methods[0].return_type, CppType::void());
 
   assert_eq!(data.methods[1].name, "~MyClass");
   assert!(data.methods[1].class_membership.as_ref().unwrap().kind.is_destructor());
   assert_eq!(data.methods[1].arguments.len(), 0);
-  assert_eq!(data.methods[1].return_type, Some(CppType::void()));
+  assert_eq!(data.methods[1].return_type, CppType::void());
 
   assert_eq!(data.methods[2].name, "func1");
   assert!(data.methods[2].class_membership.as_ref().unwrap().is_static);
 
+  assert_eq!(data.methods[3].name, "func2");
+  assert!(data.methods[3].class_membership.as_ref().unwrap().is_virtual);
+  assert!(!data.methods[3].class_membership.as_ref().unwrap().is_pure_virtual);
+  assert_eq!(data.methods[3].class_membership.as_ref().unwrap().visibility,
+             CppVisibility::Public);
+
+  assert_eq!(data.methods[4].name, "func3");
+  assert!(data.methods[4].class_membership.as_ref().unwrap().is_virtual);
+  assert!(data.methods[4].class_membership.as_ref().unwrap().is_pure_virtual);
+  assert_eq!(data.methods[4].class_membership.as_ref().unwrap().visibility,
+             CppVisibility::Protected);
+
+  assert_eq!(data.methods[5].name, "func4");
+  assert!(data.methods[5].class_membership.as_ref().unwrap().is_const);
+
+  assert_eq!(data.methods[6].name, "operator bool");
+  assert!(data.methods[6].class_membership.as_ref().unwrap().is_const);
+  assert_eq!(data.methods[6].operator,
+             Some(CppOperator::Conversion(CppType {
+               indirection: CppTypeIndirection::None,
+               is_const: false,
+               base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
+             })));
+  assert_eq!(data.methods[6].return_type,
+             CppType {
+               indirection: CppTypeIndirection::None,
+               is_const: false,
+               base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
+             });
+
+  assert_eq!(data.methods[7].name, "func6");
+  assert_eq!(data.methods[7].template_arguments,
+             Some(vec!["K".to_string(), "V".to_string()]));
+  assert_eq!(data.methods[7].arguments.len(), 1);
+  assert_eq!(data.methods[7].arguments[0].argument_type,
+             CppType {
+               indirection: CppTypeIndirection::None,
+               is_const: false,
+               base: CppTypeBase::TemplateParameter {
+                 nested_level: 0,
+                 index: 1,
+               },
+             });
+}
+
+fn template_class_method() {
+  let data = run_parser("
+  template<class T>
+  class MyVector {
+    public:
+      class Iterator {};
+      T get(int index);
+      Iterator begin();
+    };");
+  assert!(data.template_instantiations.is_empty());
+  assert!(data.types.len() == 2);
+  assert_eq!(data.types[0].name, "MyVector");
+  match data.types[0].kind {
+    CppTypeKind::Class { ref size, ref bases, ref fields, ref template_arguments } => {
+      assert!(size.is_none());
+      assert_eq!(template_arguments, &Some(vec!["T".to_string()]));
+      assert!(bases.is_empty());
+      assert!(fields.is_empty());
+    }
+    _ => panic!("invalid type kind"),
+  }
+  assert_eq!(data.types[1].name, "MyVector::Iterator");
+  assert!(data.methods.len() == 2);
+  assert_eq!(data.methods[0],
+             CppMethod {
+               name: "get".to_string(),
+               class_membership: Some(CppMethodClassMembership {
+                 class_type: CppTypeBase::Class {
+                   name: "MyVector".to_string(),
+                   template_arguments: Some(vec![CppType {
+                                                   indirection: CppTypeIndirection::None,
+                                                   is_const: false,
+                                                   base: CppTypeBase::TemplateParameter {
+                                                     nested_level: 0,
+                                                     index: 0,
+                                                   },
+                                                 }]),
+                 },
+                 kind: CppMethodKind::Regular,
+                 is_virtual: false,
+                 is_pure_virtual: false,
+                 is_const: false,
+                 is_static: false,
+                 visibility: CppVisibility::Public,
+                 is_signal: false,
+               }),
+               operator: None,
+               return_type: CppType {
+                 indirection: CppTypeIndirection::None,
+                 is_const: false,
+                 base: CppTypeBase::TemplateParameter {
+                   nested_level: 0,
+                   index: 0,
+                 },
+               },
+               arguments: vec![CppFunctionArgument {
+                                 name: "index".to_string(),
+                                 argument_type: CppType {
+                                   indirection: CppTypeIndirection::None,
+                                   is_const: false,
+                                   base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+                                 },
+                                 has_default_value: false,
+                               }],
+               allows_variadic_arguments: false,
+               include_file: "myfakelib.h".to_string(),
+               origin_location: None,
+               template_arguments: None,
+             });
+  assert_eq!(data.methods[1].name, "begin");
+  assert_eq!(data.methods[1].return_type,
+             CppType {
+               indirection: CppTypeIndirection::None,
+               is_const: false,
+               base: CppTypeBase::Class {
+                 name: "MyVector::Iterator".to_string(),
+                 template_arguments: None,
+               },
+             });
+}
+
+fn simple_enum() {
+  let data = run_parser("
+  enum Enum1 {
+    Good,
+    Bad
+  };");
+  assert_eq!(data.types.len(), 1);
+  assert_eq!(data.types[0].name, "Enum1");
+  assert_eq!(data.types[0].kind,
+             CppTypeKind::Enum {
+               values: vec![EnumValue {
+                              name: "Good".to_string(),
+                              value: 0,
+                            },
+                            EnumValue {
+                              name: "Bad".to_string(),
+                              value: 1,
+                            }],
+             });
+}
+
+fn simple_enum2() {
+  let data = run_parser("
+  namespace ns1 {
+    enum Enum1 {
+      Good = 1,
+      Bad = 2,
+      Questionable = Good | Bad
+    };
+  }");
+  assert_eq!(data.types.len(), 1);
+  assert_eq!(data.types[0].name, "ns1::Enum1");
+  assert_eq!(data.types[0].kind,
+             CppTypeKind::Enum {
+               values: vec![EnumValue {
+                              name: "Good".to_string(),
+                              value: 1,
+                            },
+                            EnumValue {
+                              name: "Bad".to_string(),
+                              value: 2,
+                            },
+                            EnumValue {
+                              name: "Questionable".to_string(),
+                              value: 3,
+                            }],
+             });
 }
 
 #[test]
@@ -488,5 +630,7 @@ fn tests() {
   free_func_operator_sub();
   simple_class_method();
   advanced_class_methods();
-  // free_func_operator_bool();
+  template_class_method();
+  simple_enum();
+  simple_enum2();
 }

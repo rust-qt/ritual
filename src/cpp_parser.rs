@@ -850,7 +850,7 @@ impl CppParser {
       },
       arguments: arguments,
       allows_variadic_arguments: allows_variadic_arguments,
-      return_type: Some(return_type_parsed),
+      return_type: return_type_parsed,
       include_file: self.entity_include_file(entity).unwrap(),
       origin_location: Some(get_origin_location(entity).unwrap()),
       template_arguments: template_arguments,
@@ -1137,8 +1137,7 @@ impl CppParser {
     let good_methods = methods.into_iter()
       .filter(|method| {
         if let Err(msg) = self.check_type_integrity(&method.return_type
-          .clone()
-          .unwrap()) {
+          .clone()) {
           log::warning(format!("Method is removed: {}: {}", method.short_text(), msg));
           return false;
         }
@@ -1186,7 +1185,7 @@ impl CppParser {
     }
     let mut result = HashMap::new();
     for m in methods {
-      check_type(m.return_type.as_ref().unwrap(), &mut result);
+      check_type(&m.return_type, &mut result);
       for arg in &m.arguments {
         check_type(&arg.argument_type, &mut result);
       }

@@ -66,10 +66,8 @@ impl CppMethod {
     if self.is_constructor() || self.is_destructor() {
       return true;
     }
-    if let Some(ref t) = self.return_type {
-      if t.needs_allocation_place_variants() {
-        return true;
-      }
+    if self.return_type.needs_allocation_place_variants() {
+      return true;
     }
     false
   }
@@ -118,40 +116,38 @@ impl CppMethod {
       }
     }
     let real_return_type = if self.is_constructor() {
-      Some(CppType {
+      CppType {
         is_const: false,
         indirection: CppTypeIndirection::None,
         base: self.class_membership.as_ref().unwrap().class_type.clone(),
-      })
+      }
     } else {
       self.return_type.clone()
     };
-    if let Some(return_type) = real_return_type {
-      match return_type.to_cpp_ffi_type(CppTypeRole::ReturnType) {
-        Ok(c_type) => {
-          if return_type.needs_allocation_place_variants() {
-            match allocation_place {
-              ReturnValueAllocationPlace::Stack => {
-                r.arguments.push(CppFfiFunctionArgument {
-                  name: "output".to_string(),
-                  argument_type: c_type,
-                  meaning: CppFfiArgumentMeaning::ReturnValue,
-                });
-              }
-              ReturnValueAllocationPlace::Heap => {
-                r.return_type = c_type;
-              }
-              ReturnValueAllocationPlace::NotApplicable => {
-                panic!("NotApplicable encountered but return value needs allocation_place variants")
-              }
+    match real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType) {
+      Ok(c_type) => {
+        if real_return_type.needs_allocation_place_variants() {
+          match allocation_place {
+            ReturnValueAllocationPlace::Stack => {
+              r.arguments.push(CppFfiFunctionArgument {
+                name: "output".to_string(),
+                argument_type: c_type,
+                meaning: CppFfiArgumentMeaning::ReturnValue,
+              });
             }
-          } else {
-            r.return_type = c_type;
+            ReturnValueAllocationPlace::Heap => {
+              r.return_type = c_type;
+            }
+            ReturnValueAllocationPlace::NotApplicable => {
+              panic!("NotApplicable encountered but return value needs allocation_place variants")
+            }
           }
+        } else {
+          r.return_type = c_type;
         }
-        Err(msg) => {
-          return Err(format!("Can't convert type to C: {:?}: {}", return_type, msg));
-        }
+      }
+      Err(msg) => {
+        return Err(format!("Can't convert type to C: {:?}: {}", real_return_type, msg));
       }
     }
     Ok(r)
@@ -219,11 +215,9 @@ impl CppMethod {
     if self.allows_variadic_arguments {
       s = format!("{} [var args]", s);
     }
-    if let Some(ref cpp_type) = self.return_type {
-      s = format!("{} {}",
-                  s,
-                  cpp_type.to_cpp_code(None).unwrap_or("[?]".to_string()));
-    }
+    s = format!("{} {}",
+                s,
+                self.return_type.to_cpp_code(None).unwrap_or("[?]".to_string()));
     s = format!("{} {}", s, self.full_name());
     s = format!("{}({})",
                 s,

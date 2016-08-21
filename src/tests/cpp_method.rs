@@ -41,7 +41,7 @@ pub fn empty_regular_method() -> CppMethod {
   CppMethod {
     name: String::new(),
     class_membership: None,
-    return_type: None,
+    return_type: CppType::void(),
     arguments: vec![],
     allows_variadic_arguments: false,
     include_file: String::new(),
@@ -204,11 +204,11 @@ fn argument_types_equal7() {
 fn argument_types_equal8() {
   let mut method1 = empty_regular_method();
   let method2 = empty_regular_method();
-  method1.return_type = Some(CppType {
+  method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
     base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-  });
+  };
   assert!(method1.argument_types_equal(&method2));
   assert!(method2.argument_types_equal(&method1));
 }
@@ -231,42 +231,42 @@ fn needs_allocation_place_variants() {
   }
   method1.operator = Some(CppOperator::Assignment);
   assert!(!method1.needs_allocation_place_variants());
-  method1.return_type = Some(CppType {
+  method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
     base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-  });
+  };
   assert!(!method1.needs_allocation_place_variants());
-  method1.return_type = Some(CppType {
+  method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
     base: CppTypeBase::Class {
       name: "QRect".to_string(),
       template_arguments: None,
     },
-  });
+  };
   assert!(method1.needs_allocation_place_variants());
-  method1.return_type = Some(CppType {
+  method1.return_type = CppType {
     indirection: CppTypeIndirection::Ptr,
     is_const: false,
     base: CppTypeBase::Class {
       name: "QRect".to_string(),
       template_arguments: None,
     },
-  });
+  };
   assert!(!method1.needs_allocation_place_variants());
   if let Some(ref mut info) = method1.class_membership {
     info.kind = CppMethodKind::Regular;
   }
   method1.operator = None;
-  method1.return_type = None;
+  method1.return_type = CppType::void();
   assert!(!method1.needs_allocation_place_variants());
 }
 
 #[test]
 fn c_signature_empty() {
   let mut method1 = empty_regular_method();
-  method1.return_type = Some(CppType::void());
+  method1.return_type = CppType::void();
 
   assert!(!method1.is_constructor());
   assert!(!method1.is_destructor());
@@ -281,11 +281,11 @@ fn c_signature_empty() {
 #[test]
 fn c_signature_simple_func() {
   let mut method1 = empty_regular_method();
-  method1.return_type = Some(CppType {
+  method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
     base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-  });
+  };
   method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
@@ -303,7 +303,7 @@ fn c_signature_simple_func() {
   assert_eq!(r.arguments[0].argument_type.conversion,
              IndirectionChange::NoChange);
   assert_eq!(r.arguments[0].meaning, CppFfiArgumentMeaning::Argument(0));
-  assert_eq!(r.return_type.ffi_type, method1.return_type.unwrap());
+  assert_eq!(r.return_type.ffi_type, method1.return_type);
   assert_eq!(r.return_type.conversion, IndirectionChange::NoChange);
 }
 
@@ -311,11 +311,11 @@ fn c_signature_simple_func() {
 fn c_signature_method_with_this() {
   let mut method1 = empty_regular_method();
   method1.class_membership = Some(empty_membership("MyClass"));
-  method1.return_type = Some(CppType {
+  method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
     base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-  });
+  };
   method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
@@ -353,7 +353,7 @@ fn c_signature_method_with_this() {
   assert_eq!(r.arguments[1].argument_type.conversion,
              IndirectionChange::ValueToPointer);
   assert_eq!(r.arguments[1].meaning, CppFfiArgumentMeaning::Argument(0));
-  assert_eq!(r.return_type.ffi_type, method1.return_type.unwrap());
+  assert_eq!(r.return_type.ffi_type, method1.return_type);
 }
 
 #[test]
@@ -364,11 +364,11 @@ fn c_signature_static_method() {
     info.is_static = true;
     info
   });
-  method1.return_type = Some(CppType {
+  method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
     base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-  });
+  };
   method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
@@ -386,7 +386,7 @@ fn c_signature_static_method() {
   assert_eq!(r.arguments[0].argument_type.conversion,
              IndirectionChange::NoChange);
   assert_eq!(r.arguments[0].meaning, CppFfiArgumentMeaning::Argument(0));
-  assert_eq!(r.return_type.ffi_type, method1.return_type.unwrap());
+  assert_eq!(r.return_type.ffi_type, method1.return_type);
 }
 
 
@@ -515,14 +515,14 @@ fn c_signature_destructor() {
 fn c_signature_method_returning_class() {
   let mut method1 = empty_regular_method();
   method1.class_membership = Some(empty_membership("MyClass"));
-  method1.return_type = Some(CppType {
+  method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
     base: CppTypeBase::Class {
       name: "MyClass3".to_string(),
       template_arguments: None,
     },
-  });
+  };
   method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
@@ -631,11 +631,11 @@ fn to_ffi_signatures_destructor() {
 #[test]
 fn to_ffi_signatures_simple_func() {
   let mut method1 = empty_regular_method();
-  method1.return_type = Some(CppType {
+  method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
     base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-  });
+  };
   method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
@@ -718,11 +718,11 @@ fn short_text1() {
       },
     }),
     operator: None,
-    return_type: Some(CppType {
+    return_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
       base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-    }),
+    },
     arguments: vec![CppFunctionArgument {
                       argument_type: CppType {
                         indirection: CppTypeIndirection::None,

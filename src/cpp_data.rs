@@ -101,7 +101,7 @@ impl CppData {
               kind: CppMethodKind::Destructor,
             }),
             operator: None,
-            return_type: None,
+            return_type: CppType::void(),
             arguments: vec![],
             allows_variadic_arguments: false,
             include_file: type1.include_file.clone(),
