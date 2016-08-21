@@ -158,13 +158,7 @@ pub fn run(config: CppParserConfig) -> CppData {
   parser.parse_types(translation_unit);
   let methods = parser.parse_methods(translation_unit);
   std::fs::remove_file(&config.tmp_cpp_path).unwrap();
-
-  println!("test1: {:?}", methods);
-
   let good_methods = parser.check_integrity(methods);
-
-  println!("test2: {:?}", good_methods);
-
   let template_instantiations = parser.find_template_instantiations(&good_methods);
   CppData {
     types: parser.types,

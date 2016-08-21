@@ -617,6 +617,34 @@ fn simple_enum2() {
              });
 }
 
+fn template_instantiation() {
+  let data = run_parser("
+  template<typename T> class Vector {};
+  class C1 {
+  public:
+    Vector<int> values();
+  };
+");
+  assert_eq!(data.methods.len(), 1);
+  let int = CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+  };
+  assert_eq!(data.methods[0].return_type,
+             CppType {
+               indirection: CppTypeIndirection::None,
+               is_const: false,
+               base: CppTypeBase::Class {
+                 name: "Vector".to_string(),
+                 template_arguments: Some(vec![int.clone()]),
+               },
+             });
+  assert!(data.template_instantiations.contains_key("Vector"));
+  assert!(data.template_instantiations["Vector"].len() == 1);
+  assert!(data.template_instantiations["Vector"][0] == vec![int]);
+}
+
 #[test]
 fn tests() {
   // clang can't be used from multiple threads, so these checks
@@ -633,4 +661,5 @@ fn tests() {
   template_class_method();
   simple_enum();
   simple_enum2();
+  template_instantiation();
 }

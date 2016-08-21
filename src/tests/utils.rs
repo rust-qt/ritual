@@ -71,7 +71,6 @@ fn case_operations() {
   assert_eq!(s4.to_snake_case(), "is_nan");
 
   let s5 = "Base64Format".to_string();
-  // println!("test {} {}", s5.to_class_case(), s5.to_snake_case());
   assert_eq!(s5.to_class_case(), "Base64Format");
   assert_eq!(s5.to_snake_case(), "base64_format");
 

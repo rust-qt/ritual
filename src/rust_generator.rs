@@ -32,7 +32,6 @@ fn remove_qt_prefix_and_convert_case(s: &String, case: Case, remove_qt_prefix: b
     Case::Snake => parts.to_snake_case(),
     Case::Class => parts.to_class_case(),
   };
-  // println!("TEST: '{}' -> '{}'", s, &result);
   result
 }
 

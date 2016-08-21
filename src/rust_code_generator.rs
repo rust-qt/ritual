@@ -294,10 +294,6 @@ impl RustCodeGenerator {
   }
 
   fn generate_rust_final_function(&self, func: &RustMethod) -> String {
-    //    println!("TEST1 {:?}", func);
-    //    if func.name == "q_uncompress" {
-    //      println!("TEST: {:?}", func);
-    //    }
     let public_qualifier = match func.scope {
       RustMethodScope::TraitImpl { .. } => "",
       _ => "pub ",

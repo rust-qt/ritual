@@ -7,7 +7,6 @@ mod cpp_parser;
 
 // Testing plan:
 //
-// - cpp_parser
 // - qt_specific
 // - main (refactor)
 // - cpp_data
