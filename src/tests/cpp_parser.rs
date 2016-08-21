@@ -394,6 +394,87 @@ fn free_func_operator_sub() {
 // }
 
 
+fn simple_class_method() {
+  let data = run_parser("class MyClass {
+    public:
+      int func1(int x);
+    private:
+      int m_x;
+    };");
+  assert!(data.template_instantiations.is_empty());
+  assert!(data.types.len() == 1);
+  assert_eq!(data.types[0].name, "MyClass");
+  match data.types[0].kind {
+    CppTypeKind::Class { ref size, ref bases, ref fields, ref template_arguments } => {
+      assert!(size.is_some());
+      assert!(template_arguments.is_none());
+      assert!(bases.is_empty());
+      assert!(fields.len() == 1);
+    }
+    _ => panic!("invalid type kind"),
+  }
+  assert!(data.methods.len() == 1);
+  assert_eq!(data.methods[0],
+             CppMethod {
+               name: "func1".to_string(),
+               class_membership: Some(CppMethodClassMembership {
+                 class_type: CppTypeBase::Class {
+                   name: "MyClass".to_string(),
+                   template_arguments: None,
+                 },
+                 kind: CppMethodKind::Regular,
+                 is_virtual: false,
+                 is_pure_virtual: false,
+                 is_const: false,
+                 is_static: false,
+                 visibility: CppVisibility::Public,
+                 is_signal: false,
+               }),
+               operator: None,
+               return_type: Some(CppType {
+                 indirection: CppTypeIndirection::None,
+                 is_const: false,
+                 base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+               }),
+               arguments: vec![CppFunctionArgument {
+                                 name: "x".to_string(),
+                                 argument_type: CppType {
+                                   indirection: CppTypeIndirection::None,
+                                   is_const: false,
+                                   base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+                                 },
+                                 has_default_value: false,
+                               }],
+               allows_variadic_arguments: false,
+               include_file: "myfakelib.h".to_string(),
+               origin_location: None,
+               template_arguments: None,
+             });
+}
+
+fn advanced_class_methods() {
+  let data = run_parser("class MyClass {
+    public:
+      MyClass(bool a, bool b, bool c);
+      virtual ~MyClass();
+      static int func1(int x);
+    };");
+  assert_eq!(data.methods.len(), 3);
+  assert_eq!(data.methods[0].name, "MyClass");
+  assert!(data.methods[0].class_membership.as_ref().unwrap().kind.is_constructor());
+  assert_eq!(data.methods[0].arguments.len(), 3);
+  assert_eq!(data.methods[0].return_type, Some(CppType::void()));
+
+  assert_eq!(data.methods[1].name, "~MyClass");
+  assert!(data.methods[1].class_membership.as_ref().unwrap().kind.is_destructor());
+  assert_eq!(data.methods[1].arguments.len(), 0);
+  assert_eq!(data.methods[1].return_type, Some(CppType::void()));
+
+  assert_eq!(data.methods[2].name, "func1");
+  assert!(data.methods[2].class_membership.as_ref().unwrap().is_static);
+
+}
+
 #[test]
 fn tests() {
   // clang can't be used from multiple threads, so these checks
@@ -405,5 +486,7 @@ fn tests() {
   variadic_func();
   free_template_func();
   free_func_operator_sub();
+  simple_class_method();
+  advanced_class_methods();
   // free_func_operator_bool();
 }
