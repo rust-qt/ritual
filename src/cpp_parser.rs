@@ -6,11 +6,11 @@ use self::regex::Regex;
 
 use log;
 use std;
-use std::collections::HashMap;
+use std::collections::{HashSet, HashMap};
 use std::path::PathBuf;
 use std::fs::File;
 
-use utils::JoinWithString;
+use utils::{JoinWithString, add_to_multihash};
 
 use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppOriginLocation,
                CppVisibility};
@@ -1158,18 +1158,13 @@ impl CppParser {
 
   fn find_template_instantiations(&self,
                                   methods: &Vec<CppMethod>)
-                                  -> HashMap<String, Vec<Vec<CppType>>> {
+                                  -> HashMap<String, HashSet<Vec<CppType>>> {
 
-    fn check_type(type1: &CppType, result: &mut HashMap<String, Vec<Vec<CppType>>>) {
+    fn check_type(type1: &CppType, result: &mut HashMap<String, HashSet<Vec<CppType>>>) {
       if let CppTypeBase::Class { ref name, ref template_arguments } = type1.base {
         if let &Some(ref template_arguments) = template_arguments {
           if template_arguments.iter().find(|x| !x.base.is_template_parameter()).is_some() {
-            if !result.contains_key(name) {
-              result.insert(name.clone(), Vec::new());
-            }
-            if result.get(name).unwrap().iter().find(|x| x == &template_arguments).is_none() {
-              result.get_mut(name).unwrap().push(template_arguments.clone());
-            }
+            add_to_multihash(result, name, template_arguments.clone());
             for arg in template_arguments {
               check_type(arg, result);
             }

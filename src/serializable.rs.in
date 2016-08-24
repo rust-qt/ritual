@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashSet, HashMap};
 
 // ------------------------------
 // from cpp_data
@@ -101,7 +101,7 @@ pub struct CppData {
   /// the template class, value is list of instantiations.
   /// Each instantiation is represented as list of C++ types
   /// used as template arguments.
-  pub template_instantiations: HashMap<String, Vec<Vec<CppType>>>,
+  pub template_instantiations: HashMap<String, HashSet<Vec<CppType>>>,
 }
 
 // -----------------------------------
@@ -303,7 +303,7 @@ pub enum CppOperator {
 // from cpp_type
 
 /// C++ type variants based on indirection
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 #[allow(dead_code)]
 pub enum CppTypeIndirection {
@@ -325,7 +325,7 @@ pub enum CppTypeIndirection {
 /// All these types have corresponding
 /// clang::TypeKind values (except for CharS and CharU
 /// which map to CppBuiltInNumericType::Char)
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub enum CppBuiltInNumericType {
   Bool,
@@ -351,7 +351,7 @@ pub enum CppBuiltInNumericType {
 }
 
 /// Information about a fixed-size primitive type
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 #[allow(dead_code)]
 pub enum CppSpecificNumericTypeKind {
@@ -364,7 +364,7 @@ pub enum CppSpecificNumericTypeKind {
 /// Base C++ type. CppType can add indirection
 /// and constness to CppTypeBase, but otherwise
 /// this enum lists all supported types.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub enum CppTypeBase {
   /// Void
@@ -428,7 +428,7 @@ pub enum CppTypeBase {
 }
 
 /// Information about a C++ type
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub struct CppType {
   /// Information about base type

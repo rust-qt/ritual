@@ -642,7 +642,7 @@ fn template_instantiation() {
              });
   assert!(data.template_instantiations.contains_key("Vector"));
   assert!(data.template_instantiations["Vector"].len() == 1);
-  assert!(data.template_instantiations["Vector"][0] == vec![int]);
+  assert!(data.template_instantiations["Vector"].iter().next().unwrap() == &vec![int]);
 }
 
 fn derived_class_simple() {

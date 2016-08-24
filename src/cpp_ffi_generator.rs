@@ -1,9 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{HashSet, HashMap};
 use log;
 use cpp_data::{CppData, CppTypeKind, CppVisibility};
 use caption_strategy::MethodCaptionStrategy;
 use cpp_method::{CppMethod, CppMethodKind};
 use cpp_ffi_data::{CppAndFfiMethod, c_base_name};
+use utils::add_to_multihash;
 
 pub struct CGenerator<'a> {
   template_classes: Vec<String>,
@@ -86,99 +87,101 @@ pub fn run(cpp_data: &CppData, include_file_blacklist: &Vec<String>) -> Vec<CppF
 }
 
 impl<'a> CGenerator<'a> {
-  pub fn process_methods<'b, I: Iterator<Item = &'b CppMethod>>(&self,
-                                                                include_file: &String,
-                                                                include_file_base_name: &String,
-                                                                methods: I)
-                                                                -> Vec<CppAndFfiMethod> {
+  fn should_process_method(&self, method: &CppMethod) -> bool {
+    if let Some(ref membership) = method.class_membership {
+      if membership.kind == CppMethodKind::Constructor {
+        let class_name = membership.class_type.maybe_name().unwrap();
+        if self.abstract_classes.iter().find(|x| x == &class_name).is_some() {
+          log::debug(format!("Method is skipped:\n{}\nConstructors are not allowed for abstract \
+                              classes.\n",
+                             method.short_text()));
+          return false;
+        }
+      }
+      if membership.visibility == CppVisibility::Private {
+        return false;
+      }
+      if membership.visibility == CppVisibility::Protected {
+        log::debug(format!("Skipping protected method: \n{}\n", method.short_text()));
+        return false;
+      }
+      if membership.is_signal {
+        log::warning(format!("Skipping signal: \n{}\n", method.short_text()));
+        return false;
+      }
+    }
+    if method.template_arguments.is_some() {
+      log::warning(format!("Skipping template method: \n{}\n", method.short_text()));
+      return false;
+    }
+    if let Some(ref class_name) = method.class_name() {
+      if self.template_classes
+        .iter()
+        .find(|x| x == class_name || class_name.starts_with(&format!("{}::", x)))
+        .is_some() {
+        log::warning(format!("Skipping method of template class: \n{}\n",
+                             method.short_text()));
+        return false;
+      }
+    }
+    true
+  }
+
+  fn process_methods<'b, I: Iterator<Item = &'b CppMethod>>(&self,
+                                                            include_file: &String,
+                                                            include_file_base_name: &String,
+                                                            methods: I)
+                                                            -> Vec<CppAndFfiMethod> {
     log::info(format!("Generating C++ FFI methods for header: <{}>", include_file));
-    let mut hash1 = HashMap::new();
-    {
-      let insert_into_hash = |hash: &mut HashMap<String, Vec<_>>, key: String, value| {
-        if let Some(values) = hash.get_mut(&key) {
-          values.push(value);
-          return;
+    let mut hash_name_to_methods: HashMap<String, Vec<_>> = HashMap::new();
+    for ref method in methods {
+      if !self.should_process_method(method) {
+        continue;
+      }
+      match method.to_ffi_signatures() {
+        Err(msg) => {
+          log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
+                               method.short_text(),
+                               msg));
         }
-        hash.insert(key, vec![value]);
-      };
-
-      for ref method in methods {
-        if let Some(ref membership) = method.class_membership {
-          if membership.kind == CppMethodKind::Constructor {
-            let class_name = membership.class_type.maybe_name().unwrap();
-            if self.abstract_classes.iter().find(|x| x == &class_name).is_some() {
-              log::debug(format!("Method is skipped:\n{}\nConstructors are not allowed for \
-                                  abstract classes.\n",
-                                 method.short_text()));
-              continue;
-            }
-          }
-          if membership.visibility == CppVisibility::Private {
-            continue;
-          }
-          if membership.visibility == CppVisibility::Protected {
-            log::debug(format!("Skipping protected method: \n{}\n", method.short_text()));
-            continue;
-          }
-          if membership.is_signal {
-            log::warning(format!("Skipping signal: \n{}\n", method.short_text()));
-            continue;
-          }
-        }
-        if method.template_arguments.is_some() {
-          log::warning(format!("Skipping template method: \n{}\n", method.short_text()));
-          continue;
-        }
-        if let Some(ref class_name) = method.class_name() {
-          if self.template_classes
-            .iter()
-            .find(|x| x == class_name || class_name.starts_with(&format!("{}::", x)))
-            .is_some() {
-            log::warning(format!("Skipping method of template class: \n{}\n",
-                                 method.short_text()));
-            continue;
-          }
-        }
-
-        match method.to_ffi_signatures() {
-          Err(msg) => {
-            log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
-                                 method.short_text(),
-                                 msg));
-          }
-          Ok(results) => {
-            for result in results {
-              match c_base_name(&result.cpp_method,
-                                &result.allocation_place,
-                                include_file_base_name) {
-                Err(msg) => {
-                  log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
-                                       method.short_text(),
-                                       msg));
-                }
-                Ok(name) => {
-                  insert_into_hash(&mut hash1, name, result);
-                }
+        Ok(results) => {
+          for result in results {
+            match c_base_name(&result.cpp_method,
+                              &result.allocation_place,
+                              include_file_base_name) {
+              Err(msg) => {
+                log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
+                                     method.short_text(),
+                                     msg));
+              }
+              Ok(name) => {
+                add_to_multihash(&mut hash_name_to_methods, &name, result);
               }
             }
           }
         }
       }
     }
-    let mut r = Vec::new();
-    for (key, mut values) in hash1.into_iter() {
+
+    let mut processed_methods = Vec::new();
+    for (key, mut values) in hash_name_to_methods.into_iter() {
       if values.len() == 1 {
-        r.push(CppAndFfiMethod::new(values.remove(0), key.clone()));
+        processed_methods.push(CppAndFfiMethod::new(values.remove(0), key.clone()));
         continue;
       }
       let mut found_strategy = None;
       for strategy in MethodCaptionStrategy::all() {
-        let mut type_captions: Vec<_> = values.iter()
-          .map(|x| x.c_signature.caption(strategy.clone()))
-          .collect();
-        type_captions.sort();
-        type_captions.dedup();
-        if type_captions.len() == values.len() {
+        let mut type_captions: HashSet<_> = HashSet::new();
+        let mut ok = true;
+        for value in &values {
+          let caption = value.c_signature.caption(strategy.clone());
+          if type_captions.contains(&caption) {
+            ok = false;
+            break;
+          }
+          type_captions.insert(caption);
+        }
+        if ok {
           found_strategy = Some(strategy);
           break;
         }
@@ -186,18 +189,19 @@ impl<'a> CGenerator<'a> {
       if let Some(strategy) = found_strategy {
         for x in values {
           let caption = x.c_signature.caption(strategy.clone());
-          r.push(CppAndFfiMethod::new(x,
-                                      format!("{}{}{}",
-                                              key,
-                                              if caption.is_empty() { "" } else { "_" },
-                                              caption)));
+          let final_name = if caption.is_empty() {
+            key.clone()
+          } else {
+            format!("{}_{}", key, caption)
+          };
+          processed_methods.push(CppAndFfiMethod::new(x, final_name));
         }
       } else {
         panic!("all type caption strategies have failed! Involved functions: \n{:?}",
                values);
       }
     }
-    r.sort_by(|a, b| a.c_name.cmp(&b.c_name));
-    r
+    processed_methods.sort_by(|a, b| a.c_name.cmp(&b.c_name));
+    processed_methods
   }
 }

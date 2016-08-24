@@ -3,7 +3,9 @@ use std::io;
 use std::fs;
 use std::fs::File;
 use std::io::Read;
-
+use std::collections::HashMap;
+use std::hash::Hash;
+use std;
 use log;
 
 pub trait JoinWithString {
@@ -219,4 +221,14 @@ impl<'a> VecCaseOperations for Vec<&'a str> {
   fn to_snake_case(self) -> String {
     iterator_to_snake_case(self.into_iter())
   }
+}
+
+
+pub fn add_to_multihash<K: Eq + Hash + Clone, T, V: Default + Extend<T>>(hash: &mut HashMap<K, V>,
+                                                                         key: &K,
+                                                                         value: T) {
+  if !hash.contains_key(key) {
+    hash.insert(key.clone(), Default::default());
+  }
+  hash.get_mut(key).unwrap().extend(std::iter::once(value));
 }
