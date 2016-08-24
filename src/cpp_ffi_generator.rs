@@ -24,6 +24,7 @@ pub struct CppAndFfiData {
   pub cpp_ffi_headers: Vec<CppFfiHeaderData>,
 }
 
+/// Runs FFI generator
 pub fn run(cpp_data: &CppData, include_file_blacklist: &Vec<String>) -> Vec<CppFfiHeaderData> {
   let abstract_classes = cpp_data.types
     .iter()
@@ -87,6 +88,8 @@ pub fn run(cpp_data: &CppData, include_file_blacklist: &Vec<String>) -> Vec<CppF
 }
 
 impl<'a> CGenerator<'a> {
+  /// Returns false if the method is excluded from processing
+  /// for some reason
   fn should_process_method(&self, method: &CppMethod) -> bool {
     if let Some(ref membership) = method.class_membership {
       if membership.kind == CppMethodKind::Constructor {
@@ -127,6 +130,8 @@ impl<'a> CGenerator<'a> {
     true
   }
 
+  /// Generates FFI wrappers for all specified methods,
+  /// resolving all name conflicts using additional method captions.
   fn process_methods<'b, I: Iterator<Item = &'b CppMethod>>(&self,
                                                             include_file: &String,
                                                             include_file_base_name: &String,
