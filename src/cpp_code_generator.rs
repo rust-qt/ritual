@@ -34,6 +34,8 @@ impl CppCodeGenerator {
     }
   }
 
+  /// Generates function name, return type and arguments list
+  /// as it appears in both function declaration and implementation.
   fn function_signature(&self, method: &CppAndFfiMethod) -> String {
     let name_with_args = format!("{}({})",
                                  method.c_name,
@@ -51,7 +53,7 @@ impl CppCodeGenerator {
   }
 
   /// Generates method declaration for the header.
-  fn header_code(&self, method: &CppAndFfiMethod) -> String {
+  fn function_declaration(&self, method: &CppAndFfiMethod) -> String {
     format!("{}_EXPORT {};\n",
             self.lib_name_upper,
             self.function_signature(method))
@@ -68,8 +70,10 @@ impl CppCodeGenerator {
           ReturnValueAllocationPlace::Stack => {
             panic!("stack allocated wrappers are expected to return void!")
           }
-          ReturnValueAllocationPlace::Heap |
           ReturnValueAllocationPlace::NotApplicable => {
+            panic!("ValueToPointer conflicts with NotApplicable");
+          }
+          ReturnValueAllocationPlace::Heap => {
             // constructors are said to return values in parse result,
             // but in reality we use `new` which returns a pointer,
             // so no conversion is necessary for constructors.
@@ -221,7 +225,7 @@ impl CppCodeGenerator {
   }
 
   /// Generates implementation of the FFI method for the source file.
-  fn source_code(&self, method: &CppAndFfiMethod) -> String {
+  fn function_implementation(&self, method: &CppAndFfiMethod) -> String {
     format!("{} {{\n  {}}}\n\n",
             self.function_signature(method),
             self.source_body(&method))
@@ -324,8 +328,8 @@ impl CppCodeGenerator {
     write!(h_file, "extern \"C\" {{\n\n").unwrap();
 
     for method in &data.methods {
-      h_file.write(&self.header_code(method).into_bytes()).unwrap();
-      cpp_file.write(&self.source_code(method).into_bytes()).unwrap();
+      h_file.write(&self.function_declaration(method).into_bytes()).unwrap();
+      cpp_file.write(&self.function_implementation(method).into_bytes()).unwrap();
     }
 
     write!(h_file, "\n}} // extern \"C\"\n\n").unwrap();
