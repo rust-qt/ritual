@@ -119,9 +119,9 @@ pub fn run(config: CppParserConfig) -> CppData {
     let mut tmp_file = File::create(&config.tmp_cpp_path).unwrap();
     write!(tmp_file, "#include \"{}\"\n", config.header_name).unwrap();
   }
+  // TODO: PIC and additional args should be moved to lib spec
   let mut args =
     vec!["-fPIC".to_string(), "-Xclang".to_string(), "-detailed-preprocessing-record".to_string()];
-  // let include_dirs_as_str = self.include_dirs.iter().map(|x| x.to_str().unwrap().to_string());
   for dir in &config.include_dirs {
     args.push("-I".to_string());
     args.push(dir.to_str().unwrap().to_string());

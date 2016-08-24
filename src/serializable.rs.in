@@ -460,6 +460,7 @@ pub struct CppLibSpec {
   /// a class or a namespace. All entities inside blacklisted
   /// entity will also be skipped.
   pub name_blacklist: Vec<String>,
+  pub include_file_blacklist: Vec<String>,
 }
 
 /// Information loaded from lib spec file and

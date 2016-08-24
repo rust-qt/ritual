@@ -645,6 +645,65 @@ fn template_instantiation() {
   assert!(data.template_instantiations["Vector"][0] == vec![int]);
 }
 
+fn derived_class_simple() {
+  let data = run_parser("class Base {}; class Derived : Base {};");
+  assert!(data.types.len() == 2);
+  assert_eq!(data.types[0].name, "Base");
+  match data.types[0].kind {
+    CppTypeKind::Class { ref bases, .. } => {
+      assert!(bases.is_empty());
+    }
+    _ => panic!("invalid type kind"),
+  }
+  assert_eq!(data.types[1].name, "Derived");
+  match data.types[1].kind {
+    CppTypeKind::Class { ref bases, .. } => {
+      assert_eq!(bases,
+                 &vec![CppType {
+                         indirection: CppTypeIndirection::None,
+                         is_const: false,
+                         base: CppTypeBase::Class {
+                           name: "Base".to_string(),
+                           template_arguments: None,
+                         },
+                       }]);
+    }
+    _ => panic!("invalid type kind"),
+  }
+}
+
+fn derived_class_multiple() {
+  let data = run_parser("
+    class Base1 {}; class Base2 {};
+    class Derived : public Base2, public Base1 {};");
+  assert!(data.types.len() == 3);
+  assert_eq!(data.types[0].name, "Base1");
+  assert_eq!(data.types[1].name, "Base2");
+  assert_eq!(data.types[2].name, "Derived");
+  match data.types[2].kind {
+    CppTypeKind::Class { ref bases, .. } => {
+      assert_eq!(bases,
+                 &vec![CppType {
+                         indirection: CppTypeIndirection::None,
+                         is_const: false,
+                         base: CppTypeBase::Class {
+                           name: "Base2".to_string(),
+                           template_arguments: None,
+                         },
+                       },
+                       CppType {
+                         indirection: CppTypeIndirection::None,
+                         is_const: false,
+                         base: CppTypeBase::Class {
+                           name: "Base1".to_string(),
+                           template_arguments: None,
+                         },
+                       }]);
+    }
+    _ => panic!("invalid type kind"),
+  }
+}
+
 #[test]
 fn tests() {
   // clang can't be used from multiple threads, so these checks
@@ -662,4 +721,6 @@ fn tests() {
   simple_enum();
   simple_enum2();
   template_instantiation();
+  derived_class_simple();
+  derived_class_multiple();
 }

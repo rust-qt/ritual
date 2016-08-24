@@ -268,8 +268,15 @@ impl CppCodeGenerator {
       .unwrap();
   }
 
+  pub fn generate_files(&self, data: &Vec<CppFfiHeaderData>) {
+    self.generate_all_headers_file(data.iter().map(|x| &x.include_file));
+    for item in data {
+      self.generate_one(item);
+    }
+  }
+
   /// Generates the header file that includes all other headers of the library.
-  pub fn generate_all_headers_file(&self, names: &Vec<String>) {
+  pub fn generate_all_headers_file<'a, I: Iterator<Item = &'a String>>(&self, names: I) {
     let mut h_path = self.lib_path.clone();
     h_path.push("include");
     h_path.push(format!("{}.h", &self.lib_name));

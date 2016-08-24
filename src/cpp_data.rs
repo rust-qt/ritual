@@ -1,7 +1,7 @@
 
 use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership};
 use cpp_operator::CppOperator;
-use std::collections::HashMap;
+use std::collections::HashSet;
 use log;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection};
 
@@ -17,6 +17,10 @@ impl CppTypeData {
     }
   }
 
+  /// Creates CppTypeBase object representing type
+  /// of an object of this type. See
+  /// default_template_parameters() documentation
+  /// for details about handling template parameters.
   pub fn default_class_type(&self) -> CppTypeBase {
     match self.kind {
       CppTypeKind::Class { .. } => {
@@ -29,6 +33,17 @@ impl CppTypeData {
     }
   }
 
+  /// Creates template parameters expected for this type.
+  /// For example, QHash<QString, int> will have 2 default
+  /// template parameters with indexes 0 and 1. This function
+  /// is helpful for determining type of "this" pointer.
+  /// Result of this function may differ from actual template
+  /// parameters, for example:
+  /// - if a class is inside another template class,
+  /// nested level should be 1 instead of 0;
+  /// - if QList<V> type is used inside QHash<K, V> type,
+  /// QList's template parameter will have index = 1
+  /// instead of 0.
   pub fn default_template_parameters(&self) -> Option<Vec<CppType>> {
     match self.kind {
       CppTypeKind::Class { ref template_arguments, .. } => {
@@ -113,17 +128,8 @@ impl CppData {
     }
   }
 
-  //  pub fn template_parameters_for_class(&self, class_name: &String) -> Option<Vec<CppType>> {
-  //    match self.types.iter().find(|x| &x.name == class_name) {
-  //      None => None,
-  //      Some(type_data) => type_data.default_template_parameters(),
-  //    }
-  //  }
-
   /// Helper function that performs a portion of add_inherited_methods implementation.
   fn add_inherited_methods_from(&mut self, base_name: &String) {
-    // let template_arguments = self.template_parameters_for_class(base_name);
-
     let mut new_methods = Vec::new();
     let mut derived_types = Vec::new();
     {
@@ -206,33 +212,22 @@ impl CppData {
     self.methods.append(&mut new_methods);
   }
 
-  /// Creates a copy of all data separated by include file names.
-  pub fn split_by_headers(&self) -> HashMap<String, CppData> {
-    let mut result = HashMap::new();
+  pub fn all_include_files(&self) -> HashSet<String> {
+    let mut result = HashSet::new();
     for method in &self.methods {
-      if !result.contains_key(&method.include_file) {
-        result.insert(method.include_file.clone(), CppData::default());
+      if !result.contains(&method.include_file) {
+        result.insert(method.include_file.clone());
       }
-      result.get_mut(&method.include_file).unwrap().methods.push(method.clone());
     }
     for tp in &self.types {
-      if !result.contains_key(&tp.include_file) {
-        result.insert(tp.include_file.clone(), CppData::default());
-      }
-      result.get_mut(&tp.include_file).unwrap().types.push(tp.clone());
-      if let CppTypeKind::Class { .. } = tp.kind {
-        if let Some(ins) = self.template_instantiations.get(&tp.name) {
-          result.get_mut(&tp.include_file)
-            .unwrap()
-            .template_instantiations
-            .insert(tp.name.clone(), ins.clone());
-        }
+      if !result.contains(&tp.include_file) {
+        result.insert(tp.include_file.clone());
       }
     }
     result
   }
 
-  /// Checks if a class is a template class.
+  /// Checks if specified class is a template class.
   pub fn is_template_class(&self, name: &String) -> bool {
     if let Some(type_info) = self.types.iter().find(|t| &t.name == name) {
       if let CppTypeKind::Class { ref template_arguments, ref bases, .. } = type_info.kind {
@@ -256,7 +251,7 @@ impl CppData {
     false
   }
 
-
+  /// Checks if specified class has virtual destructor (own or inherited).
   pub fn has_virtual_destructor(&self, class_name: &String) -> bool {
     for method in &self.methods {
       if method.is_destructor() && method.class_name() == Some(class_name) {
@@ -277,6 +272,83 @@ impl CppData {
     return false;
   }
 
+
+  #[allow(dead_code)]
+  pub fn get_all_methods(&self, class_name: &String) -> Vec<&CppMethod> {
+    let own_methods: Vec<_> = self.methods
+      .iter()
+      .filter(|m| m.class_name() == Some(class_name))
+      .collect();
+    let mut inherited_methods = Vec::new();
+    if let Some(type_info) = self.types.iter().find(|t| &t.name == class_name) {
+      if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
+        for base in bases {
+          if let CppTypeBase::Class { ref name, .. } = base.base {
+            for method in self.get_all_methods(name) {
+              if own_methods.iter()
+                .find(|m| m.name == method.name && m.argument_types_equal(&method))
+                .is_none() {
+                inherited_methods.push(method);
+              }
+            }
+          }
+        }
+      } else {
+        panic!("get_all_methods: not a class");
+      }
+    } else {
+      log::warning(format!("get_all_methods: no type info for {:?}", class_name));
+    }
+    for method in own_methods {
+      inherited_methods.push(method);
+    }
+    inherited_methods
+  }
+
+  pub fn get_pure_virtual_methods(&self, class_name: &String) -> Vec<&CppMethod> {
+
+    let own_methods: Vec<_> = self.methods
+      .iter()
+      .filter(|m| m.class_name() == Some(class_name))
+      .collect();
+    let own_pure_virtual_methods: Vec<_> = own_methods.iter()
+      .filter(|m| {
+        m.class_membership
+          .as_ref()
+          .unwrap()
+          .is_pure_virtual
+      })
+      .collect();
+    let mut inherited_methods = Vec::new();
+    if let Some(type_info) = self.types.iter().find(|t| &t.name == class_name) {
+      if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
+        for base in bases {
+          if let CppTypeBase::Class { ref name, .. } = base.base {
+            for method in self.get_pure_virtual_methods(name) {
+              if own_methods.iter()
+                .find(|m| m.name == method.name && m.argument_types_equal(&method))
+                .is_none() {
+                inherited_methods.push(method);
+              }
+            }
+          }
+        }
+      } else {
+        panic!("get_pure_virtual_methods: not a class");
+      }
+    } else {
+      log::warning(format!("get_pure_virtual_methods: no type info for {:?}",
+                           class_name));
+    }
+    for method in own_pure_virtual_methods {
+      inherited_methods.push(method);
+    }
+    inherited_methods
+  }
+
+
+  /// Performs data conversion to make it more suitable
+  /// for further wrapper generation.
   pub fn post_process(&mut self) {
     self.ensure_explicit_destructors();
     self.generate_methods_with_omitted_args();
