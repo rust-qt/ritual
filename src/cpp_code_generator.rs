@@ -280,7 +280,7 @@ impl CppCodeGenerator {
   }
 
   /// Generates the header file that includes all other headers of the library.
-  pub fn generate_all_headers_file<'a, I: Iterator<Item = &'a String>>(&self, names: I) {
+  fn generate_all_headers_file<'a, I: Iterator<Item = &'a String>>(&self, names: I) {
     let mut h_path = self.lib_path.clone();
     h_path.push("include");
     h_path.push(format!("{}.h", &self.lib_name));
@@ -301,7 +301,7 @@ impl CppCodeGenerator {
 
   /// Generates a header file and a source file for a portion of data
   /// corresponding to a header file of original C++ library.
-  pub fn generate_one(&self, data: &CppFfiHeaderData) {
+  fn generate_one(&self, data: &CppFfiHeaderData) {
     let ffi_include_file = format!("{}_{}.h", &self.lib_name, data.include_file_base_name);
 
     let cpp_path = self.lib_path

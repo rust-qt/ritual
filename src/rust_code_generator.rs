@@ -12,6 +12,7 @@ use log;
 use utils::PathBufPushTweak;
 use std::panic;
 use utils::CaseOperations;
+use rust_generator::RustGeneratorOutput;
 
 extern crate rustfmt;
 extern crate toml;
@@ -25,8 +26,35 @@ pub struct RustCodeGeneratorConfig {
   pub c_lib_name: String,
   pub cpp_lib_name: String,
   pub rustfmt_config_path: Option<PathBuf>,
-  pub remove_qt_prefix: bool,
-  pub module_blacklist: Vec<String>,
+}
+
+pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) {
+  let rustfmt_config_data = match config.rustfmt_config_path {
+    Some(ref path) => {
+      log::info(format!("Using rustfmt config file: {:?}", path));
+      let mut rustfmt_config_file = File::open(path).unwrap();
+      let mut rustfmt_config_toml = String::new();
+      rustfmt_config_file.read_to_string(&mut rustfmt_config_toml).unwrap();
+      rustfmt_config_toml
+    }
+    None => include_str!("../templates/crate/rustfmt.toml").to_string(),
+  };
+  let rustfmt_config = rustfmt::config::Config::from_toml(&rustfmt_config_data);
+  let generator = RustCodeGenerator {
+    config: config,
+    rustfmt_config: rustfmt_config,
+  };
+  generator.generate_template();
+  for module in &data.modules {
+    generator.generate_module_file(module);
+  }
+  generator.generate_lib_file(&data.modules
+    .iter()
+    .map(|x| x.name.last_name().clone())
+    .collect());
+
+  generator.generate_ffi_file(&data.ffi_functions);
+
 }
 
 pub struct RustCodeGenerator {
@@ -35,28 +63,6 @@ pub struct RustCodeGenerator {
 }
 
 impl RustCodeGenerator {
-  pub fn new(config: RustCodeGeneratorConfig) -> RustCodeGenerator {
-    let rustfmt_config_data = match config.rustfmt_config_path {
-      Some(ref path) => {
-        log::info(format!("Using rustfmt config file: {:?}", path));
-        let mut rustfmt_config_file = File::open(path).unwrap();
-        let mut rustfmt_config_toml = String::new();
-        rustfmt_config_file.read_to_string(&mut rustfmt_config_toml).unwrap();
-        rustfmt_config_toml
-      }
-      None => include_str!("../templates/crate/rustfmt.toml").to_string(),
-    };
-    let rustfmt_config = rustfmt::config::Config::from_toml(&rustfmt_config_data);
-    RustCodeGenerator {
-      config: config,
-      rustfmt_config: rustfmt_config,
-    }
-  }
-
-  pub fn config(&self) -> &RustCodeGeneratorConfig {
-    &self.config
-  }
-
   pub fn generate_template(&self) {
     match self.config.rustfmt_config_path {
       Some(ref path) => {

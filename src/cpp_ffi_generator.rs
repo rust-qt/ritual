@@ -6,7 +6,7 @@ use cpp_method::{CppMethod, CppMethodKind};
 use cpp_ffi_data::{CppAndFfiMethod, c_base_name};
 use utils::add_to_multihash;
 
-pub struct CGenerator<'a> {
+struct CGenerator<'a> {
   template_classes: Vec<String>,
   abstract_classes: Vec<String>,
   cpp_data: &'a CppData,

@@ -240,17 +240,19 @@ pub fn run(lib_spec_path: PathBuf, output_dir_path_orig: PathBuf) {
     } else {
       None
     },
-    remove_qt_prefix: is_qt_library,
-    module_blacklist: lib_spec.rust.module_blacklist,
   };
-  let mut rust_gen = rust_generator::RustGenerator::new(CppAndFfiData {
-                                                          cpp_data: parse_result,
-                                                          cpp_ffi_headers: cpp_ffi_headers,
-                                                        },
-                                                        rust_config);
-
   log::info(format!("Generating Rust crate ({}).", &lib_spec.rust.name));
-  rust_gen.generate_all();
+  let rust_data = rust_generator::run(CppAndFfiData {
+                                        cpp_data: parse_result,
+                                        cpp_ffi_headers: cpp_ffi_headers,
+                                      },
+                                      rust_generator::RustGeneratorConfig {
+                                        crate_name: lib_spec.rust.name.clone(),
+                                        remove_qt_prefix: is_qt_library,
+                                        module_blacklist: lib_spec.rust.module_blacklist,
+                                      });
+  rust_code_generator::run(rust_config, &rust_data);
+
   utils::move_files(&crate_new_path,
                     &crate_path,
                     vec!["c_lib".to_string(), "target".to_string()])
