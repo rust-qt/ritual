@@ -157,22 +157,36 @@ fn generate_type_map(input_data: &CppAndFfiData,
         continue;
       }
     }
-
-    map.insert(type_info.name.clone(),
-               calculate_rust_name(&type_info.name, &type_info.include_file, false, config));
+    if !map.contains_key(&type_info.name) {
+      map.insert(type_info.name.clone(),
+                 calculate_rust_name(&type_info.name, &type_info.include_file, false, config));
+    }
   }
   for header in &input_data.cpp_ffi_headers {
     for method in &header.methods {
       if method.cpp_method.class_membership.is_none() {
-        map.insert(method.cpp_method.name.clone(),
-                   calculate_rust_name(&method.cpp_method.name,
-                                       &header.include_file,
-                                       true,
-                                       config));
+        if !map.contains_key(&method.cpp_method.name) {
+          map.insert(method.cpp_method.name.clone(),
+                     calculate_rust_name(&method.cpp_method.name,
+                                         &header.include_file,
+                                         true,
+                                         config));
+        }
       }
     }
   }
   map
+}
+
+struct ProcessTypeResult {
+  main_type: RustTypeDeclaration,
+  overloading_types: Vec<RustTypeDeclaration>,
+}
+#[derive(Default)]
+struct ProcessFunctionsResult {
+  methods: Vec<RustMethod>,
+  trait_impls: Vec<TraitImpl>,
+  overloading_types: Vec<RustTypeDeclaration>,
 }
 
 impl RustGenerator {
@@ -362,7 +376,7 @@ impl RustGenerator {
   fn process_type(&self,
                   type_info: &CppTypeData,
                   c_header: &CppFfiHeaderData)
-                  -> Vec<RustTypeDeclaration> {
+                  -> ProcessTypeResult {
     let rust_name = self.cpp_to_rust_type_map.get(&type_info.name).unwrap();
     match type_info.kind {
       CppTypeKind::Enum { ref values } => {
@@ -413,43 +427,48 @@ impl RustGenerator {
             is_flaggable = true;
           }
         }
-        vec![RustTypeDeclaration {
-               name: rust_name.clone(),
-               kind: RustTypeDeclarationKind::CppTypeWrapper {
-                 kind: RustTypeWrapperKind::Enum {
-                   values: values,
-                   is_flaggable: is_flaggable,
-                 },
-                 cpp_type_name: type_info.name.clone(),
-                 cpp_template_arguments: None,
-                 methods: Vec::new(),
-                 traits: Vec::new(),
-               },
-             }]
+        ProcessTypeResult {
+          main_type: RustTypeDeclaration {
+            name: rust_name.last_name().clone(),
+            kind: RustTypeDeclarationKind::CppTypeWrapper {
+              kind: RustTypeWrapperKind::Enum {
+                values: values,
+                is_flaggable: is_flaggable,
+              },
+              cpp_type_name: type_info.name.clone(),
+              cpp_template_arguments: None,
+              methods: Vec::new(),
+              traits: Vec::new(),
+            },
+          },
+          overloading_types: Vec::new(),
+        }
       }
       CppTypeKind::Class { ref size, .. } => {
         let methods_scope = RustMethodScope::Impl { type_name: rust_name.clone() };
-        let (methods, traits, types) = self.generate_functions(c_header.methods
-                                                                 .iter()
-                                                                 .filter(|&x| {
-                                                                   x.cpp_method
-                                                                     .class_name() ==
-                                                                   Some(&type_info.name)
-                                                                 })
-                                                                 .collect(),
-                                                               &methods_scope);
-        let mut result = types;
-        result.push(RustTypeDeclaration {
-          name: rust_name.clone(),
-          kind: RustTypeDeclarationKind::CppTypeWrapper {
-            kind: RustTypeWrapperKind::Struct { size: size.unwrap() },
-            cpp_type_name: type_info.name.clone(),
-            cpp_template_arguments: None,
-            methods: methods,
-            traits: traits,
+        let functions_result = self.process_functions(c_header.methods
+                                                        .iter()
+                                                        .filter(|&x| {
+                                                          x.cpp_method
+                                                            .class_name() ==
+                                                          Some(&type_info.name)
+                                                        })
+                                                        .collect(),
+                                                      &methods_scope);
+
+        ProcessTypeResult {
+          main_type: RustTypeDeclaration {
+            name: rust_name.last_name().clone(),
+            kind: RustTypeDeclarationKind::CppTypeWrapper {
+              kind: RustTypeWrapperKind::Struct { size: size.unwrap() },
+              cpp_type_name: type_info.name.clone(),
+              cpp_template_arguments: None,
+              methods: functions_result.methods,
+              traits: functions_result.trait_impls,
+            },
           },
-        });
-        result
+          overloading_types: functions_result.overloading_types,
+        }
       }
     }
   }
@@ -474,6 +493,7 @@ impl RustGenerator {
 
     let mut direct_submodules = HashSet::new();
     let mut rust_types = Vec::new();
+    let mut rust_overloading_types = Vec::new();
     let mut good_methods = Vec::new();
     {
       let mut check_name = |name| {
@@ -499,7 +519,9 @@ impl RustGenerator {
       };
       for type_data in &self.input_data.cpp_data.types {
         if check_name(&type_data.name) {
-          rust_types.append(&mut self.process_type(type_data, c_header));
+          let mut result = self.process_type(type_data, c_header);
+          rust_types.push(result.main_type);
+          rust_overloading_types.append(&mut result.overloading_types);
         }
       }
       for method in &c_header.methods {
@@ -518,16 +540,22 @@ impl RustGenerator {
         submodules.push(m);
       }
     }
-
-    let (free_methods, free_traits, mut free_types) =
-      self.generate_functions(good_methods, &RustMethodScope::Free);
-    assert!(free_traits.is_empty());
-    rust_types.append(&mut free_types);
+    let mut free_functions_result = self.process_functions(good_methods, &RustMethodScope::Free);
+    assert!(free_functions_result.trait_impls.is_empty());
+    rust_overloading_types.append(&mut free_functions_result.overloading_types);
+    if rust_overloading_types.len() > 0 {
+      submodules.push(RustModule {
+        name: "overloading".to_string(),
+        types: rust_overloading_types,
+        functions: Vec::new(),
+        submodules: Vec::new(),
+      });
+    }
 
     let module = RustModule {
-      name: module_name.clone(),
+      name: module_name.last_name().clone(),
       types: rust_types,
-      functions: free_methods,
+      functions: free_functions_result.methods,
       submodules: submodules,
     };
     return Some(module);
@@ -652,15 +680,13 @@ impl RustGenerator {
     name
   }
 
-  fn generate_functions(&self,
-                        methods: Vec<&CppAndFfiMethod>,
-                        scope: &RustMethodScope)
-                        -> (Vec<RustMethod>, Vec<TraitImpl>, Vec<RustTypeDeclaration>) {
+  fn process_functions(&self,
+                       methods: Vec<&CppAndFfiMethod>,
+                       scope: &RustMethodScope)
+                       -> ProcessFunctionsResult {
     let mut single_rust_methods = Vec::new();
-    let mut rust_methods = Vec::new();
-    let mut traits = Vec::new();
-    let mut types = Vec::new();
     let mut method_names = HashSet::new();
+    let mut result = ProcessFunctionsResult::default();
     for method in &methods {
       if method.cpp_method.is_destructor() {
         if let &RustMethodScope::Impl { ref type_name } = scope {
@@ -673,7 +699,7 @@ impl RustGenerator {
                     type_name: type_name.clone(),
                     trait_name: TraitName::Drop,
                   };
-                  traits.push(TraitImpl {
+                  result.trait_impls.push(TraitImpl {
                     target_type: type_name.clone(),
                     trait_name: TraitName::Drop,
                     methods: vec![method],
@@ -686,7 +712,7 @@ impl RustGenerator {
               continue;
             }
             ReturnValueAllocationPlace::Heap => {
-              traits.push(TraitImpl {
+              result.trait_impls.push(TraitImpl {
                 target_type: type_name.clone(),
                 trait_name: TraitName::CppDeletable { deleter_name: method.c_name.clone() },
                 methods: Vec::new(),
@@ -812,8 +838,8 @@ impl RustGenerator {
 
         let methods_count = filtered_methods.len();
         let mut method = if methods_count > 1 {
-          let enum_name = RustName::new(vec![format!("{}ParamsVariants", enum_name_base)]);
-          let trait_name = RustName::new(vec![format!("{}Params", enum_name_base)]);
+          let enum_name = format!("{}ParamsVariants", enum_name_base);
+          let trait_name = format!("{}Params", enum_name_base);
           let first_method = filtered_methods[0].clone();
           let self_argument = if let RustMethodArguments::SingleVariant(ref args) =
                                      first_method.arguments {
@@ -849,10 +875,8 @@ impl RustGenerator {
           let enum_has_lifetime = enum_variants.iter()
             .find(|var| var.iter().find(|x| x.is_ref()).is_some())
             .is_some();
-          // TODO: move this enum and trait to "overloading" submodule
-
           // overloaded methods
-          types.push(RustTypeDeclaration {
+          result.overloading_types.push(RustTypeDeclaration {
             name: enum_name.clone(),
             kind: RustTypeDeclarationKind::MethodParametersEnum {
               variants: enum_variants,
@@ -860,7 +884,7 @@ impl RustGenerator {
               enum_has_lifetime: enum_has_lifetime,
             },
           });
-          types.push(RustTypeDeclaration {
+          result.overloading_types.push(RustTypeDeclaration {
             name: trait_name.clone(),
             kind: RustTypeDeclarationKind::MethodParametersTrait {
               enum_name: enum_name.clone(),
@@ -872,8 +896,8 @@ impl RustGenerator {
             scope: first_method.scope,
             return_type: first_method.return_type,
             arguments: RustMethodArguments::MultipleVariants {
-              params_enum_name: enum_name.last_name().clone(),
-              params_trait_name: trait_name.last_name().clone(),
+              params_enum_name: enum_name.clone(),
+              params_trait_name: trait_name.clone(),
               enum_has_lifetime: enum_has_lifetime,
               shared_arguments: match self_argument {
                 None => Vec::new(),
@@ -890,10 +914,10 @@ impl RustGenerator {
           let name = method.name.parts.pop().unwrap();
           method.name.parts.push(format!("{}_as_{}", name, additional_caption.to_snake_case()));
         }
-        rust_methods.push(method);
+        result.methods.push(method);
       }
     }
-    return (rust_methods, traits, types);
+    result
   }
 
   pub fn ffi(&self) -> HashMap<String, Vec<RustFFIFunction>> {

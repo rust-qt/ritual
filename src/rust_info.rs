@@ -185,24 +185,24 @@ pub enum RustTypeDeclarationKind {
   },
   MethodParametersEnum {
     variants: Vec<Vec<RustType>>,
-    trait_name: RustName,
+    trait_name: String,
     enum_has_lifetime: bool,
   },
   MethodParametersTrait {
-    enum_name: RustName,
+    enum_name: String,
     enum_has_lifetime: bool,
   },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustTypeDeclaration {
-  pub name: RustName,
+  pub name: String,
   pub kind: RustTypeDeclarationKind,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustModule {
-  pub name: RustName,
+  pub name: String,
   pub types: Vec<RustTypeDeclaration>,
   pub functions: Vec<RustMethod>,
   pub submodules: Vec<RustModule>,

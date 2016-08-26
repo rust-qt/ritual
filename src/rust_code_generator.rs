@@ -50,7 +50,7 @@ pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) {
   }
   generator.generate_lib_file(&data.modules
     .iter()
-    .map(|x| x.name.last_name().clone())
+    .map(|x| &x.name)
     .collect());
 
   generator.generate_ffi_file(&data.ffi_functions);
@@ -368,7 +368,7 @@ impl RustCodeGenerator {
             } else {
               format!("({})", var_names.join(", "))
             };
-            format!("{}::Variant{}{} => {{ {} }},",
+            format!("overloading::{}::Variant{}{} => {{ {} }},",
                     params_enum_name,
                     num,
                     pattern,
@@ -377,7 +377,8 @@ impl RustCodeGenerator {
                              .join("\n"));
         let lifetime_arg = if *enum_has_lifetime { "'a, " } else { "" };
         let lifetime_specifier = if *enum_has_lifetime { "<'a>" } else { "" };
-        format!("{pubq}fn {name}<{lfarg}{tpl_type}: {trt}{lf}>({args}){ret} {{\n{body}}}\n\n",
+        format!("{pubq}fn {name}<{lfarg}{tpl_type}: overloading::{trt}{lf}>({args}){ret} \
+                 {{\n{body}}}\n\n",
                 pubq = public_qualifier,
                 lfarg = lifetime_arg,
                 lf = lifetime_specifier,
@@ -391,7 +392,7 @@ impl RustCodeGenerator {
     }
   }
 
-  pub fn generate_lib_file(&self, modules: &Vec<String>) {
+  pub fn generate_lib_file(&self, modules: &Vec<&String>) {
     let mut lib_file_path = self.config.output_path.clone();
     lib_file_path.push("src");
     lib_file_path.push("lib.rs");
@@ -442,7 +443,7 @@ impl RustCodeGenerator {
             RustTypeWrapperKind::Enum { ref values, ref is_flaggable } => {
               let mut r = format!("#[derive(Debug, PartialEq, Eq, Clone)]\n#[repr(C)]\npub enum \
                                    {} {{\n{}\n}}\n\n",
-                                  type1.name.last_name(),
+                                  type1.name,
                                   values.iter()
                                     .map(|item| format!("  {} = {}", item.name, item.value))
                                     .join(", \n"));
@@ -456,7 +457,7 @@ impl RustCodeGenerator {
                         \
                              }}\n\n",
                             r,
-                            type1.name.last_name());
+                            type1.name);
               }
               r
             }
@@ -465,14 +466,14 @@ impl RustCodeGenerator {
                        impl {name} {{ pub unsafe fn new_uninitialized() -> {name} {{
                          {name} {{ _buffer: std::mem::uninitialized() }}
                       }} }}\n\n",
-                      name = type1.name.last_name(),
+                      name = type1.name,
                       size = size)
             }
           };
           results.push(r);
           if !methods.is_empty() {
             results.push(format!("impl {} {{\n{}}}\n\n",
-                                 type1.name.last_name(),
+                                 type1.name,
                                  methods.iter()
                                    .map(|method| self.generate_rust_final_function(method))
                                    .join("")));
@@ -493,7 +494,7 @@ impl RustCodeGenerator {
 
             results.push(format!("impl {} for {} {{\n{}}}\n\n",
                                  trait1.trait_name.to_string(),
-                                 type1.name.last_name(),
+                                 type1.name,
                                  trait_content));
           }
         }
@@ -520,7 +521,7 @@ impl RustCodeGenerator {
               format!("Variant{}{},", num, tuple_text)
             });
           results.push(format!("pub enum {}{} {{\n{}\n}}\n\n",
-                               type1.name.last_name(),
+                               type1.name,
                                match lifetime {
                                  Some(lifetime) => format!("<'{}>", lifetime),
                                  None => String::new(),
@@ -558,9 +559,9 @@ impl RustCodeGenerator {
                                    Some(lifetime) => format!("<'{}>", lifetime),
                                    None => String::new(),
                                  },
-                                 trt = trait_name.last_name(),
+                                 trt = trait_name,
                                  type_text = type_text,
-                                 enm = type1.name.last_name(),
+                                 enm = type1.name,
                                  num = num,
                                  variant_value = variant_value));
           }
@@ -569,8 +570,8 @@ impl RustCodeGenerator {
           let lifetime_specifier = if *enum_has_lifetime { "<'a>" } else { "" };
           results.push(format!("pub trait {name}{lf} {{\nfn as_enum(self) -> \
                                 {enm}{lf};\n}}",
-                               name = type1.name.last_name(),
-                               enm = enum_name.last_name(),
+                               name = type1.name,
+                               enm = enum_name,
                                lf = lifetime_specifier));
 
         }
@@ -582,7 +583,7 @@ impl RustCodeGenerator {
 
     for submodule in &data.submodules {
       results.push(format!("pub mod {} {{\n{}}}\n\n",
-                           submodule.name.last_name(),
+                           submodule.name,
                            self.generate_module_code(submodule)));
     }
     return results.join("");
@@ -610,7 +611,7 @@ impl RustCodeGenerator {
   pub fn generate_module_file(&self, data: &RustModule) {
     let mut file_path = self.config.output_path.clone();
     file_path.push("src");
-    file_path.push(format!("{}.rs", &data.name.last_name()));
+    file_path.push(format!("{}.rs", &data.name));
     {
       let mut file = File::create(&file_path).unwrap();
       file.write(self.generate_module_code(data).as_bytes()).unwrap();
