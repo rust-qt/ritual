@@ -131,7 +131,7 @@ impl RustCodeGenerator {
 
   fn rust_type_to_code(&self, rust_type: &RustType) -> String {
     match *rust_type {
-      RustType::Void => panic!("rust void can't be converted to code"),
+      RustType::Void => "()".to_string(),
       RustType::Common { ref base, ref is_const, ref indirection, ref generic_arguments, .. } => {
         let mut base_s = base.full_name(Some(&self.config.crate_name));
         if let &Some(ref args) = generic_arguments {
@@ -198,7 +198,6 @@ impl RustCodeGenerator {
   }
 
   fn generate_ffi_call(&self,
-                       func: &RustMethod,
                        variant: &RustMethodArgumentsVariant,
                        shared_arguments: &Vec<RustMethodArgument>)
                        -> String {
@@ -209,33 +208,35 @@ impl RustCodeGenerator {
       all_args.push(arg.clone());
     }
     for arg in &all_args {
-      assert!(arg.ffi_index >= 0 && arg.ffi_index < final_args.len() as i32);
-      let mut code = arg.name.clone();
-      match arg.argument_type.rust_api_to_c_conversion {
-        RustToCTypeConversion::None => {}
-        RustToCTypeConversion::RefToPtr => {
-          code = format!("{} as {}",
-                         code,
-                         self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
+      if let Some(ffi_index) = arg.ffi_index {
+        assert!(ffi_index >= 0 && ffi_index < final_args.len() as i32);
+        let mut code = arg.name.clone();
+        match arg.argument_type.rust_api_to_c_conversion {
+          RustToCTypeConversion::None => {}
+          RustToCTypeConversion::RefToPtr => {
+            code = format!("{} as {}",
+                           code,
+                           self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
 
+          }
+          RustToCTypeConversion::ValueToPtr => {
+            let is_const = if let RustType::Common { ref is_const, .. } = arg.argument_type
+              .rust_ffi_type {
+              *is_const
+            } else {
+              panic!("void is not expected here at all!")
+            };
+            code = format!("{}{} as {}",
+                           if is_const { "&" } else { "&mut " },
+                           code,
+                           self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
+          }
+          RustToCTypeConversion::QFlagsToUInt => {
+            code = format!("{}.to_int() as libc::c_uint", code);
+          }
         }
-        RustToCTypeConversion::ValueToPtr => {
-          let is_const = if let RustType::Common { ref is_const, .. } = arg.argument_type
-            .rust_ffi_type {
-            *is_const
-          } else {
-            panic!("void is not expected here at all!")
-          };
-          code = format!("{}{} as {}",
-                         if is_const { "&" } else { "&mut " },
-                         code,
-                         self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
-        }
-        RustToCTypeConversion::QFlagsToUInt => {
-          code = format!("{}.to_int() as libc::c_uint", code);
-        }
+        final_args[ffi_index as usize] = Some(code);
       }
-      final_args[arg.ffi_index as usize] = Some(code);
     }
 
     let mut result = Vec::new();
@@ -249,13 +250,13 @@ impl RustCodeGenerator {
       }
       result.push(format!("{{\nlet mut {} = unsafe {{ {}::new_uninitialized() }};\n",
                           return_var_name,
-                          self.rust_type_to_code(&func.return_type.rust_api_type)));
+                          self.rust_type_to_code(&variant.return_type.rust_api_type)));
       final_args[*i as usize] = Some(format!("&mut {}", return_var_name));
       maybe_result_var_name = Some(return_var_name);
     }
     for arg in &final_args {
       if arg.is_none() {
-        println!("func: {:?}", func);
+        println!("variant: {:?}", variant);
         panic!("ffi argument is missing");
       }
     }
@@ -266,10 +267,10 @@ impl RustCodeGenerator {
       result.push(format!("{}\n}}", name));
     }
     let mut code = result.join("");
-    match func.return_type.rust_api_to_c_conversion {
+    match variant.return_type.rust_api_to_c_conversion {
       RustToCTypeConversion::None => {}
       RustToCTypeConversion::RefToPtr => {
-        let is_const = if let RustType::Common { ref is_const, .. } = func.return_type
+        let is_const = if let RustType::Common { ref is_const, .. } = variant.return_type
           .rust_ffi_type {
           *is_const
         } else {
@@ -285,7 +286,7 @@ impl RustCodeGenerator {
         }
       }
       RustToCTypeConversion::QFlagsToUInt => {
-        let mut qflags_type = func.return_type.rust_api_type.clone();
+        let mut qflags_type = variant.return_type.rust_api_type.clone();
         if let RustType::Common { ref mut generic_arguments, .. } = qflags_type {
           *generic_arguments = None;
         } else {
@@ -299,85 +300,81 @@ impl RustCodeGenerator {
     return code;
   }
 
+  fn arg_texts(&self, args: &Vec<RustMethodArgument>, lifetime: Option<&String>) -> Vec<String> {
+    args.iter()
+      .map(|arg| {
+        let mut maybe_mut_declaration = "";
+        if let RustType::Common { ref indirection, .. } = arg.argument_type
+          .rust_api_type {
+          if *indirection == RustTypeIndirection::None &&
+             arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr {
+            if let RustType::Common { ref is_const, .. } = arg.argument_type
+              .rust_ffi_type {
+              if !is_const {
+                maybe_mut_declaration = "mut ";
+              }
+            }
+          }
+        }
+
+        format!("{}{}: {}",
+                maybe_mut_declaration,
+                arg.name,
+                match lifetime {
+                  Some(lifetime) => {
+                    self.rust_type_to_code(&arg.argument_type
+                      .rust_api_type
+                      .with_lifetime(lifetime.clone()))
+                  }
+                  None => self.rust_type_to_code(&arg.argument_type.rust_api_type),
+                })
+      })
+      .collect()
+  }
+
+
   fn generate_rust_final_function(&self, func: &RustMethod) -> String {
     let public_qualifier = match func.scope {
       RustMethodScope::TraitImpl { .. } => "",
       _ => "pub ",
     };
-    let return_type_for_signature = match func.return_type.rust_api_type {
-      RustType::Void => String::new(),
-      _ => {
-        format!(" -> {}",
-                self.rust_type_to_code(&func.return_type.rust_api_type))
-      }
-    };
-    let arg_texts = |args: &Vec<RustMethodArgument>| -> Vec<String> {
-      args.iter()
-        .map(|arg| {
-          let mut maybe_mut_declaration = "";
-          if let RustType::Common { ref indirection, .. } = arg.argument_type
-            .rust_api_type {
-            if *indirection == RustTypeIndirection::None &&
-               arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr {
-              if let RustType::Common { ref is_const, .. } = arg.argument_type
-                .rust_ffi_type {
-                if !is_const {
-                  maybe_mut_declaration = "mut ";
-                }
-              }
-            }
-          }
-
-          format!("{}{}: {}",
-                  maybe_mut_declaration,
-                  arg.name,
-                  self.rust_type_to_code(&arg.argument_type.rust_api_type))
-        })
-        .collect()
-    };
     match func.arguments {
       RustMethodArguments::SingleVariant(ref variant) => {
-        let body = self.generate_ffi_call(func, variant, &Vec::new());
+        let body = self.generate_ffi_call(variant, &Vec::new());
+        let return_type_for_signature = match variant.return_type.rust_api_type {
+          RustType::Void => String::new(),
+          _ => {
+            format!(" -> {}",
+                    self.rust_type_to_code(&variant.return_type.rust_api_type))
+          }
+        };
 
         format!("{pubq}fn {name}({args}){ret} {{\n{body}}}\n\n",
                 pubq = public_qualifier,
                 name = func.name.last_name(),
-                args = arg_texts(&variant.arguments).join(", "),
+                args = self.arg_texts(&variant.arguments, None).join(", "),
                 ret = return_type_for_signature,
                 body = body)
       }
-      RustMethodArguments::MultipleVariants { ref params_enum_name,
-                                              ref params_trait_name,
-                                              ref enum_has_lifetime,
+      RustMethodArguments::MultipleVariants { ref params_trait_name,
+                                              ref params_trait_lifetime,
                                               ref shared_arguments,
-                                              ref variant_argument_name,
-                                              ref variants } => {
+                                              ref variant_argument_name } => {
         let tpl_type = variant_argument_name.to_class_case();
-        let mut args = arg_texts(shared_arguments);
+        let body = format!("params.exec({})",
+                           shared_arguments.iter().map(|arg| arg.name.clone()).join(", "));
+        let lifetime_arg = match *params_trait_lifetime {
+          Some(ref lifetime) => format!("'{}, ", lifetime),
+          None => format!(""),
+        };
+        let lifetime_specifier = match *params_trait_lifetime {
+          Some(ref lifetime) => format!("<'{}>", lifetime),
+          None => format!(""),
+        };
+        let mut args = self.arg_texts(shared_arguments, params_trait_lifetime.as_ref());
         args.push(format!("{}: {}", variant_argument_name, tpl_type));
-        let body = format!("match {}.as_enum() {{\n{}\n}}",
-                           variant_argument_name,
-                           variants.iter()
-                             .enumerate()
-                             .map(|(num, variant)| {
-            //                               let mut all_args = shared_arguments.clone();
-            //                               all_args.append(&mut variant.arguments.clone());
-            let var_names: Vec<_> = variant.arguments.iter().map(|x| x.name.clone()).collect();
-            let pattern = if var_names.is_empty() {
-              String::new()
-            } else {
-              format!("({})", var_names.join(", "))
-            };
-            format!("overloading::{}::Variant{}{} => {{ {} }},",
-                    params_enum_name,
-                    num,
-                    pattern,
-                    self.generate_ffi_call(func, variant, shared_arguments))
-          })
-                             .join("\n"));
-        let lifetime_arg = if *enum_has_lifetime { "'a, " } else { "" };
-        let lifetime_specifier = if *enum_has_lifetime { "<'a>" } else { "" };
-        format!("{pubq}fn {name}<{lfarg}{tpl_type}: overloading::{trt}{lf}>({args}){ret} \
+        format!("{pubq}fn {name}<{lfarg}{tpl_type}: overloading::{trt}{lf}>\
+                 ({args}) -> {tpl_type}::ReturnType \
                  {{\n{body}}}\n\n",
                 pubq = public_qualifier,
                 lfarg = lifetime_arg,
@@ -386,7 +383,6 @@ impl RustCodeGenerator {
                 trt = params_trait_name,
                 tpl_type = tpl_type,
                 args = args.join(", "),
-                ret = return_type_for_signature,
                 body = body)
       }
     }
@@ -498,82 +494,101 @@ impl RustCodeGenerator {
                                  trait_content));
           }
         }
-        RustTypeDeclarationKind::MethodParametersEnum { ref variants,
-                                                        ref trait_name,
-                                                        ref enum_has_lifetime } => {
-          let lifetime = if *enum_has_lifetime { Some("a") } else { None };
-          let var_texts = variants.iter()
-            .enumerate()
-            .map(|(num, variant)| {
-              let mut tuple_text = variant.iter()
-                .map(|t| {
-                  match lifetime {
-                    Some(lifetime) => {
-                      self.rust_type_to_code(&t.with_lifetime(lifetime.to_string()))
-                    }
-                    None => self.rust_type_to_code(t),
-                  }
-                })
-                .join(",");
-              if !tuple_text.is_empty() {
-                tuple_text = format!("({})", tuple_text);
-              }
-              format!("Variant{}{},", num, tuple_text)
-            });
-          results.push(format!("pub enum {}{} {{\n{}\n}}\n\n",
-                               type1.name,
-                               match lifetime {
-                                 Some(lifetime) => format!("<'{}>", lifetime),
-                                 None => String::new(),
-                               },
-                               var_texts.join("\n")));
-
-          for (num, variant) in variants.iter().enumerate() {
-            let tuple_item_types: Vec<_> = variant.iter()
+        RustTypeDeclarationKind::MethodParametersTrait { ref shared_arguments,
+                                                         ref impls,
+                                                         ref lifetime } => {
+          let arg_list = self.arg_texts(shared_arguments, lifetime.as_ref()).join(", ");
+          let trait_lifetime_specifier = match *lifetime {
+            Some(ref lf) => format!("<'{}>", lf),
+            None => format!(""),
+          };
+          results.push(format!("pub trait {name}{trait_lifetime_specifier} {{
+              type ReturnType;
+              fn exec(self, {arg_list}) -> Self::ReturnType;
+            }}",
+                               name = type1.name,
+                               arg_list = arg_list,
+                               trait_lifetime_specifier = trait_lifetime_specifier));
+          for variant in impls {
+            let mut final_lifetime = lifetime.clone();
+            if lifetime.is_none() &&
+               (variant.arguments
+              .iter()
+              .find(|t| {
+                t.argument_type
+                  .rust_api_type
+                  .is_ref()
+              })
+              .is_some() || variant.return_type.rust_api_type.is_ref()) {
+              final_lifetime = Some("a".to_string());
+            }
+            let lifetime_specifier = match final_lifetime {
+              Some(ref lf) => format!("<'{}>", lf),
+              None => format!(""),
+            };
+            let final_arg_list = self.arg_texts(shared_arguments, final_lifetime.as_ref())
+              .join(", ");
+            let tuple_item_types: Vec<_> = variant.arguments
+              .iter()
               .map(|t| {
-                match lifetime {
-                  Some(lifetime) => self.rust_type_to_code(&t.with_lifetime(lifetime.to_string())),
-                  None => self.rust_type_to_code(t),
+                match final_lifetime {
+                  Some(ref lifetime) => {
+                    self.rust_type_to_code(&t.argument_type
+                      .rust_api_type
+                      .with_lifetime(lifetime.to_string()))
+                  }
+                  None => {
+                    self.rust_type_to_code(&t.argument_type
+                      .rust_api_type)
+                  }
                 }
               })
               .collect();
-            let type_text = if tuple_item_types.len() == 1 {
-              tuple_item_types[0].clone()
+            let mut tmp_vars = Vec::new();
+            if variant.arguments.len() == 1 {
+              if variant.arguments[0].ffi_index.is_some() {
+                tmp_vars.push(format!("let {} = self;", variant.arguments[0].name));
+              }
             } else {
-              format!("({})", tuple_item_types.join(","))
-            };
-            let variant_value = if tuple_item_types.len() == 0 {
-              String::new()
-            } else if tuple_item_types.len() == 1 {
-              "(self)".to_string()
-            } else {
-              format!("({})",
-                      variant.iter()
-                        .enumerate()
-                        .map(|(num2, _)| format!("self.{}", num2))
-                        .join(", "))
-            };
-            results.push(format!("impl{lf} {trt}{lf} for {type_text} {{\nfn as_enum(self) -> \
-                             {enm}{lf} {{\n{enm}::Variant{num}{variant_value}\n}}\n}}\n\n",
-                                 lf = match lifetime {
-                                   Some(lifetime) => format!("<'{}>", lifetime),
-                                   None => String::new(),
-                                 },
-                                 trt = trait_name,
-                                 type_text = type_text,
-                                 enm = type1.name,
-                                 num = num,
-                                 variant_value = variant_value));
-          }
-        }
-        RustTypeDeclarationKind::MethodParametersTrait { ref enum_name, ref enum_has_lifetime } => {
-          let lifetime_specifier = if *enum_has_lifetime { "<'a>" } else { "" };
-          results.push(format!("pub trait {name}{lf} {{\nfn as_enum(self) -> \
-                                {enm}{lf};\n}}",
-                               name = type1.name,
-                               enm = enum_name,
-                               lf = lifetime_specifier));
+              for (index, arg) in variant.arguments.iter().enumerate() {
+                if arg.ffi_index.is_some() {
+                  tmp_vars.push(format!("let {} = self.{};", arg.name, index));
+                }
+              }
+            }
 
+            results.push(format!("impl{lifetime_specifier} \
+                                  {trait_name}{trait_lifetime_specifier} for {impl_type} {{
+              \
+                                  type ReturnType = {return_type};
+              fn exec(self, \
+                                  {final_arg_list}) -> {return_type} {{ {tmp_vars}\n{body} }}
+            \
+                                  }}",
+                                 lifetime_specifier = lifetime_specifier,
+                                 trait_lifetime_specifier = trait_lifetime_specifier,
+                                 trait_name = type1.name,
+                                 final_arg_list = final_arg_list,
+                                 impl_type = if tuple_item_types.len() == 1 {
+                                   tuple_item_types[0].clone()
+                                 } else {
+                                   format!("({})", tuple_item_types.join(","))
+                                 },
+                                 return_type = match final_lifetime {
+                                   Some(ref lifetime) => {
+                                     self.rust_type_to_code(&variant.return_type
+                                       .rust_api_type
+                                       .with_lifetime(lifetime.to_string()))
+                                   }
+                                   None => {
+                                     self.rust_type_to_code(&variant.return_type
+                                       .rust_api_type)
+                                   }
+                                 },
+                                 tmp_vars = tmp_vars.join("\n"),
+                                 body = self.generate_ffi_call(variant, shared_arguments)));
+
+          }
         }
       };
     }

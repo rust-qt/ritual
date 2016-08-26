@@ -18,7 +18,7 @@ pub enum RustMethodScope {
 pub struct RustMethodArgument {
   pub argument_type: CompleteType,
   pub name: String,
-  pub ffi_index: i32,
+  pub ffi_index: Option<i32>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -26,6 +26,7 @@ pub struct RustMethodArgumentsVariant {
   pub arguments: Vec<RustMethodArgument>,
   pub cpp_method: CppAndFfiMethod,
   pub return_type_ffi_index: Option<i32>,
+  pub return_type: CompleteType,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -33,50 +34,47 @@ pub struct RustMethodArgumentsVariant {
 pub enum RustMethodArguments {
   SingleVariant(RustMethodArgumentsVariant),
   MultipleVariants {
-    params_enum_name: String,
     params_trait_name: String,
-    enum_has_lifetime: bool,
+    params_trait_lifetime: Option<String>,
     shared_arguments: Vec<RustMethodArgument>,
     variant_argument_name: String,
-    variants: Vec<RustMethodArgumentsVariant>,
   },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustMethod {
   pub scope: RustMethodScope,
-  pub return_type: CompleteType,
   pub name: RustName,
   pub arguments: RustMethodArguments,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum RustMethodSelfArg {
+pub enum RustMethodSelfArgKind {
   Static,
   ConstRef,
   MutRef,
   Value,
 }
 
-impl RustMethodSelfArg {
+impl RustMethodSelfArgKind {
   pub fn caption(&self) -> &'static str {
     match *self {
-      RustMethodSelfArg::Static => "static",
-      RustMethodSelfArg::ConstRef => "from_const",
-      RustMethodSelfArg::MutRef => "from_mut",
-      RustMethodSelfArg::Value => "from_value",
+      RustMethodSelfArgKind::Static => "static",
+      RustMethodSelfArgKind::ConstRef => "from_const",
+      RustMethodSelfArgKind::MutRef => "from_mut",
+      RustMethodSelfArgKind::Value => "from_value",
     }
   }
 }
 
 impl RustMethod {
-  pub fn self_arg(&self) -> RustMethodSelfArg {
+  pub fn self_arg_kind(&self) -> RustMethodSelfArgKind {
     let args = match self.arguments {
       RustMethodArguments::SingleVariant(ref var) => &var.arguments,
       RustMethodArguments::MultipleVariants { ref shared_arguments, .. } => shared_arguments,
     };
     if args.len() == 0 {
-      RustMethodSelfArg::Static
+      RustMethodSelfArgKind::Static
     } else {
       let arg = args.get(0).unwrap();
       if arg.name == "self" {
@@ -85,19 +83,19 @@ impl RustMethod {
           match *indirection {
             RustTypeIndirection::Ref { .. } => {
               if *is_const {
-                RustMethodSelfArg::ConstRef
+                RustMethodSelfArgKind::ConstRef
               } else {
-                RustMethodSelfArg::MutRef
+                RustMethodSelfArgKind::MutRef
               }
             }
-            RustTypeIndirection::None => RustMethodSelfArg::Value,
+            RustTypeIndirection::None => RustMethodSelfArgKind::Value,
             _ => panic!("invalid self argument type"),
           }
         } else {
           panic!("invalid self argument type")
         }
       } else {
-        RustMethodSelfArg::Static
+        RustMethodSelfArgKind::Static
       }
     }
   }
@@ -183,14 +181,10 @@ pub enum RustTypeDeclarationKind {
     methods: Vec<RustMethod>,
     traits: Vec<TraitImpl>,
   },
-  MethodParametersEnum {
-    variants: Vec<Vec<RustType>>,
-    trait_name: String,
-    enum_has_lifetime: bool,
-  },
   MethodParametersTrait {
-    enum_name: String,
-    enum_has_lifetime: bool,
+    lifetime: Option<String>,
+    shared_arguments: Vec<RustMethodArgument>,
+    impls: Vec<RustMethodArgumentsVariant>,
   },
 }
 

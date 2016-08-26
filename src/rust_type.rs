@@ -121,6 +121,7 @@ pub enum RustType {
 }
 
 impl RustType {
+  #[allow(dead_code)]
   pub fn caption(&self) -> String {
     match *self {
       RustType::Void => "void".to_string(),
@@ -148,6 +149,7 @@ impl RustType {
     }
   }
 
+  #[allow(dead_code)]
   pub fn is_ref(&self) -> bool {
     match *self {
       RustType::Common { ref indirection, .. } => {

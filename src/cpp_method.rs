@@ -7,7 +7,7 @@ use cpp_data::CppVisibility;
 use utils::JoinWithString;
 pub use serializable::{CppFunctionArgument, CppMethodKind, CppMethod, CppMethodClassMembership};
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ReturnValueAllocationPlace {
   /// the method returns a class object by value (or is a constructor), and
   /// it's translated to "output" FFI argument and placement new
