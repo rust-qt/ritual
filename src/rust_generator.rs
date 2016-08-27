@@ -66,6 +66,52 @@ fn sanitize_rust_identifier(name: &String) -> String {
   }
 }
 
+/// Prepares enum variants for being represented in Rust:
+/// - Converts variant names to proper case;
+/// - Removes duplicate variants that have the same associated value.
+/// Rust does not allow such duplicates.
+/// - If there is only one variant, adds another variant.
+/// Rust does not allow repr(C) enums having only one variant.
+fn prepare_enum_values(values: &Vec<EnumValue>, name: &String) -> Vec<EnumValue> {
+  // TODO: tests for prepare_enum_values
+  // TODO: remove shared prefix from variants
+  let mut value_to_variant: HashMap<i64, EnumValue> = HashMap::new();
+  for variant in values {
+    let value = variant.value;
+    if value_to_variant.contains_key(&value) {
+      log::warning(format!("warning: {}: duplicated enum variant removed: {} (previous variant: \
+                            {})",
+                           name,
+                           variant.name,
+                           value_to_variant.get(&value).unwrap().name));
+    } else {
+      value_to_variant.insert(value,
+                              EnumValue {
+                                name: variant.name.to_class_case(),
+                                value: variant.value,
+                              });
+    }
+  }
+  if value_to_variant.len() == 1 {
+    let dummy_value = if value_to_variant.contains_key(&0) {
+      1
+    } else {
+      0
+    };
+    value_to_variant.insert(dummy_value,
+                            EnumValue {
+                              name: "_Invalid".to_string(),
+                              value: dummy_value as i64,
+                            });
+  }
+  let mut result: Vec<_> = value_to_variant.into_iter()
+    .map(|(_val, variant)| variant)
+    .collect();
+  result.sort_by(|a, b| a.value.cmp(&b.value));
+  result
+}
+
+
 pub struct RustGenerator {
   input_data: CppAndFfiData,
   config: RustGeneratorConfig,
@@ -102,7 +148,7 @@ pub fn run(input_data: CppAndFfiData, config: RustGeneratorConfig) -> RustGenera
   };
   let mut modules = Vec::new();
   for header in &generator.input_data.cpp_ffi_headers {
-    if let Some(module) = generator.generate_modules_from_header(header) {
+    if let Some(module) = generator.generate_module_from_header(header) {
       modules.push(module);
     }
   }
@@ -372,7 +418,12 @@ impl RustGenerator {
   }
 
 
-
+  /// Converts specified C++ type to Rust.
+  /// Returns:
+  /// - main_type - representation of the target type, including
+  /// directly implemented methods of the type and trait implementations;
+  /// - overloading_types - traits and their implementations that
+  /// emulate C++ method overloading.
   fn process_type(&self,
                   type_info: &CppTypeData,
                   c_header: &CppFfiHeaderData)
@@ -380,39 +431,6 @@ impl RustGenerator {
     let rust_name = self.cpp_to_rust_type_map.get(&type_info.name).unwrap();
     match type_info.kind {
       CppTypeKind::Enum { ref values } => {
-        let mut value_to_variant: HashMap<i64, EnumValue> = HashMap::new();
-        for variant in values {
-          let value = variant.value;
-          if value_to_variant.contains_key(&value) {
-            log::warning(format!("warning: {}: duplicated enum variant removed: {} \
-                                  (previous variant: {})",
-                                 type_info.name,
-                                 variant.name,
-                                 value_to_variant.get(&value).unwrap().name));
-          } else {
-            value_to_variant.insert(value,
-                                    EnumValue {
-                                      name: variant.name.to_class_case(),
-                                      value: variant.value,
-                                    });
-          }
-        }
-        if value_to_variant.len() == 1 {
-          let dummy_value = if value_to_variant.contains_key(&0) {
-            1
-          } else {
-            0
-          };
-          value_to_variant.insert(dummy_value,
-                                  EnumValue {
-                                    name: "_Invalid".to_string(),
-                                    value: dummy_value as i64,
-                                  });
-        }
-        let mut values: Vec<_> = value_to_variant.into_iter()
-          .map(|(_val, variant)| variant)
-          .collect();
-        values.sort_by(|a, b| a.value.cmp(&b.value));
         let mut is_flaggable = false;
         if let Some(instantiations) = self.input_data
           .cpp_data
@@ -432,7 +450,7 @@ impl RustGenerator {
             name: rust_name.last_name().clone(),
             kind: RustTypeDeclarationKind::CppTypeWrapper {
               kind: RustTypeWrapperKind::Enum {
-                values: values,
+                values: prepare_enum_values(values, &type_info.name),
                 is_flaggable: is_flaggable,
               },
               cpp_type_name: type_info.name.clone(),
@@ -446,15 +464,10 @@ impl RustGenerator {
       }
       CppTypeKind::Class { ref size, .. } => {
         let methods_scope = RustMethodScope::Impl { type_name: rust_name.clone() };
-        let functions_result = self.process_functions(c_header.methods
-                                                        .iter()
-                                                        .filter(|&x| {
-                                                          x.cpp_method
-                                                            .class_name() ==
-                                                          Some(&type_info.name)
-                                                        })
-                                                        .collect(),
-                                                      &methods_scope);
+        let methods = c_header.methods
+          .iter()
+          .filter(|&x| x.cpp_method.class_name() == Some(&type_info.name));
+        let functions_result = self.process_functions(methods, &methods_scope);
 
         ProcessTypeResult {
           main_type: RustTypeDeclaration {
@@ -473,22 +486,28 @@ impl RustGenerator {
     }
   }
 
-  pub fn generate_modules_from_header(&self, c_header: &CppFfiHeaderData) -> Option<RustModule> {
-    let module_name = include_file_to_module_name(&c_header.include_file,
-                                                  self.config.remove_qt_prefix);
-    if self.config.module_blacklist.iter().find(|&x| x == &module_name).is_some() {
-      log::info(format!("Skipping module {}", module_name));
+  /// Generates a Rust module (including nested modules) from
+  /// specified C++ header.
+  pub fn generate_module_from_header(&self, c_header: &CppFfiHeaderData) -> Option<RustModule> {
+    let module_last_name = include_file_to_module_name(&c_header.include_file,
+                                                       self.config.remove_qt_prefix);
+    if self.config.module_blacklist.iter().find(|&x| x == &module_last_name).is_some() {
+      log::info(format!("Skipping module {}", module_last_name));
       return None;
     }
-    let module_name1 = RustName::new(vec![self.config.crate_name.clone(), module_name]);
-    return self.generate_module(c_header, &module_name1);
+    let module_name = RustName::new(vec![self.config.crate_name.clone(), module_last_name]);
+    return self.generate_module(c_header, &module_name);
   }
 
-  // TODO: check that all methods and types has been processed
+  /// Generates a Rust module with specified name from specified
+  /// C++ header. If the module should have nested modules,
+  /// this function calls itself recursively with nested module name
+  /// but the same header data.
   pub fn generate_module(&self,
                          c_header: &CppFfiHeaderData,
                          module_name: &RustName)
                          -> Option<RustModule> {
+    // TODO: check that all methods and types has been processed
     log::info(format!("Generating Rust module {}", module_name.full_name(None)));
 
     let mut direct_submodules = HashSet::new();
@@ -540,7 +559,8 @@ impl RustGenerator {
         submodules.push(m);
       }
     }
-    let mut free_functions_result = self.process_functions(good_methods, &RustMethodScope::Free);
+    let mut free_functions_result =
+      self.process_functions(good_methods.into_iter(), &RustMethodScope::Free);
     assert!(free_functions_result.trait_impls.is_empty());
     rust_overloading_types.append(&mut free_functions_result.overloading_types);
     if rust_overloading_types.len() > 0 {
@@ -672,14 +692,14 @@ impl RustGenerator {
     name
   }
 
-  fn process_functions(&self,
-                       methods: Vec<&CppAndFfiMethod>,
-                       scope: &RustMethodScope)
-                       -> ProcessFunctionsResult {
+  fn process_functions<'b, I: Iterator<Item = &'b CppAndFfiMethod>>(&self,
+                                                                    methods: I,
+                                                                    scope: &RustMethodScope)
+                                                                    -> ProcessFunctionsResult {
     let mut single_rust_methods = Vec::new();
     let mut method_names = HashSet::new();
     let mut result = ProcessFunctionsResult::default();
-    for method in &methods {
+    for method in methods {
       if method.cpp_method.is_destructor() {
         if let &RustMethodScope::Impl { ref type_name } = scope {
           match method.allocation_place {
