@@ -48,10 +48,9 @@ pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) {
   for module in &data.modules {
     generator.generate_module_file(module);
   }
-  generator.generate_lib_file(&data.modules
-    .iter()
-    .map(|x| &x.name)
-    .collect());
+  let mut module_names: Vec<_> = data.modules.iter().map(|x| &x.name).collect();
+  module_names.sort();
+  generator.generate_lib_file(&module_names);
 
   generator.generate_ffi_file(&data.ffi_functions);
 
@@ -361,7 +360,8 @@ impl RustCodeGenerator {
                                               ref shared_arguments,
                                               ref variant_argument_name } => {
         let tpl_type = variant_argument_name.to_class_case();
-        let body = format!("params.exec({})",
+        let body = format!("{}.exec({})",
+                           variant_argument_name,
                            shared_arguments.iter().map(|arg| arg.name.clone()).join(", "));
         let lifetime_arg = match *params_trait_lifetime {
           Some(ref lifetime) => format!("'{}, ", lifetime),
@@ -373,9 +373,9 @@ impl RustCodeGenerator {
         };
         let mut args = self.arg_texts(shared_arguments, params_trait_lifetime.as_ref());
         args.push(format!("{}: {}", variant_argument_name, tpl_type));
-        format!("{pubq}fn {name}<{lfarg}{tpl_type}: overloading::{trt}{lf}>\
-                 ({args}) -> {tpl_type}::ReturnType \
-                 {{\n{body}}}\n\n",
+        format!("{pubq}fn {name}<{lfarg}{tpl_type}>\
+                 ({args}) -> {tpl_type}::ReturnType
+                 where {tpl_type}: overloading::{trt}{lf} {{\n{body}}}\n\n",
                 pubq = public_qualifier,
                 lfarg = lifetime_arg,
                 lf = lifetime_specifier,

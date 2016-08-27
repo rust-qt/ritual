@@ -44,6 +44,16 @@ impl RustName {
       self.parts.join("::")
     }
   }
+
+  pub fn includes(&self, other: &RustName) -> bool {
+    let extra_modules_count = other.parts.len() - self.parts.len();
+    extra_modules_count > 0 && other.parts[0..self.parts.len()] == self.parts[..]
+  }
+
+  pub fn includes_directly(&self, other: &RustName) -> bool {
+    let extra_modules_count = other.parts.len() - self.parts.len();
+    self.includes(other) && extra_modules_count == 1
+  }
 }
 
 trait ToRustName {

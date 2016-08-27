@@ -191,6 +191,10 @@ fn calculate_rust_name(name: &String,
   RustName::new(parts)
 }
 
+/// Generates Rust names for all available C++ type
+/// and free functions. Class member methods are not included in
+/// the map. Their Rust equivalents depend on their classes'
+/// equivalents.
 fn generate_type_map(input_data: &CppAndFfiData,
                      config: &RustGeneratorConfig)
                      -> HashMap<String, RustName> {
@@ -496,50 +500,51 @@ impl RustGenerator {
       return None;
     }
     let module_name = RustName::new(vec![self.config.crate_name.clone(), module_last_name]);
-    return self.generate_module(c_header, &module_name);
+    Some(self.generate_module(c_header, &module_name))
   }
 
   /// Generates a Rust module with specified name from specified
   /// C++ header. If the module should have nested modules,
   /// this function calls itself recursively with nested module name
   /// but the same header data.
-  pub fn generate_module(&self,
-                         c_header: &CppFfiHeaderData,
-                         module_name: &RustName)
-                         -> Option<RustModule> {
+  pub fn generate_module(&self, c_header: &CppFfiHeaderData, module_name: &RustName) -> RustModule {
     // TODO: check that all methods and types has been processed
     log::info(format!("Generating Rust module {}", module_name.full_name(None)));
 
     let mut direct_submodules = HashSet::new();
-    let mut rust_types = Vec::new();
+    let mut module = RustModule {
+      name: module_name.last_name().clone(),
+      types: Vec::new(),
+      functions: Vec::new(),
+      submodules: Vec::new(),
+    };
     let mut rust_overloading_types = Vec::new();
     let mut good_methods = Vec::new();
     {
+      // Checks if the name should be processed.
+      // Returns true if the name is directly in this module.
+      // If the name is in this module's submodule, adds
+      // name of the direct submodule to direct_submodules list.
       let mut check_name = |name| {
         if let Some(rust_name) = self.cpp_to_rust_type_map.get(name) {
-          let extra_modules_count = rust_name.parts.len() - module_name.parts.len();
-          if extra_modules_count > 0 {
-            if rust_name.parts[0..module_name.parts.len()] != module_name.parts[..] {
-              return false; // not in this module
+          if module_name.includes(rust_name) {
+            if module_name.includes_directly(rust_name) {
+              return true;
+            } else {
+              let direct_submodule = &rust_name.parts[module_name.parts.len()];
+              if !direct_submodules.contains(direct_submodule) {
+                direct_submodules.insert(direct_submodule.clone());
+              }
             }
           }
-          if extra_modules_count == 2 {
-            let direct_submodule = &rust_name.parts[module_name.parts.len()];
-            if !direct_submodules.contains(direct_submodule) {
-              direct_submodules.insert(direct_submodule.clone());
-            }
-          }
-          if extra_modules_count == 1 {
-            return true;
-          }
-          // this type is in nested submodule
         }
         false
-      };
+      }; // end of check_name()
+
       for type_data in &self.input_data.cpp_data.types {
         if check_name(&type_data.name) {
           let mut result = self.process_type(type_data, c_header);
-          rust_types.push(result.main_type);
+          module.types.push(result.main_type);
           rust_overloading_types.append(&mut result.overloading_types);
         }
       }
@@ -551,36 +556,31 @@ impl RustGenerator {
         }
       }
     }
-    let mut submodules = Vec::new();
     for name in direct_submodules {
       let mut new_name = module_name.clone();
       new_name.parts.push(name);
-      if let Some(m) = self.generate_module(c_header, &new_name) {
-        submodules.push(m);
-      }
+      module.submodules.push(self.generate_module(c_header, &new_name));
     }
     let mut free_functions_result =
       self.process_functions(good_methods.into_iter(), &RustMethodScope::Free);
     assert!(free_functions_result.trait_impls.is_empty());
+    module.functions = free_functions_result.methods;
     rust_overloading_types.append(&mut free_functions_result.overloading_types);
     if rust_overloading_types.len() > 0 {
-      submodules.push(RustModule {
+      rust_overloading_types.sort_by(|a, b| a.name.cmp(&b.name));
+      module.submodules.push(RustModule {
         name: "overloading".to_string(),
         types: rust_overloading_types,
         functions: Vec::new(),
         submodules: Vec::new(),
       });
     }
-
-    let module = RustModule {
-      name: module_name.last_name().clone(),
-      types: rust_types,
-      functions: free_functions_result.methods,
-      submodules: submodules,
-    };
-    return Some(module);
+    module.types.sort_by(|a, b| a.name.cmp(&b.name));
+    module.submodules.sort_by(|a, b| a.name.cmp(&b.name));
+    module
   }
 
+  /// Converts one function to a RustMethod
   fn generate_function(&self,
                        method: &CppAndFfiMethod,
                        scope: &RustMethodScope)
@@ -593,23 +593,11 @@ impl RustGenerator {
     let mut return_type_info = None;
     for (arg_index, arg) in method.c_signature.arguments.iter().enumerate() {
       match self.complete_type(&arg.argument_type, &arg.meaning) {
-        Ok(mut complete_type) => {
+        Ok(complete_type) => {
           if arg.meaning == CppFfiArgumentMeaning::ReturnValue {
             assert!(return_type_info.is_none());
             return_type_info = Some((complete_type, Some(arg_index as i32)));
           } else {
-            if method.allocation_place == ReturnValueAllocationPlace::Heap &&
-               method.cpp_method.is_destructor() {
-              if let RustType::Common { ref mut indirection, .. } = complete_type.rust_api_type {
-                assert!(*indirection == RustTypeIndirection::Ref { lifetime: None });
-                *indirection = RustTypeIndirection::None;
-              } else {
-                panic!("unexpected void type");
-              }
-              assert!(complete_type.rust_api_to_c_conversion == RustToCTypeConversion::RefToPtr);
-              complete_type.rust_api_to_c_conversion = RustToCTypeConversion::ValueToPtr;
-            }
-
             arguments.push(RustMethodArgument {
               ffi_index: Some(arg_index as i32),
               argument_type: complete_type,
@@ -629,6 +617,8 @@ impl RustGenerator {
       }
     }
     if return_type_info.is_none() {
+      // none of the arguments has return value meaning,
+      // so FFI return value must be used
       match self.complete_type(&method.c_signature.return_type,
                                &CppFfiArgumentMeaning::ReturnValue) {
         Ok(mut r) => {
@@ -655,6 +645,8 @@ impl RustGenerator {
         }
       }
     } else {
+      // an argument has return value meaning, so
+      // FFI return type must be void
       assert!(method.c_signature.return_type == CppFfiType::void());
     }
     let return_type_info1 = return_type_info.unwrap();
@@ -671,14 +663,15 @@ impl RustGenerator {
     })
   }
 
+  /// Returns method name. For class member functions, the name doesn't
+  /// include class name and scope. For free functions, the name includes
+  /// modules.
   fn method_rust_name(&self, method: &CppAndFfiMethod) -> RustName {
     let mut name = if method.cpp_method.class_membership.is_none() {
       self.cpp_to_rust_type_map.get(&method.cpp_method.name).unwrap().clone()
     } else {
       let x = if method.cpp_method.is_constructor() {
         "new".to_string()
-      } else if method.cpp_method.is_destructor() {
-        "delete".to_string()
       } else {
         method.cpp_method.name.to_snake_case()
       };
@@ -692,89 +685,210 @@ impl RustGenerator {
     name
   }
 
-  fn process_functions<'b, I: Iterator<Item = &'b CppAndFfiMethod>>(&self,
-                                                                    methods: I,
-                                                                    scope: &RustMethodScope)
-                                                                    -> ProcessFunctionsResult {
-    let mut single_rust_methods = Vec::new();
-    let mut method_names = HashSet::new();
-    let mut result = ProcessFunctionsResult::default();
-    for method in methods {
-      if method.cpp_method.is_destructor() {
-        if let &RustMethodScope::Impl { ref type_name } = scope {
-          match method.allocation_place {
-            ReturnValueAllocationPlace::Stack => {
-              match self.generate_function(method, scope) {
-                Ok(mut method) => {
-                  method.name = RustName::new(vec!["drop".to_string()]);
-                  method.scope = RustMethodScope::TraitImpl {
-                    type_name: type_name.clone(),
-                    trait_name: TraitName::Drop,
-                  };
-                  result.trait_impls.push(TraitImpl {
-                    target_type: type_name.clone(),
-                    trait_name: TraitName::Drop,
-                    methods: vec![method],
-                  });
-                }
-                Err(msg) => {
-                  log::warning(format!("Failed to generate destructor: {}\n{:?}\n", msg, method))
-                }
-              }
-              continue;
-            }
-            ReturnValueAllocationPlace::Heap => {
-              result.trait_impls.push(TraitImpl {
-                target_type: type_name.clone(),
-                trait_name: TraitName::CppDeletable { deleter_name: method.c_name.clone() },
-                methods: Vec::new(),
-              });
-              continue;
-            }
-            ReturnValueAllocationPlace::NotApplicable => {
-              panic!("destructor must have allocation place")
+  fn process_destructor(&self,
+                        method: &CppAndFfiMethod,
+                        scope: &RustMethodScope)
+                        -> Result<TraitImpl, String> {
+    if let &RustMethodScope::Impl { ref type_name } = scope {
+      match method.allocation_place {
+        ReturnValueAllocationPlace::Stack => {
+          let mut method = try!(self.generate_function(method, scope));
+          method.name = RustName::new(vec!["drop".to_string()]);
+          method.scope = RustMethodScope::TraitImpl {
+            type_name: type_name.clone(),
+            trait_name: TraitName::Drop,
+          };
+          Ok(TraitImpl {
+            target_type: type_name.clone(),
+            trait_name: TraitName::Drop,
+            methods: vec![method],
+          })
+        }
+        ReturnValueAllocationPlace::Heap => {
+          Ok(TraitImpl {
+            target_type: type_name.clone(),
+            trait_name: TraitName::CppDeletable { deleter_name: method.c_name.clone() },
+            methods: Vec::new(),
+          })
+        }
+        ReturnValueAllocationPlace::NotApplicable => {
+          panic!("destructor must have allocation place")
+        }
+      }
+    } else {
+      panic!("destructor must be in class scope");
+    }
+  }
+
+  // Generates a single overloaded method from all specified methods or
+  // accepts a single method without change. Adds self argument caption if needed.
+  // All passed methods must be valid for overloading:
+  // - they must have the same name and be in the same scope;
+  // - they must have the same self argument type;
+  // - they must not have exactly the same argument types.
+  fn process_method(&self,
+                    mut filtered_methods: Vec<RustMethod>,
+                    scope: &RustMethodScope,
+                    use_self_arg_caption: bool)
+                    -> (RustMethod, Option<RustTypeDeclaration>) {
+    let methods_count = filtered_methods.len();
+    let mut type_declaration = None;
+    let mut method = if methods_count > 1 {
+      let first_method = filtered_methods[0].clone();
+      let self_argument = if let RustMethodArguments::SingleVariant(ref args) =
+                                 first_method.arguments {
+        if args.arguments.len() > 0 && args.arguments[0].name == "self" {
+          Some(args.arguments[0].clone())
+        } else {
+          None
+        }
+      } else {
+        unreachable!()
+      };
+      let mut args_variants = Vec::new();
+      for method in filtered_methods {
+        assert!(method.name == first_method.name);
+        assert!(method.scope == first_method.scope);
+        if let RustMethodArguments::SingleVariant(mut args) = method.arguments {
+          if let Some(ref self_argument) = self_argument {
+            assert!(args.arguments.len() > 0 && &args.arguments[0] == self_argument);
+            args.arguments.remove(0);
+          }
+          fn allocation_place_marker(marker_name: &'static str) -> RustMethodArgument {
+            RustMethodArgument {
+              name: "allocation_place_marker".to_string(),
+              ffi_index: None,
+              argument_type: CompleteType {
+                cpp_type: CppType::void(),
+                cpp_ffi_type: CppType::void(),
+                cpp_to_ffi_conversion: IndirectionChange::NoChange,
+                rust_ffi_type: RustType::Void,
+                rust_api_type: RustType::Common {
+                  base: RustName::new(vec!["cpp_box".to_string(), marker_name.to_string()]),
+                  generic_arguments: None,
+                  is_const: false,
+                  indirection: RustTypeIndirection::None,
+                },
+                rust_api_to_c_conversion: RustToCTypeConversion::None,
+              },
             }
           }
+          match args.cpp_method.allocation_place {
+            ReturnValueAllocationPlace::Stack => {
+              args.arguments.push(allocation_place_marker("RustManaged"));
+            }
+            ReturnValueAllocationPlace::Heap => {
+              args.arguments.push(allocation_place_marker("CppPointer"));
+            }
+            ReturnValueAllocationPlace::NotApplicable => {}
+          }
+          args_variants.push(args);
         } else {
-          panic!("destructor must be in class scope");
+          unreachable!()
         }
       }
 
+      // overloaded methods
+      let shared_arguments_for_trait = match self_argument {
+        None => Vec::new(),
+        Some(ref arg) => {
+          let mut renamed_self = arg.clone();
+          renamed_self.name = "original_self".to_string();
+          vec![renamed_self]
+        }
+      };
+      let shared_arguments = match self_argument {
+        None => Vec::new(),
+        Some(arg) => vec![arg],
+      };
+      let trait_lifetime = if shared_arguments.iter()
+        .find(|x| x.argument_type.rust_api_type.is_ref())
+        .is_some() {
+        Some("a".to_string())
+      } else {
+        None
+      };
+      let mut trait_name = first_method.name.last_name().clone();
+      if use_self_arg_caption {
+        trait_name = trait_name.clone() + &first_method.self_arg_kind().caption();
+      }
+      trait_name = trait_name.to_class_case() + "Args";
+      if let &RustMethodScope::Impl { ref type_name } = scope {
+        trait_name = format!("{}{}", type_name.last_name(), trait_name);
+      }
+      type_declaration = Some(RustTypeDeclaration {
+        name: trait_name.clone(),
+        kind: RustTypeDeclarationKind::MethodParametersTrait {
+          shared_arguments: shared_arguments_for_trait,
+          impls: args_variants,
+          lifetime: trait_lifetime.clone(),
+        },
+      });
+      RustMethod {
+        name: first_method.name,
+        scope: first_method.scope,
+        arguments: RustMethodArguments::MultipleVariants {
+          params_trait_name: trait_name.clone(),
+          params_trait_lifetime: trait_lifetime,
+          shared_arguments: shared_arguments,
+          variant_argument_name: "args".to_string(),
+        },
+      }
+    } else {
+      filtered_methods.pop().unwrap()
+    };
+    if use_self_arg_caption {
+      let name = method.name.parts.pop().unwrap();
+      let caption = method.self_arg_kind().caption();
+      method.name.parts.push(format!("{}_{}", name, caption));
+    }
+    (method, type_declaration)
+  }
+
+  /// Generates methods, trait implementations and overloading types
+  /// for all specified methods. All methods must either be in the same
+  /// RustMethodScope::Impl scope or be free functions in the same module.
+  fn process_functions<'b, I>(&self, methods: I, scope: &RustMethodScope) -> ProcessFunctionsResult
+    where I: Iterator<Item = &'b CppAndFfiMethod>
+  {
+    // Step 1: convert all methods to SingleVariant Rust methods and
+    // split them by last name.
+    let mut single_rust_methods: HashMap<String, Vec<RustMethod>> = HashMap::new();
+    let mut result = ProcessFunctionsResult::default();
+    for method in methods {
+      if method.cpp_method.is_destructor() {
+        match self.process_destructor(method, scope) {
+          Ok(r) => result.trait_impls.push(r),
+          Err(msg) => {
+            log::warning(format!("Failed to generate destructor: {}\n{:?}\n", msg, method))
+          }
+        }
+        continue;
+      }
       match self.generate_function(method, scope) {
         Ok(rust_method) => {
-          if !method_names.contains(rust_method.name.last_name()) {
-            method_names.insert(rust_method.name.last_name().clone());
-          }
-          single_rust_methods.push(rust_method);
+          let name = rust_method.name.last_name().clone();
+          add_to_multihash(&mut single_rust_methods, &name, rust_method);
         }
         Err(msg) => log::warning(msg),
       }
     }
-    // let mut name_counters = HashMap::new();
-    for method_name in method_names {
-      let current_methods: Vec<_> = single_rust_methods.clone()
-        .into_iter()
-        .filter(|m| m.name.last_name() == &method_name)
-        .collect();
-      let mut self_kind_to_methods: HashMap<_, Vec<_>> = HashMap::new();
+    for (_method_name, current_methods) in single_rust_methods {
       assert!(!current_methods.is_empty());
+      // Step 2: for each method name, split methods by type of
+      // their self argument. Overloading can't be emulated if self types
+      // differ.
+      let mut self_kind_to_methods: HashMap<_, Vec<_>> = HashMap::new();
       for method in current_methods {
         add_to_multihash(&mut self_kind_to_methods, &method.self_arg_kind(), method);
       }
       let use_self_arg_caption = self_kind_to_methods.len() > 1;
 
-      for (self_arg_kind, overloaded_methods) in self_kind_to_methods {
-
-        let mut trait_name = method_name.clone();
-        if use_self_arg_caption {
-          trait_name = trait_name.clone() + &self_arg_kind.caption();
-        }
-        trait_name = trait_name.to_class_case() + "Params";
-        if let &RustMethodScope::Impl { ref type_name } = scope {
-          trait_name = format!("{}{}", type_name.last_name(), trait_name);
-        }
+      for (_self_arg_kind, overloaded_methods) in self_kind_to_methods {
         assert!(!overloaded_methods.is_empty());
-
+        // Step 3: remove method duplicates with the same argument types. For example,
+        // there can be method1(libc::c_int) and method1(i32). It's valid in C++,
+        // but can't be overloaded in Rust if types are the same.
         let mut all_real_args = HashMap::new();
         all_real_args.insert(ReturnValueAllocationPlace::Stack, HashSet::new());
         all_real_args.insert(ReturnValueAllocationPlace::Heap, HashSet::new());
@@ -804,110 +918,22 @@ impl RustGenerator {
             filtered_methods.push(method);
           }
         }
-
-        let methods_count = filtered_methods.len();
-        let mut method = if methods_count > 1 {
-          let first_method = filtered_methods[0].clone();
-          let self_argument = if let RustMethodArguments::SingleVariant(ref args) =
-                                     first_method.arguments {
-            if args.arguments.len() > 0 && args.arguments[0].name == "self" {
-              Some(args.arguments[0].clone())
-            } else {
-              None
-            }
-          } else {
-            unreachable!()
-          };
-          let mut args_variants = Vec::new();
-          for method in filtered_methods {
-            assert!(method.name == first_method.name);
-            assert!(method.scope == first_method.scope);
-            if let RustMethodArguments::SingleVariant(mut args) = method.arguments {
-              if let Some(ref self_argument) = self_argument {
-                assert!(args.arguments.len() > 0 && &args.arguments[0] == self_argument);
-                args.arguments.remove(0);
-              }
-              fn allocation_place_marker(marker_name: &'static str) -> RustMethodArgument {
-                RustMethodArgument {
-                  name: "allocation_place_marker".to_string(),
-                  ffi_index: None,
-                  argument_type: CompleteType {
-                    cpp_type: CppType::void(),
-                    cpp_ffi_type: CppType::void(),
-                    cpp_to_ffi_conversion: IndirectionChange::NoChange,
-                    rust_ffi_type: RustType::Void,
-                    rust_api_type: RustType::Common {
-                      base: RustName::new(vec!["cpp_box".to_string(), marker_name.to_string()]),
-                      generic_arguments: None,
-                      is_const: false,
-                      indirection: RustTypeIndirection::None,
-                    },
-                    rust_api_to_c_conversion: RustToCTypeConversion::None,
-                  },
-                }
-              }
-              match args.cpp_method.allocation_place {
-                ReturnValueAllocationPlace::Stack => {
-                  args.arguments.push(allocation_place_marker("RustManaged"));
-                }
-                ReturnValueAllocationPlace::Heap => {
-                  args.arguments.push(allocation_place_marker("CppPointer"));
-                }
-                ReturnValueAllocationPlace::NotApplicable => {}
-              }
-              args_variants.push(args);
-            } else {
-              unreachable!()
-            }
-          }
-
-          // overloaded methods
-          let shared_arguments = match self_argument {
-            None => Vec::new(),
-            Some(arg) => {
-              let mut renamed_self = arg;
-              renamed_self.name = "original_self".to_string();
-              vec![renamed_self]
-            }
-          };
-          let trait_lifetime = if shared_arguments.iter()
-            .find(|x| x.argument_type.rust_api_type.is_ref())
-            .is_some() {
-            Some("a".to_string())
-          } else {
-            None
-          };
-          result.overloading_types.push(RustTypeDeclaration {
-            name: trait_name.clone(),
-            kind: RustTypeDeclarationKind::MethodParametersTrait {
-              shared_arguments: shared_arguments.clone(),
-              impls: args_variants,
-              lifetime: trait_lifetime.clone(),
-            },
-          });
-          RustMethod {
-            name: first_method.name,
-            scope: first_method.scope,
-            arguments: RustMethodArguments::MultipleVariants {
-              params_trait_name: trait_name.clone(),
-              params_trait_lifetime: trait_lifetime,
-              shared_arguments: shared_arguments,
-              variant_argument_name: "params".to_string(),
-            },
-          }
-        } else {
-          filtered_methods.pop().unwrap()
-        };
-        if use_self_arg_caption {
-          let name = method.name.parts.pop().unwrap();
-          method.name.parts.push(format!("{}_{}", name, self_arg_kind.caption()));
-        }
+        // Step 4: generate overloaded method if count of methods is still > 1,
+        // or accept a single method without change.
+        let (method, type_declaration) =
+          self.process_method(filtered_methods, scope, use_self_arg_caption);
         result.methods.push(method);
+        if let Some(r) = type_declaration {
+          result.overloading_types.push(r);
+        }
       }
     }
+    result.methods.sort_by(|a, b| a.name.last_name().cmp(b.name.last_name()));
+    result.trait_impls.sort_by(|a, b| a.trait_name.to_string().cmp(&b.trait_name.to_string()));
     result
   }
 
+  /// Generates Rust representations of all FFI functions
   pub fn ffi(&self) -> HashMap<String, Vec<RustFFIFunction>> {
     log::info("Generating Rust FFI functions.");
     let mut ffi_functions = HashMap::new();
@@ -931,8 +957,6 @@ impl RustGenerator {
     ffi_functions
   }
 }
-
-// TODO: sort types and methods before generating code
 
 // ---------------------------------
 #[test]
