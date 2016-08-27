@@ -1,0 +1,6 @@
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[repr(C)]
+pub enum {name} {{
+  {variants}
+}}
+

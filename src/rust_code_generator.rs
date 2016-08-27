@@ -62,6 +62,7 @@ pub struct RustCodeGenerator {
 }
 
 impl RustCodeGenerator {
+  /// Generates cargo file and skeleton of the crate
   pub fn generate_template(&self) {
     match self.config.rustfmt_config_path {
       Some(ref path) => {
@@ -78,42 +79,40 @@ impl RustCodeGenerator {
     build_rs_file.write(include_bytes!("../templates/crate/build.rs")).unwrap();
 
     let cargo_toml_data = toml::Value::Table({
-      let mut table = toml::Table::new();
-      table.insert("package".to_string(),
-                   toml::Value::Table({
-                     let mut table = toml::Table::new();
-                     table.insert("name".to_string(),
-                                  toml::Value::String(self.config.crate_name.clone()));
-                     table.insert("version".to_string(),
-                                  toml::Value::String(self.config.crate_version.clone()));
-                     let mut authors: Vec<_> = self.config
-                       .crate_authors
-                       .iter()
-                       .map(|x| toml::Value::String(x.clone()))
-                       .collect();
-                     authors.push(toml::Value::String("cpp_to_rust generator \
+      let package = toml::Value::Table({
+        let mut table = toml::Table::new();
+        table.insert("name".to_string(),
+                     toml::Value::String(self.config.crate_name.clone()));
+        table.insert("version".to_string(),
+                     toml::Value::String(self.config.crate_version.clone()));
+        let mut authors: Vec<_> = self.config
+          .crate_authors
+          .iter()
+          .map(|x| toml::Value::String(x.clone()))
+          .collect();
+        authors.push(toml::Value::String("cpp_to_rust generator \
                                                        (https://github.com/rust-qt/cpp_to_rust)"
-                       .to_string()));
-                     table.insert("authors".to_string(), toml::Value::Array(authors));
-                     table.insert("build".to_string(),
-                                  toml::Value::String("build.rs".to_string()));
-                     table
-                   }));
-      table.insert("dependencies".to_string(),
-                   toml::Value::Table({
-                     let mut table = toml::Table::new();
-                     table.insert("libc".to_string(), toml::Value::String("0.2".to_string()));
-                     table.insert("cpp_box".to_string(),
-                                  toml::Value::Table({
-                                    let mut table = toml::Table::new();
-                                    table.insert("git".to_string(),
-                                                 toml::Value::String("https://github.\
-                                                                      com/rust-qt/cpp_box.git"
-                                                   .to_string()));
-                                    table
-                                  }));
-                     table
-                   }));
+          .to_string()));
+        table.insert("authors".to_string(), toml::Value::Array(authors));
+        table.insert("build".to_string(),
+                     toml::Value::String("build.rs".to_string()));
+        table
+      });
+      let dependencies = toml::Value::Table({
+        let mut table = toml::Table::new();
+        table.insert("libc".to_string(), toml::Value::String("0.2".to_string()));
+        let cpp_box = toml::Value::Table({
+          let mut table = toml::Table::new();
+          table.insert("git".to_string(),
+                       toml::Value::String("https://github.com/rust-qt/cpp_box.git".to_string()));
+          table
+        });
+        table.insert("cpp_box".to_string(), cpp_box);
+        table
+      });
+      let mut table = toml::Table::new();
+      table.insert("package".to_string(), package);
+      table.insert("dependencies".to_string(), dependencies);
       table
     });
     let mut cargo_toml_file = File::create(self.config.output_path.with_added("Cargo.toml"))
@@ -333,7 +332,7 @@ impl RustCodeGenerator {
 
 
   fn generate_rust_final_function(&self, func: &RustMethod) -> String {
-    let public_qualifier = match func.scope {
+    let maybe_pub = match func.scope {
       RustMethodScope::TraitImpl { .. } => "",
       _ => "pub ",
     };
@@ -348,11 +347,11 @@ impl RustCodeGenerator {
           }
         };
 
-        format!("{pubq}fn {name}({args}){ret} {{\n{body}}}\n\n",
-                pubq = public_qualifier,
+        format!("{maybe_pub}fn {name}({args}){return_type} {{\n{body}}}\n\n",
+                maybe_pub = maybe_pub,
                 name = func.name.last_name(),
                 args = self.arg_texts(&variant.arguments, None).join(", "),
-                ret = return_type_for_signature,
+                return_type = return_type_for_signature,
                 body = body)
       }
       RustMethodArguments::MultipleVariants { ref params_trait_name,
@@ -373,14 +372,12 @@ impl RustCodeGenerator {
         };
         let mut args = self.arg_texts(shared_arguments, params_trait_lifetime.as_ref());
         args.push(format!("{}: {}", variant_argument_name, tpl_type));
-        format!("{pubq}fn {name}<{lfarg}{tpl_type}>\
-                 ({args}) -> {tpl_type}::ReturnType
-                 where {tpl_type}: overloading::{trt}{lf} {{\n{body}}}\n\n",
-                pubq = public_qualifier,
-                lfarg = lifetime_arg,
-                lf = lifetime_specifier,
+        format!(include_str!("../templates/crate/overloaded_function.rs.in"),
+                maybe_pub = maybe_pub,
+                lifetime_arg = lifetime_arg,
+                lifetime = lifetime_specifier,
                 name = func.name.last_name(),
-                trt = params_trait_name,
+                trait_name = params_trait_name,
                 tpl_type = tpl_type,
                 args = args.join(", "),
                 body = body)
@@ -428,40 +425,27 @@ impl RustCodeGenerator {
 
   fn generate_module_code(&self, data: &RustModule) -> String {
     let mut results = Vec::new();
-    results.push("#[allow(unused_imports)]
-      use {libc, cpp_box, std};\n\n"
-      .to_string());
+    results.push("#[allow(unused_imports)]\nuse {libc, cpp_box, std};\n\n".to_string());
 
     for type1 in &data.types {
       match type1.kind {
         RustTypeDeclarationKind::CppTypeWrapper { ref kind, ref methods, ref traits, .. } => {
           let r = match *kind {
             RustTypeWrapperKind::Enum { ref values, ref is_flaggable } => {
-              let mut r = format!("#[derive(Debug, PartialEq, Eq, Clone)]\n#[repr(C)]\npub enum \
-                                   {} {{\n{}\n}}\n\n",
-                                  type1.name,
-                                  values.iter()
+              let mut r = format!(include_str!("../templates/crate/enum_declaration.rs.in"),
+                                  name = type1.name,
+                                  variants = values.iter()
                                     .map(|item| format!("  {} = {}", item.name, item.value))
                                     .join(", \n"));
               if *is_flaggable {
-                r = format!("{}impl ::flags::FlaggableEnum for {} {{\n
-                           \
-                             fn to_int(self) -> libc::c_int {{ unsafe {{ \
-                             std::mem::transmute(self) }} }}\n
-                           fn \
-                             enum_name() -> &'static str {{ unimplemented!() }}\n
-                        \
-                             }}\n\n",
-                            r,
-                            type1.name);
+                r = r +
+                    &format!(include_str!("../templates/crate/impl_flaggable.rs.in"),
+                             name = type1.name);
               }
               r
             }
             RustTypeWrapperKind::Struct { ref size } => {
-              format!("#[repr(C)]\npub struct {name} {{\n  _buffer: [u8; {size}],\n}}\n\n
-                       impl {name} {{ pub unsafe fn new_uninitialized() -> {name} {{
-                         {name} {{ _buffer: std::mem::uninitialized() }}
-                      }} }}\n\n",
+              format!(include_str!("../templates/crate/struct_declaration.rs.in"),
                       name = type1.name,
                       size = size)
             }
@@ -557,14 +541,7 @@ impl RustCodeGenerator {
               }
             }
 
-            results.push(format!("impl{lifetime_specifier} \
-                                  {trait_name}{trait_lifetime_specifier} for {impl_type} {{
-              \
-                                  type ReturnType = {return_type};
-              fn exec(self, \
-                                  {final_arg_list}) -> {return_type} {{ {tmp_vars}\n{body} }}
-            \
-                                  }}",
+            results.push(format!(include_str!("../templates/crate/impl_overloading_trait.rs.in"),
                                  lifetime_specifier = lifetime_specifier,
                                  trait_lifetime_specifier = trait_lifetime_specifier,
                                  trait_name = type1.name,
@@ -644,9 +621,6 @@ impl RustCodeGenerator {
       write!(file, "use libc;\n\n").unwrap();
 
       write!(file, "#[link(name = \"{}\")]\n", &self.config.cpp_lib_name).unwrap();
-      //      write!(file, "#[link(name = \"icui18n\")]\n").unwrap();
-      //      write!(file, "#[link(name = \"icuuc\")]\n").unwrap();
-      //      write!(file, "#[link(name = \"icudata\")]\n").unwrap();
       write!(file, "#[link(name = \"stdc++\")]\n").unwrap();
       write!(file,
              "#[link(name = \"{}\", kind = \"static\")]\n",
