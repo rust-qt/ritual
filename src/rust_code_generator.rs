@@ -6,7 +6,6 @@ use std::io::{Read, Write};
 use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
                 RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope,
                 RustMethodArgument, TraitName};
-use std::collections::HashMap;
 use utils::{JoinWithString, copy_recursively};
 use log;
 use utils::PathBufPushTweak;
@@ -612,7 +611,7 @@ impl RustCodeGenerator {
 
   }
 
-  pub fn generate_ffi_file(&self, functions: &HashMap<String, Vec<RustFFIFunction>>) {
+  pub fn generate_ffi_file(&self, functions: &Vec<(String, Vec<RustFFIFunction>)>) {
     let mut file_path = self.config.output_path.clone();
     file_path.push("src");
     file_path.push("ffi.rs");
@@ -628,7 +627,7 @@ impl RustCodeGenerator {
         .unwrap();
       write!(file, "extern \"C\" {{\n").unwrap();
 
-      for (include_file, functions) in functions {
+      for &(ref include_file, ref functions) in functions {
         write!(file, "  // Header: {}\n", include_file).unwrap();
         for function in functions {
           file.write(self.rust_ffi_function_to_code(function).as_bytes()).unwrap();

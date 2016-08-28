@@ -124,7 +124,7 @@ pub struct RustGeneratorOutput {
   /// List of Rust modules to be generated.
   pub modules: Vec<RustModule>,
   /// List of FFI function imports to be generated.
-  pub ffi_functions: HashMap<String, Vec<RustFFIFunction>>,
+  pub ffi_functions: Vec<(String, Vec<RustFFIFunction>)>,
 }
 
 /// Config for rust_generator module.
@@ -937,9 +937,9 @@ impl RustGenerator {
   }
 
   /// Generates Rust representations of all FFI functions
-  pub fn ffi(&self) -> HashMap<String, Vec<RustFFIFunction>> {
+  pub fn ffi(&self) -> Vec<(String, Vec<RustFFIFunction>)> {
     log::info("Generating Rust FFI functions.");
-    let mut ffi_functions = HashMap::new();
+    let mut ffi_functions = Vec::new();
 
     for header in &self.input_data.cpp_ffi_headers {
       let mut functions = Vec::new();
@@ -955,7 +955,7 @@ impl RustGenerator {
           }
         }
       }
-      ffi_functions.insert(header.include_file.clone(), functions);
+      ffi_functions.push((header.include_file.clone(), functions));
     }
     ffi_functions
   }
