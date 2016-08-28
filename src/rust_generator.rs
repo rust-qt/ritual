@@ -440,12 +440,15 @@ impl RustGenerator {
           .cpp_data
           .template_instantiations
           .get(&"QFlags".to_string()) {
-          let cpp_type_sample = CppType {
-            is_const: false,
-            indirection: CppTypeIndirection::None,
-            base: CppTypeBase::Enum { name: type_info.name.clone() },
-          };
-          if instantiations.iter().find(|x| x.len() == 1 && &x[0] == &cpp_type_sample).is_some() {
+          let template_args_sample =
+            vec![CppType {
+                   is_const: false,
+                   indirection: CppTypeIndirection::None,
+                   base: CppTypeBase::Enum { name: type_info.name.clone() },
+                 }];
+          if instantiations.iter()
+            .find(|x| &x.template_arguments == &template_args_sample)
+            .is_some() {
             is_flaggable = true;
           }
         }

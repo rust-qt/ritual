@@ -6,7 +6,7 @@ use log;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection};
 
 pub use serializable::{EnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
-                       CppTypeData, CppData};
+                       CppTypeData, CppData, CppTemplateInstantiation};
 
 impl CppTypeData {
   /// Checks if the type is a class type.

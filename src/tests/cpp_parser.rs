@@ -120,27 +120,24 @@ fn functions_with_class_arg() {
       assert!(size.is_some());
       assert!(template_arguments.is_none());
       assert!(bases.is_empty());
-      assert_eq!(fields,
-                 &vec![CppClassField {
-                         name: "a".to_string(),
-                         field_type: CppType {
-                           indirection: CppTypeIndirection::None,
-                           is_const: false,
-                           base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-                         },
-                         visibility: CppVisibility::Public,
-                       },
-                       CppClassField {
-                         name: "b".to_string(),
-                         field_type: CppType {
-                           indirection: CppTypeIndirection::None,
-                           is_const: false,
-                           base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-                         },
-                         visibility: CppVisibility::Public,
-                       }]);
+      assert_eq!(fields.len(), 2);
+      assert_eq!(fields[0].name, "a");
+      assert_eq!(fields[0].field_type,
+                 CppType {
+                   indirection: CppTypeIndirection::None,
+                   is_const: false,
+                   base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+                 });
+      assert_eq!(fields[0].visibility, CppVisibility::Public);
 
-
+      assert_eq!(fields[1].name, "b");
+      assert_eq!(fields[1].field_type,
+                 CppType {
+                   indirection: CppTypeIndirection::None,
+                   is_const: false,
+                   base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+                 });
+      assert_eq!(fields[1].visibility, CppVisibility::Public);
     }
     _ => panic!("invalid type kind"),
   }
@@ -497,7 +494,7 @@ fn template_class_method() {
       Iterator begin();
     };");
   assert!(data.template_instantiations.is_empty());
-  assert!(data.types.len() == 2);
+  assert!(data.types.len() == 1);
   assert_eq!(data.types[0].name, "MyVector");
   match data.types[0].kind {
     CppTypeKind::Class { ref size, ref bases, ref fields, ref template_arguments } => {
@@ -508,8 +505,7 @@ fn template_class_method() {
     }
     _ => panic!("invalid type kind"),
   }
-  assert_eq!(data.types[1].name, "MyVector::Iterator");
-  assert!(data.methods.len() == 2);
+  assert!(data.methods.len() == 1);
   assert_eq!(data.methods[0],
              CppMethod {
                name: "get".to_string(),
@@ -555,16 +551,6 @@ fn template_class_method() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: None,
-             });
-  assert_eq!(data.methods[1].name, "begin");
-  assert_eq!(data.methods[1].return_type,
-             CppType {
-               indirection: CppTypeIndirection::None,
-               is_const: false,
-               base: CppTypeBase::Class {
-                 name: "MyVector::Iterator".to_string(),
-                 template_arguments: None,
-               },
              });
 }
 
@@ -642,7 +628,8 @@ fn template_instantiation() {
              });
   assert!(data.template_instantiations.contains_key("Vector"));
   assert!(data.template_instantiations["Vector"].len() == 1);
-  assert!(data.template_instantiations["Vector"].iter().next().unwrap() == &vec![int]);
+  assert!(&data.template_instantiations["Vector"].iter().next().unwrap().template_arguments ==
+          &vec![int]);
 }
 
 fn derived_class_simple() {

@@ -78,6 +78,21 @@ impl CppTypeBase {
       _ => false,
     }
   }
+  pub fn is_or_contains_template_parameter(&self) -> bool {
+    match self {
+      &CppTypeBase::TemplateParameter { .. } => true,
+      &CppTypeBase::Class { ref template_arguments, .. } => {
+        if let &Some(ref template_arguments) = template_arguments {
+          template_arguments.iter()
+            .find(|arg| arg.base.is_or_contains_template_parameter())
+            .is_some()
+        } else {
+          false
+        }
+      }
+      _ => false,
+    }
+  }
   pub fn to_cpp_code(&self,
                      function_pointer_inner_text: Option<&String>)
                      -> Result<String, String> {

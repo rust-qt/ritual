@@ -1,4 +1,4 @@
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap};
 
 // ------------------------------
 // from cpp_data
@@ -23,6 +23,8 @@ pub struct CppClassField {
   pub field_type: CppType,
   /// Visibility
   pub visibility: CppVisibility,
+  /// Size of type in bytes
+  pub size: Option<i32>,
 }
 
 /// Information about a C++ type declaration
@@ -89,6 +91,17 @@ pub struct CppTypeData {
   pub kind: CppTypeKind,
 }
 
+/// Information about a C++ template class
+/// instantiation.
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(Serialize, Deserialize)]
+pub struct CppTemplateInstantiation {
+  /// List of template arguments used in this instantiation
+  pub template_arguments: Vec<CppType>,
+  /// Size of resulted type in bytes
+  pub size: i32,
+}
+
 /// C++ parser output
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 #[derive(Serialize, Deserialize)]
@@ -99,9 +112,7 @@ pub struct CppData {
   pub methods: Vec<CppMethod>,
   /// List of found template instantiations. Key is name of
   /// the template class, value is list of instantiations.
-  /// Each instantiation is represented as list of C++ types
-  /// used as template arguments.
-  pub template_instantiations: HashMap<String, HashSet<Vec<CppType>>>,
+  pub template_instantiations: HashMap<String, Vec<CppTemplateInstantiation>>,
 }
 
 // -----------------------------------
