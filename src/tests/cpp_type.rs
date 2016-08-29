@@ -451,8 +451,7 @@ fn nested_template_cpp_code() {
                                       is_const: false,
                                       base: CppTypeBase::Class(CppTypeClassBase {
                                         name: "QList".to_string(),
-                                        template_arguments:
-                                          Some(vec![CppType {
+                                        template_arguments: Some(vec![CppType {
                                                       indirection: CppTypeIndirection::None,
                                                       is_const: false,
                                                       base: CppTypeBase::Class(CppTypeClassBase {

@@ -5,9 +5,9 @@ cpp_to_rust project is aimed to create Rust wrappers for C++ libraries automatic
 
 Dependencies
 ------------
-- Stable Rust.
-- libclang-dev.
-- cmake.
+- Stable Rust >= 1.9.
+- libclang-dev. Mainly developed with version 3.5, but higher versions should be compatible as well.
+- cmake >= 3.0.
 - C++ compiler and make.
 - Target library (only Qt5 is currently supported).
 
@@ -58,7 +58,8 @@ Currently implemented features:
 - C++ namespaces are mapped to Rust submodules.
 - Library is also separated to submodules based on include files.
 - Pointers, references and values are mapped to Rust's respective types.
-- Classes are mapped to structs of the same size. Classes without size and template classes are not supported yet.
+- Function pointer types are mapped to Rust's equivalent representation. Function pointers with references or class values are not supported.
+- Classes are mapped to structs of the same size. This also applies to all instantiations of template classes encountered in the library's API.
 - Free functions are mapped to free functions.
 - Class methods are mapped to structs' implementations.
 - All names are converted to match Rust naming conventions.
@@ -67,9 +68,8 @@ Currently implemented features:
 
 Not implemented yet but planned:
 
-- Create wrappers for all encountered instantiations of class templates.
+- Generate meaningful Rust documentation for generated crate.
 - Implement type information exchange between multiple wrapper crates to reuse type wrappers from dependancy libraries and perform inter-crate template instantiations.
-- Support function types. Currently any methods containing function types are not wrapped.
 - Implement operator traits for structs based on C++ operator methods.
 - Implement Debug and Display traits for structs if applicable methods exist on C++ side.
 - Implement iterator traits for collections.
@@ -78,12 +78,13 @@ Not implemented yet but planned:
 - Provide access to a class's public variables.
 - Provide access to static_cast, dynamic_cast and qobject_cast.
 - Provide conversion from enums to int and back (used in Qt API).
-- Generate meaningful Rust documentation for the crate.
 
 Not planned to support:
 
 - Advanced template usage, like types with integer template arguments.
+- Template partial specializations.
 - Template methods and functions.
+- Types nested into template types, like Class1<T>::Class2.
 - Typedef translation.
 
 Contributing
