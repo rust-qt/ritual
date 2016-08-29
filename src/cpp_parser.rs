@@ -1158,6 +1158,7 @@ impl CppParser {
           }
         }
       }
+      EntityKind::StructDecl |
       EntityKind::ClassDecl |
       EntityKind::ClassTemplate |
       EntityKind::ClassTemplatePartialSpecialization => {
@@ -1166,7 +1167,7 @@ impl CppParser {
             if let CppTypeBase::Class { ref template_arguments, .. } = parent_type.base {
               if let &Some(ref template_arguments) = template_arguments {
                 if template_arguments.iter().find(|x| !x.base.is_template_parameter()).is_some() {
-                  log::noisy(format!("skipping template partial specialization: {}", name));
+                  log::warning(format!("skipping template partial specialization: {}", name));
                   return methods;
                 }
               }

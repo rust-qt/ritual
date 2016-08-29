@@ -236,7 +236,7 @@ impl CppTypeBase {
         }
       }
       CppTypeBase::TemplateParameter { .. } => {
-        panic!("template parameters are not supported here yet");
+        panic!("template parameters are not allowed to have captions");
       }
       CppTypeBase::FunctionPointer { .. } => "func".to_string(),
     }

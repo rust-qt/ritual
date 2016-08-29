@@ -185,6 +185,7 @@ impl CppData {
         .collect();
       for type1 in &self.types {
         if type1.inherits(base_name) {
+          log::debug(format!("add inherited methods_from {} to {}", base_name, type1.name));
           let derived_name = &type1.name;
           derived_types.push(derived_name.clone());
           for base_class_method in base_methods.clone() {
@@ -192,9 +193,9 @@ impl CppData {
             for method in &self.methods {
               if method.class_name() == Some(derived_name) &&
                  method.name == base_class_method.name {
-                // log::info("Method is not added because it's overriden in derived class");
-                // log::info(format!("Base method: {}", base_class_method.short_text()));
-                // log::info(format!("Derived method: {}\n", method.short_text()));
+                log::debug("Method is not added because it's overriden in derived class");
+                log::debug(format!("Base method: {}", base_class_method.short_text()));
+                log::debug(format!("Derived method: {}\n", method.short_text()));
                 ok = false;
                 break;
               }
@@ -208,6 +209,10 @@ impl CppData {
               }
               new_method.include_file = type1.include_file.clone();
               new_method.origin_location = None;
+              log::debug(format!("Method added: {}", new_method.short_text()));
+              log::debug(format!("Base method: {} ({:?})\n",
+                                 base_class_method.short_text(),
+                                 base_class_method.origin_location));
               new_methods.push(new_method.clone());
             }
           }

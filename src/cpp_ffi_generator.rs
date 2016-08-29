@@ -117,15 +117,13 @@ impl<'a> CGenerator<'a> {
       log::warning(format!("Skipping template method: \n{}\n", method.short_text()));
       return false;
     }
-    if let Some(ref class_name) = method.class_name() {
-      if self.template_classes
-        .iter()
-        .find(|x| x == class_name || class_name.starts_with(&format!("{}::", x)))
-        .is_some() {
-        log::warning(format!("Skipping method of template class: \n{}\n",
-                             method.short_text()));
-        return false;
-      }
+    if method.all_involved_types()
+      .iter()
+      .find(|x| x.base.is_or_contains_template_parameter())
+      .is_some() {
+      log::warning(format!("Skipping method containing template parameters: \n{}\n",
+                           method.short_text()));
+      return false;
     }
     true
   }
