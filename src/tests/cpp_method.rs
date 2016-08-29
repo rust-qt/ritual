@@ -655,17 +655,9 @@ fn to_ffi_signatures_simple_func() {
 }
 
 #[test]
-fn full_name_free_function() {
-  let mut method1 = empty_regular_method();
-  method1.name = "func1".to_string();
-  assert_eq!(method1.full_name(), "func1");
-}
-
-#[test]
 fn full_name_free_function_in_namespace() {
   let mut method1 = empty_regular_method();
   method1.name = "ns::func1".to_string();
-  assert_eq!(method1.full_name(), "ns::func1");
   assert_eq!(method1.class_name(), None);
 }
 
@@ -674,7 +666,6 @@ fn full_name_method() {
   let mut method1 = empty_regular_method();
   method1.name = "func1".to_string();
   method1.class_membership = Some(empty_membership("MyClass"));
-  assert_eq!(method1.full_name(), "MyClass::func1");
   assert_eq!(method1.class_name(), Some(&"MyClass".to_string()));
 }
 
@@ -687,7 +678,6 @@ fn full_name_static_method() {
     info.is_static = true;
     info
   });
-  assert_eq!(method1.full_name(), "MyClass::func1");
   assert_eq!(method1.class_name(), Some(&"MyClass".to_string()));
 }
 
@@ -696,7 +686,6 @@ fn full_name_nested_class_method() {
   let mut method1 = empty_regular_method();
   method1.name = "func1".to_string();
   method1.class_membership = Some(empty_membership("MyClass::Iterator"));
-  assert_eq!(method1.full_name(), "MyClass::Iterator::func1");
   assert_eq!(method1.class_name(), Some(&"MyClass::Iterator".to_string()));
 }
 

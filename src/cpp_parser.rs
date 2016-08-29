@@ -713,46 +713,21 @@ impl CppParser {
           Some(pointee) => {
             match self.parse_type(pointee, context_class, context_method) {
               Ok(result) => {
-                let new_indirection = match type1.get_kind() {
-                  TypeKind::Pointer => {
-                    match result.indirection {
-                      CppTypeIndirection::None => {
-                        match result.base {
-                          CppTypeBase::FunctionPointer { .. } => Ok(CppTypeIndirection::None),
-                          _ => Ok(CppTypeIndirection::Ptr),
-                        }
-                      }
-                      CppTypeIndirection::Ptr => Ok(CppTypeIndirection::PtrPtr),
-                      _ => {
-                        Err(format!("Unsupported level of indirection: pointer to {:?}",
-                                    result.indirection))
-                      }
-                    }
-                  }
-                  TypeKind::LValueReference => {
-                    match result.indirection {
-                      CppTypeIndirection::None => Ok(CppTypeIndirection::Ref),
-                      CppTypeIndirection::Ptr => Ok(CppTypeIndirection::PtrRef),
-                      _ => {
-                        Err(format!("Unsupported level of indirection: reference to {:?}",
-                                    result.indirection))
-                      }
-                    }
-                  }
-                  TypeKind::RValueReference => {
-                    if result.indirection == CppTypeIndirection::None {
-                      Ok(CppTypeIndirection::Ref)
-                    } else {
-                      Err(format!("Unsupported level of indirection: r-value reference to {:?}",
-                                  result.indirection))
-                    }
-                  }
+                let original_type_indirection = match type1.get_kind() {
+                  TypeKind::Pointer => CppTypeIndirection::Ptr,
+                  TypeKind::LValueReference => CppTypeIndirection::Ref,
+                  TypeKind::RValueReference => CppTypeIndirection::RValueRef,
                   _ => unreachable!(),
                 };
-                match new_indirection {
-                  Ok(new_indirection) => Ok(CppType { indirection: new_indirection, ..result }),
-                  Err(msg) => Err(msg),
+
+                let mut new_indirection = try!(CppTypeIndirection::combine(&result.indirection,
+                                                   &original_type_indirection));
+                if new_indirection == CppTypeIndirection::Ptr {
+                  if let CppTypeBase::FunctionPointer { .. } = result.base {
+                    new_indirection = CppTypeIndirection::None;
+                  }
                 }
+                Ok(CppType { indirection: new_indirection, ..result })
               }
               Err(msg) => Err(msg),
             }

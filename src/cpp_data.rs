@@ -1,5 +1,5 @@
 
-use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership};
+use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership, CppFunctionArgument};
 use cpp_operator::CppOperator;
 use std::collections::HashSet;
 use log;
@@ -7,6 +7,43 @@ use cpp_type::{CppType, CppTypeBase, CppTypeIndirection};
 
 pub use serializable::{EnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
                        CppTypeData, CppData, CppTemplateInstantiation};
+
+fn apply_instantiations_to_method(method: &CppMethod,
+                                  nested_level: i32,
+                                  template_instantiations: &Vec<CppTemplateInstantiation>)
+                                  -> Result<Vec<CppMethod>, String> {
+  let mut new_methods = Vec::new();
+  for ins in template_instantiations {
+    println!("instantiation: {:?}", ins.template_arguments);
+    let mut new_method = method.clone();
+    new_method.arguments.clear();
+    for arg in &method.arguments {
+      new_method.arguments.push(CppFunctionArgument {
+        name: arg.name.clone(),
+        has_default_value: arg.has_default_value,
+        argument_type: try!(arg.argument_type
+          .instantiate(nested_level, &ins.template_arguments)),
+      });
+    }
+    new_method.return_type = try!(method.return_type
+      .instantiate(nested_level, &ins.template_arguments));
+    if let Some(ref mut info) = new_method.class_membership {
+      info.class_type = try!(info.class_type
+        .instantiate_class(nested_level, &ins.template_arguments));
+    }
+    if new_method.all_involved_types()
+      .iter()
+      .find(|t| t.base.is_or_contains_template_parameter())
+      .is_some() {
+      return Err(format!("found remaining template parameters: {}",
+                         new_method.short_text()));
+    } else {
+      println!("success: {}", new_method.short_text());
+      new_methods.push(new_method);
+    }
+  }
+  Ok(new_methods)
+}
 
 impl CppTypeData {
   /// Checks if the type is a class type.
@@ -130,6 +167,7 @@ impl CppData {
 
   /// Helper function that performs a portion of add_inherited_methods implementation.
   fn add_inherited_methods_from(&mut self, base_name: &String) {
+    // TODO: speed up this method
     let mut new_methods = Vec::new();
     let mut derived_types = Vec::new();
     {
@@ -347,11 +385,50 @@ impl CppData {
   }
 
 
+
+  fn instantiate_templates(&mut self) {
+    println!("instantiate_templates()");
+    for method in &self.methods {
+      for type1 in method.all_involved_types() {
+        if let CppTypeBase::Class { ref name, ref template_arguments } = type1.base {
+          if let &Some(ref template_arguments) = template_arguments {
+            assert!(!template_arguments.is_empty());
+            if template_arguments.iter().find(|x| !x.base.is_template_parameter()).is_none() {
+              if self.template_instantiations.contains_key(name) {
+                let nested_level = if let CppTypeBase::TemplateParameter { nested_level, .. } =
+                                          template_arguments[0].base {
+                  nested_level
+                } else {
+                  panic!("only template parameters can be here");
+                };
+                println!("");
+                println!("method: {}", method.short_text());
+                println!("found template class: {}", name);
+                match apply_instantiations_to_method(method,
+                                                     nested_level,
+                                                     &self.template_instantiations[name]) {
+                  Ok(methods) => {
+                    // TODO: add methods
+                    break;
+                  }
+                  Err(msg) => println!("failed: {}", msg),
+                }
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+
   /// Performs data conversion to make it more suitable
   /// for further wrapper generation.
   pub fn post_process(&mut self) {
     self.ensure_explicit_destructors();
     self.generate_methods_with_omitted_args();
     self.add_inherited_methods();
+    self.instantiate_templates();
   }
 }

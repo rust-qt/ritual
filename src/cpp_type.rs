@@ -5,6 +5,37 @@ pub use serializable::{CppBuiltInNumericType, CppSpecificNumericTypeKind, CppTyp
                        CppTypeIndirection};
 extern crate regex;
 
+impl CppTypeIndirection {
+  pub fn combine(left: &CppTypeIndirection,
+                 right: &CppTypeIndirection)
+                 -> Result<CppTypeIndirection, String> {
+    let error_text = || format!("too much indirection: {:?} to {:?}", left, right);
+    Ok(match *left {
+      CppTypeIndirection::None => right.clone(),
+      CppTypeIndirection::Ptr => {
+        match *right {
+          CppTypeIndirection::None => CppTypeIndirection::Ptr,
+          CppTypeIndirection::Ptr => CppTypeIndirection::PtrPtr,
+          CppTypeIndirection::Ref => CppTypeIndirection::PtrRef,
+          _ => return Err(error_text()),
+        }
+      }
+      CppTypeIndirection::Ref => {
+        match *right {
+          CppTypeIndirection::None => CppTypeIndirection::Ref,
+          _ => return Err(error_text()),
+        }
+      }
+      _ => {
+        match *right {
+          CppTypeIndirection::None => left.clone(),
+          _ => return Err(error_text()),
+        }
+      }
+    })
+  }
+}
+
 impl CppBuiltInNumericType {
   pub fn to_cpp_code(&self) -> &'static str {
     match *self {
@@ -93,6 +124,31 @@ impl CppTypeBase {
       _ => false,
     }
   }
+
+  pub fn instantiate_class(&self,
+                           nested_level1: i32,
+                           template_arguments1: &Vec<CppType>)
+                           -> Result<CppTypeBase, String> {
+    match self {
+      &CppTypeBase::Class { ref name, ref template_arguments } => {
+        Ok(CppTypeBase::Class {
+          name: name.clone(),
+          template_arguments: match template_arguments {
+            &Some(ref template_arguments) => {
+              let mut args = Vec::new();
+              for arg in template_arguments {
+                args.push(try!(arg.instantiate(nested_level1, template_arguments1)));
+              }
+              Some(args)
+            }
+            &None => None,
+          },
+        })
+      }
+      _ => Ok(self.clone()),
+    }
+  }
+
   pub fn to_cpp_code(&self,
                      function_pointer_inner_text: Option<&String>)
                      -> Result<String, String> {
@@ -123,7 +179,8 @@ impl CppTypeBase {
         }
       }
       CppTypeBase::TemplateParameter { .. } => {
-        return Err(format!("template parameters are not supported here yet"));
+        return Err(format!("template parameters are not allowed to produce C++ code without \
+                            instantiation"));
       }
       CppTypeBase::FunctionPointer { ref return_type,
                                      ref arguments,
@@ -347,5 +404,36 @@ impl CppType {
       }
     }
     return self.indirection == CppTypeIndirection::None && self.base.is_class();
+  }
+
+  pub fn instantiate(&self,
+                     nested_level1: i32,
+                     template_arguments1: &Vec<CppType>)
+                     -> Result<CppType, String> {
+    if let CppTypeBase::TemplateParameter { nested_level, index } = self.base {
+      if nested_level == nested_level1 {
+        if index < 0 {
+          panic!("CppType::instantiate: index < 0");
+        }
+        // TODO: Err instead of panic
+        if index >= template_arguments1.len() as i32 {
+          return Err("CppType::instantiate: too few template arguments".to_string());
+        }
+        let mut new_type = template_arguments1[index as usize].clone();
+        if self.is_const {
+          new_type.is_const = true;
+        }
+        // TODO: Err instead of panic
+        new_type.indirection = try!(CppTypeIndirection::combine(&new_type.indirection,
+                                                                &self.indirection));
+        return Ok(new_type);
+      }
+    }
+    Ok(CppType {
+      is_const: self.is_const,
+      indirection: self.indirection.clone(),
+      base: try!(self.base.instantiate_class(nested_level1, template_arguments1)),
+    })
+
   }
 }

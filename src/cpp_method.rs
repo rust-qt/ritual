@@ -1,4 +1,4 @@
-use cpp_type::{CppType, CppTypeIndirection, CppTypeRole};
+use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase};
 use cpp_ffi_data::CppFfiType;
 use cpp_ffi_data::CppFfiFunctionSignature;
 use cpp_ffi_data::{CppFfiFunctionArgument, CppFfiArgumentMeaning};
@@ -173,21 +173,46 @@ impl CppMethod {
     Ok(results)
   }
 
-  /// Returns full name of the method, including
-  /// class name (if any) and namespace.
-  pub fn full_name(&self) -> String {
-    if let Some(ref name) = self.class_name() {
-      format!("{}::{}", name, self.name)
-    } else {
-      self.name.clone()
-    }
-  }
-
   /// Returns short text representing values in this method
   /// (only for debug output purposes).
   pub fn short_text(&self) -> String {
+    fn type_to_cpp_code_permissive(type1: &CppType) -> String {
+      let r = match type1.base {
+        CppTypeBase::TemplateParameter { ref nested_level, ref index } => {
+          let mut fake_type = type1.clone();
+          fake_type.base = CppTypeBase::Class {
+            name: format!("T_{}_{}", nested_level, index),
+            template_arguments: None,
+          };
+          fake_type.to_cpp_code(None)
+        }
+        CppTypeBase::Class { ref name, ref template_arguments } => {
+          if let &Some(ref template_arguments) = template_arguments {
+            Ok(format!("{}<{}>",
+                       name,
+                       template_arguments.iter()
+                         .map(|x| type_to_cpp_code_permissive(x))
+                         .join(", ")))
+          } else {
+            type1.to_cpp_code(None)
+          }
+        }
+        CppTypeBase::FunctionPointer { .. } => type1.to_cpp_code(Some(&"FN_PTR".to_string())),
+        _ => type1.to_cpp_code(None),
+      };
+      r.unwrap_or_else(|_| "[?]".to_string())
+    }
+
     let mut s = String::new();
+    let mut name = self.name.clone();
     if let Some(ref info) = self.class_membership {
+      name = format!("{}::{}",
+                     type_to_cpp_code_permissive(&CppType {
+                       indirection: CppTypeIndirection::None,
+                       is_const: false,
+                       base: info.class_type.clone(),
+                     }),
+                     name);
       if info.is_virtual {
         s = format!("{} virtual", s);
       }
@@ -215,17 +240,15 @@ impl CppMethod {
     if self.allows_variadic_arguments {
       s = format!("{} [var args]", s);
     }
-    s = format!("{} {}",
-                s,
-                self.return_type.to_cpp_code(None).unwrap_or("[?]".to_string()));
-    s = format!("{} {}", s, self.full_name());
+    s = format!("{} {}", s, type_to_cpp_code_permissive(&self.return_type));
+    s = format!("{} {}", s, name);
     s = format!("{}({})",
                 s,
                 self.arguments
                   .iter()
                   .map(|arg| {
         format!("{} {}{}",
-                arg.argument_type.to_cpp_code(None).unwrap_or("[?]".to_string()),
+                type_to_cpp_code_permissive(&arg.argument_type),
                 arg.name,
                 if arg.has_default_value {
                   format!(" = ?")
@@ -266,5 +289,21 @@ impl CppMethod {
   }
   pub fn is_operator(&self) -> bool {
     self.operator.is_some()
+  }
+
+  pub fn all_involved_types(&self) -> Vec<CppType> {
+    let mut result: Vec<CppType> = Vec::new();
+    if let Some(ref class_membership) = self.class_membership {
+      result.push(CppType {
+        base: class_membership.class_type.clone(),
+        is_const: class_membership.is_const,
+        indirection: CppTypeIndirection::Ptr,
+      });
+    }
+    for t in self.arguments.iter().map(|x| x.argument_type.clone()) {
+      result.push(t);
+    }
+    result.push(self.return_type.clone());
+    result
   }
 }
