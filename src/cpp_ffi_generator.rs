@@ -5,11 +5,13 @@ use caption_strategy::MethodCaptionStrategy;
 use cpp_method::{CppMethod, CppMethodKind};
 use cpp_ffi_data::{CppAndFfiMethod, c_base_name};
 use utils::add_to_multihash;
+use serializable::CppLibSpec;
 
 struct CGenerator<'a> {
   template_classes: Vec<String>,
   abstract_classes: Vec<String>,
   cpp_data: &'a CppData,
+  cpp_lib_spec: CppLibSpec,
 }
 
 #[derive(Debug, Clone)]
@@ -25,7 +27,7 @@ pub struct CppAndFfiData {
 }
 
 /// Runs FFI generator
-pub fn run(cpp_data: &CppData, include_file_blacklist: &Vec<String>) -> Vec<CppFfiHeaderData> {
+pub fn run(cpp_data: &CppData, cpp_lib_spec: CppLibSpec) -> Vec<CppFfiHeaderData> {
   let abstract_classes = cpp_data.types
     .iter()
     .filter_map(|t| {
@@ -56,6 +58,7 @@ pub fn run(cpp_data: &CppData, include_file_blacklist: &Vec<String>) -> Vec<CppF
     template_classes: template_classes,
     cpp_data: cpp_data,
     abstract_classes: abstract_classes,
+    cpp_lib_spec: cpp_lib_spec,
   };
 
   let mut c_headers = Vec::new();
@@ -63,7 +66,7 @@ pub fn run(cpp_data: &CppData, include_file_blacklist: &Vec<String>) -> Vec<CppF
   include_name_list.sort();
 
   for include_file in &include_name_list {
-    if include_file_blacklist.iter().find(|x| x == &include_file).is_some() {
+    if generator.cpp_lib_spec.include_file_blacklist.iter().find(|x| x == &include_file).is_some() {
       log::info(format!("Skipping include file {}", include_file));
       continue;
     }
@@ -91,6 +94,11 @@ impl<'a> CGenerator<'a> {
   /// Returns false if the method is excluded from processing
   /// for some reason
   fn should_process_method(&self, method: &CppMethod) -> bool {
+    let full_name = method.full_name();
+    if self.cpp_lib_spec.ffi_methods_blacklist.iter().find(|&x| x == &full_name).is_some() {
+      log::debug(format!("Skipping blacklisted method: \n{}\n", method.short_text()));
+      return false;
+    }
     if let Some(ref membership) = method.class_membership {
       if membership.kind == CppMethodKind::Constructor {
         let class_name = membership.class_type.maybe_name().unwrap();
@@ -117,6 +125,7 @@ impl<'a> CGenerator<'a> {
       log::warning(format!("Skipping template method: \n{}\n", method.short_text()));
       return false;
     }
+    println!("check {}", method.short_text());
     if method.all_involved_types()
       .iter()
       .find(|x| x.base.is_or_contains_template_parameter())
@@ -200,8 +209,12 @@ impl<'a> CGenerator<'a> {
           processed_methods.push(CppAndFfiMethod::new(x, final_name));
         }
       } else {
-        panic!("all type caption strategies have failed! Involved functions: \n{:?}",
-               values);
+        log::debug(format!("values dump: {:?}\n", values));
+        log::error(format!("All type caption strategies have failed! Involved functions:"));
+        for value in values {
+          log::debug(format!("  {}", value.cpp_method.short_text()));
+        }
+        panic!("all type caption strategies have failed");
       }
     }
     processed_methods.sort_by(|a, b| a.c_name.cmp(&b.c_name));

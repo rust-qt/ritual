@@ -31,6 +31,14 @@ fn apply_instantiations_to_method(method: &CppMethod,
       info.class_type = try!(info.class_type
         .instantiate_class(nested_level, &ins.template_arguments));
     }
+    let mut conversion_type = None;
+    if let Some(ref mut operator) = new_method.operator {
+      if let &mut CppOperator::Conversion(ref mut cpp_type) = operator {
+        let r = try!(cpp_type.instantiate(nested_level, &ins.template_arguments));
+        *cpp_type = r.clone();
+        conversion_type = Some(r);
+      }
+    }
     if new_method.all_involved_types()
       .iter()
       .find(|t| t.base.is_or_contains_template_parameter())
@@ -38,6 +46,9 @@ fn apply_instantiations_to_method(method: &CppMethod,
       return Err(format!("found remaining template parameters: {}",
                          new_method.short_text()));
     } else {
+      if let Some(conversion_type) = conversion_type {
+        new_method.name = format!("operator {}", try!(conversion_type.to_cpp_code(None)));
+      }
       println!("success: {}", new_method.short_text());
       new_methods.push(new_method);
     }
@@ -171,49 +182,64 @@ impl CppData {
     let mut new_methods = Vec::new();
     let mut derived_types = Vec::new();
     {
-      let base_methods: Vec<_> = self.methods
-        .iter()
-        .filter(|method| {
-          if let Some(ref info) = method.class_membership {
-            info.class_type.maybe_name().unwrap() == base_name && !info.kind.is_constructor() &&
-            !info.kind.is_destructor() &&
-            method.operator != Some(CppOperator::Assignment)
-          } else {
-            false
-          }
-        })
-        .collect();
       for type1 in &self.types {
-        if type1.inherits(base_name) {
-          log::debug(format!("add inherited methods_from {} to {}", base_name, type1.name));
-          let derived_name = &type1.name;
-          derived_types.push(derived_name.clone());
-          for base_class_method in base_methods.clone() {
-            let mut ok = true;
-            for method in &self.methods {
-              if method.class_name() == Some(derived_name) &&
-                 method.name == base_class_method.name {
-                log::debug("Method is not added because it's overriden in derived class");
-                log::debug(format!("Base method: {}", base_class_method.short_text()));
-                log::debug(format!("Derived method: {}\n", method.short_text()));
-                ok = false;
-                break;
+        if let CppTypeKind::Class { ref bases, .. } = type1.kind {
+          for base in bases {
+            if let CppTypeBase::Class { ref name, ref template_arguments } = base.base {
+              if name == base_name {
+                log::debug(format!("Adding inherited methods_from {} to {}",
+                                   base_name,
+                                   type1.name));
+                let derived_name = &type1.name;
+                let base_template_arguments = template_arguments;
+                let base_methods: Vec<_> = self.methods
+                  .iter()
+                  .filter(|method| {
+                    if let Some(ref info) = method.class_membership {
+                      if let CppTypeBase::Class { ref name, ref template_arguments } =
+                             info.class_type {
+                        name == base_name && template_arguments == base_template_arguments &&
+                        !info.kind.is_constructor() &&
+                        !info.kind.is_destructor() &&
+                        method.operator != Some(CppOperator::Assignment)
+                      } else {
+                        panic!("class expected");
+                      }
+                    } else {
+                      false
+                    }
+                  })
+                  .collect();
+                derived_types.push(derived_name.clone());
+                for base_class_method in base_methods.clone() {
+                  let mut ok = true;
+                  for method in &self.methods {
+                    if method.class_name() == Some(derived_name) &&
+                       method.name == base_class_method.name {
+                      log::debug("Method is not added because it's overriden in derived class");
+                      log::debug(format!("Base method: {}", base_class_method.short_text()));
+                      log::debug(format!("Derived method: {}\n", method.short_text()));
+                      ok = false;
+                      break;
+                    }
+                  }
+                  if ok {
+                    let mut new_method = base_class_method.clone();
+                    if let Some(ref mut info) = new_method.class_membership {
+                      info.class_type = type1.default_class_type();
+                    } else {
+                      panic!("class_membership must be present");
+                    }
+                    new_method.include_file = type1.include_file.clone();
+                    new_method.origin_location = None;
+                    log::debug(format!("Method added: {}", new_method.short_text()));
+                    log::debug(format!("Base method: {} ({:?})\n",
+                                       base_class_method.short_text(),
+                                       base_class_method.origin_location));
+                    new_methods.push(new_method.clone());
+                  }
+                }
               }
-            }
-            if ok {
-              let mut new_method = base_class_method.clone();
-              if let Some(ref mut info) = new_method.class_membership {
-                info.class_type = type1.default_class_type();
-              } else {
-                panic!("class_membership must be present");
-              }
-              new_method.include_file = type1.include_file.clone();
-              new_method.origin_location = None;
-              log::debug(format!("Method added: {}", new_method.short_text()));
-              log::debug(format!("Base method: {} ({:?})\n",
-                                 base_class_method.short_text(),
-                                 base_class_method.origin_location));
-              new_methods.push(new_method.clone());
             }
           }
         }
@@ -393,6 +419,7 @@ impl CppData {
 
   fn instantiate_templates(&mut self) {
     println!("instantiate_templates()");
+    let mut new_methods = Vec::new();
     for method in &self.methods {
       for type1 in method.all_involved_types() {
         if let CppTypeBase::Class { ref name, ref template_arguments } = type1.base {
@@ -412,8 +439,8 @@ impl CppData {
                 match apply_instantiations_to_method(method,
                                                      nested_level,
                                                      &self.template_instantiations[name]) {
-                  Ok(methods) => {
-                    // TODO: add methods
+                  Ok(mut methods) => {
+                    new_methods.append(&mut methods);
                     break;
                   }
                   Err(msg) => println!("failed: {}", msg),
@@ -425,6 +452,7 @@ impl CppData {
         }
       }
     }
+    self.methods.append(&mut new_methods);
   }
 
 
@@ -433,7 +461,7 @@ impl CppData {
   pub fn post_process(&mut self) {
     self.ensure_explicit_destructors();
     self.generate_methods_with_omitted_args();
-    self.add_inherited_methods();
     self.instantiate_templates();
+    self.add_inherited_methods();
   }
 }

@@ -6,6 +6,7 @@ use cpp_ffi_data::CppMethodWithFfiSignature;
 use cpp_data::CppVisibility;
 use utils::JoinWithString;
 pub use serializable::{CppFunctionArgument, CppMethodKind, CppMethod, CppMethodClassMembership};
+use cpp_operator::CppOperator;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ReturnValueAllocationPlace {
@@ -18,6 +19,33 @@ pub enum ReturnValueAllocationPlace {
   /// the method does not return a class object by value, so
   /// there is only one FFI wrapper for it
   NotApplicable,
+}
+
+fn type_to_cpp_code_permissive(type1: &CppType) -> String {
+  let r = match type1.base {
+    CppTypeBase::TemplateParameter { ref nested_level, ref index } => {
+      let mut fake_type = type1.clone();
+      fake_type.base = CppTypeBase::Class {
+        name: format!("T_{}_{}", nested_level, index),
+        template_arguments: None,
+      };
+      fake_type.to_cpp_code(None)
+    }
+    CppTypeBase::Class { ref name, ref template_arguments } => {
+      if let &Some(ref template_arguments) = template_arguments {
+        Ok(format!("{}<{}>",
+                   name,
+                   template_arguments.iter()
+                     .map(|x| type_to_cpp_code_permissive(x))
+                     .join(", ")))
+      } else {
+        type1.to_cpp_code(None)
+      }
+    }
+    CppTypeBase::FunctionPointer { .. } => type1.to_cpp_code(Some(&"FN_PTR".to_string())),
+    _ => type1.to_cpp_code(None),
+  };
+  r.unwrap_or_else(|_| "[?]".to_string())
 }
 
 impl CppMethodKind {
@@ -173,46 +201,27 @@ impl CppMethod {
     Ok(results)
   }
 
+  pub fn full_name(&self) -> String {
+    if let Some(ref info) = self.class_membership {
+      format!("{}::{}",
+              type_to_cpp_code_permissive(&CppType {
+                indirection: CppTypeIndirection::None,
+                is_const: false,
+                base: info.class_type.clone(),
+              }),
+              self.name)
+    } else {
+      self.name.clone()
+    }
+  }
+
   /// Returns short text representing values in this method
   /// (only for debug output purposes).
   pub fn short_text(&self) -> String {
-    fn type_to_cpp_code_permissive(type1: &CppType) -> String {
-      let r = match type1.base {
-        CppTypeBase::TemplateParameter { ref nested_level, ref index } => {
-          let mut fake_type = type1.clone();
-          fake_type.base = CppTypeBase::Class {
-            name: format!("T_{}_{}", nested_level, index),
-            template_arguments: None,
-          };
-          fake_type.to_cpp_code(None)
-        }
-        CppTypeBase::Class { ref name, ref template_arguments } => {
-          if let &Some(ref template_arguments) = template_arguments {
-            Ok(format!("{}<{}>",
-                       name,
-                       template_arguments.iter()
-                         .map(|x| type_to_cpp_code_permissive(x))
-                         .join(", ")))
-          } else {
-            type1.to_cpp_code(None)
-          }
-        }
-        CppTypeBase::FunctionPointer { .. } => type1.to_cpp_code(Some(&"FN_PTR".to_string())),
-        _ => type1.to_cpp_code(None),
-      };
-      r.unwrap_or_else(|_| "[?]".to_string())
-    }
+
 
     let mut s = String::new();
-    let mut name = self.name.clone();
     if let Some(ref info) = self.class_membership {
-      name = format!("{}::{}",
-                     type_to_cpp_code_permissive(&CppType {
-                       indirection: CppTypeIndirection::None,
-                       is_const: false,
-                       base: info.class_type.clone(),
-                     }),
-                     name);
       if info.is_virtual {
         s = format!("{} virtual", s);
       }
@@ -241,7 +250,7 @@ impl CppMethod {
       s = format!("{} [var args]", s);
     }
     s = format!("{} {}", s, type_to_cpp_code_permissive(&self.return_type));
-    s = format!("{} {}", s, name);
+    s = format!("{} {}", s, self.full_name());
     s = format!("{}({})",
                 s,
                 self.arguments
@@ -304,6 +313,11 @@ impl CppMethod {
       result.push(t);
     }
     result.push(self.return_type.clone());
+    if let Some(ref operator) = self.operator {
+      if let &CppOperator::Conversion(ref cpp_type) = operator {
+        result.push(cpp_type.clone());
+      }
+    }
     result
   }
 }

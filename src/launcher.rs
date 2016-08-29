@@ -182,7 +182,7 @@ pub fn run(lib_spec_path: PathBuf, output_dir_path_orig: PathBuf) {
   fs::create_dir_all(&c_lib_tmp_path).unwrap();
   log::info(format!("Generating C wrapper library ({}).", c_lib_name));
 
-  let cpp_ffi_headers = cpp_ffi_generator::run(&parse_result, &lib_spec.cpp.include_file_blacklist);
+  let cpp_ffi_headers = cpp_ffi_generator::run(&parse_result, lib_spec.cpp.clone());
 
   let code_gen = CppCodeGenerator::new(c_lib_name.clone(), c_lib_tmp_path.clone());
   code_gen.generate_template_files(&lib_spec.cpp.include_file,
