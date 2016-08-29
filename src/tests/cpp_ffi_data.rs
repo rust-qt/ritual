@@ -204,18 +204,18 @@ fn signature_class_method() {
                         original_type: CppType {
                           indirection: CppTypeIndirection::Ptr,
                           is_const: false,
-                          base: CppTypeBase::Class {
+                          base: CppTypeBase::Class(CppTypeClassBase {
                             name: "Class1".to_string(),
                             template_arguments: None,
-                          },
+                          }),
                         },
                         ffi_type: CppType {
                           indirection: CppTypeIndirection::Ptr,
                           is_const: false,
-                          base: CppTypeBase::Class {
+                          base: CppTypeBase::Class(CppTypeClassBase {
                             name: "Class1".to_string(),
                             template_arguments: None,
-                          },
+                          }),
                         },
                         conversion: IndirectionChange::NoChange,
                       },
@@ -268,18 +268,18 @@ fn signature_class_method_const() {
                         original_type: CppType {
                           indirection: CppTypeIndirection::Ptr,
                           is_const: true,
-                          base: CppTypeBase::Class {
+                          base: CppTypeBase::Class(CppTypeClassBase {
                             name: "Class1".to_string(),
                             template_arguments: None,
-                          },
+                          }),
                         },
                         ffi_type: CppType {
                           indirection: CppTypeIndirection::Ptr,
                           is_const: true,
-                          base: CppTypeBase::Class {
+                          base: CppTypeBase::Class(CppTypeClassBase {
                             name: "Class1".to_string(),
                             template_arguments: None,
-                          },
+                          }),
                         },
                         conversion: IndirectionChange::NoChange,
                       },
@@ -505,10 +505,10 @@ fn c_base_name_conversion_operator() {
   method.class_membership = Some(empty_membership("MyClass"));
   method.operator = Some(CppOperator::Conversion(CppType {
     is_const: true,
-    base: CppTypeBase::Class {
+    base: CppTypeBase::Class(CppTypeClassBase {
       name: "QPoint".to_string(),
       template_arguments: None,
-    },
+    }),
     indirection: CppTypeIndirection::Ref,
   }));
   let include_file = "QRect".to_string();

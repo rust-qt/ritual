@@ -157,10 +157,10 @@ fn functions_with_class_arg() {
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::None,
                                    is_const: false,
-                                   base: CppTypeBase::Class {
+                                   base: CppTypeBase::Class(CppTypeClassBase {
                                      name: "Magic".to_string(),
                                      template_arguments: None,
-                                   },
+                                   }),
                                  },
                                  has_default_value: false,
                                }],
@@ -184,10 +184,10 @@ fn functions_with_class_arg() {
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::Ptr,
                                    is_const: false,
-                                   base: CppTypeBase::Class {
+                                   base: CppTypeBase::Class(CppTypeClassBase {
                                      name: "Magic".to_string(),
                                      template_arguments: None,
-                                   },
+                                   }),
                                  },
                                  has_default_value: false,
                                }],
@@ -211,10 +211,10 @@ fn functions_with_class_arg() {
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::Ref,
                                    is_const: true,
-                                   base: CppTypeBase::Class {
+                                   base: CppTypeBase::Class(CppTypeClassBase {
                                      name: "Magic".to_string(),
                                      template_arguments: None,
-                                   },
+                                   }),
                                  },
                                  has_default_value: false,
                                }],
@@ -315,20 +315,20 @@ fn free_func_operator_sub() {
                  return_type: CppType {
                    indirection: CppTypeIndirection::None,
                    is_const: false,
-                   base: CppTypeBase::Class {
+                   base: CppTypeBase::Class(CppTypeClassBase {
                      name: "C1".to_string(),
                      template_arguments: None,
-                   },
+                   }),
                  },
                  arguments: vec![CppFunctionArgument {
                                    name: "a".to_string(),
                                    argument_type: CppType {
                                      indirection: CppTypeIndirection::None,
                                      is_const: false,
-                                     base: CppTypeBase::Class {
+                                     base: CppTypeBase::Class(CppTypeClassBase {
                                        name: "C1".to_string(),
                                        template_arguments: None,
-                                     },
+                                     }),
                                    },
                                    has_default_value: false,
                                  },
@@ -337,10 +337,10 @@ fn free_func_operator_sub() {
                                    argument_type: CppType {
                                      indirection: CppTypeIndirection::None,
                                      is_const: false,
-                                     base: CppTypeBase::Class {
+                                     base: CppTypeBase::Class(CppTypeClassBase {
                                        name: "C1".to_string(),
                                        template_arguments: None,
-                                     },
+                                     }),
                                    },
                                    has_default_value: false,
                                  }],
@@ -376,7 +376,7 @@ fn simple_class_method() {
              CppMethod {
                name: "func1".to_string(),
                class_membership: Some(CppMethodClassMembership {
-                 class_type: CppTypeBase::Class {
+                 class_type: CppTypeClassBase {
                    name: "MyClass".to_string(),
                    template_arguments: None,
                  },
@@ -510,7 +510,7 @@ fn template_class_method() {
              CppMethod {
                name: "get".to_string(),
                class_membership: Some(CppMethodClassMembership {
-                 class_type: CppTypeBase::Class {
+                 class_type: CppTypeClassBase {
                    name: "MyVector".to_string(),
                    template_arguments: Some(vec![CppType {
                                                    indirection: CppTypeIndirection::None,
@@ -621,10 +621,10 @@ fn template_instantiation() {
              CppType {
                indirection: CppTypeIndirection::None,
                is_const: false,
-               base: CppTypeBase::Class {
+               base: CppTypeBase::Class(CppTypeClassBase {
                  name: "Vector".to_string(),
                  template_arguments: Some(vec![int.clone()]),
-               },
+               }),
              });
   assert!(data.template_instantiations.contains_key("Vector"));
   assert!(data.template_instantiations["Vector"].len() == 1);
@@ -649,10 +649,10 @@ fn derived_class_simple() {
                  &vec![CppType {
                          indirection: CppTypeIndirection::None,
                          is_const: false,
-                         base: CppTypeBase::Class {
+                         base: CppTypeBase::Class(CppTypeClassBase {
                            name: "Base".to_string(),
                            template_arguments: None,
-                         },
+                         }),
                        }]);
     }
     _ => panic!("invalid type kind"),
@@ -673,18 +673,18 @@ fn derived_class_multiple() {
                  &vec![CppType {
                          indirection: CppTypeIndirection::None,
                          is_const: false,
-                         base: CppTypeBase::Class {
+                         base: CppTypeBase::Class(CppTypeClassBase {
                            name: "Base2".to_string(),
                            template_arguments: None,
-                         },
+                         }),
                        },
                        CppType {
                          indirection: CppTypeIndirection::None,
                          is_const: false,
-                         base: CppTypeBase::Class {
+                         base: CppTypeBase::Class(CppTypeClassBase {
                            name: "Base1".to_string(),
                            template_arguments: None,
-                         },
+                         }),
                        }]);
     }
     _ => panic!("invalid type kind"),

@@ -145,12 +145,14 @@ pub enum CppMethodKind {
   Destructor,
 }
 
+
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[derive(Serialize, Deserialize)]
 pub struct CppMethodClassMembership {
   /// Type of the class where this method belong. This is used to construct
   /// type of "this" pointer and return type of constructors.
-  pub class_type: CppTypeBase,
+  pub class_type: CppTypeClassBase,
   /// Whether this method is a constructor, a destructor or an operator
   pub kind: CppMethodKind,
   /// True if this is a virtual method
@@ -372,6 +374,18 @@ pub enum CppSpecificNumericTypeKind {
   FloatingPoint,
 }
 
+/// Information about base C++ class type
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppTypeClassBase {
+  /// Name, including namespaces and nested classes
+  pub name: String,
+  /// For template classes, C++ types used as template
+  /// arguments in this type,
+  /// like [QString, int] in QHash<QString, int>
+  pub template_arguments: Option<Vec<CppType>>,
+}
+
 /// Base C++ type. CppType can add indirection
 /// and constness to CppTypeBase, but otherwise
 /// this enum lists all supported types.
@@ -405,14 +419,7 @@ pub enum CppTypeBase {
     name: String,
   },
   /// Class type
-  Class {
-    /// Name, including namespaces and nested classes
-    name: String,
-    /// For template classes, C++ types used as template
-    /// arguments in this type,
-    /// like [QString, int] in QHash<QString, int>
-    template_arguments: Option<Vec<CppType>>,
-  },
+  Class(CppTypeClassBase),
   /// Template parameter, like "T" anywhere inside
   /// QVector<T> declaration
   TemplateParameter {

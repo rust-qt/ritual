@@ -8,7 +8,6 @@ use utils::add_to_multihash;
 use serializable::CppLibSpec;
 
 struct CGenerator<'a> {
-  template_classes: Vec<String>,
   abstract_classes: Vec<String>,
   cpp_data: &'a CppData,
   cpp_lib_spec: CppLibSpec,
@@ -43,19 +42,7 @@ pub fn run(cpp_data: &CppData, cpp_lib_spec: CppLibSpec) -> Vec<CppFfiHeaderData
     })
     .collect();
   log::info(format!("Abstract classes: {:?}", abstract_classes));
-  let template_classes = cpp_data.types
-    .iter()
-    .filter_map(|t| {
-      if cpp_data.is_template_class(&t.name) {
-        Some(t.name.clone())
-      } else {
-        None
-      }
-    })
-    .collect();
-  log::info(format!("Template classes: {:?}", template_classes));
   let generator = CGenerator {
-    template_classes: template_classes,
     cpp_data: cpp_data,
     abstract_classes: abstract_classes,
     cpp_lib_spec: cpp_lib_spec,
@@ -101,8 +88,8 @@ impl<'a> CGenerator<'a> {
     }
     if let Some(ref membership) = method.class_membership {
       if membership.kind == CppMethodKind::Constructor {
-        let class_name = membership.class_type.maybe_name().unwrap();
-        if self.abstract_classes.iter().find(|x| x == &class_name).is_some() {
+        let class_name = &membership.class_type.name;
+        if self.abstract_classes.iter().find(|&x| x == class_name).is_some() {
           log::debug(format!("Method is skipped:\n{}\nConstructors are not allowed for abstract \
                               classes.\n",
                              method.short_text()));

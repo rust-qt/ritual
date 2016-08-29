@@ -3,7 +3,7 @@ use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership, CppFunction
 use cpp_operator::CppOperator;
 use std::collections::HashSet;
 use log;
-use cpp_type::{CppType, CppTypeBase, CppTypeIndirection};
+use cpp_type::{CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
 
 pub use serializable::{EnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
                        CppTypeData, CppData, CppTemplateInstantiation};
@@ -69,15 +69,13 @@ impl CppTypeData {
   /// of an object of this type. See
   /// default_template_parameters() documentation
   /// for details about handling template parameters.
-  pub fn default_class_type(&self) -> CppTypeBase {
-    match self.kind {
-      CppTypeKind::Class { .. } => {
-        CppTypeBase::Class {
-          name: self.name.clone(),
-          template_arguments: self.default_template_parameters(),
-        }
-      }
-      _ => panic!("not a class"),
+  pub fn default_class_type(&self) -> CppTypeClassBase {
+    if !self.is_class() {
+      panic!("not a class");
+    }
+    CppTypeClassBase {
+      name: self.name.clone(),
+      template_arguments: self.default_template_parameters(),
     }
   }
 
@@ -123,7 +121,7 @@ impl CppTypeData {
   pub fn inherits(&self, class_name: &String) -> bool {
     if let CppTypeKind::Class { ref bases, .. } = self.kind {
       for base in bases {
-        if let CppTypeBase::Class { ref name, .. } = base.base {
+        if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base {
           if name == class_name {
             return true;
           }
@@ -185,7 +183,8 @@ impl CppData {
       for type1 in &self.types {
         if let CppTypeKind::Class { ref bases, .. } = type1.kind {
           for base in bases {
-            if let CppTypeBase::Class { ref name, ref template_arguments } = base.base {
+            if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
+                   base.base {
               if name == base_name {
                 log::debug(format!("Adding inherited methods_from {} to {}",
                                    base_name,
@@ -196,15 +195,11 @@ impl CppData {
                   .iter()
                   .filter(|method| {
                     if let Some(ref info) = method.class_membership {
-                      if let CppTypeBase::Class { ref name, ref template_arguments } =
-                             info.class_type {
-                        name == base_name && template_arguments == base_template_arguments &&
-                        !info.kind.is_constructor() &&
-                        !info.kind.is_destructor() &&
-                        method.operator != Some(CppOperator::Assignment)
-                      } else {
-                        panic!("class expected");
-                      }
+                      &info.class_type.name == base_name &&
+                      &info.class_type.template_arguments == base_template_arguments &&
+                      !info.kind.is_constructor() &&
+                      !info.kind.is_destructor() &&
+                      method.operator != Some(CppOperator::Assignment)
                     } else {
                       false
                     }
@@ -297,6 +292,7 @@ impl CppData {
   }
 
   /// Checks if specified class is a template class.
+  #[allow(dead_code)]
   pub fn is_template_class(&self, name: &String) -> bool {
     if let Some(type_info) = self.types.iter().find(|t| &t.name == name) {
       if let CppTypeKind::Class { ref template_arguments, ref bases, .. } = type_info.kind {
@@ -304,7 +300,8 @@ impl CppData {
           return true;
         }
         for base in bases {
-          if let CppTypeBase::Class { ref name, ref template_arguments } = base.base {
+          if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
+                 base.base {
             if template_arguments.is_some() {
               return true;
             }
@@ -330,7 +327,7 @@ impl CppData {
     if let Some(type_info) = self.types.iter().find(|t| &t.name == class_name) {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
         for base in bases {
-          if let CppTypeBase::Class { ref name, .. } = base.base {
+          if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base {
             if self.has_virtual_destructor(name) {
               return true;
             }
@@ -352,7 +349,7 @@ impl CppData {
     if let Some(type_info) = self.types.iter().find(|t| &t.name == class_name) {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
         for base in bases {
-          if let CppTypeBase::Class { ref name, .. } = base.base {
+          if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base {
             for method in self.get_all_methods(name) {
               if own_methods.iter()
                 .find(|m| m.name == method.name && m.argument_types_equal(&method))
@@ -392,7 +389,7 @@ impl CppData {
     if let Some(type_info) = self.types.iter().find(|t| &t.name == class_name) {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
         for base in bases {
-          if let CppTypeBase::Class { ref name, .. } = base.base {
+          if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base {
             for method in self.get_pure_virtual_methods(name) {
               if own_methods.iter()
                 .find(|m| m.name == method.name && m.argument_types_equal(&method))
@@ -422,7 +419,8 @@ impl CppData {
     let mut new_methods = Vec::new();
     for method in &self.methods {
       for type1 in method.all_involved_types() {
-        if let CppTypeBase::Class { ref name, ref template_arguments } = type1.base {
+        if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
+               type1.base {
           if let &Some(ref template_arguments) = template_arguments {
             assert!(!template_arguments.is_empty());
             if template_arguments.iter().find(|x| !x.base.is_template_parameter()).is_none() {

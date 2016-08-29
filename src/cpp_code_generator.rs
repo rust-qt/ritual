@@ -153,7 +153,12 @@ impl CppCodeGenerator {
         let class_type = CppType {
           indirection: CppTypeIndirection::None,
           is_const: false,
-          base: method.cpp_method.class_membership.as_ref().unwrap().class_type.clone(),
+          base: CppTypeBase::Class(method.cpp_method
+            .class_membership
+            .as_ref()
+            .unwrap()
+            .class_type
+            .clone()),
         };
         match method.allocation_place {
           ReturnValueAllocationPlace::Stack => {
@@ -177,8 +182,7 @@ impl CppCodeGenerator {
         let scope_specifier = if let Some(ref class_membership) = method.cpp_method
           .class_membership {
           if class_membership.is_static {
-            format!("{}::",
-                    class_membership.class_type.to_cpp_code(None).unwrap())
+            format!("{}::", class_membership.class_type.to_cpp_code().unwrap())
           } else {
             if let Some(arg) = method.c_signature
               .arguments

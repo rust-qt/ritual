@@ -30,7 +30,7 @@ pub fn empty_membership(class_name: &'static str) -> CppMethodClassMembership {
     is_static: false,
     visibility: CppVisibility::Public,
     is_signal: false,
-    class_type: CppTypeBase::Class {
+    class_type: CppTypeClassBase {
       name: class_name.to_string(),
       template_arguments: None,
     },
@@ -240,19 +240,19 @@ fn needs_allocation_place_variants() {
   method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
-    base: CppTypeBase::Class {
+    base: CppTypeBase::Class(CppTypeClassBase {
       name: "QRect".to_string(),
       template_arguments: None,
-    },
+    }),
   };
   assert!(method1.needs_allocation_place_variants());
   method1.return_type = CppType {
     indirection: CppTypeIndirection::Ptr,
     is_const: false,
-    base: CppTypeBase::Class {
+    base: CppTypeBase::Class(CppTypeClassBase {
       name: "QRect".to_string(),
       template_arguments: None,
-    },
+    }),
   };
   assert!(!method1.needs_allocation_place_variants());
   if let Some(ref mut info) = method1.class_membership {
@@ -320,10 +320,10 @@ fn c_signature_method_with_this() {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
-      base: CppTypeBase::Class {
+      base: CppTypeBase::Class(CppTypeClassBase {
         name: "MyClass2".to_string(),
         template_arguments: None,
-      },
+      }),
     },
     name: "my_arg".to_string(),
     has_default_value: false,
@@ -338,7 +338,7 @@ fn c_signature_method_with_this() {
   assert!(r.arguments.len() == 2);
   assert_eq!(r.arguments[0].name, "this_ptr");
   assert_eq!(r.arguments[0].argument_type.ffi_type.base,
-             method1.class_membership.as_ref().unwrap().class_type);
+             CppTypeBase::Class(method1.class_membership.as_ref().unwrap().class_type.clone()));
   assert_eq!(r.arguments[0].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r.arguments[0].argument_type.conversion,
@@ -432,10 +432,10 @@ fn c_signature_constructor() {
              CppType {
                indirection: CppTypeIndirection::Ptr,
                is_const: false,
-               base: CppTypeBase::Class {
+               base: CppTypeBase::Class(CppTypeClassBase {
                  name: "MyClass".to_string(),
                  template_arguments: None,
-               },
+               }),
              });
   assert_eq!(r_stack.arguments[1].argument_type.conversion,
              IndirectionChange::ValueToPointer);
@@ -461,10 +461,10 @@ fn c_signature_constructor() {
              CppType {
                indirection: CppTypeIndirection::Ptr,
                is_const: false,
-               base: CppTypeBase::Class {
+               base: CppTypeBase::Class(CppTypeClassBase {
                  name: "MyClass".to_string(),
                  template_arguments: None,
-               },
+               }),
              });
   assert_eq!(r_heap.return_type.conversion,
              IndirectionChange::ValueToPointer);
@@ -488,7 +488,7 @@ fn c_signature_destructor() {
   assert!(r_stack.arguments.len() == 1);
   assert_eq!(r_stack.arguments[0].name, "this_ptr");
   assert_eq!(&r_stack.arguments[0].argument_type.ffi_type.base,
-             &method1.class_membership.as_ref().unwrap().class_type);
+             &CppTypeBase::Class(method1.class_membership.as_ref().unwrap().class_type.clone()));
   assert_eq!(r_stack.arguments[0].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r_stack.arguments[0].argument_type.conversion,
@@ -501,7 +501,7 @@ fn c_signature_destructor() {
   assert!(r_heap.arguments.len() == 1);
   assert_eq!(r_heap.arguments[0].name, "this_ptr");
   assert_eq!(r_heap.arguments[0].argument_type.ffi_type.base,
-             method1.class_membership.as_ref().unwrap().class_type);
+             CppTypeBase::Class(method1.class_membership.as_ref().unwrap().class_type.clone()));
   assert_eq!(r_heap.arguments[0].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r_heap.arguments[0].argument_type.conversion,
@@ -518,19 +518,19 @@ fn c_signature_method_returning_class() {
   method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
-    base: CppTypeBase::Class {
+    base: CppTypeBase::Class(CppTypeClassBase {
       name: "MyClass3".to_string(),
       template_arguments: None,
-    },
+    }),
   };
   method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
-      base: CppTypeBase::Class {
+      base: CppTypeBase::Class(CppTypeClassBase {
         name: "MyClass2".to_string(),
         template_arguments: None,
-      },
+      }),
     },
     name: "my_arg".to_string(),
     has_default_value: false,
@@ -539,7 +539,7 @@ fn c_signature_method_returning_class() {
   assert!(r_stack.arguments.len() == 3);
   assert_eq!(r_stack.arguments[0].name, "this_ptr");
   assert_eq!(&r_stack.arguments[0].argument_type.ffi_type.base,
-             &method1.class_membership.as_ref().unwrap().class_type);
+             &CppTypeBase::Class(method1.class_membership.as_ref().unwrap().class_type.clone()));
   assert_eq!(r_stack.arguments[0].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r_stack.arguments[0].argument_type.conversion,
@@ -561,10 +561,10 @@ fn c_signature_method_returning_class() {
              CppType {
                indirection: CppTypeIndirection::Ptr,
                is_const: false,
-               base: CppTypeBase::Class {
+               base: CppTypeBase::Class(CppTypeClassBase {
                  name: "MyClass3".to_string(),
                  template_arguments: None,
-               },
+               }),
              });
   assert_eq!(r_stack.arguments[2].argument_type.conversion,
              IndirectionChange::ValueToPointer);
@@ -577,7 +577,7 @@ fn c_signature_method_returning_class() {
   assert!(r_heap.arguments.len() == 2);
   assert_eq!(r_heap.arguments[0].name, "this_ptr");
   assert_eq!(r_heap.arguments[0].argument_type.ffi_type.base,
-             method1.class_membership.as_ref().unwrap().class_type);
+             CppTypeBase::Class(method1.class_membership.as_ref().unwrap().class_type.clone()));
   assert_eq!(r_heap.arguments[0].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r_heap.arguments[0].argument_type.conversion,
@@ -598,10 +598,10 @@ fn c_signature_method_returning_class() {
              CppType {
                indirection: CppTypeIndirection::Ptr,
                is_const: false,
-               base: CppTypeBase::Class {
+               base: CppTypeBase::Class(CppTypeClassBase {
                  name: "MyClass3".to_string(),
                  template_arguments: None,
-               },
+               }),
              });
   assert_eq!(r_heap.return_type.conversion,
              IndirectionChange::ValueToPointer);
@@ -701,7 +701,7 @@ fn short_text1() {
       is_static: false,
       visibility: CppVisibility::Protected,
       is_signal: false,
-      class_type: CppTypeBase::Class {
+      class_type: CppTypeClassBase {
         name: "Class1".to_string(),
         template_arguments: None,
       },

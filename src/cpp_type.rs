@@ -2,7 +2,7 @@
 use cpp_ffi_data::{CppFfiType, IndirectionChange};
 use caption_strategy::TypeCaptionStrategy;
 pub use serializable::{CppBuiltInNumericType, CppSpecificNumericTypeKind, CppTypeBase, CppType,
-                       CppTypeIndirection};
+                       CppTypeIndirection, CppTypeClassBase};
 extern crate regex;
 
 impl CppTypeIndirection {
@@ -87,7 +87,53 @@ impl CppBuiltInNumericType {
 }
 
 
+impl CppTypeClassBase {
+  pub fn to_cpp_code(&self) -> Result<String, String> {
+    match self.template_arguments {
+      Some(ref args) => {
+        let mut arg_texts = Vec::new();
+        for arg in args {
+          arg_texts.push(try!(arg.to_cpp_code(None)));
+        }
+        Ok(format!("{}< {} >", self.name, arg_texts.join(", ")))
+      }
+      None => Ok(self.name.clone()),
+    }
 
+  }
+  pub fn caption(&self) -> String {
+    let name_caption = self.name.replace("::", "_");
+    match self.template_arguments {
+      Some(ref args) => {
+        let mut arg_texts = Vec::new();
+        for arg in args {
+          arg_texts.push(arg.caption(TypeCaptionStrategy::Full));
+        }
+        format!("{}_{}", name_caption, arg_texts.join("_"))
+      }
+      None => name_caption,
+    }
+  }
+
+  pub fn instantiate_class(&self,
+                           nested_level1: i32,
+                           template_arguments1: &Vec<CppType>)
+                           -> Result<CppTypeClassBase, String> {
+    Ok(CppTypeClassBase {
+      name: self.name.clone(),
+      template_arguments: match self.template_arguments {
+        Some(ref template_arguments) => {
+          let mut args = Vec::new();
+          for arg in template_arguments {
+            args.push(try!(arg.instantiate(nested_level1, template_arguments1)));
+          }
+          Some(args)
+        }
+        None => None,
+      },
+    })
+  }
+}
 
 impl CppTypeBase {
   #[allow(dead_code)]
@@ -99,7 +145,7 @@ impl CppTypeBase {
   }
   pub fn is_class(&self) -> bool {
     match self {
-      &CppTypeBase::Class { .. } => true,
+      &CppTypeBase::Class(..) => true,
       _ => false,
     }
   }
@@ -112,7 +158,7 @@ impl CppTypeBase {
   pub fn is_or_contains_template_parameter(&self) -> bool {
     match self {
       &CppTypeBase::TemplateParameter { .. } => true,
-      &CppTypeBase::Class { ref template_arguments, .. } => {
+      &CppTypeBase::Class(CppTypeClassBase { ref template_arguments, .. }) => {
         if let &Some(ref template_arguments) = template_arguments {
           template_arguments.iter()
             .find(|arg| arg.base.is_or_contains_template_parameter())
@@ -122,30 +168,6 @@ impl CppTypeBase {
         }
       }
       _ => false,
-    }
-  }
-
-  pub fn instantiate_class(&self,
-                           nested_level1: i32,
-                           template_arguments1: &Vec<CppType>)
-                           -> Result<CppTypeBase, String> {
-    match self {
-      &CppTypeBase::Class { ref name, ref template_arguments } => {
-        Ok(CppTypeBase::Class {
-          name: name.clone(),
-          template_arguments: match template_arguments {
-            &Some(ref template_arguments) => {
-              let mut args = Vec::new();
-              for arg in template_arguments {
-                args.push(try!(arg.instantiate(nested_level1, template_arguments1)));
-              }
-              Some(args)
-            }
-            &None => None,
-          },
-        })
-      }
-      _ => Ok(self.clone()),
     }
   }
 
@@ -166,18 +188,7 @@ impl CppTypeBase {
       CppTypeBase::Enum { ref name } => Ok(name.clone()),
       CppTypeBase::SpecificNumeric { ref name, .. } => Ok(name.clone()),
       CppTypeBase::PointerSizedInteger { ref name, .. } => Ok(name.clone()),
-      CppTypeBase::Class { ref name, ref template_arguments } => {
-        match *template_arguments {
-          Some(ref args) => {
-            let mut arg_texts = Vec::new();
-            for arg in args {
-              arg_texts.push(try!(arg.to_cpp_code(None)));
-            }
-            Ok(format!("{}< {} >", name, arg_texts.join(", ")))
-          }
-          None => Ok(name.clone()),
-        }
-      }
+      CppTypeBase::Class(ref info) => info.to_cpp_code(),
       CppTypeBase::TemplateParameter { .. } => {
         return Err(format!("template parameters are not allowed to produce C++ code without \
                             instantiation"));
@@ -208,7 +219,7 @@ impl CppTypeBase {
       CppTypeBase::SpecificNumeric { ref name, .. } => Some(name),
       CppTypeBase::PointerSizedInteger { ref name, .. } => Some(name),
       CppTypeBase::Enum { ref name } => Some(name),
-      CppTypeBase::Class { ref name, .. } => Some(name),
+      CppTypeBase::Class(CppTypeClassBase { ref name, .. }) => Some(name),
       _ => None,
     }
   }
@@ -222,19 +233,7 @@ impl CppTypeBase {
       CppTypeBase::SpecificNumeric { ref name, .. } => name.clone(),
       CppTypeBase::PointerSizedInteger { ref name, .. } => name.clone(),
       CppTypeBase::Enum { ref name } => name.replace("::", "_"),
-      CppTypeBase::Class { ref name, ref template_arguments } => {
-        let name_caption = name.replace("::", "_");
-        match *template_arguments {
-          Some(ref args) => {
-            let mut arg_texts = Vec::new();
-            for arg in args {
-              arg_texts.push(arg.caption(TypeCaptionStrategy::Full));
-            }
-            format!("{}_{}", name_caption, arg_texts.join("_"))
-          }
-          None => name_caption,
-        }
-      }
+      CppTypeBase::Class(ref data) => data.caption(),
       CppTypeBase::TemplateParameter { .. } => {
         panic!("template parameters are not allowed to have captions");
       }
@@ -317,12 +316,9 @@ impl CppType {
             CppTypeIndirection::Ptr |
             CppTypeIndirection::PtrPtr => {}
             CppTypeIndirection::None => {
-              match arg.base {
-                CppTypeBase::Class { .. } => {
-                  return Err(format!("Function pointers containing classes by value are not \
-                                      supported"));
-                }
-                _ => {}
+              if arg.base.is_class() {
+                return Err(format!("Function pointers containing classes by value are not \
+                                    supported"));
               }
             }
           }
@@ -349,7 +345,7 @@ impl CppType {
       }
       _ => return Err("Unsupported level of indirection".to_string()),
     }
-    if let CppTypeBase::Class { ref name, .. } = self.base {
+    if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = self.base {
       if name == "QFlags" {
         assert!(self.indirection == CppTypeIndirection::None);
         conversion = IndirectionChange::QFlagsToUInt;
@@ -398,7 +394,7 @@ impl CppType {
   /// Checks if a function with this return type would need
   /// to have 2 wrappers with 2 different return value allocation places
   pub fn needs_allocation_place_variants(&self) -> bool {
-    if let CppTypeBase::Class { ref name, .. } = self.base {
+    if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = self.base {
       if name == "QFlags" {
         return false; // converted to uint in FFI
       }
@@ -432,7 +428,12 @@ impl CppType {
     Ok(CppType {
       is_const: self.is_const,
       indirection: self.indirection.clone(),
-      base: try!(self.base.instantiate_class(nested_level1, template_arguments1)),
+      base: match self.base {
+        CppTypeBase::Class(ref data) => {
+          CppTypeBase::Class(try!(data.instantiate_class(nested_level1, template_arguments1)))
+        }
+        _ => self.base.clone(),
+      },
     })
 
   }

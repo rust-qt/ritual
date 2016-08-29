@@ -1,5 +1,5 @@
 use cpp_type::{CppType, CppTypeRole, CppTypeIndirection, CppTypeBase, CppBuiltInNumericType,
-               CppSpecificNumericTypeKind};
+               CppSpecificNumericTypeKind, CppTypeClassBase};
 use caption_strategy::TypeCaptionStrategy;
 use cpp_ffi_data::IndirectionChange;
 
@@ -208,10 +208,10 @@ fn class_value() {
   let type1 = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
-    base: CppTypeBase::Class {
+    base: CppTypeBase::Class(CppTypeClassBase {
       name: "QPoint".to_string(),
       template_arguments: None,
-    },
+    }),
   };
   assert_eq!(type1.is_void(), false);
   assert_eq!(type1.base.is_void(), false);
@@ -231,10 +231,10 @@ fn class_value() {
              &CppType {
                indirection: CppTypeIndirection::Ptr,
                is_const: false,
-               base: CppTypeBase::Class {
+               base: CppTypeBase::Class(CppTypeClassBase {
                  name: "QPoint".to_string(),
                  template_arguments: None,
-               },
+               }),
              });
   assert_eq!(&ffi_return_type.ffi_type.to_cpp_code(None).unwrap(),
              "QPoint*");
@@ -247,10 +247,10 @@ fn class_value() {
              &CppType {
                indirection: CppTypeIndirection::Ptr,
                is_const: true,
-               base: CppTypeBase::Class {
+               base: CppTypeBase::Class(CppTypeClassBase {
                  name: "QPoint".to_string(),
                  template_arguments: None,
-               },
+               }),
              });
   assert_eq!(&ffi_arg.ffi_type.to_cpp_code(None).unwrap(),
              "const QPoint*");
@@ -264,10 +264,10 @@ fn class_const_ref() {
   let type1 = CppType {
     indirection: CppTypeIndirection::Ref,
     is_const: true,
-    base: CppTypeBase::Class {
+    base: CppTypeBase::Class(CppTypeClassBase {
       name: "QRectF".to_string(),
       template_arguments: None,
-    },
+    }),
   };
   assert_eq!(type1.is_void(), false);
   assert_eq!(type1.base.is_void(), false);
@@ -288,10 +288,10 @@ fn class_const_ref() {
                &CppType {
                  indirection: CppTypeIndirection::Ptr,
                  is_const: true,
-                 base: CppTypeBase::Class {
+                 base: CppTypeBase::Class(CppTypeClassBase {
                    name: "QRectF".to_string(),
                    template_arguments: None,
-                 },
+                 }),
                });
     assert_eq!(&ffi1.ffi_type.to_cpp_code(None).unwrap(), "const QRectF*");
     assert_eq!(ffi1.conversion, IndirectionChange::ReferenceToPointer);
@@ -305,10 +305,10 @@ fn class_mut_ref() {
   let type1 = CppType {
     indirection: CppTypeIndirection::Ref,
     is_const: false,
-    base: CppTypeBase::Class {
+    base: CppTypeBase::Class(CppTypeClassBase {
       name: "QRectF".to_string(),
       template_arguments: None,
-    },
+    }),
   };
   assert_eq!(type1.is_void(), false);
   assert_eq!(type1.base.is_void(), false);
@@ -329,10 +329,10 @@ fn class_mut_ref() {
                &CppType {
                  indirection: CppTypeIndirection::Ptr,
                  is_const: false,
-                 base: CppTypeBase::Class {
+                 base: CppTypeBase::Class(CppTypeClassBase {
                    name: "QRectF".to_string(),
                    template_arguments: None,
-                 },
+                 }),
                });
     assert_eq!(&ffi1.ffi_type.to_cpp_code(None).unwrap(), "QRectF*");
     assert_eq!(ffi1.conversion, IndirectionChange::ReferenceToPointer);
@@ -346,10 +346,10 @@ fn class_mut_ptr() {
   let type1 = CppType {
     indirection: CppTypeIndirection::Ptr,
     is_const: false,
-    base: CppTypeBase::Class {
+    base: CppTypeBase::Class(CppTypeClassBase {
       name: "QObject".to_string(),
       template_arguments: None,
-    },
+    }),
   };
   assert_eq!(type1.is_void(), false);
   assert_eq!(type1.base.is_void(), false);
@@ -372,18 +372,18 @@ fn class_with_template_args() {
   let args = Some(vec![CppType {
                          indirection: CppTypeIndirection::None,
                          is_const: false,
-                         base: CppTypeBase::Class {
+                         base: CppTypeBase::Class(CppTypeClassBase {
                            name: "QString".to_string(),
                            template_arguments: None,
-                         },
+                         }),
                        }]);
   let type1 = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
-    base: CppTypeBase::Class {
+    base: CppTypeBase::Class(CppTypeClassBase {
       name: "QVector".to_string(),
       template_arguments: args.clone(),
-    },
+    }),
   };
   assert_eq!(type1.is_void(), false);
   assert_eq!(type1.base.is_void(), false);
@@ -403,10 +403,10 @@ fn class_with_template_args() {
              &CppType {
                indirection: CppTypeIndirection::Ptr,
                is_const: false,
-               base: CppTypeBase::Class {
+               base: CppTypeBase::Class(CppTypeClassBase {
                  name: "QVector".to_string(),
                  template_arguments: args.clone(),
-               },
+               }),
              });
   assert_eq!(&ffi_return_type.ffi_type.to_cpp_code(None).unwrap(),
              "QVector< QString >*");
@@ -419,10 +419,10 @@ fn class_with_template_args() {
              &CppType {
                indirection: CppTypeIndirection::Ptr,
                is_const: true,
-               base: CppTypeBase::Class {
+               base: CppTypeBase::Class(CppTypeClassBase {
                  name: "QVector".to_string(),
                  template_arguments: args.clone(),
-               },
+               }),
              });
   assert_eq!(&ffi_arg.ffi_type.to_cpp_code(None).unwrap(),
              "const QVector< QString >*");
@@ -436,34 +436,33 @@ fn nested_template_cpp_code() {
   let type1 = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
-    base: CppTypeBase::Class {
+    base: CppTypeBase::Class(CppTypeClassBase {
       name: "QHash".to_string(),
       template_arguments: Some(vec![CppType {
                                       indirection: CppTypeIndirection::None,
                                       is_const: false,
-                                      base: CppTypeBase::Class {
+                                      base: CppTypeBase::Class(CppTypeClassBase {
                                         name: "QString".to_string(),
                                         template_arguments: None,
-                                      },
+                                      }),
                                     },
                                     CppType {
                                       indirection: CppTypeIndirection::None,
                                       is_const: false,
-                                      base: CppTypeBase::Class {
+                                      base: CppTypeBase::Class(CppTypeClassBase {
                                         name: "QList".to_string(),
-                                        template_arguments: Some(vec![CppType {
-                                                                        indirection:
-                                                                          CppTypeIndirection::None,
-                                                                        is_const: false,
-                                                                        base: CppTypeBase::Class {
-                                                                          name: "QString"
-                                                                            .to_string(),
-                                                                          template_arguments: None,
-                                                                        },
-                                                                      }]),
-                                      },
+                                        template_arguments:
+                                          Some(vec![CppType {
+                                                      indirection: CppTypeIndirection::None,
+                                                      is_const: false,
+                                                      base: CppTypeBase::Class(CppTypeClassBase {
+                                                        name: "QString".to_string(),
+                                                        template_arguments: None,
+                                                      }),
+                                                    }]),
+                                      }),
                                     }]),
-    },
+    }),
   };
   let code = type1.to_cpp_code(None).unwrap();
   assert_eq!(&code, "QHash< QString, QList< QString > >");
@@ -476,18 +475,18 @@ fn qflags() {
   let args = Some(vec![CppType {
                          indirection: CppTypeIndirection::None,
                          is_const: false,
-                         base: CppTypeBase::Class {
+                         base: CppTypeBase::Class(CppTypeClassBase {
                            name: "Qt::AlignmentFlag".to_string(),
                            template_arguments: None,
-                         },
+                         }),
                        }]);
   let type1 = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
-    base: CppTypeBase::Class {
+    base: CppTypeBase::Class(CppTypeClassBase {
       name: "QFlags".to_string(),
       template_arguments: args.clone(),
-    },
+    }),
   };
   assert_eq!(type1.is_void(), false);
   assert_eq!(type1.base.is_void(), false);

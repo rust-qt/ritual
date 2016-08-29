@@ -1,17 +1,18 @@
 use cpp_ffi_generator::{CppAndFfiData, CppFfiHeaderData};
 use cpp_ffi_data::CppAndFfiMethod;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
-               CppSpecificNumericTypeKind};
+               CppSpecificNumericTypeKind, CppTypeClassBase};
 use cpp_ffi_data::{CppFfiType, IndirectionChange};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
-use cpp_data::{CppTypeKind, EnumValue, CppTypeData};
+use cpp_data::{CppTypeKind, EnumValue};
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
                 RustMethodArguments, TraitImpl, TraitName};
 use cpp_method::ReturnValueAllocationPlace;
 use cpp_ffi_data::CppFfiArgumentMeaning;
-use utils::{CaseOperations, VecCaseOperations, WordIterator, add_to_multihash};
+use utils::{CaseOperations, VecCaseOperations, WordIterator, add_to_multihash, JoinWithString};
+use caption_strategy::TypeCaptionStrategy;
 use log;
 
 use std::collections::{HashMap, HashSet};
@@ -23,6 +24,19 @@ enum Case {
   /// Snake case: "one_two"
   Snake,
 }
+
+enum ProcessedTypeKind {
+  Enum { values: Vec<EnumValue> },
+  Class { size: i32 },
+}
+
+struct ProcessedTypeInfo {
+  cpp_name: String,
+  cpp_template_arguments: Option<Vec<CppType>>,
+  kind: ProcessedTypeKind,
+  rust_name: RustName,
+}
+
 
 /// If remove_qt_prefix is true, removes "Q" or "Qt"
 /// if it is first word of the string and not the only one word.
@@ -115,7 +129,7 @@ fn prepare_enum_values(values: &Vec<EnumValue>, name: &String) -> Vec<EnumValue>
 pub struct RustGenerator {
   input_data: CppAndFfiData,
   config: RustGeneratorConfig,
-  cpp_to_rust_type_map: HashMap<String, RustName>,
+  processed_types: Vec<ProcessedTypeInfo>,
 }
 
 /// Results of adapting API for Rust wrapper.
@@ -142,7 +156,7 @@ pub struct RustGeneratorConfig {
 /// Execute processing
 pub fn run(input_data: CppAndFfiData, config: RustGeneratorConfig) -> RustGeneratorOutput {
   let generator = RustGenerator {
-    cpp_to_rust_type_map: generate_type_map(&input_data, &config),
+    processed_types: generate_type_map(&input_data, &config),
     input_data: input_data,
     config: config,
   };
@@ -197,35 +211,48 @@ fn calculate_rust_name(name: &String,
 /// equivalents.
 fn generate_type_map(input_data: &CppAndFfiData,
                      config: &RustGeneratorConfig)
-                     -> HashMap<String, RustName> {
-  let mut map = HashMap::new();
+                     -> Vec<ProcessedTypeInfo> {
+  let mut result = Vec::new();
   for type_info in &input_data.cpp_data.types {
-    if let CppTypeKind::Class { size, .. } = type_info.kind {
-      if size.is_none() {
-        log::warning(format!("Rust type is not generated for a struct with unknown size: {}",
-                             type_info.name));
+    if let CppTypeKind::Class { ref template_arguments, .. } = type_info.kind {
+      if template_arguments.is_some() {
+        //        log::warning(format!("Rust type is not generated for a struct with unknown size: {}",
+        //                             type_info.name));
         continue;
       }
     }
-    if !map.contains_key(&type_info.name) {
-      map.insert(type_info.name.clone(),
-                 calculate_rust_name(&type_info.name, &type_info.include_file, false, config));
-    }
+    result.push(ProcessedTypeInfo {
+      cpp_name: type_info.name.clone(),
+      cpp_template_arguments: None,
+      kind: match type_info.kind {
+        CppTypeKind::Class { ref size, .. } => ProcessedTypeKind::Class { size: size.unwrap() },
+        CppTypeKind::Enum { ref values } => ProcessedTypeKind::Enum { values: values.clone() },
+      },
+      rust_name: calculate_rust_name(&type_info.name, &type_info.include_file, false, config),
+    });
   }
-  for header in &input_data.cpp_ffi_headers {
-    for method in &header.methods {
-      if method.cpp_method.class_membership.is_none() {
-        if !map.contains_key(&method.cpp_method.name) {
-          map.insert(method.cpp_method.name.clone(),
-                     calculate_rust_name(&method.cpp_method.name,
-                                         &header.include_file,
-                                         true,
-                                         config));
-        }
+  for (class_name, list) in &input_data.cpp_data.template_instantiations {
+    if let Some(class_type_info) = input_data.cpp_data
+      .types
+      .iter()
+      .find(|x| &x.name == class_name) {
+      for ins in list {
+        let name = format!("{}_{}",
+                           class_name,
+                           ins.template_arguments
+                             .iter()
+                             .map(|x| x.caption(TypeCaptionStrategy::Full))
+                             .join("_"));
+        result.push(ProcessedTypeInfo {
+          cpp_name: class_name.clone(),
+          cpp_template_arguments: Some(ins.template_arguments.clone()),
+          kind: ProcessedTypeKind::Class { size: ins.size },
+          rust_name: calculate_rust_name(&name, &class_type_info.include_file, false, config),
+        });
       }
     }
   }
-  map
+  result
 }
 
 struct ProcessTypeResult {
@@ -273,21 +300,22 @@ impl RustGenerator {
     }
     if cpp_ffi_type.conversion == IndirectionChange::QFlagsToUInt {
       rust_api_to_c_conversion = RustToCTypeConversion::QFlagsToUInt;
-      let enum_type = if let CppTypeBase::Class { ref template_arguments, .. } =
-                             cpp_ffi_type.original_type.base {
-        let args = template_arguments.as_ref().unwrap();
-        assert!(args.len() == 1);
-        if let CppTypeBase::Enum { ref name } = args[0].base {
-          match self.cpp_to_rust_type_map.get(name) {
-            None => return Err(format!("Type has no Rust equivalent: {}", name)),
-            Some(rust_name) => rust_name.clone(),
+      let enum_type =
+        if let CppTypeBase::Class(CppTypeClassBase { ref template_arguments, .. }) =
+               cpp_ffi_type.original_type.base {
+          let args = template_arguments.as_ref().unwrap();
+          assert!(args.len() == 1);
+          if let CppTypeBase::Enum { ref name } = args[0].base {
+            match self.processed_types.iter().find(|x| &x.cpp_name == name) {
+              None => return Err(format!("Type has no Rust equivalent: {}", name)),
+              Some(info) => info.rust_name.clone(),
+            }
+          } else {
+            panic!("invalid original type for QFlags");
           }
         } else {
           panic!("invalid original type for QFlags");
-        }
-      } else {
-        panic!("invalid original type for QFlags");
-      };
+        };
       rust_api_type = RustType::Common {
         base: RustName::new(vec!["qt_core".to_string(), "flags".to_string(), "QFlags".to_string()]),
         generic_arguments: Some(vec![RustType::Common {
@@ -358,18 +386,18 @@ impl RustGenerator {
         RustName::new(vec![if *is_signed { "isize" } else { "usize" }.to_string()])
       }
       CppTypeBase::Enum { ref name } => {
-        match self.cpp_to_rust_type_map.get(name) {
+        match self.processed_types.iter().find(|x| &x.cpp_name == name) {
           None => return Err(format!("Type has no Rust equivalent: {}", name)),
-          Some(rust_name) => rust_name.clone(),
+          Some(ref info) => info.rust_name.clone(),
         }
       }
-      CppTypeBase::Class { ref name, ref template_arguments } => {
-        if template_arguments.is_some() {
-          return Err(format!("template types are not supported here yet"));
-        }
-        match self.cpp_to_rust_type_map.get(name) {
-          None => return Err(format!("Type has no Rust equivalent: {}", name)),
-          Some(rust_name) => rust_name.clone(),
+      CppTypeBase::Class(ref name_and_args) => {
+        match self.processed_types.iter().find(|x| {
+          &x.cpp_name == &name_and_args.name &&
+          &x.cpp_template_arguments == &name_and_args.template_arguments
+        }) {
+          None => return Err(format!("Type has no Rust equivalent: {:?}", name_and_args)),
+          Some(ref info) => info.rust_name.clone(),
         }
       }
       CppTypeBase::FunctionPointer { ref return_type,
@@ -429,38 +457,46 @@ impl RustGenerator {
   /// - overloading_types - traits and their implementations that
   /// emulate C++ method overloading.
   fn process_type(&self,
-                  type_info: &CppTypeData,
+                  info: &ProcessedTypeInfo,
                   c_header: &CppFfiHeaderData)
                   -> ProcessTypeResult {
-    let rust_name = self.cpp_to_rust_type_map.get(&type_info.name).unwrap();
-    match type_info.kind {
-      CppTypeKind::Enum { ref values } => {
+    match info.kind {
+      ProcessedTypeKind::Enum { ref values } => {
         let mut is_flaggable = false;
-        if let Some(instantiations) = self.input_data
-          .cpp_data
-          .template_instantiations
-          .get(&"QFlags".to_string()) {
-          let template_args_sample =
-            vec![CppType {
-                   is_const: false,
-                   indirection: CppTypeIndirection::None,
-                   base: CppTypeBase::Enum { name: type_info.name.clone() },
-                 }];
-          if instantiations.iter()
-            .find(|x| &x.template_arguments == &template_args_sample)
-            .is_some() {
-            is_flaggable = true;
+        let template_arg_sample = CppType {
+          is_const: false,
+          indirection: CppTypeIndirection::None,
+          base: CppTypeBase::Enum { name: info.cpp_name.clone() },
+        };
+
+        for flag_owner_name in &["QFlags", "QUrlTwoFlags"] {
+          if let Some(instantiations) = self.input_data
+            .cpp_data
+            .template_instantiations
+            .get(&flag_owner_name.to_string()) {
+            if instantiations.iter()
+              .find(|ins| {
+                ins.template_arguments
+                  .iter()
+                  .find(|&arg| arg == &template_arg_sample)
+                  .is_some()
+              })
+              .is_some() {
+              is_flaggable = true;
+              break;
+            }
           }
+
         }
         ProcessTypeResult {
           main_type: RustTypeDeclaration {
-            name: rust_name.last_name().clone(),
+            name: info.rust_name.last_name().clone(),
             kind: RustTypeDeclarationKind::CppTypeWrapper {
               kind: RustTypeWrapperKind::Enum {
-                values: prepare_enum_values(values, &type_info.name),
+                values: prepare_enum_values(values, &info.cpp_name),
                 is_flaggable: is_flaggable,
               },
-              cpp_type_name: type_info.name.clone(),
+              cpp_type_name: info.cpp_name.clone(),
               cpp_template_arguments: None,
               methods: Vec::new(),
               traits: Vec::new(),
@@ -469,20 +505,30 @@ impl RustGenerator {
           overloading_types: Vec::new(),
         }
       }
-      CppTypeKind::Class { ref size, .. } => {
-        let methods_scope = RustMethodScope::Impl { type_name: rust_name.clone() };
+      ProcessedTypeKind::Class { ref size } => {
+        let methods_scope = RustMethodScope::Impl { type_name: info.rust_name.clone() };
+        let class_type = CppTypeClassBase {
+          name: info.cpp_name.clone(),
+          template_arguments: info.cpp_template_arguments.clone(),
+        };
         let methods = c_header.methods
           .iter()
-          .filter(|&x| x.cpp_method.class_name() == Some(&type_info.name));
+          .filter(|&x| {
+            if let Some(ref info) = x.cpp_method.class_membership {
+              &info.class_type == &class_type
+            } else {
+              false
+            }
+          });
         let functions_result = self.process_functions(methods, &methods_scope);
 
         ProcessTypeResult {
           main_type: RustTypeDeclaration {
-            name: rust_name.last_name().clone(),
+            name: info.rust_name.last_name().clone(),
             kind: RustTypeDeclarationKind::CppTypeWrapper {
-              kind: RustTypeWrapperKind::Struct { size: size.unwrap() },
-              cpp_type_name: type_info.name.clone(),
-              cpp_template_arguments: None,
+              kind: RustTypeWrapperKind::Struct { size: *size },
+              cpp_type_name: info.cpp_name.clone(),
+              cpp_template_arguments: info.cpp_template_arguments.clone(),
               methods: functions_result.methods,
               traits: functions_result.trait_impls,
             },
@@ -528,32 +574,37 @@ impl RustGenerator {
       // Returns true if the name is directly in this module.
       // If the name is in this module's submodule, adds
       // name of the direct submodule to direct_submodules list.
-      let mut check_name = |name| {
-        if let Some(rust_name) = self.cpp_to_rust_type_map.get(name) {
-          if module_name.includes(rust_name) {
-            if module_name.includes_directly(rust_name) {
-              return true;
-            } else {
-              let direct_submodule = &rust_name.parts[module_name.parts.len()];
-              if !direct_submodules.contains(direct_submodule) {
-                direct_submodules.insert(direct_submodule.clone());
-              }
+      let mut check_name = |rust_name: &RustName| {
+        if module_name.includes(rust_name) {
+          if module_name.includes_directly(rust_name) {
+            return true;
+          } else {
+            let direct_submodule = &rust_name.parts[module_name.parts.len()];
+            if !direct_submodules.contains(direct_submodule) {
+              direct_submodules.insert(direct_submodule.clone());
             }
           }
         }
         false
       }; // end of check_name()
 
-      for type_data in &self.input_data.cpp_data.types {
-        if check_name(&type_data.name) {
-          let mut result = self.process_type(type_data, c_header);
+      for type_data in &self.processed_types {
+        if check_name(&type_data.rust_name) {
+          let mut result = self.process_type(&type_data, c_header);
           module.types.push(result.main_type);
           rust_overloading_types.append(&mut result.overloading_types);
         }
       }
+
+
       for method in &c_header.methods {
         if method.cpp_method.class_membership.is_none() {
-          if check_name(&method.cpp_method.name) {
+          let rust_name = calculate_rust_name(&method.cpp_method.name,
+                                              &method.cpp_method.include_file,
+                                              true,
+                                              &self.config);
+
+          if check_name(&rust_name) {
             good_methods.push(method);
           }
         }
@@ -671,7 +722,10 @@ impl RustGenerator {
   /// modules.
   fn method_rust_name(&self, method: &CppAndFfiMethod) -> RustName {
     let mut name = if method.cpp_method.class_membership.is_none() {
-      self.cpp_to_rust_type_map.get(&method.cpp_method.name).unwrap().clone()
+      calculate_rust_name(&method.cpp_method.name,
+                          &method.cpp_method.include_file,
+                          true,
+                          &self.config)
     } else {
       let x = if method.cpp_method.is_constructor() {
         "new".to_string()

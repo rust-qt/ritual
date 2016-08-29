@@ -15,7 +15,7 @@ use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppO
                CppVisibility, CppTemplateInstantiation};
 use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind, CppMethodClassMembership};
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
-               CppSpecificNumericTypeKind};
+               CppSpecificNumericTypeKind, CppTypeClassBase};
 use cpp_operator::CppOperator;
 use std::io::Write;
 
@@ -181,11 +181,11 @@ pub fn run(config: CppParserConfig) -> CppData {
     .enumerate() {
     cpp_code = cpp_code +
                &format!("  {} field{};\n",
-                        CppTypeBase::Class {
+                        CppTypeClassBase {
                             name: class_name.clone(),
                             template_arguments: Some(template_args.clone()),
                           }
-                          .to_cpp_code(None)
+                          .to_cpp_code()
                           .unwrap(),
                         field_num);
   }
@@ -294,10 +294,10 @@ impl CppParser {
                 }
               }
               return Ok(CppType {
-                base: CppTypeBase::Class {
+                base: CppTypeBase::Class(CppTypeClassBase {
                   name: get_full_name(declaration).unwrap(),
                   template_arguments: Some(arg_types),
-                },
+                }),
                 is_const: is_const,
                 indirection: CppTypeIndirection::None,
               });
@@ -416,10 +416,10 @@ impl CppParser {
           type1.base = CppTypeBase::Enum { name: remaining_name.to_string() }
         }
         CppTypeKind::Class { .. } => {
-          type1.base = CppTypeBase::Class {
+          type1.base = CppTypeBase::Class(CppTypeClassBase {
             name: remaining_name.to_string(),
             template_arguments: None,
-          }
+          })
         }
       }
       return Ok(type1);
@@ -442,10 +442,10 @@ impl CppParser {
             }
           }
         }
-        type1.base = CppTypeBase::Class {
+        type1.base = CppTypeBase::Class(CppTypeClassBase {
           name: class_name.to_string(),
           template_arguments: Some(arg_types),
-        };
+        });
         return Ok(type1);
       }
     } else {
@@ -662,10 +662,10 @@ impl CppParser {
             };
 
             Ok(CppType {
-              base: CppTypeBase::Class {
+              base: CppTypeBase::Class(CppTypeClassBase {
                 name: declaration_name,
                 template_arguments: template_arguments,
-              },
+              }),
               is_const: is_const,
               indirection: CppTypeIndirection::None,
             })
@@ -1164,7 +1164,8 @@ impl CppParser {
       EntityKind::ClassTemplatePartialSpecialization => {
         if let Some(name) = entity.get_display_name() {
           if let Ok(parent_type) = self.parse_unexposed_type(None, Some(name.clone()), None, None) {
-            if let CppTypeBase::Class { ref template_arguments, .. } = parent_type.base {
+            if let CppTypeBase::Class(CppTypeClassBase { ref template_arguments, .. }) =
+                   parent_type.base {
               if let &Some(ref template_arguments) = template_arguments {
                 if template_arguments.iter().find(|x| !x.base.is_template_parameter()).is_some() {
                   log::warning(format!("skipping template partial specialization: {}", name));
@@ -1194,7 +1195,7 @@ impl CppParser {
           return Err(format!("unknown type: {}", name));
         }
       }
-      CppTypeBase::Class { ref name, ref template_arguments } => {
+      CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) => {
         if self.types.iter().find(|x| &x.name == name).is_none() {
           return Err(format!("unknown type: {}", name));
         }
@@ -1254,7 +1255,8 @@ impl CppParser {
   fn find_template_instantiations(&self, methods: &Vec<CppMethod>) -> Vec<(String, Vec<CppType>)> {
 
     fn check_type(type1: &CppType, result: &mut Vec<(String, Vec<CppType>)>) {
-      if let CppTypeBase::Class { ref name, ref template_arguments } = type1.base {
+      if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
+             type1.base {
         if let &Some(ref template_arguments) = template_arguments {
           if !template_arguments.iter()
             .find(|x| x.base.is_or_contains_template_parameter())

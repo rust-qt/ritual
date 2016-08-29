@@ -1,4 +1,4 @@
-use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase};
+use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase, CppTypeClassBase};
 use cpp_ffi_data::CppFfiType;
 use cpp_ffi_data::CppFfiFunctionSignature;
 use cpp_ffi_data::{CppFfiFunctionArgument, CppFfiArgumentMeaning};
@@ -25,13 +25,13 @@ fn type_to_cpp_code_permissive(type1: &CppType) -> String {
   let r = match type1.base {
     CppTypeBase::TemplateParameter { ref nested_level, ref index } => {
       let mut fake_type = type1.clone();
-      fake_type.base = CppTypeBase::Class {
+      fake_type.base = CppTypeBase::Class(CppTypeClassBase {
         name: format!("T_{}_{}", nested_level, index),
         template_arguments: None,
-      };
+      });
       fake_type.to_cpp_code(None)
     }
-    CppTypeBase::Class { ref name, ref template_arguments } => {
+    CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) => {
       if let &Some(ref template_arguments) = template_arguments {
         Ok(format!("{}<{}>",
                    name,
@@ -119,7 +119,7 @@ impl CppMethod {
         r.arguments.push(CppFfiFunctionArgument {
           name: "this_ptr".to_string(),
           argument_type: CppType {
-              base: info.class_type.clone(),
+              base: CppTypeBase::Class(info.class_type.clone()),
               is_const: info.is_const,
               indirection: CppTypeIndirection::Ptr,
             }
@@ -147,7 +147,7 @@ impl CppMethod {
       CppType {
         is_const: false,
         indirection: CppTypeIndirection::None,
-        base: self.class_membership.as_ref().unwrap().class_type.clone(),
+        base: CppTypeBase::Class(self.class_membership.as_ref().unwrap().class_type.clone()),
       }
     } else {
       self.return_type.clone()
@@ -207,7 +207,7 @@ impl CppMethod {
               type_to_cpp_code_permissive(&CppType {
                 indirection: CppTypeIndirection::None,
                 is_const: false,
-                base: info.class_type.clone(),
+                base: CppTypeBase::Class(info.class_type.clone()),
               }),
               self.name)
     } else {
@@ -279,7 +279,7 @@ impl CppMethod {
 
   pub fn class_name(&self) -> Option<&String> {
     match self.class_membership {
-      Some(ref info) => Some(info.class_type.maybe_name().unwrap()),
+      Some(ref info) => Some(&info.class_type.name),
       None => None,
     }
   }
@@ -304,7 +304,7 @@ impl CppMethod {
     let mut result: Vec<CppType> = Vec::new();
     if let Some(ref class_membership) = self.class_membership {
       result.push(CppType {
-        base: class_membership.class_type.clone(),
+        base: CppTypeBase::Class(class_membership.class_type.clone()),
         is_const: class_membership.is_const,
         indirection: CppTypeIndirection::Ptr,
       });
