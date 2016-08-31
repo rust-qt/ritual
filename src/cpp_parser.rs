@@ -123,7 +123,7 @@ fn run_clang<R, F: Fn(Entity) -> R>(config: &CppParserConfig, cpp_code: Option<S
   }
   // TODO: PIC and additional args should be moved to lib spec
   let mut args =
-    vec!["-fPIC".to_string(), "-Xclang".to_string(), "-detailed-preprocessing-record".to_string()];
+    vec!["-fPIC".to_string(), "-fcxx-exceptions".to_string(), "-Xclang".to_string(), "-detailed-preprocessing-record".to_string()];
   for dir in &config.include_dirs {
     args.push("-I".to_string());
     args.push(dir.to_str().unwrap().to_string());
@@ -1083,10 +1083,11 @@ impl CppParser {
         if entity.get_name().is_some() && entity.is_definition() {
           match self.parse_enum(entity) {
             Ok(r) => {
-              if self.types.iter().find(|x| x.name == r.name).is_some() {
-                panic!("repeating class declaration: {:?}", entity);
+              if let Some(info) = self.types.iter().find(|x| x.name == r.name).map(|x| x.clone()) {
+                log::warning(format!("repeating enum declaration: {:?}\nold declaration: {:?}", entity, info));
+              } else {
+                self.types.push(r);
               }
-              self.types.push(r);
             }
             Err(msg) => {
               log::warning(format!("Failed to parse enum: {}\nentity: {:?}\nerror: {}\n",
@@ -1109,10 +1110,11 @@ impl CppParser {
         if ok {
           match self.parse_class(entity) {
             Ok(r) => {
-              if self.types.iter().find(|x| x.name == r.name).is_some() {
-                panic!("repeating class declaration: {:?}", entity);
+              if let Some(info) = self.types.iter().find(|x| x.name == r.name).map(|x| x.clone()) {
+                log::warning(format!("repeating class declaration: {:?}\nold declaration: {:?}", entity, info));
+              } else {
+                self.types.push(r);
               }
-              self.types.push(r);
             }
             Err(msg) => {
               log::warning(format!("Failed to parse class: {}\nentity: {:?}\nerror: {}\n",

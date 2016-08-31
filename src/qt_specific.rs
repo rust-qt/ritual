@@ -15,6 +15,9 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) {
   for header in std::fs::read_dir(headers_dir).unwrap() {
     let header = header.unwrap();
     let header_path = header.path();
+    if !header_path.is_file() {
+      continue;
+    }
     if std::fs::metadata(&header_path).unwrap().len() < 100 {
       let mut file = std::fs::File::open(&header_path).unwrap();
       let mut file_content = Vec::new();
