@@ -510,11 +510,3 @@ pub struct LibSpec {
   /// Information related to generated Rust crate
   pub rust: RustLibSpec,
 }
-
-#[derive(Debug, Default)]
-#[derive(Serialize, Deserialize)]
-pub struct LocalOverrides {
-  pub qmake_path: Option<String>,
-  pub make_command: Option<String>,
-  pub make_arguments: Option<Vec<String>>,
-}

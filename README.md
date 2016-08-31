@@ -24,7 +24,7 @@ To start the process, you need the source folder containing data that is exclusi
 
 First argument is the path to the source file. Output path will contain source files of the crate. C wrapper library will be placed in a subdirectory of the output directory. The converter will run "cargo test" and "cargo doc" on the crate to build and test it.
 
-If you have multiple versions of Qt on your machine (for example, obtained via online installer) and you want to build against a specific version, you can edit "local_overrides.json" file in the output folder to specify path to qmake. Delete all other files in the output folder to remove cached data.
+If you have multiple versions of Qt on your machine (for example, obtained via online installer) and you want to build against a specific version, modify PATH environment variable so that qmake command of the correct Qt version is available.
 
 ### Running from a build script
 

@@ -1,4 +1,5 @@
 extern crate serde_json;
+extern crate num_cpus;
 
 use std;
 use std::fs;
@@ -15,7 +16,7 @@ use utils;
 use cpp_ffi_generator;
 use rust_code_generator;
 use rust_generator;
-use serializable::{LibSpec, LocalOverrides};
+use serializable::LibSpec;
 use cpp_ffi_generator::CppAndFfiData;
 
 /// Runs a command, checks that it is successful, and
@@ -98,25 +99,6 @@ pub fn run(env: BuildEnvironment) {
   log::info("Lib spec is valid.");
   log::info(format!("C++ library name: {}", lib_spec.cpp.name));
 
-  let local_overrides_path = {
-    let mut p = output_dir_path.clone();
-    p.push("local_overrides.json");
-    p
-  };
-  let local_overrides = if local_overrides_path.as_path().is_file() {
-    log::info(format!("Loading local overrides file: {}",
-                      local_overrides_path.to_str().unwrap()));
-    let file = File::open(&local_overrides_path).unwrap();
-    serde_json::from_reader(file).unwrap()
-  } else {
-    let r = LocalOverrides::default();
-    let mut file = File::create(&local_overrides_path).unwrap();
-    serde_json::to_writer(&mut file, &r).unwrap();
-    log::info(format!("Local overrides file created: {}",
-                      local_overrides_path.to_str().unwrap()));
-    r
-  };
-
   let is_qt_library = lib_spec.cpp.name.starts_with("Qt5");
 
   let mut include_dirs = Vec::new();
@@ -124,11 +106,7 @@ pub fn run(env: BuildEnvironment) {
   let mut qt_this_lib_headers_dir = None;
   if is_qt_library {
 
-    let qmake_path = match local_overrides.qmake_path {
-      Some(path) => path.clone(),
-      None => "qmake".to_string(),
-    };
-    log::info(format!("Using qmake path: {}", qmake_path));
+    let qmake_path = "qmake".to_string();
     log::info("Detecting Qt directories...");
     let qt_install_headers_path = PathBuf::from(run_command(Command::new(&qmake_path)
                                                               .arg("-query")
@@ -156,6 +134,7 @@ pub fn run(env: BuildEnvironment) {
   }
   let c_lib_parent_path = output_dir_path.with_added("c_lib");
   let c_lib_install_path = c_lib_parent_path.with_added("install");
+  let num_jobs = env.num_jobs.unwrap_or_else(|| num_cpus::get() as i32);
   if output_dir_path.with_added("skip_processing").as_path().exists() {
     log::info("Processing skipped!");
   } else {
@@ -220,14 +199,9 @@ pub fn run(env: BuildEnvironment) {
                   .current_dir(&c_lib_build_path),
                 false);
 
-    let make_command = match local_overrides.make_command {
-      Some(cmd) => cmd,
-      None => "make".to_string(),
-    };
-    let mut make_args = match local_overrides.make_arguments {
-      Some(args) => args,
-      None => Vec::new(),
-    };
+    let make_command = "make".to_string();
+    let mut make_args = Vec::new();
+    make_args.push(format!("-j{}", num_jobs));
     make_args.push("install".to_string());
     run_command(Command::new(make_command)
                   .args(&make_args)
@@ -282,8 +256,9 @@ pub fn run(env: BuildEnvironment) {
       log::info(format!("Compiling Rust crate."));
       for cargo_cmd in vec!["test", "doc"] {
         let mut command = Command::new("cargo");
-        command.arg(cargo_cmd)
-          .current_dir(&output_dir_path);
+        command.arg(cargo_cmd);
+        command.arg(format!("-j{}", num_jobs));
+        command.current_dir(&output_dir_path);
         if let Some(ref cpp_lib_path) = cpp_lib_path {
           let lib_path = cpp_lib_path.to_str().unwrap();
           command.env("LIBRARY_PATH", lib_path)
