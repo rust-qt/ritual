@@ -1,31 +1,15 @@
-mod cpp_ffi_generator;
-mod cpp_code_generator;
-mod caption_strategy;
-mod cpp_data;
-mod cpp_ffi_data;
-mod cpp_method;
-mod cpp_type;
-mod cpp_operator;
-mod log;
-mod qt_specific;
-mod rust_generator;
-mod rust_code_generator;
-mod rust_info;
-mod rust_type;
-mod utils;
-mod cpp_parser;
-mod serializable;
-mod launcher;
-
-#[cfg(test)]
-mod tests;
+extern crate cpp_to_rust;
 
 use std::path::PathBuf;
 
 fn print_usage() {
-  log::error("Usage:");
-  log::error("\tcargo run lib_spec_file output_dir");
+  cpp_to_rust::log::info("Usage:");
+  cpp_to_rust::log::info("\tcargo run source_dir output_dir");
+  cpp_to_rust::log::info("");
+  cpp_to_rust::log::info("See https://github.com/rust-qt/cpp_to_rust for more information.");
 }
+
+use cpp_to_rust::launcher::{BuildProfile, InvokationMethod, BuildEnvironment, run};
 
 fn main() {
   let arguments: Vec<_> = std::env::args().collect();
@@ -33,7 +17,12 @@ fn main() {
     print_usage();
     return;
   }
-  let lib_spec_path = PathBuf::from(&arguments[1]);
-  let output_dir_path = PathBuf::from(&arguments[2]);
-  launcher::run(lib_spec_path, output_dir_path);
+
+  run(BuildEnvironment {
+    invokation_method: InvokationMethod::CommandLine,
+    source_dir_path: PathBuf::from(&arguments[1]),
+    output_dir_path: PathBuf::from(&arguments[2]),
+    num_jobs: None,
+    build_profile: BuildProfile::Debug,
+  });
 }

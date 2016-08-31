@@ -214,6 +214,7 @@ impl CppTypeBase {
     }
   }
 
+  #[allow(dead_code)]
   pub fn maybe_name(&self) -> Option<&String> {
     match *self {
       CppTypeBase::SpecificNumeric { ref name, .. } => Some(name),

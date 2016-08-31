@@ -16,7 +16,14 @@ use rust_generator::RustGeneratorOutput;
 extern crate rustfmt;
 extern crate toml;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InvokationMethod {
+  CommandLine,
+  BuildScript,
+}
+
 pub struct RustCodeGeneratorConfig {
+  pub invokation_method: InvokationMethod,
   pub crate_name: String,
   pub crate_version: String,
   pub crate_authors: Vec<String>,
@@ -118,11 +125,17 @@ impl RustCodeGenerator {
       .unwrap();
     write!(cargo_toml_file, "{}", cargo_toml_data).unwrap();
 
-    for item in fs::read_dir(&self.config.template_path).unwrap() {
-      let item = item.unwrap();
-      copy_recursively(&item.path().to_path_buf(),
-                       &self.config.output_path.with_added(item.file_name()))
-        .unwrap();
+    if self.config.invokation_method == InvokationMethod::CommandLine {
+      for name in &["src", "tests"] {
+        let template_item_path = self.config.template_path.with_added(&name);
+        if template_item_path.as_path().exists() {
+          copy_recursively(&template_item_path,
+                           &self.config.output_path.with_added(&name))
+            .unwrap();
+        }
+      }
+    } else {
+      fs::create_dir_all(self.config.output_path.with_added("src")).unwrap();
     }
   }
 
@@ -388,35 +401,53 @@ impl RustCodeGenerator {
     let mut lib_file_path = self.config.output_path.clone();
     lib_file_path.push("src");
     lib_file_path.push("lib.rs");
+    if lib_file_path.as_path().exists() {
+      fs::remove_file(&lib_file_path).unwrap();
+    }
     {
       let mut lib_file = File::create(&lib_file_path).unwrap();
-      write!(lib_file, "#![allow(drop_with_repr_extern)]\n\n").unwrap();
+      if self.config.invokation_method == InvokationMethod::CommandLine {
+        write!(lib_file, "#![allow(drop_with_repr_extern)]\n\n").unwrap();
+      }
       write!(lib_file, "pub extern crate libc;\n").unwrap();
       write!(lib_file, "pub extern crate cpp_box;\n\n").unwrap();
 
       let mut extra_modules = vec!["ffi".to_string()];
-      for item in fs::read_dir(&self.config.template_path.with_added("src")).unwrap() {
-        let item = item.unwrap();
-        if item.path().is_dir() {
-          extra_modules.push(item.file_name().into_string().unwrap());
-        } else if item.path().extension().is_some() && item.path().extension().unwrap() == "rs" {
-          extra_modules.push(item.path().file_stem().unwrap().to_str().unwrap().to_string());
+      if self.config.invokation_method == InvokationMethod::CommandLine {
+        for item in fs::read_dir(&self.config.template_path.with_added("src")).unwrap() {
+          let item = item.unwrap();
+          if item.file_name().to_str().unwrap() == "lib.rs" {
+            continue;
+          }
+          if item.path().is_dir() {
+            extra_modules.push(item.file_name().into_string().unwrap());
+          } else if item.path().extension().is_some() && item.path().extension().unwrap() == "rs" {
+            extra_modules.push(item.path().file_stem().unwrap().to_str().unwrap().to_string());
+          }
         }
       }
-
-      for module in extra_modules {
+      for module in &extra_modules {
         if modules.iter().find(|x| x.as_ref() as &str == module).is_some() {
           panic!("module name conflict");
         }
-        if module == "ffi" {
+      }
+
+      let all_modules = extra_modules.iter().chain(modules.clone());
+      for module in all_modules {
+        if module == &"ffi" {
           // TODO: remove allow directive for ffi?
           // TODO: ffi should be a private mod
           write!(lib_file, "#[allow(dead_code)]\n").unwrap();
         }
-        write!(lib_file, "pub mod {};\n\n", module).unwrap();
-      }
-      for module in modules {
-        write!(lib_file, "pub mod {};\n", module).unwrap();
+        match self.config.invokation_method {
+          InvokationMethod::CommandLine => write!(lib_file, "pub mod {};\n", module).unwrap(),
+          InvokationMethod::BuildScript => {
+            write!(lib_file,
+                   "pub mod {0} {{ \n  include!(\"{0}.rs\");\n}}\n",
+                   module)
+              .unwrap()
+          }
+        }
       }
     }
     self.call_rustfmt(&lib_file_path);

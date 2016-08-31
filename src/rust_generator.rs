@@ -237,6 +237,7 @@ fn generate_type_map(input_data: &CppAndFfiData,
       .iter()
       .find(|x| &x.name == class_name) {
       for ins in list {
+        // TODO: use Rust names for template args
         let name = format!("{}_{}",
                            class_name,
                            ins.template_arguments

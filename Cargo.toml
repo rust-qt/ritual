@@ -4,6 +4,14 @@ version = "0.1.0"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 build = "build.rs"
 
+[lib]
+name = "cpp_to_rust"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cpp_to_rust_bin"
+path = "src/main.rs"
+
 [dependencies]
 serde = "0.8"
 serde_json = "0.8"

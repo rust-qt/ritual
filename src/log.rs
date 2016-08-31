@@ -1,18 +1,29 @@
 extern crate ansi_term;
 use self::ansi_term::Colour;
 use std::borrow::Borrow;
+use std;
+use std::io::Write;
 
 pub fn error<T: Borrow<str>>(text: T) {
-  println!("{}", Colour::Red.paint(text.borrow()));
+  writeln!(&mut std::io::stderr(),
+           "{}",
+           Colour::Red.paint(text.borrow()))
+    .unwrap();
 }
 pub fn warning<T: Borrow<str>>(text: T) {
-  println!("{}", Colour::Purple.paint(text.borrow()));
+  writeln!(&mut std::io::stderr(),
+           "{}",
+           Colour::Purple.paint(text.borrow()))
+    .unwrap();
 }
 pub fn info<T: Borrow<str>>(text: T) {
-  println!("{}", Colour::Green.paint(text.borrow()));
+  writeln!(&mut std::io::stderr(),
+           "{}",
+           Colour::Green.paint(text.borrow()))
+    .unwrap();
 }
 pub fn debug<T: Borrow<str>>(text: T) {
-  println!("{}", text.borrow());
+  writeln!(&mut std::io::stderr(), "{}", text.borrow()).unwrap();
 }
 
 #[allow(unused_variables)]

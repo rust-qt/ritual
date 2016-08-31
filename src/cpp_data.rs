@@ -14,7 +14,7 @@ fn apply_instantiations_to_method(method: &CppMethod,
                                   -> Result<Vec<CppMethod>, String> {
   let mut new_methods = Vec::new();
   for ins in template_instantiations {
-    println!("instantiation: {:?}", ins.template_arguments);
+    log::noisy(format!("instantiation: {:?}", ins.template_arguments));
     let mut new_method = method.clone();
     new_method.arguments.clear();
     for arg in &method.arguments {
@@ -49,7 +49,7 @@ fn apply_instantiations_to_method(method: &CppMethod,
       if let Some(conversion_type) = conversion_type {
         new_method.name = format!("operator {}", try!(conversion_type.to_cpp_code(None)));
       }
-      println!("success: {}", new_method.short_text());
+      log::noisy(format!("success: {}", new_method.short_text()));
       new_methods.push(new_method);
     }
   }
@@ -186,7 +186,7 @@ impl CppData {
             if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
                    base.base {
               if name == base_name {
-                log::debug(format!("Adding inherited methods_from {} to {}",
+                log::noisy(format!("Adding inherited methods_from {} to {}",
                                    base_name,
                                    type1.name));
                 let derived_name = &type1.name;
@@ -211,9 +211,9 @@ impl CppData {
                   for method in &self.methods {
                     if method.class_name() == Some(derived_name) &&
                        method.name == base_class_method.name {
-                      log::debug("Method is not added because it's overriden in derived class");
-                      log::debug(format!("Base method: {}", base_class_method.short_text()));
-                      log::debug(format!("Derived method: {}\n", method.short_text()));
+                      log::noisy("Method is not added because it's overriden in derived class");
+                      log::noisy(format!("Base method: {}", base_class_method.short_text()));
+                      log::noisy(format!("Derived method: {}\n", method.short_text()));
                       ok = false;
                       break;
                     }
@@ -227,8 +227,8 @@ impl CppData {
                     }
                     new_method.include_file = type1.include_file.clone();
                     new_method.origin_location = None;
-                    log::debug(format!("Method added: {}", new_method.short_text()));
-                    log::debug(format!("Base method: {} ({:?})\n",
+                    log::noisy(format!("Method added: {}", new_method.short_text()));
+                    log::noisy(format!("Base method: {} ({:?})\n",
                                        base_class_method.short_text(),
                                        base_class_method.origin_location));
                     new_methods.push(new_method.clone());
@@ -415,7 +415,7 @@ impl CppData {
 
 
   fn instantiate_templates(&mut self) {
-    println!("instantiate_templates()");
+    log::info("Instantiating templates.");
     let mut new_methods = Vec::new();
     for method in &self.methods {
       for type1 in method.all_involved_types() {
@@ -431,9 +431,9 @@ impl CppData {
                 } else {
                   panic!("only template parameters can be here");
                 };
-                println!("");
-                println!("method: {}", method.short_text());
-                println!("found template class: {}", name);
+                log::noisy(format!(""));
+                log::noisy(format!("method: {}", method.short_text()));
+                log::noisy(format!("found template class: {}", name));
                 match apply_instantiations_to_method(method,
                                                      nested_level,
                                                      &self.template_instantiations[name]) {
@@ -441,7 +441,7 @@ impl CppData {
                     new_methods.append(&mut methods);
                     break;
                   }
-                  Err(msg) => println!("failed: {}", msg),
+                  Err(msg) => log::noisy(format!("failed: {}", msg)),
                 }
                 break;
               }

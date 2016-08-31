@@ -488,6 +488,7 @@ pub struct CppLibSpec {
 #[derive(Debug, Clone)]
 #[derive(Serialize, Deserialize)]
 pub struct RustLibSpec {
+  // TODO: remove these fields and parse Cargo.toml instead
   /// Name of the crate
   pub name: String,
   /// Version of the crate
