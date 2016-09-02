@@ -1,4 +1,4 @@
-{maybe_pub}fn {name}<{lifetime_arg}{tpl_type}> ({args}) -> {tpl_type}::ReturnType
+{doc}{maybe_pub}fn {name}<{lifetime_arg}{tpl_type}> ({args}) -> {tpl_type}::ReturnType
     where {tpl_type}: overloading::{trait_name}{lifetime} {{
   {body}
 }}

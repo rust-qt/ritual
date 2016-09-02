@@ -8,11 +8,12 @@ use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFu
 use cpp_data::{CppTypeKind, EnumValue};
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
-                RustMethodArguments, TraitImpl, TraitName, RustEnumValue};
+                RustMethodArguments, TraitImpl, TraitName, RustEnumValue, RustMethodSelfArgKind};
 use cpp_method::ReturnValueAllocationPlace;
 use cpp_ffi_data::CppFfiArgumentMeaning;
 use utils::{CaseOperations, VecCaseOperations, WordIterator, add_to_multihash, JoinWithString};
 use caption_strategy::TypeCaptionStrategy;
+use rust_code_generator::rust_type_to_code;
 use log;
 
 use std::collections::{HashMap, HashSet};
@@ -754,6 +755,7 @@ impl RustGenerator {
       assert!(method.c_signature.return_type == CppFfiType::void());
     }
     let return_type_info1 = return_type_info.unwrap();
+    let doc = format!("C++ method: ```{}```", method.short_text());
 
     Ok(RustMethod {
       name: self.method_rust_name(method),
@@ -764,6 +766,7 @@ impl RustGenerator {
         return_type: return_type_info1.0,
         return_type_ffi_index: return_type_info1.1,
       }),
+      doc: doc,
     })
   }
 
@@ -842,17 +845,46 @@ impl RustGenerator {
     let mut type_declaration = None;
     let method = if methods_count > 1 {
       let first_method = filtered_methods[0].clone();
-      let self_argument = if let RustMethodArguments::SingleVariant(ref args) =
-                                 first_method.arguments {
-        if args.arguments.len() > 0 && args.arguments[0].name == "self" {
-          Some(args.arguments[0].clone())
+      let (self_argument, cpp_method_name) =
+        if let RustMethodArguments::SingleVariant(ref args) = first_method.arguments {
+          let self_argument = if args.arguments.len() > 0 && args.arguments[0].name == "self" {
+            Some(args.arguments[0].clone())
+          } else {
+            None
+          };
+          (self_argument, args.cpp_method.cpp_method.full_name())
         } else {
-          None
-        }
-      } else {
-        unreachable!()
-      };
+          unreachable!()
+        };
       let mut args_variants = Vec::new();
+      let mut doc = Vec::new();
+      doc.push(format!("C++ method: ```{}```\n\n", cpp_method_name));
+      doc.push(format!("This is an overloaded function. Available variants:\n\n"));
+      let self_arg_doc_text = match first_method.self_arg_kind() {
+        RustMethodSelfArgKind::Static => "",
+        RustMethodSelfArgKind::ConstRef => "&self, ",
+        RustMethodSelfArgKind::MutRef => "&mut self, ",
+        RustMethodSelfArgKind::Value => "self, ",
+      };
+      let mut method_name = first_method.name.clone();
+      let mut trait_name = first_method.name.last_name().clone();
+      if use_self_arg_caption {
+        trait_name = format!("{}_{}", trait_name, first_method.self_arg_kind().caption());
+        let name = method_name.parts.pop().unwrap();
+        let caption = first_method.self_arg_kind().caption();
+        method_name.parts.push(format!("{}_{}", name, caption));
+      }
+      trait_name = trait_name.to_class_case() + "Args";
+      if let &RustMethodScope::Impl { ref type_name } = scope {
+        trait_name = format!("{}{}", type_name.last_name(), trait_name);
+      }
+      let method_name_with_scope = match first_method.scope {
+        RustMethodScope::Impl { ref type_name } => {
+          format!("{}::{}", type_name.last_name(), method_name.last_name())
+        }
+        RustMethodScope::TraitImpl { .. } => panic!("TraitImpl is totally not expected here"),
+        RustMethodScope::Free => method_name.last_name().clone(),
+      };
       for method in filtered_methods {
         assert!(method.name == first_method.name);
         assert!(method.scope == first_method.scope);
@@ -889,6 +921,24 @@ impl RustGenerator {
             }
             ReturnValueAllocationPlace::NotApplicable => {}
           }
+          let arg_texts = args.arguments
+            .iter()
+            .map(|x| rust_type_to_code(&x.argument_type.rust_api_type, &self.config.crate_name))
+            .join(", ");
+          let arg_final_text = if args.arguments.len() == 1 {
+            arg_texts
+          } else {
+            format!("({})", arg_texts)
+          };
+          let return_type_text = rust_type_to_code(&args.return_type.rust_api_type,
+                                                   &self.config.crate_name);
+          let doc_rust_signature = format!("fn {name}({self_arg}{arg_text}) -> {return_type}",
+                                           name = method_name.last_name(),
+                                           self_arg = self_arg_doc_text,
+                                           arg_text = arg_final_text,
+                                           return_type = return_type_text);
+          doc.push(format!("Rust: ```{}```<br>\n", doc_rust_signature));
+          doc.push(format!("C++: ```{}```\n\n", args.cpp_method.cpp_method.short_text()));
           args_variants.push(args);
         } else {
           unreachable!()
@@ -915,25 +965,6 @@ impl RustGenerator {
       } else {
         None
       };
-      let mut trait_name = first_method.name.last_name().clone();
-      let mut method_name = first_method.name.clone();
-      if use_self_arg_caption {
-        trait_name = format!("{}_{}", trait_name, first_method.self_arg_kind().caption());
-        let name = method_name.parts.pop().unwrap();
-        let caption = first_method.self_arg_kind().caption();
-        method_name.parts.push(format!("{}_{}", name, caption));
-      }
-      trait_name = trait_name.to_class_case() + "Args";
-      if let &RustMethodScope::Impl { ref type_name } = scope {
-        trait_name = format!("{}{}", type_name.last_name(), trait_name);
-      }
-      let method_name_with_scope = match first_method.scope {
-        RustMethodScope::Impl { ref type_name } => {
-          format!("{}::{}", type_name.last_name(), method_name.last_name())
-        }
-        RustMethodScope::TraitImpl { .. } => panic!("TraitImpl is totally not expected here"),
-        RustMethodScope::Free => method_name.last_name().clone(),
-      };
       let method_link = match first_method.scope {
         RustMethodScope::Impl { ref type_name } => {
           format!("../struct.{}.html#method.{}",
@@ -955,6 +986,7 @@ impl RustGenerator {
                      name = method_name_with_scope,
                      link = method_link),
       });
+
       RustMethod {
         name: method_name,
         scope: first_method.scope,
@@ -964,6 +996,7 @@ impl RustGenerator {
           shared_arguments: shared_arguments,
           variant_argument_name: "args".to_string(),
         },
+        doc: doc.join(""),
       }
     } else {
       let mut method = filtered_methods.pop().unwrap();

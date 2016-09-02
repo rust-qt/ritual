@@ -58,6 +58,7 @@ pub struct RustMethod {
   pub scope: RustMethodScope,
   pub name: RustName,
   pub arguments: RustMethodArguments,
+  pub doc: String,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

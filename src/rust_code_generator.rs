@@ -34,6 +34,58 @@ pub struct RustCodeGeneratorConfig {
   pub rustfmt_config_path: Option<PathBuf>,
 }
 
+pub fn rust_type_to_code(rust_type: &RustType, crate_name: &String) -> String {
+  match *rust_type {
+    RustType::Void => "()".to_string(),
+    RustType::Common { ref base, ref is_const, ref indirection, ref generic_arguments, .. } => {
+      let mut base_s = base.full_name(Some(crate_name));
+      if let &Some(ref args) = generic_arguments {
+        base_s = format!("{}<{}>",
+                         base_s,
+                         args.iter().map(|x| rust_type_to_code(x, crate_name)).join(", "));
+      }
+      let s = match indirection {
+        &RustTypeIndirection::None => base_s,
+        &RustTypeIndirection::Ref { ref lifetime } => {
+          let lifetime_text = match *lifetime {
+            Some(ref lifetime) => format!("'{} ", lifetime),
+            None => String::new(),
+          };
+          if *is_const {
+            format!("&{}{}", lifetime_text, base_s)
+          } else {
+            format!("&{}mut {}", lifetime_text, base_s)
+          }
+        }
+        &RustTypeIndirection::Ptr => {
+          if *is_const {
+            format!("*const {}", base_s)
+          } else {
+            format!("*mut {}", base_s)
+          }
+        }
+        &RustTypeIndirection::PtrPtr => {
+          if *is_const {
+            format!("*const *const {}", base_s)
+          } else {
+            format!("*mut *mut {}", base_s)
+          }
+        }
+      };
+      s
+    }
+    RustType::FunctionPointer { ref return_type, ref arguments } => {
+      format!("extern \"C\" fn({}){}",
+              arguments.iter().map(|arg| rust_type_to_code(arg, crate_name)).join(", "),
+              match return_type.as_ref() {
+                &RustType::Void => String::new(),
+                return_type => format!(" -> {}", rust_type_to_code(return_type, crate_name)),
+              })
+    }
+  }
+}
+
+
 pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) {
   let rustfmt_config_data = match config.rustfmt_config_path {
     Some(ref path) => {
@@ -140,54 +192,7 @@ impl RustCodeGenerator {
   }
 
   fn rust_type_to_code(&self, rust_type: &RustType) -> String {
-    match *rust_type {
-      RustType::Void => "()".to_string(),
-      RustType::Common { ref base, ref is_const, ref indirection, ref generic_arguments, .. } => {
-        let mut base_s = base.full_name(Some(&self.config.crate_name));
-        if let &Some(ref args) = generic_arguments {
-          base_s = format!("{}<{}>",
-                           base_s,
-                           args.iter().map(|x| self.rust_type_to_code(x)).join(", "));
-        }
-        let s = match indirection {
-          &RustTypeIndirection::None => base_s,
-          &RustTypeIndirection::Ref { ref lifetime } => {
-            let lifetime_text = match *lifetime {
-              Some(ref lifetime) => format!("'{} ", lifetime),
-              None => String::new(),
-            };
-            if *is_const {
-              format!("&{}{}", lifetime_text, base_s)
-            } else {
-              format!("&{}mut {}", lifetime_text, base_s)
-            }
-          }
-          &RustTypeIndirection::Ptr => {
-            if *is_const {
-              format!("*const {}", base_s)
-            } else {
-              format!("*mut {}", base_s)
-            }
-          }
-          &RustTypeIndirection::PtrPtr => {
-            if *is_const {
-              format!("*const *const {}", base_s)
-            } else {
-              format!("*mut *mut {}", base_s)
-            }
-          }
-        };
-        s
-      }
-      RustType::FunctionPointer { ref return_type, ref arguments } => {
-        format!("extern \"C\" fn({}){}",
-                arguments.iter().map(|arg| self.rust_type_to_code(arg)).join(", "),
-                match return_type.as_ref() {
-                  &RustType::Void => String::new(),
-                  return_type => format!(" -> {}", self.rust_type_to_code(return_type)),
-                })
-      }
-    }
+    rust_type_to_code(rust_type, &self.config.crate_name)
   }
 
   fn rust_ffi_function_to_code(&self, func: &RustFFIFunction) -> String {
@@ -348,6 +353,10 @@ impl RustCodeGenerator {
       RustMethodScope::TraitImpl { .. } => "",
       _ => "pub ",
     };
+    let doc = func.doc
+      .split("\n")
+      .map(|x| format!("/// {}\n", x))
+      .join("");
     match func.arguments {
       RustMethodArguments::SingleVariant(ref variant) => {
         let body = self.generate_ffi_call(variant, &Vec::new());
@@ -359,7 +368,8 @@ impl RustCodeGenerator {
           }
         };
 
-        format!("{maybe_pub}fn {name}({args}){return_type} {{\n{body}}}\n\n",
+        format!("{doc}{maybe_pub}fn {name}({args}){return_type} {{\n{body}}}\n\n",
+                doc = doc,
                 maybe_pub = maybe_pub,
                 name = func.name.last_name(),
                 args = self.arg_texts(&variant.arguments, None).join(", "),
@@ -385,6 +395,7 @@ impl RustCodeGenerator {
         let mut args = self.arg_texts(shared_arguments, params_trait_lifetime.as_ref());
         args.push(format!("{}: {}", variant_argument_name, tpl_type));
         format!(include_str!("../templates/crate/overloaded_function.rs.in"),
+                doc = doc,
                 maybe_pub = maybe_pub,
                 lifetime_arg = lifetime_arg,
                 lifetime = lifetime_specifier,
