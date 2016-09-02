@@ -458,6 +458,9 @@ impl RustCodeGenerator {
     results.push("#[allow(unused_imports)]\nuse {libc, cpp_box, std};\n\n".to_string());
 
     for type1 in &data.types {
+      for doc_line in type1.doc.split('\n') {
+        results.push(format!("/// {}\n", doc_line));
+      }
       match type1.kind {
         RustTypeDeclarationKind::CppTypeWrapper { ref kind, ref methods, ref traits, .. } => {
           let r = match *kind {

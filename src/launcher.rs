@@ -248,6 +248,7 @@ pub fn run(env: BuildEnvironment) {
                         &output_dir_path.with_added(item.file_name()))
         .unwrap();
     }
+    fs::remove_dir(&crate_new_path).unwrap();
   }
 
 

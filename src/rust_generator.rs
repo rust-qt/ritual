@@ -489,6 +489,8 @@ impl RustGenerator {
           }
 
         }
+
+        let doc = format!("C++ type: {}", &info.cpp_name);
         ProcessTypeResult {
           main_type: RustTypeDeclaration {
             name: info.rust_name.last_name().clone(),
@@ -502,6 +504,7 @@ impl RustGenerator {
               methods: Vec::new(),
               traits: Vec::new(),
             },
+            doc: doc,
           },
           overloading_types: Vec::new(),
         }
@@ -522,6 +525,7 @@ impl RustGenerator {
             }
           });
         let functions_result = self.process_functions(methods, &methods_scope);
+        let doc = format!("C++ type: {}", &info.cpp_name);
 
         ProcessTypeResult {
           main_type: RustTypeDeclaration {
@@ -533,6 +537,7 @@ impl RustGenerator {
               methods: functions_result.methods,
               traits: functions_result.trait_impls,
             },
+            doc: doc,
           },
           overloading_types: functions_result.overloading_types,
         }
@@ -791,7 +796,7 @@ impl RustGenerator {
                     -> (RustMethod, Option<RustTypeDeclaration>) {
     let methods_count = filtered_methods.len();
     let mut type_declaration = None;
-    let mut method = if methods_count > 1 {
+    let method = if methods_count > 1 {
       let first_method = filtered_methods[0].clone();
       let self_argument = if let RustMethodArguments::SingleVariant(ref args) =
                                  first_method.arguments {
@@ -867,13 +872,33 @@ impl RustGenerator {
         None
       };
       let mut trait_name = first_method.name.last_name().clone();
+      let mut method_name = first_method.name.clone();
       if use_self_arg_caption {
-        trait_name = trait_name.clone() + &first_method.self_arg_kind().caption();
+        trait_name = format!("{}_{}", trait_name, first_method.self_arg_kind().caption());
+        let name = method_name.parts.pop().unwrap();
+        let caption = first_method.self_arg_kind().caption();
+        method_name.parts.push(format!("{}_{}", name, caption));
       }
       trait_name = trait_name.to_class_case() + "Args";
       if let &RustMethodScope::Impl { ref type_name } = scope {
         trait_name = format!("{}{}", type_name.last_name(), trait_name);
       }
+      let method_name_with_scope = match first_method.scope {
+        RustMethodScope::Impl { ref type_name } => {
+          format!("{}::{}", type_name.last_name(), method_name.last_name())
+        }
+        RustMethodScope::TraitImpl { .. } => panic!("TraitImpl is totally not expected here"),
+        RustMethodScope::Free => method_name.last_name().clone(),
+      };
+      let method_link = match first_method.scope {
+        RustMethodScope::Impl { ref type_name } => {
+          format!("../struct.{}.html#method.{}",
+                  type_name.last_name(),
+                  method_name.last_name())
+        }
+        RustMethodScope::TraitImpl { .. } => panic!("TraitImpl is totally not expected here"),
+        RustMethodScope::Free => format!("../fn.{}.html", method_name.last_name()),
+      };
       type_declaration = Some(RustTypeDeclaration {
         name: trait_name.clone(),
         kind: RustTypeDeclarationKind::MethodParametersTrait {
@@ -881,9 +906,13 @@ impl RustGenerator {
           impls: args_variants,
           lifetime: trait_lifetime.clone(),
         },
+        doc: format!("This trait represents a set of arguments accepted by [{name}]({link}) \
+                      method.",
+                     name = method_name_with_scope,
+                     link = method_link),
       });
       RustMethod {
-        name: first_method.name,
+        name: method_name,
         scope: first_method.scope,
         arguments: RustMethodArguments::MultipleVariants {
           params_trait_name: trait_name.clone(),
@@ -893,13 +922,14 @@ impl RustGenerator {
         },
       }
     } else {
-      filtered_methods.pop().unwrap()
+      let mut method = filtered_methods.pop().unwrap();
+      if use_self_arg_caption {
+        let name = method.name.parts.pop().unwrap();
+        let caption = method.self_arg_kind().caption();
+        method.name.parts.push(format!("{}_{}", name, caption));
+      }
+      method
     };
-    if use_self_arg_caption {
-      let name = method.name.parts.pop().unwrap();
-      let caption = method.self_arg_kind().caption();
-      method.name.parts.push(format!("{}_{}", name, caption));
-    }
     (method, type_declaration)
   }
 

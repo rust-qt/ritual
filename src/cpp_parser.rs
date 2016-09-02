@@ -122,8 +122,10 @@ fn run_clang<R, F: Fn(Entity) -> R>(config: &CppParserConfig, cpp_code: Option<S
     }
   }
   // TODO: PIC and additional args should be moved to lib spec
-  let mut args =
-    vec!["-fPIC".to_string(), "-fcxx-exceptions".to_string(), "-Xclang".to_string(), "-detailed-preprocessing-record".to_string()];
+  let mut args = vec!["-fPIC".to_string(),
+                      "-fcxx-exceptions".to_string(),
+                      "-Xclang".to_string(),
+                      "-detailed-preprocessing-record".to_string()];
   for dir in &config.include_dirs {
     args.push("-I".to_string());
     args.push(dir.to_str().unwrap().to_string());
@@ -1084,7 +1086,9 @@ impl CppParser {
           match self.parse_enum(entity) {
             Ok(r) => {
               if let Some(info) = self.types.iter().find(|x| x.name == r.name).map(|x| x.clone()) {
-                log::warning(format!("repeating enum declaration: {:?}\nold declaration: {:?}", entity, info));
+                log::warning(format!("repeating enum declaration: {:?}\nold declaration: {:?}",
+                                     entity,
+                                     info));
               } else {
                 self.types.push(r);
               }
@@ -1111,7 +1115,9 @@ impl CppParser {
           match self.parse_class(entity) {
             Ok(r) => {
               if let Some(info) = self.types.iter().find(|x| x.name == r.name).map(|x| x.clone()) {
-                log::warning(format!("repeating class declaration: {:?}\nold declaration: {:?}", entity, info));
+                log::warning(format!("repeating class declaration: {:?}\nold declaration: {:?}",
+                                     entity,
+                                     info));
               } else {
                 self.types.push(r);
               }

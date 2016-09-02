@@ -192,6 +192,7 @@ pub enum RustTypeDeclarationKind {
 pub struct RustTypeDeclaration {
   pub name: String,
   pub kind: RustTypeDeclarationKind,
+  pub doc: String,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
