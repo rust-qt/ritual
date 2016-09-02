@@ -1,8 +1,20 @@
 
 use rust_type::{RustName, CompleteType, RustType, RustTypeIndirection};
 use cpp_ffi_data::CppAndFfiMethod;
-use cpp_data::EnumValue;
 use cpp_type::CppType;
+
+/// One variant of a Rust enum
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct RustEnumValue {
+  /// Identifier
+  pub name: String,
+  /// Corresponding value
+  pub value: i64,
+  /// Original C++ name of the variant
+  pub cpp_name: Option<String>,
+  /// Documentation text
+  pub doc: String,
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RustMethodScope {
@@ -165,7 +177,7 @@ pub struct TraitImpl {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RustTypeWrapperKind {
   Enum {
-    values: Vec<EnumValue>,
+    values: Vec<RustEnumValue>,
     is_flaggable: bool,
   },
   Struct { size: i32 },

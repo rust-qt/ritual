@@ -8,7 +8,7 @@ use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFu
 use cpp_data::{CppTypeKind, EnumValue};
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
-                RustMethodArguments, TraitImpl, TraitName};
+                RustMethodArguments, TraitImpl, TraitName, RustEnumValue};
 use cpp_method::ReturnValueAllocationPlace;
 use cpp_ffi_data::CppFfiArgumentMeaning;
 use utils::{CaseOperations, VecCaseOperations, WordIterator, add_to_multihash, JoinWithString};
@@ -86,10 +86,10 @@ fn sanitize_rust_identifier(name: &String) -> String {
 /// Rust does not allow such duplicates.
 /// - If there is only one variant, adds another variant.
 /// Rust does not allow repr(C) enums having only one variant.
-fn prepare_enum_values(values: &Vec<EnumValue>, name: &String) -> Vec<EnumValue> {
+fn prepare_enum_values(values: &Vec<EnumValue>, name: &String) -> Vec<RustEnumValue> {
   // TODO: tests for prepare_enum_values
   // TODO: remove shared prefix from variants
-  let mut value_to_variant: HashMap<i64, EnumValue> = HashMap::new();
+  let mut value_to_variant: HashMap<i64, RustEnumValue> = HashMap::new();
   for variant in values {
     let value = variant.value;
     if value_to_variant.contains_key(&value) {
@@ -100,12 +100,15 @@ fn prepare_enum_values(values: &Vec<EnumValue>, name: &String) -> Vec<EnumValue>
                            value_to_variant.get(&value).unwrap().name));
     } else {
       value_to_variant.insert(value,
-                              EnumValue {
+                              RustEnumValue {
                                 name: variant.name.to_class_case(),
+                                cpp_name: Some(variant.name.clone()),
                                 value: variant.value,
+                                doc: format!("C++ variant: {}", &variant.name),
                               });
     }
   }
+  let more_than_one = value_to_variant.len() > 1;
   if value_to_variant.len() == 1 {
     let dummy_value = if value_to_variant.contains_key(&0) {
       1
@@ -113,14 +116,55 @@ fn prepare_enum_values(values: &Vec<EnumValue>, name: &String) -> Vec<EnumValue>
       0
     };
     value_to_variant.insert(dummy_value,
-                            EnumValue {
+                            RustEnumValue {
                               name: "_Invalid".to_string(),
                               value: dummy_value as i64,
+                              cpp_name: None,
+                              doc: format!("This variant is added in Rust because enums with one \
+                                            variant and C representation are not supported."),
                             });
   }
   let mut result: Vec<_> = value_to_variant.into_iter()
     .map(|(_val, variant)| variant)
     .collect();
+  if more_than_one {
+    let new_names = {
+      let all_words: Vec<Vec<&str>> = result.iter()
+        .map(|x| WordIterator::new(&x.name).collect())
+        .collect();
+      let tmp_buffer = all_words[0].clone();
+      let mut common_prefix = &tmp_buffer[..];
+      let mut common_suffix = &tmp_buffer[..];
+      for item in &all_words {
+        while !common_prefix.is_empty() &&
+              (item.len() < common_prefix.len() || &item[..common_prefix.len()] != common_prefix) {
+          common_prefix = &common_prefix[..common_prefix.len() - 1];
+        }
+        while !common_suffix.is_empty() &&
+              (item.len() < common_suffix.len() ||
+               &item[item.len() - common_suffix.len()..] != common_suffix) {
+          common_suffix = &common_suffix[1..];
+        }
+      }
+      let new_names: Vec<_> = all_words.iter()
+        .map(|item| item[common_prefix.len()..item.len() - common_suffix.len()].join(""))
+        .collect();
+      if new_names.iter()
+        .find(|item| item.is_empty() || item.chars().next().unwrap().is_digit(10))
+        .is_none() {
+        Some(new_names)
+      } else {
+        None
+      }
+    };
+    if let Some(new_names) = new_names {
+      assert_eq!(new_names.len(), result.len());
+      for i in 0..new_names.len() {
+        result[i].name = new_names[i].clone();
+      }
+    }
+
+  }
   result.sort_by(|a, b| a.value.cmp(&b.value));
   result
 }
@@ -525,7 +569,7 @@ impl RustGenerator {
             }
           });
         let functions_result = self.process_functions(methods, &methods_scope);
-        let doc = format!("C++ type: {}", &info.cpp_name);
+        let doc = format!("C++ type: {}", class_type.to_cpp_code().unwrap());
 
         ProcessTypeResult {
           main_type: RustTypeDeclaration {
@@ -1105,4 +1149,134 @@ fn calculate_rust_name_test() {
                                 "QRect",
                                 true,
                                 &["qt_core", "rect", "ns", "func1"]);
+}
+
+#[test]
+fn prepare_enum_values_test_simple() {
+  let r = prepare_enum_values(&vec![EnumValue {
+                                      name: "var1".to_string(),
+                                      value: 1,
+                                    },
+                                    EnumValue {
+                                      name: "other_var2".to_string(),
+                                      value: 2,
+                                    }],
+                              &String::new());
+  assert_eq!(r.len(), 2);
+  assert_eq!(r[0].name, "Var1");
+  assert_eq!(r[0].value, 1);
+  assert_eq!(r[1].name, "OtherVar2");
+  assert_eq!(r[1].value, 2);
+}
+
+#[test]
+fn prepare_enum_values_test_duplicates() {
+  let r = prepare_enum_values(&vec![EnumValue {
+                                      name: "var1".to_string(),
+                                      value: 1,
+                                    },
+                                    EnumValue {
+                                      name: "other_var2".to_string(),
+                                      value: 2,
+                                    },
+                                    EnumValue {
+                                      name: "other_var_dup".to_string(),
+                                      value: 2,
+                                    }],
+                              &String::new());
+  assert_eq!(r.len(), 2);
+  assert_eq!(r[0].name, "Var1");
+  assert_eq!(r[0].value, 1);
+  assert_eq!(r[1].name, "OtherVar2");
+  assert_eq!(r[1].value, 2);
+}
+
+#[test]
+fn prepare_enum_values_test_prefix() {
+  let r = prepare_enum_values(&vec![EnumValue {
+                                      name: "OptionGood".to_string(),
+                                      value: 1,
+                                    },
+                                    EnumValue {
+                                      name: "OptionBad".to_string(),
+                                      value: 2,
+                                    },
+                                    EnumValue {
+                                      name: "OptionNecessaryEvil".to_string(),
+                                      value: 3,
+                                    }],
+                              &String::new());
+  assert_eq!(r.len(), 3);
+  assert_eq!(r[0].name, "Good");
+  assert_eq!(r[1].name, "Bad");
+  assert_eq!(r[2].name, "NecessaryEvil");
+}
+
+#[test]
+fn prepare_enum_values_test_suffix() {
+  let r = prepare_enum_values(&vec![EnumValue {
+                                      name: "BestFriend".to_string(),
+                                      value: 1,
+                                    },
+                                    EnumValue {
+                                      name: "GoodFriend".to_string(),
+                                      value: 2,
+                                    },
+                                    EnumValue {
+                                      name: "NoFriend".to_string(),
+                                      value: 3,
+                                    }],
+                              &String::new());
+  assert_eq!(r.len(), 3);
+  assert_eq!(r[0].name, "Best");
+  assert_eq!(r[1].name, "Good");
+  assert_eq!(r[2].name, "No");
+}
+
+#[test]
+fn prepare_enum_values_test_prefix_digits() {
+  let r = prepare_enum_values(&vec![EnumValue {
+                                      name: "Base32".to_string(),
+                                      value: 1,
+                                    },
+                                    EnumValue {
+                                      name: "Base64".to_string(),
+                                      value: 2,
+                                    }],
+                              &String::new());
+  assert_eq!(r.len(), 2);
+  assert_eq!(r[0].name, "Base32");
+  assert_eq!(r[1].name, "Base64");
+}
+
+#[test]
+fn prepare_enum_values_test_suffix_empty() {
+  let r = prepare_enum_values(&vec![EnumValue {
+                                      name: "NonRecursive".to_string(),
+                                      value: 1,
+                                    },
+                                    EnumValue {
+                                      name: "Recursive".to_string(),
+                                      value: 2,
+                                    }],
+                              &String::new());
+  assert_eq!(r.len(), 2);
+  assert_eq!(r[0].name, "NonRecursive");
+  assert_eq!(r[1].name, "Recursive");
+}
+
+#[test]
+fn prepare_enum_values_test_suffix_partial() {
+  let r = prepare_enum_values(&vec![EnumValue {
+                                      name: "PreciseTimer".to_string(),
+                                      value: 1,
+                                    },
+                                    EnumValue {
+                                      name: "CoarseTimer".to_string(),
+                                      value: 2,
+                                    }],
+                              &String::new());
+  assert_eq!(r.len(), 2);
+  assert_eq!(r[0].name, "Precise");
+  assert_eq!(r[1].name, "Coarse");
 }

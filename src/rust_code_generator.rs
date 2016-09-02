@@ -468,7 +468,12 @@ impl RustCodeGenerator {
               let mut r = format!(include_str!("../templates/crate/enum_declaration.rs.in"),
                                   name = type1.name,
                                   variants = values.iter()
-                                    .map(|item| format!("  {} = {}", item.name, item.value))
+                                    .map(|item| {
+                  item.doc
+                    .split("\n")
+                    .map(|x| format!("/// {}\n", x))
+                    .join("") + &format!("  {} = {}", item.name, item.value)
+                })
                                     .join(", \n"));
               if *is_flaggable {
                 r = r +
