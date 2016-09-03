@@ -215,6 +215,14 @@ impl CppMethod {
     }
   }
 
+  pub fn doc_id(&self) -> String {
+    if let Some(ref info) = self.class_membership {
+      format!("{}::{}", info.class_type.name, self.name)
+    } else {
+      self.name.clone()
+    }
+  }
+
   /// Returns short text representing values in this method
   /// (only for debug output purposes).
   pub fn short_text(&self) -> String {

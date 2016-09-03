@@ -9,6 +9,7 @@ mod cpp_method;
 mod cpp_type;
 mod cpp_operator;
 pub mod log;
+mod qt_doc_parser;
 mod qt_specific;
 mod rust_generator;
 mod rust_code_generator;

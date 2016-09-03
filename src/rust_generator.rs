@@ -15,6 +15,7 @@ use utils::{CaseOperations, VecCaseOperations, WordIterator, add_to_multihash, J
 use caption_strategy::TypeCaptionStrategy;
 use rust_code_generator::rust_type_to_code;
 use log;
+use qt_doc_parser::QtDocData;
 
 use std::collections::{HashMap, HashSet};
 
@@ -195,6 +196,8 @@ pub struct RustGeneratorConfig {
   /// Flag instructing to remove leading "Q" and "Qt"
   /// from identifiers.
   pub remove_qt_prefix: bool,
+
+  pub qt_doc_data: Option<QtDocData>,
 }
 // TODO: when supporting other libraries, implement removal of arbitrary prefixes
 
@@ -755,7 +758,22 @@ impl RustGenerator {
       assert!(method.c_signature.return_type == CppFfiType::void());
     }
     let return_type_info1 = return_type_info.unwrap();
-    let doc = format!("C++ method: ```{}```", method.short_text());
+    let mut doc = format!("C++ method: <span style='color: green'>```{}```</span>",
+                          method.short_text());
+    if let Some(ref qt_doc_data) = self.config.qt_doc_data {
+      match qt_doc_data.for_method(&method.cpp_method.doc_id()) {
+        Ok(html) => {
+          doc.push_str(&format!("<br>C++ documentation: <div style='border: 1px solid #5CFF95; \
+                                  background: #D6FFE4; padding: 16px;'>{}</div>",
+                                html))
+        }
+        Err(msg) => {
+          log::warning(format!("Failed to get documentation for method: {}: {}",
+                               &method.cpp_method.doc_id(),
+                               msg))
+        }
+      }
+    }
 
     Ok(RustMethod {
       name: self.method_rust_name(method),
@@ -938,7 +956,8 @@ impl RustGenerator {
                                            arg_text = arg_final_text,
                                            return_type = return_type_text);
           doc.push(format!("Rust: ```{}```<br>\n", doc_rust_signature));
-          doc.push(format!("C++: ```{}```\n\n", args.cpp_method.cpp_method.short_text()));
+          doc.push(format!("C++: <span style='color: green;'>```{}```</span>\n\n",
+                           args.cpp_method.cpp_method.short_text()));
           args_variants.push(args);
         } else {
           unreachable!()
@@ -1156,6 +1175,7 @@ fn calculate_rust_name_test_part(name: &'static str,
                                    crate_name: "qt_core".to_string(),
                                    remove_qt_prefix: true,
                                    module_blacklist: Vec::new(),
+                                   qt_doc_data: None,
                                  }),
              RustName::new(expected.into_iter().map(|x| x.to_string()).collect()));
 }

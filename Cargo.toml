@@ -23,6 +23,8 @@ libc = "0.2"
 toml = "0.2"
 tempdir = "0.3.5"
 num_cpus = "1.0.0"
+select = "0.3.0" #html parsing library
+csv = "0.14.7"
 
 [build-dependencies]
 serde_codegen = "0.8"

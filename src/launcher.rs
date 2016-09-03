@@ -18,6 +18,7 @@ use rust_code_generator;
 use rust_generator;
 use serializable::LibSpec;
 use cpp_ffi_generator::CppAndFfiData;
+use qt_doc_parser::QtDocData;
 
 /// Runs a command, checks that it is successful, and
 /// returns its output if requested
@@ -132,6 +133,30 @@ pub fn run(env: BuildEnvironment) {
       log::warning("This library is not supported yet.");
     }
   }
+  let qt_doc_data = if is_qt_library {
+    let env_var_name = format!("{}_DOC_DATA", lib_spec.cpp.name.to_uppercase());
+    match std::env::var(&env_var_name) {
+      Ok(env_var_value) => {
+        match QtDocData::new(&PathBuf::from(&env_var_value)) {
+          Ok(r) => {
+            log::info(format!("Loaded Qt doc data from {}", &env_var_value));
+            Some(r)
+          }
+          Err(msg) => {
+            log::warning(format!("Failed to load Qt doc data: {}", msg));
+            None
+          }
+        }
+      }
+      Err(_) => {
+        log::warning(format!("Building without Qt doc data (no env var: {})",
+                             env_var_name));
+        None
+      }
+    }
+  } else {
+    None
+  };
   let c_lib_parent_path = output_dir_path.with_added("c_lib");
   let c_lib_install_path = c_lib_parent_path.with_added("install");
   let num_jobs = env.num_jobs.unwrap_or_else(|| num_cpus::get() as i32);
@@ -239,6 +264,7 @@ pub fn run(env: BuildEnvironment) {
                                           crate_name: lib_spec.rust.name.clone(),
                                           remove_qt_prefix: is_qt_library,
                                           module_blacklist: lib_spec.rust.module_blacklist,
+                                          qt_doc_data: qt_doc_data,
                                         });
     rust_code_generator::run(rust_config, &rust_data);
 
