@@ -168,6 +168,7 @@ impl CppData {
             include_file: type1.include_file.clone(),
             origin_location: None,
             template_arguments: None,
+            declaration_code: None,
           });
         }
       }

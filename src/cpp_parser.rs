@@ -876,6 +876,14 @@ impl CppParser {
         }
       }
     }
+    let mut token_strings = Vec::new();
+    for token in entity.get_range().unwrap().tokenize() {
+      let text = token.get_spelling();
+      if text == "{" || text == ";" {
+        break;
+      }
+      token_strings.push(text);
+    }
 
     Ok(CppMethod {
       name: name,
@@ -912,6 +920,7 @@ impl CppParser {
       include_file: self.entity_include_file(entity).unwrap(),
       origin_location: Some(get_origin_location(entity).unwrap()),
       template_arguments: template_arguments,
+      declaration_code: Some(token_strings.join(" ")),
     })
   }
 

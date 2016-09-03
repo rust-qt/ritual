@@ -73,11 +73,12 @@ fn simple_func() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: None,
+               declaration_code: Some("int func1 ( int x )".to_string()),
              });
 }
 
 fn simple_func_with_default_value() {
-  let data = run_parser("bool func1(int x = 42);");
+  let data = run_parser("bool func1(int x = 42) {\nreturn false;\n}");
   assert!(data.template_instantiations.is_empty());
   assert!(data.types.is_empty());
   assert!(data.methods.len() == 1);
@@ -104,6 +105,7 @@ fn simple_func_with_default_value() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: None,
+               declaration_code: Some("bool func1 ( int x = 42 )".to_string()),
              });
 }
 
@@ -168,6 +170,7 @@ fn functions_with_class_arg() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: None,
+               declaration_code: Some("bool func1 ( Magic x )".to_string()),
              });
   assert_eq!(data.methods[1],
              CppMethod {
@@ -195,6 +198,7 @@ fn functions_with_class_arg() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: None,
+               declaration_code: Some("bool func1 ( Magic * x )".to_string()),
              });
   assert_eq!(data.methods[2],
              CppMethod {
@@ -222,6 +226,7 @@ fn functions_with_class_arg() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: None,
+               declaration_code: Some("bool func2 ( const Magic & )".to_string()),
              });
 }
 
@@ -260,6 +265,7 @@ fn variadic_func() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: None,
+               declaration_code: Some("int my_printf ( const char * format , ... )".to_string()),
              });
 }
 
@@ -297,6 +303,7 @@ fn free_template_func() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: Some(vec!["T".to_string()]),
+               declaration_code: Some("template < typename T > T abs ( T value )".to_string()),
              });
 }
 
@@ -348,6 +355,7 @@ fn free_func_operator_sub() {
                  include_file: "myfakelib.h".to_string(),
                  origin_location: None,
                  template_arguments: None,
+                 declaration_code: Some("C1 operator - ( C1 a , C1 b )".to_string()),
                });
   }
 }
@@ -407,6 +415,7 @@ fn simple_class_method() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: None,
+               declaration_code: Some("int func1 ( int x )".to_string()),
              });
 }
 
@@ -551,6 +560,7 @@ fn template_class_method() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: None,
+               declaration_code: Some("T get ( int index )".to_string()),
              });
 }
 

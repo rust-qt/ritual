@@ -48,6 +48,7 @@ pub fn empty_regular_method() -> CppMethod {
     origin_location: None,
     template_arguments: None,
     operator: None,
+    declaration_code: None,
   }
 }
 
@@ -734,6 +735,7 @@ fn short_text1() {
     include_file: String::new(),
     origin_location: None,
     template_arguments: None,
+    declaration_code: None,
   };
   assert_eq!(method.short_text(),
              "protected int Class1::method1(int arg1, double arg2 = ?) const");
