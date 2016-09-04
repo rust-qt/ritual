@@ -761,16 +761,18 @@ impl RustGenerator {
     let mut doc = format!("C++ method: <span style='color: green'>```{}```</span>",
                           method.short_text());
     if let Some(ref qt_doc_data) = self.config.qt_doc_data {
-      match qt_doc_data.for_method(&method.cpp_method.doc_id()) {
-        Ok(html) => {
-          doc.push_str(&format!("<br>C++ documentation: <div style='border: 1px solid #5CFF95; \
-                                  background: #D6FFE4; padding: 16px;'>{}</div>",
-                                html))
-        }
-        Err(msg) => {
-          log::warning(format!("Failed to get documentation for method: {}: {}",
-                               &method.cpp_method.doc_id(),
-                               msg))
+      if let Some(ref declaration_code) = method.cpp_method.declaration_code {
+        match qt_doc_data.doc_for_method(&method.cpp_method.doc_id(), declaration_code) {
+          Ok(html) => {
+            doc.push_str(&format!("<br>C++ documentation: <div style='border: 1px solid #5CFF95; \
+                                    background: #D6FFE4; padding: 16px;'>{}</div>",
+                                  html))
+          }
+          Err(msg) => {
+            log::warning(format!("Failed to get documentation for method: {}: {}",
+                                 &method.cpp_method.doc_id(),
+                                 msg))
+          }
         }
       }
     }
@@ -956,8 +958,28 @@ impl RustGenerator {
                                            arg_text = arg_final_text,
                                            return_type = return_type_text);
           doc.push(format!("Rust: ```{}```<br>\n", doc_rust_signature));
-          doc.push(format!("C++: <span style='color: green;'>```{}```</span>\n\n",
-                           args.cpp_method.cpp_method.short_text()));
+          {
+            let cpp_method = &args.cpp_method.cpp_method;
+            doc.push(format!("C++: <span style='color: green;'>```{}```</span><br>",
+                             cpp_method.short_text()));
+            if let Some(ref qt_doc_data) = self.config.qt_doc_data {
+              if let Some(ref declaration_code) = cpp_method.declaration_code {
+                match qt_doc_data.doc_for_method(&cpp_method.doc_id(), declaration_code) {
+                  Ok(html) => {
+                    doc.push(format!("<br>C++ documentation: <div style='border: 1px solid \
+                                      #5CFF95; background: #D6FFE4; padding: 16px;'>{}</div>",
+                                     html))
+                  }
+                  Err(msg) => {
+                    log::warning(format!("Failed to get documentation for method: {}: {}",
+                                         &cpp_method.doc_id(),
+                                         msg))
+                  }
+                }
+              }
+            }
+            doc.push(format!("\n\n"));
+          }
           args_variants.push(args);
         } else {
           unreachable!()

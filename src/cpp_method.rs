@@ -231,7 +231,11 @@ impl CppMethod {
     let mut s = String::new();
     if let Some(ref info) = self.class_membership {
       if info.is_virtual {
-        s = format!("{} virtual", s);
+        if info.is_pure_virtual {
+          s = format!("{} pure virtual", s);
+        } else {
+          s = format!("{} virtual", s);
+        }
       }
       if info.is_static {
         s = format!("{} static", s);
@@ -275,9 +279,6 @@ impl CppMethod {
       })
                   .join(", "));
     if let Some(ref info) = self.class_membership {
-      if info.is_pure_virtual {
-        s = format!("{} = 0", s);
-      }
       if info.is_const {
         s = format!("{} const", s);
       }

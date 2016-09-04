@@ -18,6 +18,7 @@ use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
                CppSpecificNumericTypeKind, CppTypeClassBase};
 use cpp_operator::CppOperator;
 use std::io::Write;
+use std::io::{BufRead, BufReader};
 
 struct CppParser {
   config: CppParserConfig,
@@ -876,14 +877,59 @@ impl CppParser {
         }
       }
     }
-    let mut token_strings = Vec::new();
-    for token in entity.get_range().unwrap().tokenize() {
-      let text = token.get_spelling();
-      if text == "{" || text == ";" {
-        break;
+    let source_range = entity.get_range().unwrap();
+    let tokens = source_range.tokenize();
+    let declaration_code = if tokens.is_empty() {
+      log::warning(format!("Failed to tokenize method {} at {:?}",
+                           name,
+                           entity.get_range().unwrap()));
+      let start = source_range.get_start().get_file_location();
+      let end = source_range.get_end().get_file_location();
+      let file = File::open(start.file.get_path()).unwrap();
+      let reader = BufReader::new(file);
+      let mut result = String::new();
+      let range_line1 = (start.line - 1) as usize;
+      let range_line2 = (end.line - 1) as usize;
+      let range_col1 = (start.column - 1) as usize;
+      let range_col2 = (end.column - 1) as usize;
+      for (line_num, line) in reader.lines().enumerate() {
+        let line = line.unwrap();
+        if line_num >= range_line1 && line_num <= range_line2 {
+          let start_column = if line_num == range_line1 {
+            range_col1
+          } else {
+            0
+          };
+          let end_column = if line_num == range_line2 {
+            range_col2
+          } else {
+            line.len()
+          };
+          result.push_str(&line[start_column..end_column]);
+          if line_num >= range_line2 {
+            break;
+          }
+        }
       }
-      token_strings.push(text);
-    }
+      if let Some(index) = result.find("{") {
+        result = result[0..index].to_string();
+      }
+      if let Some(index) = result.find(";") {
+        result = result[0..index].to_string();
+      }
+      log::warning(format!("The code extracted directly from header: {:?}", result));
+      Some(result)
+    } else {
+      let mut token_strings = Vec::new();
+      for token in tokens {
+        let text = token.get_spelling();
+        if text == "{" || text == ";" {
+          break;
+        }
+        token_strings.push(text);
+      }
+      Some(token_strings.join(" "))
+    };
 
     Ok(CppMethod {
       name: name,
@@ -920,7 +966,7 @@ impl CppParser {
       include_file: self.entity_include_file(entity).unwrap(),
       origin_location: Some(get_origin_location(entity).unwrap()),
       template_arguments: template_arguments,
-      declaration_code: Some(token_strings.join(" ")),
+      declaration_code: declaration_code,
     })
   }
 
