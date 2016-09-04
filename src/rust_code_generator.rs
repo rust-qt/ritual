@@ -34,6 +34,19 @@ pub struct RustCodeGeneratorConfig {
   pub rustfmt_config_path: Option<PathBuf>,
 }
 
+fn format_doc(doc: &String) -> String {
+  doc.split("\n")
+    .map(|x| {
+      let mut line = format!("/// {}\n", x);
+      if line.starts_with("///     ") {
+        // block doc tests
+        line = line.replace("///     ", "/// &nbsp;   ");
+      }
+      line
+    })
+    .join("")
+}
+
 pub fn rust_type_to_code(rust_type: &RustType, crate_name: &String) -> String {
   match *rust_type {
     RustType::Void => "()".to_string(),
@@ -353,10 +366,6 @@ impl RustCodeGenerator {
       RustMethodScope::TraitImpl { .. } => "",
       _ => "pub ",
     };
-    let doc = func.doc
-      .split("\n")
-      .map(|x| format!("/// {}\n", x))
-      .join("");
     match func.arguments {
       RustMethodArguments::SingleVariant(ref variant) => {
         let body = self.generate_ffi_call(variant, &Vec::new());
@@ -369,7 +378,7 @@ impl RustCodeGenerator {
         };
 
         format!("{doc}{maybe_pub}fn {name}({args}){return_type} {{\n{body}}}\n\n",
-                doc = doc,
+                doc = format_doc(&func.doc),
                 maybe_pub = maybe_pub,
                 name = func.name.last_name(),
                 args = self.arg_texts(&variant.arguments, None).join(", "),
@@ -395,7 +404,7 @@ impl RustCodeGenerator {
         let mut args = self.arg_texts(shared_arguments, params_trait_lifetime.as_ref());
         args.push(format!("{}: {}", variant_argument_name, tpl_type));
         format!(include_str!("../templates/crate/overloaded_function.rs.in"),
-                doc = doc,
+                doc = format_doc(&func.doc),
                 maybe_pub = maybe_pub,
                 lifetime_arg = lifetime_arg,
                 lifetime = lifetime_specifier,
@@ -469,23 +478,19 @@ impl RustCodeGenerator {
     results.push("#[allow(unused_imports)]\nuse {libc, cpp_box, std};\n\n".to_string());
 
     for type1 in &data.types {
-      for doc_line in type1.doc.split('\n') {
-        results.push(format!("/// {}\n", doc_line));
-      }
+      results.push(format_doc(&type1.doc));
       match type1.kind {
         RustTypeDeclarationKind::CppTypeWrapper { ref kind, ref methods, ref traits, .. } => {
           let r = match *kind {
             RustTypeWrapperKind::Enum { ref values, ref is_flaggable } => {
-              let mut r = format!(include_str!("../templates/crate/enum_declaration.rs.in"),
-                                  name = type1.name,
-                                  variants = values.iter()
-                                    .map(|item| {
-                  item.doc
-                    .split("\n")
-                    .map(|x| format!("/// {}\n", x))
-                    .join("") + &format!("  {} = {}", item.name, item.value)
-                })
-                                    .join(", \n"));
+              let mut r =
+                format!(include_str!("../templates/crate/enum_declaration.rs.in"),
+                        name = type1.name,
+                        variants = values.iter()
+                          .map(|item| {
+                            format!("{}  {} = {}", format_doc(&item.doc), item.name, item.value)
+                          })
+                          .join(", \n"));
               if *is_flaggable {
                 r = r +
                     &format!(include_str!("../templates/crate/impl_flaggable.rs.in"),
