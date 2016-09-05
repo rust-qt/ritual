@@ -287,11 +287,6 @@ impl QtDocData {
                                    method_short_text,
                                    candidates[0].declarations));
 
-              // TODO: store info about method inheritance source and show documentation
-              // for inherited methods
-
-              // TODO: qmetaobject::connection
-
               if candidates[0].text.is_empty() {
                 return Err(format!("found empty documentation"));
               }
@@ -413,3 +408,11 @@ fn qt_doc_parser_test() {
   //  }
   //  assert!(false);
 }
+
+// TODO: improve Qt doc integration:
+//
+// - store info about method inheritance source and show documentation
+// for inherited methods;
+// - make "C++ documentation" a link to web site;
+// - replace links inside Qt doc with links to Rust methods and types
+// - don't show C++ enum variant name if it was not changed

@@ -331,31 +331,53 @@ impl RustCodeGenerator {
   fn arg_texts(&self, args: &Vec<RustMethodArgument>, lifetime: Option<&String>) -> Vec<String> {
     args.iter()
       .map(|arg| {
-        let mut maybe_mut_declaration = "";
-        if let RustType::Common { ref indirection, .. } = arg.argument_type
-          .rust_api_type {
-          if *indirection == RustTypeIndirection::None &&
-             arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr {
-            if let RustType::Common { ref is_const, .. } = arg.argument_type
-              .rust_ffi_type {
-              if !is_const {
-                maybe_mut_declaration = "mut ";
+        if &arg.name == "self" {
+          let self_type = match lifetime {
+            Some(lifetime) => arg.argument_type.rust_api_type.with_lifetime(lifetime.clone()),
+            None => arg.argument_type.rust_api_type.clone(),
+          };
+          if let RustType::Common { ref indirection, ref is_const, .. } = self_type {
+            let maybe_mut = if *is_const { "" } else { "mut " };
+            match indirection {
+              &RustTypeIndirection::None => format!("self"),
+              &RustTypeIndirection::Ref { ref lifetime } => {
+                match lifetime {
+                  &Some(ref lifetime) => format!("&'{} {}self", lifetime, maybe_mut),
+                  &None => format!("&{}self", maybe_mut),
+                }
+              }
+              _ => panic!("invalid self argument type (indirection)"),
+            }
+          } else {
+            panic!("invalid self argument type (not Common)");
+          }
+        } else {
+          let mut maybe_mut_declaration = "";
+          if let RustType::Common { ref indirection, .. } = arg.argument_type
+            .rust_api_type {
+            if *indirection == RustTypeIndirection::None &&
+               arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr {
+              if let RustType::Common { ref is_const, .. } = arg.argument_type
+                .rust_ffi_type {
+                if !is_const {
+                  maybe_mut_declaration = "mut ";
+                }
               }
             }
           }
-        }
 
-        format!("{}{}: {}",
-                maybe_mut_declaration,
-                arg.name,
-                match lifetime {
-                  Some(lifetime) => {
-                    self.rust_type_to_code(&arg.argument_type
-                      .rust_api_type
-                      .with_lifetime(lifetime.clone()))
-                  }
-                  None => self.rust_type_to_code(&arg.argument_type.rust_api_type),
-                })
+          format!("{}{}: {}",
+                  maybe_mut_declaration,
+                  arg.name,
+                  match lifetime {
+                    Some(lifetime) => {
+                      self.rust_type_to_code(&arg.argument_type
+                        .rust_api_type
+                        .with_lifetime(lifetime.clone()))
+                    }
+                    None => self.rust_type_to_code(&arg.argument_type.rust_api_type),
+                  })
+        }
       })
       .collect()
   }

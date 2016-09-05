@@ -603,14 +603,17 @@ impl RustGenerator {
       return None;
     }
     let module_name = RustName::new(vec![self.config.crate_name.clone(), module_last_name]);
-    Some(self.generate_module(c_header, &module_name))
+    self.generate_module(c_header, &module_name)
   }
 
   /// Generates a Rust module with specified name from specified
   /// C++ header. If the module should have nested modules,
   /// this function calls itself recursively with nested module name
   /// but the same header data.
-  pub fn generate_module(&self, c_header: &CppFfiHeaderData, module_name: &RustName) -> RustModule {
+  pub fn generate_module(&self,
+                         c_header: &CppFfiHeaderData,
+                         module_name: &RustName)
+                         -> Option<RustModule> {
     // TODO: check that all methods and types has been processed
     log::info(format!("Generating Rust module {}", module_name.full_name(None)));
 
@@ -667,7 +670,9 @@ impl RustGenerator {
     for name in direct_submodules {
       let mut new_name = module_name.clone();
       new_name.parts.push(name);
-      module.submodules.push(self.generate_module(c_header, &new_name));
+      if let Some(r) = self.generate_module(c_header, &new_name) {
+        module.submodules.push(r);
+      }
     }
     let mut free_functions_result =
       self.process_functions(good_methods.into_iter(), &RustMethodScope::Free);
@@ -685,7 +690,11 @@ impl RustGenerator {
     }
     module.types.sort_by(|a, b| a.name.cmp(&b.name));
     module.submodules.sort_by(|a, b| a.name.cmp(&b.name));
-    module
+    if module.types.is_empty() && module.functions.is_empty() && module.submodules.is_empty() {
+      log::warning(format!("Skipping empty module: {}", module.name));
+      return None;
+    }
+    Some(module)
   }
 
   /// Converts one function to a RustMethod
@@ -1452,3 +1461,15 @@ fn prepare_enum_values_test_suffix_partial() {
   assert_eq!(r[0].name, "Precise");
   assert_eq!(r[1].name, "Coarse");
 }
+
+// TODO: remove ReturnType associated type if all return types are the same
+
+// TODO: if name conflict involves 1 static and 1 non-static function,
+// don't use "from_const"/"from_mut" and just add "static" to static fn;
+// if there is only 1 const and 1 mut fn, just add "const" to const fn.
+
+// TODO: methods should accept AsRef/AsMut insead of plain references
+
+// TODO: implement AsRef/AsMut for CppBox and for up-casting derived classes
+
+// TODO: alternative Option-based overloading strategy
