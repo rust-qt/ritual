@@ -14,7 +14,7 @@ pub struct EnumValue {
 }
 
 /// Member field of a C++ class declaration
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub struct CppClassField {
   /// Identifier
@@ -55,7 +55,7 @@ pub enum CppTypeKind {
 }
 
 /// Location of a C++ type's definition in header files.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub struct CppOriginLocation {
   // Full path to the include file
@@ -68,7 +68,7 @@ pub struct CppOriginLocation {
 
 /// Visibility of a C++ entity. Defaults to Public
 /// for entities that can't have visibility (like free functions)
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub enum CppVisibility {
   Public,
@@ -119,7 +119,7 @@ pub struct CppData {
 // from cpp_method
 
 /// Information about an argument of a C++ method
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub struct CppFunctionArgument {
   /// Identifier. If the argument doesn't have a name
@@ -134,7 +134,7 @@ pub struct CppFunctionArgument {
 }
 
 /// Enumerator indicating special cases of C++ methods.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub enum CppMethodKind {
   /// Just a class method
@@ -147,7 +147,7 @@ pub enum CppMethodKind {
 
 
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub struct CppMethodClassMembership {
   /// Type of the class where this method belong. This is used to construct
@@ -171,7 +171,7 @@ pub struct CppMethodClassMembership {
 }
 
 /// Information about a C++ method
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub struct CppMethod {
   /// Identifier. For class methods, this field includes
@@ -188,6 +188,8 @@ pub struct CppMethod {
   pub return_type: CppType,
   /// List of the method's arguments
   pub arguments: Vec<CppFunctionArgument>,
+
+  pub arguments_before_omitting: Option<Vec<CppFunctionArgument>>,
   /// Whether the argument list is terminated with "..."
   pub allows_variadic_arguments: bool,
   /// File name of the include file where the method is defined
@@ -210,7 +212,7 @@ pub struct CppMethod {
 // from cpp_operators
 
 /// Available types of C++ operators
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub enum CppOperator {
   /// (type) a

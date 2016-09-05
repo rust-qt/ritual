@@ -164,6 +164,7 @@ impl CppData {
             operator: None,
             return_type: CppType::void(),
             arguments: vec![],
+            arguments_before_omitting: None,
             allows_variadic_arguments: false,
             include_file: type1.include_file.clone(),
             origin_location: None,
@@ -267,6 +268,7 @@ impl CppData {
     for method in &self.methods {
       if method.arguments.len() > 0 && method.arguments.last().unwrap().has_default_value {
         let mut method_copy = method.clone();
+        method_copy.arguments_before_omitting = Some(method.arguments.clone());
         while method_copy.arguments.len() > 0 &&
               method_copy.arguments.last().unwrap().has_default_value {
           method_copy.arguments.pop().unwrap();

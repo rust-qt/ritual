@@ -40,7 +40,7 @@ fn format_doc(doc: &String) -> String {
       let mut line = format!("/// {}\n", x);
       if line.starts_with("///     ") {
         // block doc tests
-        line = line.replace("///     ", "/// &nbsp;   ");
+        line = line.replace("///     ", "/// &#32;   ");
       }
       line
     })

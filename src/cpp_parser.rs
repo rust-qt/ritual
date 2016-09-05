@@ -961,6 +961,7 @@ impl CppParser {
         None => None,
       },
       arguments: arguments,
+      arguments_before_omitting: None,
       allows_variadic_arguments: allows_variadic_arguments,
       return_type: return_type_parsed,
       include_file: self.entity_include_file(entity).unwrap(),

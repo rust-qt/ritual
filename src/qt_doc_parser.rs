@@ -42,6 +42,20 @@ struct QtDocForMethod {
   text: String,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum QtDocResultForMethodKind {
+  ExactMatch,
+  Mismatch { declaration: String },
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct QtDocResultForMethod {
+  pub anchor: String,
+  pub text: String,
+  pub kind: QtDocResultForMethodKind,
+}
+
+
 fn arguments_from_declaration(declaration: &String) -> Option<Vec<&str>> {
   match declaration.find("(") {
     None => None,
@@ -57,9 +71,9 @@ fn arguments_from_declaration(declaration: &String) -> Option<Vec<&str>> {
 }
 
 fn are_argument_types_equal(declaration1: &String, declaration2: &String) -> bool {
-  println!("are_argument_types_equal({:?}, {:?})",
-           declaration1,
-           declaration2);
+  // println!("are_argument_types_equal({:?}, {:?})",
+  //           declaration1,
+  //           declaration2);
   let args1 = match arguments_from_declaration(declaration1) {
     Some(r) => r,
     None => return false,
@@ -68,7 +82,7 @@ fn are_argument_types_equal(declaration1: &String, declaration2: &String) -> boo
     Some(r) => r,
     None => return false,
   };
-  println!("args: {:?}, {:?}", args1, args2);
+  // println!("args: {:?}, {:?}", args1, args2);
   if args1.len() != args2.len() {
     return false;
   }
@@ -91,19 +105,19 @@ fn are_argument_types_equal(declaration1: &String, declaration2: &String) -> boo
     let arg2 = arg_prepare(&args2[i]);
     let arg1_maybe_type = arg_to_type(arg1.as_ref());
     let arg2_maybe_type = arg_to_type(arg2.as_ref());
-    println!("args maybe_type: {:?}, {:?}",
-             arg1_maybe_type,
-             arg2_maybe_type);
+    //    println!("args maybe_type: {:?}, {:?}",
+    //             arg1_maybe_type,
+    //             arg2_maybe_type);
     let a1_orig = arg1.replace(" ", "");
     let a1_type = arg1_maybe_type.replace(" ", "");
     let a2_orig = arg2.replace(" ", "");
     let a2_type = arg2_maybe_type.replace(" ", "");
     if a1_orig != a2_orig && a1_orig != a2_type && a1_type != a2_orig && a1_type != a2_type {
-      println!("arg mismatch: {:?}, {:?}", arg1, arg2);
+      //      println!("arg mismatch: {:?}, {:?}", arg1, arg2);
       return false;
     }
   }
-  println!("args match!");
+  //  println!("args match!");
   true
 }
 
@@ -158,14 +172,40 @@ impl QtDocData {
     Ok(result)
   }
 
-  pub fn doc_for_method(&self, name: &String, declaration: &String) -> Result<String, String> {
-    match self.index.iter().find(|item| &item.name == name) {
+  pub fn doc_for_method(&self,
+                        name: &String,
+                        parser_declaration: &String,
+                        method_short_text: &String)
+                        -> Result<QtDocResultForMethod, String> {
+    let mut name_parts: Vec<_> = name.split("::").collect();
+    // println!("TEST1: {:?}", name_parts);
+    let mut anchor_override = None;
+    if name_parts.len() >= 2 &&
+       name_parts[name_parts.len() - 1] == name_parts[name_parts.len() - 2] {
+      anchor_override = Some(name_parts.last().unwrap().to_string());
+      // constructors are not in the index
+      name_parts.pop().unwrap();
+      // println!("ok1");
+    }
+    if name_parts.len() == 3 {
+      // nested types don't have full names in the index
+      name_parts.remove(0);
+      // println!("ok2");
+    }
+    //    println!("TEST2: {:?}", name_parts);
+    let corrected_name = name_parts.join("::");
+    //    println!("TEST3: {:?}", corrected_name);
+    match self.index.iter().find(|item| &item.name == &corrected_name) {
       Some(item) => {
         match self.method_docs.get(&item.file_name) {
           Some(method_docs) => {
-            let anchor_prefix = format!("{}-", &item.anchor);
+            let anchor = match anchor_override {
+              Some(ref x) => x,
+              None => &item.anchor,
+            };
+            let anchor_prefix = format!("{}-", anchor);
             let candidates: Vec<_> = method_docs.iter()
-              .filter(|x| &x.anchor == &item.anchor || x.anchor.starts_with(&anchor_prefix))
+              .filter(|x| &x.anchor == anchor || x.anchor.starts_with(&anchor_prefix))
               .collect();
             if candidates.is_empty() {
               return Err(format!("No matching anchors found for {}", name));
@@ -178,82 +218,107 @@ impl QtDocData {
               }
               None => None,
             };
-            let mut declaration_no_scope = declaration.clone();
-            if let Some((ref prefix1, ref prefix2)) = scope_prefix {
-              declaration_no_scope = declaration_no_scope.replace(prefix1, "")
-                .replace(prefix2, "");
-            }
-            let query_imprint = declaration_no_scope.replace("Q_REQUIRED_RESULT", "")
-              .replace("Q_DECL_NOTHROW", "")
-              .replace("Q_DECL_CONST_FUNCTION", "")
-              .replace("Q_DECL_CONSTEXPR", "")
-              .replace("QT_FASTCALL", "")
-              .replace("inline ", "")
-              .replace("virtual ", "")
-              .replace(" ", "");
-            for item in &candidates {
-              for item_declaration in &item.declarations {
-                let mut item_declaration_imprint = item_declaration.replace("virtual ", "")
-                  .replace(" ", "");
-                if let Some((ref prefix1, ref prefix2)) = scope_prefix {
-                  item_declaration_imprint = item_declaration_imprint.replace(prefix1, "")
-                    .replace(prefix2, "");
-                }
-                if &item_declaration_imprint == &query_imprint {
-                  return Ok(item.text.clone());
+            for declaration in &[parser_declaration, method_short_text] {
+              let mut declaration_no_scope = (*declaration).clone();
+              if let Some((ref prefix1, ref prefix2)) = scope_prefix {
+                declaration_no_scope = declaration_no_scope.replace(prefix1, "")
+                  .replace(prefix2, "");
+              }
+              let mut query_imprint = declaration_no_scope.replace("Q_REQUIRED_RESULT", "")
+                .replace("Q_DECL_NOTHROW", "")
+                .replace("Q_DECL_CONST_FUNCTION", "")
+                .replace("Q_DECL_CONSTEXPR", "")
+                .replace("QT_FASTCALL", "")
+                .replace("inline ", "")
+                .replace("virtual ", "")
+                .replace(" ", "");
+              if let Some(index) = query_imprint.find("Q_DECL_NOEXCEPT_EXPR") {
+                query_imprint = query_imprint[0..index].to_string();
+              }
+              for item in &candidates {
+                for item_declaration in &item.declarations {
+                  let mut item_declaration_imprint = item_declaration.replace("virtual ", "")
+                    .replace(" ", "");
+                  if let Some((ref prefix1, ref prefix2)) = scope_prefix {
+                    item_declaration_imprint = item_declaration_imprint.replace(prefix1, "")
+                      .replace(prefix2, "");
+                  }
+                  if &item_declaration_imprint == &query_imprint {
+                    // println!("TEST: {}: {:?}", &corrected_name, &item.text);
+                    if item.text.find(|c| c != '\n').is_none() {
+                      return Err(format!("found empty documentation"));
+                    }
+                    return Ok(QtDocResultForMethod {
+                      text: item.text.clone(),
+                      anchor: item.anchor.clone(),
+                      kind: QtDocResultForMethodKind::ExactMatch,
+                    });
+                  }
                 }
               }
-            }
-            for item in &candidates {
-              for item_declaration in &item.declarations {
-                let mut item_declaration_imprint = item_declaration.clone();
-                if let Some((ref prefix1, ref prefix2)) = scope_prefix {
-                  item_declaration_imprint = item_declaration_imprint.replace(prefix1, "")
-                    .replace(prefix2, "");
-                }
-                if are_argument_types_equal(&declaration_no_scope, &item_declaration_imprint) {
-                  return Ok(item.text.clone());
+              for item in &candidates {
+                for item_declaration in &item.declarations {
+                  let mut item_declaration_imprint = item_declaration.clone();
+                  if let Some((ref prefix1, ref prefix2)) = scope_prefix {
+                    item_declaration_imprint = item_declaration_imprint.replace(prefix1, "")
+                      .replace(prefix2, "");
+                  }
+                  if are_argument_types_equal(&declaration_no_scope, &item_declaration_imprint) {
+                    // println!("TEST: {}: {:?}", &corrected_name, &item.text);
+                    if item.text.find(|c| c != '\n').is_none() {
+                      return Err(format!("found empty documentation"));
+                    }
+                    return Ok(QtDocResultForMethod {
+                      text: item.text.clone(),
+                      anchor: item.anchor.clone(),
+                      kind: QtDocResultForMethodKind::ExactMatch,
+                    });
+                  }
                 }
               }
             }
             if candidates.len() == 1 {
               log::warning(format!("\
                   Declaration mismatch ignored because there is only one method.\n\
-                  Method: {}\n\
                   Parser declaration: {}\n\
+                  Short text: {}\n\
                   Doc declaration: {:?}\n",
-                                   name,
-                                   declaration,
+                                   parser_declaration,
+                                   method_short_text,
                                    candidates[0].declarations));
-              // TODO: don't show documentation if there is matching Rust wrapper for the same method,
-              // e.g. int qstrcmp(QByteArray...) should not show doc for qstrcmp(const char...)
-              // because the same doc is shown in the same overloading method
-
-              // TODO: group all overloaded Rust methods that correspond to the same C++ method
-              // with the only difference at default parameters or allocation place, and
-              // display C++ doc once for them
 
               // TODO: store info about method inheritance source and show documentation
               // for inherited methods
 
-              // TODO: examine other "Declaration mismatch" errors
-              let warning_text = format!("Warning: no exact match found in C++ documentation.\
-                                          Below is the documentation for <code>{}</code>",
-                                         candidates[0].declarations[0]);
-              return Ok(format!("<p>{}</p>{}", warning_text, candidates[0].text.clone()));
+              // TODO: qmetaobject::connection
+
+              if candidates[0].text.is_empty() {
+                return Err(format!("found empty documentation"));
+              }
+              return Ok(QtDocResultForMethod {
+                text: candidates[0].text.clone(),
+                anchor: candidates[0].anchor.clone(),
+                kind: QtDocResultForMethodKind::Mismatch {
+                  declaration: candidates[0].declarations[0].clone(),
+                },
+              });
             }
-            println!("Declaration mismatch while searching for {:?}", declaration);
-            println!("Candidates:");
+            log::warning(format!("Declaration mismatch!\n\
+                  Parser declaration: {}\n\
+                  Short text: {}",
+                                 parser_declaration,
+                                 method_short_text));
+            log::warning(format!("Candidates:"));
             for item in &candidates {
-              println!("  {:?}", item.declarations);
+              log::warning(format!("  {:?}", item.declarations));
             }
-            println!("");
+            log::warning(format!(""));
             return Err(format!("Declaration mismatch"));
           }
           None => Err(format!("No such file: {}", &item.file_name)),
         }
       }
-      None => Err(format!("No documentation entry for {}", name)),
+      None => Err(format!("No documentation entry for {}", corrected_name)),
     }
   }
 
