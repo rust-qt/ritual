@@ -8,15 +8,14 @@ use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFu
 use cpp_data::{CppTypeKind, EnumValue};
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
-                RustMethodArguments, TraitImpl, TraitName, RustEnumValue, RustMethodSelfArgKind};
-use cpp_method::ReturnValueAllocationPlace;
+                RustMethodArguments, TraitImpl, TraitName, RustEnumValue};
+use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_ffi_data::CppFfiArgumentMeaning;
 use utils::{CaseOperations, VecCaseOperations, WordIterator, add_to_multihash, JoinWithString};
 use caption_strategy::TypeCaptionStrategy;
-use rust_code_generator::rust_type_to_code;
 use log;
-use qt_doc_parser::{QtDocData, QtDocResultForMethod, QtDocResultForMethodKind};
-
+use qt_doc_parser::{QtDocData, QtDocResultForMethod};
+use doc_formatter;
 use std::collections::{HashMap, HashSet};
 
 /// Mode of case conversion
@@ -538,6 +537,7 @@ impl RustGenerator {
 
         }
 
+        // TODO: export Qt doc for enum and its variants
         let doc = format!("C++ type: {}", &info.cpp_name);
         ProcessTypeResult {
           main_type: RustTypeDeclaration {
@@ -573,6 +573,8 @@ impl RustGenerator {
             }
           });
         let functions_result = self.process_functions(methods, &methods_scope);
+        // TODO: use type_to_cpp_code_permissive to get more beautiful templates
+        // TODO: export Qt doc
         let doc = format!("C++ type: {}", class_type.to_cpp_code().unwrap());
 
         ProcessTypeResult {
@@ -700,7 +702,8 @@ impl RustGenerator {
   /// Converts one function to a RustMethod
   fn generate_function(&self,
                        method: &CppAndFfiMethod,
-                       scope: &RustMethodScope)
+                       scope: &RustMethodScope,
+                       generate_doc: bool)
                        -> Result<RustMethod, String> {
     if method.cpp_method.is_operator() {
       // TODO: implement operator traits
@@ -767,37 +770,16 @@ impl RustGenerator {
       assert!(method.c_signature.return_type == CppFfiType::void());
     }
     let return_type_info1 = return_type_info.unwrap();
-    let mut doc = format!("C++ method: <span style='color: green'>```{}```</span>",
-                          method.short_text());
-    if let Some(ref qt_doc_data) = self.config.qt_doc_data {
-      if let Some(ref declaration_code) = method.cpp_method.declaration_code {
-        match qt_doc_data.doc_for_method(&method.cpp_method.doc_id(),
-                                         declaration_code,
-                                         &method.cpp_method.short_text()) {
-          Ok(result) => {
-            let prefix = match result.kind {
-              QtDocResultForMethodKind::ExactMatch => format!("C++ documentation:"),
-              QtDocResultForMethodKind::Mismatch { ref declaration } => {
-                format!("Warning: no exact match found in C++ documentation.\
-                         Below is the C++ documentation for <code>{}</code>:",
-                        declaration)
-              }
-            };
-
-            doc.push_str(&format!("<br>{} <div style='border: 1px solid #5CFF95; \
-                                    background: #D6FFE4; padding: 16px;'>{}</div>",
-                                  prefix,
-                                  result.text))
-          }
-          Err(msg) => {
-            log::warning(format!("Failed to get documentation for method: {}: {}",
-                                 &method.cpp_method.short_text(),
-                                 msg))
-          }
-        }
-      }
-    }
-
+    let doc = if generate_doc {
+      let doc_item = doc_formatter::DocItem {
+        cpp_fn: method.short_text(),
+        rust_fns: Vec::new(),
+        doc: self.get_qt_doc_for_method(&method.cpp_method),
+      };
+      doc_formatter::method_doc(vec![doc_item], &method.cpp_method.full_name())
+    } else {
+      String::new()
+    };
     Ok(RustMethod {
       name: self.method_rust_name(method),
       scope: scope.clone(),
@@ -843,7 +825,7 @@ impl RustGenerator {
     if let &RustMethodScope::Impl { ref type_name } = scope {
       match method.allocation_place {
         ReturnValueAllocationPlace::Stack => {
-          let mut method = try!(self.generate_function(method, scope));
+          let mut method = try!(self.generate_function(method, scope, true));
           method.name = RustName::new(vec!["drop".to_string()]);
           method.scope = RustMethodScope::TraitImpl {
             type_name: type_name.clone(),
@@ -898,15 +880,6 @@ impl RustGenerator {
           unreachable!()
         };
       let mut args_variants = Vec::new();
-      let mut doc = Vec::new();
-      doc.push(format!("C++ method: ```{}```\n\n", cpp_method_name));
-      doc.push(format!("This is an overloaded function. Available variants:\n\n"));
-      let self_arg_doc_text = match first_method.self_arg_kind() {
-        RustMethodSelfArgKind::Static => "",
-        RustMethodSelfArgKind::ConstRef => "&self, ",
-        RustMethodSelfArgKind::MutRef => "&mut self, ",
-        RustMethodSelfArgKind::Value => "self, ",
-      };
       let mut method_name = first_method.name.clone();
       let mut trait_name = first_method.name.last_name().clone();
       if use_self_arg_caption {
@@ -974,13 +947,8 @@ impl RustGenerator {
           unreachable!()
         }
       }
-      #[derive(Debug, Clone)]
-      struct DocItem {
-        doc: Option<QtDocResultForMethod>,
-        rust_fns: Vec<String>,
-        cpp_fn: String,
-      };
-      let mut docs = Vec::new();
+
+      let mut doc_items = Vec::new();
       for (cpp_method, variants) in grouped_by_cpp_method {
         let cpp_short_text = cpp_method.short_text();
         if let Some(ref qt_doc_data) = self.config.qt_doc_data {
@@ -996,34 +964,15 @@ impl RustGenerator {
                 None
               }
             };
-            docs.push(DocItem {
+            doc_items.push(doc_formatter::DocItem {
               doc: doc,
               cpp_fn: cpp_short_text,
               rust_fns: variants.iter()
                 .map(|args| {
-                  let return_type_text = rust_type_to_code(&args.return_type
-                                                             .rust_api_type,
-                                                           &self.config
-                                                             .crate_name);
-                  let arg_texts = args.arguments
-                    .iter()
-                    .map(|x| {
-                      rust_type_to_code(&x.argument_type
-                                          .rust_api_type,
-                                        &self.config.crate_name)
-                    })
-                    .join(", ");
-                  let arg_final_text = if args.arguments.len() == 1 {
-                    arg_texts
-                  } else {
-                    format!("({})", arg_texts)
-                  };
-                  format!("fn {name}({self_arg}{arg_text}) -> {return_type}",
-                          name = method_name.last_name(),
-                          self_arg = self_arg_doc_text,
-                          arg_text = arg_final_text,
-                          return_type = return_type_text)
-
+                  doc_formatter::rust_method_variant(args,
+                                                     method_name.last_name(),
+                                                     first_method.self_arg_kind(),
+                                                     &self.config.crate_name)
                 })
                 .collect(),
             });
@@ -1031,66 +980,7 @@ impl RustGenerator {
           }
         }
       }
-      let mut shown_docs = Vec::new();
-      for doc_item in &docs {
-        if doc_item.doc.is_none() ||
-           doc_item.doc.as_ref().unwrap().kind == QtDocResultForMethodKind::ExactMatch {
-          shown_docs.push(doc_item.clone());
-        }
-      }
-      for doc_item in docs {
-        if doc_item.doc.is_some() &&
-           doc_item.doc.as_ref().unwrap().kind != QtDocResultForMethodKind::ExactMatch {
-          let anchor = &doc_item.doc.as_ref().unwrap().anchor;
-          if shown_docs.iter()
-            .find(|x| x.doc.is_some() && &x.doc.as_ref().unwrap().anchor == anchor)
-            .is_some() {
-            shown_docs.push(DocItem { doc: None, ..doc_item.clone() });
-          } else {
-            shown_docs.push(doc_item.clone());
-          }
-        }
-      }
-      let shown_docs_count = shown_docs.len();
-      for (doc_index, doc_item) in shown_docs.into_iter().enumerate() {
-        if shown_docs_count > 1 {
-          doc.push(format!("\n\n## Variant {}\n\n", doc_index + 1));
-        }
-        let rust_count = doc_item.rust_fns.len();
-        doc.push(format!("Rust: <br>{}\n",
-                         doc_item.rust_fns
-                           .iter()
-                           .enumerate()
-                           .map(|(i, x)| {
-            format!("{}```{}```<br>",
-                    if rust_count > 1 {
-                      format!("{}) ", i + 1)
-                    } else {
-                      format!("")
-                    },
-                    x)
-          })
-                           .join("")));
-        doc.push(format!("C++: <span style='color: green;'>```{}```</span><br>",
-                         doc_item.cpp_fn));
-        doc.push(format!("\n\n"));
-        if let Some(result) = doc_item.doc {
-          let prefix = match result.kind {
-            QtDocResultForMethodKind::ExactMatch => format!("C++ documentation:"),
-            QtDocResultForMethodKind::Mismatch { ref declaration } => {
-              format!("Warning: no exact match found in C++ documentation.\
-                         Below is the C++ documentation for <code>{}</code>:",
-                      declaration)
-            }
-          };
-
-          doc.push(format!("<br>{} <div style='border: 1px solid #5CFF95; \
-                                    background: #D6FFE4; padding: 16px;'>{}</div>",
-                           prefix,
-                           result.text));
-
-        }
-      }
+      let doc = doc_formatter::method_doc(doc_items, &cpp_method_name);
 
       // overloaded methods
       let shared_arguments_for_trait = match self_argument {
@@ -1143,7 +1033,7 @@ impl RustGenerator {
           shared_arguments: shared_arguments,
           variant_argument_name: "args".to_string(),
         },
-        doc: doc.join(""),
+        doc: doc,
       }
     } else {
       let mut method = filtered_methods.pop().unwrap();
@@ -1152,9 +1042,45 @@ impl RustGenerator {
         let caption = method.self_arg_kind().caption();
         method.name.parts.push(format!("{}_{}", name, caption));
       }
+
+      if let RustMethodArguments::SingleVariant(ref args) = method.arguments {
+        let doc_item = doc_formatter::DocItem {
+          cpp_fn: args.cpp_method.cpp_method.short_text(),
+          rust_fns: Vec::new(),
+          doc: self.get_qt_doc_for_method(&args.cpp_method.cpp_method),
+        };
+        method.doc = doc_formatter::method_doc(vec![doc_item],
+                                               &args.cpp_method.cpp_method.full_name());
+      } else {
+        unreachable!();
+      }
+
       method
     };
     (method, type_declaration)
+  }
+
+  fn get_qt_doc_for_method(&self, cpp_method: &CppMethod) -> Option<QtDocResultForMethod> {
+    if let Some(ref qt_doc_data) = self.config.qt_doc_data {
+      if let Some(ref declaration_code) = cpp_method.declaration_code {
+        match qt_doc_data.doc_for_method(&cpp_method.doc_id(),
+                                         declaration_code,
+                                         &cpp_method.short_text()) {
+          Ok(doc) => Some(doc),
+          Err(msg) => {
+            log::warning(format!("Failed to get documentation for method: {}: {}",
+                                 &cpp_method.short_text(),
+                                 msg));
+            None
+          }
+
+        }
+      } else {
+        None
+      }
+    } else {
+      None
+    }
   }
 
   /// Generates methods, trait implementations and overloading types
@@ -1177,7 +1103,7 @@ impl RustGenerator {
         }
         continue;
       }
-      match self.generate_function(method, scope) {
+      match self.generate_function(method, scope, false) {
         Ok(rust_method) => {
           let name = rust_method.name.last_name().clone();
           add_to_multihash(&mut single_rust_methods, &name, rust_method);
@@ -1473,3 +1399,9 @@ fn prepare_enum_values_test_suffix_partial() {
 // TODO: implement AsRef/AsMut for CppBox and for up-casting derived classes
 
 // TODO: alternative Option-based overloading strategy
+
+// TODO: QList::indexOf - duplicate documentation
+
+// TODO: rename allocation place markers to AsStruct and AsBox
+
+// TODO: wrap operators as normal functions, for now

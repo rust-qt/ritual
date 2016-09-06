@@ -69,6 +69,7 @@ pub struct BuildEnvironment {
   pub invokation_method: InvokationMethod,
   pub output_dir_path: PathBuf,
   pub source_dir_path: PathBuf,
+  pub dependency_paths: Vec<PathBuf>,
   pub num_jobs: Option<i32>,
   pub build_profile: BuildProfile,
 }

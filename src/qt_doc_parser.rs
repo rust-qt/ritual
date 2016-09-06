@@ -414,5 +414,6 @@ fn qt_doc_parser_test() {
 // - store info about method inheritance source and show documentation
 // for inherited methods;
 // - make "C++ documentation" a link to web site;
-// - replace links inside Qt doc with links to Rust methods and types
+// - replace <a> and <img> links with links to web doc and
+// append links to Rust's corresponding methods and types
 // - don't show C++ enum variant name if it was not changed

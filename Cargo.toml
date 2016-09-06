@@ -25,6 +25,10 @@ tempdir = "0.3.5"
 num_cpus = "1.0.0"
 select = "0.3.0" #html parsing library
 csv = "0.14.7"
+clap = "~2.10.0"
 
 [build-dependencies]
 serde_codegen = "0.8"
+
+[profile.dev]
+#opt-level = 3
