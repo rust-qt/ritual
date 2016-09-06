@@ -464,7 +464,7 @@ pub struct CppType {
 }
 
 // -------------------------
-// from main
+// from launcher
 
 /// Information loaded from lib spec file and
 /// related to the C++ side
@@ -513,4 +513,34 @@ pub struct LibSpec {
   pub cpp: CppLibSpec,
   /// Information related to generated Rust crate
   pub rust: RustLibSpec,
+}
+
+
+// -------------------------
+// from rust_type
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct RustName {
+  pub parts: Vec<String>,
+}
+
+
+// -------------------------
+// from rust_generator
+
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
+pub enum RustProcessedTypeKind {
+  Enum { values: Vec<EnumValue> },
+  Class { size: i32 },
+}
+
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct RustProcessedTypeInfo {
+  pub cpp_name: String,
+  pub cpp_template_arguments: Option<Vec<CppType>>,
+  pub kind: RustProcessedTypeKind,
+  pub rust_name: RustName,
 }

@@ -17,6 +17,7 @@ use log;
 use qt_doc_parser::{QtDocData, QtDocResultForMethod};
 use doc_formatter;
 use std::collections::{HashMap, HashSet};
+pub use serializable::{RustProcessedTypeKind, RustProcessedTypeInfo};
 
 /// Mode of case conversion
 enum Case {
@@ -26,17 +27,7 @@ enum Case {
   Snake,
 }
 
-enum ProcessedTypeKind {
-  Enum { values: Vec<EnumValue> },
-  Class { size: i32 },
-}
 
-struct ProcessedTypeInfo {
-  cpp_name: String,
-  cpp_template_arguments: Option<Vec<CppType>>,
-  kind: ProcessedTypeKind,
-  rust_name: RustName,
-}
 
 
 /// If remove_qt_prefix is true, removes "Q" or "Qt"
@@ -174,7 +165,7 @@ fn prepare_enum_values(values: &Vec<EnumValue>, name: &String) -> Vec<RustEnumVa
 pub struct RustGenerator {
   input_data: CppAndFfiData,
   config: RustGeneratorConfig,
-  processed_types: Vec<ProcessedTypeInfo>,
+  processed_types: Vec<RustProcessedTypeInfo>,
 }
 
 /// Results of adapting API for Rust wrapper.
@@ -184,6 +175,8 @@ pub struct RustGeneratorOutput {
   pub modules: Vec<RustModule>,
   /// List of FFI function imports to be generated.
   pub ffi_functions: Vec<(String, Vec<RustFFIFunction>)>,
+  /// List of processed C++ types and their corresponding Rust names
+  pub processed_types: Vec<RustProcessedTypeInfo>,
 }
 
 /// Config for rust_generator module.
@@ -216,6 +209,7 @@ pub fn run(input_data: CppAndFfiData, config: RustGeneratorConfig) -> RustGenera
   RustGeneratorOutput {
     ffi_functions: generator.ffi(),
     modules: modules,
+    processed_types: generator.processed_types,
   }
 }
 
@@ -258,7 +252,7 @@ fn calculate_rust_name(name: &String,
 /// equivalents.
 fn generate_type_map(input_data: &CppAndFfiData,
                      config: &RustGeneratorConfig)
-                     -> Vec<ProcessedTypeInfo> {
+                     -> Vec<RustProcessedTypeInfo> {
   let mut result = Vec::new();
   for type_info in &input_data.cpp_data.types {
     if let CppTypeKind::Class { ref template_arguments, .. } = type_info.kind {
@@ -268,12 +262,12 @@ fn generate_type_map(input_data: &CppAndFfiData,
         continue;
       }
     }
-    result.push(ProcessedTypeInfo {
+    result.push(RustProcessedTypeInfo {
       cpp_name: type_info.name.clone(),
       cpp_template_arguments: None,
       kind: match type_info.kind {
-        CppTypeKind::Class { ref size, .. } => ProcessedTypeKind::Class { size: size.unwrap() },
-        CppTypeKind::Enum { ref values } => ProcessedTypeKind::Enum { values: values.clone() },
+        CppTypeKind::Class { ref size, .. } => RustProcessedTypeKind::Class { size: size.unwrap() },
+        CppTypeKind::Enum { ref values } => RustProcessedTypeKind::Enum { values: values.clone() },
       },
       rust_name: calculate_rust_name(&type_info.name, &type_info.include_file, false, config),
     });
@@ -291,10 +285,10 @@ fn generate_type_map(input_data: &CppAndFfiData,
                              .iter()
                              .map(|x| x.caption(TypeCaptionStrategy::Full))
                              .join("_"));
-        result.push(ProcessedTypeInfo {
+        result.push(RustProcessedTypeInfo {
           cpp_name: class_name.clone(),
           cpp_template_arguments: Some(ins.template_arguments.clone()),
-          kind: ProcessedTypeKind::Class { size: ins.size },
+          kind: RustProcessedTypeKind::Class { size: ins.size },
           rust_name: calculate_rust_name(&name, &class_type_info.include_file, false, config),
         });
       }
@@ -505,11 +499,11 @@ impl RustGenerator {
   /// - overloading_types - traits and their implementations that
   /// emulate C++ method overloading.
   fn process_type(&self,
-                  info: &ProcessedTypeInfo,
+                  info: &RustProcessedTypeInfo,
                   c_header: &CppFfiHeaderData)
                   -> ProcessTypeResult {
     match info.kind {
-      ProcessedTypeKind::Enum { ref values } => {
+      RustProcessedTypeKind::Enum { ref values } => {
         let mut is_flaggable = false;
         let template_arg_sample = CppType {
           is_const: false,
@@ -557,7 +551,7 @@ impl RustGenerator {
           overloading_types: Vec::new(),
         }
       }
-      ProcessedTypeKind::Class { ref size } => {
+      RustProcessedTypeKind::Class { ref size } => {
         let methods_scope = RustMethodScope::Impl { type_name: info.rust_name.clone() };
         let class_type = CppTypeClassBase {
           name: info.cpp_name.clone(),

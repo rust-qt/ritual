@@ -135,6 +135,7 @@ pub fn run(env: BuildEnvironment) {
     }
   }
   let qt_doc_data = if is_qt_library {
+    // TODO: use env only in build script, switch to cmd arg in cli
     let env_var_name = format!("{}_DOC_DATA", lib_spec.cpp.name.to_uppercase());
     match std::env::var(&env_var_name) {
       Ok(env_var_value) => {
@@ -179,9 +180,7 @@ pub fn run(env: BuildEnvironment) {
         name_blacklist: lib_spec.cpp.name_blacklist.clone(),
       });
 
-      // let serialized_parse_result = serde_json::to_vec(&parse_result).unwrap();
       let mut file = File::create(&parse_result_cache_file_path).unwrap();
-      // file.write(serialized_parse_result);
       serde_json::to_writer(&mut file, &parse_result).unwrap();
       log::info(format!("Header parse result is saved to file: {}",
                         parse_result_cache_file_path.to_str().unwrap()));
@@ -267,6 +266,14 @@ pub fn run(env: BuildEnvironment) {
                                           module_blacklist: lib_spec.rust.module_blacklist,
                                           qt_doc_data: qt_doc_data,
                                         });
+    {
+      let rust_types_path = output_dir_path.with_added("rust_types.json");
+      let mut file = File::create(&rust_types_path).unwrap();
+      serde_json::to_writer(&mut file, &rust_data.processed_types).unwrap();
+      log::info(format!("Rust types info is saved to file: {}",
+                        rust_types_path.to_str().unwrap()));
+    }
+
     rust_code_generator::run(rust_config, &rust_data);
 
     for item in fs::read_dir(&crate_new_path).unwrap() {

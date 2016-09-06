@@ -2,7 +2,7 @@ use cpp_type::CppType;
 use cpp_ffi_data::IndirectionChange;
 use utils::JoinWithString;
 use utils::CaseOperations;
-
+pub use serializable::RustName;
 extern crate libc;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -14,10 +14,7 @@ pub enum RustTypeIndirection {
   PtrPtr,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct RustName {
-  pub parts: Vec<String>,
-}
+
 
 impl RustName {
   pub fn new(parts: Vec<String>) -> RustName {
