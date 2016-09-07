@@ -8,6 +8,7 @@ mod cpp_ffi_data;
 mod cpp_method;
 mod cpp_type;
 mod cpp_operator;
+mod dependency_info;
 mod doc_formatter;
 pub mod log;
 mod qt_doc_parser;

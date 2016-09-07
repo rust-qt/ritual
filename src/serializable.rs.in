@@ -544,3 +544,10 @@ pub struct RustProcessedTypeInfo {
   pub kind: RustProcessedTypeKind,
   pub rust_name: RustName,
 }
+
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct RustExportInfo {
+  pub crate_name: String,
+  pub rust_types: Vec<RustProcessedTypeInfo>,
+}
