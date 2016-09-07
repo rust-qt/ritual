@@ -124,9 +124,14 @@ fn functions_with_class_arg() {
   assert_eq!(data.types.len(), 1);
   assert_eq!(data.types[0].name, "Magic");
   match data.types[0].kind {
-    CppTypeKind::Class { ref size, ref bases, ref fields, ref template_arguments } => {
+    CppTypeKind::Class { ref size,
+                         ref bases,
+                         ref fields,
+                         ref template_arguments,
+                         ref using_directives } => {
       assert!(size.is_some());
       assert!(template_arguments.is_none());
+      assert!(using_directives.is_empty());
       assert!(bases.is_empty());
       assert_eq!(fields.len(), 2);
       assert_eq!(fields[0].name, "a");
@@ -389,7 +394,7 @@ fn simple_class_method() {
   assert!(data.types.len() == 1);
   assert_eq!(data.types[0].name, "MyClass");
   match data.types[0].kind {
-    CppTypeKind::Class { ref size, ref bases, ref fields, ref template_arguments } => {
+    CppTypeKind::Class { ref size, ref bases, ref fields, ref template_arguments, .. } => {
       assert!(size.is_some());
       assert!(template_arguments.is_none());
       assert!(bases.is_empty());
@@ -526,7 +531,7 @@ fn template_class_method() {
   assert!(data.types.len() == 1);
   assert_eq!(data.types[0].name, "MyVector");
   match data.types[0].kind {
-    CppTypeKind::Class { ref size, ref bases, ref fields, ref template_arguments } => {
+    CppTypeKind::Class { ref size, ref bases, ref fields, ref template_arguments, .. } => {
       assert!(size.is_none());
       assert_eq!(template_arguments, &Some(vec!["T".to_string()]));
       assert!(bases.is_empty());
@@ -723,6 +728,27 @@ fn derived_class_multiple() {
   }
 }
 
+fn class_with_use() {
+  let data = run_parser("class A { public: int m1(); };
+  class B { public: double m1(); };
+  class C : public A, public B {
+    using B::m1;
+  };");
+  assert!(data.types.len() == 3);
+  assert_eq!(data.types[2].name, "C");
+  match data.types[2].kind {
+    CppTypeKind::Class { ref using_directives, .. } => {
+      assert_eq!(using_directives,
+                 &vec![CppClassUsingDirective {
+                         class_name: "B".to_string(),
+                         method_name: "m1".to_string(),
+                       }]);
+    }
+    _ => panic!("invalid type kind"),
+  }
+}
+
+
 #[test]
 fn tests() {
   // clang can't be used from multiple threads, so these checks
@@ -742,4 +768,5 @@ fn tests() {
   template_instantiation();
   derived_class_simple();
   derived_class_multiple();
+  class_with_use();
 }

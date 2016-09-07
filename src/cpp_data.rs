@@ -8,7 +8,7 @@ use cpp_type::{CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
 use std::iter;
 
 pub use serializable::{EnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
-                       CppTypeData, CppData, CppTemplateInstantiation};
+                       CppTypeData, CppData, CppTemplateInstantiation, CppClassUsingDirective};
 
 fn apply_instantiations_to_method(method: &CppMethod,
                                   nested_level: i32,
@@ -188,7 +188,7 @@ impl CppData {
     let mut new_methods = Vec::new();
     {
       for type1 in &self.types {
-        if let CppTypeKind::Class { ref bases, .. } = type1.kind {
+        if let CppTypeKind::Class { ref bases, ref using_directives, .. } = type1.kind {
           for base in bases {
             if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
                    base.base {
@@ -208,14 +208,40 @@ impl CppData {
                 // derived_types.push(derived_name.clone());
                 let mut current_new_methods = Vec::new();
                 for base_class_method in base_methods {
+                  let mut using_directive_enables = false;
+                  let mut using_directive_disables = false;
+                  for dir in using_directives {
+                    if &dir.method_name == &base_class_method.name {
+                      if &dir.class_name == base_name {
+                        log::noisy(format!("UsingDirective enables inheritance of {}",
+                                           base_class_method.short_text()));
+                        using_directive_enables = true;
+                      } else {
+                        log::noisy(format!("UsingDirective disables inheritance of {}",
+                                           base_class_method.short_text()));
+                        using_directive_disables = true;
+                      }
+                    }
+                  }
+                  if using_directive_disables {
+                    continue;
+                  }
+
                   let mut ok = true;
                   for method in &self.methods {
                     if method.class_name() == Some(derived_name) &&
                        method.name == base_class_method.name {
-                      log::noisy("Method is not added because it's overriden in derived class");
-                      log::noisy(format!("Base method: {}", base_class_method.short_text()));
-                      log::noisy(format!("Derived method: {}\n", method.short_text()));
-                      ok = false;
+                      // without using directive, any method with the same name
+                      // disables inheritance of base class method;
+                      // with using directive, only method with the same arguments
+                      // disables inheritance of base class method.
+                      if !using_directive_enables ||
+                         method.argument_types_equal(base_class_method) {
+                        log::noisy("Method is not added because it's overriden in derived class");
+                        log::noisy(format!("Base method: {}", base_class_method.short_text()));
+                        log::noisy(format!("Derived method: {}\n", method.short_text()));
+                        ok = false;
+                      }
                       break;
                     }
                   }
@@ -408,6 +434,7 @@ impl CppData {
     inherited_methods
   }
 
+  // TODO: dependency data is needed here!
   pub fn get_pure_virtual_methods(&self, class_name: &String) -> Vec<&CppMethod> {
 
     let own_methods: Vec<_> = self.methods

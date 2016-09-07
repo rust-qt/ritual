@@ -27,6 +27,14 @@ pub struct CppClassField {
   pub size: Option<i32>,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppClassUsingDirective {
+  pub class_name: String,
+  pub method_name: String,
+}
+
+
 /// Information about a C++ type declaration
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[derive(Serialize, Deserialize)]
@@ -51,6 +59,8 @@ pub enum CppTypeKind {
     /// not particularly important, but their count is.
     /// If the class is not a template class, this field is None.
     template_arguments: Option<Vec<String>>,
+    /// List of using directives, like "using BaseClass::method1;"
+    using_directives: Vec<CppClassUsingDirective>,
   },
 }
 

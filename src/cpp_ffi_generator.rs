@@ -83,10 +83,11 @@ impl<'a> CGenerator<'a> {
   fn should_process_method(&self, method: &CppMethod) -> bool {
     let full_name = method.full_name();
     let short_text = method.short_text();
+    let class_name = method.class_name().unwrap_or(&String::new()).clone();
     if self.cpp_lib_spec
       .ffi_methods_blacklist
       .iter()
-      .find(|&x| x == &full_name || x == &short_text)
+      .find(|&x| x == &full_name || x == &short_text || x == &class_name)
       .is_some() {
       log::debug(format!("Skipping blacklisted method: \n{}\n", method.short_text()));
       return false;
@@ -135,9 +136,12 @@ impl<'a> CGenerator<'a> {
                                                             include_file_base_name: &String,
                                                             methods: I)
                                                             -> Vec<CppAndFfiMethod> {
-    log::info(format!("Generating C++ FFI methods for header: <{}>", include_file));
+    log::info(format!("Generating C++ FFI methods for header: {}", include_file));
     let mut hash_name_to_methods: HashMap<String, Vec<_>> = HashMap::new();
     for ref method in methods {
+      //      if include_file == "qflags.h" {
+      //        println!("TEST {:?}", method);
+      //      }
       if !self.should_process_method(method) {
         continue;
       }

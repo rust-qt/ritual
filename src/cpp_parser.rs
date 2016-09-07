@@ -12,7 +12,7 @@ use std::fs::File;
 use utils::{JoinWithString, add_to_multihash};
 
 use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppOriginLocation,
-               CppVisibility, CppTemplateInstantiation};
+               CppVisibility, CppTemplateInstantiation, CppClassUsingDirective};
 use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind, CppMethodClassMembership};
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
                CppSpecificNumericTypeKind, CppTypeClassBase};
@@ -41,14 +41,14 @@ fn inspect_method(entity: Entity) {
 }
 
 #[allow(dead_code)]
-fn dump_entity(entity: &Entity, level: i32) {
+fn dump_entity(entity: Entity, level: i32) {
   for _ in 0..level {
     print!(". ");
   }
   println!("{:?}", entity);
   if level <= 5 {
     for child in entity.get_children() {
-      dump_entity(&child, level + 1);
+      dump_entity(child, level + 1);
     }
   }
 }
@@ -1016,6 +1016,29 @@ impl CppParser {
     let mut fields = Vec::new();
     let mut bases = Vec::new();
     let template_arguments = get_template_arguments(entity);
+    let using_directives = entity.get_children()
+      .into_iter()
+      .filter(|c| c.get_kind() == EntityKind::UsingDeclaration)
+      .filter_map(|child| {
+        let type_ref = match child.get_children()
+          .into_iter()
+          .find(|c| {
+            c.get_kind() == EntityKind::TypeRef || c.get_kind() == EntityKind::TemplateRef
+          }) {
+          Some(x) => x,
+          None => {
+            log::warning(format!("Failed to parse UsingDeclaration: class type not found"));
+            dump_entity(child, 0);
+            return None;
+          }
+        };
+        let type_def = type_ref.get_definition().expect("TypeRef definition not found");
+        Some(CppClassUsingDirective {
+          class_name: get_full_name(type_def).expect("class_name get_full_name failed"),
+          method_name: child.get_name().expect("method_name failed"),
+        })
+      })
+      .collect();
     for child in entity.get_children() {
       if child.get_kind() == EntityKind::FieldDecl {
         let field_clang_type = child.get_type().unwrap();
@@ -1081,6 +1104,7 @@ impl CppParser {
         size: size,
         bases: bases,
         fields: fields,
+        using_directives: using_directives,
         template_arguments: if entity.get_kind() == EntityKind::ClassTemplate {
           if template_arguments.is_empty() {
             panic!("missing template arguments");
