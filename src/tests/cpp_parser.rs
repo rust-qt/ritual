@@ -29,6 +29,7 @@ fn run_parser(code: &'static str) -> CppData {
   let mut result = cpp_parser::run(cpp_parser::CppParserConfig {
     include_dirs: vec![include_dir],
     header_name: include_name.to_string(),
+    target_include_dir: None,
     tmp_cpp_path: dir.path().with_added("1.cpp"),
     name_blacklist: Vec::new(),
   });

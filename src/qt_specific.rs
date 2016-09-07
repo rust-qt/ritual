@@ -30,7 +30,7 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) {
       }
     }
   }
-  {
+  if map_real_to_all_fancy.contains_key("qsharedpointer.h") {
     let v = map_real_to_all_fancy["qsharedpointer.h"].clone();
     map_real_to_all_fancy.insert("qsharedpointer_impl.h".to_string(), v);
   }

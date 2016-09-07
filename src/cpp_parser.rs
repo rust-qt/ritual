@@ -106,8 +106,13 @@ fn get_full_name(entity: Entity) -> Result<String, String> {
 
 #[derive(Clone, Debug)]
 pub struct CppParserConfig {
+  /// Include dirs passed to clang
   pub include_dirs: Vec<PathBuf>,
+  /// Header name used in #include statement
   pub header_name: String,
+  /// Directory containing headers of the target library.
+  /// Only entities declared within this directory will be processed.
+  pub target_include_dir: Option<PathBuf>,
   pub tmp_cpp_path: PathBuf,
   pub name_blacklist: Vec<String>,
 }
@@ -163,7 +168,7 @@ fn run_clang<R, F: Fn(Entity) -> R>(config: &CppParserConfig, cpp_code: Option<S
 pub fn run(config: CppParserConfig) -> CppData {
   log::info(format!("{}", get_version()));
   log::info("Initializing clang...");
-  let (parser, methods) = run_clang(&config, None, |translation_unit| {
+  let (mut parser, methods) = run_clang(&config, None, |translation_unit| {
     let mut parser = CppParser {
       types: Vec::new(),
       config: config.clone(),
@@ -175,7 +180,8 @@ pub fn run(config: CppParserConfig) -> CppData {
     (parser, methods)
   });
   log::info("Checking integrity...");
-  let good_methods = parser.check_integrity(methods);
+  let (good_methods, good_types) = parser.check_integrity(methods);
+  parser.types = good_types;
   log::info("Searching for template instantiations...");
   let template_instantiations = parser.find_template_instantiations(&good_methods);
   log::info("Determining type sizes of template instantiations...");
@@ -869,12 +875,8 @@ impl CppParser {
       let op = name["operator ".len()..].trim();
       match self.parse_unexposed_type(None, Some(op.to_string()), class_entity, Some(entity)) {
         Ok(t) => method_operator = Some(CppOperator::Conversion(t)),
-        Err(msg) => {
-          panic!("Unknown operator: '{}' (method name: {}); error: {}",
-                 op,
-                 name,
-                 msg)
-        }
+        Err(_) => return Err(format!("Unknown type in conversion operator: '{}'", op)),
+
       }
     }
     let source_range = entity.get_range().unwrap();
@@ -1115,9 +1117,11 @@ impl CppParser {
       }
       if let Some(file_path) = self.entity_include_path(entity) {
         let file_path_buf = PathBuf::from(&file_path);
-        if self.config.include_dirs.iter().find(|dir| file_path_buf.starts_with(dir)).is_none() {
-          log::noisy(format!("skipping entities from {}", file_path));
-          return false;
+        if let Some(ref target_include_dir) = self.config.target_include_dir {
+          if !file_path_buf.starts_with(target_include_dir) {
+            log::noisy(format!("skipping entities from {}", file_path));
+            return false;
+          }
         }
       }
       if self.config.name_blacklist.iter().find(|&x| x == &full_name).is_some() {
@@ -1286,7 +1290,7 @@ impl CppParser {
     Ok(())
   }
 
-  fn check_integrity(&self, methods: Vec<CppMethod>) -> Vec<CppMethod> {
+  fn check_integrity(&self, methods: Vec<CppMethod>) -> (Vec<CppMethod>, Vec<CppTypeData>) {
     log::info("Checking data integrity");
     let good_methods = methods.into_iter()
       .filter(|method| {
@@ -1304,21 +1308,35 @@ impl CppParser {
         true
       })
       .collect();
+
+    let mut good_types = Vec::new();
     for t in &self.types {
-      if let CppTypeKind::Class { ref bases, .. } = t.kind {
-        for base in bases {
+      let mut good_type = t.clone();
+      if let CppTypeKind::Class { ref mut bases, .. } = good_type.kind {
+        let mut valid_bases = Vec::new();
+        for base in bases.iter() {
           if let Err(msg) = self.check_type_integrity(&base) {
-            log::warning(format!("Class {}: base class type {:?}: {}", t.name, base, msg));
+            log::warning(format!("Class {}: base class removed because type is not available: \
+                                  {:?}: {}",
+                                 t.name,
+                                 base,
+                                 msg));
+          } else {
+            valid_bases.push(base.clone());
           }
         }
+        bases.clear();
+        bases.append(&mut valid_bases);
       }
+      good_types.push(good_type);
     }
-    good_methods
+    (good_methods, good_types)
   }
 
   fn find_template_instantiations(&self, methods: &Vec<CppMethod>) -> Vec<(String, Vec<CppType>)> {
 
     fn check_type(type1: &CppType, result: &mut Vec<(String, Vec<CppType>)>) {
+      println!("check type: {:?}", type1);
       if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
              type1.base {
         if let &Some(ref template_arguments) = template_arguments {
@@ -1340,14 +1358,14 @@ impl CppParser {
     }
     let mut result = Vec::new();
     for m in methods {
-      log::noisy(format!("method: {}", m.short_text()));
+      log::debug(format!("method: {}", m.short_text()));
       check_type(&m.return_type, &mut result);
       for arg in &m.arguments {
         check_type(&arg.argument_type, &mut result);
       }
     }
     for t in &self.types {
-      log::noisy(format!("type: {}", t.name));
+      log::debug(format!("type: {}", t.name));
       if let CppTypeKind::Class { ref bases, .. } = t.kind {
         for base in bases {
           check_type(&base, &mut result);

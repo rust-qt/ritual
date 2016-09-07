@@ -492,13 +492,6 @@ pub struct CppLibSpec {
 #[derive(Debug, Clone)]
 #[derive(Serialize, Deserialize)]
 pub struct RustLibSpec {
-  // TODO: remove these fields and parse Cargo.toml instead
-  /// Name of the crate
-  pub name: String,
-  /// Version of the crate
-  pub version: String,
-  /// Authors of the crate
-  pub authors: Vec<String>,
   /// List of top level modules that should not be generated
   pub module_blacklist: Vec<String>,
 }

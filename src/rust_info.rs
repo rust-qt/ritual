@@ -217,6 +217,39 @@ pub struct RustModule {
   pub submodules: Vec<RustModule>,
 }
 
+pub struct InputCargoTomlData {
+  /// Name of the crate
+  pub name: String,
+  /// Version of the crate
+  pub version: String,
+  /// Authors of the crate
+  pub authors: Vec<String>,
+}
+
+use std::path::PathBuf;
+use std::fs::File;
+use std::io::Read;
+extern crate toml;
+
+impl InputCargoTomlData {
+  pub fn from_file(path: &PathBuf) -> InputCargoTomlData {
+    let mut file = File::open(path).unwrap();
+    let mut buf = String::new();
+    file.read_to_string(&mut buf).unwrap();
+    let value = toml::Parser::new(&buf).parse().unwrap();
+    let package = value.get("package").unwrap();
+    InputCargoTomlData {
+      name: package.as_table().unwrap().get("name").unwrap().as_str().unwrap().to_string(),
+      version: package.as_table().unwrap().get("version").unwrap().as_str().unwrap().to_string(),
+      authors: match package.as_table().unwrap().get("authors") {
+        None => Vec::new(),
+        Some(authors) => {
+          authors.as_slice().unwrap().iter().map(|x| x.as_str().unwrap().to_string()).collect()
+        }
+      },
+    }
+  }
+}
 // pub struct Package {
 //  modules: Vec<RustModule>,
 //  cpp_data: CppAndFfiData,

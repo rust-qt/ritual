@@ -14,7 +14,7 @@ use cpp_parser;
 use qt_specific;
 use utils;
 use cpp_ffi_generator;
-use rust_info::RustExportInfo;
+use rust_info::{InputCargoTomlData, RustExportInfo};
 use rust_code_generator;
 use rust_generator;
 use serializable::LibSpec;
@@ -97,10 +97,13 @@ pub fn run(env: BuildEnvironment) {
 
   let lib_spec_path = source_dir_path.with_added("spec.json");
 
-  log::info("Reading lib spec...");
+  log::info("Reading lib spec");
   let file = File::open(&lib_spec_path).unwrap();
   let lib_spec: LibSpec = serde_json::from_reader(file).unwrap();
-  log::info("Lib spec is valid.");
+
+  log::info("Reading input Cargo.toml");
+  let input_cargo_toml_data =
+    InputCargoTomlData::from_file(&source_dir_path.with_added("Cargo.toml"));
   log::info(format!("C++ library name: {}", lib_spec.cpp.name));
 
   let is_qt_library = lib_spec.cpp.name.starts_with("Qt5");
@@ -128,12 +131,15 @@ pub fn run(env: BuildEnvironment) {
                       qt_install_libs_path.to_str().unwrap()));
     cpp_lib_path = Some(qt_install_libs_path);
     include_dirs.push(qt_install_headers_path.clone());
-    if &lib_spec.cpp.name == "Qt5Core" {
-      let dir = qt_install_headers_path.with_added("QtCore");
-      qt_this_lib_headers_dir = Some(dir.clone());
-      include_dirs.push(dir);
-    } else {
-      log::warning("This library is not supported yet.");
+
+    if lib_spec.cpp.name.starts_with("Qt5") {
+      let dir = qt_install_headers_path.with_added(format!("Qt{}", &lib_spec.cpp.name[3..]));
+      if dir.exists() {
+        qt_this_lib_headers_dir = Some(dir.clone());
+        include_dirs.push(dir);
+      } else {
+        log::warning(format!("extra header dir does not exist: {}", dir.display()));
+      }
     }
   }
   let qt_doc_data = if is_qt_library {
@@ -166,51 +172,7 @@ pub fn run(env: BuildEnvironment) {
   }
   let dependencies: Vec<_> = env.dependency_paths
     .iter()
-    .map(|path| {
-      let cpp_data_path = path.with_added("cpp_data.json");
-      if !cpp_data_path.exists() {
-        panic!("Invalid dependency: file not found: {}",
-               cpp_data_path.display());
-      }
-      let file = match File::open(&cpp_data_path) {
-        Ok(r) => r,
-        Err(_) => {
-          panic!("Invalid dependency: failed to open file: {}",
-                 cpp_data_path.display())
-        }
-      };
-      let cpp_data = match serde_json::from_reader(file) {
-        Ok(r) => r,
-        Err(_) => {
-          panic!("Invalid dependency: failed to parse file: {}",
-                 cpp_data_path.display())
-        }
-      };
-
-      let rust_export_info_path = path.with_added("rust_export_info.json");
-      if !rust_export_info_path.exists() {
-        panic!("Invalid dependency: file not found: {}",
-               rust_export_info_path.display());
-      }
-      let file2 = match File::open(&cpp_data_path) {
-        Ok(r) => r,
-        Err(_) => {
-          panic!("Invalid dependency: failed to open file: {}",
-                 rust_export_info_path.display())
-        }
-      };
-      let rust_export_info = match serde_json::from_reader(file2) {
-        Ok(r) => r,
-        Err(_) => {
-          panic!("Invalid dependency: failed to parse file: {}",
-                 rust_export_info_path.display())
-        }
-      };
-      DependencyInfo {
-        cpp_data: cpp_data,
-        rust_export_info: rust_export_info,
-      }
-    })
+    .map(|path| DependencyInfo::load(path))
     .collect();
 
   let c_lib_parent_path = output_dir_path.with_added("c_lib");
@@ -230,6 +192,7 @@ pub fn run(env: BuildEnvironment) {
       let parse_result = cpp_parser::run(cpp_parser::CppParserConfig {
         include_dirs: include_dirs.clone(),
         header_name: lib_spec.cpp.include_file.clone(),
+        target_include_dir: qt_this_lib_headers_dir.clone(),
         tmp_cpp_path: output_dir_path.with_added("1.cpp"),
         name_blacklist: lib_spec.cpp.name_blacklist.clone(),
       });
@@ -246,7 +209,7 @@ pub fn run(env: BuildEnvironment) {
     }
     parse_result.post_process();
 
-    let c_lib_name = format!("{}_c", &lib_spec.rust.name);
+    let c_lib_name = format!("{}_c", &input_cargo_toml_data.name);
     let c_lib_path = c_lib_parent_path.with_added("source");
     let c_lib_tmp_path = c_lib_parent_path.with_added("source.new");
     if c_lib_tmp_path.as_path().exists() {
@@ -288,7 +251,7 @@ pub fn run(env: BuildEnvironment) {
                 false);
 
 
-    let crate_new_path = output_dir_path.with_added(format!("{}.new", &lib_spec.rust.name));
+    let crate_new_path = output_dir_path.with_added(format!("{}.new", &input_cargo_toml_data.name));
     if crate_new_path.as_path().exists() {
       fs::remove_dir_all(&crate_new_path).unwrap();
     }
@@ -296,9 +259,9 @@ pub fn run(env: BuildEnvironment) {
     let rustfmt_config_path = source_dir_path.with_added("rustfmt.toml");
     let rust_config = rust_code_generator::RustCodeGeneratorConfig {
       invokation_method: env.invokation_method.clone(),
-      crate_name: lib_spec.rust.name.clone(),
-      crate_authors: lib_spec.rust.authors.clone(),
-      crate_version: lib_spec.rust.version.clone(),
+      crate_name: input_cargo_toml_data.name.clone(),
+      crate_authors: input_cargo_toml_data.authors.clone(),
+      crate_version: input_cargo_toml_data.version.clone(),
       output_path: crate_new_path.clone(),
       template_path: source_dir_path.clone(),
       c_lib_name: c_lib_name,
@@ -309,13 +272,13 @@ pub fn run(env: BuildEnvironment) {
         None
       },
     };
-    log::info(format!("Generating Rust crate ({}).", &lib_spec.rust.name));
+    log::info(format!("Generating Rust crate ({}).", &input_cargo_toml_data.name));
     let rust_data = rust_generator::run(CppAndFfiData {
                                           cpp_data: parse_result,
                                           cpp_ffi_headers: cpp_ffi_headers,
                                         },
                                         rust_generator::RustGeneratorConfig {
-                                          crate_name: lib_spec.rust.name.clone(),
+                                          crate_name: input_cargo_toml_data.name.clone(),
                                           remove_qt_prefix: is_qt_library,
                                           module_blacklist: lib_spec.rust.module_blacklist,
                                           qt_doc_data: qt_doc_data,
@@ -326,7 +289,7 @@ pub fn run(env: BuildEnvironment) {
       let mut file = File::create(&rust_types_path).unwrap();
       serde_json::to_writer(&mut file,
                             &RustExportInfo {
-                              crate_name: lib_spec.rust.name.clone(),
+                              crate_name: input_cargo_toml_data.name.clone(),
                               rust_types: rust_data.processed_types,
                             })
         .unwrap();
