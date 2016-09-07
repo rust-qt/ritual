@@ -82,7 +82,12 @@ impl<'a> CGenerator<'a> {
   /// for some reason
   fn should_process_method(&self, method: &CppMethod) -> bool {
     let full_name = method.full_name();
-    if self.cpp_lib_spec.ffi_methods_blacklist.iter().find(|&x| x == &full_name).is_some() {
+    let short_text = method.short_text();
+    if self.cpp_lib_spec
+      .ffi_methods_blacklist
+      .iter()
+      .find(|&x| x == &full_name || x == &short_text)
+      .is_some() {
       log::debug(format!("Skipping blacklisted method: \n{}\n", method.short_text()));
       return false;
     }

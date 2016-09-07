@@ -767,6 +767,7 @@ impl RustGenerator {
         cpp_fn: method.short_text(),
         rust_fns: Vec::new(),
         doc: self.get_qt_doc_for_method(&method.cpp_method),
+        inherited_from: method.cpp_method.inherited_from.clone(),
       };
       doc_formatter::method_doc(vec![doc_item], &method.cpp_method.full_name())
     } else {
@@ -856,6 +857,18 @@ impl RustGenerator {
                     scope: &RustMethodScope,
                     use_self_arg_caption: bool)
                     -> (RustMethod, Option<RustTypeDeclaration>) {
+    filtered_methods.sort_by(|a, b| {
+      if let RustMethodArguments::SingleVariant(ref args) = a.arguments {
+        let a_args = args;
+        if let RustMethodArguments::SingleVariant(ref args) = b.arguments {
+          a_args.cpp_method.c_name.cmp(&args.cpp_method.c_name)
+        } else {
+          unreachable!()
+        }
+      } else {
+        unreachable!()
+      }
+    });
     let methods_count = filtered_methods.len();
     let mut type_declaration = None;
     let method = if methods_count > 1 {
@@ -941,7 +954,11 @@ impl RustGenerator {
       }
 
       let mut doc_items = Vec::new();
-      for (cpp_method, variants) in grouped_by_cpp_method {
+      let mut grouped_by_cpp_method_vec: Vec<_> = grouped_by_cpp_method.into_iter().collect();
+      grouped_by_cpp_method_vec.sort_by(|&(ref a, _), &(ref b, _)| {
+        a.short_text().cmp(&b.short_text())
+      });
+      for (cpp_method, variants) in grouped_by_cpp_method_vec {
         let cpp_short_text = cpp_method.short_text();
         if let Some(ref qt_doc_data) = self.config.qt_doc_data {
           if let Some(ref declaration_code) = cpp_method.declaration_code {
@@ -967,6 +984,7 @@ impl RustGenerator {
                                                      &self.config.crate_name)
                 })
                 .collect(),
+              inherited_from: cpp_method.inherited_from.clone(),
             });
 
           }
@@ -1040,6 +1058,7 @@ impl RustGenerator {
           cpp_fn: args.cpp_method.cpp_method.short_text(),
           rust_fns: Vec::new(),
           doc: self.get_qt_doc_for_method(&args.cpp_method.cpp_method),
+          inherited_from: args.cpp_method.cpp_method.inherited_from.clone(),
         };
         method.doc = doc_formatter::method_doc(vec![doc_item],
                                                &args.cpp_method.cpp_method.full_name());
@@ -1054,7 +1073,23 @@ impl RustGenerator {
 
   fn get_qt_doc_for_method(&self, cpp_method: &CppMethod) -> Option<QtDocResultForMethod> {
     if let Some(ref qt_doc_data) = self.config.qt_doc_data {
-      if let Some(ref declaration_code) = cpp_method.declaration_code {
+      if let Some(ref inherited_from) = cpp_method.inherited_from {
+        if let Some(ref declaration_code) = inherited_from.declaration_code {
+          match qt_doc_data.doc_for_method(&inherited_from.doc_id,
+                                           declaration_code,
+                                           &inherited_from.short_text) {
+            Ok(doc) => Some(doc),
+            Err(msg) => {
+              log::warning(format!("Failed to get documentation for method: {}: {}",
+                                   &inherited_from.short_text,
+                                   msg));
+              None
+            }
+          }
+        } else {
+          None
+        }
+      } else if let Some(ref declaration_code) = cpp_method.declaration_code {
         match qt_doc_data.doc_for_method(&cpp_method.doc_id(),
                                          declaration_code,
                                          &cpp_method.short_text()) {

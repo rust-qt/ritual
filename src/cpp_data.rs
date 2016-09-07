@@ -1,16 +1,18 @@
 
-use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership, CppFunctionArgument};
+use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership, CppFunctionArgument,
+                 CppMethodInheritedFrom};
 use cpp_operator::CppOperator;
 use std::collections::HashSet;
 use log;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
+use std::iter;
 
 pub use serializable::{EnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
                        CppTypeData, CppData, CppTemplateInstantiation};
 
 fn apply_instantiations_to_method(method: &CppMethod,
                                   nested_level: i32,
-                                  template_instantiations: &Vec<CppTemplateInstantiation>)
+                                  template_instantiations: Vec<&CppTemplateInstantiation>)
                                   -> Result<Vec<CppMethod>, String> {
   let mut new_methods = Vec::new();
   for ins in template_instantiations {
@@ -136,7 +138,7 @@ impl CppData {
   /// Adds destructors for every class that does not have explicitly
   /// defined destructor, allowing to create wrappings for
   /// destructors implicitly available in C++.
-  pub fn ensure_explicit_destructors(&mut self) {
+  pub fn ensure_explicit_destructors(&mut self, dependencies: &Vec<&CppData>) {
     for type1 in &self.types {
       if let CppTypeKind::Class { .. } = type1.kind {
         let class_name = &type1.name;
@@ -148,7 +150,7 @@ impl CppData {
           }
         }
         if !found_destructor {
-          let is_virtual = self.has_virtual_destructor(class_name);
+          let is_virtual = self.has_virtual_destructor(class_name, dependencies);
           self.methods.push(CppMethod {
             name: format!("~{}", class_name),
             class_membership: Some(CppMethodClassMembership {
@@ -170,6 +172,7 @@ impl CppData {
             origin_location: None,
             template_arguments: None,
             declaration_code: None,
+            inherited_from: None, // TODO: do we need inherited_from for destructors?
           });
         }
       }
@@ -177,10 +180,12 @@ impl CppData {
   }
 
   /// Helper function that performs a portion of add_inherited_methods implementation.
-  fn add_inherited_methods_from(&mut self, base_name: &String) {
+  fn inherited_methods_from(&self,
+                            base_name: &String,
+                            all_base_methods: &Vec<&CppMethod>)
+                            -> Vec<CppMethod> {
     // TODO: speed up this method
     let mut new_methods = Vec::new();
-    let mut derived_types = Vec::new();
     {
       for type1 in &self.types {
         if let CppTypeKind::Class { ref bases, .. } = type1.kind {
@@ -193,22 +198,16 @@ impl CppData {
                                    type1.name));
                 let derived_name = &type1.name;
                 let base_template_arguments = template_arguments;
-                let base_methods: Vec<_> = self.methods
-                  .iter()
-                  .filter(|method| {
-                    if let Some(ref info) = method.class_membership {
-                      &info.class_type.name == base_name &&
-                      &info.class_type.template_arguments == base_template_arguments &&
-                      !info.kind.is_constructor() &&
-                      !info.kind.is_destructor() &&
-                      method.operator != Some(CppOperator::Assignment)
-                    } else {
-                      false
-                    }
-                  })
-                  .collect();
-                derived_types.push(derived_name.clone());
-                for base_class_method in base_methods.clone() {
+                let base_methods = all_base_methods.clone().into_iter().filter(|method| {
+                  &method.class_membership
+                    .as_ref()
+                    .unwrap()
+                    .class_type
+                    .template_arguments == base_template_arguments
+                });
+                // derived_types.push(derived_name.clone());
+                let mut current_new_methods = Vec::new();
+                for base_class_method in base_methods {
                   let mut ok = true;
                   for method in &self.methods {
                     if method.class_name() == Some(derived_name) &&
@@ -229,35 +228,65 @@ impl CppData {
                     }
                     new_method.include_file = type1.include_file.clone();
                     new_method.origin_location = None;
+                    new_method.declaration_code = None;
+                    if new_method.inherited_from.is_none() {
+                      new_method.inherited_from = Some(CppMethodInheritedFrom {
+                        doc_id: base_class_method.doc_id(),
+                        short_text: base_class_method.short_text(),
+                        declaration_code: base_class_method.declaration_code.clone(),
+                        class_type: base_class_method.class_membership
+                          .as_ref()
+                          .unwrap()
+                          .class_type
+                          .clone(),
+                      });
+                    }
                     log::noisy(format!("Method added: {}", new_method.short_text()));
                     log::noisy(format!("Base method: {} ({:?})\n",
                                        base_class_method.short_text(),
                                        base_class_method.origin_location));
-                    new_methods.push(new_method.clone());
+                    current_new_methods.push(new_method.clone());
                   }
                 }
+                new_methods.append(&mut self.inherited_methods_from(derived_name,
+                                                                    &current_new_methods.iter().collect()));
+                new_methods.append(&mut current_new_methods);
               }
             }
           }
         }
       }
     }
-    self.methods.append(&mut new_methods);
-    for name in derived_types {
-      self.add_inherited_methods_from(&name);
-    }
+    new_methods
   }
 
   /// Adds methods of derived classes inherited from base classes.
   /// A method will not be added if there is a method with the same
   /// name in the derived class. Constructors, destructors and assignment
   /// operators are also not added. This reflects C++'s method inheritance rules.
-  pub fn add_inherited_methods(&mut self) {
+  pub fn add_inherited_methods(&mut self, dependencies: &Vec<&CppData>) {
     log::info("Adding inherited methods");
-    let all_type_names: Vec<_> = self.types.iter().map(|t| t.name.clone()).collect();
-    for name in all_type_names {
-      self.add_inherited_methods_from(&name);
+    let mut all_new_methods = Vec::new();
+    for cpp_data in dependencies.clone().into_iter().chain(iter::once(self as &_)) {
+      for type1 in &cpp_data.types {
+        if type1.is_class() {
+          let base_methods = cpp_data.methods
+            .iter()
+            .filter(|method| {
+              if let Some(ref info) = method.class_membership {
+                &info.class_type.name == &type1.name && !info.kind.is_constructor() &&
+                !info.kind.is_destructor() &&
+                method.operator != Some(CppOperator::Assignment)
+              } else {
+                false
+              }
+            });
+          all_new_methods.append(&mut self.inherited_methods_from(&type1.name,
+                                                                  &base_methods.collect()));
+        }
+      }
     }
+    self.methods.append(&mut all_new_methods);
     log::info("Finished adding inherited methods");
   }
 
@@ -321,7 +350,7 @@ impl CppData {
   }
 
   /// Checks if specified class has virtual destructor (own or inherited).
-  pub fn has_virtual_destructor(&self, class_name: &String) -> bool {
+  pub fn has_virtual_destructor(&self, class_name: &String, dependencies: &Vec<&CppData>) -> bool {
     for method in &self.methods {
       if method.is_destructor() && method.class_name() == Some(class_name) {
         return method.class_membership.as_ref().unwrap().is_virtual;
@@ -331,11 +360,16 @@ impl CppData {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
         for base in bases {
           if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base {
-            if self.has_virtual_destructor(name) {
+            if self.has_virtual_destructor(name, dependencies) {
               return true;
             }
           }
         }
+      }
+    }
+    for dep in dependencies {
+      if dep.has_virtual_destructor(class_name, &Vec::new()) {
+        return true;
       }
     }
     return false;
@@ -417,36 +451,56 @@ impl CppData {
 
 
 
-  fn instantiate_templates(&mut self) {
+  fn instantiate_templates(&mut self, dependencies: &Vec<&CppData>) {
     log::info("Instantiating templates.");
     let mut new_methods = Vec::new();
-    for method in &self.methods {
-      for type1 in method.all_involved_types() {
-        if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
-               type1.base {
-          if let &Some(ref template_arguments) = template_arguments {
-            assert!(!template_arguments.is_empty());
-            if template_arguments.iter().find(|x| !x.base.is_template_parameter()).is_none() {
-              if self.template_instantiations.contains_key(name) {
-                let nested_level = if let CppTypeBase::TemplateParameter { nested_level, .. } =
-                                          template_arguments[0].base {
-                  nested_level
-                } else {
-                  panic!("only template parameters can be here");
-                };
-                log::noisy(format!(""));
-                log::noisy(format!("method: {}", method.short_text()));
-                log::noisy(format!("found template class: {}", name));
-                match apply_instantiations_to_method(method,
-                                                     nested_level,
-                                                     &self.template_instantiations[name]) {
-                  Ok(mut methods) => {
-                    new_methods.append(&mut methods);
-                    break;
+
+    for cpp_data in dependencies.clone().into_iter().chain(iter::once(self as &_)) {
+      for method in &cpp_data.methods {
+        for type1 in method.all_involved_types() {
+          if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
+                 type1.base {
+            if let &Some(ref template_arguments) = template_arguments {
+              assert!(!template_arguments.is_empty());
+              if template_arguments.iter().find(|x| !x.base.is_template_parameter()).is_none() {
+                if let Some(template_instantiations) = self.template_instantiations.get(name) {
+                  let nested_level = if let CppTypeBase::TemplateParameter { nested_level, .. } =
+                                            template_arguments[0].base {
+                    nested_level
+                  } else {
+                    panic!("only template parameters can be here");
+                  };
+                  log::noisy(format!(""));
+                  log::noisy(format!("method: {}", method.short_text()));
+                  log::noisy(format!("found template class: {}", name));
+                  let own_tpl_instantiations = template_instantiations.iter()
+                    .filter(|ins| {
+                      dependencies.iter()
+                        .find(|dep| {
+                          match dep.template_instantiations
+                            .get(name) {
+                            None => false,
+                            Some(vec) => {
+                              vec.iter()
+                                .find(|x| x.template_arguments == ins.template_arguments)
+                                .is_some()
+                            }
+                          }
+                        })
+                        .is_none()
+                    })
+                    .collect();
+                  match apply_instantiations_to_method(method,
+                                                       nested_level,
+                                                       own_tpl_instantiations) {
+                    Ok(mut methods) => {
+                      new_methods.append(&mut methods);
+                      break;
+                    }
+                    Err(msg) => log::noisy(format!("failed: {}", msg)),
                   }
-                  Err(msg) => log::noisy(format!("failed: {}", msg)),
+                  break;
                 }
-                break;
               }
             }
           }
@@ -459,10 +513,10 @@ impl CppData {
 
   /// Performs data conversion to make it more suitable
   /// for further wrapper generation.
-  pub fn post_process(&mut self) {
-    self.ensure_explicit_destructors();
+  pub fn post_process(&mut self, dependencies: &Vec<&CppData>) {
+    self.ensure_explicit_destructors(dependencies);
     self.generate_methods_with_omitted_args();
-    self.instantiate_templates();
-    self.add_inherited_methods();
+    self.instantiate_templates(dependencies);
+    self.add_inherited_methods(dependencies);
   }
 }

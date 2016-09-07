@@ -2,12 +2,14 @@ use qt_doc_parser::{QtDocResultForMethod, QtDocResultForMethodKind};
 use rust_info::{RustMethodSelfArgKind, RustMethodArgumentsVariant};
 use rust_code_generator::rust_type_to_code;
 use utils::JoinWithString;
+use cpp_method::CppMethodInheritedFrom;
 
 #[derive(Debug, Clone)]
 pub struct DocItem {
   pub doc: Option<QtDocResultForMethod>,
   pub rust_fns: Vec<String>,
   pub cpp_fn: String,
+  pub inherited_from: Option<CppMethodInheritedFrom>,
 }
 
 pub fn rust_method_variant(args: &RustMethodArgumentsVariant,
@@ -98,6 +100,12 @@ pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &String) -> String {
     doc.push(format!("C++: <span style='color: green;'>```{}```</span>",
                      doc_item.cpp_fn));
     doc.push(format!("\n\n"));
+    if let Some(ref inherited_from) = doc_item.inherited_from {
+      doc.push(format!("Inherited from {}. Original C++ method: \
+                        <span style='color: green;'>```{}```</span>\n\n",
+                       inherited_from.class_type.to_cpp_code().unwrap(), // TODO: use permissive
+                       inherited_from.short_text));
+    }
     if let Some(result) = doc_item.doc {
       let prefix = match result.kind {
         QtDocResultForMethodKind::ExactMatch => format!("C++ documentation:"),

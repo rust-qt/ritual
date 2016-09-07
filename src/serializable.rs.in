@@ -170,6 +170,15 @@ pub struct CppMethodClassMembership {
   pub is_signal: bool, //TODO: implement signal detection or remove this field
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppMethodInheritedFrom {
+  pub doc_id: String,
+  pub declaration_code: Option<String>,
+  pub short_text: String,
+  pub class_type: CppTypeClassBase,
+}
+
 /// Information about a C++ method
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
@@ -206,6 +215,8 @@ pub struct CppMethod {
   pub template_arguments: Option<Vec<String>>,
 
   pub declaration_code: Option<String>,
+
+  pub inherited_from: Option<CppMethodInheritedFrom>,
 }
 
 // ------------------------------

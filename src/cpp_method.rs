@@ -5,7 +5,8 @@ use cpp_ffi_data::{CppFfiFunctionArgument, CppFfiArgumentMeaning};
 use cpp_ffi_data::CppMethodWithFfiSignature;
 use cpp_data::CppVisibility;
 use utils::JoinWithString;
-pub use serializable::{CppFunctionArgument, CppMethodKind, CppMethod, CppMethodClassMembership};
+pub use serializable::{CppFunctionArgument, CppMethodKind, CppMethod, CppMethodClassMembership,
+                       CppMethodInheritedFrom};
 use cpp_operator::CppOperator;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

@@ -147,6 +147,7 @@ pub fn run(env: BuildEnvironment) {
     let env_var_name = format!("{}_DOC_DATA", lib_spec.cpp.name.to_uppercase());
     match std::env::var(&env_var_name) {
       Ok(env_var_value) => {
+        log::info(format!("Loading Qt doc data"));
         match QtDocData::new(&PathBuf::from(&env_var_value)) {
           Ok(r) => {
             log::info(format!("Loaded Qt doc data from {}", &env_var_value));
@@ -212,7 +213,7 @@ pub fn run(env: BuildEnvironment) {
     if is_qt_library {
       qt_specific::fix_header_names(&mut parse_result, &qt_this_lib_headers_dir.unwrap());
     }
-    parse_result.post_process();
+    parse_result.post_process(&dependencies.iter().map(|x| &x.cpp_data).collect());
 
     let c_lib_name = format!("{}_c", &input_cargo_toml_data.name);
     let c_lib_path = c_lib_parent_path.with_added("source");

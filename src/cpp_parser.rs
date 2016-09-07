@@ -983,6 +983,7 @@ impl CppParser {
       origin_location: Some(get_origin_location(entity).unwrap()),
       template_arguments: template_arguments,
       declaration_code: declaration_code,
+      inherited_from: None,
     })
   }
 
