@@ -27,12 +27,13 @@ fn run_parser(code: &'static str) -> CppData {
     include_file.write("\n".as_bytes()).unwrap();
   }
   let mut result = cpp_parser::run(cpp_parser::CppParserConfig {
-    include_dirs: vec![include_dir],
-    header_name: include_name.to_string(),
-    target_include_dir: None,
-    tmp_cpp_path: dir.path().with_added("1.cpp"),
-    name_blacklist: Vec::new(),
-  });
+                                     include_dirs: vec![include_dir],
+                                     header_name: include_name.to_string(),
+                                     target_include_dir: None,
+                                     tmp_cpp_path: dir.path().with_added("1.cpp"),
+                                     name_blacklist: Vec::new(),
+                                   },
+                                   Vec::new());
   for method in &mut result.methods {
     if let Some(ref mut origin_location) = method.origin_location {
       assert_eq!(origin_location.include_file_path,

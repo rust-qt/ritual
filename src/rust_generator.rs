@@ -257,8 +257,6 @@ fn generate_type_map(input_data: &CppAndFfiData,
   for type_info in &input_data.cpp_data.types {
     if let CppTypeKind::Class { ref template_arguments, .. } = type_info.kind {
       if template_arguments.is_some() {
-        //        log::warning(format!("Rust type is not generated for a struct with unknown size: {}",
-        //                             type_info.name));
         continue;
       }
     }

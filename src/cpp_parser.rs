@@ -23,6 +23,7 @@ use std::io::{BufRead, BufReader};
 struct CppParser {
   config: CppParserConfig,
   types: Vec<CppTypeData>,
+  dependency_types: Vec<CppTypeData>,
 }
 
 #[allow(dead_code)]
@@ -165,13 +166,14 @@ fn run_clang<R, F: Fn(Entity) -> R>(config: &CppParserConfig, cpp_code: Option<S
   result
 }
 
-pub fn run(config: CppParserConfig) -> CppData {
+pub fn run(config: CppParserConfig, dependency_types: Vec<CppTypeData>) -> CppData {
   log::info(format!("{}", get_version()));
   log::info("Initializing clang...");
   let (mut parser, methods) = run_clang(&config, None, |translation_unit| {
     let mut parser = CppParser {
       types: Vec::new(),
       config: config.clone(),
+      dependency_types: dependency_types.clone(),
     };
     log::info("Parsing types...");
     parser.parse_types(translation_unit);
@@ -218,6 +220,7 @@ pub fn run(config: CppParserConfig) -> CppData {
     let mut parser2 = CppParser {
       types: Vec::new(),
       config: config.clone(),
+      dependency_types: dependency_types.clone(),
     };
     parser2.parse_types(last_entity);
     if parser2.types.len() != 1 {
@@ -260,6 +263,16 @@ pub fn run(config: CppParserConfig) -> CppData {
 }
 
 impl CppParser {
+  fn find_type<F: Fn(&CppTypeData) -> bool>(&self, f: F) -> Option<&CppTypeData> {
+    if let Some(r) = self.types.iter().find(|x| f(x)) {
+      return Some(r);
+    }
+    if let Some(r) = self.dependency_types.iter().find(|x| f(x)) {
+      return Some(r);
+    }
+    None
+  }
+
   fn parse_unexposed_type(&self,
                           type1: Option<Type>,
                           string: Option<String>,
@@ -419,7 +432,7 @@ impl CppParser {
         });
       }
     }
-    if let Some(ref type_data) = self.types.iter().find(|x| &x.name == remaining_name) {
+    if let Some(ref type_data) = self.find_type(|x| &x.name == remaining_name) {
       match type_data.kind {
         CppTypeKind::Enum { .. } => {
           type1.base = CppTypeBase::Enum { name: remaining_name.to_string() }
@@ -436,7 +449,7 @@ impl CppParser {
 
     if let Some(matches) = template_class_regex.captures(remaining_name) {
       let class_name = matches.at(1).unwrap();
-      if self.types.iter().find(|x| &x.name == class_name && x.is_class()).is_some() {
+      if self.find_type(|x| &x.name == class_name && x.is_class()).is_some() {
         let mut arg_types = Vec::new();
         for arg in matches.at(2).unwrap().split(",") {
           match self.parse_unexposed_type(None,
@@ -954,7 +967,7 @@ impl CppParser {
               Accessibility::Private => CppVisibility::Private,
             },
             is_signal: false, // TODO: get list of signals and slots at runtime
-            class_type: match self.types.iter().find(|x| &x.name == &class_name) {
+            class_type: match self.find_type(|x| &x.name == &class_name) {
               Some(info) => info.default_class_type(),
               None => return Err(format!("Unknown class type: {}", class_name)),
             },
@@ -1145,7 +1158,7 @@ impl CppParser {
         if entity.get_name().is_some() && entity.is_definition() {
           match self.parse_enum(entity) {
             Ok(r) => {
-              if let Some(info) = self.types.iter().find(|x| x.name == r.name).map(|x| x.clone()) {
+              if let Some(info) = self.find_type(|x| x.name == r.name).map(|x| x.clone()) {
                 log::warning(format!("repeating enum declaration: {:?}\nold declaration: {:?}",
                                      entity,
                                      info));
@@ -1174,7 +1187,7 @@ impl CppParser {
         if ok {
           match self.parse_class(entity) {
             Ok(r) => {
-              if let Some(info) = self.types.iter().find(|x| x.name == r.name).map(|x| x.clone()) {
+              if let Some(info) = self.find_type(|x| x.name == r.name).map(|x| x.clone()) {
                 log::warning(format!("repeating class declaration: {:?}\nold declaration: {:?}",
                                      entity,
                                      info));
@@ -1259,12 +1272,12 @@ impl CppParser {
       CppTypeBase::SpecificNumeric { .. } |
       CppTypeBase::PointerSizedInteger { .. } => {}
       CppTypeBase::Enum { ref name } => {
-        if self.types.iter().find(|x| &x.name == name).is_none() {
+        if self.find_type(|x| &x.name == name).is_none() {
           return Err(format!("unknown type: {}", name));
         }
       }
       CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) => {
-        if self.types.iter().find(|x| &x.name == name).is_none() {
+        if self.find_type(|x| &x.name == name).is_none() {
           return Err(format!("unknown type: {}", name));
         }
         if let &Some(ref args) = template_arguments {
@@ -1379,7 +1392,7 @@ impl CppParser {
     }
     for &(ref class_name, ref ins) in &result {
       log::noisy(format!("Class: {}", class_name));
-      if let Some(ref type_info) = self.types.iter().find(|x| &x.name == class_name) {
+      if let Some(ref type_info) = self.find_type(|x| &x.name == class_name) {
         if let CppTypeKind::Class { ref template_arguments, .. } = type_info.kind {
           if let &Some(ref template_arguments) = template_arguments {
             let valid_length = template_arguments.len();

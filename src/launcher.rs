@@ -189,13 +189,18 @@ pub fn run(env: BuildEnvironment) {
       serde_json::from_reader(file).unwrap()
     } else {
       log::info("Parsing C++ headers.");
+      let mut dependency_types = Vec::new();
+      for dep in &dependencies {
+        dependency_types.extend_from_slice(&dep.cpp_data.types);
+      }
       let parse_result = cpp_parser::run(cpp_parser::CppParserConfig {
-        include_dirs: include_dirs.clone(),
-        header_name: lib_spec.cpp.include_file.clone(),
-        target_include_dir: qt_this_lib_headers_dir.clone(),
-        tmp_cpp_path: output_dir_path.with_added("1.cpp"),
-        name_blacklist: lib_spec.cpp.name_blacklist.clone(),
-      });
+                                           include_dirs: include_dirs.clone(),
+                                           header_name: lib_spec.cpp.include_file.clone(),
+                                           target_include_dir: qt_this_lib_headers_dir.clone(),
+                                           tmp_cpp_path: output_dir_path.with_added("1.cpp"),
+                                           name_blacklist: lib_spec.cpp.name_blacklist.clone(),
+                                         },
+                                         dependency_types);
 
       let mut file = File::create(&parse_result_cache_file_path).unwrap();
       serde_json::to_writer(&mut file, &parse_result).unwrap();
