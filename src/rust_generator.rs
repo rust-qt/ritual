@@ -775,7 +775,17 @@ impl RustGenerator {
       // FFI return type must be void
       assert!(method.c_signature.return_type == CppFfiType::void());
     }
-    let return_type_info1 = return_type_info.unwrap();
+    let mut return_type_info1 = return_type_info.unwrap();
+    if return_type_info1.0.rust_api_type.is_ref() {
+      if arguments.iter().find(|arg| arg.argument_type.rust_api_type.is_ref()).is_none() {
+        log::warning(format!("Method returns a reference but doesn't receive a reference: {}",
+                             method.short_text()));
+        log::warning("Assuming static lifetime of return value.");
+        return_type_info1.0.rust_api_type =
+          return_type_info1.0.rust_api_type.with_lifetime("static".to_string());
+      }
+    }
+
     let doc = if generate_doc {
       let doc_item = doc_formatter::DocItem {
         cpp_fn: method.short_text(),
