@@ -199,6 +199,7 @@ impl CaseOperations for String {
         }
       }
     }
+    // TODO: open_g_l => opengl
     parts.join("_")
   }
 }

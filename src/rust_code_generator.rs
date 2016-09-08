@@ -684,6 +684,7 @@ impl RustCodeGenerator {
   }
 
   fn call_rustfmt(&self, path: &PathBuf) {
+    // TODO: suppress "line exceeded maximum length" warning
     let result = panic::catch_unwind(|| {
       rustfmt::run(rustfmt::Input::File(path.clone()), &self.rustfmt_config)
     });

@@ -178,7 +178,6 @@ impl QtDocData {
                         method_short_text: &String)
                         -> Result<QtDocResultForMethod, String> {
     let mut name_parts: Vec<_> = name.split("::").collect();
-    // println!("TEST1: {:?}", name_parts);
     let mut anchor_override = None;
     if name_parts.len() >= 2 &&
        name_parts[name_parts.len() - 1] == name_parts[name_parts.len() - 2] {

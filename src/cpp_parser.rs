@@ -166,7 +166,7 @@ fn run_clang<R, F: Fn(Entity) -> R>(config: &CppParserConfig, cpp_code: Option<S
   result
 }
 
-pub fn run(config: CppParserConfig, dependency_types: Vec<CppTypeData>) -> CppData {
+pub fn run(config: CppParserConfig, dependency_types: &Vec<CppTypeData>) -> CppData {
   log::info(format!("{}", get_version()));
   log::info("Initializing clang...");
   let (mut parser, methods) = run_clang(&config, None, |translation_unit| {
@@ -1374,7 +1374,6 @@ impl CppParser {
   fn find_template_instantiations(&self, methods: &Vec<CppMethod>) -> Vec<(String, Vec<CppType>)> {
 
     fn check_type(type1: &CppType, result: &mut Vec<(String, Vec<CppType>)>) {
-      println!("check type: {:?}", type1);
       if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
              type1.base {
         if let &Some(ref template_arguments) = template_arguments {
@@ -1396,14 +1395,12 @@ impl CppParser {
     }
     let mut result = Vec::new();
     for m in methods {
-      log::debug(format!("method: {}", m.short_text()));
       check_type(&m.return_type, &mut result);
       for arg in &m.arguments {
         check_type(&arg.argument_type, &mut result);
       }
     }
     for t in &self.types {
-      log::debug(format!("type: {}", t.name));
       if let CppTypeKind::Class { ref bases, .. } = t.kind {
         for base in bases {
           check_type(&base, &mut result);

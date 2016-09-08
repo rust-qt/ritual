@@ -5,7 +5,7 @@ use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
 use cpp_ffi_data::{CppFfiType, IndirectionChange};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
-use cpp_data::{CppTypeKind, EnumValue};
+use cpp_data::{CppTypeKind, EnumValue, CppTypeData};
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
                 RustMethodArguments, TraitImpl, TraitName, RustEnumValue};
@@ -93,7 +93,7 @@ fn prepare_enum_values(values: &Vec<EnumValue>, name: &String) -> Vec<RustEnumVa
     } else {
       value_to_variant.insert(value,
                               RustEnumValue {
-                                name: variant.name.to_class_case(),
+                                name: sanitize_rust_identifier(&variant.name.to_class_case()),
                                 cpp_name: Some(variant.name.clone()),
                                 value: variant.value,
                                 doc: format!("C++ variant: {}", &variant.name),
@@ -152,7 +152,7 @@ fn prepare_enum_values(values: &Vec<EnumValue>, name: &String) -> Vec<RustEnumVa
     if let Some(new_names) = new_names {
       assert_eq!(new_names.len(), result.len());
       for i in 0..new_names.len() {
-        result[i].name = new_names[i].clone();
+        result[i].name = sanitize_rust_identifier(&new_names[i].clone());
       }
     }
 
@@ -196,12 +196,14 @@ pub struct RustGeneratorConfig {
 
 /// Execute processing
 pub fn run(input_data: CppAndFfiData,
-           dependency_types: Vec<RustProcessedTypeInfo>,
+
+           dependency_cpp_types: &Vec<CppTypeData>,
+           dependency_rust_types: Vec<RustProcessedTypeInfo>,
            config: RustGeneratorConfig)
            -> RustGeneratorOutput {
   let generator = RustGenerator {
-    processed_types: generate_type_map(&input_data, &config),
-    dependency_types: dependency_types,
+    processed_types: generate_type_map(&input_data, dependency_cpp_types, &config),
+    dependency_types: dependency_rust_types,
     input_data: input_data,
     config: config,
   };
@@ -256,6 +258,7 @@ fn calculate_rust_name(name: &String,
 /// the map. Their Rust equivalents depend on their classes'
 /// equivalents.
 fn generate_type_map(input_data: &CppAndFfiData,
+                     dependency_cpp_types: &Vec<CppTypeData>,
                      config: &RustGeneratorConfig)
                      -> Vec<RustProcessedTypeInfo> {
   let mut result = Vec::new();
@@ -276,25 +279,36 @@ fn generate_type_map(input_data: &CppAndFfiData,
     });
   }
   for (class_name, list) in &input_data.cpp_data.template_instantiations {
-    if let Some(class_type_info) = input_data.cpp_data
+    println!("TEST1: {} {:?}", class_name, list);
+    let include_file = match input_data.cpp_data
       .types
       .iter()
+      .chain(dependency_cpp_types.iter())
       .find(|x| &x.name == class_name) {
-      for ins in list {
-        // TODO: use Rust names for template args
-        let name = format!("{}_{}",
-                           class_name,
-                           ins.template_arguments
-                             .iter()
-                             .map(|x| x.caption(TypeCaptionStrategy::Full))
-                             .join("_"));
-        result.push(RustProcessedTypeInfo {
-          cpp_name: class_name.clone(),
-          cpp_template_arguments: Some(ins.template_arguments.clone()),
-          kind: RustProcessedTypeKind::Class { size: ins.size },
-          rust_name: calculate_rust_name(&name, &class_type_info.include_file, false, config),
-        });
+      Some(class_type_info) => &class_type_info.include_file,
+      None => {
+        log::warning(format!("Failed to process template instantiation: type info not found: \
+                              {:?}",
+                             class_name));
+        continue;
       }
+    };
+
+    for ins in list {
+      // TODO: use Rust names for template args
+      let name = format!("{}_{}",
+                         class_name,
+                         ins.template_arguments
+                           .iter()
+                           .map(|x| x.caption(TypeCaptionStrategy::Full))
+                           .join("_"));
+      result.push(RustProcessedTypeInfo {
+        cpp_name: class_name.clone(),
+        cpp_template_arguments: Some(ins.template_arguments.clone()),
+        kind: RustProcessedTypeKind::Class { size: ins.size },
+        rust_name: calculate_rust_name(&name, include_file, false, config),
+      });
+      println!("TEST2: {:?}", result.last().unwrap());
     }
   }
   result
@@ -1458,3 +1472,5 @@ fn prepare_enum_values_test_suffix_partial() {
 // TODO: wrap operators as normal functions, for now
 
 // TODO: AbstractItemModel::parent documentation doesn't show QObject::parent variant
+
+// TODO: Window::base_size; qt_gui::rgb::gray - no documentation!

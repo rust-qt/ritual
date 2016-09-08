@@ -180,6 +180,10 @@ pub fn run(env: BuildEnvironment) {
   let c_lib_parent_path = output_dir_path.with_added("c_lib");
   let c_lib_install_path = c_lib_parent_path.with_added("install");
   let num_jobs = env.num_jobs.unwrap_or_else(|| num_cpus::get() as i32);
+  let mut dependency_cpp_types = Vec::new();
+  for dep in &dependencies {
+    dependency_cpp_types.extend_from_slice(&dep.cpp_data.types);
+  }
   if output_dir_path.with_added("skip_processing").as_path().exists() {
     log::info("Processing skipped!");
   } else {
@@ -191,10 +195,6 @@ pub fn run(env: BuildEnvironment) {
       serde_json::from_reader(file).unwrap()
     } else {
       log::info("Parsing C++ headers.");
-      let mut dependency_types = Vec::new();
-      for dep in &dependencies {
-        dependency_types.extend_from_slice(&dep.cpp_data.types);
-      }
       let parse_result = cpp_parser::run(cpp_parser::CppParserConfig {
                                            include_dirs: include_dirs.clone(),
                                            header_name: lib_spec.cpp.include_file.clone(),
@@ -202,7 +202,7 @@ pub fn run(env: BuildEnvironment) {
                                            tmp_cpp_path: output_dir_path.with_added("1.cpp"),
                                            name_blacklist: lib_spec.cpp.name_blacklist.clone(),
                                          },
-                                         dependency_types);
+                                         &dependency_cpp_types);
 
       let mut file = File::create(&parse_result_cache_file_path).unwrap();
       serde_json::to_writer(&mut file, &parse_result).unwrap();
@@ -296,6 +296,7 @@ pub fn run(env: BuildEnvironment) {
                                           cpp_data: parse_result,
                                           cpp_ffi_headers: cpp_ffi_headers,
                                         },
+                                        &dependency_cpp_types,
                                         dependency_rust_types,
                                         rust_generator::RustGeneratorConfig {
                                           crate_name: input_cargo_toml_data.name.clone(),

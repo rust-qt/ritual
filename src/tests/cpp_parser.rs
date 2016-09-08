@@ -33,7 +33,7 @@ fn run_parser(code: &'static str) -> CppData {
                                      tmp_cpp_path: dir.path().with_added("1.cpp"),
                                      name_blacklist: Vec::new(),
                                    },
-                                   Vec::new());
+                                   &Vec::new());
   for method in &mut result.methods {
     if let Some(ref mut origin_location) = method.origin_location {
       assert_eq!(origin_location.include_file_path,
