@@ -166,6 +166,7 @@ pub struct RustGenerator {
   input_data: CppAndFfiData,
   config: RustGeneratorConfig,
   processed_types: Vec<RustProcessedTypeInfo>,
+  dependency_types: Vec<RustProcessedTypeInfo>,
 }
 
 /// Results of adapting API for Rust wrapper.
@@ -194,9 +195,13 @@ pub struct RustGeneratorConfig {
 // TODO: when supporting other libraries, implement removal of arbitrary prefixes
 
 /// Execute processing
-pub fn run(input_data: CppAndFfiData, config: RustGeneratorConfig) -> RustGeneratorOutput {
+pub fn run(input_data: CppAndFfiData,
+           dependency_types: Vec<RustProcessedTypeInfo>,
+           config: RustGeneratorConfig)
+           -> RustGeneratorOutput {
   let generator = RustGenerator {
     processed_types: generate_type_map(&input_data, &config),
+    dependency_types: dependency_types,
     input_data: input_data,
     config: config,
   };
@@ -346,7 +351,7 @@ impl RustGenerator {
           let args = template_arguments.as_ref().unwrap();
           assert!(args.len() == 1);
           if let CppTypeBase::Enum { ref name } = args[0].base {
-            match self.processed_types.iter().find(|x| &x.cpp_name == name) {
+            match self.find_type_info(|x| &x.cpp_name == name) {
               None => return Err(format!("Type has no Rust equivalent: {}", name)),
               Some(info) => info.rust_name.clone(),
             }
@@ -357,7 +362,7 @@ impl RustGenerator {
           panic!("invalid original type for QFlags");
         };
       rust_api_type = RustType::Common {
-        base: RustName::new(vec!["qt_core".to_string(), "flags".to_string(), "QFlags".to_string()]),
+        base: RustName::new(vec!["qt_core".to_string(), "flags".to_string(), "Flags".to_string()]),
         generic_arguments: Some(vec![RustType::Common {
                                        base: enum_type,
                                        generic_arguments: None,
@@ -377,6 +382,15 @@ impl RustGenerator {
       rust_api_type: rust_api_type,
       rust_api_to_c_conversion: rust_api_to_c_conversion,
     })
+  }
+
+  fn find_type_info<F>(&self, f: F) -> Option<&RustProcessedTypeInfo>
+    where F: Fn(&RustProcessedTypeInfo) -> bool
+  {
+    match self.processed_types.iter().find(|x| f(x)) {
+      None => self.dependency_types.iter().find(|x| f(x)),
+      Some(info) => Some(info),
+    }
   }
 
   /// Converts CppType to its exact Rust equivalent (FFI-compatible)
@@ -426,13 +440,13 @@ impl RustGenerator {
         RustName::new(vec![if *is_signed { "isize" } else { "usize" }.to_string()])
       }
       CppTypeBase::Enum { ref name } => {
-        match self.processed_types.iter().find(|x| &x.cpp_name == name) {
+        match self.find_type_info(|x| &x.cpp_name == name) {
           None => return Err(format!("Type has no Rust equivalent: {}", name)),
           Some(ref info) => info.rust_name.clone(),
         }
       }
       CppTypeBase::Class(ref name_and_args) => {
-        match self.processed_types.iter().find(|x| {
+        match self.find_type_info(|x| {
           &x.cpp_name == &name_and_args.name &&
           &x.cpp_template_arguments == &name_and_args.template_arguments
         }) {

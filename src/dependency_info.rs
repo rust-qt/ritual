@@ -10,6 +10,7 @@ extern crate serde_json;
 pub struct DependencyInfo {
   pub cpp_data: CppData,
   pub rust_export_info: RustExportInfo,
+  pub path: PathBuf,
 }
 
 impl DependencyInfo {
@@ -58,6 +59,7 @@ impl DependencyInfo {
     DependencyInfo {
       cpp_data: cpp_data,
       rust_export_info: rust_export_info,
+      path: path.clone(),
     }
 
   }

@@ -1,4 +1,4 @@
-use rust_type::{RustType, RustTypeIndirection, RustFFIFunction, RustToCTypeConversion};
+use rust_type::{RustName, RustType, RustTypeIndirection, RustFFIFunction, RustToCTypeConversion};
 use std::path::PathBuf;
 use std::fs;
 use std::fs::File;
@@ -22,6 +22,11 @@ pub enum InvokationMethod {
   BuildScript,
 }
 
+pub struct RustCodeGeneratorDependency {
+  pub crate_name: String,
+  pub crate_path: PathBuf,
+}
+
 pub struct RustCodeGeneratorConfig {
   pub invokation_method: InvokationMethod,
   pub crate_name: String,
@@ -32,6 +37,7 @@ pub struct RustCodeGeneratorConfig {
   pub c_lib_name: String,
   pub cpp_lib_name: String,
   pub rustfmt_config_path: Option<PathBuf>,
+  pub dependencies: Vec<RustCodeGeneratorDependency>,
 }
 
 fn format_doc(doc: &String) -> String {
@@ -179,6 +185,12 @@ impl RustCodeGenerator {
           table
         });
         table.insert("cpp_box".to_string(), cpp_box);
+        for dep in &self.config.dependencies {
+          let mut table_dep = toml::Table::new();
+          table_dep.insert("path".to_string(),
+                           toml::Value::String(dep.crate_path.to_str().unwrap().to_string()));
+          table.insert(dep.crate_name.clone(), toml::Value::Table(table_dep));
+        }
         table
       });
       let mut table = toml::Table::new();
@@ -453,6 +465,9 @@ impl RustCodeGenerator {
       }
       write!(lib_file, "pub extern crate libc;\n").unwrap();
       write!(lib_file, "pub extern crate cpp_box;\n\n").unwrap();
+      for dep in &self.config.dependencies {
+        write!(lib_file, "pub extern crate {};\n\n", &dep.crate_name).unwrap();
+      }
 
       let mut extra_modules = vec!["ffi".to_string()];
       if self.config.invokation_method == InvokationMethod::CommandLine {
@@ -497,7 +512,14 @@ impl RustCodeGenerator {
 
   fn generate_module_code(&self, data: &RustModule) -> String {
     let mut results = Vec::new();
-    results.push("#[allow(unused_imports)]\nuse {libc, cpp_box, std};\n\n".to_string());
+    let mut used_crates: Vec<_> =
+      self.config.dependencies.iter().map(|x| x.crate_name.as_ref()).collect();
+    used_crates.push("libc");
+    used_crates.push("cpp_box");
+    used_crates.push("std");
+
+    results.push(format!("#[allow(unused_imports)]\nuse {{{}}};\n\n",
+                         used_crates.join(", ")));
 
     for type1 in &data.types {
       results.push(format_doc(&type1.doc));
@@ -516,7 +538,11 @@ impl RustCodeGenerator {
               if *is_flaggable {
                 r = r +
                     &format!(include_str!("../templates/crate/impl_flaggable.rs.in"),
-                             name = type1.name);
+                             name = type1.name,
+                             trait_type = RustName::new(vec!["qt_core".to_string(),
+                                                             "flags".to_string(),
+                                                             "FlaggableEnum".to_string()])
+                               .full_name(Some(&self.config.crate_name)));
               }
               r
             }
@@ -695,7 +721,9 @@ impl RustCodeGenerator {
     {
       let mut file = File::create(&file_path).unwrap();
       write!(file, "use libc;\n\n").unwrap();
-
+      for dep in &self.config.dependencies {
+        write!(file, "use {};\n\n", &dep.crate_name).unwrap();
+      }
       write!(file, "#[link(name = \"{}\")]\n", &self.config.cpp_lib_name).unwrap();
       write!(file, "#[link(name = \"stdc++\")]\n").unwrap();
       write!(file,

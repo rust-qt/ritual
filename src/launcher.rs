@@ -16,6 +16,7 @@ use utils;
 use cpp_ffi_generator;
 use rust_info::{InputCargoTomlData, RustExportInfo};
 use rust_code_generator;
+use rust_code_generator::RustCodeGeneratorDependency;
 use rust_generator;
 use serializable::LibSpec;
 use cpp_ffi_generator::CppAndFfiData;
@@ -277,12 +278,25 @@ pub fn run(env: BuildEnvironment) {
       } else {
         None
       },
+      dependencies: dependencies.iter()
+        .map(|x| {
+          RustCodeGeneratorDependency {
+            crate_name: x.rust_export_info.crate_name.clone(),
+            crate_path: x.path.clone(),
+          }
+        })
+        .collect(),
     };
     log::info(format!("Generating Rust crate ({}).", &input_cargo_toml_data.name));
+    let mut dependency_rust_types = Vec::new();
+    for dep in &dependencies {
+      dependency_rust_types.extend_from_slice(&dep.rust_export_info.rust_types);
+    }
     let rust_data = rust_generator::run(CppAndFfiData {
                                           cpp_data: parse_result,
                                           cpp_ffi_headers: cpp_ffi_headers,
                                         },
+                                        dependency_rust_types,
                                         rust_generator::RustGeneratorConfig {
                                           crate_name: input_cargo_toml_data.name.clone(),
                                           remove_qt_prefix: is_qt_library,
