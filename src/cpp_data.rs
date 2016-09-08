@@ -8,11 +8,12 @@ use cpp_type::{CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
 use std::iter;
 
 pub use serializable::{EnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
-                       CppTypeData, CppData, CppTemplateInstantiation, CppClassUsingDirective};
+                       CppTypeData, CppData, CppTemplateInstantiation, CppTemplateInstantiations,
+                       CppClassUsingDirective};
 
 fn apply_instantiations_to_method(method: &CppMethod,
                                   nested_level: i32,
-                                  template_instantiations: Vec<&CppTemplateInstantiation>)
+                                  template_instantiations: &Vec<CppTemplateInstantiation>)
                                   -> Result<Vec<CppMethod>, String> {
   let mut new_methods = Vec::new();
   for ins in template_instantiations {
@@ -346,6 +347,11 @@ impl CppData {
         result.insert(tp.include_file.clone());
       }
     }
+    for instantiations in &self.template_instantiations {
+      if !result.contains(&instantiations.include_file) {
+        result.insert(instantiations.include_file.clone());
+      }
+    }
     result
   }
 
@@ -490,7 +496,9 @@ impl CppData {
             if let &Some(ref template_arguments) = template_arguments {
               assert!(!template_arguments.is_empty());
               if template_arguments.iter().find(|x| !x.base.is_template_parameter()).is_none() {
-                if let Some(template_instantiations) = self.template_instantiations.get(name) {
+                if let Some(template_instantiations) = self.template_instantiations
+                  .iter()
+                  .find(|x| &x.class_name == name) {
                   let nested_level = if let CppTypeBase::TemplateParameter { nested_level, .. } =
                                             template_arguments[0].base {
                     nested_level
@@ -500,26 +508,9 @@ impl CppData {
                   log::noisy(format!(""));
                   log::noisy(format!("method: {}", method.short_text()));
                   log::noisy(format!("found template class: {}", name));
-                  let own_tpl_instantiations = template_instantiations.iter()
-                    .filter(|ins| {
-                      dependencies.iter()
-                        .find(|dep| {
-                          match dep.template_instantiations
-                            .get(name) {
-                            None => false,
-                            Some(vec) => {
-                              vec.iter()
-                                .find(|x| x.template_arguments == ins.template_arguments)
-                                .is_some()
-                            }
-                          }
-                        })
-                        .is_none()
-                    })
-                    .collect();
                   match apply_instantiations_to_method(method,
                                                        nested_level,
-                                                       own_tpl_instantiations) {
+                                                       &template_instantiations.instantiations) {
                     Ok(mut methods) => {
                       new_methods.append(&mut methods);
                       break;

@@ -22,6 +22,8 @@ use serializable::LibSpec;
 use cpp_ffi_generator::CppAndFfiData;
 use qt_doc_parser::QtDocData;
 use dependency_info::DependencyInfo;
+use std::env;
+use cpp_data::CppTemplateInstantiations;
 
 /// Runs a command, checks that it is successful, and
 /// returns its output if requested
@@ -77,6 +79,33 @@ pub struct BuildEnvironment {
   pub build_profile: BuildProfile,
 }
 
+pub fn run_from_build_script() {
+  let mut dependency_paths = Vec::new();
+  if env::var("CARGO_MANIFEST_DIR").unwrap() != "/home/ri/rust/rust_qt/repos/qt_gui/../qt_core" {
+    for (name, value) in env::vars_os() {
+      if let Ok(name) = name.into_string() {
+        if name.starts_with("DEP_") && name.ends_with("_CPP_TO_RUST_DATA_PATH") {
+          let value = value.into_string().unwrap();
+          log::info(format!("Found dependency: {}", &value));
+          dependency_paths.push(PathBuf::from(value));
+        }
+      }
+    }
+  }
+  run(BuildEnvironment {
+    invokation_method: InvokationMethod::BuildScript,
+    source_dir_path: PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()),
+    output_dir_path: PathBuf::from(env::var("OUT_DIR").unwrap()),
+    num_jobs: env::var("NUM_JOBS").unwrap().parse().ok(),
+    build_profile: match env::var("PROFILE").unwrap().as_ref() {
+      "debug" | "test" | "doc" => BuildProfile::Debug,
+      "release" | "bench" => BuildProfile::Release,
+      a @ _ => panic!("unsupported profile: {}", a),
+    },
+    dependency_paths: dependency_paths,
+  });
+}
+
 pub fn run(env: BuildEnvironment) {
   // canonicalize paths
   let current_dir = std::env::current_dir().unwrap();
@@ -86,7 +115,7 @@ pub fn run(env: BuildEnvironment) {
     env.output_dir_path
   };
   if !output_dir_path.as_path().exists() {
-    fs::create_dir(&output_dir_path).unwrap();
+    fs::create_dir_all(&output_dir_path).unwrap();
   }
   output_dir_path = fs::canonicalize(&output_dir_path).unwrap();
   let mut source_dir_path = if env.source_dir_path.is_relative() {
@@ -195,14 +224,55 @@ pub fn run(env: BuildEnvironment) {
       serde_json::from_reader(file).unwrap()
     } else {
       log::info("Parsing C++ headers.");
-      let parse_result = cpp_parser::run(cpp_parser::CppParserConfig {
-                                           include_dirs: include_dirs.clone(),
-                                           header_name: lib_spec.cpp.include_file.clone(),
-                                           target_include_dir: qt_this_lib_headers_dir.clone(),
-                                           tmp_cpp_path: output_dir_path.with_added("1.cpp"),
-                                           name_blacklist: lib_spec.cpp.name_blacklist.clone(),
-                                         },
-                                         &dependency_cpp_types);
+      let mut parse_result = cpp_parser::run(cpp_parser::CppParserConfig {
+                                               include_dirs: include_dirs.clone(),
+                                               header_name: lib_spec.cpp.include_file.clone(),
+                                               target_include_dir: qt_this_lib_headers_dir.clone(),
+                                               tmp_cpp_path: output_dir_path.with_added("1.cpp"),
+                                               name_blacklist: lib_spec.cpp.name_blacklist.clone(),
+                                             },
+                                             &dependency_cpp_types);
+      if is_qt_library {
+        qt_specific::fix_header_names(&mut parse_result, &qt_this_lib_headers_dir.unwrap());
+      }
+      parse_result.template_instantiations = parse_result.template_instantiations
+        .into_iter()
+        .filter_map(|data| {
+          let good_items: Vec<_> = {
+            let class_name = &data.class_name;
+            data.instantiations
+              .into_iter()
+              .filter(|ins| {
+                dependencies.iter()
+                  .find(|dep| {
+                    match dep.cpp_data
+                      .template_instantiations
+                      .iter()
+                      .find(|x| &x.class_name == class_name) {
+                      None => false,
+                      Some(vec) => {
+                        vec.instantiations
+                          .iter()
+                          .find(|x| x.template_arguments == ins.template_arguments)
+                          .is_some()
+                      }
+                    }
+                  })
+                  .is_none()
+              })
+              .collect()
+          };
+          if good_items.is_empty() {
+            None
+          } else {
+            Some(CppTemplateInstantiations {
+              class_name: data.class_name,
+              include_file: data.include_file,
+              instantiations: good_items,
+            })
+          }
+        })
+        .collect();
 
       let mut file = File::create(&parse_result_cache_file_path).unwrap();
       serde_json::to_writer(&mut file, &parse_result).unwrap();
@@ -211,9 +281,6 @@ pub fn run(env: BuildEnvironment) {
       parse_result
     };
     log::info("Post-processing parse result.");
-    if is_qt_library {
-      qt_specific::fix_header_names(&mut parse_result, &qt_this_lib_headers_dir.unwrap());
-    }
     parse_result.post_process(&dependencies.iter().map(|x| &x.cpp_data).collect());
 
     let c_lib_name = format!("{}_c", &input_cargo_toml_data.name);
@@ -296,7 +363,6 @@ pub fn run(env: BuildEnvironment) {
                                           cpp_data: parse_result,
                                           cpp_ffi_headers: cpp_ffi_headers,
                                         },
-                                        &dependency_cpp_types,
                                         dependency_rust_types,
                                         rust_generator::RustGeneratorConfig {
                                           crate_name: input_cargo_toml_data.name.clone(),
@@ -352,6 +418,8 @@ pub fn run(env: BuildEnvironment) {
         let lib_path = cpp_lib_path.to_str().unwrap();
         println!("cargo:rustc-link-search=native={}", lib_path);
       }
+      println!("cargo:cpp_to_rust_data_path={}",
+               output_dir_path.to_str().unwrap());
     }
   }
 }

@@ -663,10 +663,21 @@ fn template_instantiation() {
                  template_arguments: Some(vec![int.clone()]),
                }),
              });
-  assert!(data.template_instantiations.contains_key("Vector"));
-  assert!(data.template_instantiations["Vector"].len() == 1);
-  assert!(&data.template_instantiations["Vector"].iter().next().unwrap().template_arguments ==
-          &vec![int]);
+  assert!(data.template_instantiations.iter().find(|x| &x.class_name == "Vector").is_some());
+  assert!(data.template_instantiations
+    .iter()
+    .find(|x| &x.class_name == "Vector")
+    .unwrap()
+    .instantiations
+    .len() == 1);
+  assert!(&data.template_instantiations
+    .iter()
+    .find(|x| &x.class_name == "Vector")
+    .unwrap()
+    .instantiations
+    .get(0)
+    .unwrap()
+    .template_arguments == &vec![int]);
 }
 
 fn derived_class_simple() {

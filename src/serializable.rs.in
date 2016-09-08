@@ -1,4 +1,4 @@
-use std::collections::{HashMap};
+
 
 // ------------------------------
 // from cpp_data
@@ -112,6 +112,16 @@ pub struct CppTemplateInstantiation {
   pub size: i32,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(Serialize, Deserialize)]
+pub struct CppTemplateInstantiations {
+  pub class_name: String,
+  pub instantiations: Vec<CppTemplateInstantiation>,
+  /// File name of the include file (without full path)
+  /// of the template type
+  pub include_file: String,
+}
+
 /// C++ parser output
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 #[derive(Serialize, Deserialize)]
@@ -122,7 +132,7 @@ pub struct CppData {
   pub methods: Vec<CppMethod>,
   /// List of found template instantiations. Key is name of
   /// the template class, value is list of instantiations.
-  pub template_instantiations: HashMap<String, Vec<CppTemplateInstantiation>>,
+  pub template_instantiations: Vec<CppTemplateInstantiations>,
 }
 
 // -----------------------------------

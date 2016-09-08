@@ -5,14 +5,12 @@ extern crate regex;
 use self::regex::Regex;
 
 use log;
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::fs::File;
 
-use utils::{JoinWithString, add_to_multihash};
-
 use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppOriginLocation,
-               CppVisibility, CppTemplateInstantiation, CppClassUsingDirective};
+               CppVisibility, CppTemplateInstantiation, CppTemplateInstantiations,
+               CppClassUsingDirective};
 use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind, CppMethodClassMembership};
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
                CppSpecificNumericTypeKind, CppTypeClassBase};
@@ -226,7 +224,7 @@ pub fn run(config: CppParserConfig, dependency_types: &Vec<CppTypeData>) -> CppD
     if parser2.types.len() != 1 {
       panic!("AllFields parse result: expected 1 type");
     }
-    let mut final_template_instantiations = HashMap::new();
+    let mut final_template_instantiations = Vec::<CppTemplateInstantiations>::new();
     if let CppTypeKind::Class { ref fields, .. } = parser2.types[0].kind {
       if fields.len() != template_instantiations.len() {
         panic!("AllFields parse result: fields count mismatch");
@@ -239,12 +237,33 @@ pub fn run(config: CppParserConfig, dependency_types: &Vec<CppTypeData>) -> CppD
                  class_name,
                  template_args);
         }
-        add_to_multihash(&mut final_template_instantiations,
-                         class_name,
-                         CppTemplateInstantiation {
-                           template_arguments: template_args.clone(),
-                           size: size.unwrap(),
-                         });
+        if final_template_instantiations.iter().find(|x| &x.class_name == class_name).is_none() {
+          // first encounter of this template class
+          if let Some(type_info) = parser.find_type(|x| &x.name == class_name) {
+            if let CppTypeKind::Class { ref template_arguments, .. } = type_info.kind {
+              if template_arguments.is_none() {
+                panic!("Invalid instantiation: type {} is not a template class",
+                       class_name);
+              }
+            } else {
+              panic!("Invalid instantiation: type {} is not a class", class_name);
+            }
+            final_template_instantiations.push(CppTemplateInstantiations {
+              class_name: class_name.clone(),
+              include_file: type_info.include_file.clone(),
+              instantiations: Vec::new(),
+            });
+          } else {
+            panic!("Invalid instantiation: unknown class type: {}", class_name);
+          }
+        }
+        // TODO: reimplement checking template args count
+        let result_item =
+          final_template_instantiations.iter_mut().find(|x| &x.class_name == class_name).unwrap();
+        result_item.instantiations.push(CppTemplateInstantiation {
+          template_arguments: template_args.clone(),
+          size: size.unwrap(),
+        });
       }
     } else {
       panic!("AllFields parse result: type is not a class");
@@ -1405,40 +1424,6 @@ impl CppParser {
         for base in bases {
           check_type(&base, &mut result);
         }
-      }
-    }
-    if result.is_empty() {
-      log::noisy("No template instantiations detected.");
-    } else {
-      log::noisy("Detected template instantiations:");
-    }
-    for &(ref class_name, ref ins) in &result {
-      log::noisy(format!("Class: {}", class_name));
-      if let Some(ref type_info) = self.find_type(|x| &x.name == class_name) {
-        if let CppTypeKind::Class { ref template_arguments, .. } = type_info.kind {
-          if let &Some(ref template_arguments) = template_arguments {
-            let valid_length = template_arguments.len();
-            log::noisy(format!("    {}<{}>",
-                               class_name,
-                               ins.iter()
-                                 .map(|t| {
-                                   t.to_cpp_code(None).unwrap_or_else(|_| format!("{:?}", t))
-                                 })
-                                 .join(", ")));
-            if ins.len() != valid_length {
-              panic!("template arguments count mismatch: {}: {:?} vs {:?}",
-                     class_name,
-                     template_arguments,
-                     ins);
-            }
-          } else {
-            panic!("template class is not a template class: {}", class_name);
-          }
-        } else {
-          panic!("template class is not a class: {}", class_name);
-        }
-      } else {
-        panic!("template class is not available: {}", class_name);
       }
     }
     result

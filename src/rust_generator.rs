@@ -5,7 +5,7 @@ use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
 use cpp_ffi_data::{CppFfiType, IndirectionChange};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
-use cpp_data::{CppTypeKind, EnumValue, CppTypeData};
+use cpp_data::{CppTypeKind, EnumValue};
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
                 RustMethodArguments, TraitImpl, TraitName, RustEnumValue};
@@ -196,13 +196,11 @@ pub struct RustGeneratorConfig {
 
 /// Execute processing
 pub fn run(input_data: CppAndFfiData,
-
-           dependency_cpp_types: &Vec<CppTypeData>,
            dependency_rust_types: Vec<RustProcessedTypeInfo>,
            config: RustGeneratorConfig)
            -> RustGeneratorOutput {
   let generator = RustGenerator {
-    processed_types: generate_type_map(&input_data, dependency_cpp_types, &config),
+    processed_types: generate_type_map(&input_data, &config),
     dependency_types: dependency_rust_types,
     input_data: input_data,
     config: config,
@@ -258,7 +256,6 @@ fn calculate_rust_name(name: &String,
 /// the map. Their Rust equivalents depend on their classes'
 /// equivalents.
 fn generate_type_map(input_data: &CppAndFfiData,
-                     dependency_cpp_types: &Vec<CppTypeData>,
                      config: &RustGeneratorConfig)
                      -> Vec<RustProcessedTypeInfo> {
   let mut result = Vec::new();
@@ -278,35 +275,22 @@ fn generate_type_map(input_data: &CppAndFfiData,
       rust_name: calculate_rust_name(&type_info.name, &type_info.include_file, false, config),
     });
   }
-  for (class_name, list) in &input_data.cpp_data.template_instantiations {
-    println!("TEST1: {} {:?}", class_name, list);
-    let include_file = match input_data.cpp_data
-      .types
-      .iter()
-      .chain(dependency_cpp_types.iter())
-      .find(|x| &x.name == class_name) {
-      Some(class_type_info) => &class_type_info.include_file,
-      None => {
-        log::warning(format!("Failed to process template instantiation: type info not found: \
-                              {:?}",
-                             class_name));
-        continue;
-      }
-    };
+  for template_instantiations in &input_data.cpp_data.template_instantiations {
+    println!("TEST1: {:?}", template_instantiations);
 
-    for ins in list {
+    for ins in &template_instantiations.instantiations {
       // TODO: use Rust names for template args
       let name = format!("{}_{}",
-                         class_name,
+                         template_instantiations.class_name,
                          ins.template_arguments
                            .iter()
                            .map(|x| x.caption(TypeCaptionStrategy::Full))
                            .join("_"));
       result.push(RustProcessedTypeInfo {
-        cpp_name: class_name.clone(),
+        cpp_name: template_instantiations.class_name.clone(),
         cpp_template_arguments: Some(ins.template_arguments.clone()),
         kind: RustProcessedTypeKind::Class { size: ins.size },
-        rust_name: calculate_rust_name(&name, include_file, false, config),
+        rust_name: calculate_rust_name(&name, &template_instantiations.include_file, false, config),
       });
       println!("TEST2: {:?}", result.last().unwrap());
     }
@@ -541,8 +525,10 @@ impl RustGenerator {
           if let Some(instantiations) = self.input_data
             .cpp_data
             .template_instantiations
-            .get(&flag_owner_name.to_string()) {
-            if instantiations.iter()
+            .iter()
+            .find(|x| &x.class_name == &flag_owner_name.to_string()) {
+            if instantiations.instantiations
+              .iter()
               .find(|ins| {
                 ins.template_arguments
                   .iter()

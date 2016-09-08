@@ -78,6 +78,9 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) {
     let x = get_header(&m.include_file, m.class_name());
     m.include_file = x;
   }
+  for t in &mut data.template_instantiations {
+    t.include_file = get_header(&t.include_file, Some(&t.class_name));
+  }
 }
 
 // TODO: save header mapping and use in dependencies
