@@ -1,8 +1,11 @@
 [package]
 name = "cpp_to_rust"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 build = "build.rs"
+description = "Automatic generator of C++ library wrappers"
+license = "MIT"
+repository = "https://github.com/rust-qt/cpp_to_rust"
 
 [lib]
 name = "cpp_to_rust"
@@ -16,7 +19,7 @@ path = "src/main.rs"
 serde = "0.8"
 serde_json = "0.8"
 ansi_term = "0.7"
-clang = { git = "https://github.com/KyleMayes/clang-rs" }
+clang = "0.12.0"
 regex = "0.1"
 rustfmt = "0.5.0"
 libc = "0.2"

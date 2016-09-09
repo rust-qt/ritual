@@ -1,9 +1,9 @@
 [root]
 name = "cpp_to_rust"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ansi_term 0.7.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "clang 0.12.0 (git+https://github.com/KyleMayes/clang-rs)",
+ "clang 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.10.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "csv 0.14.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -75,7 +75,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "clang"
 version = "0.12.0"
-source = "git+https://github.com/KyleMayes/clang-rs#140ff498099580253f511ce3fd8924f7ebb40257"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "clang-sys 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",

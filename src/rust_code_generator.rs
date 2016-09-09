@@ -162,14 +162,11 @@ impl RustCodeGenerator {
                      toml::Value::String(self.config.crate_name.clone()));
         table.insert("version".to_string(),
                      toml::Value::String(self.config.crate_version.clone()));
-        let mut authors: Vec<_> = self.config
+        let authors = self.config
           .crate_authors
           .iter()
           .map(|x| toml::Value::String(x.clone()))
           .collect();
-        authors.push(toml::Value::String("cpp_to_rust generator \
-                                                       (https://github.com/rust-qt/cpp_to_rust)"
-          .to_string()));
         table.insert("authors".to_string(), toml::Value::Array(authors));
         table.insert("build".to_string(),
                      toml::Value::String("build.rs".to_string()));
@@ -178,13 +175,8 @@ impl RustCodeGenerator {
       let dependencies = toml::Value::Table({
         let mut table = toml::Table::new();
         table.insert("libc".to_string(), toml::Value::String("0.2".to_string()));
-        let cpp_utils = toml::Value::Table({
-          let mut table = toml::Table::new();
-          table.insert("git".to_string(),
-                       toml::Value::String("https://github.com/rust-qt/cpp_utils.git".to_string()));
-          table
-        });
-        table.insert("cpp_utils".to_string(), cpp_utils);
+        table.insert("cpp_utils".to_string(),
+                     toml::Value::String("0.0".to_string()));
         for dep in &self.config.dependencies {
           let mut table_dep = toml::Table::new();
           table_dep.insert("path".to_string(),
