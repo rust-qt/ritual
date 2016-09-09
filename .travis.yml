@@ -4,7 +4,7 @@ rust:
   - stable
 #  - beta
 
-addons:
-  apt:
-    packages:
-    - libclang-3.5-dev
+install:
+  - sudo apt-add-repository "deb http://llvm.org/apt/precise/ llvm-toolchain-precise main" --yes
+  - sudo apt-get update
+  - sudo apt-get install libclang1-3.7 libclang-common-3.7-dev  --yes --force-yes
