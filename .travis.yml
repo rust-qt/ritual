@@ -2,4 +2,9 @@ language: rust
 
 rust:
   - stable
-  - beta
+#  - beta
+
+addons:
+  apt:
+    packages:
+    - libclang-3.5-dev
