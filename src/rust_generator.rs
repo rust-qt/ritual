@@ -276,8 +276,6 @@ fn generate_type_map(input_data: &CppAndFfiData,
     });
   }
   for template_instantiations in &input_data.cpp_data.template_instantiations {
-    println!("TEST1: {:?}", template_instantiations);
-
     for ins in &template_instantiations.instantiations {
       // TODO: use Rust names for template args
       let name = format!("{}_{}",
@@ -292,7 +290,6 @@ fn generate_type_map(input_data: &CppAndFfiData,
         kind: RustProcessedTypeKind::Class { size: ins.size },
         rust_name: calculate_rust_name(&name, &template_instantiations.include_file, false, config),
       });
-      println!("TEST2: {:?}", result.last().unwrap());
     }
   }
   result
@@ -947,7 +944,7 @@ impl RustGenerator {
                 cpp_to_ffi_conversion: IndirectionChange::NoChange,
                 rust_ffi_type: RustType::Void,
                 rust_api_type: RustType::Common {
-                  base: RustName::new(vec!["cpp_box".to_string(), marker_name.to_string()]),
+                  base: RustName::new(vec!["cpp_utils".to_string(), marker_name.to_string()]),
                   generic_arguments: None,
                   is_const: false,
                   indirection: RustTypeIndirection::None,

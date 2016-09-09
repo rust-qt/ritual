@@ -89,14 +89,14 @@ impl<'a> CGenerator<'a> {
       .iter()
       .find(|&x| x == &full_name || x == &short_text || x == &class_name)
       .is_some() {
-      log::debug(format!("Skipping blacklisted method: \n{}\n", method.short_text()));
+      log::noisy(format!("Skipping blacklisted method: \n{}\n", method.short_text()));
       return false;
     }
     if let Some(ref membership) = method.class_membership {
       if membership.kind == CppMethodKind::Constructor {
         let class_name = &membership.class_type.name;
         if self.abstract_classes.iter().find(|&x| x == class_name).is_some() {
-          log::debug(format!("Method is skipped:\n{}\nConstructors are not allowed for abstract \
+          log::noisy(format!("Method is skipped:\n{}\nConstructors are not allowed for abstract \
                               classes.\n",
                              method.short_text()));
           return false;
@@ -106,7 +106,7 @@ impl<'a> CGenerator<'a> {
         return false;
       }
       if membership.visibility == CppVisibility::Protected {
-        log::debug(format!("Skipping protected method: \n{}\n", method.short_text()));
+        log::noisy(format!("Skipping protected method: \n{}\n", method.short_text()));
         return false;
       }
       if membership.is_signal {
@@ -139,9 +139,6 @@ impl<'a> CGenerator<'a> {
     log::info(format!("Generating C++ FFI methods for header: {}", include_file));
     let mut hash_name_to_methods: HashMap<String, Vec<_>> = HashMap::new();
     for ref method in methods {
-      //      if include_file == "qflags.h" {
-      //        println!("TEST {:?}", method);
-      //      }
       if !self.should_process_method(method) {
         continue;
       }
@@ -204,10 +201,10 @@ impl<'a> CGenerator<'a> {
           processed_methods.push(CppAndFfiMethod::new(x, final_name));
         }
       } else {
-        log::debug(format!("values dump: {:?}\n", values));
+        log::error(format!("values dump: {:?}\n", values));
         log::error(format!("All type caption strategies have failed! Involved functions:"));
         for value in values {
-          log::debug(format!("  {}", value.cpp_method.short_text()));
+          log::error(format!("  {}", value.cpp_method.short_text()));
         }
         panic!("all type caption strategies have failed");
       }

@@ -178,13 +178,13 @@ impl RustCodeGenerator {
       let dependencies = toml::Value::Table({
         let mut table = toml::Table::new();
         table.insert("libc".to_string(), toml::Value::String("0.2".to_string()));
-        let cpp_box = toml::Value::Table({
+        let cpp_utils = toml::Value::Table({
           let mut table = toml::Table::new();
           table.insert("git".to_string(),
-                       toml::Value::String("https://github.com/rust-qt/cpp_box.git".to_string()));
+                       toml::Value::String("https://github.com/rust-qt/cpp_utils.git".to_string()));
           table
         });
-        table.insert("cpp_box".to_string(), cpp_box);
+        table.insert("cpp_utils".to_string(), cpp_utils);
         for dep in &self.config.dependencies {
           let mut table_dep = toml::Table::new();
           table_dep.insert("path".to_string(),
@@ -464,7 +464,7 @@ impl RustCodeGenerator {
         write!(lib_file, "#![allow(drop_with_repr_extern)]\n\n").unwrap();
       }
       write!(lib_file, "pub extern crate libc;\n").unwrap();
-      write!(lib_file, "pub extern crate cpp_box;\n\n").unwrap();
+      write!(lib_file, "pub extern crate cpp_utils;\n\n").unwrap();
       for dep in &self.config.dependencies {
         write!(lib_file, "pub extern crate {};\n\n", &dep.crate_name).unwrap();
       }
@@ -515,7 +515,7 @@ impl RustCodeGenerator {
     let mut used_crates: Vec<_> =
       self.config.dependencies.iter().map(|x| x.crate_name.as_ref()).collect();
     used_crates.push("libc");
-    used_crates.push("cpp_box");
+    used_crates.push("cpp_utils");
     used_crates.push("std");
 
     results.push(format!("#[allow(unused_imports)]\nuse {{{}}};\n\n",
@@ -563,7 +563,7 @@ impl RustCodeGenerator {
           for trait1 in traits {
             let trait_content = match trait1.trait_name {
               TraitName::CppDeletable { ref deleter_name } => {
-                format!("fn deleter() -> cpp_box::Deleter<Self> {{\n  ::ffi::{}\n}}\n",
+                format!("fn deleter() -> cpp_utils::Deleter<Self> {{\n  ::ffi::{}\n}}\n",
                         deleter_name)
               }
               _ => {

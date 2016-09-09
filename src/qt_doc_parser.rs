@@ -71,9 +71,6 @@ fn arguments_from_declaration(declaration: &String) -> Option<Vec<&str>> {
 }
 
 fn are_argument_types_equal(declaration1: &String, declaration2: &String) -> bool {
-  // println!("are_argument_types_equal({:?}, {:?})",
-  //           declaration1,
-  //           declaration2);
   let args1 = match arguments_from_declaration(declaration1) {
     Some(r) => r,
     None => return false,
@@ -82,7 +79,6 @@ fn are_argument_types_equal(declaration1: &String, declaration2: &String) -> boo
     Some(r) => r,
     None => return false,
   };
-  // println!("args: {:?}, {:?}", args1, args2);
   if args1.len() != args2.len() {
     return false;
   }
@@ -105,19 +101,14 @@ fn are_argument_types_equal(declaration1: &String, declaration2: &String) -> boo
     let arg2 = arg_prepare(&args2[i]);
     let arg1_maybe_type = arg_to_type(arg1.as_ref());
     let arg2_maybe_type = arg_to_type(arg2.as_ref());
-    //    println!("args maybe_type: {:?}, {:?}",
-    //             arg1_maybe_type,
-    //             arg2_maybe_type);
     let a1_orig = arg1.replace(" ", "");
     let a1_type = arg1_maybe_type.replace(" ", "");
     let a2_orig = arg2.replace(" ", "");
     let a2_type = arg2_maybe_type.replace(" ", "");
     if a1_orig != a2_orig && a1_orig != a2_type && a1_type != a2_orig && a1_type != a2_type {
-      //      println!("arg mismatch: {:?}, {:?}", arg1, arg2);
       return false;
     }
   }
-  //  println!("args match!");
   true
 }
 
@@ -184,16 +175,12 @@ impl QtDocData {
       anchor_override = Some(name_parts.last().unwrap().to_string());
       // constructors are not in the index
       name_parts.pop().unwrap();
-      // println!("ok1");
     }
     if name_parts.len() == 3 {
       // nested types don't have full names in the index
       name_parts.remove(0);
-      // println!("ok2");
     }
-    //    println!("TEST2: {:?}", name_parts);
     let corrected_name = name_parts.join("::");
-    //    println!("TEST3: {:?}", corrected_name);
     match self.index.iter().find(|item| &item.name == &corrected_name) {
       Some(item) => {
         match self.method_docs.get(&item.file_name) {
@@ -243,7 +230,6 @@ impl QtDocData {
                       .replace(prefix2, "");
                   }
                   if &item_declaration_imprint == &query_imprint {
-                    // println!("TEST: {}: {:?}", &corrected_name, &item.text);
                     if item.text.find(|c| c != '\n').is_none() {
                       return Err(format!("found empty documentation"));
                     }
@@ -263,7 +249,6 @@ impl QtDocData {
                       .replace(prefix2, "");
                   }
                   if are_argument_types_equal(&declaration_no_scope, &item_declaration_imprint) {
-                    // println!("TEST: {}: {:?}", &corrected_name, &item.text);
                     if item.text.find(|c| c != '\n').is_none() {
                       return Err(format!("found empty documentation"));
                     }
@@ -397,15 +382,6 @@ fn qt_doc_parser_test() {
                                     const char * method, Qt::ConnectionType type = \
                                     Qt::AutoConnection)"
                                      .to_string()));
-
-  //  let data = QtDocData::new(&PathBuf::from("/home/ri/rust/rust_qt/qt-doc")).unwrap();
-  //  for item in data.method_docs.get(&"qtextcodec.html".to_string()).unwrap() {
-  //    println!("declaration: {:?}", item.declaration);
-  //    println!("anchor: {:?}", item.anchor);
-  //    println!("text: {:?}", item.text);
-  //    println!("");
-  //  }
-  //  assert!(false);
 }
 
 // TODO: improve Qt doc integration:

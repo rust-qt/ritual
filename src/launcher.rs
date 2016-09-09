@@ -23,7 +23,6 @@ use cpp_ffi_generator::CppAndFfiData;
 use qt_doc_parser::QtDocData;
 use dependency_info::DependencyInfo;
 use std::env;
-use cpp_data::CppTemplateInstantiations;
 
 /// Runs a command, checks that it is successful, and
 /// returns its output if requested
@@ -217,7 +216,7 @@ pub fn run(env: BuildEnvironment) {
     log::info("Processing skipped!");
   } else {
     let parse_result_cache_file_path = output_dir_path.with_added("cpp_data.json");
-    let mut parse_result = if parse_result_cache_file_path.as_path().is_file() {
+    let parse_result = if parse_result_cache_file_path.as_path().is_file() {
       log::info(format!("C++ data is loaded from file: {}",
                         parse_result_cache_file_path.to_str().unwrap()));
       let file = File::open(&parse_result_cache_file_path).unwrap();
@@ -235,44 +234,8 @@ pub fn run(env: BuildEnvironment) {
       if is_qt_library {
         qt_specific::fix_header_names(&mut parse_result, &qt_this_lib_headers_dir.unwrap());
       }
-      parse_result.template_instantiations = parse_result.template_instantiations
-        .into_iter()
-        .filter_map(|data| {
-          let good_items: Vec<_> = {
-            let class_name = &data.class_name;
-            data.instantiations
-              .into_iter()
-              .filter(|ins| {
-                dependencies.iter()
-                  .find(|dep| {
-                    match dep.cpp_data
-                      .template_instantiations
-                      .iter()
-                      .find(|x| &x.class_name == class_name) {
-                      None => false,
-                      Some(vec) => {
-                        vec.instantiations
-                          .iter()
-                          .find(|x| x.template_arguments == ins.template_arguments)
-                          .is_some()
-                      }
-                    }
-                  })
-                  .is_none()
-              })
-              .collect()
-          };
-          if good_items.is_empty() {
-            None
-          } else {
-            Some(CppTemplateInstantiations {
-              class_name: data.class_name,
-              include_file: data.include_file,
-              instantiations: good_items,
-            })
-          }
-        })
-        .collect();
+      log::info("Post-processing parse result.");
+      parse_result.post_process(&dependencies.iter().map(|x| &x.cpp_data).collect());
 
       let mut file = File::create(&parse_result_cache_file_path).unwrap();
       serde_json::to_writer(&mut file, &parse_result).unwrap();
@@ -280,8 +243,6 @@ pub fn run(env: BuildEnvironment) {
                         parse_result_cache_file_path.to_str().unwrap()));
       parse_result
     };
-    log::info("Post-processing parse result.");
-    parse_result.post_process(&dependencies.iter().map(|x| &x.cpp_data).collect());
 
     let c_lib_name = format!("{}_c", &input_cargo_toml_data.name);
     let c_lib_path = c_lib_parent_path.with_added("source");

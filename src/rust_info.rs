@@ -163,7 +163,7 @@ pub enum TraitName {
 impl TraitName {
   pub fn to_string(&self) -> String {
     match *self {
-      TraitName::CppDeletable { .. } => "cpp_box::CppDeletable".to_string(),
+      TraitName::CppDeletable { .. } => "cpp_utils::CppDeletable".to_string(),
       _ => format!("{:?}", self),
     }
   }

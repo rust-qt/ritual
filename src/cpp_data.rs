@@ -194,7 +194,7 @@ impl CppData {
             if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
                    base.base {
               if name == base_name {
-                log::noisy(format!("Adding inherited methods_from {} to {}",
+                log::noisy(format!("Adding inherited methods from {} to {}",
                                    base_name,
                                    type1.name));
                 let derived_name = &type1.name;
@@ -294,22 +294,31 @@ impl CppData {
   pub fn add_inherited_methods(&mut self, dependencies: &Vec<&CppData>) {
     log::info("Adding inherited methods");
     let mut all_new_methods = Vec::new();
-    for cpp_data in dependencies.clone().into_iter().chain(iter::once(self as &_)) {
+    for (is_self, cpp_data) in dependencies.clone()
+      .into_iter()
+      .map(|x| (false, x))
+      .chain(iter::once((true, self as &_))) {
       for type1 in &cpp_data.types {
         if type1.is_class() {
-          let base_methods = cpp_data.methods
-            .iter()
-            .filter(|method| {
-              if let Some(ref info) = method.class_membership {
-                &info.class_type.name == &type1.name && !info.kind.is_constructor() &&
-                !info.kind.is_destructor() &&
-                method.operator != Some(CppOperator::Assignment)
-              } else {
-                false
-              }
-            });
-          all_new_methods.append(&mut self.inherited_methods_from(&type1.name,
-                                                                  &base_methods.collect()));
+          let mut interesting_cpp_datas = vec![cpp_data];
+          if !is_self {
+            interesting_cpp_datas.push(self);
+          }
+          for cpp_data2 in interesting_cpp_datas {
+            let base_methods = cpp_data2.methods
+              .iter()
+              .filter(|method| {
+                if let Some(ref info) = method.class_membership {
+                  &info.class_type.name == &type1.name && !info.kind.is_constructor() &&
+                  !info.kind.is_destructor() &&
+                  method.operator != Some(CppOperator::Assignment)
+                } else {
+                  false
+                }
+              });
+            all_new_methods.append(&mut self.inherited_methods_from(&type1.name,
+                                                                    &base_methods.collect()));
+          }
         }
       }
     }
@@ -507,7 +516,8 @@ impl CppData {
                   };
                   log::noisy(format!(""));
                   log::noisy(format!("method: {}", method.short_text()));
-                  log::noisy(format!("found template class: {}", name));
+                  log::noisy(format!("found template instantiations: {:?}",
+                                     template_instantiations));
                   match apply_instantiations_to_method(method,
                                                        nested_level,
                                                        &template_instantiations.instantiations) {
@@ -528,10 +538,52 @@ impl CppData {
     self.methods.append(&mut new_methods);
   }
 
+  pub fn remove_existing_instantiations(&mut self, dependencies: &Vec<&CppData>) {
+    self.template_instantiations = self.template_instantiations
+      .iter()
+      .filter_map(|data| {
+        let good_items: Vec<_> = {
+          let class_name = &data.class_name;
+          data.instantiations
+            .clone()
+            .into_iter()
+            .filter(|ins| {
+              dependencies.iter()
+                .find(|dep| {
+                  match dep.template_instantiations
+                    .iter()
+                    .find(|x| &x.class_name == class_name) {
+                    None => false,
+                    Some(vec) => {
+                      vec.instantiations
+                        .iter()
+                        .find(|x| x.template_arguments == ins.template_arguments)
+                        .is_some()
+                    }
+                  }
+                })
+                .is_none()
+            })
+            .collect()
+        };
+        if good_items.is_empty() {
+          None
+        } else {
+          Some(CppTemplateInstantiations {
+            class_name: data.class_name.clone(),
+            include_file: data.include_file.clone(),
+            instantiations: good_items,
+          })
+        }
+      })
+      .collect();
+  }
+
 
   /// Performs data conversion to make it more suitable
   /// for further wrapper generation.
   pub fn post_process(&mut self, dependencies: &Vec<&CppData>) {
+    self.remove_existing_instantiations(dependencies);
     self.ensure_explicit_destructors(dependencies);
     self.generate_methods_with_omitted_args();
     self.instantiate_templates(dependencies);
