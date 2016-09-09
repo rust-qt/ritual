@@ -6,5 +6,6 @@ rust:
 
 install:
   - sudo apt-add-repository "deb http://llvm.org/apt/precise/ llvm-toolchain-precise-3.5 main" --yes
+  - sudo apt-add-repository "deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu precise main"  --yes
   - sudo apt-get update
   - sudo apt-get install libclang-3.5-dev --yes --force-yes
