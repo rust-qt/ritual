@@ -1,12 +1,8 @@
-language: rust
-
-rust: stable
-#  - beta
-
-
 matrix:
   include:
   - os: linux
+    language: rust
+    rust: stable
     install:
     - sudo apt-add-repository "deb http://llvm.org/apt/precise/ llvm-toolchain-precise-3.5 main" --yes
     - sudo apt-add-repository "deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu precise main"  --yes
@@ -15,4 +11,6 @@ matrix:
     env:
     - LIBCLANG_PATH=/usr/lib/llvm-3.5/lib
   - os: osx
+    language: rust
+    rust: stable
 
