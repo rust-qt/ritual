@@ -9,3 +9,9 @@ install:
   - sudo apt-add-repository "deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu precise main"  --yes
   - sudo apt-get update
   - sudo apt-get install libclang-3.5-dev --yes --force-yes
+  - ls /usr/lib
+  - ls /usr/lib/llvm-3.5
+  - ls /usr/lib/llvm-3.5/lib
+
+env:
+- LIBCLANG_PATH=/usr/lib/llvm-3.5/lib
