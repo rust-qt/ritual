@@ -1,7 +1,6 @@
 language: rust
 
-rust:
-- stable
+rust: stable
 #  - beta
 
 
@@ -13,9 +12,7 @@ matrix:
     - sudo apt-add-repository "deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu precise main"  --yes
     - sudo apt-get update
     - sudo apt-get install libclang-3.5-dev --yes --force-yes
-
     env:
     - LIBCLANG_PATH=/usr/lib/llvm-3.5/lib
-
   - os: osx
 
