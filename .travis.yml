@@ -1,15 +1,14 @@
 matrix:
   include:
   - os: linux
+    dist: trusty
     language: rust
     rust: stable
     install:
-    - sudo apt-add-repository "deb http://llvm.org/apt/precise/ llvm-toolchain-precise-3.8 main" --yes
-    - sudo apt-add-repository "deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu precise main"  --yes
-    - sudo apt-get update
     - sudo apt-get install llvm-3.8 libclang-3.8-dev --yes --force-yes
     env:
     - LLVM_CONFIG_PATH=/usr/lib/llvm-3.8/bin/llvm-config
+    - CLANG_SYSTEM_INCLUDE_PATH=/usr/lib/llvm-3.8/lib/clang/3.8.0/include
   - os: osx
     language: rust
     rust: stable
@@ -19,3 +18,4 @@ matrix:
     - mv clang+llvm-3.8.0-x86_64-apple-darwin /Users/travis/clang-3.8
     env:
     - LLVM_CONFIG_PATH=/Users/travis/clang-3.8/bin/llvm-config
+    - CLANG_SYSTEM_INCLUDE_PATH=/Users/travis/clang-3.8/lib/clang/3.8.0/include
