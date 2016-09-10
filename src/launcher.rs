@@ -107,22 +107,12 @@ pub fn run_from_build_script() {
 
 pub fn run(env: BuildEnvironment) {
   // canonicalize paths
-  let current_dir = std::env::current_dir().unwrap();
-  let mut output_dir_path = if env.output_dir_path.is_relative() {
-    current_dir.with_added(&env.output_dir_path)
-  } else {
-    env.output_dir_path
-  };
-  if !output_dir_path.as_path().exists() {
-    fs::create_dir_all(&output_dir_path).unwrap();
+  //let current_dir = std::env::current_dir().unwrap();
+  if !env.output_dir_path.as_path().exists() {
+    fs::create_dir_all(&env.output_dir_path).unwrap();
   }
-  output_dir_path = fs::canonicalize(&output_dir_path).unwrap();
-  let mut source_dir_path = if env.source_dir_path.is_relative() {
-    current_dir.with_added(&env.source_dir_path)
-  } else {
-    env.source_dir_path
-  };
-  source_dir_path = fs::canonicalize(&source_dir_path).unwrap();
+  let output_dir_path = fs::canonicalize(&env.output_dir_path).unwrap();
+  let source_dir_path = fs::canonicalize(&env.source_dir_path).unwrap();
 
   let lib_spec_path = source_dir_path.with_added("spec.json");
 
@@ -202,7 +192,7 @@ pub fn run(env: BuildEnvironment) {
   }
   let dependencies: Vec<_> = env.dependency_paths
     .iter()
-    .map(|path| DependencyInfo::load(path))
+    .map(|path| DependencyInfo::load(&fs::canonicalize(path).unwrap()))
     .collect();
 
   let c_lib_parent_path = output_dir_path.with_added("c_lib");
