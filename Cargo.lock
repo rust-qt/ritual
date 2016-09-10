@@ -1,6 +1,6 @@
 [root]
 name = "cpp_to_rust"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "ansi_term 0.7.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "clang 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",

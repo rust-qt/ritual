@@ -492,7 +492,8 @@ impl RustCodeGenerator {
           InvokationMethod::CommandLine => write!(lib_file, "pub mod {};\n", module).unwrap(),
           InvokationMethod::BuildScript => {
             write!(lib_file,
-                   "pub mod {0} {{ \n  include!(\"{0}.rs\");\n}}\n",
+                   "pub mod {0} {{ \n  include!(concat!(env!(\"OUT_DIR\"), \
+                    \"/src/{0}.rs\"));\n}}\n",
                    module)
               .unwrap()
           }
