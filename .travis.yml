@@ -9,7 +9,7 @@ matrix:
     - sudo apt-get update
     - sudo apt-get install llvm-3.8 libclang-3.8-dev --yes --force-yes
     env:
-    - LLVM_CONFIG_PATH=/usr/lib/llvm-3.8/bin
+    - LLVM_CONFIG_PATH=/usr/lib/llvm-3.8/bin/llvm-config
   - os: osx
     language: rust
     rust: stable
@@ -18,5 +18,5 @@ matrix:
     - tar -xJf clang+llvm-3.8.0-x86_64-apple-darwin.tar.xz
     - mv clang+llvm-3.8.0-x86_64-apple-darwin /Users/travis/clang-3.8
     env:
-    - LLVM_CONFIG_PATH=/Users/travis/clang-3.8/bin
+    - LLVM_CONFIG_PATH=/Users/travis/clang-3.8/bin/llvm-config
 
