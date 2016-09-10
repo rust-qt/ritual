@@ -19,4 +19,3 @@ matrix:
     - mv clang+llvm-3.8.0-x86_64-apple-darwin /Users/travis/clang-3.8
     env:
     - LLVM_CONFIG_PATH=/Users/travis/clang-3.8/bin/llvm-config
-

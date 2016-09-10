@@ -17,6 +17,7 @@ use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
 use cpp_operator::CppOperator;
 use std::io::Write;
 use std::io::{BufRead, BufReader};
+use std::env;
 
 struct CppParser {
   config: CppParserConfig,
@@ -134,6 +135,10 @@ fn run_clang<R, F: Fn(Entity) -> R>(config: &CppParserConfig, cpp_code: Option<S
   for dir in &config.include_dirs {
     args.push("-I".to_string());
     args.push(dir.to_str().unwrap().to_string());
+  }
+  if let Ok(path) = env::var("CLANG_SYSTEM_INCLUDE_PATH") {
+    args.push("-isystem".to_string());
+    args.push(path);
   }
 
   let tu = index.parser(&config.tmp_cpp_path)
