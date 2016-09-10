@@ -4,13 +4,13 @@ matrix:
     language: rust
     rust: stable
     install:
-    - sudo apt-add-repository "deb http://llvm.org/apt/precise/ llvm-toolchain-precise-3.5 main" --yes
+    - sudo apt-add-repository "deb http://llvm.org/apt/precise/ llvm-toolchain-precise-3.8 main" --yes
     - sudo apt-add-repository "deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu precise main"  --yes
     - sudo apt-get update
-    - sudo apt-get install libclang-3.5-dev --yes --force-yes
+    - sudo apt-get install libclang-3.8-dev --yes --force-yes
     env:
-    - LLVM_CONFIG_PATH=/usr/lib/llvm-3.5/bin
-    - LIBCLANG_PATH=/usr/lib/llvm-3.5/lib
+    - LLVM_CONFIG_PATH=/usr/lib/llvm-3.8/bin
+    - LIBCLANG_PATH=/usr/lib/llvm-3.8/lib
   - os: osx
     language: rust
     rust: stable
@@ -18,6 +18,8 @@ matrix:
     - wget http://llvm.org/releases/3.8.0/clang+llvm-3.8.0-x86_64-apple-darwin.tar.xz
     - tar -xJf clang+llvm-3.8.0-x86_64-apple-darwin.tar.xz
     - mv clang+llvm-3.8.0-x86_64-apple-darwin clang-3.8
+    - pwd
+    - ls
     - ls /Users/travis/
     - ls /Users/travis/clang-3.8/
     - ls /Users/travis/clang-3.8/bin
