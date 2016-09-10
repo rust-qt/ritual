@@ -17,8 +17,7 @@ matrix:
     install:
     - wget http://llvm.org/releases/3.8.0/clang+llvm-3.8.0-x86_64-apple-darwin.tar.xz
     - tar -xJf clang+llvm-3.8.0-x86_64-apple-darwin.tar.xz
-    - mv clang+llvm-3.8.0-x86_64-apple-darwin clang-3.8
-    - pwd
+    - mv clang+llvm-3.8.0-x86_64-apple-darwin /Users/travis/clang-3.8
     - ls
     - ls /Users/travis/
     - ls /Users/travis/clang-3.8/
