@@ -223,14 +223,15 @@ pub fn run(env: BuildEnvironment) {
       serde_json::from_reader(file).unwrap()
     } else {
       log::info("Parsing C++ headers.");
-      let mut parse_result = cpp_parser::run(cpp_parser::CppParserConfig {
-                                               include_dirs: include_dirs.clone(),
-                                               header_name: lib_spec.cpp.include_file.clone(),
-                                               target_include_dir: qt_this_lib_headers_dir.clone(),
-                                               tmp_cpp_path: output_dir_path.with_added("1.cpp"),
-                                               name_blacklist: lib_spec.cpp.name_blacklist.clone(),
-                                             },
-                                             &dependency_cpp_types);
+      let mut parse_result =
+        cpp_parser::run(cpp_parser::CppParserConfig {
+                          include_dirs: include_dirs.clone(),
+                          header_name: lib_spec.cpp.include_file.clone(),
+                          target_include_dir: qt_this_lib_headers_dir.clone(),
+                          tmp_cpp_path: output_dir_path.with_added("1.cpp"),
+                          name_blacklist: lib_spec.cpp.name_blacklist.clone().unwrap_or(Vec::new()),
+                        },
+                        &dependency_cpp_types);
       if is_qt_library {
         qt_specific::fix_header_names(&mut parse_result, &qt_this_lib_headers_dir.unwrap());
       }
@@ -301,6 +302,7 @@ pub fn run(env: BuildEnvironment) {
       template_path: source_dir_path.clone(),
       c_lib_name: c_lib_name,
       cpp_lib_name: lib_spec.cpp.name.clone(),
+      cpp_extra_libs: lib_spec.cpp.extra_libs.clone().unwrap_or(Vec::new()),
       rustfmt_config_path: if rustfmt_config_path.as_path().exists() {
         Some(rustfmt_config_path)
       } else {
@@ -320,17 +322,18 @@ pub fn run(env: BuildEnvironment) {
     for dep in &dependencies {
       dependency_rust_types.extend_from_slice(&dep.rust_export_info.rust_types);
     }
-    let rust_data = rust_generator::run(CppAndFfiData {
-                                          cpp_data: parse_result,
-                                          cpp_ffi_headers: cpp_ffi_headers,
-                                        },
-                                        dependency_rust_types,
-                                        rust_generator::RustGeneratorConfig {
-                                          crate_name: input_cargo_toml_data.name.clone(),
-                                          remove_qt_prefix: is_qt_library,
-                                          module_blacklist: lib_spec.rust.module_blacklist,
-                                          qt_doc_data: qt_doc_data,
-                                        });
+    let rust_data =
+      rust_generator::run(CppAndFfiData {
+                            cpp_data: parse_result,
+                            cpp_ffi_headers: cpp_ffi_headers,
+                          },
+                          dependency_rust_types,
+                          rust_generator::RustGeneratorConfig {
+                            crate_name: input_cargo_toml_data.name.clone(),
+                            remove_qt_prefix: is_qt_library,
+                            module_blacklist: lib_spec.rust.module_blacklist.unwrap_or(Vec::new()),
+                            qt_doc_data: qt_doc_data,
+                          });
     rust_code_generator::run(rust_config, &rust_data);
     {
       let rust_types_path = output_dir_path.with_added("rust_export_info.json");

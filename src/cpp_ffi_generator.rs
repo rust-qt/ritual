@@ -53,9 +53,11 @@ pub fn run(cpp_data: &CppData, cpp_lib_spec: CppLibSpec) -> Vec<CppFfiHeaderData
   include_name_list.sort();
 
   for include_file in &include_name_list {
-    if generator.cpp_lib_spec.include_file_blacklist.iter().find(|x| x == &include_file).is_some() {
-      log::info(format!("Skipping include file {}", include_file));
-      continue;
+    if let Some(ref include_file_blacklist) = generator.cpp_lib_spec.include_file_blacklist {
+      if include_file_blacklist.iter().find(|x| x == &include_file).is_some() {
+        log::info(format!("Skipping include file {}", include_file));
+        continue;
+      }
     }
     let mut include_file_base_name = include_file.clone();
     if include_file_base_name.ends_with(".h") {
@@ -84,13 +86,13 @@ impl<'a> CGenerator<'a> {
     let full_name = method.full_name();
     let short_text = method.short_text();
     let class_name = method.class_name().unwrap_or(&String::new()).clone();
-    if self.cpp_lib_spec
-      .ffi_methods_blacklist
-      .iter()
-      .find(|&x| x == &full_name || x == &short_text || x == &class_name)
-      .is_some() {
-      log::noisy(format!("Skipping blacklisted method: \n{}\n", method.short_text()));
-      return false;
+    if let Some(ref ffi_methods_blacklist) = self.cpp_lib_spec.ffi_methods_blacklist {
+      if ffi_methods_blacklist.iter()
+        .find(|&x| x == &full_name || x == &short_text || x == &class_name)
+        .is_some() {
+        log::noisy(format!("Skipping blacklisted method: \n{}\n", method.short_text()));
+        return false;
+      }
     }
     if let Some(ref membership) = method.class_membership {
       if membership.kind == CppMethodKind::Constructor {

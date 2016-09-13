@@ -504,6 +504,8 @@ pub struct CppType {
 pub struct CppLibSpec {
   /// Name of C++ library used for linking
   pub name: String,
+  /// Other libraries that need to be linked
+  pub extra_libs: Option<Vec<String>>,
   /// Name of the library's include file
   pub include_file: String,
   /// List of C++ identifiers which should be skipped
@@ -512,10 +514,10 @@ pub struct CppLibSpec {
   /// C++ identifiers). Identifier may refer to a method,
   /// a class or a namespace. All entities inside blacklisted
   /// entity will also be skipped.
-  pub name_blacklist: Vec<String>,
-  pub include_file_blacklist: Vec<String>,
+  pub name_blacklist: Option<Vec<String>>,
+  pub include_file_blacklist: Option<Vec<String>>,
 
-  pub ffi_methods_blacklist: Vec<String>,
+  pub ffi_methods_blacklist: Option<Vec<String>>,
 }
 
 /// Information loaded from lib spec file and
@@ -524,7 +526,7 @@ pub struct CppLibSpec {
 #[derive(Serialize, Deserialize)]
 pub struct RustLibSpec {
   /// List of top level modules that should not be generated
-  pub module_blacklist: Vec<String>,
+  pub module_blacklist: Option<Vec<String>>,
 }
 
 /// Information loaded from lib spec file.

@@ -36,6 +36,7 @@ pub struct RustCodeGeneratorConfig {
   pub template_path: PathBuf,
   pub c_lib_name: String,
   pub cpp_lib_name: String,
+  pub cpp_extra_libs: Vec<String>,
   pub rustfmt_config_path: Option<PathBuf>,
   pub dependencies: Vec<RustCodeGeneratorDependency>,
 }
@@ -719,6 +720,9 @@ impl RustCodeGenerator {
         write!(file, "use {};\n\n", &dep.crate_name).unwrap();
       }
       write!(file, "#[link(name = \"{}\")]\n", &self.config.cpp_lib_name).unwrap();
+      for name in &self.config.cpp_extra_libs {
+        write!(file, "#[link(name = \"{}\")]\n", name).unwrap();
+      }
       write!(file, "#[link(name = \"stdc++\")]\n").unwrap();
       write!(file,
              "#[link(name = \"{}\", kind = \"static\")]\n",
