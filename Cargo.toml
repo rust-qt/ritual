@@ -1,6 +1,6 @@
 [package]
 name = "cpp_to_rust"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 build = "build.rs"
 description = "Automatic generator of C++ library wrappers"
