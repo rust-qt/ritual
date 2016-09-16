@@ -164,7 +164,7 @@ impl RustCodeGenerator {
 
     {
       let mut build_rs_file = File::create(self.config.output_path.with_added("build.rs")).unwrap();
-      let mut extra = self.config.framework_dirs.iter().map(|x| {
+      let extra = self.config.framework_dirs.iter().map(|x| {
         format!("  println!(\"cargo:rustc-link-search=framework={{}}\", \"{}\");", x)
       }).join("\n");
       write!(build_rs_file, include_str!("../templates/crate/build.rs"), extra = extra).unwrap();
