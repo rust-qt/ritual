@@ -108,6 +108,8 @@ fn get_full_name(entity: Entity) -> Result<String, String> {
 pub struct CppParserConfig {
   /// Include dirs passed to clang
   pub include_dirs: Vec<PathBuf>,
+  /// Frameworks passed to clang
+  pub framework_dirs: Vec<PathBuf>,
   /// Header name used in #include statement
   pub header_name: String,
   /// Directory containing headers of the target library.
@@ -130,6 +132,7 @@ fn run_clang<R, F: Fn(Entity) -> R>(config: &CppParserConfig, cpp_code: Option<S
   // TODO: PIC and additional args should be moved to lib spec
   let mut args = vec!["-fPIC".to_string(),
                       "-fcxx-exceptions".to_string(),
+                      "-std=gnu++11".to_string(),
                       "-Xclang".to_string(),
                       "-detailed-preprocessing-record".to_string()];
   for dir in &config.include_dirs {
@@ -140,6 +143,11 @@ fn run_clang<R, F: Fn(Entity) -> R>(config: &CppParserConfig, cpp_code: Option<S
     args.push("-isystem".to_string());
     args.push(path);
   }
+  for dir in &config.framework_dirs {
+    args.push("-F".to_string());
+    args.push(dir.to_str().unwrap().to_string());
+  }
+  log::info(format!("clang arguments: {:?}", args));
 
   let tu = index.parser(&config.tmp_cpp_path)
     .arguments(&args)

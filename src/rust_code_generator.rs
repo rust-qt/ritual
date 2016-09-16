@@ -27,6 +27,15 @@ pub struct RustCodeGeneratorDependency {
   pub crate_path: PathBuf,
 }
 
+pub enum RustLinkKind {
+  SharedLibrary,
+  Framework, 
+}
+pub struct RustLinkItem {
+  pub name: String,
+  pub kind: RustLinkKind,
+}
+
 pub struct RustCodeGeneratorConfig {
   pub invokation_method: InvokationMethod,
   pub crate_name: String,
@@ -35,8 +44,8 @@ pub struct RustCodeGeneratorConfig {
   pub output_path: PathBuf,
   pub template_path: PathBuf,
   pub c_lib_name: String,
-  pub cpp_lib_name: String,
-  pub cpp_extra_libs: Vec<String>,
+  pub link_items: Vec<RustLinkItem>,
+  pub framework_dirs: Vec<String>,
   pub rustfmt_config_path: Option<PathBuf>,
   pub dependencies: Vec<RustCodeGeneratorDependency>,
 }
@@ -153,8 +162,13 @@ impl RustCodeGenerator {
       }
     };
 
-    let mut build_rs_file = File::create(self.config.output_path.with_added("build.rs")).unwrap();
-    build_rs_file.write(include_bytes!("../templates/crate/build.rs")).unwrap();
+    {
+      let mut build_rs_file = File::create(self.config.output_path.with_added("build.rs")).unwrap();
+      let mut extra = self.config.framework_dirs.iter().map(|x| {
+        format!("  println!(\"cargo:rustc-link-search=framework={{}}\", \"{}\");", x)
+      }).join("\n");
+      write!(build_rs_file, include_str!("../templates/crate/build.rs"), extra = extra).unwrap();
+    }
 
     let cargo_toml_data = toml::Value::Table({
       let package = toml::Value::Table({
@@ -719,9 +733,11 @@ impl RustCodeGenerator {
       for dep in &self.config.dependencies {
         write!(file, "use {};\n\n", &dep.crate_name).unwrap();
       }
-      write!(file, "#[link(name = \"{}\")]\n", &self.config.cpp_lib_name).unwrap();
-      for name in &self.config.cpp_extra_libs {
-        write!(file, "#[link(name = \"{}\")]\n", name).unwrap();
+      for item in &self.config.link_items {
+        match item.kind {
+          RustLinkKind::SharedLibrary => write!(file, "#[link(name = \"{}\")]\n", item.name).unwrap(),
+          RustLinkKind::Framework => write!(file, "#[link(name = \"{}\", kind = \"framework\")]\n", item.name).unwrap(),
+        }
       }
       write!(file, "#[link(name = \"stdc++\")]\n").unwrap();
       write!(file,

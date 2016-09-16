@@ -238,16 +238,22 @@ impl CppCodeGenerator {
   /// Generates main files and directories of the library.
   pub fn generate_template_files(&self,
                                  cpp_lib_include_file: &String,
-                                 include_directories: &Vec<String>) {
+                                 include_directories: &Vec<String>,
+                                 framework_directories: &Vec<String>) {
     let name_upper = self.lib_name.to_uppercase();
     let mut cmakelists_file = File::create(self.lib_path.with_added("CMakeLists.txt")).unwrap();
+    let mut cxx_flags = "-fPIC -std=gnu++11".to_string();
+    for dir in framework_directories {
+      cxx_flags.push_str(&format!(" -F\\\"{}\\\"", dir));
+    }
     write!(cmakelists_file,
            include_str!("../templates/c_lib/CMakeLists.txt"),
            lib_name_lowercase = &self.lib_name,
            lib_name_uppercase = name_upper,
            include_directories = include_directories.into_iter()
              .map(|x| format!("\"{}\"", x))
-             .join(" "))
+             .join(" "),
+           cxx_flags = cxx_flags)
       .unwrap();
     let src_dir = self.lib_path.with_added("src");
     fs::create_dir_all(&src_dir).unwrap();

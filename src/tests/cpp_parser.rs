@@ -32,6 +32,7 @@ fn run_parser(code: &'static str) -> CppData {
                                      target_include_dir: None,
                                      tmp_cpp_path: dir.path().with_added("1.cpp"),
                                      name_blacklist: Vec::new(),
+                                     framework_dirs: Vec::new(),
                                    },
                                    &Vec::new());
   for method in &mut result.methods {

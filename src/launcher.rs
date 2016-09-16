@@ -5,6 +5,7 @@ use std;
 use std::fs;
 use std::fs::File;
 use utils::PathBufPushTweak;
+use utils::JoinWithString;
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -16,7 +17,7 @@ use utils;
 use cpp_ffi_generator;
 use rust_info::{InputCargoTomlData, RustExportInfo};
 use rust_code_generator;
-use rust_code_generator::RustCodeGeneratorDependency;
+use rust_code_generator::{RustCodeGeneratorDependency, RustLinkItem, RustLinkKind};
 use rust_generator;
 use serializable::LibSpec;
 use cpp_ffi_generator::CppAndFfiData;
@@ -130,6 +131,8 @@ pub fn run(env: BuildEnvironment) {
   let mut include_dirs = Vec::new();
   let mut cpp_lib_path = None;
   let mut qt_this_lib_headers_dir = None;
+  let mut framework_dirs = Vec::new();
+  let mut link_items = Vec::new();
   if is_qt_library {
 
     let qmake_path = "qmake".to_string();
@@ -148,7 +151,7 @@ pub fn run(env: BuildEnvironment) {
       .trim());
     log::info(format!("QT_INSTALL_LIBS = \"{}\"",
                       qt_install_libs_path.to_str().unwrap()));
-    cpp_lib_path = Some(qt_install_libs_path);
+    cpp_lib_path = Some(qt_install_libs_path.clone());
     include_dirs.push(qt_install_headers_path.clone());
 
     if lib_spec.cpp.name.starts_with("Qt5") {
@@ -157,8 +160,22 @@ pub fn run(env: BuildEnvironment) {
         qt_this_lib_headers_dir = Some(dir.clone());
         include_dirs.push(dir);
       } else {
-        log::warning(format!("extra header dir does not exist: {}", dir.display()));
+        let dir2 = qt_install_libs_path.with_added(format!("Qt{}.framework/Headers", &lib_spec.cpp.name[3..]));
+        if dir2.exists() {
+          qt_this_lib_headers_dir = Some(dir2.clone());
+          include_dirs.push(dir2);
+          framework_dirs.push(qt_install_libs_path.clone());
+          link_items.push(RustLinkItem { name: format!("Qt{}", &lib_spec.cpp.name[3..]), kind: RustLinkKind::Framework });
+        } else {
+          log::warning(format!("extra header dir not found (tried: {}, {})", dir.display(), dir2.display()));
+        }
       }
+    }
+  }
+  if framework_dirs.is_empty() {
+    link_items.push(RustLinkItem { name: lib_spec.cpp.name.clone(), kind: RustLinkKind::SharedLibrary });
+    for name in lib_spec.cpp.extra_libs.as_ref().unwrap_or(&Vec::new()) {
+      link_items.push(RustLinkItem { name: name.clone(), kind: RustLinkKind::SharedLibrary });
     }
   }
   let qt_doc_data = if is_qt_library {
@@ -216,6 +233,7 @@ pub fn run(env: BuildEnvironment) {
       let mut parse_result =
         cpp_parser::run(cpp_parser::CppParserConfig {
                           include_dirs: include_dirs.clone(),
+                          framework_dirs: framework_dirs.clone(),
                           header_name: lib_spec.cpp.include_file.clone(),
                           target_include_dir: qt_this_lib_headers_dir.clone(),
                           tmp_cpp_path: output_dir_path.with_added("1.cpp"),
@@ -249,6 +267,9 @@ pub fn run(env: BuildEnvironment) {
     let code_gen = CppCodeGenerator::new(c_lib_name.clone(), c_lib_tmp_path.clone());
     code_gen.generate_template_files(&lib_spec.cpp.include_file,
                                      &include_dirs.iter()
+                                       .map(|x| x.to_str().unwrap().to_string())
+                                       .collect(),
+                                     &framework_dirs.iter()
                                        .map(|x| x.to_str().unwrap().to_string())
                                        .collect());
     code_gen.generate_files(&cpp_ffi_headers);
@@ -291,8 +312,8 @@ pub fn run(env: BuildEnvironment) {
       output_path: crate_new_path.clone(),
       template_path: source_dir_path.clone(),
       c_lib_name: c_lib_name,
-      cpp_lib_name: lib_spec.cpp.name.clone(),
-      cpp_extra_libs: lib_spec.cpp.extra_libs.clone().unwrap_or(Vec::new()),
+      link_items: link_items,
+      framework_dirs: framework_dirs.iter().map(|x| x.to_str().unwrap().to_string()).collect(),
       rustfmt_config_path: if rustfmt_config_path.as_path().exists() {
         Some(rustfmt_config_path)
       } else {
@@ -356,10 +377,14 @@ pub fn run(env: BuildEnvironment) {
         command.arg(cargo_cmd);
         command.arg(format!("-j{}", num_jobs));
         command.current_dir(&output_dir_path);
+        // TODO: if env var already exists, add to it instead of overwriting
         if let Some(ref cpp_lib_path) = cpp_lib_path {
           let lib_path = cpp_lib_path.to_str().unwrap();
           command.env("LIBRARY_PATH", lib_path)
             .env("LD_LIBRARY_PATH", lib_path);
+        }
+        if !framework_dirs.is_empty() {
+          command.env("DYLD_FRAMEWORK_PATH", framework_dirs.iter().map(|x| x.to_str().unwrap().to_string()).join(":"));
         }
         run_command(&mut command, false);
       }
@@ -374,6 +399,9 @@ pub fn run(env: BuildEnvironment) {
       }
       println!("cargo:cpp_to_rust_data_path={}",
                output_dir_path.to_str().unwrap());
+      for dir in &framework_dirs {
+        println!("cargo:rustc-link-search=framework={}", dir.to_str().unwrap());
+      }
     }
   }
 }

@@ -12,6 +12,7 @@ pub trait JoinWithString {
   fn join(self, separator: &'static str) -> String;
 }
 
+// TODO: accept iterator over AsRef<String> 
 impl<X> JoinWithString for X
   where X: Iterator<Item = String>
 {
