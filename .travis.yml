@@ -1,21 +1,6 @@
 matrix:
   include:
-  - os: linux
-    dist: trusty
-    language: rust
-    rust: stable
-    install:
-    - sudo apt-get install llvm-3.8 libclang-3.8-dev --yes --force-yes
-    env:
-    - LLVM_CONFIG_PATH=/usr/lib/llvm-3.8/bin/llvm-config
-    - CLANG_SYSTEM_INCLUDE_PATH=/usr/lib/llvm-3.8/lib/clang/3.8.0/include
-  - os: osx
-    language: rust
-    rust: stable
-    install:
-    - wget http://llvm.org/releases/3.8.0/clang+llvm-3.8.0-x86_64-apple-darwin.tar.xz
-    - tar -xJf clang+llvm-3.8.0-x86_64-apple-darwin.tar.xz
-    - mv clang+llvm-3.8.0-x86_64-apple-darwin /Users/travis/clang-3.8
-    env:
-    - LLVM_CONFIG_PATH=/Users/travis/clang-3.8/bin/llvm-config
-    - CLANG_SYSTEM_INCLUDE_PATH=/Users/travis/clang-3.8/lib/clang/3.8.0/include
+    - os: linux
+      dist: trusty
+    - os: osx
+script: tests/travis.bash
