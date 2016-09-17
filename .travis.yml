@@ -4,3 +4,6 @@ matrix:
       dist: trusty
     - os: osx
 script: tests/travis.bash
+language: rust
+rust: stable
+
