@@ -117,14 +117,15 @@ impl<'a> CGenerator<'a> {
       }
     }
     if method.template_arguments.is_some() {
-      log::warning(format!("Skipping template method: \n{}\n", method.short_text()));
+      // TODO: check findChildren and similar instantiated methods
+      log::noisy(format!("Skipping template method: \n{}\n", method.short_text()));
       return false;
     }
     if method.all_involved_types()
       .iter()
       .find(|x| x.base.is_or_contains_template_parameter())
       .is_some() {
-      log::warning(format!("Skipping method containing template parameters: \n{}\n",
+      log::noisy(format!("Skipping method containing template parameters: \n{}\n",
                            method.short_text()));
       return false;
     }

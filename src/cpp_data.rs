@@ -10,7 +10,8 @@ use std::iter;
 pub use serializable::{EnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
                        CppTypeData, CppData, CppTemplateInstantiation, CppTemplateInstantiations,
                        CppClassUsingDirective};
-
+// TODO: remove template arguments from methods, e.g.
+// QList<T> findChildren<T>() -> QList<QObject*> findChildren()
 fn apply_instantiations_to_method(method: &CppMethod,
                                   nested_level: i32,
                                   template_instantiations: &Vec<CppTemplateInstantiation>)

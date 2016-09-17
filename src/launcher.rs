@@ -283,6 +283,7 @@ pub fn run(env: BuildEnvironment) {
 
     run_command(Command::new("cmake")
                   .arg(&c_lib_path)
+                  .arg("-DCMAKE_RULE_MESSAGES=OFF")
                   .arg(format!("-DCMAKE_INSTALL_PREFIX={}",
                                c_lib_install_path.to_str().unwrap()))
                   .current_dir(&c_lib_build_path),

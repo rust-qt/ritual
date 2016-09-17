@@ -108,10 +108,10 @@ pub fn move_one_file(old_path: &PathBuf, new_path: &PathBuf) -> io::Result<()> {
       try!(fs::remove_file(new_path));
     }
     try!(fs::rename(old_path, new_path));
-    log::info(format!("File changed: {}", new_path.to_str().unwrap()));
+    log::noisy(format!("File changed: {}", new_path.to_str().unwrap()));
   } else {
     try!(fs::remove_file(old_path));
-    log::info(format!("File not changed: {}", new_path.to_str().unwrap()));
+    log::noisy(format!("File not changed: {}", new_path.to_str().unwrap()));
   }
   Ok(())
 }

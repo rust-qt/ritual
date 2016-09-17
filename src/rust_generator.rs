@@ -1151,6 +1151,9 @@ impl RustGenerator {
         }
         continue;
       }
+      if method.cpp_method.is_operator() {
+        continue; // TODO: support operators
+      }
       match self.generate_function(method, scope, false) {
         Ok(rust_method) => {
           let name = rust_method.name.last_name().clone();

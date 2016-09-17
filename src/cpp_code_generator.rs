@@ -317,10 +317,10 @@ impl CppCodeGenerator {
     let cpp_path = self.lib_path
       .with_added("src")
       .with_added(format!("{}_{}.cpp", &self.lib_name, data.include_file_base_name));
-    log::info(format!("Generating source file: {:?}", cpp_path));
+    log::noisy(format!("Generating source file: {:?}", cpp_path));
 
     let h_path = self.lib_path.with_added("include").with_added(&ffi_include_file);
-    log::info(format!("Generating header file: {:?}", h_path));
+    log::noisy(format!("Generating header file: {:?}", h_path));
 
     let mut cpp_file = File::create(&cpp_path).unwrap();
     let mut h_file = File::create(&h_path).unwrap();

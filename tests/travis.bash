@@ -3,7 +3,6 @@
 # This script is used to run tests in Travis's Linux and Mac OS environments,
 # but it's possible to run it locally:
 # 
-# - set TRAVIS_OS_NAME to "osx" or "linux";
 # - set NOT_TRAVIS_FILES to the directory where to write files
 #   (defaults to $HOME);
 # - current directory should be cpp_to_rust repositry.
@@ -14,6 +13,11 @@
 
 
 set -o errexit
+
+if [ "$TRAVIS" = "true" ]; then 
+  echo "Travis detected. Forcing quiet mode."
+  export CPP_TO_RUST_QUIET=1
+fi
 
 if [ "$TRAVIS_BUILD_DIR" = "" ]; then 
   echo "TRAVIS_BUILD_DIR is not present!"
@@ -27,7 +31,26 @@ else
 fi
 echo "Files are stored in \"$FILES\""
  
+
+
 if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+  OS_NAME=osx
+elif [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+  OS_NAME=linux
+else
+  case "$OSTYPE" in
+    linux*)   OS_NAME=linux ;;
+    darwin*)  OS_NAME=osx ;; 
+    win*)     OS_NAME=windows ;;
+    cygwin*)  OS_NAME=cygwin ;;
+    bsd*)     OS_NAME=bsd ;;
+    solaris*) OS_NAME=solaris ;;
+    *)        OS_NAME=$OSTYPE ;;
+  esac
+fi
+echo "Detected OS: $OS_NAME"
+
+if [[ "$OS_NAME" == "osx" ]]; then
   cd $FILES
   CLANG_DIR=$FILES/clang-3.8
   if [ -d "$CLANG_DIR" ]; then
@@ -52,7 +75,7 @@ if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
   export PATH=$QT_DIR/bin:$PATH
   set +x
 
-elif [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+elif [[ "$OS_NAME" == "linux" ]]; then
   echo "Installing libclang"
   sudo apt-get install llvm-3.8 libclang-3.8-dev --yes --force-yes
   echo "Installing Qt"
@@ -67,8 +90,8 @@ else
   exit 1
 fi
 
-#BUILD_TYPE="--release"
-BUILD_TYPE=""
+BUILD_TYPE="--release"
+#BUILD_TYPE=""
 
 if [ -f "$FILES/tests_ok" ]; then
   echo "$FILES/tests_ok already exists"
@@ -99,17 +122,20 @@ cd "$TRAVIS_BUILD_DIR"
 function build_one {
   local NAME=$1
   local DEPS=$2
+  local PREFIX=$3
   local COMPLETED="$OUT/${NAME}_out/completed"
   if [ -f "$COMPLETED" ]; then
     echo "$COMPLETED already exists"
   else
     echo "Building and testing $NAME"
-    cargo run $BUILD_TYPE -- -s $REPOS/$NAME -o $OUT/${NAME}_out $DEPS
+    $PREFIX cargo run $BUILD_TYPE -- -s $REPOS/$NAME -o $OUT/${NAME}_out $DEPS
     touch "$COMPLETED"
   fi
 }
 
+XVFB_RUN="xvfb-run -a"
+
 build_one qt_core
-build_one qt_gui "-d $OUT/qt_core_out"
-build_one qt_widgets "-d $OUT/qt_core_out $OUT/qt_gui_out"
+build_one qt_gui "-d $OUT/qt_core_out" "$XVFB_RUN"
+build_one qt_widgets "-d $OUT/qt_core_out $OUT/qt_gui_out" "$XVFB_RUN"
 

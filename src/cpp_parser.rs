@@ -614,6 +614,9 @@ impl CppParser {
                           context_class: Option<Entity>,
                           context_method: Option<Entity>)
                           -> Result<CppType, String> {
+    if type1.is_volatile_qualified() {
+      return Err(format!("Volatile type"));
+    }
     let is_const = type1.is_const_qualified();
     match type1.get_kind() {
       TypeKind::Void => {
@@ -927,7 +930,7 @@ impl CppParser {
     let source_range = entity.get_range().unwrap();
     let tokens = source_range.tokenize();
     let declaration_code = if tokens.is_empty() {
-      log::warning(format!("Failed to tokenize method {} at {:?}",
+      log::noisy(format!("Failed to tokenize method {} at {:?}",
                            name,
                            entity.get_range().unwrap()));
       let start = source_range.get_start().get_file_location();
@@ -964,7 +967,11 @@ impl CppParser {
       if let Some(index) = result.find(";") {
         result = result[0..index].to_string();
       }
-      log::warning(format!("The code extracted directly from header: {:?}", result));
+      log::noisy(format!("The code extracted directly from header: {:?}", result));
+      if result.contains("volatile") {
+        log::warning(format!("Warning: volatile method is detected based on source code"));
+        return Err(format!("Probably a volatile method."));
+      }
       Some(result)
     } else {
       let mut token_strings = Vec::new();
@@ -972,6 +979,9 @@ impl CppParser {
         let text = token.get_spelling();
         if text == "{" || text == ";" {
           break;
+        }
+        if text == "volatile" {
+          return Err(format!("A volatile method."));
         }
         token_strings.push(text);
       }

@@ -1,4 +1,5 @@
 use rust_type::{RustName, RustType, RustTypeIndirection, RustFFIFunction, RustToCTypeConversion};
+use std;
 use std::path::PathBuf;
 use std::fs;
 use std::fs::File;
@@ -137,10 +138,8 @@ pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) {
   }
   let mut module_names: Vec<_> = data.modules.iter().map(|x| &x.name).collect();
   module_names.sort();
-  generator.generate_lib_file(&module_names);
-
   generator.generate_ffi_file(&data.ffi_functions);
-
+  generator.generate_lib_file(&module_names);
 }
 
 pub struct RustCodeGenerator {
@@ -692,18 +691,18 @@ impl RustCodeGenerator {
   }
 
   fn call_rustfmt(&self, path: &PathBuf) {
-    // TODO: suppress "line exceeded maximum length" warning
+    log::noisy(format!("Formatting {}", path.display()));
     let result = panic::catch_unwind(|| {
-      rustfmt::run(rustfmt::Input::File(path.clone()), &self.rustfmt_config)
+      rustfmt::format_input(rustfmt::Input::File(path.clone()), &self.rustfmt_config, Some(&mut std::io::stdout()))
     });
     match result {
       Ok(rustfmt_result) => {
-        if !rustfmt_result.has_no_errors() {
-          log::warning(format!("rustfmt failed to format file: {:?}", path));
+        if rustfmt_result.is_err() {
+          log::warning(format!("rustfmt returned Err on file: {:?}", path));
         }
       }
       Err(cause) => {
-        log::warning(format!("rustfmt failed to format file: {:?} (panic: {:?})",
+        log::warning(format!("rustfmt paniced on file: {:?}: {:?}",
                              path,
                              cause));
       }
