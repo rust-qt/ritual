@@ -74,12 +74,14 @@ if [[ "$OS_NAME" == "osx" ]]; then
   set -x
   export PATH=$QT_DIR/bin:$PATH
   set +x
+  XVFB_RUN=""
 
 elif [[ "$OS_NAME" == "linux" ]]; then
   set -x
   export LLVM_CONFIG_PATH=/usr/lib/llvm-3.8/bin/llvm-config
   export CLANG_SYSTEM_INCLUDE_PATH=/usr/lib/llvm-3.8/lib/clang/3.8.0/include
   set +x
+  XVFB_RUN="xvfb-run -a"
 
 else
   echo "TRAVIS_OS_NAME env var must be either 'osx' or 'linux'."
@@ -128,8 +130,6 @@ function build_one {
     touch "$COMPLETED"
   fi
 }
-
-XVFB_RUN="xvfb-run -a"
 
 build_one qt_core
 build_one qt_gui "-d $OUT/qt_core_out" "$XVFB_RUN"
