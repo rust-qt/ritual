@@ -1,9 +1,12 @@
 matrix:
   include:
-    - os: linux
-      dist: trusty
-    - os: osx
-script: tests/travis.bash
-language: rust
-rust: stable
+  - os: linux
+    dist: trusty
+    language: rust
+    rust: stable
+    script: sudo tests/travis.bash
+  - os: osx
+    language: rust
+    rust: stable
+    script: tests/travis.bash
 
