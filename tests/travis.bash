@@ -100,8 +100,8 @@ else
   touch $FILES/tests_ok
 fi
 
-cargo build $BUILD_TYPE
-exit
+# cargo build $BUILD_TYPE
+# exit
 
 echo "Running cpp_to_rust on Qt libraries"
 cd $FILES
