@@ -100,6 +100,8 @@ else
   touch $FILES/tests_ok
 fi
 
+exit
+
 echo "Running cpp_to_rust on Qt libraries"
 cd $FILES
 REPOS=$FILES/repos
