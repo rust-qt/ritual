@@ -108,7 +108,7 @@ pub fn run_from_build_script() {
 
 pub fn run(env: BuildEnvironment) {
   // canonicalize paths
-  //let current_dir = std::env::current_dir().unwrap();
+  // let current_dir = std::env::current_dir().unwrap();
   if !env.output_dir_path.as_path().exists() {
     fs::create_dir_all(&env.output_dir_path).unwrap();
   }
@@ -165,17 +165,28 @@ pub fn run(env: BuildEnvironment) {
           qt_this_lib_headers_dir = Some(dir2.clone());
           include_dirs.push(dir2);
           framework_dirs.push(qt_install_libs_path.clone());
-          link_items.push(RustLinkItem { name: format!("Qt{}", &lib_spec.cpp.name[3..]), kind: RustLinkKind::Framework });
+          link_items.push(RustLinkItem {
+            name: format!("Qt{}", &lib_spec.cpp.name[3..]),
+            kind: RustLinkKind::Framework,
+          });
         } else {
-          log::warning(format!("extra header dir not found (tried: {}, {})", dir.display(), dir2.display()));
+          log::warning(format!("extra header dir not found (tried: {}, {})",
+                               dir.display(),
+                               dir2.display()));
         }
       }
     }
   }
   if framework_dirs.is_empty() {
-    link_items.push(RustLinkItem { name: lib_spec.cpp.name.clone(), kind: RustLinkKind::SharedLibrary });
+    link_items.push(RustLinkItem {
+      name: lib_spec.cpp.name.clone(),
+      kind: RustLinkKind::SharedLibrary,
+    });
     for name in lib_spec.cpp.extra_libs.as_ref().unwrap_or(&Vec::new()) {
-      link_items.push(RustLinkItem { name: name.clone(), kind: RustLinkKind::SharedLibrary });
+      link_items.push(RustLinkItem {
+        name: name.clone(),
+        kind: RustLinkKind::SharedLibrary,
+      });
     }
   }
   let qt_doc_data = if is_qt_library {
@@ -385,7 +396,8 @@ pub fn run(env: BuildEnvironment) {
             .env("LD_LIBRARY_PATH", lib_path);
         }
         if !framework_dirs.is_empty() {
-          command.env("DYLD_FRAMEWORK_PATH", framework_dirs.iter().map(|x| x.to_str().unwrap().to_string()).join(":"));
+          command.env("DYLD_FRAMEWORK_PATH",
+                      framework_dirs.iter().map(|x| x.to_str().unwrap().to_string()).join(":"));
         }
         run_command(&mut command, false);
       }
@@ -401,7 +413,8 @@ pub fn run(env: BuildEnvironment) {
       println!("cargo:cpp_to_rust_data_path={}",
                output_dir_path.to_str().unwrap());
       for dir in &framework_dirs {
-        println!("cargo:rustc-link-search=framework={}", dir.to_str().unwrap());
+        println!("cargo:rustc-link-search=framework={}",
+                 dir.to_str().unwrap());
       }
     }
   }

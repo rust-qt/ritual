@@ -126,7 +126,7 @@ impl<'a> CGenerator<'a> {
       .find(|x| x.base.is_or_contains_template_parameter())
       .is_some() {
       log::noisy(format!("Skipping method containing template parameters: \n{}\n",
-                           method.short_text()));
+                         method.short_text()));
       return false;
     }
     true

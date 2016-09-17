@@ -30,7 +30,7 @@ pub struct RustCodeGeneratorDependency {
 
 pub enum RustLinkKind {
   SharedLibrary,
-  Framework, 
+  Framework,
 }
 pub struct RustLinkItem {
   pub name: String,
@@ -163,10 +163,18 @@ impl RustCodeGenerator {
 
     {
       let mut build_rs_file = File::create(self.config.output_path.with_added("build.rs")).unwrap();
-      let extra = self.config.framework_dirs.iter().map(|x| {
-        format!("  println!(\"cargo:rustc-link-search=framework={{}}\", \"{}\");", x)
-      }).join("\n");
-      write!(build_rs_file, include_str!("../templates/crate/build.rs"), extra = extra).unwrap();
+      let extra = self.config
+        .framework_dirs
+        .iter()
+        .map(|x| {
+          format!("  println!(\"cargo:rustc-link-search=framework={{}}\", \"{}\");",
+                  x)
+        })
+        .join("\n");
+      write!(build_rs_file,
+             include_str!("../templates/crate/build.rs"),
+             extra = extra)
+        .unwrap();
     }
 
     let cargo_toml_data = toml::Value::Table({
@@ -693,7 +701,9 @@ impl RustCodeGenerator {
   fn call_rustfmt(&self, path: &PathBuf) {
     log::noisy(format!("Formatting {}", path.display()));
     let result = panic::catch_unwind(|| {
-      rustfmt::format_input(rustfmt::Input::File(path.clone()), &self.rustfmt_config, Some(&mut std::io::stdout()))
+      rustfmt::format_input(rustfmt::Input::File(path.clone()),
+                            &self.rustfmt_config,
+                            Some(&mut std::io::stdout()))
     });
     match result {
       Ok(rustfmt_result) => {
@@ -702,9 +712,7 @@ impl RustCodeGenerator {
         }
       }
       Err(cause) => {
-        log::warning(format!("rustfmt paniced on file: {:?}: {:?}",
-                             path,
-                             cause));
+        log::warning(format!("rustfmt paniced on file: {:?}: {:?}", path, cause));
       }
     }
     assert!(path.as_path().is_file());
@@ -734,8 +742,15 @@ impl RustCodeGenerator {
       }
       for item in &self.config.link_items {
         match item.kind {
-          RustLinkKind::SharedLibrary => write!(file, "#[link(name = \"{}\")]\n", item.name).unwrap(),
-          RustLinkKind::Framework => write!(file, "#[link(name = \"{}\", kind = \"framework\")]\n", item.name).unwrap(),
+          RustLinkKind::SharedLibrary => {
+            write!(file, "#[link(name = \"{}\")]\n", item.name).unwrap()
+          }
+          RustLinkKind::Framework => {
+            write!(file,
+                   "#[link(name = \"{}\", kind = \"framework\")]\n",
+                   item.name)
+              .unwrap()
+          }
         }
       }
       write!(file, "#[link(name = \"stdc++\")]\n").unwrap();

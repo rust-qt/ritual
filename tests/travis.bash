@@ -2,11 +2,11 @@
 
 # This script is used to run tests in Travis's Linux and Mac OS environments,
 # but it's possible to run it locally:
-# 
+#
 # - set NOT_TRAVIS_FILES to the directory where to write files
 #   (defaults to $HOME);
 # - current directory should be cpp_to_rust repositry.
-# 
+#
 # The script will skip some parts if certain files are present.
 # Remove these files to force execution.
 # Travis runs the script on a clean VM, so it will run everything.
@@ -14,12 +14,12 @@
 
 set -o errexit
 
-if [ "$TRAVIS" = "true" ]; then 
+if [ "$TRAVIS" = "true" ]; then
   echo "Travis detected. Forcing quiet mode."
   export CPP_TO_RUST_QUIET=1
 fi
 
-if [ "$TRAVIS_BUILD_DIR" = "" ]; then 
+if [ "$TRAVIS_BUILD_DIR" = "" ]; then
   echo "TRAVIS_BUILD_DIR is not present!"
   TRAVIS_BUILD_DIR=`pwd`
   echo "TRAVIS_BUILD_DIR is set to \"$TRAVIS_BUILD_DIR\""
@@ -30,7 +30,7 @@ else
   FILES=$NO_TRAVIS_FILES
 fi
 echo "Files are stored in \"$FILES\""
- 
+
 
 
 if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
@@ -40,7 +40,7 @@ elif [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
 else
   case "$OSTYPE" in
     linux*)   OS_NAME=linux ;;
-    darwin*)  OS_NAME=osx ;; 
+    darwin*)  OS_NAME=osx ;;
     win*)     OS_NAME=windows ;;
     cygwin*)  OS_NAME=cygwin ;;
     bsd*)     OS_NAME=bsd ;;
@@ -76,10 +76,6 @@ if [[ "$OS_NAME" == "osx" ]]; then
   set +x
 
 elif [[ "$OS_NAME" == "linux" ]]; then
-  echo "Installing libclang"
-  sudo apt-get install llvm-3.8 libclang-3.8-dev --yes --force-yes
-  echo "Installing Qt"
-  sudo apt-get install qt5-default --yes --force-yes
   set -x
   export LLVM_CONFIG_PATH=/usr/lib/llvm-3.8/bin/llvm-config
   export CLANG_SYSTEM_INCLUDE_PATH=/usr/lib/llvm-3.8/lib/clang/3.8.0/include
@@ -95,7 +91,7 @@ BUILD_TYPE="--release"
 
 if [ -f "$FILES/tests_ok" ]; then
   echo "$FILES/tests_ok already exists"
-else 
+else
   echo "Compiling and testing cpp_to_rust"
   cd "$TRAVIS_BUILD_DIR"
   cargo test $BUILD_TYPE --verbose
@@ -108,7 +104,7 @@ REPOS=$FILES/repos
 OUT=$FILES/output
 if [ -d "$REPOS" ]; then
   echo "$REPOS already exists"
-else 
+else
   mkdir $REPOS
   cd $REPOS
   QT_REPOS_BRANCH="-b travis_start"

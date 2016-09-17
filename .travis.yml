@@ -4,7 +4,10 @@ matrix:
     dist: trusty
     language: rust
     rust: stable
-    script: sudo tests/travis.bash
+    script:
+    - sudo apt-get install llvm-3.8 libclang-3.8-dev --yes --force-yes
+    - sudo apt-get install qt5-default --yes --force-yes
+    - tests/travis.bash
   - os: osx
     language: rust
     rust: stable

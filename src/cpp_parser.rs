@@ -931,8 +931,8 @@ impl CppParser {
     let tokens = source_range.tokenize();
     let declaration_code = if tokens.is_empty() {
       log::noisy(format!("Failed to tokenize method {} at {:?}",
-                           name,
-                           entity.get_range().unwrap()));
+                         name,
+                         entity.get_range().unwrap()));
       let start = source_range.get_start().get_file_location();
       let end = source_range.get_end().get_file_location();
       let file = File::open(start.file.get_path()).unwrap();
@@ -1055,7 +1055,7 @@ impl CppParser {
   }
 
   fn parse_class(&self, entity: Entity) -> Result<CppTypeData, String> {
-//    println!("TEST parse class");
+    //    println!("TEST parse class");
     let mut fields = Vec::new();
     let mut bases = Vec::new();
     let template_arguments = get_template_arguments(entity);
@@ -1132,7 +1132,7 @@ impl CppParser {
         return Err("Types nested into template types are not supported".to_string());
       }
     }
-    //println!("TEST parse class end");
+    // println!("TEST parse class end");
     Ok(CppTypeData {
       name: get_full_name(entity).unwrap(),
       include_file: match self.entity_include_file(entity) {
@@ -1216,8 +1216,8 @@ impl CppParser {
 
 
   fn parse_types(&mut self, entity: Entity) {
-    //println!("TEST: parse_types");
-    //println!("TEST: parse_types: {:?}", entity);
+    // println!("TEST: parse_types");
+    // println!("TEST: parse_types: {:?}", entity);
     if !self.should_process_entity(entity) {
       return;
     }
@@ -1277,12 +1277,12 @@ impl CppParser {
       }
       _ => {}
     }
-    //if entity.get_kind() == EntityKind::UnexposedExpr {
+    // if entity.get_kind() == EntityKind::UnexposedExpr {
     //  return;
-    //}
-    //println!("TEST get children for:");
-    //println!("{:?} {:?}", entity.get_display_name(), entity.get_kind());
-    //println!("{:?}", entity);
+    // }
+    // println!("TEST get children for:");
+    // println!("{:?} {:?}", entity.get_display_name(), entity.get_kind());
+    // println!("{:?}", entity);
     for c in entity.get_children() {
       self.parse_types(c);
     }
