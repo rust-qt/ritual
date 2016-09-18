@@ -1055,7 +1055,6 @@ impl CppParser {
   }
 
   fn parse_class(&self, entity: Entity) -> Result<CppTypeData, String> {
-    //    println!("TEST parse class");
     let mut fields = Vec::new();
     let mut bases = Vec::new();
     let template_arguments = get_template_arguments(entity);
@@ -1132,7 +1131,6 @@ impl CppParser {
         return Err("Types nested into template types are not supported".to_string());
       }
     }
-    // println!("TEST parse class end");
     Ok(CppTypeData {
       name: get_full_name(entity).unwrap(),
       include_file: match self.entity_include_file(entity) {
@@ -1216,8 +1214,6 @@ impl CppParser {
 
 
   fn parse_types(&mut self, entity: Entity) {
-    // println!("TEST: parse_types");
-    // println!("TEST: parse_types: {:?}", entity);
     if !self.should_process_entity(entity) {
       return;
     }
@@ -1277,13 +1273,11 @@ impl CppParser {
       }
       _ => {}
     }
-    // if entity.get_kind() == EntityKind::UnexposedExpr {
-    //  return;
-    // }
-    // println!("TEST get children for:");
-    // println!("{:?} {:?}", entity.get_display_name(), entity.get_kind());
-    // println!("{:?}", entity);
     for c in entity.get_children() {
+      if c.get_kind() == EntityKind::BinaryOperator && c.get_location() == entity.get_location() {
+        log::warning("get_children refers to itself!");
+        continue;
+      } 
       self.parse_types(c);
     }
   }
@@ -1336,7 +1330,12 @@ impl CppParser {
       }
       _ => {}
     }
+    // TODO: check children only if it makes sense for the entity kind
     for c in entity.get_children() {
+      if c.get_kind() == EntityKind::BinaryOperator && c.get_location() == entity.get_location() {
+        log::warning("get_children refers to itself!");
+        continue;
+      } 
       methods.append(&mut self.parse_methods(c));
     }
     methods

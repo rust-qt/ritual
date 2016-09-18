@@ -5,6 +5,7 @@
 #
 # - set NOT_TRAVIS_FILES to the directory where to write files
 #   (defaults to $HOME);
+# - set BUILD_TYPE to "debug" if you want to disable release mode;
 # - current directory should be cpp_to_rust repositry.
 #
 # The script will skip some parts if certain files are present.
@@ -73,6 +74,7 @@ if [[ "$OS_NAME" == "osx" ]]; then
   fi
   set -x
   export PATH=$QT_DIR/bin:$PATH
+  export QT_PLUGIN_PATH=$QT_DIR/plugins
   set +x
   XVFB_RUN=""
 
@@ -88,8 +90,16 @@ else
   exit 1
 fi
 
-BUILD_TYPE="--release"
-#BUILD_TYPE=""
+if [[ "$BUILD_TYPE" == "debug" ]]; then
+  echo "Building in debug mode."
+  BUILD_TYPE=""
+  export RUST_BACKTRACE=1
+else
+  echo "Building in release mode."
+  BUILD_TYPE="--release"
+fi
+
+
 
 if [ -f "$FILES/tests_ok" ]; then
   echo "$FILES/tests_ok already exists"
