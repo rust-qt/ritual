@@ -5,7 +5,7 @@ use std;
 use std::fs;
 use std::fs::File;
 use utils::PathBufPushTweak;
-use utils::JoinWithString;
+use utils::is_msvc;
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -24,6 +24,7 @@ use cpp_ffi_generator::CppAndFfiData;
 use qt_doc_parser::QtDocData;
 use dependency_info::DependencyInfo;
 use std::env;
+
 
 /// Runs a command, checks that it is successful, and
 /// returns its output if requested
@@ -61,6 +62,15 @@ fn run_command(command: &mut Command, fetch_stdout: bool) -> String {
     }
     String::new()
   }
+}
+
+fn add_env_path_item(env_var_name: &'static str, mut new_paths: Vec<PathBuf>) -> std::ffi::OsString {
+  for path in env::split_paths(&env::var(env_var_name).unwrap_or(String::new())) {
+    if new_paths.iter().find(|&x| x == &path).is_none() {
+      new_paths.push(path);
+    }
+  }
+  env::join_paths(new_paths).unwrap()
 }
 
 pub enum BuildProfile {
@@ -108,7 +118,9 @@ pub fn run_from_build_script() {
 
 pub fn run(env: BuildEnvironment) {
   // canonicalize paths
-  // let current_dir = std::env::current_dir().unwrap();
+  if !env.source_dir_path.as_path().exists() {
+    panic!("Invalid source dir: {}", env.source_dir_path.display());
+  }
   if !env.output_dir_path.as_path().exists() {
     fs::create_dir_all(&env.output_dir_path).unwrap();
   }
@@ -291,21 +303,47 @@ pub fn run(env: BuildEnvironment) {
     let c_lib_build_path = c_lib_parent_path.with_added("build");
     fs::create_dir_all(&c_lib_build_path).unwrap();
     fs::create_dir_all(&c_lib_install_path).unwrap();
+    let mut cmake_command = Command::new("cmake");
+    fn path_without_long_path(pathbuf: &PathBuf) -> &str {
+      let path = pathbuf.to_str().unwrap();
+      if path.starts_with(r"\\?\") {
+        let result = &path[4..];
+        if result.len() > 255 {
+          panic!("This path can't be longer than 255 symbols: {}", result);
+        }
+        result
+      } else {
+        path
+      }
+    }
+    cmake_command.arg(&path_without_long_path(&c_lib_path))
+                 .arg(format!("-DCMAKE_INSTALL_PREFIX={}",
+                              path_without_long_path(&c_lib_install_path)))
+                 .current_dir(path_without_long_path(&c_lib_build_path));
+    if is_msvc() {
+      cmake_command.arg("-G").arg("NMake Makefiles");
+      // Rust always links to release version of MSVC runtime, so
+      // link will fail if C library is built in debug mode
+      cmake_command.arg("-DCMAKE_BUILD_TYPE=Release");
+    }
+    // TODO: enable release mode on other platforms if cargo is in release mode
+    // (maybe build C library in both debug and release in separate folders)
+    run_command(&mut cmake_command, false);
 
-    run_command(Command::new("cmake")
-                  .arg(&c_lib_path)
-                  .arg(format!("-DCMAKE_INSTALL_PREFIX={}",
-                               c_lib_install_path.to_str().unwrap()))
-                  .current_dir(&c_lib_build_path),
-                false);
-
-    let make_command = "make".to_string();
+    let make_command = if is_msvc() {
+      "nmake"
+    } else {
+      "make"
+    }.to_string();
     let mut make_args = Vec::new();
-    make_args.push(format!("-j{}", num_jobs));
+    if !is_msvc() { // nmake doesn't support multiple jobs
+      // TODO: allow to use jom
+      make_args.push(format!("-j{}", num_jobs));
+    }
     make_args.push("install".to_string());
     run_command(Command::new(make_command)
                   .args(&make_args)
-                  .current_dir(&c_lib_build_path),
+                  .current_dir(path_without_long_path(&c_lib_build_path)),
                 false);
 
 
@@ -390,13 +428,13 @@ pub fn run(env: BuildEnvironment) {
         command.current_dir(&output_dir_path);
         // TODO: if env var already exists, add to it instead of overwriting
         if let Some(ref cpp_lib_path) = cpp_lib_path {
-          let lib_path = cpp_lib_path.to_str().unwrap();
-          command.env("LIBRARY_PATH", lib_path)
-            .env("LD_LIBRARY_PATH", lib_path);
+          for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB"] {
+            command.env(name, add_env_path_item(name, vec![cpp_lib_path.clone()]));
+          }
         }
         if !framework_dirs.is_empty() {
           command.env("DYLD_FRAMEWORK_PATH",
-                      framework_dirs.iter().map(|x| x.to_str().unwrap().to_string()).join(":"));
+                      add_env_path_item("DYLD_FRAMEWORK_PATH", framework_dirs.clone()));
         }
         run_command(&mut command, false);
       }

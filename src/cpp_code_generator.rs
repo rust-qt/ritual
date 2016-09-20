@@ -10,6 +10,7 @@ use std::io::Write;
 use utils::JoinWithString;
 use std::path::PathBuf;
 use utils::PathBufPushTweak;
+use utils::is_msvc;
 use cpp_type::{CppType, CppTypeIndirection, CppTypeBase};
 
 /// Generates C++ code for the C wrapper library.
@@ -242,7 +243,10 @@ impl CppCodeGenerator {
                                  framework_directories: &Vec<String>) {
     let name_upper = self.lib_name.to_uppercase();
     let mut cmakelists_file = File::create(self.lib_path.with_added("CMakeLists.txt")).unwrap();
-    let mut cxx_flags = "-fPIC -std=gnu++11".to_string();
+    let mut cxx_flags = String::new();
+    if !is_msvc() {
+      cxx_flags.push_str("-fPIC -std=gnu++11");
+    }
     for dir in framework_directories {
       cxx_flags.push_str(&format!(" -F\\\"{}\\\"", dir));
     }
@@ -251,7 +255,7 @@ impl CppCodeGenerator {
            lib_name_lowercase = &self.lib_name,
            lib_name_uppercase = name_upper,
            include_directories = include_directories.into_iter()
-             .map(|x| format!("\"{}\"", x))
+             .map(|x| format!("\"{}\"", x.replace(r"\", r"\\")))
              .join(" "),
            cxx_flags = cxx_flags)
       .unwrap();

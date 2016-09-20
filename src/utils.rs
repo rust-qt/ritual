@@ -8,6 +8,13 @@ use std::hash::Hash;
 use std;
 use log;
 
+#[cfg(all(windows, target_env = "msvc"))]
+pub fn is_msvc() -> bool { true }
+
+#[cfg(not(all(windows, target_env = "msvc")))]
+pub fn is_msvc() -> bool { false }
+
+
 pub trait JoinWithString {
   fn join(self, separator: &'static str) -> String;
 }

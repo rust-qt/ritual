@@ -18,6 +18,7 @@ use cpp_operator::CppOperator;
 use std::io::Write;
 use std::io::{BufRead, BufReader};
 use std::env;
+use utils::is_msvc;
 
 struct CppParser {
   config: CppParserConfig,
@@ -132,9 +133,13 @@ fn run_clang<R, F: Fn(Entity) -> R>(config: &CppParserConfig, cpp_code: Option<S
   // TODO: PIC and additional args should be moved to lib spec
   let mut args = vec!["-fPIC".to_string(),
                       "-fcxx-exceptions".to_string(),
-                      "-std=gnu++11".to_string(),
                       "-Xclang".to_string(),
                       "-detailed-preprocessing-record".to_string()];
+  if is_msvc() {
+    args.push("-std=c++14".to_string());
+  } else {
+    args.push("-std=gnu++11".to_string());
+  }
   for dir in &config.include_dirs {
     args.push("-I".to_string());
     args.push(dir.to_str().unwrap().to_string());
@@ -515,6 +520,11 @@ impl CppParser {
                 context_class: Option<Entity>,
                 context_method: Option<Entity>)
                 -> Result<CppType, String> {
+    let display_name = type1.get_display_name();
+    if &display_name == "std::list<T>" {
+      return Err(format!("Type blacklisted because it causes crash on Windows: {}", display_name));
+    }
+
     let parsed =
       try!(self.parse_canonical_type(type1.get_canonical_type(), context_class, context_method));
     if let CppTypeBase::BuiltInNumeric(..) = parsed.base {
@@ -823,7 +833,6 @@ impl CppParser {
       None => (None, None),
     };
 
-
     let return_type = entity.get_type()
       .unwrap_or_else(|| panic!("failed to get function type"))
       .get_result_type()
@@ -831,7 +840,7 @@ impl CppParser {
     let return_type_parsed = match self.parse_type(return_type, class_entity, Some(entity)) {
       Ok(x) => x,
       Err(msg) => {
-        return Err(format!("Can't parse return type: {:?}: {}", return_type, msg));
+        return Err(format!("Can't parse return type: {}: {}", return_type.get_display_name(), msg));
       }
     };
     let mut arguments = Vec::new();
@@ -875,9 +884,9 @@ impl CppParser {
           });
         }
         Err(msg) => {
-          return Err(format!("Can't parse argument type: {}: {:?}: {}",
+          return Err(format!("Can't parse argument type: {}: {}: {}",
                              name,
-                             argument_entity.get_type().unwrap(),
+                             argument_entity.get_type().unwrap().get_display_name(),
                              msg));
         }
       }
@@ -919,6 +928,7 @@ impl CppParser {
                             its signature."));
       }
     }
+
     if method_operator.is_none() && name.starts_with("operator ") {
       let op = name["operator ".len()..].trim();
       match self.parse_unexposed_type(None, Some(op.to_string()), class_entity, Some(entity)) {
@@ -987,7 +997,6 @@ impl CppParser {
       }
       Some(token_strings.join(" "))
     };
-
     Ok(CppMethod {
       name: name,
       operator: method_operator,
@@ -1277,7 +1286,7 @@ impl CppParser {
       if c.get_kind() == EntityKind::BinaryOperator && c.get_location() == entity.get_location() {
         log::warning("get_children refers to itself!");
         continue;
-      } 
+      }
       self.parse_types(c);
     }
   }
@@ -1335,7 +1344,7 @@ impl CppParser {
       if c.get_kind() == EntityKind::BinaryOperator && c.get_location() == entity.get_location() {
         log::warning("get_children refers to itself!");
         continue;
-      } 
+      }
       methods.append(&mut self.parse_methods(c));
     }
     methods

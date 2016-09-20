@@ -10,6 +10,7 @@ use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMe
 use utils::{JoinWithString, copy_recursively};
 use log;
 use utils::PathBufPushTweak;
+use utils::is_msvc;
 use std::panic;
 use utils::CaseOperations;
 use rust_generator::RustGeneratorOutput;
@@ -753,7 +754,9 @@ impl RustCodeGenerator {
           }
         }
       }
-      write!(file, "#[link(name = \"stdc++\")]\n").unwrap();
+      if !is_msvc() {
+        write!(file, "#[link(name = \"stdc++\")]\n").unwrap();
+      }
       write!(file,
              "#[link(name = \"{}\", kind = \"static\")]\n",
              &self.config.c_lib_name)
