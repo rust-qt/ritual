@@ -522,7 +522,8 @@ impl CppParser {
                 -> Result<CppType, String> {
     let display_name = type1.get_display_name();
     if &display_name == "std::list<T>" {
-      return Err(format!("Type blacklisted because it causes crash on Windows: {}", display_name));
+      return Err(format!("Type blacklisted because it causes crash on Windows: {}",
+                         display_name));
     }
 
     let parsed =
@@ -840,7 +841,9 @@ impl CppParser {
     let return_type_parsed = match self.parse_type(return_type, class_entity, Some(entity)) {
       Ok(x) => x,
       Err(msg) => {
-        return Err(format!("Can't parse return type: {}: {}", return_type.get_display_name(), msg));
+        return Err(format!("Can't parse return type: {}: {}",
+                           return_type.get_display_name(),
+                           msg));
       }
     };
     let mut arguments = Vec::new();
@@ -1220,7 +1223,8 @@ impl CppParser {
     }
     if let Some(name) = entity.get_name() {
       if self.config.name_blacklist.iter().find(|&x| x == &name).is_some() {
-        log::info(format!("Skipping blacklisted entity: {}", get_full_name(entity).unwrap()));
+        log::info(format!("Skipping blacklisted entity: {}",
+                          get_full_name(entity).unwrap()));
         return false;
       }
     }

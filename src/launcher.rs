@@ -64,7 +64,9 @@ fn run_command(command: &mut Command, fetch_stdout: bool) -> String {
   }
 }
 
-fn add_env_path_item(env_var_name: &'static str, mut new_paths: Vec<PathBuf>) -> std::ffi::OsString {
+fn add_env_path_item(env_var_name: &'static str,
+                     mut new_paths: Vec<PathBuf>)
+                     -> std::ffi::OsString {
   for path in env::split_paths(&env::var(env_var_name).unwrap_or(String::new())) {
     if new_paths.iter().find(|&x| x == &path).is_none() {
       new_paths.push(path);
@@ -297,7 +299,9 @@ pub fn run(env: BuildEnvironment) {
     let mut cpp_libs = Vec::new();
     if c_lib_is_shared {
 
-      for spec in dependencies.iter().map(|dep| &dep.rust_export_info.lib_spec).chain(std::iter::once(&lib_spec)) {
+      for spec in dependencies.iter()
+        .map(|dep| &dep.rust_export_info.lib_spec)
+        .chain(std::iter::once(&lib_spec)) {
         cpp_libs.push(spec.cpp.name.clone());
         if let Some(ref extra_libs) = spec.cpp.extra_libs {
           for name in extra_libs {
@@ -309,7 +313,10 @@ pub fn run(env: BuildEnvironment) {
         }
       }
     }
-    let code_gen = CppCodeGenerator::new(c_lib_name.clone(), c_lib_tmp_path.clone(), c_lib_is_shared, cpp_libs);
+    let code_gen = CppCodeGenerator::new(c_lib_name.clone(),
+                                         c_lib_tmp_path.clone(),
+                                         c_lib_is_shared,
+                                         cpp_libs);
     code_gen.generate_template_files(&lib_spec.cpp.include_file,
                                      &include_dirs.iter()
                                        .map(|x| x.to_str().unwrap().to_string())
@@ -339,9 +346,9 @@ pub fn run(env: BuildEnvironment) {
       }
     }
     cmake_command.arg(&path_without_long_path(&c_lib_path))
-                 .arg(format!("-DCMAKE_INSTALL_PREFIX={}",
-                              path_without_long_path(&c_lib_install_path)))
-                 .current_dir(path_without_long_path(&c_lib_build_path));
+      .arg(format!("-DCMAKE_INSTALL_PREFIX={}",
+                   path_without_long_path(&c_lib_install_path)))
+      .current_dir(path_without_long_path(&c_lib_build_path));
     if is_msvc() {
       cmake_command.arg("-G").arg("NMake Makefiles");
       // Rust always links to release version of MSVC runtime, so
@@ -352,20 +359,17 @@ pub fn run(env: BuildEnvironment) {
     // (maybe build C library in both debug and release in separate folders)
     run_command(&mut cmake_command, false);
 
-    let make_command_name = if is_msvc() {
-      "nmake"
-    } else {
-      "make"
-    }.to_string();
+    let make_command_name = if is_msvc() { "nmake" } else { "make" }.to_string();
     let mut make_args = Vec::new();
-    if !is_msvc() { // nmake doesn't support multiple jobs
+    if !is_msvc() {
+      // nmake doesn't support multiple jobs
       // TODO: allow to use jom
       make_args.push(format!("-j{}", num_jobs));
     }
     make_args.push("install".to_string());
     let mut make_command = Command::new(make_command_name);
     make_command.args(&make_args)
-                .current_dir(path_without_long_path(&c_lib_build_path));
+      .current_dir(path_without_long_path(&c_lib_build_path));
     if c_lib_is_shared {
       if let Some(ref cpp_lib_path) = cpp_lib_path {
         for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB"] {
@@ -411,18 +415,20 @@ pub fn run(env: BuildEnvironment) {
     for dep in &dependencies {
       dependency_rust_types.extend_from_slice(&dep.rust_export_info.rust_types);
     }
-    let rust_data =
-      rust_generator::run(CppAndFfiData {
-                            cpp_data: parse_result,
-                            cpp_ffi_headers: cpp_ffi_headers,
-                          },
-                          dependency_rust_types,
-                          rust_generator::RustGeneratorConfig {
-                            crate_name: input_cargo_toml_data.name.clone(),
-                            remove_qt_prefix: is_qt_library,
-                            module_blacklist: lib_spec.rust.module_blacklist.clone().unwrap_or(Vec::new()),
-                            qt_doc_data: qt_doc_data,
-                          });
+    let rust_data = rust_generator::run(CppAndFfiData {
+                                          cpp_data: parse_result,
+                                          cpp_ffi_headers: cpp_ffi_headers,
+                                        },
+                                        dependency_rust_types,
+                                        rust_generator::RustGeneratorConfig {
+                                          crate_name: input_cargo_toml_data.name.clone(),
+                                          remove_qt_prefix: is_qt_library,
+                                          module_blacklist: lib_spec.rust
+                                            .module_blacklist
+                                            .clone()
+                                            .unwrap_or(Vec::new()),
+                                          qt_doc_data: qt_doc_data,
+                                        });
     rust_code_generator::run(rust_config, &rust_data);
     {
       let rust_types_path = output_dir_path.with_added("rust_export_info.json");

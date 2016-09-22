@@ -264,13 +264,11 @@ impl CppCodeGenerator {
            include_directories = include_directories.into_iter()
              .map(|x| format!("\"{}\"", x.replace(r"\", r"\\")))
              .join(" "),
-           library_type = if self.is_shared {
-             "SHARED"
-           } else {
-             "STATIC"
-           },
+           library_type = if self.is_shared { "SHARED" } else { "STATIC" },
            target_link_libraries = if self.is_shared {
-             format!("target_link_libraries({} {})", &self.lib_name, self.cpp_libs.join(" "))
+             format!("target_link_libraries({} {})",
+                     &self.lib_name,
+                     self.cpp_libs.join(" "))
            } else {
              String::new()
            },
