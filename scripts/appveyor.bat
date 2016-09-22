@@ -55,8 +55,6 @@ if exist "%FILES%\tests_ok" (
   type nul > "%FILES%\tests_ok" || goto :error
 )
 
-exit
-
 set REPOS=%FILES%\repos
 set OUT=%FILES%\output
 
