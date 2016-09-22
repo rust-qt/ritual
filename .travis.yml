@@ -11,8 +11,8 @@ matrix:
     script:
     - sudo apt-get install llvm-3.8 libclang-3.8-dev --yes --force-yes
     - sudo apt-get install qt5-default --yes --force-yes
-    - tests/travis.bash
+    - scripts/travis.bash
   - <<: *common
     os: osx
-    script: tests/travis.bash
+    script: scripts/travis.bash
 

@@ -1218,6 +1218,12 @@ impl CppParser {
         return false;
       }
     }
+    if let Some(name) = entity.get_name() {
+      if self.config.name_blacklist.iter().find(|&x| x == &name).is_some() {
+        log::info(format!("Skipping blacklisted entity: {}", get_full_name(entity).unwrap()));
+        return false;
+      }
+    }
     true
   }
 

@@ -13,6 +13,8 @@ use utils::PathBufPushTweak;
 use utils::is_msvc;
 use cpp_type::{CppType, CppTypeIndirection, CppTypeBase};
 
+// TODO: skip empty files (e.g. QFlags in qt_widgets)
+
 /// Generates C++ code for the C wrapper library.
 pub struct CppCodeGenerator {
   /// Library name
@@ -21,17 +23,22 @@ pub struct CppCodeGenerator {
   lib_name_upper: String,
   /// Path to the directory where the library is generated
   lib_path: PathBuf,
+
+  is_shared: bool,
+  cpp_libs: Vec<String>,
 }
 
 impl CppCodeGenerator {
   /// Creates a generator for a library.
   /// lib_name: library name
   /// lib_path: path to the directory where the library is generated
-  pub fn new(lib_name: String, lib_path: PathBuf) -> Self {
+  pub fn new(lib_name: String, lib_path: PathBuf, is_shared: bool, cpp_libs: Vec<String>) -> Self {
     CppCodeGenerator {
       lib_name: lib_name.clone(),
       lib_name_upper: lib_name.to_uppercase(),
       lib_path: lib_path,
+      is_shared: is_shared,
+      cpp_libs: cpp_libs,
     }
   }
 
@@ -257,6 +264,16 @@ impl CppCodeGenerator {
            include_directories = include_directories.into_iter()
              .map(|x| format!("\"{}\"", x.replace(r"\", r"\\")))
              .join(" "),
+           library_type = if self.is_shared {
+             "SHARED"
+           } else {
+             "STATIC"
+           },
+           target_link_libraries = if self.is_shared {
+             format!("target_link_libraries({} {})", &self.lib_name, self.cpp_libs.join(" "))
+           } else {
+             String::new()
+           },
            cxx_flags = cxx_flags)
       .unwrap();
     let src_dir = self.lib_path.with_added("src");

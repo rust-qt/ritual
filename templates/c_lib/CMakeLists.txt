@@ -5,12 +5,17 @@ include_directories(${{CMAKE_CURRENT_SOURCE_DIR}}/include ${{CMAKE_CURRENT_BINAR
 
 file(GLOB sources src/*.cpp)
 file(GLOB headers include/*.h)
-add_library({lib_name_lowercase} STATIC ${{sources}})
+add_library({lib_name_lowercase} {library_type} ${{sources}})
+{target_link_libraries}
 include_directories({include_directories})
-
 add_definitions(-D{lib_name_uppercase}_LIBRARY)
 
-install(TARGETS {lib_name_lowercase} ARCHIVE DESTINATION lib)
+install(TARGETS {lib_name_lowercase}
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION lib
+)
+
 install(FILES ${{headers}} DESTINATION include)
 
 if(${{CMAKE_COMPILER_IS_GNUCXX}})

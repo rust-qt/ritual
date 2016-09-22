@@ -576,4 +576,5 @@ pub struct RustProcessedTypeInfo {
 pub struct RustExportInfo {
   pub crate_name: String,
   pub rust_types: Vec<RustProcessedTypeInfo>,
+  pub lib_spec: LibSpec,
 }

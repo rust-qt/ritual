@@ -195,6 +195,11 @@ pub fn run(env: BuildEnvironment) {
       kind: RustLinkKind::SharedLibrary,
     });
     for name in lib_spec.cpp.extra_libs.as_ref().unwrap_or(&Vec::new()) {
+      if is_msvc() && name == "GL" {
+        // msvc doesn't need to link to GL
+        // TODO: allow platform-specific link items in manifest
+        continue;
+      }
       link_items.push(RustLinkItem {
         name: name.clone(),
         kind: RustLinkKind::SharedLibrary,
@@ -237,11 +242,13 @@ pub fn run(env: BuildEnvironment) {
 
   let c_lib_parent_path = output_dir_path.with_added("c_lib");
   let c_lib_install_path = c_lib_parent_path.with_added("install");
+  let c_lib_lib_path = c_lib_install_path.with_added("lib");
   let num_jobs = env.num_jobs.unwrap_or_else(|| num_cpus::get() as i32);
   let mut dependency_cpp_types = Vec::new();
   for dep in &dependencies {
     dependency_cpp_types.extend_from_slice(&dep.cpp_data.types);
   }
+  let c_lib_is_shared = is_msvc();
   if output_dir_path.with_added("skip_processing").as_path().exists() {
     log::info("Processing skipped!");
   } else {
@@ -287,7 +294,22 @@ pub fn run(env: BuildEnvironment) {
 
     let cpp_ffi_headers = cpp_ffi_generator::run(&parse_result, lib_spec.cpp.clone());
 
-    let code_gen = CppCodeGenerator::new(c_lib_name.clone(), c_lib_tmp_path.clone());
+    let mut cpp_libs = Vec::new();
+    if c_lib_is_shared {
+
+      for spec in dependencies.iter().map(|dep| &dep.rust_export_info.lib_spec).chain(std::iter::once(&lib_spec)) {
+        cpp_libs.push(spec.cpp.name.clone());
+        if let Some(ref extra_libs) = spec.cpp.extra_libs {
+          for name in extra_libs {
+            if is_msvc() && name == "GL" {
+              continue;
+            }
+            cpp_libs.push(name.clone());
+          }
+        }
+      }
+    }
+    let code_gen = CppCodeGenerator::new(c_lib_name.clone(), c_lib_tmp_path.clone(), c_lib_is_shared, cpp_libs);
     code_gen.generate_template_files(&lib_spec.cpp.include_file,
                                      &include_dirs.iter()
                                        .map(|x| x.to_str().unwrap().to_string())
@@ -330,7 +352,7 @@ pub fn run(env: BuildEnvironment) {
     // (maybe build C library in both debug and release in separate folders)
     run_command(&mut cmake_command, false);
 
-    let make_command = if is_msvc() {
+    let make_command_name = if is_msvc() {
       "nmake"
     } else {
       "make"
@@ -341,11 +363,17 @@ pub fn run(env: BuildEnvironment) {
       make_args.push(format!("-j{}", num_jobs));
     }
     make_args.push("install".to_string());
-    run_command(Command::new(make_command)
-                  .args(&make_args)
-                  .current_dir(path_without_long_path(&c_lib_build_path)),
-                false);
-
+    let mut make_command = Command::new(make_command_name);
+    make_command.args(&make_args)
+                .current_dir(path_without_long_path(&c_lib_build_path));
+    if c_lib_is_shared {
+      if let Some(ref cpp_lib_path) = cpp_lib_path {
+        for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB"] {
+          make_command.env(name, add_env_path_item(name, vec![cpp_lib_path.clone()]));
+        }
+      }
+    }
+    run_command(&mut make_command, false);
 
     let crate_new_path = output_dir_path.with_added(format!("{}.new", &input_cargo_toml_data.name));
     if crate_new_path.as_path().exists() {
@@ -361,6 +389,7 @@ pub fn run(env: BuildEnvironment) {
       output_path: crate_new_path.clone(),
       template_path: source_dir_path.clone(),
       c_lib_name: c_lib_name,
+      c_lib_is_shared: c_lib_is_shared,
       link_items: link_items,
       framework_dirs: framework_dirs.iter().map(|x| x.to_str().unwrap().to_string()).collect(),
       rustfmt_config_path: if rustfmt_config_path.as_path().exists() {
@@ -391,7 +420,7 @@ pub fn run(env: BuildEnvironment) {
                           rust_generator::RustGeneratorConfig {
                             crate_name: input_cargo_toml_data.name.clone(),
                             remove_qt_prefix: is_qt_library,
-                            module_blacklist: lib_spec.rust.module_blacklist.unwrap_or(Vec::new()),
+                            module_blacklist: lib_spec.rust.module_blacklist.clone().unwrap_or(Vec::new()),
                             qt_doc_data: qt_doc_data,
                           });
     rust_code_generator::run(rust_config, &rust_data);
@@ -402,6 +431,7 @@ pub fn run(env: BuildEnvironment) {
                             &RustExportInfo {
                               crate_name: input_cargo_toml_data.name.clone(),
                               rust_types: rust_data.processed_types,
+                              lib_spec: lib_spec.clone(),
                             })
         .unwrap();
       log::info(format!("Rust export info is saved to file: {}",
@@ -421,20 +451,34 @@ pub fn run(env: BuildEnvironment) {
   match env.invokation_method {
     InvokationMethod::CommandLine => {
       log::info(format!("Compiling Rust crate."));
-      for cargo_cmd in vec!["test", "doc"] {
+      let mut lib_dirs = Vec::new();
+      if let Some(ref cpp_lib_path) = cpp_lib_path {
+        lib_dirs.push(cpp_lib_path.clone());
+      }
+      if c_lib_is_shared {
+        lib_dirs.push(c_lib_lib_path.clone());
+      }
+      for cargo_cmd in vec!["build", "test", "doc"] {
         let mut command = Command::new("cargo");
         command.arg(cargo_cmd);
+        command.arg("--verbose");
         command.arg(format!("-j{}", num_jobs));
         command.current_dir(&output_dir_path);
         // TODO: if env var already exists, add to it instead of overwriting
-        if let Some(ref cpp_lib_path) = cpp_lib_path {
+        if !lib_dirs.is_empty() {
           for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB"] {
-            command.env(name, add_env_path_item(name, vec![cpp_lib_path.clone()]));
+            command.env(name, add_env_path_item(name, lib_dirs.clone()));
           }
         }
         if !framework_dirs.is_empty() {
           command.env("DYLD_FRAMEWORK_PATH",
                       add_env_path_item("DYLD_FRAMEWORK_PATH", framework_dirs.clone()));
+        }
+        if is_msvc() && cargo_cmd == "test" {
+          // cargo doesn't pass this flag to rustc when it compiles qt_core,
+          // so it's compiled with static std and the tests fail with
+          // "cannot satisfy dependencies so `std` only shows up once" error.
+          command.env("RUSTFLAGS", "-C prefer-dynamic");
         }
         run_command(&mut command, false);
       }
@@ -442,7 +486,7 @@ pub fn run(env: BuildEnvironment) {
     }
     InvokationMethod::BuildScript => {
       println!("cargo:rustc-link-search={}",
-               c_lib_install_path.with_added("lib").to_str().unwrap());
+               c_lib_lib_path.to_str().unwrap());
       if let Some(ref cpp_lib_path) = cpp_lib_path {
         let lib_path = cpp_lib_path.to_str().unwrap();
         println!("cargo:rustc-link-search=native={}", lib_path);

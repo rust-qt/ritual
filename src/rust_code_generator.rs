@@ -46,6 +46,7 @@ pub struct RustCodeGeneratorConfig {
   pub output_path: PathBuf,
   pub template_path: PathBuf,
   pub c_lib_name: String,
+  pub c_lib_is_shared: bool,
   pub link_items: Vec<RustLinkItem>,
   pub framework_dirs: Vec<String>,
   pub rustfmt_config_path: Option<PathBuf>,
@@ -211,6 +212,16 @@ impl RustCodeGenerator {
       let mut table = toml::Table::new();
       table.insert("package".to_string(), package);
       table.insert("dependencies".to_string(), dependencies);
+      if is_msvc() {
+        // LNK1189 (too many members) in MSVC with static linking,
+        // so we use dynamic linking
+        let lib = toml::Value::Table({
+          let mut table = toml::Table::new();
+          table.insert("crate-type".to_string(), toml::Value::Array(vec![toml::Value::String("dylib".to_string())]));
+          table
+        });
+        table.insert("lib".to_string(), lib);
+      }
       table
     });
     let mut cargo_toml_file = File::create(self.config.output_path.with_added("Cargo.toml"))
@@ -757,10 +768,17 @@ impl RustCodeGenerator {
       if !is_msvc() {
         write!(file, "#[link(name = \"stdc++\")]\n").unwrap();
       }
-      write!(file,
-             "#[link(name = \"{}\", kind = \"static\")]\n",
-             &self.config.c_lib_name)
-        .unwrap();
+      if self.config.c_lib_is_shared {
+        write!(file,
+               "#[link(name = \"{}\")]\n",
+               &self.config.c_lib_name)
+          .unwrap();
+      } else {
+        write!(file,
+               "#[link(name = \"{}\", kind = \"static\")]\n",
+               &self.config.c_lib_name)
+          .unwrap();
+      }
       write!(file, "extern \"C\" {{\n").unwrap();
 
       for &(ref include_file, ref functions) in functions {
