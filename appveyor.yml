@@ -1,4 +1,1 @@
 build_script: scripts\appveyor.bat
-cache:
-- 'target -> appveyor.yml'
-- 'C:\Users\appveyor\.cargo'
