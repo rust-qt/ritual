@@ -92,36 +92,36 @@ fi
 
 if [[ "$BUILD_TYPE" == "debug" ]]; then
   echo "Building in debug mode."
-  BUILD_TYPE=""
+  CARGO_ARGS=""
   export RUST_BACKTRACE=1
 else
   echo "Building in release mode."
-  BUILD_TYPE="--release"
+  CARGO_ARGS="--release"
 fi
 
 
 
 if [ -f "$FILES/tests_ok" ]; then
-  echo "$FILES/tests_ok already exists"
+  echo "Skipped compiling and testing cpp_to_rust because $FILES/tests_ok already exists"
 else
   echo "Compiling and testing cpp_to_rust"
   cd "$TRAVIS_BUILD_DIR"
-  cargo test $BUILD_TYPE --verbose
+  cargo test $CARGO_ARGS --verbose
   touch $FILES/tests_ok
 fi
 
-# cargo build $BUILD_TYPE
+# cargo build $CARGO_ARGS
 # exit
 
-echo "Running cpp_to_rust on Qt libraries"
 cd $FILES
 REPOS=$FILES/repos
 OUT=$FILES/output
 if [ -d "$REPOS" ]; then
-  echo "$REPOS already exists"
+  echo "Skipped cloning Qt library repos because $REPOS already exists"
 else
-  mkdir $REPOS
-  cd $REPOS
+  echo "Cloning Qt library repos"
+  mkdir "$REPOS"
+  cd "$REPOS"
   QT_REPOS_BRANCH="-b travis_start"
   git clone $QT_REPOS_BRANCH https://github.com/rust-qt/qt_core.git
   git clone $QT_REPOS_BRANCH https://github.com/rust-qt/qt_gui.git
@@ -130,16 +130,18 @@ fi
 
 cd "$TRAVIS_BUILD_DIR"
 
+echo "Running cpp_to_rust on Qt libraries"
+
 function build_one {
   local NAME=$1
   local DEPS=$2
   local PREFIX=$3
   local COMPLETED="$OUT/${NAME}_out/completed"
   if [ -f "$COMPLETED" ]; then
-    echo "$COMPLETED already exists"
+    echo "Skipped building and testing $NAME because $COMPLETED already exists"
   else
     echo "Building and testing $NAME"
-    $PREFIX cargo run $BUILD_TYPE -- -s $REPOS/$NAME -o $OUT/${NAME}_out $DEPS
+    $PREFIX cargo run $CARGO_ARGS -- -s $REPOS/$NAME -o $OUT/${NAME}_out $DEPS
     touch "$COMPLETED"
   fi
 }
