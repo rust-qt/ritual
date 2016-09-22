@@ -217,7 +217,8 @@ impl RustCodeGenerator {
         // so we use dynamic linking
         let lib = toml::Value::Table({
           let mut table = toml::Table::new();
-          table.insert("crate-type".to_string(), toml::Value::Array(vec![toml::Value::String("dylib".to_string())]));
+          table.insert("crate-type".to_string(),
+                       toml::Value::Array(vec![toml::Value::String("dylib".to_string())]));
           table
         });
         table.insert("lib".to_string(), lib);
@@ -769,10 +770,7 @@ impl RustCodeGenerator {
         write!(file, "#[link(name = \"stdc++\")]\n").unwrap();
       }
       if self.config.c_lib_is_shared {
-        write!(file,
-               "#[link(name = \"{}\")]\n",
-               &self.config.c_lib_name)
-          .unwrap();
+        write!(file, "#[link(name = \"{}\")]\n", &self.config.c_lib_name).unwrap();
       } else {
         write!(file,
                "#[link(name = \"{}\", kind = \"static\")]\n",
