@@ -2,6 +2,8 @@ echo on
 setlocal EnableDelayedExpansion
 
 set FILES=%USERPROFILE%\files
+if not exist "%FILES%" mkdir "%FILES%"
+
 if "%BUILD_TYPE%"=="debug" (
   echo "Building in debug mode."
   set CARGO_ARGS=
@@ -52,6 +54,8 @@ if exist "%FILES%\tests_ok" (
   cargo test %CARGO_ARGS% || goto :error
   type nul > "%FILES%\tests_ok" || goto :error
 )
+
+exit
 
 set REPOS=%FILES%\repos
 set OUT=%FILES%\output
