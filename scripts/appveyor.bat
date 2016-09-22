@@ -1,14 +1,15 @@
+echo on
+setlocal EnableDelayedExpansion
 
-rem TODO: install Rust
-
-rustup toolchain list || goto :error
-
-echo "Setting VS environment"
-call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64 || goto :error
-
-set PATH=C:\Qt\5.7\msvc2015_64\bin;%PATH%
-rem TODO: add llvm-config path
-rem set CLANG_SYSTEM_INCLUDE_PATH=C:\Program Files\LLVM\lib\clang\3.8.0\include
+set FILES=%USERPROFILE%\files
+if "%BUILD_TYPE%"=="debug" (
+  echo "Building in debug mode."
+  set CARGO_ARGS=
+  set RUST_BACKTRACE=1
+) else (
+  echo "Building in release mode."
+  set CARGO_ARGS="--release"
+)
 
 if "%APPVEYOR_BUILD_FOLDER%"=="" (
   set BUILD_DIR=%cd%
@@ -16,20 +17,32 @@ if "%APPVEYOR_BUILD_FOLDER%"=="" (
   set BUILD_DIR=%APPVEYOR_BUILD_FOLDER%
 )
 
+set PATH=%USERPROFILE%\.cargo\bin;%PATH%
 
-if "%BUILD_TYPE%"=="debug" (
-  echo "Building in debug mode."
-  set CARGO_ARGS=
+rustup show
+if "%ERRORLEVEL%" == "0" (
+  echo "Rustup is already intstalled."
 ) else (
-  echo "Building in release mode."
-  set CARGO_ARGS="--release"
+  echo "Installing rustup"
+  cd "%FILES%"
+  curl -sSf -o rustup-init.exe https://win.rustup.rs/ || goto :error
+  rustup-init.exe -y || goto :error
+  rustup show || goto :error
 )
 
+rustup toolchain list || goto :error
+where rustc cargo || goto :error
+rustc -vV || goto :error
+cargo -vV || goto :error
 
-rem TODO: release mode by default
-set RUST_BACKTRACE=1
 
-set FILES=%USERPROFILE%\files
+echo "Setting VS environment"
+call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64 || goto :error
+
+set PATH=C:\Qt\5.7\msvc2015_64\bin;%PATH%
+
+
+
 
 cd "%BUILD_DIR%"
 if exist "%FILES%\tests_ok" (
