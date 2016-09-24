@@ -8,7 +8,7 @@
 # - set BUILD_TYPE to "debug" if you want to disable release mode;
 # - current directory should be cpp_to_rust repositry.
 #
-# The script will skip some parts if certain files are present.
+# The script will skip some parts if certain files  are present.
 # Remove these files to force execution.
 # Travis runs the script on a clean VM, so it will run everything.
 
