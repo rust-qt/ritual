@@ -1,7 +1,7 @@
 echo on
 setlocal EnableDelayedExpansion
 
-set QT_REPOS_BRANCH="-btravis_start"
+set QT_REPOS_BRANCH=-b master
 
 set FILES=%USERPROFILE%\files
 if not exist "%FILES%" mkdir "%FILES%"
@@ -25,7 +25,7 @@ set PATH=%USERPROFILE%\.cargo\bin;%PATH%
 
 rustup show
 if "%ERRORLEVEL%" == "0" (
-  echo "Rustup is already intstalled."
+  echo "Rustup is already installed."
 ) else (
   echo "Installing rustup"
   cd "%FILES%"
@@ -44,9 +44,6 @@ echo "Setting VS environment"
 call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64 || goto :error
 
 set PATH=C:\Qt\5.7\msvc2015_64\bin;%PATH%
-
-
-
 
 cd "%BUILD_DIR%"
 if exist "%FILES%\tests_ok" (
@@ -67,17 +64,23 @@ if exist "%REPOS%" (
   mkdir "%REPOS%" || goto :error
   cd "%REPOS%" || goto :error
   git clone %QT_REPOS_BRANCH% https://github.com/rust-qt/qt_core.git || goto :error
-  git clone %QT_REPOS_BRANCH% https://github.com/rust-qt/qt_gui.git || goto :error
-  git clone %QT_REPOS_BRANCH% https://github.com/rust-qt/qt_widgets.git || goto :error
+  if "%APPVEYOR%" == "True" (
+    echo "Quick mode: only qt_core"
+  ) else (
+    git clone %QT_REPOS_BRANCH% https://github.com/rust-qt/qt_gui.git || goto :error
+    git clone %QT_REPOS_BRANCH% https://github.com/rust-qt/qt_widgets.git || goto :error
+  )
 )
-
 
 echo "Running cpp_to_rust on Qt libraries"
 cd "%BUILD_DIR%"
 call :build_one qt_core || goto :error
-call :build_one qt_gui "-d %OUT%\qt_core_out" || goto :error
-call :build_one qt_widgets "-d %OUT%\qt_core_out %OUT%\qt_gui_out" || goto :error
-
+if "%APPVEYOR%" == "True" (
+  echo "Quick mode: only qt_core"
+) else (
+  call :build_one qt_gui "-d %OUT%\qt_core_out" || goto :error
+  call :build_one qt_widgets "-d %OUT%\qt_core_out %OUT%\qt_gui_out" || goto :error
+)
 
 goto :eof
 

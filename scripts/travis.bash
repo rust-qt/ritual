@@ -15,6 +15,9 @@
 
 set -o errexit
 
+QT_REPOS_BRANCH="-b master"
+
+
 if [ "$TRAVIS" = "true" ]; then
   echo "Travis detected. Forcing quiet mode."
   export CPP_TO_RUST_QUIET=1
@@ -122,10 +125,13 @@ else
   echo "Cloning Qt library repos"
   mkdir "$REPOS"
   cd "$REPOS"
-  QT_REPOS_BRANCH="-b travis_start"
   git clone $QT_REPOS_BRANCH https://github.com/rust-qt/qt_core.git
-  git clone $QT_REPOS_BRANCH https://github.com/rust-qt/qt_gui.git
-  git clone $QT_REPOS_BRANCH https://github.com/rust-qt/qt_widgets.git
+  if [ "$TRAVIS" = "true" ]; then
+    echo "Quick mode: only qt_core"
+  else
+    git clone $QT_REPOS_BRANCH https://github.com/rust-qt/qt_gui.git
+    git clone $QT_REPOS_BRANCH https://github.com/rust-qt/qt_widgets.git
+  fi
 fi
 
 cd "$TRAVIS_BUILD_DIR"
@@ -147,6 +153,10 @@ function build_one {
 }
 
 build_one qt_core
-build_one qt_gui "-d $OUT/qt_core_out" "$XVFB_RUN"
-build_one qt_widgets "-d $OUT/qt_core_out $OUT/qt_gui_out" "$XVFB_RUN"
+if [ "$TRAVIS" = "true" ]; then
+  echo "Quick mode: only qt_core"
+else
+  build_one qt_gui "-d $OUT/qt_core_out" "$XVFB_RUN"
+  build_one qt_widgets "-d $OUT/qt_core_out $OUT/qt_gui_out" "$XVFB_RUN"
+fi
 
