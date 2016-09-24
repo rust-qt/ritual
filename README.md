@@ -58,11 +58,16 @@ If you use custom Qt version that is not available in library path, you need to 
 
 ## Platform support
 
-`cpp_to_rust` is continuously tested on the following platforms (using Travis and Appveyor):
+`cpp_to_rust` is continuously tested on the following platforms:
 
-- Ubuntu Trusty x64 (stable-x86_64-unknown-linux-gnu);
-- OS X 10.9.5 (stable-x86_64-apple-darwin);
-- Windows Server 2012 R2 Windows 7 x64 with MSVC 14 (stable-x86_64-pc-windows-msvc).
+- with Travis: [![Build Status](https://travis-ci.org/rust-qt/cpp_to_rust.svg?branch=master)](https://travis-ci.org/rust-qt/cpp_to_rust)
+
+  - Ubuntu Trusty x64 (stable-x86_64-unknown-linux-gnu);
+  - OS X 10.9.5 (stable-x86_64-apple-darwin);
+
+- with Appveyor: [![Build status](https://ci.appveyor.com/api/projects/status/m4yo29j2f5wfu3w0/branch/master?svg=true)](https://ci.appveyor.com/project/Riateche/cpp-to-rust/branch/master)
+
+  - Windows Server 2012 R2 Windows 7 x64 with MSVC 14 (stable-x86_64-pc-windows-msvc).
 
 It's also occasionally tested on other systems (Windows 7 x64, Debian Jessie x64).
 
