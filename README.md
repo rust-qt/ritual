@@ -7,8 +7,7 @@
 - Stable Rust >= 1.9.
 - `libclang-dev`. Mainly developed with version 3.5, but higher versions should be compatible as well.
 - cmake >= 3.0.
-- C++ compiler compatible with the Rust toolchain in use.
-- make.
+- make and C++ compiler compatible with the Rust toolchain in use. On OS X, the command line developer tools are needed, but full Xcode installation is not needed.
 - The C++ library to wrap, built for the same toolchain as Rust.
 
 If you have multiple versions of Qt on your machine (for example, obtained via online installer) and you want to build against a specific version, modify `PATH` environment variable so that `qmake` command of the correct Qt version is available. `cpp_to_rust` uses `qmake` command to find library paths.
@@ -19,7 +18,7 @@ The converter parses C++ headers of the library and generates a wrapper library 
 
 ## How to run
 
-### Input files 
+### Input files
 
 The generator requires multiple files to run: `Cargo.toml` file template for the library, `spec.json` file with additional information, tests and extra source files. Exact specification of input files is not stabilized at the moment. Prepared input files are available for multiple libraries:
 
@@ -39,14 +38,14 @@ To use generated library, include it in your project's `Cargo.toml` by specifyin
 
     qt_core = { path = "../output/qt_core" }
 
-When processing a library with dependencies on other C++ libraries (e.g. QtWidgets that depends on QtCore and QtGui), dependencies need to be processed first. Use `-d <OUT_DIR1> <OUT_DIR2>...` argument to add dependencies to `cpp_to_rust`. You may not need to include dependencies in your project's `Cargo.toml` file because each generated crate re-exports all its dependencies. But if you decide to do it, make sure that you use the same crate directory that was used in `-d`.   
+When processing a library with dependencies on other C++ libraries (e.g. QtWidgets that depends on QtCore and QtGui), dependencies need to be processed first. Use `-d <OUT_DIR1> <OUT_DIR2>...` argument to add dependencies to `cpp_to_rust`. You may not need to include dependencies in your project's `Cargo.toml` file because each generated crate re-exports all its dependencies. But if you decide to do it, make sure that you use the same crate directory that was used in `-d`.
 
 ### Running from a build script
 
 This option uses standard Cargo's build system. The input files folder itself is a full-featured crate with a build script that uses `cpp_to_rust` to generate the sources. You can either clone the input folder and run `cargo build` in it, or just include the input files folder directly in your project:
 
     qt_widgets = { git = "https://github.com/rust-qt/qt_widgets.git" }
-    
+
 If the library is published on crates.io, you can also include it using its version:
 
     qt_widgets = "0.0"
@@ -59,7 +58,13 @@ If you use custom Qt version that is not available in library path, you need to 
 
 ## Platform support
 
-Only Linux is currently supported. Windows support is a high priority. Mac OS support is not planned, but contributions are welcome.
+`cpp_to_rust` is continuously tested on the following platforms (using Travis and Appveyor):
+
+- Ubuntu Trusty x64 (stable-x86_64-unknown-linux-gnu);
+- OS X 10.9.5 (stable-x86_64-apple-darwin);
+- Windows Server 2012 R2 Windows 7 x64 with MSVC 14 (stable-x86_64-pc-windows-msvc).
+
+It's also occasionally tested on other systems (Windows 7 x64, Debian Jessie x64).
 
 ## Library coverage
 
@@ -85,7 +90,7 @@ Currently implemented features:
 - All names are converted to match Rust naming conventions.
 - Method overloading is emulated with wrapping arguments in a tuple and creating a trait describing tuples acceptable by each method. Methods with default arguments are treated in the same way.
 - Methods inherited from base classes are added directly to wrapper struct of the derived class.
-- If a type is wrapped in a dependency, it will be reused, not duplicated. 
+- If a type is wrapped in a dependency, it will be reused, not duplicated.
 - Rustdoc comments are generated (a work in progress). Qt documentation is parsed and used in rustdoc comments.
 
 Not implemented yet but planned:
