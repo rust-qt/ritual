@@ -1,6 +1,8 @@
 echo on
 setlocal EnableDelayedExpansion
 
+set QT_REPOS_BRANCH="-btravis_start"
+
 set FILES=%USERPROFILE%\files
 if not exist "%FILES%" mkdir "%FILES%"
 
@@ -64,7 +66,6 @@ if exist "%REPOS%" (
   echo "Cloning Qt library repos"
   mkdir "%REPOS%" || goto :error
   cd "%REPOS%" || goto :error
-  set QT_REPOS_BRANCH="-b travis_start"
   git clone %QT_REPOS_BRANCH% https://github.com/rust-qt/qt_core.git || goto :error
   git clone %QT_REPOS_BRANCH% https://github.com/rust-qt/qt_gui.git || goto :error
   git clone %QT_REPOS_BRANCH% https://github.com/rust-qt/qt_widgets.git || goto :error
