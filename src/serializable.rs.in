@@ -504,6 +504,12 @@ pub struct CppType {
 pub struct CppLibSpec {
   /// Name of C++ library used for linking
   pub name: String,
+
+
+  pub include_dirs: Option<Vec<String>>,
+  pub target_include_dirs: Option<Vec<String>>,
+  pub lib_dirs: Option<Vec<String>>,
+
   /// Other libraries that need to be linked
   pub extra_libs: Option<Vec<String>>,
   /// Name of the library's include file

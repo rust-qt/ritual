@@ -115,7 +115,7 @@ pub struct CppParserConfig {
   pub header_name: String,
   /// Directory containing headers of the target library.
   /// Only entities declared within this directory will be processed.
-  pub target_include_dir: Option<PathBuf>,
+  pub target_include_dirs: Option<Vec<PathBuf>>,
   pub tmp_cpp_path: PathBuf,
   pub name_blacklist: Vec<String>,
 }
@@ -1095,6 +1095,7 @@ impl CppParser {
       .collect();
     for child in entity.get_children() {
       if child.get_kind() == EntityKind::FieldDecl {
+        println!("test: {:?}", child);
         let field_clang_type = child.get_type().unwrap();
         match self.parse_type(field_clang_type, Some(entity), None) {
           Ok(field_type) => {
@@ -1209,8 +1210,8 @@ impl CppParser {
       }
       if let Some(file_path) = self.entity_include_path(entity) {
         let file_path_buf = PathBuf::from(&file_path);
-        if let Some(ref target_include_dir) = self.config.target_include_dir {
-          if !file_path_buf.starts_with(target_include_dir) {
+        if let Some(ref target_include_dirs) = self.config.target_include_dirs {
+          if target_include_dirs.iter().find(|x| file_path_buf.starts_with(x)).is_none() {
             log::noisy(format!("skipping entities from {}", file_path));
             return false;
           }

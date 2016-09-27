@@ -152,6 +152,18 @@ pub fn run(env: BuildEnvironment) {
   let mut include_dirs = Vec::new();
   let mut cpp_lib_path = None;
   let mut qt_this_lib_headers_dir = None;
+  let mut target_include_dirs = lib_spec.cpp.target_include_dirs.as_ref().map(|dirs| {
+    dirs.iter()
+      .map(|dir| {
+        let absolute_dir = source_dir_path.with_added(dir);
+        if !absolute_dir.exists() {
+          panic!("Target include dir does not exist: {}",
+                 absolute_dir.display());
+        }
+        fs::canonicalize(absolute_dir).unwrap()
+      })
+      .collect()
+  });
   let mut framework_dirs = Vec::new();
   let mut link_items = Vec::new();
   if is_qt_library {
@@ -179,12 +191,18 @@ pub fn run(env: BuildEnvironment) {
       let dir = qt_install_headers_path.with_added(format!("Qt{}", &lib_spec.cpp.name[3..]));
       if dir.exists() {
         qt_this_lib_headers_dir = Some(dir.clone());
-        include_dirs.push(dir);
+        include_dirs.push(dir.clone());
+        if target_include_dirs.is_none() {
+          target_include_dirs = Some(vec![dir]);
+        }
       } else {
         let dir2 = qt_install_libs_path.with_added(format!("Qt{}.framework/Headers", &lib_spec.cpp.name[3..]));
         if dir2.exists() {
           qt_this_lib_headers_dir = Some(dir2.clone());
-          include_dirs.push(dir2);
+          include_dirs.push(dir2.clone());
+          if target_include_dirs.is_none() {
+            target_include_dirs = Some(vec![dir2]);
+          }
           framework_dirs.push(qt_install_libs_path.clone());
           link_items.push(RustLinkItem {
             name: format!("Qt{}", &lib_spec.cpp.name[3..]),
@@ -196,6 +214,15 @@ pub fn run(env: BuildEnvironment) {
                                dir2.display()));
         }
       }
+    }
+  }
+  if let Some(ref spec_include_dirs) = lib_spec.cpp.include_dirs {
+    for dir in spec_include_dirs {
+      let absolute_dir = source_dir_path.with_added(dir);
+      if !absolute_dir.exists() {
+        panic!("Include dir does not exist: {}", absolute_dir.display());
+      }
+      include_dirs.push(fs::canonicalize(absolute_dir).unwrap());
     }
   }
   if framework_dirs.is_empty() {
@@ -274,13 +301,15 @@ pub fn run(env: BuildEnvironment) {
                           include_dirs: include_dirs.clone(),
                           framework_dirs: framework_dirs.clone(),
                           header_name: lib_spec.cpp.include_file.clone(),
-                          target_include_dir: qt_this_lib_headers_dir.clone(),
+                          target_include_dirs: target_include_dirs,
                           tmp_cpp_path: output_dir_path.with_added("1.cpp"),
                           name_blacklist: lib_spec.cpp.name_blacklist.clone().unwrap_or(Vec::new()),
                         },
                         &dependency_cpp_types);
       if is_qt_library {
-        qt_specific::fix_header_names(&mut parse_result, &qt_this_lib_headers_dir.unwrap());
+        if let Some(ref qt_this_lib_headers_dir) = qt_this_lib_headers_dir {
+          qt_specific::fix_header_names(&mut parse_result, qt_this_lib_headers_dir);
+        }
       }
       log::info("Post-processing parse result.");
       parse_result.post_process(&dependencies.iter().map(|x| &x.cpp_data).collect());
