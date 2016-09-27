@@ -132,12 +132,19 @@ pub fn run(env: BuildEnvironment) {
   let lib_spec_path = source_dir_path.with_added("spec.json");
 
   log::info("Reading lib spec");
+  if !lib_spec_path.exists() {
+    panic!("Lib spec file does not exist: {}", lib_spec_path.display());
+  }
   let file = File::open(&lib_spec_path).unwrap();
   let lib_spec: LibSpec = serde_json::from_reader(file).unwrap();
 
   log::info("Reading input Cargo.toml");
-  let input_cargo_toml_data =
-    InputCargoTomlData::from_file(&source_dir_path.with_added("Cargo.toml"));
+  let input_cargo_toml_path = source_dir_path.with_added("Cargo.toml");
+  if !input_cargo_toml_path.exists() {
+    panic!("Input Cargo.toml does not exist: {}",
+           input_cargo_toml_path.display());
+  }
+  let input_cargo_toml_data = InputCargoTomlData::from_file(&input_cargo_toml_path);
   log::info(format!("C++ library name: {}", lib_spec.cpp.name));
 
   let is_qt_library = lib_spec.cpp.name.starts_with("Qt5");
