@@ -50,8 +50,8 @@ fn remove_qt_prefix_and_convert_case(s: &String, case: Case, remove_qt_prefix: b
 /// processing as remove_qt_prefix_and_convert_case() for snake case.
 fn include_file_to_module_name(include_file: &String, remove_qt_prefix: bool) -> String {
   let mut r = include_file.clone();
-  if r.ends_with(".h") {
-    r = r[0..r.len() - 2].to_string();
+  if let Some(index) = r.find(".") {
+    r = r[0..index].to_string();
   }
   remove_qt_prefix_and_convert_case(&r, Case::Snake, remove_qt_prefix)
 }

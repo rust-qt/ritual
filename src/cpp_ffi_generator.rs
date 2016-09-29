@@ -60,9 +60,9 @@ pub fn run(cpp_data: &CppData, cpp_lib_spec: CppLibSpec) -> Vec<CppFfiHeaderData
       }
     }
     let mut include_file_base_name = include_file.clone();
-    if include_file_base_name.ends_with(".h") {
-      include_file_base_name = include_file_base_name[0..include_file_base_name.len() - 2]
-        .to_string();
+
+    if let Some(index) = include_file_base_name.find(".") {
+      include_file_base_name = include_file_base_name[0..index].to_string();
     }
     let methods = generator.process_methods(&include_file,
                                             &include_file_base_name,
