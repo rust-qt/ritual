@@ -175,6 +175,7 @@ impl CppData {
             template_arguments: None,
             declaration_code: None,
             inherited_from: None, // TODO: do we need inherited_from for destructors?
+            inheritance_chain: Vec::new(),
           });
         }
       }
@@ -268,6 +269,7 @@ impl CppData {
                           .clone(),
                       });
                     }
+                    new_method.inheritance_chain.push(base.clone());
                     log::debug(format!("Method added: {}", new_method.short_text()));
                     log::debug(format!("Base method: {} ({:?})\n",
                                        base_class_method.short_text(),
@@ -322,7 +324,64 @@ impl CppData {
         }
       }
     }
-    self.methods.append(&mut all_new_methods);
+    while !all_new_methods.is_empty() {
+      let method = all_new_methods.pop().unwrap();
+      let mut duplicates = Vec::new();
+      while let Some(index) = all_new_methods.iter().position(|m| {
+        m.name == method.name && m.class_membership == method.class_membership &&
+        m.arguments == method.arguments &&
+        m.allows_variadic_arguments == method.allows_variadic_arguments
+      }) {
+        duplicates.push(all_new_methods.remove(index));
+      }
+      if duplicates.is_empty() {
+        self.methods.push(method);
+      } else {
+        duplicates.push(method);
+
+        let mut allow_method = false;
+
+        let return_type_mismatch = {
+          let first_return_type = &duplicates[0].return_type;
+          duplicates.iter().find(|x| &x.return_type != first_return_type).is_some()
+        };
+        if !return_type_mismatch {
+          if duplicates.iter().find(|x| x.inheritance_chain.is_empty()).is_none() {
+            // TODO: support more complicated cases
+            let first_base = &duplicates[0].inheritance_chain.get(0).unwrap().base_type;
+            if duplicates.iter()
+              .find(|x| {
+                !x.inheritance_chain[0].is_virtual ||
+                &x.inheritance_chain[0].base_type != first_base
+              })
+              .is_none() {
+              allow_method = true;
+            }
+          }
+        }
+        if allow_method {
+          log::debug(format!("Allowing duplicated inherited method (virtual diamond inheritance)"));
+          log::debug(format!("{}", duplicates[0].short_text()));
+          for duplicate in &duplicates {
+            log::debug(format!("  {}", duplicate.inheritance_chain_text()));
+          }
+          self.methods.push(duplicates.pop().unwrap());
+        } else {
+          log::warning(format!("Removed duplicated inherited methods:"));
+          if return_type_mismatch {
+            for duplicate in &duplicates {
+              log::warning(format!("  {}", duplicate.short_text()));
+              log::warning(format!("  {}", duplicate.inheritance_chain_text()));
+            }
+          } else {
+            log::warning(format!("{}", duplicates[0].short_text()));
+            for duplicate in &duplicates {
+              log::warning(format!("  {}", duplicate.inheritance_chain_text()));
+            }
+          }
+        }
+      }
+    }
     log::info("Finished adding inherited methods");
   }
 

@@ -1045,6 +1045,7 @@ impl CppParser {
       template_arguments: template_arguments,
       declaration_code: declaration_code,
       inherited_from: None,
+      inheritance_chain: Vec::new(),
     })
   }
 
@@ -1132,7 +1133,6 @@ impl CppParser {
           Ok(r) => r,
           Err(msg) => return Err(format!("Can't parse base class type: {}", msg)),
         };
-        println!("TEST VIS {:?}", child.get_accessibility());
         bases.push(CppBaseSpecifier {
           base_type: base_type,
           is_virtual: child.is_virtual_base(),

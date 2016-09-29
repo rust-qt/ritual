@@ -287,6 +287,24 @@ impl CppMethod {
     s.trim().to_string()
   }
 
+  pub fn inheritance_chain_text(&self) -> String {
+    self.inheritance_chain
+      .iter()
+      .map(|x| {
+        let mut text = type_to_cpp_code_permissive(&x.base_type);
+        if x.is_virtual {
+          text = format!("virtual {}", text);
+        }
+        match x.visibility {
+          CppVisibility::Protected => text = format!("protected {}", text),
+          CppVisibility::Private => text = format!("private {}", text),
+          CppVisibility::Public => {}
+        }
+        text
+      })
+      .join(" -> ")
+  }
+
   pub fn class_name(&self) -> Option<&String> {
     match self.class_membership {
       Some(ref info) => Some(&info.class_type.name),
