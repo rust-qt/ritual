@@ -10,7 +10,7 @@ use std::fs::File;
 
 use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppOriginLocation,
                CppVisibility, CppTemplateInstantiation, CppTemplateInstantiations,
-               CppClassUsingDirective};
+               CppClassUsingDirective, CppBaseSpecifier};
 use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind, CppMethodClassMembership};
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
                CppSpecificNumericTypeKind, CppTypeClassBase};
@@ -875,15 +875,22 @@ impl CppParser {
 
       match type1 {
         Ok(argument_type) => {
+          let mut has_default_value = false;
+          for token in argument_entity.get_range().unwrap().tokenize() {
+            let spelling = token.get_spelling();
+            if spelling == "=" {
+              has_default_value = true;
+              break;
+            }
+            if spelling == "{" {
+              // clang sometimes reports incorrect range for arguments
+              break;
+            }
+          }
           arguments.push(CppFunctionArgument {
             name: name,
             argument_type: argument_type,
-            has_default_value: argument_entity.get_range()
-              .unwrap()
-              .tokenize()
-              .iter()
-              .find(|t| t.get_spelling() == "=")
-              .is_some(),
+            has_default_value: has_default_value,
           });
         }
         Err(msg) => {
@@ -1095,7 +1102,6 @@ impl CppParser {
       .collect();
     for child in entity.get_children() {
       if child.get_kind() == EntityKind::FieldDecl {
-        println!("test: {:?}", child);
         let field_clang_type = child.get_type().unwrap();
         match self.parse_type(field_clang_type, Some(entity), None) {
           Ok(field_type) => {
@@ -1126,7 +1132,16 @@ impl CppParser {
           Ok(r) => r,
           Err(msg) => return Err(format!("Can't parse base class type: {}", msg)),
         };
-        bases.push(base_type);
+        println!("TEST VIS {:?}", child.get_accessibility());
+        bases.push(CppBaseSpecifier {
+          base_type: base_type,
+          is_virtual: child.is_virtual_base(),
+          visibility: match child.get_accessibility().unwrap_or(Accessibility::Public) {
+            Accessibility::Public => CppVisibility::Public,
+            Accessibility::Protected => CppVisibility::Protected,
+            Accessibility::Private => CppVisibility::Private,
+          },
+        });
       }
       if child.get_kind() == EntityKind::NonTypeTemplateParameter {
         return Err(format!("Non-type template parameter is not supported"));
@@ -1424,7 +1439,7 @@ impl CppParser {
       if let CppTypeKind::Class { ref mut bases, .. } = good_type.kind {
         let mut valid_bases = Vec::new();
         for base in bases.iter() {
-          if let Err(msg) = self.check_type_integrity(&base) {
+          if let Err(msg) = self.check_type_integrity(&base.base_type) {
             log::warning(format!("Class {}: base class removed because type is not available: \
                                   {:?}: {}",
                                  t.name,
@@ -1474,7 +1489,7 @@ impl CppParser {
     for t in &self.types {
       if let CppTypeKind::Class { ref bases, .. } = t.kind {
         for base in bases {
-          check_type(&base, &mut result);
+          check_type(&base.base_type, &mut result);
         }
       }
     }

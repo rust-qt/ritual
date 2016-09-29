@@ -9,7 +9,7 @@ use std::iter;
 
 pub use serializable::{EnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
                        CppTypeData, CppData, CppTemplateInstantiation, CppTemplateInstantiations,
-                       CppClassUsingDirective};
+                       CppClassUsingDirective, CppBaseSpecifier};
 // TODO: remove template arguments from methods, e.g.
 // QList<T> findChildren<T>() -> QList<QObject*> findChildren()
 fn apply_instantiations_to_method(method: &CppMethod,
@@ -125,7 +125,7 @@ impl CppTypeData {
   pub fn inherits(&self, class_name: &String) -> bool {
     if let CppTypeKind::Class { ref bases, .. } = self.kind {
       for base in bases {
-        if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base {
+        if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
           if name == class_name {
             return true;
           }
@@ -193,9 +193,9 @@ impl CppData {
         if let CppTypeKind::Class { ref bases, ref using_directives, .. } = type1.kind {
           for base in bases {
             if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
-                   base.base {
+                   base.base_type.base {
               if name == base_name {
-                log::noisy(format!("Adding inherited methods from {} to {}",
+                log::debug(format!("Adding inherited methods from {} to {}",
                                    base_name,
                                    type1.name));
                 let derived_name = &type1.name;
@@ -207,7 +207,6 @@ impl CppData {
                     .class_type
                     .template_arguments == base_template_arguments
                 });
-                // derived_types.push(derived_name.clone());
                 let mut current_new_methods = Vec::new();
                 for base_class_method in base_methods {
                   let mut using_directive_enables = false;
@@ -215,11 +214,11 @@ impl CppData {
                   for dir in using_directives {
                     if &dir.method_name == &base_class_method.name {
                       if &dir.class_name == base_name {
-                        log::noisy(format!("UsingDirective enables inheritance of {}",
+                        log::debug(format!("UsingDirective enables inheritance of {}",
                                            base_class_method.short_text()));
                         using_directive_enables = true;
                       } else {
-                        log::noisy(format!("UsingDirective disables inheritance of {}",
+                        log::debug(format!("UsingDirective disables inheritance of {}",
                                            base_class_method.short_text()));
                         using_directive_disables = true;
                       }
@@ -239,9 +238,9 @@ impl CppData {
                       // disables inheritance of base class method.
                       if !using_directive_enables ||
                          method.argument_types_equal(base_class_method) {
-                        log::noisy("Method is not added because it's overriden in derived class");
-                        log::noisy(format!("Base method: {}", base_class_method.short_text()));
-                        log::noisy(format!("Derived method: {}\n", method.short_text()));
+                        log::debug("Method is not added because it's overriden in derived class");
+                        log::debug(format!("Base method: {}", base_class_method.short_text()));
+                        log::debug(format!("Derived method: {}\n", method.short_text()));
                         ok = false;
                       }
                       break;
@@ -269,8 +268,8 @@ impl CppData {
                           .clone(),
                       });
                     }
-                    log::noisy(format!("Method added: {}", new_method.short_text()));
-                    log::noisy(format!("Base method: {} ({:?})\n",
+                    log::debug(format!("Method added: {}", new_method.short_text()));
+                    log::debug(format!("Base method: {} ({:?})\n",
                                        base_class_method.short_text(),
                                        base_class_method.origin_location));
                     current_new_methods.push(new_method.clone());
@@ -375,7 +374,7 @@ impl CppData {
         }
         for base in bases {
           if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
-                 base.base {
+                 base.base_type.base {
             if template_arguments.is_some() {
               return true;
             }
@@ -401,7 +400,7 @@ impl CppData {
     if let Some(type_info) = self.types.iter().find(|t| &t.name == class_name) {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
         for base in bases {
-          if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base {
+          if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
             if self.has_virtual_destructor(name, dependencies) {
               return true;
             }
@@ -428,7 +427,7 @@ impl CppData {
     if let Some(type_info) = self.types.iter().find(|t| &t.name == class_name) {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
         for base in bases {
-          if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base {
+          if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
             for method in self.get_all_methods(name) {
               if own_methods.iter()
                 .find(|m| m.name == method.name && m.argument_types_equal(&method))
@@ -469,7 +468,7 @@ impl CppData {
     if let Some(type_info) = self.types.iter().find(|t| &t.name == class_name) {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
         for base in bases {
-          if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base {
+          if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
             for method in self.get_pure_virtual_methods(name) {
               if own_methods.iter()
                 .find(|m| m.name == method.name && m.argument_types_equal(&method))

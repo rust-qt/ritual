@@ -29,7 +29,7 @@ fn run_parser(code: &'static str) -> CppData {
   let mut result = cpp_parser::run(cpp_parser::CppParserConfig {
                                      include_dirs: vec![include_dir],
                                      header_name: include_name.to_string(),
-                                     target_include_dir: None,
+                                     target_include_dirs: None,
                                      tmp_cpp_path: dir.path().with_added("1.cpp"),
                                      name_blacklist: Vec::new(),
                                      framework_dirs: Vec::new(),
@@ -682,6 +682,37 @@ fn template_instantiation() {
 }
 
 fn derived_class_simple() {
+  let data = run_parser("class Base {}; class Derived : public Base {};");
+  assert!(data.types.len() == 2);
+  assert_eq!(data.types[0].name, "Base");
+  match data.types[0].kind {
+    CppTypeKind::Class { ref bases, .. } => {
+      assert!(bases.is_empty());
+    }
+    _ => panic!("invalid type kind"),
+  }
+  assert_eq!(data.types[1].name, "Derived");
+  match data.types[1].kind {
+    CppTypeKind::Class { ref bases, .. } => {
+      assert_eq!(bases,
+                 &vec![CppBaseSpecifier {
+                         base_type: CppType {
+                           indirection: CppTypeIndirection::None,
+                           is_const: false,
+                           base: CppTypeBase::Class(CppTypeClassBase {
+                             name: "Base".to_string(),
+                             template_arguments: None,
+                           }),
+                         },
+                         is_virtual: false,
+                         visibility: CppVisibility::Public,
+                       }]);
+    }
+    _ => panic!("invalid type kind"),
+  }
+}
+
+fn derived_class_simple_private() {
   let data = run_parser("class Base {}; class Derived : Base {};");
   assert!(data.types.len() == 2);
   assert_eq!(data.types[0].name, "Base");
@@ -695,18 +726,55 @@ fn derived_class_simple() {
   match data.types[1].kind {
     CppTypeKind::Class { ref bases, .. } => {
       assert_eq!(bases,
-                 &vec![CppType {
-                         indirection: CppTypeIndirection::None,
-                         is_const: false,
-                         base: CppTypeBase::Class(CppTypeClassBase {
-                           name: "Base".to_string(),
-                           template_arguments: None,
-                         }),
+                 &vec![CppBaseSpecifier {
+                         base_type: CppType {
+                           indirection: CppTypeIndirection::None,
+                           is_const: false,
+                           base: CppTypeBase::Class(CppTypeClassBase {
+                             name: "Base".to_string(),
+                             template_arguments: None,
+                           }),
+                         },
+                         is_virtual: false,
+                         visibility: CppVisibility::Private,
                        }]);
     }
     _ => panic!("invalid type kind"),
   }
 }
+
+
+fn derived_class_simple_virtual() {
+  let data = run_parser("class Base {}; class Derived : public virtual Base {};");
+  assert!(data.types.len() == 2);
+  assert_eq!(data.types[0].name, "Base");
+  match data.types[0].kind {
+    CppTypeKind::Class { ref bases, .. } => {
+      assert!(bases.is_empty());
+    }
+    _ => panic!("invalid type kind"),
+  }
+  assert_eq!(data.types[1].name, "Derived");
+  match data.types[1].kind {
+    CppTypeKind::Class { ref bases, .. } => {
+      assert_eq!(bases,
+                 &vec![CppBaseSpecifier {
+                         base_type: CppType {
+                           indirection: CppTypeIndirection::None,
+                           is_const: false,
+                           base: CppTypeBase::Class(CppTypeClassBase {
+                             name: "Base".to_string(),
+                             template_arguments: None,
+                           }),
+                         },
+                         is_virtual: true,
+                         visibility: CppVisibility::Public,
+                       }]);
+    }
+    _ => panic!("invalid type kind"),
+  }
+}
+
 
 fn derived_class_multiple() {
   let data = run_parser("
@@ -719,21 +787,29 @@ fn derived_class_multiple() {
   match data.types[2].kind {
     CppTypeKind::Class { ref bases, .. } => {
       assert_eq!(bases,
-                 &vec![CppType {
-                         indirection: CppTypeIndirection::None,
-                         is_const: false,
-                         base: CppTypeBase::Class(CppTypeClassBase {
-                           name: "Base2".to_string(),
-                           template_arguments: None,
-                         }),
+                 &vec![CppBaseSpecifier {
+                         base_type: CppType {
+                           indirection: CppTypeIndirection::None,
+                           is_const: false,
+                           base: CppTypeBase::Class(CppTypeClassBase {
+                             name: "Base2".to_string(),
+                             template_arguments: None,
+                           }),
+                         },
+                         is_virtual: false,
+                         visibility: CppVisibility::Public,
                        },
-                       CppType {
-                         indirection: CppTypeIndirection::None,
-                         is_const: false,
-                         base: CppTypeBase::Class(CppTypeClassBase {
-                           name: "Base1".to_string(),
-                           template_arguments: None,
-                         }),
+                       CppBaseSpecifier {
+                         base_type: CppType {
+                           indirection: CppTypeIndirection::None,
+                           is_const: false,
+                           base: CppTypeBase::Class(CppTypeClassBase {
+                             name: "Base1".to_string(),
+                             template_arguments: None,
+                           }),
+                         },
+                         is_virtual: false,
+                         visibility: CppVisibility::Public,
                        }]);
     }
     _ => panic!("invalid type kind"),
@@ -779,6 +855,8 @@ fn tests() {
   simple_enum2();
   template_instantiation();
   derived_class_simple();
+  derived_class_simple_private();
+  derived_class_simple_virtual();
   derived_class_multiple();
   class_with_use();
 }

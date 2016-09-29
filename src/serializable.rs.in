@@ -34,6 +34,14 @@ pub struct CppClassUsingDirective {
   pub method_name: String,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppBaseSpecifier {
+  pub base_type: CppType,
+  pub is_virtual: bool,
+  pub visibility: CppVisibility,
+}
+
 
 /// Information about a C++ type declaration
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -51,7 +59,7 @@ pub enum CppTypeKind {
     /// e.g. it's a template class
     size: Option<i32>,
     /// List of class types this class is derived from
-    bases: Vec<CppType>,
+    bases: Vec<CppBaseSpecifier>,
     /// List of class fields
     fields: Vec<CppClassField>,
     /// If the class is a template class, this field contains
