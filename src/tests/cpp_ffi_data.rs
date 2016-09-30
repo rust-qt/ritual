@@ -25,11 +25,13 @@ fn argument_int() {
       original_type: CppType {
         indirection: CppTypeIndirection::None,
         is_const: false,
+        is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
       ffi_type: CppType {
         indirection: CppTypeIndirection::None,
         is_const: false,
+        is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
       conversion: IndirectionChange::NoChange,
@@ -56,11 +58,13 @@ fn argument_int_ptr() {
       original_type: CppType {
         indirection: CppTypeIndirection::Ptr,
         is_const: false,
+        is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
       ffi_type: CppType {
         indirection: CppTypeIndirection::Ptr,
         is_const: false,
+        is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
       conversion: IndirectionChange::NoChange,
@@ -83,22 +87,26 @@ fn argument_int_ptr() {
 fn argument_func() {
   let type1 = CppType {
     is_const: false,
+    is_const2: false,
     indirection: CppTypeIndirection::None,
     base: CppTypeBase::FunctionPointer {
       allows_variadic_arguments: false,
       return_type: Box::new(CppType {
         indirection: CppTypeIndirection::None,
         is_const: false,
+        is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
       }),
       arguments: vec![CppType {
                         indirection: CppTypeIndirection::None,
                         is_const: false,
+                        is_const2: false,
                         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
                       },
                       CppType {
                         indirection: CppTypeIndirection::Ptr,
                         is_const: false,
+                        is_const2: false,
                         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
                       }],
     },
@@ -134,11 +142,13 @@ fn signature_two_numbers() {
                         original_type: CppType {
                           indirection: CppTypeIndirection::None,
                           is_const: false,
+                          is_const2: false,
                           base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
                         },
                         ffi_type: CppType {
                           indirection: CppTypeIndirection::None,
                           is_const: false,
+                          is_const2: false,
                           base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
                         },
                         conversion: IndirectionChange::NoChange,
@@ -151,11 +161,13 @@ fn signature_two_numbers() {
                         original_type: CppType {
                           indirection: CppTypeIndirection::None,
                           is_const: false,
+                          is_const2: false,
                           base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
                         },
                         ffi_type: CppType {
                           indirection: CppTypeIndirection::None,
                           is_const: false,
+                          is_const2: false,
                           base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
                         },
                         conversion: IndirectionChange::NoChange,
@@ -204,6 +216,7 @@ fn signature_class_method() {
                         original_type: CppType {
                           indirection: CppTypeIndirection::Ptr,
                           is_const: false,
+                          is_const2: false,
                           base: CppTypeBase::Class(CppTypeClassBase {
                             name: "Class1".to_string(),
                             template_arguments: None,
@@ -212,6 +225,7 @@ fn signature_class_method() {
                         ffi_type: CppType {
                           indirection: CppTypeIndirection::Ptr,
                           is_const: false,
+                          is_const2: false,
                           base: CppTypeBase::Class(CppTypeClassBase {
                             name: "Class1".to_string(),
                             template_arguments: None,
@@ -227,11 +241,13 @@ fn signature_class_method() {
                         original_type: CppType {
                           indirection: CppTypeIndirection::None,
                           is_const: false,
+                          is_const2: false,
                           base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
                         },
                         ffi_type: CppType {
                           indirection: CppTypeIndirection::None,
                           is_const: false,
+                          is_const2: false,
                           base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
                         },
                         conversion: IndirectionChange::NoChange,
@@ -268,6 +284,7 @@ fn signature_class_method_const() {
                         original_type: CppType {
                           indirection: CppTypeIndirection::Ptr,
                           is_const: true,
+                          is_const2: false,
                           base: CppTypeBase::Class(CppTypeClassBase {
                             name: "Class1".to_string(),
                             template_arguments: None,
@@ -276,6 +293,7 @@ fn signature_class_method_const() {
                         ffi_type: CppType {
                           indirection: CppTypeIndirection::Ptr,
                           is_const: true,
+                          is_const2: false,
                           base: CppTypeBase::Class(CppTypeClassBase {
                             name: "Class1".to_string(),
                             template_arguments: None,
@@ -291,11 +309,13 @@ fn signature_class_method_const() {
                         original_type: CppType {
                           indirection: CppTypeIndirection::None,
                           is_const: false,
+                          is_const2: false,
                           base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
                         },
                         ffi_type: CppType {
                           indirection: CppTypeIndirection::None,
                           is_const: false,
+                          is_const2: false,
                           base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
                         },
                         conversion: IndirectionChange::NoChange,
@@ -505,6 +525,7 @@ fn c_base_name_conversion_operator() {
   method.class_membership = Some(empty_membership("MyClass"));
   method.operator = Some(CppOperator::Conversion(CppType {
     is_const: true,
+    is_const2: false,
     base: CppTypeBase::Class(CppTypeClassBase {
       name: "QPoint".to_string(),
       template_arguments: None,

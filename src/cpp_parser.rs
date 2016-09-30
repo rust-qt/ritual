@@ -82,18 +82,23 @@ fn get_full_name(entity: Entity) -> Result<String, String> {
   if let Some(mut s) = entity.get_name() {
     loop {
       if let Some(p) = current_entity.get_semantic_parent() {
-        if p.get_kind() == EntityKind::ClassDecl || p.get_kind() == EntityKind::ClassTemplate ||
-           p.get_kind() == EntityKind::StructDecl ||
-           p.get_kind() == EntityKind::Namespace ||
-           p.get_kind() == EntityKind::EnumDecl || p.get_kind() == EntityKind::Method ||
-           p.get_kind() == EntityKind::ClassTemplatePartialSpecialization {
-          match p.get_name() {
-            Some(p_name) => s = format!("{}::{}", p_name, s),
-            None => return Err(format!("Anonymous nested type")),
+        match p.get_kind() {
+          EntityKind::ClassDecl |
+          EntityKind::ClassTemplate |
+          EntityKind::StructDecl |
+          EntityKind::Namespace |
+          EntityKind::EnumDecl |
+          EntityKind::ClassTemplatePartialSpecialization => {
+            match p.get_name() {
+              Some(p_name) => s = format!("{}::{}", p_name, s),
+              None => return Err(format!("Anonymous nested type")),
+            }
+            current_entity = p;
           }
-          current_entity = p;
-        } else {
-          break;
+          EntityKind::Method => {
+            return Err(format!("Type nested in a method"));
+          }
+          _ => break,
         }
       } else {
         break;
@@ -358,6 +363,7 @@ impl CppParser {
                   template_arguments: Some(arg_types),
                 }),
                 is_const: is_const,
+                is_const2: false,
                 indirection: CppTypeIndirection::None,
               });
             } else {
@@ -385,6 +391,7 @@ impl CppParser {
           index: matches.at(2).unwrap().parse().unwrap(),
         },
         is_const: is_const,
+        is_const2: false,
         indirection: CppTypeIndirection::None,
       });
     }
@@ -399,6 +406,7 @@ impl CppParser {
               index: index as i32,
             },
             is_const: is_const,
+            is_const2: false,
             indirection: CppTypeIndirection::None,
           });
         }
@@ -413,6 +421,7 @@ impl CppParser {
             index: index as i32,
           },
           is_const: is_const,
+          is_const2: false,
           indirection: CppTypeIndirection::None,
         });
       }
@@ -420,6 +429,7 @@ impl CppParser {
     let mut remaining_name: &str = name.as_ref();
     let mut type1 = CppType {
       is_const: is_const,
+      is_const2: false,
       indirection: CppTypeIndirection::None,
       base: CppTypeBase::Void,
     };
@@ -446,26 +456,23 @@ impl CppParser {
                                                      Some(remaining_name.to_string()),
                                                      context_class,
                                                      context_method) {
+        let mut new_indirection = try!(CppTypeIndirection::combine(&subtype.indirection,
+                                                                   &type1.indirection));
+        if new_indirection == CppTypeIndirection::Ptr {
+          if let CppTypeBase::FunctionPointer { .. } = subtype.base {
+            new_indirection = CppTypeIndirection::None;
+          }
+        }
+        let new_is_const2 = if new_indirection == CppTypeIndirection::PtrPtr {
+          remaining_name.trim().ends_with(" const")
+        } else {
+          false
+        };
         return Ok(CppType {
           base: subtype.base,
-          is_const: is_const,
-          indirection: match type1.indirection {
-            CppTypeIndirection::Ptr => {
-              match subtype.indirection {
-                CppTypeIndirection::None => CppTypeIndirection::Ptr,
-                CppTypeIndirection::Ptr => CppTypeIndirection::PtrPtr,
-                _ => return Err(format!("too much indirection")),
-              }
-            }
-            CppTypeIndirection::Ref => {
-              match subtype.indirection {
-                CppTypeIndirection::None => CppTypeIndirection::Ref,
-                CppTypeIndirection::Ptr => CppTypeIndirection::PtrRef,
-                _ => return Err(format!("too much indirection")),
-              }
-            }
-            _ => unreachable!(),
-          },
+          is_const: subtype.is_const,
+          is_const2: new_is_const2,
+          indirection: new_indirection,
         });
       }
     }
@@ -612,6 +619,7 @@ impl CppParser {
             base: real_type,
             indirection: parsed.indirection,
             is_const: parsed.is_const,
+            is_const2: parsed.is_const2,
           });
         }
       }
@@ -634,6 +642,7 @@ impl CppParser {
         Ok(CppType {
           base: CppTypeBase::Void,
           is_const: is_const,
+          is_const2: false,
           indirection: CppTypeIndirection::None,
         })
       }
@@ -684,6 +693,7 @@ impl CppParser {
             _ => unreachable!(),
           }),
           is_const: is_const,
+          is_const2: false,
           indirection: CppTypeIndirection::None,
         })
       }
@@ -693,6 +703,7 @@ impl CppParser {
             name: get_full_name(type1.get_declaration().unwrap()).unwrap(),
           },
           is_const: is_const,
+          is_const2: false,
           indirection: CppTypeIndirection::None,
         })
       }
@@ -735,6 +746,7 @@ impl CppParser {
                 template_arguments: template_arguments,
               }),
               is_const: is_const,
+              is_const2: false,
               indirection: CppTypeIndirection::None,
             })
 
@@ -771,6 +783,7 @@ impl CppParser {
             allows_variadic_arguments: type1.is_variadic(),
           },
           is_const: is_const,
+          is_const2: false,
           indirection: CppTypeIndirection::None,
         })
       }
@@ -780,7 +793,7 @@ impl CppParser {
         match type1.get_pointee_type() {
           Some(pointee) => {
             match self.parse_type(pointee, context_class, context_method) {
-              Ok(result) => {
+              Ok(subtype) => {
                 let original_type_indirection = match type1.get_kind() {
                   TypeKind::Pointer => CppTypeIndirection::Ptr,
                   TypeKind::LValueReference => CppTypeIndirection::Ref,
@@ -788,14 +801,24 @@ impl CppParser {
                   _ => unreachable!(),
                 };
 
-                let mut new_indirection = try!(CppTypeIndirection::combine(&result.indirection,
+                let mut new_indirection = try!(CppTypeIndirection::combine(&subtype.indirection,
                                                    &original_type_indirection));
                 if new_indirection == CppTypeIndirection::Ptr {
-                  if let CppTypeBase::FunctionPointer { .. } = result.base {
+                  if let CppTypeBase::FunctionPointer { .. } = subtype.base {
                     new_indirection = CppTypeIndirection::None;
                   }
                 }
-                Ok(CppType { indirection: new_indirection, ..result })
+                let new_is_const2 = if new_indirection == CppTypeIndirection::PtrPtr {
+                  pointee.is_const_qualified()
+                } else {
+                  false
+                };
+                Ok(CppType {
+                  indirection: new_indirection,
+                  base: subtype.base,
+                  is_const: subtype.is_const,
+                  is_const2: new_is_const2,
+                })
               }
               Err(msg) => Err(msg),
             }
@@ -1075,6 +1098,7 @@ impl CppParser {
   }
 
   fn parse_class(&self, entity: Entity) -> Result<CppTypeData, String> {
+    let full_name = try!(get_full_name(entity));
     let mut fields = Vec::new();
     let mut bases = Vec::new();
     let template_arguments = get_template_arguments(entity);
@@ -1122,7 +1146,7 @@ impl CppParser {
           }
           Err(msg) => {
             log::warning(format!("Can't parse field type: {}::{}: {}",
-                                 get_full_name(entity).unwrap(),
+                                 get_full_name(entity).unwrap_or_else(|msg| format!("[{}]", msg)),
                                  child.get_name().unwrap(),
                                  msg))
           }
@@ -1160,7 +1184,7 @@ impl CppParser {
       }
     }
     Ok(CppTypeData {
-      name: get_full_name(entity).unwrap(),
+      name: full_name,
       include_file: match self.entity_include_file(entity) {
         Some(x) => x.clone(),
         None => {
@@ -1299,7 +1323,8 @@ impl CppParser {
             }
             Err(msg) => {
               log::warning(format!("Failed to parse class: {}\nentity: {:?}\nerror: {}\n",
-                                   get_full_name(entity).unwrap(),
+                                   get_full_name(entity)
+                                     .unwrap_or_else(|msg| format!("[{}]", msg)),
                                    entity,
                                    msg));
             }

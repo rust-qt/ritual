@@ -122,6 +122,7 @@ impl CppMethod {
           argument_type: CppType {
               base: CppTypeBase::Class(info.class_type.clone()),
               is_const: info.is_const,
+              is_const2: false,
               indirection: CppTypeIndirection::Ptr,
             }
             .to_cpp_ffi_type(CppTypeRole::NotReturnType)
@@ -147,6 +148,7 @@ impl CppMethod {
     let real_return_type = if self.is_constructor() {
       CppType {
         is_const: false,
+        is_const2: false,
         indirection: CppTypeIndirection::None,
         base: CppTypeBase::Class(self.class_membership.as_ref().unwrap().class_type.clone()),
       }
@@ -208,6 +210,7 @@ impl CppMethod {
               type_to_cpp_code_permissive(&CppType {
                 indirection: CppTypeIndirection::None,
                 is_const: false,
+                is_const2: false,
                 base: CppTypeBase::Class(info.class_type.clone()),
               }),
               self.name)
@@ -334,6 +337,7 @@ impl CppMethod {
       result.push(CppType {
         base: CppTypeBase::Class(class_membership.class_type.clone()),
         is_const: class_membership.is_const,
+        is_const2: false,
         indirection: CppTypeIndirection::Ptr,
       });
     }

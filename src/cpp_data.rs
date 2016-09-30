@@ -105,6 +105,7 @@ impl CppTypeData {
               .map(|(num, _)| {
                 CppType {
                   is_const: false,
+                  is_const2: false,
                   indirection: CppTypeIndirection::None,
                   base: CppTypeBase::TemplateParameter {
                     nested_level: 0,
@@ -324,12 +325,20 @@ impl CppData {
         }
       }
     }
+    println!("TEST: {:?}",
+             all_new_methods.iter()
+               .filter(|m| m.full_name() == "POA_CosNaming::BindingIterator::_do_get_interface")
+               .collect::<Vec<_>>());
     while !all_new_methods.is_empty() {
       let method = all_new_methods.pop().unwrap();
       let mut duplicates = Vec::new();
       while let Some(index) = all_new_methods.iter().position(|m| {
-        m.name == method.name && m.class_membership == method.class_membership &&
-        m.arguments == method.arguments &&
+        m.class_membership.as_ref().unwrap().is_const ==
+        method.class_membership.as_ref().unwrap().is_const &&
+        m.class_membership.as_ref().unwrap().is_static ==
+        method.class_membership.as_ref().unwrap().is_static &&
+        m.class_name() == method.class_name() && m.name == method.name &&
+        m.argument_types_equal(&method) &&
         m.allows_variadic_arguments == method.allows_variadic_arguments
       }) {
         duplicates.push(all_new_methods.remove(index));
@@ -341,6 +350,20 @@ impl CppData {
 
         let mut allow_method = false;
 
+        let mut lowest_visibility = CppVisibility::Public;
+        for duplicate in &duplicates {
+          if let Some(ref info) = duplicate.class_membership {
+            if info.visibility == CppVisibility::Private {
+              lowest_visibility = CppVisibility::Private;
+            } else if info.visibility == CppVisibility::Protected &&
+                      lowest_visibility != CppVisibility::Private {
+              lowest_visibility = CppVisibility::Protected;
+            }
+          } else {
+            panic!("only class methods can appear here");
+          }
+        }
+
         let return_type_mismatch = {
           let first_return_type = &duplicates[0].return_type;
           duplicates.iter().find(|x| &x.return_type != first_return_type).is_some()
@@ -348,6 +371,8 @@ impl CppData {
         if !return_type_mismatch {
           if duplicates.iter().find(|x| x.inheritance_chain.is_empty()).is_none() {
             // TODO: support more complicated cases
+            // TODO: can't detect if the method was overloaded in intermediate class
+            // because the most base class is not in inheritance_chain
             let first_base = &duplicates[0].inheritance_chain.get(0).unwrap().base_type;
             if duplicates.iter()
               .find(|x| {
@@ -365,7 +390,13 @@ impl CppData {
           for duplicate in &duplicates {
             log::debug(format!("  {}", duplicate.inheritance_chain_text()));
           }
-          self.methods.push(duplicates.pop().unwrap());
+          let mut final_method = duplicates.pop().unwrap();
+          if let Some(ref mut info) = final_method.class_membership {
+            info.visibility = lowest_visibility;
+          } else {
+            panic!("only class methods can appear here");
+          }
+          self.methods.push(final_method);
         } else {
           log::warning(format!("Removed duplicated inherited methods:"));
           if return_type_mismatch {

@@ -71,6 +71,7 @@ fn argument_types_equal2() {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
+      is_const2: false,
       base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "arg1".to_string(),
@@ -88,6 +89,7 @@ fn argument_types_equal3() {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
+      is_const2: false,
       base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "arg1".to_string(),
@@ -97,6 +99,7 @@ fn argument_types_equal3() {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
+      is_const2: false,
       base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "x".to_string(),
@@ -114,6 +117,7 @@ fn argument_types_equal4() {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
+      is_const2: false,
       base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "arg1".to_string(),
@@ -123,6 +127,7 @@ fn argument_types_equal4() {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
+      is_const2: false,
       base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "arg1".to_string(),
@@ -140,6 +145,7 @@ fn argument_types_equal5() {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
+      is_const2: false,
       base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "arg1".to_string(),
@@ -149,6 +155,7 @@ fn argument_types_equal5() {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
+      is_const2: false,
       base: CppTypeBase::Enum { name: "Enum1".to_string() },
     },
     name: "arg1".to_string(),
@@ -166,6 +173,7 @@ fn argument_types_equal6() {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
+      is_const2: false,
       base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "arg1".to_string(),
@@ -175,6 +183,7 @@ fn argument_types_equal6() {
     argument_type: CppType {
       indirection: CppTypeIndirection::Ptr,
       is_const: false,
+      is_const2: false,
       base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "arg1".to_string(),
@@ -191,6 +200,7 @@ fn argument_types_equal7() {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
+      is_const2: false,
       base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "arg1".to_string(),
@@ -211,6 +221,7 @@ fn argument_types_equal8() {
   method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
+    is_const2: false,
     base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
   };
   assert!(method1.argument_types_equal(&method2));
@@ -238,12 +249,14 @@ fn needs_allocation_place_variants() {
   method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
+    is_const2: false,
     base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
   };
   assert!(!method1.needs_allocation_place_variants());
   method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
+    is_const2: false,
     base: CppTypeBase::Class(CppTypeClassBase {
       name: "QRect".to_string(),
       template_arguments: None,
@@ -253,6 +266,7 @@ fn needs_allocation_place_variants() {
   method1.return_type = CppType {
     indirection: CppTypeIndirection::Ptr,
     is_const: false,
+    is_const2: false,
     base: CppTypeBase::Class(CppTypeClassBase {
       name: "QRect".to_string(),
       template_arguments: None,
@@ -288,12 +302,14 @@ fn c_signature_simple_func() {
   method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
+    is_const2: false,
     base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
   };
   method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
+      is_const2: false,
       base: CppTypeBase::Enum { name: "Enum1".to_string() },
     },
     name: "arg1".to_string(),
@@ -318,12 +334,14 @@ fn c_signature_method_with_this() {
   method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
+    is_const2: false,
     base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
   };
   method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
+      is_const2: false,
       base: CppTypeBase::Class(CppTypeClassBase {
         name: "MyClass2".to_string(),
         template_arguments: None,
@@ -371,12 +389,14 @@ fn c_signature_static_method() {
   method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
+    is_const2: false,
     base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
   };
   method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
+      is_const2: false,
       base: CppTypeBase::Enum { name: "Enum1".to_string() },
     },
     name: "arg1".to_string(),
@@ -406,6 +426,7 @@ fn c_signature_constructor() {
     argument_type: CppType {
       indirection: CppTypeIndirection::Ref,
       is_const: true,
+      is_const2: false,
       base: CppTypeBase::Enum { name: "Enum1".to_string() },
     },
     name: "arg1".to_string(),
@@ -424,6 +445,7 @@ fn c_signature_constructor() {
              CppType {
                indirection: CppTypeIndirection::Ptr,
                is_const: true,
+               is_const2: false,
                base: CppTypeBase::Enum { name: "Enum1".to_string() },
              });
   assert_eq!(r_stack.arguments[0].argument_type.conversion,
@@ -436,6 +458,7 @@ fn c_signature_constructor() {
              CppType {
                indirection: CppTypeIndirection::Ptr,
                is_const: false,
+               is_const2: false,
                base: CppTypeBase::Class(CppTypeClassBase {
                  name: "MyClass".to_string(),
                  template_arguments: None,
@@ -455,6 +478,7 @@ fn c_signature_constructor() {
              CppType {
                indirection: CppTypeIndirection::Ptr,
                is_const: true,
+               is_const2: false,
                base: CppTypeBase::Enum { name: "Enum1".to_string() },
              });
   assert_eq!(r_heap.arguments[0].argument_type.conversion,
@@ -465,6 +489,7 @@ fn c_signature_constructor() {
              CppType {
                indirection: CppTypeIndirection::Ptr,
                is_const: false,
+               is_const2: false,
                base: CppTypeBase::Class(CppTypeClassBase {
                  name: "MyClass".to_string(),
                  template_arguments: None,
@@ -522,6 +547,7 @@ fn c_signature_method_returning_class() {
   method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
+    is_const2: false,
     base: CppTypeBase::Class(CppTypeClassBase {
       name: "MyClass3".to_string(),
       template_arguments: None,
@@ -531,6 +557,7 @@ fn c_signature_method_returning_class() {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
+      is_const2: false,
       base: CppTypeBase::Class(CppTypeClassBase {
         name: "MyClass2".to_string(),
         template_arguments: None,
@@ -565,6 +592,7 @@ fn c_signature_method_returning_class() {
              CppType {
                indirection: CppTypeIndirection::Ptr,
                is_const: false,
+               is_const2: false,
                base: CppTypeBase::Class(CppTypeClassBase {
                  name: "MyClass3".to_string(),
                  template_arguments: None,
@@ -602,6 +630,7 @@ fn c_signature_method_returning_class() {
              CppType {
                indirection: CppTypeIndirection::Ptr,
                is_const: false,
+               is_const2: false,
                base: CppTypeBase::Class(CppTypeClassBase {
                  name: "MyClass3".to_string(),
                  template_arguments: None,
@@ -638,12 +667,14 @@ fn to_ffi_signatures_simple_func() {
   method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
+    is_const2: false,
     base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
   };
   method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
+      is_const2: false,
       base: CppTypeBase::Enum { name: "Enum1".to_string() },
     },
     name: "arg1".to_string(),
@@ -714,12 +745,14 @@ fn short_text1() {
     return_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
+      is_const2: false,
       base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     arguments: vec![CppFunctionArgument {
                       argument_type: CppType {
                         indirection: CppTypeIndirection::None,
                         is_const: false,
+                        is_const2: false,
                         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
                       },
                       name: "arg1".to_string(),
@@ -729,6 +762,7 @@ fn short_text1() {
                       argument_type: CppType {
                         indirection: CppTypeIndirection::None,
                         is_const: false,
+                        is_const2: false,
                         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
                       },
                       name: "arg2".to_string(),

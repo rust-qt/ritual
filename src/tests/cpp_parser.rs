@@ -61,6 +61,7 @@ fn simple_func() {
                return_type: CppType {
                  indirection: CppTypeIndirection::None,
                  is_const: false,
+                 is_const2: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
                },
                arguments: vec![CppFunctionArgument {
@@ -68,6 +69,7 @@ fn simple_func() {
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::None,
                                    is_const: false,
+                                   is_const2: false,
                                    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
                                  },
                                  has_default_value: false,
@@ -96,6 +98,7 @@ fn simple_func_with_default_value() {
                return_type: CppType {
                  indirection: CppTypeIndirection::None,
                  is_const: false,
+                 is_const2: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
                },
                arguments: vec![CppFunctionArgument {
@@ -103,6 +106,7 @@ fn simple_func_with_default_value() {
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::None,
                                    is_const: false,
+                                   is_const2: false,
                                    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
                                  },
                                  has_default_value: true,
@@ -142,6 +146,7 @@ fn functions_with_class_arg() {
                  CppType {
                    indirection: CppTypeIndirection::None,
                    is_const: false,
+                   is_const2: false,
                    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
                  });
       assert_eq!(fields[0].visibility, CppVisibility::Public);
@@ -151,6 +156,7 @@ fn functions_with_class_arg() {
                  CppType {
                    indirection: CppTypeIndirection::None,
                    is_const: false,
+                   is_const2: false,
                    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
                  });
       assert_eq!(fields[1].visibility, CppVisibility::Public);
@@ -166,6 +172,7 @@ fn functions_with_class_arg() {
                return_type: CppType {
                  indirection: CppTypeIndirection::None,
                  is_const: false,
+                 is_const2: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
                },
                arguments: vec![CppFunctionArgument {
@@ -173,6 +180,7 @@ fn functions_with_class_arg() {
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::None,
                                    is_const: false,
+                                   is_const2: false,
                                    base: CppTypeBase::Class(CppTypeClassBase {
                                      name: "Magic".to_string(),
                                      template_arguments: None,
@@ -197,6 +205,7 @@ fn functions_with_class_arg() {
                return_type: CppType {
                  indirection: CppTypeIndirection::None,
                  is_const: false,
+                 is_const2: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
                },
                arguments: vec![CppFunctionArgument {
@@ -204,6 +213,7 @@ fn functions_with_class_arg() {
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::Ptr,
                                    is_const: false,
+                                   is_const2: false,
                                    base: CppTypeBase::Class(CppTypeClassBase {
                                      name: "Magic".to_string(),
                                      template_arguments: None,
@@ -228,6 +238,7 @@ fn functions_with_class_arg() {
                return_type: CppType {
                  indirection: CppTypeIndirection::None,
                  is_const: false,
+                 is_const2: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
                },
                arguments: vec![CppFunctionArgument {
@@ -235,6 +246,7 @@ fn functions_with_class_arg() {
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::Ref,
                                    is_const: true,
+                                   is_const2: false,
                                    base: CppTypeBase::Class(CppTypeClassBase {
                                      name: "Magic".to_string(),
                                      template_arguments: None,
@@ -273,6 +285,7 @@ fn variadic_func() {
                return_type: CppType {
                  indirection: CppTypeIndirection::None,
                  is_const: false,
+                 is_const2: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
                },
                arguments: vec![CppFunctionArgument {
@@ -280,6 +293,7 @@ fn variadic_func() {
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::Ptr,
                                    is_const: true,
+                                   is_const2: false,
                                    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Char),
                                  },
                                  has_default_value: false,
@@ -308,6 +322,7 @@ fn free_template_func() {
                return_type: CppType {
                  indirection: CppTypeIndirection::None,
                  is_const: false,
+                 is_const2: false,
                  base: CppTypeBase::TemplateParameter {
                    nested_level: 0,
                    index: 0,
@@ -318,6 +333,7 @@ fn free_template_func() {
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::None,
                                    is_const: false,
+                                   is_const2: false,
                                    base: CppTypeBase::TemplateParameter {
                                      nested_level: 0,
                                      index: 0,
@@ -351,6 +367,7 @@ fn free_func_operator_sub() {
                  return_type: CppType {
                    indirection: CppTypeIndirection::None,
                    is_const: false,
+                   is_const2: false,
                    base: CppTypeBase::Class(CppTypeClassBase {
                      name: "C1".to_string(),
                      template_arguments: None,
@@ -361,6 +378,7 @@ fn free_func_operator_sub() {
                                    argument_type: CppType {
                                      indirection: CppTypeIndirection::None,
                                      is_const: false,
+                                     is_const2: false,
                                      base: CppTypeBase::Class(CppTypeClassBase {
                                        name: "C1".to_string(),
                                        template_arguments: None,
@@ -373,6 +391,7 @@ fn free_func_operator_sub() {
                                    argument_type: CppType {
                                      indirection: CppTypeIndirection::None,
                                      is_const: false,
+                                     is_const2: false,
                                      base: CppTypeBase::Class(CppTypeClassBase {
                                        name: "C1".to_string(),
                                        template_arguments: None,
@@ -432,6 +451,7 @@ fn simple_class_method() {
                return_type: CppType {
                  indirection: CppTypeIndirection::None,
                  is_const: false,
+                 is_const2: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
                },
                arguments: vec![CppFunctionArgument {
@@ -439,6 +459,7 @@ fn simple_class_method() {
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::None,
                                    is_const: false,
+                                   is_const2: false,
                                    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
                                  },
                                  has_default_value: false,
@@ -504,12 +525,14 @@ fn advanced_class_methods() {
              Some(CppOperator::Conversion(CppType {
                indirection: CppTypeIndirection::None,
                is_const: false,
+               is_const2: false,
                base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
              })));
   assert_eq!(data.methods[6].return_type,
              CppType {
                indirection: CppTypeIndirection::None,
                is_const: false,
+               is_const2: false,
                base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
              });
 
@@ -521,6 +544,7 @@ fn advanced_class_methods() {
              CppType {
                indirection: CppTypeIndirection::None,
                is_const: false,
+               is_const2: false,
                base: CppTypeBase::TemplateParameter {
                  nested_level: 0,
                  index: 1,
@@ -559,6 +583,7 @@ fn template_class_method() {
                    template_arguments: Some(vec![CppType {
                                                    indirection: CppTypeIndirection::None,
                                                    is_const: false,
+                                                   is_const2: false,
                                                    base: CppTypeBase::TemplateParameter {
                                                      nested_level: 0,
                                                      index: 0,
@@ -577,6 +602,7 @@ fn template_class_method() {
                return_type: CppType {
                  indirection: CppTypeIndirection::None,
                  is_const: false,
+                 is_const2: false,
                  base: CppTypeBase::TemplateParameter {
                    nested_level: 0,
                    index: 0,
@@ -587,6 +613,7 @@ fn template_class_method() {
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::None,
                                    is_const: false,
+                                   is_const2: false,
                                    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
                                  },
                                  has_default_value: false,
@@ -663,12 +690,14 @@ fn template_instantiation() {
   let int = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
+    is_const2: false,
     base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
   };
   assert_eq!(data.methods[0].return_type,
              CppType {
                indirection: CppTypeIndirection::None,
                is_const: false,
+               is_const2: false,
                base: CppTypeBase::Class(CppTypeClassBase {
                  name: "Vector".to_string(),
                  template_arguments: Some(vec![int.clone()]),
@@ -709,6 +738,7 @@ fn derived_class_simple() {
                          base_type: CppType {
                            indirection: CppTypeIndirection::None,
                            is_const: false,
+                           is_const2: false,
                            base: CppTypeBase::Class(CppTypeClassBase {
                              name: "Base".to_string(),
                              template_arguments: None,
@@ -740,6 +770,7 @@ fn derived_class_simple_private() {
                          base_type: CppType {
                            indirection: CppTypeIndirection::None,
                            is_const: false,
+                           is_const2: false,
                            base: CppTypeBase::Class(CppTypeClassBase {
                              name: "Base".to_string(),
                              template_arguments: None,
@@ -772,6 +803,7 @@ fn derived_class_simple_virtual() {
                          base_type: CppType {
                            indirection: CppTypeIndirection::None,
                            is_const: false,
+                           is_const2: false,
                            base: CppTypeBase::Class(CppTypeClassBase {
                              name: "Base".to_string(),
                              template_arguments: None,
@@ -801,6 +833,7 @@ fn derived_class_multiple() {
                          base_type: CppType {
                            indirection: CppTypeIndirection::None,
                            is_const: false,
+                           is_const2: false,
                            base: CppTypeBase::Class(CppTypeClassBase {
                              name: "Base2".to_string(),
                              template_arguments: None,
@@ -813,6 +846,7 @@ fn derived_class_multiple() {
                          base_type: CppType {
                            indirection: CppTypeIndirection::None,
                            is_const: false,
+                           is_const2: false,
                            base: CppTypeBase::Class(CppTypeClassBase {
                              name: "Base1".to_string(),
                              template_arguments: None,
@@ -846,6 +880,93 @@ fn class_with_use() {
   }
 }
 
+fn complex_const_types() {
+  let data = run_parser("
+    int f0();
+    const int f1();
+    int* f2();
+    const int* f3();
+    int* const f4();
+    int** f5();
+    int* const* f6();
+    const int* const* f7();
+    int const* const* f8();
+    int const* const* const f9();
+  ");
+  let base = CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int);
+  assert_eq!(data.methods.len(), 10);
+  assert_eq!(&data.methods[0].return_type,
+             &CppType {
+               base: base.clone(),
+               indirection: CppTypeIndirection::None,
+               is_const: false,
+               is_const2: false,
+             });
+  assert_eq!(&data.methods[1].return_type,
+             &CppType {
+               base: base.clone(),
+               indirection: CppTypeIndirection::None,
+               is_const: true,
+               is_const2: false,
+             });
+  assert_eq!(&data.methods[2].return_type,
+             &CppType {
+               base: base.clone(),
+               indirection: CppTypeIndirection::Ptr,
+               is_const: false,
+               is_const2: false,
+             });
+  assert_eq!(&data.methods[3].return_type,
+             &CppType {
+               base: base.clone(),
+               indirection: CppTypeIndirection::Ptr,
+               is_const: true,
+               is_const2: false,
+             });
+  assert_eq!(&data.methods[4].return_type,
+             &CppType {
+               base: base.clone(),
+               indirection: CppTypeIndirection::Ptr,
+               is_const: false,
+               is_const2: false,
+             });
+  assert_eq!(&data.methods[5].return_type,
+             &CppType {
+               base: base.clone(),
+               indirection: CppTypeIndirection::PtrPtr,
+               is_const: false,
+               is_const2: false,
+             });
+  assert_eq!(&data.methods[6].return_type,
+             &CppType {
+               base: base.clone(),
+               indirection: CppTypeIndirection::PtrPtr,
+               is_const: false,
+               is_const2: true,
+             });
+  assert_eq!(&data.methods[7].return_type,
+             &CppType {
+               base: base.clone(),
+               indirection: CppTypeIndirection::PtrPtr,
+               is_const: true,
+               is_const2: true,
+             });
+  assert_eq!(&data.methods[8].return_type,
+             &CppType {
+               base: base.clone(),
+               indirection: CppTypeIndirection::PtrPtr,
+               is_const: true,
+               is_const2: true,
+             });
+  assert_eq!(&data.methods[9].return_type,
+             &CppType {
+               base: base.clone(),
+               indirection: CppTypeIndirection::PtrPtr,
+               is_const: true,
+               is_const2: true,
+             });
+}
+
 
 #[test]
 fn tests() {
@@ -869,4 +990,5 @@ fn tests() {
   derived_class_simple_virtual();
   derived_class_multiple();
   class_with_use();
+  complex_const_types();
 }

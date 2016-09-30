@@ -161,6 +161,7 @@ impl CppCodeGenerator {
         let class_type = CppType {
           indirection: CppTypeIndirection::None,
           is_const: false,
+          is_const2: false,
           base: CppTypeBase::Class(method.cpp_method
             .class_membership
             .as_ref()

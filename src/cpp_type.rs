@@ -254,6 +254,7 @@ impl CppType {
   pub fn void() -> Self {
     CppType {
       is_const: false,
+      is_const2: false,
       indirection: CppTypeIndirection::None,
       base: CppTypeBase::Void,
     }
@@ -275,7 +276,7 @@ impl CppType {
                  CppTypeIndirection::Ptr => "*",
                  CppTypeIndirection::Ref => "&",
                  CppTypeIndirection::PtrRef => "*&",
-                 CppTypeIndirection::PtrPtr => "**",
+                 CppTypeIndirection::PtrPtr => if self.is_const2 { "* const*" } else { "**" },
                  CppTypeIndirection::RValueRef => "&&",
                }))
   }
@@ -381,7 +382,13 @@ impl CppType {
           CppTypeIndirection::Ptr => r = format!("{}_ptr", r),
           CppTypeIndirection::Ref => r = format!("{}_ref", r),
           CppTypeIndirection::PtrRef => r = format!("{}_ptr_ref", r),
-          CppTypeIndirection::PtrPtr => r = format!("{}_ptr_ptr", r),
+          CppTypeIndirection::PtrPtr => {
+            if self.is_const2 {
+              r = format!("{}_ptr_const_ptr", r);
+            } else {
+              r = format!("{}_ptr_ptr", r);
+            }
+          }
           CppTypeIndirection::RValueRef => r = format!("{}_rvalue_ref", r),
         }
         if self.is_const {
@@ -412,7 +419,6 @@ impl CppType {
         if index < 0 {
           panic!("CppType::instantiate: index < 0");
         }
-        // TODO: Err instead of panic
         if index >= template_arguments1.len() as i32 {
           return Err("CppType::instantiate: too few template arguments".to_string());
         }
@@ -420,14 +426,23 @@ impl CppType {
         if self.is_const {
           new_type.is_const = true;
         }
-        // TODO: Err instead of panic
-        new_type.indirection = try!(CppTypeIndirection::combine(&new_type.indirection,
-                                                                &self.indirection));
+        if self.is_const2 {
+          new_type.is_const2 = true;
+        }
+        match CppTypeIndirection::combine(&new_type.indirection, &self.indirection) {
+          Err(msg) => return Err(msg),
+          Ok(r) => new_type.indirection = r,
+        }
+        if new_type.indirection == CppTypeIndirection::PtrPtr &&
+           self.indirection != CppTypeIndirection::PtrPtr {
+          new_type.is_const2 = self.is_const;
+        }
         return Ok(new_type);
       }
     }
     Ok(CppType {
       is_const: self.is_const,
+      is_const2: self.is_const2,
       indirection: self.indirection.clone(),
       base: match self.base {
         CppTypeBase::Class(ref data) => {

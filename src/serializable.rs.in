@@ -498,9 +498,11 @@ pub struct CppType {
   /// Indirection applied to base type
   pub indirection: CppTypeIndirection,
   /// If the type has const qualifier. Defaults to false
-  /// when not applicable. Complex constness cases
-  /// (like "const int * const") are not supported.
+  /// when not applicable.
   pub is_const: bool,
+  /// If 2nd indirection part of the type is const, e.g.
+  /// true for "int* const*".
+  pub is_const2: bool,
 }
 
 // -------------------------

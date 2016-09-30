@@ -119,6 +119,7 @@ pub enum RustType {
     base: RustName,
     generic_arguments: Option<Vec<RustType>>,
     is_const: bool,
+    is_const2: bool,
     indirection: RustTypeIndirection,
   },
   FunctionPointer {
@@ -132,7 +133,11 @@ impl RustType {
   pub fn caption(&self) -> String {
     match *self {
       RustType::Void => "void".to_string(),
-      RustType::Common { ref base, ref generic_arguments, ref is_const, ref indirection } => {
+      RustType::Common { ref base,
+                         ref generic_arguments,
+                         ref is_const,
+                         ref is_const2,
+                         ref indirection } => {
         let mut name = base.last_name().to_snake_case();
         if let &Some(ref args) = generic_arguments {
           name = format!("{}_{}", name, args.iter().map(|x| x.caption()).join("_"));
@@ -147,7 +152,8 @@ impl RustType {
             name = format!("{}{}_ptr", name, mut_text);
           }
           RustTypeIndirection::PtrPtr => {
-            name = format!("{}{}_ptr_ptr", name, mut_text);
+            let mut_text2 = if *is_const2 { "" } else { "_mut" };
+            name = format!("{}{}_ptr{}_ptr", name, mut_text, mut_text2);
           }
         }
         name
@@ -184,7 +190,11 @@ impl RustType {
   pub fn dealias_libc(&self) -> RustType {
     match *self {
       RustType::Void => self.clone(),
-      RustType::Common { ref base, ref generic_arguments, ref is_const, ref indirection } => {
+      RustType::Common { ref base,
+                         ref generic_arguments,
+                         ref is_const,
+                         ref is_const2,
+                         ref indirection } => {
         if base.parts.len() == 2 && &base.parts[0] == "libc" {
           let real_name = match base.parts[1].as_ref() {
             "c_void" => return self.clone(),
@@ -208,6 +218,7 @@ impl RustType {
             base: real_name,
             generic_arguments: generic_arguments.clone(),
             is_const: is_const.clone(),
+            is_const2: is_const2.clone(),
             indirection: indirection.clone(),
           }
         } else {

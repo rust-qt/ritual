@@ -363,9 +363,11 @@ impl RustGenerator {
                                        generic_arguments: None,
                                        indirection: RustTypeIndirection::None,
                                        is_const: false,
+                                       is_const2: false,
                                      }]),
         indirection: RustTypeIndirection::None,
         is_const: false,
+        is_const2: false,
       }
     }
 
@@ -470,6 +472,7 @@ impl RustGenerator {
     return Ok(RustType::Common {
       base: rust_name,
       is_const: cpp_ffi_type.is_const,
+      is_const2: cpp_ffi_type.is_const2,
       indirection: match cpp_ffi_type.indirection {
         CppTypeIndirection::None => RustTypeIndirection::None,
         CppTypeIndirection::Ptr => RustTypeIndirection::Ptr,
@@ -514,6 +517,7 @@ impl RustGenerator {
         let mut is_flaggable = false;
         let template_arg_sample = CppType {
           is_const: false,
+          is_const2: false,
           indirection: CppTypeIndirection::None,
           base: CppTypeBase::Enum { name: info.cpp_name.clone() },
         };
@@ -947,6 +951,7 @@ impl RustGenerator {
                   base: RustName::new(vec!["cpp_utils".to_string(), marker_name.to_string()]),
                   generic_arguments: None,
                   is_const: false,
+                  is_const2: false,
                   indirection: RustTypeIndirection::None,
                 },
                 rust_api_to_c_conversion: RustToCTypeConversion::None,
