@@ -3,6 +3,7 @@ use cpp_ffi_data::{CppFfiType, IndirectionChange};
 use caption_strategy::TypeCaptionStrategy;
 pub use serializable::{CppBuiltInNumericType, CppSpecificNumericTypeKind, CppTypeBase, CppType,
                        CppTypeIndirection, CppTypeClassBase};
+use utils::JoinWithString;
 extern crate regex;
 
 impl CppTypeIndirection {
@@ -227,7 +228,7 @@ impl CppTypeBase {
 
   /// Generates alphanumeric representation of self
   /// used to generate FFI function names
-  pub fn caption(&self) -> String {
+  pub fn caption(&self, strategy: TypeCaptionStrategy) -> String {
     match *self {
       CppTypeBase::Void => "void".to_string(),
       CppTypeBase::BuiltInNumeric(ref t) => t.to_cpp_code().to_string().replace(" ", "_"),
@@ -238,7 +239,17 @@ impl CppTypeBase {
       CppTypeBase::TemplateParameter { .. } => {
         panic!("template parameters are not allowed to have captions");
       }
-      CppTypeBase::FunctionPointer { .. } => "func".to_string(),
+      CppTypeBase::FunctionPointer { ref return_type, ref arguments, .. } => {
+        match strategy {
+          TypeCaptionStrategy::Short => "func".to_string(),
+          TypeCaptionStrategy::Full => {
+            format!("{}_func_{}",
+                    return_type.caption(strategy.clone()),
+                    arguments.iter().map(|x| x.caption(strategy.clone())).join("_"))
+          }
+        }
+      }
+
     }
   }
 }
@@ -374,9 +385,9 @@ impl CppType {
   /// used to generate FFI function names
   pub fn caption(&self, strategy: TypeCaptionStrategy) -> String {
     match strategy {
-      TypeCaptionStrategy::Short => self.base.caption(),
+      TypeCaptionStrategy::Short => self.base.caption(strategy.clone()),
       TypeCaptionStrategy::Full => {
-        let mut r = self.base.caption();
+        let mut r = self.base.caption(strategy.clone());
         match self.indirection {
           CppTypeIndirection::None => {}
           CppTypeIndirection::Ptr => r = format!("{}_ptr", r),

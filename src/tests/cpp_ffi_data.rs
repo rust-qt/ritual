@@ -125,11 +125,11 @@ fn argument_func() {
   assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short)),
              "func");
   assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full)),
-             "func");
+             "int_func_int_bool_ptr");
   assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short)),
              "func_arg1");
   assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full)),
-             "func_arg1");
+             "int_func_int_bool_ptr_arg1");
   assert_eq!(arg.to_cpp_code().unwrap(), "int (*arg1)(int, bool*)");
 }
 
