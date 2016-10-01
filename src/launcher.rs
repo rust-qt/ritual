@@ -150,7 +150,7 @@ pub fn run(env: BuildEnvironment) {
   let is_qt_library = lib_spec.cpp.name.starts_with("Qt5");
 
   let mut include_dirs = Vec::new();
-  let mut cpp_lib_path = None;
+  let mut cpp_lib_dirs = Vec::new();
   let mut qt_this_lib_headers_dir = None;
   let mut target_include_dirs = lib_spec.cpp.target_include_dirs.as_ref().map(|dirs| {
     dirs.iter()
@@ -184,7 +184,7 @@ pub fn run(env: BuildEnvironment) {
       .trim());
     log::info(format!("QT_INSTALL_LIBS = \"{}\"",
                       qt_install_libs_path.to_str().unwrap()));
-    cpp_lib_path = Some(qt_install_libs_path.clone());
+    cpp_lib_dirs.push(qt_install_libs_path.clone());
     include_dirs.push(qt_install_headers_path.clone());
 
     if lib_spec.cpp.name.starts_with("Qt5") {
@@ -223,6 +223,15 @@ pub fn run(env: BuildEnvironment) {
         panic!("Include dir does not exist: {}", absolute_dir.display());
       }
       include_dirs.push(fs::canonicalize(absolute_dir).unwrap());
+    }
+  }
+  if let Some(ref spec_lib_dirs) = lib_spec.cpp.lib_dirs {
+    for dir in spec_lib_dirs {
+      let absolute_dir = source_dir_path.with_added(dir);
+      if !absolute_dir.exists() {
+        panic!("Include dir does not exist: {}", absolute_dir.display());
+      }
+      cpp_lib_dirs.push(fs::canonicalize(absolute_dir).unwrap());
     }
   }
   if framework_dirs.is_empty() {
@@ -407,9 +416,9 @@ pub fn run(env: BuildEnvironment) {
     make_command.args(&make_args)
       .current_dir(path_without_long_path(&c_lib_build_path));
     if c_lib_is_shared {
-      if let Some(ref cpp_lib_path) = cpp_lib_path {
+      if !cpp_lib_dirs.is_empty() {
         for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB"] {
-          make_command.env(name, add_env_path_item(name, vec![cpp_lib_path.clone()]));
+          make_command.env(name, add_env_path_item(name, cpp_lib_dirs.clone()));
         }
       }
     }
@@ -446,11 +455,11 @@ pub fn run(env: BuildEnvironment) {
         })
         .collect(),
     };
-    log::info(format!("Generating Rust crate ({}).", &input_cargo_toml_data.name));
     let mut dependency_rust_types = Vec::new();
     for dep in &dependencies {
       dependency_rust_types.extend_from_slice(&dep.rust_export_info.rust_types);
     }
+    log::info(format!("Preparing Rust functions"));
     let rust_data = rust_generator::run(CppAndFfiData {
                                           cpp_data: parse_result,
                                           cpp_ffi_headers: cpp_ffi_headers,
@@ -465,6 +474,7 @@ pub fn run(env: BuildEnvironment) {
                                             .unwrap_or(Vec::new()),
                                           qt_doc_data: qt_doc_data,
                                         });
+    log::info(format!("Generating Rust crate ({}).", &input_cargo_toml_data.name));
     rust_code_generator::run(rust_config, &rust_data);
     {
       let rust_types_path = output_dir_path.with_added("rust_export_info.json");
@@ -493,12 +503,9 @@ pub fn run(env: BuildEnvironment) {
   match env.invokation_method {
     InvokationMethod::CommandLine => {
       log::info(format!("Compiling Rust crate."));
-      let mut lib_dirs = Vec::new();
-      if let Some(ref cpp_lib_path) = cpp_lib_path {
-        lib_dirs.push(cpp_lib_path.clone());
-      }
+      let mut all_cpp_lib_dirs = cpp_lib_dirs.clone();
       if c_lib_is_shared {
-        lib_dirs.push(c_lib_lib_path.clone());
+        all_cpp_lib_dirs.push(c_lib_lib_path.clone());
       }
       for cargo_cmd in vec!["build", "test", "doc"] {
         let mut command = Command::new("cargo");
@@ -507,9 +514,9 @@ pub fn run(env: BuildEnvironment) {
         command.arg(format!("-j{}", num_jobs));
         command.current_dir(&output_dir_path);
         // TODO: if env var already exists, add to it instead of overwriting
-        if !lib_dirs.is_empty() {
+        if !all_cpp_lib_dirs.is_empty() {
           for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB"] {
-            command.env(name, add_env_path_item(name, lib_dirs.clone()));
+            command.env(name, add_env_path_item(name, all_cpp_lib_dirs.clone()));
           }
         }
         if !framework_dirs.is_empty() {
@@ -529,8 +536,8 @@ pub fn run(env: BuildEnvironment) {
     InvokationMethod::BuildScript => {
       println!("cargo:rustc-link-search={}",
                c_lib_lib_path.to_str().unwrap());
-      if let Some(ref cpp_lib_path) = cpp_lib_path {
-        let lib_path = cpp_lib_path.to_str().unwrap();
+      for dir in cpp_lib_dirs {
+        let lib_path = dir.to_str().unwrap();
         println!("cargo:rustc-link-search=native={}", lib_path);
       }
       println!("cargo:cpp_to_rust_data_path={}",
