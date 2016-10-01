@@ -43,12 +43,12 @@ impl RustName {
   }
 
   pub fn includes(&self, other: &RustName) -> bool {
-    let extra_modules_count = other.parts.len() - self.parts.len();
+    let extra_modules_count = other.parts.len() as isize - self.parts.len() as isize;
     extra_modules_count > 0 && other.parts[0..self.parts.len()] == self.parts[..]
   }
 
   pub fn includes_directly(&self, other: &RustName) -> bool {
-    let extra_modules_count = other.parts.len() - self.parts.len();
+    let extra_modules_count = other.parts.len() as isize - self.parts.len() as isize;
     self.includes(other) && extra_modules_count == 1
   }
 }
