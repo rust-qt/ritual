@@ -164,7 +164,10 @@ impl<'a> CGenerator<'a> {
                                      msg));
               }
               Ok(name) => {
-                add_to_multihash(&mut hash_name_to_methods, &name, result);
+
+                add_to_multihash(&mut hash_name_to_methods,
+                                 &format!("{}_{}", &self.cpp_lib_spec.name, name),
+                                 result);
               }
             }
           }
