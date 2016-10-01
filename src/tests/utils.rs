@@ -49,6 +49,19 @@ fn word_iterator2() {
   assert_eq!(a1.next(), None);
 }
 
+fn split_to_words(s: &'static str) -> Vec<&'static str> {
+  use utils::WordIterator;
+  WordIterator::new(s).collect()
+}
+
+#[test]
+fn word_iterator3() {
+  assert_eq!(split_to_words("one_two"), vec!["one", "two"]);
+  assert_eq!(split_to_words("ONE_two"), vec!["ONE", "two"]);
+  assert_eq!(split_to_words("OneXTwo"), vec!["One", "X", "Two"]);
+  assert_eq!(split_to_words("QThreadPool"), vec!["Q", "Thread", "Pool"]);
+}
+
 
 #[test]
 fn case_operations() {

@@ -127,16 +127,25 @@ pub fn move_one_file(old_path: &PathBuf, new_path: &PathBuf) -> io::Result<()> {
   Ok(())
 }
 
+#[derive(PartialEq, Debug)]
+enum WordCase {
+  Upper,
+  Lower,
+  Capitalized,
+}
+
 pub struct WordIterator<'a> {
-  string: &'a String,
+  string: &'a str,
   index: usize,
+  previous_word_case: Option<WordCase>,
 }
 
 impl<'a> WordIterator<'a> {
-  pub fn new(string: &String) -> WordIterator {
+  pub fn new(string: &str) -> WordIterator {
     WordIterator {
       string: string,
       index: 0,
+      previous_word_case: None,
     }
   }
 }
@@ -150,22 +159,57 @@ impl<'a> Iterator for WordIterator<'a> {
     if self.index >= self.string.len() {
       return None;
     }
-    let mut i = self.index + 1;
-
-    loop {
-      let ok = if i == self.string.len() {
-        true
+    let mut i = self.index;
+    let mut word_case = WordCase::Lower;
+    while i < self.string.len() {
+      let current = &self.string[i..i + 1].chars().next().unwrap();
+      if current == &'_' {
+        break;
+      }
+      if i - self.index == 0 {
+        // first letter
+        if current.is_uppercase() {
+          word_case = WordCase::Capitalized;
+        } else {
+          word_case = WordCase::Lower;
+        }
+      } else if i - self.index == 1 {
+        if current.is_uppercase() {
+          if word_case == WordCase::Capitalized {
+            let next_not_upper = if i + 1 < self.string.len() {
+              !self.string[i + 1..i + 2].chars().next().unwrap().is_uppercase()
+            } else {
+              true
+            };
+            if next_not_upper || self.previous_word_case == Some(WordCase::Capitalized) {
+              break;
+            } else {
+              word_case = WordCase::Upper;
+            }
+          } else if word_case == WordCase::Lower {
+            break;
+          }
+        }
       } else {
-        let current = &self.string[i..i + 1].chars().next().unwrap();
-        current == &'_' || current.is_uppercase()
-      };
-      if ok {
-        let result = &self.string[self.index..i];
-        self.index = i;
-        return Some(result);
+        match word_case {
+          WordCase::Lower | WordCase::Capitalized => {
+            if current.is_uppercase() {
+              break;
+            }
+          }
+          WordCase::Upper => {
+            if !current.is_uppercase() {
+              break;
+            }
+          }
+        }
       }
       i = i + 1;
     }
+    let result = &self.string[self.index..i];
+    self.index = i;
+    self.previous_word_case = Some(word_case);
+    return Some(result);
   }
 }
 
