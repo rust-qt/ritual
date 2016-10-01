@@ -238,7 +238,8 @@ impl RustCodeGenerator {
             .unwrap();
         }
       }
-    } else {
+    }
+    if !self.config.output_path.with_added("src").exists() {
       fs::create_dir_all(self.config.output_path.with_added("src")).unwrap();
     }
   }
@@ -498,15 +499,17 @@ impl RustCodeGenerator {
 
       let mut extra_modules = vec!["ffi".to_string()];
       if self.config.invokation_method == InvokationMethod::CommandLine {
-        for item in fs::read_dir(&self.config.template_path.with_added("src")).unwrap() {
-          let item = item.unwrap();
-          if item.file_name().to_str().unwrap() == "lib.rs" {
-            continue;
-          }
-          if item.path().is_dir() {
-            extra_modules.push(item.file_name().into_string().unwrap());
-          } else if item.path().extension().is_some() && item.path().extension().unwrap() == "rs" {
-            extra_modules.push(item.path().file_stem().unwrap().to_str().unwrap().to_string());
+        if self.config.template_path.with_added("src").exists() {
+          for item in fs::read_dir(&self.config.template_path.with_added("src")).unwrap() {
+            let item = item.unwrap();
+            if item.file_name().to_str().unwrap() == "lib.rs" {
+              continue;
+            }
+            if item.path().is_dir() {
+              extra_modules.push(item.file_name().into_string().unwrap());
+            } else if item.path().extension().is_some() && item.path().extension().unwrap() == "rs" {
+              extra_modules.push(item.path().file_stem().unwrap().to_str().unwrap().to_string());
+            }
           }
         }
       }
