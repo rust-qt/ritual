@@ -86,6 +86,7 @@ impl<'a> CGenerator<'a> {
     let full_name = method.full_name();
     let short_text = method.short_text();
     let class_name = method.class_name().unwrap_or(&String::new()).clone();
+    println!("TEST {:?}", full_name);
     if let Some(ref ffi_methods_blacklist) = self.cpp_lib_spec.ffi_methods_blacklist {
       if ffi_methods_blacklist.iter()
         .find(|&x| x == &full_name || x == &short_text || x == &class_name)

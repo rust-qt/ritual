@@ -325,22 +325,11 @@ impl CppData {
         }
       }
     }
-    println!("TEST: {:?}",
-             all_new_methods.iter()
-               .filter(|m| m.full_name() == "POA_CosNaming::BindingIterator::_do_get_interface")
-               .collect::<Vec<_>>());
     while !all_new_methods.is_empty() {
       let method = all_new_methods.pop().unwrap();
       let mut duplicates = Vec::new();
-      while let Some(index) = all_new_methods.iter().position(|m| {
-        m.class_membership.as_ref().unwrap().is_const ==
-        method.class_membership.as_ref().unwrap().is_const &&
-        m.class_membership.as_ref().unwrap().is_static ==
-        method.class_membership.as_ref().unwrap().is_static &&
-        m.class_name() == method.class_name() && m.name == method.name &&
-        m.argument_types_equal(&method) &&
-        m.allows_variadic_arguments == method.allows_variadic_arguments
-      }) {
+      while let Some(index) = all_new_methods.iter()
+        .position(|m| m.class_name() == method.class_name() && m.name == method.name) {
         duplicates.push(all_new_methods.remove(index));
       }
       if duplicates.is_empty() {
@@ -364,11 +353,18 @@ impl CppData {
           }
         }
 
-        let return_type_mismatch = {
-          let first_return_type = &duplicates[0].return_type;
-          duplicates.iter().find(|x| &x.return_type != first_return_type).is_some()
-        };
-        if !return_type_mismatch {
+        let signature_mismatch = duplicates.iter()
+          .find(|m| {
+            let f = &duplicates[0];
+            m.class_membership.as_ref().unwrap().is_const !=
+            f.class_membership.as_ref().unwrap().is_const ||
+            m.class_membership.as_ref().unwrap().is_static !=
+            f.class_membership.as_ref().unwrap().is_static ||
+            &m.return_type != &f.return_type || !m.argument_types_equal(f) ||
+            m.allows_variadic_arguments == f.allows_variadic_arguments
+          })
+          .is_some();
+        if !signature_mismatch {
           if duplicates.iter().find(|x| x.inheritance_chain.is_empty()).is_none() {
             // TODO: support more complicated cases
             // TODO: can't detect if the method was overloaded in intermediate class
@@ -398,8 +394,8 @@ impl CppData {
           }
           self.methods.push(final_method);
         } else {
-          log::warning(format!("Removed duplicated inherited methods:"));
-          if return_type_mismatch {
+          log::warning(format!("Removed ambiguous inherited methods (presumed inaccessible):"));
+          if signature_mismatch {
             for duplicate in &duplicates {
               log::warning(format!("  {}", duplicate.short_text()));
               log::warning(format!("  {}", duplicate.inheritance_chain_text()));
