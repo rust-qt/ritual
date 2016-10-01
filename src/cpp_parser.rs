@@ -932,9 +932,10 @@ impl CppParser {
         name = matches.at(1).unwrap().to_string();
       }
     }
+    let mut name_with_namespace = name.clone();
     if let Some(parent) = entity.get_semantic_parent() {
       if parent.get_kind() == EntityKind::Namespace {
-        name = format!("{}::{}", get_full_name(parent).unwrap(), name);
+        name_with_namespace = format!("{}::{}", get_full_name(parent).unwrap(), name);
       }
     }
     let allows_variadic_arguments = entity.is_variadic();
@@ -974,7 +975,7 @@ impl CppParser {
     let tokens = source_range.tokenize();
     let declaration_code = if tokens.is_empty() {
       log::noisy(format!("Failed to tokenize method {} at {:?}",
-                         name,
+                         name_with_namespace,
                          entity.get_range().unwrap()));
       let start = source_range.get_start().get_file_location();
       let end = source_range.get_end().get_file_location();
@@ -1031,7 +1032,7 @@ impl CppParser {
       Some(token_strings.join(" "))
     };
     Ok(CppMethod {
-      name: name,
+      name: name_with_namespace,
       operator: method_operator,
       class_membership: match class_name {
         Some(class_name) => {
