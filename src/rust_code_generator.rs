@@ -507,7 +507,8 @@ impl RustCodeGenerator {
             }
             if item.path().is_dir() {
               extra_modules.push(item.file_name().into_string().unwrap());
-            } else if item.path().extension().is_some() && item.path().extension().unwrap() == "rs" {
+            } else if item.path().extension().is_some() &&
+                      item.path().extension().unwrap() == "rs" {
               extra_modules.push(item.path().file_stem().unwrap().to_str().unwrap().to_string());
             }
           }
