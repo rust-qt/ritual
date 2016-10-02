@@ -1,7 +1,7 @@
 use cpp_ffi_generator::{CppAndFfiData, CppFfiHeaderData};
 use cpp_ffi_data::CppAndFfiMethod;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
-               CppSpecificNumericTypeKind, CppTypeClassBase};
+               CppSpecificNumericTypeKind, CppTypeClassBase, CppTypeRole};
 use cpp_ffi_data::{CppFfiType, IndirectionChange};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
@@ -11,8 +11,7 @@ use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKin
                 RustMethodArguments, TraitImpl, TraitName, RustEnumValue};
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_ffi_data::CppFfiArgumentMeaning;
-use utils::{CaseOperations, VecCaseOperations, WordIterator, add_to_multihash, JoinWithString};
-use caption_strategy::TypeCaptionStrategy;
+use utils::{CaseOperations, VecCaseOperations, WordIterator, add_to_multihash};
 use log;
 use qt_doc_parser::{QtDocData, QtDocResultForMethod};
 use doc_formatter;
@@ -79,8 +78,6 @@ fn sanitize_rust_identifier(name: &String) -> String {
 /// - If there is only one variant, adds another variant.
 /// Rust does not allow repr(C) enums having only one variant.
 fn prepare_enum_values(values: &Vec<EnumValue>, name: &String) -> Vec<RustEnumValue> {
-  // TODO: tests for prepare_enum_values
-  // TODO: remove shared prefix from variants
   let mut value_to_variant: HashMap<i64, RustEnumValue> = HashMap::new();
   for variant in values {
     let value = variant.value;
@@ -192,7 +189,7 @@ pub struct RustGeneratorConfig {
 
   pub qt_doc_data: Option<QtDocData>,
 }
-// TODO: when supporting other libraries, implement removal of arbitrary prefixes
+// TODO: when supporting other libraries, implement removal of arbitrary prefixes (#25)
 
 /// Execute processing
 pub fn run(input_data: CppAndFfiData,
@@ -200,7 +197,7 @@ pub fn run(input_data: CppAndFfiData,
            config: RustGeneratorConfig)
            -> RustGeneratorOutput {
   let generator = RustGenerator {
-    processed_types: generate_type_map(&input_data, &config),
+    processed_types: generate_type_map(&input_data, &config, &dependency_rust_types),
     dependency_types: dependency_rust_types,
     input_data: input_data,
     config: config,
@@ -256,7 +253,8 @@ fn calculate_rust_name(name: &String,
 /// the map. Their Rust equivalents depend on their classes'
 /// equivalents.
 fn generate_type_map(input_data: &CppAndFfiData,
-                     config: &RustGeneratorConfig)
+                     config: &RustGeneratorConfig,
+                     dependency_types: &Vec<RustProcessedTypeInfo>)
                      -> Vec<RustProcessedTypeInfo> {
   let mut result = Vec::new();
   for type_info in &input_data.cpp_data.types {
@@ -275,22 +273,56 @@ fn generate_type_map(input_data: &CppAndFfiData,
       rust_name: calculate_rust_name(&type_info.name, &type_info.include_file, false, config),
     });
   }
+  let template_final_name = |result: &Vec<RustProcessedTypeInfo>,
+                             item: &RustProcessedTypeInfo|
+                             -> Result<RustName, String> {
+    let mut name = item.rust_name.clone();
+    let last_name = name.parts.pop().unwrap();
+    let mut arg_captions = Vec::new();
+    for x in item.cpp_template_arguments.as_ref().unwrap() {
+      let rust_type = try!(complete_type(result,
+                                         dependency_types,
+                                         &try!(x.to_cpp_ffi_type(CppTypeRole::NotReturnType)),
+                                         &CppFfiArgumentMeaning::Argument(0)));
+      arg_captions.push(rust_type.rust_api_type.caption().to_class_case());
+    }
+    name.parts.push(last_name + &arg_captions.join(""));
+    Ok(name)
+  };
+  let mut name_failed_items = Vec::new();
   for template_instantiations in &input_data.cpp_data.template_instantiations {
     for ins in &template_instantiations.instantiations {
-      // TODO: use Rust names for template args
-      let name = format!("{}_{}",
-                         template_instantiations.class_name,
-                         ins.template_arguments
-                           .iter()
-                           .map(|x| x.caption(TypeCaptionStrategy::Full))
-                           .join("_"));
-      result.push(RustProcessedTypeInfo {
+      name_failed_items.push(RustProcessedTypeInfo {
         cpp_name: template_instantiations.class_name.clone(),
         cpp_template_arguments: Some(ins.template_arguments.clone()),
         kind: RustProcessedTypeKind::Class { size: ins.size },
-        rust_name: calculate_rust_name(&name, &template_instantiations.include_file, false, config),
+        rust_name: calculate_rust_name(&template_instantiations.class_name,
+                                       &template_instantiations.include_file,
+                                       false,
+                                       config),
       });
     }
+  }
+  let mut any_success = true;
+  while !name_failed_items.is_empty() {
+    if !any_success {
+      panic!("Failed to generate Rust names for template types: {:?}",
+             name_failed_items);
+    }
+    any_success = false;
+    let mut name_failed_items_new = Vec::new();
+    for mut r in name_failed_items {
+      match template_final_name(&result, &r) {
+        Ok(name) => {
+          r.rust_name = name;
+          result.push(r);
+          any_success = true;
+        }
+        Err(_) => name_failed_items_new.push(r),
+      }
+
+    }
+    name_failed_items = name_failed_items_new;
   }
   result
 }
@@ -306,196 +338,205 @@ struct ProcessFunctionsResult {
   overloading_types: Vec<RustTypeDeclaration>,
 }
 
-impl RustGenerator {
-  /// Generates CompleteType from CppFfiType, adding
-  /// Rust API type, Rust FFI type and conversion between them.
-  fn complete_type(&self,
-                   cpp_ffi_type: &CppFfiType,
-                   argument_meaning: &CppFfiArgumentMeaning)
-                   -> Result<CompleteType, String> {
-    let rust_ffi_type = try!(self.ffi_type(&cpp_ffi_type.ffi_type));
-    let mut rust_api_type = rust_ffi_type.clone();
-    let mut rust_api_to_c_conversion = RustToCTypeConversion::None;
-    if let RustType::Common { ref mut indirection, .. } = rust_api_type {
-      match cpp_ffi_type.conversion {
-        IndirectionChange::NoChange => {
-          if argument_meaning == &CppFfiArgumentMeaning::This {
-            assert!(indirection == &RustTypeIndirection::Ptr);
-            *indirection = RustTypeIndirection::Ref { lifetime: None };
-            rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
-          }
-        }
-        IndirectionChange::ValueToPointer => {
-          assert!(indirection == &RustTypeIndirection::Ptr);
-          *indirection = RustTypeIndirection::None;
-          rust_api_to_c_conversion = RustToCTypeConversion::ValueToPtr;
-        }
-        IndirectionChange::ReferenceToPointer => {
+/// Generates CompleteType from CppFfiType, adding
+/// Rust API type, Rust FFI type and conversion between them.
+fn complete_type(processed_types: &Vec<RustProcessedTypeInfo>,
+                 dependency_types: &Vec<RustProcessedTypeInfo>,
+                 cpp_ffi_type: &CppFfiType,
+                 argument_meaning: &CppFfiArgumentMeaning)
+                 -> Result<CompleteType, String> {
+  let rust_ffi_type = try!(ffi_type(processed_types, dependency_types, &cpp_ffi_type.ffi_type));
+  let mut rust_api_type = rust_ffi_type.clone();
+  let mut rust_api_to_c_conversion = RustToCTypeConversion::None;
+  if let RustType::Common { ref mut indirection, .. } = rust_api_type {
+    match cpp_ffi_type.conversion {
+      IndirectionChange::NoChange => {
+        if argument_meaning == &CppFfiArgumentMeaning::This {
           assert!(indirection == &RustTypeIndirection::Ptr);
           *indirection = RustTypeIndirection::Ref { lifetime: None };
           rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
         }
-        IndirectionChange::QFlagsToUInt => {}
       }
-    }
-    if cpp_ffi_type.conversion == IndirectionChange::QFlagsToUInt {
-      rust_api_to_c_conversion = RustToCTypeConversion::QFlagsToUInt;
-      let enum_type =
-        if let CppTypeBase::Class(CppTypeClassBase { ref template_arguments, .. }) =
-               cpp_ffi_type.original_type.base {
-          let args = template_arguments.as_ref().unwrap();
-          assert!(args.len() == 1);
-          if let CppTypeBase::Enum { ref name } = args[0].base {
-            match self.find_type_info(|x| &x.cpp_name == name) {
-              None => return Err(format!("Type has no Rust equivalent: {}", name)),
-              Some(info) => info.rust_name.clone(),
-            }
-          } else {
-            panic!("invalid original type for QFlags");
-          }
-        } else {
-          panic!("invalid original type for QFlags");
-        };
-      rust_api_type = RustType::Common {
-        base: RustName::new(vec!["qt_core".to_string(), "flags".to_string(), "Flags".to_string()]),
-        generic_arguments: Some(vec![RustType::Common {
-                                       base: enum_type,
-                                       generic_arguments: None,
-                                       indirection: RustTypeIndirection::None,
-                                       is_const: false,
-                                       is_const2: false,
-                                     }]),
-        indirection: RustTypeIndirection::None,
-        is_const: false,
-        is_const2: false,
+      IndirectionChange::ValueToPointer => {
+        assert!(indirection == &RustTypeIndirection::Ptr);
+        *indirection = RustTypeIndirection::None;
+        rust_api_to_c_conversion = RustToCTypeConversion::ValueToPtr;
       }
-    }
-
-    Ok(CompleteType {
-      cpp_ffi_type: cpp_ffi_type.ffi_type.clone(),
-      cpp_type: cpp_ffi_type.original_type.clone(),
-      cpp_to_ffi_conversion: cpp_ffi_type.conversion.clone(),
-      rust_ffi_type: rust_ffi_type,
-      rust_api_type: rust_api_type,
-      rust_api_to_c_conversion: rust_api_to_c_conversion,
-    })
-  }
-
-  fn find_type_info<F>(&self, f: F) -> Option<&RustProcessedTypeInfo>
-    where F: Fn(&RustProcessedTypeInfo) -> bool
-  {
-    match self.processed_types.iter().find(|x| f(x)) {
-      None => self.dependency_types.iter().find(|x| f(x)),
-      Some(info) => Some(info),
+      IndirectionChange::ReferenceToPointer => {
+        assert!(indirection == &RustTypeIndirection::Ptr);
+        *indirection = RustTypeIndirection::Ref { lifetime: None };
+        rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
+      }
+      IndirectionChange::QFlagsToUInt => {}
     }
   }
-
-  /// Converts CppType to its exact Rust equivalent (FFI-compatible)
-  fn ffi_type(&self, cpp_ffi_type: &CppType) -> Result<RustType, String> {
-    let rust_name = match cpp_ffi_type.base {
-      CppTypeBase::Void => {
-        match cpp_ffi_type.indirection {
-          CppTypeIndirection::None => return Ok(RustType::Void),
-          _ => RustName::new(vec!["libc".to_string(), "c_void".to_string()]),
-        }
-      }
-      CppTypeBase::BuiltInNumeric(ref numeric) => {
-        if numeric == &CppBuiltInNumericType::Bool {
-          RustName::new(vec!["bool".to_string()])
-        } else {
-          let own_name = match *numeric {
-            CppBuiltInNumericType::Bool => unreachable!(),
-            CppBuiltInNumericType::Char => "c_char",
-            CppBuiltInNumericType::SChar => "c_schar",
-            CppBuiltInNumericType::UChar => "c_uchar",
-            CppBuiltInNumericType::WChar => "wchar_t",
-            CppBuiltInNumericType::Short => "c_short",
-            CppBuiltInNumericType::UShort => "c_ushort",
-            CppBuiltInNumericType::Int => "c_int",
-            CppBuiltInNumericType::UInt => "c_uint",
-            CppBuiltInNumericType::Long => "c_long",
-            CppBuiltInNumericType::ULong => "c_ulong",
-            CppBuiltInNumericType::LongLong => "c_longlong",
-            CppBuiltInNumericType::ULongLong => "c_ulonglong",
-            CppBuiltInNumericType::Float => "c_float",
-            CppBuiltInNumericType::Double => "c_double",
-            _ => return Err(format!("unsupported numeric type: {:?}", numeric)),
-          };
-          RustName::new(vec!["libc".to_string(), own_name.to_string()])
-        }
-      }
-      CppTypeBase::SpecificNumeric { ref bits, ref kind, .. } => {
-        let letter = match *kind {
-          CppSpecificNumericTypeKind::Integer { ref is_signed } => {
-            if *is_signed { "i" } else { "u" }
-          }
-          CppSpecificNumericTypeKind::FloatingPoint => "f",
-        };
-        RustName::new(vec![format!("{}{}", letter, bits)])
-      }
-      CppTypeBase::PointerSizedInteger { ref is_signed, .. } => {
-        RustName::new(vec![if *is_signed { "isize" } else { "usize" }.to_string()])
-      }
-      CppTypeBase::Enum { ref name } => {
-        match self.find_type_info(|x| &x.cpp_name == name) {
+  if cpp_ffi_type.conversion == IndirectionChange::QFlagsToUInt {
+    rust_api_to_c_conversion = RustToCTypeConversion::QFlagsToUInt;
+    let enum_type = if let CppTypeBase::Class(CppTypeClassBase { ref template_arguments, .. }) =
+                           cpp_ffi_type.original_type.base {
+      let args = template_arguments.as_ref().unwrap();
+      assert!(args.len() == 1);
+      if let CppTypeBase::Enum { ref name } = args[0].base {
+        match find_type_info(processed_types, dependency_types, |x| &x.cpp_name == name) {
           None => return Err(format!("Type has no Rust equivalent: {}", name)),
-          Some(ref info) => info.rust_name.clone(),
+          Some(info) => info.rust_name.clone(),
         }
+      } else {
+        panic!("invalid original type for QFlags");
       }
-      CppTypeBase::Class(ref name_and_args) => {
-        match self.find_type_info(|x| {
-          &x.cpp_name == &name_and_args.name &&
-          &x.cpp_template_arguments == &name_and_args.template_arguments
-        }) {
-          None => return Err(format!("Type has no Rust equivalent: {:?}", name_and_args)),
-          Some(ref info) => info.rust_name.clone(),
-        }
-      }
-      CppTypeBase::FunctionPointer { ref return_type,
-                                     ref arguments,
-                                     ref allows_variadic_arguments } => {
-        if *allows_variadic_arguments {
-          return Err(format!("Function pointers with variadic arguments are not supported"));
-        }
-        let mut rust_args = Vec::new();
-        for arg in arguments {
-          rust_args.push(try!(self.ffi_type(arg)));
-        }
-        let rust_return_type = try!(self.ffi_type(return_type));
-        return Ok(RustType::FunctionPointer {
-          arguments: rust_args,
-          return_type: Box::new(rust_return_type),
-        });
-      }
-      CppTypeBase::TemplateParameter { .. } => panic!("invalid cpp type"),
+    } else {
+      panic!("invalid original type for QFlags");
     };
-    return Ok(RustType::Common {
-      base: rust_name,
-      is_const: cpp_ffi_type.is_const,
-      is_const2: cpp_ffi_type.is_const2,
-      indirection: match cpp_ffi_type.indirection {
-        CppTypeIndirection::None => RustTypeIndirection::None,
-        CppTypeIndirection::Ptr => RustTypeIndirection::Ptr,
-        CppTypeIndirection::PtrPtr => RustTypeIndirection::PtrPtr,
-        _ => return Err(format!("unsupported level of indirection: {:?}", cpp_ffi_type)),
-      },
-      generic_arguments: None,
-    });
+    rust_api_type = RustType::Common {
+      base: RustName::new(vec!["qt_core".to_string(), "flags".to_string(), "Flags".to_string()]),
+      generic_arguments: Some(vec![RustType::Common {
+                                     base: enum_type,
+                                     generic_arguments: None,
+                                     indirection: RustTypeIndirection::None,
+                                     is_const: false,
+                                     is_const2: false,
+                                   }]),
+      indirection: RustTypeIndirection::None,
+      is_const: false,
+      is_const2: false,
+    }
   }
 
+  Ok(CompleteType {
+    cpp_ffi_type: cpp_ffi_type.ffi_type.clone(),
+    cpp_type: cpp_ffi_type.original_type.clone(),
+    cpp_to_ffi_conversion: cpp_ffi_type.conversion.clone(),
+    rust_ffi_type: rust_ffi_type,
+    rust_api_type: rust_api_type,
+    rust_api_to_c_conversion: rust_api_to_c_conversion,
+  })
+}
+
+fn find_type_info<'a, F>(processed_types: &'a Vec<RustProcessedTypeInfo>,
+                         dependency_types: &'a Vec<RustProcessedTypeInfo>,
+                         f: F)
+                         -> Option<&'a RustProcessedTypeInfo>
+  where F: Fn(&RustProcessedTypeInfo) -> bool
+{
+  match processed_types.iter().find(|x| f(x)) {
+    None => dependency_types.iter().find(|x| f(x)),
+    Some(info) => Some(info),
+  }
+}
+
+/// Converts CppType to its exact Rust equivalent (FFI-compatible)
+fn ffi_type(processed_types: &Vec<RustProcessedTypeInfo>,
+            dependency_types: &Vec<RustProcessedTypeInfo>,
+            cpp_ffi_type: &CppType)
+            -> Result<RustType, String> {
+  let rust_name = match cpp_ffi_type.base {
+    CppTypeBase::Void => {
+      match cpp_ffi_type.indirection {
+        CppTypeIndirection::None => return Ok(RustType::Void),
+        _ => RustName::new(vec!["libc".to_string(), "c_void".to_string()]),
+      }
+    }
+    CppTypeBase::BuiltInNumeric(ref numeric) => {
+      if numeric == &CppBuiltInNumericType::Bool {
+        RustName::new(vec!["bool".to_string()])
+      } else {
+        let own_name = match *numeric {
+          CppBuiltInNumericType::Bool => unreachable!(),
+          CppBuiltInNumericType::Char => "c_char",
+          CppBuiltInNumericType::SChar => "c_schar",
+          CppBuiltInNumericType::UChar => "c_uchar",
+          CppBuiltInNumericType::WChar => "wchar_t",
+          CppBuiltInNumericType::Short => "c_short",
+          CppBuiltInNumericType::UShort => "c_ushort",
+          CppBuiltInNumericType::Int => "c_int",
+          CppBuiltInNumericType::UInt => "c_uint",
+          CppBuiltInNumericType::Long => "c_long",
+          CppBuiltInNumericType::ULong => "c_ulong",
+          CppBuiltInNumericType::LongLong => "c_longlong",
+          CppBuiltInNumericType::ULongLong => "c_ulonglong",
+          CppBuiltInNumericType::Float => "c_float",
+          CppBuiltInNumericType::Double => "c_double",
+          _ => return Err(format!("unsupported numeric type: {:?}", numeric)),
+        };
+        RustName::new(vec!["libc".to_string(), own_name.to_string()])
+      }
+    }
+    CppTypeBase::SpecificNumeric { ref bits, ref kind, .. } => {
+      let letter = match *kind {
+        CppSpecificNumericTypeKind::Integer { ref is_signed } => if *is_signed { "i" } else { "u" },
+        CppSpecificNumericTypeKind::FloatingPoint => "f",
+      };
+      RustName::new(vec![format!("{}{}", letter, bits)])
+    }
+    CppTypeBase::PointerSizedInteger { ref is_signed, .. } => {
+      RustName::new(vec![if *is_signed { "isize" } else { "usize" }.to_string()])
+    }
+    CppTypeBase::Enum { ref name } => {
+      match find_type_info(processed_types, dependency_types, |x| &x.cpp_name == name) {
+        None => return Err(format!("Type has no Rust equivalent: {}", name)),
+        Some(ref info) => info.rust_name.clone(),
+      }
+    }
+    CppTypeBase::Class(ref name_and_args) => {
+      match find_type_info(processed_types, dependency_types, |x| {
+        &x.cpp_name == &name_and_args.name &&
+        &x.cpp_template_arguments == &name_and_args.template_arguments
+      }) {
+        None => return Err(format!("Type has no Rust equivalent: {:?}", name_and_args)),
+        Some(ref info) => info.rust_name.clone(),
+      }
+    }
+    CppTypeBase::FunctionPointer { ref return_type,
+                                   ref arguments,
+                                   ref allows_variadic_arguments } => {
+      if *allows_variadic_arguments {
+        return Err(format!("Function pointers with variadic arguments are not supported"));
+      }
+      let mut rust_args = Vec::new();
+      for arg in arguments {
+        rust_args.push(try!(ffi_type(processed_types, dependency_types, arg)));
+      }
+      let rust_return_type = try!(ffi_type(processed_types, dependency_types, return_type));
+      return Ok(RustType::FunctionPointer {
+        arguments: rust_args,
+        return_type: Box::new(rust_return_type),
+      });
+    }
+    CppTypeBase::TemplateParameter { .. } => panic!("invalid cpp type"),
+  };
+  return Ok(RustType::Common {
+    base: rust_name,
+    is_const: cpp_ffi_type.is_const,
+    is_const2: cpp_ffi_type.is_const2,
+    indirection: match cpp_ffi_type.indirection {
+      CppTypeIndirection::None => RustTypeIndirection::None,
+      CppTypeIndirection::Ptr => RustTypeIndirection::Ptr,
+      CppTypeIndirection::PtrPtr => RustTypeIndirection::PtrPtr,
+      _ => return Err(format!("unsupported level of indirection: {:?}", cpp_ffi_type)),
+    },
+    generic_arguments: None,
+  });
+}
+
+
+impl RustGenerator {
   /// Generates exact Rust equivalent of CppAndFfiMethod object
   /// (FFI-compatible)
   fn ffi_function(&self, data: &CppAndFfiMethod) -> Result<RustFFIFunction, String> {
     let mut args = Vec::new();
     for arg in &data.c_signature.arguments {
-      let rust_type = try!(self.ffi_type(&arg.argument_type.ffi_type));
+      let rust_type = try!(ffi_type(&self.processed_types,
+                                    &self.dependency_types,
+                                    &arg.argument_type.ffi_type));
       args.push(RustFFIArgument {
         name: sanitize_rust_identifier(&arg.name),
         argument_type: rust_type,
       });
     }
     Ok(RustFFIFunction {
-      return_type: try!(self.ffi_type(&data.c_signature.return_type.ffi_type)),
+      return_type: try!(ffi_type(&self.processed_types,
+                                 &self.dependency_types,
+                                 &data.c_signature.return_type.ffi_type)),
       name: data.c_name.clone(),
       arguments: args,
     })
@@ -719,7 +760,10 @@ impl RustGenerator {
     let mut arguments = Vec::new();
     let mut return_type_info = None;
     for (arg_index, arg) in method.c_signature.arguments.iter().enumerate() {
-      match self.complete_type(&arg.argument_type, &arg.meaning) {
+      match complete_type(&self.processed_types,
+                          &self.dependency_types,
+                          &arg.argument_type,
+                          &arg.meaning) {
         Ok(complete_type) => {
           if arg.meaning == CppFfiArgumentMeaning::ReturnValue {
             assert!(return_type_info.is_none());
@@ -746,8 +790,10 @@ impl RustGenerator {
     if return_type_info.is_none() {
       // none of the arguments has return value meaning,
       // so FFI return value must be used
-      match self.complete_type(&method.c_signature.return_type,
-                               &CppFfiArgumentMeaning::ReturnValue) {
+      match complete_type(&self.processed_types,
+                          &self.dependency_types,
+                          &method.c_signature.return_type,
+                          &CppFfiArgumentMeaning::ReturnValue) {
         Ok(mut r) => {
           if method.allocation_place == ReturnValueAllocationPlace::Heap &&
              !method.cpp_method.is_destructor() {
