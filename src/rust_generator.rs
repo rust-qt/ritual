@@ -621,9 +621,15 @@ impl RustGenerator {
             }
           });
         let functions_result = self.process_functions(methods, &methods_scope);
-        // TODO: use type_to_cpp_code_permissive to get more beautiful templates
         // TODO: export Qt doc
-        let doc = format!("C++ type: {}", class_type.to_cpp_code().unwrap());
+        let doc = format!("C++ type: `{}`.",
+                          CppType {
+                              base: CppTypeBase::Class(class_type.clone()),
+                              indirection: CppTypeIndirection::None,
+                              is_const: false,
+                              is_const2: false,
+                            }
+                            .to_cpp_pseudo_code());
 
         ProcessTypeResult {
           main_type: RustTypeDeclaration {

@@ -1,4 +1,4 @@
-use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase, CppTypeClassBase};
+use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase};
 use cpp_ffi_data::CppFfiType;
 use cpp_ffi_data::CppFfiFunctionSignature;
 use cpp_ffi_data::{CppFfiFunctionArgument, CppFfiArgumentMeaning};
@@ -20,33 +20,6 @@ pub enum ReturnValueAllocationPlace {
   /// the method does not return a class object by value, so
   /// there is only one FFI wrapper for it
   NotApplicable,
-}
-
-fn type_to_cpp_code_permissive(type1: &CppType) -> String {
-  let r = match type1.base {
-    CppTypeBase::TemplateParameter { ref nested_level, ref index } => {
-      let mut fake_type = type1.clone();
-      fake_type.base = CppTypeBase::Class(CppTypeClassBase {
-        name: format!("T_{}_{}", nested_level, index),
-        template_arguments: None,
-      });
-      fake_type.to_cpp_code(None)
-    }
-    CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) => {
-      if let &Some(ref template_arguments) = template_arguments {
-        Ok(format!("{}<{}>",
-                   name,
-                   template_arguments.iter()
-                     .map(|x| type_to_cpp_code_permissive(x))
-                     .join(", ")))
-      } else {
-        type1.to_cpp_code(None)
-      }
-    }
-    CppTypeBase::FunctionPointer { .. } => type1.to_cpp_code(Some(&"FN_PTR".to_string())),
-    _ => type1.to_cpp_code(None),
-  };
-  r.unwrap_or_else(|_| "[?]".to_string())
 }
 
 impl CppMethodKind {
@@ -207,12 +180,13 @@ impl CppMethod {
   pub fn full_name(&self) -> String {
     if let Some(ref info) = self.class_membership {
       format!("{}::{}",
-              type_to_cpp_code_permissive(&CppType {
-                indirection: CppTypeIndirection::None,
-                is_const: false,
-                is_const2: false,
-                base: CppTypeBase::Class(info.class_type.clone()),
-              }),
+              CppType {
+                  indirection: CppTypeIndirection::None,
+                  is_const: false,
+                  is_const2: false,
+                  base: CppTypeBase::Class(info.class_type.clone()),
+                }
+                .to_cpp_pseudo_code(),
               self.name)
     } else {
       self.name.clone()
@@ -265,7 +239,7 @@ impl CppMethod {
     if self.allows_variadic_arguments {
       s = format!("{} [var args]", s);
     }
-    s = format!("{} {}", s, type_to_cpp_code_permissive(&self.return_type));
+    s = format!("{} {}", s, self.return_type.to_cpp_pseudo_code());
     s = format!("{} {}", s, self.full_name());
     s = format!("{}({})",
                 s,
@@ -273,7 +247,7 @@ impl CppMethod {
                   .iter()
                   .map(|arg| {
         format!("{} {}{}",
-                type_to_cpp_code_permissive(&arg.argument_type),
+                arg.argument_type.to_cpp_pseudo_code(),
                 arg.name,
                 if arg.has_default_value {
                   format!(" = ?")
@@ -294,7 +268,7 @@ impl CppMethod {
     self.inheritance_chain
       .iter()
       .map(|x| {
-        let mut text = type_to_cpp_code_permissive(&x.base_type);
+        let mut text = x.base_type.to_cpp_pseudo_code();
         if x.is_virtual {
           text = format!("virtual {}", text);
         }

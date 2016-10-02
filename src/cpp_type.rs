@@ -292,6 +292,33 @@ impl CppType {
                }))
   }
 
+  pub fn to_cpp_pseudo_code(&self) -> String {
+    let r = match self.base {
+      CppTypeBase::TemplateParameter { ref nested_level, ref index } => {
+        let mut fake_type = self.clone();
+        fake_type.base = CppTypeBase::Class(CppTypeClassBase {
+          name: format!("T_{}_{}", nested_level, index),
+          template_arguments: None,
+        });
+        fake_type.to_cpp_code(None)
+      }
+      CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) => {
+        if let &Some(ref template_arguments) = template_arguments {
+          Ok(format!("{}<{}>",
+                     name,
+                     template_arguments.iter()
+                       .map(|x| x.to_cpp_pseudo_code())
+                       .join(", ")))
+        } else {
+          self.to_cpp_code(None)
+        }
+      }
+      CppTypeBase::FunctionPointer { .. } => self.to_cpp_code(Some(&"FN_PTR".to_string())),
+      _ => self.to_cpp_code(None),
+    };
+    r.unwrap_or_else(|_| "[?]".to_string())
+  }
+
   /// Converts this C++ type to its adaptation for FFI interface,
   /// removing all features not supported by C ABI
   /// (e.g. references and passing objects by value)
