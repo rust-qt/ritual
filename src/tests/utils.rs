@@ -94,4 +94,9 @@ fn case_operations() {
   let s7 = "too_many__underscores".to_string();
   assert_eq!(s7.to_class_case(), "TooManyUnderscores");
   assert_eq!(s7.to_snake_case(), "too_many_underscores");
+
+  let s8 = "OpenGLFunctions".to_string();
+  assert_eq!(s8.to_class_case(), "OpenGLFunctions");
+  assert_eq!(s8.to_snake_case(), "opengl_functions");
+
 }

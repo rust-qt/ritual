@@ -19,18 +19,23 @@ pub fn is_msvc() -> bool {
 }
 
 
-pub trait JoinWithString {
-  fn join(self, separator: &'static str) -> String;
+pub trait JoinWithString<S> {
+  fn join(self, separator: S) -> String;
 }
 
-// TODO: accept iterator over AsRef<String>
-impl<X> JoinWithString for X
-  where X: Iterator<Item = String>
+impl<S, S2, X> JoinWithString<S2> for X
+  where S: AsRef<str>,
+        S2: AsRef<str>,
+        X: Iterator<Item = S>
 {
-  fn join(self, separator: &'static str) -> String {
+  fn join(self, separator: S2) -> String {
     self.fold("".to_string(), |a, b| {
-      let m = if a.len() > 0 { a + separator } else { a };
-      m + &b
+      let m = if a.len() > 0 {
+        a + separator.as_ref()
+      } else {
+        a
+      };
+      m + b.as_ref()
     })
   }
 }
@@ -236,6 +241,22 @@ fn iterator_to_snake_case<'a, S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> St
   it.map(|x| x.as_ref().to_lowercase()).join("_")
 }
 
+fn replace_all_sub_vecs(parts: &mut Vec<String>, needle: Vec<&str>) {
+  let mut any_found = true;
+  while any_found {
+    any_found = false;
+    for i in 0..parts.len() + 1 - needle.len() {
+      if &parts[i..i + needle.len()] == &needle[..] {
+        for _ in 0..needle.len() - 1 {
+          parts.remove(i + 1);
+        }
+        parts[i] = needle.join("");
+        any_found = true;
+        break;
+      }
+    }
+  }
+}
 
 impl CaseOperations for String {
   fn to_class_case(&self) -> Self {
@@ -243,19 +264,8 @@ impl CaseOperations for String {
   }
   fn to_snake_case(&self) -> Self {
     let mut parts: Vec<_> = WordIterator::new(self).map(|x| x.to_lowercase()).collect();
-    let mut any_found = true;
-    while any_found {
-      any_found = false;
-      for i in 0..parts.len() - 1 {
-        if parts[i] == "na" && parts[i + 1] == "n" {
-          parts.remove(i + 1);
-          parts[i] = "nan".to_string();
-          any_found = true;
-          break;
-        }
-      }
-    }
-    // TODO: open_g_l => opengl
+    replace_all_sub_vecs(&mut parts, vec!["na", "n"]);
+    replace_all_sub_vecs(&mut parts, vec!["open", "g", "l"]);
     parts.join("_")
   }
 }
