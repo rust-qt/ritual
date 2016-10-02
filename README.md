@@ -135,8 +135,8 @@ Contributions are always welcome! There are easy ways to contribute:
 
 - Suggest a C++ library to adapt;
 - Submit a bug report, a feature request, or an improvement suggestion at the [issue tracker](https://github.com/rust-qt/cpp_to_rust/issues);
-- Write a test for `cpp_to_rust` itself or any of wrapped libraries and submit a pull request;
-- Fix a bug or implement a feature and submit a pull request. (If you want big changes, they should be discussed at the issue tracker first.)
+- Write a test for `cpp_to_rust` itself or any of wrapped libraries;
+- Pick up an issue with [help wanted](https://github.com/rust-qt/cpp_to_rust/labels/help%20wanted) tag or any other issue you like.
 
 
 
