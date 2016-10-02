@@ -968,6 +968,20 @@ fn complex_const_types() {
 }
 
 
+fn anon_enum() {
+  let data = run_parser("class X {
+    enum { v1, v2 } field;
+  };");
+  assert!(data.types.len() == 1);
+  assert_eq!(data.types[0].name, "X");
+  match data.types[0].kind {
+    CppTypeKind::Class { ref fields, .. } => {
+      assert!(fields.is_empty());
+    }
+    _ => panic!("invalid type kind"),
+  }
+}
+
 #[test]
 fn tests() {
   // clang can't be used from multiple threads, so these checks
@@ -991,4 +1005,5 @@ fn tests() {
   derived_class_multiple();
   class_with_use();
   complex_const_types();
+  anon_enum();
 }

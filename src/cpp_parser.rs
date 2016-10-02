@@ -699,9 +699,7 @@ impl CppParser {
       }
       TypeKind::Enum => {
         Ok(CppType {
-          base: CppTypeBase::Enum {
-            name: get_full_name(type1.get_declaration().unwrap()).unwrap(),
-          },
+          base: CppTypeBase::Enum { name: try!(get_full_name(type1.get_declaration().unwrap())) },
           is_const: is_const,
           is_const2: false,
           indirection: CppTypeIndirection::None,
