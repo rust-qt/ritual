@@ -245,14 +245,16 @@ fn replace_all_sub_vecs(parts: &mut Vec<String>, needle: Vec<&str>) {
   let mut any_found = true;
   while any_found {
     any_found = false;
-    for i in 0..parts.len() + 1 - needle.len() {
-      if &parts[i..i + needle.len()] == &needle[..] {
-        for _ in 0..needle.len() - 1 {
-          parts.remove(i + 1);
+    if parts.len() + 1 >= needle.len() {
+      for i in 0..parts.len() + 1 - needle.len() {
+        if &parts[i..i + needle.len()] == &needle[..] {
+          for _ in 0..needle.len() - 1 {
+            parts.remove(i + 1);
+          }
+          parts[i] = needle.join("");
+          any_found = true;
+          break;
         }
-        parts[i] = needle.join("");
-        any_found = true;
-        break;
       }
     }
   }
