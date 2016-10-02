@@ -298,36 +298,53 @@ pub fn run(env: BuildEnvironment) {
     log::info("Processing skipped!");
   } else {
     let parse_result_cache_file_path = output_dir_path.with_added("cpp_data.json");
-    let parse_result = if parse_result_cache_file_path.as_path().is_file() {
-      log::info(format!("C++ data is loaded from file: {}",
-                        parse_result_cache_file_path.to_str().unwrap()));
+    let loaded_parse_result = if parse_result_cache_file_path.as_path().is_file() {
       let file = File::open(&parse_result_cache_file_path).unwrap();
-      serde_json::from_reader(file).unwrap()
-    } else {
-      log::info("Parsing C++ headers.");
-      let mut parse_result =
-        cpp_parser::run(cpp_parser::CppParserConfig {
-                          include_dirs: include_dirs.clone(),
-                          framework_dirs: framework_dirs.clone(),
-                          header_name: lib_spec.cpp.include_file.clone(),
-                          target_include_dirs: target_include_dirs,
-                          tmp_cpp_path: output_dir_path.with_added("1.cpp"),
-                          name_blacklist: lib_spec.cpp.name_blacklist.clone().unwrap_or(Vec::new()),
-                        },
-                        &dependency_cpp_types);
-      if is_qt_library {
-        if let Some(ref qt_this_lib_headers_dir) = qt_this_lib_headers_dir {
-          qt_specific::fix_header_names(&mut parse_result, qt_this_lib_headers_dir);
+      match serde_json::from_reader(file) {
+        Ok(r) => {
+          log::info(format!("C++ data is loaded from file: {}",
+                            parse_result_cache_file_path.to_str().unwrap()));
+          Some(r)
+        }
+        Err(err) => {
+          log::warning(format!("Failed to load C++ data: {}", err));
+          None
         }
       }
-      log::info("Post-processing parse result.");
-      parse_result.post_process(&dependencies.iter().map(|x| &x.cpp_data).collect());
+    } else {
+      None
+    };
 
-      let mut file = File::create(&parse_result_cache_file_path).unwrap();
-      serde_json::to_writer(&mut file, &parse_result).unwrap();
-      log::info(format!("Header parse result is saved to file: {}",
-                        parse_result_cache_file_path.to_str().unwrap()));
-      parse_result
+    let parse_result = match loaded_parse_result {
+      Some(r) => r,
+      None => {
+        log::info("Parsing C++ headers.");
+        let mut parse_result = cpp_parser::run(cpp_parser::CppParserConfig {
+                                                 include_dirs: include_dirs.clone(),
+                                                 framework_dirs: framework_dirs.clone(),
+                                                 header_name: lib_spec.cpp.include_file.clone(),
+                                                 target_include_dirs: target_include_dirs,
+                                                 tmp_cpp_path: output_dir_path.with_added("1.cpp"),
+                                                 name_blacklist: lib_spec.cpp
+                                                   .name_blacklist
+                                                   .clone()
+                                                   .unwrap_or(Vec::new()),
+                                               },
+                                               &dependency_cpp_types);
+        if is_qt_library {
+          if let Some(ref qt_this_lib_headers_dir) = qt_this_lib_headers_dir {
+            qt_specific::fix_header_names(&mut parse_result, qt_this_lib_headers_dir);
+          }
+        }
+        log::info("Post-processing parse result.");
+        parse_result.post_process(&dependencies.iter().map(|x| &x.cpp_data).collect());
+
+        let mut file = File::create(&parse_result_cache_file_path).unwrap();
+        serde_json::to_writer(&mut file, &parse_result).unwrap();
+        log::info(format!("Header parse result is saved to file: {}",
+                          parse_result_cache_file_path.to_str().unwrap()));
+        parse_result
+      }
     };
 
     let c_lib_name = format!("{}_c", &input_cargo_toml_data.name);
