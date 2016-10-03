@@ -81,7 +81,7 @@ pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &String) -> String {
     }
     let rust_count = doc_item.rust_fns.len();
     if overloaded {
-      doc.push(format!("Rust: {}{}\n",
+      doc.push(format!("Rust arguments: {}{}\n",
                        if rust_count > 1 { "<br>" } else { "" },
                        doc_item.rust_fns
                          .iter()
@@ -97,7 +97,7 @@ pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &String) -> String {
         })
                          .join("")));
     }
-    doc.push(format!("C++: <span style='color: green;'>```{}```</span>",
+    doc.push(format!("C++ method: <span style='color: green;'>```{}```</span>",
                      doc_item.cpp_fn));
     doc.push(format!("\n\n"));
     if let Some(ref inherited_from) = doc_item.inherited_from {

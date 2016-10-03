@@ -54,6 +54,9 @@ pub struct RustCodeGeneratorConfig {
 }
 
 fn format_doc(doc: &String) -> String {
+  if doc.is_empty() {
+    return String::new();
+  }
   doc.split("\n")
     .map(|x| {
       let mut line = format!("/// {}\n", x);

@@ -621,7 +621,7 @@ impl RustGenerator {
             }
           });
         let functions_result = self.process_functions(methods, &methods_scope);
-        // TODO: export Qt doc
+        // TODO: export Qt doc (???)
         let doc = format!("C++ type: `{}`.",
                           CppType {
                               base: CppTypeBase::Class(class_type.clone()),
@@ -1037,36 +1037,19 @@ impl RustGenerator {
         a.short_text().cmp(&b.short_text())
       });
       for (cpp_method, variants) in grouped_by_cpp_method_vec {
-        let cpp_short_text = cpp_method.short_text();
-        if let Some(ref qt_doc_data) = self.config.qt_doc_data {
-          if let Some(ref declaration_code) = cpp_method.declaration_code {
-            let doc = match qt_doc_data.doc_for_method(&cpp_method.doc_id(),
-                                                       declaration_code,
-                                                       &cpp_short_text) {
-              Ok(doc) => Some(doc),
-              Err(msg) => {
-                log::warning(format!("Failed to get documentation for method: {}: {}",
-                                     &cpp_method.short_text(),
-                                     msg));
-                None
-              }
-            };
-            doc_items.push(doc_formatter::DocItem {
-              doc: doc,
-              cpp_fn: cpp_short_text,
-              rust_fns: variants.iter()
-                .map(|args| {
-                  doc_formatter::rust_method_variant(args,
-                                                     method_name.last_name(),
-                                                     first_method.self_arg_kind(),
-                                                     &self.config.crate_name)
-                })
-                .collect(),
-              inherited_from: cpp_method.inherited_from.clone(),
-            });
-
-          }
-        }
+        doc_items.push(doc_formatter::DocItem {
+          doc: self.get_qt_doc_for_method(&cpp_method),
+          cpp_fn: cpp_method.short_text(),
+          rust_fns: variants.iter()
+            .map(|args| {
+              doc_formatter::rust_method_variant(args,
+                                                 method_name.last_name(),
+                                                 first_method.self_arg_kind(),
+                                                 &self.config.crate_name)
+            })
+            .collect(),
+          inherited_from: cpp_method.inherited_from.clone(),
+        });
       }
       let doc = doc_formatter::method_doc(doc_items, &cpp_method_name);
 
@@ -1268,6 +1251,9 @@ impl RustGenerator {
         // or accept a single method without change.
         let (method, type_declaration) =
           self.process_method(filtered_methods, scope, use_self_arg_caption);
+        if method.doc.is_empty() {
+          panic!("doc is empty! {:?}", method);
+        }
         result.methods.push(method);
         if let Some(r) = type_declaration {
           result.overloading_types.push(r);
@@ -1515,5 +1501,3 @@ fn prepare_enum_values_test_suffix_partial() {
 // TODO: wrap operators as normal functions, for now
 
 // TODO: AbstractItemModel::parent documentation doesn't show QObject::parent variant
-
-// TODO: Window::base_size; qt_gui::rgb::gray - no documentation!
