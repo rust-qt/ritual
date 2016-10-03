@@ -275,25 +275,29 @@ impl CppType {
     !self.is_const && self.indirection == CppTypeIndirection::None && self.base == CppTypeBase::Void
   }
 
+  fn to_cpp_code_intermediate(&self, base_code: &String) -> String {
+    format!("{}{}{}",
+            if self.is_const { "const " } else { "" },
+            base_code,
+            match self.indirection {
+              CppTypeIndirection::None => "",
+              CppTypeIndirection::Ptr => "*",
+              CppTypeIndirection::Ref => "&",
+              CppTypeIndirection::PtrRef => "*&",
+              CppTypeIndirection::PtrPtr => if self.is_const2 { "* const*" } else { "**" },
+              CppTypeIndirection::RValueRef => "&&",
+            })
+  }
+
   pub fn to_cpp_code(&self,
                      function_pointer_inner_text: Option<&String>)
                      -> Result<String, String> {
-    let name = try!(self.base.to_cpp_code(function_pointer_inner_text));
-    Ok(format!("{}{}{}",
-               if self.is_const { "const " } else { "" },
-               name,
-               match self.indirection {
-                 CppTypeIndirection::None => "",
-                 CppTypeIndirection::Ptr => "*",
-                 CppTypeIndirection::Ref => "&",
-                 CppTypeIndirection::PtrRef => "*&",
-                 CppTypeIndirection::PtrPtr => if self.is_const2 { "* const*" } else { "**" },
-                 CppTypeIndirection::RValueRef => "&&",
-               }))
+    let base_code = try!(self.base.to_cpp_code(function_pointer_inner_text));
+    Ok(self.to_cpp_code_intermediate(&base_code))
   }
 
   pub fn to_cpp_pseudo_code(&self) -> String {
-    let r = match self.base {
+    let base_code = match self.base {
       CppTypeBase::TemplateParameter { ref nested_level, ref index } => {
         let mut fake_type = self.clone();
         fake_type.base = CppTypeBase::Class(CppTypeClassBase {
@@ -313,10 +317,10 @@ impl CppType {
           self.to_cpp_code(None)
         }
       }
-      CppTypeBase::FunctionPointer { .. } => self.to_cpp_code(Some(&"FN_PTR".to_string())),
-      _ => self.to_cpp_code(None),
+      CppTypeBase::FunctionPointer { .. } => self.base.to_cpp_code(Some(&"FN_PTR".to_string())),
+      _ => self.base.to_cpp_code(None),
     };
-    r.unwrap_or_else(|_| "[?]".to_string())
+    self.to_cpp_code_intermediate(&base_code.unwrap_or_else(|_| "[?]".to_string()))
   }
 
   /// Converts this C++ type to its adaptation for FFI interface,

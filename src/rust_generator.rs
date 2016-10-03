@@ -34,7 +34,8 @@ enum Case {
 fn operator_rust_name(operator: &CppOperator) -> String {
   match *operator {
     CppOperator::Conversion(ref type1) => {
-      format!("as_{}", type1.caption(TypeCaptionStrategy::Full).to_snake_case())
+      format!("as_{}",
+              type1.caption(TypeCaptionStrategy::Full).to_snake_case())
     }
     _ => format!("op_{}", operator.c_name()),
   }
@@ -854,7 +855,7 @@ impl RustGenerator {
       for arg in &mut arguments {
         if arg.argument_type.rust_api_type.is_ref() {
           arg.argument_type.rust_api_type =
-              arg.argument_type.rust_api_type.with_lifetime(format!("l{}", next_lifetime_num));
+            arg.argument_type.rust_api_type.with_lifetime(format!("l{}", next_lifetime_num));
           next_lifetime_num += 1;
         }
       }

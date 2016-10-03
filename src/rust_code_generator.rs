@@ -441,10 +441,21 @@ impl RustCodeGenerator {
                     self.rust_type_to_code(&variant.return_type.rust_api_type))
           }
         };
+        let all_lifetimes: Vec<_> = variant.arguments
+          .iter()
+          .filter_map(|x| x.argument_type.rust_api_type.lifetime())
+          .collect();
+        let lifetimes_text = if all_lifetimes.len() > 0 {
+          format!("<{}>",
+                  all_lifetimes.iter().map(|x| format!("'{}", x)).join(", "))
+        } else {
+          String::new()
+        };
 
-        format!("{doc}{maybe_pub}fn {name}({args}){return_type} {{\n{body}}}\n\n",
+        format!("{doc}{maybe_pub}fn {name}{lifetimes_text}({args}){return_type} {{\n{body}}}\n\n",
                 doc = format_doc(&func.doc),
                 maybe_pub = maybe_pub,
+                lifetimes_text = lifetimes_text,
                 name = func.name.last_name(),
                 args = self.arg_texts(&variant.arguments, None).join(", "),
                 return_type = return_type_for_signature,

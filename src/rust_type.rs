@@ -180,11 +180,22 @@ impl RustType {
     let mut r = self.clone();
     if let RustType::Common { ref mut indirection, .. } = r {
       if let RustTypeIndirection::Ref { ref mut lifetime } = *indirection {
-        assert!(lifetime.is_none());
         *lifetime = Some(new_lifetime);
       }
     }
     r
+  }
+
+  pub fn lifetime(&self) -> Option<&String> {
+    match *self {
+      RustType::Common { ref indirection, .. } => {
+        match *indirection {
+          RustTypeIndirection::Ref { ref lifetime } => lifetime.as_ref(),
+          _ => None,
+        }
+      }
+      _ => None,
+    }
   }
 
   pub fn dealias_libc(&self) -> RustType {

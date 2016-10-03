@@ -364,58 +364,65 @@ impl CppData {
             panic!("only class methods can appear here");
           }
         }
-
-        let signature_mismatch = duplicates.iter()
-          .find(|m| {
-            let f = &duplicates[0];
-            m.class_membership.as_ref().unwrap().is_const !=
-            f.class_membership.as_ref().unwrap().is_const ||
-            m.class_membership.as_ref().unwrap().is_static !=
-            f.class_membership.as_ref().unwrap().is_static ||
-            &m.return_type != &f.return_type || !m.argument_types_equal(f) ||
-            m.allows_variadic_arguments == f.allows_variadic_arguments
-          })
-          .is_some();
-        if !signature_mismatch {
-          if duplicates.iter().find(|x| x.inheritance_chain.is_empty()).is_none() {
-            // TODO: support more complicated cases
-            // TODO: can't detect if the method was overloaded in intermediate class
-            // because the most base class is not in inheritance_chain
-            let first_base = &duplicates[0].inheritance_chain.get(0).unwrap().base_type;
-            if duplicates.iter()
-              .find(|x| {
-                !x.inheritance_chain[0].is_virtual ||
-                &x.inheritance_chain[0].base_type != first_base
-              })
-              .is_none() {
-              allow_method = true;
-            }
-          }
-        }
-        if allow_method {
-          log::debug(format!("Allowing duplicated inherited method (virtual diamond inheritance)"));
-          log::debug(format!("{}", duplicates[0].short_text()));
-          for duplicate in &duplicates {
-            log::debug(format!("  {}", duplicate.inheritance_chain_text()));
-          }
-          let mut final_method = duplicates.pop().unwrap();
-          if let Some(ref mut info) = final_method.class_membership {
-            info.visibility = lowest_visibility;
-          } else {
-            panic!("only class methods can appear here");
-          }
-          self.methods.push(final_method);
+        if duplicates.iter()
+          .find(|m| m.inheritance_chain.last() != duplicates[0].inheritance_chain.last())
+          .is_none() {
+          // all methods are inherited from one base class
+          self.methods.append(&mut duplicates);
         } else {
-          log::warning(format!("Removed ambiguous inherited methods (presumed inaccessible):"));
-          if signature_mismatch {
-            for duplicate in &duplicates {
-              log::warning(format!("  {}", duplicate.short_text()));
-              log::warning(format!("  {}", duplicate.inheritance_chain_text()));
+          let signature_mismatch = duplicates.iter()
+            .find(|m| {
+              let f = &duplicates[0];
+              m.class_membership.as_ref().unwrap().is_const !=
+              f.class_membership.as_ref().unwrap().is_const ||
+              m.class_membership.as_ref().unwrap().is_static !=
+              f.class_membership.as_ref().unwrap().is_static ||
+              &m.return_type != &f.return_type || !m.argument_types_equal(f) ||
+              m.allows_variadic_arguments == f.allows_variadic_arguments
+            })
+            .is_some();
+          if !signature_mismatch {
+            if duplicates.iter().find(|x| x.inheritance_chain.is_empty()).is_none() {
+              // TODO: support more complicated cases
+              // TODO: can't detect if the method was overloaded in intermediate class
+              // because the most base class is not in inheritance_chain
+              let first_base = &duplicates[0].inheritance_chain.get(0).unwrap().base_type;
+              if duplicates.iter()
+                .find(|x| {
+                  !x.inheritance_chain[0].is_virtual ||
+                  &x.inheritance_chain[0].base_type != first_base
+                })
+                .is_none() {
+                allow_method = true;
+              }
             }
-          } else {
-            log::warning(format!("{}", duplicates[0].short_text()));
+          }
+          if allow_method {
+            log::debug(format!("Allowing duplicated inherited method (virtual diamond \
+                                inheritance)"));
+            log::debug(format!("{}", duplicates[0].short_text()));
             for duplicate in &duplicates {
-              log::warning(format!("  {}", duplicate.inheritance_chain_text()));
+              log::debug(format!("  {}", duplicate.inheritance_chain_text()));
+            }
+            let mut final_method = duplicates.pop().unwrap();
+            if let Some(ref mut info) = final_method.class_membership {
+              info.visibility = lowest_visibility;
+            } else {
+              panic!("only class methods can appear here");
+            }
+            self.methods.push(final_method);
+          } else {
+            log::warning(format!("Removed ambiguous inherited methods (presumed inaccessible):"));
+            if signature_mismatch {
+              for duplicate in &duplicates {
+                log::warning(format!("  {}", duplicate.short_text()));
+                log::warning(format!("  {}", duplicate.inheritance_chain_text()));
+              }
+            } else {
+              log::warning(format!("{}", duplicates[0].short_text()));
+              for duplicate in &duplicates {
+                log::warning(format!("  {}", duplicate.inheritance_chain_text()));
+              }
             }
           }
         }
