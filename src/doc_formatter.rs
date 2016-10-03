@@ -50,7 +50,7 @@ pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &String) -> String {
   let overloaded = doc_items.len() > 1 || (doc_items.len() == 1 && doc_items[0].rust_fns.len() > 1);
   let mut doc = Vec::new();
   if overloaded {
-    doc.push(format!("C++ method: ```{}```\n\n", cpp_method_name));
+    doc.push(format!("C++ method: <span style='color: green;'>```{}```</span>\n\n", cpp_method_name));
     doc.push(format!("This is an overloaded function. Available variants:\n\n"));
   }
 
