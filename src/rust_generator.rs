@@ -330,7 +330,7 @@ fn generate_type_map(input_data: &CppAndFfiData,
   while !name_failed_items.is_empty() {
     if !any_success {
       log::warning(format!("Failed to generate Rust names for template types:"));
-      for mut r in name_failed_items {
+      for r in name_failed_items {
         log::warning(format!("  {:?}\n  {}\n\n",
                              r,
                              template_final_name(&result, &r).err().unwrap()));

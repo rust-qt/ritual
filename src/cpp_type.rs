@@ -481,7 +481,9 @@ impl CppType {
           CppTypeIndirection::None => {
             new_type.is_const = self.is_const || arg.is_const;
           }
-          CppTypeIndirection::Ptr | CppTypeIndirection::Ref => {
+          CppTypeIndirection::Ptr |
+          CppTypeIndirection::Ref |
+          CppTypeIndirection::RValueRef => {
             if self.indirection != CppTypeIndirection::None {
               new_type.is_const = self.is_const;
             } else if arg.indirection != CppTypeIndirection::None {
@@ -503,7 +505,6 @@ impl CppType {
               new_type.is_const2 = self.is_const;
             }
           }
-          CppTypeIndirection::RValueRef => unreachable!(),
         }
         return Ok(new_type);
       }
