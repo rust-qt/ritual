@@ -301,6 +301,7 @@ impl CppMethod {
       None => false,
     }
   }
+  #[allow(dead_code)]
   pub fn is_operator(&self) -> bool {
     self.operator.is_some()
   }

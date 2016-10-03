@@ -16,7 +16,11 @@ use log;
 use qt_doc_parser::{QtDocData, QtDocResultForMethod};
 use doc_formatter;
 use std::collections::{HashMap, HashSet};
+use cpp_operator::CppOperator;
+use caption_strategy::TypeCaptionStrategy;
+
 pub use serializable::{RustProcessedTypeKind, RustProcessedTypeInfo};
+
 
 /// Mode of case conversion
 enum Case {
@@ -27,7 +31,14 @@ enum Case {
 }
 
 
-
+fn operator_rust_name(operator: &CppOperator) -> String {
+  match *operator {
+    CppOperator::Conversion(ref type1) => {
+      format!("as_{}", type1.caption(TypeCaptionStrategy::Full).to_snake_case())
+    }
+    _ => format!("op_{}", operator.c_name()),
+  }
+}
 
 /// If remove_qt_prefix is true, removes "Q" or "Qt"
 /// if it is first word of the string and not the only one word.
@@ -220,16 +231,22 @@ pub fn run(input_data: CppAndFfiData,
 fn calculate_rust_name(name: &String,
                        include_file: &String,
                        is_function: bool,
+                       operator: Option<&CppOperator>,
                        config: &RustGeneratorConfig)
                        -> RustName {
   let mut split_parts: Vec<_> = name.split("::").collect();
-  let last_part = remove_qt_prefix_and_convert_case(&split_parts.pop().unwrap().to_string(),
-                                                    if is_function {
-                                                      Case::Snake
-                                                    } else {
-                                                      Case::Class
-                                                    },
-                                                    config.remove_qt_prefix);
+  let original_last_part = split_parts.pop().unwrap().to_string();
+  let last_part = if let Some(operator) = operator {
+    operator_rust_name(operator)
+  } else {
+    remove_qt_prefix_and_convert_case(&original_last_part,
+                                      if is_function {
+                                        Case::Snake
+                                      } else {
+                                        Case::Class
+                                      },
+                                      config.remove_qt_prefix)
+  };
 
   let mut parts = Vec::new();
   parts.push(config.crate_name.clone());
@@ -270,7 +287,11 @@ fn generate_type_map(input_data: &CppAndFfiData,
         CppTypeKind::Class { ref size, .. } => RustProcessedTypeKind::Class { size: size.unwrap() },
         CppTypeKind::Enum { ref values } => RustProcessedTypeKind::Enum { values: values.clone() },
       },
-      rust_name: calculate_rust_name(&type_info.name, &type_info.include_file, false, config),
+      rust_name: calculate_rust_name(&type_info.name,
+                                     &type_info.include_file,
+                                     false,
+                                     None,
+                                     config),
     });
   }
   let template_final_name = |result: &Vec<RustProcessedTypeInfo>,
@@ -299,6 +320,7 @@ fn generate_type_map(input_data: &CppAndFfiData,
         rust_name: calculate_rust_name(&template_instantiations.class_name,
                                        &template_instantiations.include_file,
                                        false,
+                                       None,
                                        config),
       });
     }
@@ -715,6 +737,7 @@ impl RustGenerator {
           let rust_name = calculate_rust_name(&method.cpp_method.name,
                                               &method.cpp_method.include_file,
                                               true,
+                                              method.cpp_method.operator.as_ref(),
                                               &self.config);
 
           if check_name(&rust_name) {
@@ -759,10 +782,7 @@ impl RustGenerator {
                        scope: &RustMethodScope,
                        generate_doc: bool)
                        -> Result<RustMethod, String> {
-    if method.cpp_method.is_operator() {
-      // TODO: implement operator traits
-      return Err(format!("operators are not supported yet"));
-    }
+    // TODO: implement operator traits
     let mut arguments = Vec::new();
     let mut return_type_info = None;
     for (arg_index, arg) in method.c_signature.arguments.iter().enumerate() {
@@ -830,13 +850,24 @@ impl RustGenerator {
     }
     let mut return_type_info1 = return_type_info.unwrap();
     if return_type_info1.0.rust_api_type.is_ref() {
-      if arguments.iter().find(|arg| arg.argument_type.rust_api_type.is_ref()).is_none() {
+      let mut next_lifetime_num = 0;
+      for arg in &mut arguments {
+        if arg.argument_type.rust_api_type.is_ref() {
+          arg.argument_type.rust_api_type =
+              arg.argument_type.rust_api_type.with_lifetime(format!("l{}", next_lifetime_num));
+          next_lifetime_num += 1;
+        }
+      }
+      let return_lifetime = if next_lifetime_num == 0 {
         log::warning(format!("Method returns a reference but doesn't receive a reference: {}",
                              method.short_text()));
         log::warning("Assuming static lifetime of return value.");
-        return_type_info1.0.rust_api_type =
-          return_type_info1.0.rust_api_type.with_lifetime("static".to_string());
-      }
+        "static".to_string()
+      } else {
+        "l0".to_string()
+      };
+      return_type_info1.0.rust_api_type =
+        return_type_info1.0.rust_api_type.with_lifetime(return_lifetime);
     }
 
     let doc = if generate_doc {
@@ -871,12 +902,17 @@ impl RustGenerator {
       calculate_rust_name(&method.cpp_method.name,
                           &method.cpp_method.include_file,
                           true,
+                          method.cpp_method.operator.as_ref(),
                           &self.config)
     } else {
       let x = if method.cpp_method.is_constructor() {
         "new".to_string()
       } else {
-        method.cpp_method.name.to_snake_case()
+        if let Some(ref operator) = method.cpp_method.operator {
+          operator_rust_name(operator)
+        } else {
+          method.cpp_method.name.to_snake_case()
+        }
       };
       RustName::new(vec![x])
     };
@@ -1191,9 +1227,7 @@ impl RustGenerator {
         }
         continue;
       }
-      if method.cpp_method.is_operator() {
-        continue; // TODO: support operators
-      }
+      // TODO: support operators
       match self.generate_function(method, scope, false) {
         Ok(rust_method) => {
           let name = rust_method.name.last_name().clone();
@@ -1319,6 +1353,7 @@ fn calculate_rust_name_test_part(name: &'static str,
   assert_eq!(calculate_rust_name(&name.to_string(),
                                  &include_file.to_string(),
                                  is_function,
+                                 None,
                                  &RustGeneratorConfig {
                                    crate_name: "qt_core".to_string(),
                                    remove_qt_prefix: true,
@@ -1495,7 +1530,3 @@ fn prepare_enum_values_test_suffix_partial() {
 // TODO: alternative Option-based overloading strategy
 
 // TODO: rename allocation place markers to AsStruct and AsBox
-
-// TODO: wrap operators as normal functions, for now
-
-// TODO: AbstractItemModel::parent documentation doesn't show QObject::parent variant
