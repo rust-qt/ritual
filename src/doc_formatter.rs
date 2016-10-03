@@ -3,6 +3,7 @@ use rust_info::{RustMethodSelfArgKind, RustMethodArgumentsVariant};
 use rust_code_generator::rust_type_to_code;
 use utils::JoinWithString;
 use cpp_method::CppMethodInheritedFrom;
+use cpp_type::CppTypeBase;
 
 #[derive(Debug, Clone)]
 pub struct DocItem {
@@ -46,12 +47,15 @@ pub fn rust_method_variant(args: &RustMethodArgumentsVariant,
           return_type = return_type_text)
 }
 
+pub fn wrap_inline_cpp_code(code: &String) -> String {
+  format!("<span style='color: green;'>```{}```</span>", code)
+}
+
 pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &String) -> String {
   let overloaded = doc_items.len() > 1 || (doc_items.len() == 1 && doc_items[0].rust_fns.len() > 1);
   let mut doc = Vec::new();
   if overloaded {
-    doc.push(format!("C++ method: <span style='color: green;'>```{}```</span>\n\n",
-                     cpp_method_name));
+    doc.push(format!("C++ method: {}\n\n", wrap_inline_cpp_code(cpp_method_name)));
     doc.push(format!("This is an overloaded function. Available variants:\n\n"));
   }
 
@@ -98,14 +102,14 @@ pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &String) -> String {
         })
                          .join("")));
     }
-    doc.push(format!("C++ method: <span style='color: green;'>```{}```</span>",
-                     doc_item.cpp_fn));
+    doc.push(format!("C++ method: {}", wrap_inline_cpp_code(&doc_item.cpp_fn)));
     doc.push(format!("\n\n"));
     if let Some(ref inherited_from) = doc_item.inherited_from {
-      doc.push(format!("Inherited from {}. Original C++ method: \
-                        <span style='color: green;'>```{}```</span>\n\n",
-                       inherited_from.class_type.to_cpp_code().unwrap(), // TODO: use permissive
-                       inherited_from.short_text));
+      doc.push(format!("Inherited from {}. Original C++ method: {}\n\n",
+                       wrap_inline_cpp_code(&CppTypeBase::Class(inherited_from.class_type
+                           .clone())
+                         .to_cpp_pseudo_code()),
+                       wrap_inline_cpp_code(&inherited_from.short_text)));
     }
     if let Some(result) = doc_item.doc {
       let prefix = match result.kind {

@@ -609,7 +609,8 @@ impl RustGenerator {
         }
 
         // TODO: export Qt doc for enum and its variants
-        let doc = format!("C++ type: {}", &info.cpp_name);
+        let doc = format!("C++ type: {}",
+                          doc_formatter::wrap_inline_cpp_code(&info.cpp_name));
         ProcessTypeResult {
           main_type: RustTypeDeclaration {
             name: info.rust_name.last_name().clone(),
@@ -645,14 +646,14 @@ impl RustGenerator {
           });
         let functions_result = self.process_functions(methods, &methods_scope);
         // TODO: export Qt doc (???)
-        let doc = format!("C++ type: `{}`.",
-                          CppType {
+        let doc = format!("C++ type: {}.",
+                          doc_formatter::wrap_inline_cpp_code(&CppType {
                               base: CppTypeBase::Class(class_type.clone()),
                               indirection: CppTypeIndirection::None,
                               is_const: false,
                               is_const2: false,
                             }
-                            .to_cpp_pseudo_code());
+                            .to_cpp_pseudo_code()));
 
         ProcessTypeResult {
           main_type: RustTypeDeclaration {

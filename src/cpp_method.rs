@@ -180,13 +180,7 @@ impl CppMethod {
   pub fn full_name(&self) -> String {
     if let Some(ref info) = self.class_membership {
       format!("{}::{}",
-              CppType {
-                  indirection: CppTypeIndirection::None,
-                  is_const: false,
-                  is_const2: false,
-                  base: CppTypeBase::Class(info.class_type.clone()),
-                }
-                .to_cpp_pseudo_code(),
+              CppTypeBase::Class(info.class_type.clone()).to_cpp_pseudo_code(),
               self.name)
     } else {
       self.name.clone()
