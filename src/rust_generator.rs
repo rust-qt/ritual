@@ -329,8 +329,13 @@ fn generate_type_map(input_data: &CppAndFfiData,
   let mut any_success = true;
   while !name_failed_items.is_empty() {
     if !any_success {
-      panic!("Failed to generate Rust names for template types: {:?}",
-             name_failed_items);
+      log::warning(format!("Failed to generate Rust names for template types:"));
+      for mut r in name_failed_items {
+        log::warning(format!("  {:?}\n  {}\n\n",
+                             r,
+                             template_final_name(&result, &r).err().unwrap()));
+      }
+      break;
     }
     any_success = false;
     let mut name_failed_items_new = Vec::new();
