@@ -1494,8 +1494,6 @@ fn prepare_enum_values_test_suffix_partial() {
 
 // TODO: alternative Option-based overloading strategy
 
-// TODO: QList::indexOf - duplicate documentation
-
 // TODO: rename allocation place markers to AsStruct and AsBox
 
 // TODO: wrap operators as normal functions, for now

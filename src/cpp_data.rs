@@ -29,6 +29,18 @@ fn apply_instantiations_to_method(method: &CppMethod,
           .instantiate(nested_level, &ins.template_arguments)),
       });
     }
+    if let Some(ref args) = method.arguments_before_omitting {
+      let mut new_args = Vec::new();
+      for arg in args {
+        new_args.push(CppFunctionArgument {
+          name: arg.name.clone(),
+          has_default_value: arg.has_default_value,
+          argument_type: try!(arg.argument_type
+            .instantiate(nested_level, &ins.template_arguments)),
+        });
+      }
+      new_method.arguments_before_omitting = Some(new_args);
+    }
     new_method.return_type = try!(method.return_type
       .instantiate(nested_level, &ins.template_arguments));
     if let Some(ref mut info) = new_method.class_membership {
