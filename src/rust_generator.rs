@@ -386,8 +386,15 @@ fn complete_type(processed_types: &Vec<RustProcessedTypeInfo>,
         rust_api_to_c_conversion = RustToCTypeConversion::ValueToPtr;
       }
       IndirectionChange::ReferenceToPointer => {
-        assert!(indirection == &RustTypeIndirection::Ptr);
-        *indirection = RustTypeIndirection::Ref { lifetime: None };
+        match *indirection {
+          RustTypeIndirection::Ptr => {
+            *indirection = RustTypeIndirection::Ref { lifetime: None };
+          }
+          RustTypeIndirection::PtrPtr => {
+            *indirection = RustTypeIndirection::PtrRef { lifetime: None };
+          }
+          _ => panic!("invalid indirection for ReferenceToPointer"),
+        }
         rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
       }
       IndirectionChange::QFlagsToUInt => {}

@@ -12,9 +12,8 @@ pub enum RustTypeIndirection {
   Ptr,
   Ref { lifetime: Option<String> },
   PtrPtr,
+  PtrRef { lifetime: Option<String> },
 }
-
-
 
 impl RustName {
   pub fn new(parts: Vec<String>) -> RustName {
@@ -155,6 +154,10 @@ impl RustType {
             let mut_text2 = if *is_const2 { "" } else { "_mut" };
             name = format!("{}{}_ptr{}_ptr", name, mut_text, mut_text2);
           }
+          RustTypeIndirection::PtrRef { .. } => {
+            let mut_text2 = if *is_const2 { "" } else { "_mut" };
+            name = format!("{}{}_ptr{}_ref", name, mut_text, mut_text2);
+          }
         }
         name
       }
@@ -167,7 +170,8 @@ impl RustType {
     match *self {
       RustType::Common { ref indirection, .. } => {
         match *indirection {
-          RustTypeIndirection::Ref { .. } => true,
+          RustTypeIndirection::Ref { .. } |
+          RustTypeIndirection::PtrRef { .. } => true,
           _ => false,
         }
       }
@@ -179,8 +183,10 @@ impl RustType {
   pub fn with_lifetime(&self, new_lifetime: String) -> RustType {
     let mut r = self.clone();
     if let RustType::Common { ref mut indirection, .. } = r {
-      if let RustTypeIndirection::Ref { ref mut lifetime } = *indirection {
-        *lifetime = Some(new_lifetime);
+      match *indirection {
+        RustTypeIndirection::Ref { ref mut lifetime } => *lifetime = Some(new_lifetime),
+        RustTypeIndirection::PtrRef { ref mut lifetime } => *lifetime = Some(new_lifetime),
+        _ => {}
       }
     }
     r
@@ -191,6 +197,7 @@ impl RustType {
       RustType::Common { ref indirection, .. } => {
         match *indirection {
           RustTypeIndirection::Ref { ref lifetime } => lifetime.as_ref(),
+          RustTypeIndirection::PtrRef { ref lifetime } => lifetime.as_ref(),
           _ => None,
         }
       }

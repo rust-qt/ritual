@@ -72,16 +72,21 @@ fn format_doc(doc: &String) -> String {
 pub fn rust_type_to_code(rust_type: &RustType, crate_name: &String) -> String {
   match *rust_type {
     RustType::Void => "()".to_string(),
-    RustType::Common { ref base, ref is_const, ref indirection, ref generic_arguments, .. } => {
+    RustType::Common { ref base,
+                       ref is_const,
+                       ref is_const2,
+                       ref indirection,
+                       ref generic_arguments,
+                       .. } => {
       let mut base_s = base.full_name(Some(crate_name));
       if let &Some(ref args) = generic_arguments {
         base_s = format!("{}<{}>",
                          base_s,
                          args.iter().map(|x| rust_type_to_code(x, crate_name)).join(", "));
       }
-      let s = match indirection {
-        &RustTypeIndirection::None => base_s,
-        &RustTypeIndirection::Ref { ref lifetime } => {
+      let s = match *indirection {
+        RustTypeIndirection::None => base_s,
+        RustTypeIndirection::Ref { ref lifetime } => {
           let lifetime_text = match *lifetime {
             Some(ref lifetime) => format!("'{} ", lifetime),
             None => String::new(),
@@ -92,19 +97,30 @@ pub fn rust_type_to_code(rust_type: &RustType, crate_name: &String) -> String {
             format!("&{}mut {}", lifetime_text, base_s)
           }
         }
-        &RustTypeIndirection::Ptr => {
+        RustTypeIndirection::Ptr => {
           if *is_const {
             format!("*const {}", base_s)
           } else {
             format!("*mut {}", base_s)
           }
         }
-        &RustTypeIndirection::PtrPtr => {
-          if *is_const {
-            format!("*const *const {}", base_s)
+        RustTypeIndirection::PtrPtr => {
+          let const_text1 = if *is_const { "*const " } else { "*mut " };
+          let const_text2 = if *is_const2 { "*const " } else { "*mut " };
+          format!("{}{}{}", const_text2, const_text1, base_s)
+        }
+        RustTypeIndirection::PtrRef { ref lifetime } => {
+          let const_text1 = if *is_const { "*const " } else { "*mut " };
+          let lifetime_text = match *lifetime {
+            Some(ref lifetime) => format!("'{} ", lifetime),
+            None => String::new(),
+          };
+          let const_text2 = if *is_const2 {
+            format!("&{}", lifetime_text)
           } else {
-            format!("*mut *mut {}", base_s)
-          }
+            format!("&{}mut ", lifetime_text)
+          };
+          format!("{}{}{}", const_text2, const_text1, base_s)
         }
       };
       s
@@ -291,12 +307,18 @@ impl RustCodeGenerator {
 
           }
           RustToCTypeConversion::ValueToPtr => {
-            let is_const = if let RustType::Common { ref is_const, .. } = arg.argument_type
-              .rust_ffi_type {
-              *is_const
-            } else {
-              panic!("void is not expected here at all!")
-            };
+            let is_const =
+              if let RustType::Common { ref is_const, ref is_const2, ref indirection, .. } =
+                     arg.argument_type
+                .rust_ffi_type {
+                match *indirection {
+                  RustTypeIndirection::PtrPtr { .. } |
+                  RustTypeIndirection::PtrRef { .. } => *is_const2,
+                  _ => *is_const,
+                }
+              } else {
+                panic!("void is not expected here at all!")
+              };
             code = format!("{}{} as {}",
                            if is_const { "&" } else { "&mut " },
                            code,
@@ -341,12 +363,18 @@ impl RustCodeGenerator {
     match variant.return_type.rust_api_to_c_conversion {
       RustToCTypeConversion::None => {}
       RustToCTypeConversion::RefToPtr => {
-        let is_const = if let RustType::Common { ref is_const, .. } = variant.return_type
-          .rust_ffi_type {
-          *is_const
-        } else {
-          panic!("void is not expected here at all!")
-        };
+        let is_const =
+          if let RustType::Common { ref is_const, ref is_const2, ref indirection, .. } =
+                 variant.return_type
+            .rust_ffi_type {
+            match *indirection {
+              RustTypeIndirection::PtrPtr { .. } |
+              RustTypeIndirection::PtrRef { .. } => *is_const2,
+              _ => *is_const,
+            }
+          } else {
+            panic!("void is not expected here at all!")
+          };
         code = format!("let ffi_result = {};\nunsafe {{ {}*ffi_result }}",
                        code,
                        if is_const { "& " } else { "&mut " });

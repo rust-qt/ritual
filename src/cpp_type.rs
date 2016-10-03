@@ -305,8 +305,8 @@ impl CppType {
               CppTypeIndirection::None => "",
               CppTypeIndirection::Ptr => "*",
               CppTypeIndirection::Ref => "&",
-              CppTypeIndirection::PtrRef => "*&",
-              CppTypeIndirection::PtrPtr => if self.is_const2 { "* const*" } else { "**" },
+              CppTypeIndirection::PtrRef => if self.is_const2 { "* const &" } else { "*&" },
+              CppTypeIndirection::PtrPtr => if self.is_const2 { "* const *" } else { "**" },
               CppTypeIndirection::RValueRef => "&&",
             })
   }
@@ -387,7 +387,13 @@ impl CppType {
         result.indirection = CppTypeIndirection::Ptr;
         conversion = IndirectionChange::ReferenceToPointer;
       }
-      _ => return Err("Unsupported level of indirection".to_string()),
+      CppTypeIndirection::PtrRef => {
+        result.indirection = CppTypeIndirection::PtrPtr;
+        conversion = IndirectionChange::ReferenceToPointer;
+      }
+      CppTypeIndirection::RValueRef => {
+        return Err("rvalue references are not supported".to_string())
+      }
     }
     if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = self.base {
       if name == "QFlags" {
@@ -464,20 +470,40 @@ impl CppType {
         if index >= template_arguments1.len() as i32 {
           return Err("CppType::instantiate: too few template arguments".to_string());
         }
-        let mut new_type = template_arguments1[index as usize].clone();
-        if self.is_const {
-          new_type.is_const = true;
-        }
-        if self.is_const2 {
-          new_type.is_const2 = true;
-        }
-        match CppTypeIndirection::combine(&new_type.indirection, &self.indirection) {
+        let arg = &template_arguments1[index as usize];
+        let mut new_type = CppType::void();
+        new_type.base = arg.base.clone();
+        match CppTypeIndirection::combine(&arg.indirection, &self.indirection) {
           Err(msg) => return Err(msg),
           Ok(r) => new_type.indirection = r,
         }
-        if new_type.indirection == CppTypeIndirection::PtrPtr &&
-           self.indirection != CppTypeIndirection::PtrPtr {
-          new_type.is_const2 = self.is_const;
+        match new_type.indirection {
+          CppTypeIndirection::None => {
+            new_type.is_const = self.is_const || arg.is_const;
+          }
+          CppTypeIndirection::Ptr | CppTypeIndirection::Ref => {
+            if self.indirection != CppTypeIndirection::None {
+              new_type.is_const = self.is_const;
+            } else if arg.indirection != CppTypeIndirection::None {
+              new_type.is_const = arg.is_const;
+            } else {
+              panic!("one of types must be ptr or ref!");
+            }
+          }
+          CppTypeIndirection::PtrPtr |
+          CppTypeIndirection::PtrRef => {
+            if self.indirection == new_type.indirection {
+              new_type.is_const = self.is_const;
+              new_type.is_const2 = self.is_const2;
+            } else if arg.indirection == new_type.indirection {
+              new_type.is_const = arg.is_const;
+              new_type.is_const2 = arg.is_const2;
+            } else {
+              new_type.is_const = arg.is_const;
+              new_type.is_const2 = self.is_const;
+            }
+          }
+          CppTypeIndirection::RValueRef => unreachable!(),
         }
         return Ok(new_type);
       }

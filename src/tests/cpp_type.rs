@@ -648,3 +648,28 @@ fn function1() {
   assert!(!type1.needs_allocation_place_variants());
   assert_eq!(type1.base.maybe_name(), None);
 }
+
+#[test]
+fn instantiate1() {
+  let type1 = CppType {
+    indirection: CppTypeIndirection::Ref,
+    is_const: true,
+    is_const2: false,
+    base: CppTypeBase::TemplateParameter {
+      nested_level: 0,
+      index: 0,
+    },
+  };
+  let type2 = CppType {
+    indirection: CppTypeIndirection::Ptr,
+    is_const: false,
+    is_const2: false,
+    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
+  };
+  let r = type1.instantiate(0, &vec![type2]).unwrap();
+  assert_eq!(r.base,
+             CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool));
+  assert_eq!(r.indirection, CppTypeIndirection::PtrRef);
+  assert_eq!(r.is_const, false);
+  assert_eq!(r.is_const2, true);
+}

@@ -18,7 +18,7 @@ fn apply_instantiations_to_method(method: &CppMethod,
                                   -> Result<Vec<CppMethod>, String> {
   let mut new_methods = Vec::new();
   for ins in template_instantiations {
-    log::noisy(format!("instantiation: {:?}", ins.template_arguments));
+    log::debug(format!("instantiation: {:?}", ins.template_arguments));
     let mut new_method = method.clone();
     new_method.arguments.clear();
     for arg in &method.arguments {
@@ -65,7 +65,7 @@ fn apply_instantiations_to_method(method: &CppMethod,
       if let Some(conversion_type) = conversion_type {
         new_method.name = format!("operator {}", try!(conversion_type.to_cpp_code(None)));
       }
-      log::noisy(format!("success: {}", new_method.short_text()));
+      log::debug(format!("success: {}", new_method.short_text()));
       new_methods.push(new_method);
     }
   }
@@ -619,9 +619,9 @@ impl CppData {
                   } else {
                     panic!("only template parameters can be here");
                   };
-                  log::noisy(format!(""));
-                  log::noisy(format!("method: {}", method.short_text()));
-                  log::noisy(format!("found template instantiations: {:?}",
+                  log::debug(format!(""));
+                  log::debug(format!("method: {}", method.short_text()));
+                  log::debug(format!("found template instantiations: {:?}",
                                      template_instantiations));
                   match apply_instantiations_to_method(method,
                                                        nested_level,
@@ -630,7 +630,7 @@ impl CppData {
                       new_methods.append(&mut methods);
                       break;
                     }
-                    Err(msg) => log::noisy(format!("failed: {}", msg)),
+                    Err(msg) => log::debug(format!("failed: {}", msg)),
                   }
                   break;
                 }
