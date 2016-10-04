@@ -208,7 +208,7 @@ pub struct CppMethodClassMembership {
   /// Method visibility
   pub visibility: CppVisibility,
   /// True if the method is a Qt signal
-  pub is_signal: bool, //TODO: implement signal detection or remove this field
+  pub is_signal: bool, //TODO: implement signal detection or remove this field (#7)
 }
 
 /// Additional information about original method
@@ -272,7 +272,7 @@ pub struct CppMethod {
   /// List of base classes this method was inferited from.
   /// The first item is the most base class.
   pub inheritance_chain: Vec<CppBaseSpecifier>,
-  // TODO: fill inheritance_chain for explicitly redeclared methods
+  // TODO: fill inheritance_chain for explicitly redeclared methods (#23)
 }
 
 // ------------------------------

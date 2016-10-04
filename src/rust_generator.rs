@@ -707,7 +707,7 @@ impl RustGenerator {
 
         }
 
-        // TODO: export Qt doc for enum and its variants
+        // TODO: export Qt doc for enum and its variants (#35)
         let doc = format!("C++ type: {}",
                           doc_formatter::wrap_inline_cpp_code(&info.cpp_name));
         (ProcessTypeResult {
@@ -748,7 +748,7 @@ impl RustGenerator {
         }
         cpp_methods = tmp_cpp_methods;
         let functions_result = self.process_functions(good_methods.into_iter(), &methods_scope);
-        // TODO: export Qt doc for class (detailed description)
+        // TODO: export Qt doc for class (detailed description) (#35)
         let doc = format!("C++ type: {}.",
                           doc_formatter::wrap_inline_cpp_code(&CppType {
                               base: CppTypeBase::Class(class_type.clone()),
@@ -880,7 +880,6 @@ impl RustGenerator {
                        scope: &RustMethodScope,
                        generate_doc: bool)
                        -> Result<RustMethod, String> {
-    // TODO: implement operator traits
     let mut arguments = Vec::new();
     let mut return_type_info = None;
     for (arg_index, arg) in method.c_signature.arguments.iter().enumerate() {
@@ -1325,7 +1324,6 @@ impl RustGenerator {
         }
         continue;
       }
-      // TODO: support operators
       match self.generate_function(method, scope, false) {
         Ok(rust_method) => {
           let name = rust_method.name.last_name().clone();
@@ -1613,17 +1611,3 @@ fn prepare_enum_values_test_suffix_partial() {
   assert_eq!(r[0].name, "Precise");
   assert_eq!(r[1].name, "Coarse");
 }
-
-// TODO: remove ReturnType associated type if all return types are the same
-
-// TODO: if name conflict involves 1 static and 1 non-static function,
-// don't use "from_const"/"from_mut" and just add "static" to static fn;
-// if there is only 1 const and 1 mut fn, just add "const" to const fn.
-
-// TODO: methods should accept AsRef/AsMut insead of plain references
-
-// TODO: implement AsRef/AsMut for CppBox and for up-casting derived classes
-
-// TODO: alternative Option-based overloading strategy
-
-// TODO: rename allocation place markers to AsStruct and AsBox
