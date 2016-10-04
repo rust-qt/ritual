@@ -582,15 +582,6 @@ pub struct CppLibSpec {
   pub ffi_methods_blacklist: Option<Vec<String>>,
 }
 
-/// Information loaded from lib spec file and
-/// related to generated Rust crate
-#[derive(Debug, Clone)]
-#[derive(Serialize, Deserialize)]
-pub struct RustLibSpec {
-  /// List of top level modules that should not be generated
-  pub module_blacklist: Option<Vec<String>>,
-}
-
 /// Information loaded from lib spec file.
 /// This struct contains general instructions
 /// about processing the library.
@@ -599,8 +590,6 @@ pub struct RustLibSpec {
 pub struct LibSpec {
   /// Information related to the C++ side
   pub cpp: CppLibSpec,
-  /// Information related to generated Rust crate
-  pub rust: RustLibSpec,
 }
 
 

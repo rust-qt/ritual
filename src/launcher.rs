@@ -485,10 +485,6 @@ pub fn run(env: BuildEnvironment) {
                                         rust_generator::RustGeneratorConfig {
                                           crate_name: input_cargo_toml_data.name.clone(),
                                           remove_qt_prefix: is_qt_library,
-                                          module_blacklist: lib_spec.rust
-                                            .module_blacklist
-                                            .clone()
-                                            .unwrap_or(Vec::new()),
                                           qt_doc_data: qt_doc_data,
                                         });
     log::info(format!("Generating Rust crate ({}).", &input_cargo_toml_data.name));

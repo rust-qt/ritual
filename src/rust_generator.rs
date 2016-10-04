@@ -21,6 +21,26 @@ use caption_strategy::TypeCaptionStrategy;
 
 pub use serializable::{RustProcessedTypeKind, RustProcessedTypeInfo};
 
+impl RustProcessedTypeInfo {
+  fn is_declared_in(&self, modules: &Vec<RustModule>) -> bool {
+    for module in modules {
+      if module.types.iter().any(|t| match t.kind {
+        RustTypeDeclarationKind::CppTypeWrapper { ref cpp_type_name,
+                                                  ref cpp_template_arguments,
+                                                  .. } => {
+          cpp_type_name == &self.cpp_name && cpp_template_arguments == &self.cpp_template_arguments
+        }
+        _ => false,
+      }) {
+        return true;
+      }
+      if self.is_declared_in(&module.submodules) {
+        return true;
+      }
+    }
+    false
+  }
+}
 
 /// Mode of case conversion
 enum Case {
@@ -193,8 +213,6 @@ pub struct RustGeneratorOutput {
 pub struct RustGeneratorConfig {
   /// Name of generated crate
   pub crate_name: String,
-  /// List of module names that should not be generated
-  pub module_blacklist: Vec<String>,
   /// Flag instructing to remove leading "Q" and "Qt"
   /// from identifiers.
   pub remove_qt_prefix: bool,
@@ -209,7 +227,7 @@ pub fn run(input_data: CppAndFfiData,
            config: RustGeneratorConfig)
            -> RustGeneratorOutput {
   let generator = RustGenerator {
-    processed_types: process_names(&input_data, &config, &dependency_rust_types),
+    processed_types: process_types(&input_data, &config, &dependency_rust_types),
     dependency_types: dependency_rust_types,
     input_data: input_data,
     config: config,
@@ -226,14 +244,23 @@ pub fn run(input_data: CppAndFfiData,
         module_names_set.insert(item.rust_name.parts[1].clone());
       }
     }
+    for method in cpp_methods.clone() {
+      if method.cpp_method.class_membership.is_none() {
+        let rust_name = calculate_rust_name(&method.cpp_method.name,
+                                            &method.cpp_method.include_file,
+                                            true,
+                                            method.cpp_method.operator.as_ref(),
+                                            &generator.config);
+        if !module_names_set.contains(&rust_name.parts[1]) {
+          module_names_set.insert(rust_name.parts[1].clone());
+        }
+      }
+    }
+
     let mut module_names: Vec<_> = module_names_set.into_iter().collect();
     module_names.sort();
     let module_count = module_names.len();
     for (i, module_name) in module_names.into_iter().enumerate() {
-      if generator.config.module_blacklist.iter().find(|&x| x == &module_name).is_some() {
-        log::info(format!("Skipping module {}", module_name));
-        continue;
-      }
       log::info(format!("({}/{}) Generating module: {}",
                         i + 1,
                         module_count,
@@ -267,6 +294,16 @@ pub fn run(input_data: CppAndFfiData,
       }
       panic!("unprocessed cpp methods left");
     }
+  }
+  let mut any_not_declared = false;
+  for type1 in &generator.processed_types {
+    if !type1.is_declared_in(&modules) {
+      log::warning(format!("type is not processed: {:?}", type1));
+      any_not_declared = true;
+    }
+  }
+  if any_not_declared {
+    panic!("unprocessed cpp types left");
   }
   RustGeneratorOutput {
     ffi_functions: generator.ffi(),
@@ -314,11 +351,8 @@ fn calculate_rust_name(name: &String,
   RustName::new(parts)
 }
 
-/// Generates Rust names for all available C++ type
-/// and free functions. Class member methods are not included in
-/// the map. Their Rust equivalents depend on their classes'
-/// equivalents.
-fn process_names(input_data: &CppAndFfiData,
+/// Generates Rust names and type information for all available C++ types.
+fn process_types(input_data: &CppAndFfiData,
                  config: &RustGeneratorConfig,
                  dependency_types: &Vec<RustProcessedTypeInfo>)
                  -> Vec<RustProcessedTypeInfo> {
@@ -361,9 +395,11 @@ fn process_names(input_data: &CppAndFfiData,
   };
   let mut name_failed_items = Vec::new();
   for template_instantiations in &input_data.cpp_data.template_instantiations {
-    println!("TEST2 {}", &template_instantiations.class_name);
+    if template_instantiations.class_name == "QFlags" {
+      // special processing is implemented for QFlags
+      continue;
+    }
     for ins in &template_instantiations.instantiations {
-      println!("  TEST3 {:?}", &ins.template_arguments);
       name_failed_items.push(RustProcessedTypeInfo {
         cpp_name: template_instantiations.class_name.clone(),
         cpp_template_arguments: Some(ins.template_arguments.clone()),
@@ -749,7 +785,6 @@ impl RustGenerator {
                                  mut cpp_methods: Vec<&'a CppAndFfiMethod>,
                                  module_name: &'b RustName)
                                  -> (Option<RustModule>, Vec<&'a CppAndFfiMethod>) {
-    // TODO: check that all methods and types has been processed
     log::info(format!("Generating Rust module {}", module_name.full_name(None)));
 
     let mut direct_submodules = HashSet::new();
@@ -1420,7 +1455,6 @@ fn calculate_rust_name_test_part(name: &'static str,
                                  &RustGeneratorConfig {
                                    crate_name: "qt_core".to_string(),
                                    remove_qt_prefix: true,
-                                   module_blacklist: Vec::new(),
                                    qt_doc_data: None,
                                  }),
              RustName::new(expected.into_iter().map(|x| x.to_string()).collect()));
