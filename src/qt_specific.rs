@@ -82,6 +82,3 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) {
     t.include_file = get_header(&t.include_file, Some(&t.class_name));
   }
 }
-
-// TODO: save header mapping and use in dependencies
-// (e.g. qflags.h instead of QFlags in QtGui is not good)

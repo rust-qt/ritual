@@ -200,7 +200,7 @@ impl CppData {
                             base_name: &String,
                             all_base_methods: &Vec<&CppMethod>)
                             -> Vec<CppMethod> {
-    // TODO: speed up this method
+    // TODO: speed up this method (#12)
     let mut new_methods = Vec::new();
     {
       for type1 in &self.types {
@@ -383,9 +383,7 @@ impl CppData {
             .is_some();
           if !signature_mismatch {
             if duplicates.iter().find(|x| x.inheritance_chain.is_empty()).is_none() {
-              // TODO: support more complicated cases
-              // TODO: can't detect if the method was overloaded in intermediate class
-              // because the most base class is not in inheritance_chain
+              // TODO: support more complicated cases (#23)
               let first_base = &duplicates[0].inheritance_chain.get(0).unwrap().base_type;
               if duplicates.iter()
                 .find(|x| {
