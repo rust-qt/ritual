@@ -1,4 +1,4 @@
-use cpp_ffi_generator::{CppAndFfiData, CppFfiHeaderData};
+use cpp_ffi_generator::CppAndFfiData;
 use cpp_ffi_data::CppAndFfiMethod;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
                CppSpecificNumericTypeKind, CppTypeClassBase, CppTypeRole};
@@ -201,7 +201,7 @@ pub struct RustGeneratorConfig {
 
   pub qt_doc_data: Option<QtDocData>,
 }
-// TODO: when supporting other libraries, implement removal of arbitrary prefixes (#25)
+// TODO: implement removal of arbitrary prefixes (#25)
 
 /// Execute processing
 pub fn run(input_data: CppAndFfiData,
@@ -209,15 +209,63 @@ pub fn run(input_data: CppAndFfiData,
            config: RustGeneratorConfig)
            -> RustGeneratorOutput {
   let generator = RustGenerator {
-    processed_types: generate_type_map(&input_data, &config, &dependency_rust_types),
+    processed_types: process_names(&input_data, &config, &dependency_rust_types),
     dependency_types: dependency_rust_types,
     input_data: input_data,
     config: config,
   };
   let mut modules = Vec::new();
-  for header in &generator.input_data.cpp_ffi_headers {
-    if let Some(module) = generator.generate_module_from_header(header) {
-      modules.push(module);
+  {
+    let mut cpp_methods = Vec::new();
+    for header in &generator.input_data.cpp_ffi_headers {
+      cpp_methods.extend(header.methods.iter());
+    }
+    let mut module_names_set = HashSet::new();
+    for item in &generator.processed_types {
+      if !module_names_set.contains(&item.rust_name.parts[1]) {
+        module_names_set.insert(item.rust_name.parts[1].clone());
+      }
+    }
+    let mut module_names: Vec<_> = module_names_set.into_iter().collect();
+    module_names.sort();
+    let module_count = module_names.len();
+    for (i, module_name) in module_names.into_iter().enumerate() {
+      if generator.config.module_blacklist.iter().find(|&x| x == &module_name).is_some() {
+        log::info(format!("Skipping module {}", module_name));
+        continue;
+      }
+      log::info(format!("({}/{}) Generating module: {}",
+                        i + 1,
+                        module_count,
+                        module_name));
+      let full_module_name = RustName::new(vec![generator.config.crate_name.clone(), module_name]);
+      let (module, tmp_cpp_methods) = generator.generate_module(cpp_methods, &full_module_name);
+      cpp_methods = tmp_cpp_methods;
+      if let Some(module) = module {
+        modules.push(module);
+      }
+    }
+    if !cpp_methods.is_empty() {
+      log::warning(format!("unprocessed cpp methods left:"));
+      for method in cpp_methods {
+        log::warning(format!("  {}", method.cpp_method.short_text()));
+        if method.cpp_method.class_membership.is_none() {
+          let rust_name = calculate_rust_name(&method.cpp_method.name,
+                                              &method.cpp_method.include_file,
+                                              true,
+                                              method.cpp_method.operator.as_ref(),
+                                              &generator.config);
+          log::warning(format!("  -> {}", rust_name.full_name(None)));
+        } else {
+          let rust_name = calculate_rust_name(method.cpp_method.class_name().unwrap(),
+                                              &method.cpp_method.include_file,
+                                              false,
+                                              None,
+                                              &generator.config);
+          log::warning(format!("  -> {}", rust_name.full_name(None)));
+        }
+      }
+      panic!("unprocessed cpp methods left");
     }
   }
   RustGeneratorOutput {
@@ -270,10 +318,10 @@ fn calculate_rust_name(name: &String,
 /// and free functions. Class member methods are not included in
 /// the map. Their Rust equivalents depend on their classes'
 /// equivalents.
-fn generate_type_map(input_data: &CppAndFfiData,
-                     config: &RustGeneratorConfig,
-                     dependency_types: &Vec<RustProcessedTypeInfo>)
-                     -> Vec<RustProcessedTypeInfo> {
+fn process_names(input_data: &CppAndFfiData,
+                 config: &RustGeneratorConfig,
+                 dependency_types: &Vec<RustProcessedTypeInfo>)
+                 -> Vec<RustProcessedTypeInfo> {
   let mut result = Vec::new();
   for type_info in &input_data.cpp_data.types {
     if let CppTypeKind::Class { ref template_arguments, .. } = type_info.kind {
@@ -313,7 +361,9 @@ fn generate_type_map(input_data: &CppAndFfiData,
   };
   let mut name_failed_items = Vec::new();
   for template_instantiations in &input_data.cpp_data.template_instantiations {
+    println!("TEST2 {}", &template_instantiations.class_name);
     for ins in &template_instantiations.instantiations {
+      println!("  TEST3 {:?}", &ins.template_arguments);
       name_failed_items.push(RustProcessedTypeInfo {
         cpp_name: template_instantiations.class_name.clone(),
         cpp_template_arguments: Some(ins.template_arguments.clone()),
@@ -343,6 +393,7 @@ fn generate_type_map(input_data: &CppAndFfiData,
       match template_final_name(&result, &r) {
         Ok(name) => {
           r.rust_name = name;
+          println!("TEST1 {}", r.rust_name.full_name(None));
           result.push(r);
           any_success = true;
         }
@@ -584,10 +635,10 @@ impl RustGenerator {
   /// directly implemented methods of the type and trait implementations;
   /// - overloading_types - traits and their implementations that
   /// emulate C++ method overloading.
-  fn process_type(&self,
-                  info: &RustProcessedTypeInfo,
-                  c_header: &CppFfiHeaderData)
-                  -> ProcessTypeResult {
+  fn process_type<'a>(&'a self,
+                      info: &'a RustProcessedTypeInfo,
+                      mut cpp_methods: Vec<&'a CppAndFfiMethod>)
+                      -> (ProcessTypeResult, Vec<&'a CppAndFfiMethod>) {
     match info.kind {
       RustProcessedTypeKind::Enum { ref values } => {
         let mut is_flaggable = false;
@@ -623,7 +674,7 @@ impl RustGenerator {
         // TODO: export Qt doc for enum and its variants
         let doc = format!("C++ type: {}",
                           doc_formatter::wrap_inline_cpp_code(&info.cpp_name));
-        ProcessTypeResult {
+        (ProcessTypeResult {
           main_type: RustTypeDeclaration {
             name: info.rust_name.last_name().clone(),
             kind: RustTypeDeclarationKind::CppTypeWrapper {
@@ -639,7 +690,8 @@ impl RustGenerator {
             doc: doc,
           },
           overloading_types: Vec::new(),
-        }
+        },
+         cpp_methods)
       }
       RustProcessedTypeKind::Class { ref size } => {
         let methods_scope = RustMethodScope::Impl { type_name: info.rust_name.clone() };
@@ -647,17 +699,20 @@ impl RustGenerator {
           name: info.cpp_name.clone(),
           template_arguments: info.cpp_template_arguments.clone(),
         };
-        let methods = c_header.methods
-          .iter()
-          .filter(|&x| {
-            if let Some(ref info) = x.cpp_method.class_membership {
-              &info.class_type == &class_type
-            } else {
-              false
+        let mut good_methods = Vec::new();
+        let mut tmp_cpp_methods = Vec::new();
+        for method in cpp_methods {
+          if let Some(ref info) = method.cpp_method.class_membership {
+            if &info.class_type == &class_type {
+              good_methods.push(method);
+              continue;
             }
-          });
-        let functions_result = self.process_functions(methods, &methods_scope);
-        // TODO: export Qt doc (???)
+          }
+          tmp_cpp_methods.push(method);
+        }
+        cpp_methods = tmp_cpp_methods;
+        let functions_result = self.process_functions(good_methods.into_iter(), &methods_scope);
+        // TODO: export Qt doc for class (detailed description)
         let doc = format!("C++ type: {}.",
                           doc_formatter::wrap_inline_cpp_code(&CppType {
                               base: CppTypeBase::Class(class_type.clone()),
@@ -667,7 +722,7 @@ impl RustGenerator {
                             }
                             .to_cpp_pseudo_code()));
 
-        ProcessTypeResult {
+        (ProcessTypeResult {
           main_type: RustTypeDeclaration {
             name: info.rust_name.last_name().clone(),
             kind: RustTypeDeclarationKind::CppTypeWrapper {
@@ -680,32 +735,20 @@ impl RustGenerator {
             doc: doc,
           },
           overloading_types: functions_result.overloading_types,
-        }
+        },
+         cpp_methods)
       }
     }
-  }
-
-  /// Generates a Rust module (including nested modules) from
-  /// specified C++ header.
-  pub fn generate_module_from_header(&self, c_header: &CppFfiHeaderData) -> Option<RustModule> {
-    let module_last_name = include_file_to_module_name(&c_header.include_file,
-                                                       self.config.remove_qt_prefix);
-    if self.config.module_blacklist.iter().find(|&x| x == &module_last_name).is_some() {
-      log::info(format!("Skipping module {}", module_last_name));
-      return None;
-    }
-    let module_name = RustName::new(vec![self.config.crate_name.clone(), module_last_name]);
-    self.generate_module(c_header, &module_name)
   }
 
   /// Generates a Rust module with specified name from specified
   /// C++ header. If the module should have nested modules,
   /// this function calls itself recursively with nested module name
   /// but the same header data.
-  pub fn generate_module(&self,
-                         c_header: &CppFfiHeaderData,
-                         module_name: &RustName)
-                         -> Option<RustModule> {
+  pub fn generate_module<'a, 'b>(&'a self,
+                                 mut cpp_methods: Vec<&'a CppAndFfiMethod>,
+                                 module_name: &'b RustName)
+                                 -> (Option<RustModule>, Vec<&'a CppAndFfiMethod>) {
     // TODO: check that all methods and types has been processed
     log::info(format!("Generating Rust module {}", module_name.full_name(None)));
 
@@ -739,14 +782,15 @@ impl RustGenerator {
 
       for type_data in &self.processed_types {
         if check_name(&type_data.rust_name) {
-          let mut result = self.process_type(&type_data, c_header);
+          let (mut result, tmp_cpp_methods) = self.process_type(&type_data, cpp_methods);
+          cpp_methods = tmp_cpp_methods;
           module.types.push(result.main_type);
           rust_overloading_types.append(&mut result.overloading_types);
         }
       }
 
-
-      for method in &c_header.methods {
+      let mut tmp_cpp_methods = Vec::new();
+      for method in cpp_methods {
         if method.cpp_method.class_membership.is_none() {
           let rust_name = calculate_rust_name(&method.cpp_method.name,
                                               &method.cpp_method.include_file,
@@ -756,15 +800,20 @@ impl RustGenerator {
 
           if check_name(&rust_name) {
             good_methods.push(method);
+            continue;
           }
         }
+        tmp_cpp_methods.push(method);
       }
+      cpp_methods = tmp_cpp_methods;
     }
     for name in direct_submodules {
       let mut new_name = module_name.clone();
       new_name.parts.push(name);
-      if let Some(r) = self.generate_module(c_header, &new_name) {
-        module.submodules.push(r);
+      let (submodule, tmp_cpp_methods) = self.generate_module(cpp_methods, &new_name);
+      cpp_methods = tmp_cpp_methods;
+      if let Some(submodule) = submodule {
+        module.submodules.push(submodule);
       }
     }
     let mut free_functions_result =
@@ -785,9 +834,9 @@ impl RustGenerator {
     module.submodules.sort_by(|a, b| a.name.cmp(&b.name));
     if module.types.is_empty() && module.functions.is_empty() && module.submodules.is_empty() {
       log::warning(format!("Skipping empty module: {}", module.name));
-      return None;
+      return (None, cpp_methods);
     }
-    Some(module)
+    (Some(module), cpp_methods)
   }
 
   /// Converts one function to a RustMethod
