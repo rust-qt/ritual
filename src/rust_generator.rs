@@ -244,6 +244,22 @@ pub fn run(input_data: CppAndFfiData,
         module_names_set.insert(item.rust_name.parts[1].clone());
       }
     }
+    cpp_methods = cpp_methods.into_iter()
+      .filter(|method| {
+        if let Some(ref info) = method.cpp_method.class_membership {
+          if !generator.processed_types.iter().any(|t| {
+            t.cpp_name == info.class_type.name &&
+            t.cpp_template_arguments == info.class_type.template_arguments
+          }) {
+            log::warning(format!("Warning: method is skipped because class type is not \
+                                  available in Rust:"));
+            log::warning(format!("{}\n", method.short_text()));
+            return false;
+          }
+        }
+        true
+      })
+      .collect();
     for method in cpp_methods.clone() {
       if method.cpp_method.class_membership.is_none() {
         let rust_name = calculate_rust_name(&method.cpp_method.name,
@@ -429,7 +445,6 @@ fn process_types(input_data: &CppAndFfiData,
       match template_final_name(&result, &r) {
         Ok(name) => {
           r.rust_name = name;
-          println!("TEST1 {}", r.rust_name.full_name(None));
           result.push(r);
           any_success = true;
         }
