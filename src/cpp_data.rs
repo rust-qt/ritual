@@ -596,7 +596,31 @@ impl CppData {
     inherited_methods
   }
 
-
+  fn check_template_type(&self,
+                         dependencies: &Vec<&CppData>,
+                         type1: &CppType)
+                         -> Result<(), String> {
+    if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) = type1.base {
+      if let &Some(ref template_arguments) = template_arguments {
+        if !dependencies.clone().into_iter().chain(iter::once(self)).any(|cpp_data| {
+          cpp_data.template_instantiations
+            .iter()
+            .any(|inst| {
+              &inst.class_name == name &&
+              inst.instantiations
+                .iter()
+                .any(|x| &x.template_arguments == template_arguments)
+            })
+        }) {
+          return Err(format!("Unknown type: {}", type1.to_cpp_pseudo_code()));
+        }
+        for arg in template_arguments {
+          try!(self.check_template_type(dependencies, arg));
+        }
+      }
+    }
+    Ok(())
+  }
 
   fn instantiate_templates(&mut self, dependencies: &Vec<&CppData>) {
     log::info("Instantiating templates.");
@@ -626,8 +650,24 @@ impl CppData {
                   match apply_instantiations_to_method(method,
                                                        nested_level,
                                                        &template_instantiations.instantiations) {
-                    Ok(mut methods) => {
-                      new_methods.append(&mut methods);
+                    Ok(methods) => {
+                      for method in methods {
+                        let mut ok = true;
+                        for type1 in method.all_involved_types() {
+                          match self.check_template_type(dependencies, &type1) {
+                            Ok(_) => {}
+                            Err(msg) => {
+                              ok = false;
+                              log::debug(format!("method is not accepted: {}",
+                                                 method.short_text()));
+                              log::debug(format!("  {}", msg));
+                            }
+                          }
+                        }
+                        if ok {
+                          new_methods.push(method);
+                        }
+                      }
                       break;
                     }
                     Err(msg) => log::debug(format!("failed: {}", msg)),
@@ -688,6 +728,7 @@ impl CppData {
   /// Performs data conversion to make it more suitable
   /// for further wrapper generation.
   pub fn post_process(&mut self, dependencies: &Vec<&CppData>) {
+    // TODO: skip existing inst. in cpp_parser instead
     self.remove_existing_instantiations(dependencies);
     self.ensure_explicit_destructors(dependencies);
     self.generate_methods_with_omitted_args();
