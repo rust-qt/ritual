@@ -564,18 +564,23 @@ impl RustCodeGenerator {
 
       let all_modules = extra_modules.iter().chain(modules.clone());
       for module in all_modules {
-        if module == &"ffi" {
-          // TODO: remove allow directive for ffi?
-          // TODO: ffi should be a private mod
+        let mut maybe_pub = "pub ";
+        if module == "ffi" {
+          maybe_pub = "";
+          // some ffi functions are not used because
+          // some Rust methods are filtered
           write!(lib_file, "#[allow(dead_code)]\n").unwrap();
         }
         match self.config.invokation_method {
-          InvokationMethod::CommandLine => write!(lib_file, "pub mod {};\n", module).unwrap(),
+          InvokationMethod::CommandLine => {
+            write!(lib_file, "{}mod {};\n", maybe_pub, module).unwrap()
+          }
           InvokationMethod::BuildScript => {
             write!(lib_file,
-                   "pub mod {0} {{ \n  include!(concat!(env!(\"OUT_DIR\"), \
-                    \"/src/{0}.rs\"));\n}}\n",
-                   module)
+                   "{maybe_pub}mod {name} {{ \n  include!(concat!(env!(\"OUT_DIR\"), \
+                    \"/src/{name}.rs\"));\n}}\n",
+                   name = module,
+                   maybe_pub = maybe_pub)
               .unwrap()
           }
         }
