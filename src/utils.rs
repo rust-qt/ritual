@@ -64,7 +64,7 @@ impl PathBufPushTweak for Path {
 pub fn move_files(src: &PathBuf, dst: &PathBuf) -> io::Result<()> {
   if src.as_path().is_dir() {
     if !dst.as_path().is_dir() {
-      log::info(format!("New dir created: {}", dst.to_str().unwrap()));
+      log::noisy(format!("New dir created: {}", dst.to_str().unwrap()));
       try!(fs::create_dir(dst));
     }
 
@@ -73,10 +73,10 @@ pub fn move_files(src: &PathBuf, dst: &PathBuf) -> io::Result<()> {
       if !src.with_added(item.file_name()).as_path().exists() {
         let path = item.path();
         if path.as_path().is_dir() {
-          log::info(format!("Old dir removed: {}", path.to_str().unwrap()));
+          log::noisy(format!("Old dir removed: {}", path.to_str().unwrap()));
           try!(fs::remove_dir_all(path));
         } else {
-          log::info(format!("Old file removed: {}", path.to_str().unwrap()));
+          log::noisy(format!("Old file removed: {}", path.to_str().unwrap()));
           try!(fs::remove_file(path));
         }
       }
