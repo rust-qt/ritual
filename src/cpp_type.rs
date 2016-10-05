@@ -1,4 +1,3 @@
-
 use cpp_ffi_data::{CppFfiType, IndirectionChange};
 use caption_strategy::TypeCaptionStrategy;
 pub use serializable::{CppBuiltInNumericType, CppSpecificNumericTypeKind, CppTypeBase, CppType,
@@ -397,9 +396,16 @@ impl CppType {
     }
     if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = self.base {
       if name == "QFlags" {
-        assert!(self.indirection == CppTypeIndirection::None);
+        if !(self.indirection == CppTypeIndirection::None ||
+             (self.indirection == CppTypeIndirection::Ref && self.is_const)) {
+          return Err(format!("Only value or const reference is allowed for QFlags type. \
+                              Invalid type: {:?}",
+                             self));
+        }
         conversion = IndirectionChange::QFlagsToUInt;
         result.base = CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::UInt);
+        result.is_const = false;
+        result.indirection = CppTypeIndirection::None;
       } else {
         // structs can't be passed by value
         if self.indirection == CppTypeIndirection::None {

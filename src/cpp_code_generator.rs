@@ -129,9 +129,16 @@ impl CppCodeGenerator {
           IndirectionChange::ReferenceToPointer => result = format!("*{}", result),
           IndirectionChange::NoChange => {}
           IndirectionChange::QFlagsToUInt => {
-            result = format!("{}({})",
-                             cpp_argument.argument_type.to_cpp_code(None).unwrap(),
-                             result);
+            let type_text = if cpp_argument.argument_type.indirection == CppTypeIndirection::Ref &&
+                               cpp_argument.argument_type.is_const {
+              let mut fake_type = cpp_argument.argument_type.clone();
+              fake_type.is_const = false;
+              fake_type.indirection = CppTypeIndirection::None;
+              fake_type.to_cpp_code(None).unwrap()
+            } else {
+              cpp_argument.argument_type.to_cpp_code(None).unwrap()
+            };
+            result = format!("{}({})", type_text, result);
           }
         }
         filled_arguments.push(result);
