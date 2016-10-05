@@ -13,8 +13,6 @@ use utils::PathBufPushTweak;
 use utils::is_msvc;
 use cpp_type::{CppType, CppTypeIndirection, CppTypeBase};
 
-// TODO: skip empty files (e.g. QFlags in qt_widgets)
-
 /// Generates C++ code for the C wrapper library.
 pub struct CppCodeGenerator {
   /// Library name

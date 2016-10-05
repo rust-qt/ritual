@@ -70,11 +70,15 @@ pub fn run(cpp_data: &CppData, cpp_lib_spec: CppLibSpec) -> Vec<CppFfiHeaderData
                                               .methods
                                               .iter()
                                               .filter(|x| &x.include_file == include_file));
-    c_headers.push(CppFfiHeaderData {
-      include_file: include_file.clone(),
-      include_file_base_name: include_file_base_name,
-      methods: methods,
-    });
+    if methods.is_empty() {
+      log::info(format!("Skipping empty include file {}", include_file));
+    } else {
+      c_headers.push(CppFfiHeaderData {
+        include_file: include_file.clone(),
+        include_file_base_name: include_file_base_name,
+        methods: methods,
+      });
+    }
   }
   c_headers
 }
