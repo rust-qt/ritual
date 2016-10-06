@@ -1,6 +1,6 @@
 use std::collections::{HashSet, HashMap};
 use log;
-use cpp_data::{CppData, CppTypeKind, CppVisibility};
+use cpp_data::{CppData, CppVisibility};
 use caption_strategy::MethodCaptionStrategy;
 use cpp_method::{CppMethod, CppMethodKind};
 use cpp_ffi_data::{CppAndFfiMethod, c_base_name};
@@ -8,7 +8,6 @@ use utils::add_to_multihash;
 use serializable::CppLibSpec;
 
 struct CGenerator<'a> {
-  abstract_classes: Vec<String>,
   cpp_data: &'a CppData,
   cpp_lib_spec: CppLibSpec,
 }
@@ -27,24 +26,8 @@ pub struct CppAndFfiData {
 
 /// Runs FFI generator
 pub fn run(cpp_data: &CppData, cpp_lib_spec: CppLibSpec) -> Vec<CppFfiHeaderData> {
-  let abstract_classes = cpp_data.types
-    .iter()
-    .filter_map(|t| {
-      if let CppTypeKind::Class { .. } = t.kind {
-        if cpp_data.get_pure_virtual_methods(&t.name).len() > 0 {
-          Some(t.name.clone())
-        } else {
-          None
-        }
-      } else {
-        None
-      }
-    })
-    .collect();
-  log::info(format!("Abstract classes: {:?}", abstract_classes));
   let generator = CGenerator {
     cpp_data: cpp_data,
-    abstract_classes: abstract_classes,
     cpp_lib_spec: cpp_lib_spec,
   };
 
@@ -103,7 +86,7 @@ impl<'a> CGenerator<'a> {
     if let Some(ref membership) = method.class_membership {
       if membership.kind == CppMethodKind::Constructor {
         let class_name = &membership.class_type.name;
-        if self.abstract_classes.iter().find(|&x| x == class_name).is_some() {
+        if self.cpp_data.has_pure_virtual_methods(class_name) {
           log::noisy(format!("Method is skipped:\n{}\nConstructors are not allowed for abstract \
                               classes.\n",
                              method.short_text()));

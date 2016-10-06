@@ -561,46 +561,11 @@ impl CppData {
     inherited_methods
   }
 
-  // TODO: dependency data is needed here!
-  pub fn get_pure_virtual_methods(&self, class_name: &String) -> Vec<&CppMethod> {
-
-    let own_methods: Vec<_> = self.methods
-      .iter()
-      .filter(|m| m.class_name() == Some(class_name))
-      .collect();
-    let own_pure_virtual_methods: Vec<_> = own_methods.iter()
-      .filter(|m| {
-        m.class_membership
-          .as_ref()
-          .unwrap()
-          .is_pure_virtual
-      })
-      .collect();
-    let mut inherited_methods = Vec::new();
-    if let Some(type_info) = self.types.iter().find(|t| &t.name == class_name) {
-      if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
-        for base in bases {
-          if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
-            for method in self.get_pure_virtual_methods(name) {
-              if own_methods.iter()
-                .find(|m| m.name == method.name && m.argument_types_equal(&method))
-                .is_none() {
-                inherited_methods.push(method);
-              }
-            }
-          }
-        }
-      } else {
-        panic!("get_pure_virtual_methods: not a class");
-      }
-    } else {
-      log::warning(format!("get_pure_virtual_methods: no type info for {:?}",
-                           class_name));
-    }
-    for method in own_pure_virtual_methods {
-      inherited_methods.push(method);
-    }
-    inherited_methods
+  pub fn has_pure_virtual_methods(&self, class_name: &String) -> bool {
+    self.methods.iter().any(|m| match m.class_membership {
+      Some(ref info) => &info.class_type.name == class_name && info.is_pure_virtual,
+      None => false,
+    })
   }
 
   fn check_template_type(&self,
