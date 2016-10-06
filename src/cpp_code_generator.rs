@@ -11,7 +11,7 @@ use utils::JoinWithString;
 use std::path::PathBuf;
 use utils::PathBufPushTweak;
 use utils::is_msvc;
-use cpp_type::{CppType, CppTypeIndirection, CppTypeBase};
+use cpp_type::{CppTypeIndirection, CppTypeBase};
 
 /// Generates C++ code for the C wrapper library.
 pub struct CppCodeGenerator {
@@ -163,33 +163,19 @@ impl CppCodeGenerator {
       }
     } else {
       let result_without_args = if method.cpp_method.is_constructor() {
-        let class_type = CppType {
-          indirection: CppTypeIndirection::None,
-          is_const: false,
-          is_const2: false,
-          base: CppTypeBase::Class(method.cpp_method
-            .class_membership
-            .as_ref()
-            .unwrap()
-            .class_type
-            .clone()),
-        };
+        let class_type = &method.cpp_method.class_membership.as_ref().unwrap().class_type;
         match method.allocation_place {
           ReturnValueAllocationPlace::Stack => {
             if let Some(arg) = method.c_signature
               .arguments
               .iter()
               .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
-              format!("new({}) {}",
-                      arg.name,
-                      class_type.to_cpp_code(None).unwrap())
+              format!("new({}) {}", arg.name, class_type.to_cpp_code().unwrap())
             } else {
               panic!("no return value equivalent argument found");
             }
           }
-          ReturnValueAllocationPlace::Heap => {
-            format!("new {}", class_type.to_cpp_code(None).unwrap())
-          }
+          ReturnValueAllocationPlace::Heap => format!("new {}", class_type.to_cpp_code().unwrap()),
           ReturnValueAllocationPlace::NotApplicable => unreachable!(),
         }
       } else {
@@ -210,7 +196,17 @@ impl CppCodeGenerator {
         } else {
           "".to_string()
         };
-        format!("{}{}", scope_specifier, method.cpp_method.name)
+        let template_args = match method.cpp_method.template_arguments_values {
+          Some(ref args) => {
+            format!("<{}>",
+                    args.iter().map(|x| x.to_cpp_code(None).unwrap()).join(", "))
+          }
+          None => String::new(),
+        };
+        format!("{}{}{}",
+                scope_specifier,
+                method.cpp_method.name,
+                template_args)
       };
       format!("{}({})",
               result_without_args,

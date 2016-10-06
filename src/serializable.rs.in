@@ -71,11 +71,8 @@ pub enum CppTypeKind {
     bases: Vec<CppBaseSpecifier>,
     /// List of class fields
     fields: Vec<CppClassField>,
-    /// If the class is a template class, this field contains
-    /// names of its template arguments. Names themselves are
-    /// not particularly important, but their count is.
-    /// If the class is not a template class, this field is None.
-    template_arguments: Option<Vec<String>>,
+
+    template_arguments: Option<TemplateArgumentsDeclaration>,
     /// List of using directives, like "using BaseClass::method1;"
     using_directives: Vec<CppClassUsingDirective>,
   },
@@ -116,6 +113,15 @@ pub struct CppTypeData {
   pub origin_location: CppOriginLocation,
   /// Type information
   pub kind: CppTypeKind,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct TemplateArgumentsDeclaration {
+  pub nested_level: i32,
+  /// Names of template arguments. Names themselves are
+  /// not particularly important, but their count is.
+  pub names: Vec<String>,
 }
 
 /// Information about a C++ template class
@@ -261,7 +267,9 @@ pub struct CppMethod {
   /// None if this is not a template method.
   /// If the method belongs to a template class,
   /// the class's template arguments are not included here.
-  pub template_arguments: Option<Vec<String>>,
+  pub template_arguments: Option<TemplateArgumentsDeclaration>,
+
+  pub template_arguments_values: Option<Vec<CppType>>,
   /// C++ code of the method's declaration.
   /// None if the method was not explicitly declared.
   pub declaration_code: Option<String>,

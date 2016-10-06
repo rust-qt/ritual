@@ -9,9 +9,7 @@ use std::iter;
 
 pub use serializable::{EnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
                        CppTypeData, CppData, CppTemplateInstantiation, CppTemplateInstantiations,
-                       CppClassUsingDirective, CppBaseSpecifier};
-// TODO: remove template arguments from methods, e.g.
-// QList<T> findChildren<T>() -> QList<QObject*> findChildren()
+                       CppClassUsingDirective, CppBaseSpecifier, TemplateArgumentsDeclaration};
 fn apply_instantiations_to_method(method: &CppMethod,
                                   nested_level: i32,
                                   template_instantiations: &Vec<CppTemplateInstantiation>)
@@ -20,6 +18,15 @@ fn apply_instantiations_to_method(method: &CppMethod,
   for ins in template_instantiations {
     log::debug(format!("instantiation: {:?}", ins.template_arguments));
     let mut new_method = method.clone();
+    if let Some(ref args) = method.template_arguments {
+      if args.nested_level == nested_level {
+        if args.count() != ins.template_arguments.len() as i32 {
+          return Err(format!("arguments count mismatch"));
+        }
+        new_method.template_arguments = None;
+        new_method.template_arguments_values = Some(ins.template_arguments.clone());
+      }
+    }
     new_method.arguments.clear();
     for arg in &method.arguments {
       new_method.arguments.push(CppFunctionArgument {
@@ -83,7 +90,7 @@ impl CppTypeData {
 
   /// Creates CppTypeBase object representing type
   /// of an object of this type. See
-  /// default_template_parameters() documentation
+  /// default_template_arguments() documentation
   /// for details about handling template parameters.
   pub fn default_class_type(&self) -> CppTypeClassBase {
     if !self.is_class() {
@@ -91,7 +98,7 @@ impl CppTypeData {
     }
     CppTypeClassBase {
       name: self.name.clone(),
-      template_arguments: self.default_template_parameters(),
+      template_arguments: self.default_template_arguments(),
     }
   }
 
@@ -106,13 +113,14 @@ impl CppTypeData {
   /// - if QList<V> type is used inside QHash<K, V> type,
   /// QList's template parameter will have index = 1
   /// instead of 0.
-  pub fn default_template_parameters(&self) -> Option<Vec<CppType>> {
+  pub fn default_template_arguments(&self) -> Option<Vec<CppType>> {
     match self.kind {
       CppTypeKind::Class { ref template_arguments, .. } => {
         match *template_arguments {
           None => None,
-          Some(ref strings) => {
-            Some(strings.iter()
+          Some(ref arguments) => {
+            Some(arguments.names
+              .iter()
               .enumerate()
               .map(|(num, _)| {
                 CppType {
@@ -120,7 +128,7 @@ impl CppTypeData {
                   is_const2: false,
                   indirection: CppTypeIndirection::None,
                   base: CppTypeBase::TemplateParameter {
-                    nested_level: 0,
+                    nested_level: arguments.nested_level,
                     index: num as i32,
                   },
                 }
@@ -186,6 +194,7 @@ impl CppData {
             include_file: type1.include_file.clone(),
             origin_location: None,
             template_arguments: None,
+            template_arguments_values: None,
             declaration_code: None,
             inherited_from: None, // TODO: do we need inherited_from for destructors?
             inheritance_chain: Vec::new(),
@@ -732,5 +741,12 @@ impl CppData {
     self.generate_methods_with_omitted_args();
     self.instantiate_templates(dependencies);
     self.add_inherited_methods(dependencies);
+  }
+}
+
+impl TemplateArgumentsDeclaration {
+  #[allow(dead_code)]
+  pub fn count(&self) -> i32 {
+    self.names.len() as i32
   }
 }

@@ -235,6 +235,14 @@ impl CppMethod {
     }
     s = format!("{} {}", s, self.return_type.to_cpp_pseudo_code());
     s = format!("{} {}", s, self.full_name());
+    if let Some(ref args) = self.template_arguments {
+      s = format!("{}<{}>", s, args.names.iter().join(", "));
+    }
+    if let Some(ref args) = self.template_arguments_values {
+      s = format!("{}<{}>",
+                  s,
+                  args.iter().map(|x| x.to_cpp_pseudo_code()).join(", "));
+    }
     s = format!("{}({})",
                 s,
                 self.arguments

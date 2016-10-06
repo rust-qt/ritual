@@ -81,6 +81,7 @@ fn simple_func() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: None,
+               template_arguments_values: None,
                declaration_code: Some("int func1 ( int x )".to_string()),
              });
 }
@@ -118,6 +119,7 @@ fn simple_func_with_default_value() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: None,
+               template_arguments_values: None,
                declaration_code: Some("bool func1 ( int x = 42 )".to_string()),
              });
 }
@@ -195,6 +197,7 @@ fn functions_with_class_arg() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: None,
+               template_arguments_values: None,
                declaration_code: Some("bool func1 ( Magic x )".to_string()),
              });
   assert_eq!(data.methods[1],
@@ -228,6 +231,7 @@ fn functions_with_class_arg() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: None,
+               template_arguments_values: None,
                declaration_code: Some("bool func1 ( Magic * x )".to_string()),
              });
   assert_eq!(data.methods[2],
@@ -261,6 +265,7 @@ fn functions_with_class_arg() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: None,
+               template_arguments_values: None,
                declaration_code: Some("bool func2 ( const Magic & )".to_string()),
              });
 }
@@ -305,6 +310,7 @@ fn variadic_func() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: None,
+               template_arguments_values: None,
                declaration_code: Some("int my_printf ( const char * format , ... )".to_string()),
              });
 }
@@ -347,7 +353,11 @@ fn free_template_func() {
                allows_variadic_arguments: false,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
-               template_arguments: Some(vec!["T".to_string()]),
+               template_arguments: Some(TemplateArgumentsDeclaration {
+                 nested_level: 0,
+                 names: vec!["T".to_string()],
+               }),
+               template_arguments_values: None,
                declaration_code: Some("template < typename T > T abs ( T value )".to_string()),
              });
 }
@@ -406,6 +416,7 @@ fn free_func_operator_sub() {
                  include_file: "myfakelib.h".to_string(),
                  origin_location: None,
                  template_arguments: None,
+                 template_arguments_values: None,
                  declaration_code: Some("C1 operator - ( C1 a , C1 b )".to_string()),
                });
   }
@@ -471,6 +482,7 @@ fn simple_class_method() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: None,
+               template_arguments_values: None,
                declaration_code: Some("int func1 ( int x )".to_string()),
              });
 }
@@ -538,7 +550,10 @@ fn advanced_class_methods() {
 
   assert_eq!(data.methods[7].name, "func6");
   assert_eq!(data.methods[7].template_arguments,
-             Some(vec!["K".to_string(), "V".to_string()]));
+             Some(TemplateArgumentsDeclaration {
+               nested_level: 0,
+               names: vec!["K".to_string(), "V".to_string()],
+             }));
   assert_eq!(data.methods[7].arguments.len(), 1);
   assert_eq!(data.methods[7].arguments[0].argument_type,
              CppType {
@@ -567,7 +582,11 @@ fn template_class_method() {
   match data.types[0].kind {
     CppTypeKind::Class { ref size, ref bases, ref fields, ref template_arguments, .. } => {
       assert!(size.is_none());
-      assert_eq!(template_arguments, &Some(vec!["T".to_string()]));
+      assert_eq!(template_arguments,
+                 &Some(TemplateArgumentsDeclaration {
+                   nested_level: 0,
+                   names: vec!["T".to_string()],
+                 }));
       assert!(bases.is_empty());
       assert!(fields.is_empty());
     }
@@ -625,9 +644,53 @@ fn template_class_method() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: None,
+               template_arguments_values: None,
                declaration_code: Some("T get ( int index )".to_string()),
              });
 }
+
+fn template_class_template_method() {
+  let data = run_parser("
+  template<class T>
+  class MyVector {
+    public:
+      template<typename F>
+      F get_f();
+
+      T get_t();
+    };");
+  assert_eq!(data.methods[0].name, "get_f");
+  assert_eq!(data.methods[0].template_arguments,
+             Some(TemplateArgumentsDeclaration {
+               nested_level: 1,
+               names: vec!["F".to_string()],
+             }));
+  assert_eq!(data.methods[0].return_type,
+             CppType {
+               indirection: CppTypeIndirection::None,
+               is_const: false,
+               is_const2: false,
+               base: CppTypeBase::TemplateParameter {
+                 nested_level: 1,
+                 index: 0,
+               },
+             });
+
+  assert_eq!(data.methods[1].name, "get_t");
+  assert_eq!(data.methods[1].template_arguments, None);
+  assert_eq!(data.methods[1].return_type,
+             CppType {
+               indirection: CppTypeIndirection::None,
+               is_const: false,
+               is_const2: false,
+               base: CppTypeBase::TemplateParameter {
+                 nested_level: 0,
+                 index: 0,
+               },
+             });
+
+}
+
 
 fn simple_enum() {
   let data = run_parser("
@@ -982,6 +1045,13 @@ fn anon_enum() {
   }
 }
 
+fn non_type_template_parameter() {
+  let data = run_parser("\
+  template<int> struct QAtomicOpsSupport { enum { IsSupported = 0 }; };
+  template<> struct QAtomicOpsSupport<4> { enum { IsSupported = 1 }; };");
+  assert!(data.types.is_empty());
+}
+
 #[test]
 fn tests() {
   // clang can't be used from multiple threads, so these checks
@@ -996,6 +1066,7 @@ fn tests() {
   simple_class_method();
   advanced_class_methods();
   template_class_method();
+  template_class_template_method();
   simple_enum();
   simple_enum2();
   template_instantiation();
@@ -1006,4 +1077,5 @@ fn tests() {
   class_with_use();
   complex_const_types();
   anon_enum();
+  non_type_template_parameter();
 }

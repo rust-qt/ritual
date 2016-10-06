@@ -50,6 +50,7 @@ pub fn empty_regular_method() -> CppMethod {
     include_file: String::new(),
     origin_location: None,
     template_arguments: None,
+    template_arguments_values: None,
     operator: None,
     declaration_code: None,
   }
@@ -775,6 +776,7 @@ fn short_text1() {
     include_file: String::new(),
     origin_location: None,
     template_arguments: None,
+    template_arguments_values: None,
     declaration_code: None,
   };
   assert_eq!(method.short_text(),

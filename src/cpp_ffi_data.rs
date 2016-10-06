@@ -263,7 +263,14 @@ pub fn c_base_name(cpp_method: &CppMethod,
   } else {
     add_place_note(cpp_method.name.replace("::", "_"))
   };
-  Ok(scope_prefix + &method_name)
+  let template_args_text = match cpp_method.template_arguments_values {
+    Some(ref args) => {
+      format!("_{}",
+              args.iter().map(|x| x.caption(TypeCaptionStrategy::Full)).join("_"))
+    }
+    None => String::new(),
+  };
+  Ok(scope_prefix + &method_name + &template_args_text)
 }
 
 impl CppAndFfiMethod {

@@ -10,7 +10,7 @@ use std::fs::File;
 
 use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppOriginLocation,
                CppVisibility, CppTemplateInstantiation, CppTemplateInstantiations,
-               CppClassUsingDirective, CppBaseSpecifier};
+               CppClassUsingDirective, CppBaseSpecifier, TemplateArgumentsDeclaration};
 use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind, CppMethodClassMembership};
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
                CppSpecificNumericTypeKind, CppTypeClassBase};
@@ -67,13 +67,27 @@ fn get_origin_location(entity: Entity) -> Result<CppOriginLocation, String> {
   }
 }
 
-fn get_template_arguments(entity: Entity) -> Vec<String> {
-  entity.get_children()
+fn get_template_arguments(entity: Entity) -> Option<TemplateArgumentsDeclaration> {
+  let mut nested_level = 0;
+  if let Some(parent) = entity.get_semantic_parent() {
+    if let Some(args) = get_template_arguments(parent) {
+      nested_level = args.nested_level + 1;
+    }
+  }
+  let names: Vec<_> = entity.get_children()
     .into_iter()
     .filter(|c| c.get_kind() == EntityKind::TemplateTypeParameter)
     .enumerate()
     .map(|(i, c)| c.get_name().unwrap_or_else(|| format!("Type{}", i + 1)))
-    .collect()
+    .collect();
+  if names.is_empty() {
+    None
+  } else {
+    Some(TemplateArgumentsDeclaration {
+      nested_level: nested_level,
+      names: names,
+    })
+  }
 }
 
 
@@ -395,14 +409,12 @@ impl CppParser {
         indirection: CppTypeIndirection::None,
       });
     }
-    let mut method_has_template_arguments = false;
     if let Some(e) = context_method {
-      let args = get_template_arguments(e);
-      if !args.is_empty() {
-        if let Some(index) = args.iter().position(|x| *x == name) {
+      if let Some(args) = get_template_arguments(e) {
+        if let Some(index) = args.names.iter().position(|x| *x == name) {
           return Ok(CppType {
             base: CppTypeBase::TemplateParameter {
-              nested_level: 0,
+              nested_level: args.nested_level,
               index: index as i32,
             },
             is_const: is_const,
@@ -410,20 +422,21 @@ impl CppParser {
             indirection: CppTypeIndirection::None,
           });
         }
-        method_has_template_arguments = true;
       }
     }
     if let Some(e) = context_class {
-      if let Some(index) = get_template_arguments(e).iter().position(|x| *x == name) {
-        return Ok(CppType {
-          base: CppTypeBase::TemplateParameter {
-            nested_level: if method_has_template_arguments { 1 } else { 0 },
-            index: index as i32,
-          },
-          is_const: is_const,
-          is_const2: false,
-          indirection: CppTypeIndirection::None,
-        });
+      if let Some(args) = get_template_arguments(e) {
+        if let Some(index) = args.names.iter().position(|x| *x == name) {
+          return Ok(CppType {
+            base: CppTypeBase::TemplateParameter {
+              nested_level: args.nested_level,
+              index: index as i32,
+            },
+            is_const: is_const,
+            is_const2: false,
+            indirection: CppTypeIndirection::None,
+          });
+        }
       }
     }
     let mut remaining_name: &str = name.as_ref();
@@ -882,7 +895,7 @@ impl CppParser {
           .is_some() {
           return Err(format!("Non-type template parameter is not supported"));
         }
-        Some(get_template_arguments(entity))
+        get_template_arguments(entity)
       }
       _ => None,
     };
@@ -1065,6 +1078,7 @@ impl CppParser {
       include_file: self.entity_include_file(entity).unwrap(),
       origin_location: Some(get_origin_location(entity).unwrap()),
       template_arguments: template_arguments,
+      template_arguments_values: None,
       declaration_code: declaration_code,
       inherited_from: None,
       inheritance_chain: Vec::new(),
@@ -1100,7 +1114,6 @@ impl CppParser {
     let full_name = try!(get_full_name(entity));
     let mut fields = Vec::new();
     let mut bases = Vec::new();
-    let template_arguments = get_template_arguments(entity);
     let using_directives = entity.get_children()
       .into_iter()
       .filter(|c| c.get_kind() == EntityKind::UsingDeclaration)
@@ -1170,15 +1183,26 @@ impl CppParser {
         return Err(format!("Non-type template parameter is not supported"));
       }
     }
+    let template_arguments = get_template_arguments(entity);
+    if entity.get_kind() == EntityKind::ClassTemplate {
+      if template_arguments.is_none() {
+        println!("FAIL {:?}", entity);
+        panic!("missing template arguments");
+      }
+    } else {
+      if template_arguments.is_some() {
+        panic!("unexpected template arguments");
+      }
+    }
     let size = match entity.get_type() {
       Some(type1) => type1.get_sizeof().ok().map(|x| x as i32),
       None => None,
     };
-    if template_arguments.is_empty() && size.is_none() {
+    if template_arguments.is_none() && size.is_none() {
       return Err("Failed to request size, but the class is not a template class".to_string());
     }
     if let Some(parent) = entity.get_semantic_parent() {
-      if get_template_arguments(parent).len() > 0 {
+      if get_template_arguments(parent).is_some() {
         return Err("Types nested into template types are not supported".to_string());
       }
     }
@@ -1198,17 +1222,7 @@ impl CppParser {
         bases: bases,
         fields: fields,
         using_directives: using_directives,
-        template_arguments: if entity.get_kind() == EntityKind::ClassTemplate {
-          if template_arguments.is_empty() {
-            panic!("missing template arguments");
-          }
-          Some(template_arguments)
-        } else {
-          if !template_arguments.is_empty() {
-            panic!("unexpected template arguments");
-          }
-          None
-        },
+        template_arguments: template_arguments,
       },
     })
   }
