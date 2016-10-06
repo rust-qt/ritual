@@ -123,7 +123,11 @@ impl<'a> CGenerator<'a> {
       }
     }
     if method.template_arguments.is_some() {
-      // TODO: check findChildren and similar instantiated methods
+      log::noisy(format!("Skipping template method: \n{}\n", method.short_text()));
+      return false;
+    }
+    if method.template_arguments_values.is_some() {
+      // TODO: re-enable after template test compilation (#24) is implemented
       log::noisy(format!("Skipping template method: \n{}\n", method.short_text()));
       return false;
     }
