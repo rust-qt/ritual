@@ -196,7 +196,7 @@ impl CppData {
             template_arguments: None,
             template_arguments_values: None,
             declaration_code: None,
-            inherited_from: None, // TODO: do we need inherited_from for destructors?
+            inherited_from: None,
             inheritance_chain: Vec::new(),
           });
         }

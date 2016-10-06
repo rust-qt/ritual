@@ -242,7 +242,7 @@ pub fn run(env: BuildEnvironment) {
     for name in lib_spec.cpp.extra_libs.as_ref().unwrap_or(&Vec::new()) {
       if is_msvc() && name == "GL" {
         // msvc doesn't need to link to GL
-        // TODO: allow platform-specific link items in manifest
+        // TODO: allow platform-specific link items in manifest (#14)
         continue;
       }
       link_items.push(RustLinkItem {
@@ -252,7 +252,7 @@ pub fn run(env: BuildEnvironment) {
     }
   }
   let qt_doc_data = if is_qt_library {
-    // TODO: use env only in build script, switch to cmd arg in cli
+    // TODO: find a better way to specify doc source (#35)
     let env_var_name = format!("{}_DOC_DATA", lib_spec.cpp.name.to_uppercase());
     match std::env::var(&env_var_name) {
       Ok(env_var_value) => {
@@ -526,7 +526,6 @@ pub fn run(env: BuildEnvironment) {
         command.arg("--verbose");
         command.arg(format!("-j{}", num_jobs));
         command.current_dir(&output_dir_path);
-        // TODO: if env var already exists, add to it instead of overwriting
         if !all_cpp_lib_dirs.is_empty() {
           for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB"] {
             command.env(name, add_env_path_item(name, all_cpp_lib_dirs.clone()));

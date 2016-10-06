@@ -227,9 +227,6 @@ impl CppMethod {
         CppMethodKind::Regular => {}
       }
     }
-    //    if let Some(ref op) = self.operator {
-    //      s = format!("{} [{:?}]", s, op);
-    //    }
     if self.allows_variadic_arguments {
       s = format!("{} [var args]", s);
     }

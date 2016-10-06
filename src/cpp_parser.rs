@@ -149,7 +149,7 @@ fn run_clang<R, F: Fn(Entity) -> R>(config: &CppParserConfig, cpp_code: Option<S
       tmp_file.write(&cpp_code.as_bytes()).unwrap();
     }
   }
-  // TODO: PIC and additional args should be moved to lib spec
+  // TODO: PIC and additional args should be moved to lib spec (#13)
   let mut args = vec!["-fPIC".to_string(),
                       "-fcxx-exceptions".to_string(),
                       "-Xclang".to_string(),
@@ -295,6 +295,7 @@ pub fn run(config: CppParserConfig, dependency_types: &Vec<CppTypeData>) -> CppD
           }
         }
         // TODO: reimplement checking template args count
+        // TODO: pass inst. of dependencies here and skip duplicates
         let result_item =
           final_template_instantiations.iter_mut().find(|x| &x.class_name == class_name).unwrap();
         result_item.instantiations.push(CppTemplateInstantiation {
@@ -1062,7 +1063,7 @@ impl CppParser {
               Accessibility::Protected => CppVisibility::Protected,
               Accessibility::Private => CppVisibility::Private,
             },
-            is_signal: false, // TODO: get list of signals and slots at runtime
+            is_signal: false, // TODO: parse signals and slots (#7)
             class_type: match self.find_type(|x| &x.name == &class_name) {
               Some(info) => info.default_class_type(),
               None => return Err(format!("Unknown class type: {}", class_name)),
