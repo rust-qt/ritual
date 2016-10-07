@@ -521,6 +521,9 @@ pub fn run(env: BuildEnvironment) {
         all_cpp_lib_dirs.push(c_lib_lib_path.clone());
       }
       for cargo_cmd in vec!["build", "test", "doc"] {
+      if output_dir_path.with_added("Cargo.lock").exists() {
+        fs::remove_file(output_dir_path.with_added("Cargo.lock")).unwrap();
+      }
         let mut command = Command::new("cargo");
         command.arg(cargo_cmd);
         command.arg("--verbose");
