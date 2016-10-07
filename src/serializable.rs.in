@@ -415,8 +415,8 @@ pub enum CppTypeIndirection {
 
 /// Available built-in C++ numeric types.
 /// All these types have corresponding
-/// clang::TypeKind values (except for CharS and CharU
-/// which map to CppBuiltInNumericType::Char)
+/// `clang::TypeKind` values (except for `CharS` and `CharU`
+/// which map to `CppBuiltInNumericType::Char`)
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub enum CppBuiltInNumericType {
@@ -465,8 +465,8 @@ pub struct CppTypeClassBase {
   pub template_arguments: Option<Vec<CppType>>,
 }
 
-/// Base C++ type. CppType can add indirection
-/// and constness to CppTypeBase, but otherwise
+/// Base C++ type. `CppType` can add indirection
+/// and constness to `CppTypeBase`, but otherwise
 /// this enum lists all supported types.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]

@@ -32,7 +32,7 @@ impl RustName {
   pub fn last_name(&self) -> &String {
     self.parts.last().unwrap()
   }
-  pub fn full_name(&self, current_crate: Option<&String>) -> String {
+  pub fn full_name(&self, current_crate: Option<&str>) -> String {
     if current_crate.is_some() && self.crate_name().is_some() &&
        current_crate.unwrap() == self.crate_name().unwrap() {
       format!("::{}", self.parts[1..].join("::"))
@@ -138,7 +138,7 @@ impl RustType {
                          ref is_const2,
                          ref indirection } => {
         let mut name = base.last_name().to_snake_case();
-        if let &Some(ref args) = generic_arguments {
+        if let Some(ref args) = *generic_arguments {
           name = format!("{}_{}", name, args.iter().map(|x| x.caption()).join("_"));
         }
         let mut_text = if *is_const { "" } else { "_mut" };
@@ -184,7 +184,7 @@ impl RustType {
     let mut r = self.clone();
     if let RustType::Common { ref mut indirection, .. } = r {
       match *indirection {
-        RustTypeIndirection::Ref { ref mut lifetime } => *lifetime = Some(new_lifetime),
+        RustTypeIndirection::Ref { ref mut lifetime } |
         RustTypeIndirection::PtrRef { ref mut lifetime } => *lifetime = Some(new_lifetime),
         _ => {}
       }
@@ -196,7 +196,7 @@ impl RustType {
     match *self {
       RustType::Common { ref indirection, .. } => {
         match *indirection {
-          RustTypeIndirection::Ref { ref lifetime } => lifetime.as_ref(),
+          RustTypeIndirection::Ref { ref lifetime } |
           RustTypeIndirection::PtrRef { ref lifetime } => lifetime.as_ref(),
           _ => None,
         }
@@ -235,8 +235,8 @@ impl RustType {
           RustType::Common {
             base: real_name,
             generic_arguments: generic_arguments.clone(),
-            is_const: is_const.clone(),
-            is_const2: is_const2.clone(),
+            is_const: *is_const,
+            is_const2: *is_const2,
             indirection: indirection.clone(),
           }
         } else {

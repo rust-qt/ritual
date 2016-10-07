@@ -1,5 +1,5 @@
 
-/// Mode used by CppType::caption to generate
+/// Mode used by `CppType::caption` to generate
 /// type captions for C++ types
 /// (used to generate FFI function names).
 #[derive(Debug, PartialEq, Eq, Clone)]

@@ -208,11 +208,9 @@ impl CppCodeGenerator {
                 method.cpp_method.name,
                 template_args)
       };
-      format!("{}({})",
-              result_without_args,
-              self.arguments_values(&method))
+      format!("{}({})", result_without_args, self.arguments_values(method))
     };
-    self.convert_return_type(&method, result)
+    self.convert_return_type(method, result)
   }
 
   /// Generates body of the FFI method implementation.
@@ -247,9 +245,9 @@ impl CppCodeGenerator {
 
   /// Generates main files and directories of the library.
   pub fn generate_template_files(&self,
-                                 cpp_lib_include_file: &String,
-                                 include_directories: &Vec<String>,
-                                 framework_directories: &Vec<String>) {
+                                 cpp_lib_include_file: &str,
+                                 include_directories: &[String],
+                                 framework_directories: &[String]) {
     let name_upper = self.lib_name.to_uppercase();
     let mut cmakelists_file = File::create(self.lib_path.with_added("CMakeLists.txt")).unwrap();
     let mut cxx_flags = String::new();
@@ -303,7 +301,7 @@ impl CppCodeGenerator {
       .unwrap();
   }
 
-  pub fn generate_files(&self, data: &Vec<CppFfiHeaderData>) {
+  pub fn generate_files(&self, data: &[CppFfiHeaderData]) {
     self.generate_all_headers_file(data.iter().map(|x| &x.include_file));
     for item in data {
       self.generate_one(item);

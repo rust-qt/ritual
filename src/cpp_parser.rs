@@ -6,6 +6,7 @@ use self::regex::Regex;
 
 use log;
 use std::path::PathBuf;
+use std::fs;
 use std::fs::File;
 
 use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppOriginLocation,
@@ -63,7 +64,7 @@ fn get_origin_location(entity: Entity) -> Result<CppOriginLocation, String> {
         column: location.2,
       })
     }
-    None => Err(format!("No info about location.")),
+    None => Err("No info about location.".to_string()),
   }
 }
 
@@ -94,33 +95,29 @@ fn get_template_arguments(entity: Entity) -> Option<TemplateArgumentsDeclaration
 fn get_full_name(entity: Entity) -> Result<String, String> {
   let mut current_entity = entity;
   if let Some(mut s) = entity.get_name() {
-    loop {
-      if let Some(p) = current_entity.get_semantic_parent() {
-        match p.get_kind() {
-          EntityKind::ClassDecl |
-          EntityKind::ClassTemplate |
-          EntityKind::StructDecl |
-          EntityKind::Namespace |
-          EntityKind::EnumDecl |
-          EntityKind::ClassTemplatePartialSpecialization => {
-            match p.get_name() {
-              Some(p_name) => s = format!("{}::{}", p_name, s),
-              None => return Err(format!("Anonymous nested type")),
-            }
-            current_entity = p;
+    while let Some(p) = current_entity.get_semantic_parent() {
+      match p.get_kind() {
+        EntityKind::ClassDecl |
+        EntityKind::ClassTemplate |
+        EntityKind::StructDecl |
+        EntityKind::Namespace |
+        EntityKind::EnumDecl |
+        EntityKind::ClassTemplatePartialSpecialization => {
+          match p.get_name() {
+            Some(p_name) => s = format!("{}::{}", p_name, s),
+            None => return Err("Anonymous nested type".to_string()),
           }
-          EntityKind::Method => {
-            return Err(format!("Type nested in a method"));
-          }
-          _ => break,
+          current_entity = p;
         }
-      } else {
-        break;
+        EntityKind::Method => {
+          return Err("Type nested in a method".to_string());
+        }
+        _ => break,
       }
     }
     Ok(s)
   } else {
-    Err(format!("Anonymous type"))
+    Err("Anonymous type".to_string())
   }
 }
 
@@ -146,7 +143,7 @@ fn run_clang<R, F: Fn(Entity) -> R>(config: &CppParserConfig, cpp_code: Option<S
     let mut tmp_file = File::create(&config.tmp_cpp_path).unwrap();
     write!(tmp_file, "#include \"{}\"\n", config.header_name).unwrap();
     if let Some(cpp_code) = cpp_code {
-      tmp_file.write(&cpp_code.as_bytes()).unwrap();
+      tmp_file.write(cpp_code.as_bytes()).unwrap();
     }
   }
   // TODO: PIC and additional args should be moved to lib spec (#13)
@@ -188,27 +185,27 @@ fn run_clang<R, F: Fn(Entity) -> R>(config: &CppParserConfig, cpp_code: Option<S
       }
     }
     if diagnostics.iter()
-      .find(|d| {
+      .any(|d| {
         d.get_severity() == clang::diagnostic::Severity::Error ||
         d.get_severity() == clang::diagnostic::Severity::Fatal
-      })
-      .is_some() {
+      }) {
       panic!("terminated because of clang errors");
     }
   }
   let result = f(translation_unit);
-  // std::fs::remove_file(&config.tmp_cpp_path).unwrap();
+  fs::remove_file(&config.tmp_cpp_path).unwrap();
   result
 }
 
-pub fn run(config: CppParserConfig, dependency_types: &Vec<CppTypeData>) -> CppData {
-  log::info(format!("{}", get_version()));
+// TODO: use &[&CppTypeData]
+pub fn run(config: CppParserConfig, dependency_types: &[CppTypeData]) -> CppData {
+  log::info(get_version());
   log::info("Initializing clang...");
   let (mut parser, methods) = run_clang(&config, None, |translation_unit| {
     let mut parser = CppParser {
       types: Vec::new(),
       config: config.clone(),
-      dependency_types: dependency_types.clone(),
+      dependency_types: Vec::from(dependency_types),
     };
     log::info("Parsing types...");
     parser.parse_types(translation_unit);
@@ -255,7 +252,7 @@ pub fn run(config: CppParserConfig, dependency_types: &Vec<CppTypeData>) -> CppD
     let mut parser2 = CppParser {
       types: Vec::new(),
       config: config.clone(),
-      dependency_types: dependency_types.clone(),
+      dependency_types: Vec::from(dependency_types),
     };
     parser2.parse_types(last_entity);
     if parser2.types.len() != 1 {
@@ -268,7 +265,7 @@ pub fn run(config: CppParserConfig, dependency_types: &Vec<CppTypeData>) -> CppD
       }
       for (field_num, &(ref class_name, ref template_args)) in template_instantiations.iter()
         .enumerate() {
-        let size = fields[field_num].size.clone();
+        let size = fields[field_num].size;
         if size.is_none() {
           panic!("AllFields parse result: failed to get size of {}<{:?}>",
                  class_name,
@@ -359,7 +356,7 @@ impl CppParser {
             }
             if let Some(matches) = template_class_regex.captures(name.as_ref()) {
               let mut arg_types = Vec::new();
-              for arg in matches.at(2).unwrap().split(",") {
+              for arg in matches.at(2).unwrap().split(',') {
                 match self.parse_unexposed_type(None,
                                                 Some(arg.trim().to_string()),
                                                 context_class,
@@ -490,7 +487,7 @@ impl CppParser {
         });
       }
     }
-    if let Some(ref type_data) = self.find_type(|x| &x.name == remaining_name) {
+    if let Some(type_data) = self.find_type(|x| &x.name == remaining_name) {
       match type_data.kind {
         CppTypeKind::Enum { .. } => {
           type1.base = CppTypeBase::Enum { name: remaining_name.to_string() }
@@ -509,7 +506,7 @@ impl CppParser {
       let class_name = matches.at(1).unwrap();
       if self.find_type(|x| &x.name == class_name && x.is_class()).is_some() {
         let mut arg_types = Vec::new();
-        for arg in matches.at(2).unwrap().split(",") {
+        for arg in matches.at(2).unwrap().split(',') {
           match self.parse_unexposed_type(None,
                                           Some(arg.trim().to_string()),
                                           context_class,
@@ -533,7 +530,7 @@ impl CppParser {
                          name));
     }
 
-    return Err(format!("Unrecognized unexposed type: {}", name));
+    Err(format!("Unrecognized unexposed type: {}", name))
   }
 
   fn parse_type(&self,
@@ -638,7 +635,7 @@ impl CppParser {
         }
       }
     }
-    return Ok(parsed);
+    Ok(parsed)
   }
 
 
@@ -648,7 +645,7 @@ impl CppParser {
                           context_method: Option<Entity>)
                           -> Result<CppType, String> {
     if type1.is_volatile_qualified() {
-      return Err(format!("Volatile type"));
+      return Err("Volatile type".to_string());
     }
     let is_const = type1.is_const_qualified();
     match type1.get_kind() {
@@ -684,8 +681,7 @@ impl CppParser {
         Ok(CppType {
           base: CppTypeBase::BuiltInNumeric(match type1.get_kind() {
             TypeKind::Bool => CppBuiltInNumericType::Bool,
-            TypeKind::CharS => CppBuiltInNumericType::Char,
-            TypeKind::CharU => CppBuiltInNumericType::Char,
+            TypeKind::CharS | TypeKind::CharU => CppBuiltInNumericType::Char,
             TypeKind::SChar => CppBuiltInNumericType::SChar,
             TypeKind::UChar => CppBuiltInNumericType::UChar,
             TypeKind::WChar => CppBuiltInNumericType::WChar,
@@ -737,7 +733,7 @@ impl CppParser {
                 }
                 for arg_type in arg_types {
                   match arg_type {
-                    None => return Err(format!("Template argument is None")),
+                    None => return Err("Template argument is None".to_string()),
                     Some(arg_type) => {
                       match self.parse_type(arg_type, context_class, context_method) {
                         Ok(parsed_type) => r.push(parsed_type),
@@ -845,6 +841,7 @@ impl CppParser {
     }
   }
 
+  // TODO: simplify this function
   fn parse_function(&self, entity: Entity) -> Result<CppMethod, String> {
     let (class_name, class_entity) = match entity.get_semantic_parent() {
       Some(p) => {
@@ -861,7 +858,7 @@ impl CppParser {
             }
           }
           EntityKind::ClassTemplatePartialSpecialization => {
-            return Err(format!("this function is part of a template partial specialization"));
+            return Err("this function is part of a template partial specialization".to_string());
           }
           _ => (None, None),
         }
@@ -892,9 +889,8 @@ impl CppParser {
       EntityKind::FunctionTemplate => {
         if entity.get_children()
           .into_iter()
-          .find(|c| c.get_kind() == EntityKind::NonTypeTemplateParameter)
-          .is_some() {
-          return Err(format!("Non-type template parameter is not supported"));
+          .any(|c| c.get_kind() == EntityKind::NonTypeTemplateParameter) {
+          return Err("Non-type template parameter is not supported".to_string());
         }
         get_template_arguments(entity)
       }
@@ -903,7 +899,8 @@ impl CppParser {
 
     for (argument_number, argument_entity) in argument_entities.into_iter()
       .enumerate() {
-      let name = argument_entity.get_name().unwrap_or(format!("arg{}", argument_number + 1));
+      let name = argument_entity.get_name()
+        .unwrap_or_else(|| format!("arg{}", argument_number + 1));
       let type1 = self.parse_type(argument_entity.get_type().unwrap(),
                                   class_entity,
                                   Some(entity));
@@ -970,8 +967,9 @@ impl CppParser {
         }
       }
       if method_operator.is_none() && name_matches {
-        return Err(format!("This method is recognized as operator but arguments do not match \
-                            its signature."));
+        return Err("This method is recognized as operator but arguments do not match \
+                            its signature."
+          .to_string());
       }
     }
 
@@ -1017,16 +1015,16 @@ impl CppParser {
           }
         }
       }
-      if let Some(index) = result.find("{") {
+      if let Some(index) = result.find('{') {
         result = result[0..index].to_string();
       }
-      if let Some(index) = result.find(";") {
+      if let Some(index) = result.find(';') {
         result = result[0..index].to_string();
       }
       log::noisy(format!("The code extracted directly from header: {:?}", result));
       if result.contains("volatile") {
-        log::warning(format!("Warning: volatile method is detected based on source code"));
-        return Err(format!("Probably a volatile method."));
+        log::warning("Warning: volatile method is detected based on source code".to_string());
+        return Err("Probably a volatile method.".to_string());
       }
       Some(result)
     } else {
@@ -1037,7 +1035,7 @@ impl CppParser {
           break;
         }
         if text == "volatile" {
-          return Err(format!("A volatile method."));
+          return Err("A volatile method.".to_string());
         }
         token_strings.push(text);
       }
@@ -1126,7 +1124,7 @@ impl CppParser {
           }) {
           Some(x) => x,
           None => {
-            log::warning(format!("Failed to parse UsingDeclaration: class type not found"));
+            log::warning("Failed to parse UsingDeclaration: class type not found".to_string());
             dump_entity(child, 0);
             return None;
           }
@@ -1181,19 +1179,16 @@ impl CppParser {
         });
       }
       if child.get_kind() == EntityKind::NonTypeTemplateParameter {
-        return Err(format!("Non-type template parameter is not supported"));
+        return Err("Non-type template parameter is not supported".to_string());
       }
     }
     let template_arguments = get_template_arguments(entity);
     if entity.get_kind() == EntityKind::ClassTemplate {
       if template_arguments.is_none() {
-        println!("FAIL {:?}", entity);
         panic!("missing template arguments");
       }
-    } else {
-      if template_arguments.is_some() {
-        panic!("unexpected template arguments");
-      }
+    } else if template_arguments.is_some() {
+      panic!("unexpected template arguments");
     }
     let size = match entity.get_type() {
       Some(type1) => type1.get_sizeof().ok().map(|x| x as i32),
@@ -1270,13 +1265,13 @@ impl CppParser {
           }
         }
       }
-      if self.config.name_blacklist.iter().find(|&x| x == &full_name).is_some() {
+      if self.config.name_blacklist.iter().any(|x| x == &full_name) {
         log::info(format!("Skipping blacklisted entity: {}", full_name));
         return false;
       }
     }
     if let Some(name) = entity.get_name() {
-      if self.config.name_blacklist.iter().find(|&x| x == &name).is_some() {
+      if self.config.name_blacklist.iter().any(|x| x == &name) {
         log::info(format!("Skipping blacklisted entity: {}",
                           get_full_name(entity).unwrap()));
         return false;
@@ -1298,7 +1293,7 @@ impl CppParser {
         if entity.get_name().is_some() && entity.is_definition() {
           match self.parse_enum(entity) {
             Ok(r) => {
-              if let Some(info) = self.find_type(|x| x.name == r.name).map(|x| x.clone()) {
+              if let Some(info) = self.find_type(|x| x.name == r.name).cloned() {
                 log::warning(format!("repeating enum declaration: {:?}\nold declaration: {:?}",
                                      entity,
                                      info));
@@ -1327,7 +1322,7 @@ impl CppParser {
         if ok {
           match self.parse_class(entity) {
             Ok(r) => {
-              if let Some(info) = self.find_type(|x| x.name == r.name).map(|x| x.clone()) {
+              if let Some(info) = self.find_type(|x| x.name == r.name).cloned() {
                 log::warning(format!("repeating class declaration: {:?}\nold declaration: {:?}",
                                      entity,
                                      info));
@@ -1392,8 +1387,8 @@ impl CppParser {
           if let Ok(parent_type) = self.parse_unexposed_type(None, Some(name.clone()), None, None) {
             if let CppTypeBase::Class(CppTypeClassBase { ref template_arguments, .. }) =
                    parent_type.base {
-              if let &Some(ref template_arguments) = template_arguments {
-                if template_arguments.iter().find(|x| !x.base.is_template_parameter()).is_some() {
+              if let Some(ref template_arguments) = *template_arguments {
+                if template_arguments.iter().any(|x| !x.base.is_template_parameter()) {
                   log::warning(format!("skipping template partial specialization: {}", name));
                   return methods;
                 }
@@ -1420,7 +1415,8 @@ impl CppParser {
       CppTypeBase::Void |
       CppTypeBase::BuiltInNumeric(..) |
       CppTypeBase::SpecificNumeric { .. } |
-      CppTypeBase::PointerSizedInteger { .. } => {}
+      CppTypeBase::PointerSizedInteger { .. } |
+      CppTypeBase::TemplateParameter { .. } => {}
       CppTypeBase::Enum { ref name } => {
         if self.find_type(|x| &x.name == name).is_none() {
           return Err(format!("unknown type: {}", name));
@@ -1430,9 +1426,9 @@ impl CppParser {
         if self.find_type(|x| &x.name == name).is_none() {
           return Err(format!("unknown type: {}", name));
         }
-        if let &Some(ref args) = template_arguments {
+        if let Some(ref args) = *template_arguments {
           for arg in args {
-            if let Err(msg) = self.check_type_integrity(&arg) {
+            if let Err(msg) = self.check_type_integrity(arg) {
               return Err(msg);
             }
           }
@@ -1448,7 +1444,6 @@ impl CppParser {
           }
         }
       }
-      CppTypeBase::TemplateParameter { .. } => {}
     }
     Ok(())
   }
@@ -1496,21 +1491,18 @@ impl CppParser {
     (good_methods, good_types)
   }
 
-  fn find_template_instantiations(&self, methods: &Vec<CppMethod>) -> Vec<(String, Vec<CppType>)> {
+  fn find_template_instantiations(&self, methods: &[CppMethod]) -> Vec<(String, Vec<CppType>)> {
 
     fn check_type(type1: &CppType, result: &mut Vec<(String, Vec<CppType>)>) {
       if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
              type1.base {
-        if let &Some(ref template_arguments) = template_arguments {
-          if !template_arguments.iter()
-            .find(|x| x.base.is_or_contains_template_parameter())
-            .is_some() {
-            if result.iter().find(|x| &x.0 == name && &x.1 == template_arguments).is_none() {
-              log::noisy(format!("Found template instantiation: {}<{:?}>",
-                                 name,
-                                 template_arguments));
-              result.push((name.clone(), template_arguments.clone()));
-            }
+        if let Some(ref template_arguments) = *template_arguments {
+          if !template_arguments.iter().any(|x| x.base.is_or_contains_template_parameter()) &&
+             !result.iter().any(|x| &x.0 == name && &x.1 == template_arguments) {
+            log::noisy(format!("Found template instantiation: {}<{:?}>",
+                               name,
+                               template_arguments));
+            result.push((name.clone(), template_arguments.clone()));
           }
           for arg in template_arguments {
             check_type(arg, result);

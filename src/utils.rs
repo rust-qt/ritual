@@ -30,7 +30,7 @@ impl<S, S2, X> JoinWithString<S2> for X
 {
   fn join(self, separator: S2) -> String {
     self.fold("".to_string(), |a, b| {
-      let m = if a.len() > 0 {
+      let m = if !a.is_empty() {
         a + separator.as_ref()
       } else {
         a
@@ -159,7 +159,7 @@ impl<'a> Iterator for WordIterator<'a> {
   type Item = &'a str;
   fn next(&mut self) -> Option<&'a str> {
     while self.index < self.string.len() && &self.string[self.index..self.index + 1] == "_" {
-      self.index = self.index + 1;
+      self.index += 1;
     }
     if self.index >= self.string.len() {
       return None;
@@ -209,12 +209,12 @@ impl<'a> Iterator for WordIterator<'a> {
           }
         }
       }
-      i = i + 1;
+      i += 1;
     }
     let result = &self.string[self.index..i];
     self.index = i;
     self.previous_word_case = Some(word_case);
-    return Some(result);
+    Some(result)
   }
 }
 
@@ -228,7 +228,7 @@ pub trait VecCaseOperations {
 }
 
 
-fn iterator_to_class_case<'a, S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {
+fn iterator_to_class_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {
   it.map(|x| {
       format!("{}{}",
               x.as_ref()[0..1].to_uppercase(),
@@ -237,7 +237,7 @@ fn iterator_to_class_case<'a, S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> St
     .join("")
 }
 
-fn iterator_to_snake_case<'a, S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {
+fn iterator_to_snake_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {
   it.map(|x| x.as_ref().to_lowercase()).join("_")
 }
 

@@ -26,8 +26,8 @@ impl CppFfiArgumentMeaning {
   /// Checks if this argument coresponds to an original
   /// C++ method's argument
   pub fn is_argument(&self) -> bool {
-    match self {
-      &CppFfiArgumentMeaning::Argument(..) => true,
+    match *self {
+      CppFfiArgumentMeaning::Argument(..) => true,
       _ => false,
     }
   }
@@ -95,8 +95,7 @@ impl CppFfiFunctionSignature {
   pub fn has_const_this(&self) -> bool {
     self.arguments
       .iter()
-      .find(|arg| arg.meaning == CppFfiArgumentMeaning::This && arg.argument_type.ffi_type.is_const)
-      .is_some()
+      .any(|arg| arg.meaning == CppFfiArgumentMeaning::This && arg.argument_type.ffi_type.is_const)
   }
 
   /// Generates arguments caption string for FFI method.
@@ -108,7 +107,7 @@ impl CppFfiFunctionSignature {
       .filter(|x| x.meaning.is_argument())
       .map(|x| x.caption(strategy.clone()))
       .join("_");
-    if r.len() == 0 {
+    if r.is_empty() {
       "no_args".to_string()
     } else {
       r
@@ -222,7 +221,7 @@ pub struct CppAndFfiMethod {
 /// Generates initial FFI method name without any captions
 pub fn c_base_name(cpp_method: &CppMethod,
                    allocation_place: &ReturnValueAllocationPlace,
-                   include_file: &String)
+                   include_file: &str)
                    -> Result<String, String> {
   let scope_prefix = match cpp_method.class_membership {
     Some(ref info) => format!("{}_", info.class_type.caption()),
@@ -242,7 +241,7 @@ pub fn c_base_name(cpp_method: &CppMethod,
       ReturnValueAllocationPlace::Stack => "constructor".to_string(),
       ReturnValueAllocationPlace::Heap => "new".to_string(),
       ReturnValueAllocationPlace::NotApplicable => {
-        return Err(format!("NotApplicable is not allowed for constructor"))
+        return Err("NotApplicable is not allowed for constructor".to_string())
       }
     }
   } else if cpp_method.is_destructor() {
@@ -250,7 +249,7 @@ pub fn c_base_name(cpp_method: &CppMethod,
       ReturnValueAllocationPlace::Stack => "destructor".to_string(),
       ReturnValueAllocationPlace::Heap => "delete".to_string(),
       ReturnValueAllocationPlace::NotApplicable => {
-        return Err(format!("NotApplicable is not allowed for constructor"))
+        return Err("NotApplicable is not allowed for constructor".to_string())
       }
     }
   } else if let Some(ref operator) = cpp_method.operator {

@@ -112,12 +112,13 @@ pub fn run_from_build_script() {
     build_profile: match env::var("PROFILE").unwrap().as_ref() {
       "debug" | "test" | "doc" => BuildProfile::Debug,
       "release" | "bench" => BuildProfile::Release,
-      a @ _ => panic!("unsupported profile: {}", a),
+      a => panic!("unsupported profile: {}", a),
     },
     dependency_paths: dependency_paths,
   });
 }
 
+// TODO: simplify this function
 pub fn run(env: BuildEnvironment) {
   // canonicalize paths
   if !env.source_dir_path.as_path().exists() {
@@ -256,12 +257,9 @@ pub fn run(env: BuildEnvironment) {
     let env_var_name = format!("{}_DOC_DATA", lib_spec.cpp.name.to_uppercase());
     match std::env::var(&env_var_name) {
       Ok(env_var_value) => {
-        log::info(format!("Loading Qt doc data"));
+        log::info(format!("Loading Qt doc data from {}", &env_var_value));
         match QtDocData::new(&PathBuf::from(&env_var_value)) {
-          Ok(r) => {
-            log::info(format!("Loaded Qt doc data from {}", &env_var_value));
-            Some(r)
-          }
+          Ok(r) => Some(r),
           Err(msg) => {
             log::warning(format!("Failed to load Qt doc data: {}", msg));
             None
@@ -277,7 +275,7 @@ pub fn run(env: BuildEnvironment) {
   } else {
     None
   };
-  if env.dependency_paths.len() > 0 {
+  if !env.dependency_paths.is_empty() {
     log::info("Loading dependencies");
   }
   let dependencies: Vec<_> = env.dependency_paths
@@ -328,7 +326,7 @@ pub fn run(env: BuildEnvironment) {
                                                  name_blacklist: lib_spec.cpp
                                                    .name_blacklist
                                                    .clone()
-                                                   .unwrap_or(Vec::new()),
+                                                   .unwrap_or_default(),
                                                },
                                                &dependency_cpp_types);
         if is_qt_library {
@@ -337,7 +335,7 @@ pub fn run(env: BuildEnvironment) {
           }
         }
         log::info("Post-processing parse result.");
-        parse_result.post_process(&dependencies.iter().map(|x| &x.cpp_data).collect());
+        parse_result.post_process(&dependencies.iter().map(|x| &x.cpp_data).collect::<Vec<_>>());
 
         let mut file = File::create(&parse_result_cache_file_path).unwrap();
         serde_json::to_writer(&mut file, &parse_result).unwrap();
@@ -382,15 +380,15 @@ pub fn run(env: BuildEnvironment) {
     code_gen.generate_template_files(&lib_spec.cpp.include_file,
                                      &include_dirs.iter()
                                        .map(|x| x.to_str().unwrap().to_string())
-                                       .collect(),
+                                       .collect::<Vec<_>>(),
                                      &framework_dirs.iter()
                                        .map(|x| x.to_str().unwrap().to_string())
-                                       .collect());
+                                       .collect::<Vec<_>>());
     code_gen.generate_files(&cpp_ffi_headers);
 
     utils::move_files(&c_lib_tmp_path, &c_lib_path).unwrap();
 
-    log::info(format!("Building C wrapper library."));
+    log::info("Building C wrapper library.");
     let c_lib_build_path = c_lib_parent_path.with_added("build");
     fs::create_dir_all(&c_lib_build_path).unwrap();
     fs::create_dir_all(&c_lib_install_path).unwrap();
@@ -432,11 +430,9 @@ pub fn run(env: BuildEnvironment) {
     let mut make_command = Command::new(make_command_name);
     make_command.args(&make_args)
       .current_dir(path_without_long_path(&c_lib_build_path));
-    if c_lib_is_shared {
-      if !cpp_lib_dirs.is_empty() {
-        for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB"] {
-          make_command.env(name, add_env_path_item(name, cpp_lib_dirs.clone()));
-        }
+    if c_lib_is_shared && !cpp_lib_dirs.is_empty() {
+      for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB"] {
+        make_command.env(name, add_env_path_item(name, cpp_lib_dirs.clone()));
       }
     }
     run_command(&mut make_command, false);
@@ -476,7 +472,7 @@ pub fn run(env: BuildEnvironment) {
     for dep in &dependencies {
       dependency_rust_types.extend_from_slice(&dep.rust_export_info.rust_types);
     }
-    log::info(format!("Preparing Rust functions"));
+    log::info("Preparing Rust functions");
     let rust_data = rust_generator::run(CppAndFfiData {
                                           cpp_data: parse_result,
                                           cpp_ffi_headers: cpp_ffi_headers,
@@ -515,15 +511,15 @@ pub fn run(env: BuildEnvironment) {
 
   match env.invokation_method {
     InvokationMethod::CommandLine => {
-      log::info(format!("Compiling Rust crate."));
+      log::info("Compiling Rust crate.");
       let mut all_cpp_lib_dirs = cpp_lib_dirs.clone();
       if c_lib_is_shared {
         all_cpp_lib_dirs.push(c_lib_lib_path.clone());
       }
-      for cargo_cmd in vec!["build", "test", "doc"] {
       if output_dir_path.with_added("Cargo.lock").exists() {
         fs::remove_file(output_dir_path.with_added("Cargo.lock")).unwrap();
       }
+      for cargo_cmd in &["build", "test", "doc"] {
         let mut command = Command::new("cargo");
         command.arg(cargo_cmd);
         command.arg("--verbose");
@@ -538,7 +534,7 @@ pub fn run(env: BuildEnvironment) {
           command.env("DYLD_FRAMEWORK_PATH",
                       add_env_path_item("DYLD_FRAMEWORK_PATH", framework_dirs.clone()));
         }
-        if is_msvc() && cargo_cmd == "test" {
+        if is_msvc() && *cargo_cmd == "test" {
           // cargo doesn't pass this flag to rustc when it compiles qt_core,
           // so it's compiled with static std and the tests fail with
           // "cannot satisfy dependencies so `std` only shows up once" error.

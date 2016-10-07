@@ -43,7 +43,7 @@ fn main() {
     .get_matches();
 
   let dependency_paths = match matches.values_of("dependencies") {
-    Some(values) => values.map(|x| PathBuf::from(x)).collect(),
+    Some(values) => values.map(PathBuf::from).collect(),
     None => Vec::new(),
   };
 

@@ -53,11 +53,11 @@ pub struct RustCodeGeneratorConfig {
   pub dependencies: Vec<RustCodeGeneratorDependency>,
 }
 
-fn format_doc(doc: &String) -> String {
+fn format_doc(doc: &str) -> String {
   if doc.is_empty() {
     return String::new();
   }
-  doc.split("\n")
+  doc.split('\n')
     .map(|x| {
       let mut line = format!("/// {}\n", x);
       if line.starts_with("///     ") {
@@ -69,7 +69,7 @@ fn format_doc(doc: &String) -> String {
     .join("")
 }
 
-pub fn rust_type_to_code(rust_type: &RustType, crate_name: &String) -> String {
+pub fn rust_type_to_code(rust_type: &RustType, crate_name: &str) -> String {
   match *rust_type {
     RustType::Void => "()".to_string(),
     RustType::Common { ref base,
@@ -79,12 +79,12 @@ pub fn rust_type_to_code(rust_type: &RustType, crate_name: &String) -> String {
                        ref generic_arguments,
                        .. } => {
       let mut base_s = base.full_name(Some(crate_name));
-      if let &Some(ref args) = generic_arguments {
+      if let Some(ref args) = *generic_arguments {
         base_s = format!("{}<{}>",
                          base_s,
                          args.iter().map(|x| rust_type_to_code(x, crate_name)).join(", "));
       }
-      let s = match *indirection {
+      match *indirection {
         RustTypeIndirection::None => base_s,
         RustTypeIndirection::Ref { ref lifetime } => {
           let lifetime_text = match *lifetime {
@@ -122,8 +122,7 @@ pub fn rust_type_to_code(rust_type: &RustType, crate_name: &String) -> String {
           };
           format!("{}{}{}", const_text2, const_text1, base_s)
         }
-      };
-      s
+      }
     }
     RustType::FunctionPointer { ref return_type, ref arguments } => {
       format!("extern \"C\" fn({}){}",
@@ -286,11 +285,11 @@ impl RustCodeGenerator {
 
   fn generate_ffi_call(&self,
                        variant: &RustMethodArgumentsVariant,
-                       shared_arguments: &Vec<RustMethodArgument>)
+                       shared_arguments: &[RustMethodArgument])
                        -> String {
     let mut final_args = Vec::new();
     final_args.resize(variant.cpp_method.c_signature.arguments.len(), None);
-    let mut all_args = shared_arguments.clone();
+    let mut all_args: Vec<RustMethodArgument> = Vec::from(shared_arguments);
     for arg in &variant.arguments {
       all_args.push(arg.clone());
     }
@@ -337,7 +336,7 @@ impl RustCodeGenerator {
     if let Some(ref i) = variant.return_type_ffi_index {
       let mut return_var_name = "object".to_string();
       let mut ii = 1;
-      while variant.arguments.iter().find(|x| &x.name == &return_var_name).is_some() {
+      while variant.arguments.iter().any(|x| &x.name == &return_var_name) {
         ii += 1;
         return_var_name = format!("object{}", ii);
       }
@@ -396,10 +395,10 @@ impl RustCodeGenerator {
                        self.rust_type_to_code(&qflags_type));
       }
     }
-    return code;
+    code
   }
 
-  fn arg_texts(&self, args: &Vec<RustMethodArgument>, lifetime: Option<&String>) -> Vec<String> {
+  fn arg_texts(&self, args: &[RustMethodArgument], lifetime: Option<&String>) -> Vec<String> {
     args.iter()
       .map(|arg| {
         if &arg.name == "self" {
@@ -409,12 +408,12 @@ impl RustCodeGenerator {
           };
           if let RustType::Common { ref indirection, ref is_const, .. } = self_type {
             let maybe_mut = if *is_const { "" } else { "mut " };
-            match indirection {
-              &RustTypeIndirection::None => format!("self"),
-              &RustTypeIndirection::Ref { ref lifetime } => {
-                match lifetime {
-                  &Some(ref lifetime) => format!("&'{} {}self", lifetime, maybe_mut),
-                  &None => format!("&{}self", maybe_mut),
+            match *indirection {
+              RustTypeIndirection::None => "self".to_string(),
+              RustTypeIndirection::Ref { ref lifetime } => {
+                match *lifetime {
+                  Some(ref lifetime) => format!("&'{} {}self", lifetime, maybe_mut),
+                  None => format!("&{}self", maybe_mut),
                 }
               }
               _ => panic!("invalid self argument type (indirection)"),
@@ -473,7 +472,7 @@ impl RustCodeGenerator {
           .iter()
           .filter_map(|x| x.argument_type.rust_api_type.lifetime())
           .collect();
-        let lifetimes_text = if all_lifetimes.len() > 0 {
+        let lifetimes_text = if !all_lifetimes.is_empty() {
           format!("<{}>",
                   all_lifetimes.iter().map(|x| format!("'{}", x)).join(", "))
         } else {
@@ -499,11 +498,11 @@ impl RustCodeGenerator {
                            shared_arguments.iter().map(|arg| arg.name.clone()).join(", "));
         let lifetime_arg = match *params_trait_lifetime {
           Some(ref lifetime) => format!("'{}, ", lifetime),
-          None => format!(""),
+          None => String::new(),
         };
         let lifetime_specifier = match *params_trait_lifetime {
           Some(ref lifetime) => format!("<'{}>", lifetime),
-          None => format!(""),
+          None => String::new(),
         };
         let mut args = self.arg_texts(shared_arguments, params_trait_lifetime.as_ref());
         args.push(format!("{}: {}", variant_argument_name, tpl_type));
@@ -521,7 +520,7 @@ impl RustCodeGenerator {
     }
   }
 
-  pub fn generate_lib_file(&self, modules: &Vec<&String>) {
+  pub fn generate_lib_file(&self, modules: &[&String]) {
     let mut lib_file_path = self.config.output_path.clone();
     lib_file_path.push("src");
     lib_file_path.push("lib.rs");
@@ -557,12 +556,12 @@ impl RustCodeGenerator {
         }
       }
       for module in &extra_modules {
-        if modules.iter().find(|x| x.as_ref() as &str == module).is_some() {
+        if modules.iter().any(|x| x.as_ref() as &str == module) {
           panic!("module name conflict");
         }
       }
 
-      let all_modules = extra_modules.iter().chain(modules.clone());
+      let all_modules = extra_modules.iter().chain(modules.iter().map(|x| *x));
       for module in all_modules {
         let mut maybe_pub = "pub ";
         if module == "ffi" {
@@ -665,7 +664,7 @@ impl RustCodeGenerator {
           let arg_list = self.arg_texts(shared_arguments, lifetime.as_ref()).join(", ");
           let trait_lifetime_specifier = match *lifetime {
             Some(ref lf) => format!("<'{}>", lf),
-            None => format!(""),
+            None => String::new(),
           };
           results.push(format!("pub trait {name}{trait_lifetime_specifier} {{
               type ReturnType;
@@ -675,21 +674,17 @@ impl RustCodeGenerator {
                                arg_list = arg_list,
                                trait_lifetime_specifier = trait_lifetime_specifier));
           for variant in impls {
-            let mut final_lifetime = lifetime.clone();
-            if lifetime.is_none() &&
-               (variant.arguments
-              .iter()
-              .find(|t| {
-                t.argument_type
-                  .rust_api_type
-                  .is_ref()
-              })
-              .is_some() || variant.return_type.rust_api_type.is_ref()) {
-              final_lifetime = Some("a".to_string());
-            }
+            let final_lifetime =
+              if lifetime.is_none() &&
+                 (variant.arguments.iter().any(|t| t.argument_type.rust_api_type.is_ref()) ||
+                  variant.return_type.rust_api_type.is_ref()) {
+                Some("a".to_string())
+              } else {
+                lifetime.clone()
+              };
             let lifetime_specifier = match final_lifetime {
               Some(ref lf) => format!("<'{}>", lf),
-              None => format!(""),
+              None => String::new(),
             };
             let final_arg_list = self.arg_texts(shared_arguments, final_lifetime.as_ref())
               .join(", ");
@@ -759,7 +754,7 @@ impl RustCodeGenerator {
                            submodule.name,
                            self.generate_module_code(submodule)));
     }
-    return results.join("");
+    results.join("")
   }
 
   fn call_rustfmt(&self, path: &PathBuf) {
@@ -794,7 +789,7 @@ impl RustCodeGenerator {
 
   }
 
-  pub fn generate_ffi_file(&self, functions: &Vec<(String, Vec<RustFFIFunction>)>) {
+  pub fn generate_ffi_file(&self, functions: &[(String, Vec<RustFFIFunction>)]) {
     let mut file_path = self.config.output_path.clone();
     file_path.push("src");
     file_path.push("ffi.rs");

@@ -14,9 +14,9 @@ pub struct DocItem {
 }
 
 pub fn rust_method_variant(args: &RustMethodArgumentsVariant,
-                           method_name: &String,
+                           method_name: &str,
                            self_arg_kind: RustMethodSelfArgKind,
-                           crate_name: &String)
+                           crate_name: &str)
                            -> String {
   let self_arg_doc_text = match self_arg_kind {
     RustMethodSelfArgKind::Static => "",
@@ -47,16 +47,16 @@ pub fn rust_method_variant(args: &RustMethodArgumentsVariant,
           return_type = return_type_text)
 }
 
-pub fn wrap_inline_cpp_code(code: &String) -> String {
+pub fn wrap_inline_cpp_code(code: &str) -> String {
   format!("<span style='color: green;'>```{}```</span>", code)
 }
 
-pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &String) -> String {
+pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &str) -> String {
   let overloaded = doc_items.len() > 1 || (doc_items.len() == 1 && doc_items[0].rust_fns.len() > 1);
   let mut doc = Vec::new();
   if overloaded {
     doc.push(format!("C++ method: {}\n\n", wrap_inline_cpp_code(cpp_method_name)));
-    doc.push(format!("This is an overloaded function. Available variants:\n\n"));
+    doc.push("This is an overloaded function. Available variants:\n\n".to_string());
   }
 
   let mut shown_docs = Vec::new();
@@ -71,8 +71,7 @@ pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &String) -> String {
        doc_item.doc.as_ref().unwrap().kind != QtDocResultForMethodKind::ExactMatch {
       let anchor = &doc_item.doc.as_ref().unwrap().anchor;
       if shown_docs.iter()
-        .find(|x| x.doc.is_some() && &x.doc.as_ref().unwrap().anchor == anchor)
-        .is_some() {
+        .any(|x| x.doc.is_some() && &x.doc.as_ref().unwrap().anchor == anchor) {
         shown_docs.push(DocItem { doc: None, ..doc_item.clone() });
       } else {
         shown_docs.push(doc_item.clone());
@@ -96,14 +95,14 @@ pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &String) -> String {
                   if rust_count > 1 {
                     format!("{}) ", i + 1)
                   } else {
-                    format!("")
+                    String::new()
                   },
                   x)
         })
                          .join("")));
     }
     doc.push(format!("C++ method: {}", wrap_inline_cpp_code(&doc_item.cpp_fn)));
-    doc.push(format!("\n\n"));
+    doc.push("\n\n".to_string());
     if let Some(ref inherited_from) = doc_item.inherited_from {
       doc.push(format!("Inherited from {}. Original C++ method: {}\n\n",
                        wrap_inline_cpp_code(&CppTypeBase::Class(inherited_from.class_type
@@ -113,7 +112,7 @@ pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &String) -> String {
     }
     if let Some(result) = doc_item.doc {
       let prefix = match result.kind {
-        QtDocResultForMethodKind::ExactMatch => format!("C++ documentation:"),
+        QtDocResultForMethodKind::ExactMatch => "C++ documentation:".to_string(),
         QtDocResultForMethodKind::Mismatch { ref declaration } => {
           format!("Warning: no exact match found in C++ documentation.\
                          Below is the C++ documentation for <code>{}</code>:",

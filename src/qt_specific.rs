@@ -68,7 +68,7 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) {
     if let Some(fancy_header) = map_real_to_fancy.get(real_header) {
       return fancy_header.clone();
     }
-    return real_header.clone();
+    real_header.clone()
   };
 
   for t in &mut data.types {

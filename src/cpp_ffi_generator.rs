@@ -37,17 +37,17 @@ pub fn run(cpp_data: &CppData, cpp_lib_spec: CppLibSpec) -> Vec<CppFfiHeaderData
 
   for include_file in &include_name_list {
     if let Some(ref include_file_blacklist) = generator.cpp_lib_spec.include_file_blacklist {
-      if include_file_blacklist.iter().find(|x| x == &include_file).is_some() {
+      if include_file_blacklist.iter().any(|x| x == include_file) {
         log::info(format!("Skipping include file {}", include_file));
         continue;
       }
     }
     let mut include_file_base_name = include_file.clone();
 
-    if let Some(index) = include_file_base_name.find(".") {
+    if let Some(index) = include_file_base_name.find('.') {
       include_file_base_name = include_file_base_name[0..index].to_string();
     }
-    let methods = generator.process_methods(&include_file,
+    let methods = generator.process_methods(include_file,
                                             &include_file_base_name,
                                             generator.cpp_data
                                               .methods
@@ -77,8 +77,7 @@ impl<'a> CGenerator<'a> {
     log::debug(format!(" short_text: {}", short_text));
     if let Some(ref ffi_methods_blacklist) = self.cpp_lib_spec.ffi_methods_blacklist {
       if ffi_methods_blacklist.iter()
-        .find(|&x| x == &full_name || x == &short_text || x == &class_name)
-        .is_some() {
+        .any(|x| x == &full_name || x == &short_text || x == &class_name) {
         log::noisy(format!("Skipping blacklisted method: \n{}\n", method.short_text()));
         return false;
       }
@@ -116,8 +115,7 @@ impl<'a> CGenerator<'a> {
     }
     if method.all_involved_types()
       .iter()
-      .find(|x| x.base.is_or_contains_template_parameter())
-      .is_some() {
+      .any(|x| x.base.is_or_contains_template_parameter()) {
       log::noisy(format!("Skipping method containing template parameters: \n{}\n",
                          method.short_text()));
       return false;
@@ -128,13 +126,13 @@ impl<'a> CGenerator<'a> {
   /// Generates FFI wrappers for all specified methods,
   /// resolving all name conflicts using additional method captions.
   fn process_methods<'b, I: Iterator<Item = &'b CppMethod>>(&self,
-                                                            include_file: &String,
-                                                            include_file_base_name: &String,
+                                                            include_file: &str,
+                                                            include_file_base_name: &str,
                                                             methods: I)
                                                             -> Vec<CppAndFfiMethod> {
     log::info(format!("Generating C++ FFI methods for header: {}", include_file));
     let mut hash_name_to_methods: HashMap<String, Vec<_>> = HashMap::new();
-    for ref method in methods {
+    for method in methods {
       if !self.should_process_method(method) {
         continue;
       }
@@ -167,7 +165,7 @@ impl<'a> CGenerator<'a> {
     }
 
     let mut processed_methods = Vec::new();
-    for (key, mut values) in hash_name_to_methods.into_iter() {
+    for (key, mut values) in hash_name_to_methods {
       if values.len() == 1 {
         processed_methods.push(CppAndFfiMethod::new(values.remove(0), key.clone()));
         continue;
@@ -201,7 +199,7 @@ impl<'a> CGenerator<'a> {
         }
       } else {
         log::error(format!("values dump: {:?}\n", values));
-        log::error(format!("All type caption strategies have failed! Involved functions:"));
+        log::error("All type caption strategies have failed! Involved functions:");
         for value in values {
           log::error(format!("  {}", value.cpp_method.short_text()));
         }

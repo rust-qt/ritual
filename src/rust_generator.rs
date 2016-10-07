@@ -15,14 +15,14 @@ use utils::{CaseOperations, VecCaseOperations, WordIterator, add_to_multihash};
 use log;
 use qt_doc_parser::{QtDocData, QtDocResultForMethod};
 use doc_formatter;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, hash_map};
 use cpp_operator::CppOperator;
 use caption_strategy::TypeCaptionStrategy;
 
 pub use serializable::{RustProcessedTypeKind, RustProcessedTypeInfo};
 
 impl RustProcessedTypeInfo {
-  fn is_declared_in(&self, modules: &Vec<RustModule>) -> bool {
+  fn is_declared_in(&self, modules: &[RustModule]) -> bool {
     for module in modules {
       if module.types.iter().any(|t| match t.kind {
         RustTypeDeclarationKind::CppTypeWrapper { ref cpp_type_name,
@@ -61,10 +61,10 @@ fn operator_rust_name(operator: &CppOperator) -> String {
   }
 }
 
-/// If remove_qt_prefix is true, removes "Q" or "Qt"
+/// If `remove_qt_prefix` is true, removes "Q" or "Qt"
 /// if it is first word of the string and not the only one word.
 /// Also converts case of the words.
-fn remove_qt_prefix_and_convert_case(s: &String, case: Case, remove_qt_prefix: bool) -> String {
+fn remove_qt_prefix_and_convert_case(s: &str, case: Case, remove_qt_prefix: bool) -> String {
   let mut parts: Vec<_> = WordIterator::new(s).collect();
   if remove_qt_prefix && parts.len() > 1 {
     if parts[0] == "Q" || parts[0] == "q" || parts[0] == "Qt" {
@@ -78,10 +78,10 @@ fn remove_qt_prefix_and_convert_case(s: &String, case: Case, remove_qt_prefix: b
 }
 
 /// Removes ".h" from include file name and performs the same
-/// processing as remove_qt_prefix_and_convert_case() for snake case.
-fn include_file_to_module_name(include_file: &String, remove_qt_prefix: bool) -> String {
-  let mut r = include_file.clone();
-  if let Some(index) = r.find(".") {
+/// processing as `remove_qt_prefix_and_convert_case()` for snake case.
+fn include_file_to_module_name(include_file: &str, remove_qt_prefix: bool) -> String {
+  let mut r = include_file.to_string();
+  if let Some(index) = r.find('.') {
     r = r[0..index].to_string();
   }
   remove_qt_prefix_and_convert_case(&r, Case::Snake, remove_qt_prefix)
@@ -89,8 +89,8 @@ fn include_file_to_module_name(include_file: &String, remove_qt_prefix: bool) ->
 
 /// Adds "_" to a string if it is a reserved word in Rust
 #[cfg_attr(rustfmt, rustfmt_skip)]
-fn sanitize_rust_identifier(name: &String) -> String {
-  match name.as_ref() {
+fn sanitize_rust_identifier(name: &str) -> String {
+  match name {
     "abstract" | "alignof" | "as" | "become" | "box" | "break" | "const" |
     "continue" | "crate" | "do" | "else" | "enum" | "extern" | "false" |
     "final" | "fn" | "for" | "if" | "impl" | "in" | "let" | "loop" |
@@ -99,7 +99,7 @@ fn sanitize_rust_identifier(name: &String) -> String {
     "sizeof" | "static" | "struct" | "super" | "trait" | "true" | "type" |
     "typeof" | "unsafe" | "unsized" | "use" | "virtual" | "where" | "while" |
     "yield" => format!("{}_", name),
-    _ => name.clone()
+    _ => name.to_string()
   }
 }
 
@@ -109,24 +109,27 @@ fn sanitize_rust_identifier(name: &String) -> String {
 /// Rust does not allow such duplicates.
 /// - If there is only one variant, adds another variant.
 /// Rust does not allow repr(C) enums having only one variant.
-fn prepare_enum_values(values: &Vec<EnumValue>, name: &String) -> Vec<RustEnumValue> {
+fn prepare_enum_values(values: &[EnumValue], name: &str) -> Vec<RustEnumValue> {
   let mut value_to_variant: HashMap<i64, RustEnumValue> = HashMap::new();
   for variant in values {
     let value = variant.value;
-    if value_to_variant.contains_key(&value) {
-      log::warning(format!("warning: {}: duplicated enum variant removed: {} (previous variant: \
-                            {})",
-                           name,
-                           variant.name,
-                           value_to_variant.get(&value).unwrap().name));
-    } else {
-      value_to_variant.insert(value,
-                              RustEnumValue {
-                                name: sanitize_rust_identifier(&variant.name.to_class_case()),
-                                cpp_name: Some(variant.name.clone()),
-                                value: variant.value,
-                                doc: format!("C++ variant: {}", &variant.name),
-                              });
+    match value_to_variant.entry(value) {
+      hash_map::Entry::Occupied(entry) => {
+        log::warning(format!("warning: {}: duplicated enum variant removed: {} (previous \
+                              variant: {})",
+                             name,
+                             variant.name,
+                             entry.get().name));
+      }
+      hash_map::Entry::Vacant(entry) => {
+        entry.insert(RustEnumValue {
+          name: sanitize_rust_identifier(&variant.name.to_class_case()),
+          cpp_name: Some(variant.name.clone()),
+          value: variant.value,
+          doc: format!("C++ variant: {}", &variant.name),
+        });
+
+      }
     }
   }
   let more_than_one = value_to_variant.len() > 1;
@@ -141,8 +144,9 @@ fn prepare_enum_values(values: &Vec<EnumValue>, name: &String) -> Vec<RustEnumVa
                               name: "_Invalid".to_string(),
                               value: dummy_value as i64,
                               cpp_name: None,
-                              doc: format!("This variant is added in Rust because enums with one \
-                                            variant and C representation are not supported."),
+                              doc: "This variant is added in Rust because enums with one \
+                                            variant and C representation are not supported."
+                                .to_string(),
                             });
   }
   let mut result: Vec<_> = value_to_variant.into_iter()
@@ -209,7 +213,7 @@ pub struct RustGeneratorOutput {
   pub processed_types: Vec<RustProcessedTypeInfo>,
 }
 
-/// Config for rust_generator module.
+/// Config for `rust_generator` module.
 pub struct RustGeneratorConfig {
   /// Name of generated crate
   pub crate_name: String,
@@ -234,7 +238,7 @@ pub fn run(input_data: CppAndFfiData,
   };
   let mut modules = Vec::new();
   {
-    let mut cpp_methods = Vec::new();
+    let mut cpp_methods: Vec<&CppAndFfiMethod> = Vec::new();
     for header in &generator.input_data.cpp_ffi_headers {
       cpp_methods.extend(header.methods.iter());
     }
@@ -251,8 +255,8 @@ pub fn run(input_data: CppAndFfiData,
             t.cpp_name == info.class_type.name &&
             t.cpp_template_arguments == info.class_type.template_arguments
           }) {
-            log::warning(format!("Warning: method is skipped because class type is not \
-                                  available in Rust:"));
+            log::warning("Warning: method is skipped because class type is not \
+                                  available in Rust:");
             log::warning(format!("{}\n", method.short_text()));
             return false;
           }
@@ -289,7 +293,7 @@ pub fn run(input_data: CppAndFfiData,
       }
     }
     if !cpp_methods.is_empty() {
-      log::warning(format!("unprocessed cpp methods left:"));
+      log::warning("unprocessed cpp methods left:");
       for method in cpp_methods {
         log::warning(format!("  {}", method.cpp_method.short_text()));
         if method.cpp_method.class_membership.is_none() {
@@ -328,10 +332,10 @@ pub fn run(input_data: CppAndFfiData,
   }
 }
 
-/// Generates RustName for specified function or type name,
+/// Generates `RustName` for specified function or type name,
 /// including crate name and modules list.
-fn calculate_rust_name(name: &String,
-                       include_file: &String,
+fn calculate_rust_name(name: &str,
+                       include_file: &str,
                        is_function: bool,
                        operator: Option<&CppOperator>,
                        config: &RustGeneratorConfig)
@@ -352,7 +356,7 @@ fn calculate_rust_name(name: &String,
 
   let mut parts = Vec::new();
   parts.push(config.crate_name.clone());
-  parts.push(include_file_to_module_name(&include_file, config.remove_qt_prefix));
+  parts.push(include_file_to_module_name(include_file, config.remove_qt_prefix));
   for part in split_parts {
     parts.push(remove_qt_prefix_and_convert_case(&part.to_string(),
                                                  Case::Snake,
@@ -370,7 +374,7 @@ fn calculate_rust_name(name: &String,
 /// Generates Rust names and type information for all available C++ types.
 fn process_types(input_data: &CppAndFfiData,
                  config: &RustGeneratorConfig,
-                 dependency_types: &Vec<RustProcessedTypeInfo>)
+                 dependency_types: &[RustProcessedTypeInfo])
                  -> Vec<RustProcessedTypeInfo> {
   let mut result = Vec::new();
   for type_info in &input_data.cpp_data.types {
@@ -431,7 +435,7 @@ fn process_types(input_data: &CppAndFfiData,
   let mut any_success = true;
   while !name_failed_items.is_empty() {
     if !any_success {
-      log::warning(format!("Failed to generate Rust names for template types:"));
+      log::warning("Failed to generate Rust names for template types:");
       for r in name_failed_items {
         log::warning(format!("  {:?}\n  {}\n\n",
                              r,
@@ -468,10 +472,10 @@ struct ProcessFunctionsResult {
   overloading_types: Vec<RustTypeDeclaration>,
 }
 
-/// Generates CompleteType from CppFfiType, adding
+/// Generates `CompleteType` from `CppFfiType`, adding
 /// Rust API type, Rust FFI type and conversion between them.
-fn complete_type(processed_types: &Vec<RustProcessedTypeInfo>,
-                 dependency_types: &Vec<RustProcessedTypeInfo>,
+fn complete_type(processed_types: &[RustProcessedTypeInfo],
+                 dependency_types: &[RustProcessedTypeInfo],
                  cpp_ffi_type: &CppFfiType,
                  argument_meaning: &CppFfiArgumentMeaning)
                  -> Result<CompleteType, String> {
@@ -549,8 +553,8 @@ fn complete_type(processed_types: &Vec<RustProcessedTypeInfo>,
   })
 }
 
-fn find_type_info<'a, F>(processed_types: &'a Vec<RustProcessedTypeInfo>,
-                         dependency_types: &'a Vec<RustProcessedTypeInfo>,
+fn find_type_info<'a, F>(processed_types: &'a [RustProcessedTypeInfo],
+                         dependency_types: &'a [RustProcessedTypeInfo],
                          f: F)
                          -> Option<&'a RustProcessedTypeInfo>
   where F: Fn(&RustProcessedTypeInfo) -> bool
@@ -561,9 +565,9 @@ fn find_type_info<'a, F>(processed_types: &'a Vec<RustProcessedTypeInfo>,
   }
 }
 
-/// Converts CppType to its exact Rust equivalent (FFI-compatible)
-fn ffi_type(processed_types: &Vec<RustProcessedTypeInfo>,
-            dependency_types: &Vec<RustProcessedTypeInfo>,
+/// Converts `CppType` to its exact Rust equivalent (FFI-compatible)
+fn ffi_type(processed_types: &[RustProcessedTypeInfo],
+            dependency_types: &[RustProcessedTypeInfo],
             cpp_ffi_type: &CppType)
             -> Result<RustType, String> {
   let rust_name = match cpp_ffi_type.base {
@@ -611,7 +615,7 @@ fn ffi_type(processed_types: &Vec<RustProcessedTypeInfo>,
     CppTypeBase::Enum { ref name } => {
       match find_type_info(processed_types, dependency_types, |x| &x.cpp_name == name) {
         None => return Err(format!("Type has no Rust equivalent: {}", name)),
-        Some(ref info) => info.rust_name.clone(),
+        Some(info) => info.rust_name.clone(),
       }
     }
     CppTypeBase::Class(ref name_and_args) => {
@@ -620,14 +624,14 @@ fn ffi_type(processed_types: &Vec<RustProcessedTypeInfo>,
         &x.cpp_template_arguments == &name_and_args.template_arguments
       }) {
         None => return Err(format!("Type has no Rust equivalent: {:?}", name_and_args)),
-        Some(ref info) => info.rust_name.clone(),
+        Some(info) => info.rust_name.clone(),
       }
     }
     CppTypeBase::FunctionPointer { ref return_type,
                                    ref arguments,
                                    ref allows_variadic_arguments } => {
       if *allows_variadic_arguments {
-        return Err(format!("Function pointers with variadic arguments are not supported"));
+        return Err("Function pointers with variadic arguments are not supported".to_string());
       }
       let mut rust_args = Vec::new();
       for arg in arguments {
@@ -641,7 +645,7 @@ fn ffi_type(processed_types: &Vec<RustProcessedTypeInfo>,
     }
     CppTypeBase::TemplateParameter { .. } => panic!("invalid cpp type"),
   };
-  return Ok(RustType::Common {
+  Ok(RustType::Common {
     base: rust_name,
     is_const: cpp_ffi_type.is_const,
     is_const2: cpp_ffi_type.is_const2,
@@ -652,7 +656,7 @@ fn ffi_type(processed_types: &Vec<RustProcessedTypeInfo>,
       _ => return Err(format!("unsupported level of indirection: {:?}", cpp_ffi_type)),
     },
     generic_arguments: None,
-  });
+  })
 }
 
 
@@ -708,13 +712,7 @@ impl RustGenerator {
             .find(|x| &x.class_name == &flag_owner_name.to_string()) {
             if instantiations.instantiations
               .iter()
-              .find(|ins| {
-                ins.template_arguments
-                  .iter()
-                  .find(|&arg| arg == &template_arg_sample)
-                  .is_some()
-              })
-              .is_some() {
+              .any(|ins| ins.template_arguments.iter().any(|arg| arg == &template_arg_sample)) {
               is_flaggable = true;
               break;
             }
@@ -832,7 +830,7 @@ impl RustGenerator {
 
       for type_data in &self.processed_types {
         if check_name(&type_data.rust_name) {
-          let (mut result, tmp_cpp_methods) = self.process_type(&type_data, cpp_methods);
+          let (mut result, tmp_cpp_methods) = self.process_type(type_data, cpp_methods);
           cpp_methods = tmp_cpp_methods;
           module.types.push(result.main_type);
           rust_overloading_types.append(&mut result.overloading_types);
@@ -871,7 +869,7 @@ impl RustGenerator {
     assert!(free_functions_result.trait_impls.is_empty());
     module.functions = free_functions_result.methods;
     rust_overloading_types.append(&mut free_functions_result.overloading_types);
-    if rust_overloading_types.len() > 0 {
+    if !rust_overloading_types.is_empty() {
       rust_overloading_types.sort_by(|a, b| a.name.cmp(&b.name));
       module.submodules.push(RustModule {
         name: "overloading".to_string(),
@@ -1019,12 +1017,10 @@ impl RustGenerator {
     } else {
       let x = if method.cpp_method.is_constructor() {
         "new".to_string()
+      } else if let Some(ref operator) = method.cpp_method.operator {
+        operator_rust_name(operator)
       } else {
-        if let Some(ref operator) = method.cpp_method.operator {
-          operator_rust_name(operator)
-        } else {
-          method.cpp_method.name.to_snake_case()
-        }
+        method.cpp_method.name.to_snake_case()
       };
       RustName::new(vec![x])
     };
@@ -1040,7 +1036,7 @@ impl RustGenerator {
                         method: &CppAndFfiMethod,
                         scope: &RustMethodScope)
                         -> Result<TraitImpl, String> {
-    if let &RustMethodScope::Impl { ref type_name } = scope {
+    if let RustMethodScope::Impl { ref type_name } = *scope {
       match method.allocation_place {
         ReturnValueAllocationPlace::Stack => {
           let mut method = try!(self.generate_function(method, scope, true));
@@ -1119,7 +1115,7 @@ impl RustGenerator {
         method_name.parts.push(format!("{}_{}", name, caption));
       }
       trait_name = trait_name.to_class_case() + "Args";
-      if let &RustMethodScope::Impl { ref type_name } = scope {
+      if let RustMethodScope::Impl { ref type_name } = *scope {
         trait_name = format!("{}{}", type_name.last_name(), trait_name);
       }
       let method_name_with_scope = match first_method.scope {
@@ -1215,8 +1211,7 @@ impl RustGenerator {
         Some(arg) => vec![arg],
       };
       let trait_lifetime = if shared_arguments.iter()
-        .find(|x| x.argument_type.rust_api_type.is_ref())
-        .is_some() {
+        .any(|x| x.argument_type.rust_api_type.is_ref()) {
         Some("a".to_string())
       } else {
         None
@@ -1347,7 +1342,7 @@ impl RustGenerator {
         Err(msg) => log::warning(msg),
       }
     }
-    for (_method_name, current_methods) in single_rust_methods {
+    for (_, current_methods) in single_rust_methods {
       assert!(!current_methods.is_empty());
       // Step 2: for each method name, split methods by type of
       // their self argument. Overloading can't be emulated if self types
@@ -1358,7 +1353,7 @@ impl RustGenerator {
       }
       let use_self_arg_caption = self_kind_to_methods.len() > 1;
 
-      for (_self_arg_kind, overloaded_methods) in self_kind_to_methods {
+      for (_, overloaded_methods) in self_kind_to_methods {
         assert!(!overloaded_methods.is_empty());
         // Step 3: remove method duplicates with the same argument types. For example,
         // there can be method1(libc::c_int) and method1(i32). It's valid in C++,

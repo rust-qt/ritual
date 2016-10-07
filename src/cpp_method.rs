@@ -249,7 +249,7 @@ impl CppMethod {
                 arg.argument_type.to_cpp_pseudo_code(),
                 arg.name,
                 if arg.has_default_value {
-                  format!(" = ?")
+                  " = ?".to_string()
                 } else {
                   String::new()
                 })
@@ -320,7 +320,7 @@ impl CppMethod {
     }
     result.push(self.return_type.clone());
     if let Some(ref operator) = self.operator {
-      if let &CppOperator::Conversion(ref cpp_type) = operator {
+      if let CppOperator::Conversion(ref cpp_type) = *operator {
         result.push(cpp_type.clone());
       }
     }

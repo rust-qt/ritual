@@ -87,7 +87,7 @@ impl RustMethod {
       RustMethodArguments::SingleVariant(ref var) => &var.arguments,
       RustMethodArguments::MultipleVariants { ref shared_arguments, .. } => shared_arguments,
     };
-    if args.len() == 0 {
+    if args.is_empty() {
       RustMethodSelfArgKind::Static
     } else {
       let arg = args.get(0).unwrap();

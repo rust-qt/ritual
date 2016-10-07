@@ -117,7 +117,7 @@ impl CppTypeClassBase {
 
   pub fn instantiate_class(&self,
                            nested_level1: i32,
-                           template_arguments1: &Vec<CppType>)
+                           template_arguments1: &[CppType])
                            -> Result<CppTypeClassBase, String> {
     Ok(CppTypeClassBase {
       name: self.name.clone(),
@@ -138,31 +138,30 @@ impl CppTypeClassBase {
 impl CppTypeBase {
   #[allow(dead_code)]
   pub fn is_void(&self) -> bool {
-    match self {
-      &CppTypeBase::Void => true,
+    match *self {
+      CppTypeBase::Void => true,
       _ => false,
     }
   }
   pub fn is_class(&self) -> bool {
-    match self {
-      &CppTypeBase::Class(..) => true,
+    match *self {
+      CppTypeBase::Class(..) => true,
       _ => false,
     }
   }
   pub fn is_template_parameter(&self) -> bool {
-    match self {
-      &CppTypeBase::TemplateParameter { .. } => true,
+    match *self {
+      CppTypeBase::TemplateParameter { .. } => true,
       _ => false,
     }
   }
   pub fn is_or_contains_template_parameter(&self) -> bool {
-    match self {
-      &CppTypeBase::TemplateParameter { .. } => true,
-      &CppTypeBase::Class(CppTypeClassBase { ref template_arguments, .. }) => {
-        if let &Some(ref template_arguments) = template_arguments {
+    match *self {
+      CppTypeBase::TemplateParameter { .. } => true,
+      CppTypeBase::Class(CppTypeClassBase { ref template_arguments, .. }) => {
+        if let Some(ref template_arguments) = *template_arguments {
           template_arguments.iter()
-            .find(|arg| arg.base.is_or_contains_template_parameter())
-            .is_some()
+            .any(|arg| arg.base.is_or_contains_template_parameter())
         } else {
           false
         }
@@ -185,19 +184,22 @@ impl CppTypeBase {
     match *self {
       CppTypeBase::Void => Ok("void".to_string()),
       CppTypeBase::BuiltInNumeric(ref t) => Ok(t.to_cpp_code().to_string()),
-      CppTypeBase::Enum { ref name } => Ok(name.clone()),
-      CppTypeBase::SpecificNumeric { ref name, .. } => Ok(name.clone()),
+      CppTypeBase::Enum { ref name } |
+      CppTypeBase::SpecificNumeric { ref name, .. } |
       CppTypeBase::PointerSizedInteger { ref name, .. } => Ok(name.clone()),
+      //      CppTypeBase::SpecificNumeric { ref name, .. } => Ok(name.clone()),
+      //      CppTypeBase::PointerSizedInteger { ref name, .. } => Ok(name.clone()),
       CppTypeBase::Class(ref info) => info.to_cpp_code(),
       CppTypeBase::TemplateParameter { .. } => {
-        return Err(format!("template parameters are not allowed to produce C++ code without \
-                            instantiation"));
+        Err("template parameters are not allowed to produce C++ code without \
+                            instantiation"
+          .to_string())
       }
       CppTypeBase::FunctionPointer { ref return_type,
                                      ref arguments,
                                      ref allows_variadic_arguments } => {
         if *allows_variadic_arguments {
-          return Err(format!("Function pointers with variadic arguments are not supported"));
+          return Err("Function pointers with variadic arguments are not supported".to_string());
         }
         let mut arg_texts = Vec::new();
         for arg in arguments {
@@ -217,9 +219,9 @@ impl CppTypeBase {
   #[allow(dead_code)]
   pub fn maybe_name(&self) -> Option<&String> {
     match *self {
-      CppTypeBase::SpecificNumeric { ref name, .. } => Some(name),
-      CppTypeBase::PointerSizedInteger { ref name, .. } => Some(name),
-      CppTypeBase::Enum { ref name } => Some(name),
+      CppTypeBase::SpecificNumeric { ref name, .. } |
+      CppTypeBase::PointerSizedInteger { ref name, .. } |
+      CppTypeBase::Enum { ref name } |
       CppTypeBase::Class(CppTypeClassBase { ref name, .. }) => Some(name),
       _ => None,
     }
@@ -231,7 +233,7 @@ impl CppTypeBase {
     match *self {
       CppTypeBase::Void => "void".to_string(),
       CppTypeBase::BuiltInNumeric(ref t) => t.to_cpp_code().to_string().replace(" ", "_"),
-      CppTypeBase::SpecificNumeric { ref name, .. } => name.clone(),
+      CppTypeBase::SpecificNumeric { ref name, .. } |
       CppTypeBase::PointerSizedInteger { ref name, .. } => name.clone(),
       CppTypeBase::Enum { ref name } => name.replace("::", "_"),
       CppTypeBase::Class(ref data) => data.caption(),
@@ -258,7 +260,7 @@ impl CppTypeBase {
         return format!("T_{}_{}", nested_level, index);
       }
       CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) => {
-        if let &Some(ref template_arguments) = template_arguments {
+        if let Some(ref template_arguments) = *template_arguments {
           return format!("{}<{}>",
                          name,
                          template_arguments.iter()
@@ -296,7 +298,7 @@ impl CppType {
     !self.is_const && self.indirection == CppTypeIndirection::None && self.base == CppTypeBase::Void
   }
 
-  fn to_cpp_code_intermediate(&self, base_code: &String) -> String {
+  fn to_cpp_code_intermediate(&self, base_code: &str) -> String {
     format!("{}{}{}",
             if self.is_const { "const " } else { "" },
             base_code,
@@ -328,25 +330,27 @@ impl CppType {
   pub fn to_cpp_ffi_type(&self, role: CppTypeRole) -> Result<CppFfiType, String> {
     match self.base {
       CppTypeBase::TemplateParameter { .. } => {
-        return Err(format!("Unsupported type"));
+        return Err("Unsupported type".to_string());
       }
       CppTypeBase::FunctionPointer { ref return_type,
                                      ref arguments,
                                      ref allows_variadic_arguments } => {
         if *allows_variadic_arguments {
-          return Err(format!("Function pointers with variadic arguments are not supported"));
+          return Err("Function pointers with variadic arguments are not supported".to_string());
         }
         let mut all_types: Vec<&CppType> = arguments.iter().collect();
         all_types.push(return_type.as_ref());
         for arg in all_types {
           match arg.base {
             CppTypeBase::TemplateParameter { .. } => {
-              return Err(format!("Function pointers containing template parameters are not \
-                                  supported"));
+              return Err("Function pointers containing template parameters are not \
+                                  supported"
+                .to_string());
             }
             CppTypeBase::FunctionPointer { .. } => {
-              return Err(format!("Function pointers containing nested function pointers are not \
-                                  supported"));
+              return Err("Function pointers containing nested function pointers are not \
+                                  supported"
+                .to_string());
             }
             _ => {}
           }
@@ -354,14 +358,15 @@ impl CppType {
             CppTypeIndirection::Ref |
             CppTypeIndirection::PtrRef |
             CppTypeIndirection::RValueRef => {
-              return Err(format!("Function pointers containing references are not supported"));
+              return Err("Function pointers containing references are not supported".to_string());
             }
             CppTypeIndirection::Ptr |
             CppTypeIndirection::PtrPtr => {}
             CppTypeIndirection::None => {
               if arg.base.is_class() {
-                return Err(format!("Function pointers containing classes by value are not \
-                                    supported"));
+                return Err("Function pointers containing classes by value are not \
+                                    supported"
+                  .to_string());
               }
             }
           }
@@ -461,12 +466,12 @@ impl CppType {
         return false; // converted to uint in FFI
       }
     }
-    return self.indirection == CppTypeIndirection::None && self.base.is_class();
+    self.indirection == CppTypeIndirection::None && self.base.is_class()
   }
 
   pub fn instantiate(&self,
                      nested_level1: i32,
-                     template_arguments1: &Vec<CppType>)
+                     template_arguments1: &[CppType])
                      -> Result<CppType, String> {
     if let CppTypeBase::TemplateParameter { nested_level, index } = self.base {
       if nested_level == nested_level1 {

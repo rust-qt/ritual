@@ -56,13 +56,13 @@ pub struct QtDocResultForMethod {
 }
 
 
-fn arguments_from_declaration(declaration: &String) -> Option<Vec<&str>> {
-  match declaration.find("(") {
+fn arguments_from_declaration(declaration: &str) -> Option<Vec<&str>> {
+  match declaration.find('(') {
     None => None,
     Some(start_index) => {
-      match declaration.rfind(")") {
+      match declaration.rfind(')') {
         None => None,
-        Some(end_index) => Some(declaration[start_index + 1..end_index].split(",").collect()),
+        Some(end_index) => Some(declaration[start_index + 1..end_index].split(',').collect()),
       }
     }
   }
@@ -70,7 +70,7 @@ fn arguments_from_declaration(declaration: &String) -> Option<Vec<&str>> {
 
 }
 
-fn are_argument_types_equal(declaration1: &String, declaration2: &String) -> bool {
+fn are_argument_types_equal(declaration1: &str, declaration2: &str) -> bool {
   let args1 = match arguments_from_declaration(declaration1) {
     Some(r) => r,
     None => return false,
@@ -84,8 +84,8 @@ fn are_argument_types_equal(declaration1: &String, declaration2: &String) -> boo
   }
   fn arg_prepare(arg: &str) -> &str {
     let arg1 = arg.trim();
-    match arg1.find("=") {
-      Some(index) => &arg1[0..index].trim(),
+    match arg1.find('=') {
+      Some(index) => arg1[0..index].trim(),
       None => arg1,
     }
   }
@@ -97,8 +97,8 @@ fn are_argument_types_equal(declaration1: &String, declaration2: &String) -> boo
     }
   }
   for i in 0..args1.len() {
-    let arg1 = arg_prepare(&args1[i]);
-    let arg2 = arg_prepare(&args2[i]);
+    let arg1 = arg_prepare(args1[i]);
+    let arg2 = arg_prepare(args2[i]);
     let arg1_maybe_type = arg_to_type(arg1.as_ref());
     let arg2_maybe_type = arg_to_type(arg2.as_ref());
     let a1_orig = arg1.replace(" ", "");
@@ -164,9 +164,9 @@ impl QtDocData {
   }
 
   pub fn doc_for_method(&self,
-                        name: &String,
-                        parser_declaration: &String,
-                        method_short_text: &String)
+                        name: &str,
+                        parser_declaration: &str,
+                        method_short_text: &str)
                         -> Result<QtDocResultForMethod, String> {
     let mut name_parts: Vec<_> = name.split("::").collect();
     let mut anchor_override = None;
@@ -205,7 +205,7 @@ impl QtDocData {
               None => None,
             };
             for declaration in &[parser_declaration, method_short_text] {
-              let mut declaration_no_scope = (*declaration).clone();
+              let mut declaration_no_scope = declaration.to_string();
               if let Some((ref prefix1, ref prefix2)) = scope_prefix {
                 declaration_no_scope = declaration_no_scope.replace(prefix1, "")
                   .replace(prefix2, "");
@@ -231,7 +231,7 @@ impl QtDocData {
                   }
                   if &item_declaration_imprint == &query_imprint {
                     if item.text.find(|c| c != '\n').is_none() {
-                      return Err(format!("found empty documentation"));
+                      return Err("found empty documentation".to_string());
                     }
                     return Ok(QtDocResultForMethod {
                       text: item.text.clone(),
@@ -250,7 +250,7 @@ impl QtDocData {
                   }
                   if are_argument_types_equal(&declaration_no_scope, &item_declaration_imprint) {
                     if item.text.find(|c| c != '\n').is_none() {
-                      return Err(format!("found empty documentation"));
+                      return Err("found empty documentation".to_string());
                     }
                     return Ok(QtDocResultForMethod {
                       text: item.text.clone(),
@@ -272,7 +272,7 @@ impl QtDocData {
                                    candidates[0].declarations));
 
               if candidates[0].text.is_empty() {
-                return Err(format!("found empty documentation"));
+                return Err("found empty documentation".to_string());
               }
               return Ok(QtDocResultForMethod {
                 text: candidates[0].text.clone(),
@@ -287,12 +287,12 @@ impl QtDocData {
                   Short text: {}",
                                  parser_declaration,
                                  method_short_text));
-            log::warning(format!("Candidates:"));
+            log::warning("Candidates:");
             for item in &candidates {
               log::warning(format!("  {:?}", item.declarations));
             }
-            log::warning(format!(""));
-            return Err(format!("Declaration mismatch"));
+            log::warning("");
+            Err("Declaration mismatch".to_string())
           }
           None => Err(format!("No such file: {}", &item.file_name)),
         }
@@ -311,7 +311,7 @@ impl QtDocData {
       let anchor_node = match anchor.iter().next() {
         Some(r) => r,
         None => {
-          log::warning(format!("Failed to get anchor_node"));
+          log::warning("Failed to get anchor_node");
           continue;
         }
       };
@@ -331,7 +331,7 @@ impl QtDocData {
       let mut node = match h3.next() {
         Some(r) => r,
         None => {
-          log::warning(format!("Failed to find element next to h3_node"));
+          log::warning("Failed to find element next to h3_node");
           continue;
         }
       };
