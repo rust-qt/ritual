@@ -29,6 +29,7 @@ num_cpus = "1.0.0"
 select = "0.3.0" #html parsing library
 csv = "0.14.7"
 clap = "~2.10.0"
+clippy = {version = "*", optional = true}
 
 [build-dependencies]
 serde_codegen = "0.8"

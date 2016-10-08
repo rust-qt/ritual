@@ -151,6 +151,7 @@ impl CppCodeGenerator {
   }
 
   /// Generates code for the value returned by the FFI method.
+  #[cfg_attr(feature="clippy", allow(collapsible_if))]
   fn returned_expression(&self, method: &CppAndFfiMethod) -> String {
     let result = if method.cpp_method.is_destructor() {
       if let Some(arg) = method.c_signature
