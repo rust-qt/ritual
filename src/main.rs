@@ -54,5 +54,6 @@ fn main() {
     dependency_paths: dependency_paths,
     num_jobs: None,
     build_profile: BuildProfile::Debug,
+    extra_lib_paths: Vec::new(),
   });
 }

@@ -24,57 +24,8 @@ use cpp_ffi_generator::CppAndFfiData;
 use qt_doc_parser::QtDocData;
 use dependency_info::DependencyInfo;
 use std::env;
-
-
-/// Runs a command, checks that it is successful, and
-/// returns its output if requested
-fn run_command(command: &mut Command, fetch_stdout: bool) -> String {
-  log::info(format!("Executing command: {:?}", command));
-  if fetch_stdout {
-    match command.output() {
-      Ok(output) => {
-        match command.status() {
-          Ok(status) => {
-            if !status.success() {
-              panic!("Command failed: {:?} (status: {})", command, status);
-            }
-          }
-          Err(error) => {
-            panic!("Execution failed: {}", error);
-          }
-        }
-        String::from_utf8(output.stdout).unwrap()
-      }
-      Err(error) => {
-        panic!("Execution failed: {}", error);
-      }
-    }
-  } else {
-    match command.status() {
-      Ok(status) => {
-        if !status.success() {
-          panic!("Command failed: {:?} (status: {})", command, status);
-        }
-      }
-      Err(error) => {
-        panic!("Execution failed: {}", error);
-      }
-    }
-    String::new()
-  }
-}
-
-#[cfg_attr(feature="clippy", allow(or_fun_call))]
-fn add_env_path_item(env_var_name: &'static str,
-                     mut new_paths: Vec<PathBuf>)
-                     -> std::ffi::OsString {
-  for path in env::split_paths(&env::var(env_var_name).unwrap_or(String::new())) {
-    if new_paths.iter().find(|&x| x == &path).is_none() {
-      new_paths.push(path);
-    }
-  }
-  env::join_paths(new_paths).unwrap()
-}
+use utils::{run_command, add_env_path_item};
+use cpp_lib_builder::CppLibBuilder;
 
 pub enum BuildProfile {
   Debug,
@@ -88,6 +39,7 @@ pub struct BuildEnvironment {
   pub output_dir_path: PathBuf,
   pub source_dir_path: PathBuf,
   pub dependency_paths: Vec<PathBuf>,
+  pub extra_lib_paths: Vec<PathBuf>,
   pub num_jobs: Option<i32>,
   pub build_profile: BuildProfile,
 }
@@ -116,6 +68,7 @@ pub fn run_from_build_script() {
       a => panic!("unsupported profile: {}", a),
     },
     dependency_paths: dependency_paths,
+    extra_lib_paths: Vec::new(),
   });
 }
 
@@ -234,11 +187,12 @@ pub fn run(env: BuildEnvironment) {
     for dir in spec_lib_dirs {
       let absolute_dir = source_dir_path.with_added(dir);
       if !absolute_dir.exists() {
-        panic!("Include dir does not exist: {}", absolute_dir.display());
+        panic!("Library dir does not exist: {}", absolute_dir.display());
       }
       cpp_lib_dirs.push(fs::canonicalize(absolute_dir).unwrap());
     }
   }
+  cpp_lib_dirs.extend_from_slice(&env.extra_lib_paths);
   if framework_dirs.is_empty() {
     link_items.push(RustLinkItem {
       name: lib_spec.cpp.name.clone(),
@@ -390,50 +344,18 @@ pub fn run(env: BuildEnvironment) {
     let c_lib_build_path = c_lib_parent_path.with_added("build");
     fs::create_dir_all(&c_lib_build_path).unwrap();
     fs::create_dir_all(&c_lib_install_path).unwrap();
-    let mut cmake_command = Command::new("cmake");
-    fn path_without_long_path(pathbuf: &PathBuf) -> &str {
-      let path = pathbuf.to_str().unwrap();
-      if path.starts_with(r"\\?\") {
-        let result = &path[4..];
-        if result.len() > 255 {
-          panic!("This path can't be longer than 255 symbols: {}", result);
-        }
-        result
-      } else {
-        path
-      }
-    }
-    cmake_command.arg(&path_without_long_path(&c_lib_path))
-      .arg(format!("-DCMAKE_INSTALL_PREFIX={}",
-                   path_without_long_path(&c_lib_install_path)))
-      .current_dir(path_without_long_path(&c_lib_build_path));
-    if is_msvc() {
-      cmake_command.arg("-G").arg("NMake Makefiles");
-      // Rust always links to release version of MSVC runtime, so
-      // link will fail if C library is built in debug mode
-      cmake_command.arg("-DCMAKE_BUILD_TYPE=Release");
-    }
-    // TODO: enable release mode on other platforms if cargo is in release mode
-    // (maybe build C library in both debug and release in separate folders)
-    run_command(&mut cmake_command, false);
 
-    let make_command_name = if is_msvc() { "nmake" } else { "make" }.to_string();
-    let mut make_args = Vec::new();
-    if !is_msvc() {
-      // nmake doesn't support multiple jobs
-      // TODO: allow to use jom
-      make_args.push(format!("-j{}", num_jobs));
-    }
-    make_args.push("install".to_string());
-    let mut make_command = Command::new(make_command_name);
-    make_command.args(&make_args)
-      .current_dir(path_without_long_path(&c_lib_build_path));
-    if c_lib_is_shared && !cpp_lib_dirs.is_empty() {
-      for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB"] {
-        make_command.env(name, add_env_path_item(name, cpp_lib_dirs.clone()));
+    CppLibBuilder {
+      cmake_source_dir: &c_lib_path,
+      build_dir: &c_lib_build_path,
+      install_dir: &c_lib_install_path,
+      num_jobs: num_jobs,
+      linker_env_library_dirs: if c_lib_is_shared {
+        Some(&cpp_lib_dirs)
+      } else {
+        None
       }
-    }
-    run_command(&mut make_command, false);
+    }.run();
 
     let crate_new_path = output_dir_path.with_added(format!("{}.new", &input_cargo_toml_data.name));
     if crate_new_path.as_path().exists() {
