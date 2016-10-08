@@ -666,7 +666,7 @@ fn instantiate1() {
     is_const2: false,
     base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
   };
-  let r = type1.instantiate(0, &vec![type2]).unwrap();
+  let r = type1.instantiate(0, &[type2]).unwrap();
   assert_eq!(r.base,
              CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool));
   assert_eq!(r.indirection, CppTypeIndirection::PtrRef);

@@ -308,12 +308,11 @@ impl QtDocData {
     let h3s = doc.find(And(Name("h3"), Class("fn")));
     for h3 in h3s.iter() {
       let anchor = h3.find(And(Name("a"), Attr("name", ())));
-      let anchor_node = match anchor.iter().next() {
-        Some(r) => r,
-        None => {
-          log::warning("Failed to get anchor_node");
-          continue;
-        }
+      let anchor_node = if let Some(r) = anchor.iter().next() {
+        r
+      } else {
+        log::warning("Failed to get anchor_node");
+        continue;
       };
       let anchor_text = anchor_node.attr("name").unwrap().to_string();
       let mut main_declaration = h3.text()
@@ -328,12 +327,11 @@ impl QtDocData {
       }
       let mut declarations = vec![main_declaration];
       let mut result = String::new();
-      let mut node = match h3.next() {
-        Some(r) => r,
-        None => {
-          log::warning("Failed to find element next to h3_node");
-          continue;
-        }
+      let mut node = if let Some(r) = h3.next() {
+        r
+      } else {
+        log::warning("Failed to find element next to h3_node");
+        continue;
       };
       loop {
         if node.name() == Some("h3") {

@@ -315,6 +315,7 @@ impl CppData {
   /// A method will not be added if there is a method with the same
   /// name in the derived class. Constructors, destructors and assignment
   /// operators are also not added. This reflects C++'s method inheritance rules.
+  #[cfg_attr(feature="clippy", allow(block_in_if_condition_stmt))]
   pub fn add_inherited_methods(&mut self, dependencies: &[&CppData]) {
     log::info("Adding inherited methods");
     let mut all_new_methods = Vec::new();
@@ -437,7 +438,7 @@ impl CppData {
   pub fn generate_methods_with_omitted_args(&mut self) {
     let mut new_methods = Vec::new();
     for method in &self.methods {
-      if method.arguments.len() > 0 && method.arguments.last().unwrap().has_default_value {
+      if !method.arguments.is_empty() && method.arguments.last().unwrap().has_default_value {
         let mut method_copy = method.clone();
         method_copy.arguments_before_omitting = Some(method.arguments.clone());
         while !method_copy.arguments.is_empty() &&

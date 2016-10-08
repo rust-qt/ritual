@@ -30,10 +30,10 @@ impl<S, S2, X> JoinWithString<S2> for X
 {
   fn join(self, separator: S2) -> String {
     self.fold("".to_string(), |a, b| {
-      let m = if !a.is_empty() {
-        a + separator.as_ref()
-      } else {
+      let m = if a.is_empty() {
         a
+      } else {
+        a + separator.as_ref()
       };
       m + b.as_ref()
     })
@@ -241,11 +241,13 @@ fn iterator_to_snake_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String
   it.map(|x| x.as_ref().to_lowercase()).join("_")
 }
 
+#[cfg_attr(feature="clippy", allow(needless_range_loop))]
 fn replace_all_sub_vecs(parts: &mut Vec<String>, needle: Vec<&str>) {
   let mut any_found = true;
   while any_found {
     any_found = false;
     if parts.len() + 1 >= needle.len() {
+      // TODO: maybe rewrite this
       for i in 0..parts.len() + 1 - needle.len() {
         if &parts[i..i + needle.len()] == &needle[..] {
           for _ in 0..needle.len() - 1 {

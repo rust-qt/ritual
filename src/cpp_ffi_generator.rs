@@ -83,14 +83,12 @@ impl<'a> CGenerator<'a> {
       }
     }
     if let Some(ref membership) = method.class_membership {
-      if membership.kind == CppMethodKind::Constructor {
-        let class_name = &membership.class_type.name;
-        if self.cpp_data.has_pure_virtual_methods(class_name) {
-          log::noisy(format!("Method is skipped:\n{}\nConstructors are not allowed for abstract \
-                              classes.\n",
-                             method.short_text()));
-          return false;
-        }
+      if membership.kind == CppMethodKind::Constructor &&
+         self.cpp_data.has_pure_virtual_methods(&class_name) {
+        log::noisy(format!("Method is skipped:\n{}\nConstructors are not allowed for abstract \
+                            classes.\n",
+                           method.short_text()));
+        return false;
       }
       if membership.visibility == CppVisibility::Private {
         return false;

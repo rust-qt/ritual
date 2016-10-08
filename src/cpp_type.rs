@@ -155,6 +155,12 @@ impl CppTypeBase {
       _ => false,
     }
   }
+  pub fn is_function_pointer(&self) -> bool {
+    match *self {
+      CppTypeBase::FunctionPointer { .. } => true,
+      _ => false,
+    }
+  }
   pub fn is_or_contains_template_parameter(&self) -> bool {
     match *self {
       CppTypeBase::TemplateParameter { .. } => true,
@@ -173,13 +179,8 @@ impl CppTypeBase {
   pub fn to_cpp_code(&self,
                      function_pointer_inner_text: Option<&String>)
                      -> Result<String, String> {
-    match *self {
-      CppTypeBase::FunctionPointer { .. } => {}
-      _ => {
-        if function_pointer_inner_text.is_some() {
-          return Err("unexpected function_pointer_inner_text".to_string());
-        }
-      }
+    if !self.is_function_pointer() && function_pointer_inner_text.is_some() {
+      return Err("unexpected function_pointer_inner_text".to_string());
     }
     match *self {
       CppTypeBase::Void => Ok("void".to_string()),
@@ -327,6 +328,7 @@ impl CppType {
   /// Converts this C++ type to its adaptation for FFI interface,
   /// removing all features not supported by C ABI
   /// (e.g. references and passing objects by value)
+  #[cfg_attr(feature="clippy", allow(collapsible_if))]
   pub fn to_cpp_ffi_type(&self, role: CppTypeRole) -> Result<CppFfiType, String> {
     match self.base {
       CppTypeBase::TemplateParameter { .. } => {
@@ -469,6 +471,7 @@ impl CppType {
     self.indirection == CppTypeIndirection::None && self.base.is_class()
   }
 
+  #[cfg_attr(feature="clippy", allow(if_not_else))]
   pub fn instantiate(&self,
                      nested_level1: i32,
                      template_arguments1: &[CppType])

@@ -46,15 +46,12 @@ impl CppCodeGenerator {
     let name_with_args = format!("{}({})",
                                  method.c_name,
                                  method.c_signature.arguments_to_cpp_code().unwrap());
-    match method.c_signature.return_type.ffi_type.base {
-      CppTypeBase::FunctionPointer { .. } => {
-        method.c_signature.return_type.ffi_type.to_cpp_code(Some(&name_with_args)).unwrap()
-      }
-      _ => {
-        format!("{} {}",
-                method.c_signature.return_type.ffi_type.to_cpp_code(None).unwrap(),
-                name_with_args)
-      }
+    if let CppTypeBase::FunctionPointer { .. } = method.c_signature.return_type.ffi_type.base {
+      method.c_signature.return_type.ffi_type.to_cpp_code(Some(&name_with_args)).unwrap()
+    } else {
+      format!("{} {}",
+              method.c_signature.return_type.ffi_type.to_cpp_code(None).unwrap(),
+              name_with_args)
     }
   }
 

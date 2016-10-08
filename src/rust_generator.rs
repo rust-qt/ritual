@@ -64,6 +64,7 @@ fn operator_rust_name(operator: &CppOperator) -> String {
 /// If `remove_qt_prefix` is true, removes "Q" or "Qt"
 /// if it is first word of the string and not the only one word.
 /// Also converts case of the words.
+#[cfg_attr(feature="clippy", allow(collapsible_if))]
 fn remove_qt_prefix_and_convert_case(s: &str, case: Case, remove_qt_prefix: bool) -> String {
   let mut parts: Vec<_> = WordIterator::new(s).collect();
   if remove_qt_prefix && parts.len() > 1 {
@@ -226,6 +227,8 @@ pub struct RustGeneratorConfig {
 // TODO: implement removal of arbitrary prefixes (#25)
 
 /// Execute processing
+#[cfg_attr(feature="clippy", allow(extend_from_slice))]
+#[cfg_attr(feature="clippy", allow(block_in_if_condition_stmt))]
 pub fn run(input_data: CppAndFfiData,
            dependency_rust_types: Vec<RustProcessedTypeInfo>,
            config: RustGeneratorConfig)
@@ -1096,7 +1099,7 @@ impl RustGenerator {
       let first_method = filtered_methods[0].clone();
       let (self_argument, cpp_method_name) =
         if let RustMethodArguments::SingleVariant(ref args) = first_method.arguments {
-          let self_argument = if args.arguments.len() > 0 && args.arguments[0].name == "self" {
+          let self_argument = if !args.arguments.is_empty() && args.arguments[0].name == "self" {
             Some(args.arguments[0].clone())
           } else {
             None
@@ -1317,6 +1320,7 @@ impl RustGenerator {
   /// Generates methods, trait implementations and overloading types
   /// for all specified methods. All methods must either be in the same
   /// RustMethodScope::Impl scope or be free functions in the same module.
+  #[cfg_attr(feature="clippy", allow(for_kv_map))]
   fn process_functions<'b, I>(&self, methods: I, scope: &RustMethodScope) -> ProcessFunctionsResult
     where I: Iterator<Item = &'b CppAndFfiMethod>
   {
@@ -1494,15 +1498,15 @@ fn calculate_rust_name_test() {
 
 #[test]
 fn prepare_enum_values_test_simple() {
-  let r = prepare_enum_values(&vec![EnumValue {
-                                      name: "var1".to_string(),
-                                      value: 1,
-                                    },
-                                    EnumValue {
-                                      name: "other_var2".to_string(),
-                                      value: 2,
-                                    }],
-                              &String::new());
+  let r = prepare_enum_values(&[EnumValue {
+                                  name: "var1".to_string(),
+                                  value: 1,
+                                },
+                                EnumValue {
+                                  name: "other_var2".to_string(),
+                                  value: 2,
+                                }],
+                              "");
   assert_eq!(r.len(), 2);
   assert_eq!(r[0].name, "Var1");
   assert_eq!(r[0].value, 1);
@@ -1512,19 +1516,19 @@ fn prepare_enum_values_test_simple() {
 
 #[test]
 fn prepare_enum_values_test_duplicates() {
-  let r = prepare_enum_values(&vec![EnumValue {
-                                      name: "var1".to_string(),
-                                      value: 1,
-                                    },
-                                    EnumValue {
-                                      name: "other_var2".to_string(),
-                                      value: 2,
-                                    },
-                                    EnumValue {
-                                      name: "other_var_dup".to_string(),
-                                      value: 2,
-                                    }],
-                              &String::new());
+  let r = prepare_enum_values(&[EnumValue {
+                                  name: "var1".to_string(),
+                                  value: 1,
+                                },
+                                EnumValue {
+                                  name: "other_var2".to_string(),
+                                  value: 2,
+                                },
+                                EnumValue {
+                                  name: "other_var_dup".to_string(),
+                                  value: 2,
+                                }],
+                              "");
   assert_eq!(r.len(), 2);
   assert_eq!(r[0].name, "Var1");
   assert_eq!(r[0].value, 1);
@@ -1534,19 +1538,19 @@ fn prepare_enum_values_test_duplicates() {
 
 #[test]
 fn prepare_enum_values_test_prefix() {
-  let r = prepare_enum_values(&vec![EnumValue {
-                                      name: "OptionGood".to_string(),
-                                      value: 1,
-                                    },
-                                    EnumValue {
-                                      name: "OptionBad".to_string(),
-                                      value: 2,
-                                    },
-                                    EnumValue {
-                                      name: "OptionNecessaryEvil".to_string(),
-                                      value: 3,
-                                    }],
-                              &String::new());
+  let r = prepare_enum_values(&[EnumValue {
+                                  name: "OptionGood".to_string(),
+                                  value: 1,
+                                },
+                                EnumValue {
+                                  name: "OptionBad".to_string(),
+                                  value: 2,
+                                },
+                                EnumValue {
+                                  name: "OptionNecessaryEvil".to_string(),
+                                  value: 3,
+                                }],
+                              "");
   assert_eq!(r.len(), 3);
   assert_eq!(r[0].name, "Good");
   assert_eq!(r[1].name, "Bad");
@@ -1555,19 +1559,19 @@ fn prepare_enum_values_test_prefix() {
 
 #[test]
 fn prepare_enum_values_test_suffix() {
-  let r = prepare_enum_values(&vec![EnumValue {
-                                      name: "BestFriend".to_string(),
-                                      value: 1,
-                                    },
-                                    EnumValue {
-                                      name: "GoodFriend".to_string(),
-                                      value: 2,
-                                    },
-                                    EnumValue {
-                                      name: "NoFriend".to_string(),
-                                      value: 3,
-                                    }],
-                              &String::new());
+  let r = prepare_enum_values(&[EnumValue {
+                                  name: "BestFriend".to_string(),
+                                  value: 1,
+                                },
+                                EnumValue {
+                                  name: "GoodFriend".to_string(),
+                                  value: 2,
+                                },
+                                EnumValue {
+                                  name: "NoFriend".to_string(),
+                                  value: 3,
+                                }],
+                              "");
   assert_eq!(r.len(), 3);
   assert_eq!(r[0].name, "Best");
   assert_eq!(r[1].name, "Good");
@@ -1576,15 +1580,15 @@ fn prepare_enum_values_test_suffix() {
 
 #[test]
 fn prepare_enum_values_test_prefix_digits() {
-  let r = prepare_enum_values(&vec![EnumValue {
-                                      name: "Base32".to_string(),
-                                      value: 1,
-                                    },
-                                    EnumValue {
-                                      name: "Base64".to_string(),
-                                      value: 2,
-                                    }],
-                              &String::new());
+  let r = prepare_enum_values(&[EnumValue {
+                                  name: "Base32".to_string(),
+                                  value: 1,
+                                },
+                                EnumValue {
+                                  name: "Base64".to_string(),
+                                  value: 2,
+                                }],
+                              "");
   assert_eq!(r.len(), 2);
   assert_eq!(r[0].name, "Base32");
   assert_eq!(r[1].name, "Base64");
@@ -1592,15 +1596,15 @@ fn prepare_enum_values_test_prefix_digits() {
 
 #[test]
 fn prepare_enum_values_test_suffix_empty() {
-  let r = prepare_enum_values(&vec![EnumValue {
-                                      name: "NonRecursive".to_string(),
-                                      value: 1,
-                                    },
-                                    EnumValue {
-                                      name: "Recursive".to_string(),
-                                      value: 2,
-                                    }],
-                              &String::new());
+  let r = prepare_enum_values(&[EnumValue {
+                                  name: "NonRecursive".to_string(),
+                                  value: 1,
+                                },
+                                EnumValue {
+                                  name: "Recursive".to_string(),
+                                  value: 2,
+                                }],
+                              "");
   assert_eq!(r.len(), 2);
   assert_eq!(r[0].name, "NonRecursive");
   assert_eq!(r[1].name, "Recursive");
@@ -1608,15 +1612,15 @@ fn prepare_enum_values_test_suffix_empty() {
 
 #[test]
 fn prepare_enum_values_test_suffix_partial() {
-  let r = prepare_enum_values(&vec![EnumValue {
-                                      name: "PreciseTimer".to_string(),
-                                      value: 1,
-                                    },
-                                    EnumValue {
-                                      name: "CoarseTimer".to_string(),
-                                      value: 2,
-                                    }],
-                              &String::new());
+  let r = prepare_enum_values(&[EnumValue {
+                                  name: "PreciseTimer".to_string(),
+                                  value: 1,
+                                },
+                                EnumValue {
+                                  name: "CoarseTimer".to_string(),
+                                  value: 2,
+                                }],
+                              "");
   assert_eq!(r.len(), 2);
   assert_eq!(r[0].name, "Precise");
   assert_eq!(r[1].name, "Coarse");

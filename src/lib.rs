@@ -10,7 +10,7 @@
 #![cfg_attr(feature="clippy", warn(shadow_unrelated))]
 #![cfg_attr(feature="clippy", warn(single_match_else))]
 
-// sometime in the future...
+// some time in the future...
 // #![warn(option_unwrap_used)]
 // #![warn(result_unwrap_used)]
 // #![warn(print_stdout)]

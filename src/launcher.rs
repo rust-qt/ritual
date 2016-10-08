@@ -64,6 +64,7 @@ fn run_command(command: &mut Command, fetch_stdout: bool) -> String {
   }
 }
 
+#[cfg_attr(feature="clippy", allow(or_fun_call))]
 fn add_env_path_item(env_var_name: &'static str,
                      mut new_paths: Vec<PathBuf>)
                      -> std::ffi::OsString {
@@ -119,6 +120,7 @@ pub fn run_from_build_script() {
 }
 
 // TODO: simplify this function
+#[cfg_attr(feature="clippy", allow(cyclomatic_complexity))]
 pub fn run(env: BuildEnvironment) {
   // canonicalize paths
   if !env.source_dir_path.as_path().exists() {
@@ -136,8 +138,10 @@ pub fn run(env: BuildEnvironment) {
   if !lib_spec_path.exists() {
     panic!("Lib spec file does not exist: {}", lib_spec_path.display());
   }
-  let file = File::open(&lib_spec_path).unwrap();
-  let lib_spec: LibSpec = serde_json::from_reader(file).unwrap();
+  let lib_spec: LibSpec = {
+    let file = File::open(&lib_spec_path).unwrap();
+    serde_json::from_reader(file).unwrap()
+  };
 
   log::info("Reading input Cargo.toml");
   let input_cargo_toml_path = source_dir_path.with_added("Cargo.toml");
@@ -255,22 +259,19 @@ pub fn run(env: BuildEnvironment) {
   let qt_doc_data = if is_qt_library {
     // TODO: find a better way to specify doc source (#35)
     let env_var_name = format!("{}_DOC_DATA", lib_spec.cpp.name.to_uppercase());
-    match std::env::var(&env_var_name) {
-      Ok(env_var_value) => {
-        log::info(format!("Loading Qt doc data from {}", &env_var_value));
-        match QtDocData::new(&PathBuf::from(&env_var_value)) {
-          Ok(r) => Some(r),
-          Err(msg) => {
-            log::warning(format!("Failed to load Qt doc data: {}", msg));
-            None
-          }
+    if let Ok(env_var_value) = std::env::var(&env_var_name) {
+      log::info(format!("Loading Qt doc data from {}", &env_var_value));
+      match QtDocData::new(&PathBuf::from(&env_var_value)) {
+        Ok(r) => Some(r),
+        Err(msg) => {
+          log::warning(format!("Failed to load Qt doc data: {}", msg));
+          None
         }
       }
-      Err(_) => {
-        log::warning(format!("Building without Qt doc data (no env var: {})",
-                             env_var_name));
-        None
-      }
+    } else {
+      log::warning(format!("Building without Qt doc data (no env var: {})",
+                           env_var_name));
+      None
     }
   } else {
     None
@@ -313,37 +314,34 @@ pub fn run(env: BuildEnvironment) {
       None
     };
 
-    let parse_result = match loaded_parse_result {
-      Some(r) => r,
-      None => {
-        log::info("Parsing C++ headers.");
-        let mut parse_result = cpp_parser::run(cpp_parser::CppParserConfig {
-                                                 include_dirs: include_dirs.clone(),
-                                                 framework_dirs: framework_dirs.clone(),
-                                                 header_name: lib_spec.cpp.include_file.clone(),
-                                                 target_include_dirs: target_include_dirs,
-                                                 tmp_cpp_path: output_dir_path.with_added("1.cpp"),
-                                                 name_blacklist: lib_spec.cpp
-                                                   .name_blacklist
-                                                   .clone()
-                                                   .unwrap_or_default(),
-                                               },
-                                               &dependency_cpp_types);
-        if is_qt_library {
-          if let Some(ref qt_this_lib_headers_dir) = qt_this_lib_headers_dir {
-            qt_specific::fix_header_names(&mut parse_result, qt_this_lib_headers_dir);
-          }
+    let parse_result = loaded_parse_result.unwrap_or_else(|| {
+      log::info("Parsing C++ headers.");
+      let mut parse_result = cpp_parser::run(cpp_parser::CppParserConfig {
+                                               include_dirs: include_dirs.clone(),
+                                               framework_dirs: framework_dirs.clone(),
+                                               header_name: lib_spec.cpp.include_file.clone(),
+                                               target_include_dirs: target_include_dirs,
+                                               tmp_cpp_path: output_dir_path.with_added("1.cpp"),
+                                               name_blacklist: lib_spec.cpp
+                                                 .name_blacklist
+                                                 .clone()
+                                                 .unwrap_or_default(),
+                                             },
+                                             &dependency_cpp_types);
+      if is_qt_library {
+        if let Some(ref qt_this_lib_headers_dir) = qt_this_lib_headers_dir {
+          qt_specific::fix_header_names(&mut parse_result, qt_this_lib_headers_dir);
         }
-        log::info("Post-processing parse result.");
-        parse_result.post_process(&dependencies.iter().map(|x| &x.cpp_data).collect::<Vec<_>>());
-
-        let mut file = File::create(&parse_result_cache_file_path).unwrap();
-        serde_json::to_writer(&mut file, &parse_result).unwrap();
-        log::info(format!("Header parse result is saved to file: {}",
-                          parse_result_cache_file_path.to_str().unwrap()));
-        parse_result
       }
-    };
+      log::info("Post-processing parse result.");
+      parse_result.post_process(&dependencies.iter().map(|x| &x.cpp_data).collect::<Vec<_>>());
+
+      let mut file = File::create(&parse_result_cache_file_path).unwrap();
+      serde_json::to_writer(&mut file, &parse_result).unwrap();
+      log::info(format!("Header parse result is saved to file: {}",
+                        parse_result_cache_file_path.to_str().unwrap()));
+      parse_result
+    });
 
     let c_lib_name = format!("{}_c", &input_cargo_toml_data.name);
     let c_lib_path = c_lib_parent_path.with_added("source");

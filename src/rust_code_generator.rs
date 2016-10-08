@@ -170,15 +170,12 @@ pub struct RustCodeGenerator {
 impl RustCodeGenerator {
   /// Generates cargo file and skeleton of the crate
   pub fn generate_template(&self) {
-    match self.config.rustfmt_config_path {
-      Some(ref path) => {
-        fs::copy(path, self.config.output_path.with_added("rustfmt.toml")).unwrap();
-      }
-      None => {
-        let mut rustfmt_file = File::create(self.config.output_path.with_added("rustfmt.toml"))
-          .unwrap();
-        rustfmt_file.write(include_bytes!("../templates/crate/rustfmt.toml")).unwrap();
-      }
+    if let Some(ref path) = self.config.rustfmt_config_path {
+      fs::copy(path, self.config.output_path.with_added("rustfmt.toml")).unwrap();
+    } else {
+      let mut rustfmt_file = File::create(self.config.output_path.with_added("rustfmt.toml"))
+        .unwrap();
+      rustfmt_file.write(include_bytes!("../templates/crate/rustfmt.toml")).unwrap();
     };
 
     {
@@ -461,22 +458,21 @@ impl RustCodeGenerator {
     match func.arguments {
       RustMethodArguments::SingleVariant(ref variant) => {
         let body = self.generate_ffi_call(variant, &Vec::new());
-        let return_type_for_signature = match variant.return_type.rust_api_type {
-          RustType::Void => String::new(),
-          _ => {
-            format!(" -> {}",
-                    self.rust_type_to_code(&variant.return_type.rust_api_type))
-          }
+        let return_type_for_signature = if variant.return_type.rust_api_type == RustType::Void {
+          String::new()
+        } else {
+          format!(" -> {}",
+                  self.rust_type_to_code(&variant.return_type.rust_api_type))
         };
         let all_lifetimes: Vec<_> = variant.arguments
           .iter()
           .filter_map(|x| x.argument_type.rust_api_type.lifetime())
           .collect();
-        let lifetimes_text = if !all_lifetimes.is_empty() {
+        let lifetimes_text = if all_lifetimes.is_empty() {
+          String::new()
+        } else {
           format!("<{}>",
                   all_lifetimes.iter().map(|x| format!("'{}", x)).join(", "))
-        } else {
-          String::new()
         };
 
         format!("{doc}{maybe_pub}fn {name}{lifetimes_text}({args}){return_type} {{\n{body}}}\n\n",
@@ -520,6 +516,7 @@ impl RustCodeGenerator {
     }
   }
 
+  #[cfg_attr(feature="clippy", allow(collapsible_if))]
   pub fn generate_lib_file(&self, modules: &[&String]) {
     let mut lib_file_path = self.config.output_path.clone();
     lib_file_path.push("src");
@@ -588,6 +585,7 @@ impl RustCodeGenerator {
     self.call_rustfmt(&lib_file_path);
   }
 
+  #[cfg_attr(feature="clippy", allow(single_match_else))]
   fn generate_module_code(&self, data: &RustModule) -> String {
     let mut results = Vec::new();
     let mut used_crates: Vec<_> =
@@ -691,16 +689,13 @@ impl RustCodeGenerator {
             let tuple_item_types: Vec<_> = variant.arguments
               .iter()
               .map(|t| {
-                match final_lifetime {
-                  Some(ref lifetime) => {
-                    self.rust_type_to_code(&t.argument_type
-                      .rust_api_type
-                      .with_lifetime(lifetime.to_string()))
-                  }
-                  None => {
-                    self.rust_type_to_code(&t.argument_type
-                      .rust_api_type)
-                  }
+                if let Some(ref lifetime) = final_lifetime {
+                  self.rust_type_to_code(&t.argument_type
+                    .rust_api_type
+                    .with_lifetime(lifetime.to_string()))
+                } else {
+                  self.rust_type_to_code(&t.argument_type
+                    .rust_api_type)
                 }
               })
               .collect();
