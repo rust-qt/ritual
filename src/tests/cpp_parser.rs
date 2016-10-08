@@ -48,6 +48,7 @@ fn run_parser(code: &'static str) -> CppData {
   result
 }
 
+#[test]
 fn simple_func() {
   let data = run_parser("int func1(int x);");
   assert!(data.template_instantiations.is_empty());
@@ -86,6 +87,7 @@ fn simple_func() {
              });
 }
 
+#[test]
 fn simple_func_with_default_value() {
   let data = run_parser("bool func1(int x = 42) {\nreturn false;\n}");
   assert!(data.template_instantiations.is_empty());
@@ -124,6 +126,7 @@ fn simple_func_with_default_value() {
              });
 }
 
+#[test]
 fn functions_with_class_arg() {
   let data = run_parser("class Magic { public: int a, b; };
   bool func1(Magic x);
@@ -269,6 +272,7 @@ fn functions_with_class_arg() {
              });
 }
 
+#[test]
 fn func_with_unknown_type() {
   let data = run_parser("class SomeClass; \n int func1(SomeClass* x);");
   assert!(data.template_instantiations.is_empty());
@@ -276,6 +280,7 @@ fn func_with_unknown_type() {
   assert!(data.methods.is_empty());
 }
 
+#[test]
 fn variadic_func() {
   let data = run_parser("int my_printf ( const char * format, ... );");
   assert!(data.template_instantiations.is_empty());
@@ -314,6 +319,7 @@ fn variadic_func() {
              });
 }
 
+#[test]
 fn free_template_func() {
   let data = run_parser("template<typename T> T abs(T value) { return 2*value; }");
   assert!(data.template_instantiations.is_empty());
@@ -361,6 +367,7 @@ fn free_template_func() {
              });
 }
 
+#[test]
 fn free_func_operator_sub() {
   for code in &["class C1 {}; \n C1 operator-(C1 a, C1 b);",
                 "class C1 {}; \n C1 operator -(C1 a, C1 b);"] {
@@ -421,6 +428,7 @@ fn free_func_operator_sub() {
   }
 }
 
+#[test]
 fn simple_class_method() {
   let data = run_parser("class MyClass {
     public:
@@ -487,6 +495,7 @@ fn simple_class_method() {
 }
 
 #[cfg_attr(feature="clippy", allow(cyclomatic_complexity))]
+#[test]
 fn advanced_class_methods() {
   let data = run_parser("class MyClass {
     public:
@@ -567,6 +576,7 @@ fn advanced_class_methods() {
              });
 }
 
+#[test]
 fn template_class_method() {
   let data = run_parser("
   template<class T>
@@ -649,6 +659,7 @@ fn template_class_method() {
              });
 }
 
+#[test]
 fn template_class_template_method() {
   let data = run_parser("
   template<class T>
@@ -691,7 +702,7 @@ fn template_class_template_method() {
 
 }
 
-
+#[test]
 fn simple_enum() {
   let data = run_parser("
   enum Enum1 {
@@ -713,6 +724,7 @@ fn simple_enum() {
              });
 }
 
+#[test]
 fn simple_enum2() {
   let data = run_parser("
   namespace ns1 {
@@ -741,6 +753,7 @@ fn simple_enum2() {
              });
 }
 
+#[test]
 fn template_instantiation() {
   let data = run_parser("
   template<typename T> class Vector {};
@@ -783,6 +796,7 @@ fn template_instantiation() {
     .template_arguments == &vec![int]);
 }
 
+#[test]
 fn derived_class_simple() {
   let data = run_parser("class Base {}; class Derived : public Base {};");
   assert!(data.types.len() == 2);
@@ -813,6 +827,7 @@ fn derived_class_simple() {
   }
 }
 
+#[test]
 fn derived_class_simple_private() {
   let data = run_parser("class Base {}; class Derived : Base {};");
   assert!(data.types.len() == 2);
@@ -843,7 +858,7 @@ fn derived_class_simple_private() {
   }
 }
 
-
+#[test]
 fn derived_class_simple_virtual() {
   let data = run_parser("class Base {}; class Derived : public virtual Base {};");
   assert!(data.types.len() == 2);
@@ -874,7 +889,7 @@ fn derived_class_simple_virtual() {
   }
 }
 
-
+#[test]
 fn derived_class_multiple() {
   let data = run_parser("
     class Base1 {}; class Base2 {};
@@ -916,6 +931,7 @@ fn derived_class_multiple() {
   }
 }
 
+#[test]
 fn class_with_use() {
   let data = run_parser("class A { public: int m1(); };
   class B { public: double m1(); };
@@ -935,6 +951,7 @@ fn class_with_use() {
   }
 }
 
+#[test]
 fn complex_const_types() {
   let data = run_parser("
     int f0();
@@ -1022,7 +1039,7 @@ fn complex_const_types() {
              });
 }
 
-
+#[test]
 fn anon_enum() {
   let data = run_parser("class X {
     enum { v1, v2 } field;
@@ -1036,6 +1053,7 @@ fn anon_enum() {
   }
 }
 
+#[test]
 fn non_type_template_parameter() {
   let data = run_parser("\
   template<int> struct QAtomicOpsSupport { enum { IsSupported = 0 }; };
@@ -1043,30 +1061,3 @@ fn non_type_template_parameter() {
   assert!(data.types.is_empty());
 }
 
-#[test]
-fn tests() {
-  // clang can't be used from multiple threads, so these checks
-  // must be run consequently
-  simple_func();
-  simple_func_with_default_value();
-  functions_with_class_arg();
-  func_with_unknown_type();
-  variadic_func();
-  free_template_func();
-  free_func_operator_sub();
-  simple_class_method();
-  advanced_class_methods();
-  template_class_method();
-  template_class_template_method();
-  simple_enum();
-  simple_enum2();
-  template_instantiation();
-  derived_class_simple();
-  derived_class_simple_private();
-  derived_class_simple_virtual();
-  derived_class_multiple();
-  class_with_use();
-  complex_const_types();
-  anon_enum();
-  non_type_template_parameter();
-}

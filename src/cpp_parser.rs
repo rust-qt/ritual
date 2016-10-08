@@ -136,9 +136,28 @@ pub struct CppParserConfig {
   pub name_blacklist: Vec<String>,
 }
 
+#[cfg(test)]
+fn init_clang() -> Clang {
+  use std;
+  for _ in 0..20 {
+    if let Ok(clang) = Clang::new() {
+      return clang;
+    }
+    std::thread::sleep(std::time::Duration::from_millis(100));
+  }
+  panic!("clang init failed");
+}
+
+#[cfg(not(test))]
+fn init_clang() -> Clang {
+  Clang::new().unwrap_or_else(|err| panic!("clang init failed: {:?}", err))
+}
+
+
+
 #[cfg_attr(feature="clippy", allow(block_in_if_condition_stmt))]
 fn run_clang<R, F: Fn(Entity) -> R>(config: &CppParserConfig, cpp_code: Option<String>, f: F) -> R {
-  let clang = Clang::new().unwrap_or_else(|err| panic!("clang init failed: {:?}", err));
+  let clang = init_clang();
   let index = Index::new(&clang, false, false);
   {
     let mut tmp_file = File::create(&config.tmp_cpp_path).unwrap();
