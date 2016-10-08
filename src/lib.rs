@@ -20,6 +20,7 @@ mod cpp_code_generator;
 mod caption_strategy;
 mod cpp_data;
 mod cpp_ffi_data;
+mod cpp_lib_builder;
 mod cpp_method;
 mod cpp_type;
 mod cpp_operator;

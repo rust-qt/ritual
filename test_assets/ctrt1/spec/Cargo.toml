@@ -1,0 +1,13 @@
+[package]
+authors = ["Pavel Strakhov <ri@idzaaus.org>"]
+build = "build.rs"
+name = "ctrt1"
+version = "0.0.0"
+links = "ctrt1"
+
+[dependencies]
+libc = "0.2"
+cpp_utils = "0.0"
+
+[build-dependencies]
+cpp_to_rust = "0.1"

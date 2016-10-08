@@ -4,6 +4,7 @@ mod cpp_method;
 mod cpp_ffi_data;
 mod cpp_operator;
 mod cpp_parser;
+mod full_run;
 
 // Testing plan:
 //

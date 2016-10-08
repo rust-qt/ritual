@@ -1060,4 +1060,3 @@ fn non_type_template_parameter() {
   template<> struct QAtomicOpsSupport<4> { enum { IsSupported = 1 }; };");
   assert!(data.types.is_empty());
 }
-

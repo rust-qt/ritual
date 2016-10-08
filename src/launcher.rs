@@ -346,16 +346,17 @@ pub fn run(env: BuildEnvironment) {
     fs::create_dir_all(&c_lib_install_path).unwrap();
 
     CppLibBuilder {
-      cmake_source_dir: &c_lib_path,
-      build_dir: &c_lib_build_path,
-      install_dir: &c_lib_install_path,
-      num_jobs: num_jobs,
-      linker_env_library_dirs: if c_lib_is_shared {
-        Some(&cpp_lib_dirs)
-      } else {
-        None
+        cmake_source_dir: &c_lib_path,
+        build_dir: &c_lib_build_path,
+        install_dir: &c_lib_install_path,
+        num_jobs: num_jobs,
+        linker_env_library_dirs: if c_lib_is_shared {
+          Some(&cpp_lib_dirs)
+        } else {
+          None
+        },
       }
-    }.run();
+      .run();
 
     let crate_new_path = output_dir_path.with_added(format!("{}.new", &input_cargo_toml_data.name));
     if crate_new_path.as_path().exists() {

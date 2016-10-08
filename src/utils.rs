@@ -336,8 +336,8 @@ pub fn run_command(command: &mut Command, fetch_stdout: bool) -> String {
 
 #[cfg_attr(feature="clippy", allow(or_fun_call))]
 pub fn add_env_path_item(env_var_name: &'static str,
-                     mut new_paths: Vec<PathBuf>)
-                     -> std::ffi::OsString {
+                         mut new_paths: Vec<PathBuf>)
+                         -> std::ffi::OsString {
   for path in env::split_paths(&env::var(env_var_name).unwrap_or(String::new())) {
     if new_paths.iter().find(|&x| x == &path).is_none() {
       new_paths.push(path);
