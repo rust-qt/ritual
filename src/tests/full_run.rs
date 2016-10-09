@@ -6,9 +6,17 @@ use launcher::{BuildEnvironment, InvokationMethod, BuildProfile};
 use launcher;
 extern crate tempdir;
 
+fn manifest_dir() -> PathBuf {
+  let mut path = env!("CARGO_MANIFEST_DIR");
+  if path.starts_with(r"\\?\") {
+    path = &path[4..];
+  }
+  PathBuf::from(path)
+}
+
 fn build_cpp_lib() -> tempdir::TempDir {
   let cpp_lib_source_dir = {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut path = manifest_dir();
     path.push("test_assets");
     path.push("ctrt1");
     path.push("cpp");
@@ -44,7 +52,7 @@ fn full_run() {
   assert!(cpp_install_lib_dir.exists());
   temp_dir.into_path(); //DEBUG
   let lib_spec_dir = {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut path = manifest_dir();
     path.push("test_assets");
     path.push("ctrt1");
     path.push("spec");

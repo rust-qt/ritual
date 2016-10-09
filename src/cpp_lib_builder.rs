@@ -10,29 +10,13 @@ pub struct CppLibBuilder<'a> {
   pub linker_env_library_dirs: Option<&'a Vec<PathBuf>>,
 }
 
-fn path_without_long_path(pathbuf: &PathBuf) -> &str {
-  // cmake suffers from weird file globbing issues
-  // when source dir starts with "\\?\" prefix
-  let path = pathbuf.to_str().unwrap();
-  if path.starts_with(r"\\?\") {
-    let result = &path[4..];
-    if result.len() > 255 {
-      panic!("This path can't be longer than 255 symbols: {}", result);
-    }
-    result
-  } else {
-    path
-  }
-}
-
-
 impl<'a> CppLibBuilder<'a> {
   pub fn run(self) {
     let mut cmake_command = Command::new("cmake");
-    cmake_command.arg(&path_without_long_path(self.cmake_source_dir))
+    cmake_command.arg(self.cmake_source_dir)
       .arg(format!("-DCMAKE_INSTALL_PREFIX={}",
-                   path_without_long_path(self.install_dir)))
-      .current_dir(path_without_long_path(self.build_dir));
+                   self.install_dir.to_str().unwrap()))
+      .current_dir(self.build_dir);
     if is_msvc() {
       cmake_command.arg("-G").arg("NMake Makefiles");
       // Rust always links to release version of MSVC runtime, so
@@ -53,7 +37,7 @@ impl<'a> CppLibBuilder<'a> {
     make_args.push("install".to_string());
     let mut make_command = Command::new(make_command_name);
     make_command.args(&make_args)
-      .current_dir(path_without_long_path(self.build_dir));
+      .current_dir(self.build_dir);
     if let Some(linker_env_library_dirs) = self.linker_env_library_dirs {
       if !linker_env_library_dirs.is_empty() {
         for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB"] {

@@ -72,6 +72,15 @@ pub fn run_from_build_script() {
   });
 }
 
+fn my_canonicalize(path: &PathBuf) -> PathBuf {
+  let r = fs::canonicalize(path).unwrap();
+  if r.to_str().unwrap().starts_with(r"\\?\") {
+    PathBuf::from(&r.to_str().unwrap()[4..])
+  } else {
+    r
+  }
+}
+
 // TODO: simplify this function
 #[cfg_attr(feature="clippy", allow(cyclomatic_complexity))]
 pub fn run(env: BuildEnvironment) {
@@ -82,8 +91,8 @@ pub fn run(env: BuildEnvironment) {
   if !env.output_dir_path.as_path().exists() {
     fs::create_dir_all(&env.output_dir_path).unwrap();
   }
-  let output_dir_path = fs::canonicalize(&env.output_dir_path).unwrap();
-  let source_dir_path = fs::canonicalize(&env.source_dir_path).unwrap();
+  let output_dir_path = my_canonicalize(&env.output_dir_path);
+  let source_dir_path = my_canonicalize(&env.source_dir_path);
 
   let lib_spec_path = source_dir_path.with_added("spec.json");
 
@@ -118,7 +127,7 @@ pub fn run(env: BuildEnvironment) {
           panic!("Target include dir does not exist: {}",
                  absolute_dir.display());
         }
-        fs::canonicalize(absolute_dir).unwrap()
+        my_canonicalize(&absolute_dir)
       })
       .collect()
   });
@@ -180,7 +189,7 @@ pub fn run(env: BuildEnvironment) {
       if !absolute_dir.exists() {
         panic!("Include dir does not exist: {}", absolute_dir.display());
       }
-      include_dirs.push(fs::canonicalize(absolute_dir).unwrap());
+      include_dirs.push(my_canonicalize(&absolute_dir));
     }
   }
   if let Some(ref spec_lib_dirs) = lib_spec.cpp.lib_dirs {
@@ -189,7 +198,7 @@ pub fn run(env: BuildEnvironment) {
       if !absolute_dir.exists() {
         panic!("Library dir does not exist: {}", absolute_dir.display());
       }
-      cpp_lib_dirs.push(fs::canonicalize(absolute_dir).unwrap());
+      cpp_lib_dirs.push(my_canonicalize(&absolute_dir));
     }
   }
   cpp_lib_dirs.extend_from_slice(&env.extra_lib_paths);
@@ -235,7 +244,7 @@ pub fn run(env: BuildEnvironment) {
   }
   let dependencies: Vec<_> = env.dependency_paths
     .iter()
-    .map(|path| DependencyInfo::load(&fs::canonicalize(path).unwrap()))
+    .map(|path| DependencyInfo::load(&my_canonicalize(path)))
     .collect();
 
   let c_lib_parent_path = output_dir_path.with_added("c_lib");
@@ -447,7 +456,7 @@ pub fn run(env: BuildEnvironment) {
         command.arg(format!("-j{}", num_jobs));
         command.current_dir(&output_dir_path);
         if !all_cpp_lib_dirs.is_empty() {
-          for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB"] {
+          for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB", "PATH"] {
             command.env(name, add_env_path_item(name, all_cpp_lib_dirs.clone()));
           }
         }

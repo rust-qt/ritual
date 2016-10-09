@@ -1,7 +1,7 @@
 [package]
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 build = "build.rs"
-name = "ctrt1"
+name = "rust_ctrt1"
 version = "0.0.0"
 links = "ctrt1"
 
