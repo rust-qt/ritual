@@ -45,7 +45,6 @@ rustup toolchain list || goto :error
 where rustc cargo || goto :error
 rustc -vV || goto :error
 cargo -vV || goto :error
-exit
 
 echo "Setting VS environment"
 call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64 || goto :error
