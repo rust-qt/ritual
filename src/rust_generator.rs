@@ -11,7 +11,8 @@ use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKin
                 RustMethodArguments, TraitImpl, TraitName, RustEnumValue};
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_ffi_data::CppFfiArgumentMeaning;
-use utils::{CaseOperations, VecCaseOperations, WordIterator, add_to_multihash};
+use string_utils::{CaseOperations, VecCaseOperations, WordIterator};
+use utils::add_to_multihash;
 use log;
 use qt_doc_parser::{QtDocData, QtDocResultForMethod};
 use doc_formatter;

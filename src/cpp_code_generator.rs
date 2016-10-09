@@ -7,7 +7,7 @@ use log;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
-use utils::JoinWithString;
+use string_utils::JoinWithString;
 use std::path::PathBuf;
 use file_utils::PathBufWithAdded;
 use utils::is_msvc;

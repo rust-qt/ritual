@@ -30,6 +30,7 @@ mod dependency_info;
 mod doc_formatter;
 mod errors;
 mod file_utils;
+pub mod launcher;
 pub mod log;
 mod qt_doc_parser;
 mod qt_specific;
@@ -40,7 +41,7 @@ mod rust_type;
 mod utils;
 mod cpp_parser;
 mod serializable;
-pub mod launcher;
+mod string_utils;
 
 #[cfg(test)]
 mod tests;

@@ -1,5 +1,5 @@
 use caption_strategy::ArgumentCaptionStrategy;
-use utils::JoinWithString;
+use string_utils::JoinWithString;
 use cpp_type::CppTypeBase;
 use cpp_type::CppType;
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};

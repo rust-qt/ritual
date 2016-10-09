@@ -2,7 +2,7 @@ use cpp_ffi_data::{CppFfiType, IndirectionChange};
 use caption_strategy::TypeCaptionStrategy;
 pub use serializable::{CppBuiltInNumericType, CppSpecificNumericTypeKind, CppTypeBase, CppType,
                        CppTypeIndirection, CppTypeClassBase};
-use utils::JoinWithString;
+use string_utils::JoinWithString;
 extern crate regex;
 
 impl CppTypeIndirection {

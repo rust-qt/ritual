@@ -4,7 +4,7 @@ use cpp_ffi_data::CppFfiFunctionSignature;
 use cpp_ffi_data::{CppFfiFunctionArgument, CppFfiArgumentMeaning};
 use cpp_ffi_data::CppMethodWithFfiSignature;
 use cpp_data::CppVisibility;
-use utils::JoinWithString;
+use string_utils::JoinWithString;
 pub use serializable::{CppFunctionArgument, CppMethodKind, CppMethod, CppMethodClassMembership,
                        CppMethodInheritedFrom};
 use cpp_operator::CppOperator;

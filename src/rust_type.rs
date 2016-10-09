@@ -1,7 +1,6 @@
 use cpp_type::CppType;
 use cpp_ffi_data::IndirectionChange;
-use utils::JoinWithString;
-use utils::CaseOperations;
+use string_utils::{JoinWithString, CaseOperations};
 pub use serializable::RustName;
 extern crate libc;
 

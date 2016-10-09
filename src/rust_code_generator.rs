@@ -7,12 +7,12 @@ use std::io::{Read, Write};
 use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
                 RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope,
                 RustMethodArgument, TraitName};
-use utils::JoinWithString;
+use string_utils::JoinWithString;
 use log;
 use file_utils::{PathBufWithAdded, copy_recursively};
 use utils::is_msvc;
 use std::panic;
-use utils::CaseOperations;
+use string_utils::CaseOperations;
 use rust_generator::RustGeneratorOutput;
 
 extern crate rustfmt;
