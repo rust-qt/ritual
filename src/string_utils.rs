@@ -42,6 +42,13 @@ impl<'a> WordIterator<'a> {
   }
 }
 
+fn char_at(str: &str, index: usize) -> char {
+  if index >= str.len() {
+    panic!("char_at: index out of bounds");
+  }
+  str[index..index + 1].chars().next().unwrap()
+}
+
 impl<'a> Iterator for WordIterator<'a> {
   type Item = &'a str;
   fn next(&mut self) -> Option<&'a str> {
@@ -54,8 +61,8 @@ impl<'a> Iterator for WordIterator<'a> {
     let mut i = self.index;
     let mut word_case = WordCase::Lower;
     while i < self.string.len() {
-      let current = &self.string[i..i + 1].chars().next().unwrap();
-      if current == &'_' {
+      let current = char_at(&self.string, i);
+      if current == '_' {
         break;
       }
       if i - self.index == 0 {
@@ -69,7 +76,7 @@ impl<'a> Iterator for WordIterator<'a> {
         if current.is_uppercase() {
           if word_case == WordCase::Capitalized {
             let next_not_upper = if i + 1 < self.string.len() {
-              !self.string[i + 1..i + 2].chars().next().unwrap().is_uppercase()
+              !char_at(&self.string, i + 1).is_uppercase()
             } else {
               true
             };

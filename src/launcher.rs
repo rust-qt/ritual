@@ -470,12 +470,15 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
         command.current_dir(&output_dir_path);
         if !all_cpp_lib_dirs.is_empty() {
           for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB", "PATH"] {
-            command.env(name, add_env_path_item(name, all_cpp_lib_dirs.clone()));
+            let value = try!(add_env_path_item(name, all_cpp_lib_dirs.clone())
+              .chain_err(|| ErrorKind::AddEnvFailed));
+            command.env(name, value);
           }
         }
         if !framework_dirs.is_empty() {
           command.env("DYLD_FRAMEWORK_PATH",
-                      add_env_path_item("DYLD_FRAMEWORK_PATH", framework_dirs.clone()));
+                      try!(add_env_path_item("DYLD_FRAMEWORK_PATH", framework_dirs.clone())
+                        .chain_err(|| ErrorKind::AddEnvFailed)));
         }
         if is_msvc() && *cargo_cmd == "test" {
           // cargo doesn't pass this flag to rustc when it compiles qt_core,

@@ -43,8 +43,9 @@ impl<'a> CppLibBuilder<'a> {
     if let Some(linker_env_library_dirs) = self.linker_env_library_dirs {
       if !linker_env_library_dirs.is_empty() {
         for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB"] {
-          make_command.env(name,
-                           add_env_path_item(name, (*linker_env_library_dirs).clone()));
+          let value = try!(add_env_path_item(name, (*linker_env_library_dirs).clone())
+            .chain_err(|| ErrorKind::AddEnvFailed));
+          make_command.env(name, value);
         }
       }
     }
