@@ -16,20 +16,26 @@ name = "cpp_to_rust_bin"
 path = "src/main.rs"
 
 [dependencies]
-serde = "0.8"
-serde_json = "0.8"
-ansi_term = "0.7"
-clang = "0.12.0"
-regex = "0.1"
-rustfmt = "0.6"
+
 libc = "0.2"
-toml = "0.2"
-tempdir = "0.3.5"
-num_cpus = "1.0.0"
-select = "0.3.0" #html parsing library
-csv = "0.14.7"
-clap = "~2.10.0"
-clippy = {version = "*", optional = true}
+regex = "0.1"
+
+serde = "0.8"       # serialization
+serde_json = "0.8"
+
+clang = "0.12.0"    # C++ parsing
+toml = "0.2"        # toml parsing
+select = "0.3.0"    # html parsing
+csv = "0.14.7"      # csv parsing
+
+clap = "~2.10.0"    # command line args parsing
+tempdir = "0.3.5"   # temporary directory creation
+num_cpus = "1.0.0"  # detect preferred task count
+
+ansi_term = "0.7"   # colored output
+rustfmt = "0.6"     # Rust code formatting
+
+clippy = {version = "*", optional = true} # linter
 
 [build-dependencies]
 serde_codegen = "0.8"
