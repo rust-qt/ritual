@@ -63,6 +63,9 @@ pub fn run(cpp_data: &CppData, cpp_lib_spec: CppLibSpec) -> Vec<CppFfiHeaderData
       });
     }
   }
+  if c_headers.is_empty() {
+    panic!("No FFI headers generated");
+  }
   c_headers
 }
 

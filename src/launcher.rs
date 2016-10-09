@@ -112,6 +112,11 @@ pub fn run(env: BuildEnvironment) {
            input_cargo_toml_path.display());
   }
   let input_cargo_toml_data = InputCargoTomlData::from_file(&input_cargo_toml_path);
+  if lib_spec.cpp.name == input_cargo_toml_data.name {
+    panic!("Rust crate must not have the same name as C++ library ({}) \
+            because it can cause library name conflict.",
+           lib_spec.cpp.name);
+  }
   log::info(format!("C++ library name: {}", lib_spec.cpp.name));
 
   let is_qt_library = lib_spec.cpp.name.starts_with("Qt5");
