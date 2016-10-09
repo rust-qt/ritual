@@ -66,9 +66,5 @@ pub fn add_env_path_item(env_var_name: &'static str,
 }
 
 pub fn manifest_dir() -> PathBuf {
-  let mut path = env!("CARGO_MANIFEST_DIR");
-  if path.starts_with(r"\\?\") {
-    path = &path[4..];
-  }
-  PathBuf::from(path)
+  PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
