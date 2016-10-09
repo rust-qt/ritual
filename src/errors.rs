@@ -10,10 +10,14 @@ error_chain! {
   errors {
     CreateDirFailed(path: String)
     ReadDirFailed(path: String)
-    ReadDirItemFailed
+    ReadDirItemFailed(path: String)
     RemoveDirAllFailed(path: String)
     RemoveFileFailed(path: String)
     MoveOneFileFailed { from: String, to: String }
     MoveFilesFailed { from: String, to: String }
+    CopyRecursivelyFailed { from: String, to: String }
+    CopyFileFailed { from: String, to: String }
+    ReadFileFailed(path: String)
+    RenameFileFailed { from: String, to: String }
   }
 }

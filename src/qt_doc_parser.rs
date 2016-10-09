@@ -4,7 +4,7 @@ extern crate csv;
 
 use std::path::PathBuf;
 use std::collections::HashMap;
-use utils::PathBufPushTweak;
+use file_utils::PathBufWithAdded;
 use std::fs;
 use std::fs::File;
 use std::io::Read;

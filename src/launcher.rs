@@ -4,7 +4,7 @@ extern crate num_cpus;
 use std;
 use std::fs;
 use std::fs::File;
-use utils::PathBufPushTweak;
+use file_utils::{PathBufWithAdded, move_files};
 use utils::is_msvc;
 
 use std::path::PathBuf;
@@ -13,7 +13,6 @@ use cpp_code_generator::CppCodeGenerator;
 use log;
 use cpp_parser;
 use qt_specific;
-use utils;
 use cpp_ffi_generator;
 use rust_info::{InputCargoTomlData, RustExportInfo};
 use rust_code_generator;
@@ -352,7 +351,7 @@ pub fn run(env: BuildEnvironment) {
                                        .collect::<Vec<_>>());
     code_gen.generate_files(&cpp_ffi_headers);
 
-    utils::move_files(&c_lib_tmp_path, &c_lib_path).unwrap();
+    move_files(&c_lib_tmp_path, &c_lib_path).unwrap();
 
     log::info("Building C wrapper library.");
     let c_lib_build_path = c_lib_parent_path.with_added("build");
@@ -436,8 +435,8 @@ pub fn run(env: BuildEnvironment) {
 
     for item in fs::read_dir(&crate_new_path).unwrap() {
       let item = item.unwrap();
-      utils::move_files(&crate_new_path.with_added(item.file_name()),
-                        &output_dir_path.with_added(item.file_name()))
+      move_files(&crate_new_path.with_added(item.file_name()),
+                 &output_dir_path.with_added(item.file_name()))
         .unwrap();
     }
     fs::remove_dir(&crate_new_path).unwrap();

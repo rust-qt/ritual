@@ -29,6 +29,7 @@ mod cpp_operator;
 mod dependency_info;
 mod doc_formatter;
 mod errors;
+mod file_utils;
 pub mod log;
 mod qt_doc_parser;
 mod qt_specific;

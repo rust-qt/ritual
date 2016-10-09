@@ -3,7 +3,7 @@ use rust_info::RustExportInfo;
 use std::path::PathBuf;
 use std::fs::File;
 
-use utils::PathBufPushTweak;
+use file_utils::PathBufWithAdded;
 
 extern crate serde_json;
 

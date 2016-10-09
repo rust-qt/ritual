@@ -9,7 +9,7 @@ use std::fs::File;
 use std::io::Write;
 use utils::JoinWithString;
 use std::path::PathBuf;
-use utils::PathBufPushTweak;
+use file_utils::PathBufWithAdded;
 use utils::is_msvc;
 use cpp_type::{CppTypeIndirection, CppTypeBase};
 

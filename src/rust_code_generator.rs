@@ -7,9 +7,9 @@ use std::io::{Read, Write};
 use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
                 RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope,
                 RustMethodArgument, TraitName};
-use utils::{JoinWithString, copy_recursively};
+use utils::JoinWithString;
 use log;
-use utils::PathBufPushTweak;
+use file_utils::{PathBufWithAdded, copy_recursively};
 use utils::is_msvc;
 use std::panic;
 use utils::CaseOperations;
