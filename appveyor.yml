@@ -1,6 +1,6 @@
 build_script: scripts\appveyor.bat
 
 cache:
-- 'target'
-- '%USERPROFILE%\.cargo'
-- '%USERPROFILE%\.multirust'
+#- 'target'
+#- '%USERPROFILE%\.cargo'
+#- '%USERPROFILE%\.multirust'
