@@ -21,6 +21,12 @@ if "%APPVEYOR_BUILD_FOLDER%"=="" (
   set BUILD_DIR=%APPVEYOR_BUILD_FOLDER%
 )
 
+
+if "%APPVEYOR%"=="True" (
+  echo "Appveyor detected. Forcing quiet mode."
+  set CPP_TO_RUST_QUIET=1
+)
+
 set PATH=%USERPROFILE%\.cargo\bin;%PATH%
 
 rustup show
