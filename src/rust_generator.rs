@@ -1172,7 +1172,7 @@ impl RustGenerator {
             cpp_method_key.arguments = cpp_method_key.arguments_before_omitting.unwrap();
             cpp_method_key.arguments_before_omitting = None;
           }
-          add_to_multihash(&mut grouped_by_cpp_method, &cpp_method_key, args.clone());
+          add_to_multihash(&mut grouped_by_cpp_method, cpp_method_key, args.clone());
           args_variants.push(args);
         } else {
           unreachable!()
@@ -1342,7 +1342,7 @@ impl RustGenerator {
       match self.generate_function(method, scope, false) {
         Ok(rust_method) => {
           let name = rust_method.name.last_name().clone();
-          add_to_multihash(&mut single_rust_methods, &name, rust_method);
+          add_to_multihash(&mut single_rust_methods, name, rust_method);
         }
         Err(msg) => log::warning(msg),
       }
@@ -1354,7 +1354,7 @@ impl RustGenerator {
       // differ.
       let mut self_kind_to_methods: HashMap<_, Vec<_>> = HashMap::new();
       for method in current_methods {
-        add_to_multihash(&mut self_kind_to_methods, &method.self_arg_kind(), method);
+        add_to_multihash(&mut self_kind_to_methods, method.self_arg_kind(), method);
       }
       let use_self_arg_caption = self_kind_to_methods.len() > 1;
 

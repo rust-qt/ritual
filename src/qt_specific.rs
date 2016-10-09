@@ -26,7 +26,7 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) {
       if let Some(matches) = re.captures(file_content_string.as_ref()) {
         let real_header = matches.at(1).unwrap().to_string();
         let fancy_header = header.file_name().into_string().unwrap();
-        add_to_multihash(&mut map_real_to_all_fancy, &real_header, fancy_header);
+        add_to_multihash(&mut map_real_to_all_fancy, real_header, fancy_header);
       }
     }
   }

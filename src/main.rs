@@ -47,7 +47,7 @@ fn main() {
     None => Vec::new(),
   };
 
-  run(BuildEnvironment {
+  if let Err(err) = run(BuildEnvironment {
     invokation_method: InvokationMethod::CommandLine,
     source_dir_path: PathBuf::from(matches.value_of("source_dir").unwrap()),
     output_dir_path: PathBuf::from(matches.value_of("output_dir").unwrap()),
@@ -55,5 +55,8 @@ fn main() {
     num_jobs: None,
     build_profile: BuildProfile::Debug,
     extra_lib_paths: Vec::new(),
-  });
+  }) {
+    err.display_report();
+    std::process::exit(1);
+  }
 }

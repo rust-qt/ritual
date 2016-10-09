@@ -1,6 +1,8 @@
+use utils::{is_msvc, add_env_path_item, run_command};
+use errors::{ErrorKind, Result, ChainErr};
+
 use std::process::Command;
 use std::path::PathBuf;
-use utils::{is_msvc, add_env_path_item, run_command};
 
 pub struct CppLibBuilder<'a> {
   pub cmake_source_dir: &'a PathBuf,
@@ -11,7 +13,7 @@ pub struct CppLibBuilder<'a> {
 }
 
 impl<'a> CppLibBuilder<'a> {
-  pub fn run(self) {
+  pub fn run(self) -> Result<()> {
     let mut cmake_command = Command::new("cmake");
     cmake_command.arg(self.cmake_source_dir)
       .arg(format!("-DCMAKE_INSTALL_PREFIX={}",
@@ -25,7 +27,7 @@ impl<'a> CppLibBuilder<'a> {
     }
     // TODO: enable release mode on other platforms if cargo is in release mode
     // (maybe build C library in both debug and release in separate folders)
-    run_command(&mut cmake_command, false);
+    try!(run_command(&mut cmake_command, false).chain_err(|| ErrorKind::CMakeFailed));
 
     let make_command_name = if is_msvc() { "nmake" } else { "make" }.to_string();
     let mut make_args = Vec::new();
@@ -46,6 +48,7 @@ impl<'a> CppLibBuilder<'a> {
         }
       }
     }
-    run_command(&mut make_command, false);
+    try!(run_command(&mut make_command, false).chain_err(|| ErrorKind::MakeFailed));
+    Ok(())
   }
 }

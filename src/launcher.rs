@@ -1,14 +1,9 @@
 extern crate serde_json;
 extern crate num_cpus;
 
-use std;
-use std::fs;
-use std::fs::File;
+use errors::{ErrorKind, Result, ChainErr};
 use file_utils::{PathBufWithAdded, move_files};
 use utils::is_msvc;
-
-use std::path::PathBuf;
-use std::process::Command;
 use cpp_code_generator::CppCodeGenerator;
 use log;
 use cpp_parser;
@@ -22,9 +17,15 @@ use serializable::LibSpec;
 use cpp_ffi_generator::CppAndFfiData;
 use qt_doc_parser::QtDocData;
 use dependency_info::DependencyInfo;
-use std::env;
 use utils::{run_command, add_env_path_item};
 use cpp_lib_builder::CppLibBuilder;
+
+use std;
+use std::fs;
+use std::fs::File;
+use std::path::PathBuf;
+use std::process::Command;
+use std::env;
 
 pub enum BuildProfile {
   Debug,
@@ -43,7 +44,7 @@ pub struct BuildEnvironment {
   pub build_profile: BuildProfile,
 }
 
-pub fn run_from_build_script() {
+pub fn run_from_build_script() -> Result<()> {
   let mut dependency_paths = Vec::new();
   if env::var("CARGO_MANIFEST_DIR").unwrap() != "/home/ri/rust/rust_qt/repos/qt_gui/../qt_core" {
     for (name, value) in env::vars_os() {
@@ -68,7 +69,7 @@ pub fn run_from_build_script() {
     },
     dependency_paths: dependency_paths,
     extra_lib_paths: Vec::new(),
-  });
+  })
 }
 
 fn my_canonicalize(path: &PathBuf) -> PathBuf {
@@ -82,10 +83,10 @@ fn my_canonicalize(path: &PathBuf) -> PathBuf {
 
 // TODO: simplify this function
 #[cfg_attr(feature="clippy", allow(cyclomatic_complexity))]
-pub fn run(env: BuildEnvironment) {
+pub fn run(env: BuildEnvironment) -> Result<()> {
   // canonicalize paths
   if !env.source_dir_path.as_path().exists() {
-    panic!("Invalid source dir: {}", env.source_dir_path.display());
+    return Err(ErrorKind::SourceDirDoesntExist(env.source_dir_path.display().to_string()).into());
   }
   if !env.output_dir_path.as_path().exists() {
     fs::create_dir_all(&env.output_dir_path).unwrap();
@@ -141,18 +142,20 @@ pub fn run(env: BuildEnvironment) {
 
     let qmake_path = "qmake".to_string();
     log::info("Detecting Qt directories...");
-    let qt_install_headers_path = PathBuf::from(run_command(Command::new(&qmake_path)
-                                                              .arg("-query")
-                                                              .arg("QT_INSTALL_HEADERS"),
-                                                            true)
-      .trim());
+    let result1 = try!(run_command(Command::new(&qmake_path)
+                                     .arg("-query")
+                                     .arg("QT_INSTALL_HEADERS"),
+                                   true)
+      .chain_err(|| ErrorKind::QMakeQueryFailed));
+    let qt_install_headers_path = PathBuf::from(result1.trim());
     log::info(format!("QT_INSTALL_HEADERS = \"{}\"",
                       qt_install_headers_path.to_str().unwrap()));
-    let qt_install_libs_path = PathBuf::from(run_command(Command::new(&qmake_path)
-                                                           .arg("-query")
-                                                           .arg("QT_INSTALL_LIBS"),
-                                                         true)
-      .trim());
+    let result2 = try!(run_command(Command::new(&qmake_path)
+                                     .arg("-query")
+                                     .arg("QT_INSTALL_LIBS"),
+                                   true)
+      .chain_err(|| ErrorKind::QMakeQueryFailed));
+    let qt_install_libs_path = PathBuf::from(result2.trim());
     log::info(format!("QT_INSTALL_LIBS = \"{}\"",
                       qt_install_libs_path.to_str().unwrap()));
     cpp_lib_dirs.push(qt_install_libs_path.clone());
@@ -351,14 +354,19 @@ pub fn run(env: BuildEnvironment) {
                                        .collect::<Vec<_>>());
     code_gen.generate_files(&cpp_ffi_headers);
 
-    move_files(&c_lib_tmp_path, &c_lib_path).unwrap();
+    try!(move_files(&c_lib_tmp_path, &c_lib_path).chain_err(|| {
+      ErrorKind::MoveFilesFailed {
+        from: c_lib_tmp_path.display().to_string(),
+        to: c_lib_path.display().to_string(),
+      }
+    }));
 
     log::info("Building C wrapper library.");
     let c_lib_build_path = c_lib_parent_path.with_added("build");
     fs::create_dir_all(&c_lib_build_path).unwrap();
     fs::create_dir_all(&c_lib_install_path).unwrap();
 
-    CppLibBuilder {
+    try!(CppLibBuilder {
         cmake_source_dir: &c_lib_path,
         build_dir: &c_lib_build_path,
         install_dir: &c_lib_install_path,
@@ -369,7 +377,8 @@ pub fn run(env: BuildEnvironment) {
           None
         },
       }
-      .run();
+      .run()
+      .chain_err(|| ErrorKind::CWrapperBuildFailed));
 
     let crate_new_path = output_dir_path.with_added(format!("{}.new", &input_cargo_toml_data.name));
     if crate_new_path.as_path().exists() {
@@ -474,7 +483,7 @@ pub fn run(env: BuildEnvironment) {
           // "cannot satisfy dependencies so `std` only shows up once" error.
           command.env("RUSTFLAGS", "-C prefer-dynamic");
         }
-        run_command(&mut command, false);
+        try!(run_command(&mut command, false).chain_err(|| ErrorKind::CargoFailed));
       }
       log::info("Completed successfully.");
     }
@@ -493,4 +502,5 @@ pub fn run(env: BuildEnvironment) {
       }
     }
   }
+  Ok(())
 }

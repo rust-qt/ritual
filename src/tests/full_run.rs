@@ -1,18 +1,12 @@
 use std::path::PathBuf;
 use std;
-use utils::PathBufPushTweak;
+use utils::{PathBufPushTweak, manifest_dir};
 use cpp_lib_builder::CppLibBuilder;
 use launcher::{BuildEnvironment, InvokationMethod, BuildProfile};
 use launcher;
 extern crate tempdir;
 
-fn manifest_dir() -> PathBuf {
-  let mut path = env!("CARGO_MANIFEST_DIR");
-  if path.starts_with(r"\\?\") {
-    path = &path[4..];
-  }
-  PathBuf::from(path)
-}
+
 
 fn build_cpp_lib() -> tempdir::TempDir {
   let cpp_lib_source_dir = {

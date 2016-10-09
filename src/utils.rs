@@ -17,56 +17,40 @@ pub fn is_msvc() -> bool {
   false
 }
 
-
-
-
-
 pub fn add_to_multihash<K: Eq + Hash + Clone, T, V: Default + Extend<T>>(hash: &mut HashMap<K, V>,
-                                                                         key: &K,
+                                                                         key: K,
                                                                          value: T) {
-  if !hash.contains_key(key) {
-    hash.insert(key.clone(), Default::default());
+  use std::collections::hash_map::Entry;
+  match hash.entry(key) {
+    Entry::Occupied(mut entry) => entry.get_mut().extend(std::iter::once(value)),
+    Entry::Vacant(entry) => {
+      let mut r = V::default();
+      r.extend(std::iter::once(value));
+      entry.insert(r);
+    }
   }
-  hash.get_mut(key).unwrap().extend(std::iter::once(value));
 }
-
 
 /// Runs a command, checks that it is successful, and
 /// returns its output if requested
-pub fn run_command(command: &mut Command, fetch_stdout: bool) -> String {
+pub fn run_command(command: &mut Command, fetch_stdout: bool) -> Result<String> {
+  let cmd_text = format!("{:?}", command);
   log::info(format!("Executing command: {:?}", command));
-  if fetch_stdout {
-    match command.output() {
-      Ok(output) => {
-        match command.status() {
-          Ok(status) => {
-            if !status.success() {
-              panic!("Command failed: {:?} (status: {})", command, status);
-            }
-          }
-          Err(error) => {
-            panic!("Execution failed: {}", error);
-          }
-        }
-        String::from_utf8(output.stdout).unwrap()
-      }
-      Err(error) => {
-        panic!("Execution failed: {}", error);
-      }
-    }
+  let result = if fetch_stdout {
+    let output = try!(command.output().chain_err(|| ErrorKind::CommandFailed(cmd_text.clone())));
+    String::from_utf8(output.stdout).unwrap()
   } else {
-    match command.status() {
-      Ok(status) => {
-        if !status.success() {
-          panic!("Command failed: {:?} (status: {})", command, status);
-        }
-      }
-      Err(error) => {
-        panic!("Execution failed: {}", error);
-      }
-    }
     String::new()
+  };
+  let status = try!(command.status().chain_err(|| ErrorKind::CommandFailed(cmd_text.clone())));
+  if !status.success() {
+    return Err(ErrorKind::CommandStatusFailed {
+        cmd: cmd_text,
+        status: status,
+      }
+      .into());
   }
+  Ok(result)
 }
 
 #[cfg_attr(feature="clippy", allow(or_fun_call))]
@@ -79,4 +63,12 @@ pub fn add_env_path_item(env_var_name: &'static str,
     }
   }
   env::join_paths(new_paths).unwrap()
+}
+
+pub fn manifest_dir() -> PathBuf {
+  let mut path = env!("CARGO_MANIFEST_DIR");
+  if path.starts_with(r"\\?\") {
+    path = &path[4..];
+  }
+  PathBuf::from(path)
 }
