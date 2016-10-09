@@ -9,6 +9,7 @@ use std;
 use log;
 use std::process::Command;
 use std::env;
+use errors::{ErrorKind, Result, ChainErr};
 
 #[cfg(all(windows, target_env = "msvc"))]
 pub fn is_msvc() -> bool {
@@ -63,35 +64,51 @@ impl PathBufPushTweak for Path {
 }
 
 
-pub fn move_files(src: &PathBuf, dst: &PathBuf) -> io::Result<()> {
+pub fn move_files(src: &PathBuf, dst: &PathBuf) -> Result<()> {
   if src.as_path().is_dir() {
     if !dst.as_path().is_dir() {
-      log::noisy(format!("New dir created: {}", dst.to_str().unwrap()));
-      try!(fs::create_dir(dst));
+      log::noisy(format!("New dir created: {}", dst.display()));
+      try!(fs::create_dir(dst).chain_err(|| ErrorKind::CreateDirFailed(dst.display().to_string())));
     }
 
-    for item in try!(fs::read_dir(dst)) {
-      let item = try!(item);
+    for item in try!(fs::read_dir(dst)
+      .chain_err(|| ErrorKind::ReadDirFailed(dst.display().to_string()))) {
+      let item = try!(item.chain_err(|| ErrorKind::ReadDirItemFailed));
       if !src.with_added(item.file_name()).as_path().exists() {
         let path = item.path();
         if path.as_path().is_dir() {
-          log::noisy(format!("Old dir removed: {}", path.to_str().unwrap()));
-          try!(fs::remove_dir_all(path));
+          log::noisy(format!("Old dir removed: {}", path.display()));
+          try!(fs::remove_dir_all(&path)
+            .chain_err(|| ErrorKind::RemoveDirAllFailed(path.display().to_string())));
         } else {
-          log::noisy(format!("Old file removed: {}", path.to_str().unwrap()));
-          try!(fs::remove_file(path));
+          log::noisy(format!("Old file removed: {}", path.display()));
+          try!(fs::remove_file(&path)
+            .chain_err(|| ErrorKind::RemoveFileFailed(path.display().to_string())));
         }
       }
     }
 
-    for item in try!(fs::read_dir(src)) {
-      let item = try!(item);
-      try!(move_files(&item.path().to_path_buf(),
-                      &dst.with_added(item.file_name())));
+    for item in try!(fs::read_dir(src)
+      .chain_err(|| ErrorKind::ReadDirFailed(src.display().to_string()))) {
+      let item = try!(item.chain_err(|| ErrorKind::ReadDirItemFailed));
+      let from = item.path().to_path_buf();
+      let to = dst.with_added(item.file_name());
+      try!(move_files(&from, &to).chain_err(|| {
+        ErrorKind::MoveFilesFailed {
+          from: from.display().to_string(),
+          to: to.display().to_string(),
+        }
+      }));
     }
-    try!(fs::remove_dir_all(src));
+    try!(fs::remove_dir_all(src)
+      .chain_err(|| ErrorKind::RemoveDirAllFailed(src.display().to_string())));
   } else {
-    try!(move_one_file(src, dst));
+    try!(move_one_file(src, dst).chain_err(|| {
+      ErrorKind::MoveOneFileFailed {
+        from: src.display().to_string(),
+        to: dst.display().to_string(),
+      }
+    }));
   }
   Ok(())
 }
@@ -126,10 +143,10 @@ pub fn move_one_file(old_path: &PathBuf, new_path: &PathBuf) -> io::Result<()> {
       try!(fs::remove_file(new_path));
     }
     try!(fs::rename(old_path, new_path));
-    log::noisy(format!("File changed: {}", new_path.to_str().unwrap()));
+    log::noisy(format!("File changed: {}", new_path.display()));
   } else {
     try!(fs::remove_file(old_path));
-    log::noisy(format!("File not changed: {}", new_path.to_str().unwrap()));
+    log::noisy(format!("File not changed: {}", new_path.display()));
   }
   Ok(())
 }

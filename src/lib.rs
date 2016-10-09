@@ -1,6 +1,4 @@
-#![forbid(unused_must_use)]
-
-// #![allow(unknown_lints)]
+// #![forbid(unused_must_use)]
 
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
@@ -9,11 +7,15 @@
 #![cfg_attr(feature="clippy", warn(shadow_same))]
 #![cfg_attr(feature="clippy", warn(shadow_unrelated))]
 #![cfg_attr(feature="clippy", warn(single_match_else))]
-
 // some time in the future...
 // #![warn(option_unwrap_used)]
 // #![warn(result_unwrap_used)]
 // #![warn(print_stdout)]
+
+#![recursion_limit = "1024"] // for error_chain
+#[macro_use]
+extern crate error_chain;
+
 
 mod cpp_ffi_generator;
 mod cpp_code_generator;
@@ -26,6 +28,7 @@ mod cpp_type;
 mod cpp_operator;
 mod dependency_info;
 mod doc_formatter;
+mod errors;
 pub mod log;
 mod qt_doc_parser;
 mod qt_specific;
