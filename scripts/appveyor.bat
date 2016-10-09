@@ -2,6 +2,7 @@ echo on
 setlocal EnableDelayedExpansion
 
 set QT_REPOS_BRANCH=-b master
+set BUILD_TYPE=debug
 
 set FILES=%USERPROFILE%\files
 if not exist "%FILES%" mkdir "%FILES%"
