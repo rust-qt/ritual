@@ -6,7 +6,7 @@ extern crate tempdir;
 
 use cpp_parser;
 use cpp_data::*;
-use utils::PathBufPushTweak;
+use file_utils::PathBufWithAdded;
 use std::fs;
 use std::fs::File;
 use std::io::Write;

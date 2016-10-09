@@ -1,6 +1,6 @@
-use std::path::PathBuf;
 use std;
-use utils::{PathBufPushTweak, manifest_dir};
+use file_utils::PathBufWithAdded;
+use utils::manifest_dir;
 use cpp_lib_builder::CppLibBuilder;
 use launcher::{BuildEnvironment, InvokationMethod, BuildProfile};
 use launcher;
@@ -29,7 +29,11 @@ fn build_cpp_lib() -> tempdir::TempDir {
       num_jobs: 1,
       linker_env_library_dirs: None,
     }
-    .run();
+    .run()
+    .unwrap_or_else(|e| {
+      e.display_report();
+      panic!("{}", e);
+    });
   temp_dir
 }
 
@@ -54,12 +58,16 @@ fn full_run() {
   };
   assert!(lib_spec_dir.exists());
   launcher::run(BuildEnvironment {
-    invokation_method: InvokationMethod::CommandLine,
-    output_dir_path: output_dir,
-    source_dir_path: lib_spec_dir,
-    dependency_paths: Vec::new(),
-    num_jobs: Some(1),
-    build_profile: BuildProfile::Debug,
-    extra_lib_paths: vec![cpp_install_lib_dir],
-  });
+      invokation_method: InvokationMethod::CommandLine,
+      output_dir_path: output_dir,
+      source_dir_path: lib_spec_dir,
+      dependency_paths: Vec::new(),
+      num_jobs: Some(1),
+      build_profile: BuildProfile::Debug,
+      extra_lib_paths: vec![cpp_install_lib_dir],
+    })
+    .unwrap_or_else(|e| {
+      e.display_report();
+      panic!("{}", e);
+    });
 }

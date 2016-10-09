@@ -201,9 +201,6 @@ fn signature_two_numbers() {
 
   assert_eq!(sig.caption(MethodCaptionStrategy::ConstOnly), "");
 
-  assert_eq!(sig.arguments_to_cpp_code().unwrap(),
-             "int arg1, double arg2");
-
   assert!(!sig.has_const_this());
 }
 
@@ -268,9 +265,6 @@ fn signature_class_method() {
              "double_arg1");
 
   assert_eq!(sig.caption(MethodCaptionStrategy::ConstOnly), "");
-
-  assert_eq!(sig.arguments_to_cpp_code().unwrap(),
-             "Class1* this_ptr, double arg1");
 
   assert!(!sig.has_const_this());
 }
@@ -359,9 +353,6 @@ fn signature_class_method_const() {
              "const_double_arg1");
   assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))),
              "const_double_arg1");
-
-  assert_eq!(sig.arguments_to_cpp_code().unwrap(),
-             "const Class1* this_ptr, double arg1");
 
   assert!(sig.has_const_this());
 }

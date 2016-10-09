@@ -484,7 +484,8 @@ impl CppParser {
                                                      context_class,
                                                      context_method) {
         let mut new_indirection = try!(CppTypeIndirection::combine(&subtype.indirection,
-                                                                   &result_type.indirection));
+                                                                   &result_type.indirection)
+          .map_err(|e| e.to_string()));
         if new_indirection == CppTypeIndirection::Ptr {
           if let CppTypeBase::FunctionPointer { .. } = subtype.base {
             new_indirection = CppTypeIndirection::None;
@@ -825,8 +826,10 @@ impl CppParser {
                   _ => unreachable!(),
                 };
 
-                let mut new_indirection = try!(CppTypeIndirection::combine(&subtype.indirection,
-                                                   &original_type_indirection));
+                let mut new_indirection =
+                  try!(CppTypeIndirection::combine(&subtype.indirection,
+                                                   &original_type_indirection)
+                    .map_err(|e| e.to_string()));
                 if new_indirection == CppTypeIndirection::Ptr {
                   if let CppTypeBase::FunctionPointer { .. } = subtype.base {
                     new_indirection = CppTypeIndirection::None;

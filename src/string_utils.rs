@@ -61,7 +61,7 @@ impl<'a> Iterator for WordIterator<'a> {
     let mut i = self.index;
     let mut word_case = WordCase::Lower;
     while i < self.string.len() {
-      let current = char_at(&self.string, i);
+      let current = char_at(self.string, i);
       if current == '_' {
         break;
       }
@@ -76,7 +76,7 @@ impl<'a> Iterator for WordIterator<'a> {
         if current.is_uppercase() {
           if word_case == WordCase::Capitalized {
             let next_not_upper = if i + 1 < self.string.len() {
-              !char_at(&self.string, i + 1).is_uppercase()
+              !char_at(self.string, i + 1).is_uppercase()
             } else {
               true
             };

@@ -5,6 +5,7 @@ use cpp_type::CppType;
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use caption_strategy::{MethodCaptionStrategy, TypeCaptionStrategy};
 use cpp_operator::CppOperator;
+use errors::{ErrorKind, Result, ChainErr};
 
 /// Information that indicates how the FFI function argument
 /// should be interpreted
@@ -64,7 +65,7 @@ impl CppFfiFunctionArgument {
 
   /// Generates C++ code for the part of FFI function signature
   /// corresponding to this argument
-  pub fn to_cpp_code(&self) -> Result<String, String> {
+  pub fn to_cpp_code(&self) -> Result<String> {
     if let CppTypeBase::FunctionPointer { .. } = self.argument_type.ffi_type.base {
       Ok(try!(self.argument_type.ffi_type.to_cpp_code(Some(&self.name))))
     } else {
@@ -132,18 +133,6 @@ impl CppFfiFunctionSignature {
         r + &self.arguments_caption(s)
       }
     }
-  }
-
-  /// Generates C++ code for arguments list in the function signature
-  pub fn arguments_to_cpp_code(&self) -> Result<String, String> {
-    let mut code = Vec::new();
-    for arg in &self.arguments {
-      match arg.to_cpp_code() {
-        Ok(c) => code.push(c),
-        Err(msg) => return Err(msg),
-      }
-    }
-    Ok(code.join(", "))
   }
 }
 
@@ -219,7 +208,7 @@ pub struct CppAndFfiMethod {
 pub fn c_base_name(cpp_method: &CppMethod,
                    allocation_place: &ReturnValueAllocationPlace,
                    include_file: &str)
-                   -> Result<String, String> {
+                   -> Result<String> {
   let scope_prefix = match cpp_method.class_membership {
     Some(ref info) => format!("{}_", info.class_type.caption()),
     None => format!("{}_G_", include_file),
@@ -238,7 +227,7 @@ pub fn c_base_name(cpp_method: &CppMethod,
       ReturnValueAllocationPlace::Stack => "constructor".to_string(),
       ReturnValueAllocationPlace::Heap => "new".to_string(),
       ReturnValueAllocationPlace::NotApplicable => {
-        return Err("NotApplicable is not allowed for constructor".to_string())
+        return Err(ErrorKind::NotApplicableAllocationPlaceInConstructor.into())
       }
     }
   } else if cpp_method.is_destructor() {
@@ -246,7 +235,7 @@ pub fn c_base_name(cpp_method: &CppMethod,
       ReturnValueAllocationPlace::Stack => "destructor".to_string(),
       ReturnValueAllocationPlace::Heap => "delete".to_string(),
       ReturnValueAllocationPlace::NotApplicable => {
-        return Err("NotApplicable is not allowed for constructor".to_string())
+        return Err(ErrorKind::NotApplicableAllocationPlaceInConstructor.into())
       }
     }
   } else if let Some(ref operator) = cpp_method.operator {

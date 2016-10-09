@@ -352,7 +352,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
                                      &framework_dirs.iter()
                                        .map(|x| x.to_str().unwrap().to_string())
                                        .collect::<Vec<_>>());
-    code_gen.generate_files(&cpp_ffi_headers);
+    try!(code_gen.generate_files(&cpp_ffi_headers));
 
     try!(move_files(&c_lib_tmp_path, &c_lib_path).chain_err(|| {
       ErrorKind::MoveFilesFailed {

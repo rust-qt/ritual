@@ -6,6 +6,7 @@ use std::collections::HashSet;
 use log;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
 use std::iter;
+use errors::{ErrorKind, Result, ChainErr};
 
 pub use serializable::{EnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
                        CppTypeData, CppData, CppTemplateInstantiation, CppTemplateInstantiations,
@@ -13,7 +14,7 @@ pub use serializable::{EnumValue, CppClassField, CppTypeKind, CppOriginLocation,
 fn apply_instantiations_to_method(method: &CppMethod,
                                   nested_level: i32,
                                   template_instantiations: &[CppTemplateInstantiation])
-                                  -> Result<Vec<CppMethod>, String> {
+                                  -> Result<Vec<CppMethod>> {
   let mut new_methods = Vec::new();
   for ins in template_instantiations {
     log::debug(format!("instantiation: {:?}", ins.template_arguments));
@@ -21,7 +22,7 @@ fn apply_instantiations_to_method(method: &CppMethod,
     if let Some(ref args) = method.template_arguments {
       if args.nested_level == nested_level {
         if args.count() != ins.template_arguments.len() as i32 {
-          return Err("arguments count mismatch".to_string());
+          return Err(ErrorKind::TemplateArgsCountMismatch.into());
         }
         new_method.template_arguments = None;
         new_method.template_arguments_values = Some(ins.template_arguments.clone());
@@ -65,8 +66,7 @@ fn apply_instantiations_to_method(method: &CppMethod,
     if new_method.all_involved_types()
       .iter()
       .any(|t| t.base.is_or_contains_template_parameter()) {
-      return Err(format!("found remaining template parameters: {}",
-                         new_method.short_text()));
+      return Err(ErrorKind::ExtraTemplateParametersLeft(new_method.short_text()).into());
     } else {
       if let Some(conversion_type) = conversion_type {
         new_method.name = format!("operator {}", try!(conversion_type.to_cpp_code(None)));
@@ -563,7 +563,7 @@ impl CppData {
     })
   }
 
-  fn check_template_type(&self, dependencies: &[&CppData], type1: &CppType) -> Result<(), String> {
+  fn check_template_type(&self, dependencies: &[&CppData], type1: &CppType) -> Result<()> {
     if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) = type1.base {
       if let Some(ref template_arguments) = *template_arguments {
         let is_valid = |cpp_data: &&CppData| {
@@ -575,7 +575,7 @@ impl CppData {
           })
         };
         if !dependencies.into_iter().chain(iter::once(&self)).any(is_valid) {
-          return Err(format!("Unknown type: {}", type1.to_cpp_pseudo_code()));
+          return Err(ErrorKind::TypeNotAvailable(type1.clone()).into());
         }
         for arg in template_arguments {
           try!(self.check_template_type(dependencies, arg));

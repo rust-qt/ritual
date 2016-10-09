@@ -5,11 +5,19 @@ pub use serializable::{CppBuiltInNumericType, CppSpecificNumericTypeKind, CppTyp
 use string_utils::JoinWithString;
 extern crate regex;
 
+use errors::{ErrorKind, Result, ChainErr};
+
 impl CppTypeIndirection {
   pub fn combine(left: &CppTypeIndirection,
                  right: &CppTypeIndirection)
-                 -> Result<CppTypeIndirection, String> {
-    let error_text = || format!("too much indirection: {:?} to {:?}", left, right);
+                 -> Result<CppTypeIndirection> {
+    let error = || {
+      ErrorKind::TooMuchIndirection {
+          left: left.clone(),
+          right: right.clone(),
+        }
+        .into()
+    };
     Ok(match *left {
       CppTypeIndirection::None => right.clone(),
       CppTypeIndirection::Ptr => {
@@ -17,19 +25,19 @@ impl CppTypeIndirection {
           CppTypeIndirection::None => CppTypeIndirection::Ptr,
           CppTypeIndirection::Ptr => CppTypeIndirection::PtrPtr,
           CppTypeIndirection::Ref => CppTypeIndirection::PtrRef,
-          _ => return Err(error_text()),
+          _ => return Err(error()),
         }
       }
       CppTypeIndirection::Ref => {
         match *right {
           CppTypeIndirection::None => CppTypeIndirection::Ref,
-          _ => return Err(error_text()),
+          _ => return Err(error()),
         }
       }
       _ => {
         match *right {
           CppTypeIndirection::None => left.clone(),
-          _ => return Err(error_text()),
+          _ => return Err(error()),
         }
       }
     })
@@ -88,7 +96,7 @@ impl CppBuiltInNumericType {
 
 
 impl CppTypeClassBase {
-  pub fn to_cpp_code(&self) -> Result<String, String> {
+  pub fn to_cpp_code(&self) -> Result<String> {
     match self.template_arguments {
       Some(ref args) => {
         let mut arg_texts = Vec::new();
@@ -118,7 +126,7 @@ impl CppTypeClassBase {
   pub fn instantiate_class(&self,
                            nested_level1: i32,
                            template_arguments1: &[CppType])
-                           -> Result<CppTypeClassBase, String> {
+                           -> Result<CppTypeClassBase> {
     Ok(CppTypeClassBase {
       name: self.name.clone(),
       template_arguments: match self.template_arguments {
@@ -176,11 +184,9 @@ impl CppTypeBase {
     }
   }
 
-  pub fn to_cpp_code(&self,
-                     function_pointer_inner_text: Option<&String>)
-                     -> Result<String, String> {
+  pub fn to_cpp_code(&self, function_pointer_inner_text: Option<&String>) -> Result<String> {
     if !self.is_function_pointer() && function_pointer_inner_text.is_some() {
-      return Err("unexpected function_pointer_inner_text".to_string());
+      return Err(ErrorKind::UnexpectedFunctionPointerInnerText.into());
     }
     match *self {
       CppTypeBase::Void => Ok("void".to_string()),
@@ -192,22 +198,20 @@ impl CppTypeBase {
       //      CppTypeBase::PointerSizedInteger { ref name, .. } => Ok(name.clone()),
       CppTypeBase::Class(ref info) => info.to_cpp_code(),
       CppTypeBase::TemplateParameter { .. } => {
-        Err("template parameters are not allowed to produce C++ code without \
-                            instantiation"
-          .to_string())
+        Err(ErrorKind::TemplateParameterToCodeAttempt.into())
       }
       CppTypeBase::FunctionPointer { ref return_type,
                                      ref arguments,
                                      ref allows_variadic_arguments } => {
         if *allows_variadic_arguments {
-          return Err("Function pointers with variadic arguments are not supported".to_string());
+          return Err(ErrorKind::VariadicFunctionPointer.into());
         }
         let mut arg_texts = Vec::new();
         for arg in arguments {
           arg_texts.push(try!(arg.to_cpp_code(None)));
         }
         if function_pointer_inner_text.is_none() {
-          return Err("function_pointer_inner_text argument is required".to_string());
+          return Err(ErrorKind::FunctionPointerInnerTextMissing.into());
         }
         Ok(format!("{} (*{})({})",
                    try!(return_type.as_ref().to_cpp_code(None)),
@@ -313,9 +317,7 @@ impl CppType {
             })
   }
 
-  pub fn to_cpp_code(&self,
-                     function_pointer_inner_text: Option<&String>)
-                     -> Result<String, String> {
+  pub fn to_cpp_code(&self, function_pointer_inner_text: Option<&String>) -> Result<String> {
     let base_code = try!(self.base.to_cpp_code(function_pointer_inner_text));
     Ok(self.to_cpp_code_intermediate(&base_code))
   }
@@ -329,30 +331,26 @@ impl CppType {
   /// removing all features not supported by C ABI
   /// (e.g. references and passing objects by value)
   #[cfg_attr(feature="clippy", allow(collapsible_if))]
-  pub fn to_cpp_ffi_type(&self, role: CppTypeRole) -> Result<CppFfiType, String> {
+  pub fn to_cpp_ffi_type(&self, role: CppTypeRole) -> Result<CppFfiType> {
     match self.base {
       CppTypeBase::TemplateParameter { .. } => {
-        return Err("Unsupported type".to_string());
+        return Err(ErrorKind::TemplateParameterToFFIAttempt.into());
       }
       CppTypeBase::FunctionPointer { ref return_type,
                                      ref arguments,
                                      ref allows_variadic_arguments } => {
         if *allows_variadic_arguments {
-          return Err("Function pointers with variadic arguments are not supported".to_string());
+          return Err(ErrorKind::VariadicFunctionPointer.into());
         }
         let mut all_types: Vec<&CppType> = arguments.iter().collect();
         all_types.push(return_type.as_ref());
         for arg in all_types {
           match arg.base {
             CppTypeBase::TemplateParameter { .. } => {
-              return Err("Function pointers containing template parameters are not \
-                                  supported"
-                .to_string());
+              return Err(ErrorKind::TemplateFunctionPointer.into());
             }
             CppTypeBase::FunctionPointer { .. } => {
-              return Err("Function pointers containing nested function pointers are not \
-                                  supported"
-                .to_string());
+              return Err(ErrorKind::NestedFunctionPointer.into());
             }
             _ => {}
           }
@@ -360,15 +358,13 @@ impl CppType {
             CppTypeIndirection::Ref |
             CppTypeIndirection::PtrRef |
             CppTypeIndirection::RValueRef => {
-              return Err("Function pointers containing references are not supported".to_string());
+              return Err(ErrorKind::FunctionPointerWithReference.into());
             }
             CppTypeIndirection::Ptr |
             CppTypeIndirection::PtrPtr => {}
             CppTypeIndirection::None => {
               if arg.base.is_class() {
-                return Err("Function pointers containing classes by value are not \
-                                    supported"
-                  .to_string());
+                return Err(ErrorKind::FunctionPointerWithClassValue.into());
               }
             }
           }
@@ -398,16 +394,14 @@ impl CppType {
         conversion = IndirectionChange::ReferenceToPointer;
       }
       CppTypeIndirection::RValueRef => {
-        return Err("rvalue references are not supported".to_string())
+        return Err(ErrorKind::RValueReference.into());
       }
     }
     if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = self.base {
       if name == "QFlags" {
         if !(self.indirection == CppTypeIndirection::None ||
              (self.indirection == CppTypeIndirection::Ref && self.is_const)) {
-          return Err(format!("Only value or const reference is allowed for QFlags type. \
-                              Invalid type: {:?}",
-                             self));
+          return Err(ErrorKind::QFlagsInvalidIndirection.into());
         }
         conversion = IndirectionChange::QFlagsToUInt;
         result.base = CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::UInt);
@@ -475,14 +469,14 @@ impl CppType {
   pub fn instantiate(&self,
                      nested_level1: i32,
                      template_arguments1: &[CppType])
-                     -> Result<CppType, String> {
+                     -> Result<CppType> {
     if let CppTypeBase::TemplateParameter { nested_level, index } = self.base {
       if nested_level == nested_level1 {
         if index < 0 {
           panic!("CppType::instantiate: index < 0");
         }
         if index >= template_arguments1.len() as i32 {
-          return Err("CppType::instantiate: too few template arguments".to_string());
+          return Err(ErrorKind::NotEnoughTemplateArguments.into());
         }
         let arg = &template_arguments1[index as usize];
         let mut new_type = CppType::void();

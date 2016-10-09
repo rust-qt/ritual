@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use file_utils::PathBufWithAdded;
 use utils::is_msvc;
 use cpp_type::{CppTypeIndirection, CppTypeBase};
+use errors::{ErrorKind, Result, ChainErr};
 
 /// Generates C++ code for the C wrapper library.
 pub struct CppCodeGenerator {
@@ -42,24 +43,31 @@ impl CppCodeGenerator {
 
   /// Generates function name, return type and arguments list
   /// as it appears in both function declaration and implementation.
-  fn function_signature(&self, method: &CppAndFfiMethod) -> String {
-    let name_with_args = format!("{}({})",
-                                 method.c_name,
-                                 method.c_signature.arguments_to_cpp_code().unwrap());
-    if let CppTypeBase::FunctionPointer { .. } = method.c_signature.return_type.ffi_type.base {
-      method.c_signature.return_type.ffi_type.to_cpp_code(Some(&name_with_args)).unwrap()
+  fn function_signature(&self, method: &CppAndFfiMethod) -> Result<String> {
+    let mut arg_texts = Vec::new();
+    for arg in &method.c_signature.arguments {
+      arg_texts.push(try!(arg.to_cpp_code()
+        .chain_err(|| ErrorKind::FfiArgumentToCodeFailed(arg.clone()))));
+    }
+    let name_with_args = format!("{}({})", method.c_name, arg_texts.join(", "));
+    let return_type = &method.c_signature.return_type.ffi_type;
+    let r = if let CppTypeBase::FunctionPointer { .. } = return_type.base {
+      try!(return_type.to_cpp_code(Some(&name_with_args))
+        .chain_err(|| ErrorKind::CppTypeToCodeFailed(return_type.clone())))
     } else {
       format!("{} {}",
-              method.c_signature.return_type.ffi_type.to_cpp_code(None).unwrap(),
+              try!(return_type.to_cpp_code(None)
+                .chain_err(|| ErrorKind::CppTypeToCodeFailed(return_type.clone()))),
               name_with_args)
-    }
+    };
+    Ok(r)
   }
 
   /// Generates method declaration for the header.
-  fn function_declaration(&self, method: &CppAndFfiMethod) -> String {
-    format!("{}_EXPORT {};\n",
-            self.lib_name_upper,
-            self.function_signature(method))
+  fn function_declaration(&self, method: &CppAndFfiMethod) -> Result<String> {
+    Ok(format!("{}_EXPORT {};\n",
+               self.lib_name_upper,
+               try!(self.function_signature(method))))
   }
 
   /// Wraps expression returned by the original method to
@@ -235,10 +243,10 @@ impl CppCodeGenerator {
   }
 
   /// Generates implementation of the FFI method for the source file.
-  fn function_implementation(&self, method: &CppAndFfiMethod) -> String {
-    format!("{} {{\n  {}}}\n\n",
-            self.function_signature(method),
-            self.source_body(&method))
+  fn function_implementation(&self, method: &CppAndFfiMethod) -> Result<String> {
+    Ok(format!("{} {{\n  {}}}\n\n",
+               try!(self.function_signature(method)),
+               self.source_body(&method)))
   }
 
   /// Generates main files and directories of the library.
@@ -299,11 +307,12 @@ impl CppCodeGenerator {
       .unwrap();
   }
 
-  pub fn generate_files(&self, data: &[CppFfiHeaderData]) {
+  pub fn generate_files(&self, data: &[CppFfiHeaderData]) -> Result<()> {
     self.generate_all_headers_file(data.iter().map(|x| &x.include_file));
     for item in data {
-      self.generate_one(item);
+      try!(self.generate_one(item).chain_err(|| ErrorKind::CppCodeGeneratorFailed));
     }
+    Ok(())
   }
 
   /// Generates the header file that includes all other headers of the library.
@@ -328,7 +337,7 @@ impl CppCodeGenerator {
 
   /// Generates a header file and a source file for a portion of data
   /// corresponding to a header file of original C++ library.
-  fn generate_one(&self, data: &CppFfiHeaderData) {
+  fn generate_one(&self, data: &CppFfiHeaderData) -> Result<()> {
     let ffi_include_file = format!("{}_{}.h", &self.lib_name, data.include_file_base_name);
 
     let cpp_path = self.lib_path
@@ -355,12 +364,13 @@ impl CppCodeGenerator {
     write!(h_file, "extern \"C\" {{\n\n").unwrap();
 
     for method in &data.methods {
-      h_file.write(&self.function_declaration(method).into_bytes()).unwrap();
-      cpp_file.write(&self.function_implementation(method).into_bytes()).unwrap();
+      h_file.write(&try!(self.function_declaration(method)).into_bytes()).unwrap();
+      cpp_file.write(&try!(self.function_implementation(method)).into_bytes()).unwrap();
     }
 
     write!(h_file, "\n}} // extern \"C\"\n\n").unwrap();
 
     write!(h_file, "#endif // {}\n", include_guard_name).unwrap();
+    Ok(())
   }
 }
