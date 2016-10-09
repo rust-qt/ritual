@@ -826,8 +826,7 @@ impl CppParser {
                   _ => unreachable!(),
                 };
 
-                let mut new_indirection =
-                  try!(CppTypeIndirection::combine(&subtype.indirection,
+                let mut new_indirection = try!(CppTypeIndirection::combine(&subtype.indirection,
                                                    &original_type_indirection)
                     .map_err(|e| e.to_string()));
                 if new_indirection == CppTypeIndirection::Ptr {

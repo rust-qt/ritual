@@ -40,6 +40,9 @@ error_chain! {
     ReadFileFailed(path: String) {
       display("failed: read_file({:?})", path)
     }
+    WriteFileFailed(path: String) {
+      display("failed: write_file({:?})", path)
+    }
     RenameFileFailed { from: String, to: String } {
       display("failed: rename_file({:?}, {:?})", from, to)
     }
@@ -122,5 +125,43 @@ error_chain! {
       display("failed: complete_type({:?})", t)
     }
     CppCodeGeneratorFailed
+
+    StackAllocatedNonVoidWrapper {
+      display("stack allocated wrappers are expected to return void")
+    }
+    ValueToPointerConflictsWithNotApplicable {
+      display("ValueToPointer conflicts with NotApplicable")
+    }
+    NoThisInDestructor
+    NoThisInMethod
+    NoReturnValueArgument
+    Unexpected(msg: &'static str) {
+      display("{}", msg)
+    }
+
+  }
+}
+
+
+impl Error {
+  pub fn is_unexpected(&self) -> bool {
+    use self::ErrorKind::*;
+    match *self.kind() {
+      Unexpected(..) |
+      StackAllocatedNonVoidWrapper |
+      ValueToPointerConflictsWithNotApplicable |
+      NoThisInDestructor |
+      NoThisInMethod |
+      NoReturnValueArgument |
+      NotApplicableAllocationPlaceInConstructor => true,
+      _ => false,
+    }
+  }
+  pub fn discard_expected(&self) {
+    if self.is_unexpected() {
+      self.display_report();
+      // TODO: don't panic on this in production
+      panic!("unexpected error");
+    }
   }
 }
