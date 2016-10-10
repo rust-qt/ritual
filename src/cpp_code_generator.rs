@@ -4,12 +4,9 @@ use cpp_method::ReturnValueAllocationPlace;
 use cpp_ffi_data::CppFfiArgumentMeaning;
 use cpp_ffi_generator::CppFfiHeaderData;
 use log;
-use std::fs;
-use std::fs::File;
-use std::io::Write;
 use string_utils::JoinWithString;
 use std::path::PathBuf;
-use file_utils::PathBufWithAdded;
+use file_utils::{PathBufWithAdded, create_dir_all, create_file};
 use utils::is_msvc;
 use cpp_type::{CppTypeIndirection, CppTypeBase};
 use errors::{ErrorKind, Result, ChainErr};
@@ -267,8 +264,7 @@ impl CppCodeGenerator {
                                  -> Result<()> {
     let name_upper = self.lib_name.to_uppercase();
     let cmakelists_path = self.lib_path.with_added("CMakeLists.txt");
-    let mut cmakelists_file = try!(File::create(&cmakelists_path)
-      .chain_err(|| ErrorKind::WriteFileFailed(cmakelists_path.display().to_string())));
+    let mut cmakelists_file = try!(create_file(&cmakelists_path));
     let mut cxx_flags = String::new();
     if !is_msvc() {
       cxx_flags.push_str("-fPIC -std=gnu++11");
@@ -276,47 +272,38 @@ impl CppCodeGenerator {
     for dir in framework_directories {
       cxx_flags.push_str(&format!(" -F\\\"{}\\\"", dir));
     }
-    try!(write!(cmakelists_file,
-                include_str!("../templates/c_lib/CMakeLists.txt"),
-                lib_name_lowercase = &self.lib_name,
-                lib_name_uppercase = name_upper,
-                include_directories = include_directories.into_iter()
-                  .map(|x| format!("\"{}\"", x.replace(r"\", r"\\")))
-                  .join(" "),
-                library_type = if self.is_shared { "SHARED" } else { "STATIC" },
-                target_link_libraries = if self.is_shared {
-                  format!("target_link_libraries({} {})",
-                          &self.lib_name,
-                          self.cpp_libs.join(" "))
-                } else {
-                  String::new()
-                },
-                cxx_flags = cxx_flags)
-      .chain_err(|| ErrorKind::WriteFileFailed(cmakelists_path.display().to_string())));
+    try!(cmakelists_file.write(format!(include_str!("../templates/c_lib/CMakeLists.txt"),
+                                       lib_name_lowercase = &self.lib_name,
+                                       lib_name_uppercase = name_upper,
+                                       include_directories = include_directories.into_iter()
+                                         .map(|x| format!("\"{}\"", x.replace(r"\", r"\\")))
+                                         .join(" "),
+                                       library_type =
+                                         if self.is_shared { "SHARED" } else { "STATIC" },
+                                       target_link_libraries = if self.is_shared {
+                                         format!("target_link_libraries({} {})",
+                                                 &self.lib_name,
+                                                 self.cpp_libs.join(" "))
+                                       } else {
+                                         String::new()
+                                       },
+                                       cxx_flags = cxx_flags)));
     let src_dir = self.lib_path.with_added("src");
-    try!(fs::create_dir_all(&src_dir)
-      .chain_err(|| ErrorKind::CreateDirFailed(src_dir.display().to_string())));
+    try!(create_dir_all(&src_dir));
 
     let include_dir = self.lib_path.with_added("include");
-    try!(fs::create_dir_all(&include_dir)
-      .chain_err(|| ErrorKind::CreateDirFailed(include_dir.display().to_string())));
+    try!(create_dir_all(&include_dir));
     let exports_file_path = include_dir.with_added(format!("{}_exports.h", &self.lib_name));
-    let mut exports_file = try!(File::create(&exports_file_path)
-      .chain_err(|| ErrorKind::WriteFileFailed(exports_file_path.display().to_string())));
-    try!(write!(exports_file,
-                include_str!("../templates/c_lib/exports.h"),
-                lib_name_uppercase = name_upper)
-      .chain_err(|| ErrorKind::WriteFileFailed(exports_file_path.display().to_string())));
+    let mut exports_file = try!(create_file(&exports_file_path));
+    try!(exports_file.write(format!(include_str!("../templates/c_lib/exports.h"),
+                                    lib_name_uppercase = name_upper)));
 
     let global_file_path = include_dir.with_added(format!("{}_global.h", &self.lib_name));
-    let mut global_file = try!(File::create(&global_file_path)
-      .chain_err(|| ErrorKind::WriteFileFailed(global_file_path.display().to_string())));
-    try!(write!(global_file,
-                include_str!("../templates/c_lib/global.h"),
-                lib_name_lowercase = &self.lib_name,
-                lib_name_uppercase = name_upper,
-                cpp_lib_include_file = cpp_lib_include_file)
-      .chain_err(|| ErrorKind::WriteFileFailed(global_file_path.display().to_string())));
+    let mut global_file = try!(create_file(&global_file_path));
+    try!(global_file.write(format!(include_str!("../templates/c_lib/global.h"),
+                                   lib_name_lowercase = &self.lib_name,
+                                   lib_name_uppercase = name_upper,
+                                   cpp_lib_include_file = cpp_lib_include_file)));
     Ok(())
   }
 
@@ -333,21 +320,12 @@ impl CppCodeGenerator {
     let mut h_path = self.lib_path.clone();
     h_path.push("include");
     h_path.push(format!("{}.h", &self.lib_name));
-    let mut all_header_file = try!(File::create(&h_path)
-      .chain_err(|| ErrorKind::WriteFileFailed(h_path.display().to_string())));
-    try!(write!(all_header_file,
-                "#ifndef {0}_H\n#define {0}_H\n\n",
-                &self.lib_name_upper)
-      .chain_err(|| ErrorKind::WriteFileFailed(h_path.display().to_string())));
+    let mut all_header_file = try!(create_file(&h_path));
+    try!(all_header_file.write(format!("#ifndef {0}_H\n#define {0}_H\n\n", &self.lib_name_upper)));
     for name in names {
-      try!(write!(all_header_file,
-                  "#include \"{}_{}.h\"\n",
-                  &self.lib_name,
-                  name)
-        .chain_err(|| ErrorKind::WriteFileFailed(h_path.display().to_string())));
+      try!(all_header_file.write(format!("#include \"{}_{}.h\"\n", &self.lib_name, name)));
     }
-    try!(write!(all_header_file, "#endif // {}_H\n", &self.lib_name_upper)
-      .chain_err(|| ErrorKind::WriteFileFailed(h_path.display().to_string())));
+    try!(all_header_file.write(format!("#endif // {}_H\n", &self.lib_name_upper)));
     Ok(())
   }
 
@@ -364,29 +342,27 @@ impl CppCodeGenerator {
     let h_path = self.lib_path.with_added("include").with_added(&ffi_include_file);
     log::noisy(format!("Generating header file: {:?}", h_path));
 
-    let mut cpp_file = File::create(&cpp_path).unwrap();
-    let mut h_file = File::create(&h_path).unwrap();
+    let mut cpp_file = try!(create_file(&cpp_path));
+    let mut h_file = try!(create_file(&h_path));
 
-    write!(cpp_file, "#include \"{}\"\n\n", ffi_include_file).unwrap();
+    try!(cpp_file.write(format!("#include \"{}\"\n\n", ffi_include_file)));
     let include_guard_name = ffi_include_file.replace(".", "_").to_uppercase();
-    write!(h_file,
-           "#ifndef {}\n#define {}\n\n",
-           include_guard_name,
-           include_guard_name)
-      .unwrap();
+    try!(h_file.write(format!("#ifndef {}\n#define {}\n\n",
+                              include_guard_name,
+                              include_guard_name)));
 
-    write!(h_file, "#include \"{}_global.h\"\n\n", &self.lib_name).unwrap();
+    try!(h_file.write(format!("#include \"{}_global.h\"\n\n", &self.lib_name)));
 
-    write!(h_file, "extern \"C\" {{\n\n").unwrap();
+    try!(h_file.write(format!("extern \"C\" {{\n\n")));
 
     for method in &data.methods {
-      h_file.write(&try!(self.function_declaration(method)).into_bytes()).unwrap();
-      cpp_file.write(&try!(self.function_implementation(method)).into_bytes()).unwrap();
+      try!(h_file.write(try!(self.function_declaration(method))));
+      try!(cpp_file.write(try!(self.function_implementation(method))));
     }
 
-    write!(h_file, "\n}} // extern \"C\"\n\n").unwrap();
+    try!(h_file.write(format!("\n}} // extern \"C\"\n\n")));
 
-    write!(h_file, "#endif // {}\n", include_guard_name).unwrap();
+    try!(h_file.write(format!("#endif // {}\n", include_guard_name)));
     Ok(())
   }
 }

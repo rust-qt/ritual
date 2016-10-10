@@ -34,21 +34,18 @@ pub fn add_to_multihash<K: Eq + Hash + Clone, T, V: Default + Extend<T>>(hash: &
 /// Runs a command, checks that it is successful, and
 /// returns its output if requested
 pub fn run_command(command: &mut Command, fetch_stdout: bool) -> Result<String> {
-  let cmd_text = format!("{:?}", command);
   log::info(format!("Executing command: {:?}", command));
   let result = if fetch_stdout {
-    let output = try!(command.output().chain_err(|| ErrorKind::CommandFailed(cmd_text.clone())));
+    let output = try!(command.output()
+      .chain_err(|| format!("command execution failed: {:?}", command)));
     String::from_utf8(output.stdout).unwrap()
   } else {
     String::new()
   };
-  let status = try!(command.status().chain_err(|| ErrorKind::CommandFailed(cmd_text.clone())));
+  let status = try!(command.status()
+    .chain_err(|| format!("command execution failed: {:?}", command)));
   if !status.success() {
-    return Err(ErrorKind::CommandStatusFailed {
-        cmd: cmd_text,
-        status: status,
-      }
-      .into());
+    return Err(format!("command failed with status {:?}: {:?}", status, command).into());
   }
   Ok(result)
 }

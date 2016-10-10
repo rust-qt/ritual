@@ -2,7 +2,7 @@ extern crate serde_json;
 extern crate num_cpus;
 
 use errors::{ErrorKind, Result, ChainErr};
-use file_utils::{PathBufWithAdded, move_files};
+use file_utils::{PathBufWithAdded, move_files, create_dir_all};
 use utils::is_msvc;
 use cpp_code_generator::CppCodeGenerator;
 use log;
@@ -89,7 +89,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     return Err(ErrorKind::SourceDirDoesntExist(env.source_dir_path.display().to_string()).into());
   }
   if !env.output_dir_path.as_path().exists() {
-    fs::create_dir_all(&env.output_dir_path).unwrap();
+    try!(create_dir_all(&env.output_dir_path));
   }
   let output_dir_path = my_canonicalize(&env.output_dir_path);
   let source_dir_path = my_canonicalize(&env.source_dir_path);
@@ -319,7 +319,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     if c_lib_tmp_path.as_path().exists() {
       fs::remove_dir_all(&c_lib_tmp_path).unwrap();
     }
-    fs::create_dir_all(&c_lib_tmp_path).unwrap();
+    try!(create_dir_all(&c_lib_tmp_path));
     log::info(format!("Generating C wrapper library ({}).", c_lib_name));
 
     let cpp_ffi_headers = cpp_ffi_generator::run(&parse_result, lib_spec.cpp.clone());
@@ -354,17 +354,12 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
                                        .collect::<Vec<_>>());
     try!(code_gen.generate_files(&cpp_ffi_headers));
 
-    try!(move_files(&c_lib_tmp_path, &c_lib_path).chain_err(|| {
-      ErrorKind::MoveFilesFailed {
-        from: c_lib_tmp_path.display().to_string(),
-        to: c_lib_path.display().to_string(),
-      }
-    }));
+    try!(move_files(&c_lib_tmp_path, &c_lib_path));
 
     log::info("Building C wrapper library.");
     let c_lib_build_path = c_lib_parent_path.with_added("build");
-    fs::create_dir_all(&c_lib_build_path).unwrap();
-    fs::create_dir_all(&c_lib_install_path).unwrap();
+    try!(create_dir_all(&c_lib_build_path));
+    try!(create_dir_all(&c_lib_install_path));
 
     try!(CppLibBuilder {
         cmake_source_dir: &c_lib_path,
@@ -384,7 +379,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     if crate_new_path.as_path().exists() {
       fs::remove_dir_all(&crate_new_path).unwrap();
     }
-    fs::create_dir_all(&crate_new_path).unwrap();
+    try!(create_dir_all(&crate_new_path));
     let rustfmt_config_path = source_dir_path.with_added("rustfmt.toml");
     let rust_config = rust_code_generator::RustCodeGeneratorConfig {
       invokation_method: env.invokation_method.clone(),
