@@ -324,7 +324,8 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     try!(create_dir_all(&c_lib_tmp_path));
     log::info(format!("Generating C wrapper library ({}).", c_lib_name));
 
-    let cpp_ffi_headers = cpp_ffi_generator::run(&parse_result, lib_spec.cpp.clone());
+    let cpp_ffi_headers = try!(cpp_ffi_generator::run(&parse_result, lib_spec.cpp.clone())
+      .chain_err(|| "FFI generator failed"));
 
     let mut cpp_libs = Vec::new();
     if c_lib_is_shared {

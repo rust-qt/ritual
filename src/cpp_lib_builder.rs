@@ -17,7 +17,11 @@ impl<'a> CppLibBuilder<'a> {
     let mut cmake_command = Command::new("cmake");
     cmake_command.arg(self.cmake_source_dir)
       .arg(format!("-DCMAKE_INSTALL_PREFIX={}",
-                   self.install_dir.to_str().unwrap()))
+                   if let Some(str) = self.install_dir.to_str() {
+                     str
+                   } else {
+                     return Err("install_dir is not a valid Unicode".into());
+                   }))
       .current_dir(self.build_dir);
     if is_msvc() {
       cmake_command.arg("-G").arg("NMake Makefiles");

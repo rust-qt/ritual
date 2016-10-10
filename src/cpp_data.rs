@@ -373,7 +373,7 @@ impl CppData {
               lowest_visibility = CppVisibility::Protected;
             }
           } else {
-            panic!("only class methods can appear here");
+            return Err("only class methods can appear here".into());
           }
         }
         if duplicates.iter()
@@ -417,7 +417,7 @@ impl CppData {
               if let Some(ref mut info) = final_method.class_membership {
                 info.visibility = lowest_visibility;
               } else {
-                panic!("only class methods can appear here");
+                return Err("only class methods can appear here".into());
               }
               self.methods.push(final_method);
             } else {
@@ -541,7 +541,7 @@ impl CppData {
 
 
   #[allow(dead_code)]
-  pub fn get_all_methods(&self, class_name: &str) -> Vec<&CppMethod> {
+  pub fn get_all_methods(&self, class_name: &str) -> Result<Vec<&CppMethod>> {
     let own_methods: Vec<_> = self.methods
       .iter()
       .filter(|m| m.class_name().map(|x| x.as_ref()) == Some(class_name))
@@ -551,7 +551,7 @@ impl CppData {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
         for base in bases {
           if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
-            for method in self.get_all_methods(name) {
+            for method in try!(self.get_all_methods(name)) {
               if own_methods.iter()
                 .find(|m| m.name == method.name && m.argument_types_equal(method))
                 .is_none() {
@@ -561,7 +561,7 @@ impl CppData {
           }
         }
       } else {
-        panic!("get_all_methods: not a class");
+        return Err("get_all_methods: not a class".into());
       }
     } else {
       log::warning(format!("get_all_methods: no type info for {:?}", class_name));
@@ -569,7 +569,7 @@ impl CppData {
     for method in own_methods {
       inherited_methods.push(method);
     }
-    inherited_methods
+    Ok(inherited_methods)
   }
 
   pub fn has_pure_virtual_methods(&self, class_name: &str) -> bool {
@@ -601,7 +601,7 @@ impl CppData {
     Ok(())
   }
 
-  fn instantiate_templates(&mut self, dependencies: &[&CppData]) {
+  fn instantiate_templates(&mut self, dependencies: &[&CppData]) -> Result<()> {
     log::info("Instantiating templates.");
     let mut new_methods = Vec::new();
 
@@ -612,7 +612,7 @@ impl CppData {
                  type1.base {
             if let Some(ref template_arguments) = *template_arguments {
               assert!(!template_arguments.is_empty());
-              if template_arguments.iter().find(|x| !x.base.is_template_parameter()).is_none() {
+              if template_arguments.iter().all(|x| x.base.is_template_parameter()) {
                 if let Some(template_instantiations) = self.template_instantiations
                   .iter()
                   .find(|x| &x.class_name == name) {
@@ -620,7 +620,7 @@ impl CppData {
                                             template_arguments[0].base {
                     nested_level
                   } else {
-                    panic!("only template parameters can be here");
+                    return Err("only template parameters can be here".into());
                   };
                   log::debug("");
                   log::debug(format!("method: {}", method.short_text()));
@@ -660,6 +660,7 @@ impl CppData {
       }
     }
     self.methods.append(&mut new_methods);
+    Ok(())
   }
 
   pub fn remove_existing_instantiations(&mut self, dependencies: &[&CppData]) {
@@ -710,7 +711,7 @@ impl CppData {
     self.remove_existing_instantiations(dependencies);
     try!(self.ensure_explicit_destructors(dependencies));
     self.generate_methods_with_omitted_args();
-    self.instantiate_templates(dependencies);
+    try!(self.instantiate_templates(dependencies));
     try!(self.add_inherited_methods(dependencies));
     Ok(())
   }

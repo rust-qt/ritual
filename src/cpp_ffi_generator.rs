@@ -7,6 +7,8 @@ use cpp_ffi_data::{CppAndFfiMethod, c_base_name};
 use utils::add_to_multihash;
 use serializable::CppLibSpec;
 
+use errors::{Result, unexpected};
+
 struct CGenerator<'a> {
   cpp_data: &'a CppData,
   cpp_lib_spec: CppLibSpec,
@@ -25,7 +27,7 @@ pub struct CppAndFfiData {
 }
 
 /// Runs FFI generator
-pub fn run(cpp_data: &CppData, cpp_lib_spec: CppLibSpec) -> Vec<CppFfiHeaderData> {
+pub fn run(cpp_data: &CppData, cpp_lib_spec: CppLibSpec) -> Result<Vec<CppFfiHeaderData>> {
   let generator = CGenerator {
     cpp_data: cpp_data,
     cpp_lib_spec: cpp_lib_spec,
@@ -47,12 +49,12 @@ pub fn run(cpp_data: &CppData, cpp_lib_spec: CppLibSpec) -> Vec<CppFfiHeaderData
     if let Some(index) = include_file_base_name.find('.') {
       include_file_base_name = include_file_base_name[0..index].to_string();
     }
-    let methods = generator.process_methods(include_file,
-                                            &include_file_base_name,
-                                            generator.cpp_data
-                                              .methods
-                                              .iter()
-                                              .filter(|x| &x.include_file == include_file));
+    let methods = try!(generator.process_methods(include_file,
+                                                 &include_file_base_name,
+                                                 generator.cpp_data
+                                                   .methods
+                                                   .iter()
+                                                   .filter(|x| &x.include_file == include_file)));
     if methods.is_empty() {
       log::info(format!("Skipping empty include file {}", include_file));
     } else {
@@ -64,9 +66,9 @@ pub fn run(cpp_data: &CppData, cpp_lib_spec: CppLibSpec) -> Vec<CppFfiHeaderData
     }
   }
   if c_headers.is_empty() {
-    panic!("No FFI headers generated");
+    return Err("No FFI headers generated".into());
   }
-  c_headers
+  Ok(c_headers)
 }
 
 impl<'a> CGenerator<'a> {
@@ -130,7 +132,7 @@ impl<'a> CGenerator<'a> {
                                                             include_file: &str,
                                                             include_file_base_name: &str,
                                                             methods: I)
-                                                            -> Vec<CppAndFfiMethod> {
+                                                            -> Result<Vec<CppAndFfiMethod>> {
     log::info(format!("Generating C++ FFI methods for header: {}", include_file));
     let mut hash_name_to_methods: HashMap<String, Vec<_>> = HashMap::new();
     for method in methods {
@@ -204,10 +206,10 @@ impl<'a> CGenerator<'a> {
         for value in values {
           log::error(format!("  {}", value.cpp_method.short_text()));
         }
-        panic!("all type caption strategies have failed");
+        return Err(unexpected("all type caption strategies have failed"));
       }
     }
     processed_methods.sort_by(|a, b| a.c_name.cmp(&b.c_name));
-    processed_methods
+    Ok(processed_methods)
   }
 }
