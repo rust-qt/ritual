@@ -523,7 +523,7 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
       assert!(args.len() == 1);
       if let CppTypeBase::Enum { ref name } = args[0].base {
         match find_type_info(processed_types, dependency_types, |x| &x.cpp_name == name) {
-          None => return Err(ErrorKind::NoRustType(name.clone()).into()),
+          None => return Err(format!("type has no Rust equivalent: {}", name).into()),
           Some(info) => info.rust_name.clone(),
         }
       } else {
@@ -601,7 +601,7 @@ fn ffi_type(processed_types: &[RustProcessedTypeInfo],
           CppBuiltInNumericType::ULongLong => "c_ulonglong",
           CppBuiltInNumericType::Float => "c_float",
           CppBuiltInNumericType::Double => "c_double",
-          _ => return Err(ErrorKind::UnsupportedNumericType(numeric.clone()).into()),
+          _ => return Err(format!("unsupported numeric type: {:?}", numeric).into()),
         };
         RustName::new(vec!["libc".to_string(), own_name.to_string()])
       }
@@ -618,7 +618,7 @@ fn ffi_type(processed_types: &[RustProcessedTypeInfo],
     }
     CppTypeBase::Enum { ref name } => {
       match find_type_info(processed_types, dependency_types, |x| &x.cpp_name == name) {
-        None => return Err(ErrorKind::NoRustType(name.clone()).into()),
+        None => return Err(format!("type has no Rust equivalent: {}", name).into()),
         Some(info) => info.rust_name.clone(),
       }
     }
@@ -627,7 +627,7 @@ fn ffi_type(processed_types: &[RustProcessedTypeInfo],
         &x.cpp_name == &name_and_args.name &&
         &x.cpp_template_arguments == &name_and_args.template_arguments
       }) {
-        None => return Err(ErrorKind::NoRustType(format!("{:?}", name_and_args)).into()),
+        None => return Err(format!("type has no Rust equivalent: {:?}", name_and_args).into()),
         Some(info) => info.rust_name.clone(),
       }
     }
@@ -635,7 +635,7 @@ fn ffi_type(processed_types: &[RustProcessedTypeInfo],
                                    ref arguments,
                                    ref allows_variadic_arguments } => {
       if *allows_variadic_arguments {
-        return Err(ErrorKind::VariadicFunctionPointer.into());
+        return Err("function pointers with variadic arguments are not supported".into());
       }
       let mut rust_args = Vec::new();
       for arg in arguments {
@@ -657,7 +657,11 @@ fn ffi_type(processed_types: &[RustProcessedTypeInfo],
       CppTypeIndirection::None => RustTypeIndirection::None,
       CppTypeIndirection::Ptr => RustTypeIndirection::Ptr,
       CppTypeIndirection::PtrPtr => RustTypeIndirection::PtrPtr,
-      _ => return Err(ErrorKind::InvalidFfiIndirection(cpp_ffi_type.indirection.clone()).into()),
+      _ => {
+        return Err(format!("invalid FFI type indirection: {:?}",
+                           cpp_ffi_type.indirection)
+          .into())
+      }
     },
     generic_arguments: None,
   })
@@ -903,8 +907,7 @@ impl RustGenerator {
       let arg_type = try!(complete_type(&self.processed_types,
                                         &self.dependency_types,
                                         &arg.argument_type,
-                                        &arg.meaning)
-        .chain_err(|| ErrorKind::TypeToCompleteFailed(arg.argument_type.clone())));
+                                        &arg.meaning));
       if arg.meaning == CppFfiArgumentMeaning::ReturnValue {
         assert!(return_type_info.is_none());
         return_type_info = Some((arg_type, Some(arg_index as i32)));
@@ -926,8 +929,7 @@ impl RustGenerator {
       let mut return_type = try!(complete_type(&self.processed_types,
                                                &self.dependency_types,
                                                &method.c_signature.return_type,
-                                               &CppFfiArgumentMeaning::ReturnValue)
-        .chain_err(|| ErrorKind::TypeToCompleteFailed(method.c_signature.return_type.clone())));
+                                               &CppFfiArgumentMeaning::ReturnValue));
       if method.allocation_place == ReturnValueAllocationPlace::Heap &&
          !method.cpp_method.is_destructor() {
         if let RustType::Common { ref mut indirection, .. } = return_type.rust_api_type {

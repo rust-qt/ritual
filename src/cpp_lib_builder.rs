@@ -27,7 +27,7 @@ impl<'a> CppLibBuilder<'a> {
     }
     // TODO: enable release mode on other platforms if cargo is in release mode
     // (maybe build C library in both debug and release in separate folders)
-    try!(run_command(&mut cmake_command, false).chain_err(|| ErrorKind::CMakeFailed));
+    try!(run_command(&mut cmake_command, false));
 
     let make_command_name = if is_msvc() { "nmake" } else { "make" }.to_string();
     let mut make_args = Vec::new();
@@ -43,13 +43,12 @@ impl<'a> CppLibBuilder<'a> {
     if let Some(linker_env_library_dirs) = self.linker_env_library_dirs {
       if !linker_env_library_dirs.is_empty() {
         for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB"] {
-          let value = try!(add_env_path_item(name, (*linker_env_library_dirs).clone())
-            .chain_err(|| ErrorKind::AddEnvFailed));
+          let value = try!(add_env_path_item(name, (*linker_env_library_dirs).clone()));
           make_command.env(name, value);
         }
       }
     }
-    try!(run_command(&mut make_command, false).chain_err(|| ErrorKind::MakeFailed));
+    try!(run_command(&mut make_command, false));
     Ok(())
   }
 }

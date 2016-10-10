@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use file_utils::{PathBufWithAdded, create_dir_all, create_file};
 use utils::is_msvc;
 use cpp_type::{CppTypeIndirection, CppTypeBase};
-use errors::{ErrorKind, Result, ChainErr};
+use errors::{ErrorKind, Result, ChainErr, unexpected};
 
 /// Generates C++ code for the C wrapper library.
 pub struct CppCodeGenerator {
@@ -43,19 +43,14 @@ impl CppCodeGenerator {
   fn function_signature(&self, method: &CppAndFfiMethod) -> Result<String> {
     let mut arg_texts = Vec::new();
     for arg in &method.c_signature.arguments {
-      arg_texts.push(try!(arg.to_cpp_code()
-        .chain_err(|| ErrorKind::FfiArgumentToCodeFailed(arg.clone()))));
+      arg_texts.push(try!(arg.to_cpp_code()));
     }
     let name_with_args = format!("{}({})", method.c_name, arg_texts.join(", "));
     let return_type = &method.c_signature.return_type.ffi_type;
     let r = if let CppTypeBase::FunctionPointer { .. } = return_type.base {
-      try!(return_type.to_cpp_code(Some(&name_with_args))
-        .chain_err(|| ErrorKind::CppTypeToCodeFailed(return_type.clone())))
+      try!(return_type.to_cpp_code(Some(&name_with_args)))
     } else {
-      format!("{} {}",
-              try!(return_type.to_cpp_code(None)
-                .chain_err(|| ErrorKind::CppTypeToCodeFailed(return_type.clone()))),
-              name_with_args)
+      format!("{} {}", try!(return_type.to_cpp_code(None)), name_with_args)
     };
     Ok(r)
   }
@@ -76,10 +71,10 @@ impl CppCodeGenerator {
       IndirectionChange::ValueToPointer => {
         match method.allocation_place {
           ReturnValueAllocationPlace::Stack => {
-            return Err(ErrorKind::StackAllocatedNonVoidWrapper.into());
+            return Err(unexpected("stack allocated wrappers are expected to return void"));
           }
           ReturnValueAllocationPlace::NotApplicable => {
-            return Err(ErrorKind::ValueToPointerConflictsWithNotApplicable.into());
+            return Err(unexpected("ValueToPointer conflicts with NotApplicable"));
           }
           ReturnValueAllocationPlace::Heap => {
             // constructors are said to return values in parse result,
@@ -161,7 +156,7 @@ impl CppCodeGenerator {
         .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
         format!("{}_call_destructor({})", self.lib_name, arg.name)
       } else {
-        return Err(ErrorKind::NoThisInDestructor.into());
+        return Err(unexpected("no this arg in destructor"));
       }
     } else {
       let result_without_args = if method.cpp_method.is_constructor() {
@@ -175,16 +170,16 @@ impl CppCodeGenerator {
                 .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
                 format!("new({}) {}", arg.name, try!(class_type.to_cpp_code()))
               } else {
-                return Err(ErrorKind::NoReturnValueArgument.into());
+                return Err(unexpected("return value argument not found"));
               }
             }
             ReturnValueAllocationPlace::Heap => format!("new {}", try!(class_type.to_cpp_code())),
             ReturnValueAllocationPlace::NotApplicable => {
-              return Err(ErrorKind::NotApplicableAllocationPlaceInConstructor.into())
+              return Err(unexpected("NotApplicable in constructor"));
             }
           }
         } else {
-          return Err(ErrorKind::Unexpected("constructor without class membership").into());
+          return Err(unexpected("constructor without class membership").into());
         }
       } else {
         let scope_specifier = if let Some(ref class_membership) = method.cpp_method
@@ -198,7 +193,7 @@ impl CppCodeGenerator {
               .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
               format!("{}->", arg.name)
             } else {
-              return Err(ErrorKind::NoThisInMethod.into());
+              return Err(unexpected("no this arg in non-static method"));
             }
           }
         } else {
@@ -310,7 +305,7 @@ impl CppCodeGenerator {
   pub fn generate_files(&self, data: &[CppFfiHeaderData]) -> Result<()> {
     try!(self.generate_all_headers_file(data.iter().map(|x| &x.include_file)));
     for item in data {
-      try!(self.generate_one(item).chain_err(|| ErrorKind::CppCodeGeneratorFailed));
+      try!(self.generate_one(item).chain_err(|| "C++ code generator failed"));
     }
     Ok(())
   }

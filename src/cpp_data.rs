@@ -22,7 +22,7 @@ fn apply_instantiations_to_method(method: &CppMethod,
     if let Some(ref args) = method.template_arguments {
       if args.nested_level == nested_level {
         if args.count() != ins.template_arguments.len() as i32 {
-          return Err(ErrorKind::TemplateArgsCountMismatch.into());
+          return Err("template arguments count mismatch".into());
         }
         new_method.template_arguments = None;
         new_method.template_arguments_values = Some(ins.template_arguments.clone());
@@ -66,7 +66,9 @@ fn apply_instantiations_to_method(method: &CppMethod,
     if new_method.all_involved_types()
       .iter()
       .any(|t| t.base.is_or_contains_template_parameter()) {
-      return Err(ErrorKind::ExtraTemplateParametersLeft(new_method.short_text()).into());
+      return Err(format!("extra template parameters left: {}",
+                         new_method.short_text())
+        .into());
     } else {
       if let Some(conversion_type) = conversion_type {
         new_method.name = format!("operator {}", try!(conversion_type.to_cpp_code(None)));
@@ -575,7 +577,7 @@ impl CppData {
           })
         };
         if !dependencies.into_iter().chain(iter::once(&self)).any(is_valid) {
-          return Err(ErrorKind::TypeNotAvailable(type1.clone()).into());
+          return Err(format!("type not available: {:?}", type1).into());
         }
         for arg in template_arguments {
           try!(self.check_template_type(dependencies, arg));

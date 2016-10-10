@@ -86,7 +86,9 @@ fn my_canonicalize(path: &PathBuf) -> PathBuf {
 pub fn run(env: BuildEnvironment) -> Result<()> {
   // canonicalize paths
   if !env.source_dir_path.as_path().exists() {
-    return Err(ErrorKind::SourceDirDoesntExist(env.source_dir_path.display().to_string()).into());
+    return Err(format!("source dir doesn't exist: {}",
+                       env.source_dir_path.display())
+      .into());
   }
   if !env.output_dir_path.as_path().exists() {
     try!(create_dir_all(&env.output_dir_path));
@@ -145,16 +147,14 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     let result1 = try!(run_command(Command::new(&qmake_path)
                                      .arg("-query")
                                      .arg("QT_INSTALL_HEADERS"),
-                                   true)
-      .chain_err(|| ErrorKind::QMakeQueryFailed));
+                                   true));
     let qt_install_headers_path = PathBuf::from(result1.trim());
     log::info(format!("QT_INSTALL_HEADERS = \"{}\"",
                       qt_install_headers_path.to_str().unwrap()));
     let result2 = try!(run_command(Command::new(&qmake_path)
                                      .arg("-query")
                                      .arg("QT_INSTALL_LIBS"),
-                                   true)
-      .chain_err(|| ErrorKind::QMakeQueryFailed));
+                                   true));
     let qt_install_libs_path = PathBuf::from(result2.trim());
     log::info(format!("QT_INSTALL_LIBS = \"{}\"",
                       qt_install_libs_path.to_str().unwrap()));
@@ -373,7 +373,8 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
         },
       }
       .run()
-      .chain_err(|| ErrorKind::CWrapperBuildFailed));
+      .chain_err(|| "C wrapper build failed")
+      .into());
 
     let crate_new_path = output_dir_path.with_added(format!("{}.new", &input_cargo_toml_data.name));
     if crate_new_path.as_path().exists() {
@@ -465,15 +466,13 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
         command.current_dir(&output_dir_path);
         if !all_cpp_lib_dirs.is_empty() {
           for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB", "PATH"] {
-            let value = try!(add_env_path_item(name, all_cpp_lib_dirs.clone())
-              .chain_err(|| ErrorKind::AddEnvFailed));
+            let value = try!(add_env_path_item(name, all_cpp_lib_dirs.clone()));
             command.env(name, value);
           }
         }
         if !framework_dirs.is_empty() {
           command.env("DYLD_FRAMEWORK_PATH",
-                      try!(add_env_path_item("DYLD_FRAMEWORK_PATH", framework_dirs.clone())
-                        .chain_err(|| ErrorKind::AddEnvFailed)));
+                      try!(add_env_path_item("DYLD_FRAMEWORK_PATH", framework_dirs.clone())));
         }
         if is_msvc() && *cargo_cmd == "test" {
           // cargo doesn't pass this flag to rustc when it compiles qt_core,
@@ -481,7 +480,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
           // "cannot satisfy dependencies so `std` only shows up once" error.
           command.env("RUSTFLAGS", "-C prefer-dynamic");
         }
-        try!(run_command(&mut command, false).chain_err(|| ErrorKind::CargoFailed));
+        try!(run_command(&mut command, false).chain_err(|| "failed to build generated crate"));
       }
       log::info("Completed successfully.");
     }

@@ -227,7 +227,7 @@ pub fn c_base_name(cpp_method: &CppMethod,
       ReturnValueAllocationPlace::Stack => "constructor".to_string(),
       ReturnValueAllocationPlace::Heap => "new".to_string(),
       ReturnValueAllocationPlace::NotApplicable => {
-        return Err(ErrorKind::NotApplicableAllocationPlaceInConstructor.into())
+        return Err("NotApplicable in constructor".into());
       }
     }
   } else if cpp_method.is_destructor() {
@@ -235,7 +235,7 @@ pub fn c_base_name(cpp_method: &CppMethod,
       ReturnValueAllocationPlace::Stack => "destructor".to_string(),
       ReturnValueAllocationPlace::Heap => "delete".to_string(),
       ReturnValueAllocationPlace::NotApplicable => {
-        return Err(ErrorKind::NotApplicableAllocationPlaceInConstructor.into())
+        return Err("NotApplicable in destructor".into());
       }
     }
   } else if let Some(ref operator) = cpp_method.operator {

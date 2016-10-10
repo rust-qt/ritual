@@ -59,7 +59,7 @@ pub fn add_env_path_item(env_var_name: &'static str,
       new_paths.push(path);
     }
   }
-  env::join_paths(new_paths).chain_err(|| ErrorKind::JoinPathsFailed)
+  env::join_paths(new_paths).chain_err(|| "env::join_paths failed")
 }
 
 pub fn manifest_dir() -> PathBuf {
