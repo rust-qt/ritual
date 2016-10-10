@@ -1082,7 +1082,7 @@ impl CppParser {
             },
             is_signal: false, // TODO: parse signals and slots (#7)
             class_type: match self.find_type(|x| &x.name == &class_name) {
-              Some(info) => info.default_class_type(),
+              Some(info) => info.default_class_type().unwrap(),
               None => return Err(format!("Unknown class type: {}", class_name)),
             },
           })

@@ -19,7 +19,7 @@ use doc_formatter;
 use std::collections::{HashMap, HashSet, hash_map};
 use cpp_operator::CppOperator;
 use caption_strategy::TypeCaptionStrategy;
-use errors::{ErrorKind, Result, ChainErr};
+use errors::Result;
 
 pub use serializable::{RustProcessedTypeKind, RustProcessedTypeInfo};
 

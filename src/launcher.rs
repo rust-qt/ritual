@@ -1,7 +1,7 @@
 extern crate serde_json;
 extern crate num_cpus;
 
-use errors::{ErrorKind, Result, ChainErr};
+use errors::{Result, ChainErr};
 use file_utils::{PathBufWithAdded, move_files, create_dir_all};
 use utils::is_msvc;
 use cpp_code_generator::CppCodeGenerator;
@@ -284,7 +284,9 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       None
     };
 
-    let parse_result = loaded_parse_result.unwrap_or_else(|| {
+    let parse_result = if let Some(r) = loaded_parse_result {
+      r
+    } else {
       log::info("Parsing C++ headers.");
       let mut parse_result = cpp_parser::run(cpp_parser::CppParserConfig {
                                                include_dirs: include_dirs.clone(),
@@ -304,14 +306,14 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
         }
       }
       log::info("Post-processing parse result.");
-      parse_result.post_process(&dependencies.iter().map(|x| &x.cpp_data).collect::<Vec<_>>());
+      try!(parse_result.post_process(&dependencies.iter().map(|x| &x.cpp_data).collect::<Vec<_>>()));
 
       let mut file = File::create(&parse_result_cache_file_path).unwrap();
       serde_json::to_writer(&mut file, &parse_result).unwrap();
       log::info(format!("Header parse result is saved to file: {}",
                         parse_result_cache_file_path.to_str().unwrap()));
       parse_result
-    });
+    };
 
     let c_lib_name = format!("{}_c", &input_cargo_toml_data.name);
     let c_lib_path = c_lib_parent_path.with_added("source");
@@ -345,13 +347,13 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
                                          c_lib_tmp_path.clone(),
                                          c_lib_is_shared,
                                          cpp_libs);
-    code_gen.generate_template_files(&lib_spec.cpp.include_file,
-                                     &include_dirs.iter()
-                                       .map(|x| x.to_str().unwrap().to_string())
-                                       .collect::<Vec<_>>(),
-                                     &framework_dirs.iter()
-                                       .map(|x| x.to_str().unwrap().to_string())
-                                       .collect::<Vec<_>>());
+    try!(code_gen.generate_template_files(&lib_spec.cpp.include_file,
+                                          &include_dirs.iter()
+                                            .map(|x| x.to_str().unwrap().to_string())
+                                            .collect::<Vec<_>>(),
+                                          &framework_dirs.iter()
+                                            .map(|x| x.to_str().unwrap().to_string())
+                                            .collect::<Vec<_>>()));
     try!(code_gen.generate_files(&cpp_ffi_headers));
 
     try!(move_files(&c_lib_tmp_path, &c_lib_path));

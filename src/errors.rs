@@ -1,8 +1,6 @@
 #![cfg_attr(feature="clippy", allow(redundant_closure))]
 
 use std;
-use cpp_type::{CppType, CppTypeIndirection, CppBuiltInNumericType};
-use cpp_ffi_data::{CppFfiFunctionArgument, CppFfiType};
 
 error_chain! {
   foreign_links {

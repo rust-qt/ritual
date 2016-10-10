@@ -5,7 +5,7 @@ use std;
 use log;
 use std::process::Command;
 use std::env;
-use errors::{ErrorKind, Result, ChainErr};
+use errors::{Result, ChainErr};
 
 #[cfg(all(windows, target_env = "msvc"))]
 pub fn is_msvc() -> bool {

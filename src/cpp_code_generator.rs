@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use file_utils::{PathBufWithAdded, create_dir_all, create_file};
 use utils::is_msvc;
 use cpp_type::{CppTypeIndirection, CppTypeBase};
-use errors::{ErrorKind, Result, ChainErr, unexpected};
+use errors::{Result, ChainErr, unexpected};
 
 /// Generates C++ code for the C wrapper library.
 pub struct CppCodeGenerator {
@@ -348,14 +348,14 @@ impl CppCodeGenerator {
 
     try!(h_file.write(format!("#include \"{}_global.h\"\n\n", &self.lib_name)));
 
-    try!(h_file.write(format!("extern \"C\" {{\n\n")));
+    try!(h_file.write("extern \"C\" {\n\n"));
 
     for method in &data.methods {
       try!(h_file.write(try!(self.function_declaration(method))));
       try!(cpp_file.write(try!(self.function_implementation(method))));
     }
 
-    try!(h_file.write(format!("\n}} // extern \"C\"\n\n")));
+    try!(h_file.write("\n} // extern \"C\"\n\n"));
 
     try!(h_file.write(format!("#endif // {}\n", include_guard_name)));
     Ok(())

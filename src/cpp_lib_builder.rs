@@ -1,5 +1,5 @@
 use utils::{is_msvc, add_env_path_item, run_command};
-use errors::{ErrorKind, Result, ChainErr};
+use errors::Result;
 
 use std::process::Command;
 use std::path::PathBuf;

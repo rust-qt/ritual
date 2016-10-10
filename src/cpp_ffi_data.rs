@@ -5,7 +5,7 @@ use cpp_type::CppType;
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use caption_strategy::{MethodCaptionStrategy, TypeCaptionStrategy};
 use cpp_operator::CppOperator;
-use errors::{ErrorKind, Result, ChainErr};
+use errors::Result;
 
 /// Information that indicates how the FFI function argument
 /// should be interpreted

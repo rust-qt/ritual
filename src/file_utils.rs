@@ -1,5 +1,5 @@
 use log;
-use errors::{ErrorKind, Result, ChainErr};
+use errors::{Result, ChainErr};
 
 use std::path::{Path, PathBuf};
 use std::fs;

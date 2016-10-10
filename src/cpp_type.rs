@@ -5,7 +5,7 @@ pub use serializable::{CppBuiltInNumericType, CppSpecificNumericTypeKind, CppTyp
 use string_utils::JoinWithString;
 extern crate regex;
 
-use errors::{ErrorKind, Result, ChainErr};
+use errors::Result;
 
 impl CppTypeIndirection {
   pub fn combine(left: &CppTypeIndirection,
