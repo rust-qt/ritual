@@ -8,6 +8,7 @@ use string_utils::JoinWithString;
 pub use serializable::{CppFunctionArgument, CppMethodKind, CppMethod, CppMethodClassMembership,
                        CppMethodInheritedFrom};
 use cpp_operator::CppOperator;
+use errors::{Result, unexpected};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ReturnValueAllocationPlace {
@@ -53,9 +54,8 @@ impl CppMethod {
     if self.allows_variadic_arguments != other.allows_variadic_arguments {
       return false;
     }
-    for i in 0..self.arguments.len() {
-      if self.arguments.get(i).unwrap().argument_type !=
-         other.arguments.get(i).unwrap().argument_type {
+    for (i, j) in self.arguments.iter().zip(other.arguments.iter()) {
+      if i.argument_type != j.argument_type {
         return false;
       }
     }
@@ -80,9 +80,9 @@ impl CppMethod {
   /// - adds "output" argument for return value if allocation_place is Stack.
   pub fn c_signature(&self,
                      allocation_place: ReturnValueAllocationPlace)
-                     -> Result<CppFfiFunctionSignature, String> {
+                     -> Result<CppFfiFunctionSignature> {
     if self.allows_variadic_arguments {
-      return Err("Variable arguments are not supported".to_string());
+      return Err("Variable arguments are not supported".into());
     }
     let mut r = CppFfiFunctionSignature {
       arguments: Vec::new(),
@@ -92,74 +92,62 @@ impl CppMethod {
       if !info.is_static && info.kind != CppMethodKind::Constructor {
         r.arguments.push(CppFfiFunctionArgument {
           name: "this_ptr".to_string(),
-          argument_type: CppType {
+          argument_type: try!(CppType {
               base: CppTypeBase::Class(info.class_type.clone()),
               is_const: info.is_const,
               is_const2: false,
               indirection: CppTypeIndirection::Ptr,
             }
-            .to_cpp_ffi_type(CppTypeRole::NotReturnType)
-            .unwrap(),
+            .to_cpp_ffi_type(CppTypeRole::NotReturnType)),
           meaning: CppFfiArgumentMeaning::This,
         });
       }
     }
     for (index, arg) in self.arguments.iter().enumerate() {
-      match arg.argument_type.to_cpp_ffi_type(CppTypeRole::NotReturnType) {
-        Ok(c_type) => {
-          r.arguments.push(CppFfiFunctionArgument {
-            name: arg.name.clone(),
-            argument_type: c_type,
-            meaning: CppFfiArgumentMeaning::Argument(index as i8),
-          });
-        }
-        Err(msg) => {
-          return Err(format!("Can't convert type to C: {:?}: {}", arg.argument_type, msg));
-        }
-      }
+      let c_type = try!(arg.argument_type.to_cpp_ffi_type(CppTypeRole::NotReturnType));
+      r.arguments.push(CppFfiFunctionArgument {
+        name: arg.name.clone(),
+        argument_type: c_type,
+        meaning: CppFfiArgumentMeaning::Argument(index as i8),
+      });
     }
-    let real_return_type = if self.is_constructor() {
+    let real_return_type = if let Some(info) = self.class_info_if_constructor() {
       CppType {
         is_const: false,
         is_const2: false,
         indirection: CppTypeIndirection::None,
-        base: CppTypeBase::Class(self.class_membership.as_ref().unwrap().class_type.clone()),
+        base: CppTypeBase::Class(info.class_type.clone()),
       }
     } else {
       self.return_type.clone()
     };
-    match real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType) {
-      Ok(c_type) => {
-        if real_return_type.needs_allocation_place_variants() {
-          match allocation_place {
-            ReturnValueAllocationPlace::Stack => {
-              r.arguments.push(CppFfiFunctionArgument {
-                name: "output".to_string(),
-                argument_type: c_type,
-                meaning: CppFfiArgumentMeaning::ReturnValue,
-              });
-            }
-            ReturnValueAllocationPlace::Heap => {
-              r.return_type = c_type;
-            }
-            ReturnValueAllocationPlace::NotApplicable => {
-              panic!("NotApplicable encountered but return value needs allocation_place variants")
-            }
-          }
-        } else {
+    let c_type = try!(real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType));
+    if real_return_type.needs_allocation_place_variants() {
+      match allocation_place {
+        ReturnValueAllocationPlace::Stack => {
+          r.arguments.push(CppFfiFunctionArgument {
+            name: "output".to_string(),
+            argument_type: c_type,
+            meaning: CppFfiArgumentMeaning::ReturnValue,
+          });
+        }
+        ReturnValueAllocationPlace::Heap => {
           r.return_type = c_type;
         }
+        ReturnValueAllocationPlace::NotApplicable => {
+          return Err(unexpected("NotApplicable encountered but return value needs \
+                                 allocation_place variants"));
+        }
       }
-      Err(msg) => {
-        return Err(format!("Can't convert type to C: {:?}: {}", real_return_type, msg));
-      }
+    } else {
+      r.return_type = c_type;
     }
     Ok(r)
   }
 
   /// Generates either one or two FFI signatures for this method,
   /// depending on its return type.
-  pub fn to_ffi_signatures(&self) -> Result<Vec<CppMethodWithFfiSignature>, String> {
+  pub fn to_ffi_signatures(&self) -> Result<Vec<CppMethodWithFfiSignature>> {
     let places = if self.needs_allocation_place_variants() {
       vec![ReturnValueAllocationPlace::Heap, ReturnValueAllocationPlace::Stack]
     } else {
@@ -300,6 +288,20 @@ impl CppMethod {
       None => false,
     }
   }
+  pub fn class_info_if_constructor(&self) -> Option<&CppMethodClassMembership> {
+    if let Some(ref info) = self.class_membership {
+      if info.kind.is_constructor() {
+        Some(info)
+      } else {
+        None
+      }
+    } else {
+      None
+    }
+  }
+
+
+
   #[allow(dead_code)]
   pub fn is_operator(&self) -> bool {
     self.operator.is_some()

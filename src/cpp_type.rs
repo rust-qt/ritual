@@ -5,7 +5,7 @@ pub use serializable::{CppBuiltInNumericType, CppSpecificNumericTypeKind, CppTyp
 use string_utils::JoinWithString;
 extern crate regex;
 
-use errors::Result;
+use errors::{Result, ChainErr, Error};
 
 impl CppTypeIndirection {
   pub fn combine(left: &CppTypeIndirection,
@@ -326,27 +326,31 @@ impl CppType {
   /// (e.g. references and passing objects by value)
   #[cfg_attr(feature="clippy", allow(collapsible_if))]
   pub fn to_cpp_ffi_type(&self, role: CppTypeRole) -> Result<CppFfiType> {
+    let err = || format!("Can't express type to FFI: {:?}", self);
     match self.base {
       CppTypeBase::TemplateParameter { .. } => {
-        return Err("template parameters cannot be expressed in FFI".into());
+        return Err(Error::from("template parameters cannot be expressed in FFI")).chain_err(&err);
       }
       CppTypeBase::FunctionPointer { ref return_type,
                                      ref arguments,
                                      ref allows_variadic_arguments } => {
         if *allows_variadic_arguments {
-          return Err("function pointers with variadic arguments are not supported".into());
+          return Err(Error::from("function pointers with variadic arguments are not supported"))
+            .chain_err(&err);
         }
         let mut all_types: Vec<&CppType> = arguments.iter().collect();
         all_types.push(return_type.as_ref());
         for arg in all_types {
           match arg.base {
             CppTypeBase::TemplateParameter { .. } => {
-              return Err("function pointers containing template parameters are not supported"
-                .into());
+              return Err(Error::from("function pointers containing template parameters are not \
+                                      supported"))
+                .chain_err(&err);
             }
             CppTypeBase::FunctionPointer { .. } => {
-              return Err("function pointers containing nested function pointers are not supported"
-                .into());
+              return Err(Error::from("function pointers containing nested function pointers are \
+                                      not supported"))
+                .chain_err(&err);
             }
             _ => {}
           }
@@ -354,14 +358,16 @@ impl CppType {
             CppTypeIndirection::Ref |
             CppTypeIndirection::PtrRef |
             CppTypeIndirection::RValueRef => {
-              return Err("Function pointers containing references are not supported".into());
+              return Err(Error::from("Function pointers containing references are not supported"))
+                .chain_err(&err);
             }
             CppTypeIndirection::Ptr |
             CppTypeIndirection::PtrPtr => {}
             CppTypeIndirection::None => {
               if arg.base.is_class() {
-                return Err("Function pointers containing classes by value are not supported"
-                  .into());
+                return Err(Error::from("Function pointers containing classes by value are not \
+                                        supported"))
+                  .chain_err(&err);
               }
             }
           }
@@ -391,16 +397,17 @@ impl CppType {
         conversion = IndirectionChange::ReferenceToPointer;
       }
       CppTypeIndirection::RValueRef => {
-        return Err("rvalue references are not supported".into());
+        return Err(Error::from("rvalue references are not supported")).chain_err(&err);
       }
     }
     if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = self.base {
       if name == "QFlags" {
         if !(self.indirection == CppTypeIndirection::None ||
              (self.indirection == CppTypeIndirection::Ref && self.is_const)) {
-          return Err(format!("QFlags type can only be values or const references: {:?}",
-                             self)
-            .into());
+          return Err(Error::from(format!("QFlags type can only be values or const references: \
+                                          {:?}",
+                                         self)))
+            .chain_err(&err);
         }
         conversion = IndirectionChange::QFlagsToUInt;
         result.base = CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::UInt);
