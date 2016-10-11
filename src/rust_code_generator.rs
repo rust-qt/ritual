@@ -526,9 +526,6 @@ impl RustCodeGenerator {
     }
     {
       let mut lib_file = File::create(&lib_file_path).unwrap();
-      if self.config.invokation_method == InvokationMethod::CommandLine {
-        write!(lib_file, "#![allow(drop_with_repr_extern)]\n\n").unwrap();
-      }
       write!(lib_file, "pub extern crate libc;\n").unwrap();
       write!(lib_file, "pub extern crate cpp_utils;\n\n").unwrap();
       for dep in &self.config.dependencies {
