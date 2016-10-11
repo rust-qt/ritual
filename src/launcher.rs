@@ -415,17 +415,20 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       dependency_rust_types.extend_from_slice(&dep.rust_export_info.rust_types);
     }
     log::info("Preparing Rust functions");
-    let rust_data = rust_generator::run(CppAndFfiData {
-                                          cpp_data: parse_result,
-                                          cpp_ffi_headers: cpp_ffi_headers,
-                                        },
-                                        dependency_rust_types,
-                                        rust_generator::RustGeneratorConfig {
-                                          crate_name: input_cargo_toml_data.name.clone(),
-                                          remove_qt_prefix: is_qt_library,
-                                          qt_doc_data: qt_doc_data,
-                                        });
+    let rust_data = try!(rust_generator::run(CppAndFfiData {
+                                               cpp_data: parse_result,
+                                               cpp_ffi_headers: cpp_ffi_headers,
+                                             },
+                                             dependency_rust_types,
+                                             rust_generator::RustGeneratorConfig {
+                                               crate_name: input_cargo_toml_data.name.clone(),
+                                               remove_qt_prefix: is_qt_library,
+                                               qt_doc_data: qt_doc_data,
+                                             })
+      .chain_err(|| "Rust data generator failed"));
     log::info(format!("Generating Rust crate ({}).", &input_cargo_toml_data.name));
+    //    try!(Ok(rust_code_generator::run(rust_config, &rust_data))
+    //      .chain_err(|| "Rust code generator failed"));
     rust_code_generator::run(rust_config, &rust_data);
     {
       let rust_types_path = output_dir_path.with_added("rust_export_info.json");

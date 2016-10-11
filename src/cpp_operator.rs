@@ -1,5 +1,7 @@
 pub use serializable::CppOperator;
 
+use errors::Result;
+
 /// Constraints applied to a C++ operator method
 /// of a certain kind
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -98,10 +100,12 @@ impl CppOperator {
 
   /// Returns alphanumeric identifier for this operator
   /// used to name FFI functions.
-  pub fn c_name(&self) -> &'static str {
+  pub fn c_name(&self) -> Result<&'static str> {
     use self::CppOperator::*;
-    match *self {
-      Conversion(..) => panic!("CppOperator::c_name: conversion operators are not supported"),
+    Ok(match *self {
+      Conversion(..) => {
+        return Err("CppOperator::c_name: conversion operators are not supported".into())
+      }
       Assignment => "assign",
       Addition => "add",
       Subtraction => "sub",
@@ -150,7 +154,7 @@ impl CppOperator {
       NewArray => "new_array",
       Delete => "delete",
       DeleteArray => "delete_array",
-    }
+    })
   }
 
   /// Returns all existing operator kinds except for

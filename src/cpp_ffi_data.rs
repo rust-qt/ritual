@@ -243,7 +243,7 @@ pub fn c_base_name(cpp_method: &CppMethod,
       CppOperator::Conversion(ref cpp_type) => {
         format!("convert_to_{}", cpp_type.caption(TypeCaptionStrategy::Full))
       }
-      _ => format!("operator_{}", operator.c_name()),
+      _ => format!("operator_{}", try!(operator.c_name())),
     })
   } else {
     add_place_note(cpp_method.name.replace("::", "_"))
