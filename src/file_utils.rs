@@ -142,6 +142,9 @@ impl FileWrapper {
       .map(|_| ())
       .chain_err(|| format!("Failed to write to file: {:?}", self.path))
   }
+  pub fn into_file(self) -> fs::File {
+    self.file
+  }
 }
 
 pub fn create_dir<P: AsRef<Path>>(path: P) -> Result<()> {
