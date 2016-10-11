@@ -663,52 +663,9 @@ impl CppData {
     Ok(())
   }
 
-  pub fn remove_existing_instantiations(&mut self, dependencies: &[&CppData]) {
-    self.template_instantiations = self.template_instantiations
-      .iter()
-      .filter_map(|data| {
-        let good_items: Vec<_> = {
-          let class_name = &data.class_name;
-          data.instantiations
-            .clone()
-            .into_iter()
-            .filter(|ins| {
-              dependencies.iter()
-                .find(|dep| {
-                  match dep.template_instantiations
-                    .iter()
-                    .find(|x| &x.class_name == class_name) {
-                    None => false,
-                    Some(vec) => {
-                      vec.instantiations
-                        .iter()
-                        .any(|x| x.template_arguments == ins.template_arguments)
-                    }
-                  }
-                })
-                .is_none()
-            })
-            .collect()
-        };
-        if good_items.is_empty() {
-          None
-        } else {
-          Some(CppTemplateInstantiations {
-            class_name: data.class_name.clone(),
-            include_file: data.include_file.clone(),
-            instantiations: good_items,
-          })
-        }
-      })
-      .collect();
-  }
-
-
   /// Performs data conversion to make it more suitable
   /// for further wrapper generation.
   pub fn post_process(&mut self, dependencies: &[&CppData]) -> Result<()> {
-    // TODO: skip existing inst. in cpp_parser instead
-    self.remove_existing_instantiations(dependencies);
     try!(self.ensure_explicit_destructors(dependencies));
     self.generate_methods_with_omitted_args();
     try!(self.instantiate_templates(dependencies));

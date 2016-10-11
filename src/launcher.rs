@@ -288,20 +288,20 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       r
     } else {
       log::info("Parsing C++ headers.");
-      let mut parse_result = try!(cpp_parser::run(cpp_parser::CppParserConfig {
-                                                    include_dirs: include_dirs.clone(),
-                                                    framework_dirs: framework_dirs.clone(),
-                                                    header_name: lib_spec.cpp.include_file.clone(),
-                                                    target_include_dirs: target_include_dirs,
-                                                    tmp_cpp_path:
-                                                      output_dir_path.with_added("1.cpp"),
-                                                    name_blacklist: lib_spec.cpp
-                                                      .name_blacklist
-                                                      .clone()
-                                                      .unwrap_or_default(),
-                                                  },
-                                                  &dependency_cpp_types)
-        .chain_err(|| "C++ parser failed"));
+      let mut parse_result =
+        try!(cpp_parser::run(cpp_parser::CppParserConfig {
+                               include_dirs: include_dirs.clone(),
+                               framework_dirs: framework_dirs.clone(),
+                               header_name: lib_spec.cpp.include_file.clone(),
+                               target_include_dirs: target_include_dirs,
+                               tmp_cpp_path: output_dir_path.with_added("1.cpp"),
+                               name_blacklist: lib_spec.cpp
+                                 .name_blacklist
+                                 .clone()
+                                 .unwrap_or_default(),
+                             },
+                             &dependencies.iter().map(|x| &x.cpp_data).collect::<Vec<_>>())
+          .chain_err(|| "C++ parser failed"));
       if is_qt_library {
         if let Some(ref qt_this_lib_headers_dir) = qt_this_lib_headers_dir {
           qt_specific::fix_header_names(&mut parse_result, qt_this_lib_headers_dir);

@@ -20,10 +20,10 @@ use std::io::{BufRead, BufReader};
 use std::env;
 use utils::is_msvc;
 
-struct CppParser {
+struct CppParser<'a> {
   config: CppParserConfig,
   types: Vec<CppTypeData>,
-  dependency_types: Vec<CppTypeData>,
+  dependencies_data: &'a [&'a CppData],
 }
 
 #[allow(dead_code)]
@@ -213,15 +213,14 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
   result
 }
 
-// TODO: use &[&CppTypeData]
-pub fn run(config: CppParserConfig, dependency_types: &[CppTypeData]) -> Result<CppData> {
+pub fn run(config: CppParserConfig, dependencies_data: &[&CppData]) -> Result<CppData> {
   log::info(get_version());
   log::info("Initializing clang...");
   let (mut parser, methods) = try!(run_clang(&config, None, |translation_unit| {
     let mut parser = CppParser {
       types: Vec::new(),
       config: config.clone(),
-      dependency_types: Vec::from(dependency_types),
+      dependencies_data: dependencies_data,
     };
     log::info("Parsing types...");
     parser.parse_types(translation_unit);
@@ -268,7 +267,7 @@ pub fn run(config: CppParserConfig, dependency_types: &[CppTypeData]) -> Result<
       let mut parser2 = CppParser {
         types: Vec::new(),
         config: config.clone(),
-        dependency_types: Vec::from(dependency_types),
+        dependencies_data: dependencies_data,
       };
       parser2.parse_types(last_entity);
       if parser2.types.len() != 1 {
@@ -331,13 +330,15 @@ pub fn run(config: CppParserConfig, dependency_types: &[CppTypeData]) -> Result<
   })
 }
 
-impl CppParser {
+impl<'a> CppParser<'a> {
   fn find_type<F: Fn(&CppTypeData) -> bool>(&self, f: F) -> Option<&CppTypeData> {
     if let Some(r) = self.types.iter().find(|x| f(x)) {
       return Some(r);
     }
-    if let Some(r) = self.dependency_types.iter().find(|x| f(x)) {
-      return Some(r);
+    for data in self.dependencies_data {
+      if let Some(r) = data.types.iter().find(|&x| f(x)) {
+        return Some(r);
+      }
     }
     None
   }
@@ -1520,36 +1521,43 @@ impl CppParser {
     (good_methods, good_types)
   }
 
+  #[cfg_attr(feature="clippy", allow(block_in_if_condition_stmt))]
   fn find_template_instantiations(&self, methods: &[CppMethod]) -> Vec<(String, Vec<CppType>)> {
 
-    fn check_type(type1: &CppType, result: &mut Vec<(String, Vec<CppType>)>) {
+    fn check_type(type1: &CppType, deps: &[&CppData], result: &mut Vec<(String, Vec<CppType>)>) {
       if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
              type1.base {
         if let Some(ref template_arguments) = *template_arguments {
           if !template_arguments.iter().any(|x| x.base.is_or_contains_template_parameter()) &&
-             !result.iter().any(|x| &x.0 == name && &x.1 == template_arguments) {
+             !result.iter().any(|x| &x.0 == name && &x.1 == template_arguments) &&
+             !deps.iter().any(|data| {
+            data.template_instantiations.iter().any(|item| {
+              &item.class_name == name &&
+              item.instantiations.iter().any(|x| &x.template_arguments == template_arguments)
+            })
+          }) {
             log::noisy(format!("Found template instantiation: {}<{:?}>",
                                name,
                                template_arguments));
             result.push((name.clone(), template_arguments.clone()));
           }
           for arg in template_arguments {
-            check_type(arg, result);
+            check_type(arg, deps, result);
           }
         }
       }
     }
     let mut result = Vec::new();
     for m in methods {
-      check_type(&m.return_type, &mut result);
+      check_type(&m.return_type, self.dependencies_data, &mut result);
       for arg in &m.arguments {
-        check_type(&arg.argument_type, &mut result);
+        check_type(&arg.argument_type, self.dependencies_data, &mut result);
       }
     }
     for t in &self.types {
       if let CppTypeKind::Class { ref bases, .. } = t.kind {
         for base in bases {
-          check_type(&base.base_type, &mut result);
+          check_type(&base.base_type, self.dependencies_data, &mut result);
         }
       }
     }
