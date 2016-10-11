@@ -6,7 +6,7 @@ use self::regex::Regex;
 
 use log;
 use std::path::PathBuf;
-use errors::{Result, ChainErr};
+use errors::{Result, ChainErr, unexpected};
 use file_utils::{remove_file, open_file, create_file};
 
 use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppOriginLocation,
@@ -287,7 +287,7 @@ pub fn run(config: CppParserConfig, dependencies_data: &[&CppData]) -> Result<Cp
                                template_args)
               .into());
           }
-          if final_template_instantiations.iter().find(|x| &x.class_name == class_name).is_none() {
+          if !final_template_instantiations.iter().any(|x| &x.class_name == class_name) {
             // first encounter of this template class
             if let Some(type_info) = parser.find_type(|x| &x.name == class_name) {
               if let CppTypeKind::Class { ref template_arguments, .. } = type_info.kind {
@@ -307,14 +307,21 @@ pub fn run(config: CppParserConfig, dependencies_data: &[&CppData]) -> Result<Cp
               panic!("Invalid instantiation: unknown class type: {}", class_name);
             }
           }
-          // TODO: reimplement checking template args count
-          // TODO: pass inst. of dependencies here and skip duplicates
-          let result_item =
-            final_template_instantiations.iter_mut().find(|x| &x.class_name == class_name).unwrap();
-          result_item.instantiations.push(CppTemplateInstantiation {
-            template_arguments: template_args.clone(),
-            size: size.unwrap(),
-          });
+
+          if let Some(result_item) = final_template_instantiations.iter_mut()
+            .find(|x| &x.class_name == class_name) {
+            result_item.instantiations.push(CppTemplateInstantiation {
+              template_arguments: template_args.clone(),
+              size: if let Some(size) = size {
+                size
+              } else {
+                return Err("template instantiation's size is None".into());
+              },
+            });
+          } else {
+            return Err(unexpected("final_template_instantiations must contain this class now")
+              .into());
+          }
         }
       } else {
         panic!("AllFields parse result: type is not a class");
@@ -349,7 +356,7 @@ impl<'a> CppParser<'a> {
                           context_class: Option<Entity>,
                           context_method: Option<Entity>)
                           -> Result<CppType> {
-    let template_class_regex = Regex::new(r"^([\w:]+)<(.+)>$").unwrap();
+    let template_class_regex = try!(Regex::new(r"^([\w:]+)<(.+)>$"));
     let (is_const, name) = if let Some(type1) = type1 {
       let is_const = type1.is_const_qualified();
       let mut name = type1.get_display_name();
@@ -367,28 +374,32 @@ impl<'a> CppParser<'a> {
           if declaration.get_accessibility().unwrap_or(Accessibility::Public) !=
              Accessibility::Public {
             return Err(format!("Type uses private class ({})",
-                               get_full_name(declaration).unwrap())
+                               get_full_name(declaration).unwrap_or("?".into()))
               .into());
           }
           if let Some(matches) = template_class_regex.captures(name.as_ref()) {
             let mut arg_types = Vec::new();
-            for arg in matches.at(2).unwrap().split(',') {
-              match self.parse_unexposed_type(None,
-                                              Some(arg.trim().to_string()),
-                                              context_class,
-                                              context_method) {
-                Ok(arg_type) => arg_types.push(arg_type),
-                Err(msg) => {
-                  return Err(format!("Template argument of unexposed type is not parsed: {}: {}",
-                                     arg,
-                                     msg)
-                    .into())
+            if let Some(items) = matches.at(2) {
+              for arg in items.split(',') {
+                match self.parse_unexposed_type(None,
+                                                Some(arg.trim().to_string()),
+                                                context_class,
+                                                context_method) {
+                  Ok(arg_type) => arg_types.push(arg_type),
+                  Err(msg) => {
+                    return Err(format!("Template argument of unexposed type is not parsed: {}: {}",
+                                       arg,
+                                       msg)
+                      .into())
+                  }
                 }
               }
+            } else {
+              return Err(unexpected("invalid matches count in regexp").into());
             }
             return Ok(CppType {
               base: CppTypeBase::Class(CppTypeClassBase {
-                name: get_full_name(declaration).unwrap(),
+                name: try!(get_full_name(declaration)),
                 template_arguments: Some(arg_types),
               }),
               is_const: is_const,
@@ -403,20 +414,28 @@ impl<'a> CppParser<'a> {
         }
       }
       (is_const, name)
-    } else {
-      let mut name = string.unwrap();
+    } else if let Some(mut name) = string {
       let is_const_in_name = name.starts_with("const ");
       if is_const_in_name {
         name = name[6..].to_string();
       }
       (is_const_in_name, name)
+    } else {
+      return Err("parse_unexposed_type: either type or string must be present".into());
     };
-    let re = Regex::new(r"^type-parameter-(\d+)-(\d+)$").unwrap();
+    let re = try!(Regex::new(r"^type-parameter-(\d+)-(\d+)$"));
     if let Some(matches) = re.captures(name.as_ref()) {
+      if matches.len() < 3 {
+        return Err("invalid matches len in regexp".into());
+      }
       return Ok(CppType {
         base: CppTypeBase::TemplateParameter {
-          nested_level: matches.at(1).unwrap().parse().unwrap(),
-          index: matches.at(2).unwrap().parse().unwrap(),
+          nested_level: try!(matches[1]
+            .parse()
+            .chain_err(|| "encountered not a number while parsing type-parameter-X-X")),
+          index: try!(matches[2]
+            .parse()
+            .chain_err(|| "encountered not a number while parsing type-parameter-X-X")),
         },
         is_const: is_const,
         is_const2: false,
@@ -520,10 +539,13 @@ impl<'a> CppParser<'a> {
     }
 
     if let Some(matches) = template_class_regex.captures(remaining_name) {
-      let class_name = matches.at(1).unwrap();
+      if matches.len() < 3 {
+        return Err("invalid matches len in regexp".into());
+      }
+      let class_name = &matches[1];
       if self.find_type(|x| &x.name == class_name && x.is_class()).is_some() {
         let mut arg_types = Vec::new();
-        for arg in matches.at(2).unwrap().split(',') {
+        for arg in matches[2].split(',') {
           match self.parse_unexposed_type(None,
                                           Some(arg.trim().to_string()),
                                           context_class,
@@ -728,85 +750,97 @@ impl<'a> CppParser<'a> {
         })
       }
       TypeKind::Enum => {
-        Ok(CppType {
-          base: CppTypeBase::Enum { name: try!(get_full_name(type1.get_declaration().unwrap())) },
-          is_const: is_const,
-          is_const2: false,
-          indirection: CppTypeIndirection::None,
-        })
+        if let Some(declaration) = type1.get_declaration() {
+          Ok(CppType {
+            base: CppTypeBase::Enum { name: try!(get_full_name(declaration)) },
+            is_const: is_const,
+            is_const2: false,
+            indirection: CppTypeIndirection::None,
+          })
+        } else {
+          return Err(format!("failed to get enum declaration: {:?}", type1).into());
+        }
       }
       TypeKind::Record => {
-        let declaration = type1.get_declaration().unwrap();
-        if declaration.get_accessibility().unwrap_or(Accessibility::Public) !=
-           Accessibility::Public {
-          return Err(format!("Type uses private class ({})",
-                             get_full_name(declaration).unwrap_or("unnamed".to_string()))
-            .into());
-        }
-        match get_full_name(declaration) {
-          Ok(declaration_name) => {
-            let template_arguments = match type1.get_template_argument_types() {
-              None => None,
-              Some(arg_types) => {
-                let mut r = Vec::new();
-                if arg_types.is_empty() {
-                  panic!("arg_types is empty");
-                }
-                for arg_type in arg_types {
-                  match arg_type {
-                    None => return Err("Template argument is None".into()),
-                    Some(arg_type) => {
-                      match self.parse_type(arg_type, context_class, context_method) {
-                        Ok(parsed_type) => r.push(parsed_type),
-                        Err(msg) => {
-                          return Err(format!("Invalid template argument: {:?}: {}", arg_type, msg)
-                            .into())
-                        }
+        if let Some(declaration) = type1.get_declaration() {
+          if declaration.get_accessibility().unwrap_or(Accessibility::Public) !=
+             Accessibility::Public {
+            return Err(format!("Type uses private class ({})",
+                               get_full_name(declaration).unwrap_or("unnamed".to_string()))
+              .into());
+          }
+          let declaration_name = try!(get_full_name(declaration));
+          let template_arguments = match type1.get_template_argument_types() {
+            None => None,
+            Some(arg_types) => {
+              let mut r = Vec::new();
+              if arg_types.is_empty() {
+                panic!("arg_types is empty");
+              }
+              for arg_type in arg_types {
+                match arg_type {
+                  None => return Err("Template argument is None".into()),
+                  Some(arg_type) => {
+                    match self.parse_type(arg_type, context_class, context_method) {
+                      Ok(parsed_type) => r.push(parsed_type),
+                      Err(msg) => {
+                        return Err(format!("Invalid template argument: {:?}: {}", arg_type, msg)
+                          .into())
                       }
                     }
                   }
                 }
-                Some(r)
               }
-            };
+              Some(r)
+            }
+          };
 
-            Ok(CppType {
-              base: CppTypeBase::Class(CppTypeClassBase {
-                name: declaration_name,
-                template_arguments: template_arguments,
-              }),
-              is_const: is_const,
-              is_const2: false,
-              indirection: CppTypeIndirection::None,
-            })
-
-          }
-          Err(msg) => Err(format!("get_full_name failed: {}", msg).into()),
+          Ok(CppType {
+            base: CppTypeBase::Class(CppTypeClassBase {
+              name: declaration_name,
+              template_arguments: template_arguments,
+            }),
+            is_const: is_const,
+            is_const2: false,
+            indirection: CppTypeIndirection::None,
+          })
+        } else {
+          return Err(format!("failed to get class declaration: {:?}", type1).into());
         }
       }
       TypeKind::FunctionPrototype => {
         let mut arguments = Vec::new();
-        for arg_type in type1.get_argument_types().unwrap() {
-          match self.parse_type(arg_type, context_class, context_method) {
-            Ok(t) => arguments.push(t),
+        if let Some(argument_types) = type1.get_argument_types() {
+          for arg_type in argument_types {
+            match self.parse_type(arg_type, context_class, context_method) {
+              Ok(t) => arguments.push(t),
+              Err(msg) => {
+                return Err(format!("Failed to parse function type's argument type: {:?}: {}",
+                                   arg_type,
+                                   msg)
+                  .into())
+              }
+            }
+          }
+        } else {
+          return Err(format!("Failed to parse get argument types from function type: {:?}",
+                             type1)
+            .into());
+        }
+        let return_type = if let Some(result_type) = type1.get_result_type() {
+          match self.parse_type(result_type, context_class, context_method) {
+            Ok(t) => Box::new(t),
             Err(msg) => {
               return Err(format!("Failed to parse function type's argument type: {:?}: {}",
-                                 arg_type,
+                                 result_type,
                                  msg)
                 .into())
             }
           }
-        }
-        let return_type = match self.parse_type(type1.get_result_type().unwrap(),
-                                                context_class,
-                                                context_method) {
-          Ok(t) => Box::new(t),
-          Err(msg) => {
-            return Err(format!("Failed to parse function type's argument type: {:?}: {}",
-                               type1.get_result_type().unwrap(),
-                               msg)
-              .into())
-          }
+        } else {
+          return Err(format!("Failed to parse get result type from function type: {:?}",
+                             type1)
+            .into());
         };
         Ok(CppType {
           base: CppTypeBase::FunctionPointer {
@@ -892,10 +926,17 @@ impl<'a> CppParser<'a> {
       None => (None, None),
     };
 
-    let return_type = entity.get_type()
-      .unwrap_or_else(|| panic!("failed to get function type"))
-      .get_result_type()
-      .unwrap_or_else(|| panic!("failed to get function return type"));
+
+
+    let return_type = if let Some(x) = entity.get_type() {
+      if let Some(y) = x.get_result_type() {
+        y
+      } else {
+        return Err(format!("failed to get function return type: {:?}", entity).into());
+      }
+    } else {
+      return Err(format!("failed to get function type: {:?}", entity).into());
+    };
     let return_type_parsed = match self.parse_type(return_type, class_entity, Some(entity)) {
       Ok(x) => x,
       Err(msg) => {
@@ -906,11 +947,12 @@ impl<'a> CppParser<'a> {
       }
     };
     let mut arguments = Vec::new();
-    let argument_entities = match entity.get_kind() {
-      EntityKind::FunctionTemplate => {
-        entity.get_children().into_iter().filter(|c| c.get_kind() == EntityKind::ParmDecl).collect()
-      }
-      _ => entity.get_arguments().unwrap(),
+    let argument_entities = if entity.get_kind() == EntityKind::FunctionTemplate {
+      entity.get_children().into_iter().filter(|c| c.get_kind() == EntityKind::ParmDecl).collect()
+    } else if let Some(args) = entity.get_arguments() {
+      args
+    } else {
+      return Err(format!("failed to get function arguments: {:?}", entity).into());
     };
     let template_arguments = match entity.get_kind() {
       EntityKind::FunctionTemplate => {

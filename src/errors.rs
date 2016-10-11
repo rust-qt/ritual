@@ -1,10 +1,12 @@
 #![cfg_attr(feature="clippy", allow(redundant_closure))]
 
 use std;
+extern crate regex;
 
 error_chain! {
   foreign_links {
     std::io::Error, IO;
+    regex::Error, Regex;
   }
 
   errors {

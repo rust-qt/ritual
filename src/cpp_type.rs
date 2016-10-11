@@ -4,8 +4,8 @@ pub use serializable::{CppBuiltInNumericType, CppSpecificNumericTypeKind, CppTyp
                        CppTypeIndirection, CppTypeClassBase};
 use string_utils::JoinWithString;
 extern crate regex;
-
-use errors::{Result, ChainErr, Error};
+use utils::MapIfOk;
+use errors::{Result, ChainErr, Error, unexpected};
 
 impl CppTypeIndirection {
   pub fn combine(left: &CppTypeIndirection,
@@ -103,18 +103,16 @@ impl CppTypeClassBase {
     }
 
   }
-  pub fn caption(&self) -> String {
+  pub fn caption(&self) -> Result<String> {
     let name_caption = self.name.replace("::", "_");
-    match self.template_arguments {
+    Ok(match self.template_arguments {
       Some(ref args) => {
-        let mut arg_texts = Vec::new();
-        for arg in args {
-          arg_texts.push(arg.caption(TypeCaptionStrategy::Full));
-        }
-        format!("{}_{}", name_caption, arg_texts.join("_"))
+        format!("{}_{}",
+                name_caption,
+                try!(args.iter().map_if_ok(|arg| arg.caption(TypeCaptionStrategy::Full))).join("_"))
       }
       None => name_caption,
-    }
+    })
   }
 
   pub fn instantiate_class(&self,
@@ -204,13 +202,14 @@ impl CppTypeBase {
         for arg in arguments {
           arg_texts.push(try!(arg.to_cpp_code(None)));
         }
-        if function_pointer_inner_text.is_none() {
-          return Err("function pointers with variadic arguments are not supported".into());
+        if let Some(function_pointer_inner_text) = function_pointer_inner_text {
+          Ok(format!("{} (*{})({})",
+                     try!(return_type.as_ref().to_cpp_code(None)),
+                     function_pointer_inner_text,
+                     arg_texts.join(", ")))
+        } else {
+          return Err("function_pointer_inner_text argument is missing".into());
         }
-        Ok(format!("{} (*{})({})",
-                   try!(return_type.as_ref().to_cpp_code(None)),
-                   function_pointer_inner_text.unwrap(),
-                   arg_texts.join(", ")))
       }
     }
   }
@@ -228,29 +227,29 @@ impl CppTypeBase {
 
   /// Generates alphanumeric representation of self
   /// used to generate FFI function names
-  pub fn caption(&self, strategy: TypeCaptionStrategy) -> String {
-    match *self {
+  pub fn caption(&self, strategy: TypeCaptionStrategy) -> Result<String> {
+    Ok(match *self {
       CppTypeBase::Void => "void".to_string(),
       CppTypeBase::BuiltInNumeric(ref t) => t.to_cpp_code().to_string().replace(" ", "_"),
       CppTypeBase::SpecificNumeric { ref name, .. } |
       CppTypeBase::PointerSizedInteger { ref name, .. } => name.clone(),
       CppTypeBase::Enum { ref name } => name.replace("::", "_"),
-      CppTypeBase::Class(ref data) => data.caption(),
+      CppTypeBase::Class(ref data) => try!(data.caption()),
       CppTypeBase::TemplateParameter { .. } => {
-        panic!("template parameters are not allowed to have captions");
+        return Err("template parameters are not allowed to have captions".into());
       }
       CppTypeBase::FunctionPointer { ref return_type, ref arguments, .. } => {
         match strategy {
           TypeCaptionStrategy::Short => "func".to_string(),
           TypeCaptionStrategy::Full => {
             format!("{}_func_{}",
-                    return_type.caption(strategy.clone()),
-                    arguments.iter().map(|x| x.caption(strategy.clone())).join("_"))
+                    try!(return_type.caption(strategy.clone())),
+                    try!(arguments.iter().map_if_ok(|x| x.caption(strategy.clone()))).join("_"))
           }
         }
       }
 
-    }
+    })
   }
 
   pub fn to_cpp_pseudo_code(&self) -> String {
@@ -433,11 +432,11 @@ impl CppType {
 
   /// Generates alphanumeric representation of self
   /// used to generate FFI function names
-  pub fn caption(&self, strategy: TypeCaptionStrategy) -> String {
-    match strategy {
-      TypeCaptionStrategy::Short => self.base.caption(strategy.clone()),
+  pub fn caption(&self, strategy: TypeCaptionStrategy) -> Result<String> {
+    Ok(match strategy {
+      TypeCaptionStrategy::Short => try!(self.base.caption(strategy.clone())),
       TypeCaptionStrategy::Full => {
-        let mut r = self.base.caption(strategy.clone());
+        let mut r = try!(self.base.caption(strategy.clone()));
         match self.indirection {
           CppTypeIndirection::None => {}
           CppTypeIndirection::Ptr => r = format!("{}_ptr", r),
@@ -457,7 +456,7 @@ impl CppType {
         }
         r
       }
-    }
+    })
   }
 
   /// Checks if a function with this return type would need
@@ -479,7 +478,7 @@ impl CppType {
     if let CppTypeBase::TemplateParameter { nested_level, index } = self.base {
       if nested_level == nested_level1 {
         if index < 0 {
-          panic!("CppType::instantiate: index < 0");
+          return Err(unexpected("CppType::instantiate: index < 0").into());
         }
         if index >= template_arguments1.len() as i32 {
           return Err("not enough template arguments".into());
@@ -503,7 +502,8 @@ impl CppType {
             } else if arg.indirection != CppTypeIndirection::None {
               new_type.is_const = arg.is_const;
             } else {
-              panic!("one of types must be ptr or ref!");
+              return Err(unexpected("CppType::instantiate: one of types must be ptr or ref!")
+                .into());
             }
           }
           CppTypeIndirection::PtrPtr |

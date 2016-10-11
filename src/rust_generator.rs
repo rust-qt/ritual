@@ -57,7 +57,7 @@ fn operator_rust_name(operator: &CppOperator) -> Result<String> {
   Ok(match *operator {
     CppOperator::Conversion(ref type1) => {
       format!("as_{}",
-              type1.caption(TypeCaptionStrategy::Full).to_snake_case())
+              try!(type1.caption(TypeCaptionStrategy::Full)).to_snake_case())
     }
     _ => format!("op_{}", try!(operator.c_name())),
   })

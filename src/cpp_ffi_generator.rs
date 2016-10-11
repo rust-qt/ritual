@@ -178,7 +178,7 @@ impl<'a> CGenerator<'a> {
         let mut type_captions: HashSet<_> = HashSet::new();
         let mut ok = true;
         for value in &values {
-          let caption = value.c_signature.caption(strategy.clone());
+          let caption = try!(value.c_signature.caption(strategy.clone()));
           if type_captions.contains(&caption) {
             ok = false;
             break;
@@ -192,7 +192,7 @@ impl<'a> CGenerator<'a> {
       }
       if let Some(strategy) = found_strategy {
         for x in values {
-          let caption = x.c_signature.caption(strategy.clone());
+          let caption = try!(x.c_signature.caption(strategy.clone()));
           let final_name = if caption.is_empty() {
             key.clone()
           } else {

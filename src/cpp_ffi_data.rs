@@ -1,11 +1,11 @@
 use caption_strategy::ArgumentCaptionStrategy;
-use string_utils::JoinWithString;
 use cpp_type::CppTypeBase;
 use cpp_type::CppType;
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use caption_strategy::{MethodCaptionStrategy, TypeCaptionStrategy};
 use cpp_operator::CppOperator;
 use errors::Result;
+use utils::MapIfOk;
 
 /// Information that indicates how the FFI function argument
 /// should be interpreted
@@ -49,18 +49,18 @@ impl CppFfiFunctionArgument {
   /// Generates part of caption string for FFI method.
   /// Used to generate FFI methods with different names
   /// for overloaded functions.
-  pub fn caption(&self, strategy: ArgumentCaptionStrategy) -> String {
-    match strategy {
+  pub fn caption(&self, strategy: ArgumentCaptionStrategy) -> Result<String> {
+    Ok(match strategy {
       ArgumentCaptionStrategy::NameOnly => self.name.clone(),
       ArgumentCaptionStrategy::TypeOnly(type_strategy) => {
-        self.argument_type.original_type.caption(type_strategy)
+        try!(self.argument_type.original_type.caption(type_strategy))
       }
       ArgumentCaptionStrategy::TypeAndName(type_strategy) => {
         format!("{}_{}",
-                self.argument_type.original_type.caption(type_strategy),
+                try!(self.argument_type.original_type.caption(type_strategy)),
                 self.name)
       }
-    }
+    })
   }
 
   /// Generates C++ code for the part of FFI function signature
@@ -99,24 +99,23 @@ impl CppFfiFunctionSignature {
   /// Generates arguments caption string for FFI method.
   /// Used to generate FFI methods with different names
   /// for overloaded functions.
-  pub fn arguments_caption(&self, strategy: ArgumentCaptionStrategy) -> String {
-    let r = self.arguments
+  pub fn arguments_caption(&self, strategy: ArgumentCaptionStrategy) -> Result<String> {
+    let r = try!(self.arguments
       .iter()
       .filter(|x| x.meaning.is_argument())
-      .map(|x| x.caption(strategy.clone()))
-      .join("_");
-    if r.is_empty() {
+      .map_if_ok(|arg| arg.caption(strategy.clone())));
+    Ok(if r.is_empty() {
       "no_args".to_string()
     } else {
-      r
-    }
+      r.join("_")
+    })
   }
 
   /// Generates a caption for this method using specified strategy
   /// to avoid name conflict.
-  pub fn caption(&self, strategy: MethodCaptionStrategy) -> String {
-    match strategy {
-      MethodCaptionStrategy::ArgumentsOnly(s) => self.arguments_caption(s),
+  pub fn caption(&self, strategy: MethodCaptionStrategy) -> Result<String> {
+    Ok(match strategy {
+      MethodCaptionStrategy::ArgumentsOnly(s) => try!(self.arguments_caption(s)),
       MethodCaptionStrategy::ConstOnly => {
         if self.has_const_this() {
           "const".to_string()
@@ -130,9 +129,9 @@ impl CppFfiFunctionSignature {
         } else {
           "".to_string()
         };
-        r + &self.arguments_caption(s)
+        r + &try!(self.arguments_caption(s))
       }
-    }
+    })
   }
 }
 
@@ -210,7 +209,7 @@ pub fn c_base_name(cpp_method: &CppMethod,
                    include_file: &str)
                    -> Result<String> {
   let scope_prefix = match cpp_method.class_membership {
-    Some(ref info) => format!("{}_", info.class_type.caption()),
+    Some(ref info) => format!("{}_", try!(info.class_type.caption())),
     None => format!("{}_G_", include_file),
   };
 
@@ -241,7 +240,8 @@ pub fn c_base_name(cpp_method: &CppMethod,
   } else if let Some(ref operator) = cpp_method.operator {
     add_place_note(match *operator {
       CppOperator::Conversion(ref cpp_type) => {
-        format!("convert_to_{}", cpp_type.caption(TypeCaptionStrategy::Full))
+        format!("convert_to_{}",
+                try!(cpp_type.caption(TypeCaptionStrategy::Full)))
       }
       _ => format!("operator_{}", try!(operator.c_name())),
     })
@@ -251,7 +251,7 @@ pub fn c_base_name(cpp_method: &CppMethod,
   let template_args_text = match cpp_method.template_arguments_values {
     Some(ref args) => {
       format!("_{}",
-              args.iter().map(|x| x.caption(TypeCaptionStrategy::Full)).join("_"))
+              try!(args.iter().map_if_ok(|x| x.caption(TypeCaptionStrategy::Full))).join("_"))
     }
     None => String::new(),
   };

@@ -65,3 +65,22 @@ pub fn add_env_path_item(env_var_name: &'static str,
 pub fn manifest_dir() -> PathBuf {
   PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
+
+pub trait MapIfOk<A> {
+  fn map_if_ok<B, E, F: Fn(A) -> std::result::Result<B, E>>(self,
+                                                            f: F)
+                                                            -> std::result::Result<Vec<B>, E>;
+}
+
+impl<A, T: Iterator<Item = A>> MapIfOk<A> for T {
+  fn map_if_ok<B, E, F: Fn(A) -> std::result::Result<B, E>>(self,
+                                                            f: F)
+                                                            -> std::result::Result<Vec<B>, E> {
+    let mut r = Vec::new();
+    r.reserve(self.size_hint().0);
+    for item in self {
+      r.push(try!(f(item)));
+    }
+    Ok(r)
+  }
+}
