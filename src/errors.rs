@@ -38,3 +38,15 @@ impl Error {
 pub fn unexpected<S: Into<String>>(text: S) -> Error {
   ErrorKind::Unexpected(text.into()).into()
 }
+
+impl<T> ChainErr<T> for Option<T> {
+  fn chain_err<F, EK>(self, callback: F) -> Result<T>
+    where F: FnOnce() -> EK,
+          EK: Into<ErrorKind>
+  {
+    match self {
+      Some(x) => Ok(x),
+      None => Err(Error::from("None encountered")).chain_err(callback),
+    }
+  }
+}
