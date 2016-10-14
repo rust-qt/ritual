@@ -7,7 +7,7 @@ use self::regex::Regex;
 use log;
 use std::path::PathBuf;
 use errors::{Result, ChainErr, unexpected};
-use file_utils::{remove_file, open_file, create_file};
+use file_utils::{remove_file, open_file, create_file, path_to_str};
 
 use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppOriginLocation,
                CppVisibility, CppTemplateInstantiation, CppTemplateInstantiations,
@@ -165,24 +165,18 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
     args.push("-std=gnu++11".to_string());
   }
   for dir in &config.include_dirs {
-    if let Some(str) = dir.to_str() {
-      args.push("-I".to_string());
-      args.push(str.to_string());
-    } else {
-      return Err(format!("include dir is not valid Unicode: {}", dir.display()).into());
-    }
+    let str = try!(path_to_str(dir));
+    args.push("-I".to_string());
+    args.push(str.to_string());
   }
   if let Ok(path) = env::var("CLANG_SYSTEM_INCLUDE_PATH") {
     args.push("-isystem".to_string());
     args.push(path);
   }
   for dir in &config.framework_dirs {
-    if let Some(str) = dir.to_str() {
-      args.push("-F".to_string());
-      args.push(str.to_string());
-    } else {
-      return Err(format!("framework dir is not valid Unicode: {}", dir.display()).into());
-    }
+    let str = try!(path_to_str(dir));
+    args.push("-F".to_string());
+    args.push(str.to_string());
   }
   log::info(format!("clang arguments: {:?}", args));
 

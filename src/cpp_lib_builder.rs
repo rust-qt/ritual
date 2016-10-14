@@ -1,5 +1,6 @@
 use utils::{is_msvc, add_env_path_item, run_command};
 use errors::Result;
+use file_utils::path_to_str;
 
 use std::process::Command;
 use std::path::PathBuf;
@@ -17,11 +18,7 @@ impl<'a> CppLibBuilder<'a> {
     let mut cmake_command = Command::new("cmake");
     cmake_command.arg(self.cmake_source_dir)
       .arg(format!("-DCMAKE_INSTALL_PREFIX={}",
-                   if let Some(str) = self.install_dir.to_str() {
-                     str
-                   } else {
-                     return Err("install_dir is not a valid Unicode".into());
-                   }))
+                   try!(path_to_str(&self.install_dir))))
       .current_dir(self.build_dir);
     if is_msvc() {
       cmake_command.arg("-G").arg("NMake Makefiles");

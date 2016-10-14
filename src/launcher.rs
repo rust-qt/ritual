@@ -1,7 +1,8 @@
 extern crate num_cpus;
 
 use errors::{Result, ChainErr};
-use file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json};
+use file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json, canonicalize,
+                 remove_dir_all, remove_dir, read_dir, remove_file, path_to_str};
 use utils::is_msvc;
 use cpp_code_generator::CppCodeGenerator;
 use log;
@@ -43,23 +44,28 @@ pub struct BuildEnvironment {
 
 pub fn run_from_build_script() -> Result<()> {
   let mut dependency_paths = Vec::new();
-  if env::var("CARGO_MANIFEST_DIR").unwrap() != "/home/ri/rust/rust_qt/repos/qt_gui/../qt_core" {
-    for (name, value) in env::vars_os() {
-      if let Ok(name) = name.into_string() {
-        if name.starts_with("DEP_") && name.ends_with("_CPP_TO_RUST_DATA_PATH") {
-          let value = value.into_string().unwrap();
-          log::info(format!("Found dependency: {}", &value));
-          dependency_paths.push(PathBuf::from(value));
-        }
+  for (name, value) in env::vars_os() {
+    if let Ok(name) = name.into_string() {
+      if name.starts_with("DEP_") && name.ends_with("_CPP_TO_RUST_DATA_PATH") {
+        let value = try!(value.into_string()
+          .map_err(|_| "invalid unicode in dependency path env var"));
+        log::info(format!("Found dependency: {}", &value));
+        dependency_paths.push(PathBuf::from(value));
       }
     }
   }
   run(BuildEnvironment {
     invokation_method: InvokationMethod::BuildScript,
-    source_dir_path: PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()),
-    output_dir_path: PathBuf::from(env::var("OUT_DIR").unwrap()),
-    num_jobs: env::var("NUM_JOBS").unwrap().parse().ok(),
-    build_profile: match env::var("PROFILE").unwrap().as_ref() {
+    source_dir_path: PathBuf::from(try!(env::var("CARGO_MANIFEST_DIR")
+      .chain_err(|| "failed to read required env var: CARGO_MANIFEST_DIR"))),
+    output_dir_path: PathBuf::from(try!(env::var("OUT_DIR")
+      .chain_err(|| "failed to read required env var: OUT_DIR"))),
+    num_jobs: try!(env::var("NUM_JOBS").chain_err(|| "failed to read required env var: NUM_JOBS"))
+      .parse()
+      .ok(),
+    build_profile: match try!(env::var("PROFILE")
+        .chain_err(|| "failed to read required env var: PROFILE"))
+      .as_ref() {
       "debug" | "test" | "doc" => BuildProfile::Debug,
       "release" | "bench" => BuildProfile::Release,
       a => return Err(format!("unsupported profile: {}", a).into()),
@@ -69,14 +75,7 @@ pub fn run_from_build_script() -> Result<()> {
   })
 }
 
-fn my_canonicalize(path: &PathBuf) -> PathBuf {
-  let r = fs::canonicalize(path).unwrap();
-  if r.to_str().unwrap().starts_with(r"\\?\") {
-    PathBuf::from(&r.to_str().unwrap()[4..])
-  } else {
-    r
-  }
-}
+
 
 // TODO: simplify this function
 #[cfg_attr(feature="clippy", allow(cyclomatic_complexity))]
@@ -90,8 +89,8 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
   if !env.output_dir_path.as_path().exists() {
     try!(create_dir_all(&env.output_dir_path));
   }
-  let output_dir_path = my_canonicalize(&env.output_dir_path);
-  let source_dir_path = my_canonicalize(&env.source_dir_path);
+  let output_dir_path = try!(canonicalize(&env.output_dir_path));
+  let source_dir_path = try!(canonicalize(&env.source_dir_path));
 
   let lib_spec_path = source_dir_path.with_added("spec.json");
 
@@ -128,9 +127,10 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
         let absolute_dir = source_dir_path.with_added(dir);
         if !absolute_dir.exists() {
           return Err(format!("Target include dir does not exist: {}",
-                             absolute_dir.display()));
+                             absolute_dir.display())
+            .into());
         }
-        Ok(my_canonicalize(&absolute_dir))
+        canonicalize(&absolute_dir)
       })))
   } else {
     None
@@ -147,14 +147,13 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
                                    true));
     let qt_install_headers_path = PathBuf::from(result1.trim());
     log::info(format!("QT_INSTALL_HEADERS = \"{}\"",
-                      qt_install_headers_path.to_str().unwrap()));
+                      qt_install_headers_path.display()));
     let result2 = try!(run_command(Command::new(&qmake_path)
                                      .arg("-query")
                                      .arg("QT_INSTALL_LIBS"),
                                    true));
     let qt_install_libs_path = PathBuf::from(result2.trim());
-    log::info(format!("QT_INSTALL_LIBS = \"{}\"",
-                      qt_install_libs_path.to_str().unwrap()));
+    log::info(format!("QT_INSTALL_LIBS = \"{}\"", qt_install_libs_path.display()));
     cpp_lib_dirs.push(qt_install_libs_path.clone());
     include_dirs.push(qt_install_headers_path.clone());
 
@@ -193,7 +192,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       if !absolute_dir.exists() {
         return Err(format!("Include dir does not exist: {}", absolute_dir.display()).into());
       }
-      include_dirs.push(my_canonicalize(&absolute_dir));
+      include_dirs.push(try!(canonicalize(&absolute_dir)));
     }
   }
   if let Some(ref spec_lib_dirs) = lib_spec.cpp.lib_dirs {
@@ -202,7 +201,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       if !absolute_dir.exists() {
         return Err(format!("Library dir does not exist: {}", absolute_dir.display()).into());
       }
-      cpp_lib_dirs.push(my_canonicalize(&absolute_dir));
+      cpp_lib_dirs.push(try!(canonicalize(&absolute_dir)));
     }
   }
   cpp_lib_dirs.extend_from_slice(&env.extra_lib_paths);
@@ -248,7 +247,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
   }
   let dependencies: Vec<_> = try!(env.dependency_paths
     .iter()
-    .map_if_ok(|path| DependencyInfo::load(&my_canonicalize(path)))
+    .map_if_ok(|path| DependencyInfo::load(&try!(canonicalize(path))))
     .chain_err(|| "failed to load dependency"));
 
   let c_lib_parent_path = output_dir_path.with_added("c_lib");
@@ -317,7 +316,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     let c_lib_path = c_lib_parent_path.with_added("source");
     let c_lib_tmp_path = c_lib_parent_path.with_added("source.new");
     if c_lib_tmp_path.as_path().exists() {
-      fs::remove_dir_all(&c_lib_tmp_path).unwrap();
+      try!(remove_dir_all(&c_lib_tmp_path));
     }
     try!(create_dir_all(&c_lib_tmp_path));
     log::info(format!("Generating C wrapper library ({}).", c_lib_name));
@@ -346,13 +345,13 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
                                          c_lib_tmp_path.clone(),
                                          c_lib_is_shared,
                                          cpp_libs);
+    let include_dirs_str = try!(include_dirs.iter()
+      .map_if_ok(|x| -> Result<_> { Ok(try!(path_to_str(x)).to_string()) }));
+    let framework_dirs_str = try!(framework_dirs.iter()
+      .map_if_ok(|x| -> Result<_> { Ok(try!(path_to_str(x)).to_string()) }));
     try!(code_gen.generate_template_files(&lib_spec.cpp.include_file,
-                                          &include_dirs.iter()
-                                            .map(|x| x.to_str().unwrap().to_string())
-                                            .collect::<Vec<_>>(),
-                                          &framework_dirs.iter()
-                                            .map(|x| x.to_str().unwrap().to_string())
-                                            .collect::<Vec<_>>()));
+                                          &include_dirs_str,
+                                          &framework_dirs_str));
     try!(code_gen.generate_files(&cpp_ffi_headers));
 
     try!(move_files(&c_lib_tmp_path, &c_lib_path));
@@ -379,7 +378,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
 
     let crate_new_path = output_dir_path.with_added(format!("{}.new", &input_cargo_toml_data.name));
     if crate_new_path.as_path().exists() {
-      fs::remove_dir_all(&crate_new_path).unwrap();
+      try!(remove_dir_all(&crate_new_path));
     }
     try!(create_dir_all(&crate_new_path));
     let rustfmt_config_path = source_dir_path.with_added("rustfmt.toml");
@@ -393,7 +392,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       c_lib_name: c_lib_name,
       c_lib_is_shared: c_lib_is_shared,
       link_items: link_items,
-      framework_dirs: framework_dirs.iter().map(|x| x.to_str().unwrap().to_string()).collect(),
+      framework_dirs: framework_dirs_str,
       rustfmt_config_path: if rustfmt_config_path.as_path().exists() {
         Some(rustfmt_config_path)
       } else {
@@ -437,16 +436,15 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
                        lib_spec: lib_spec.clone(),
                      }));
       log::info(format!("Rust export info is saved to file: {}",
-                        rust_export_path.to_str().unwrap()));
+                        rust_export_path.display()));
     }
 
-    for item in fs::read_dir(&crate_new_path).unwrap() {
-      let item = item.unwrap();
-      move_files(&crate_new_path.with_added(item.file_name()),
-                 &output_dir_path.with_added(item.file_name()))
-        .unwrap();
+    for item in try!(read_dir(&crate_new_path)) {
+      let item = try!(item);
+      try!(move_files(&crate_new_path.with_added(item.file_name()),
+                      &output_dir_path.with_added(item.file_name())));
     }
-    fs::remove_dir(&crate_new_path).unwrap();
+    try!(remove_dir(&crate_new_path));
   }
 
 
@@ -458,7 +456,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
         all_cpp_lib_dirs.push(c_lib_lib_path.clone());
       }
       if output_dir_path.with_added("Cargo.lock").exists() {
-        fs::remove_file(output_dir_path.with_added("Cargo.lock")).unwrap();
+        try!(remove_file(output_dir_path.with_added("Cargo.lock")));
       }
       for cargo_cmd in &["build", "test", "doc"] {
         let mut command = Command::new("cargo");
@@ -488,16 +486,15 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     }
     InvokationMethod::BuildScript => {
       println!("cargo:rustc-link-search={}",
-               c_lib_lib_path.to_str().unwrap());
-      for dir in cpp_lib_dirs {
-        let lib_path = dir.to_str().unwrap();
-        println!("cargo:rustc-link-search=native={}", lib_path);
+               try!(path_to_str(&c_lib_lib_path)));
+      for dir in &cpp_lib_dirs {
+        println!("cargo:rustc-link-search=native={}", try!(path_to_str(dir)));
       }
       println!("cargo:cpp_to_rust_data_path={}",
-               output_dir_path.to_str().unwrap());
+               try!(path_to_str(&output_dir_path)));
       for dir in &framework_dirs {
         println!("cargo:rustc-link-search=framework={}",
-                 dir.to_str().unwrap());
+                 try!(path_to_str(dir)));
       }
     }
   }

@@ -27,13 +27,13 @@ pub fn move_files(src: &PathBuf, dst: &PathBuf) -> Result<()> {
       }
     }
 
-    for item in try!(fs::read_dir(src).chain_err(&err)) {
+    for item in try!(read_dir(src).chain_err(&err)) {
       let item = try!(item.chain_err(&err));
       let from = item.path().to_path_buf();
       let to = dst.with_added(item.file_name());
       try!(move_files(&from, &to).chain_err(&err));
     }
-    try!(fs::remove_dir_all(src).chain_err(&err));
+    try!(remove_dir_all(src).chain_err(&err));
   } else {
     try!(move_one_file(src, dst).chain_err(&err));
   }
@@ -44,7 +44,7 @@ pub fn copy_recursively(src: &PathBuf, dst: &PathBuf) -> Result<()> {
   let err = || format!("failed: copy_recursively({:?}, {:?})", src, dst);
   if src.as_path().is_dir() {
     try!(create_dir(&dst).chain_err(&err));
-    for item in try!(fs::read_dir(src).chain_err(&err)) {
+    for item in try!(read_dir(src).chain_err(&err)) {
       let item = try!(item.chain_err(&err));
       let from = item.path().to_path_buf();
       let to = dst.with_added(item.file_name());
@@ -174,6 +174,10 @@ pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<()> {
   })
 }
 
+pub fn remove_dir<P: AsRef<Path>>(path: P) -> Result<()> {
+  fs::remove_dir(path.as_ref()).chain_err(|| format!("Failed to remove dir: {:?}", path.as_ref()))
+}
+
 pub fn remove_dir_all<P: AsRef<Path>>(path: P) -> Result<()> {
   fs::remove_dir_all(path.as_ref())
     .chain_err(|| format!("Failed to remove dir (recursively): {:?}", path.as_ref()))
@@ -219,4 +223,20 @@ impl Iterator for ReadDirWrapper {
       .next()
       .map(|value| value.chain_err(|| format!("Failed to read dir (in item): {:?}", self.path)))
   }
+}
+
+pub fn canonicalize(path: &PathBuf) -> Result<PathBuf> {
+  let r = try!(fs::canonicalize(path)
+    .chain_err(|| format!("failed to canonicalize {}", path.display())));
+  {
+    let str = try!(path_to_str(&r));
+    if str.starts_with(r"\\?\") {
+      return Ok(PathBuf::from(&str[4..]));
+    }
+  }
+  Ok(r)
+}
+
+pub fn path_to_str(path: &Path) -> Result<&str> {
+  path.to_str().chain_err(|| format!("Path is not valid unicode: {}", path.display()))
 }
