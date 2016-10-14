@@ -1,8 +1,7 @@
-extern crate serde_json;
 extern crate num_cpus;
 
 use errors::{Result, ChainErr};
-use file_utils::{PathBufWithAdded, move_files, create_dir_all};
+use file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json};
 use utils::is_msvc;
 use cpp_code_generator::CppCodeGenerator;
 use log;
@@ -17,12 +16,10 @@ use serializable::LibSpec;
 use cpp_ffi_generator::CppAndFfiData;
 use qt_doc_parser::QtDocData;
 use dependency_info::DependencyInfo;
-use utils::{run_command, add_env_path_item};
+use utils::{run_command, add_env_path_item, MapIfOk};
 use cpp_lib_builder::CppLibBuilder;
 
 use std;
-use std::fs;
-use std::fs::File;
 use std::path::PathBuf;
 use std::process::Command;
 use std::env;
@@ -65,7 +62,7 @@ pub fn run_from_build_script() -> Result<()> {
     build_profile: match env::var("PROFILE").unwrap().as_ref() {
       "debug" | "test" | "doc" => BuildProfile::Debug,
       "release" | "bench" => BuildProfile::Release,
-      a => panic!("unsupported profile: {}", a),
+      a => return Err(format!("unsupported profile: {}", a).into()),
     },
     dependency_paths: dependency_paths,
     extra_lib_paths: Vec::new(),
@@ -100,24 +97,23 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
 
   log::info("Reading lib spec");
   if !lib_spec_path.exists() {
-    panic!("Lib spec file does not exist: {}", lib_spec_path.display());
+    return Err(format!("Lib spec file does not exist: {}", lib_spec_path.display()).into());
   }
-  let lib_spec: LibSpec = {
-    let file = File::open(&lib_spec_path).unwrap();
-    serde_json::from_reader(file).unwrap()
-  };
+  let lib_spec: LibSpec = try!(load_json(&lib_spec_path));
 
   log::info("Reading input Cargo.toml");
   let input_cargo_toml_path = source_dir_path.with_added("Cargo.toml");
   if !input_cargo_toml_path.exists() {
-    panic!("Input Cargo.toml does not exist: {}",
-           input_cargo_toml_path.display());
+    return Err(format!("Input Cargo.toml does not exist: {}",
+                       input_cargo_toml_path.display())
+      .into());
   }
   let input_cargo_toml_data = InputCargoTomlData::from_file(&input_cargo_toml_path);
   if lib_spec.cpp.name == input_cargo_toml_data.name {
-    panic!("Rust crate must not have the same name as C++ library ({}) \
+    return Err(format!("Rust crate must not have the same name as C++ library ({}) \
             because it can cause library name conflict.",
-           lib_spec.cpp.name);
+                       lib_spec.cpp.name)
+      .into());
   }
   log::info(format!("C++ library name: {}", lib_spec.cpp.name));
 
@@ -126,18 +122,19 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
   let mut include_dirs = Vec::new();
   let mut cpp_lib_dirs = Vec::new();
   let mut qt_this_lib_headers_dir = None;
-  let mut target_include_dirs = lib_spec.cpp.target_include_dirs.as_ref().map(|dirs| {
-    dirs.iter()
-      .map(|dir| {
+  let mut target_include_dirs = if let Some(ref dirs) = lib_spec.cpp.target_include_dirs {
+    Some(try!(dirs.iter()
+      .map_if_ok(|dir| {
         let absolute_dir = source_dir_path.with_added(dir);
         if !absolute_dir.exists() {
-          panic!("Target include dir does not exist: {}",
-                 absolute_dir.display());
+          return Err(format!("Target include dir does not exist: {}",
+                             absolute_dir.display()));
         }
-        my_canonicalize(&absolute_dir)
-      })
-      .collect()
-  });
+        Ok(my_canonicalize(&absolute_dir))
+      })))
+  } else {
+    None
+  };
   let mut framework_dirs = Vec::new();
   let mut link_items = Vec::new();
   if is_qt_library {
@@ -194,7 +191,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     for dir in spec_include_dirs {
       let absolute_dir = source_dir_path.with_added(dir);
       if !absolute_dir.exists() {
-        panic!("Include dir does not exist: {}", absolute_dir.display());
+        return Err(format!("Include dir does not exist: {}", absolute_dir.display()).into());
       }
       include_dirs.push(my_canonicalize(&absolute_dir));
     }
@@ -203,7 +200,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     for dir in spec_lib_dirs {
       let absolute_dir = source_dir_path.with_added(dir);
       if !absolute_dir.exists() {
-        panic!("Library dir does not exist: {}", absolute_dir.display());
+        return Err(format!("Library dir does not exist: {}", absolute_dir.display()).into());
       }
       cpp_lib_dirs.push(my_canonicalize(&absolute_dir));
     }
@@ -249,10 +246,10 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
   if !env.dependency_paths.is_empty() {
     log::info("Loading dependencies");
   }
-  let dependencies: Vec<_> = env.dependency_paths
+  let dependencies: Vec<_> = try!(env.dependency_paths
     .iter()
-    .map(|path| DependencyInfo::load(&my_canonicalize(path)))
-    .collect();
+    .map_if_ok(|path| DependencyInfo::load(&my_canonicalize(path)))
+    .chain_err(|| "failed to load dependency"));
 
   let c_lib_parent_path = output_dir_path.with_added("c_lib");
   let c_lib_install_path = c_lib_parent_path.with_added("install");
@@ -268,15 +265,15 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
   } else {
     let parse_result_cache_file_path = output_dir_path.with_added("cpp_data.json");
     let loaded_parse_result = if parse_result_cache_file_path.as_path().is_file() {
-      let file = File::open(&parse_result_cache_file_path).unwrap();
-      match serde_json::from_reader(file) {
+      match load_json(&parse_result_cache_file_path) {
         Ok(r) => {
           log::info(format!("C++ data is loaded from file: {}",
-                            parse_result_cache_file_path.to_str().unwrap()));
+                            parse_result_cache_file_path.display()));
           Some(r)
         }
         Err(err) => {
           log::warning(format!("Failed to load C++ data: {}", err));
+          err.discard_expected();
           None
         }
       }
@@ -310,10 +307,9 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       log::info("Post-processing parse result.");
       try!(parse_result.post_process(&dependencies.iter().map(|x| &x.cpp_data).collect::<Vec<_>>()));
 
-      let mut file = File::create(&parse_result_cache_file_path).unwrap();
-      serde_json::to_writer(&mut file, &parse_result).unwrap();
+      try!(save_json(&parse_result_cache_file_path, &parse_result));
       log::info(format!("Header parse result is saved to file: {}",
-                        parse_result_cache_file_path.to_str().unwrap()));
+                        parse_result_cache_file_path.display()));
       parse_result
     };
 
@@ -433,17 +429,15 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     //      .chain_err(|| "Rust code generator failed"));
     rust_code_generator::run(rust_config, &rust_data);
     {
-      let rust_types_path = output_dir_path.with_added("rust_export_info.json");
-      let mut file = File::create(&rust_types_path).unwrap();
-      serde_json::to_writer(&mut file,
-                            &RustExportInfo {
-                              crate_name: input_cargo_toml_data.name.clone(),
-                              rust_types: rust_data.processed_types,
-                              lib_spec: lib_spec.clone(),
-                            })
-        .unwrap();
+      let rust_export_path = output_dir_path.with_added("rust_export_info.json");
+      try!(save_json(&rust_export_path,
+                     &RustExportInfo {
+                       crate_name: input_cargo_toml_data.name.clone(),
+                       rust_types: rust_data.processed_types,
+                       lib_spec: lib_spec.clone(),
+                     }));
       log::info(format!("Rust export info is saved to file: {}",
-                        rust_types_path.to_str().unwrap()));
+                        rust_export_path.to_str().unwrap()));
     }
 
     for item in fs::read_dir(&crate_new_path).unwrap() {

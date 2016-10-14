@@ -61,20 +61,29 @@ pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &str) -> String {
 
   let mut shown_docs = Vec::new();
   for doc_item in &doc_items {
-    if doc_item.doc.is_none() ||
-       doc_item.doc.as_ref().unwrap().kind == QtDocResultForMethodKind::ExactMatch {
-      shown_docs.push(doc_item.clone());
+    let ok = if let Some(ref x) = doc_item.doc {
+      x.kind == QtDocResultForMethodKind::ExactMatch
+    } else {
+      true
+    };
+    if ok {
+      shown_docs.push(doc_item.clone())
     }
   }
   for doc_item in doc_items {
-    if doc_item.doc.is_some() &&
-       doc_item.doc.as_ref().unwrap().kind != QtDocResultForMethodKind::ExactMatch {
-      let anchor = &doc_item.doc.as_ref().unwrap().anchor;
-      if shown_docs.iter()
-        .any(|x| x.doc.is_some() && &x.doc.as_ref().unwrap().anchor == anchor) {
-        shown_docs.push(DocItem { doc: None, ..doc_item.clone() });
-      } else {
-        shown_docs.push(doc_item.clone());
+    if let Some(ref item_doc) = doc_item.doc {
+      if item_doc.kind != QtDocResultForMethodKind::ExactMatch {
+        let anchor = &item_doc.anchor;
+        if shown_docs.iter()
+          .any(|x| if let Some(ref xx) = x.doc {
+            &xx.anchor == anchor
+          } else {
+            false
+          }) {
+          shown_docs.push(DocItem { doc: None, ..doc_item.clone() });
+        } else {
+          shown_docs.push(doc_item.clone());
+        }
       }
     }
   }

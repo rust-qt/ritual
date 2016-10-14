@@ -113,6 +113,23 @@ pub fn open_file<P: AsRef<Path>>(path: P) -> Result<FileWrapper> {
   })
 }
 
+extern crate serde;
+extern crate serde_json;
+pub fn load_json<P: AsRef<Path>, T: serde::Deserialize>(path: P) -> Result<T> {
+  let file = try!(open_file(path.as_ref()));
+  serde_json::from_reader(file.into_file())
+    .chain_err(|| format!("failed to parse file as JSON: {}", path.as_ref().display()))
+}
+
+pub fn save_json<P: AsRef<Path>, T: serde::Serialize>(path: P, value: &T) -> Result<()> {
+  let file = try!(create_file(path.as_ref()));
+  serde_json::to_writer(&mut file.into_file(), value).chain_err(|| {
+    format!("failed to serialize to JSON file: {}",
+            path.as_ref().display())
+  })
+}
+
+
 pub fn file_to_string<P: AsRef<Path>>(path: P) -> Result<String> {
   let mut f = try!(open_file(path));
   f.read_all()
@@ -138,8 +155,7 @@ impl FileWrapper {
   pub fn write<S: AsRef<str>>(&mut self, text: S) -> Result<()> {
     use std::io::Write;
     self.file
-      .write(text.as_ref().as_bytes())
-      .map(|_| ())
+      .write_all(text.as_ref().as_bytes())
       .chain_err(|| format!("Failed to write to file: {:?}", self.path))
   }
   pub fn into_file(self) -> fs::File {
