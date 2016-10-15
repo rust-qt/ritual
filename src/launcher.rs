@@ -40,6 +40,7 @@ pub struct BuildEnvironment {
   pub extra_lib_paths: Vec<PathBuf>,
   pub num_jobs: Option<i32>,
   pub build_profile: BuildProfile,
+  pub pipe_output: bool,
 }
 
 pub fn run_from_build_script() -> Result<()> {
@@ -47,9 +48,7 @@ pub fn run_from_build_script() -> Result<()> {
   for (name, value) in env::vars_os() {
     if let Ok(name) = name.into_string() {
       if name.starts_with("DEP_") && name.ends_with("_CPP_TO_RUST_DATA_PATH") {
-        let value = try!(value.into_string()
-          .map_err(|_| "invalid unicode in dependency path env var"));
-        log::info(format!("Found dependency: {}", &value));
+        log::info(format!("Found dependency: {}", value.to_string_lossy()));
         dependency_paths.push(PathBuf::from(value));
       }
     }
@@ -72,6 +71,7 @@ pub fn run_from_build_script() -> Result<()> {
     },
     dependency_paths: dependency_paths,
     extra_lib_paths: Vec::new(),
+    pipe_output: false,
   })
 }
 
@@ -144,6 +144,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     let result1 = try!(run_command(Command::new(&qmake_path)
                                      .arg("-query")
                                      .arg("QT_INSTALL_HEADERS"),
+                                   true,
                                    true));
     let qt_install_headers_path = PathBuf::from(result1.trim());
     log::info(format!("QT_INSTALL_HEADERS = \"{}\"",
@@ -151,6 +152,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     let result2 = try!(run_command(Command::new(&qmake_path)
                                      .arg("-query")
                                      .arg("QT_INSTALL_LIBS"),
+                                   true,
                                    true));
     let qt_install_libs_path = PathBuf::from(result2.trim());
     log::info(format!("QT_INSTALL_LIBS = \"{}\"", qt_install_libs_path.display()));
@@ -300,7 +302,8 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
           .chain_err(|| "C++ parser failed"));
       if is_qt_library {
         if let Some(ref qt_this_lib_headers_dir) = qt_this_lib_headers_dir {
-          qt_specific::fix_header_names(&mut parse_result, qt_this_lib_headers_dir);
+          try!(qt_specific::fix_header_names(&mut parse_result, qt_this_lib_headers_dir)
+            .chain_err(|| "qt fix_header_names failed"));
         }
       }
       log::info("Post-processing parse result.");
@@ -371,6 +374,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
         } else {
           None
         },
+        pipe_output: env.pipe_output,
       }
       .run()
       .chain_err(|| "C wrapper build failed")
@@ -426,7 +430,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     log::info(format!("Generating Rust crate ({}).", &input_cargo_toml_data.name));
     //    try!(Ok(rust_code_generator::run(rust_config, &rust_data))
     //      .chain_err(|| "Rust code generator failed"));
-    rust_code_generator::run(rust_config, &rust_data);
+    try!(rust_code_generator::run(rust_config, &rust_data));
     {
       let rust_export_path = output_dir_path.with_added("rust_export_info.json");
       try!(save_json(&rust_export_path,
@@ -480,7 +484,8 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
           // "cannot satisfy dependencies so `std` only shows up once" error.
           command.env("RUSTFLAGS", "-C prefer-dynamic");
         }
-        try!(run_command(&mut command, false).chain_err(|| "failed to build generated crate"));
+        try!(run_command(&mut command, false, env.pipe_output)
+          .chain_err(|| "failed to build generated crate"));
       }
       log::info("Completed successfully.");
     }

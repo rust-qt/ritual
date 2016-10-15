@@ -11,6 +11,7 @@ pub struct CppLibBuilder<'a> {
   pub install_dir: &'a PathBuf,
   pub num_jobs: i32,
   pub linker_env_library_dirs: Option<&'a Vec<PathBuf>>,
+  pub pipe_output: bool,
 }
 
 impl<'a> CppLibBuilder<'a> {
@@ -28,7 +29,7 @@ impl<'a> CppLibBuilder<'a> {
     }
     // TODO: enable release mode on other platforms if cargo is in release mode
     // (maybe build C library in both debug and release in separate folders)
-    try!(run_command(&mut cmake_command, false));
+    try!(run_command(&mut cmake_command, false, self.pipe_output));
 
     let make_command_name = if is_msvc() { "nmake" } else { "make" }.to_string();
     let mut make_args = Vec::new();
@@ -49,7 +50,7 @@ impl<'a> CppLibBuilder<'a> {
         }
       }
     }
-    try!(run_command(&mut make_command, false));
+    try!(run_command(&mut make_command, false, self.pipe_output));
     Ok(())
   }
 }

@@ -19,7 +19,7 @@ use doc_formatter;
 use std::collections::{HashMap, HashSet, hash_map};
 use cpp_operator::CppOperator;
 use caption_strategy::TypeCaptionStrategy;
-use errors::Result;
+use errors::{Result, ChainErr};
 
 pub use serializable::{RustProcessedTypeKind, RustProcessedTypeInfo};
 
@@ -178,11 +178,14 @@ fn prepare_enum_values(values: &[EnumValue], name: &str) -> Vec<RustEnumValue> {
         .map(|item| item[common_prefix.len()..item.len() - common_suffix.len()].join(""))
         .collect();
       if new_names.iter()
-        .find(|item| item.is_empty() || item.chars().next().unwrap().is_digit(10))
-        .is_none() {
-        Some(new_names)
-      } else {
+        .any(|item| if let Some(ch) = item.chars().next() {
+          ch.is_digit(10)
+        } else {
+          true
+        }) {
         None
+      } else {
+        Some(new_names)
       }
     };
     if let Some(new_names) = new_names {
@@ -302,18 +305,18 @@ pub fn run(input_data: CppAndFfiData,
       log::warning("unprocessed cpp methods left:");
       for method in cpp_methods {
         log::warning(format!("  {}", method.cpp_method.short_text()));
-        if method.cpp_method.class_membership.is_none() {
+        if let Some(ref info) = method.cpp_method.class_membership {
+          let rust_name = try!(calculate_rust_name(&info.class_type.name,
+                                                   &method.cpp_method.include_file,
+                                                   false,
+                                                   None,
+                                                   &generator.config));
+          log::warning(format!("  -> {}", rust_name.full_name(None)));
+        } else {
           let rust_name = try!(calculate_rust_name(&method.cpp_method.name,
                                                    &method.cpp_method.include_file,
                                                    true,
                                                    method.cpp_method.operator.as_ref(),
-                                                   &generator.config));
-          log::warning(format!("  -> {}", rust_name.full_name(None)));
-        } else {
-          let rust_name = try!(calculate_rust_name(method.cpp_method.class_name().unwrap(),
-                                                   &method.cpp_method.include_file,
-                                                   false,
-                                                   None,
                                                    &generator.config));
           log::warning(format!("  -> {}", rust_name.full_name(None)));
         }
@@ -347,7 +350,8 @@ fn calculate_rust_name(name: &str,
                        config: &RustGeneratorConfig)
                        -> Result<RustName> {
   let mut split_parts: Vec<_> = name.split("::").collect();
-  let original_last_part = split_parts.pop().unwrap().to_string();
+  let original_last_part = try!(split_parts.pop().chain_err(|| "split_parts can't be empty"))
+    .to_string();
   let last_part = if let Some(operator) = operator {
     try!(operator_rust_name(operator))
   } else {
@@ -393,7 +397,9 @@ fn process_types(input_data: &CppAndFfiData,
       cpp_name: type_info.name.clone(),
       cpp_template_arguments: None,
       kind: match type_info.kind {
-        CppTypeKind::Class { ref size, .. } => RustProcessedTypeKind::Class { size: size.unwrap() },
+        CppTypeKind::Class { ref size, .. } => {
+          RustProcessedTypeKind::Class { size: try!(size.chain_err(|| "size must be present")) }
+        }
         CppTypeKind::Enum { ref values } => RustProcessedTypeKind::Enum { values: values.clone() },
       },
       rust_name: try!(calculate_rust_name(&type_info.name,
@@ -406,14 +412,18 @@ fn process_types(input_data: &CppAndFfiData,
   let template_final_name =
     |result: &Vec<RustProcessedTypeInfo>, item: &RustProcessedTypeInfo| -> Result<RustName> {
       let mut name = item.rust_name.clone();
-      let last_name = name.parts.pop().unwrap();
+      let last_name = try!(name.parts.pop().chain_err(|| "name.parts can't be empty"));
       let mut arg_captions = Vec::new();
-      for x in item.cpp_template_arguments.as_ref().unwrap() {
-        let rust_type = try!(complete_type(result,
-                                           dependency_types,
-                                           &try!(x.to_cpp_ffi_type(CppTypeRole::NotReturnType)),
-                                           &CppFfiArgumentMeaning::Argument(0)));
-        arg_captions.push(rust_type.rust_api_type.caption().to_class_case());
+      if let Some(ref args) = item.cpp_template_arguments {
+        for x in args {
+          let rust_type = try!(complete_type(result,
+                                             dependency_types,
+                                             &try!(x.to_cpp_ffi_type(CppTypeRole::NotReturnType)),
+                                             &CppFfiArgumentMeaning::Argument(0)));
+          arg_captions.push(rust_type.rust_api_type.caption().to_class_case());
+        }
+      } else {
+        return Err("template arguments expected".into());
       }
       name.parts.push(last_name + &arg_captions.join(""));
       Ok(name)
@@ -444,7 +454,12 @@ fn process_types(input_data: &CppAndFfiData,
       for r in name_failed_items {
         log::warning(format!("  {:?}\n  {}\n\n",
                              r,
-                             template_final_name(&result, &r).err().unwrap()));
+                             if let Err(err) = template_final_name(&result, &r) {
+                               err
+                             } else {
+                               return Err("template_final_name must return Err at this stage"
+                                 .into());
+                             }));
       }
       break;
     }
@@ -520,8 +535,11 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
     rust_api_to_c_conversion = RustToCTypeConversion::QFlagsToUInt;
     let enum_type = if let CppTypeBase::Class(CppTypeClassBase { ref template_arguments, .. }) =
                            cpp_ffi_type.original_type.base {
-      let args = template_arguments.as_ref().unwrap();
-      assert!(args.len() == 1);
+      let args = try!(template_arguments.as_ref()
+        .chain_err(|| "QFlags type must have template arguments"));
+      if args.len() != 1 {
+        return Err("QFlags type must have exactly 1 template argument".into());
+      }
       if let CppTypeBase::Enum { ref name } = args[0].base {
         match find_type_info(processed_types, dependency_types, |x| &x.cpp_name == name) {
           None => return Err(format!("type has no Rust equivalent: {}", name).into()),
@@ -903,16 +921,12 @@ impl RustGenerator {
                        generate_doc: bool)
                        -> Result<RustMethod> {
     let mut arguments = Vec::new();
-    let mut return_type_info = None;
     for (arg_index, arg) in method.c_signature.arguments.iter().enumerate() {
-      let arg_type = try!(complete_type(&self.processed_types,
-                                        &self.dependency_types,
-                                        &arg.argument_type,
-                                        &arg.meaning));
-      if arg.meaning == CppFfiArgumentMeaning::ReturnValue {
-        assert!(return_type_info.is_none());
-        return_type_info = Some((arg_type, Some(arg_index as i32)));
-      } else {
+      if arg.meaning != CppFfiArgumentMeaning::ReturnValue {
+        let arg_type = try!(complete_type(&self.processed_types,
+                                          &self.dependency_types,
+                                          &arg.argument_type,
+                                          &arg.meaning));
         arguments.push(RustMethodArgument {
           ffi_index: Some(arg_index as i32),
           argument_type: arg_type,
@@ -924,7 +938,20 @@ impl RustGenerator {
         });
       }
     }
-    if return_type_info.is_none() {
+    let (mut return_type, return_arg_index) = if let Some((arg_index, arg)) = method.c_signature
+      .arguments
+      .iter()
+      .enumerate()
+      .find(|&(_arg_index, arg)| arg.meaning == CppFfiArgumentMeaning::ReturnValue) {
+      // an argument has return value meaning, so
+      // FFI return type must be void
+      assert!(method.c_signature.return_type == CppFfiType::void());
+      (try!(complete_type(&self.processed_types,
+                          &self.dependency_types,
+                          &arg.argument_type,
+                          &arg.meaning)),
+       Some(arg_index as i32))
+    } else {
       // none of the arguments has return value meaning,
       // so FFI return value must be used
       let mut return_type = try!(complete_type(&self.processed_types,
@@ -944,14 +971,9 @@ impl RustGenerator {
         assert!(return_type.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr);
         return_type.rust_api_to_c_conversion = RustToCTypeConversion::None;
       }
-      return_type_info = Some((return_type, None));
-    } else {
-      // an argument has return value meaning, so
-      // FFI return type must be void
-      assert!(method.c_signature.return_type == CppFfiType::void());
-    }
-    let mut return_type_info1 = return_type_info.unwrap();
-    if return_type_info1.0.rust_api_type.is_ref() {
+      (return_type, None)
+    };
+    if return_type.rust_api_type.is_ref() {
       let mut next_lifetime_num = 0;
       for arg in &mut arguments {
         if arg.argument_type.rust_api_type.is_ref() {
@@ -968,8 +990,7 @@ impl RustGenerator {
       } else {
         "l0".to_string()
       };
-      return_type_info1.0.rust_api_type =
-        return_type_info1.0.rust_api_type.with_lifetime(return_lifetime);
+      return_type.rust_api_type = return_type.rust_api_type.with_lifetime(return_lifetime);
     }
 
     let doc = if generate_doc {
@@ -989,8 +1010,8 @@ impl RustGenerator {
       arguments: RustMethodArguments::SingleVariant(RustMethodArgumentsVariant {
         arguments: arguments,
         cpp_method: method.clone(),
-        return_type: return_type_info1.0,
-        return_type_ffi_index: return_type_info1.1,
+        return_type: return_type,
+        return_type_ffi_index: return_arg_index,
       }),
       doc: doc,
     })
@@ -1457,7 +1478,8 @@ fn calculate_rust_name_test_part(name: &'static str,
                                    crate_name: "qt_core".to_string(),
                                    remove_qt_prefix: true,
                                    qt_doc_data: None,
-                                 }),
+                                 })
+               .unwrap(),
              RustName::new(expected.into_iter().map(|x| x.to_string()).collect()));
 }
 

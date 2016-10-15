@@ -28,6 +28,7 @@ fn build_cpp_lib() -> tempdir::TempDir {
       install_dir: &install_dir,
       num_jobs: 1,
       linker_env_library_dirs: None,
+      pipe_output: true,
     }
     .run()
     .unwrap_or_else(|e| {
@@ -65,6 +66,7 @@ fn full_run() {
       num_jobs: Some(1),
       build_profile: BuildProfile::Debug,
       extra_lib_paths: vec![cpp_install_lib_dir],
+      pipe_output: true,
     })
     .unwrap_or_else(|e| {
       e.display_report();

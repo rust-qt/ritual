@@ -5,11 +5,10 @@ extern crate csv;
 use std::path::PathBuf;
 use std::collections::HashMap;
 use file_utils::PathBufWithAdded;
-use std::fs;
-use std::fs::File;
-use std::io::Read;
 use log;
-
+use errors::{Result, ChainErr};
+use utils::MapIfOk;
+use file_utils::{read_dir, file_to_string, os_str_to_str};
 
 #[derive(Debug)]
 struct QtDocIndexItem {
@@ -113,51 +112,31 @@ fn are_argument_types_equal(declaration1: &str, declaration2: &str) -> bool {
 }
 
 impl QtDocData {
-  pub fn new(data_folder: &PathBuf) -> Result<QtDocData, String> {
+  pub fn new(data_folder: &PathBuf) -> Result<QtDocData> {
     let index_path = data_folder.with_added("index.csv");
     if !index_path.exists() {
-      return Err(format!("Index file not found: {}", index_path.display()));
+      return Err(format!("Index file not found: {}", index_path.display()).into());
     }
-    let mut index_reader = match csv::Reader::from_file(index_path) {
-      Ok(r) => r,
-      Err(err) => return Err(format!("CSV reader error: {}", err)),
-    };
+    let mut index_reader = try!(csv::Reader::from_file(index_path)
+      .chain_err(|| "CSV reader error"));
     let mut result = QtDocData {
-      index: index_reader.decode().map(|x| QtDocIndexItem::from_line(x.unwrap())).collect(),
+      index: try!(index_reader.decode()
+        .map_if_ok(|x| -> Result<_> { Ok(QtDocIndexItem::from_line(try!(x))) })),
       files: HashMap::new(),
       method_docs: HashMap::new(),
     };
     let dir_path = data_folder.with_added("html");
-    let dir_iterator = match fs::read_dir(&dir_path) {
-      Ok(r) => r,
-      Err(err) => return Err(format!("Failed to read directory {}: {}", dir_path.display(), err)),
-    };
-    for item in dir_iterator {
-      let item = match item {
-        Ok(r) => r,
-        Err(err) => {
-          return Err(format!("Failed to iterate over directory {}: {}",
-                             dir_path.display(),
-                             err))
-        }
-      };
+    for item in try!(read_dir(&dir_path)) {
+      let item = try!(item);
       let file_path = item.path();
       if file_path.is_dir() {
         continue;
       }
-      let mut html_file = match File::open(&file_path) {
-        Ok(r) => r,
-        Err(err) => return Err(format!("Failed to open file {}: {}", file_path.display(), err)),
-      };
-      let mut html_content = String::new();
-      match html_file.read_to_string(&mut html_content) {
-        Ok(_size) => {}
-        Err(err) => return Err(format!("Failed to read file {}: {}", file_path.display(), err)),
-      }
+      let html_content = try!(file_to_string(&file_path));
       let doc = Document::from(html_content.as_ref());
-      result.method_docs.insert(item.file_name().into_string().unwrap(),
-                                QtDocData::all_method_docs(&doc));
-      result.files.insert(item.file_name().into_string().unwrap(), doc);
+      let file_name = try!(os_str_to_str(&item.file_name())).to_string();
+      result.method_docs.insert(file_name.clone(), try!(QtDocData::all_method_docs(&doc)));
+      result.files.insert(file_name, doc);
 
     }
     Ok(result)
@@ -167,15 +146,16 @@ impl QtDocData {
                         name: &str,
                         parser_declaration: &str,
                         method_short_text: &str)
-                        -> Result<QtDocResultForMethod, String> {
+                        -> Result<QtDocResultForMethod> {
     let mut name_parts: Vec<_> = name.split("::").collect();
-    let mut anchor_override = None;
-    if name_parts.len() >= 2 &&
-       name_parts[name_parts.len() - 1] == name_parts[name_parts.len() - 2] {
-      anchor_override = Some(name_parts.last().unwrap().to_string());
+    let anchor_override = if name_parts.len() >= 2 &&
+                             name_parts[name_parts.len() - 1] == name_parts[name_parts.len() - 2] {
       // constructors are not in the index
-      name_parts.pop().unwrap();
-    }
+      let last_part = try!(name_parts.pop().chain_err(|| "name_parts can't be empty"));
+      Some(last_part.to_string())
+    } else {
+      None
+    };
     if name_parts.len() == 3 {
       // nested types don't have full names in the index
       name_parts.remove(0);
@@ -194,7 +174,7 @@ impl QtDocData {
               .filter(|x| &x.anchor == anchor || x.anchor.starts_with(&anchor_prefix))
               .collect();
             if candidates.is_empty() {
-              return Err(format!("No matching anchors found for {}", name));
+              return Err(format!("No matching anchors found for {}", name).into());
             }
             let scope_prefix = match name.find("::") {
               Some(index) => {
@@ -231,7 +211,7 @@ impl QtDocData {
                   }
                   if &item_declaration_imprint == &query_imprint {
                     if item.text.find(|c| c != '\n').is_none() {
-                      return Err("found empty documentation".to_string());
+                      return Err("found empty documentation".into());
                     }
                     return Ok(QtDocResultForMethod {
                       text: item.text.clone(),
@@ -250,7 +230,7 @@ impl QtDocData {
                   }
                   if are_argument_types_equal(&declaration_no_scope, &item_declaration_imprint) {
                     if item.text.find(|c| c != '\n').is_none() {
-                      return Err("found empty documentation".to_string());
+                      return Err("found empty documentation".into());
                     }
                     return Ok(QtDocResultForMethod {
                       text: item.text.clone(),
@@ -272,7 +252,7 @@ impl QtDocData {
                                    candidates[0].declarations));
 
               if candidates[0].text.is_empty() {
-                return Err("found empty documentation".to_string());
+                return Err("found empty documentation".into());
               }
               return Ok(QtDocResultForMethod {
                 text: candidates[0].text.clone(),
@@ -292,17 +272,17 @@ impl QtDocData {
               log::warning(format!("  {:?}", item.declarations));
             }
             log::warning("");
-            Err("Declaration mismatch".to_string())
+            Err("Declaration mismatch".into())
           }
-          None => Err(format!("No such file: {}", &item.file_name)),
+          None => Err(format!("No such file: {}", &item.file_name).into()),
         }
       }
-      None => Err(format!("No documentation entry for {}", corrected_name)),
+      None => Err(format!("No documentation entry for {}", corrected_name).into()),
     }
   }
 
 
-  fn all_method_docs(doc: &Document) -> Vec<QtDocForMethod> {
+  fn all_method_docs(doc: &Document) -> Result<Vec<QtDocForMethod>> {
     let mut results = Vec::new();
     use self::select::predicate::{And, Attr, Name, Class};
     let h3s = doc.find(And(Name("h3"), Class("fn")));
@@ -314,7 +294,9 @@ impl QtDocData {
         log::warning("Failed to get anchor_node");
         continue;
       };
-      let anchor_text = anchor_node.attr("name").unwrap().to_string();
+      let anchor_text = try!(anchor_node.attr("name")
+          .chain_err(|| "anchor_node doesn't have name attribute"))
+        .to_string();
       let mut main_declaration = h3.text()
         .replace("[static]", "static")
         .replace("[protected]", "protected")
@@ -340,7 +322,8 @@ impl QtDocData {
         if node.as_comment().is_none() {
           result.push_str(node.html().as_ref());
           for td1 in node.find(And(Name("td"), Class("memItemLeft"))).iter() {
-            let declaration = format!("{} {}", td1.text(), td1.next().unwrap().text());
+            let td2 = try!(td1.next().chain_err(|| "td1.next() failed"));
+            let declaration = format!("{} {}", td1.text(), td2.text());
             declarations.push(declaration);
           }
 
@@ -356,7 +339,7 @@ impl QtDocData {
         anchor: anchor_text,
       });
     }
-    results
+    Ok(results)
   }
 }
 

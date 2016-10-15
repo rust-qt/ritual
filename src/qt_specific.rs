@@ -3,29 +3,29 @@ extern crate regex;
 use std;
 use std::path::PathBuf;
 use cpp_data::CppData;
-use std::io::Read;
 use std::collections::HashMap;
 use log;
 use utils::add_to_multihash;
+use file_utils::{read_dir, file_to_string, os_str_to_str};
+use errors::{Result, ChainErr};
 
-pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) {
-  let re = self::regex::Regex::new(r#"^#include "([a-zA-Z._]+)"$"#).unwrap();
+pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) -> Result<()> {
+  let re = try!(self::regex::Regex::new(r#"^#include "([a-zA-Z._]+)"$"#));
   let mut map_real_to_all_fancy: HashMap<_, Vec<_>> = HashMap::new();
   log::info("Detecting fancy Qt header names.");
-  for header in std::fs::read_dir(headers_dir).unwrap() {
-    let header = header.unwrap();
+  for header in try!(read_dir(headers_dir)) {
+    let header = try!(header);
     let header_path = header.path();
     if !header_path.is_file() {
       continue;
     }
-    if std::fs::metadata(&header_path).unwrap().len() < 100 {
-      let mut file = std::fs::File::open(&header_path).unwrap();
-      let mut file_content = Vec::new();
-      file.read_to_end(&mut file_content).unwrap();
-      let file_content_string = String::from_utf8(file_content).unwrap().trim().to_string();
-      if let Some(matches) = re.captures(file_content_string.as_ref()) {
-        let real_header = matches.at(1).unwrap().to_string();
-        let fancy_header = header.file_name().into_string().unwrap();
+    let metadata = try!(std::fs::metadata(&header_path)
+      .chain_err(|| format!("failed to get metadata for {}", header_path.display())));
+    if metadata.len() < 100 {
+      let file_content = try!(file_to_string(&header_path));
+      if let Some(matches) = re.captures(file_content.as_ref()) {
+        let real_header = try!(matches.at(1).chain_err(|| "invalid regexp matches")).to_string();
+        let fancy_header = try!(os_str_to_str(&header.file_name())).to_string();
         add_to_multihash(&mut map_real_to_all_fancy, real_header, fancy_header);
       }
     }
@@ -81,4 +81,5 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) {
   for t in &mut data.template_instantiations {
     t.include_file = get_header(&t.include_file, Some(&t.class_name));
   }
+  Ok(())
 }

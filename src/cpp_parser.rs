@@ -7,7 +7,7 @@ use self::regex::Regex;
 use log;
 use std::path::PathBuf;
 use errors::{Result, ChainErr, unexpected};
-use file_utils::{remove_file, open_file, create_file, path_to_str};
+use file_utils::{remove_file, open_file, create_file, path_to_str, os_str_to_str};
 
 use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppOriginLocation,
                CppVisibility, CppTemplateInstantiation, CppTemplateInstantiations,
@@ -1181,6 +1181,30 @@ impl<'a> CppParser<'a> {
     })
   }
 
+  fn parse_class_field(&self, entity: Entity) -> Result<CppClassField> {
+    let field_name = try!(entity.get_name().chain_err(|| "failed to get field name"));
+    let field_clang_type = try!(entity.get_type().chain_err(|| "failed to get field type"));
+    let field_type = try!(self.parse_type(field_clang_type, Some(entity), None)
+      .chain_err(|| {
+        format!("failed to parse field type: {}::{}",
+                get_full_name(entity).unwrap_or("?".into()),
+                field_name)
+      }));
+    Ok(CppClassField {
+      size: match field_clang_type.get_sizeof() {
+        Ok(size) => Some(size as i32),
+        Err(_) => None,
+      },
+      name: field_name,
+      field_type: field_type,
+      visibility: match entity.get_accessibility().unwrap_or(Accessibility::Public) {
+        Accessibility::Public => CppVisibility::Public,
+        Accessibility::Protected => CppVisibility::Protected,
+        Accessibility::Private => CppVisibility::Private,
+      },
+    })
+  }
+
   fn parse_class(&self, entity: Entity) -> Result<CppTypeData> {
     let include_file = try!(self.entity_include_file(entity).chain_err(|| {
       format!("Origin of type is unknown: {}; entity: {:?}",
@@ -1214,27 +1238,13 @@ impl<'a> CppParser<'a> {
         .collect();
     for child in entity.get_children() {
       if child.get_kind() == EntityKind::FieldDecl {
-        let field_name = try!(child.get_name().chain_err(|| "failed to get field name"));
-        let field_clang_type = try!(child.get_type().chain_err(|| "failed to get field type"));
-        let field_type = try!(self.parse_type(field_clang_type, Some(entity), None)
-          .chain_err(|| {
-            format!("failed to parse field type: {}::{}",
-                    get_full_name(entity).unwrap_or("?".into()),
-                    field_name)
-          }));
-        fields.push(CppClassField {
-          size: match field_clang_type.get_sizeof() {
-            Ok(size) => Some(size as i32),
-            Err(_) => None,
-          },
-          name: field_name,
-          field_type: field_type,
-          visibility: match entity.get_accessibility().unwrap_or(Accessibility::Public) {
-            Accessibility::Public => CppVisibility::Public,
-            Accessibility::Protected => CppVisibility::Protected,
-            Accessibility::Private => CppVisibility::Private,
-          },
-        });
+        match self.parse_class_field(child) {
+          Ok(field) => fields.push(field),
+          Err(err) => {
+            log::warning(format!("failed to parse class field: {}", err));
+            err.discard_expected();
+          }
+        }
       }
       if child.get_kind() == EntityKind::BaseSpecifier {
         let base_type = match self.parse_type(child.get_type().unwrap(), None, None) {
@@ -1305,7 +1315,7 @@ impl<'a> CppParser<'a> {
   fn entity_include_file(&self, entity: Entity) -> Result<String> {
     let file_path_buf = PathBuf::from(try!(self.entity_include_path(entity)));
     let file_name = try!(file_path_buf.file_name().chain_err(|| "no file name in file path"));
-    Ok(try!(file_name.to_str().chain_err(|| "invalid Unicode in file name")).to_string())
+    Ok(try!(os_str_to_str(file_name)).to_string())
   }
 
   fn should_process_entity(&self, entity: Entity) -> bool {

@@ -34,7 +34,8 @@ fn run_parser(code: &'static str) -> CppData {
                                      name_blacklist: Vec::new(),
                                      framework_dirs: Vec::new(),
                                    },
-                                   &Vec::new());
+                                   &Vec::new())
+    .unwrap();
   for method in &mut result.methods {
     if let Some(ref mut origin_location) = method.origin_location {
       assert_eq!(origin_location.include_file_path,

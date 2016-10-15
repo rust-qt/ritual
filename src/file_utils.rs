@@ -240,3 +240,13 @@ pub fn canonicalize(path: &PathBuf) -> Result<PathBuf> {
 pub fn path_to_str(path: &Path) -> Result<&str> {
   path.to_str().chain_err(|| format!("Path is not valid unicode: {}", path.display()))
 }
+
+use std::ffi::{OsStr, OsString};
+pub fn os_str_to_str(os_str: &OsStr) -> Result<&str> {
+  os_str.to_str().chain_err(|| format!("String is not valid unicode: {}", os_str.to_string_lossy()))
+}
+
+pub fn os_string_into_string(s: OsString) -> Result<String> {
+  s.into_string()
+    .map_err(|s| format!("String is not valid unicode: {}", s.to_string_lossy()).into())
+}

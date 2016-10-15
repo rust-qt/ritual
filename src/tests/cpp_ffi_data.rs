@@ -38,14 +38,16 @@ fn argument_int() {
     },
     meaning: CppFfiArgumentMeaning::Argument(0),
   };
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::NameOnly), "arg1");
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short)),
+  assert_eq!(arg.caption(ArgumentCaptionStrategy::NameOnly).unwrap(),
+             "arg1");
+  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short)).unwrap(),
              "int");
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full)),
+  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full)).unwrap(),
              "int");
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short)),
+  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))
+               .unwrap(),
              "int_arg1");
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full)),
+  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full)).unwrap(),
              "int_arg1");
   assert_eq!(arg.to_cpp_code().unwrap(), "int arg1");
 }
@@ -71,14 +73,16 @@ fn argument_int_ptr() {
     },
     meaning: CppFfiArgumentMeaning::Argument(0),
   };
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::NameOnly), "arg1");
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short)),
+  assert_eq!(arg.caption(ArgumentCaptionStrategy::NameOnly).unwrap(),
+             "arg1");
+  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short)).unwrap(),
              "int");
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full)),
+  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full)).unwrap(),
              "int_ptr");
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short)),
+  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))
+               .unwrap(),
              "int_arg1");
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full)),
+  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full)).unwrap(),
              "int_ptr_arg1");
   assert_eq!(arg.to_cpp_code().unwrap(), "int* arg1");
 }
@@ -121,14 +125,16 @@ fn argument_func() {
     },
     meaning: CppFfiArgumentMeaning::Argument(0),
   };
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::NameOnly), "arg1");
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short)),
+  assert_eq!(arg.caption(ArgumentCaptionStrategy::NameOnly).unwrap(),
+             "arg1");
+  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short)).unwrap(),
              "func");
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full)),
+  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full)).unwrap(),
              "int_func_int_bool_ptr");
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short)),
+  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))
+               .unwrap(),
              "func_arg1");
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full)),
+  assert_eq!(arg.caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full)).unwrap(),
              "int_func_int_bool_ptr_arg1");
   assert_eq!(arg.to_cpp_code().unwrap(), "int (*arg1)(int, bool*)");
 }
@@ -177,29 +183,33 @@ fn signature_two_numbers() {
     return_type: CppFfiType::void(),
   };
 
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::NameOnly),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::NameOnly).unwrap(),
              "arg1_arg2");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short)),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))
+               .unwrap(),
              "int_double");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full)),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))
+               .unwrap(),
              "int_double");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short)),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short)).unwrap(),
              "int_arg1_double_arg2");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full)),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))
+               .unwrap(),
              "int_arg1_double_arg2");
 
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::NameOnly)),
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::NameOnly))
+               .unwrap(),
              "arg1_arg2");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))),
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))).unwrap(),
              "int_double");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))),
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))).unwrap(),
              "int_double");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))),
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))).unwrap(),
              "int_arg1_double_arg2");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))),
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))).unwrap(),
              "int_arg1_double_arg2");
 
-  assert_eq!(sig.caption(MethodCaptionStrategy::ConstOnly), "");
+  assert_eq!(sig.caption(MethodCaptionStrategy::ConstOnly).unwrap(), "");
 
   assert!(!sig.has_const_this());
 }
@@ -253,18 +263,21 @@ fn signature_class_method() {
                     }],
     return_type: CppFfiType::void(),
   };
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::NameOnly),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::NameOnly).unwrap(),
              "arg1");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short)),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))
+               .unwrap(),
              "double");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full)),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))
+               .unwrap(),
              "double");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short)),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short)).unwrap(),
              "double_arg1");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full)),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))
+               .unwrap(),
              "double_arg1");
 
-  assert_eq!(sig.caption(MethodCaptionStrategy::ConstOnly), "");
+  assert_eq!(sig.caption(MethodCaptionStrategy::ConstOnly).unwrap(), "");
 
   assert!(!sig.has_const_this());
 }
@@ -319,39 +332,44 @@ fn signature_class_method_const() {
     return_type: CppFfiType::void(),
   };
 
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::NameOnly),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::NameOnly).unwrap(),
              "arg1");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short)),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))
+               .unwrap(),
              "double");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full)),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))
+               .unwrap(),
              "double");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short)),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short)).unwrap(),
              "double_arg1");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full)),
+  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))
+               .unwrap(),
              "double_arg1");
 
-  assert_eq!(sig.caption(MethodCaptionStrategy::ConstOnly), "const");
+  assert_eq!(sig.caption(MethodCaptionStrategy::ConstOnly).unwrap(),
+             "const");
 
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::NameOnly)),
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::NameOnly))
+               .unwrap(),
              "arg1");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))),
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))).unwrap(),
              "double");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))),
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))).unwrap(),
              "double");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))),
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))).unwrap(),
              "double_arg1");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))),
+  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))).unwrap(),
              "double_arg1");
 
-  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::NameOnly)),
+  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::NameOnly)).unwrap(),
              "const_arg1");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))),
+  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))).unwrap(),
              "const_double");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))),
+  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))).unwrap(),
              "const_double");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))),
+  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))).unwrap(),
              "const_double_arg1");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))),
+  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))).unwrap(),
              "const_double_arg1");
 
   assert!(sig.has_const_this());
