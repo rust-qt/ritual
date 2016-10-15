@@ -159,27 +159,23 @@ impl CppCodeGenerator {
         return Err(unexpected("no this arg in destructor"));
       }
     } else {
-      let result_without_args = if method.cpp_method.is_constructor() {
-        if let Some(ref info) = method.cpp_method.class_membership {
-          let class_type = &info.class_type;
-          match method.allocation_place {
-            ReturnValueAllocationPlace::Stack => {
-              if let Some(arg) = method.c_signature
-                .arguments
-                .iter()
-                .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
-                format!("new({}) {}", arg.name, try!(class_type.to_cpp_code()))
-              } else {
-                return Err(unexpected("return value argument not found"));
-              }
-            }
-            ReturnValueAllocationPlace::Heap => format!("new {}", try!(class_type.to_cpp_code())),
-            ReturnValueAllocationPlace::NotApplicable => {
-              return Err(unexpected("NotApplicable in constructor"));
+      let result_without_args = if let Some(ref info) = method.cpp_method.class_info_if_constructor() {
+        let class_type = &info.class_type;
+        match method.allocation_place {
+          ReturnValueAllocationPlace::Stack => {
+            if let Some(arg) = method.c_signature
+              .arguments
+              .iter()
+              .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
+              format!("new({}) {}", arg.name, try!(class_type.to_cpp_code()))
+            } else {
+              return Err(unexpected(format!("return value argument not found\n{:?}", method)));
             }
           }
-        } else {
-          return Err(unexpected("constructor without class membership").into());
+          ReturnValueAllocationPlace::Heap => format!("new {}", try!(class_type.to_cpp_code())),
+          ReturnValueAllocationPlace::NotApplicable => {
+            return Err(unexpected("NotApplicable in constructor"));
+          }
         }
       } else {
         let scope_specifier = if let Some(ref class_membership) = method.cpp_method
