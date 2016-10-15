@@ -87,6 +87,9 @@ impl<'a> CGenerator<'a> {
         return false;
       }
     }
+    if class_name == "QFlags" {
+      return false;
+    }
     if let Some(ref membership) = method.class_membership {
       if membership.kind == CppMethodKind::Constructor &&
          self.cpp_data.has_pure_virtual_methods(&class_name) {

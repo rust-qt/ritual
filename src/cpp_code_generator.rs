@@ -159,7 +159,8 @@ impl CppCodeGenerator {
         return Err(unexpected("no this arg in destructor"));
       }
     } else {
-      let result_without_args = if let Some(ref info) = method.cpp_method.class_info_if_constructor() {
+      let result_without_args = if let Some(ref info) = method.cpp_method
+        .class_info_if_constructor() {
         let class_type = &info.class_type;
         match method.allocation_place {
           ReturnValueAllocationPlace::Stack => {
