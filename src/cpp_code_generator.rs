@@ -71,10 +71,10 @@ impl CppCodeGenerator {
       IndirectionChange::ValueToPointer => {
         match method.allocation_place {
           ReturnValueAllocationPlace::Stack => {
-            return Err(unexpected("stack allocated wrappers are expected to return void"));
+            return Err(unexpected("stack allocated wrappers are expected to return void").into());
           }
           ReturnValueAllocationPlace::NotApplicable => {
-            return Err(unexpected("ValueToPointer conflicts with NotApplicable"));
+            return Err(unexpected("ValueToPointer conflicts with NotApplicable").into());
           }
           ReturnValueAllocationPlace::Heap => {
             // constructors are said to return values in parse result,
@@ -156,10 +156,10 @@ impl CppCodeGenerator {
         .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
         format!("{}_call_destructor({})", self.lib_name, arg.name)
       } else {
-        return Err(unexpected("no this arg in destructor"));
+        return Err(unexpected("no this arg in destructor").into());
       }
     } else {
-      let result_without_args = if let Some(ref info) = method.cpp_method
+      let result_without_args = if let Some(info) = method.cpp_method
         .class_info_if_constructor() {
         let class_type = &info.class_type;
         match method.allocation_place {
@@ -170,12 +170,13 @@ impl CppCodeGenerator {
               .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
               format!("new({}) {}", arg.name, try!(class_type.to_cpp_code()))
             } else {
-              return Err(unexpected(format!("return value argument not found\n{:?}", method)));
+              return Err(unexpected(format!("return value argument not found\n{:?}", method))
+                .into());
             }
           }
           ReturnValueAllocationPlace::Heap => format!("new {}", try!(class_type.to_cpp_code())),
           ReturnValueAllocationPlace::NotApplicable => {
-            return Err(unexpected("NotApplicable in constructor"));
+            return Err(unexpected("NotApplicable in constructor").into());
           }
         }
       } else {
@@ -190,7 +191,7 @@ impl CppCodeGenerator {
               .find(|x| x.meaning == CppFfiArgumentMeaning::This) {
               format!("{}->", arg.name)
             } else {
-              return Err(unexpected("no this arg in non-static method"));
+              return Err(unexpected("no this arg in non-static method").into());
             }
           }
         } else {

@@ -209,7 +209,7 @@ impl<'a> CGenerator<'a> {
         for value in values {
           log::error(format!("  {}", value.cpp_method.short_text()));
         }
-        return Err(unexpected("all type caption strategies have failed"));
+        return Err(unexpected("all type caption strategies have failed").into());
       }
     }
     processed_methods.sort_by(|a, b| a.c_name.cmp(&b.c_name));

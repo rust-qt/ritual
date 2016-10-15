@@ -3,6 +3,9 @@ use rust_type::{RustName, CompleteType, RustType, RustTypeIndirection};
 use cpp_ffi_data::CppAndFfiMethod;
 use cpp_type::CppType;
 pub use serializable::RustExportInfo;
+use errors::{Result, ChainErr, unexpected};
+use file_utils::file_to_string;
+use utils::MapIfOk;
 
 /// One variant of a Rust enum
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -82,15 +85,12 @@ impl RustMethodSelfArgKind {
 }
 
 impl RustMethod {
-  pub fn self_arg_kind(&self) -> RustMethodSelfArgKind {
+  pub fn self_arg_kind(&self) -> Result<RustMethodSelfArgKind> {
     let args = match self.arguments {
       RustMethodArguments::SingleVariant(ref var) => &var.arguments,
       RustMethodArguments::MultipleVariants { ref shared_arguments, .. } => shared_arguments,
     };
-    if args.is_empty() {
-      RustMethodSelfArgKind::Static
-    } else {
-      let arg = args.get(0).unwrap();
+    Ok(if let Some(arg) = args.get(0) {
       if arg.name == "self" {
         if let RustType::Common { ref indirection, ref is_const, .. } = arg.argument_type
           .rust_api_type {
@@ -103,15 +103,17 @@ impl RustMethod {
               }
             }
             RustTypeIndirection::None => RustMethodSelfArgKind::Value,
-            _ => panic!("invalid self argument type"),
+            _ => return Err(unexpected("invalid self argument type").into()),
           }
         } else {
-          panic!("invalid self argument type")
+          return Err(unexpected("invalid self argument type").into());
         }
       } else {
         RustMethodSelfArgKind::Static
       }
-    }
+    } else {
+      RustMethodSelfArgKind::Static
+    })
   }
 }
 
@@ -227,31 +229,37 @@ pub struct InputCargoTomlData {
 }
 
 use std::path::PathBuf;
-use std::fs::File;
-use std::io::Read;
+
 extern crate toml;
 
 impl InputCargoTomlData {
-  pub fn from_file(path: &PathBuf) -> InputCargoTomlData {
-    let mut file = File::open(path).unwrap();
-    let mut buf = String::new();
-    file.read_to_string(&mut buf).unwrap();
-    let value = toml::Parser::new(&buf).parse().unwrap();
-    let package = value.get("package").unwrap();
-    InputCargoTomlData {
-      name: package.as_table().unwrap().get("name").unwrap().as_str().unwrap().to_string(),
-      version: package.as_table().unwrap().get("version").unwrap().as_str().unwrap().to_string(),
-      authors: match package.as_table().unwrap().get("authors") {
-        None => Vec::new(),
-        Some(authors) => {
-          authors.as_slice().unwrap().iter().map(|x| x.as_str().unwrap().to_string()).collect()
-        }
+  pub fn from_file(path: &PathBuf) -> Result<InputCargoTomlData> {
+    let buf = try!(file_to_string(path));
+    let value = try!(toml::Parser::new(&buf)
+      .parse()
+      .chain_err(|| format!("failed to parse file as TOMLL: {}", path.display())));
+    let package = try!(value.get("package")
+      .chain_err(|| "'package' field not found in Cargo.toml"));
+    let package = try!(package.as_table().chain_err(|| "'package' must be a table"));
+    Ok(InputCargoTomlData {
+      name: {
+        let name = try!(package.get("name")
+          .chain_err(|| "'package.name' field not found in Cargo.toml"));
+        try!(name.as_str().chain_err(|| "'package.name' must be a string")).to_string()
       },
-    }
+      version: {
+        let version = try!(package.get("version")
+          .chain_err(|| "'package.version' field not found in Cargo.toml"));
+        try!(version.as_str().chain_err(|| "'package.version' must be a string")).to_string()
+      },
+      authors: if let Some(authors) = package.get("authors") {
+        let authors = try!(authors.as_slice().chain_err(|| "'package.authors' must be an array"));
+        try!(authors.iter().map_if_ok(|x| -> Result<_> {
+          Ok(try!(x.as_str().chain_err(|| "'package.authors[i]' must be a string")).to_string())
+        }))
+      } else {
+        Vec::new()
+      },
+    })
   }
 }
-// pub struct Package {
-//  modules: Vec<RustModule>,
-//  cpp_data: CppAndFfiData,
-//
-// }

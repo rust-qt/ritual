@@ -277,7 +277,7 @@ impl CppData {
                     if let Some(ref mut info) = new_method.class_membership {
                       info.class_type = try!(type1.default_class_type());
                     } else {
-                      return Err(unexpected("no class membership"));
+                      return Err(unexpected("no class membership").into());
                     }
                     new_method.include_file = type1.include_file.clone();
                     new_method.origin_location = None;
@@ -290,7 +290,7 @@ impl CppData {
                         class_type: if let Some(ref info) = base_class_method.class_membership {
                           info.class_type.clone()
                         } else {
-                          return Err(unexpected("no class membership"));
+                          return Err(unexpected("no class membership").into());
                         },
                       });
                     }
@@ -421,7 +421,7 @@ impl CppData {
               }
               self.methods.push(final_method);
             } else {
-              return Err(unexpected("duplicates can't be empty"));
+              return Err(unexpected("duplicates can't be empty").into());
             }
           } else {
             log::warning("Removed ambiguous inherited methods (presumed inaccessible):");

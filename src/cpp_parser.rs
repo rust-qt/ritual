@@ -287,11 +287,13 @@ pub fn run(config: CppParserConfig, dependencies_data: &[&CppData]) -> Result<Cp
                 if template_arguments.is_none() {
                   return Err(unexpected(format!("Invalid instantiation: type {} is not a \
                                                  template class",
-                                                class_name)));
+                                                class_name))
+                    .into());
                 }
               } else {
                 return Err(unexpected(format!("Invalid instantiation: type {} is not a class",
-                                              class_name)));
+                                              class_name))
+                  .into());
               }
               final_template_instantiations.push(CppTemplateInstantiations {
                 class_name: class_name.clone(),
@@ -300,7 +302,8 @@ pub fn run(config: CppParserConfig, dependencies_data: &[&CppData]) -> Result<Cp
               });
             } else {
               return Err(unexpected(format!("Invalid instantiation: unknown class type: {}",
-                                            class_name)));
+                                            class_name))
+                .into());
             }
           }
 
@@ -320,7 +323,7 @@ pub fn run(config: CppParserConfig, dependencies_data: &[&CppData]) -> Result<Cp
           }
         }
       } else {
-        return Err(unexpected("AllFields parse result: type is not a class"));
+        return Err(unexpected("AllFields parse result: type is not a class").into());
       }
       Ok(final_template_instantiations)
     }));
@@ -358,7 +361,7 @@ impl<'a> CppParser<'a> {
       let mut name = type1.get_display_name();
       let is_const_in_name = name.starts_with("const ");
       if is_const != is_const_in_name {
-        return Err(unexpected(format!("const inconsistency: {}, {:?}", is_const, type1)));
+        return Err(unexpected(format!("const inconsistency: {}, {:?}", is_const, type1)).into());
       }
       if is_const_in_name {
         name = name[6..].to_string();
@@ -771,7 +774,7 @@ impl<'a> CppParser<'a> {
             Some(arg_types) => {
               let mut r = Vec::new();
               if arg_types.is_empty() {
-                return Err(unexpected("arg_types is empty"));
+                return Err(unexpected("arg_types is empty").into());
               }
               for arg_type in arg_types {
                 match arg_type {
@@ -1268,10 +1271,10 @@ impl<'a> CppParser<'a> {
     let template_arguments = get_template_arguments(entity);
     if entity.get_kind() == EntityKind::ClassTemplate {
       if template_arguments.is_none() {
-        return Err(unexpected("missing template arguments"));
+        return Err(unexpected("missing template arguments").into());
       }
     } else if template_arguments.is_some() {
-      return Err(unexpected("unexpected template arguments"));
+      return Err(unexpected("unexpected template arguments").into());
     }
     let size = match entity.get_type() {
       Some(type1) => type1.get_sizeof().ok().map(|x| x as i32),

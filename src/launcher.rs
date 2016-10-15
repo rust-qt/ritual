@@ -107,7 +107,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
                        input_cargo_toml_path.display())
       .into());
   }
-  let input_cargo_toml_data = InputCargoTomlData::from_file(&input_cargo_toml_path);
+  let input_cargo_toml_data = try!(InputCargoTomlData::from_file(&input_cargo_toml_path));
   if lib_spec.cpp.name == input_cargo_toml_data.name {
     return Err(format!("Rust crate must not have the same name as C++ library ({}) \
             because it can cause library name conflict.",

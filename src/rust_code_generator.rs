@@ -470,7 +470,7 @@ impl RustCodeGenerator {
                 doc = format_doc(&func.doc),
                 maybe_pub = maybe_pub,
                 lifetimes_text = lifetimes_text,
-                name = func.name.last_name(),
+                name = try!(func.name.last_name()),
                 args = self.arg_texts(&variant.arguments, None).join(", "),
                 return_type = return_type_for_signature,
                 body = body)
@@ -498,7 +498,7 @@ impl RustCodeGenerator {
                 maybe_pub = maybe_pub,
                 lifetime_arg = lifetime_arg,
                 lifetime = lifetime_specifier,
-                name = func.name.last_name(),
+                name = try!(func.name.last_name()),
                 trait_name = params_trait_name,
                 tpl_type = tpl_type,
                 args = args.join(", "),
@@ -607,9 +607,9 @@ impl RustCodeGenerator {
                 r = r +
                     &format!(include_str!("../templates/crate/impl_flaggable.rs.in"),
                              name = type1.name,
-                             trait_type = RustName::new(vec!["qt_core".to_string(),
-                                                             "flags".to_string(),
-                                                             "FlaggableEnum".to_string()])
+                             trait_type = try!(RustName::new(vec!["qt_core".to_string(),
+                                                                  "flags".to_string(),
+                                                                  "FlaggableEnum".to_string()]))
                                .full_name(Some(&self.config.crate_name)));
               }
               r

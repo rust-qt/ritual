@@ -136,7 +136,8 @@ impl CppMethod {
         }
         ReturnValueAllocationPlace::NotApplicable => {
           return Err(unexpected("NotApplicable encountered but return value needs \
-                                 allocation_place variants"));
+                                 allocation_place variants")
+            .into());
         }
       }
     } else {

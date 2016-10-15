@@ -89,8 +89,8 @@ impl Error {
   }
 }
 
-pub fn unexpected<S: Into<String>>(text: S) -> Error {
-  ErrorKind::Unexpected(text.into()).into()
+pub fn unexpected<S: Into<String>>(text: S) -> ErrorKind {
+  ErrorKind::Unexpected(text.into())
 }
 
 impl<T> ChainErr<T> for Option<T> {

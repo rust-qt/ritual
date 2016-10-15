@@ -1,8 +1,10 @@
 use cpp_type::CppType;
 use cpp_ffi_data::IndirectionChange;
-use string_utils::{JoinWithString, CaseOperations};
+use string_utils::CaseOperations;
 pub use serializable::RustName;
 extern crate libc;
+use errors::{Result, unexpected, ChainErr};
+use utils::MapIfOk;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[allow(dead_code)]
@@ -15,9 +17,11 @@ pub enum RustTypeIndirection {
 }
 
 impl RustName {
-  pub fn new(parts: Vec<String>) -> RustName {
-    assert!(parts.len() > 0);
-    RustName { parts: parts }
+  pub fn new(parts: Vec<String>) -> Result<RustName> {
+    if parts.is_empty() {
+      return Err(unexpected("RustName can't be empty").into());
+    }
+    Ok(RustName { parts: parts })
   }
 
   pub fn crate_name(&self) -> Option<&String> {
@@ -28,16 +32,18 @@ impl RustName {
       None
     }
   }
-  pub fn last_name(&self) -> &String {
-    self.parts.last().unwrap()
+  pub fn last_name(&self) -> Result<&String> {
+    self.parts.last().chain_err(|| unexpected("RustName can't be empty"))
   }
   pub fn full_name(&self, current_crate: Option<&str>) -> String {
-    if current_crate.is_some() && self.crate_name().is_some() &&
-       current_crate.unwrap() == self.crate_name().unwrap() {
-      format!("::{}", self.parts[1..].join("::"))
-    } else {
-      self.parts.join("::")
+    if let Some(current_crate) = current_crate {
+      if let Some(self_crate) = self.crate_name() {
+        if self_crate == current_crate {
+          return format!("::{}", self.parts[1..].join("::"));
+        }
+      }
     }
+    self.parts.join("::")
   }
 
   pub fn includes(&self, other: &RustName) -> bool {
@@ -52,56 +58,56 @@ impl RustName {
 }
 
 trait ToRustName {
-  fn to_rust_name() -> RustName;
+  fn to_rust_name() -> Result<RustName>;
 }
 
 impl ToRustName for u8 {
-  fn to_rust_name() -> RustName {
+  fn to_rust_name() -> Result<RustName> {
     RustName::new(vec!["u8".to_string()])
   }
 }
 impl ToRustName for i8 {
-  fn to_rust_name() -> RustName {
+  fn to_rust_name() -> Result<RustName> {
     RustName::new(vec!["i8".to_string()])
   }
 }
 impl ToRustName for u16 {
-  fn to_rust_name() -> RustName {
+  fn to_rust_name() -> Result<RustName> {
     RustName::new(vec!["u16".to_string()])
   }
 }
 impl ToRustName for i16 {
-  fn to_rust_name() -> RustName {
+  fn to_rust_name() -> Result<RustName> {
     RustName::new(vec!["i16".to_string()])
   }
 }
 impl ToRustName for u32 {
-  fn to_rust_name() -> RustName {
+  fn to_rust_name() -> Result<RustName> {
     RustName::new(vec!["u32".to_string()])
   }
 }
 impl ToRustName for i32 {
-  fn to_rust_name() -> RustName {
+  fn to_rust_name() -> Result<RustName> {
     RustName::new(vec!["i32".to_string()])
   }
 }
 impl ToRustName for u64 {
-  fn to_rust_name() -> RustName {
+  fn to_rust_name() -> Result<RustName> {
     RustName::new(vec!["u64".to_string()])
   }
 }
 impl ToRustName for i64 {
-  fn to_rust_name() -> RustName {
+  fn to_rust_name() -> Result<RustName> {
     RustName::new(vec!["i64".to_string()])
   }
 }
 impl ToRustName for f32 {
-  fn to_rust_name() -> RustName {
+  fn to_rust_name() -> Result<RustName> {
     RustName::new(vec!["f32".to_string()])
   }
 }
 impl ToRustName for f64 {
-  fn to_rust_name() -> RustName {
+  fn to_rust_name() -> Result<RustName> {
     RustName::new(vec!["f64".to_string()])
   }
 }
@@ -128,17 +134,19 @@ pub enum RustType {
 
 impl RustType {
   #[allow(dead_code)]
-  pub fn caption(&self) -> String {
-    match *self {
+  pub fn caption(&self) -> Result<String> {
+    Ok(match *self {
       RustType::Void => "void".to_string(),
       RustType::Common { ref base,
                          ref generic_arguments,
                          ref is_const,
                          ref is_const2,
                          ref indirection } => {
-        let mut name = base.last_name().to_snake_case();
+        let mut name = try!(base.last_name()).to_snake_case();
         if let Some(ref args) = *generic_arguments {
-          name = format!("{}_{}", name, args.iter().map(|x| x.caption()).join("_"));
+          name = format!("{}_{}",
+                         name,
+                         try!(args.iter().map_if_ok(|x| x.caption())).join("_"));
         }
         let mut_text = if *is_const { "" } else { "_mut" };
         match *indirection {
@@ -161,7 +169,7 @@ impl RustType {
         name
       }
       RustType::FunctionPointer { .. } => "fn".to_string(),
-    }
+    })
   }
 
   #[allow(dead_code)]
@@ -204,8 +212,8 @@ impl RustType {
     }
   }
 
-  pub fn dealias_libc(&self) -> RustType {
-    match *self {
+  pub fn dealias_libc(&self) -> Result<RustType> {
+    Ok(match *self {
       RustType::Void => self.clone(),
       RustType::Common { ref base,
                          ref generic_arguments,
@@ -214,7 +222,7 @@ impl RustType {
                          ref indirection } => {
         if base.parts.len() == 2 && &base.parts[0] == "libc" {
           let real_name = match base.parts[1].as_ref() {
-            "c_void" => return self.clone(),
+            "c_void" => return Ok(self.clone()),
             "c_schar" => libc::c_schar::to_rust_name(),
             "c_char" => libc::c_char::to_rust_name(),
             "c_uchar" => libc::c_uchar::to_rust_name(),
@@ -229,10 +237,10 @@ impl RustType {
             "c_ulonglong" => libc::c_ulonglong::to_rust_name(),
             "c_float" => libc::c_float::to_rust_name(),
             "c_double" => libc::c_double::to_rust_name(),
-            _ => panic!("unknown libc type: {:?}", base),
+            _ => return Err(unexpected(format!("unknown libc type: {:?}", base)).into()),
           };
           RustType::Common {
-            base: real_name,
+            base: try!(real_name),
             generic_arguments: generic_arguments.clone(),
             is_const: *is_const,
             is_const2: *is_const2,
@@ -244,11 +252,11 @@ impl RustType {
       }
       RustType::FunctionPointer { ref return_type, ref arguments } => {
         RustType::FunctionPointer {
-          return_type: Box::new(return_type.as_ref().dealias_libc()),
-          arguments: arguments.iter().map(|arg| arg.dealias_libc()).collect(),
+          return_type: Box::new(try!(return_type.as_ref().dealias_libc())),
+          arguments: try!(arguments.iter().map_if_ok(|arg| arg.dealias_libc())),
         }
       }
-    }
+    })
   }
 }
 
