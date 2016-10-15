@@ -1,13 +1,13 @@
-extern crate regex;
-
-use std;
-use std::path::PathBuf;
 use cpp_data::CppData;
-use std::collections::HashMap;
+use errors::{Result, ChainErr};
+use file_utils::{read_dir, file_to_string, os_str_to_str};
 use log;
 use utils::add_to_multihash;
-use file_utils::{read_dir, file_to_string, os_str_to_str};
-use errors::{Result, ChainErr};
+
+use std::path::PathBuf;
+use std::collections::HashMap;
+
+extern crate regex;
 
 struct HeaderNameMap {
   map_real_to_all_fancy: HashMap<String, Vec<String>>,
@@ -40,7 +40,7 @@ impl HeaderNameMap {
       if !header_path.is_file() {
         continue;
       }
-      let metadata = try!(std::fs::metadata(&header_path)
+      let metadata = try!(::std::fs::metadata(&header_path)
         .chain_err(|| format!("failed to get metadata for {}", header_path.display())));
       if metadata.len() < 100 {
         let file_content = try!(file_to_string(&header_path));

@@ -1,10 +1,12 @@
-use cpp_type::CppType;
 use cpp_ffi_data::IndirectionChange;
-use string_utils::CaseOperations;
-pub use serializable::RustName;
-extern crate libc;
+use cpp_type::CppType;
 use errors::{Result, unexpected, ChainErr};
+use string_utils::CaseOperations;
 use utils::MapIfOk;
+
+extern crate libc;
+
+pub use serializable::RustName;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[allow(dead_code)]

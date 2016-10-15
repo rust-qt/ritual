@@ -1,24 +1,22 @@
+use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppOriginLocation,
+               CppVisibility, CppTemplateInstantiation, CppTemplateInstantiations,
+               CppClassUsingDirective, CppBaseSpecifier, TemplateArgumentsDeclaration};
+use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind, CppMethodClassMembership};
+use cpp_operator::CppOperator;
+use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
+               CppSpecificNumericTypeKind, CppTypeClassBase};
+use errors::{Result, ChainErr, unexpected};
+use file_utils::{remove_file, open_file, create_file, path_to_str, os_str_to_str};
+use log;
+
+use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
+
 extern crate clang;
 use self::clang::*;
 
 extern crate regex;
 use self::regex::Regex;
-
-use log;
-use std::path::PathBuf;
-use errors::{Result, ChainErr, unexpected};
-use file_utils::{remove_file, open_file, create_file, path_to_str, os_str_to_str};
-
-use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppOriginLocation,
-               CppVisibility, CppTemplateInstantiation, CppTemplateInstantiations,
-               CppClassUsingDirective, CppBaseSpecifier, TemplateArgumentsDeclaration};
-use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind, CppMethodClassMembership};
-use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
-               CppSpecificNumericTypeKind, CppTypeClassBase};
-use cpp_operator::CppOperator;
-use std::io::{BufRead, BufReader};
-use std::env;
-use utils::is_msvc;
 
 struct CppParser<'a> {
   config: CppParserConfig,
@@ -159,7 +157,7 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
                       "-fcxx-exceptions".to_string(),
                       "-Xclang".to_string(),
                       "-detailed-preprocessing-record".to_string()];
-  if is_msvc() {
+  if ::utils::is_msvc() {
     args.push("-std=c++14".to_string());
   } else {
     args.push("-std=gnu++11".to_string());
@@ -169,7 +167,7 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
     args.push("-I".to_string());
     args.push(str.to_string());
   }
-  if let Ok(path) = env::var("CLANG_SYSTEM_INCLUDE_PATH") {
+  if let Ok(path) = ::std::env::var("CLANG_SYSTEM_INCLUDE_PATH") {
     args.push("-isystem".to_string());
     args.push(path);
   }

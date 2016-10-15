@@ -1,9 +1,9 @@
-use qt_doc_parser::{QtDocResultForMethod, QtDocResultForMethodKind};
-use rust_info::{RustMethodSelfArgKind, RustMethodArgumentsVariant};
-use rust_code_generator::rust_type_to_code;
-use string_utils::JoinWithString;
 use cpp_method::CppMethodInheritedFrom;
 use cpp_type::CppTypeBase;
+use qt_doc_parser::{QtDocResultForMethod, QtDocResultForMethodKind};
+use rust_code_generator::rust_type_to_code;
+use rust_info::{RustMethodSelfArgKind, RustMethodArgumentsVariant};
+use string_utils::JoinWithString;
 
 #[derive(Debug, Clone)]
 pub struct DocItem {

@@ -1,20 +1,17 @@
-use rust_type::{RustName, RustType, RustTypeIndirection, RustFFIFunction, RustToCTypeConversion};
-use std;
-use std::path::PathBuf;
-use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
-                RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope,
-                RustMethodArgument, TraitName};
-use string_utils::JoinWithString;
-use log;
+use errors::{Result, ChainErr};
 use file_utils::{PathBufWithAdded, copy_recursively, file_to_string, copy_file, create_file,
                  path_to_str, create_dir_all, remove_file, read_dir, os_str_to_str,
                  os_string_into_string};
-use utils::is_msvc;
-use std::panic;
-use string_utils::CaseOperations;
+use log;
 use rust_generator::RustGeneratorOutput;
-use errors::{Result, ChainErr};
-use utils::MapIfOk;
+use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
+                RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope,
+                RustMethodArgument, TraitName};
+use rust_type::{RustName, RustType, RustTypeIndirection, RustFFIFunction, RustToCTypeConversion};
+use string_utils::{JoinWithString, CaseOperations};
+use utils::{is_msvc, MapIfOk};
+
+use std::path::PathBuf;
 
 extern crate rustfmt;
 extern crate toml;
@@ -746,10 +743,10 @@ impl RustCodeGenerator {
 
   fn call_rustfmt(&self, path: &PathBuf) {
     log::noisy(format!("Formatting {}", path.display()));
-    let result = panic::catch_unwind(|| {
+    let result = ::std::panic::catch_unwind(|| {
       rustfmt::format_input(rustfmt::Input::File(path.clone()),
                             &self.rustfmt_config,
-                            Some(&mut std::io::stdout()))
+                            Some(&mut ::std::io::stdout()))
     });
     match result {
       Ok(rustfmt_result) => {

@@ -1,14 +1,14 @@
-extern crate select;
-use self::select::document::Document;
-extern crate csv;
+use errors::{Result, ChainErr};
+use file_utils::{PathBufWithAdded, read_dir, file_to_string, os_str_to_str};
+use log;
+use utils::MapIfOk;
 
 use std::path::PathBuf;
 use std::collections::HashMap;
-use file_utils::PathBufWithAdded;
-use log;
-use errors::{Result, ChainErr};
-use utils::MapIfOk;
-use file_utils::{read_dir, file_to_string, os_str_to_str};
+
+extern crate select;
+use self::select::document::Document;
+extern crate csv;
 
 #[derive(Debug)]
 struct QtDocIndexItem {

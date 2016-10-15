@@ -6,25 +6,21 @@ extern crate tempdir;
 
 use cpp_parser;
 use cpp_data::*;
-use file_utils::PathBufWithAdded;
-use std::fs;
-use std::fs::File;
-use std::io::Write;
 use cpp_method::*;
 use cpp_type::*;
 use cpp_operator::CppOperator;
-
+use file_utils::{create_dir, create_file, PathBufWithAdded};
 
 fn run_parser(code: &'static str) -> CppData {
   let dir = tempdir::TempDir::new("test_cpp_parser_run").unwrap();
   let include_dir = dir.path().with_added("include");
-  fs::create_dir(&include_dir).unwrap();
+  create_dir(&include_dir).unwrap();
   let include_name = "myfakelib.h";
   let include_file_path = include_dir.with_added(&include_name);
   {
-    let mut include_file = File::create(&include_file_path).unwrap();
-    include_file.write(code.as_bytes()).unwrap();
-    include_file.write(b"\n").unwrap();
+    let mut include_file = create_file(&include_file_path).unwrap();
+    include_file.write(code).unwrap();
+    include_file.write("\n").unwrap();
   }
   let mut result = cpp_parser::run(cpp_parser::CppParserConfig {
                                      include_dirs: vec![include_dir],

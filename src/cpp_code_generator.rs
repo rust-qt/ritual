@@ -1,15 +1,11 @@
-use cpp_ffi_data::CppAndFfiMethod;
-use cpp_ffi_data::IndirectionChange;
-use cpp_method::ReturnValueAllocationPlace;
-use cpp_ffi_data::CppFfiArgumentMeaning;
+use cpp_ffi_data::{IndirectionChange, CppAndFfiMethod, CppFfiArgumentMeaning};
 use cpp_ffi_generator::CppFfiHeaderData;
-use log;
-use string_utils::JoinWithString;
-use std::path::PathBuf;
-use file_utils::{PathBufWithAdded, create_dir_all, create_file};
-use utils::is_msvc;
+use cpp_method::ReturnValueAllocationPlace;
 use cpp_type::{CppTypeIndirection, CppTypeBase};
 use errors::{Result, ChainErr, unexpected};
+use file_utils::{PathBufWithAdded, create_dir_all, create_file};
+use log;
+use string_utils::JoinWithString;
 
 /// Generates C++ code for the C wrapper library.
 pub struct CppCodeGenerator {
@@ -18,7 +14,7 @@ pub struct CppCodeGenerator {
   /// Uppercase library name (for optimization)
   lib_name_upper: String,
   /// Path to the directory where the library is generated
-  lib_path: PathBuf,
+  lib_path: ::std::path::PathBuf,
 
   is_shared: bool,
   cpp_libs: Vec<String>,
@@ -28,7 +24,11 @@ impl CppCodeGenerator {
   /// Creates a generator for a library.
   /// lib_name: library name
   /// lib_path: path to the directory where the library is generated
-  pub fn new(lib_name: String, lib_path: PathBuf, is_shared: bool, cpp_libs: Vec<String>) -> Self {
+  pub fn new(lib_name: String,
+             lib_path: ::std::path::PathBuf,
+             is_shared: bool,
+             cpp_libs: Vec<String>)
+             -> Self {
     CppCodeGenerator {
       lib_name: lib_name.clone(),
       lib_name_upper: lib_name.to_uppercase(),
@@ -259,7 +259,7 @@ impl CppCodeGenerator {
     let cmakelists_path = self.lib_path.with_added("CMakeLists.txt");
     let mut cmakelists_file = try!(create_file(&cmakelists_path));
     let mut cxx_flags = String::new();
-    if !is_msvc() {
+    if !::utils::is_msvc() {
       cxx_flags.push_str("-fPIC -std=gnu++11");
     }
     for dir in framework_directories {

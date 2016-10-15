@@ -1,11 +1,11 @@
-
-use rust_type::{RustName, CompleteType, RustType, RustTypeIndirection};
 use cpp_ffi_data::CppAndFfiMethod;
 use cpp_type::CppType;
-pub use serializable::RustExportInfo;
 use errors::{Result, ChainErr, unexpected};
 use file_utils::file_to_string;
+use rust_type::{RustName, CompleteType, RustType, RustTypeIndirection};
 use utils::MapIfOk;
+
+pub use serializable::RustExportInfo;
 
 /// One variant of a Rust enum
 #[derive(Debug, PartialEq, Eq, Clone)]

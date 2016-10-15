@@ -1,29 +1,28 @@
 extern crate num_cpus;
 
+use cpp_code_generator::CppCodeGenerator;
+use cpp_ffi_generator;
+use cpp_lib_builder::CppLibBuilder;
+use cpp_parser;
+use dependency_info::DependencyInfo;
 use errors::{Result, ChainErr};
 use file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json, canonicalize,
                  remove_dir_all, remove_dir, read_dir, remove_file, path_to_str};
-use utils::is_msvc;
-use cpp_code_generator::CppCodeGenerator;
 use log;
-use cpp_parser;
-use qt_specific;
-use cpp_ffi_generator;
-use rust_info::{InputCargoTomlData, RustExportInfo};
-use rust_code_generator;
-use rust_code_generator::{RustCodeGeneratorDependency, RustLinkItem, RustLinkKind};
-use rust_generator;
-use serializable::LibSpec;
-use cpp_ffi_generator::CppAndFfiData;
 use qt_doc_parser::QtDocData;
-use dependency_info::DependencyInfo;
-use utils::{run_command, add_env_path_item, MapIfOk};
-use cpp_lib_builder::CppLibBuilder;
+use qt_specific;
+use rust_code_generator::{RustCodeGeneratorDependency, RustLinkItem, RustLinkKind};
+use rust_code_generator;
+use rust_generator;
+use rust_info::{InputCargoTomlData, RustExportInfo};
+use serializable::LibSpec;
+use utils::{is_msvc, run_command, add_env_path_item, MapIfOk};
 
 use std;
 use std::path::PathBuf;
 use std::process::Command;
 use std::env;
+use std::iter::once;
 
 pub enum BuildProfile {
   Debug,
@@ -227,7 +226,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
   let qt_doc_data = if is_qt_library {
     // TODO: find a better way to specify doc source (#35)
     let env_var_name = format!("{}_DOC_DATA", lib_spec.cpp.name.to_uppercase());
-    if let Ok(env_var_value) = std::env::var(&env_var_name) {
+    if let Ok(env_var_value) = env::var(&env_var_name) {
       log::info(format!("Loading Qt doc data from {}", &env_var_value));
       match QtDocData::new(&PathBuf::from(&env_var_value)) {
         Ok(r) => Some(r),
@@ -332,7 +331,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
 
       for spec in dependencies.iter()
         .map(|dep| &dep.rust_export_info.lib_spec)
-        .chain(std::iter::once(&lib_spec)) {
+        .chain(once(&lib_spec)) {
         cpp_libs.push(spec.cpp.name.clone());
         if let Some(ref extra_libs) = spec.cpp.extra_libs {
           for name in extra_libs {
@@ -416,7 +415,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       dependency_rust_types.extend_from_slice(&dep.rust_export_info.rust_types);
     }
     log::info("Preparing Rust functions");
-    let rust_data = try!(rust_generator::run(CppAndFfiData {
+    let rust_data = try!(rust_generator::run(cpp_ffi_generator::CppAndFfiData {
                                                cpp_data: parse_result,
                                                cpp_ffi_headers: cpp_ffi_headers,
                                              },
@@ -428,9 +427,8 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
                                              })
       .chain_err(|| "Rust data generator failed"));
     log::info(format!("Generating Rust crate ({}).", &input_cargo_toml_data.name));
-    //    try!(Ok(rust_code_generator::run(rust_config, &rust_data))
-    //      .chain_err(|| "Rust code generator failed"));
-    try!(rust_code_generator::run(rust_config, &rust_data));
+    try!(rust_code_generator::run(rust_config, &rust_data)
+      .chain_err(|| "Rust code generator failed"));
     {
       let rust_export_path = output_dir_path.with_added("rust_export_info.json");
       try!(save_json(&rust_export_path,

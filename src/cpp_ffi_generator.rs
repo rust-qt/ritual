@@ -1,13 +1,13 @@
-use std::collections::{HashSet, HashMap};
-use log;
-use cpp_data::{CppData, CppVisibility};
 use caption_strategy::MethodCaptionStrategy;
-use cpp_method::{CppMethod, CppMethodKind};
+use cpp_data::{CppData, CppVisibility};
 use cpp_ffi_data::{CppAndFfiMethod, c_base_name};
-use utils::add_to_multihash;
-use serializable::CppLibSpec;
-
+use cpp_method::{CppMethod, CppMethodKind};
 use errors::{Result, unexpected};
+use log;
+use serializable::CppLibSpec;
+use utils::add_to_multihash;
+
+use std::collections::{HashSet, HashMap};
 
 struct CGenerator<'a> {
   cpp_data: &'a CppData,
@@ -178,7 +178,7 @@ impl<'a> CGenerator<'a> {
       }
       let mut found_strategy = None;
       for strategy in MethodCaptionStrategy::all() {
-        let mut type_captions: HashSet<_> = HashSet::new();
+        let mut type_captions = HashSet::new();
         let mut ok = true;
         for value in &values {
           let caption = try!(value.c_signature.caption(strategy.clone()));

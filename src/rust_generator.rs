@@ -1,25 +1,24 @@
+use caption_strategy::TypeCaptionStrategy;
+use cpp_data::{CppTypeKind, EnumValue};
+use cpp_ffi_data::{CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiType, IndirectionChange};
 use cpp_ffi_generator::CppAndFfiData;
-use cpp_ffi_data::CppAndFfiMethod;
+use cpp_method::{CppMethod, ReturnValueAllocationPlace};
+use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
                CppSpecificNumericTypeKind, CppTypeClassBase, CppTypeRole};
-use cpp_ffi_data::{CppFfiType, IndirectionChange};
-use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
-                RustFFIArgument, RustToCTypeConversion};
-use cpp_data::{CppTypeKind, EnumValue};
+use doc_formatter;
+use errors::{Result, ChainErr, unexpected};
+use log;
+use qt_doc_parser::{QtDocData, QtDocResultForMethod};
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
                 RustMethodArguments, TraitImpl, TraitName, RustEnumValue};
-use cpp_method::{CppMethod, ReturnValueAllocationPlace};
-use cpp_ffi_data::CppFfiArgumentMeaning;
+use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
+                RustFFIArgument, RustToCTypeConversion};
 use string_utils::{CaseOperations, VecCaseOperations, WordIterator};
 use utils::{add_to_multihash, MapIfOk};
-use log;
-use qt_doc_parser::{QtDocData, QtDocResultForMethod};
-use doc_formatter;
+
 use std::collections::{HashMap, HashSet, hash_map};
-use cpp_operator::CppOperator;
-use caption_strategy::TypeCaptionStrategy;
-use errors::{Result, ChainErr, unexpected};
 
 pub use serializable::{RustProcessedTypeKind, RustProcessedTypeInfo};
 

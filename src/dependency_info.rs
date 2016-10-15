@@ -1,8 +1,10 @@
 use cpp_data::CppData;
-use rust_info::RustExportInfo;
-use std::path::PathBuf;
-use file_utils::{PathBufWithAdded, load_json};
 use errors::Result;
+use file_utils::{PathBufWithAdded, load_json};
+use rust_info::RustExportInfo;
+
+use std::path::PathBuf;
+
 extern crate serde_json;
 
 pub struct DependencyInfo {

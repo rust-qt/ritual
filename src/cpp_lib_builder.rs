@@ -1,6 +1,6 @@
-use utils::{is_msvc, add_env_path_item, run_command};
 use errors::Result;
 use file_utils::path_to_str;
+use utils::{is_msvc, add_env_path_item, run_command};
 
 use std::process::Command;
 use std::path::PathBuf;

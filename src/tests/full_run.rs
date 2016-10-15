@@ -1,12 +1,10 @@
-use std;
-use file_utils::PathBufWithAdded;
+use file_utils::{PathBufWithAdded, create_dir};
 use utils::manifest_dir;
 use cpp_lib_builder::CppLibBuilder;
 use launcher::{BuildEnvironment, InvokationMethod, BuildProfile};
 use launcher;
+
 extern crate tempdir;
-
-
 
 fn build_cpp_lib() -> tempdir::TempDir {
   let cpp_lib_source_dir = {
@@ -20,8 +18,8 @@ fn build_cpp_lib() -> tempdir::TempDir {
   let temp_dir = tempdir::TempDir::new("test_full_run").unwrap();
   let build_dir = temp_dir.path().with_added("build");
   let install_dir = temp_dir.path().with_added("install");
-  std::fs::create_dir(&build_dir).unwrap();
-  std::fs::create_dir(&install_dir).unwrap();
+  create_dir(&build_dir).unwrap();
+  create_dir(&install_dir).unwrap();
   CppLibBuilder {
       cmake_source_dir: &cpp_lib_source_dir,
       build_dir: &build_dir,

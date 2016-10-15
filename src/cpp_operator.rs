@@ -1,6 +1,6 @@
-pub use serializable::CppOperator;
-
 use errors::Result;
+
+pub use serializable::CppOperator;
 
 /// Constraints applied to a C++ operator method
 /// of a certain kind

@@ -1,11 +1,13 @@
-use cpp_ffi_data::{CppFfiType, IndirectionChange};
 use caption_strategy::TypeCaptionStrategy;
+use cpp_ffi_data::{CppFfiType, IndirectionChange};
+use errors::{Result, ChainErr, Error, unexpected};
+use string_utils::JoinWithString;
+use utils::MapIfOk;
+
+extern crate regex;
+
 pub use serializable::{CppBuiltInNumericType, CppSpecificNumericTypeKind, CppTypeBase, CppType,
                        CppTypeIndirection, CppTypeClassBase};
-use string_utils::JoinWithString;
-extern crate regex;
-use utils::MapIfOk;
-use errors::{Result, ChainErr, Error, unexpected};
 
 impl CppTypeIndirection {
   pub fn combine(left: &CppTypeIndirection,

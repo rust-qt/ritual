@@ -1,11 +1,11 @@
+use errors::{Result, ChainErr};
+use log;
+
+use std;
 use std::path::PathBuf;
 use std::collections::HashMap;
 use std::hash::Hash;
-use std;
-use log;
 use std::process::Command;
-use std::env;
-use errors::{Result, ChainErr};
 
 #[cfg(all(windows, target_env = "msvc"))]
 pub fn is_msvc() -> bool {
@@ -76,6 +76,7 @@ pub fn run_command(command: &mut Command, fetch_stdout: bool, pipe_output: bool)
 pub fn add_env_path_item(env_var_name: &'static str,
                          mut new_paths: Vec<PathBuf>)
                          -> Result<std::ffi::OsString> {
+  use std::env;
   for path in env::split_paths(&env::var(env_var_name).unwrap_or(String::new())) {
     if new_paths.iter().find(|&x| x == &path).is_none() {
       new_paths.push(path);

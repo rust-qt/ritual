@@ -1,9 +1,7 @@
-use caption_strategy::ArgumentCaptionStrategy;
-use cpp_type::CppTypeBase;
-use cpp_type::CppType;
+use caption_strategy::{ArgumentCaptionStrategy, MethodCaptionStrategy, TypeCaptionStrategy};
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
-use caption_strategy::{MethodCaptionStrategy, TypeCaptionStrategy};
 use cpp_operator::CppOperator;
+use cpp_type::{CppType, CppTypeBase};
 use errors::Result;
 use utils::MapIfOk;
 

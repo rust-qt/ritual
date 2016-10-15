@@ -1,12 +1,12 @@
-
 use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership, CppFunctionArgument,
                  CppMethodInheritedFrom};
 use cpp_operator::CppOperator;
-use std::collections::HashSet;
-use log;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
-use std::iter;
 use errors::{Result, unexpected};
+use log;
+
+use std::collections::HashSet;
+use std::iter::once;
 
 pub use serializable::{EnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
                        CppTypeData, CppData, CppTemplateInstantiation, CppTemplateInstantiations,
@@ -325,7 +325,7 @@ impl CppData {
     let mut all_new_methods = Vec::new();
     for (is_self, cpp_data) in dependencies.into_iter()
       .map(|x| (false, x))
-      .chain(iter::once((true, &(self as &_)))) {
+      .chain(once((true, &(self as &_)))) {
       for type1 in &cpp_data.types {
         if type1.is_class() {
           let mut interesting_cpp_datas: Vec<&CppData> = vec![cpp_data];
@@ -590,7 +590,7 @@ impl CppData {
               .any(|x| &x.template_arguments == template_arguments)
           })
         };
-        if !dependencies.into_iter().chain(iter::once(&self)).any(is_valid) {
+        if !dependencies.into_iter().chain(once(&self)).any(is_valid) {
           return Err(format!("type not available: {:?}", type1).into());
         }
         for arg in template_arguments {
@@ -605,7 +605,7 @@ impl CppData {
     log::info("Instantiating templates.");
     let mut new_methods = Vec::new();
 
-    for cpp_data in dependencies.into_iter().chain(iter::once(&(self as &_))) {
+    for cpp_data in dependencies.into_iter().chain(once(&(self as &_))) {
       for method in &cpp_data.methods {
         for type1 in method.all_involved_types() {
           if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =

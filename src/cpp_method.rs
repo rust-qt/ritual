@@ -1,14 +1,13 @@
-use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase};
-use cpp_ffi_data::CppFfiType;
-use cpp_ffi_data::CppFfiFunctionSignature;
-use cpp_ffi_data::{CppFfiFunctionArgument, CppFfiArgumentMeaning};
-use cpp_ffi_data::CppMethodWithFfiSignature;
 use cpp_data::CppVisibility;
+use cpp_ffi_data::{CppMethodWithFfiSignature, CppFfiType, CppFfiFunctionSignature,
+                   CppFfiFunctionArgument, CppFfiArgumentMeaning};
+use cpp_operator::CppOperator;
+use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase};
+use errors::{Result, unexpected};
 use string_utils::JoinWithString;
+
 pub use serializable::{CppFunctionArgument, CppMethodKind, CppMethod, CppMethodClassMembership,
                        CppMethodInheritedFrom};
-use cpp_operator::CppOperator;
-use errors::{Result, unexpected};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ReturnValueAllocationPlace {

@@ -1,9 +1,10 @@
-extern crate cpp_to_rust;
-extern crate clap;
+use cpp_to_rust::launcher::{BuildProfile, InvokationMethod, BuildEnvironment, run};
 
 use std::path::PathBuf;
 
-use cpp_to_rust::launcher::{BuildProfile, InvokationMethod, BuildEnvironment, run};
+extern crate cpp_to_rust;
+extern crate clap;
+
 
 fn main() {
   use clap::{Arg, App};
