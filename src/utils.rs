@@ -56,9 +56,9 @@ pub fn run_command(command: &mut Command, fetch_stdout: bool, pipe_output: bool)
       let output = try!(command.output()
         .chain_err(|| format!("command execution failed: {:?}", command)));
       log::error("Stdout:");
-      std::io::stderr().write(&output.stdout).unwrap();
+      try!(std::io::stderr().write_all(&output.stdout).chain_err(|| "output failed"));
       log::error("Stderr:");
-      std::io::stderr().write(&output.stderr).unwrap();
+      try!(std::io::stderr().write_all(&output.stderr).chain_err(|| "output failed"));
     }
     Err(format!("command failed with status {:?}: {:?}", status, command).into())
   }

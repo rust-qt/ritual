@@ -720,8 +720,8 @@ impl RustGenerator {
   fn process_type<'a>(&'a self,
                       info: &'a RustProcessedTypeInfo,
                       mut cpp_methods: Vec<&'a CppAndFfiMethod>)
-                      -> (ProcessTypeResult, Vec<&'a CppAndFfiMethod>) {
-    match info.kind {
+                      -> Result<(ProcessTypeResult, Vec<&'a CppAndFfiMethod>)> {
+    Ok(match info.kind {
       RustProcessedTypeKind::Enum { ref values } => {
         let mut is_flaggable = false;
         let template_arg_sample = CppType {
@@ -787,7 +787,8 @@ impl RustGenerator {
           tmp_cpp_methods.push(method);
         }
         cpp_methods = tmp_cpp_methods;
-        let functions_result = self.process_functions(good_methods.into_iter(), &methods_scope);
+        let functions_result =
+          try!(self.process_functions(good_methods.into_iter(), &methods_scope));
         // TODO: export Qt doc for class (detailed description) (#35)
         let doc = format!("C++ type: {}.",
                           doc_formatter::wrap_inline_cpp_code(&CppType {
@@ -814,7 +815,7 @@ impl RustGenerator {
         },
          cpp_methods)
       }
-    }
+    })
   }
 
   /// Generates a Rust module with specified name from specified
@@ -857,7 +858,7 @@ impl RustGenerator {
 
       for type_data in &self.processed_types {
         if check_name(&type_data.rust_name) {
-          let (mut result, tmp_cpp_methods) = self.process_type(type_data, cpp_methods);
+          let (mut result, tmp_cpp_methods) = try!(self.process_type(type_data, cpp_methods));
           cpp_methods = tmp_cpp_methods;
           module.types.push(result.main_type);
           rust_overloading_types.append(&mut result.overloading_types);
@@ -892,7 +893,7 @@ impl RustGenerator {
       }
     }
     let mut free_functions_result =
-      self.process_functions(good_methods.into_iter(), &RustMethodScope::Free);
+      try!(self.process_functions(good_methods.into_iter(), &RustMethodScope::Free));
     assert!(free_functions_result.trait_impls.is_empty());
     module.functions = free_functions_result.methods;
     rust_overloading_types.append(&mut free_functions_result.overloading_types);
@@ -1039,7 +1040,7 @@ impl RustGenerator {
     };
     let sanitized = sanitize_rust_identifier(name.last_name());
     if &sanitized != name.last_name() {
-      name.parts.pop().unwrap();
+      try!(name.parts.pop().chain_err(|| "name can't be empty"));
       name.parts.push(sanitized);
     }
     Ok(name)
@@ -1090,7 +1091,7 @@ impl RustGenerator {
                     mut filtered_methods: Vec<RustMethod>,
                     scope: &RustMethodScope,
                     use_self_arg_caption: bool)
-                    -> (RustMethod, Option<RustTypeDeclaration>) {
+                    -> Result<(RustMethod, Option<RustTypeDeclaration>)> {
     filtered_methods.sort_by(|a, b| {
       if let RustMethodArguments::SingleVariant(ref args) = a.arguments {
         let a_args = args;
@@ -1123,7 +1124,7 @@ impl RustGenerator {
       let mut trait_name = first_method.name.last_name().clone();
       if use_self_arg_caption {
         trait_name = format!("{}_{}", trait_name, first_method.self_arg_kind().caption());
-        let name = method_name.parts.pop().unwrap();
+        let name = try!(method_name.parts.pop().chain_err(|| "name can't be empty"));
         let caption = first_method.self_arg_kind().caption();
         method_name.parts.push(format!("{}_{}", name, caption));
       }
@@ -1177,8 +1178,8 @@ impl RustGenerator {
             ReturnValueAllocationPlace::NotApplicable => {}
           }
           let mut cpp_method_key = args.cpp_method.cpp_method.clone();
-          if cpp_method_key.arguments_before_omitting.is_some() {
-            cpp_method_key.arguments = cpp_method_key.arguments_before_omitting.unwrap();
+          if let Some(v) = cpp_method_key.arguments_before_omitting {
+            cpp_method_key.arguments = v;
             cpp_method_key.arguments_before_omitting = None;
           }
           add_to_multihash(&mut grouped_by_cpp_method, cpp_method_key, args.clone());
@@ -1263,9 +1264,9 @@ impl RustGenerator {
         doc: doc,
       }
     } else {
-      let mut method = filtered_methods.pop().unwrap();
+      let mut method = try!(filtered_methods.pop().chain_err(|| "filtered_methods can't be empty"));
       if use_self_arg_caption {
-        let name = method.name.parts.pop().unwrap();
+        let name = try!(method.name.parts.pop().chain_err(|| "name can't be empty"));
         let caption = method.self_arg_kind().caption();
         method.name.parts.push(format!("{}_{}", name, caption));
       }
@@ -1285,7 +1286,7 @@ impl RustGenerator {
 
       method
     };
-    (method, type_declaration)
+    Ok((method, type_declaration))
   }
 
   fn get_qt_doc_for_method(&self, cpp_method: &CppMethod) -> Option<QtDocResultForMethod> {
@@ -1331,7 +1332,10 @@ impl RustGenerator {
   /// for all specified methods. All methods must either be in the same
   /// RustMethodScope::Impl scope or be free functions in the same module.
   #[cfg_attr(feature="clippy", allow(for_kv_map))]
-  fn process_functions<'b, I>(&self, methods: I, scope: &RustMethodScope) -> ProcessFunctionsResult
+  fn process_functions<'b, I>(&self,
+                              methods: I,
+                              scope: &RustMethodScope)
+                              -> Result<ProcessFunctionsResult>
     where I: Iterator<Item = &'b CppAndFfiMethod>
   {
     // Step 1: convert all methods to SingleVariant Rust methods and
@@ -1383,15 +1387,15 @@ impl RustGenerator {
               .iter()
               .map(|x| x.argument_type.rust_api_type.dealias_libc())
               .collect();
-            if all_real_args.get_mut(&args.cpp_method.allocation_place)
-              .unwrap()
-              .contains(&real_args) {
+            let set = try!(all_real_args.get_mut(&args.cpp_method.allocation_place)
+              .chain_err(|| "all_real_args must contain every possible allocation place"));
+            if set.contains(&real_args) {
               log::warning(format!("Removing method because another method with the same \
                                     argument types exists:\n{:?}",
                                    args.cpp_method.short_text()));
               false
             } else {
-              all_real_args.get_mut(&args.cpp_method.allocation_place).unwrap().insert(real_args);
+              set.insert(real_args);
               true
             }
           } else {
@@ -1404,7 +1408,7 @@ impl RustGenerator {
         // Step 4: generate overloaded method if count of methods is still > 1,
         // or accept a single method without change.
         let (method, type_declaration) =
-          self.process_method(filtered_methods, scope, use_self_arg_caption);
+          try!(self.process_method(filtered_methods, scope, use_self_arg_caption));
         if method.doc.is_empty() {
           panic!("doc is empty! {:?}", method);
         }
@@ -1416,7 +1420,7 @@ impl RustGenerator {
     }
     result.methods.sort_by(|a, b| a.name.last_name().cmp(b.name.last_name()));
     result.trait_impls.sort_by(|a, b| a.trait_name.to_string().cmp(&b.trait_name.to_string()));
-    result
+    Ok(result)
   }
 
   /// Generates Rust representations of all FFI functions
