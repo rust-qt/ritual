@@ -23,7 +23,7 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) -> Result<()>
       .chain_err(|| format!("failed to get metadata for {}", header_path.display())));
     if metadata.len() < 100 {
       let file_content = try!(file_to_string(&header_path));
-      if let Some(matches) = re.captures(file_content.as_ref()) {
+      if let Some(matches) = re.captures(file_content.trim()) {
         let real_header = try!(matches.at(1).chain_err(|| "invalid regexp matches")).to_string();
         let fancy_header = try!(os_str_to_str(&header.file_name())).to_string();
         add_to_multihash(&mut map_real_to_all_fancy, real_header, fancy_header);
@@ -49,11 +49,11 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) -> Result<()>
         }
       }
       if !ok {
-        log::noisy(format!("{} -> {:?} (detect failed)", real_header, fancy_headers));
+        log::info(format!("{} -> {:?} (detect failed)", real_header, fancy_headers));
       }
       result
     };
-    log::noisy(format!("{} -> {}", real_header, fancy_header));
+    log::info(format!("{} -> {}", real_header, fancy_header));
     map_real_to_fancy.insert(real_header, fancy_header);
   }
   let get_header = |real_header: &String, class_name: Option<&String>| -> String {
