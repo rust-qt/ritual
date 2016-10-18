@@ -268,6 +268,7 @@ pub enum RustToCTypeConversion {
   None,
   RefToPtr,
   ValueToPtr,
+  CppBoxToPtr,
   QFlagsToUInt,
 }
 

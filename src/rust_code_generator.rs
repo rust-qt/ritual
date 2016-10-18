@@ -1,4 +1,4 @@
-use errors::{Result, ChainErr};
+use errors::{Result, ChainErr, unexpected};
 use file_utils::{PathBufWithAdded, copy_recursively, file_to_string, copy_file, create_file,
                  path_to_str, create_dir_all, remove_file, read_dir, os_str_to_str,
                  os_string_into_string};
@@ -207,7 +207,7 @@ impl RustCodeGenerator {
         let mut table = toml::Table::new();
         table.insert("libc".to_string(), toml::Value::String("0.2".to_string()));
         table.insert("cpp_utils".to_string(),
-                     toml::Value::String("0.0".to_string()));
+                     toml::Value::String("0.1".to_string()));
         for dep in &self.config.dependencies {
           let mut table_dep = toml::Table::new();
           table_dep.insert("path".to_string(),
@@ -293,7 +293,8 @@ impl RustCodeGenerator {
                            self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
 
           }
-          RustToCTypeConversion::ValueToPtr => {
+          RustToCTypeConversion::ValueToPtr |
+          RustToCTypeConversion::CppBoxToPtr => {
             let is_const =
               if let RustType::Common { ref is_const, ref is_const2, ref indirection, .. } =
                      arg.argument_type
@@ -304,12 +305,17 @@ impl RustCodeGenerator {
                   _ => *is_const,
                 }
               } else {
-                panic!("void is not expected here at all!")
+                return Err(unexpected("void is not expected here at all!").into());
               };
-            code = format!("{}{} as {}",
-                           if is_const { "&" } else { "&mut " },
-                           code,
-                           self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
+            if arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::CppBoxToPtr {
+              let method = if is_const { "as_ptr" } else { "as_mut_ptr" };
+              code = format!("{}.{}()", code, method);
+            } else {
+              code = format!("{}{} as {}",
+                             if is_const { "&" } else { "&mut " },
+                             code,
+                             self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
+            }
           }
           RustToCTypeConversion::QFlagsToUInt => {
             code = format!("{}.to_int() as libc::c_uint", code);
@@ -328,9 +334,23 @@ impl RustCodeGenerator {
         ii += 1;
         return_var_name = format!("object{}", ii);
       }
+      let struct_name = if variant.return_type.rust_api_to_c_conversion ==
+                           RustToCTypeConversion::CppBoxToPtr {
+        if let RustType::Common { ref generic_arguments, .. } = variant.return_type.rust_api_type {
+          let generic_arguments = try!(generic_arguments.as_ref()
+            .chain_err(|| "CppBox must have generic_arguments"));
+          let arg = try!(generic_arguments.get(0)
+            .chain_err(|| "CppBox must have non-empty generic_arguments"));
+          self.rust_type_to_code(arg)
+        } else {
+          return Err(unexpected("CppBox type expected").into());
+        }
+      } else {
+        self.rust_type_to_code(&variant.return_type.rust_api_type)
+      };
       result.push(format!("{{\nlet mut {} = unsafe {{ {}::new_uninitialized() }};\n",
                           return_var_name,
-                          self.rust_type_to_code(&variant.return_type.rust_api_type)));
+                          struct_name));
       final_args[*i as usize] = Some(format!("&mut {}", return_var_name));
       maybe_result_var_name = Some(return_var_name);
     }
@@ -367,6 +387,11 @@ impl RustCodeGenerator {
         if maybe_result_var_name.is_none() {
           code = format!("let ffi_result = {};\nunsafe {{ *ffi_result }}", code);
         }
+      }
+      RustToCTypeConversion::CppBoxToPtr => {
+        code = format!("let ffi_result = {};\n\
+                        unsafe {{ ::cpp_utils::CppBox::new(ffi_result) }}",
+                       code);
       }
       RustToCTypeConversion::QFlagsToUInt => {
         let mut qflags_type = variant.return_type.rust_api_type.clone();

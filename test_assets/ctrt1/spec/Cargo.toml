@@ -7,7 +7,7 @@ links = "ctrt1"
 
 [dependencies]
 libc = "0.2"
-cpp_utils = "0.0"
+cpp_utils = "0.1"
 
 [build-dependencies]
 cpp_to_rust = "0.1"

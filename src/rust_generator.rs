@@ -419,7 +419,8 @@ fn process_types(input_data: &CppAndFfiData,
           let rust_type = try!(complete_type(result,
                                              dependency_types,
                                              &try!(x.to_cpp_ffi_type(CppTypeRole::NotReturnType)),
-                                             &CppFfiArgumentMeaning::Argument(0)));
+                                             &CppFfiArgumentMeaning::Argument(0),
+                                             &ReturnValueAllocationPlace::NotApplicable));
           arg_captions.push(try!(rust_type.rust_api_type.caption()).to_class_case());
         }
       } else {
@@ -497,12 +498,17 @@ struct ProcessFunctionsResult {
 fn complete_type(processed_types: &[RustProcessedTypeInfo],
                  dependency_types: &[RustProcessedTypeInfo],
                  cpp_ffi_type: &CppFfiType,
-                 argument_meaning: &CppFfiArgumentMeaning)
+                 argument_meaning: &CppFfiArgumentMeaning,
+                 allocation_place: &ReturnValueAllocationPlace)
                  -> Result<CompleteType> {
   let rust_ffi_type = try!(ffi_type(processed_types, dependency_types, &cpp_ffi_type.ffi_type));
   let mut rust_api_type = rust_ffi_type.clone();
   let mut rust_api_to_c_conversion = RustToCTypeConversion::None;
-  if let RustType::Common { ref mut indirection, .. } = rust_api_type {
+  if let RustType::Common { ref mut indirection,
+                            ref mut base,
+                            ref mut generic_arguments,
+                            ref mut is_const,
+                            ref mut is_const2 } = rust_api_type {
     match cpp_ffi_type.conversion {
       IndirectionChange::NoChange => {
         if argument_meaning == &CppFfiArgumentMeaning::This {
@@ -513,8 +519,39 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
       }
       IndirectionChange::ValueToPointer => {
         assert!(indirection == &RustTypeIndirection::Ptr);
-        *indirection = RustTypeIndirection::None;
-        rust_api_to_c_conversion = RustToCTypeConversion::ValueToPtr;
+        if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
+          match *allocation_place {
+            ReturnValueAllocationPlace::Stack => {
+              *indirection = RustTypeIndirection::None;
+              rust_api_to_c_conversion = RustToCTypeConversion::ValueToPtr;
+            }
+            ReturnValueAllocationPlace::Heap => {
+              *indirection = RustTypeIndirection::None;
+              rust_api_to_c_conversion = RustToCTypeConversion::CppBoxToPtr;
+              assert!(generic_arguments.is_none());
+              assert!(!*is_const);
+              assert!(!*is_const2);
+              let new_generic_argument = RustType::Common {
+                base: base.clone(),
+                generic_arguments: None,
+                is_const: false,
+                is_const2: false,
+                indirection: RustTypeIndirection::None,
+              };
+              *base = try!(RustName::new(vec!["cpp_utils".to_string(), "CppBox".to_string()]));
+              *generic_arguments = Some(vec![new_generic_argument]);
+
+            }
+            ReturnValueAllocationPlace::NotApplicable => {
+              return Err(unexpected("NotApplicable conflicts with ValueToPointer").into());
+            }
+          }
+        } else {
+          *indirection = RustTypeIndirection::Ref { lifetime: None };
+          *is_const = true;
+          *is_const2 = true;
+          rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
+        }
       }
       IndirectionChange::ReferenceToPointer => {
         match *indirection {
@@ -929,7 +966,8 @@ impl RustGenerator {
         let arg_type = try!(complete_type(&self.processed_types,
                                           &self.dependency_types,
                                           &arg.argument_type,
-                                          &arg.meaning));
+                                          &arg.meaning,
+                                          &method.allocation_place));
         arguments.push(RustMethodArgument {
           ffi_index: Some(arg_index as i32),
           argument_type: arg_type,
@@ -952,28 +990,17 @@ impl RustGenerator {
       (try!(complete_type(&self.processed_types,
                           &self.dependency_types,
                           &arg.argument_type,
-                          &arg.meaning)),
+                          &arg.meaning,
+                          &method.allocation_place)),
        Some(arg_index as i32))
     } else {
       // none of the arguments has return value meaning,
       // so FFI return value must be used
-      let mut return_type = try!(complete_type(&self.processed_types,
-                                               &self.dependency_types,
-                                               &method.c_signature.return_type,
-                                               &CppFfiArgumentMeaning::ReturnValue));
-      if method.allocation_place == ReturnValueAllocationPlace::Heap &&
-         !method.cpp_method.is_destructor() {
-        if let RustType::Common { ref mut indirection, .. } = return_type.rust_api_type {
-          assert!(*indirection == RustTypeIndirection::None);
-          *indirection = RustTypeIndirection::Ptr;
-        } else {
-          return Err(unexpected("unexpected void type").into());
-        }
-        assert!(return_type.cpp_type.indirection == CppTypeIndirection::None);
-        assert!(return_type.cpp_to_ffi_conversion == IndirectionChange::ValueToPointer);
-        assert!(return_type.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr);
-        return_type.rust_api_to_c_conversion = RustToCTypeConversion::None;
-      }
+      let return_type = try!(complete_type(&self.processed_types,
+                                           &self.dependency_types,
+                                           &method.c_signature.return_type,
+                                           &CppFfiArgumentMeaning::ReturnValue,
+                                           &method.allocation_place));
       (return_type, None)
     };
     if return_type.rust_api_type.is_ref() {
@@ -1178,10 +1205,10 @@ impl RustGenerator {
           }
           match args.cpp_method.allocation_place {
             ReturnValueAllocationPlace::Stack => {
-              args.arguments.push(try!(allocation_place_marker("RustManaged")));
+              args.arguments.push(try!(allocation_place_marker("AsStruct")));
             }
             ReturnValueAllocationPlace::Heap => {
-              args.arguments.push(try!(allocation_place_marker("CppPointer")));
+              args.arguments.push(try!(allocation_place_marker("AsBox")));
             }
             ReturnValueAllocationPlace::NotApplicable => {}
           }
