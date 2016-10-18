@@ -1,6 +1,6 @@
 #include "ctrt1/exports.h"
 
-CTRT1_EXPORT class Class1 {
+class CTRT1_EXPORT Class1 {
 public:
   Class1(int x);
   int x();
