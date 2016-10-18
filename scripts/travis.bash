@@ -102,19 +102,17 @@ else
   CARGO_ARGS="--release"
 fi
 
-
+cd "$TRAVIS_BUILD_DIR"
+cargo update
 
 if [ -f "$FILES/tests_ok" ]; then
   echo "Skipped compiling and testing cpp_to_rust because $FILES/tests_ok already exists"
 else
   echo "Compiling and testing cpp_to_rust"
-  cd "$TRAVIS_BUILD_DIR"
   cargo test $CARGO_ARGS --verbose
   touch $FILES/tests_ok
 fi
 
-# cargo build $CARGO_ARGS
-# exit
 
 cd $FILES
 REPOS=$FILES/repos
