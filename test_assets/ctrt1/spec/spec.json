@@ -1,7 +1,7 @@
 {
   "cpp": {
     "name": "ctrt1",
-    "include_file": "ctrt1/utils.h",
+    "include_file": "ctrt1/all.h",
     "include_dirs": ["../cpp/include"],
     "target_include_dirs": ["../cpp/include"]
   }

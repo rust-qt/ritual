@@ -6,6 +6,7 @@ build = "build.rs"
 description = "Automatic generator of C++ library wrappers"
 license = "MIT"
 repository = "https://github.com/rust-qt/cpp_to_rust"
+exclude = ["scripts/**/*", "test_assets/**/*"]
 
 [lib]
 name = "cpp_to_rust"

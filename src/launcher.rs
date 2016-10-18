@@ -18,7 +18,6 @@ use rust_info::{InputCargoTomlData, RustExportInfo};
 use serializable::LibSpec;
 use utils::{is_msvc, run_command, add_env_path_item, MapIfOk};
 
-use std;
 use std::path::PathBuf;
 use std::process::Command;
 use std::env;
