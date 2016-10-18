@@ -38,7 +38,7 @@ rustfmt = "0.6"     # Rust code formatting
 error-chain = "0.5" # error handling
 backtrace = "0.2.1" # error backtrace manipulation
 
-clippy = {version = "*", optional = true} # linter
+clippy = {version = "0.0", optional = true} # linter
 
 [build-dependencies]
 serde_codegen = "0.8"
