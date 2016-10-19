@@ -129,6 +129,13 @@ pub fn save_json<P: AsRef<Path>, T: serde::Serialize>(path: P, value: &T) -> Res
   })
 }
 
+extern crate toml;
+pub fn load_toml<P: AsRef<Path>>(path: P) -> Result<toml::Table> {
+  let buf = try!(file_to_string(path.as_ref()));
+  toml::Parser::new(&buf)
+    .parse()
+    .chain_err(|| format!("failed to parse file as TOML: {}", path.as_ref().display()))
+}
 
 pub fn file_to_string<P: AsRef<Path>>(path: P) -> Result<String> {
   let mut f = try!(open_file(path));

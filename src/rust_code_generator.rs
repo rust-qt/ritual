@@ -37,7 +37,6 @@ pub struct RustLinkItem {
 }
 
 pub struct RustCodeGeneratorConfig {
-  pub invokation_method: InvokationMethod,
   pub crate_name: String,
   pub crate_version: String,
   pub crate_authors: Vec<String>,
@@ -233,15 +232,13 @@ impl RustCodeGenerator {
       table
     });
     let mut cargo_toml_file = try!(create_file(self.config.output_path.with_added("Cargo.toml")));
-    try!(cargo_toml_file.write(format!("{}", cargo_toml_data)));
+    try!(cargo_toml_file.write(cargo_toml_data.to_string()));
 
-    if self.config.invokation_method == InvokationMethod::CommandLine {
-      for name in &["src", "tests"] {
-        let template_item_path = self.config.template_path.with_added(&name);
-        if template_item_path.as_path().exists() {
-          try!(copy_recursively(&template_item_path,
-                                &self.config.output_path.with_added(&name)));
-        }
+    for name in &["src", "tests"] {
+      let template_item_path = self.config.template_path.with_added(&name);
+      if template_item_path.as_path().exists() {
+        try!(copy_recursively(&template_item_path,
+                              &self.config.output_path.with_added(&name)));
       }
     }
     if !self.config.output_path.with_added("src").exists() {
@@ -531,37 +528,39 @@ impl RustCodeGenerator {
 
   #[cfg_attr(feature="clippy", allow(collapsible_if))]
   pub fn generate_lib_file(&self, modules: &[&String]) -> Result<()> {
-    let mut lib_file_path = self.config.output_path.clone();
-    lib_file_path.push("src");
-    lib_file_path.push("lib.rs");
+    let src_path = self.config.output_path.with_added("src");
+    let lib_file_path = src_path.with_added("lib.rs");
     if lib_file_path.as_path().exists() {
       try!(remove_file(&lib_file_path));
     }
+    let lib_in_file_path = src_path.with_added("lib.in.rs");
     {
       let mut lib_file = try!(create_file(&lib_file_path));
-      try!(lib_file.write("pub extern crate libc;\n"));
-      try!(lib_file.write("pub extern crate cpp_utils;\n\n"));
-      for dep in &self.config.dependencies {
-        try!(lib_file.write(format!("pub extern crate {};\n\n", &dep.crate_name)));
+      let mut lib_in_file = try!(create_file(&lib_in_file_path));
+      for file in &mut [&mut lib_file, &mut lib_in_file] {
+        try!(file.write("pub extern crate libc;\n"));
+        try!(file.write("pub extern crate cpp_utils;\n\n"));
+        for dep in &self.config.dependencies {
+          try!(file.write(format!("pub extern crate {};\n\n", &dep.crate_name)));
+        }
+
       }
 
       let mut extra_modules = vec!["ffi".to_string()];
-      if self.config.invokation_method == InvokationMethod::CommandLine {
-        if self.config.template_path.with_added("src").exists() {
-          for item in try!(read_dir(&self.config.template_path.with_added("src"))) {
-            let item = try!(item);
-            let path = item.path();
-            let file_name = try!(os_string_into_string(item.file_name()));
-            if file_name == "lib.rs" {
-              continue;
-            }
-            if item.path().is_dir() {
-              extra_modules.push(file_name.to_string());
-            } else if let Some(ext) = item.path().extension() {
-              if ext == "rs" {
-                let stem = try!(path.file_stem().chain_err(|| "file_stem() failed for .rs file"));
-                extra_modules.push(try!(os_str_to_str(stem)).to_string());
-              }
+      if self.config.template_path.with_added("src").exists() {
+        for item in try!(read_dir(&self.config.template_path.with_added("src"))) {
+          let item = try!(item);
+          let path = item.path();
+          let file_name = try!(os_string_into_string(item.file_name()));
+          if file_name == "lib.rs" {
+            continue;
+          }
+          if item.path().is_dir() {
+            extra_modules.push(file_name.to_string());
+          } else if let Some(ext) = item.path().extension() {
+            if ext == "rs" {
+              let stem = try!(path.file_stem().chain_err(|| "file_stem() failed for .rs file"));
+              extra_modules.push(try!(os_str_to_str(stem)).to_string());
             }
           }
         }
@@ -580,22 +579,18 @@ impl RustCodeGenerator {
           // some ffi functions are not used because
           // some Rust methods are filtered
           try!(lib_file.write("#[allow(dead_code)]\n"));
+          try!(lib_in_file.write("#[allow(dead_code)]\n"));
         }
-        match self.config.invokation_method {
-          InvokationMethod::CommandLine => {
-            try!(lib_file.write(format!("{}mod {};\n", maybe_pub, module)));
-          }
-          InvokationMethod::BuildScript => {
-            try!(lib_file.write(format!(
-                   "{maybe_pub}mod {name} {{ \n  include!(concat!(env!(\"OUT_DIR\"), \
-                    \"/src/{name}.rs\"));\n}}\n",
-                   name = module,
-                   maybe_pub = maybe_pub)));
-          }
-        }
+        try!(lib_file.write(format!("{}mod {};\n", maybe_pub, module)));
+        try!(lib_in_file.write(format!(
+               "{maybe_pub}mod {name} {{ \n  include!(concat!(env!(\"OUT_DIR\"), \
+                \"/src/{name}.rs\"));\n}}\n",
+               name = module,
+               maybe_pub = maybe_pub)));
       }
     }
     self.call_rustfmt(&lib_file_path);
+    self.call_rustfmt(&lib_in_file_path);
     Ok(())
   }
 

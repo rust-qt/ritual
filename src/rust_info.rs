@@ -1,7 +1,7 @@
 use cpp_ffi_data::CppAndFfiMethod;
 use cpp_type::CppType;
 use errors::{Result, ChainErr, unexpected};
-use file_utils::file_to_string;
+use file_utils::load_toml;
 use rust_type::{RustName, CompleteType, RustType, RustTypeIndirection};
 use utils::MapIfOk;
 
@@ -230,14 +230,11 @@ pub struct InputCargoTomlData {
 
 use std::path::PathBuf;
 
-extern crate toml;
+
 
 impl InputCargoTomlData {
   pub fn from_file(path: &PathBuf) -> Result<InputCargoTomlData> {
-    let buf = try!(file_to_string(path));
-    let value = try!(toml::Parser::new(&buf)
-      .parse()
-      .chain_err(|| format!("failed to parse file as TOMLL: {}", path.display())));
+    let value = try!(load_toml(path));
     let package = try!(value.get("package")
       .chain_err(|| "'package' field not found in Cargo.toml"));
     let package = try!(package.as_table().chain_err(|| "'package' must be a table"));

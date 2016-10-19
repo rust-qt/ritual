@@ -1,5 +1,6 @@
 extern crate num_cpus;
 
+use config::Config;
 use cpp_code_generator::CppCodeGenerator;
 use cpp_ffi_generator;
 use cpp_lib_builder::CppLibBuilder;
@@ -7,7 +8,7 @@ use cpp_parser;
 use dependency_info::DependencyInfo;
 use errors::{Result, ChainErr};
 use file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json, canonicalize,
-                 remove_dir_all, remove_dir, read_dir, remove_file, path_to_str};
+                 remove_dir_all, remove_dir, read_dir, path_to_str};
 use log;
 use qt_doc_parser::QtDocData;
 use qt_specific;
@@ -16,7 +17,7 @@ use rust_code_generator;
 use rust_generator;
 use rust_info::{InputCargoTomlData, RustExportInfo};
 use serializable::LibSpec;
-use utils::{is_msvc, run_command, add_env_path_item, MapIfOk};
+use utils::{is_msvc, run_command, MapIfOk};
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -31,17 +32,16 @@ pub enum BuildProfile {
 pub use rust_code_generator::InvokationMethod;
 
 pub struct BuildEnvironment {
-  pub invokation_method: InvokationMethod,
+  pub config: Config,
   pub output_dir_path: PathBuf,
   pub source_dir_path: PathBuf,
   pub dependency_paths: Vec<PathBuf>,
-  pub extra_lib_paths: Vec<PathBuf>,
   pub num_jobs: Option<i32>,
   pub build_profile: BuildProfile,
   pub pipe_output: bool,
 }
 
-pub fn run_from_build_script() -> Result<()> {
+pub fn run_from_build_script(config: Config) -> Result<()> {
   let mut dependency_paths = Vec::new();
   for (name, value) in env::vars_os() {
     if let Ok(name) = name.into_string() {
@@ -52,7 +52,7 @@ pub fn run_from_build_script() -> Result<()> {
     }
   }
   run(BuildEnvironment {
-    invokation_method: InvokationMethod::BuildScript,
+    config: config,
     source_dir_path: PathBuf::from(try!(env::var("CARGO_MANIFEST_DIR")
       .chain_err(|| "failed to read required env var: CARGO_MANIFEST_DIR"))),
     output_dir_path: PathBuf::from(try!(env::var("OUT_DIR")
@@ -68,7 +68,6 @@ pub fn run_from_build_script() -> Result<()> {
       a => return Err(format!("unsupported profile: {}", a).into()),
     },
     dependency_paths: dependency_paths,
-    extra_lib_paths: Vec::new(),
     pipe_output: false,
   })
 }
@@ -204,7 +203,6 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       cpp_lib_dirs.push(try!(canonicalize(&absolute_dir)));
     }
   }
-  cpp_lib_dirs.extend_from_slice(&env.extra_lib_paths);
   if framework_dirs.is_empty() {
     link_items.push(RustLinkItem {
       name: lib_spec.cpp.name.clone(),
@@ -385,7 +383,6 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     try!(create_dir_all(&crate_new_path));
     let rustfmt_config_path = source_dir_path.with_added("rustfmt.toml");
     let rust_config = rust_code_generator::RustCodeGeneratorConfig {
-      invokation_method: env.invokation_method.clone(),
       crate_name: input_cargo_toml_data.name.clone(),
       crate_authors: input_cargo_toml_data.authors.clone(),
       crate_version: input_cargo_toml_data.version.clone(),
@@ -449,56 +446,54 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
   }
 
 
-  match env.invokation_method {
-    InvokationMethod::CommandLine => {
-      log::info("Compiling Rust crate.");
-      let mut all_cpp_lib_dirs = cpp_lib_dirs.clone();
-      if c_lib_is_shared {
-        all_cpp_lib_dirs.push(c_lib_lib_path.clone());
-      }
-      if output_dir_path.with_added("Cargo.lock").exists() {
-        try!(remove_file(output_dir_path.with_added("Cargo.lock")));
-      }
-      for cargo_cmd in &["build", "test", "doc"] {
-        let mut command = Command::new("cargo");
-        command.arg(cargo_cmd);
-        command.arg("--verbose");
-        command.arg(format!("-j{}", num_jobs));
-        command.current_dir(&output_dir_path);
-        if !all_cpp_lib_dirs.is_empty() {
-          for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB", "PATH"] {
-            let value = try!(add_env_path_item(name, all_cpp_lib_dirs.clone()));
-            command.env(name, value);
-          }
-        }
-        if !framework_dirs.is_empty() {
-          command.env("DYLD_FRAMEWORK_PATH",
-                      try!(add_env_path_item("DYLD_FRAMEWORK_PATH", framework_dirs.clone())));
-        }
-        if is_msvc() && *cargo_cmd == "test" {
-          // cargo doesn't pass this flag to rustc when it compiles qt_core,
-          // so it's compiled with static std and the tests fail with
-          // "cannot satisfy dependencies so `std` only shows up once" error.
-          command.env("RUSTFLAGS", "-C prefer-dynamic");
-        }
-        try!(run_command(&mut command, false, env.pipe_output)
-          .chain_err(|| "failed to build generated crate"));
-      }
-      log::info("Completed successfully.");
-    }
-    InvokationMethod::BuildScript => {
-      println!("cargo:rustc-link-search={}",
-               try!(path_to_str(&c_lib_lib_path)));
-      for dir in &cpp_lib_dirs {
-        println!("cargo:rustc-link-search=native={}", try!(path_to_str(dir)));
-      }
-      println!("cargo:cpp_to_rust_data_path={}",
-               try!(path_to_str(&output_dir_path)));
-      for dir in &framework_dirs {
-        println!("cargo:rustc-link-search=framework={}",
-                 try!(path_to_str(dir)));
-      }
-    }
+  // match env.invokation_method {
+  // InvokationMethod::CommandLine => {
+  // log::info("Compiling Rust crate.");
+  // let mut all_cpp_lib_dirs = cpp_lib_dirs.clone();
+  // if c_lib_is_shared {
+  // all_cpp_lib_dirs.push(c_lib_lib_path.clone());
+  // }
+  // if output_dir_path.with_added("Cargo.lock").exists() {
+  // try!(remove_file(output_dir_path.with_added("Cargo.lock")));
+  // }
+  // for cargo_cmd in &["build", "test", "doc"] {
+  // let mut command = Command::new("cargo");
+  // command.arg(cargo_cmd);
+  // command.arg("--verbose");
+  // command.arg(format!("-j{}", num_jobs));
+  // command.current_dir(&output_dir_path);
+  // if !all_cpp_lib_dirs.is_empty() {
+  // for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB", "PATH"] {
+  // let value = try!(add_env_path_item(name, all_cpp_lib_dirs.clone()));
+  // command.env(name, value);
+  // }
+  // }
+  // if !framework_dirs.is_empty() {
+  // command.env("DYLD_FRAMEWORK_PATH",
+  // try!(add_env_path_item("DYLD_FRAMEWORK_PATH", framework_dirs.clone())));
+  // }
+  // if is_msvc() && *cargo_cmd == "test" {
+  // cargo doesn't pass this flag to rustc when it compiles qt_core,
+  // so it's compiled with static std and the tests fail with
+  // "cannot satisfy dependencies so `std` only shows up once" error.
+  // command.env("RUSTFLAGS", "-C prefer-dynamic");
+  // }
+  // try!(run_command(&mut command, false, env.pipe_output)
+  // .chain_err(|| "failed to build generated crate"));
+  // }
+  // log::info("Completed successfully.");
+  // }
+  // InvokationMethod::BuildScript => {
+  println!("cargo:rustc-link-search={}",
+           try!(path_to_str(&c_lib_lib_path)));
+  for dir in &cpp_lib_dirs {
+    println!("cargo:rustc-link-search=native={}", try!(path_to_str(dir)));
+  }
+  println!("cargo:cpp_to_rust_data_path={}",
+           try!(path_to_str(&output_dir_path)));
+  for dir in &framework_dirs {
+    println!("cargo:rustc-link-search=framework={}",
+             try!(path_to_str(dir)));
   }
   Ok(())
 }

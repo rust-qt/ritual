@@ -8,14 +8,6 @@ license = "MIT"
 repository = "https://github.com/rust-qt/cpp_to_rust"
 exclude = ["scripts/**/*", "test_assets/**/*"]
 
-[lib]
-name = "cpp_to_rust"
-path = "src/lib.rs"
-
-[[bin]]
-name = "cpp_to_rust_bin"
-path = "src/main.rs"
-
 [dependencies]
 
 libc = "0.2"
