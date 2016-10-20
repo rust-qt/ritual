@@ -4,7 +4,6 @@ use cpp_ffi_data::{CppAndFfiMethod, c_base_name};
 use cpp_method::{CppMethod, CppMethodKind};
 use errors::{Result, ChainErr, unexpected};
 use log;
-use serializable::CppLibSpec;
 use utils::add_to_multihash;
 use config::CppFfiGeneratorFilterFn;
 
@@ -12,7 +11,6 @@ use std::collections::{HashSet, HashMap};
 
 struct CGenerator<'a> {
   cpp_data: &'a CppData,
-  cpp_lib_spec: CppLibSpec,
   cpp_lib_name: String,
   filter: Option<&'a Box<CppFfiGeneratorFilterFn>>,
 }
@@ -31,13 +29,11 @@ pub struct CppAndFfiData {
 
 /// Runs FFI generator
 pub fn run(cpp_data: &CppData,
-           cpp_lib_spec: CppLibSpec,
            cpp_lib_name: String,
            filter: Option<&Box<CppFfiGeneratorFilterFn>>)
            -> Result<Vec<CppFfiHeaderData>> {
   let generator = CGenerator {
     cpp_data: cpp_data,
-    cpp_lib_spec: cpp_lib_spec,
     cpp_lib_name: cpp_lib_name,
     filter: filter,
   };
@@ -47,12 +43,6 @@ pub fn run(cpp_data: &CppData,
   include_name_list.sort();
 
   for include_file in &include_name_list {
-    if let Some(ref include_file_blacklist) = generator.cpp_lib_spec.include_file_blacklist {
-      if include_file_blacklist.iter().any(|x| x == include_file) {
-        log::info(format!("Skipping include file {}", include_file));
-        continue;
-      }
-    }
     let mut include_file_base_name = include_file.clone();
 
     if let Some(index) = include_file_base_name.find('.') {

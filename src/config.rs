@@ -51,6 +51,10 @@ pub struct Config {
   /// will also be skipped.
   cpp_parser_blocked_names: Vec<String>,
 
+  /// Custom function that decides whether a C++ method should be
+  /// added to FFI library wrapper. Err indicates an unexpected failure
+  /// and terminates processing. Ok(true) allows the method, and
+  /// Ok(false) blocks the method.
   cpp_ffi_generator_filter: CppFfiGeneratorFilter,
 }
 

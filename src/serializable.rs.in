@@ -539,29 +539,6 @@ pub struct CppType {
 }
 
 // -------------------------
-// from launcher
-
-/// Information loaded from lib spec file and
-/// related to the C++ side
-#[derive(Debug, Clone)]
-#[derive(Serialize, Deserialize)]
-pub struct CppLibSpec {
-  /// List of include file names that should be skipped during FFI generation.
-  pub include_file_blacklist: Option<Vec<String>>,
-}
-
-/// Information loaded from lib spec file.
-/// This struct contains general instructions
-/// about processing the library.
-#[derive(Debug, Clone)]
-#[derive(Serialize, Deserialize)]
-pub struct LibSpec {
-  /// Information related to the C++ side
-  pub cpp: CppLibSpec,
-}
-
-
-// -------------------------
 // from rust_type
 
 /// Rust identifier. Represented by

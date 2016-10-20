@@ -16,7 +16,6 @@ use rust_code_generator::{RustCodeGeneratorDependency, RustLinkItem, RustLinkKin
 use rust_code_generator;
 use rust_generator;
 use rust_info::{InputCargoTomlData, RustExportInfo};
-use serializable::LibSpec;
 use utils::{is_msvc, run_command, MapIfOk};
 
 use std::path::PathBuf;
@@ -87,14 +86,6 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
   }
   let output_dir_path = try!(canonicalize(&env.output_dir_path));
   let source_dir_path = try!(canonicalize(&env.source_dir_path));
-
-  let lib_spec_path = source_dir_path.with_added("spec.json");
-
-  log::info("Reading lib spec");
-  if !lib_spec_path.exists() {
-    return Err(format!("Lib spec file does not exist: {}", lib_spec_path.display()).into());
-  }
-  let lib_spec: LibSpec = try!(load_json(&lib_spec_path));
 
   log::info("Reading input Cargo.toml");
   let input_cargo_toml_path = source_dir_path.with_added("Cargo.toml");
@@ -300,7 +291,6 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     log::info(format!("Generating C wrapper library ({}).", c_lib_name));
 
     let cpp_ffi_headers = try!(cpp_ffi_generator::run(&parse_result,
-                                                      lib_spec.cpp.clone(),
                                                       input_cargo_toml_data.cpp_lib_name.clone(),
                                                       env.config.cpp_ffi_generator_filter())
       .chain_err(|| "FFI generator failed"));
