@@ -533,64 +533,72 @@ impl RustCodeGenerator {
     if lib_file_path.as_path().exists() {
       try!(remove_file(&lib_file_path));
     }
-    let lib_in_file_path = src_path.with_added("lib.in.rs");
-    {
-      let mut lib_file = try!(create_file(&lib_file_path));
-      let mut lib_in_file = try!(create_file(&lib_in_file_path));
-      for file in &mut [&mut lib_file, &mut lib_in_file] {
-        try!(file.write("pub extern crate libc;\n"));
-        try!(file.write("pub extern crate cpp_utils;\n\n"));
+    #[derive(PartialEq, Eq)]
+    enum Mode {
+      LibInRs,
+      LibRs,
+    }
+    for mode in &[Mode::LibInRs, Mode::LibRs] {
+      let lib_file_path = src_path.with_added(match *mode {
+        Mode::LibInRs => "lib.in.rs",
+        Mode::LibRs => "lib.rs",
+      });
+      {
+        let mut lib_file = try!(create_file(&lib_file_path));
+        try!(lib_file.write("pub extern crate libc;\n"));
+        try!(lib_file.write("pub extern crate cpp_utils;\n\n"));
         for dep in &self.config.dependencies {
-          try!(file.write(format!("pub extern crate {};\n\n", &dep.crate_name)));
+          try!(lib_file.write(format!("pub extern crate {};\n\n", &dep.crate_name)));
         }
-
-      }
-
-      let mut extra_modules = vec!["ffi".to_string()];
-      if self.config.template_path.with_added("src").exists() {
-        for item in try!(read_dir(&self.config.template_path.with_added("src"))) {
-          let item = try!(item);
-          let path = item.path();
-          let file_name = try!(os_string_into_string(item.file_name()));
-          if file_name == "lib.rs" {
-            continue;
-          }
-          if item.path().is_dir() {
-            extra_modules.push(file_name.to_string());
-          } else if let Some(ext) = item.path().extension() {
-            if ext == "rs" {
-              let stem = try!(path.file_stem().chain_err(|| "file_stem() failed for .rs file"));
-              extra_modules.push(try!(os_str_to_str(stem)).to_string());
+        let mut extra_modules = vec!["ffi".to_string()];
+        if mode == &Mode::LibRs {
+          if self.config.template_path.with_added("src").exists() {
+            for item in try!(read_dir(&self.config.template_path.with_added("src"))) {
+              let item = try!(item);
+              let path = item.path();
+              let file_name = try!(os_string_into_string(item.file_name()));
+              if file_name == "lib.rs" {
+                continue;
+              }
+              if item.path().is_dir() {
+                extra_modules.push(file_name.to_string());
+              } else if let Some(ext) = item.path().extension() {
+                if ext == "rs" {
+                  let stem = try!(path.file_stem().chain_err(|| "file_stem() failed for .rs file"));
+                  extra_modules.push(try!(os_str_to_str(stem)).to_string());
+                }
+              }
             }
           }
         }
-      }
-      for module in &extra_modules {
-        if modules.iter().any(|x| x.as_ref() as &str == module) {
-          panic!("module name conflict");
+        for module in &extra_modules {
+          if modules.iter().any(|x| x.as_ref() as &str == module) {
+            panic!("module name conflict");
+          }
+        }
+        let all_modules = extra_modules.iter().chain(modules.iter().map(|x| *x));
+        for module in all_modules {
+          let mut maybe_pub = "pub ";
+          if module == "ffi" {
+            maybe_pub = "";
+            // some ffi functions are not used because
+            // some Rust methods are filtered
+            try!(lib_file.write("#[allow(dead_code)]\n"));
+          }
+          match *mode {
+            Mode::LibInRs => {
+              try!(lib_file.write(format!("{maybe_pub}mod {name} {{ \n  \
+                                           include!(concat!(env!(\"OUT_DIR\"), \
+                                           \"/src/{name}.rs\"));\n}}\n",
+                                          name = module,
+                                          maybe_pub = maybe_pub)))
+            }
+            Mode::LibRs => try!(lib_file.write(format!("{}mod {};\n", maybe_pub, module))),
+          }
         }
       }
-
-      let all_modules = extra_modules.iter().chain(modules.iter().map(|x| *x));
-      for module in all_modules {
-        let mut maybe_pub = "pub ";
-        if module == "ffi" {
-          maybe_pub = "";
-          // some ffi functions are not used because
-          // some Rust methods are filtered
-          try!(lib_file.write("#[allow(dead_code)]\n"));
-          try!(lib_in_file.write("#[allow(dead_code)]\n"));
-        }
-        try!(lib_file.write(format!("{}mod {};\n", maybe_pub, module)));
-        try!(lib_in_file.write(format!(
-               "{maybe_pub}mod {name} {{ \n  include!(concat!(env!(\"OUT_DIR\"), \
-                \"/src/{name}.rs\"));\n}}\n",
-               name = module,
-               maybe_pub = maybe_pub)));
-      }
+      self.call_rustfmt(&lib_file_path);
     }
-    self.call_rustfmt(&lib_file_path);
-    self.call_rustfmt(&lib_in_file_path);
     Ok(())
   }
 

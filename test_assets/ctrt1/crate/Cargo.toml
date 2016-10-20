@@ -11,3 +11,6 @@ cpp_utils = "0.1"
 
 [build-dependencies]
 cpp_to_rust = "0.3"
+
+[replace]
+"cpp_to_rust:0.3.0" = { path = "../../.." }

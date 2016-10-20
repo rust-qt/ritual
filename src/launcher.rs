@@ -22,7 +22,6 @@ use utils::{is_msvc, run_command, MapIfOk};
 use std::path::PathBuf;
 use std::process::Command;
 use std::env;
-use std::iter::once;
 
 pub enum BuildProfile {
   Debug,
@@ -105,33 +104,36 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       .into());
   }
   let input_cargo_toml_data = try!(InputCargoTomlData::from_file(&input_cargo_toml_path));
-  if lib_spec.cpp.name == input_cargo_toml_data.name {
-    return Err(format!("Rust crate must not have the same name as C++ library ({}) \
+  if input_cargo_toml_data.cpp_lib_name == input_cargo_toml_data.name {
+    return Err(format!("Rust crate name ({}) must not be the same as C++ library name ({}) \
             because it can cause library name conflict.",
-                       lib_spec.cpp.name)
+                       input_cargo_toml_data.name,
+                       input_cargo_toml_data.cpp_lib_name)
       .into());
   }
-  log::info(format!("C++ library name: {}", lib_spec.cpp.name));
+  log::info(format!("C++ library name: {}", input_cargo_toml_data.cpp_lib_name));
 
-  let is_qt_library = lib_spec.cpp.name.starts_with("Qt5");
+  let is_qt_library = input_cargo_toml_data.cpp_lib_name.starts_with("Qt5");
 
-  let mut include_dirs = Vec::new();
-  let mut cpp_lib_dirs = Vec::new();
   let mut qt_this_lib_headers_dir = None;
-  let mut target_include_dirs = if let Some(ref dirs) = lib_spec.cpp.target_include_dirs {
-    Some(try!(dirs.iter()
-      .map_if_ok(|dir| {
-        let absolute_dir = source_dir_path.with_added(dir);
-        if !absolute_dir.exists() {
-          return Err(format!("Target include dir does not exist: {}",
-                             absolute_dir.display())
-            .into());
-        }
-        canonicalize(&absolute_dir)
-      })))
-  } else {
-    None
-  };
+  for &(caption, paths) in &[("Include path", env.config.include_paths()),
+                             ("Lib path", env.config.lib_paths()),
+                             ("Target include path", env.config.target_include_paths())] {
+    for path in paths {
+      if !path.is_absolute() {
+        return Err(format!("{} is not absolute: {}", caption, path.display()).into());
+      }
+      if !path.exists() {
+        return Err(format!("{} does not exist: {}", caption, path.display()).into());
+      }
+      if !path.is_dir() {
+        return Err(format!("{} is not a directory: {}", caption, path.display()).into());
+      }
+    }
+  }
+  let mut cpp_lib_dirs = Vec::from(env.config.lib_paths());
+  let mut include_dirs = Vec::from(env.config.include_paths());
+  let mut target_include_dirs = Vec::from(env.config.target_include_paths());
   let mut framework_dirs = Vec::new();
   let mut link_items = Vec::new();
   if is_qt_library {
@@ -156,25 +158,22 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     cpp_lib_dirs.push(qt_install_libs_path.clone());
     include_dirs.push(qt_install_headers_path.clone());
 
-    if lib_spec.cpp.name.starts_with("Qt5") {
-      let dir = qt_install_headers_path.with_added(format!("Qt{}", &lib_spec.cpp.name[3..]));
+    if input_cargo_toml_data.cpp_lib_name.starts_with("Qt5") {
+      let dir = qt_install_headers_path.with_added(format!("Qt{}", &input_cargo_toml_data.cpp_lib_name[3..]));
       if dir.exists() {
         qt_this_lib_headers_dir = Some(dir.clone());
         include_dirs.push(dir.clone());
-        if target_include_dirs.is_none() {
-          target_include_dirs = Some(vec![dir]);
-        }
+        target_include_dirs.push(dir);
       } else {
-        let dir2 = qt_install_libs_path.with_added(format!("Qt{}.framework/Headers", &lib_spec.cpp.name[3..]));
+        let dir2 = qt_install_libs_path.with_added(format!("Qt{}.framework/Headers",
+                              &input_cargo_toml_data.cpp_lib_name[3..]));
         if dir2.exists() {
           qt_this_lib_headers_dir = Some(dir2.clone());
           include_dirs.push(dir2.clone());
-          if target_include_dirs.is_none() {
-            target_include_dirs = Some(vec![dir2]);
-          }
+          target_include_dirs.push(dir2);
           framework_dirs.push(qt_install_libs_path.clone());
           link_items.push(RustLinkItem {
-            name: format!("Qt{}", &lib_spec.cpp.name[3..]),
+            name: format!("Qt{}", &input_cargo_toml_data.cpp_lib_name[3..]),
             kind: RustLinkKind::Framework,
           });
         } else {
@@ -185,30 +184,12 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       }
     }
   }
-  if let Some(ref spec_include_dirs) = lib_spec.cpp.include_dirs {
-    for dir in spec_include_dirs {
-      let absolute_dir = source_dir_path.with_added(dir);
-      if !absolute_dir.exists() {
-        return Err(format!("Include dir does not exist: {}", absolute_dir.display()).into());
-      }
-      include_dirs.push(try!(canonicalize(&absolute_dir)));
-    }
-  }
-  if let Some(ref spec_lib_dirs) = lib_spec.cpp.lib_dirs {
-    for dir in spec_lib_dirs {
-      let absolute_dir = source_dir_path.with_added(dir);
-      if !absolute_dir.exists() {
-        return Err(format!("Library dir does not exist: {}", absolute_dir.display()).into());
-      }
-      cpp_lib_dirs.push(try!(canonicalize(&absolute_dir)));
-    }
-  }
   if framework_dirs.is_empty() {
     link_items.push(RustLinkItem {
-      name: lib_spec.cpp.name.clone(),
+      name: input_cargo_toml_data.cpp_lib_name.clone(),
       kind: RustLinkKind::SharedLibrary,
     });
-    for name in lib_spec.cpp.extra_libs.as_ref().unwrap_or(&Vec::new()) {
+    for name in env.config.extra_libs() {
       if is_msvc() && name == "GL" {
         // msvc doesn't need to link to GL
         // TODO: allow platform-specific link items in manifest (#14)
@@ -222,7 +203,8 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
   }
   let qt_doc_data = if is_qt_library {
     // TODO: find a better way to specify doc source (#35)
-    let env_var_name = format!("{}_DOC_DATA", lib_spec.cpp.name.to_uppercase());
+    let env_var_name = format!("{}_DOC_DATA",
+                               input_cargo_toml_data.cpp_lib_name.to_uppercase());
     if let Ok(env_var_value) = env::var(&env_var_name) {
       log::info(format!("Loading Qt doc data from {}", &env_var_value));
       match QtDocData::new(&PathBuf::from(&env_var_value)) {
@@ -286,7 +268,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
         try!(cpp_parser::run(cpp_parser::CppParserConfig {
                                include_dirs: include_dirs.clone(),
                                framework_dirs: framework_dirs.clone(),
-                               header_name: lib_spec.cpp.include_file.clone(),
+                               include_directives: Vec::from(env.config.include_directives()),
                                target_include_dirs: target_include_dirs,
                                tmp_cpp_path: output_dir_path.with_added("1.cpp"),
                                name_blacklist: lib_spec.cpp
@@ -320,35 +302,36 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     try!(create_dir_all(&c_lib_tmp_path));
     log::info(format!("Generating C wrapper library ({}).", c_lib_name));
 
-    let cpp_ffi_headers = try!(cpp_ffi_generator::run(&parse_result, lib_spec.cpp.clone())
+    let cpp_ffi_headers = try!(cpp_ffi_generator::run(&parse_result,
+                                                      lib_spec.cpp.clone(),
+                                                      input_cargo_toml_data.cpp_lib_name.clone())
       .chain_err(|| "FFI generator failed"));
 
-    let mut cpp_libs = Vec::new();
+    let mut cpp_libs_for_shared_c_lib = Vec::new();
     if c_lib_is_shared {
-
-      for spec in dependencies.iter()
-        .map(|dep| &dep.rust_export_info.lib_spec)
-        .chain(once(&lib_spec)) {
-        cpp_libs.push(spec.cpp.name.clone());
-        if let Some(ref extra_libs) = spec.cpp.extra_libs {
-          for name in extra_libs {
-            if is_msvc() && name == "GL" {
-              continue;
-            }
-            cpp_libs.push(name.clone());
-          }
+      let mut add_lib = |c: &String| {
+        if !(is_msvc() && c == "GL") {
+          cpp_libs_for_shared_c_lib.push(c.clone());
+        }
+      };
+      for extra_lib in env.config.extra_libs() {
+        add_lib(extra_lib);
+      }
+      for dep in &dependencies {
+        for extra_lib in &dep.rust_export_info.extra_libs {
+          add_lib(extra_lib);
         }
       }
     }
     let code_gen = CppCodeGenerator::new(c_lib_name.clone(),
                                          c_lib_tmp_path.clone(),
                                          c_lib_is_shared,
-                                         cpp_libs);
+                                         cpp_libs_for_shared_c_lib);
     let include_dirs_str = try!(include_dirs.iter()
       .map_if_ok(|x| -> Result<_> { Ok(try!(path_to_str(x)).to_string()) }));
     let framework_dirs_str = try!(framework_dirs.iter()
       .map_if_ok(|x| -> Result<_> { Ok(try!(path_to_str(x)).to_string()) }));
-    try!(code_gen.generate_template_files(&lib_spec.cpp.include_file,
+    try!(code_gen.generate_template_files(env.config.include_directives(),
                                           &include_dirs_str,
                                           &framework_dirs_str));
     try!(code_gen.generate_files(&cpp_ffi_headers));
@@ -431,7 +414,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
                      &RustExportInfo {
                        crate_name: input_cargo_toml_data.name.clone(),
                        rust_types: rust_data.processed_types,
-                       lib_spec: lib_spec.clone(),
+                       extra_libs: Vec::from(env.config.extra_libs()),
                      }));
       log::info(format!("Rust export info is saved to file: {}",
                         rust_export_path.display()));

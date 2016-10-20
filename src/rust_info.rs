@@ -219,6 +219,9 @@ pub struct RustModule {
   pub submodules: Vec<RustModule>,
 }
 
+
+use std::path::PathBuf;
+
 pub struct InputCargoTomlData {
   /// Name of the crate
   pub name: String,
@@ -226,10 +229,9 @@ pub struct InputCargoTomlData {
   pub version: String,
   /// Authors of the crate
   pub authors: Vec<String>,
+  /// Name of the C++ library
+  pub cpp_lib_name: String,
 }
-
-use std::path::PathBuf;
-
 
 
 impl InputCargoTomlData {
@@ -256,6 +258,11 @@ impl InputCargoTomlData {
         }))
       } else {
         Vec::new()
+      },
+      cpp_lib_name: {
+        let links = try!(package.get("links")
+          .chain_err(|| "'package.links' field not found in Cargo.toml"));
+        try!(links.as_str().chain_err(|| "'package.links' must be a string")).to_string()
       },
     })
   }

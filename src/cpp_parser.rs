@@ -111,10 +111,10 @@ pub struct CppParserConfig {
   /// Frameworks passed to clang
   pub framework_dirs: Vec<PathBuf>,
   /// Header name used in #include statement
-  pub header_name: String,
+  pub include_directives: Vec<PathBuf>,
   /// Directory containing headers of the target library.
   /// Only entities declared within this directory will be processed.
-  pub target_include_dirs: Option<Vec<PathBuf>>,
+  pub target_include_dirs: Vec<PathBuf>,
   pub tmp_cpp_path: PathBuf,
   pub name_blacklist: Vec<String>,
 }
@@ -147,7 +147,9 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
   let index = Index::new(&clang, false, false);
   {
     let mut tmp_file = try!(create_file(&config.tmp_cpp_path));
-    try!(tmp_file.write(format!("#include \"{}\"\n", config.header_name)));
+    for directive in &config.include_directives {
+      try!(tmp_file.write(format!("#include \"{}\"\n", try!(path_to_str(directive)))));
+    }
     if let Some(cpp_code) = cpp_code {
       try!(tmp_file.write(cpp_code));
     }
@@ -1326,11 +1328,10 @@ impl<'a> CppParser<'a> {
       }
       if let Ok(file_path) = self.entity_include_path(entity) {
         let file_path_buf = PathBuf::from(&file_path);
-        if let Some(ref target_include_dirs) = self.config.target_include_dirs {
-          if target_include_dirs.iter().find(|x| file_path_buf.starts_with(x)).is_none() {
-            log::noisy(format!("skipping entities from {}", file_path));
-            return false;
-          }
+        if !self.config.target_include_dirs.is_empty() &&
+           !self.config.target_include_dirs.iter().any(|x| file_path_buf.starts_with(x)) {
+          log::noisy(format!("skipping entities from {}", file_path));
+          return false;
         }
       }
       if self.config.name_blacklist.iter().any(|x| x == &full_name) {

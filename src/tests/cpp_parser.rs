@@ -11,6 +11,8 @@ use cpp_type::*;
 use cpp_operator::CppOperator;
 use file_utils::{create_dir, create_file, PathBufWithAdded};
 
+use std::path::PathBuf;
+
 fn run_parser(code: &'static str) -> CppData {
   let dir = tempdir::TempDir::new("test_cpp_parser_run").unwrap();
   let include_dir = dir.path().with_added("include");
@@ -24,8 +26,8 @@ fn run_parser(code: &'static str) -> CppData {
   }
   let mut result = cpp_parser::run(cpp_parser::CppParserConfig {
                                      include_dirs: vec![include_dir],
-                                     header_name: include_name.to_string(),
-                                     target_include_dirs: None,
+                                     include_directives: vec![PathBuf::from(include_name)],
+                                     target_include_dirs: Vec::new(),
                                      tmp_cpp_path: dir.path().with_added("1.cpp"),
                                      name_blacklist: Vec::new(),
                                      framework_dirs: Vec::new(),

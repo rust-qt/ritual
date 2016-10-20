@@ -6,7 +6,7 @@
 // placement new statements require this
 #include <new>
 
-#include "{cpp_lib_include_file}"
+{include_directives_code}
 
 #include "{lib_name_lowercase}_exports.h"
 

@@ -546,30 +546,6 @@ pub struct CppType {
 #[derive(Debug, Clone)]
 #[derive(Serialize, Deserialize)]
 pub struct CppLibSpec {
-  /// Name of C++ library used as "-l" option to linker.
-  pub name: String,
-  // TODO: "name" field is duplicated in "links" field of Cargo.toml
-  /// Other libraries that need to be linked.
-  /// Used as "-l" option to linker.
-  pub extra_libs: Option<Vec<String>>,
-  /// Paths to include directories supplied to the C++ parser
-  /// and compiler of the C++ wrapper via '-I' option.
-  /// This is detected automatically for Qt libraries using qmake.
-  /// Paths can be relative to lib spec file's directory.
-  pub include_dirs: Option<Vec<String>>,
-  /// Paths to include directories of the library.
-  /// Only types and methods declared within these directories
-  /// will be parsed.
-  /// This is detected automatically for Qt libraries using qmake.
-  /// Paths can be relative to lib spec file's directory.
-  pub target_include_dirs: Option<Vec<String>>,
-  /// Paths to library directories supplied to the linker
-  /// via '-L' option or environment variables.
-  /// This is detected automatically for Qt libraries using qmake.
-  /// Paths can be relative to lib spec file's directory.
-  pub lib_dirs: Option<Vec<String>>,
-  /// Name of the library's include file
-  pub include_file: String,
   /// List of C++ identifiers which should be skipped
   /// by C++ parser. Identifier can contain namespaces
   /// and nested classes, with "::" separator (like in
@@ -644,6 +620,8 @@ pub struct RustProcessedTypeInfo {
   pub rust_name: RustName,
 }
 
+
+
 /// Exported information about generated crate
 #[derive(Debug, Clone)]
 #[derive(Serialize, Deserialize)]
@@ -652,6 +630,7 @@ pub struct RustExportInfo {
   pub crate_name: String,
   /// List of generated types
   pub rust_types: Vec<RustProcessedTypeInfo>,
-  /// Original lib spec
-  pub lib_spec: LibSpec,
+
+  /// As in `Config`
+  pub extra_libs: Vec<String>,
 }

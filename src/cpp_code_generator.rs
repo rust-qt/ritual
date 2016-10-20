@@ -3,9 +3,12 @@ use cpp_ffi_generator::CppFfiHeaderData;
 use cpp_method::ReturnValueAllocationPlace;
 use cpp_type::{CppTypeIndirection, CppTypeBase};
 use errors::{Result, ChainErr, unexpected};
-use file_utils::{PathBufWithAdded, create_dir_all, create_file};
+use file_utils::{PathBufWithAdded, create_dir_all, create_file, path_to_str};
 use log;
 use string_utils::JoinWithString;
+use utils::MapIfOk;
+
+use std::path::PathBuf;
 
 /// Generates C++ code for the C wrapper library.
 pub struct CppCodeGenerator {
@@ -251,7 +254,7 @@ impl CppCodeGenerator {
 
   /// Generates main files and directories of the library.
   pub fn generate_template_files(&self,
-                                 cpp_lib_include_file: &str,
+                                 include_directives: &[PathBuf],
                                  include_directories: &[String],
                                  framework_directories: &[String])
                                  -> Result<()> {
@@ -291,12 +294,17 @@ impl CppCodeGenerator {
     try!(exports_file.write(format!(include_str!("../templates/c_lib/exports.h"),
                                     lib_name_uppercase = name_upper)));
 
+    let include_directives_code = try!(include_directives.map_if_ok(|d| -> Result<_> {
+        Ok(format!("#include \"{}\"", try!(path_to_str(d))))
+      }))
+      .join("\n");
+
     let global_file_path = include_dir.with_added(format!("{}_global.h", &self.lib_name));
     let mut global_file = try!(create_file(&global_file_path));
     try!(global_file.write(format!(include_str!("../templates/c_lib/global.h"),
                                    lib_name_lowercase = &self.lib_name,
                                    lib_name_uppercase = name_upper,
-                                   cpp_lib_include_file = cpp_lib_include_file)));
+                                   include_directives_code = include_directives_code)));
     Ok(())
   }
 

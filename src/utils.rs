@@ -95,12 +95,11 @@ pub trait MapIfOk<A> {
                                                             -> std::result::Result<Vec<B>, E>;
 }
 
-impl<A, T: Iterator<Item = A>> MapIfOk<A> for T {
+impl<A, T: IntoIterator<Item = A>> MapIfOk<A> for T {
   fn map_if_ok<B, E, F: Fn(A) -> std::result::Result<B, E>>(self,
                                                             f: F)
                                                             -> std::result::Result<Vec<B>, E> {
     let mut r = Vec::new();
-    r.reserve(self.size_hint().0);
     for item in self {
       r.push(try!(f(item)));
     }
