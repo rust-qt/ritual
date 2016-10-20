@@ -546,15 +546,6 @@ pub struct CppType {
 #[derive(Debug, Clone)]
 #[derive(Serialize, Deserialize)]
 pub struct CppLibSpec {
-  /// List of C++ identifiers which should be skipped
-  /// by C++ parser. Identifier can contain namespaces
-  /// and nested classes, with "::" separator (like in
-  /// C++ identifiers). Identifier may refer to a method,
-  /// a class, a enum or a namespace. All entities inside blacklisted
-  /// entity (e.g. methods of a class and content of a namespace)
-  /// will also be skipped.
-  pub name_blacklist: Option<Vec<String>>,
-
   /// List of include file names that should be skipped during FFI generation.
   pub include_file_blacklist: Option<Vec<String>>,
   /// List of methods that should be skipped during FFI generation.

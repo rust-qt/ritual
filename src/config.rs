@@ -28,6 +28,16 @@ pub struct Config {
   // TODO: allow both dirs and files in target_include_paths
   /// Name of the library's include file
   include_directives: Vec<PathBuf>,
+
+  /// List of C++ identifiers which should be skipped
+  /// by C++ parser. Identifier can contain namespaces
+  /// and nested classes, with "::" separator (like in
+  /// C++ identifiers). Identifier may refer to a method,
+  /// a class, a enum or a namespace. All entities inside blacklisted
+  /// entity (e.g. the methods of a blocked class or
+  /// the contents of a blocked namespace)
+  /// will also be skipped.
+  cpp_parser_blocked_names: Vec<String>,
 }
 
 impl Config {
@@ -38,6 +48,19 @@ impl Config {
 
   pub fn add_extra_lib<P: Into<String>>(&mut self, lib: P) {
     self.extra_libs.push(lib.into());
+  }
+
+  pub fn add_cpp_parser_blocked_name<P: Into<String>>(&mut self, lib: P) {
+    self.cpp_parser_blocked_names.push(lib.into());
+  }
+
+  pub fn add_cpp_parser_blocked_names<Item, Iter>(&mut self, items: Iter)
+    where Item: Into<String>,
+          Iter: IntoIterator<Item = Item>
+  {
+    for item in items {
+      self.cpp_parser_blocked_names.push(item.into());
+    }
   }
 
   pub fn add_include_path<P: Into<PathBuf>>(&mut self, path: P) {
@@ -62,6 +85,10 @@ impl Config {
 
   pub fn extra_libs(&self) -> &[String] {
     &self.extra_libs
+  }
+
+  pub fn cpp_parser_blocked_names(&self) -> &[String] {
+    &self.cpp_parser_blocked_names
   }
 
   pub fn include_paths(&self) -> &[PathBuf] {

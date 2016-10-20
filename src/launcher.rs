@@ -271,10 +271,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
                                include_directives: Vec::from(env.config.include_directives()),
                                target_include_dirs: target_include_dirs,
                                tmp_cpp_path: output_dir_path.with_added("1.cpp"),
-                               name_blacklist: lib_spec.cpp
-                                 .name_blacklist
-                                 .clone()
-                                 .unwrap_or_default(),
+                               name_blacklist: Vec::from(env.config.cpp_parser_blocked_names()),
                              },
                              &dependencies.iter().map(|x| &x.cpp_data).collect::<Vec<_>>())
           .chain_err(|| "C++ parser failed"));
