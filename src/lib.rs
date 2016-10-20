@@ -29,7 +29,7 @@ mod cpp_type;
 mod cpp_operator;
 mod dependency_info;
 mod doc_formatter;
-mod errors;
+pub mod errors;
 mod file_utils;
 pub mod launcher;
 pub mod log;

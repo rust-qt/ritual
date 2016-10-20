@@ -301,7 +301,8 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
 
     let cpp_ffi_headers = try!(cpp_ffi_generator::run(&parse_result,
                                                       lib_spec.cpp.clone(),
-                                                      input_cargo_toml_data.cpp_lib_name.clone())
+                                                      input_cargo_toml_data.cpp_lib_name.clone(),
+                                                      env.config.cpp_ffi_generator_filter())
       .chain_err(|| "FFI generator failed"));
 
     let mut cpp_libs_for_shared_c_lib = Vec::new();

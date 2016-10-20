@@ -1,5 +1,17 @@
 use std::path::PathBuf;
 use errors::Result;
+use cpp_method::CppMethod;
+
+pub type CppFfiGeneratorFilterFn = Fn(&CppMethod) -> Result<bool>;
+
+#[derive(Default)]
+struct CppFfiGeneratorFilter(Option<Box<CppFfiGeneratorFilterFn>>);
+
+impl ::std::fmt::Debug for CppFfiGeneratorFilter {
+  fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::result::Result<(), ::std::fmt::Error> {
+    write!(f, "{}", if self.0.is_some() { "Some(fn)" } else { "None" })
+  }
+}
 
 #[derive(Default, Debug)]
 pub struct Config {
@@ -38,6 +50,8 @@ pub struct Config {
   /// the contents of a blocked namespace)
   /// will also be skipped.
   cpp_parser_blocked_names: Vec<String>,
+
+  cpp_ffi_generator_filter: CppFfiGeneratorFilter,
 }
 
 impl Config {
@@ -79,6 +93,10 @@ impl Config {
     self.include_directives.push(path.into());
   }
 
+  pub fn set_cpp_ffi_generator_filter(&mut self, f: Box<CppFfiGeneratorFilterFn>) {
+    self.cpp_ffi_generator_filter.0 = Some(f);
+  }
+
   pub fn exec(self) -> Result<()> {
     ::launcher::run_from_build_script(self)
   }
@@ -105,5 +123,9 @@ impl Config {
 
   pub fn include_directives(&self) -> &[PathBuf] {
     &self.include_directives
+  }
+
+  pub fn cpp_ffi_generator_filter(&self) -> Option<&Box<CppFfiGeneratorFilterFn>> {
+    self.cpp_ffi_generator_filter.0.as_ref()
   }
 }

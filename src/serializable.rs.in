@@ -548,11 +548,6 @@ pub struct CppType {
 pub struct CppLibSpec {
   /// List of include file names that should be skipped during FFI generation.
   pub include_file_blacklist: Option<Vec<String>>,
-  /// List of methods that should be skipped during FFI generation.
-  /// Each entry can be either full name of the method (including class name and namespace),
-  /// signature of the method (as returned by CppMethod::short_text) or
-  /// full name of a class.
-  pub ffi_methods_blacklist: Option<Vec<String>>,
 }
 
 /// Information loaded from lib spec file.

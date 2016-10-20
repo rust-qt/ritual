@@ -2,10 +2,11 @@ use caption_strategy::MethodCaptionStrategy;
 use cpp_data::{CppData, CppVisibility};
 use cpp_ffi_data::{CppAndFfiMethod, c_base_name};
 use cpp_method::{CppMethod, CppMethodKind};
-use errors::{Result, unexpected};
+use errors::{Result, ChainErr, unexpected};
 use log;
 use serializable::CppLibSpec;
 use utils::add_to_multihash;
+use config::CppFfiGeneratorFilterFn;
 
 use std::collections::{HashSet, HashMap};
 
@@ -13,6 +14,7 @@ struct CGenerator<'a> {
   cpp_data: &'a CppData,
   cpp_lib_spec: CppLibSpec,
   cpp_lib_name: String,
+  filter: Option<&'a Box<CppFfiGeneratorFilterFn>>,
 }
 
 #[derive(Debug, Clone)]
@@ -30,12 +32,14 @@ pub struct CppAndFfiData {
 /// Runs FFI generator
 pub fn run(cpp_data: &CppData,
            cpp_lib_spec: CppLibSpec,
-           cpp_lib_name: String)
+           cpp_lib_name: String,
+           filter: Option<&Box<CppFfiGeneratorFilterFn>>)
            -> Result<Vec<CppFfiHeaderData>> {
   let generator = CGenerator {
     cpp_data: cpp_data,
     cpp_lib_spec: cpp_lib_spec,
     cpp_lib_name: cpp_lib_name,
+    filter: filter,
   };
 
   let mut c_headers = Vec::new();
@@ -79,21 +83,26 @@ pub fn run(cpp_data: &CppData,
 impl<'a> CGenerator<'a> {
   /// Returns false if the method is excluded from processing
   /// for some reason
-  fn should_process_method(&self, method: &CppMethod) -> bool {
-    let full_name = method.full_name();
-    let short_text = method.short_text();
+  fn should_process_method(&self, method: &CppMethod) -> Result<bool> {
+    // let full_name = method.full_name();
+    // let short_text = method.short_text();
     let class_name = method.class_name().unwrap_or(&String::new()).clone();
-    log::debug(format!("method name: {}", full_name));
-    log::debug(format!(" short_text: {}", short_text));
-    if let Some(ref ffi_methods_blacklist) = self.cpp_lib_spec.ffi_methods_blacklist {
-      if ffi_methods_blacklist.iter()
-        .any(|x| x == &full_name || x == &short_text || x == &class_name) {
-        log::noisy(format!("Skipping blacklisted method: \n{}\n", method.short_text()));
-        return false;
+    // log::debug(format!("method name: {}", full_name));
+    // log::debug(format!(" short_text: {}", short_text));
+    // if let Some(ref ffi_methods_blacklist) = self.cpp_lib_spec.ffi_methods_blacklist {
+    // if ffi_methods_blacklist.iter()
+    // .any(|x| x == &full_name || x == &short_text || x == &class_name) {
+    // }
+    // }
+    if let Some(filter) = self.filter {
+      let allowed = try!(filter(method).chain_err(|| "cpp_ffi_generator_filter failed"));
+      if !allowed {
+        log::info(format!("Skipping blacklisted method: \n{}\n", method.short_text()));
+        return Ok(false);
       }
     }
     if class_name == "QFlags" {
-      return false;
+      return Ok(false);
     }
     if let Some(ref membership) = method.class_membership {
       if membership.kind == CppMethodKind::Constructor &&
@@ -101,37 +110,37 @@ impl<'a> CGenerator<'a> {
         log::noisy(format!("Method is skipped:\n{}\nConstructors are not allowed for abstract \
                             classes.\n",
                            method.short_text()));
-        return false;
+        return Ok(false);
       }
       if membership.visibility == CppVisibility::Private {
-        return false;
+        return Ok(false);
       }
       if membership.visibility == CppVisibility::Protected {
         log::noisy(format!("Skipping protected method: \n{}\n", method.short_text()));
-        return false;
+        return Ok(false);
       }
       if membership.is_signal {
         log::warning(format!("Skipping signal: \n{}\n", method.short_text()));
-        return false;
+        return Ok(false);
       }
     }
     if method.template_arguments.is_some() {
       log::noisy(format!("Skipping template method: \n{}\n", method.short_text()));
-      return false;
+      return Ok(false);
     }
     if method.template_arguments_values.is_some() {
       // TODO: re-enable after template test compilation (#24) is implemented
       log::noisy(format!("Skipping template method: \n{}\n", method.short_text()));
-      return false;
+      return Ok(false);
     }
     if method.all_involved_types()
       .iter()
       .any(|x| x.base.is_or_contains_template_parameter()) {
       log::noisy(format!("Skipping method containing template parameters: \n{}\n",
                          method.short_text()));
-      return false;
+      return Ok(false);
     }
-    true
+    Ok(true)
   }
 
   /// Generates FFI wrappers for all specified methods,
@@ -144,7 +153,7 @@ impl<'a> CGenerator<'a> {
     log::info(format!("Generating C++ FFI methods for header: {}", include_file));
     let mut hash_name_to_methods: HashMap<String, Vec<_>> = HashMap::new();
     for method in methods {
-      if !self.should_process_method(method) {
+      if !try!(self.should_process_method(method)) {
         continue;
       }
       match method.to_ffi_signatures() {

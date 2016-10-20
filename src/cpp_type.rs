@@ -135,6 +135,18 @@ impl CppTypeClassBase {
       },
     })
   }
+
+  pub fn to_cpp_pseudo_code(&self) -> String {
+    if let Some(ref template_arguments) = self.template_arguments {
+      format!("{}<{}>",
+              self.name,
+              template_arguments.iter()
+                .map(|x| x.to_cpp_pseudo_code())
+                .join(", "))
+    } else {
+      self.name.clone()
+    }
+  }
 }
 
 impl CppTypeBase {
@@ -259,15 +271,7 @@ impl CppTypeBase {
       CppTypeBase::TemplateParameter { ref nested_level, ref index } => {
         return format!("T_{}_{}", nested_level, index);
       }
-      CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) => {
-        if let Some(ref template_arguments) = *template_arguments {
-          return format!("{}<{}>",
-                         name,
-                         template_arguments.iter()
-                           .map(|x| x.to_cpp_pseudo_code())
-                           .join(", "));
-        }
-      }
+      CppTypeBase::Class(ref base) => return base.to_cpp_pseudo_code(),
       CppTypeBase::FunctionPointer { .. } => {
         return self.to_cpp_code(Some(&"FN_PTR".to_string())).unwrap_or_else(|_| "[?]".to_string())
       }
