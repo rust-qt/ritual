@@ -595,5 +595,6 @@ pub struct RustExportInfo {
   pub rust_types: Vec<RustProcessedTypeInfo>,
 
   /// As in `Config`
-  pub extra_libs: Vec<String>,
+  pub linked_libs: Vec<String>,
+  pub linked_frameworks: Vec<String>,
 }

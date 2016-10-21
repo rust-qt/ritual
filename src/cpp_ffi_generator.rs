@@ -11,7 +11,7 @@ use std::collections::{HashSet, HashMap};
 
 struct CGenerator<'a> {
   cpp_data: &'a CppData,
-  cpp_lib_name: String,
+  c_lib_name: String,
   filter: Option<&'a Box<CppFfiGeneratorFilterFn>>,
 }
 
@@ -29,12 +29,12 @@ pub struct CppAndFfiData {
 
 /// Runs FFI generator
 pub fn run(cpp_data: &CppData,
-           cpp_lib_name: String,
+           c_lib_name: String,
            filter: Option<&Box<CppFfiGeneratorFilterFn>>)
            -> Result<Vec<CppFfiHeaderData>> {
   let generator = CGenerator {
     cpp_data: cpp_data,
-    cpp_lib_name: cpp_lib_name,
+    c_lib_name: c_lib_name,
     filter: filter,
   };
 
@@ -165,7 +165,7 @@ impl<'a> CGenerator<'a> {
               Ok(name) => {
 
                 add_to_multihash(&mut hash_name_to_methods,
-                                 format!("{}_{}", &self.cpp_lib_name, name),
+                                 format!("{}_{}", &self.c_lib_name, name),
                                  result);
               }
             }

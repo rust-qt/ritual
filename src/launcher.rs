@@ -11,15 +11,14 @@ use file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_j
                  remove_dir_all, remove_dir, read_dir, path_to_str};
 use log;
 use qt_doc_parser::QtDocData;
-use qt_specific;
 use rust_code_generator::{RustCodeGeneratorDependency, RustLinkItem, RustLinkKind};
 use rust_code_generator;
 use rust_generator;
 use rust_info::{InputCargoTomlData, RustExportInfo};
-use utils::{is_msvc, run_command, MapIfOk};
+use string_utils::JoinWithString;
+use utils::{is_msvc, MapIfOk};
 
 use std::path::PathBuf;
-use std::process::Command;
 use std::env;
 
 pub enum BuildProfile {
@@ -95,18 +94,13 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       .into());
   }
   let input_cargo_toml_data = try!(InputCargoTomlData::from_file(&input_cargo_toml_path));
-  if input_cargo_toml_data.cpp_lib_name == input_cargo_toml_data.name {
-    return Err(format!("Rust crate name ({}) must not be the same as C++ library name ({}) \
-            because it can cause library name conflict.",
-                       input_cargo_toml_data.name,
-                       input_cargo_toml_data.cpp_lib_name)
+  if env.config.linked_libs().iter().any(|x| x == &input_cargo_toml_data.name) {
+    return Err(format!("Rust crate name ({}) must not be the same as linked library name \
+            because it can cause library name conflict and linker failure.",
+                       input_cargo_toml_data.name)
       .into());
   }
-  log::info(format!("C++ library name: {}", input_cargo_toml_data.cpp_lib_name));
 
-  let is_qt_library = input_cargo_toml_data.cpp_lib_name.starts_with("Qt5");
-
-  let mut qt_this_lib_headers_dir = None;
   for &(caption, paths) in &[("Include path", env.config.include_paths()),
                              ("Lib path", env.config.lib_paths()),
                              ("Target include path", env.config.target_include_paths())] {
@@ -122,80 +116,38 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       }
     }
   }
-  let mut cpp_lib_dirs = Vec::from(env.config.lib_paths());
-  let mut include_dirs = Vec::from(env.config.include_paths());
-  let mut target_include_dirs = Vec::from(env.config.target_include_paths());
-  let mut framework_dirs = Vec::new();
+  let cpp_lib_dirs = Vec::from(env.config.lib_paths());
+  let framework_dirs = Vec::from(env.config.framework_paths());
+  let include_dirs = Vec::from(env.config.include_paths());
+  let target_include_dirs = Vec::from(env.config.target_include_paths());
   let mut link_items = Vec::new();
-  if is_qt_library {
-
-    let qmake_path = "qmake".to_string();
-    log::info("Detecting Qt directories...");
-    let result1 = try!(run_command(Command::new(&qmake_path)
-                                     .arg("-query")
-                                     .arg("QT_INSTALL_HEADERS"),
-                                   true,
-                                   true));
-    let qt_install_headers_path = PathBuf::from(result1.trim());
-    log::info(format!("QT_INSTALL_HEADERS = \"{}\"",
-                      qt_install_headers_path.display()));
-    let result2 = try!(run_command(Command::new(&qmake_path)
-                                     .arg("-query")
-                                     .arg("QT_INSTALL_LIBS"),
-                                   true,
-                                   true));
-    let qt_install_libs_path = PathBuf::from(result2.trim());
-    log::info(format!("QT_INSTALL_LIBS = \"{}\"", qt_install_libs_path.display()));
-    cpp_lib_dirs.push(qt_install_libs_path.clone());
-    include_dirs.push(qt_install_headers_path.clone());
-
-    if input_cargo_toml_data.cpp_lib_name.starts_with("Qt5") {
-      let dir = qt_install_headers_path.with_added(format!("Qt{}", &input_cargo_toml_data.cpp_lib_name[3..]));
-      if dir.exists() {
-        qt_this_lib_headers_dir = Some(dir.clone());
-        include_dirs.push(dir.clone());
-        target_include_dirs.push(dir);
-      } else {
-        let dir2 = qt_install_libs_path.with_added(format!("Qt{}.framework/Headers",
-                              &input_cargo_toml_data.cpp_lib_name[3..]));
-        if dir2.exists() {
-          qt_this_lib_headers_dir = Some(dir2.clone());
-          include_dirs.push(dir2.clone());
-          target_include_dirs.push(dir2);
-          framework_dirs.push(qt_install_libs_path.clone());
-          link_items.push(RustLinkItem {
-            name: format!("Qt{}", &input_cargo_toml_data.cpp_lib_name[3..]),
-            kind: RustLinkKind::Framework,
-          });
-        } else {
-          log::warning(format!("extra header dir not found (tried: {}, {})",
-                               dir.display(),
-                               dir2.display()));
-        }
-      }
-    }
-  }
-  if framework_dirs.is_empty() {
+  for item in env.config.linked_libs() {
+    // TODO: exclude GL if msvc in qt_gui build script
     link_items.push(RustLinkItem {
-      name: input_cargo_toml_data.cpp_lib_name.clone(),
+      name: item.to_string(),
       kind: RustLinkKind::SharedLibrary,
     });
-    for name in env.config.extra_libs() {
-      if is_msvc() && name == "GL" {
-        // msvc doesn't need to link to GL
-        // TODO: allow platform-specific link items in manifest (#14)
-        continue;
-      }
-      link_items.push(RustLinkItem {
-        name: name.clone(),
-        kind: RustLinkKind::SharedLibrary,
-      });
-    }
   }
+  for item in env.config.linked_frameworks() {
+    link_items.push(RustLinkItem {
+      name: item.to_string(),
+      kind: RustLinkKind::Framework,
+    });
+  }
+  if !link_items.iter().any(|x| &x.name == &input_cargo_toml_data.links) {
+    return Err(format!("Value of 'links' field in Cargo.toml ({}) must be one of \
+      linked libraries or frameworks ({}).",
+                       input_cargo_toml_data.links,
+                       link_items.iter().map(|x| &x.name).join(", "))
+      .into());
+  }
+
+  // TODO: move other effects of this var to qt_build_tools
+  let is_qt_library = link_items.iter().any(|x| x.name.starts_with("Qt"));
+
   let qt_doc_data = if is_qt_library {
     // TODO: find a better way to specify doc source (#35)
-    let env_var_name = format!("{}_DOC_DATA",
-                               input_cargo_toml_data.cpp_lib_name.to_uppercase());
+    let env_var_name = format!("{}_DOC_DATA", "QT5CORE".to_uppercase());
     if let Ok(env_var_value) = env::var(&env_var_name) {
       log::info(format!("Loading Qt doc data from {}", &env_var_value));
       match QtDocData::new(&PathBuf::from(&env_var_value)) {
@@ -266,11 +218,8 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
                              },
                              &dependencies.iter().map(|x| &x.cpp_data).collect::<Vec<_>>())
           .chain_err(|| "C++ parser failed"));
-      if is_qt_library {
-        if let Some(ref qt_this_lib_headers_dir) = qt_this_lib_headers_dir {
-          try!(qt_specific::fix_header_names(&mut parse_result, qt_this_lib_headers_dir)
-            .chain_err(|| "qt fix_header_names failed"));
-        }
+      if let Some(filter) = env.config.cpp_data_filter() {
+        try!(filter(&mut parse_result).chain_err(|| "cpp_data_filter failed"));
       }
       log::info("Post-processing parse result.");
       try!(parse_result.post_process(&dependencies.iter().map(|x| &x.cpp_data).collect::<Vec<_>>()));
@@ -291,23 +240,18 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     log::info(format!("Generating C wrapper library ({}).", c_lib_name));
 
     let cpp_ffi_headers = try!(cpp_ffi_generator::run(&parse_result,
-                                                      input_cargo_toml_data.cpp_lib_name.clone(),
+                                                      c_lib_name.clone(),
                                                       env.config.cpp_ffi_generator_filter())
       .chain_err(|| "FFI generator failed"));
 
     let mut cpp_libs_for_shared_c_lib = Vec::new();
     if c_lib_is_shared {
-      let mut add_lib = |c: &String| {
-        if !(is_msvc() && c == "GL") {
-          cpp_libs_for_shared_c_lib.push(c.clone());
-        }
-      };
-      for extra_lib in env.config.extra_libs() {
-        add_lib(extra_lib);
+      for lib in env.config.linked_libs() {
+        cpp_libs_for_shared_c_lib.push(lib.clone());
       }
       for dep in &dependencies {
-        for extra_lib in &dep.rust_export_info.extra_libs {
-          add_lib(extra_lib);
+        for lib in &dep.rust_export_info.linked_libs {
+          cpp_libs_for_shared_c_lib.push(lib.clone());
         }
       }
     }
@@ -402,7 +346,8 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
                      &RustExportInfo {
                        crate_name: input_cargo_toml_data.name.clone(),
                        rust_types: rust_data.processed_types,
-                       extra_libs: Vec::from(env.config.extra_libs()),
+                       linked_libs: Vec::from(env.config.linked_libs()),
+                       linked_frameworks: Vec::from(env.config.linked_frameworks()),
                      }));
       log::info(format!("Rust export info is saved to file: {}",
                         rust_export_path.display()));
