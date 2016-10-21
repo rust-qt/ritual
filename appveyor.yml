@@ -1,4 +1,4 @@
-build_script: scripts\appveyor.bat
+build_script: ci\appveyor\run.bat
 
 cache:
 - 'target'

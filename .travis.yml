@@ -10,9 +10,8 @@ matrix:
     dist: trusty
     script:
     - sudo apt-get install llvm-3.8 libclang-3.8-dev --yes --force-yes
-    - sudo apt-get install qt5-default --yes --force-yes
-    - scripts/travis.bash
+    - ci/travis/run.bash
   - <<: *common
     os: osx
-    script: scripts/travis.bash
+    script: ci/travis/run.bash
 
