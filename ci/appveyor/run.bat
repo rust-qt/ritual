@@ -1,7 +1,7 @@
 echo on
 setlocal EnableDelayedExpansion
 
-"APPVEYOR_BUILD_FOLDER\ci\appveyor\setup_rust.bash" || goto :error
+"%APPVEYOR_BUILD_FOLDER%\ci\appveyor\setup_rust.bash" || goto :error
 
 set CPP_TO_RUST_QUIET=1
 set RUST_BACKTRACE=1
