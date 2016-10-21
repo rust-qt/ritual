@@ -14,7 +14,7 @@ set PATH=C:\Qt\5.7\msvc2015_64\bin;%PATH%
 echo "Compiling and testing cpp_to_rust"
 cargo test || goto :error
 
-goto :eof
+exit /b 0
 
 :error
 echo "Failed (errorlevel = %errorlevel%)"

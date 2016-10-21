@@ -19,3 +19,9 @@ where rustc cargo || goto :error
 rustc -vV || goto :error
 cargo -vV || goto :error
 
+exit /b 0
+
+:error
+echo "Failed (errorlevel = %errorlevel%)"
+exit /b %errorlevel%
+
