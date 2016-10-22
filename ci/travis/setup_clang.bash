@@ -5,7 +5,7 @@
 set -o errexit
 
 if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-  DEST=$HOME/clang-3.8
+  CLANG_DIR=$HOME/clang-3.8
   cd "$HOME"
   echo "Downloading libclang"
   wget http://llvm.org/releases/3.8.0/clang+llvm-3.8.0-x86_64-apple-darwin.tar.xz -O - | tar -xJ
