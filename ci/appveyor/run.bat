@@ -9,7 +9,7 @@ set CPP_TO_RUST_QUIET=1
 set RUST_BACKTRACE=1
 
 echo "Compiling and testing cpp_to_rust"
-cargo test || goto :error
+cargo test -- --nocapture || goto :error
 
 exit /b 0
 

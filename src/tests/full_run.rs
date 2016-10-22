@@ -88,6 +88,6 @@ fn full_run() {
       let value = add_env_path_item(name, vec![cpp_install_lib_dir.clone()]).unwrap();
       command.env(name, value);
     }
-    run_command(&mut command, false, true).unwrap();
+    run_command(&mut command, false, false).unwrap();
   }
 }
