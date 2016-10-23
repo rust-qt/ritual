@@ -77,11 +77,13 @@ fn full_run() {
         .to_string())
       .unwrap();
   }
-  for cargo_cmd in &["build", "test", "doc"] {
+  for cargo_cmd in &["update", "build", "test", "doc"] {
     let mut command = Command::new("cargo");
     command.arg(cargo_cmd);
     command.arg("--verbose");
-    command.arg("-j1");
+    if *cargo_cmd != "update" {
+      command.arg("-j1");
+    }
     command.current_dir(&crate_dir);
 
     for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB", "PATH"] {

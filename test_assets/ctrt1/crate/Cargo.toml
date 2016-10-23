@@ -10,7 +10,4 @@ libc = "0.2"
 cpp_utils = "0.1"
 
 [build-dependencies]
-cpp_to_rust = "0.3"
-
-[replace]
-"cpp_to_rust:0.3.0" = { path = "../../.." }
+cpp_to_rust = { path = "../../.." }
