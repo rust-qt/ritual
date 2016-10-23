@@ -135,11 +135,10 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     });
   }
   if !link_items.iter().any(|x| &x.name == &input_cargo_toml_data.links) {
-    return Err(format!("Value of 'links' field in Cargo.toml ({}) must be one of \
+    log::warning(format!("Value of 'links' field in Cargo.toml ({}) should be one of \
       linked libraries or frameworks ({}).",
-                       input_cargo_toml_data.links,
-                       link_items.iter().map(|x| &x.name).join(", "))
-      .into());
+                         input_cargo_toml_data.links,
+                         link_items.iter().map(|x| &x.name).join(", ")));
   }
 
   // TODO: move other effects of this var to qt_build_tools
