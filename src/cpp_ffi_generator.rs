@@ -12,7 +12,7 @@ use std::collections::{HashSet, HashMap};
 struct CGenerator<'a> {
   cpp_data: &'a CppData,
   c_lib_name: String,
-  filter: Option<&'a Box<CppFfiGeneratorFilterFn>>,
+  filters: Vec<&'a Box<CppFfiGeneratorFilterFn>>,
 }
 
 #[derive(Debug, Clone)]
@@ -30,12 +30,12 @@ pub struct CppAndFfiData {
 /// Runs FFI generator
 pub fn run(cpp_data: &CppData,
            c_lib_name: String,
-           filter: Option<&Box<CppFfiGeneratorFilterFn>>)
+           filters: Vec<&Box<CppFfiGeneratorFilterFn>>)
            -> Result<Vec<CppFfiHeaderData>> {
   let generator = CGenerator {
     cpp_data: cpp_data,
     c_lib_name: c_lib_name,
-    filter: filter,
+    filters: filters,
   };
 
   let mut c_headers = Vec::new();
@@ -74,17 +74,8 @@ impl<'a> CGenerator<'a> {
   /// Returns false if the method is excluded from processing
   /// for some reason
   fn should_process_method(&self, method: &CppMethod) -> Result<bool> {
-    // let full_name = method.full_name();
-    // let short_text = method.short_text();
     let class_name = method.class_name().unwrap_or(&String::new()).clone();
-    // log::debug(format!("method name: {}", full_name));
-    // log::debug(format!(" short_text: {}", short_text));
-    // if let Some(ref ffi_methods_blacklist) = self.cpp_lib_spec.ffi_methods_blacklist {
-    // if ffi_methods_blacklist.iter()
-    // .any(|x| x == &full_name || x == &short_text || x == &class_name) {
-    // }
-    // }
-    if let Some(filter) = self.filter {
+    for filter in &self.filters {
       let allowed = try!(filter(method).chain_err(|| "cpp_ffi_generator_filter failed"));
       if !allowed {
         log::info(format!("Skipping blacklisted method: \n{}\n", method.short_text()));

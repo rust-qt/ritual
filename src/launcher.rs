@@ -215,7 +215,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
                              },
                              &dependencies.iter().map(|x| &x.cpp_data).collect::<Vec<_>>())
           .chain_err(|| "C++ parser failed"));
-      if let Some(filter) = env.config.cpp_data_filter() {
+      for filter in env.config.cpp_data_filters() {
         try!(filter(&mut parse_result).chain_err(|| "cpp_data_filter failed"));
       }
       log::info("Post-processing parse result.");
@@ -238,7 +238,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
 
     let cpp_ffi_headers = try!(cpp_ffi_generator::run(&parse_result,
                                                       c_lib_name.clone(),
-                                                      env.config.cpp_ffi_generator_filter())
+                                                      env.config.cpp_ffi_generator_filters())
       .chain_err(|| "FFI generator failed"));
 
     let mut cpp_libs_for_shared_c_lib = Vec::new();
