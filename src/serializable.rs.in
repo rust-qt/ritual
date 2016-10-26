@@ -566,7 +566,10 @@ pub enum RustProcessedTypeKind {
   /// Enum with list of values
   Enum { values: Vec<EnumValue> },
   /// Class with size in bytes
-  Class { size: i32 },
+  Class {
+    size: i32,
+    is_deletable: bool,
+  },
 }
 
 /// Exported information about a Rust wrapper type

@@ -539,6 +539,18 @@ impl CppData {
     false
   }
 
+  /// Checks if specified class has public destructor.
+  pub fn has_public_destructor(&self, class_type: &CppTypeClassBase) -> bool {
+    for method in &self.methods {
+      if let Some(ref info) = method.class_membership {
+        if info.kind == CppMethodKind::Destructor && &info.class_type == class_type {
+          return info.visibility == CppVisibility::Public;
+        }
+      }
+    }
+    false
+  }
+
 
   #[allow(dead_code)]
   pub fn get_all_methods(&self, class_name: &str) -> Result<Vec<&CppMethod>> {

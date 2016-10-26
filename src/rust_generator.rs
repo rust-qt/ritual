@@ -398,7 +398,13 @@ fn process_types(input_data: &CppAndFfiData,
       cpp_template_arguments: None,
       kind: match type_info.kind {
         CppTypeKind::Class { ref size, .. } => {
-          RustProcessedTypeKind::Class { size: try!(size.chain_err(|| "size must be present")) }
+          RustProcessedTypeKind::Class {
+            size: try!(size.chain_err(|| "size must be present")),
+            is_deletable: input_data.cpp_data.has_public_destructor(&CppTypeClassBase {
+              name: type_info.name.clone(),
+              template_arguments: None,
+            }),
+          }
         }
         CppTypeKind::Enum { ref values } => RustProcessedTypeKind::Enum { values: values.clone() },
       },
@@ -439,7 +445,13 @@ fn process_types(input_data: &CppAndFfiData,
       name_failed_items.push(RustProcessedTypeInfo {
         cpp_name: template_instantiations.class_name.clone(),
         cpp_template_arguments: Some(ins.template_arguments.clone()),
-        kind: RustProcessedTypeKind::Class { size: ins.size },
+        kind: RustProcessedTypeKind::Class {
+          size: ins.size,
+          is_deletable: input_data.cpp_data.has_public_destructor(&CppTypeClassBase {
+            name: template_instantiations.class_name.clone(),
+            template_arguments: Some(ins.template_arguments.clone()),
+          }),
+        },
         rust_name: try!(calculate_rust_name(&template_instantiations.class_name,
                                             &template_instantiations.include_file,
                                             false,
@@ -520,6 +532,21 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
       IndirectionChange::ValueToPointer => {
         assert!(indirection == &RustTypeIndirection::Ptr);
         if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
+          if let Some(info) = find_type_info(processed_types,
+                                             dependency_types,
+                                             |x| &x.rust_name == base) {
+            if let RustProcessedTypeKind::Class { ref is_deletable, .. } = info.kind {
+              if !*is_deletable {
+                return Err(format!("{} is not deletable", base.full_name(None)).into());
+              }
+            } else {
+              return Err(unexpected("class type expected here").into());
+            }
+          } else {
+            return Err(unexpected("find_type_info failed in complete_type() after success in \
+                                   ffi_type()")
+              .into());
+          }
           match *allocation_place {
             ReturnValueAllocationPlace::Stack => {
               *indirection = RustTypeIndirection::None;
@@ -808,7 +835,7 @@ impl RustGenerator {
         },
          cpp_methods)
       }
-      RustProcessedTypeKind::Class { ref size } => {
+      RustProcessedTypeKind::Class { ref size, .. } => {
         let methods_scope = RustMethodScope::Impl { type_name: info.rust_name.clone() };
         let class_type = CppTypeClassBase {
           name: info.cpp_name.clone(),
