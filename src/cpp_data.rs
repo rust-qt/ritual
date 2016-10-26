@@ -18,7 +18,7 @@ fn apply_instantiations_to_method(method: &CppMethod,
                                   -> Result<Vec<CppMethod>> {
   let mut new_methods = Vec::new();
   for ins in template_instantiations {
-    log::debug(format!("instantiation: {:?}", ins.template_arguments));
+    log::noisy(format!("instantiation: {:?}", ins.template_arguments));
     let mut new_method = method.clone();
     if let Some(ref args) = method.template_arguments {
       if args.nested_level == nested_level {
@@ -74,7 +74,7 @@ fn apply_instantiations_to_method(method: &CppMethod,
       if let Some(conversion_type) = conversion_type {
         new_method.name = format!("operator {}", try!(conversion_type.to_cpp_code(None)));
       }
-      log::debug(format!("success: {}", new_method.short_text()));
+      log::noisy(format!("success: {}", new_method.short_text()));
       new_methods.push(new_method);
     }
   }
@@ -221,7 +221,7 @@ impl CppData {
             if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
                    base.base_type.base {
               if name == base_name {
-                log::debug(format!("Adding inherited methods from {} to {}",
+                log::noisy(format!("Adding inherited methods from {} to {}",
                                    base_name,
                                    type1.name));
                 let derived_name = &type1.name;
@@ -240,11 +240,11 @@ impl CppData {
                   for dir in using_directives {
                     if &dir.method_name == &base_class_method.name {
                       if &dir.class_name == base_name {
-                        log::debug(format!("UsingDirective enables inheritance of {}",
+                        log::noisy(format!("UsingDirective enables inheritance of {}",
                                            base_class_method.short_text()));
                         using_directive_enables = true;
                       } else {
-                        log::debug(format!("UsingDirective disables inheritance of {}",
+                        log::noisy(format!("UsingDirective disables inheritance of {}",
                                            base_class_method.short_text()));
                         using_directive_disables = true;
                       }
@@ -264,9 +264,9 @@ impl CppData {
                       // disables inheritance of base class method.
                       if !using_directive_enables ||
                          method.argument_types_equal(base_class_method) {
-                        log::debug("Method is not added because it's overriden in derived class");
-                        log::debug(format!("Base method: {}", base_class_method.short_text()));
-                        log::debug(format!("Derived method: {}\n", method.short_text()));
+                        log::noisy("Method is not added because it's overriden in derived class");
+                        log::noisy(format!("Base method: {}", base_class_method.short_text()));
+                        log::noisy(format!("Derived method: {}\n", method.short_text()));
                         ok = false;
                       }
                       break;
@@ -295,8 +295,8 @@ impl CppData {
                       });
                     }
                     new_method.inheritance_chain.push(base.clone());
-                    log::debug(format!("Method added: {}", new_method.short_text()));
-                    log::debug(format!("Base method: {} ({:?})\n",
+                    log::noisy(format!("Method added: {}", new_method.short_text()));
+                    log::noisy(format!("Base method: {} ({:?})\n",
                                        base_class_method.short_text(),
                                        base_class_method.origin_location));
                     current_new_methods.push(new_method.clone());
@@ -407,11 +407,11 @@ impl CppData {
             }
           }
           if allow_method {
-            log::debug("Allowing duplicated inherited method (virtual diamond \
+            log::noisy("Allowing duplicated inherited method (virtual diamond \
                                 inheritance)");
-            log::debug(duplicates[0].short_text());
+            log::noisy(duplicates[0].short_text());
             for duplicate in &duplicates {
-              log::debug(format!("  {}", duplicate.inheritance_chain_text()));
+              log::noisy(format!("  {}", duplicate.inheritance_chain_text()));
             }
             if let Some(mut final_method) = duplicates.pop() {
               if let Some(ref mut info) = final_method.class_membership {
@@ -424,16 +424,16 @@ impl CppData {
               return Err(unexpected("duplicates can't be empty").into());
             }
           } else {
-            log::warning("Removed ambiguous inherited methods (presumed inaccessible):");
+            log::noisy("Removed ambiguous inherited methods (presumed inaccessible):");
             if signature_mismatch {
               for duplicate in &duplicates {
-                log::warning(format!("  {}", duplicate.short_text()));
-                log::warning(format!("  {}", duplicate.inheritance_chain_text()));
+                log::noisy(format!("  {}", duplicate.short_text()));
+                log::noisy(format!("  {}", duplicate.inheritance_chain_text()));
               }
             } else {
-              log::warning(duplicates[0].short_text());
+              log::noisy(duplicates[0].short_text());
               for duplicate in &duplicates {
-                log::warning(format!("  {}", duplicate.inheritance_chain_text()));
+                log::noisy(format!("  {}", duplicate.inheritance_chain_text()));
               }
             }
           }
@@ -634,9 +634,9 @@ impl CppData {
                   } else {
                     return Err("only template parameters can be here".into());
                   };
-                  log::debug("");
-                  log::debug(format!("method: {}", method.short_text()));
-                  log::debug(format!("found template instantiations: {:?}",
+                  log::noisy("");
+                  log::noisy(format!("method: {}", method.short_text()));
+                  log::noisy(format!("found template instantiations: {:?}",
                                      template_instantiations));
                   match apply_instantiations_to_method(method,
                                                        nested_level,
@@ -649,9 +649,9 @@ impl CppData {
                             Ok(_) => {}
                             Err(msg) => {
                               ok = false;
-                              log::debug(format!("method is not accepted: {}",
+                              log::noisy(format!("method is not accepted: {}",
                                                  method.short_text()));
-                              log::debug(format!("  {}", msg));
+                              log::noisy(format!("  {}", msg));
                             }
                           }
                         }
@@ -661,7 +661,7 @@ impl CppData {
                       }
                       break;
                     }
-                    Err(msg) => log::debug(format!("failed: {}", msg)),
+                    Err(msg) => log::noisy(format!("failed: {}", msg)),
                   }
                   break;
                 }
