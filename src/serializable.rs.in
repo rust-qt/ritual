@@ -140,11 +140,11 @@ pub struct CppTemplateInstantiation {
 pub struct CppTemplateInstantiations {
   /// Template class name
   pub class_name: String,
-  /// List of encountered instantiations
-  pub instantiations: Vec<CppTemplateInstantiation>,
   /// File name of the include file (without full path)
   /// of the template type
   pub include_file: String,
+  /// List of encountered instantiations
+  pub instantiations: Vec<CppTemplateInstantiation>,
 }
 
 /// C++ parser output
@@ -212,7 +212,7 @@ pub struct CppMethodClassMembership {
   /// Method visibility
   pub visibility: CppVisibility,
   /// True if the method is a Qt signal
-  pub is_signal: bool, //TODO: implement signal detection or remove this field (#7)
+  pub is_signal: bool, // TODO: implement signal detection or remove this field (#7)
 }
 
 /// Additional information about original method
@@ -277,8 +277,7 @@ pub struct CppMethod {
   pub inherited_from: Option<CppMethodInheritedFrom>,
   /// List of base classes this method was inferited from.
   /// The first item is the most base class.
-  pub inheritance_chain: Vec<CppBaseSpecifier>,
-  // TODO: fill inheritance_chain for explicitly redeclared methods (#23)
+  pub inheritance_chain: Vec<CppBaseSpecifier>, /* TODO: fill inheritance_chain for explicitly redeclared methods (#23) */
 }
 
 // ------------------------------
@@ -445,9 +444,7 @@ pub enum CppBuiltInNumericType {
 #[derive(Serialize, Deserialize)]
 #[allow(dead_code)]
 pub enum CppSpecificNumericTypeKind {
-  Integer {
-    is_signed: bool,
-  },
+  Integer { is_signed: bool },
   FloatingPoint,
 }
 
@@ -486,10 +483,7 @@ pub enum CppTypeBase {
   },
   /// Pointer sized integer, like qintptr
   /// (may be translated to Rust's isize)
-  PointerSizedInteger {
-    name: String,
-    is_signed: bool,
-  },
+  PointerSizedInteger { name: String, is_signed: bool },
   /// Enum type
   Enum {
     /// Name, including namespaces and nested classes
