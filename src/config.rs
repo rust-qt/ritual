@@ -5,23 +5,21 @@ use cpp_data::CppData;
 
 pub type CppFfiGeneratorFilterFn = Fn(&CppMethod) -> Result<bool>;
 
-#[derive(Default)]
-struct CppFfiGeneratorFilter(Option<Box<CppFfiGeneratorFilterFn>>);
+struct CppFfiGeneratorFilter(Box<CppFfiGeneratorFilterFn>);
 
 impl ::std::fmt::Debug for CppFfiGeneratorFilter {
   fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::result::Result<(), ::std::fmt::Error> {
-    write!(f, "{}", if self.0.is_some() { "Some(fn)" } else { "None" })
+    write!(f, "CppFfiGeneratorFilter")
   }
 }
 
 pub type CppDataFilterFn = Fn(&mut CppData) -> Result<()>;
 
-#[derive(Default)]
-struct CppDataFilter(Option<Box<CppDataFilterFn>>);
+struct CppDataFilter(Box<CppDataFilterFn>);
 
 impl ::std::fmt::Debug for CppDataFilter {
   fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::result::Result<(), ::std::fmt::Error> {
-    write!(f, "{}", if self.0.is_some() { "Some(fn)" } else { "None" })
+    write!(f, "CppDataFilter")
   }
 }
 
@@ -74,8 +72,8 @@ pub struct Config {
   /// added to FFI library wrapper. Err indicates an unexpected failure
   /// and terminates processing. Ok(true) allows the method, and
   /// Ok(false) blocks the method.
-  cpp_ffi_generator_filter: CppFfiGeneratorFilter,
-  cpp_data_filter: CppDataFilter,
+  cpp_ffi_generator_filters: Vec<CppFfiGeneratorFilter>,
+  cpp_data_filters: Vec<CppDataFilter>,
 }
 
 impl Config {
@@ -125,12 +123,12 @@ impl Config {
     self.include_directives.push(path.into());
   }
 
-  pub fn set_cpp_ffi_generator_filter(&mut self, f: Box<CppFfiGeneratorFilterFn>) {
-    self.cpp_ffi_generator_filter.0 = Some(f);
+  pub fn add_cpp_ffi_generator_filter(&mut self, f: Box<CppFfiGeneratorFilterFn>) {
+    self.cpp_ffi_generator_filters.push(CppFfiGeneratorFilter(f));
   }
 
-  pub fn set_cpp_data_filter(&mut self, f: Box<CppDataFilterFn>) {
-    self.cpp_data_filter.0 = Some(f);
+  pub fn add_cpp_data_filter(&mut self, f: Box<CppDataFilterFn>) {
+    self.cpp_data_filters.push(CppDataFilter(f));
   }
 
   pub fn exec(self) -> Result<()> {
@@ -169,11 +167,11 @@ impl Config {
     &self.include_directives
   }
 
-  pub fn cpp_ffi_generator_filter(&self) -> Option<&Box<CppFfiGeneratorFilterFn>> {
-    self.cpp_ffi_generator_filter.0.as_ref()
+  pub fn cpp_ffi_generator_filters(&self) -> Vec<&Box<CppFfiGeneratorFilterFn>> {
+    self.cpp_ffi_generator_filters.iter().map(|x| &x.0).collect()
   }
 
-  pub fn cpp_data_filter(&self) -> Option<&Box<CppDataFilterFn>> {
-    self.cpp_data_filter.0.as_ref()
+  pub fn cpp_data_filters(&self) -> Vec<&Box<CppDataFilterFn>> {
+    self.cpp_data_filters.iter().map(|x| &x.0).collect()
   }
 }
