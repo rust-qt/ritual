@@ -26,8 +26,6 @@ pub enum BuildProfile {
   Release,
 }
 
-pub use rust_code_generator::InvokationMethod;
-
 pub struct BuildEnvironment {
   pub config: Config,
   pub output_dir_path: PathBuf,

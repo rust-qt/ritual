@@ -31,7 +31,7 @@ mod dependency_info;
 mod doc_formatter;
 pub mod errors;
 pub mod file_utils;
-pub mod launcher;
+mod launcher;
 pub mod log;
 mod qt_doc_parser;
 mod qt_specific;

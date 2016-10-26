@@ -16,12 +16,6 @@ use std::path::PathBuf;
 extern crate rustfmt;
 extern crate toml;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum InvokationMethod {
-  CommandLine,
-  BuildScript,
-}
-
 pub struct RustCodeGeneratorDependency {
   pub crate_name: String,
   pub crate_path: PathBuf,
