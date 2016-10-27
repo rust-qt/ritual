@@ -263,7 +263,7 @@ impl InputCargoTomlData {
         Some(try!(links.as_str().chain_err(|| "'package.links' must be a string")).to_string())
       } else {
         None
-      }
+      },
     })
   }
 }
