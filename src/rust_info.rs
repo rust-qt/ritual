@@ -230,7 +230,7 @@ pub struct InputCargoTomlData {
   /// Authors of the crate
   pub authors: Vec<String>,
   /// Name of the C++ library
-  pub links: String,
+  pub links: Option<String>,
 }
 
 
@@ -259,11 +259,11 @@ impl InputCargoTomlData {
       } else {
         Vec::new()
       },
-      links: {
-        let links = try!(package.get("links")
-          .chain_err(|| "'package.links' field not found in Cargo.toml"));
-        try!(links.as_str().chain_err(|| "'package.links' must be a string")).to_string()
-      },
+      links: if let Some(links) = package.get("links") {
+        Some(try!(links.as_str().chain_err(|| "'package.links' must be a string")).to_string())
+      } else {
+        None
+      }
     })
   }
 }

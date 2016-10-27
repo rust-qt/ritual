@@ -132,11 +132,15 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       kind: RustLinkKind::Framework,
     });
   }
-  if !link_items.iter().any(|x| &x.name == &input_cargo_toml_data.links) {
-    log::warning(format!("Value of 'links' field in Cargo.toml ({}) should be one of \
-      linked libraries or frameworks ({}).",
-                         input_cargo_toml_data.links,
-                         link_items.iter().map(|x| &x.name).join(", ")));
+  if let Some(ref links) = input_cargo_toml_data.links {
+    if !link_items.iter().any(|x| &x.name == links) {
+      log::warning(format!("Value of 'links' field in Cargo.toml ({}) should be one of \
+        linked libraries or frameworks ({}).",
+                           links,
+                           link_items.iter().map(|x| &x.name).join(", ")));
+    }
+  } else {
+    log::warning("It's recommended to add 'links' field to Cargo.toml.");
   }
 
   // TODO: move other effects of this var to qt_build_tools
