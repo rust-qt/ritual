@@ -97,6 +97,35 @@ If you want to run `cpp_to_rust` on another library of your choice, you need to 
 
 Documentation is important! `cpp_to_rust` generates `rustdoc` comments with information about corresponding C++ types and methods. Overloaded methods have detailed documentation listing all available variants. Qt documentation is integrated in `rustdoc` comments.
 
+### Allocating C++ objects on the stack and the heap
+
+`cpp_to_rust` supports two allocation place modes for C++ objects. The user can select the mode by passing `AsBox` or `AsStruct` as additional argument to constructors and other functions that return objects by value in C++.
+ 
+`AsBox` mode:
+ 
+1. The C++ object is created in the C++ wrapper library using `new`. Constructors are called like `new MyClass(args)`, and functions that return objects by value are called like `new MyClass(function(args))`.
+2. Pointer returned by `new` is passed through FFI to the Rust wrapper and to `CppBox::new`. `CppBox<T>` is returned to the caller.
+3. When `CppBox` is dropped, it calls the deleter function, which calls `delete object` on C++ side.
+4. The raw pointer can be moved out of `CppBox` and passed to another function that can take ownership of the object.
+  
+`AsStruct` mode:
+  
+1. An uninitialized Rust struct is created on the stack. The size of the struct is the same as the size of the C++ object.  
+2. Pointer to the struct is passed to the C++ wrapper function that uses placement new. Constructors are called like `new(buf) MyClass(args)`, where `buf` is pointer to the struct created in Rust. The struct is filled with valid data.
+3. The caller retains ownership of the struct and can move it to the heap using `Box` or `Vec`, pass it to another place and take references and pointers to it. 
+4. When the struct is dropped, a C++ destructor is called using a C++ wrapper function. Memory of the struct itself is managed by Rust.
+  
+`AsBox` is a more general and safe way to store C++ objects in Rust, but it can produce unnecessary overhead when working with multiple small objects. 
+
+`AsStruct` is more limited and dangerous. You can't use it if pointers to the object are stored somewhere because Rust can move the struct in memory and the pointer can become invalid. And sometimes it's not clear whether they are stored or not. It is also forbidden to pass such structs to functions that take ownership, as they would try to delete it and free the memory that is managed by Rust. However, `AsStruct` allows to avoid heap allocations and can be used for small simple structs and classes.
+  
+Selecting one of these modes in currently up to the caller, but some kind of smart defaults and limitations may be implemented in the future.
+  
+
+
+
+
+
 ### Portability and API stability issues
 
 Assuming that the C++ library has exactly the same API on all platforms, the generated C++ and Rust code is almost totally portable. The only issue is using sizes of classes because they depend on the platform.
