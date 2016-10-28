@@ -19,7 +19,7 @@ use string_utils::JoinWithString;
 use utils::{is_msvc, MapIfOk};
 
 use std::path::PathBuf;
-use std::env;
+use std;
 
 pub enum BuildProfile {
   Debug,
@@ -38,7 +38,7 @@ pub struct BuildEnvironment {
 
 pub fn run_from_build_script(config: Config) -> Result<()> {
   let mut dependency_paths = Vec::new();
-  for (name, value) in env::vars_os() {
+  for (name, value) in std::env::vars_os() {
     if let Ok(name) = name.into_string() {
       if name.starts_with("DEP_") && name.ends_with("_CPP_TO_RUST_DATA_PATH") {
         log::info(format!("Found dependency: {}", value.to_string_lossy()));
@@ -48,14 +48,15 @@ pub fn run_from_build_script(config: Config) -> Result<()> {
   }
   run(BuildEnvironment {
     config: config,
-    source_dir_path: PathBuf::from(try!(env::var("CARGO_MANIFEST_DIR")
+    source_dir_path: PathBuf::from(try!(std::env::var("CARGO_MANIFEST_DIR")
       .chain_err(|| "failed to read required env var: CARGO_MANIFEST_DIR"))),
-    output_dir_path: PathBuf::from(try!(env::var("OUT_DIR")
+    output_dir_path: PathBuf::from(try!(std::env::var("OUT_DIR")
       .chain_err(|| "failed to read required env var: OUT_DIR"))),
-    num_jobs: try!(env::var("NUM_JOBS").chain_err(|| "failed to read required env var: NUM_JOBS"))
+    num_jobs: try!(std::env::var("NUM_JOBS")
+        .chain_err(|| "failed to read required env var: NUM_JOBS"))
       .parse()
       .ok(),
-    build_profile: match try!(env::var("PROFILE")
+    build_profile: match try!(std::env::var("PROFILE")
         .chain_err(|| "failed to read required env var: PROFILE"))
       .as_ref() {
       "debug" | "test" | "doc" => BuildProfile::Debug,
@@ -149,7 +150,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
   let qt_doc_data = if is_qt_library {
     // TODO: find a better way to specify doc source (#35)
     let env_var_name = format!("{}_DOC_DATA", "QT5CORE".to_uppercase());
-    if let Ok(env_var_value) = env::var(&env_var_name) {
+    if let Ok(env_var_value) = std::env::var(&env_var_name) {
       log::info(format!("Loading Qt doc data from {}", &env_var_value));
       match QtDocData::new(&PathBuf::from(&env_var_value)) {
         Ok(r) => Some(r),
@@ -187,7 +188,8 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     log::info("Processing skipped!");
   } else {
     let parse_result_cache_file_path = output_dir_path.with_added("cpp_data.json");
-    let loaded_parse_result = if parse_result_cache_file_path.as_path().is_file() {
+    let loaded_parse_result = if std::env::var("CPP_TO_RUST_DEV_CACHE").is_ok() &&
+                                 parse_result_cache_file_path.as_path().is_file() {
       match load_json(&parse_result_cache_file_path) {
         Ok(r) => {
           log::info(format!("C++ data is loaded from file: {}",
