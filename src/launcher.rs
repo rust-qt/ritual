@@ -121,7 +121,6 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
   let target_include_dirs = Vec::from(env.config.target_include_paths());
   let mut link_items = Vec::new();
   for item in env.config.linked_libs() {
-    // TODO: exclude GL if msvc in qt_gui build script
     link_items.push(RustLinkItem {
       name: item.to_string(),
       kind: RustLinkKind::SharedLibrary,
@@ -212,10 +211,10 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       log::info("Parsing C++ headers.");
       let mut parse_result =
         try!(cpp_parser::run(cpp_parser::CppParserConfig {
-                               include_dirs: include_dirs.clone(),
-                               framework_dirs: framework_dirs.clone(),
+                               include_paths: include_dirs.clone(),
+                               framework_paths: framework_dirs.clone(),
                                include_directives: Vec::from(env.config.include_directives()),
-                               target_include_dirs: target_include_dirs,
+                               target_include_paths: target_include_dirs,
                                tmp_cpp_path: output_dir_path.with_added("1.cpp"),
                                name_blacklist: Vec::from(env.config.cpp_parser_blocked_names()),
                              },

@@ -107,14 +107,14 @@ fn get_full_name(entity: Entity) -> Result<String> {
 #[derive(Clone, Debug)]
 pub struct CppParserConfig {
   /// Include dirs passed to clang
-  pub include_dirs: Vec<PathBuf>,
+  pub include_paths: Vec<PathBuf>,
   /// Frameworks passed to clang
-  pub framework_dirs: Vec<PathBuf>,
+  pub framework_paths: Vec<PathBuf>,
   /// Header name used in #include statement
   pub include_directives: Vec<PathBuf>,
-  /// Directory containing headers of the target library.
-  /// Only entities declared within this directory will be processed.
-  pub target_include_dirs: Vec<PathBuf>,
+  /// Directories and/or files containing headers of the target library.
+  /// Only entities declared within these paths will be processed.
+  pub target_include_paths: Vec<PathBuf>,
   pub tmp_cpp_path: PathBuf,
   pub name_blacklist: Vec<String>,
 }
@@ -164,7 +164,7 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
   } else {
     args.push("-std=gnu++11".to_string());
   }
-  for dir in &config.include_dirs {
+  for dir in &config.include_paths {
     let str = try!(path_to_str(dir));
     args.push("-I".to_string());
     args.push(str.to_string());
@@ -173,7 +173,7 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
     args.push("-isystem".to_string());
     args.push(path);
   }
-  for dir in &config.framework_dirs {
+  for dir in &config.framework_paths {
     let str = try!(path_to_str(dir));
     args.push("-F".to_string());
     args.push(str.to_string());
@@ -1328,8 +1328,8 @@ impl<'a> CppParser<'a> {
       }
       if let Ok(file_path) = self.entity_include_path(entity) {
         let file_path_buf = PathBuf::from(&file_path);
-        if !self.config.target_include_dirs.is_empty() &&
-           !self.config.target_include_dirs.iter().any(|x| file_path_buf.starts_with(x)) {
+        if !self.config.target_include_paths.is_empty() &&
+           !self.config.target_include_paths.iter().any(|x| file_path_buf.starts_with(x)) {
           log::noisy(format!("skipping entities from {}", file_path));
           return false;
         }

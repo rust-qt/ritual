@@ -25,12 +25,12 @@ fn run_parser(code: &'static str) -> CppData {
     include_file.write("\n").unwrap();
   }
   let mut result = cpp_parser::run(cpp_parser::CppParserConfig {
-                                     include_dirs: vec![include_dir],
+                                     include_paths: vec![include_dir],
                                      include_directives: vec![PathBuf::from(include_name)],
-                                     target_include_dirs: Vec::new(),
+                                     target_include_paths: Vec::new(),
                                      tmp_cpp_path: dir.path().with_added("1.cpp"),
                                      name_blacklist: Vec::new(),
-                                     framework_dirs: Vec::new(),
+                                     framework_paths: Vec::new(),
                                    },
                                    &Vec::new())
     .unwrap();
