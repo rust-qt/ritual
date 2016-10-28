@@ -122,7 +122,7 @@ pub struct CppParserConfig {
 #[cfg(test)]
 fn init_clang() -> Result<Clang> {
   use std;
-  for _ in 0..20 {
+  for _ in 0..600 {
     if let Ok(clang) = Clang::new() {
       return Ok(clang);
     }
