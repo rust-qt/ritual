@@ -24,76 +24,56 @@ impl ::std::fmt::Debug for CppDataFilter {
 }
 
 
-
+/// The starting point of `cpp_to_rust` API.
+/// Create a `Config` object, set its properties,
+/// add custom functions if necessary, and start
+/// the processing with `Config::exec`.
 #[derive(Default, Debug)]
 pub struct Config {
-  /// Extra libraries to be linked.
-  /// Used as "-l" option to linker.
+  // see documentation for setters
   linked_libs: Vec<String>,
-  /// Paths to library directories supplied to the linker
-  /// via '-L' option or environment variables.
   lib_paths: Vec<PathBuf>,
-
-  /// Extra frameworks to be linked (MacOS specific).
-  /// Used as "-f" option to linker.
   linked_frameworks: Vec<String>,
-
-  /// Paths to framework directories supplied to the linker
-  /// via '-F' option or environment variables.
   framework_paths: Vec<PathBuf>,
-
-  /// Paths to include directories supplied to the C++ parser
-  /// and compiler of the C++ wrapper via '-I' option.
-  /// This is detected automatically for Qt libraries using qmake.
-  /// Paths can be relative to lib spec file's directory.
   include_paths: Vec<PathBuf>,
-
-  /// Paths to include directories of the library.
-  /// Only types and methods declared within these directories
-  /// will be parsed.
-  /// This is detected automatically for Qt libraries using qmake.
-  /// Paths can be relative to lib spec file's directory.
   target_include_paths: Vec<PathBuf>,
-  // TODO: allow both dirs and files in target_include_paths
-  /// Name of the library's include file
   include_directives: Vec<PathBuf>,
-
-  /// List of C++ identifiers which should be skipped
-  /// by C++ parser. Identifier can contain namespaces
-  /// and nested classes, with "::" separator (like in
-  /// C++ identifiers). Identifier may refer to a method,
-  /// a class, a enum or a namespace. All entities inside blacklisted
-  /// entity (e.g. the methods of a blocked class or
-  /// the contents of a blocked namespace)
-  /// will also be skipped.
   cpp_parser_blocked_names: Vec<String>,
-
-  /// Custom function that decides whether a C++ method should be
-  /// added to FFI library wrapper. Err indicates an unexpected failure
-  /// and terminates processing. Ok(true) allows the method, and
-  /// Ok(false) blocks the method.
   cpp_ffi_generator_filters: Vec<CppFfiGeneratorFilter>,
   cpp_data_filters: Vec<CppDataFilter>,
 }
 
 impl Config {
-  /// Creates empty Config
+  /// Creates an empty `Config`.
   pub fn new() -> Config {
     Config::default()
   }
 
+  /// Adds a library for linking. Used as `-l` option to the linker.
   pub fn add_linked_lib<P: Into<String>>(&mut self, lib: P) {
     self.linked_libs.push(lib.into());
   }
 
+  /// Adds a framework for linking (OS X specific). Used as `-f` option to the linker.
   pub fn add_linked_framework<P: Into<String>>(&mut self, lib: P) {
     self.linked_frameworks.push(lib.into());
   }
 
+  /// Adds a C++ identifier that should be skipped
+  /// by the C++ parser. Identifier can contain namespaces
+  /// and nested classes, with `::` separator (like in
+  /// C++ identifiers). Identifier may refer to a method,
+  /// a class, a enum or a namespace. All entities inside blacklisted
+  /// entity (e.g. the methods of a blocked class or
+  /// the contents of a blocked namespace)
+  /// will also be skipped.
+  /// All class methods with names matching the blocked name
+  /// will be skipped, regardless of class name.
   pub fn add_cpp_parser_blocked_name<P: Into<String>>(&mut self, lib: P) {
     self.cpp_parser_blocked_names.push(lib.into());
   }
 
+  /// Adds multiple blocked names. See `Config::add_cpp_parser_blocked_name`.
   pub fn add_cpp_parser_blocked_names<Item, Iter>(&mut self, items: Iter)
     where Item: Into<String>,
           Iter: IntoIterator<Item = Item>
@@ -103,34 +83,82 @@ impl Config {
     }
   }
 
+  /// Adds path to an include directory.
+  /// It's supplied to the C++ parser
+  /// and the C++ compiler via `-I` option.
   pub fn add_include_path<P: Into<PathBuf>>(&mut self, path: P) {
     self.include_paths.push(path.into());
   }
 
+  /// Adds path to a lib directory.
+  /// It's supplied to the linker via `-L` option or environment variables.
   pub fn add_lib_path<P: Into<PathBuf>>(&mut self, path: P) {
     self.lib_paths.push(path.into());
   }
 
+  /// Adds path to a framework directory (OS X specific).
+  /// It's supplied to the linker via `-F` option or environment variables.
   pub fn add_framework_path<P: Into<PathBuf>>(&mut self, path: P) {
     self.framework_paths.push(path.into());
   }
 
+  /// Adds path to an include directory or an include file
+  /// of the target library.
+  /// Any C++ types and methods will be parsed and used only
+  /// if they are declared within one of files or directories
+  /// added with this method.
+  ///
+  /// If no target include paths are added, all types and methods
+  /// will be used. Most libraries include system headers and
+  /// other libraries' header files, so this mode is often unwanted.
   pub fn add_target_include_path<P: Into<PathBuf>>(&mut self, path: P) {
     self.target_include_paths.push(path.into());
   }
 
+  /// Adds an include directive. Each directive will be added
+  /// as `#include <path>` to the input file for the C++ parser.
+  /// Relative paths should be used in this method.
   pub fn add_include_directive<P: Into<PathBuf>>(&mut self, path: P) {
     self.include_directives.push(path.into());
   }
 
+  /// Adds a custom function that decides whether a C++ method should be
+  /// added to the C++ wrapper library. For each C++ method,
+  /// each function will be run once. Filters are executed in the same order they
+  /// were added.
+  ///
+  /// Interpetation of the function's output:
+  ///
+  /// - `Err` indicates an unexpected failure and terminates the processing.
+  /// - `Ok(true)` allows to continue processing of the method.
+  /// If all functions return `Ok(true)`, the method is accepted.
+  /// - `Ok(false)` blocks the method. Remaining filter functions are not run
+  /// on this method.
   pub fn add_cpp_ffi_generator_filter(&mut self, f: Box<CppFfiGeneratorFilterFn>) {
     self.cpp_ffi_generator_filters.push(CppFfiGeneratorFilter(f));
   }
 
+  /// Adds a custom function that visits `&mut CppData` and can perform any changes
+  /// in the output of the C++ parser. Filters are executed in the same order they
+  /// were added. If the function returns `Err`, the processing is terminated.
   pub fn add_cpp_data_filter(&mut self, f: Box<CppDataFilterFn>) {
     self.cpp_data_filters.push(CppDataFilter(f));
   }
 
+  /// Starts execution of the generator.
+  /// This function will print the necessary build script output to stdout.
+  /// It also displays some debugging output that can be made visible by
+  /// running cargo commands with `-vv` option.
+  ///
+  /// The result of this function must be checked. The recommended way:
+  ///
+  /// ```rust,should_panic
+  /// # let config = cpp_to_rust::config::Config::new();
+  /// if let Err(err) = config.exec() {
+  ///   err.display_report();
+  ///   std::process::exit(1);
+  /// }
+  /// ```
   pub fn exec(self) -> Result<()> {
     ::launcher::run_from_build_script(self)
   }
