@@ -3,8 +3,8 @@ pub struct {name} {{
   _buffer: [u8; {size}],
 }}
 
-impl {name} {{
-  pub unsafe fn new_uninitialized() -> {name} {{
+impl ::NewUninitialized for {name} {{
+  unsafe fn new_uninitialized() -> {name} {{
     {name} {{ _buffer: std::mem::uninitialized() }}
   }}
 }}
