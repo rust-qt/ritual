@@ -217,6 +217,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
                                target_include_paths: target_include_dirs,
                                tmp_cpp_path: output_dir_path.with_added("1.cpp"),
                                name_blacklist: Vec::from(env.config.cpp_parser_blocked_names()),
+                               flags: Vec::from(env.config.cpp_parser_flags()),
                              },
                              &dependencies.iter().map(|x| &x.cpp_data).collect::<Vec<_>>())
           .chain_err(|| "C++ parser failed"));
@@ -267,7 +268,8 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       .map_if_ok(|x| -> Result<_> { Ok(try!(path_to_str(x)).to_string()) }));
     try!(code_gen.generate_template_files(env.config.include_directives(),
                                           &include_dirs_str,
-                                          &framework_dirs_str));
+                                          &framework_dirs_str,
+                                          env.config.cpp_compiler_flags()));
     try!(code_gen.generate_files(&cpp_ffi_headers));
 
     try!(move_files(&c_lib_tmp_path, &c_lib_path));

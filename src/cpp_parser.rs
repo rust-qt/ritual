@@ -115,6 +115,7 @@ pub struct CppParserConfig {
   /// Directories and/or files containing headers of the target library.
   /// Only entities declared within these paths will be processed.
   pub target_include_paths: Vec<PathBuf>,
+  pub flags: Vec<String>,
   pub tmp_cpp_path: PathBuf,
   pub name_blacklist: Vec<String>,
 }
@@ -155,15 +156,8 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
     }
   }
   // TODO: PIC and additional args should be moved to lib spec (#13)
-  let mut args = vec!["-fPIC".to_string(),
-                      "-fcxx-exceptions".to_string(),
-                      "-Xclang".to_string(),
-                      "-detailed-preprocessing-record".to_string()];
-  if ::utils::is_msvc() {
-    args.push("-std=c++14".to_string());
-  } else {
-    args.push("-std=gnu++11".to_string());
-  }
+  let mut args = vec!["-Xclang".to_string(), "-detailed-preprocessing-record".to_string()];
+  args.append(&mut config.flags.clone());
   for dir in &config.include_paths {
     let str = try!(path_to_str(dir));
     args.push("-I".to_string());

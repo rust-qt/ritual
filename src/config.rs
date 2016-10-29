@@ -38,6 +38,8 @@ pub struct Config {
   include_paths: Vec<PathBuf>,
   target_include_paths: Vec<PathBuf>,
   include_directives: Vec<PathBuf>,
+  cpp_parser_flags: Vec<String>,
+  cpp_compiler_flags: Vec<String>,
   cpp_parser_blocked_names: Vec<String>,
   cpp_ffi_generator_filters: Vec<CppFfiGeneratorFilter>,
   cpp_data_filters: Vec<CppDataFilter>,
@@ -80,6 +82,36 @@ impl Config {
   {
     for item in items {
       self.cpp_parser_blocked_names.push(item.into());
+    }
+  }
+
+  /// Adds a command line argument for clang C++ parser.
+  pub fn add_cpp_parser_flag<P: Into<String>>(&mut self, lib: P) {
+    self.cpp_parser_flags.push(lib.into());
+  }
+
+  /// Adds multiple flags. See `Config::add_cpp_parser_flag`.
+  pub fn add_cpp_parser_flags<Item, Iter>(&mut self, items: Iter)
+    where Item: Into<String>,
+          Iter: IntoIterator<Item = Item>
+  {
+    for item in items {
+      self.cpp_parser_flags.push(item.into());
+    }
+  }
+
+  /// Adds a command line argument for the C++ compiler.
+  pub fn add_cpp_compiler_flag<P: Into<String>>(&mut self, lib: P) {
+    self.cpp_compiler_flags.push(lib.into());
+  }
+
+  /// Adds multiple flags. See `Config::add_cpp_compiler_flag`.
+  pub fn add_cpp_compiler_flags<Item, Iter>(&mut self, items: Iter)
+    where Item: Into<String>,
+          Iter: IntoIterator<Item = Item>
+  {
+    for item in items {
+      self.cpp_compiler_flags.push(item.into());
     }
   }
 
@@ -173,6 +205,14 @@ impl Config {
 
   pub fn cpp_parser_blocked_names(&self) -> &[String] {
     &self.cpp_parser_blocked_names
+  }
+
+  pub fn cpp_parser_flags(&self) -> &[String] {
+    &self.cpp_parser_flags
+  }
+
+  pub fn cpp_compiler_flags(&self) -> &[String] {
+    &self.cpp_compiler_flags
   }
 
   pub fn include_paths(&self) -> &[PathBuf] {

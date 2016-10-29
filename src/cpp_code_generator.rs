@@ -256,18 +256,18 @@ impl CppCodeGenerator {
   pub fn generate_template_files(&self,
                                  include_directives: &[PathBuf],
                                  include_directories: &[String],
-                                 framework_directories: &[String])
+                                 framework_directories: &[String],
+                                 cpp_compiler_flags: &[String])
                                  -> Result<()> {
     let name_upper = self.lib_name.to_uppercase();
     let cmakelists_path = self.lib_path.with_added("CMakeLists.txt");
     let mut cmakelists_file = try!(create_file(&cmakelists_path));
-    let mut cxx_flags = String::new();
-    if !::utils::is_msvc() {
-      cxx_flags.push_str("-fPIC -std=gnu++11");
-    }
+
+    let mut all_cpp_flags = Vec::from(cpp_compiler_flags);
     for dir in framework_directories {
-      cxx_flags.push_str(&format!(" -F\\\"{}\\\"", dir));
+      all_cpp_flags.push(format!("-F\"{}\"", dir));
     }
+    let all_cpp_flags_text = all_cpp_flags.iter().map(|x| x.replace("\"", "\\\"")).join(" ");
     try!(cmakelists_file.write(format!(include_str!("../templates/c_lib/CMakeLists.txt"),
                                        lib_name_lowercase = &self.lib_name,
                                        lib_name_uppercase = name_upper,
@@ -283,7 +283,7 @@ impl CppCodeGenerator {
                                        } else {
                                          String::new()
                                        },
-                                       cxx_flags = cxx_flags)));
+                                       cxx_flags = all_cpp_flags_text)));
     let src_dir = self.lib_path.with_added("src");
     try!(create_dir_all(&src_dir));
 

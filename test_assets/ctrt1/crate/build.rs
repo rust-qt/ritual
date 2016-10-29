@@ -16,6 +16,9 @@ fn main() {
   config.add_include_path(&path);
   config.add_target_include_path(&path);
   config.add_linked_lib("ctrt1");
+  if !cpp_to_rust::utils::is_msvc() {
+    config.add_cpp_compiler_flag("-fPIC");
+  }
 
   if let Err(err) = config.exec() {
     err.display_report();
