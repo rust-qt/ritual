@@ -12,7 +12,7 @@ use log;
 use qt_doc_parser::{QtDocData, QtDocResultForMethod};
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
-                RustMethodArguments, TraitImpl, TraitName, RustEnumValue};
+                RustMethodArguments, TraitImpl, TraitName, RustEnumValue, RustMethodSelfArgKind};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
 use string_utils::{CaseOperations, VecCaseOperations, WordIterator};
@@ -1146,7 +1146,7 @@ impl RustGenerator {
   fn process_method(&self,
                     mut filtered_methods: Vec<RustMethod>,
                     scope: &RustMethodScope,
-                    use_self_arg_caption: bool)
+                    self_arg_kind_caption: Option<&'static str>)
                     -> Result<(RustMethod, Option<RustTypeDeclaration>)> {
     filtered_methods.sort_by(|a, b| {
       if let RustMethodArguments::SingleVariant(ref args) = a.arguments {
@@ -1178,13 +1178,10 @@ impl RustGenerator {
       let mut args_variants = Vec::new();
       let mut method_name = first_method.name.clone();
       let mut trait_name = try!(first_method.name.last_name()).clone();
-      if use_self_arg_caption {
-        trait_name = format!("{}_{}",
-                             trait_name,
-                             try!(first_method.self_arg_kind()).caption());
+      if let Some(self_arg_kind_caption) = self_arg_kind_caption {
+        trait_name = format!("{}_{}", trait_name, self_arg_kind_caption);
         let name = try!(method_name.parts.pop().chain_err(|| "name can't be empty"));
-        let caption = try!(first_method.self_arg_kind()).caption();
-        method_name.parts.push(format!("{}_{}", name, caption));
+        method_name.parts.push(format!("{}_{}", name, self_arg_kind_caption));
       }
       trait_name = trait_name.to_class_case() + "Args";
       if let RustMethodScope::Impl { ref type_name } = *scope {
@@ -1327,10 +1324,9 @@ impl RustGenerator {
       }
     } else {
       let mut method = try!(filtered_methods.pop().chain_err(|| "filtered_methods can't be empty"));
-      if use_self_arg_caption {
+      if let Some(self_arg_kind_caption) = self_arg_kind_caption {
         let name = try!(method.name.parts.pop().chain_err(|| "name can't be empty"));
-        let caption = try!(method.self_arg_kind()).caption();
-        method.name.parts.push(format!("{}_{}", name, caption));
+        method.name.parts.push(format!("{}_{}", name, self_arg_kind_caption));
       }
 
       if let RustMethodArguments::SingleVariant(ref args) = method.arguments {
@@ -1433,9 +1429,23 @@ impl RustGenerator {
                          try!(method.self_arg_kind()),
                          method);
       }
-      let use_self_arg_caption = self_kind_to_methods.len() > 1;
+      let all_self_args: Vec<_> = self_kind_to_methods.keys().cloned().collect();
+      for (self_arg_kind, overloaded_methods) in self_kind_to_methods {
+        let self_arg_kind_caption = if all_self_args.len() == 1 ||
+                                       self_arg_kind == RustMethodSelfArgKind::ConstRef {
+          None
+        } else if self_arg_kind == RustMethodSelfArgKind::Static {
+          Some("static")
+        } else if self_arg_kind == RustMethodSelfArgKind::MutRef {
+          if all_self_args.iter().any(|x| *x == RustMethodSelfArgKind::ConstRef) {
+            Some("mut")
+          } else {
+            None
+          }
+        } else {
+          return Err("unsupported self arg kinds combination".into());
+        };
 
-      for (_, overloaded_methods) in self_kind_to_methods {
         assert!(!overloaded_methods.is_empty());
         // Step 3: remove method duplicates with the same argument types. For example,
         // there can be method1(libc::c_int) and method1(i32). It's valid in C++,
@@ -1471,7 +1481,7 @@ impl RustGenerator {
         // Step 4: generate overloaded method if count of methods is still > 1,
         // or accept a single method without change.
         let (method, type_declaration) =
-          try!(self.process_method(filtered_methods, scope, use_self_arg_caption));
+          try!(self.process_method(filtered_methods, scope, self_arg_kind_caption));
         if method.doc.is_empty() {
           return Err(unexpected(format!("doc is empty! {:?}", method)).into());
         }

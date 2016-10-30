@@ -73,17 +73,6 @@ pub enum RustMethodSelfArgKind {
   Value,
 }
 
-impl RustMethodSelfArgKind {
-  pub fn caption(&self) -> &'static str {
-    match *self {
-      RustMethodSelfArgKind::Static => "static",
-      RustMethodSelfArgKind::ConstRef => "from_const",
-      RustMethodSelfArgKind::MutRef => "from_mut",
-      RustMethodSelfArgKind::Value => "from_value",
-    }
-  }
-}
-
 impl RustMethod {
   pub fn self_arg_kind(&self) -> Result<RustMethodSelfArgKind> {
     let args = match self.arguments {
