@@ -18,6 +18,12 @@ public:
   void f4();
   static void f4(int);
 
+  int ov1() { return 1; }
+  int ov1(int) { return 0; }
+
+  int ov2() { return 1; }
+  float ov2(int) { return 0; }
+
 private:
   int m_x;
 };

@@ -491,6 +491,7 @@ impl RustCodeGenerator {
       }
       RustMethodArguments::MultipleVariants { ref params_trait_name,
                                               ref params_trait_lifetime,
+                                              ref params_trait_return_type,
                                               ref shared_arguments,
                                               ref variant_argument_name } => {
         let tpl_type = variant_argument_name.to_class_case();
@@ -507,6 +508,11 @@ impl RustCodeGenerator {
         };
         let mut args = self.arg_texts(shared_arguments, params_trait_lifetime.as_ref());
         args.push(format!("{}: {}", variant_argument_name, tpl_type));
+        let return_type_string = if let Some(ref t) = *params_trait_return_type {
+          self.rust_type_to_code(t)
+        } else {
+          format!("{}::ReturnType", tpl_type)
+        };
         format!(include_str!("../templates/crate/overloaded_function.rs.in"),
                 doc = format_doc(&func.doc),
                 maybe_pub = maybe_pub,
@@ -516,7 +522,8 @@ impl RustCodeGenerator {
                 trait_name = params_trait_name,
                 tpl_type = tpl_type,
                 args = args.join(", "),
-                body = body)
+                body = body,
+                return_type_string = return_type_string)
       }
     })
   }
@@ -672,19 +679,35 @@ impl RustCodeGenerator {
         }
         RustTypeDeclarationKind::MethodParametersTrait { ref shared_arguments,
                                                          ref impls,
-                                                         ref lifetime } => {
+                                                         ref lifetime,
+                                                         ref return_type } => {
           let arg_list = self.arg_texts(shared_arguments, lifetime.as_ref()).join(", ");
           let trait_lifetime_specifier = match *lifetime {
             Some(ref lf) => format!("<'{}>", lf),
             None => String::new(),
           };
+          if impls.is_empty() {
+            return Err("MethodParametersTrait with empty impls".into());
+          }
+          let return_type_decl = if return_type.is_some() {
+            ""
+          } else {
+            "type ReturnType;"
+          };
+          let return_type_string = if let Some(ref return_type) = *return_type {
+            self.rust_type_to_code(return_type)
+          } else {
+            "Self::ReturnType".to_string()
+          };
           results.push(format!("pub trait {name}{trait_lifetime_specifier} {{
-              type ReturnType;
-              fn exec(self, {arg_list}) -> Self::ReturnType;
+              {return_type_decl}\
+              fn exec(self, {arg_list}) -> {return_type_string};
             }}",
                                name = type1.name,
                                arg_list = arg_list,
-                               trait_lifetime_specifier = trait_lifetime_specifier));
+                               trait_lifetime_specifier = trait_lifetime_specifier,
+                               return_type_decl = return_type_decl,
+                               return_type_string = return_type_string));
           for variant in impls {
             let final_lifetime =
               if lifetime.is_none() &&
@@ -725,7 +748,22 @@ impl RustCodeGenerator {
                 }
               }
             }
-
+            let return_type_string = match final_lifetime {
+              Some(ref lifetime) => {
+                self.rust_type_to_code(&variant.return_type
+                  .rust_api_type
+                  .with_lifetime(lifetime.to_string()))
+              }
+              None => {
+                self.rust_type_to_code(&variant.return_type
+                  .rust_api_type)
+              }
+            };
+            let return_type_decl = if return_type.is_some() {
+              String::new()
+            } else {
+              format!("type ReturnType = {};", return_type_string)
+            };
             results.push(format!(include_str!("../templates/crate/impl_overloading_trait.rs.in"),
                                  lifetime_specifier = lifetime_specifier,
                                  trait_lifetime_specifier = trait_lifetime_specifier,
@@ -736,17 +774,8 @@ impl RustCodeGenerator {
                                  } else {
                                    format!("({})", tuple_item_types.join(","))
                                  },
-                                 return_type = match final_lifetime {
-                                   Some(ref lifetime) => {
-                                     self.rust_type_to_code(&variant.return_type
-                                       .rust_api_type
-                                       .with_lifetime(lifetime.to_string()))
-                                   }
-                                   None => {
-                                     self.rust_type_to_code(&variant.return_type
-                                       .rust_api_type)
-                                   }
-                                 },
+                                 return_type_decl = return_type_decl,
+                                 return_type_string = return_type_string,
                                  tmp_vars = tmp_vars.join("\n"),
                                  body = try!(self.generate_ffi_call(variant, shared_arguments))));
 

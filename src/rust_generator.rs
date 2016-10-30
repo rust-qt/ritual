@@ -1298,12 +1298,20 @@ impl RustGenerator {
         }
         RustMethodScope::Free => format!("../fn.{}.html", try!(method_name.last_name())),
       };
+      let first_return_type = args_variants[0].return_type.rust_api_type.clone();
+      let trait_return_type = if args_variants.iter()
+        .all(|x| &x.return_type.rust_api_type == &first_return_type) {
+        Some(first_return_type)
+      } else {
+        None
+      };
       type_declaration = Some(RustTypeDeclaration {
         name: trait_name.clone(),
         kind: RustTypeDeclarationKind::MethodParametersTrait {
           shared_arguments: shared_arguments_for_trait,
           impls: args_variants,
           lifetime: trait_lifetime.clone(),
+          return_type: trait_return_type.clone(),
         },
         doc: format!("This trait represents a set of arguments accepted by [{name}]({link}) \
                       method.",
@@ -1317,6 +1325,7 @@ impl RustGenerator {
         arguments: RustMethodArguments::MultipleVariants {
           params_trait_name: trait_name.clone(),
           params_trait_lifetime: trait_lifetime,
+          params_trait_return_type: trait_return_type,
           shared_arguments: shared_arguments,
           variant_argument_name: "args".to_string(),
         },
