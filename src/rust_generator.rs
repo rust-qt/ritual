@@ -1030,24 +1030,34 @@ impl RustGenerator {
                                            &method.allocation_place));
       (return_type, None)
     };
-    if return_type.rust_api_type.is_ref() {
-      let mut next_lifetime_num = 0;
-      for arg in &mut arguments {
-        if arg.argument_type.rust_api_type.is_ref() {
-          arg.argument_type.rust_api_type =
-            arg.argument_type.rust_api_type.with_lifetime(format!("l{}", next_lifetime_num));
-          next_lifetime_num += 1;
+    if return_type.rust_api_type.is_ref() && return_type.rust_api_type.lifetime().is_none() {
+      let mut found = false;
+      for arg in &arguments {
+        if let Some(lifetime) = arg.argument_type.rust_api_type.lifetime() {
+          return_type.rust_api_type = return_type.rust_api_type.with_lifetime(lifetime.clone());
+          found = true;
+          break;
         }
       }
-      let return_lifetime = if next_lifetime_num == 0 {
-        log::warning(format!("Method returns a reference but doesn't receive a reference: {}",
-                             method.short_text()));
-        log::warning("Assuming static lifetime of return value.");
-        "static".to_string()
-      } else {
-        "l0".to_string()
-      };
-      return_type.rust_api_type = return_type.rust_api_type.with_lifetime(return_lifetime);
+      if !found {
+        let mut next_lifetime_num = 0;
+        for arg in &mut arguments {
+          if arg.argument_type.rust_api_type.is_ref() && arg.argument_type.rust_api_type.lifetime().is_none() {
+            arg.argument_type.rust_api_type =
+              arg.argument_type.rust_api_type.with_lifetime(format!("l{}", next_lifetime_num));
+            next_lifetime_num += 1;
+          }
+        }
+        let return_lifetime = if next_lifetime_num == 0 {
+          log::warning(format!("Method returns a reference but doesn't receive a reference: {}",
+                               method.short_text()));
+          log::warning("Assuming static lifetime of return value.");
+          "static".to_string()
+        } else {
+          "l0".to_string()
+        };
+        return_type.rust_api_type = return_type.rust_api_type.with_lifetime(return_lifetime);
+      }
     }
 
     let doc = if generate_doc {
@@ -1277,15 +1287,9 @@ impl RustGenerator {
           vec![renamed_self]
         }
       };
-      let shared_arguments = match self_argument {
+      let mut shared_arguments = match self_argument {
         None => Vec::new(),
         Some(arg) => vec![arg],
-      };
-      let trait_lifetime = if shared_arguments.iter()
-        .any(|x| x.argument_type.rust_api_type.is_ref()) {
-        Some("a".to_string())
-      } else {
-        None
       };
       let method_link = match first_method.scope {
         RustMethodScope::Impl { ref type_name } => {
@@ -1298,10 +1302,29 @@ impl RustGenerator {
         }
         RustMethodScope::Free => format!("../fn.{}.html", try!(method_name.last_name())),
       };
+      let trait_lifetime_name = "largs";
+      let mut has_trait_lifetime = shared_arguments.iter().any(|x| x.argument_type.rust_api_type.is_ref());
       let first_return_type = args_variants[0].return_type.rust_api_type.clone();
       let trait_return_type = if args_variants.iter()
         .all(|x| &x.return_type.rust_api_type == &first_return_type) {
-        Some(first_return_type)
+        if first_return_type.is_ref() {
+          has_trait_lifetime = true;
+          Some(first_return_type.with_lifetime(trait_lifetime_name.to_string()))
+        } else {
+          Some(first_return_type)
+        }
+      } else {
+        None
+      };
+      if has_trait_lifetime {
+        for arg in &mut shared_arguments {
+          if arg.argument_type.rust_api_type.is_ref() {
+            arg.argument_type.rust_api_type = arg.argument_type.rust_api_type.with_lifetime(trait_lifetime_name.to_string());
+          }
+        }
+      }
+      let params_trait_lifetime = if has_trait_lifetime {
+        Some(trait_lifetime_name.to_string())
       } else {
         None
       };
@@ -1310,7 +1333,7 @@ impl RustGenerator {
         kind: RustTypeDeclarationKind::MethodParametersTrait {
           shared_arguments: shared_arguments_for_trait,
           impls: args_variants,
-          lifetime: trait_lifetime.clone(),
+          lifetime: params_trait_lifetime.clone(),
           return_type: trait_return_type.clone(),
         },
         doc: format!("This trait represents a set of arguments accepted by [{name}]({link}) \
@@ -1324,7 +1347,7 @@ impl RustGenerator {
         scope: first_method.scope,
         arguments: RustMethodArguments::MultipleVariants {
           params_trait_name: trait_name.clone(),
-          params_trait_lifetime: trait_lifetime,
+          params_trait_lifetime: params_trait_lifetime,
           params_trait_return_type: trait_return_type,
           shared_arguments: shared_arguments,
           variant_argument_name: "args".to_string(),

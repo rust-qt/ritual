@@ -1,4 +1,4 @@
-{doc}{maybe_pub}fn {name}<{lifetime_arg}{tpl_type}> ({args}) -> {return_type_string}
-    where {tpl_type}: overloading::{trait_name}{lifetime} {{
+{doc}{maybe_pub}fn {name}<{tpl_decl}> ({args}) -> {return_type_string}
+    where {tpl_type}: overloading::{trait_name}{trait_lifetime_arg} {{
   {body}
 }}

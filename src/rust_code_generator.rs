@@ -498,15 +498,23 @@ impl RustCodeGenerator {
         let body = format!("{}.exec({})",
                            variant_argument_name,
                            shared_arguments.iter().map(|arg| arg.name.clone()).join(", "));
-        let lifetime_arg = match *params_trait_lifetime {
-          Some(ref lifetime) => format!("'{}, ", lifetime),
-          None => String::new(),
-        };
-        let lifetime_specifier = match *params_trait_lifetime {
+        let mut all_lifetimes: Vec<_> = shared_arguments
+            .iter()
+            .filter_map(|x| x.argument_type.rust_api_type.lifetime())
+            .collect();
+        if let Some(ref params_trait_lifetime) = *params_trait_lifetime {
+          if !all_lifetimes.iter().any(|x| x == &params_trait_lifetime) {
+            all_lifetimes.push(params_trait_lifetime);
+          }
+        }
+        let mut tpl_decl_texts: Vec<_> = all_lifetimes.iter().map(|x| format!("'{}", x)).collect();
+        tpl_decl_texts.push(tpl_type.clone());
+        let tpl_decl = tpl_decl_texts.join(", ");
+        let trait_lifetime_arg = match *params_trait_lifetime {
           Some(ref lifetime) => format!("<'{}>", lifetime),
           None => String::new(),
         };
-        let mut args = self.arg_texts(shared_arguments, params_trait_lifetime.as_ref());
+        let mut args = self.arg_texts(shared_arguments, None);
         args.push(format!("{}: {}", variant_argument_name, tpl_type));
         let return_type_string = if let Some(ref t) = *params_trait_return_type {
           self.rust_type_to_code(t)
@@ -516,8 +524,8 @@ impl RustCodeGenerator {
         format!(include_str!("../templates/crate/overloaded_function.rs.in"),
                 doc = format_doc(&func.doc),
                 maybe_pub = maybe_pub,
-                lifetime_arg = lifetime_arg,
-                lifetime = lifetime_specifier,
+                tpl_decl = tpl_decl,
+                trait_lifetime_arg = trait_lifetime_arg,
                 name = try!(func.name.last_name()),
                 trait_name = params_trait_name,
                 tpl_type = tpl_type,
