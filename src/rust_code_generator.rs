@@ -498,10 +498,9 @@ impl RustCodeGenerator {
         let body = format!("{}.exec({})",
                            variant_argument_name,
                            shared_arguments.iter().map(|arg| arg.name.clone()).join(", "));
-        let mut all_lifetimes: Vec<_> = shared_arguments
-            .iter()
-            .filter_map(|x| x.argument_type.rust_api_type.lifetime())
-            .collect();
+        let mut all_lifetimes: Vec<_> = shared_arguments.iter()
+          .filter_map(|x| x.argument_type.rust_api_type.lifetime())
+          .collect();
         if let Some(ref params_trait_lifetime) = *params_trait_lifetime {
           if !all_lifetimes.iter().any(|x| x == &params_trait_lifetime) {
             all_lifetimes.push(params_trait_lifetime);

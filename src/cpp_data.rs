@@ -1,5 +1,5 @@
 use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership, CppFunctionArgument,
-                 CppMethodInheritedFrom};
+                 CppMethodInheritedFrom, CppFieldAccessorType, CppFieldAccessor};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
 use errors::{Result, unexpected};
@@ -187,6 +187,7 @@ impl CppData {
               visibility: CppVisibility::Public,
               is_signal: false,
               kind: CppMethodKind::Destructor,
+              field_accessor: None,
             }),
             operator: None,
             return_type: CppType::void(),
@@ -675,13 +676,97 @@ impl CppData {
     Ok(())
   }
 
+  pub fn add_field_accessors(&mut self) -> Result<()> {
+    let mut new_methods = Vec::new();
+    for type_info in &self.types {
+      if let CppTypeKind::Class { ref fields, .. } = type_info.kind {
+        for field in fields {
+          let create_method =
+            |name, accessor_type, return_type, arguments| -> Result<CppMethod> {
+              Ok(CppMethod {
+                name: name,
+                class_membership: Some(CppMethodClassMembership {
+                  class_type: try!(type_info.default_class_type()),
+                  kind: CppMethodKind::Regular,
+                  is_virtual: false,
+                  is_pure_virtual: false,
+                  is_const: match accessor_type {
+                    CppFieldAccessorType::CopyGetter |
+                    CppFieldAccessorType::ConstRefGetter => true,
+                    CppFieldAccessorType::MutRefGetter |
+                    CppFieldAccessorType::Setter => false,
+                  },
+                  is_static: false,
+                  visibility: CppVisibility::Public,
+                  is_signal: false,
+                  field_accessor: Some(CppFieldAccessor {
+                    accessor_type: accessor_type,
+                    field_name: field.name.clone(),
+                  }),
+                }),
+                operator: None,
+                return_type: return_type,
+                arguments: arguments,
+                arguments_before_omitting: None,
+                allows_variadic_arguments: false,
+                include_file: type_info.include_file.clone(),
+                origin_location: None,
+                template_arguments: None,
+                template_arguments_values: None,
+                declaration_code: None,
+                inherited_from: None,
+                inheritance_chain: Vec::new(),
+              })
+            };
+          if field.visibility == CppVisibility::Public {
+            if field.field_type.indirection == CppTypeIndirection::None &&
+               field.field_type.base.is_class() {
+
+              let mut type2_const = field.field_type.clone();
+              type2_const.is_const = true;
+              type2_const.indirection = CppTypeIndirection::Ref;
+              let mut type2_mut = field.field_type.clone();
+              type2_mut.is_const = false;
+              type2_mut.indirection = CppTypeIndirection::Ref;
+              new_methods.push(try!(create_method(field.name.clone(),
+                                                  CppFieldAccessorType::ConstRefGetter,
+                                                  type2_const,
+                                                  Vec::new())));
+              new_methods.push(try!(create_method(format!("{}_mut", field.name),
+                                                  CppFieldAccessorType::MutRefGetter,
+                                                  type2_mut,
+                                                  Vec::new())));
+            } else {
+              new_methods.push(try!(create_method(field.name.clone(),
+                                                  CppFieldAccessorType::CopyGetter,
+                                                  field.field_type.clone(),
+                                                  Vec::new())));
+            }
+            let arg = CppFunctionArgument {
+              argument_type: field.field_type.clone(),
+              name: "value".to_string(),
+              has_default_value: false,
+            };
+            new_methods.push(try!(create_method(format!("set_{}", field.name),
+                                                CppFieldAccessorType::Setter,
+                                                CppType::void(),
+                                                vec![arg])));
+          }
+        }
+      }
+    }
+    self.methods.append(&mut new_methods);
+    Ok(())
+  }
+
   /// Performs data conversion to make it more suitable
   /// for further wrapper generation.
   pub fn post_process(&mut self, dependencies: &[&CppData]) -> Result<()> {
     try!(self.ensure_explicit_destructors(dependencies));
     self.generate_methods_with_omitted_args();
     try!(self.instantiate_templates(dependencies));
-    try!(self.add_inherited_methods(dependencies));
+    try!(self.add_inherited_methods(dependencies)); // TODO: add inherited fields too
+    try!(self.add_field_accessors()); // TODO: fix doc generator for field accessors
     Ok(())
   }
 }

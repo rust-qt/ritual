@@ -190,7 +190,21 @@ pub enum CppMethodKind {
   Destructor,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub enum CppFieldAccessorType {
+  CopyGetter,
+  ConstRefGetter,
+  MutRefGetter,
+  Setter
+}
 
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppFieldAccessor {
+  pub accessor_type: CppFieldAccessorType,
+  pub field_name: String,
+}
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
@@ -213,6 +227,9 @@ pub struct CppMethodClassMembership {
   pub visibility: CppVisibility,
   /// True if the method is a Qt signal
   pub is_signal: bool, // TODO: implement signal detection or remove this field (#7)
+  /// If this method is a generated field accessor, this field contains
+  /// information about it. Field accessors do not have real C++ methods corresponding to them.
+  pub field_accessor: Option<CppFieldAccessor>,
 }
 
 /// Additional information about original method

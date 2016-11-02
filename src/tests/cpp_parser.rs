@@ -464,6 +464,7 @@ fn simple_class_method() {
                  is_static: false,
                  visibility: CppVisibility::Public,
                  is_signal: false,
+                 field_accessor: None,
                }),
                operator: None,
                return_type: CppType {
@@ -626,6 +627,7 @@ fn template_class_method() {
                  is_static: false,
                  visibility: CppVisibility::Public,
                  is_signal: false,
+                 field_accessor: None,
                }),
                operator: None,
                return_type: CppType {

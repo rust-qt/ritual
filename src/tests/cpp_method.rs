@@ -34,6 +34,7 @@ pub fn empty_membership(class_name: &'static str) -> CppMethodClassMembership {
       name: class_name.to_string(),
       template_arguments: None,
     },
+    field_accessor: None,
   }
 }
 
@@ -741,6 +742,7 @@ fn short_text1() {
         name: "Class1".to_string(),
         template_arguments: None,
       },
+      field_accessor: None,
     }),
     operator: None,
     return_type: CppType {

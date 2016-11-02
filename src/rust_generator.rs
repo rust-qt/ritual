@@ -1042,7 +1042,8 @@ impl RustGenerator {
       if !found {
         let mut next_lifetime_num = 0;
         for arg in &mut arguments {
-          if arg.argument_type.rust_api_type.is_ref() && arg.argument_type.rust_api_type.lifetime().is_none() {
+          if arg.argument_type.rust_api_type.is_ref() &&
+             arg.argument_type.rust_api_type.lifetime().is_none() {
             arg.argument_type.rust_api_type =
               arg.argument_type.rust_api_type.with_lifetime(format!("l{}", next_lifetime_num));
             next_lifetime_num += 1;
@@ -1303,7 +1304,8 @@ impl RustGenerator {
         RustMethodScope::Free => format!("../fn.{}.html", try!(method_name.last_name())),
       };
       let trait_lifetime_name = "largs";
-      let mut has_trait_lifetime = shared_arguments.iter().any(|x| x.argument_type.rust_api_type.is_ref());
+      let mut has_trait_lifetime = shared_arguments.iter()
+        .any(|x| x.argument_type.rust_api_type.is_ref());
       let first_return_type = args_variants[0].return_type.rust_api_type.clone();
       let trait_return_type = if args_variants.iter()
         .all(|x| &x.return_type.rust_api_type == &first_return_type) {
@@ -1319,7 +1321,8 @@ impl RustGenerator {
       if has_trait_lifetime {
         for arg in &mut shared_arguments {
           if arg.argument_type.rust_api_type.is_ref() {
-            arg.argument_type.rust_api_type = arg.argument_type.rust_api_type.with_lifetime(trait_lifetime_name.to_string());
+            arg.argument_type.rust_api_type =
+              arg.argument_type.rust_api_type.with_lifetime(trait_lifetime_name.to_string());
           }
         }
       }

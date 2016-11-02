@@ -1135,6 +1135,7 @@ impl<'a> CppParser<'a> {
               Some(info) => try!(info.default_class_type()),
               None => return Err(format!("Unknown class type: {}", class_name).into()),
             },
+            field_accessor: None,
           })
         }
         None => None,
@@ -1532,7 +1533,7 @@ impl<'a> CppParser<'a> {
     let mut good_types = Vec::new();
     for t in &self.types {
       let mut good_type = t.clone();
-      if let CppTypeKind::Class { ref mut bases, .. } = good_type.kind {
+      if let CppTypeKind::Class { ref mut bases, ref mut fields, .. } = good_type.kind {
         let mut valid_bases = Vec::new();
         for base in bases.iter() {
           if let Err(msg) = self.check_type_integrity(&base.base_type) {
@@ -1547,6 +1548,22 @@ impl<'a> CppParser<'a> {
         }
         bases.clear();
         bases.append(&mut valid_bases);
+
+        let mut valid_fields = Vec::new();
+        for field in fields.iter() {
+          if let Err(msg) = self.check_type_integrity(&field.field_type) {
+            log::warning(format!("Class {}: field removed because type is not available: \
+                                  {:?}: {}",
+                                 t.name,
+                                 field,
+                                 msg));
+          } else {
+            valid_fields.push(field.clone());
+          }
+        }
+        fields.clear();
+        fields.append(&mut valid_fields);
+
       }
       good_types.push(good_type);
     }

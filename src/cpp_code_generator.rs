@@ -1,6 +1,6 @@
 use cpp_ffi_data::{IndirectionChange, CppAndFfiMethod, CppFfiArgumentMeaning};
 use cpp_ffi_generator::CppFfiHeaderData;
-use cpp_method::ReturnValueAllocationPlace;
+use cpp_method::{ReturnValueAllocationPlace, CppFieldAccessorType};
 use cpp_type::{CppTypeIndirection, CppTypeBase};
 use errors::{Result, ChainErr, unexpected};
 use file_utils::{PathBufWithAdded, create_dir_all, create_file, path_to_str};
@@ -162,6 +162,7 @@ impl CppCodeGenerator {
         return Err(unexpected("no this arg in destructor").into());
       }
     } else {
+      let mut is_field_accessor = false;
       let result_without_args = if let Some(info) = method.cpp_method
         .class_info_if_constructor() {
         let class_type = &info.class_type;
@@ -210,14 +211,33 @@ impl CppCodeGenerator {
           }
           None => String::new(),
         };
-        format!("{}{}{}",
-                scope_specifier,
-                method.cpp_method.name,
-                template_args)
+        if let Some(&Some(ref field_accessor)) = method.cpp_method
+          .class_membership
+          .as_ref()
+          .map(|x| &x.field_accessor) {
+          is_field_accessor = true;
+          if field_accessor.accessor_type == CppFieldAccessorType::Setter {
+            format!("{}{} = {}",
+                    scope_specifier,
+                    field_accessor.field_name,
+                    try!(self.arguments_values(method)))
+          } else {
+            format!("{}{}", scope_specifier, field_accessor.field_name)
+          }
+        } else {
+          format!("{}{}{}",
+                  scope_specifier,
+                  method.cpp_method.name,
+                  template_args)
+        }
       };
-      format!("{}({})",
-              result_without_args,
-              try!(self.arguments_values(method)))
+      if is_field_accessor {
+        result_without_args
+      } else {
+        format!("{}({})",
+                result_without_args,
+                try!(self.arguments_values(method)))
+      }
     };
     self.convert_return_type(method, result)
   }

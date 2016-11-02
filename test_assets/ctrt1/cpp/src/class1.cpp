@@ -1,7 +1,8 @@
 #include "ctrt1/class1.h"
 
-Class1::Class1(int x) {
+Class1::Class1(int x) : field1(1), field3(field1) {
   m_x = x;
+  field2 = 0;
 }
 
 int Class1::x() {
