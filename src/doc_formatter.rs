@@ -1,16 +1,13 @@
-use cpp_method::CppMethodInheritedFrom;
-use cpp_type::CppTypeBase;
-use qt_doc_parser::{QtDocResultForMethod, QtDocResultForMethodKind};
+use cpp_method::CppMethodDoc;
 use rust_code_generator::rust_type_to_code;
 use rust_info::{RustMethodSelfArgKind, RustMethodArgumentsVariant};
 use string_utils::JoinWithString;
 
 #[derive(Debug, Clone)]
 pub struct DocItem {
-  pub doc: Option<QtDocResultForMethod>,
+  pub doc: Option<CppMethodDoc>,
   pub rust_fns: Vec<String>,
   pub cpp_fn: String,
-  pub inherited_from: Option<CppMethodInheritedFrom>,
 }
 
 pub fn rust_method_variant(args: &RustMethodArgumentsVariant,
@@ -62,7 +59,7 @@ pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &str) -> String {
   let mut shown_docs = Vec::new();
   for doc_item in &doc_items {
     let ok = if let Some(ref x) = doc_item.doc {
-      x.kind == QtDocResultForMethodKind::ExactMatch
+      x.mismatched_declaration.is_none()
     } else {
       true
     };
@@ -72,7 +69,7 @@ pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &str) -> String {
   }
   for doc_item in doc_items {
     if let Some(ref item_doc) = doc_item.doc {
-      if item_doc.kind != QtDocResultForMethodKind::ExactMatch {
+      if item_doc.mismatched_declaration.is_some() {
         let anchor = &item_doc.anchor;
         if shown_docs.iter()
           .any(|x| if let Some(ref xx) = x.doc {
@@ -112,21 +109,21 @@ pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &str) -> String {
     }
     doc.push(format!("C++ method: {}", wrap_inline_cpp_code(&doc_item.cpp_fn)));
     doc.push("\n\n".to_string());
-    if let Some(ref inherited_from) = doc_item.inherited_from {
-      doc.push(format!("Inherited from {}. Original C++ method: {}\n\n",
-                       wrap_inline_cpp_code(&CppTypeBase::Class(inherited_from.class_type
-                           .clone())
-                         .to_cpp_pseudo_code()),
-                       wrap_inline_cpp_code(&inherited_from.short_text)));
-    }
+    // TODO: use inheritance_chain to generate documentation
+    //    if let Some(ref inherited_from) = doc_item.inherited_from {
+    //      doc.push(format!("Inherited from {}. Original C++ method: {}\n\n",
+    //                       wrap_inline_cpp_code(&CppTypeBase::Class(inherited_from.class_type
+    //                           .clone())
+    //                         .to_cpp_pseudo_code()),
+    //                       wrap_inline_cpp_code(&inherited_from.short_text)));
+    //    }
     if let Some(result) = doc_item.doc {
-      let prefix = match result.kind {
-        QtDocResultForMethodKind::ExactMatch => "C++ documentation:".to_string(),
-        QtDocResultForMethodKind::Mismatch { ref declaration } => {
-          format!("Warning: no exact match found in C++ documentation.\
+      let prefix = if let Some(ref declaration) = result.mismatched_declaration {
+        format!("Warning: no exact match found in C++ documentation.\
                          Below is the C++ documentation for <code>{}</code>:",
-                  declaration)
-        }
+                declaration)
+      } else {
+        "C++ documentation:".to_string()
       };
 
       doc.push(format!("{} <div style='border: 1px solid #5CFF95; \

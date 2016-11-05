@@ -2,14 +2,13 @@ use caption_strategy::TypeCaptionStrategy;
 use cpp_data::{CppTypeKind, EnumValue};
 use cpp_ffi_data::{CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiType, IndirectionChange};
 use cpp_ffi_generator::CppAndFfiData;
-use cpp_method::{CppMethod, ReturnValueAllocationPlace};
+use cpp_method::ReturnValueAllocationPlace;
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
                CppSpecificNumericTypeKind, CppTypeClassBase, CppTypeRole};
 use doc_formatter;
 use errors::{Result, ChainErr, unexpected};
 use log;
-use qt_doc_parser::{QtDocData, QtDocResultForMethod};
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
                 RustMethodArguments, TraitImpl, TraitName, RustEnumValue, RustMethodSelfArgKind};
@@ -225,8 +224,6 @@ pub struct RustGeneratorConfig {
   /// Flag instructing to remove leading "Q" and "Qt"
   /// from identifiers.
   pub remove_qt_prefix: bool,
-
-  pub qt_doc_data: Option<QtDocData>,
 }
 // TODO: implement removal of arbitrary prefixes (#25)
 
@@ -1065,8 +1062,7 @@ impl RustGenerator {
       let doc_item = doc_formatter::DocItem {
         cpp_fn: method.short_text(),
         rust_fns: Vec::new(),
-        doc: self.get_qt_doc_for_method(&method.cpp_method),
-        inherited_from: method.cpp_method.inherited_from.clone(),
+        doc: method.cpp_method.doc.clone(),
       };
       doc_formatter::method_doc(vec![doc_item], &method.cpp_method.full_name())
     } else {
@@ -1266,7 +1262,7 @@ impl RustGenerator {
       });
       for (cpp_method, variants) in grouped_by_cpp_method_vec {
         doc_items.push(doc_formatter::DocItem {
-          doc: self.get_qt_doc_for_method(&cpp_method),
+          doc: cpp_method.doc.clone(),
           cpp_fn: cpp_method.short_text(),
           rust_fns: try!(variants.iter().map_if_ok(|args| -> Result<_> {
             Ok(doc_formatter::rust_method_variant(args,
@@ -1274,7 +1270,6 @@ impl RustGenerator {
                                                   try!(first_method.self_arg_kind()),
                                                   &self.config.crate_name))
           })),
-          inherited_from: cpp_method.inherited_from.clone(),
         });
       }
       let doc = doc_formatter::method_doc(doc_items, &cpp_method_name);
@@ -1368,8 +1363,7 @@ impl RustGenerator {
         let doc_item = doc_formatter::DocItem {
           cpp_fn: args.cpp_method.cpp_method.short_text(),
           rust_fns: Vec::new(),
-          doc: self.get_qt_doc_for_method(&args.cpp_method.cpp_method),
-          inherited_from: args.cpp_method.cpp_method.inherited_from.clone(),
+          doc: args.cpp_method.cpp_method.doc.clone(),
         };
         method.doc = doc_formatter::method_doc(vec![doc_item],
                                                &args.cpp_method.cpp_method.full_name());
@@ -1380,45 +1374,6 @@ impl RustGenerator {
       method
     };
     Ok((method, type_declaration))
-  }
-
-  fn get_qt_doc_for_method(&self, cpp_method: &CppMethod) -> Option<QtDocResultForMethod> {
-    if let Some(ref qt_doc_data) = self.config.qt_doc_data {
-      if let Some(ref inherited_from) = cpp_method.inherited_from {
-        if let Some(ref declaration_code) = inherited_from.declaration_code {
-          match qt_doc_data.doc_for_method(&inherited_from.doc_id,
-                                           declaration_code,
-                                           &inherited_from.short_text) {
-            Ok(doc) => Some(doc),
-            Err(msg) => {
-              log::warning(format!("Failed to get documentation for method: {}: {}",
-                                   &inherited_from.short_text,
-                                   msg));
-              None
-            }
-          }
-        } else {
-          None
-        }
-      } else if let Some(ref declaration_code) = cpp_method.declaration_code {
-        match qt_doc_data.doc_for_method(&cpp_method.doc_id(),
-                                         declaration_code,
-                                         &cpp_method.short_text()) {
-          Ok(doc) => Some(doc),
-          Err(msg) => {
-            log::warning(format!("Failed to get documentation for method: {}: {}",
-                                 &cpp_method.short_text(),
-                                 msg));
-            None
-          }
-
-        }
-      } else {
-        None
-      }
-    } else {
-      None
-    }
   }
 
   /// Generates methods, trait implementations and overloading types
@@ -1591,7 +1546,6 @@ fn calculate_rust_name_test_part(name: &'static str,
                                  &RustGeneratorConfig {
                                    crate_name: "qt_core".to_string(),
                                    remove_qt_prefix: true,
-                                   qt_doc_data: None,
                                  })
                .unwrap(),
              RustName::new(expected.into_iter().map(|x| x.to_string()).collect()).unwrap());

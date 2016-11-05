@@ -104,3 +104,10 @@ impl<T> ChainErr<T> for Option<T> {
     }
   }
 }
+
+pub fn fancy_unwrap<T>(value: Result<T>) -> T {
+  if let Err(ref err) = value {
+    err.display_report();
+  }
+  value.unwrap()
+}

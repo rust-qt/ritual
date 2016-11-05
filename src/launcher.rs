@@ -10,7 +10,6 @@ use errors::{Result, ChainErr};
 use file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json, canonicalize,
                  remove_dir_all, remove_dir, read_dir, path_to_str};
 use log;
-use qt_doc_parser::QtDocData;
 use rust_code_generator::{RustCodeGeneratorDependency, RustLinkItem, RustLinkKind};
 use rust_code_generator;
 use rust_generator;
@@ -146,26 +145,6 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
   // TODO: move other effects of this var to qt_build_tools
   let is_qt_library = link_items.iter().any(|x| x.name.starts_with("Qt"));
 
-  let qt_doc_data = if is_qt_library {
-    // TODO: find a better way to specify doc source (#35)
-    let env_var_name = format!("{}_DOC_DATA", "QT5CORE".to_uppercase());
-    if let Ok(env_var_value) = std::env::var(&env_var_name) {
-      log::info(format!("Loading Qt doc data from {}", &env_var_value));
-      match QtDocData::new(&PathBuf::from(&env_var_value)) {
-        Ok(r) => Some(r),
-        Err(msg) => {
-          log::warning(format!("Failed to load Qt doc data: {}", msg));
-          None
-        }
-      }
-    } else {
-      log::warning(format!("Building without Qt doc data (no env var: {})",
-                           env_var_name));
-      None
-    }
-  } else {
-    None
-  };
   if !env.dependency_paths.is_empty() {
     log::info("Loading dependencies");
   }
@@ -338,7 +317,6 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
                                              rust_generator::RustGeneratorConfig {
                                                crate_name: input_cargo_toml_data.name.clone(),
                                                remove_qt_prefix: is_qt_library,
-                                               qt_doc_data: qt_doc_data,
                                              })
       .chain_err(|| "Rust data generator failed"));
     log::info(format!("Generating Rust crate ({}).", &input_cargo_toml_data.name));

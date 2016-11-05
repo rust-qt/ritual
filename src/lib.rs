@@ -33,7 +33,6 @@ pub mod errors;
 pub mod file_utils;
 mod launcher;
 pub mod log;
-mod qt_doc_parser;
 mod rust_generator;
 mod rust_code_generator;
 mod rust_info;

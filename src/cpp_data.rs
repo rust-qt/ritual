@@ -1,5 +1,5 @@
 use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership, CppFunctionArgument,
-                 CppMethodInheritedFrom, CppFieldAccessorType, CppFieldAccessor};
+                 CppFieldAccessorType, CppFieldAccessor};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
 use errors::{Result, unexpected};
@@ -199,7 +199,7 @@ impl CppData {
             template_arguments: None,
             template_arguments_values: None,
             declaration_code: None,
-            inherited_from: None,
+            doc: None,
             inheritance_chain: Vec::new(),
           });
         }
@@ -283,18 +283,6 @@ impl CppData {
                     new_method.include_file = type1.include_file.clone();
                     new_method.origin_location = None;
                     new_method.declaration_code = None;
-                    if new_method.inherited_from.is_none() {
-                      new_method.inherited_from = Some(CppMethodInheritedFrom {
-                        doc_id: base_class_method.doc_id(),
-                        short_text: base_class_method.short_text(),
-                        declaration_code: base_class_method.declaration_code.clone(),
-                        class_type: if let Some(ref info) = base_class_method.class_membership {
-                          info.class_type.clone()
-                        } else {
-                          return Err(unexpected("no class membership").into());
-                        },
-                      });
-                    }
                     new_method.inheritance_chain.push(base.clone());
                     log::noisy(format!("Method added: {}", new_method.short_text()));
                     log::noisy(format!("Base method: {} ({:?})\n",
@@ -714,7 +702,7 @@ impl CppData {
                 template_arguments: None,
                 template_arguments_values: None,
                 declaration_code: None,
-                inherited_from: None,
+                doc: None,
                 inheritance_chain: Vec::new(),
               })
             };

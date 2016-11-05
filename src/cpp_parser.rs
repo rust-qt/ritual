@@ -1149,7 +1149,7 @@ impl<'a> CppParser<'a> {
       template_arguments: template_arguments,
       template_arguments_values: None,
       declaration_code: declaration_code,
-      inherited_from: None,
+      doc: None,
       inheritance_chain: Vec::new(),
     })
   }

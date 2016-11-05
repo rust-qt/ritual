@@ -232,20 +232,12 @@ pub struct CppMethodClassMembership {
   pub field_accessor: Option<CppFieldAccessor>,
 }
 
-/// Additional information about original method
-/// for an inherited method
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
-pub struct CppMethodInheritedFrom {
-  /// Presumed identifier of original method in the Qt documentation index
-  pub doc_id: String,
-  /// C++ code of the method's declaration.
-  /// None if the method was not declared explicitly.
-  pub declaration_code: Option<String>,
-  /// CppMethod::short_text() result of original method
-  pub short_text: String,
-  /// Class type of original method
-  pub class_type: CppTypeClassBase,
+pub struct CppMethodDoc {
+  pub anchor: String,
+  pub text: String,
+  pub mismatched_declaration: Option<String>,
 }
 
 /// Information about a C++ method
@@ -288,13 +280,11 @@ pub struct CppMethod {
   /// C++ code of the method's declaration.
   /// None if the method was not explicitly declared.
   pub declaration_code: Option<String>,
-  /// If Some, the method was inherited from a base class.
-  /// This field contains additional information about original
-  /// method, mostly for generating documentation.
-  pub inherited_from: Option<CppMethodInheritedFrom>,
   /// List of base classes this method was inferited from.
   /// The first item is the most base class.
   pub inheritance_chain: Vec<CppBaseSpecifier>, /* TODO: fill inheritance_chain for explicitly redeclared methods (#23) */
+
+  pub doc: Option<CppMethodDoc>,
 }
 
 // ------------------------------
