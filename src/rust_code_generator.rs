@@ -35,6 +35,7 @@ pub struct RustCodeGeneratorConfig {
   pub crate_version: String,
   pub crate_authors: Vec<String>,
   pub output_path: PathBuf,
+  pub final_output_path: PathBuf,
   pub template_path: PathBuf,
   pub c_lib_name: String,
   pub c_lib_is_shared: bool,
@@ -548,10 +549,10 @@ impl RustCodeGenerator {
       LibRs,
     }
     for mode in &[Mode::LibInRs, Mode::LibRs] {
-      let lib_file_path = src_path.with_added(match *mode {
-        Mode::LibInRs => "lib.in.rs",
-        Mode::LibRs => "lib.rs",
-      });
+      let lib_file_path = match *mode {
+        Mode::LibInRs => self.config.output_path.with_added("lib.in.rs"),
+        Mode::LibRs => src_path.with_added("lib.rs"),
+      };
       {
         let mut lib_file = try!(create_file(&lib_file_path));
         try!(lib_file.write("pub extern crate libc;\n"));
@@ -598,9 +599,12 @@ impl RustCodeGenerator {
           }
           match *mode {
             Mode::LibInRs => {
+              let mut file_path = self.config.final_output_path.clone();
+              file_path.push("src");
+              file_path.push(format!("{}.rs", module));
               try!(lib_file.write(format!("{maybe_pub}mod {name} {{ \n  \
-                                           include!(concat!(env!(\"OUT_DIR\"), \
-                                           \"/src/{name}.rs\"));\n}}\n",
+                                           include!(\"{path}\");\n}}\n",
+                                          path = try!(path_to_str(&file_path)).replace("\\", "\\\\"),
                                           name = module,
                                           maybe_pub = maybe_pub)))
             }

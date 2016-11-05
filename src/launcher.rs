@@ -8,7 +8,7 @@ use cpp_parser;
 use dependency_info::DependencyInfo;
 use errors::{Result, ChainErr};
 use file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json, canonicalize,
-                 remove_dir_all, remove_dir, read_dir, path_to_str};
+                 remove_dir_all, remove_dir, read_dir, path_to_str, create_file};
 use log;
 use rust_code_generator::{RustCodeGeneratorDependency, RustLinkItem, RustLinkKind};
 use rust_code_generator;
@@ -33,6 +33,7 @@ pub struct BuildEnvironment {
   pub num_jobs: Option<i32>,
   pub build_profile: BuildProfile,
   pub pipe_output: bool,
+  pub aggressive_caching: bool,
 }
 
 pub fn run_from_build_script(config: Config) -> Result<()> {
@@ -45,12 +46,34 @@ pub fn run_from_build_script(config: Config) -> Result<()> {
       }
     }
   }
+  let source_dir_path = PathBuf::from(try!(std::env::var("CARGO_MANIFEST_DIR")
+    .chain_err(|| "failed to read required env var: CARGO_MANIFEST_DIR")));
+  let out_dir = PathBuf::from(try!(std::env::var("OUT_DIR")
+    .chain_err(|| "failed to read required env var: OUT_DIR")));
+  let mut aggressive_caching = false;
+  let output_dir_path = if let Ok(cache) = std::env::var("CPP_TO_RUST_CACHE") {
+    let input_cargo_toml_path = source_dir_path.with_added("Cargo.toml");
+    if !input_cargo_toml_path.exists() {
+      return Err(format!("Input Cargo.toml does not exist: {}",
+                         input_cargo_toml_path.display())
+        .into());
+    }
+    let input_cargo_toml_data = try!(InputCargoTomlData::from_file(&input_cargo_toml_path));
+    let cache_path = PathBuf::from(cache).with_added(&input_cargo_toml_data.name);
+    let lib_in_file_path = out_dir.with_added("lib.in.rs");
+    let mut lib_in_file = try!(create_file(lib_in_file_path));
+    try!(lib_in_file.write(format!("include!(\"{}\");\n",
+                                   cache_path.with_added("lib.in.rs").display())));
+    log::info(format!("Using cache directory: {}", cache_path.display()));
+    aggressive_caching = true;
+    cache_path
+  } else {
+    out_dir
+  };
   run(BuildEnvironment {
     config: config,
-    source_dir_path: PathBuf::from(try!(std::env::var("CARGO_MANIFEST_DIR")
-      .chain_err(|| "failed to read required env var: CARGO_MANIFEST_DIR"))),
-    output_dir_path: PathBuf::from(try!(std::env::var("OUT_DIR")
-      .chain_err(|| "failed to read required env var: OUT_DIR"))),
+    source_dir_path: source_dir_path,
+    output_dir_path: output_dir_path,
     num_jobs: try!(std::env::var("NUM_JOBS")
         .chain_err(|| "failed to read required env var: NUM_JOBS"))
       .parse()
@@ -64,6 +87,7 @@ pub fn run_from_build_script(config: Config) -> Result<()> {
     },
     dependency_paths: dependency_paths,
     pipe_output: false,
+    aggressive_caching: aggressive_caching,
   })
 }
 
@@ -162,11 +186,12 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     dependency_cpp_types.extend_from_slice(&dep.cpp_data.types);
   }
   let c_lib_is_shared = is_msvc();
-  if output_dir_path.with_added("skip_processing").as_path().exists() {
-    log::info("Processing skipped!");
+  if env.aggressive_caching &&
+     output_dir_path.with_added("cpp_to_rust_completed").as_path().exists() {
+    log::info("No processing! cpp_to_rust uses previous results.");
   } else {
     let parse_result_cache_file_path = output_dir_path.with_added("cpp_data.json");
-    let loaded_parse_result = if std::env::var("CPP_TO_RUST_DEV_CACHE").is_ok() &&
+    let loaded_parse_result = if env.aggressive_caching &&
                                  parse_result_cache_file_path.as_path().is_file() {
       match load_json(&parse_result_cache_file_path) {
         Ok(r) => {
@@ -285,6 +310,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       crate_authors: input_cargo_toml_data.authors.clone(),
       crate_version: input_cargo_toml_data.version.clone(),
       output_path: crate_new_path.clone(),
+      final_output_path: output_dir_path.clone(),
       template_path: source_dir_path.clone(),
       c_lib_name: c_lib_name,
       c_lib_is_shared: c_lib_is_shared,
@@ -393,5 +419,6 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     println!("cargo:rustc-link-search=framework={}",
              try!(path_to_str(dir)));
   }
+  try!(create_file(output_dir_path.with_added("cpp_to_rust_completed")));
   Ok(())
 }
