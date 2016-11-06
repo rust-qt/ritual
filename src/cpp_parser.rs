@@ -1604,9 +1604,12 @@ impl<'a> CppParser<'a> {
       }
     }
     for t in &self.types {
-      if let CppTypeKind::Class { ref bases, .. } = t.kind {
+      if let CppTypeKind::Class { ref bases, ref fields, .. } = t.kind {
         for base in bases {
           check_type(&base.base_type, self.dependencies_data, &mut result);
+        }
+        for field in fields {
+          check_type(&field.field_type, self.dependencies_data, &mut result);
         }
       }
     }
