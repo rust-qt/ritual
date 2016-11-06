@@ -36,22 +36,12 @@ pub struct BuildEnvironment {
   pub aggressive_caching: bool,
 }
 
-pub fn run_from_build_script(config: Config) -> Result<()> {
-  let mut dependency_paths = Vec::new();
-  for (name, value) in std::env::vars_os() {
-    if let Ok(name) = name.into_string() {
-      if name.starts_with("DEP_") && name.ends_with("_CPP_TO_RUST_DATA_PATH") {
-        log::info(format!("Found dependency: {}", value.to_string_lossy()));
-        dependency_paths.push(PathBuf::from(value));
-      }
-    }
-  }
+fn read_cache_env() -> Result<(PathBuf, PathBuf, bool)> {
   let source_dir_path = PathBuf::from(try!(std::env::var("CARGO_MANIFEST_DIR")
     .chain_err(|| "failed to read required env var: CARGO_MANIFEST_DIR")));
   let out_dir = PathBuf::from(try!(std::env::var("OUT_DIR")
     .chain_err(|| "failed to read required env var: OUT_DIR")));
-  let mut aggressive_caching = false;
-  let output_dir_path = if let Ok(cache) = std::env::var("CPP_TO_RUST_CACHE") {
+  if let Ok(cache) = std::env::var("CPP_TO_RUST_CACHE") {
     let input_cargo_toml_path = source_dir_path.with_added("Cargo.toml");
     if !input_cargo_toml_path.exists() {
       return Err(format!("Input Cargo.toml does not exist: {}",
@@ -65,11 +55,31 @@ pub fn run_from_build_script(config: Config) -> Result<()> {
     try!(lib_in_file.write(format!("include!(\"{}\");\n",
                                    cache_path.with_added("lib.in.rs").display())));
     log::info(format!("Using cache directory: {}", cache_path.display()));
-    aggressive_caching = true;
-    cache_path
+    Ok((source_dir_path, cache_path, true))
   } else {
-    out_dir
-  };
+    Ok((source_dir_path, out_dir, false))
+  }
+}
+
+const COMPLETED_MARKER_FILE_NAME: &'static str = "cpp_to_rust_completed";
+
+pub fn is_processing_skipped() -> Result<bool> {
+  let (_source_dir_path, output_dir_path, aggressive_caching) = try!(read_cache_env());
+  Ok(aggressive_caching &&
+     output_dir_path.with_added(COMPLETED_MARKER_FILE_NAME).as_path().exists())
+}
+
+pub fn run_from_build_script(config: Config) -> Result<()> {
+  let mut dependency_paths = Vec::new();
+  for (name, value) in std::env::vars_os() {
+    if let Ok(name) = name.into_string() {
+      if name.starts_with("DEP_") && name.ends_with("_CPP_TO_RUST_DATA_PATH") {
+        log::info(format!("Found dependency: {}", value.to_string_lossy()));
+        dependency_paths.push(PathBuf::from(value));
+      }
+    }
+  }
+  let (source_dir_path, output_dir_path, aggressive_caching) = try!(read_cache_env());
   run(BuildEnvironment {
     config: config,
     source_dir_path: source_dir_path,
@@ -169,27 +179,27 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
   // TODO: move other effects of this var to qt_build_tools
   let is_qt_library = link_items.iter().any(|x| x.name.starts_with("Qt"));
 
-  if !env.dependency_paths.is_empty() {
-    log::info("Loading dependencies");
-  }
-  let dependencies: Vec<_> = try!(env.dependency_paths
-    .iter()
-    .map_if_ok(|path| DependencyInfo::load(&try!(canonicalize(path))))
-    .chain_err(|| "failed to load dependency"));
 
   let c_lib_parent_path = output_dir_path.with_added("c_lib");
   let c_lib_install_path = c_lib_parent_path.with_added("install");
   let c_lib_lib_path = c_lib_install_path.with_added("lib");
   let num_jobs = env.num_jobs.unwrap_or_else(|| num_cpus::get() as i32);
-  let mut dependency_cpp_types = Vec::new();
-  for dep in &dependencies {
-    dependency_cpp_types.extend_from_slice(&dep.cpp_data.types);
-  }
   let c_lib_is_shared = is_msvc();
   if env.aggressive_caching &&
-     output_dir_path.with_added("cpp_to_rust_completed").as_path().exists() {
+     output_dir_path.with_added(COMPLETED_MARKER_FILE_NAME).as_path().exists() {
     log::info("No processing! cpp_to_rust uses previous results.");
   } else {
+    if !env.dependency_paths.is_empty() {
+      log::info("Loading dependencies");
+    }
+    let dependencies: Vec<_> = try!(env.dependency_paths
+      .iter()
+      .map_if_ok(|path| DependencyInfo::load(&try!(canonicalize(path))))
+      .chain_err(|| "failed to load dependency"));
+    let mut dependency_cpp_types = Vec::new();
+    for dep in &dependencies {
+      dependency_cpp_types.extend_from_slice(&dep.cpp_data.types);
+    }
     let parse_result_cache_file_path = output_dir_path.with_added("cpp_data.json");
     let loaded_parse_result = if env.aggressive_caching &&
                                  parse_result_cache_file_path.as_path().is_file() {
