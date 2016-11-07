@@ -111,6 +111,8 @@ pub struct CppTypeData {
   pub origin_location: CppOriginLocation,
   /// Type information
   pub kind: CppTypeKind,
+
+  pub doc: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -140,6 +142,8 @@ pub struct CppTemplateInstantiation {
 pub struct CppTemplateInstantiations {
   /// Template class name
   pub class_name: String,
+
+  pub cpp_doc: Option<String>,
   /// File name of the include file (without full path)
   /// of the template type
   pub include_file: String,
@@ -579,6 +583,7 @@ pub enum RustProcessedTypeKind {
 pub struct RustProcessedTypeInfo {
   /// Full name of corresponding C++ type (class or enum).
   pub cpp_name: String,
+  pub cpp_doc: Option<String>,
   /// Template arguments. None if C++ type is not a template class.
   pub cpp_template_arguments: Option<Vec<CppType>>,
   /// Kind of the type and additional information.

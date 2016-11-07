@@ -291,6 +291,7 @@ pub fn run(config: CppParserConfig, dependencies_data: &[&CppData]) -> Result<Cp
               }
               final_template_instantiations.push(CppTemplateInstantiations {
                 class_name: class_name.clone(),
+                cpp_doc: type_info.doc.clone(),
                 include_file: type_info.include_file.clone(),
                 instantiations: Vec::new(),
               });
@@ -1176,6 +1177,7 @@ impl<'a> CppParser<'a> {
       include_file: include_file,
       origin_location: try!(get_origin_location(entity)),
       kind: CppTypeKind::Enum { values: values },
+      doc: None,
     })
   }
 
@@ -1294,6 +1296,7 @@ impl<'a> CppParser<'a> {
         using_directives: using_directives,
         template_arguments: template_arguments,
       },
+      doc: None,
     })
   }
 

@@ -392,6 +392,7 @@ fn process_types(input_data: &CppAndFfiData,
     }
     result.push(RustProcessedTypeInfo {
       cpp_name: type_info.name.clone(),
+      cpp_doc: type_info.doc.clone(),
       cpp_template_arguments: None,
       kind: match type_info.kind {
         CppTypeKind::Class { ref size, .. } => {
@@ -441,6 +442,7 @@ fn process_types(input_data: &CppAndFfiData,
     for ins in &template_instantiations.instantiations {
       name_failed_items.push(RustProcessedTypeInfo {
         cpp_name: template_instantiations.class_name.clone(),
+        cpp_doc: template_instantiations.cpp_doc.clone(),
         cpp_template_arguments: Some(ins.template_arguments.clone()),
         kind: RustProcessedTypeKind::Class {
           size: ins.size,
@@ -811,8 +813,6 @@ impl RustGenerator {
         }
 
         // TODO: export Qt doc for enum and its variants (#35)
-        let doc = format!("C++ type: {}",
-                          doc_formatter::wrap_inline_cpp_code(&info.cpp_name));
         (ProcessTypeResult {
           main_type: RustTypeDeclaration {
             name: try!(info.rust_name.last_name()).clone(),
@@ -826,7 +826,7 @@ impl RustGenerator {
               methods: Vec::new(),
               traits: Vec::new(),
             },
-            doc: doc,
+            doc: doc_formatter::type_doc(&info.cpp_name, &info.cpp_doc),
           },
           overloading_types: Vec::new(),
         },
@@ -852,16 +852,13 @@ impl RustGenerator {
         cpp_methods = tmp_cpp_methods;
         let functions_result =
           try!(self.process_functions(good_methods.into_iter(), &methods_scope));
-        // TODO: export Qt doc for class (detailed description) (#35)
-        let doc = format!("C++ type: {}.",
-                          doc_formatter::wrap_inline_cpp_code(&CppType {
-                              base: CppTypeBase::Class(class_type.clone()),
-                              indirection: CppTypeIndirection::None,
-                              is_const: false,
-                              is_const2: false,
-                            }
-                            .to_cpp_pseudo_code()));
-
+        let cpp_type_name = CppType {
+            base: CppTypeBase::Class(class_type.clone()),
+            indirection: CppTypeIndirection::None,
+            is_const: false,
+            is_const2: false,
+          }
+          .to_cpp_pseudo_code();
         (ProcessTypeResult {
           main_type: RustTypeDeclaration {
             name: try!(info.rust_name.last_name()).clone(),
@@ -872,7 +869,7 @@ impl RustGenerator {
               methods: functions_result.methods,
               traits: functions_result.trait_impls,
             },
-            doc: doc,
+            doc: doc_formatter::type_doc(&cpp_type_name, &info.cpp_doc),
           },
           overloading_types: functions_result.overloading_types,
         },

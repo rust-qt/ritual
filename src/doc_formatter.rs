@@ -48,6 +48,21 @@ pub fn wrap_inline_cpp_code(code: &str) -> String {
   format!("<span style='color: green;'>```{}```</span>", code)
 }
 
+pub fn wrap_cpp_doc_block(html: &str) -> String {
+  format!("<div style='border: 1px solid #5CFF95; \
+                       background: #D6FFE4; padding: 16px;'>{}</div>",
+          html)
+}
+
+pub fn type_doc(cpp_type_name: &str, cpp_doc: &Option<String>) -> String {
+  let mut doc = format!("C++ type: {}", wrap_inline_cpp_code(cpp_type_name));
+  if let Some(ref cpp_doc) = *cpp_doc {
+    // TODO: use doc_formatter
+    doc += &format!("\n\nC++ documentation: {}", wrap_cpp_doc_block(cpp_doc));
+  }
+  doc
+}
+
 pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &str) -> String {
   let overloaded = doc_items.len() > 1 || (doc_items.len() == 1 && doc_items[0].rust_fns.len() > 1);
   let mut doc = Vec::new();
@@ -125,12 +140,7 @@ pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &str) -> String {
       } else {
         "C++ documentation:".to_string()
       };
-
-      doc.push(format!("{} <div style='border: 1px solid #5CFF95; \
-                                    background: #D6FFE4; padding: 16px;'>{}</div>",
-                       prefix,
-                       result.text));
-
+      doc.push(format!("{} {}", prefix, wrap_cpp_doc_block(&result.text)));
     }
   }
   doc.join("")
