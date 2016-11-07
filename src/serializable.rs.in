@@ -4,11 +4,13 @@
 /// One item of a C++ enum declaration
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[derive(Serialize, Deserialize)]
-pub struct EnumValue {
+pub struct CppEnumValue {
   /// Identifier
   pub name: String,
   /// Corresponding value
   pub value: i64,
+
+  pub doc: Option<String>,
 }
 
 /// Member field of a C++ class declaration
@@ -57,7 +59,7 @@ pub enum CppTypeKind {
   /// Enum declaration
   Enum {
     /// List of items
-    values: Vec<EnumValue>,
+    values: Vec<CppEnumValue>,
   },
   /// Class declaration
   Class {
@@ -562,20 +564,35 @@ pub struct RustName {
 
 
 // -------------------------
-// from rust_generator
+// from rust_info
 
-/// Information about a Rust wrapper type
-#[derive(Debug, Clone)]
+/// One variant of a Rust enum
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[derive(Serialize, Deserialize)]
-pub enum RustProcessedTypeKind {
-  /// Enum with list of values
-  Enum { values: Vec<EnumValue> },
-  /// Class with size in bytes
-  Class {
+pub struct RustEnumValue {
+  /// Identifier
+  pub name: String,
+  /// Corresponding value
+  pub value: i64,
+  /// Documentation text
+  pub doc: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub enum RustTypeWrapperKind {
+  Enum {
+    values: Vec<RustEnumValue>,
+    is_flaggable: bool,
+  },
+  Struct {
     size: i32,
     is_deletable: bool,
   },
 }
+
+// -------------------------
+// from rust_generator
 
 /// Exported information about a Rust wrapper type
 #[derive(Debug, Clone)]
@@ -587,7 +604,7 @@ pub struct RustProcessedTypeInfo {
   /// Template arguments. None if C++ type is not a template class.
   pub cpp_template_arguments: Option<Vec<CppType>>,
   /// Kind of the type and additional information.
-  pub kind: RustProcessedTypeKind,
+  pub kind: RustTypeWrapperKind,
   /// Identifier of Rust type
   pub rust_name: RustName,
 }

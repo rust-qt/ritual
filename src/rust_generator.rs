@@ -1,5 +1,5 @@
 use caption_strategy::TypeCaptionStrategy;
-use cpp_data::{CppTypeKind, EnumValue};
+use cpp_data::{CppTypeKind, CppEnumValue};
 use cpp_ffi_data::{CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiType, IndirectionChange};
 use cpp_ffi_generator::CppAndFfiData;
 use cpp_method::ReturnValueAllocationPlace;
@@ -11,15 +11,14 @@ use errors::{Result, ChainErr, unexpected};
 use log;
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
-                RustMethodArguments, TraitImpl, TraitName, RustEnumValue, RustMethodSelfArgKind};
+                RustMethodArguments, TraitImpl, TraitName, RustEnumValue, RustMethodSelfArgKind,
+                RustProcessedTypeInfo};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
 use string_utils::{CaseOperations, VecCaseOperations, WordIterator};
 use utils::{add_to_multihash, MapIfOk};
 
 use std::collections::{HashMap, HashSet, hash_map};
-
-pub use serializable::{RustProcessedTypeKind, RustProcessedTypeInfo};
 
 impl RustProcessedTypeInfo {
   fn is_declared_in(&self, modules: &[RustModule]) -> bool {
@@ -110,49 +109,53 @@ fn sanitize_rust_identifier(name: &str) -> String {
 /// Rust does not allow such duplicates.
 /// - If there is only one variant, adds another variant.
 /// Rust does not allow repr(C) enums having only one variant.
-fn prepare_enum_values(values: &[EnumValue], name: &str) -> Vec<RustEnumValue> {
-  let mut value_to_variant: HashMap<i64, RustEnumValue> = HashMap::new();
+fn prepare_enum_values(values: &[CppEnumValue]) -> Vec<RustEnumValue> {
+  use doc_formatter::EnumValueCppDocItem as DocItem;
+
+  let mut value_to_variant: HashMap<i64, (RustEnumValue, Vec<DocItem>)> = HashMap::new();
   for variant in values {
     let value = variant.value;
+    let doc_item = DocItem {
+      variant_name: variant.name.clone(),
+      doc: variant.doc.clone(),
+    };
     match value_to_variant.entry(value) {
-      hash_map::Entry::Occupied(entry) => {
-        log::warning(format!("warning: {}: duplicated enum variant removed: {} (previous \
-                              variant: {})",
-                             name,
-                             variant.name,
-                             entry.get().name));
+      hash_map::Entry::Occupied(mut entry) => {
+        entry.get_mut().1.push(doc_item);
       }
       hash_map::Entry::Vacant(entry) => {
-        entry.insert(RustEnumValue {
+        entry.insert((RustEnumValue {
           name: sanitize_rust_identifier(&variant.name.to_class_case()),
-          cpp_name: Some(variant.name.clone()),
           value: variant.value,
-          doc: format!("C++ variant: {}", &variant.name),
-        });
+          doc: String::new(),
+        },
+                      vec![doc_item]));
 
       }
     }
   }
   let more_than_one = value_to_variant.len() > 1;
-  if value_to_variant.len() == 1 {
-    let dummy_value = if value_to_variant.contains_key(&0) {
-      1
-    } else {
-      0
-    };
-    value_to_variant.insert(dummy_value,
-                            RustEnumValue {
-                              name: "_Invalid".to_string(),
-                              value: dummy_value as i64,
-                              cpp_name: None,
-                              doc: "This variant is added in Rust because enums with one \
-                                            variant and C representation are not supported."
-                                .to_string(),
-                            });
-  }
+  let dummy_value: i64 = if value_to_variant.contains_key(&0) {
+    1
+  } else {
+    0
+  };
   let mut result: Vec<_> = value_to_variant.into_iter()
-    .map(|(_val, variant)| variant)
+    .map(|(_val, (mut variant, docs))| {
+      variant.doc = doc_formatter::enum_value_doc(variant.value, &docs);
+      variant
+    })
     .collect();
+  if result.len() == 1 {
+    result.push(RustEnumValue {
+      name: "_Invalid".to_string(),
+      value: dummy_value,
+      doc: "This variant is added in Rust because \
+            enums with one variant and C representation are not supported."
+        .to_string(),
+    });
+  }
+
   if more_than_one {
     let new_names = {
       let all_words: Vec<Vec<&str>> = result.iter()
@@ -396,7 +399,7 @@ fn process_types(input_data: &CppAndFfiData,
       cpp_template_arguments: None,
       kind: match type_info.kind {
         CppTypeKind::Class { ref size, .. } => {
-          RustProcessedTypeKind::Class {
+          RustTypeWrapperKind::Struct {
             size: try!(size.chain_err(|| "size must be present")),
             is_deletable: input_data.cpp_data.has_public_destructor(&CppTypeClassBase {
               name: type_info.name.clone(),
@@ -404,7 +407,34 @@ fn process_types(input_data: &CppAndFfiData,
             }),
           }
         }
-        CppTypeKind::Enum { ref values } => RustProcessedTypeKind::Enum { values: values.clone() },
+        CppTypeKind::Enum { ref values } => {
+
+          let mut is_flaggable = false;
+          let template_arg_sample = CppType {
+            is_const: false,
+            is_const2: false,
+            indirection: CppTypeIndirection::None,
+            base: CppTypeBase::Enum { name: type_info.name.clone() },
+          };
+
+          for flag_owner_name in &["QFlags", "QUrlTwoFlags"] {
+            if let Some(instantiations) = input_data.cpp_data
+              .template_instantiations
+              .iter()
+              .find(|x| &x.class_name == &flag_owner_name.to_string()) {
+              if instantiations.instantiations
+                .iter()
+                .any(|ins| ins.template_arguments.iter().any(|arg| arg == &template_arg_sample)) {
+                is_flaggable = true;
+                break;
+              }
+            }
+          }
+          RustTypeWrapperKind::Enum {
+            values: prepare_enum_values(values),
+            is_flaggable: is_flaggable,
+          }
+        }
       },
       rust_name: try!(calculate_rust_name(&type_info.name,
                                           &type_info.include_file,
@@ -444,7 +474,7 @@ fn process_types(input_data: &CppAndFfiData,
         cpp_name: template_instantiations.class_name.clone(),
         cpp_doc: template_instantiations.cpp_doc.clone(),
         cpp_template_arguments: Some(ins.template_arguments.clone()),
-        kind: RustProcessedTypeKind::Class {
+        kind: RustTypeWrapperKind::Struct {
           size: ins.size,
           is_deletable: input_data.cpp_data.has_public_destructor(&CppTypeClassBase {
             name: template_instantiations.class_name.clone(),
@@ -534,7 +564,7 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
           if let Some(info) = find_type_info(processed_types,
                                              dependency_types,
                                              |x| &x.rust_name == base) {
-            if let RustProcessedTypeKind::Class { ref is_deletable, .. } = info.kind {
+            if let RustTypeWrapperKind::Struct { ref is_deletable, .. } = info.kind {
               if !*is_deletable {
                 return Err(format!("{} is not deletable", base.full_name(None)).into());
               }
@@ -787,40 +817,12 @@ impl RustGenerator {
                       mut cpp_methods: Vec<&'a CppAndFfiMethod>)
                       -> Result<(ProcessTypeResult, Vec<&'a CppAndFfiMethod>)> {
     Ok(match info.kind {
-      RustProcessedTypeKind::Enum { ref values } => {
-        let mut is_flaggable = false;
-        let template_arg_sample = CppType {
-          is_const: false,
-          is_const2: false,
-          indirection: CppTypeIndirection::None,
-          base: CppTypeBase::Enum { name: info.cpp_name.clone() },
-        };
-
-        for flag_owner_name in &["QFlags", "QUrlTwoFlags"] {
-          if let Some(instantiations) = self.input_data
-            .cpp_data
-            .template_instantiations
-            .iter()
-            .find(|x| &x.class_name == &flag_owner_name.to_string()) {
-            if instantiations.instantiations
-              .iter()
-              .any(|ins| ins.template_arguments.iter().any(|arg| arg == &template_arg_sample)) {
-              is_flaggable = true;
-              break;
-            }
-          }
-
-        }
-
-        // TODO: export Qt doc for enum and its variants (#35)
+      RustTypeWrapperKind::Enum { .. } => {
         (ProcessTypeResult {
           main_type: RustTypeDeclaration {
             name: try!(info.rust_name.last_name()).clone(),
             kind: RustTypeDeclarationKind::CppTypeWrapper {
-              kind: RustTypeWrapperKind::Enum {
-                values: prepare_enum_values(values, &info.cpp_name),
-                is_flaggable: is_flaggable,
-              },
+              kind: info.kind.clone(),
               cpp_type_name: info.cpp_name.clone(),
               cpp_template_arguments: None,
               methods: Vec::new(),
@@ -832,7 +834,7 @@ impl RustGenerator {
         },
          cpp_methods)
       }
-      RustProcessedTypeKind::Class { ref size, .. } => {
+      RustTypeWrapperKind::Struct { .. } => {
         let methods_scope = RustMethodScope::Impl { type_name: info.rust_name.clone() };
         let class_type = CppTypeClassBase {
           name: info.cpp_name.clone(),
@@ -863,7 +865,7 @@ impl RustGenerator {
           main_type: RustTypeDeclaration {
             name: try!(info.rust_name.last_name()).clone(),
             kind: RustTypeDeclarationKind::CppTypeWrapper {
-              kind: RustTypeWrapperKind::Struct { size: *size },
+              kind: info.kind.clone(),
               cpp_type_name: info.cpp_name.clone(),
               cpp_template_arguments: info.cpp_template_arguments.clone(),
               methods: functions_result.methods,
@@ -1574,15 +1576,16 @@ fn calculate_rust_name_test() {
 
 #[test]
 fn prepare_enum_values_test_simple() {
-  let r = prepare_enum_values(&[EnumValue {
+  let r = prepare_enum_values(&[CppEnumValue {
                                   name: "var1".to_string(),
                                   value: 1,
+                                  doc: None,
                                 },
-                                EnumValue {
+                                CppEnumValue {
                                   name: "other_var2".to_string(),
                                   value: 2,
-                                }],
-                              "");
+                                  doc: None,
+                                }]);
   assert_eq!(r.len(), 2);
   assert_eq!(r[0].name, "Var1");
   assert_eq!(r[0].value, 1);
@@ -1592,19 +1595,21 @@ fn prepare_enum_values_test_simple() {
 
 #[test]
 fn prepare_enum_values_test_duplicates() {
-  let r = prepare_enum_values(&[EnumValue {
+  let r = prepare_enum_values(&[CppEnumValue {
                                   name: "var1".to_string(),
                                   value: 1,
+                                  doc: None,
                                 },
-                                EnumValue {
+                                CppEnumValue {
                                   name: "other_var2".to_string(),
                                   value: 2,
+                                  doc: None,
                                 },
-                                EnumValue {
+                                CppEnumValue {
                                   name: "other_var_dup".to_string(),
                                   value: 2,
-                                }],
-                              "");
+                                  doc: None,
+                                }]);
   assert_eq!(r.len(), 2);
   assert_eq!(r[0].name, "Var1");
   assert_eq!(r[0].value, 1);
@@ -1614,19 +1619,21 @@ fn prepare_enum_values_test_duplicates() {
 
 #[test]
 fn prepare_enum_values_test_prefix() {
-  let r = prepare_enum_values(&[EnumValue {
+  let r = prepare_enum_values(&[CppEnumValue {
                                   name: "OptionGood".to_string(),
                                   value: 1,
+                                  doc: None,
                                 },
-                                EnumValue {
+                                CppEnumValue {
                                   name: "OptionBad".to_string(),
                                   value: 2,
+                                  doc: None,
                                 },
-                                EnumValue {
+                                CppEnumValue {
                                   name: "OptionNecessaryEvil".to_string(),
                                   value: 3,
-                                }],
-                              "");
+                                  doc: None,
+                                }]);
   assert_eq!(r.len(), 3);
   assert_eq!(r[0].name, "Good");
   assert_eq!(r[1].name, "Bad");
@@ -1635,19 +1642,21 @@ fn prepare_enum_values_test_prefix() {
 
 #[test]
 fn prepare_enum_values_test_suffix() {
-  let r = prepare_enum_values(&[EnumValue {
+  let r = prepare_enum_values(&[CppEnumValue {
                                   name: "BestFriend".to_string(),
                                   value: 1,
+                                  doc: None,
                                 },
-                                EnumValue {
+                                CppEnumValue {
                                   name: "GoodFriend".to_string(),
                                   value: 2,
+                                  doc: None,
                                 },
-                                EnumValue {
+                                CppEnumValue {
                                   name: "NoFriend".to_string(),
                                   value: 3,
-                                }],
-                              "");
+                                  doc: None,
+                                }]);
   assert_eq!(r.len(), 3);
   assert_eq!(r[0].name, "Best");
   assert_eq!(r[1].name, "Good");
@@ -1656,15 +1665,16 @@ fn prepare_enum_values_test_suffix() {
 
 #[test]
 fn prepare_enum_values_test_prefix_digits() {
-  let r = prepare_enum_values(&[EnumValue {
+  let r = prepare_enum_values(&[CppEnumValue {
                                   name: "Base32".to_string(),
                                   value: 1,
+                                  doc: None,
                                 },
-                                EnumValue {
+                                CppEnumValue {
                                   name: "Base64".to_string(),
                                   value: 2,
-                                }],
-                              "");
+                                  doc: None,
+                                }]);
   assert_eq!(r.len(), 2);
   assert_eq!(r[0].name, "Base32");
   assert_eq!(r[1].name, "Base64");
@@ -1672,15 +1682,16 @@ fn prepare_enum_values_test_prefix_digits() {
 
 #[test]
 fn prepare_enum_values_test_suffix_empty() {
-  let r = prepare_enum_values(&[EnumValue {
+  let r = prepare_enum_values(&[CppEnumValue {
                                   name: "NonRecursive".to_string(),
                                   value: 1,
+                                  doc: None,
                                 },
-                                EnumValue {
+                                CppEnumValue {
                                   name: "Recursive".to_string(),
                                   value: 2,
-                                }],
-                              "");
+                                  doc: None,
+                                }]);
   assert_eq!(r.len(), 2);
   assert_eq!(r[0].name, "NonRecursive");
   assert_eq!(r[1].name, "Recursive");
@@ -1688,15 +1699,16 @@ fn prepare_enum_values_test_suffix_empty() {
 
 #[test]
 fn prepare_enum_values_test_suffix_partial() {
-  let r = prepare_enum_values(&[EnumValue {
+  let r = prepare_enum_values(&[CppEnumValue {
                                   name: "PreciseTimer".to_string(),
                                   value: 1,
+                                  doc: None,
                                 },
-                                EnumValue {
+                                CppEnumValue {
                                   name: "CoarseTimer".to_string(),
                                   value: 2,
-                                }],
-                              "");
+                                  doc: None,
+                                }]);
   assert_eq!(r.len(), 2);
   assert_eq!(r[0].name, "Precise");
   assert_eq!(r[1].name, "Coarse");

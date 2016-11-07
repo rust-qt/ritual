@@ -2,6 +2,7 @@ use cpp_method::CppMethodDoc;
 use rust_code_generator::rust_type_to_code;
 use rust_info::{RustMethodSelfArgKind, RustMethodArgumentsVariant};
 use string_utils::JoinWithString;
+use log;
 
 #[derive(Debug, Clone)]
 pub struct DocItem {
@@ -61,6 +62,42 @@ pub fn type_doc(cpp_type_name: &str, cpp_doc: &Option<String>) -> String {
     doc += &format!("\n\nC++ documentation: {}", wrap_cpp_doc_block(cpp_doc));
   }
   doc
+}
+
+pub struct EnumValueCppDocItem {
+  pub variant_name: String,
+  pub doc: Option<String>,
+}
+
+pub fn enum_value_doc(value: i64, cpp_docs: &[EnumValueCppDocItem]) -> String {
+  if cpp_docs.is_empty() {
+    log::warning("enum_value_doc: cpp_docs is empty");
+    return String::new();
+  }
+  if cpp_docs.len() > 1 {
+    let mut doc =
+      "This variant corresponds to multiple C++ enum variants with the same value:\n\n".to_string();
+    for cpp_doc in cpp_docs {
+      doc.push_str(&format!("- {}{}\n",
+                            wrap_inline_cpp_code(&format!("{} = {}",
+                                                          cpp_doc.variant_name,
+                                                          value)),
+                            if let Some(ref text) = cpp_doc.doc {
+                              format!(": {}", text)
+                            } else {
+                              String::new()
+                            }));
+    }
+    doc
+  } else {
+    let cpp_doc = &cpp_docs[0];
+    let doc_part = format!("C++ enum variant: {}",
+                           wrap_inline_cpp_code(&format!("{} = {}", cpp_doc.variant_name, value)));
+    match cpp_doc.doc {
+      Some(ref text) if !text.is_empty() => format!("{} ({})", text, doc_part),
+      _ => doc_part,
+    }
+  }
 }
 
 pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &str) -> String {

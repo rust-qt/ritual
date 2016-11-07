@@ -8,7 +8,7 @@ use log;
 use std::collections::HashSet;
 use std::iter::once;
 
-pub use serializable::{EnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
+pub use serializable::{CppEnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
                        CppTypeData, CppData, CppTemplateInstantiation, CppTemplateInstantiations,
                        CppClassUsingDirective, CppBaseSpecifier, TemplateArgumentsDeclaration};
 

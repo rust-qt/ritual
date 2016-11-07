@@ -654,7 +654,7 @@ impl RustCodeGenerator {
               }
               r
             }
-            RustTypeWrapperKind::Struct { ref size } => {
+            RustTypeWrapperKind::Struct { ref size, .. } => {
               format!(include_str!("../templates/crate/struct_declaration.rs.in"),
                       name = type1.name,
                       size = size)

@@ -715,13 +715,15 @@ fn simple_enum() {
   assert_eq!(data.types[0].name, "Enum1");
   assert_eq!(data.types[0].kind,
              CppTypeKind::Enum {
-               values: vec![EnumValue {
+               values: vec![CppEnumValue {
                               name: "Good".to_string(),
                               value: 0,
+                              doc: None,
                             },
-                            EnumValue {
+                            CppEnumValue {
                               name: "Bad".to_string(),
                               value: 1,
+                              doc: None,
                             }],
              });
 }
@@ -740,17 +742,20 @@ fn simple_enum2() {
   assert_eq!(data.types[0].name, "ns1::Enum1");
   assert_eq!(data.types[0].kind,
              CppTypeKind::Enum {
-               values: vec![EnumValue {
+               values: vec![CppEnumValue {
                               name: "Good".to_string(),
                               value: 1,
+                              doc: None,
                             },
-                            EnumValue {
+                            CppEnumValue {
                               name: "Bad".to_string(),
                               value: 2,
+                              doc: None,
                             },
-                            EnumValue {
+                            CppEnumValue {
                               name: "Questionable".to_string(),
                               value: 3,
+                              doc: None,
                             }],
              });
 }

@@ -1,4 +1,4 @@
-use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, EnumValue, CppOriginLocation,
+use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, CppEnumValue, CppOriginLocation,
                CppVisibility, CppTemplateInstantiation, CppTemplateInstantiations,
                CppClassUsingDirective, CppBaseSpecifier, TemplateArgumentsDeclaration};
 use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind, CppMethodClassMembership};
@@ -1166,9 +1166,10 @@ impl<'a> CppParser<'a> {
       if child.get_kind() == EntityKind::EnumConstantDecl {
         let val = try!(child.get_enum_constant_value()
           .chain_err(|| "failed to get value of enum variant"));
-        values.push(EnumValue {
+        values.push(CppEnumValue {
           name: try!(child.get_name().chain_err(|| "failed to get name of enum variant")),
           value: val.0,
+          doc: None,
         });
       }
     }

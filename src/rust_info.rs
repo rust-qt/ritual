@@ -5,20 +5,8 @@ use file_utils::load_toml;
 use rust_type::{RustName, CompleteType, RustType, RustTypeIndirection};
 use utils::MapIfOk;
 
-pub use serializable::RustExportInfo;
+pub use serializable::{RustEnumValue, RustTypeWrapperKind, RustProcessedTypeInfo, RustExportInfo};
 
-/// One variant of a Rust enum
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct RustEnumValue {
-  /// Identifier
-  pub name: String,
-  /// Corresponding value
-  pub value: i64,
-  /// Original C++ name of the variant
-  pub cpp_name: Option<String>,
-  /// Documentation text
-  pub doc: String,
-}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RustMethodScope {
@@ -166,15 +154,6 @@ pub struct TraitImpl {
   pub target_type: RustName,
   pub trait_name: TraitName,
   pub methods: Vec<RustMethod>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum RustTypeWrapperKind {
-  Enum {
-    values: Vec<RustEnumValue>,
-    is_flaggable: bool,
-  },
-  Struct { size: i32 },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
