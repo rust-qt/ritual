@@ -100,6 +100,13 @@ pub enum CppVisibility {
   Private,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct CppTypeDoc {
+  pub html: String,
+  pub url: String,
+}
+
 /// Information about a C++ type declaration
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[derive(Serialize, Deserialize)]
@@ -114,7 +121,7 @@ pub struct CppTypeData {
   /// Type information
   pub kind: CppTypeKind,
 
-  pub doc: Option<String>,
+  pub doc: Option<CppTypeDoc>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -145,7 +152,7 @@ pub struct CppTemplateInstantiations {
   /// Template class name
   pub class_name: String,
 
-  pub cpp_doc: Option<String>,
+  pub cpp_doc: Option<CppTypeDoc>,
   /// File name of the include file (without full path)
   /// of the template type
   pub include_file: String,
@@ -242,8 +249,9 @@ pub struct CppMethodClassMembership {
 #[derive(Serialize, Deserialize)]
 pub struct CppMethodDoc {
   pub anchor: String,
-  pub text: String,
+  pub html: String,
   pub mismatched_declaration: Option<String>,
+  pub url: String,
 }
 
 /// Information about a C++ method
@@ -600,7 +608,7 @@ pub enum RustTypeWrapperKind {
 pub struct RustProcessedTypeInfo {
   /// Full name of corresponding C++ type (class or enum).
   pub cpp_name: String,
-  pub cpp_doc: Option<String>,
+  pub cpp_doc: Option<CppTypeDoc>,
   /// Template arguments. None if C++ type is not a template class.
   pub cpp_template_arguments: Option<Vec<CppType>>,
   /// Kind of the type and additional information.

@@ -1,4 +1,5 @@
 use cpp_method::CppMethodDoc;
+use cpp_data::CppTypeDoc;
 use rust_code_generator::rust_type_to_code;
 use rust_info::{RustMethodSelfArgKind, RustMethodArgumentsVariant};
 use string_utils::JoinWithString;
@@ -55,11 +56,13 @@ pub fn wrap_cpp_doc_block(html: &str) -> String {
           html)
 }
 
-pub fn type_doc(cpp_type_name: &str, cpp_doc: &Option<String>) -> String {
+pub fn type_doc(cpp_type_name: &str, cpp_doc: &Option<CppTypeDoc>) -> String {
   let mut doc = format!("C++ type: {}", wrap_inline_cpp_code(cpp_type_name));
   if let Some(ref cpp_doc) = *cpp_doc {
     // TODO: use doc_formatter
-    doc += &format!("\n\nC++ documentation: {}", wrap_cpp_doc_block(cpp_doc));
+    doc += &format!("\n\n<a href=\"{}\">C++ documentation:</a> {}",
+                    cpp_doc.url,
+                    wrap_cpp_doc_block(&cpp_doc.html));
   }
   doc
 }
@@ -75,8 +78,8 @@ pub fn enum_value_doc(value: i64, cpp_docs: &[EnumValueCppDocItem]) -> String {
     return String::new();
   }
   if cpp_docs.len() > 1 {
-    let mut doc =
-      "This variant corresponds to multiple C++ enum variants with the same value:\n\n".to_string();
+    let mut doc = "This variant corresponds to multiple C++ enum variants with the same value:\n\n"
+      .to_string();
     for cpp_doc in cpp_docs {
       doc.push_str(&format!("- {}{}\n",
                             wrap_inline_cpp_code(&format!("{} = {}",
@@ -172,12 +175,13 @@ pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &str) -> String {
     if let Some(result) = doc_item.doc {
       let prefix = if let Some(ref declaration) = result.mismatched_declaration {
         format!("Warning: no exact match found in C++ documentation.\
-                         Below is the C++ documentation for <code>{}</code>:",
+                         Below is the <a href=\"{}\">C++ documentation</a> for <code>{}</code>:",
+                result.url,
                 declaration)
       } else {
-        "C++ documentation:".to_string()
+        format!("<a href=\"{}\">C++ documentation:</a>", result.url)
       };
-      doc.push(format!("{} {}", prefix, wrap_cpp_doc_block(&result.text)));
+      doc.push(format!("{} {}", prefix, wrap_cpp_doc_block(&result.html)));
     }
   }
   doc.join("")

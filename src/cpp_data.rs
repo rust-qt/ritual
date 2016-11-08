@@ -9,8 +9,9 @@ use std::collections::HashSet;
 use std::iter::once;
 
 pub use serializable::{CppEnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
-                       CppTypeData, CppData, CppTemplateInstantiation, CppTemplateInstantiations,
-                       CppClassUsingDirective, CppBaseSpecifier, TemplateArgumentsDeclaration};
+                       CppTypeData, CppTypeDoc, CppData, CppTemplateInstantiation,
+                       CppTemplateInstantiations, CppClassUsingDirective, CppBaseSpecifier,
+                       TemplateArgumentsDeclaration};
 
 fn apply_instantiations_to_method(method: &CppMethod,
                                   nested_level: i32,
