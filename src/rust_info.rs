@@ -4,8 +4,18 @@ use errors::{Result, ChainErr, unexpected};
 use file_utils::load_toml;
 use rust_type::{RustName, CompleteType, RustType, RustTypeIndirection};
 use utils::MapIfOk;
+use cpp_method::CppMethodDoc;
+use cpp_data::CppTypeDoc;
+pub use serializable::{RustEnumValue, RustTypeWrapperKind, RustProcessedTypeInfo, RustExportInfo,
+                       CppEnumValueDocItem};
 
-pub use serializable::{RustEnumValue, RustTypeWrapperKind, RustProcessedTypeInfo, RustExportInfo};
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct RustMethodDocItem {
+  pub doc: Option<CppMethodDoc>,
+  pub rust_fns: Vec<String>,
+  pub cpp_fn: String,
+}
+
 
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -43,6 +53,7 @@ pub enum RustMethodArguments {
     params_trait_return_type: Option<RustType>,
     shared_arguments: Vec<RustMethodArgument>,
     variant_argument_name: String,
+    cpp_method_name: String,
   },
 }
 
@@ -51,7 +62,7 @@ pub struct RustMethod {
   pub scope: RustMethodScope,
   pub name: RustName,
   pub arguments: RustMethodArguments,
-  pub doc: String,
+  pub docs: Vec<RustMethodDocItem>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -163,6 +174,7 @@ pub enum RustTypeDeclarationKind {
     kind: RustTypeWrapperKind,
     cpp_type_name: String,
     cpp_template_arguments: Option<Vec<CppType>>,
+    cpp_doc: Option<CppTypeDoc>,
     methods: Vec<RustMethod>,
     traits: Vec<TraitImpl>,
   },
@@ -171,6 +183,8 @@ pub enum RustTypeDeclarationKind {
     shared_arguments: Vec<RustMethodArgument>,
     return_type: Option<RustType>,
     impls: Vec<RustMethodArgumentsVariant>,
+    method_scope: RustMethodScope,
+    method_name: RustName,
   },
 }
 
@@ -178,7 +192,6 @@ pub enum RustTypeDeclarationKind {
 pub struct RustTypeDeclaration {
   pub name: String,
   pub kind: RustTypeDeclarationKind,
-  pub doc: String,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

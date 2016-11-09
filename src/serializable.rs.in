@@ -105,6 +105,7 @@ pub enum CppVisibility {
 pub struct CppTypeDoc {
   pub html: String,
   pub url: String,
+  pub cross_references: Vec<String>,
 }
 
 /// Information about a C++ type declaration
@@ -252,6 +253,7 @@ pub struct CppMethodDoc {
   pub html: String,
   pub mismatched_declaration: Option<String>,
   pub url: String,
+  pub cross_references: Vec<String>,
 }
 
 /// Information about a C++ method
@@ -573,6 +575,12 @@ pub struct RustName {
 
 // -------------------------
 // from rust_info
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct CppEnumValueDocItem {
+  pub variant_name: String,
+  pub doc: Option<String>,
+}
 
 /// One variant of a Rust enum
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -582,8 +590,10 @@ pub struct RustEnumValue {
   pub name: String,
   /// Corresponding value
   pub value: i64,
-  /// Documentation text
-  pub doc: String,
+  /// Documentation of corresponding C++ variants
+  pub cpp_docs: Vec<CppEnumValueDocItem>,
+
+  pub is_dummy: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

@@ -1,16 +1,10 @@
-use cpp_method::CppMethodDoc;
-use cpp_data::CppTypeDoc;
 use rust_code_generator::rust_type_to_code;
-use rust_info::{RustMethodSelfArgKind, RustMethodArgumentsVariant};
+use rust_info::{RustMethodSelfArgKind, RustMethodArgumentsVariant, RustTypeDeclaration,
+                RustTypeDeclarationKind, RustMethodScope, RustEnumValue, RustMethod,
+                RustMethodArguments, RustMethodDocItem};
+use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
 use string_utils::JoinWithString;
 use log;
-
-#[derive(Debug, Clone)]
-pub struct DocItem {
-  pub doc: Option<CppMethodDoc>,
-  pub rust_fns: Vec<String>,
-  pub cpp_fn: String,
-}
 
 pub fn rust_method_variant(args: &RustMethodArgumentsVariant,
                            method_name: &str,
@@ -56,35 +50,82 @@ pub fn wrap_cpp_doc_block(html: &str) -> String {
           html)
 }
 
-pub fn type_doc(cpp_type_name: &str, cpp_doc: &Option<CppTypeDoc>) -> String {
-  let mut doc = format!("C++ type: {}", wrap_inline_cpp_code(cpp_type_name));
-  if let Some(ref cpp_doc) = *cpp_doc {
-    // TODO: use doc_formatter
-    doc += &format!("\n\n<a href=\"{}\">C++ documentation:</a> {}",
-                    cpp_doc.url,
-                    wrap_cpp_doc_block(&cpp_doc.html));
+pub fn type_doc(type1: &RustTypeDeclaration) -> String {
+  match type1.kind {
+    RustTypeDeclarationKind::CppTypeWrapper { ref cpp_type_name,
+                                              ref cpp_template_arguments,
+                                              ref cpp_doc,
+                                              .. } => {
+      let cpp_type_code = CppType {
+          base: CppTypeBase::Class(CppTypeClassBase {
+            name: cpp_type_name.clone(),
+            template_arguments: cpp_template_arguments.clone(),
+          }),
+          indirection: CppTypeIndirection::None,
+          is_const: false,
+          is_const2: false,
+        }
+        .to_cpp_pseudo_code();
+      let mut doc = format!("C++ type: {}", wrap_inline_cpp_code(&cpp_type_code));
+      if let Some(ref cpp_doc) = *cpp_doc {
+        // TODO: use doc_formatter
+        doc += &format!("\n\n<a href=\"{}\">C++ documentation:</a> {}",
+                        cpp_doc.url,
+                        wrap_cpp_doc_block(&cpp_doc.html));
+      }
+      doc
+    }
+    RustTypeDeclarationKind::MethodParametersTrait { ref method_scope, ref method_name, .. } => {
+      let method_name_with_scope = match *method_scope {
+        RustMethodScope::Impl { ref type_name } => {
+          format!("{}::{}",
+                  type_name.last_name().unwrap(),
+                  method_name.last_name().unwrap())
+        }
+        RustMethodScope::TraitImpl { .. } => {
+          panic!("TraitImpl is totally not expected here");
+        }
+        RustMethodScope::Free => method_name.last_name().unwrap().clone(),
+      };
+      let method_link = match *method_scope {
+        RustMethodScope::Impl { ref type_name } => {
+          format!("../struct.{}.html#method.{}",
+                  type_name.last_name().unwrap(),
+                  method_name.last_name().unwrap())
+        }
+        RustMethodScope::TraitImpl { .. } => {
+          panic!("TraitImpl is totally not expected here");
+        }
+        RustMethodScope::Free => format!("../fn.{}.html", method_name.last_name().unwrap()),
+      };
+      format!("This trait represents a set of arguments accepted by [{name}]({link}) \
+                      method.",
+              name = method_name_with_scope,
+              link = method_link)
+    }
   }
-  doc
 }
 
-pub struct EnumValueCppDocItem {
-  pub variant_name: String,
-  pub doc: Option<String>,
-}
 
-pub fn enum_value_doc(value: i64, cpp_docs: &[EnumValueCppDocItem]) -> String {
-  if cpp_docs.is_empty() {
+
+pub fn enum_value_doc(value: &RustEnumValue) -> String {
+  if value.is_dummy {
+    return "This variant is added in Rust because \
+            enums with one variant and C representation are not supported."
+      .to_string();
+  }
+  if value.cpp_docs.is_empty() {
     log::warning("enum_value_doc: cpp_docs is empty");
     return String::new();
   }
-  if cpp_docs.len() > 1 {
+  if value.cpp_docs.len() > 1 {
     let mut doc = "This variant corresponds to multiple C++ enum variants with the same value:\n\n"
       .to_string();
-    for cpp_doc in cpp_docs {
+    for cpp_doc in &value.cpp_docs {
       doc.push_str(&format!("- {}{}\n",
                             wrap_inline_cpp_code(&format!("{} = {}",
                                                           cpp_doc.variant_name,
-                                                          value)),
+                                                          value.value)),
                             if let Some(ref text) = cpp_doc.doc {
                               format!(": {}", text)
                             } else {
@@ -93,9 +134,10 @@ pub fn enum_value_doc(value: i64, cpp_docs: &[EnumValueCppDocItem]) -> String {
     }
     doc
   } else {
-    let cpp_doc = &cpp_docs[0];
-    let doc_part = format!("C++ enum variant: {}",
-                           wrap_inline_cpp_code(&format!("{} = {}", cpp_doc.variant_name, value)));
+    let cpp_doc = &value.cpp_docs[0];
+    let doc_part =
+      format!("C++ enum variant: {}",
+              wrap_inline_cpp_code(&format!("{} = {}", cpp_doc.variant_name, value.value)));
     match cpp_doc.doc {
       Some(ref text) if !text.is_empty() => format!("{} ({})", text, doc_part),
       _ => doc_part,
@@ -103,16 +145,23 @@ pub fn enum_value_doc(value: i64, cpp_docs: &[EnumValueCppDocItem]) -> String {
   }
 }
 
-pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &str) -> String {
-  let overloaded = doc_items.len() > 1 || (doc_items.len() == 1 && doc_items[0].rust_fns.len() > 1);
+pub fn method_doc(method: &RustMethod) -> String {
+
+  let cpp_method_name = match method.arguments {
+    RustMethodArguments::SingleVariant(ref v) => v.cpp_method.cpp_method.full_name(),
+    RustMethodArguments::MultipleVariants { ref cpp_method_name, .. } => cpp_method_name.clone(),
+  };
+
+  let overloaded = method.docs.len() > 1 ||
+                   (method.docs.len() == 1 && method.docs[0].rust_fns.len() > 1);
   let mut doc = Vec::new();
   if overloaded {
-    doc.push(format!("C++ method: {}\n\n", wrap_inline_cpp_code(cpp_method_name)));
+    doc.push(format!("C++ method: {}\n\n", wrap_inline_cpp_code(&cpp_method_name)));
     doc.push("This is an overloaded function. Available variants:\n\n".to_string());
   }
 
   let mut shown_docs = Vec::new();
-  for doc_item in &doc_items {
+  for doc_item in &method.docs {
     let ok = if let Some(ref x) = doc_item.doc {
       x.mismatched_declaration.is_none()
     } else {
@@ -122,7 +171,7 @@ pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &str) -> String {
       shown_docs.push(doc_item.clone())
     }
   }
-  for doc_item in doc_items {
+  for doc_item in &method.docs {
     if let Some(ref item_doc) = doc_item.doc {
       if item_doc.mismatched_declaration.is_some() {
         let anchor = &item_doc.anchor;
@@ -132,7 +181,7 @@ pub fn method_doc(doc_items: Vec<DocItem>, cpp_method_name: &str) -> String {
           } else {
             false
           }) {
-          shown_docs.push(DocItem { doc: None, ..doc_item.clone() });
+          shown_docs.push(RustMethodDocItem { doc: None, ..doc_item.clone() });
         } else {
           shown_docs.push(doc_item.clone());
         }

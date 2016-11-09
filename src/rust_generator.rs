@@ -2,22 +2,21 @@ use caption_strategy::TypeCaptionStrategy;
 use cpp_data::{CppTypeKind, CppEnumValue};
 use cpp_ffi_data::{CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiType, IndirectionChange};
 use cpp_ffi_generator::CppAndFfiData;
-use cpp_method::ReturnValueAllocationPlace;
+use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
                CppSpecificNumericTypeKind, CppTypeClassBase, CppTypeRole};
-use doc_formatter;
 use errors::{Result, ChainErr, unexpected};
 use log;
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
                 RustMethodArguments, TraitImpl, TraitName, RustEnumValue, RustMethodSelfArgKind,
-                RustProcessedTypeInfo};
+                RustProcessedTypeInfo, RustMethodDocItem};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
 use string_utils::{CaseOperations, VecCaseOperations, WordIterator};
 use utils::{add_to_multihash, MapIfOk};
-
+use doc_formatter;
 use std::collections::{HashMap, HashSet, hash_map};
 
 impl RustProcessedTypeInfo {
@@ -110,9 +109,9 @@ fn sanitize_rust_identifier(name: &str) -> String {
 /// - If there is only one variant, adds another variant.
 /// Rust does not allow repr(C) enums having only one variant.
 fn prepare_enum_values(values: &[CppEnumValue]) -> Vec<RustEnumValue> {
-  use doc_formatter::EnumValueCppDocItem as DocItem;
+  use rust_info::CppEnumValueDocItem as DocItem;
 
-  let mut value_to_variant: HashMap<i64, (RustEnumValue, Vec<DocItem>)> = HashMap::new();
+  let mut value_to_variant: HashMap<i64, RustEnumValue> = HashMap::new();
   for variant in values {
     let value = variant.value;
     let doc_item = DocItem {
@@ -121,15 +120,15 @@ fn prepare_enum_values(values: &[CppEnumValue]) -> Vec<RustEnumValue> {
     };
     match value_to_variant.entry(value) {
       hash_map::Entry::Occupied(mut entry) => {
-        entry.get_mut().1.push(doc_item);
+        entry.get_mut().cpp_docs.push(doc_item);
       }
       hash_map::Entry::Vacant(entry) => {
-        entry.insert((RustEnumValue {
+        entry.insert(RustEnumValue {
           name: sanitize_rust_identifier(&variant.name.to_class_case()),
           value: variant.value,
-          doc: String::new(),
-        },
-                      vec![doc_item]));
+          cpp_docs: vec![doc_item],
+          is_dummy: false,
+        });
 
       }
     }
@@ -140,19 +139,13 @@ fn prepare_enum_values(values: &[CppEnumValue]) -> Vec<RustEnumValue> {
   } else {
     0
   };
-  let mut result: Vec<_> = value_to_variant.into_iter()
-    .map(|(_val, (mut variant, docs))| {
-      variant.doc = doc_formatter::enum_value_doc(variant.value, &docs);
-      variant
-    })
-    .collect();
+  let mut result: Vec<_> = value_to_variant.into_iter().map(|(_k, v)| v).collect();
   if result.len() == 1 {
     result.push(RustEnumValue {
       name: "_Invalid".to_string(),
       value: dummy_value,
-      doc: "This variant is added in Rust because \
-            enums with one variant and C representation are not supported."
-        .to_string(),
+      cpp_docs: Vec::new(),
+      is_dummy: true,
     });
   }
 
@@ -273,11 +266,7 @@ pub fn run(input_data: CppAndFfiData,
       .collect();
     for method in cpp_methods.clone() {
       if method.cpp_method.class_membership.is_none() {
-        let rust_name = try!(calculate_rust_name(&method.cpp_method.name,
-                                                 &method.cpp_method.include_file,
-                                                 true,
-                                                 method.cpp_method.operator.as_ref(),
-                                                 &generator.config));
+        let rust_name = try!(generator.calculate_rust_name_for_free_function(&method.cpp_method));
         if !module_names_set.contains(&rust_name.parts[1]) {
           module_names_set.insert(rust_name.parts[1].clone());
         }
@@ -313,11 +302,7 @@ pub fn run(input_data: CppAndFfiData,
                                                    &generator.config));
           log::warning(format!("  -> {}", rust_name.full_name(None)));
         } else {
-          let rust_name = try!(calculate_rust_name(&method.cpp_method.name,
-                                                   &method.cpp_method.include_file,
-                                                   true,
-                                                   method.cpp_method.operator.as_ref(),
-                                                   &generator.config));
+          let rust_name = try!(generator.calculate_rust_name_for_free_function(&method.cpp_method));
           log::warning(format!("  -> {}", rust_name.full_name(None)));
         }
       }
@@ -825,10 +810,10 @@ impl RustGenerator {
               kind: info.kind.clone(),
               cpp_type_name: info.cpp_name.clone(),
               cpp_template_arguments: None,
+              cpp_doc: info.cpp_doc.clone(),
               methods: Vec::new(),
               traits: Vec::new(),
             },
-            doc: doc_formatter::type_doc(&info.cpp_name, &info.cpp_doc),
           },
           overloading_types: Vec::new(),
         },
@@ -854,13 +839,6 @@ impl RustGenerator {
         cpp_methods = tmp_cpp_methods;
         let functions_result =
           try!(self.process_functions(good_methods.into_iter(), &methods_scope));
-        let cpp_type_name = CppType {
-            base: CppTypeBase::Class(class_type.clone()),
-            indirection: CppTypeIndirection::None,
-            is_const: false,
-            is_const2: false,
-          }
-          .to_cpp_pseudo_code();
         (ProcessTypeResult {
           main_type: RustTypeDeclaration {
             name: try!(info.rust_name.last_name()).clone(),
@@ -868,10 +846,10 @@ impl RustGenerator {
               kind: info.kind.clone(),
               cpp_type_name: info.cpp_name.clone(),
               cpp_template_arguments: info.cpp_template_arguments.clone(),
+              cpp_doc: info.cpp_doc.clone(),
               methods: functions_result.methods,
               traits: functions_result.trait_impls,
             },
-            doc: doc_formatter::type_doc(&cpp_type_name, &info.cpp_doc),
           },
           overloading_types: functions_result.overloading_types,
         },
@@ -930,11 +908,7 @@ impl RustGenerator {
       let mut tmp_cpp_methods = Vec::new();
       for method in cpp_methods {
         if method.cpp_method.class_membership.is_none() {
-          let rust_name = try!(calculate_rust_name(&method.cpp_method.name,
-                                                   &method.cpp_method.include_file,
-                                                   true,
-                                                   method.cpp_method.operator.as_ref(),
-                                                   &self.config));
+          let rust_name = try!(self.calculate_rust_name_for_free_function(&method.cpp_method));
 
           if check_name(&rust_name) {
             good_methods.push(method);
@@ -975,6 +949,14 @@ impl RustGenerator {
       return Ok((None, cpp_methods));
     }
     Ok((Some(module), cpp_methods))
+  }
+
+  fn calculate_rust_name_for_free_function(&self, cpp_method: &CppMethod) -> Result<RustName> {
+    calculate_rust_name(&cpp_method.name,
+                        &cpp_method.include_file,
+                        true,
+                        cpp_method.operator.as_ref(),
+                        &self.config)
   }
 
   /// Converts one function to a RustMethod
@@ -1057,15 +1039,14 @@ impl RustGenerator {
       }
     }
 
-    let doc = if generate_doc {
-      let doc_item = doc_formatter::DocItem {
-        cpp_fn: method.short_text(),
-        rust_fns: Vec::new(),
-        doc: method.cpp_method.doc.clone(),
-      };
-      doc_formatter::method_doc(vec![doc_item], &method.cpp_method.full_name())
+    let docs = if generate_doc {
+      vec![RustMethodDocItem {
+             cpp_fn: method.short_text(),
+             rust_fns: Vec::new(),
+             doc: method.cpp_method.doc.clone(),
+           }]
     } else {
-      String::new()
+      Vec::new()
     };
     Ok(RustMethod {
       name: try!(self.method_rust_name(method)),
@@ -1076,20 +1057,73 @@ impl RustGenerator {
         return_type: return_type,
         return_type_ffi_index: return_arg_index,
       }),
-      doc: doc,
+      docs: docs,
     })
   }
-
+  // fn rustdoc_path_for_type(&self, type1: &RustProcessedTypeInfo) -> String {
+  // let parts = type1.rust_name.parts.clone();
+  // parts.remove(0); // no crate name in rustdoc path
+  // let last = parts.pop().expect("too few parts in RustName");
+  // parts.push(match type1.kind {
+  // RustTypeWrapperKind::Enum { .. } => format!("enum.{}.html", last),
+  // RustTypeWrapperKind::Struct { .. } => format!("struct.{}.html", last),
+  // });
+  // parts.join("/")
+  // }
+  //
+  // fn doc_url_to_rustdoc_link(&self, cpp_url: &str) -> Result<String> {
+  // if let Some(cpp_type) = self.input_data
+  // .cpp_data
+  // .types
+  // .iter()
+  // .find(|t| if let Some(ref doc) = t.doc {
+  // &doc.url == cpp_url
+  // } else {
+  // false
+  // }) {
+  // if let Some(processed_type) = self.processed_types
+  // .iter()
+  // .find(|x| x.cpp_name == cpp_type.name) {
+  // return format!("[{}]({})",
+  // processed_type.rust_name.last_name().unwrap(),
+  // self.rustdoc_path_for_type(processed_type));
+  // } else {
+  // return Err(format!("no Rust type for C++ type: {}", cpp_type.name).into());
+  // }
+  // }
+  // if let Some(cpp_method) = self.input_data
+  // .cpp_data
+  // .methods
+  // .iter()
+  // .find(|m| if let Some(ref doc) = m.doc {
+  // &doc.url == cpp_url
+  // } else {
+  // false
+  // }) {
+  // if let Some(ref info) = cpp_method.class_membership {
+  // if let Some(processed_type) = self.processed_types
+  // .iter()
+  // .find(|x| x.cpp_name == info.class_type.name) {
+  // return format!("[{}::]({})",
+  // processed_type.rust_name.last_name().unwrap(),
+  // self.rustdoc_path_for_type(processed_type));
+  // } else {
+  // return Err(format!("no Rust type for C++ type: {}", cpp_type.name).into());
+  // }
+  // }
+  //
+  //
+  // }
+  //
+  //
+  // }
+  //
   /// Returns method name. For class member functions, the name doesn't
   /// include class name and scope. For free functions, the name includes
   /// modules.
   fn method_rust_name(&self, method: &CppAndFfiMethod) -> Result<RustName> {
     let mut name = if method.cpp_method.class_membership.is_none() {
-      try!(calculate_rust_name(&method.cpp_method.name,
-                               &method.cpp_method.include_file,
-                               true,
-                               method.cpp_method.operator.as_ref(),
-                               &self.config))
+      try!(self.calculate_rust_name_for_free_function(&method.cpp_method))
     } else {
       let x = if method.cpp_method.is_constructor() {
         "new".to_string()
@@ -1193,17 +1227,6 @@ impl RustGenerator {
       if let RustMethodScope::Impl { ref type_name } = *scope {
         trait_name = format!("{}{}", try!(type_name.last_name()), trait_name);
       }
-      let method_name_with_scope = match first_method.scope {
-        RustMethodScope::Impl { ref type_name } => {
-          format!("{}::{}",
-                  try!(type_name.last_name()),
-                  try!(method_name.last_name()))
-        }
-        RustMethodScope::TraitImpl { .. } => {
-          return Err(unexpected("TraitImpl is totally not expected here").into())
-        }
-        RustMethodScope::Free => try!(method_name.last_name()).clone(),
-      };
       let mut grouped_by_cpp_method: HashMap<_, Vec<_>> = HashMap::new();
       for method in filtered_methods {
         assert!(method.name == first_method.name);
@@ -1260,7 +1283,7 @@ impl RustGenerator {
         a.short_text().cmp(&b.short_text())
       });
       for (cpp_method, variants) in grouped_by_cpp_method_vec {
-        doc_items.push(doc_formatter::DocItem {
+        doc_items.push(RustMethodDocItem {
           doc: cpp_method.doc.clone(),
           cpp_fn: cpp_method.short_text(),
           rust_fns: try!(variants.iter().map_if_ok(|args| -> Result<_> {
@@ -1271,7 +1294,6 @@ impl RustGenerator {
           })),
         });
       }
-      let doc = doc_formatter::method_doc(doc_items, &cpp_method_name);
 
       // overloaded methods
       let shared_arguments_for_trait = match self_argument {
@@ -1285,17 +1307,6 @@ impl RustGenerator {
       let mut shared_arguments = match self_argument {
         None => Vec::new(),
         Some(arg) => vec![arg],
-      };
-      let method_link = match first_method.scope {
-        RustMethodScope::Impl { ref type_name } => {
-          format!("../struct.{}.html#method.{}",
-                  try!(type_name.last_name()),
-                  try!(method_name.last_name()))
-        }
-        RustMethodScope::TraitImpl { .. } => {
-          return Err(unexpected("TraitImpl is totally not expected here").into())
-        }
-        RustMethodScope::Free => format!("../fn.{}.html", try!(method_name.last_name())),
       };
       let trait_lifetime_name = "largs";
       let mut has_trait_lifetime = shared_arguments.iter()
@@ -1332,11 +1343,9 @@ impl RustGenerator {
           impls: args_variants,
           lifetime: params_trait_lifetime.clone(),
           return_type: trait_return_type.clone(),
+          method_name: method_name.clone(),
+          method_scope: first_method.scope.clone(),
         },
-        doc: format!("This trait represents a set of arguments accepted by [{name}]({link}) \
-                      method.",
-                     name = method_name_with_scope,
-                     link = method_link),
       });
 
       RustMethod {
@@ -1348,8 +1357,9 @@ impl RustGenerator {
           params_trait_return_type: trait_return_type,
           shared_arguments: shared_arguments,
           variant_argument_name: "args".to_string(),
+          cpp_method_name: cpp_method_name,
         },
-        doc: doc,
+        docs: doc_items,
       }
     } else {
       let mut method = try!(filtered_methods.pop().chain_err(|| "filtered_methods can't be empty"));
@@ -1359,13 +1369,12 @@ impl RustGenerator {
       }
 
       if let RustMethodArguments::SingleVariant(ref args) = method.arguments {
-        let doc_item = doc_formatter::DocItem {
+        let doc_item = RustMethodDocItem {
           cpp_fn: args.cpp_method.cpp_method.short_text(),
           rust_fns: Vec::new(),
           doc: args.cpp_method.cpp_method.doc.clone(),
         };
-        method.doc = doc_formatter::method_doc(vec![doc_item],
-                                               &args.cpp_method.cpp_method.full_name());
+        method.docs = vec![doc_item];
       } else {
         unreachable!();
       }
@@ -1471,8 +1480,8 @@ impl RustGenerator {
         // or accept a single method without change.
         let (method, type_declaration) =
           try!(self.process_method(filtered_methods, scope, self_arg_kind_caption));
-        if method.doc.is_empty() {
-          return Err(unexpected(format!("doc is empty! {:?}", method)).into());
+        if method.docs.is_empty() {
+          return Err(unexpected(format!("docs are empty! {:?}", method)).into());
         }
         result.methods.push(method);
         if let Some(r) = type_declaration {

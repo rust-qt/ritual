@@ -10,7 +10,7 @@ use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMe
 use rust_type::{RustName, RustType, RustTypeIndirection, RustFFIFunction, RustToCTypeConversion};
 use string_utils::{JoinWithString, CaseOperations};
 use utils::{is_msvc, MapIfOk};
-
+use doc_formatter;
 use std::path::PathBuf;
 
 extern crate rustfmt;
@@ -482,7 +482,7 @@ impl RustCodeGenerator {
         };
 
         format!("{doc}{maybe_pub}fn {name}{lifetimes_text}({args}){return_type} {{\n{body}}}\n\n",
-                doc = format_doc(&func.doc),
+                doc = format_doc(&doc_formatter::method_doc(&func)),
                 maybe_pub = maybe_pub,
                 lifetimes_text = lifetimes_text,
                 name = try!(func.name.last_name()),
@@ -494,7 +494,8 @@ impl RustCodeGenerator {
                                               ref params_trait_lifetime,
                                               ref params_trait_return_type,
                                               ref shared_arguments,
-                                              ref variant_argument_name } => {
+                                              ref variant_argument_name,
+                                              .. } => {
         let tpl_type = variant_argument_name.to_class_case();
         let body = format!("{}.exec({})",
                            variant_argument_name,
@@ -522,7 +523,7 @@ impl RustCodeGenerator {
           format!("{}::ReturnType", tpl_type)
         };
         format!(include_str!("../templates/crate/overloaded_function.rs.in"),
-                doc = format_doc(&func.doc),
+                doc = format_doc(&doc_formatter::method_doc(&func)),
                 maybe_pub = maybe_pub,
                 tpl_decl = tpl_decl,
                 trait_lifetime_arg = trait_lifetime_arg,
@@ -630,19 +631,21 @@ impl RustCodeGenerator {
                          used_crates.join(", ")));
 
     for type1 in &data.types {
-      results.push(format_doc(&type1.doc));
+      results.push(format_doc(&doc_formatter::type_doc(type1)));
       match type1.kind {
         RustTypeDeclarationKind::CppTypeWrapper { ref kind, ref methods, ref traits, .. } => {
           let r = match *kind {
             RustTypeWrapperKind::Enum { ref values, ref is_flaggable } => {
-              let mut r =
-                format!(include_str!("../templates/crate/enum_declaration.rs.in"),
-                        name = type1.name,
-                        variants = values.iter()
-                          .map(|item| {
-                            format!("{}  {} = {}", format_doc(&item.doc), item.name, item.value)
-                          })
-                          .join(", \n"));
+              let mut r = format!(include_str!("../templates/crate/enum_declaration.rs.in"),
+                                  name = type1.name,
+                                  variants = values.iter()
+                                    .map(|item| {
+                                      format!("{}  {} = {}",
+                                              format_doc(&doc_formatter::enum_value_doc(&item)),
+                                              item.name,
+                                              item.value)
+                                    })
+                                    .join(", \n"));
               if *is_flaggable {
                 r = r +
                     &format!(include_str!("../templates/crate/impl_flaggable.rs.in"),
@@ -691,7 +694,8 @@ impl RustCodeGenerator {
         RustTypeDeclarationKind::MethodParametersTrait { ref shared_arguments,
                                                          ref impls,
                                                          ref lifetime,
-                                                         ref return_type } => {
+                                                         ref return_type,
+                                                         .. } => {
           let arg_list = self.arg_texts(shared_arguments, lifetime.as_ref()).join(", ");
           let trait_lifetime_specifier = match *lifetime {
             Some(ref lf) => format!("<'{}>", lf),
