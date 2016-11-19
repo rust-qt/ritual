@@ -107,6 +107,7 @@ impl RustMethod {
     })
   }
 
+  #[allow(dead_code)]
   pub fn cpp_cross_references(&self) -> Vec<String> {
     let mut r = Vec::new();
     for doc in &self.docs {
@@ -116,6 +117,8 @@ impl RustMethod {
     }
     r
   }
+
+  #[allow(dead_code)]
   pub fn add_rust_cross_references(&mut self, table: HashMap<String, RustCrossReference>) {
     for doc in &mut self.docs {
       let mut result = Vec::new();
@@ -192,6 +195,7 @@ pub struct TraitImpl {
   pub methods: Vec<RustMethod>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RustCrossReferenceKind {
   Method { scope: RustMethodScope },

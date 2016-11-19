@@ -341,7 +341,8 @@ impl RustCodeGenerator {
         self.rust_type_to_code(&variant.return_type.rust_api_type)
       };
       result.push(format!("{{\nlet mut {var}: {t} = unsafe {{ \
-                           ::NewUninitialized::new_uninitialized() }};\n",
+                           cpp_utils::new_uninitialized::NewUninitialized::new_uninitialized() \
+                           }};\n",
                           var = return_var_name,
                           t = struct_name));
       final_args[*i as usize] = Some(format!("&mut {}", return_var_name));
@@ -562,7 +563,6 @@ impl RustCodeGenerator {
           try!(lib_file.write(format!("pub extern crate {};\n\n", &dep.crate_name)));
         }
         let mut extra_modules = vec!["ffi".to_string()];
-        try!(lib_file.write(include_str!("../templates/crate/new_uninitialized_trait.rs.in")));
 
         if mode == &Mode::LibRs {
           if self.config.template_path.with_added("src").exists() {
