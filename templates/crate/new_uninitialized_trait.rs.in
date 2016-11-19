@@ -1,3 +1,0 @@
-trait NewUninitialized {
-  unsafe fn new_uninitialized() -> Self;
-}
