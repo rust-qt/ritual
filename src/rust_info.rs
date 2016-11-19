@@ -8,12 +8,14 @@ use cpp_method::CppMethodDoc;
 use cpp_data::CppTypeDoc;
 pub use serializable::{RustEnumValue, RustTypeWrapperKind, RustProcessedTypeInfo, RustExportInfo,
                        CppEnumValueDocItem};
+use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustMethodDocItem {
   pub doc: Option<CppMethodDoc>,
   pub rust_fns: Vec<String>,
   pub cpp_fn: String,
+  pub rust_cross_references: Vec<RustCrossReference>,
 }
 
 
@@ -104,6 +106,29 @@ impl RustMethod {
       RustMethodSelfArgKind::Static
     })
   }
+
+  pub fn cpp_cross_references(&self) -> Vec<String> {
+    let mut r = Vec::new();
+    for doc in &self.docs {
+      if let Some(ref doc) = doc.doc {
+        r.append(&mut doc.cross_references.clone());
+      }
+    }
+    r
+  }
+  pub fn add_rust_cross_references(&mut self, table: HashMap<String, RustCrossReference>) {
+    for doc in &mut self.docs {
+      let mut result = Vec::new();
+      if let Some(ref doc) = doc.doc {
+        for reference in &doc.cross_references {
+          if let Some(r) = table.get(reference) {
+            result.push(r.clone());
+          }
+        }
+      }
+      doc.rust_cross_references = result;
+    }
+  }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -168,6 +193,18 @@ pub struct TraitImpl {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum RustCrossReferenceKind {
+  Method { scope: RustMethodScope },
+  Type,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct RustCrossReference {
+  name: RustName,
+  kind: RustCrossReferenceKind,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[allow(dead_code)]
 pub enum RustTypeDeclarationKind {
   CppTypeWrapper {
@@ -175,6 +212,7 @@ pub enum RustTypeDeclarationKind {
     cpp_type_name: String,
     cpp_template_arguments: Option<Vec<CppType>>,
     cpp_doc: Option<CppTypeDoc>,
+    rust_cross_references: Vec<RustCrossReference>,
     methods: Vec<RustMethod>,
     traits: Vec<TraitImpl>,
   },

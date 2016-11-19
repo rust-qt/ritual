@@ -813,6 +813,7 @@ impl RustGenerator {
               cpp_doc: info.cpp_doc.clone(),
               methods: Vec::new(),
               traits: Vec::new(),
+              rust_cross_references: Vec::new(),
             },
           },
           overloading_types: Vec::new(),
@@ -849,6 +850,7 @@ impl RustGenerator {
               cpp_doc: info.cpp_doc.clone(),
               methods: functions_result.methods,
               traits: functions_result.trait_impls,
+              rust_cross_references: Vec::new(),
             },
           },
           overloading_types: functions_result.overloading_types,
@@ -1044,6 +1046,7 @@ impl RustGenerator {
              cpp_fn: method.short_text(),
              rust_fns: Vec::new(),
              doc: method.cpp_method.doc.clone(),
+             rust_cross_references: Vec::new(),
            }]
     } else {
       Vec::new()
@@ -1292,6 +1295,7 @@ impl RustGenerator {
                                                   try!(first_method.self_arg_kind()),
                                                   &self.config.crate_name))
           })),
+          rust_cross_references: Vec::new(),
         });
       }
 
@@ -1373,6 +1377,7 @@ impl RustGenerator {
           cpp_fn: args.cpp_method.cpp_method.short_text(),
           rust_fns: Vec::new(),
           doc: args.cpp_method.cpp_method.doc.clone(),
+          rust_cross_references: Vec::new(),
         };
         method.docs = vec![doc_item];
       } else {
@@ -1520,6 +1525,27 @@ impl RustGenerator {
     ffi_functions
   }
 }
+
+
+// fn find_cross_references(modules: &mut [RustModule]) {
+//  let mut all_cpp_urls = Vec::new();
+//  {
+//    let mut add_from_module = |module| {
+//      for type1 in &module.types {
+//        if let RustTypeDeclarationKind::CppTypeWrapper { ref cpp_doc, ref methods, .. } = type1.kind {
+//
+//        }
+//
+//      }
+//
+//      for module in &module.submodules {
+//        add_from_module(module);
+//      }
+//
+//    }
+//  }
+//
+// }
 
 // ---------------------------------
 #[test]
