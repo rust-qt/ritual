@@ -269,7 +269,9 @@ pub struct CppMethodClassMembership {
   /// Method visibility
   pub visibility: CppVisibility,
   /// True if the method is a Qt signal
-  pub is_signal: bool, // TODO: implement signal detection or remove this field (#7)
+  pub is_signal: bool,
+  /// True if the method is a Qt slot
+  pub is_slot: bool,
   /// If this method is a generated field accessor, this field contains
   /// information about it. Field accessors do not have real C++ methods corresponding to them.
   pub field_accessor: Option<CppFieldAccessor>,

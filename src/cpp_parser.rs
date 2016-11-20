@@ -1135,7 +1135,8 @@ impl<'a> CppParser<'a> {
               Accessibility::Protected => CppVisibility::Protected,
               Accessibility::Private => CppVisibility::Private,
             },
-            is_signal: false, // TODO: parse signals and slots (#7)
+            is_signal: false,
+            is_slot: false,
             class_type: match self.find_type(|x| &x.name == &class_name) {
               Some(info) => try!(info.default_class_type()),
               None => return Err(format!("Unknown class type: {}", class_name).into()),

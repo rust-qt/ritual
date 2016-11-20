@@ -30,6 +30,7 @@ pub fn empty_membership(class_name: &'static str) -> CppMethodClassMembership {
     is_static: false,
     visibility: CppVisibility::Public,
     is_signal: false,
+    is_slot: false,
     class_type: CppTypeClassBase {
       name: class_name.to_string(),
       template_arguments: None,
@@ -738,6 +739,7 @@ fn short_text1() {
       is_static: false,
       visibility: CppVisibility::Protected,
       is_signal: false,
+      is_slot: false,
       class_type: CppTypeClassBase {
         name: "Class1".to_string(),
         template_arguments: None,

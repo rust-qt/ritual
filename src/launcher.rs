@@ -208,6 +208,8 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
   if env.aggressive_caching &&
      output_dir_path.with_added(COMPLETED_MARKER_FILE_NAME).as_path().exists() {
     log::info("No processing! cpp_to_rust uses previous results.");
+    log::info(format!("Remove \"{}\" file to force processing.",
+                      output_dir_path.with_added(COMPLETED_MARKER_FILE_NAME).display()));
   } else {
     if !env.dependency_paths.is_empty() {
       log::info("Loading dependencies");
@@ -224,13 +226,13 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       dependencies_cpp_data.push(cpp_data);
     }
 
-    let parse_result_cache_file_path = output_dir_path.with_added("cpp_data.json");
-    let loaded_parse_result = if env.aggressive_caching &&
-                                 parse_result_cache_file_path.as_path().is_file() {
-      match load_json(&parse_result_cache_file_path) {
+    let cpp_data_cache_file_path = output_dir_path.with_added("cpp_data.json");
+    let loaded_cpp_data = if env.aggressive_caching &&
+                             cpp_data_cache_file_path.as_path().is_file() {
+      match load_json(&cpp_data_cache_file_path) {
         Ok(r) => {
           log::info(format!("C++ data is loaded from file: {}",
-                            parse_result_cache_file_path.display()));
+                            cpp_data_cache_file_path.display()));
           Some(r)
         }
         Err(err) => {
@@ -242,33 +244,44 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     } else {
       None
     };
-
-    let parse_result = if let Some(r) = loaded_parse_result {
+    let cpp_data = if let Some(r) = loaded_cpp_data {
       r
     } else {
-      log::info("Parsing C++ headers.");
-      let mut parse_result =
-        try!(cpp_parser::run(cpp_parser::CppParserConfig {
-                               include_paths: include_dirs.clone(),
-                               framework_paths: framework_dirs.clone(),
-                               include_directives: Vec::from(env.config.include_directives()),
-                               target_include_paths: target_include_dirs,
-                               tmp_cpp_path: output_dir_path.with_added("1.cpp"),
-                               name_blacklist: Vec::from(env.config.cpp_parser_blocked_names()),
-                               flags: Vec::from(env.config.cpp_parser_flags()),
-                             },
-                             dependencies_cpp_data)
-          .chain_err(|| "C++ parser failed"));
+      let raw_cpp_data_cache_file_path = output_dir_path.with_added("raw_cpp_data.json");
+      let mut cpp_data = if env.aggressive_caching &&
+                            raw_cpp_data_cache_file_path.as_path().is_file() {
+        try!(load_json(&raw_cpp_data_cache_file_path))
+      } else {
+        log::info("Parsing C++ headers.");
+        let cpp_data =
+          try!(cpp_parser::run(cpp_parser::CppParserConfig {
+                                 include_paths: include_dirs.clone(),
+                                 framework_paths: framework_dirs.clone(),
+                                 include_directives: Vec::from(env.config.include_directives()),
+                                 target_include_paths: target_include_dirs,
+                                 tmp_cpp_path: output_dir_path.with_added("1.cpp"),
+                                 name_blacklist: Vec::from(env.config.cpp_parser_blocked_names()),
+                                 flags: Vec::from(env.config.cpp_parser_flags()),
+                               },
+                               dependencies_cpp_data)
+            .chain_err(|| "C++ parser failed"));
+        if env.aggressive_caching {
+          try!(save_json(&raw_cpp_data_cache_file_path, &cpp_data));
+          log::info(format!("Raw C++ data is saved to file: {}",
+                            raw_cpp_data_cache_file_path.display()));
+        }
+        cpp_data
+      };
       for filter in env.config.cpp_data_filters() {
-        try!(filter(&mut parse_result).chain_err(|| "cpp_data_filter failed"));
+        try!(filter(&mut cpp_data).chain_err(|| "cpp_data_filter failed"));
       }
       log::info("Post-processing parse result.");
-      try!(parse_result.post_process());
+      try!(cpp_data.post_process());
 
-      try!(save_json(&parse_result_cache_file_path, &parse_result));
-      log::info(format!("Header parse result is saved to file: {}",
-                        parse_result_cache_file_path.display()));
-      parse_result
+      try!(save_json(&cpp_data_cache_file_path, &cpp_data));
+      log::info(format!("C++ data is saved to file: {}",
+                        cpp_data_cache_file_path.display()));
+      cpp_data
     };
 
     let c_lib_name = format!("{}_c", &input_cargo_toml_data.name);
@@ -280,7 +293,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     try!(create_dir_all(&c_lib_tmp_path));
     log::info(format!("Generating C wrapper library ({}).", c_lib_name));
 
-    let cpp_ffi_headers = try!(cpp_ffi_generator::run(&parse_result,
+    let cpp_ffi_headers = try!(cpp_ffi_generator::run(&cpp_data,
                                                       c_lib_name.clone(),
                                                       env.config.cpp_ffi_generator_filters())
       .chain_err(|| "FFI generator failed"));
@@ -370,7 +383,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     }
     log::info("Preparing Rust functions");
     let rust_data = try!(rust_generator::run(cpp_ffi_generator::CppAndFfiData {
-                                               cpp_data: parse_result,
+                                               cpp_data: cpp_data,
                                                cpp_ffi_headers: cpp_ffi_headers,
                                              },
                                              dependency_rust_types,

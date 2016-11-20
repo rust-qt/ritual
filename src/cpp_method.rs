@@ -186,8 +186,6 @@ impl CppMethod {
   /// Returns short text representing values in this method
   /// (only for debug output purposes).
   pub fn short_text(&self) -> String {
-
-
     let mut s = String::new();
     if let Some(ref info) = self.class_membership {
       if info.is_virtual {
@@ -208,6 +206,9 @@ impl CppMethod {
       }
       if info.is_signal {
         s = format!("{} [signal]", s);
+      }
+      if info.is_slot {
+        s = format!("{} [slot]", s);
       }
       match info.kind {
         CppMethodKind::Constructor => s = format!("{} [constructor]", s),

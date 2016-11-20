@@ -2,16 +2,21 @@ use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership, CppFunction
                  CppFieldAccessorType, CppFieldAccessor};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
-use errors::{Result, unexpected};
+use errors::{Result, unexpected, ChainErr};
+use file_utils::open_file;
 use log;
 
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::iter::once;
+use std::io::{BufRead, BufReader};
 
 pub use serializable::{CppEnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
                        CppTypeData, CppTypeDoc, CppData, CppTemplateInstantiation,
                        CppTemplateInstantiations, CppClassUsingDirective, CppBaseSpecifier,
                        TemplateArgumentsDeclaration};
+
+extern crate regex;
+use self::regex::Regex;
 
 fn apply_instantiations_to_method(method: &CppMethod,
                                   nested_level: i32,
@@ -187,6 +192,7 @@ impl CppData {
               is_static: false,
               visibility: CppVisibility::Public,
               is_signal: false,
+              is_slot: false,
               kind: CppMethodKind::Destructor,
               field_accessor: None,
             }),
@@ -689,6 +695,7 @@ impl CppData {
                   is_static: false,
                   visibility: CppVisibility::Public,
                   is_signal: false,
+                  is_slot: false,
                   field_accessor: Some(CppFieldAccessor {
                     accessor_type: accessor_type,
                     field_name: field.name.clone(),
@@ -749,9 +756,132 @@ impl CppData {
     Ok(())
   }
 
+  pub fn inherits(&self, class_name: &str, base_name: &str) -> bool {
+    for types in self.dependencies.iter().map(|x| &x.types).chain(once(&self.types)) {
+      if let Some(info) = types.iter().find(|x| &x.name == class_name) {
+        if let CppTypeKind::Class { ref bases, .. } = info.kind {
+          for base1 in bases {
+            if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base1.base_type.base {
+              if name == base_name {
+                return true;
+              }
+              if self.inherits(name, base_name) {
+                return true;
+              }
+            }
+          }
+        }
+      }
+    }
+    false
+  }
+
+  fn detect_signals_and_slots(&mut self) -> Result<()> {
+    let mut files = HashSet::new();
+    for type1 in &self.types {
+      if self.inherits(&type1.name, "QObject") &&
+         !files.contains(&type1.origin_location.include_file_path) {
+        files.insert(type1.origin_location.include_file_path.clone());
+      }
+    }
+
+    #[derive(Debug)]
+    enum SectionType {
+      Signals,
+      Slots,
+      Other,
+    }
+    #[derive(Debug)]
+    struct Section {
+      line: i32,
+      section_type: SectionType,
+    }
+
+    if files.is_empty() {
+      return Ok(());
+    }
+    log::info("Detecting signals and slots");
+    let re_signals = try!(Regex::new(r"(signals|Q_SIGNALS)\s*:"));
+    let re_slots = try!(Regex::new(r"(slots|Q_SLOTS)\s*:"));
+    let re_other = try!(Regex::new(r"(public|protected|private)\s*:"));
+    let mut sections = HashMap::new();
+
+    for file_path in files {
+      let mut file_sections = Vec::new();
+      log::info(format!("File: {}", &file_path));
+      let file = try!(open_file(&file_path));
+      let reader = BufReader::new(file.into_file());
+      for (line_num, line) in reader.lines().enumerate() {
+        let line =
+          try!(line.chain_err(|| format!("failed while reading lines from {}", &file_path)));
+        let section_type = if re_signals.is_match(&line) {
+          Some(SectionType::Signals)
+        } else if re_slots.is_match(&line) {
+          Some(SectionType::Slots)
+        } else if re_other.is_match(&line) {
+          Some(SectionType::Other)
+        } else {
+          None
+        };
+        if let Some(section_type) = section_type {
+          file_sections.push(Section {
+            line: line_num as i32,
+            section_type: section_type,
+          });
+        }
+      }
+      println!("sections: {:?}", file_sections);
+      if !file_sections.is_empty() {
+        sections.insert(file_path, file_sections);
+      }
+    }
+    for type1 in &self.types {
+      if let Some(sections) = sections.get(&type1.origin_location.include_file_path) {
+        let sections: Vec<_> =
+          sections.iter().filter(|x| x.line >= type1.origin_location.line as i32 - 1).collect();
+        for method in &mut self.methods {
+          if let Some(ref mut info) = method.class_membership {
+            if info.class_type.name == type1.name {
+              if let Some(ref location) = method.origin_location {
+                let matching_sections: Vec<_> = sections.clone()
+                  .into_iter()
+                  .filter(|x| x.line <= location.line as i32 - 1)
+                  .collect();
+                if !matching_sections.is_empty() {
+                  let section = matching_sections[matching_sections.len() - 1];
+                  match section.section_type {
+                    SectionType::Signals => {
+                      info.is_signal = true;
+                    }
+                    SectionType::Slots => {
+                      info.is_slot = true;
+                    }
+                    SectionType::Other => {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    for method in &self.methods {
+      if let Some(ref info) = method.class_membership {
+        if info.is_signal {
+          log::info(format!("Found signal: {}", method.short_text()));
+        }
+        if info.is_slot {
+          log::info(format!("Found slot: {}", method.short_text()));
+        }
+      }
+    }
+    Ok(())
+  }
+
   /// Performs data conversion to make it more suitable
   /// for further wrapper generation.
   pub fn post_process(&mut self) -> Result<()> {
+    try!(self.detect_signals_and_slots());
     try!(self.ensure_explicit_destructors());
     self.generate_methods_with_omitted_args();
     try!(self.instantiate_templates());
