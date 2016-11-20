@@ -146,7 +146,7 @@ impl CppTypeData {
 
   /// Checks if the type was directly derived from specified type.
   #[allow(dead_code)]
-  pub fn inherits(&self, class_name: &str) -> bool {
+  pub fn inherits_directly(&self, class_name: &str) -> bool {
     if let CppTypeKind::Class { ref bases, .. } = self.kind {
       for base in bases {
         if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
@@ -164,7 +164,7 @@ impl CppData {
   /// Adds destructors for every class that does not have explicitly
   /// defined destructor, allowing to create wrappings for
   /// destructors implicitly available in C++.
-  pub fn ensure_explicit_destructors(&mut self, dependencies: &[&CppData]) -> Result<()> {
+  pub fn ensure_explicit_destructors(&mut self) -> Result<()> {
     for type1 in &self.types {
       if let CppTypeKind::Class { .. } = type1.kind {
         let class_name = &type1.name;
@@ -176,7 +176,7 @@ impl CppData {
           }
         }
         if !found_destructor {
-          let is_virtual = self.has_virtual_destructor(class_name, dependencies);
+          let is_virtual = self.has_virtual_destructor(class_name);
           self.methods.push(CppMethod {
             name: format!("~{}", class_name),
             class_membership: Some(CppMethodClassMembership {
@@ -310,12 +310,13 @@ impl CppData {
   /// name in the derived class. Constructors, destructors and assignment
   /// operators are also not added. This reflects C++'s method inheritance rules.
   #[cfg_attr(feature="clippy", allow(block_in_if_condition_stmt))]
-  pub fn add_inherited_methods(&mut self, dependencies: &[&CppData]) -> Result<()> {
+  pub fn add_inherited_methods(&mut self) -> Result<()> {
     log::info("Adding inherited methods");
     let mut all_new_methods = Vec::new();
-    for (is_self, cpp_data) in dependencies.into_iter()
+    for (is_self, cpp_data) in self.dependencies
+      .iter()
       .map(|x| (false, x))
-      .chain(once((true, &(self as &_)))) {
+      .chain(once((true, self as &_))) {
       for type1 in &cpp_data.types {
         if type1.is_class() {
           let mut interesting_cpp_datas: Vec<&CppData> = vec![cpp_data];
@@ -502,7 +503,7 @@ impl CppData {
   }
 
   /// Checks if specified class has virtual destructor (own or inherited).
-  pub fn has_virtual_destructor(&self, class_name: &str, dependencies: &[&CppData]) -> bool {
+  pub fn has_virtual_destructor(&self, class_name: &str) -> bool {
     for method in &self.methods {
       if let Some(ref info) = method.class_membership {
         if info.kind == CppMethodKind::Destructor && &info.class_type.name == class_name {
@@ -514,15 +515,15 @@ impl CppData {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
         for base in bases {
           if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
-            if self.has_virtual_destructor(name, dependencies) {
+            if self.has_virtual_destructor(name) {
               return true;
             }
           }
         }
       }
     }
-    for dep in dependencies {
-      if dep.has_virtual_destructor(class_name, &Vec::new()) {
+    for dep in &self.dependencies {
+      if dep.has_virtual_destructor(class_name) {
         return true;
       }
     }
@@ -581,10 +582,10 @@ impl CppData {
     })
   }
 
-  fn check_template_type(&self, dependencies: &[&CppData], type1: &CppType) -> Result<()> {
+  fn check_template_type(&self, type1: &CppType) -> Result<()> {
     if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) = type1.base {
       if let Some(ref template_arguments) = *template_arguments {
-        let is_valid = |cpp_data: &&CppData| {
+        let is_valid = |cpp_data: &CppData| {
           cpp_data.template_instantiations.iter().any(|inst| {
             &inst.class_name == name &&
             inst.instantiations
@@ -592,22 +593,22 @@ impl CppData {
               .any(|x| &x.template_arguments == template_arguments)
           })
         };
-        if !dependencies.into_iter().chain(once(&self)).any(is_valid) {
+        if !self.dependencies.iter().chain(once(self)).any(is_valid) {
           return Err(format!("type not available: {:?}", type1).into());
         }
         for arg in template_arguments {
-          try!(self.check_template_type(dependencies, arg));
+          try!(self.check_template_type(arg));
         }
       }
     }
     Ok(())
   }
 
-  fn instantiate_templates(&mut self, dependencies: &[&CppData]) -> Result<()> {
+  fn instantiate_templates(&mut self) -> Result<()> {
     log::info("Instantiating templates.");
     let mut new_methods = Vec::new();
 
-    for cpp_data in dependencies.into_iter().chain(once(&(self as &_))) {
+    for cpp_data in self.dependencies.iter().chain(once(self as &_)) {
       for method in &cpp_data.methods {
         for type1 in method.all_involved_types() {
           if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
@@ -635,7 +636,7 @@ impl CppData {
                       for method in methods {
                         let mut ok = true;
                         for type1 in method.all_involved_types() {
-                          match self.check_template_type(dependencies, &type1) {
+                          match self.check_template_type(&type1) {
                             Ok(_) => {}
                             Err(msg) => {
                               ok = false;
@@ -750,11 +751,11 @@ impl CppData {
 
   /// Performs data conversion to make it more suitable
   /// for further wrapper generation.
-  pub fn post_process(&mut self, dependencies: &[&CppData]) -> Result<()> {
-    try!(self.ensure_explicit_destructors(dependencies));
+  pub fn post_process(&mut self) -> Result<()> {
+    try!(self.ensure_explicit_destructors());
     self.generate_methods_with_omitted_args();
-    try!(self.instantiate_templates(dependencies));
-    try!(self.add_inherited_methods(dependencies)); // TODO: add inherited fields too
+    try!(self.instantiate_templates());
+    try!(self.add_inherited_methods()); // TODO: add inherited fields too
     try!(self.add_field_accessors()); // TODO: fix doc generator for field accessors
     Ok(())
   }

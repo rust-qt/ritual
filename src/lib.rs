@@ -27,7 +27,6 @@ mod cpp_lib_builder;
 pub mod cpp_method;
 pub mod cpp_type;
 pub mod cpp_operator;
-mod dependency_info;
 mod doc_formatter;
 pub mod errors;
 pub mod file_utils;

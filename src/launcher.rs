@@ -2,10 +2,10 @@ extern crate num_cpus;
 
 use config::Config;
 use cpp_code_generator::CppCodeGenerator;
+use cpp_data::CppData;
 use cpp_ffi_generator;
 use cpp_lib_builder::CppLibBuilder;
 use cpp_parser;
-use dependency_info::DependencyInfo;
 use errors::{Result, ChainErr};
 use file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json, canonicalize,
                  remove_dir_all, remove_dir, read_dir, path_to_str, create_file};
@@ -67,6 +67,26 @@ pub fn is_processing_skipped() -> Result<bool> {
   let (_source_dir_path, output_dir_path, aggressive_caching) = try!(read_cache_env());
   Ok(aggressive_caching &&
      output_dir_path.with_added(COMPLETED_MARKER_FILE_NAME).as_path().exists())
+}
+
+struct DependencyInfo {
+  pub rust_export_info: RustExportInfo,
+  pub path: PathBuf,
+}
+
+fn load_dependency(path: &PathBuf) -> Result<(RustExportInfo, CppData)> {
+  let cpp_data_path = path.with_added("cpp_data.json");
+  if !cpp_data_path.exists() {
+    return Err(format!("file not found: {}", cpp_data_path.display()).into());
+  }
+  let cpp_data = try!(load_json(&cpp_data_path));
+
+  let rust_export_info_path = path.with_added("rust_export_info.json");
+  if !rust_export_info_path.exists() {
+    return Err(format!("file not found: {}", rust_export_info_path.display()).into());
+  }
+  let rust_export_info = try!(load_json(&rust_export_info_path));
+  Ok((rust_export_info, cpp_data))
 }
 
 pub fn run_from_build_script(config: Config) -> Result<()> {
@@ -192,14 +212,18 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
     if !env.dependency_paths.is_empty() {
       log::info("Loading dependencies");
     }
-    let dependencies: Vec<_> = try!(env.dependency_paths
-      .iter()
-      .map_if_ok(|path| DependencyInfo::load(&try!(canonicalize(path))))
-      .chain_err(|| "failed to load dependency"));
-    let mut dependency_cpp_types = Vec::new();
-    for dep in &dependencies {
-      dependency_cpp_types.extend_from_slice(&dep.cpp_data.types);
+    let mut dependencies = Vec::new();
+    let mut dependencies_cpp_data = Vec::new();
+    for path in &env.dependency_paths {
+      let (info, cpp_data) = try!(load_dependency(&try!(canonicalize(path)))
+        .chain_err(|| "failed to load dependency"));
+      dependencies.push(DependencyInfo {
+        path: path.clone(),
+        rust_export_info: info,
+      });
+      dependencies_cpp_data.push(cpp_data);
     }
+
     let parse_result_cache_file_path = output_dir_path.with_added("cpp_data.json");
     let loaded_parse_result = if env.aggressive_caching &&
                                  parse_result_cache_file_path.as_path().is_file() {
@@ -233,13 +257,13 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
                                name_blacklist: Vec::from(env.config.cpp_parser_blocked_names()),
                                flags: Vec::from(env.config.cpp_parser_flags()),
                              },
-                             &dependencies.iter().map(|x| &x.cpp_data).collect::<Vec<_>>())
+                             dependencies_cpp_data)
           .chain_err(|| "C++ parser failed"));
       for filter in env.config.cpp_data_filters() {
         try!(filter(&mut parse_result).chain_err(|| "cpp_data_filter failed"));
       }
       log::info("Post-processing parse result.");
-      try!(parse_result.post_process(&dependencies.iter().map(|x| &x.cpp_data).collect::<Vec<_>>()));
+      try!(parse_result.post_process());
 
       try!(save_json(&parse_result_cache_file_path, &parse_result));
       log::info(format!("Header parse result is saved to file: {}",

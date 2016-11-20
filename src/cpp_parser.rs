@@ -21,7 +21,7 @@ use self::regex::Regex;
 struct CppParser<'a> {
   config: CppParserConfig,
   types: Vec<CppTypeData>,
-  dependencies_data: &'a [&'a CppData],
+  dependencies_data: &'a [CppData],
 }
 
 #[allow(dead_code)]
@@ -200,134 +200,138 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
   result
 }
 
-pub fn run(config: CppParserConfig, dependencies_data: &[&CppData]) -> Result<CppData> {
+pub fn run(config: CppParserConfig, dependencies_data: Vec<CppData>) -> Result<CppData> {
   log::info(get_version());
   log::info("Initializing clang...");
-  let (mut parser, methods) = try!(run_clang(&config, None, |translation_unit| {
-    let mut parser = CppParser {
-      types: Vec::new(),
-      config: config.clone(),
-      dependencies_data: dependencies_data,
-    };
-    log::info("Parsing types...");
-    parser.parse_types(translation_unit);
-    log::info("Parsing methods...");
-    let methods = parser.parse_methods(translation_unit);
-    Ok((parser, methods))
-  }));
-  log::info("Checking integrity...");
-  let (good_methods, good_types) = parser.check_integrity(methods);
-  parser.types = good_types;
-  log::info("Searching for template instantiations...");
-  let template_instantiations = parser.find_template_instantiations(&good_methods);
-  log::info("Determining type sizes of template instantiations...");
-  let mut cpp_code = "class AllFields {\npublic:\n".to_string();
-  for (field_num, &(ref class_name, ref template_args)) in template_instantiations.iter()
-    .enumerate() {
-    cpp_code = cpp_code +
-               &format!("  {} field{};\n",
-                        try!(CppTypeClassBase {
-                            name: class_name.clone(),
-                            template_arguments: Some(template_args.clone()),
-                          }
-                          .to_cpp_code()),
-                        field_num);
-  }
-  cpp_code = cpp_code + "};\n";
-  let final_template_instantiations =
-    try!(run_clang(&config, Some(cpp_code), |translation_unit| {
-      let last_entity = {
-        let mut top_entities = translation_unit.get_children();
-        if let Some(e) = top_entities.pop() {
-          e
-        } else {
-          return Err("AllFields not found: no entities".into());
-        }
-      };
-      if let Some(name) = last_entity.get_name() {
-        if name != "AllFields" {
-          return Err(format!("AllFields not found: entity name mismatch: '{}'", name).into());
-        }
-      } else {
-        return Err("AllFields not found: entity has no name".into());
-      }
-      let mut parser2 = CppParser {
+  let (types, methods, insts) = {
+    let (mut parser, methods) = try!(run_clang(&config, None, |translation_unit| {
+      let mut parser = CppParser {
         types: Vec::new(),
         config: config.clone(),
-        dependencies_data: dependencies_data,
+        dependencies_data: &dependencies_data,
       };
-      parser2.parse_types(last_entity);
-      if parser2.types.len() != 1 {
-        return Err("AllFields parse result: expected 1 type".into());
-      }
-      let mut final_template_instantiations = Vec::<CppTemplateInstantiations>::new();
-      if let CppTypeKind::Class { ref fields, .. } = parser2.types[0].kind {
-        if fields.len() != template_instantiations.len() {
-          return Err("AllFields parse result: fields count mismatch".into());
-        }
-        for (field_num, &(ref class_name, ref template_args)) in template_instantiations.iter()
-          .enumerate() {
-          let size = fields[field_num].size;
-          if size.is_none() {
-            return Err(format!("AllFields parse result: failed to get size of {}<{:?}>",
-                               class_name,
-                               template_args)
-              .into());
+      log::info("Parsing types...");
+      parser.parse_types(translation_unit);
+      log::info("Parsing methods...");
+      let methods = parser.parse_methods(translation_unit);
+      Ok((parser, methods))
+    }));
+    log::info("Checking integrity...");
+    let (good_methods, good_types) = parser.check_integrity(methods);
+    parser.types = good_types;
+    log::info("Searching for template instantiations...");
+    let template_instantiations = parser.find_template_instantiations(&good_methods);
+    log::info("Determining type sizes of template instantiations...");
+    let mut cpp_code = "class AllFields {\npublic:\n".to_string();
+    for (field_num, &(ref class_name, ref template_args)) in template_instantiations.iter()
+      .enumerate() {
+      cpp_code = cpp_code +
+                 &format!("  {} field{};\n",
+                          try!(CppTypeClassBase {
+                              name: class_name.clone(),
+                              template_arguments: Some(template_args.clone()),
+                            }
+                            .to_cpp_code()),
+                          field_num);
+    }
+    cpp_code = cpp_code + "};\n";
+    let final_template_instantiations =
+      try!(run_clang(&config, Some(cpp_code), |translation_unit| {
+        let last_entity = {
+          let mut top_entities = translation_unit.get_children();
+          if let Some(e) = top_entities.pop() {
+            e
+          } else {
+            return Err("AllFields not found: no entities".into());
           }
-          if !final_template_instantiations.iter().any(|x| &x.class_name == class_name) {
-            // first encounter of this template class
-            if let Some(type_info) = parser.find_type(|x| &x.name == class_name) {
-              if let CppTypeKind::Class { ref template_arguments, .. } = type_info.kind {
-                if template_arguments.is_none() {
-                  return Err(unexpected(format!("Invalid instantiation: type {} is not a \
-                                                 template class",
+        };
+        if let Some(name) = last_entity.get_name() {
+          if name != "AllFields" {
+            return Err(format!("AllFields not found: entity name mismatch: '{}'", name).into());
+          }
+        } else {
+          return Err("AllFields not found: entity has no name".into());
+        }
+        let mut parser2 = CppParser {
+          types: Vec::new(),
+          config: config.clone(),
+          dependencies_data: &dependencies_data,
+        };
+        parser2.parse_types(last_entity);
+        if parser2.types.len() != 1 {
+          return Err("AllFields parse result: expected 1 type".into());
+        }
+        let mut final_template_instantiations = Vec::<CppTemplateInstantiations>::new();
+        if let CppTypeKind::Class { ref fields, .. } = parser2.types[0].kind {
+          if fields.len() != template_instantiations.len() {
+            return Err("AllFields parse result: fields count mismatch".into());
+          }
+          for (field_num, &(ref class_name, ref template_args)) in template_instantiations.iter()
+            .enumerate() {
+            let size = fields[field_num].size;
+            if size.is_none() {
+              return Err(format!("AllFields parse result: failed to get size of {}<{:?}>",
+                                 class_name,
+                                 template_args)
+                .into());
+            }
+            if !final_template_instantiations.iter().any(|x| &x.class_name == class_name) {
+              // first encounter of this template class
+              if let Some(type_info) = parser.find_type(|x| &x.name == class_name) {
+                if let CppTypeKind::Class { ref template_arguments, .. } = type_info.kind {
+                  if template_arguments.is_none() {
+                    return Err(unexpected(format!("Invalid instantiation: type {} is not a \
+                                                   template class",
+                                                  class_name))
+                      .into());
+                  }
+                } else {
+                  return Err(unexpected(format!("Invalid instantiation: type {} is not a class",
                                                 class_name))
                     .into());
                 }
+                final_template_instantiations.push(CppTemplateInstantiations {
+                  class_name: class_name.clone(),
+                  cpp_doc: type_info.doc.clone(),
+                  include_file: type_info.include_file.clone(),
+                  instantiations: Vec::new(),
+                });
               } else {
-                return Err(unexpected(format!("Invalid instantiation: type {} is not a class",
+                return Err(unexpected(format!("Invalid instantiation: unknown class type: {}",
                                               class_name))
                   .into());
               }
-              final_template_instantiations.push(CppTemplateInstantiations {
-                class_name: class_name.clone(),
-                cpp_doc: type_info.doc.clone(),
-                include_file: type_info.include_file.clone(),
-                instantiations: Vec::new(),
+            }
+
+            if let Some(result_item) = final_template_instantiations.iter_mut()
+              .find(|x| &x.class_name == class_name) {
+              result_item.instantiations.push(CppTemplateInstantiation {
+                template_arguments: template_args.clone(),
+                size: if let Some(size) = size {
+                  size
+                } else {
+                  return Err("template instantiation's size is None".into());
+                },
               });
             } else {
-              return Err(unexpected(format!("Invalid instantiation: unknown class type: {}",
-                                            class_name))
+              return Err(unexpected("final_template_instantiations must contain this class now")
                 .into());
             }
           }
-
-          if let Some(result_item) = final_template_instantiations.iter_mut()
-            .find(|x| &x.class_name == class_name) {
-            result_item.instantiations.push(CppTemplateInstantiation {
-              template_arguments: template_args.clone(),
-              size: if let Some(size) = size {
-                size
-              } else {
-                return Err("template instantiation's size is None".into());
-              },
-            });
-          } else {
-            return Err(unexpected("final_template_instantiations must contain this class now")
-              .into());
-          }
+        } else {
+          return Err(unexpected("AllFields parse result: type is not a class").into());
         }
-      } else {
-        return Err(unexpected("AllFields parse result: type is not a class").into());
-      }
-      Ok(final_template_instantiations)
-    }));
+        Ok(final_template_instantiations)
+      }));
 
-  log::info("C++ parser finished.");
+    log::info("C++ parser finished.");
+    (parser.types, good_methods, final_template_instantiations)
+  };
   Ok(CppData {
-    types: parser.types,
-    methods: good_methods,
-    template_instantiations: final_template_instantiations,
+    types: types,
+    methods: methods,
+    template_instantiations: insts,
+    dependencies: dependencies_data,
   })
 }
 
@@ -1577,7 +1581,7 @@ impl<'a> CppParser<'a> {
   #[cfg_attr(feature="clippy", allow(block_in_if_condition_stmt))]
   fn find_template_instantiations(&self, methods: &[CppMethod]) -> Vec<(String, Vec<CppType>)> {
 
-    fn check_type(type1: &CppType, deps: &[&CppData], result: &mut Vec<(String, Vec<CppType>)>) {
+    fn check_type(type1: &CppType, deps: &[CppData], result: &mut Vec<(String, Vec<CppType>)>) {
       if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
              type1.base {
         if let Some(ref template_arguments) = *template_arguments {

@@ -33,7 +33,7 @@ fn run_parser(code: &'static str) -> CppData {
                                      framework_paths: Vec::new(),
                                      flags: Vec::new(),
                                    },
-                                   &Vec::new())
+                                   Vec::new())
     .unwrap();
   for method in &mut result.methods {
     if let Some(ref mut origin_location) = method.origin_location {

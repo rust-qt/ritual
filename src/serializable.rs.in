@@ -189,6 +189,8 @@ pub struct CppData {
   /// List of found template instantiations. Key is name of
   /// the template class, value is list of instantiations.
   pub template_instantiations: Vec<CppTemplateInstantiations>,
+  /// Data of dependencies
+  pub dependencies: Vec<CppData>,
 }
 
 // -----------------------------------
