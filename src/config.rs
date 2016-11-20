@@ -3,6 +3,7 @@ use errors::Result;
 use cpp_method::CppMethod;
 use cpp_data::CppData;
 
+/// Function type used in `Config::add_cpp_ffi_generator_filter`.
 pub type CppFfiGeneratorFilterFn = Fn(&CppMethod) -> Result<bool>;
 
 struct CppFfiGeneratorFilter(Box<CppFfiGeneratorFilterFn>);
@@ -13,6 +14,7 @@ impl ::std::fmt::Debug for CppFfiGeneratorFilter {
   }
 }
 
+/// Function type used in `Config::add_cpp_data_filter`.
 pub type CppDataFilterFn = Fn(&mut CppData) -> Result<()>;
 
 struct CppDataFilter(Box<CppDataFilterFn>);

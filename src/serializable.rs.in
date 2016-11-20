@@ -9,7 +9,7 @@ pub struct CppEnumValue {
   pub name: String,
   /// Corresponding value
   pub value: i64,
-
+  /// C++ documentation for this item in HTML
   pub doc: Option<String>,
 }
 
@@ -90,7 +90,7 @@ pub struct CppOriginLocation {
   pub column: u32,
 }
 
-/// Visibility of a C++ entity. Defaults to Public
+/// Visibility of a C++ entity. Defaults to `Public`
 /// for entities that can't have visibility (like free functions)
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
@@ -100,11 +100,15 @@ pub enum CppVisibility {
   Private,
 }
 
+/// C++ documentation for a type
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[derive(Serialize, Deserialize)]
 pub struct CppTypeDoc {
+  /// HTML content
   pub html: String,
+  /// Absolute URL to online documentation page for this type
   pub url: String,
+  /// Absolute documentation URLs encountered in the content
   pub cross_references: Vec<String>,
 }
 
@@ -121,13 +125,26 @@ pub struct CppTypeData {
   pub origin_location: CppOriginLocation,
   /// Type information
   pub kind: CppTypeKind,
-
+  /// C++ documentation data for this type
   pub doc: Option<CppTypeDoc>,
 }
 
+/// Information about template arguments of a C++ class type
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub struct TemplateArgumentsDeclaration {
+  /// Indicates how many template types this type is nested into.
+  ///
+  /// In the following example class `A`
+  /// has level 0, and class `B` has level 1.
+  ///
+  /// ```C++
+  /// template<class T>
+  /// class A {
+  ///   template<class T2>
+  ///   class B {};
+  /// };
+  /// ```
   pub nested_level: i32,
   /// Names of template arguments. Names themselves are
   /// not particularly important, but their count is.
@@ -146,13 +163,13 @@ pub struct CppTemplateInstantiation {
 }
 
 /// List of template instantiations of
-/// a class template
+/// a template class.
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 #[derive(Serialize, Deserialize)]
 pub struct CppTemplateInstantiations {
   /// Template class name
   pub class_name: String,
-
+  /// C++ documentation for the template type
   pub cpp_doc: Option<CppTypeDoc>,
   /// File name of the include file (without full path)
   /// of the template type
@@ -204,22 +221,32 @@ pub enum CppMethodKind {
   Destructor,
 }
 
+/// Variation of a field accessor method
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub enum CppFieldAccessorType {
+  /// Returns copy of the field
   CopyGetter,
+  /// Returns const reference to the field
   ConstRefGetter,
+  /// Returns mutable reference to the field
   MutRefGetter,
+  /// Copies value from its argument to the field
   Setter
 }
 
+/// Information about automatically generated method
+/// for accessing a public field of a class
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub struct CppFieldAccessor {
+  /// Type of the accessor
   pub accessor_type: CppFieldAccessorType,
+  /// Name of the C++ field
   pub field_name: String,
 }
 
+/// Information about a C++ class member method
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub struct CppMethodClassMembership {
@@ -246,13 +273,22 @@ pub struct CppMethodClassMembership {
   pub field_accessor: Option<CppFieldAccessor>,
 }
 
+/// C++ documentation for a method
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub struct CppMethodDoc {
+  /// HTML anchor of this documentation entry
+  /// (used to detect duplicates)
   pub anchor: String,
+  /// HTML content
   pub html: String,
+  /// If the documentation parser couldn't find documentation for the exact same
+  /// method, it can still provide documentation entry for the closest match.
+  /// In this case, this field should contain C++ declaration of the found method.
   pub mismatched_declaration: Option<String>,
+  /// Absolute URL to online documentation page for this method
   pub url: String,
+  /// Absolute documentation URLs encountered in the content
   pub cross_references: Vec<String>,
 }
 
@@ -291,7 +327,11 @@ pub struct CppMethod {
   /// If the method belongs to a template class,
   /// the class's template arguments are not included here.
   pub template_arguments: Option<TemplateArgumentsDeclaration>,
-
+  /// For an instantiated template method, this field contains the types
+  /// used for instantiation. For example, `T QObject::findChild<T>()` would have
+  /// no `template_arguments_values` because it's not instantiated, and
+  /// `QWidget* QObject::findChild<QWidget*>()` would have `QWidget*` type in
+  /// `template_arguments_values`.
   pub template_arguments_values: Option<Vec<CppType>>,
   /// C++ code of the method's declaration.
   /// None if the method was not explicitly declared.
@@ -299,7 +339,7 @@ pub struct CppMethod {
   /// List of base classes this method was inferited from.
   /// The first item is the most base class.
   pub inheritance_chain: Vec<CppBaseSpecifier>, /* TODO: fill inheritance_chain for explicitly redeclared methods (#23) */
-
+  /// C++ documentation data for this method
   pub doc: Option<CppMethodDoc>,
 }
 
@@ -575,10 +615,14 @@ pub struct RustName {
 
 // -------------------------
 // from rust_info
+
+/// C++ documentation data for a enum variant
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[derive(Serialize, Deserialize)]
 pub struct CppEnumValueDocItem {
+  /// C++ name of the variant
   pub variant_name: String,
+  /// HTML content
   pub doc: Option<String>,
 }
 
@@ -592,19 +636,30 @@ pub struct RustEnumValue {
   pub value: i64,
   /// Documentation of corresponding C++ variants
   pub cpp_docs: Vec<CppEnumValueDocItem>,
-
+  /// True if this variant was added because enums with
+  /// one variant are not supported
   pub is_dummy: bool,
 }
 
+/// Information about a Rust type wrapper
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[derive(Serialize, Deserialize)]
 pub enum RustTypeWrapperKind {
+  /// Enum wrapper
   Enum {
+    /// List of enum values
     values: Vec<RustEnumValue>,
+    /// True if `FlaggableEnum` trait is implemented
+    /// for this type, i.e. if `QFlags<T>` with this C++ type
+    /// is used in API.
     is_flaggable: bool,
   },
+  /// Struct wrapper
   Struct {
+    /// Size of the buffer in bytes
     size: i32,
+    /// True if `CppDeletable` trait is implemented
+    /// for this type, i.e. if this C++ type has public destructor.
     is_deletable: bool,
   },
 }
@@ -618,6 +673,7 @@ pub enum RustTypeWrapperKind {
 pub struct RustProcessedTypeInfo {
   /// Full name of corresponding C++ type (class or enum).
   pub cpp_name: String,
+  /// C++ documentation for this type
   pub cpp_doc: Option<CppTypeDoc>,
   /// Template arguments. None if C++ type is not a template class.
   pub cpp_template_arguments: Option<Vec<CppType>>,
@@ -637,8 +693,8 @@ pub struct RustExportInfo {
   pub crate_name: String,
   /// List of generated types
   pub rust_types: Vec<RustProcessedTypeInfo>,
-
   /// As in `Config`
   pub linked_libs: Vec<String>,
+  /// As in `Config`
   pub linked_frameworks: Vec<String>,
 }
