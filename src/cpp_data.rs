@@ -167,17 +167,9 @@ impl CppTypeData {
 
 impl CppData {
   pub fn find_type_info<F>(&self, f: F) -> Option<&CppTypeData>
-    where F: Fn(&CppTypeData) -> bool
+    where F: Fn(&&CppTypeData) -> bool
   {
-    if let Some(r) = self.types.iter().find(|x| f(x)) {
-      return Some(r);
-    }
-    for dep in &self.dependencies {
-      if let Some(r) = dep.find_type_info(|x| f(x)) {
-        return Some(r);
-      }
-    }
-    None
+    once(&self.types).chain(self.dependencies.iter().map(|d| &d.types)).flat_map(|x| x).find(f)
   }
 
 
