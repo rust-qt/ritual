@@ -169,11 +169,6 @@ pub struct CppTemplateInstantiation {
 pub struct CppTemplateInstantiations {
   /// Template class name
   pub class_name: String,
-  /// C++ documentation for the template type
-  pub cpp_doc: Option<CppTypeDoc>,
-  /// File name of the include file (without full path)
-  /// of the template type
-  pub include_file: String,
   /// List of encountered instantiations
   pub instantiations: Vec<CppTemplateInstantiation>,
 }

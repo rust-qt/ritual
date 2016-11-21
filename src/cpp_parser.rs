@@ -292,8 +292,6 @@ pub fn run(config: CppParserConfig, dependencies_data: Vec<CppData>) -> Result<C
                 }
                 final_template_instantiations.push(CppTemplateInstantiations {
                   class_name: class_name.clone(),
-                  cpp_doc: type_info.doc.clone(),
-                  include_file: type_info.include_file.clone(),
                   instantiations: Vec::new(),
                 });
               } else {

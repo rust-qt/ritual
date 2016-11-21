@@ -16,7 +16,7 @@ regex = "0.1"
 serde = "0.8"       # serialization
 serde_json = "0.8"
 
-clang = "0.12.0"    # C++ parsing
+clang = "0.14"    # C++ parsing
 toml = "0.2"        # toml parsing
 select = "0.3.0"    # html parsing
 csv = "0.14.7"      # csv parsing

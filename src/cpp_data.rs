@@ -166,6 +166,21 @@ impl CppTypeData {
 }
 
 impl CppData {
+  pub fn find_type_info<F>(&self, f: F) -> Option<&CppTypeData>
+    where F: Fn(&CppTypeData) -> bool
+  {
+    if let Some(r) = self.types.iter().find(|x| f(x)) {
+      return Some(r);
+    }
+    for dep in &self.dependencies {
+      if let Some(r) = dep.find_type_info(|x| f(x)) {
+        return Some(r);
+      }
+    }
+    None
+  }
+
+
   /// Adds destructors for every class that does not have explicitly
   /// defined destructor, allowing to create wrappings for
   /// destructors implicitly available in C++.
@@ -462,7 +477,7 @@ impl CppData {
     self.methods.append(&mut new_methods);
   }
 
-  pub fn all_include_files(&self) -> HashSet<String> {
+  pub fn all_include_files(&self) -> Result<HashSet<String>> {
     let mut result = HashSet::new();
     for method in &self.methods {
       if !result.contains(&method.include_file) {
@@ -475,11 +490,13 @@ impl CppData {
       }
     }
     for instantiations in &self.template_instantiations {
-      if !result.contains(&instantiations.include_file) {
-        result.insert(instantiations.include_file.clone());
+      let type_info = try!(self.find_type_info(|x| &x.name == &instantiations.class_name)
+        .chain_err(|| format!("type info not found for {}", &instantiations.class_name)));
+      if !result.contains(&type_info.include_file) {
+        result.insert(type_info.include_file.clone());
       }
     }
-    result
+    Ok(result)
   }
 
   /// Checks if specified class is a template class.

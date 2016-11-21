@@ -39,7 +39,8 @@ pub fn run(cpp_data: &CppData,
   };
 
   let mut c_headers = Vec::new();
-  let mut include_name_list: Vec<_> = generator.cpp_data.all_include_files().into_iter().collect();
+  let mut include_name_list: Vec<_> =
+    try!(generator.cpp_data.all_include_files()).into_iter().collect();
   include_name_list.sort();
 
   for include_file in &include_name_list {

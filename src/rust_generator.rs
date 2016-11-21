@@ -448,16 +448,19 @@ fn process_types(input_data: &CppAndFfiData,
       name.parts.push(last_name + &arg_captions.join(""));
       Ok(name)
     };
-  let mut name_failed_items = Vec::new();
+  let mut unnamed_items = Vec::new();
   for template_instantiations in &input_data.cpp_data.template_instantiations {
+    let type_info = try!(input_data.cpp_data
+      .find_type_info(|x| &x.name == &template_instantiations.class_name)
+      .chain_err(|| format!("type info not found for {}", &template_instantiations.class_name)));
     if template_instantiations.class_name == "QFlags" {
       // special processing is implemented for QFlags
       continue;
     }
     for ins in &template_instantiations.instantiations {
-      name_failed_items.push(RustProcessedTypeInfo {
+      unnamed_items.push(RustProcessedTypeInfo {
         cpp_name: template_instantiations.class_name.clone(),
-        cpp_doc: template_instantiations.cpp_doc.clone(),
+        cpp_doc: type_info.doc.clone(),
         cpp_template_arguments: Some(ins.template_arguments.clone()),
         kind: RustTypeWrapperKind::Struct {
           size: ins.size,
@@ -467,7 +470,7 @@ fn process_types(input_data: &CppAndFfiData,
           }),
         },
         rust_name: try!(calculate_rust_name(&template_instantiations.class_name,
-                                            &template_instantiations.include_file,
+                                            &type_info.include_file,
                                             false,
                                             None,
                                             config)),
@@ -475,10 +478,10 @@ fn process_types(input_data: &CppAndFfiData,
     }
   }
   let mut any_success = true;
-  while !name_failed_items.is_empty() {
+  while !unnamed_items.is_empty() {
     if !any_success {
       log::warning("Failed to generate Rust names for template types:");
-      for r in name_failed_items {
+      for r in unnamed_items {
         log::warning(format!("  {:?}\n  {}\n\n",
                              r,
                              if let Err(err) = template_final_name(&result, &r) {
@@ -491,19 +494,19 @@ fn process_types(input_data: &CppAndFfiData,
       break;
     }
     any_success = false;
-    let mut name_failed_items_new = Vec::new();
-    for mut r in name_failed_items {
+    let mut unnamed_items_new = Vec::new();
+    for mut r in unnamed_items {
       match template_final_name(&result, &r) {
         Ok(name) => {
           r.rust_name = name;
           result.push(r);
           any_success = true;
         }
-        Err(_) => name_failed_items_new.push(r),
+        Err(_) => unnamed_items_new.push(r),
       }
 
     }
-    name_failed_items = name_failed_items_new;
+    unnamed_items = unnamed_items_new;
   }
   Ok(result)
 }
