@@ -6,6 +6,7 @@ use errors::{Result, ChainErr, unexpected};
 use log;
 use utils::add_to_multihash;
 use config::CppFfiGeneratorFilterFn;
+use string_utils::JoinWithString;
 
 use std::collections::{HashSet, HashMap};
 
@@ -65,6 +66,7 @@ pub fn run(cpp_data: &CppData,
       });
     }
   }
+  try!(generator.generate_slot_wrappers());
   if c_headers.is_empty() {
     return Err("No FFI headers generated".into());
   }
@@ -211,4 +213,40 @@ impl<'a> CGenerator<'a> {
     processed_methods.sort_by(|a, b| a.c_name.cmp(&b.c_name));
     Ok(processed_methods)
   }
+
+  fn generate_slot_wrappers(&'a self) -> Result<()> {
+    let mut all_types = HashSet::new();
+    for method in &self.cpp_data.methods {
+      if let Some(ref info) = method.class_membership {
+        if info.is_signal {
+          let types: Vec<_> = method.arguments.iter().map(|x| x.argument_type.clone()).collect();
+          if !all_types.contains(&types) {
+            all_types.insert(types);
+          }
+        }
+      }
+    }
+    let mut types_with_omitted_args = HashSet::new();
+    for t in &all_types {
+      let mut types = t.clone();
+      while let Some(_) = types.pop() {
+        if !types_with_omitted_args.contains(&types) {
+          types_with_omitted_args.insert(types.clone());
+        }
+      }
+    }
+    all_types.extend(types_with_omitted_args.into_iter());
+
+
+//    if all_types.is_empty() {
+//      return Ok(());
+//    }
+    println!("generate_slot_wrappers:");
+    for t in all_types {
+      println!("  ({})", t.iter().map(|x| x.to_cpp_pseudo_code()).join(", "));
+    }
+    unimplemented!();
+    Ok(())
+  }
+
 }
