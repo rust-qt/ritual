@@ -1522,7 +1522,7 @@ impl RustGenerator {
           }
         }
       }
-      ffi_functions.push((header.include_file.clone(), functions));
+      ffi_functions.push((header.include_file_base_name.clone(), functions));
     }
     ffi_functions
   }

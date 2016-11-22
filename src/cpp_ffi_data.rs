@@ -283,7 +283,6 @@ pub struct QtSlotWrapper {
 
 #[derive(Debug, Clone)]
 pub struct CppFfiHeaderData {
-  pub include_file: String,
   pub include_file_base_name: String,
   pub methods: Vec<CppAndFfiMethod>,
   pub qt_slot_wrappers: Vec<QtSlotWrapper>,

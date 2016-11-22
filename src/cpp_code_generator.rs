@@ -328,7 +328,7 @@ impl CppCodeGenerator {
   }
 
   pub fn generate_files(&self, data: &[CppFfiHeaderData]) -> Result<()> {
-    try!(self.generate_all_headers_file(data.iter().map(|x| &x.include_file)));
+    try!(self.generate_all_headers_file(data.iter().map(|x| &x.include_file_base_name)));
     for item in data {
       try!(self.generate_one(item).chain_err(|| "C++ code generator failed"));
     }

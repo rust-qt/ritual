@@ -49,7 +49,6 @@ pub fn run(cpp_data: &CppData,
       log::info(format!("Skipping empty include file {}", include_file));
     } else {
       c_headers.push(CppFfiHeaderData {
-        include_file: include_file.clone(),
         include_file_base_name: include_file_base_name,
         methods: methods,
         qt_slot_wrappers: Vec::new(),
@@ -59,7 +58,6 @@ pub fn run(cpp_data: &CppData,
   let qt_slot_wrappers = try!(generator.generate_slot_wrappers());
   if !qt_slot_wrappers.is_empty() {
     c_headers.push(CppFfiHeaderData {
-      include_file: "QtSlotWrappers".to_string(),
       include_file_base_name: "QtSlotWrappers".to_string(),
       methods: Vec::new(),
       qt_slot_wrappers: qt_slot_wrappers,
