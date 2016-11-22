@@ -184,6 +184,10 @@ pub struct CppData {
   /// List of found template instantiations. Key is name of
   /// the template class, value is list of instantiations.
   pub template_instantiations: Vec<CppTemplateInstantiations>,
+  /// List of all argument types used by signals,
+  /// including variations with omitted arguments,
+  /// but excluding argument types from dependencies.
+  pub signal_argument_types: Vec<Vec<CppType>>,
   /// Data of dependencies
   pub dependencies: Vec<CppData>,
 }

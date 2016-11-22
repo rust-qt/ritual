@@ -9,6 +9,7 @@ use log;
 use std::collections::{HashSet, HashMap};
 use std::iter::once;
 use std::io::{BufRead, BufReader};
+use string_utils::JoinWithString;
 
 pub use serializable::{CppEnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
                        CppTypeData, CppTypeDoc, CppData, CppTemplateInstantiation,
@@ -794,7 +795,7 @@ impl CppData {
       }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     enum SectionType {
       Signals,
       Slots,
@@ -844,12 +845,14 @@ impl CppData {
         sections.insert(file_path, file_sections);
       }
     }
+    let mut all_types = HashSet::new();
     for type1 in &self.types {
       if let Some(sections) = sections.get(&type1.origin_location.include_file_path) {
         let sections: Vec<_> =
           sections.iter().filter(|x| x.line >= type1.origin_location.line as i32 - 1).collect();
         for method in &mut self.methods {
-          if let Some(ref mut info) = method.class_membership {
+          let mut section_type = SectionType::Other;
+          if let Some(ref info) = method.class_membership {
             if info.class_type.name == type1.name {
               if let Some(ref location) = method.origin_location {
                 let matching_sections: Vec<_> = sections.clone()
@@ -858,12 +861,18 @@ impl CppData {
                   .collect();
                 if !matching_sections.is_empty() {
                   let section = matching_sections[matching_sections.len() - 1];
+                  section_type = section.section_type.clone();
                   match section.section_type {
                     SectionType::Signals => {
-                      info.is_signal = true;
+                      log::info(format!("Found signal: {}", method.short_text()));
+                      let types: Vec<_> = method.arguments.iter().map(|x| x.argument_type.clone()).collect();
+                      if !all_types.contains(&types) &&
+                          !self.dependencies.iter().any(|d| d.signal_argument_types.iter().any(|t| t == &types)) {
+                        all_types.insert(types);
+                      }
                     }
                     SectionType::Slots => {
-                      info.is_slot = true;
+                      log::info(format!("Found slot: {}", method.short_text()));
                     }
                     SectionType::Other => {}
                   }
@@ -871,19 +880,44 @@ impl CppData {
               }
             }
           }
+          if let Some(ref mut info) = method.class_membership {
+            match section_type {
+              SectionType::Signals => {
+                info.is_signal = true;
+              }
+              SectionType::Slots => {
+                info.is_slot = true;
+              }
+              SectionType::Other => {}
+            }
+          }
+
         }
       }
     }
-    for method in &self.methods {
-      if let Some(ref info) = method.class_membership {
-        if info.is_signal {
-          log::info(format!("Found signal: {}", method.short_text()));
-        }
-        if info.is_slot {
-          log::info(format!("Found slot: {}", method.short_text()));
+
+    let mut types_with_omitted_args = HashSet::new();
+    for t in &all_types {
+      let mut types = t.clone();
+      while let Some(_) = types.pop() {
+        if !types_with_omitted_args.contains(&types) &&
+            !all_types.contains(&types) &&
+           !self.dependencies.iter().any(|d| d.signal_argument_types.iter().any(|t| t == &types)){
+          types_with_omitted_args.insert(types.clone());
         }
       }
     }
+    all_types.extend(types_with_omitted_args.into_iter());
+
+
+    //    if all_types.is_empty() {
+    //      return Ok(());
+    //    }
+    println!("Signal argument types:");
+    for t in &all_types {
+      println!("  ({})", t.iter().map(|x| x.to_cpp_pseudo_code()).join(", "));
+    }
+    self.signal_argument_types = all_types.into_iter().collect();
     Ok(())
   }
 

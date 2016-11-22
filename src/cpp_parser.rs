@@ -329,6 +329,7 @@ pub fn run(config: CppParserConfig, dependencies_data: Vec<CppData>) -> Result<C
     types: types,
     methods: methods,
     template_instantiations: insts,
+    signal_argument_types: Vec::new(),
     dependencies: dependencies_data,
   })
 }
