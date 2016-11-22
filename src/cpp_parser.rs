@@ -503,7 +503,7 @@ impl<'a> CppParser<'a> {
                                                                    &result_type.indirection)
           .map_err(|e| e.to_string()));
         if new_indirection == CppTypeIndirection::Ptr {
-          if let CppTypeBase::FunctionPointer { .. } = subtype.base {
+          if let CppTypeBase::FunctionPointer(..) = subtype.base {
             new_indirection = CppTypeIndirection::None;
           }
         }
@@ -868,7 +868,7 @@ impl<'a> CppParser<'a> {
                                                    &original_type_indirection)
                     .map_err(|e| e.to_string()));
                 if new_indirection == CppTypeIndirection::Ptr {
-                  if let CppTypeBase::FunctionPointer { .. } = subtype.base {
+                  if let CppTypeBase::FunctionPointer(..) = subtype.base {
                     new_indirection = CppTypeIndirection::None;
                   }
                 }

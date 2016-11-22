@@ -172,7 +172,7 @@ impl CppTypeBase {
   }
   pub fn is_function_pointer(&self) -> bool {
     match *self {
-      CppTypeBase::FunctionPointer { .. } => true,
+      CppTypeBase::FunctionPointer(..) => true,
       _ => false,
     }
   }
@@ -191,7 +191,7 @@ impl CppTypeBase {
     }
   }
 
-  pub fn to_cpp_code(&self, function_pointer_inner_text: Option<&String>) -> Result<String> {
+  pub fn to_cpp_code(&self, function_pointer_inner_text: Option<&str>) -> Result<String> {
     if !self.is_function_pointer() && function_pointer_inner_text.is_some() {
       return Err("unexpected function_pointer_inner_text".into());
     }
@@ -273,7 +273,7 @@ impl CppTypeBase {
         return format!("T_{}_{}", nested_level, index);
       }
       CppTypeBase::Class(ref base) => return base.to_cpp_pseudo_code(),
-      CppTypeBase::FunctionPointer { .. } => {
+      CppTypeBase::FunctionPointer(..) => {
         return self.to_cpp_code(Some(&"FN_PTR".to_string())).unwrap_or_else(|_| "[?]".to_string())
       }
       _ => {}
@@ -317,7 +317,7 @@ impl CppType {
             })
   }
 
-  pub fn to_cpp_code(&self, function_pointer_inner_text: Option<&String>) -> Result<String> {
+  pub fn to_cpp_code(&self, function_pointer_inner_text: Option<&str>) -> Result<String> {
     let base_code = try!(self.base.to_cpp_code(function_pointer_inner_text));
     Ok(self.to_cpp_code_intermediate(&base_code))
   }
@@ -353,7 +353,7 @@ impl CppType {
                                       supported"))
                 .chain_err(&err);
             }
-            CppTypeBase::FunctionPointer { .. } => {
+            CppTypeBase::FunctionPointer(..) => {
               return Err(Error::from("function pointers containing nested function pointers are \
                                       not supported"))
                 .chain_err(&err);

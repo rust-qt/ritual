@@ -1,6 +1,6 @@
 use caption_strategy::{TypeCaptionStrategy, MethodCaptionStrategy};
 use cpp_data::{CppData, CppVisibility, CppFunctionPointerType};
-use cpp_type::{CppTypeRole, CppType};
+use cpp_type::{CppTypeRole, CppType, CppTypeBase, CppTypeIndirection};
 use cpp_ffi_data::{CppAndFfiMethod, c_base_name, CppFfiHeaderData, QtSlotWrapper};
 use cpp_method::{CppMethod, CppMethodKind};
 use errors::{Result, ChainErr, unexpected};
@@ -8,6 +8,7 @@ use log;
 use utils::{MapIfOk, add_to_multihash};
 use config::CppFfiGeneratorFilterFn;
 use std::collections::{HashSet, HashMap};
+use std::iter::once;
 
 struct CGenerator<'a> {
   cpp_data: &'a CppData,
@@ -220,7 +221,12 @@ impl<'a> CGenerator<'a> {
       } else {
         args_captions.join("_")
       };
-      let func_arguments = ffi_types.iter().map(|t| t.ffi_type.clone()).collect();
+      let func_arguments = once(CppType {
+        base: CppTypeBase::Void,
+        indirection: CppTypeIndirection::Ptr,
+        is_const: false,
+        is_const2: false,
+      }).chain(ffi_types.iter().map(|t| t.ffi_type.clone())).collect();
       result.push(QtSlotWrapper {
         class_name: format!("{}_QtSlotWrapper_{}", self.c_lib_name, args_caption),
         arguments: ffi_types,

@@ -65,7 +65,7 @@ impl CppFfiFunctionArgument {
   /// Generates C++ code for the part of FFI function signature
   /// corresponding to this argument
   pub fn to_cpp_code(&self) -> Result<String> {
-    if let CppTypeBase::FunctionPointer { .. } = self.argument_type.ffi_type.base {
+    if let CppTypeBase::FunctionPointer(..) = self.argument_type.ffi_type.base {
       Ok(try!(self.argument_type.ffi_type.to_cpp_code(Some(&self.name))))
     } else {
       Ok(format!("{} {}",

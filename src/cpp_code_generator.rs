@@ -1,6 +1,7 @@
-use cpp_ffi_data::{IndirectionChange, CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiHeaderData};
+use cpp_ffi_data::{QtSlotWrapper, IndirectionChange, CppAndFfiMethod, CppFfiArgumentMeaning,
+                   CppFfiHeaderData, CppFfiType};
 use cpp_method::{ReturnValueAllocationPlace, CppFieldAccessorType};
-use cpp_type::{CppTypeIndirection, CppTypeBase};
+use cpp_type::{CppTypeIndirection, CppTypeBase, CppType};
 use errors::{Result, ChainErr, unexpected};
 use file_utils::{PathBufWithAdded, create_dir_all, create_file, path_to_str};
 use log;
@@ -8,6 +9,7 @@ use string_utils::JoinWithString;
 use utils::MapIfOk;
 
 use std::path::PathBuf;
+use std::iter::once;
 
 /// Generates C++ code for the C wrapper library.
 pub struct CppCodeGenerator {
@@ -49,7 +51,7 @@ impl CppCodeGenerator {
     }
     let name_with_args = format!("{}({})", method.c_name, arg_texts.join(", "));
     let return_type = &method.c_signature.return_type.ffi_type;
-    let r = if let CppTypeBase::FunctionPointer { .. } = return_type.base {
+    let r = if let CppTypeBase::FunctionPointer(..) = return_type.base {
       try!(return_type.to_cpp_code(Some(&name_with_args)))
     } else {
       format!("{} {}", try!(return_type.to_cpp_code(None)), name_with_args)
@@ -62,6 +64,50 @@ impl CppCodeGenerator {
     Ok(format!("{}_EXPORT {};\n",
                self.lib_name_upper,
                try!(self.function_signature(method))))
+  }
+
+  fn qt_slot_wrapper(&self, wrapper: &QtSlotWrapper) -> Result<String> {
+    let func_type = CppType {
+      base: CppTypeBase::FunctionPointer(wrapper.function_type.clone()),
+      indirection: CppTypeIndirection::None,
+      is_const: false,
+      is_const2: false,
+    };
+    let method_args = try!(wrapper.arguments
+        .iter()
+        .enumerate()
+        .map_if_ok(|(num, t)| -> Result<_> {
+          Ok(format!("{} arg{}", try!(t.original_type.to_cpp_code(None)), num))
+        }))
+      .join(", ");
+    let func_args = once("m_data".to_string())
+      .chain(try!(wrapper.arguments
+        .iter()
+        .enumerate()
+        .map_if_ok(|(num, t)| self.convert_type_to_ffi(t, format!("arg{}", num)))))
+      .join(", ");
+    Ok(format!(include_str!("../templates/c_lib/qt_slot_wrapper.h"),
+               class_name = &wrapper.class_name,
+               func_arg = try!(func_type.to_cpp_code(Some("func"))),
+               func_field = try!(func_type.to_cpp_code(Some("m_func"))),
+               method_args = method_args,
+               func_args = func_args))
+
+
+
+  }
+
+  fn convert_type_to_ffi(&self, type1: &CppFfiType, expression: String) -> Result<String> {
+    Ok(match type1.conversion {
+      IndirectionChange::NoChange => expression,
+      IndirectionChange::ValueToPointer => {
+        format!("new {}({})",
+                try!(type1.original_type.base.to_cpp_code(None)),
+                expression)
+      }
+      IndirectionChange::ReferenceToPointer => format!("&{}", expression),
+      IndirectionChange::QFlagsToUInt => format!("uint({})", expression),
+    })
   }
 
   /// Wraps expression returned by the original method to
@@ -372,9 +418,10 @@ impl CppCodeGenerator {
                               include_guard_name)));
 
     try!(h_file.write(format!("#include \"{}_global.h\"\n\n", &self.lib_name)));
-
+    for wrapper in &data.qt_slot_wrappers {
+      try!(h_file.write(try!(self.qt_slot_wrapper(wrapper))));
+    }
     try!(h_file.write("extern \"C\" {\n\n"));
-
     for method in &data.methods {
       try!(h_file.write(try!(self.function_declaration(method))));
       try!(cpp_file.write(try!(self.function_implementation(method))));
