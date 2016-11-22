@@ -4,6 +4,7 @@ use caption_strategy::*;
 use tests::cpp_method::{empty_regular_method, empty_membership};
 use cpp_method::{CppMethodKind, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
+use cpp_data::CppFunctionPointerType;
 
 #[test]
 fn argument_meaning() {
@@ -93,7 +94,7 @@ fn argument_func() {
     is_const: false,
     is_const2: false,
     indirection: CppTypeIndirection::None,
-    base: CppTypeBase::FunctionPointer {
+    base: CppTypeBase::FunctionPointer(CppFunctionPointerType {
       allows_variadic_arguments: false,
       return_type: Box::new(CppType {
         indirection: CppTypeIndirection::None,
@@ -113,7 +114,7 @@ fn argument_func() {
                         is_const2: false,
                         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
                       }],
-    },
+    }),
   };
 
   let arg = CppFfiFunctionArgument {

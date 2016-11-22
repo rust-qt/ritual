@@ -14,7 +14,7 @@ use string_utils::JoinWithString;
 pub use serializable::{CppEnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
                        CppTypeData, CppTypeDoc, CppData, CppTemplateInstantiation,
                        CppTemplateInstantiations, CppClassUsingDirective, CppBaseSpecifier,
-                       TemplateArgumentsDeclaration};
+                       TemplateArgumentsDeclaration, CppFunctionPointerType};
 
 extern crate regex;
 use self::regex::Regex;

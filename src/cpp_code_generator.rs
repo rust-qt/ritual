@@ -1,5 +1,4 @@
-use cpp_ffi_data::{IndirectionChange, CppAndFfiMethod, CppFfiArgumentMeaning};
-use cpp_ffi_generator::CppFfiHeaderData;
+use cpp_ffi_data::{IndirectionChange, CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiHeaderData};
 use cpp_method::{ReturnValueAllocationPlace, CppFieldAccessorType};
 use cpp_type::{CppTypeIndirection, CppTypeBase};
 use errors::{Result, ChainErr, unexpected};

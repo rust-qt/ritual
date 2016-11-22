@@ -1,7 +1,6 @@
 use caption_strategy::TypeCaptionStrategy;
-use cpp_data::{CppTypeKind, CppEnumValue};
-use cpp_ffi_data::{CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiType, IndirectionChange};
-use cpp_ffi_generator::CppAndFfiData;
+use cpp_data::{CppTypeKind, CppEnumValue, CppFunctionPointerType};
+use cpp_ffi_data::{CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiType, IndirectionChange, CppAndFfiData};
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
@@ -733,9 +732,9 @@ fn ffi_type(processed_types: &[RustProcessedTypeInfo],
         Some(info) => info.rust_name.clone(),
       }
     }
-    CppTypeBase::FunctionPointer { ref return_type,
+    CppTypeBase::FunctionPointer(CppFunctionPointerType { ref return_type,
                                    ref arguments,
-                                   ref allows_variadic_arguments } => {
+                                   ref allows_variadic_arguments }) => {
       if *allows_variadic_arguments {
         return Err("function pointers with variadic arguments are not supported".into());
       }

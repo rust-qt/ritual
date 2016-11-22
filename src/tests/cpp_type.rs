@@ -1,5 +1,6 @@
 use cpp_type::{CppType, CppTypeRole, CppTypeIndirection, CppTypeBase, CppBuiltInNumericType,
                CppSpecificNumericTypeKind, CppTypeClassBase};
+use cpp_data::CppFunctionPointerType;
 use caption_strategy::TypeCaptionStrategy;
 use cpp_ffi_data::IndirectionChange;
 
@@ -610,7 +611,7 @@ fn function1() {
     is_const: false,
     is_const2: false,
     indirection: CppTypeIndirection::None,
-    base: CppTypeBase::FunctionPointer {
+    base: CppTypeBase::FunctionPointer(CppFunctionPointerType {
       allows_variadic_arguments: false,
       return_type: Box::new(CppType {
         indirection: CppTypeIndirection::None,
@@ -630,7 +631,7 @@ fn function1() {
                         is_const2: false,
                         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
                       }],
-    },
+    }),
   };
   assert_eq!(type1.is_void(), false);
   assert_eq!(type1.base.is_void(), false);

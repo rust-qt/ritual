@@ -3,6 +3,7 @@ extern crate num_cpus;
 use config::Config;
 use cpp_code_generator::CppCodeGenerator;
 use cpp_data::CppData;
+use cpp_ffi_data::CppAndFfiData;
 use cpp_ffi_generator;
 use cpp_lib_builder::CppLibBuilder;
 use cpp_parser;
@@ -382,7 +383,7 @@ pub fn run(env: BuildEnvironment) -> Result<()> {
       dependency_rust_types.extend_from_slice(&dep.rust_export_info.rust_types);
     }
     log::info("Preparing Rust functions");
-    let rust_data = try!(rust_generator::run(cpp_ffi_generator::CppAndFfiData {
+    let rust_data = try!(rust_generator::run(CppAndFfiData {
                                                cpp_data: cpp_data,
                                                cpp_ffi_headers: cpp_ffi_headers,
                                              },

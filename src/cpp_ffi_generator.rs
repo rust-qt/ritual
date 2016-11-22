@@ -1,12 +1,12 @@
-use caption_strategy::MethodCaptionStrategy;
-use cpp_data::{CppData, CppVisibility};
-use cpp_ffi_data::{CppAndFfiMethod, c_base_name};
+use caption_strategy::{TypeCaptionStrategy, MethodCaptionStrategy};
+use cpp_data::{CppData, CppVisibility, CppFunctionPointerType};
+use cpp_type::{CppTypeRole, CppType};
+use cpp_ffi_data::{CppAndFfiMethod, c_base_name, CppFfiHeaderData, QtSlotWrapper};
 use cpp_method::{CppMethod, CppMethodKind};
 use errors::{Result, ChainErr, unexpected};
 use log;
-use utils::add_to_multihash;
+use utils::{MapIfOk, add_to_multihash};
 use config::CppFfiGeneratorFilterFn;
-
 use std::collections::{HashSet, HashMap};
 
 struct CGenerator<'a> {
@@ -15,17 +15,7 @@ struct CGenerator<'a> {
   filters: Vec<&'a Box<CppFfiGeneratorFilterFn>>,
 }
 
-#[derive(Debug, Clone)]
-pub struct CppFfiHeaderData {
-  pub include_file: String,
-  pub include_file_base_name: String,
-  pub methods: Vec<CppAndFfiMethod>,
-}
 
-pub struct CppAndFfiData {
-  pub cpp_data: CppData,
-  pub cpp_ffi_headers: Vec<CppFfiHeaderData>,
-}
 
 /// Runs FFI generator
 pub fn run(cpp_data: &CppData,
@@ -62,10 +52,19 @@ pub fn run(cpp_data: &CppData,
         include_file: include_file.clone(),
         include_file_base_name: include_file_base_name,
         methods: methods,
+        qt_slot_wrappers: Vec::new(),
       });
     }
   }
-  try!(generator.generate_slot_wrappers());
+  let qt_slot_wrappers = try!(generator.generate_slot_wrappers());
+  if !qt_slot_wrappers.is_empty() {
+    c_headers.push(CppFfiHeaderData {
+      include_file: "QtSlotWrappers".to_string(),
+      include_file_base_name: "QtSlotWrappers".to_string(),
+      methods: Vec::new(),
+      qt_slot_wrappers: qt_slot_wrappers,
+    });
+  }
   if c_headers.is_empty() {
     return Err("No FFI headers generated".into());
   }
@@ -213,11 +212,28 @@ impl<'a> CGenerator<'a> {
     Ok(processed_methods)
   }
 
-  fn generate_slot_wrappers(&'a self) -> Result<()> {
+  fn generate_slot_wrappers(&'a self) -> Result<Vec<QtSlotWrapper>> {
+    let mut result = Vec::new();
     for types in &self.cpp_data.signal_argument_types {
-      println!("OK {:?}", types);
+      let ffi_types = try!(types.map_if_ok(|t| t.to_cpp_ffi_type(CppTypeRole::NotReturnType)));
+      let args_captions = try!(types.map_if_ok(|t| t.caption(TypeCaptionStrategy::Full)));
+      let args_caption = if args_captions.is_empty() {
+        "no_args".to_string()
+      } else {
+        args_captions.join("_")
+      };
+      let func_arguments = ffi_types.iter().map(|t| t.ffi_type.clone()).collect();
+      result.push(QtSlotWrapper {
+        class_name: format!("{}_QtSlotWrapper_{}", self.c_lib_name, args_caption),
+        arguments: ffi_types,
+        function_type: CppFunctionPointerType {
+          return_type: Box::new(CppType::void()),
+          arguments: func_arguments,
+          allows_variadic_arguments: false,
+        },
+      });
     }
-    unimplemented!()
+    Ok(result)
   }
 
 }

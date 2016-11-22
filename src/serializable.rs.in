@@ -526,6 +526,17 @@ pub struct CppTypeClassBase {
   pub template_arguments: Option<Vec<CppType>>,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppFunctionPointerType {
+  /// Return type of the function
+  pub return_type: Box<CppType>,
+  /// Arguments of the function
+  pub arguments: Vec<CppType>,
+  /// Whether arguments are terminated with "..."
+  pub allows_variadic_arguments: bool,
+}
+
 /// Base C++ type. `CppType` can add indirection
 /// and constness to `CppTypeBase`, but otherwise
 /// this enum lists all supported types.
@@ -572,14 +583,7 @@ pub enum CppTypeBase {
     index: i32,
   },
   /// Function pointer type
-  FunctionPointer {
-    /// Return type of the function
-    return_type: Box<CppType>,
-    /// Arguments of the function
-    arguments: Vec<CppType>,
-    /// Whether arguments are terminated with "..."
-    allows_variadic_arguments: bool,
-  },
+  FunctionPointer(CppFunctionPointerType),
 }
 
 /// Information about a C++ type

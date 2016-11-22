@@ -2,6 +2,7 @@ use caption_strategy::{ArgumentCaptionStrategy, MethodCaptionStrategy, TypeCapti
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase};
+use cpp_data::{CppFunctionPointerType, CppData};
 use errors::Result;
 use utils::MapIfOk;
 
@@ -271,4 +272,24 @@ impl CppAndFfiMethod {
   pub fn short_text(&self) -> String {
     self.cpp_method.short_text()
   }
+}
+
+#[derive(Debug, Clone)]
+pub struct QtSlotWrapper {
+  pub class_name: String,
+  pub arguments: Vec<CppFfiType>,
+  pub function_type: CppFunctionPointerType,
+}
+
+#[derive(Debug, Clone)]
+pub struct CppFfiHeaderData {
+  pub include_file: String,
+  pub include_file_base_name: String,
+  pub methods: Vec<CppAndFfiMethod>,
+  pub qt_slot_wrappers: Vec<QtSlotWrapper>,
+}
+
+pub struct CppAndFfiData {
+  pub cpp_data: CppData,
+  pub cpp_ffi_headers: Vec<CppFfiHeaderData>,
 }
