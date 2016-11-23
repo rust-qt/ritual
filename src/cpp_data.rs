@@ -865,9 +865,12 @@ impl CppData {
                   match section.section_type {
                     SectionType::Signals => {
                       log::info(format!("Found signal: {}", method.short_text()));
-                      let types: Vec<_> = method.arguments.iter().map(|x| x.argument_type.clone()).collect();
+                      let types: Vec<_> =
+                        method.arguments.iter().map(|x| x.argument_type.clone()).collect();
                       if !all_types.contains(&types) &&
-                          !self.dependencies.iter().any(|d| d.signal_argument_types.iter().any(|t| t == &types)) {
+                         !self.dependencies
+                        .iter()
+                        .any(|d| d.signal_argument_types.iter().any(|t| t == &types)) {
                         all_types.insert(types);
                       }
                     }
@@ -900,9 +903,8 @@ impl CppData {
     for t in &all_types {
       let mut types = t.clone();
       while let Some(_) = types.pop() {
-        if !types_with_omitted_args.contains(&types) &&
-            !all_types.contains(&types) &&
-           !self.dependencies.iter().any(|d| d.signal_argument_types.iter().any(|t| t == &types)){
+        if !types_with_omitted_args.contains(&types) && !all_types.contains(&types) &&
+           !self.dependencies.iter().any(|d| d.signal_argument_types.iter().any(|t| t == &types)) {
           types_with_omitted_args.insert(types.clone());
         }
       }
@@ -915,7 +917,8 @@ impl CppData {
     //    }
     println!("Signal argument types:");
     for t in &all_types {
-      println!("  ({})", t.iter().map(|x| x.to_cpp_pseudo_code()).join(", "));
+      println!("  ({})",
+               t.iter().map(|x| x.to_cpp_pseudo_code()).join(", "));
     }
     self.signal_argument_types = all_types.into_iter().collect();
     Ok(())

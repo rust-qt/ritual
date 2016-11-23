@@ -208,8 +208,8 @@ impl CppTypeBase {
         Err("template parameters are not allowed in C++ code generator".into())
       }
       CppTypeBase::FunctionPointer(CppFunctionPointerType { ref return_type,
-                                     ref arguments,
-                                     ref allows_variadic_arguments }) => {
+                                                            ref arguments,
+                                                            ref allows_variadic_arguments }) => {
         if *allows_variadic_arguments {
           return Err("function pointers with variadic arguments are not supported".into());
         }
@@ -253,7 +253,9 @@ impl CppTypeBase {
       CppTypeBase::TemplateParameter { .. } => {
         return Err("template parameters are not allowed to have captions".into());
       }
-      CppTypeBase::FunctionPointer(CppFunctionPointerType { ref return_type, ref arguments, .. }) => {
+      CppTypeBase::FunctionPointer(CppFunctionPointerType { ref return_type,
+                                                            ref arguments,
+                                                            .. }) => {
         match strategy {
           TypeCaptionStrategy::Short => "func".to_string(),
           TypeCaptionStrategy::Full => {
@@ -338,8 +340,8 @@ impl CppType {
         return Err(Error::from("template parameters cannot be expressed in FFI")).chain_err(&err);
       }
       CppTypeBase::FunctionPointer(CppFunctionPointerType { ref return_type,
-                                     ref arguments,
-                                     ref allows_variadic_arguments }) => {
+                                                            ref arguments,
+                                                            ref allows_variadic_arguments }) => {
         if *allows_variadic_arguments {
           return Err(Error::from("function pointers with variadic arguments are not supported"))
             .chain_err(&err);

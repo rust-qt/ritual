@@ -8,7 +8,7 @@ public:
   }}
 
 public slots:
-  void method({method_args}) {{
+  void custom_slot({method_args}) {{
     m_func({func_args});
   }}
 

@@ -669,6 +669,10 @@ pub enum RustTypeWrapperKind {
     /// for this type, i.e. if this C++ type has public destructor.
     is_deletable: bool,
   },
+  /// Pointer-only type wrapper
+  EmptyEnum {
+    is_deletable: bool,
+  }
 }
 
 // -------------------------

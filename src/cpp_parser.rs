@@ -1,6 +1,7 @@
 use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, CppEnumValue, CppOriginLocation,
                CppVisibility, CppTemplateInstantiation, CppTemplateInstantiations,
-               CppClassUsingDirective, CppBaseSpecifier, TemplateArgumentsDeclaration, CppFunctionPointerType};
+               CppClassUsingDirective, CppBaseSpecifier, TemplateArgumentsDeclaration,
+               CppFunctionPointerType};
 use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind, CppMethodClassMembership};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
@@ -1505,7 +1506,9 @@ impl<'a> CppParser<'a> {
           }
         }
       }
-      CppTypeBase::FunctionPointer(CppFunctionPointerType { ref return_type, ref arguments, .. }) => {
+      CppTypeBase::FunctionPointer(CppFunctionPointerType { ref return_type,
+                                                            ref arguments,
+                                                            .. }) => {
         if let Err(msg) = self.check_type_integrity(return_type) {
           return Err(msg);
         }

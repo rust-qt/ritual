@@ -662,6 +662,7 @@ impl RustCodeGenerator {
                       name = type1.name,
                       size = size)
             }
+            RustTypeWrapperKind::EmptyEnum { .. } => format!("pub enum {} {{}}\n\n", type1.name),
           };
           results.push(r);
           if !methods.is_empty() {

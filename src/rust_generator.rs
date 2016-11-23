@@ -1,6 +1,7 @@
 use caption_strategy::TypeCaptionStrategy;
 use cpp_data::{CppTypeKind, CppEnumValue, CppFunctionPointerType};
-use cpp_ffi_data::{CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiType, IndirectionChange, CppAndFfiData};
+use cpp_ffi_data::{CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiType, IndirectionChange,
+                   CppAndFfiData};
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
@@ -451,7 +452,10 @@ fn process_types(input_data: &CppAndFfiData,
   for template_instantiations in &input_data.cpp_data.template_instantiations {
     let type_info = try!(input_data.cpp_data
       .find_type_info(|x| &x.name == &template_instantiations.class_name)
-      .chain_err(|| format!("type info not found for {}", &template_instantiations.class_name)));
+      .chain_err(|| {
+        format!("type info not found for {}",
+                &template_instantiations.class_name)
+      }));
     if template_instantiations.class_name == "QFlags" {
       // special processing is implemented for QFlags
       continue;
@@ -507,6 +511,34 @@ fn process_types(input_data: &CppAndFfiData,
     }
     unnamed_items = unnamed_items_new;
   }
+  for header in &input_data.cpp_ffi_headers {
+    for qt_slot_wrapper in &header.qt_slot_wrappers {
+      let arg_names = try!(qt_slot_wrapper.arguments.iter().map_if_ok(|x| -> Result<_> {
+        let rust_type = try!(complete_type(&result,
+                                           dependency_types,
+                                           x,
+                                           &CppFfiArgumentMeaning::Argument(0),
+                                           &ReturnValueAllocationPlace::NotApplicable));
+        rust_type.rust_api_type.caption()
+      }));
+      let args_text = if arg_names.is_empty() {
+        "no_args".to_string()
+      } else {
+        arg_names.join("_")
+      };
+      result.push(RustProcessedTypeInfo {
+        cpp_name: qt_slot_wrapper.class_name.clone(),
+        cpp_template_arguments: None,
+        cpp_doc: None, // TODO: do we need doc for this?
+        rust_name: try!(calculate_rust_name(&format!("slot_wrapper_{}", args_text),
+                                            &header.include_file_base_name,
+                                            false,
+                                            None,
+                                            config)),
+        kind: RustTypeWrapperKind::EmptyEnum { is_deletable: true },
+      });
+    }
+  }
   Ok(result)
 }
 
@@ -551,12 +583,16 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
           if let Some(info) = find_type_info(processed_types,
                                              dependency_types,
                                              |x| &x.rust_name == base) {
-            if let RustTypeWrapperKind::Struct { ref is_deletable, .. } = info.kind {
-              if !*is_deletable {
-                return Err(format!("{} is not deletable", base.full_name(None)).into());
+            match info.kind {
+              RustTypeWrapperKind::Struct { ref is_deletable, .. } |
+              RustTypeWrapperKind::EmptyEnum { ref is_deletable } => {
+                if !*is_deletable {
+                  return Err(format!("{} is not deletable", base.full_name(None)).into());
+                }
               }
-            } else {
-              return Err(unexpected("class type expected here").into());
+              RustTypeWrapperKind::Enum { .. } => {
+                return Err(unexpected("class type expected here").into())
+              }
             }
           } else {
             return Err(unexpected("find_type_info failed in complete_type() after success in \
@@ -733,8 +769,8 @@ fn ffi_type(processed_types: &[RustProcessedTypeInfo],
       }
     }
     CppTypeBase::FunctionPointer(CppFunctionPointerType { ref return_type,
-                                   ref arguments,
-                                   ref allows_variadic_arguments }) => {
+                                                          ref arguments,
+                                                          ref allows_variadic_arguments }) => {
       if *allows_variadic_arguments {
         return Err("function pointers with variadic arguments are not supported".into());
       }
@@ -822,7 +858,8 @@ impl RustGenerator {
         },
          cpp_methods)
       }
-      RustTypeWrapperKind::Struct { .. } => {
+      RustTypeWrapperKind::Struct { .. } |
+      RustTypeWrapperKind::EmptyEnum { .. } => {
         let methods_scope = RustMethodScope::Impl { type_name: info.rust_name.clone() };
         let class_type = CppTypeClassBase {
           name: info.cpp_name.clone(),
