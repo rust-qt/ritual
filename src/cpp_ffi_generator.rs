@@ -104,7 +104,7 @@ impl<'a> CGenerator<'a> {
       log::noisy(format!("Skipping template method: \n{}\n", method.short_text()));
       return Ok(false);
     }
-    if method.template_arguments_values.is_some() {
+    if method.template_arguments_values.is_some() && !method.is_ffi_whitelisted {
       // TODO: re-enable after template test compilation (#24) is implemented
       log::noisy(format!("Skipping template method: \n{}\n", method.short_text()));
       return Ok(false);
@@ -129,6 +129,9 @@ impl<'a> CGenerator<'a> {
                       include_file_base_name));
     let mut hash_name_to_methods: HashMap<String, Vec<_>> = HashMap::new();
     for method in methods {
+      //      if method.name == "static_cast" {
+      //        println!("OK1!!! {:?}", method);
+      //      }
       if !try!(self.should_process_method(method)) {
         continue;
       }
@@ -260,7 +263,7 @@ impl<'a> CGenerator<'a> {
             is_signal: false,
             is_slot: false,
             kind: kind,
-            field_accessor: None,
+            fake: None,
           }),
           operator: None,
           return_type: CppType::void(),
@@ -274,6 +277,7 @@ impl<'a> CGenerator<'a> {
           declaration_code: None,
           doc: None,
           inheritance_chain: Vec::new(),
+          is_ffi_whitelisted: false,
         };
         let mut result = try!(self.process_methods(include_file_name, once(&method)))
           .into_iter()

@@ -35,7 +35,7 @@ pub fn empty_membership(class_name: &'static str) -> CppMethodClassMembership {
       name: class_name.to_string(),
       template_arguments: None,
     },
-    field_accessor: None,
+    fake: None,
   }
 }
 
@@ -55,6 +55,7 @@ pub fn empty_regular_method() -> CppMethod {
     template_arguments_values: None,
     operator: None,
     declaration_code: None,
+    is_ffi_whitelisted: false,
   }
 }
 
@@ -744,7 +745,7 @@ fn short_text1() {
         name: "Class1".to_string(),
         template_arguments: None,
       },
-      field_accessor: None,
+      fake: None,
     }),
     operator: None,
     return_type: CppType {
@@ -782,6 +783,7 @@ fn short_text1() {
     template_arguments: None,
     template_arguments_values: None,
     declaration_code: None,
+    is_ffi_whitelisted: false,
   };
   assert_eq!(method.short_text(),
              "protected int Class1::method1(int arg1, double arg2 = ?) const");

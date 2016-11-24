@@ -7,7 +7,7 @@ use errors::{Result, unexpected};
 use string_utils::JoinWithString;
 
 pub use serializable::{CppFunctionArgument, CppMethodKind, CppMethod, CppMethodClassMembership,
-                       CppFieldAccessorType, CppFieldAccessor, CppMethodDoc};
+                       CppFieldAccessorType, FakeCppMethod, CppMethodDoc};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ReturnValueAllocationPlace {

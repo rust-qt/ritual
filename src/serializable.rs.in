@@ -236,7 +236,30 @@ pub enum CppFieldAccessorType {
   Setter
 }
 
+/// Type of C++ cast operation
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub enum CppCastType {
+  /// `static_cast<T>()`
+  Static,
+  /// `dynamic_cast<T>()`
+  Dynamic,
+  /// `qobject_cast<T>()`
+  QObject,
+}
+
 /// Information about automatically generated method
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub enum FakeCppMethod {
+  /// Method for accessing a public field of a class
+  FieldAccessor {
+    accessor_type: CppFieldAccessorType,
+    field_name: String,
+  },
+}
+
+
 /// for accessing a public field of a class
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
@@ -273,7 +296,7 @@ pub struct CppMethodClassMembership {
   pub is_slot: bool,
   /// If this method is a generated field accessor, this field contains
   /// information about it. Field accessors do not have real C++ methods corresponding to them.
-  pub field_accessor: Option<CppFieldAccessor>,
+  pub fake: Option<FakeCppMethod>,
 }
 
 /// C++ documentation for a method
@@ -344,6 +367,8 @@ pub struct CppMethod {
   pub inheritance_chain: Vec<CppBaseSpecifier>, /* TODO: fill inheritance_chain for explicitly redeclared methods (#23) */
   /// C++ documentation data for this method
   pub doc: Option<CppMethodDoc>,
+  /// If true, FFI generator skips some checks
+  pub is_ffi_whitelisted: bool,
 }
 
 // ------------------------------

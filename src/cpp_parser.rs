@@ -1141,7 +1141,7 @@ impl<'a> CppParser<'a> {
               Some(info) => try!(info.default_class_type()),
               None => return Err(format!("Unknown class type: {}", class_name).into()),
             },
-            field_accessor: None,
+            fake: None,
           })
         }
         None => None,
@@ -1157,6 +1157,7 @@ impl<'a> CppParser<'a> {
       declaration_code: declaration_code,
       doc: None,
       inheritance_chain: Vec::new(),
+      is_ffi_whitelisted: false,
     })
   }
 

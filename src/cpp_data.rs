@@ -1,5 +1,5 @@
 use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership, CppFunctionArgument,
-                 CppFieldAccessorType, CppFieldAccessor};
+                 CppFieldAccessorType, FakeCppMethod};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
 use errors::{Result, unexpected, ChainErr};
@@ -173,6 +173,13 @@ impl CppData {
     once(&self.types).chain(self.dependencies.iter().map(|d| &d.types)).flat_map(|x| x).find(f)
   }
 
+  pub fn is_polymorphic_type(&self, name: &str) -> bool {
+    self.methods.iter().any(|m| if let Some(ref info) = m.class_membership {
+      info.is_virtual && &info.class_type.name == name
+    } else {
+      false
+    })
+  }
 
   /// Adds destructors for every class that does not have explicitly
   /// defined destructor, allowing to create wrappings for
@@ -202,7 +209,7 @@ impl CppData {
               is_signal: false,
               is_slot: false,
               kind: CppMethodKind::Destructor,
-              field_accessor: None,
+              fake: None,
             }),
             operator: None,
             return_type: CppType::void(),
@@ -216,6 +223,7 @@ impl CppData {
             declaration_code: None,
             doc: None,
             inheritance_chain: Vec::new(),
+            is_ffi_whitelisted: false,
           });
         }
       }
@@ -706,7 +714,7 @@ impl CppData {
                   visibility: CppVisibility::Public,
                   is_signal: false,
                   is_slot: false,
-                  field_accessor: Some(CppFieldAccessor {
+                  fake: Some(FakeCppMethod::FieldAccessor {
                     accessor_type: accessor_type,
                     field_name: field.name.clone(),
                   }),
@@ -723,6 +731,7 @@ impl CppData {
                 declaration_code: None,
                 doc: None,
                 inheritance_chain: Vec::new(),
+                is_ffi_whitelisted: false,
               })
             };
           if field.visibility == CppVisibility::Public {
@@ -759,6 +768,82 @@ impl CppData {
                                                 CppType::void(),
                                                 vec![arg])));
           }
+        }
+      }
+    }
+    self.methods.append(&mut new_methods);
+    Ok(())
+  }
+
+  fn add_casts_one(&self,
+                   target_type: &CppTypeClassBase,
+                   base_type: &CppType)
+                   -> Result<Vec<CppMethod>> {
+    let type_info = try!(self.find_type_info(|x| x.name == target_type.name)
+      .chain_err(|| "type info not found"));
+    let target_ptr_type = CppType {
+      base: CppTypeBase::Class(target_type.clone()),
+      indirection: CppTypeIndirection::Ptr,
+      is_const: false,
+      is_const2: false,
+    };
+    let base_ptr_type = CppType {
+      base: base_type.base.clone(),
+      indirection: CppTypeIndirection::Ptr,
+      is_const: false,
+      is_const2: false,
+    };
+    let create_method = |name: &str, from: &CppType, to: &CppType| {
+      CppMethod {
+        name: name.to_string(),
+        class_membership: None,
+        operator: None,
+        return_type: to.clone(),
+        arguments: vec![CppFunctionArgument {
+                          name: "ptr".to_string(),
+                          argument_type: from.clone(),
+                          has_default_value: false,
+                        }],
+        arguments_before_omitting: None,
+        allows_variadic_arguments: false,
+        include_file: type_info.include_file.clone(),
+        origin_location: None,
+        template_arguments: None,
+        template_arguments_values: Some(vec![to.clone()]),
+        declaration_code: None,
+        doc: None,
+        inheritance_chain: Vec::new(),
+        is_ffi_whitelisted: true,
+      }
+    };
+    let mut new_methods = Vec::new();
+    new_methods.push(create_method("static_cast", &base_ptr_type, &target_ptr_type));
+    new_methods.push(create_method("static_cast", &target_ptr_type, &base_ptr_type));
+    if let CppTypeBase::Class(ref base) = base_type.base {
+      if self.is_polymorphic_type(&base.name) {
+        new_methods.push(create_method("dynamic_cast", &base_ptr_type, &target_ptr_type));
+      }
+    }
+
+    if let CppTypeBase::Class(ref base) = base_type.base {
+      if let Some(type_info) = self.find_type_info(|x| x.name == base.name) {
+        if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
+          for base in bases {
+            new_methods.append(&mut try!(self.add_casts_one(target_type, &base.base_type)));
+          }
+        }
+      }
+    }
+    Ok(new_methods)
+  }
+
+  fn add_casts(&mut self) -> Result<()> {
+    let mut new_methods = Vec::new();
+    for type_info in &self.types {
+      if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
+        let t = try!(type_info.default_class_type());
+        for base in bases {
+          new_methods.append(&mut try!(self.add_casts_one(&t, &base.base_type)));
         }
       }
     }
@@ -933,6 +1018,7 @@ impl CppData {
     try!(self.instantiate_templates());
     try!(self.add_inherited_methods()); // TODO: add inherited fields too
     try!(self.add_field_accessors()); // TODO: fix doc generator for field accessors
+    try!(self.add_casts());
     Ok(())
   }
 }
