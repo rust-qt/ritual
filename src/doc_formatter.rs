@@ -1,4 +1,5 @@
 use rust_code_generator::rust_type_to_code;
+use rust_type::RustType;
 use rust_info::{RustMethodSelfArgKind, RustMethodArgumentsVariant, RustTypeDeclaration,
                 RustTypeDeclarationKind, RustMethodScope, RustEnumValue, RustMethod,
                 RustMethodArguments, RustMethodDocItem};
@@ -77,23 +78,31 @@ pub fn type_doc(type1: &RustTypeDeclaration) -> String {
     }
     RustTypeDeclarationKind::MethodParametersTrait { ref method_scope, ref method_name, .. } => {
       let method_name_with_scope = match *method_scope {
-        RustMethodScope::Impl { ref type_name } => {
+        RustMethodScope::Impl { ref target_type } => {
           format!("{}::{}",
-                  type_name.last_name().unwrap(),
+                  if let RustType::Common { ref base, .. } = *target_type {
+                    base.last_name().unwrap()
+                  } else {
+                    panic!("RustType::Common expected");
+                  },
                   method_name.last_name().unwrap())
         }
-        RustMethodScope::TraitImpl { .. } => {
+        RustMethodScope::TraitImpl => {
           panic!("TraitImpl is totally not expected here");
         }
         RustMethodScope::Free => method_name.last_name().unwrap().clone(),
       };
       let method_link = match *method_scope {
-        RustMethodScope::Impl { ref type_name } => {
+        RustMethodScope::Impl { ref target_type } => {
           format!("../struct.{}.html#method.{}",
-                  type_name.last_name().unwrap(),
+                  if let RustType::Common { ref base, .. } = *target_type {
+                    base.last_name().unwrap()
+                  } else {
+                    panic!("RustType::Common expected");
+                  },
                   method_name.last_name().unwrap())
         }
-        RustMethodScope::TraitImpl { .. } => {
+        RustMethodScope::TraitImpl => {
           panic!("TraitImpl is totally not expected here");
         }
         RustMethodScope::Free => format!("../fn.{}.html", method_name.last_name().unwrap()),

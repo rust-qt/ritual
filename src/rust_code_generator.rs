@@ -6,7 +6,7 @@ use log;
 use rust_generator::RustGeneratorOutput;
 use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
                 RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope,
-                RustMethodArgument, TraitName};
+                RustMethodArgument, TraitImpl, TraitImplExtra};
 use rust_type::{RustName, RustType, RustTypeIndirection, RustFFIFunction, RustToCTypeConversion};
 use string_utils::{JoinWithString, CaseOperations};
 use utils::{is_msvc, MapIfOk};
@@ -279,11 +279,24 @@ impl RustCodeGenerator {
         let mut code = arg.name.clone();
         match arg.argument_type.rust_api_to_c_conversion {
           RustToCTypeConversion::None => {}
+          RustToCTypeConversion::OptionRefToPtr => {
+            return Err("OptionRefToPtr is not supported here yet".into());
+          }
           RustToCTypeConversion::RefToPtr => {
-            code = format!("{} as {}",
-                           code,
-                           self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
+            if try!(arg.argument_type.rust_api_type.is_const()) &&
+               !try!(arg.argument_type.rust_ffi_type.is_const()) {
+              let mut intermediate_type = arg.argument_type.rust_ffi_type.clone();
+              try!(intermediate_type.set_const(true));
+              code = format!("{} as {} as {}",
+                             code,
+                             self.rust_type_to_code(&intermediate_type),
+                             self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
 
+            } else {
+              code = format!("{} as {}",
+                             code,
+                             self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
+            }
           }
           RustToCTypeConversion::ValueToPtr |
           RustToCTypeConversion::CppBoxToPtr => {
@@ -360,22 +373,32 @@ impl RustCodeGenerator {
     let mut code = result.join("");
     match variant.return_type.rust_api_to_c_conversion {
       RustToCTypeConversion::None => {}
-      RustToCTypeConversion::RefToPtr => {
-        let is_const =
-          if let RustType::Common { ref is_const, ref is_const2, ref indirection, .. } =
-                 variant.return_type
-            .rust_ffi_type {
-            match *indirection {
-              RustTypeIndirection::PtrPtr { .. } |
-              RustTypeIndirection::PtrRef { .. } => *is_const2,
-              _ => *is_const,
+      RustToCTypeConversion::RefToPtr |
+      RustToCTypeConversion::OptionRefToPtr => {
+        let api_is_const = if variant.return_type.rust_api_to_c_conversion == RustToCTypeConversion::OptionRefToPtr {
+          if let RustType::Common { ref generic_arguments, .. } = variant.return_type.rust_api_type {
+            let args = try!(generic_arguments.as_ref().chain_err(|| "Option with no generic_arguments"));
+            if args.len() != 1 {
+              return Err("Option with invalid args count".into());
             }
+            try!(args[0].last_is_const())
           } else {
-            panic!("void is not expected here at all!")
-          };
-        code = format!("let ffi_result = {};\nunsafe {{ {}*ffi_result }}",
+            return Err("Option type expected".into());
+          }
+        } else {
+          try!(variant.return_type.rust_api_type.last_is_const())
+        };
+        let unwrap_code = match variant.return_type.rust_api_to_c_conversion {
+          RustToCTypeConversion::RefToPtr => {
+            ".expect(\"Attempted to convert null pointer to reference\")"
+          }
+          RustToCTypeConversion::OptionRefToPtr => "",
+          _ => unreachable!(),
+        };
+        code = format!("let ffi_result = {};\nunsafe {{ ffi_result.{}() }}{}",
                        code,
-                       if is_const { "& " } else { "&mut " });
+                       if api_is_const { "as_ref" } else { "as_mut" },
+                       unwrap_code);
       }
       RustToCTypeConversion::ValueToPtr => {
         if maybe_result_var_name.is_none() {
@@ -459,7 +482,7 @@ impl RustCodeGenerator {
 
   fn generate_rust_final_function(&self, func: &RustMethod) -> Result<String> {
     let maybe_pub = match func.scope {
-      RustMethodScope::TraitImpl { .. } => "",
+      RustMethodScope::TraitImpl => "",
       _ => "pub ",
     };
     Ok(match func.arguments {
@@ -618,6 +641,27 @@ impl RustCodeGenerator {
     Ok(())
   }
 
+  fn generate_trait_impls(&self, trait_impls: &[TraitImpl]) -> Result<String> {
+    let mut results = Vec::new();
+    for trait1 in trait_impls {
+      let trait_content = if let Some(TraitImplExtra::CppDeletable { ref deleter_name }) =
+                                 trait1.extra {
+        format!("fn deleter() -> cpp_utils::Deleter<Self> {{\n  ::ffi::{}\n}}\n",
+                deleter_name)
+      } else {
+        try!(trait1.methods
+            .iter()
+            .map_if_ok(|method| self.generate_rust_final_function(method)))
+          .join("")
+      };
+      results.push(format!("impl {} for {} {{\n{}}}\n\n",
+                           self.rust_type_to_code(&trait1.trait_type),
+                           self.rust_type_to_code(&trait1.target_type),
+                           trait_content));
+    }
+    Ok(results.join(""))
+  }
+
   #[cfg_attr(feature="clippy", allow(single_match_else))]
   fn generate_module_code(&self, data: &RustModule) -> Result<String> {
     let mut results = Vec::new();
@@ -633,7 +677,7 @@ impl RustCodeGenerator {
     for type1 in &data.types {
       results.push(format_doc(&doc_formatter::type_doc(type1)));
       match type1.kind {
-        RustTypeDeclarationKind::CppTypeWrapper { ref kind, ref methods, ref traits, .. } => {
+        RustTypeDeclarationKind::CppTypeWrapper { ref kind, ref methods, ref trait_impls, .. } => {
           let r = match *kind {
             RustTypeWrapperKind::Enum { ref values, ref is_flaggable } => {
               let mut r = format!(include_str!("../templates/crate/enum_declaration.rs.in"),
@@ -672,25 +716,8 @@ impl RustCodeGenerator {
                                    .map_if_ok(|method| self.generate_rust_final_function(method)))
                                    .join("")));
           }
-          for trait1 in traits {
-            let trait_content = match trait1.trait_name {
-              TraitName::CppDeletable { ref deleter_name } => {
-                format!("fn deleter() -> cpp_utils::Deleter<Self> {{\n  ::ffi::{}\n}}\n",
-                        deleter_name)
-              }
-              _ => {
-                try!(trait1.methods
-                    .iter()
-                    .map_if_ok(|method| self.generate_rust_final_function(method)))
-                  .join("")
-              }
-            };
+          results.push(try!(self.generate_trait_impls(trait_impls)));
 
-            results.push(format!("impl {} for {} {{\n{}}}\n\n",
-                                 trait1.trait_name.to_string(),
-                                 type1.name,
-                                 trait_content));
-          }
         }
         RustTypeDeclarationKind::MethodParametersTrait { ref shared_arguments,
                                                          ref impls,
@@ -802,7 +829,7 @@ impl RustCodeGenerator {
     for method in &data.functions {
       results.push(try!(self.generate_rust_final_function(method)));
     }
-
+    results.push(try!(self.generate_trait_impls(&data.trait_impls)));
     for submodule in &data.submodules {
       results.push(format!("pub mod {} {{\n{}}}\n\n",
                            submodule.name,

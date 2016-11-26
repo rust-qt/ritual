@@ -8,6 +8,7 @@ use cpp_method::CppMethodDoc;
 use cpp_data::CppTypeDoc;
 pub use serializable::{RustEnumValue, RustTypeWrapperKind, RustProcessedTypeInfo, RustExportInfo,
                        CppEnumValueDocItem};
+
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -22,11 +23,8 @@ pub struct RustMethodDocItem {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RustMethodScope {
-  Impl { type_name: RustName },
-  TraitImpl {
-    type_name: RustName,
-    trait_name: TraitName,
-  },
+  Impl { target_type: RustType },
+  TraitImpl,
   Free,
 }
 
@@ -135,63 +133,15 @@ impl RustMethod {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[allow(dead_code)]
-pub enum TraitName {
-  Clone,
+pub enum TraitImplExtra {
   CppDeletable { deleter_name: String },
-  Debug,
-  Default,
-  Display,
-  Drop,
-  Eq,
-  Hash,
-  Ord,
-  PartialEq,
-  PartialOrd,
-  Add,
-  AddAssign,
-  BitAnd,
-  BitAndAssign,
-  BitOr,
-  BitOrAssign,
-  BitXor,
-  BitXorAssign,
-  Div,
-  DivAssign,
-  Index,
-  IndexMut,
-  Mul,
-  MulAssign,
-  Neg,
-  Not,
-  Rem,
-  RemAssign,
-  Shl,
-  ShlAssign,
-  Shr,
-  ShrAssign,
-  Sub,
-  SubAssign,
-  DoubleEndedIterator,
-  ExactSizeIterator,
-  Extend,
-  FromIterator,
-  IntoIterator,
-  Iterator,
-}
-impl TraitName {
-  pub fn to_string(&self) -> String {
-    match *self {
-      TraitName::CppDeletable { .. } => "cpp_utils::CppDeletable".to_string(),
-      _ => format!("{:?}", self),
-    }
-  }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TraitImpl {
-  pub target_type: RustName,
-  pub trait_name: TraitName,
+  pub target_type: RustType,
+  pub trait_type: RustType,
+  pub extra: Option<TraitImplExtra>,
   pub methods: Vec<RustMethod>,
 }
 
@@ -218,7 +168,7 @@ pub enum RustTypeDeclarationKind {
     cpp_doc: Option<CppTypeDoc>,
     rust_cross_references: Vec<RustCrossReference>,
     methods: Vec<RustMethod>,
-    traits: Vec<TraitImpl>,
+    trait_impls: Vec<TraitImpl>,
   },
   MethodParametersTrait {
     lifetime: Option<String>,
@@ -241,6 +191,7 @@ pub struct RustModule {
   pub name: String,
   pub types: Vec<RustTypeDeclaration>,
   pub functions: Vec<RustMethod>,
+  pub trait_impls: Vec<TraitImpl>,
   pub submodules: Vec<RustModule>,
 }
 

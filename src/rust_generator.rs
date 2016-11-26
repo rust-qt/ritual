@@ -10,8 +10,8 @@ use errors::{Result, ChainErr, unexpected};
 use log;
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
-                RustMethodArguments, TraitImpl, TraitName, RustEnumValue, RustMethodSelfArgKind,
-                RustProcessedTypeInfo, RustMethodDocItem};
+                RustMethodArguments, TraitImpl, TraitImplExtra, RustEnumValue,
+                RustMethodSelfArgKind, RustProcessedTypeInfo, RustMethodDocItem};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
 use string_utils::{CaseOperations, VecCaseOperations, WordIterator};
@@ -850,7 +850,7 @@ impl RustGenerator {
               cpp_template_arguments: None,
               cpp_doc: info.cpp_doc.clone(),
               methods: Vec::new(),
-              traits: Vec::new(),
+              trait_impls: Vec::new(),
               rust_cross_references: Vec::new(),
             },
           },
@@ -860,7 +860,15 @@ impl RustGenerator {
       }
       RustTypeWrapperKind::Struct { .. } |
       RustTypeWrapperKind::EmptyEnum { .. } => {
-        let methods_scope = RustMethodScope::Impl { type_name: info.rust_name.clone() };
+        let methods_scope = RustMethodScope::Impl {
+          target_type: RustType::Common {
+            base: info.rust_name.clone(),
+            generic_arguments: None,
+            indirection: RustTypeIndirection::None,
+            is_const: false,
+            is_const2: false,
+          },
+        };
         let class_type = CppTypeClassBase {
           name: info.cpp_name.clone(),
           template_arguments: info.cpp_template_arguments.clone(),
@@ -888,7 +896,7 @@ impl RustGenerator {
               cpp_template_arguments: info.cpp_template_arguments.clone(),
               cpp_doc: info.cpp_doc.clone(),
               methods: functions_result.methods,
-              traits: functions_result.trait_impls,
+              trait_impls: functions_result.trait_impls,
               rust_cross_references: Vec::new(),
             },
           },
@@ -915,6 +923,7 @@ impl RustGenerator {
       types: Vec::new(),
       functions: Vec::new(),
       submodules: Vec::new(),
+      trait_impls: Vec::new(),
     };
     let mut rust_overloading_types = Vec::new();
     let mut good_methods = Vec::new();
@@ -971,7 +980,7 @@ impl RustGenerator {
     }
     let mut free_functions_result =
       try!(self.process_functions(good_methods.into_iter(), &RustMethodScope::Free));
-    assert!(free_functions_result.trait_impls.is_empty());
+    module.trait_impls = free_functions_result.trait_impls;
     module.functions = free_functions_result.methods;
     rust_overloading_types.append(&mut free_functions_result.overloading_types);
     if !rust_overloading_types.is_empty() {
@@ -981,6 +990,7 @@ impl RustGenerator {
         types: rust_overloading_types,
         functions: Vec::new(),
         submodules: Vec::new(),
+        trait_impls: Vec::new(),
       });
     }
     module.types.sort_by(|a, b| a.name.cmp(&b.name));
@@ -1188,25 +1198,36 @@ impl RustGenerator {
                         method: &CppAndFfiMethod,
                         scope: &RustMethodScope)
                         -> Result<TraitImpl> {
-    if let RustMethodScope::Impl { ref type_name } = *scope {
+    if let RustMethodScope::Impl { ref target_type } = *scope {
       match method.allocation_place {
         ReturnValueAllocationPlace::Stack => {
           let mut method = try!(self.generate_function(method, scope, true));
           method.name = try!(RustName::new(vec!["drop".to_string()]));
-          method.scope = RustMethodScope::TraitImpl {
-            type_name: type_name.clone(),
-            trait_name: TraitName::Drop,
-          };
+          method.scope = RustMethodScope::TraitImpl;
           Ok(TraitImpl {
-            target_type: type_name.clone(),
-            trait_name: TraitName::Drop,
+            target_type: target_type.clone(),
+            trait_type: RustType::Common {
+              base: try!(RustName::new(vec!["Drop".to_string()])),
+              indirection: RustTypeIndirection::None,
+              is_const: false,
+              is_const2: false,
+              generic_arguments: None,
+            },
+            extra: None,
             methods: vec![method],
           })
         }
         ReturnValueAllocationPlace::Heap => {
           Ok(TraitImpl {
-            target_type: type_name.clone(),
-            trait_name: TraitName::CppDeletable { deleter_name: method.c_name.clone() },
+            target_type: target_type.clone(),
+            trait_type: RustType::Common {
+              base: try!(RustName::new(vec!["cpp_utils".to_string(), "CppDeletable".to_string()])),
+              indirection: RustTypeIndirection::None,
+              is_const: false,
+              is_const2: false,
+              generic_arguments: None,
+            },
+            extra: Some(TraitImplExtra::CppDeletable { deleter_name: method.c_name.clone() }),
             methods: Vec::new(),
           })
         }
@@ -1216,6 +1237,69 @@ impl RustGenerator {
       }
     } else {
       return Err(unexpected("destructor must be in class scope").into());
+    }
+  }
+
+  fn process_cpp_cast(&self, method: RustMethod) -> Result<TraitImpl> {
+    let mut final_methods = vec![(method.clone(), false), (method.clone(), true)];
+    if let RustMethodArguments::SingleVariant(ref args) = method.arguments {
+      let trait_name = match args.cpp_method.cpp_method.name.as_str() {
+        "static_cast" => vec!["cpp_utils".to_string(), "StaticCast".to_string()],
+        "dynamic_cast" => vec!["cpp_utils".to_string(), "DynamicCast".to_string()],
+        "qobject_cast" => {
+          vec!["qt_core".to_string(), "object".to_string(), "QObjectCast".to_string()]
+        }
+        _ => return Err("invalid method name".into()),
+      };
+      for &mut (ref mut final_method, ref mut final_is_const) in &mut final_methods {
+        let method_name = if *final_is_const {
+          args.cpp_method.cpp_method.name.clone()
+        } else {
+          format!("{}_mut", args.cpp_method.cpp_method.name)
+        };
+        final_method.scope = RustMethodScope::TraitImpl;
+        final_method.name = try!(RustName::new(vec![method_name]));
+        if let RustMethodArguments::SingleVariant(ref mut args) = final_method.arguments {
+          let return_ref_type = try!(args.return_type.ptr_to_ref(*final_is_const));
+          if &args.cpp_method.cpp_method.name == "static_cast" {
+            args.return_type = return_ref_type;
+          } else {
+            args.return_type.rust_api_to_c_conversion = RustToCTypeConversion::OptionRefToPtr;
+            args.return_type.rust_api_type = RustType::Common {
+              base: try!(RustName::new(vec!["Option".to_string()])),
+              indirection: RustTypeIndirection::None,
+              is_const: false,
+              is_const2: false,
+              generic_arguments: Some(vec![return_ref_type.rust_api_type]),
+            }
+          };
+          args.arguments[0].argument_type =
+            try!(args.arguments[0].argument_type.ptr_to_ref(*final_is_const));
+          args.arguments[0].name = "self".to_string();
+        } else {
+          unreachable!()
+        };
+      }
+      if args.arguments.len() != 1 {
+        return Err(unexpected("1 argument expected").into());
+      }
+      let from_type = &args.arguments[0].argument_type;
+      let to_type = &args.return_type;
+      let trait_type = RustType::Common {
+        base: try!(RustName::new(trait_name)),
+        indirection: RustTypeIndirection::None,
+        is_const: false,
+        is_const2: false,
+        generic_arguments: Some(vec![try!(to_type.ptr_to_value()).rust_api_type]),
+      };
+      Ok(TraitImpl {
+        target_type: try!(from_type.ptr_to_value()).rust_api_type,
+        trait_type: trait_type,
+        extra: None,
+        methods: final_methods.into_iter().map(|x| x.0).collect(),
+      })
+    } else {
+      return Err(unexpected("SingleVariant expected").into());
     }
   }
 
@@ -1266,8 +1350,13 @@ impl RustGenerator {
         method_name.parts.push(format!("{}_{}", name, self_arg_kind_caption));
       }
       trait_name = trait_name.to_class_case() + "Args";
-      if let RustMethodScope::Impl { ref type_name } = *scope {
-        trait_name = format!("{}{}", try!(type_name.last_name()), trait_name);
+      if let RustMethodScope::Impl { ref target_type } = *scope {
+        let target_type_name = try!(if let RustType::Common { ref base, .. } = *target_type {
+          base.last_name()
+        } else {
+          Err("RustType::Common expected".into())
+        });
+        trait_name = format!("{}{}", target_type_name, trait_name);
       }
       let mut grouped_by_cpp_method: HashMap<_, Vec<_>> = HashMap::new();
       for method in filtered_methods {
@@ -1454,8 +1543,20 @@ impl RustGenerator {
       }
       match self.generate_function(method, scope, false) {
         Ok(rust_method) => {
-          let name = try!(rust_method.name.last_name()).clone();
-          add_to_multihash(&mut single_rust_methods, name, rust_method);
+          if (&method.cpp_method.name == "static_cast" ||
+              &method.cpp_method.name == "dynamic_cast" ||
+              &method.cpp_method.name == "qobject_cast") &&
+             method.cpp_method.class_membership.is_none() {
+            match self.process_cpp_cast(rust_method) {
+              Ok(r) => result.trait_impls.push(r),
+              Err(msg) => {
+                log::warning(format!("Failed to generate cast wrapper: {}\n{:?}\n", msg, method))
+              }
+            }
+          } else {
+            let name = try!(rust_method.name.last_name()).clone();
+            add_to_multihash(&mut single_rust_methods, name, rust_method);
+          }
         }
         Err(err) => log::warning(err.to_string()),
       }
@@ -1536,7 +1637,7 @@ impl RustGenerator {
     result.methods.sort_by(|a, b| {
       a.name.last_name().unwrap_or(&String::new()).cmp(b.name.last_name().unwrap_or(&String::new()))
     });
-    result.trait_impls.sort_by(|a, b| a.trait_name.to_string().cmp(&b.trait_name.to_string()));
+    result.trait_impls.sort_by(|a, b| a.trait_type.cmp(&b.trait_type));
     Ok(result)
   }
 

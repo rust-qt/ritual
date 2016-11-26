@@ -236,18 +236,6 @@ pub enum CppFieldAccessorType {
   Setter
 }
 
-/// Type of C++ cast operation
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-#[derive(Serialize, Deserialize)]
-pub enum CppCastType {
-  /// `static_cast<T>()`
-  Static,
-  /// `dynamic_cast<T>()`
-  Dynamic,
-  /// `qobject_cast<T>()`
-  QObject,
-}
-
 /// Information about automatically generated method
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
@@ -637,7 +625,7 @@ pub struct CppType {
 /// and intermediate names are module names.
 /// Built-in types are represented
 /// by a single vector item, like `vec!["i32"]`.
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 #[derive(Serialize, Deserialize)]
 pub struct RustName {
   /// Parts of the name

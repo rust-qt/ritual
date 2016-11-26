@@ -8,7 +8,7 @@ extern crate libc;
 
 pub use serializable::RustName;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 #[allow(dead_code)]
 pub enum RustTypeIndirection {
   None,
@@ -118,7 +118,7 @@ impl ToRustName for f64 {
 
 
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum RustType {
   Void,
   Common {
@@ -213,6 +213,32 @@ impl RustType {
       _ => None,
     }
   }
+  pub fn last_is_const(&self) -> Result<bool> {
+    if let RustType::Common { ref is_const, ref is_const2, ref indirection, .. } = *self {
+      match *indirection {
+        RustTypeIndirection::PtrPtr { .. } |
+        RustTypeIndirection::PtrRef { .. } => Ok(*is_const2),
+        _ => Ok(*is_const),
+      }
+    } else {
+      Err("not a Common type".into())
+    }
+  }
+  pub fn is_const(&self) -> Result<bool> {
+    match *self {
+      RustType::Common { ref is_const, .. } => Ok(*is_const),
+      _ => Err("not a Common type".into()),
+    }
+  }
+  pub fn set_const(&mut self, value: bool) -> Result<()> {
+    match *self {
+      RustType::Common { ref mut is_const, .. } => {
+        *is_const = value;
+        Ok(())
+      }
+      _ => Err("not a Common type".into()),
+    }
+  }
 
   pub fn dealias_libc(&self) -> Result<RustType> {
     Ok(match *self {
@@ -267,6 +293,7 @@ impl RustType {
 pub enum RustToCTypeConversion {
   None,
   RefToPtr,
+  OptionRefToPtr,
   ValueToPtr,
   CppBoxToPtr,
   QFlagsToUInt,
@@ -293,4 +320,41 @@ pub struct RustFFIFunction {
   pub return_type: RustType,
   pub name: String,
   pub arguments: Vec<RustFFIArgument>,
+}
+
+impl CompleteType {
+  pub fn ptr_to_ref(&self, is_const1: bool) -> Result<CompleteType> {
+    let mut r = self.clone();
+    if let RustType::Common { ref mut is_const, ref mut indirection, .. } = r.rust_api_type {
+      if *indirection != RustTypeIndirection::Ptr {
+        return Err("not a pointer type".into());
+      }
+      *indirection = RustTypeIndirection::Ref { lifetime: None };
+      *is_const = is_const1;
+    } else {
+      return Err("not a RustType::Common".into());
+    }
+    if r.rust_api_to_c_conversion != RustToCTypeConversion::None {
+      return Err("rust_api_to_c_conversion is not none".into());
+    }
+    r.rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
+    Ok(r)
+  }
+  pub fn ptr_to_value(&self) -> Result<CompleteType> {
+    let mut r = self.clone();
+    if let RustType::Common { ref mut is_const, ref mut indirection, .. } = r.rust_api_type {
+      if *indirection != RustTypeIndirection::Ptr {
+        return Err("not a pointer type".into());
+      }
+      *indirection = RustTypeIndirection::None;
+      *is_const = true;
+    } else {
+      return Err("not a RustType::Common".into());
+    }
+    if r.rust_api_to_c_conversion != RustToCTypeConversion::None {
+      return Err("rust_api_to_c_conversion is not none".into());
+    }
+    r.rust_api_to_c_conversion = RustToCTypeConversion::ValueToPtr;
+    Ok(r)
+  }
 }
