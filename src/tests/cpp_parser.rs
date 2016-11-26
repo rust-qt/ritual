@@ -85,6 +85,7 @@ fn simple_func() {
                template_arguments_values: None,
                declaration_code: Some("int func1 ( int x )".to_string()),
                is_ffi_whitelisted: false,
+               is_unsafe_static_cast: false,
              });
 }
 
@@ -125,6 +126,7 @@ fn simple_func_with_default_value() {
                template_arguments_values: None,
                declaration_code: Some("bool func1 ( int x = 42 )".to_string()),
                is_ffi_whitelisted: false,
+               is_unsafe_static_cast: false,
              });
 }
 
@@ -204,6 +206,7 @@ fn functions_with_class_arg() {
                template_arguments_values: None,
                declaration_code: Some("bool func1 ( Magic x )".to_string()),
                is_ffi_whitelisted: false,
+               is_unsafe_static_cast: false,
              });
   assert_eq!(data.methods[1],
              CppMethod {
@@ -239,6 +242,7 @@ fn functions_with_class_arg() {
                template_arguments_values: None,
                declaration_code: Some("bool func1 ( Magic * x )".to_string()),
                is_ffi_whitelisted: false,
+               is_unsafe_static_cast: false,
              });
   assert_eq!(data.methods[2],
              CppMethod {
@@ -274,6 +278,7 @@ fn functions_with_class_arg() {
                template_arguments_values: None,
                declaration_code: Some("bool func2 ( const Magic & )".to_string()),
                is_ffi_whitelisted: false,
+               is_unsafe_static_cast: false,
              });
 }
 
@@ -322,6 +327,7 @@ fn variadic_func() {
                template_arguments_values: None,
                declaration_code: Some("int my_printf ( const char * format , ... )".to_string()),
                is_ffi_whitelisted: false,
+               is_unsafe_static_cast: false,
              });
 }
 
@@ -371,6 +377,7 @@ fn free_template_func() {
                template_arguments_values: None,
                declaration_code: Some("template < typename T > T abs ( T value )".to_string()),
                is_ffi_whitelisted: false,
+               is_unsafe_static_cast: false,
              });
 }
 
@@ -432,6 +439,7 @@ fn free_func_operator_sub() {
                  template_arguments_values: None,
                  declaration_code: Some("C1 operator - ( C1 a , C1 b )".to_string()),
                  is_ffi_whitelisted: false,
+                 is_unsafe_static_cast: false,
                });
   }
 }
@@ -502,6 +510,7 @@ fn simple_class_method() {
                template_arguments_values: None,
                declaration_code: Some("int func1 ( int x )".to_string()),
                is_ffi_whitelisted: false,
+               is_unsafe_static_cast: false,
              });
 }
 
@@ -670,6 +679,7 @@ fn template_class_method() {
                template_arguments_values: None,
                declaration_code: Some("T get ( int index )".to_string()),
                is_ffi_whitelisted: false,
+               is_unsafe_static_cast: false,
              });
 }
 

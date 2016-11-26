@@ -1158,6 +1158,7 @@ impl<'a> CppParser<'a> {
       doc: None,
       inheritance_chain: Vec::new(),
       is_ffi_whitelisted: false,
+      is_unsafe_static_cast: false,
     })
   }
 

@@ -56,6 +56,7 @@ pub fn empty_regular_method() -> CppMethod {
     operator: None,
     declaration_code: None,
     is_ffi_whitelisted: false,
+    is_unsafe_static_cast: false,
   }
 }
 
@@ -784,6 +785,7 @@ fn short_text1() {
     template_arguments_values: None,
     declaration_code: None,
     is_ffi_whitelisted: false,
+    is_unsafe_static_cast: false,
   };
   assert_eq!(method.short_text(),
              "protected int Class1::method1(int arg1, double arg2 = ?) const");

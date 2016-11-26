@@ -60,6 +60,7 @@ pub enum RustMethodArguments {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustMethod {
   pub scope: RustMethodScope,
+  pub is_unsafe: bool,
   pub name: RustName,
   pub arguments: RustMethodArguments,
   pub docs: Vec<RustMethodDocItem>,
@@ -177,6 +178,7 @@ pub enum RustTypeDeclarationKind {
     impls: Vec<RustMethodArgumentsVariant>,
     method_scope: RustMethodScope,
     method_name: RustName,
+    is_unsafe: bool,
   },
 }
 

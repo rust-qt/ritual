@@ -265,8 +265,14 @@ impl RustCodeGenerator {
 
   fn generate_ffi_call(&self,
                        variant: &RustMethodArgumentsVariant,
-                       shared_arguments: &[RustMethodArgument])
+                       shared_arguments: &[RustMethodArgument],
+                       in_unsafe_context: bool)
                        -> Result<String> {
+    let (unsafe_start, unsafe_end) = if in_unsafe_context {
+      ("", "")
+    } else {
+      ("unsafe { ", " }")
+    };
     let mut final_args = Vec::new();
     final_args.resize(variant.cpp_method.c_signature.arguments.len(), None);
     let mut all_args: Vec<RustMethodArgument> = Vec::from(shared_arguments);
@@ -353,20 +359,29 @@ impl RustCodeGenerator {
       } else {
         self.rust_type_to_code(&variant.return_type.rust_api_type)
       };
-      result.push(format!("{{\nlet mut {var}: {t} = unsafe {{ \
-                           cpp_utils::new_uninitialized::NewUninitialized::new_uninitialized() \
-                           }};\n",
+      result.push(format!("{{\nlet mut {var}: {t} = {unsafe_start}\
+                           cpp_utils::new_uninitialized::NewUninitialized::new_uninitialized()\
+                           {unsafe_end};\n",
                           var = return_var_name,
-                          t = struct_name));
+                          t = struct_name,
+                          unsafe_start = unsafe_start,
+                          unsafe_end = unsafe_end));
       final_args[*i as usize] = Some(format!("&mut {}", return_var_name));
       maybe_result_var_name = Some(return_var_name);
     }
     let final_args = try!(final_args.into_iter()
       .map_if_ok(|x| x.chain_err(|| "ffi argument is missing")));
 
-    result.push(format!("unsafe {{ ::ffi::{}({}) }}",
+    result.push(format!("{unsafe_start}::ffi::{}({}){maybe_semicolon}{unsafe_end}",
                         variant.cpp_method.c_name,
-                        final_args.join(", ")));
+                        final_args.join(", "),
+                        maybe_semicolon = if maybe_result_var_name.is_some() {
+                          ";"
+                        } else {
+                          ""
+                        },
+                        unsafe_start = unsafe_start,
+                        unsafe_end = unsafe_end));
     if let Some(ref name) = maybe_result_var_name {
       result.push(format!("{}\n}}", name));
     }
@@ -375,9 +390,12 @@ impl RustCodeGenerator {
       RustToCTypeConversion::None => {}
       RustToCTypeConversion::RefToPtr |
       RustToCTypeConversion::OptionRefToPtr => {
-        let api_is_const = if variant.return_type.rust_api_to_c_conversion == RustToCTypeConversion::OptionRefToPtr {
-          if let RustType::Common { ref generic_arguments, .. } = variant.return_type.rust_api_type {
-            let args = try!(generic_arguments.as_ref().chain_err(|| "Option with no generic_arguments"));
+        let api_is_const = if variant.return_type.rust_api_to_c_conversion ==
+                              RustToCTypeConversion::OptionRefToPtr {
+          if let RustType::Common { ref generic_arguments, .. } = variant.return_type
+            .rust_api_type {
+            let args = try!(generic_arguments.as_ref()
+              .chain_err(|| "Option with no generic_arguments"));
             if args.len() != 1 {
               return Err("Option with invalid args count".into());
             }
@@ -395,20 +413,27 @@ impl RustCodeGenerator {
           RustToCTypeConversion::OptionRefToPtr => "",
           _ => unreachable!(),
         };
-        code = format!("let ffi_result = {};\nunsafe {{ ffi_result.{}() }}{}",
+        code = format!("let ffi_result = {};\n{unsafe_start}ffi_result.{}(){unsafe_end}{}",
                        code,
                        if api_is_const { "as_ref" } else { "as_mut" },
-                       unwrap_code);
+                       unwrap_code,
+                       unsafe_start = unsafe_start,
+                       unsafe_end = unsafe_end);
       }
       RustToCTypeConversion::ValueToPtr => {
         if maybe_result_var_name.is_none() {
-          code = format!("let ffi_result = {};\nunsafe {{ *ffi_result }}", code);
+          code = format!("let ffi_result = {};\n{unsafe_start}*ffi_result{unsafe_end}",
+                         code,
+                         unsafe_start = unsafe_start,
+                         unsafe_end = unsafe_end);
         }
       }
       RustToCTypeConversion::CppBoxToPtr => {
         code = format!("let ffi_result = {};\n\
-                        unsafe {{ ::cpp_utils::CppBox::new(ffi_result) }}",
-                       code);
+                        {unsafe_start}::cpp_utils::CppBox::new(ffi_result){unsafe_end}",
+                       code,
+                       unsafe_start = unsafe_start,
+                       unsafe_end = unsafe_end);
       }
       RustToCTypeConversion::QFlagsToUInt => {
         let mut qflags_type = variant.return_type.rust_api_type.clone();
@@ -485,9 +510,10 @@ impl RustCodeGenerator {
       RustMethodScope::TraitImpl => "",
       _ => "pub ",
     };
+    let maybe_unsafe = if func.is_unsafe { "unsafe " } else { "" };
     Ok(match func.arguments {
       RustMethodArguments::SingleVariant(ref variant) => {
-        let body = try!(self.generate_ffi_call(variant, &Vec::new()));
+        let body = try!(self.generate_ffi_call(variant, &Vec::new(), func.is_unsafe));
         let return_type_for_signature = if variant.return_type.rust_api_type == RustType::Void {
           String::new()
         } else {
@@ -505,9 +531,11 @@ impl RustCodeGenerator {
                   all_lifetimes.iter().map(|x| format!("'{}", x)).join(", "))
         };
 
-        format!("{doc}{maybe_pub}fn {name}{lifetimes_text}({args}){return_type} {{\n{body}}}\n\n",
+        format!("{doc}{maybe_pub}{maybe_unsafe}fn {name}{lifetimes_text}({args}){return_type} \
+                 {{\n{body}}}\n\n",
                 doc = format_doc(&doc_formatter::method_doc(&func)),
                 maybe_pub = maybe_pub,
+                maybe_unsafe = maybe_unsafe,
                 lifetimes_text = lifetimes_text,
                 name = try!(func.name.last_name()),
                 args = self.arg_texts(&variant.arguments, None).join(", "),
@@ -723,7 +751,7 @@ impl RustCodeGenerator {
                                                          ref impls,
                                                          ref lifetime,
                                                          ref return_type,
-                                                         .. } => {
+                                                         ref is_unsafe, .. } => {
           let arg_list = self.arg_texts(shared_arguments, lifetime.as_ref()).join(", ");
           let trait_lifetime_specifier = match *lifetime {
             Some(ref lf) => format!("<'{}>", lf),
@@ -808,19 +836,20 @@ impl RustCodeGenerator {
               format!("type ReturnType = {};", return_type_string)
             };
             results.push(format!(include_str!("../templates/crate/impl_overloading_trait.rs.in"),
-                                 lifetime_specifier = lifetime_specifier,
-                                 trait_lifetime_specifier = trait_lifetime_specifier,
-                                 trait_name = type1.name,
-                                 final_arg_list = final_arg_list,
-                                 impl_type = if tuple_item_types.len() == 1 {
-                                   tuple_item_types[0].clone()
-                                 } else {
-                                   format!("({})", tuple_item_types.join(","))
-                                 },
-                                 return_type_decl = return_type_decl,
-                                 return_type_string = return_type_string,
-                                 tmp_vars = tmp_vars.join("\n"),
-                                 body = try!(self.generate_ffi_call(variant, shared_arguments))));
+                            lifetime_specifier = lifetime_specifier,
+                            trait_lifetime_specifier = trait_lifetime_specifier,
+                            trait_name = type1.name,
+                            final_arg_list = final_arg_list,
+                            impl_type = if tuple_item_types.len() == 1 {
+                              tuple_item_types[0].clone()
+                            } else {
+                              format!("({})", tuple_item_types.join(","))
+                            },
+                            return_type_decl = return_type_decl,
+                            return_type_string = return_type_string,
+                            tmp_vars = tmp_vars.join("\n"),
+                            body =
+                              try!(self.generate_ffi_call(variant, shared_arguments, *is_unsafe))));
 
           }
         }

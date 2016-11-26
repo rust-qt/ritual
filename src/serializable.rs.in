@@ -357,6 +357,8 @@ pub struct CppMethod {
   pub doc: Option<CppMethodDoc>,
   /// If true, FFI generator skips some checks
   pub is_ffi_whitelisted: bool,
+
+  pub is_unsafe_static_cast: bool,
 }
 
 // ------------------------------

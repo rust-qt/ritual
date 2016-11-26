@@ -34,6 +34,7 @@ Many things are directly translated from C++ to Rust:
 - Destructors are mapped to `Drop` and `CppDeletable` implementations.
 - Function pointer types are mapped to Rust's equivalent representation. Function pointers with references or class values are not supported.
 - `QFlags<Enum>` types are converted to Rust's own similar implementation.
+- `static_cast`, `dynamic_cast` and `qobject_cast` are available in Rust through corresponding traits.
 
 Names of Rust identifiers are modified according to Rust's naming conventions.
 
@@ -52,7 +53,6 @@ Not implemented yet but planned:
 - Signals and slots API ([issue](https://github.com/rust-qt/cpp_to_rust/issues/7)).
 - Subclassing API ([issue](https://github.com/rust-qt/cpp_to_rust/issues/26)).
 - Provide access to a class's public variables ([issue](https://github.com/rust-qt/cpp_to_rust/issues/18)).
-- Provide access to `static_cast`, `dynamic_cast` and `qobject_cast`.
 - Provide conversion from enums to int and back (used in Qt API).
 - Support C++ types nested into template types, like `Class1<T>::Class2`.
 

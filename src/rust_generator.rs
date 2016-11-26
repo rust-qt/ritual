@@ -1110,6 +1110,7 @@ impl RustGenerator {
         return_type_ffi_index: return_arg_index,
       }),
       docs: docs,
+      is_unsafe: false,
     })
   }
   // fn rustdoc_path_for_type(&self, type1: &RustProcessedTypeInfo) -> String {
@@ -1241,10 +1242,17 @@ impl RustGenerator {
   }
 
   fn process_cpp_cast(&self, method: RustMethod) -> Result<TraitImpl> {
+    // TODO: qobject_cast
     let mut final_methods = vec![(method.clone(), false), (method.clone(), true)];
     if let RustMethodArguments::SingleVariant(ref args) = method.arguments {
       let trait_name = match args.cpp_method.cpp_method.name.as_str() {
-        "static_cast" => vec!["cpp_utils".to_string(), "StaticCast".to_string()],
+        "static_cast" => {
+          if args.cpp_method.cpp_method.is_unsafe_static_cast {
+            vec!["cpp_utils".to_string(), "UnsafeStaticCast".to_string()]
+          } else {
+            vec!["cpp_utils".to_string(), "StaticCast".to_string()]
+          }
+        }
         "dynamic_cast" => vec!["cpp_utils".to_string(), "DynamicCast".to_string()],
         "qobject_cast" => {
           vec!["qt_core".to_string(), "object".to_string(), "QObjectCast".to_string()]
@@ -1259,6 +1267,9 @@ impl RustGenerator {
         };
         final_method.scope = RustMethodScope::TraitImpl;
         final_method.name = try!(RustName::new(vec![method_name]));
+        if args.cpp_method.cpp_method.is_unsafe_static_cast {
+          final_method.is_unsafe = true;
+        }
         if let RustMethodArguments::SingleVariant(ref mut args) = final_method.arguments {
           let return_ref_type = try!(args.return_type.ptr_to_ref(*final_is_const));
           if &args.cpp_method.cpp_method.name == "static_cast" {
@@ -1477,6 +1488,7 @@ impl RustGenerator {
           return_type: trait_return_type.clone(),
           method_name: method_name.clone(),
           method_scope: first_method.scope.clone(),
+          is_unsafe: false,
         },
       });
 
@@ -1492,6 +1504,7 @@ impl RustGenerator {
           cpp_method_name: cpp_method_name,
         },
         docs: doc_items,
+        is_unsafe: false,
       }
     } else {
       let mut method = try!(filtered_methods.pop().chain_err(|| "filtered_methods can't be empty"));

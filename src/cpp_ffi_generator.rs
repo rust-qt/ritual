@@ -278,6 +278,7 @@ impl<'a> CGenerator<'a> {
           doc: None,
           inheritance_chain: Vec::new(),
           is_ffi_whitelisted: false,
+          is_unsafe_static_cast: false,
         };
         let mut result = try!(self.process_methods(include_file_name, once(&method)))
           .into_iter()
