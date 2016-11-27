@@ -45,7 +45,11 @@ impl RustName {
         }
       }
     }
-    self.parts.join("::")
+    if self.parts.len() == 1 {
+      self.parts[0].clone()
+    } else {
+      format!("::{}", self.parts.join("::"))
+    }
   }
 
   pub fn includes(&self, other: &RustName) -> bool {
@@ -144,7 +148,12 @@ impl RustType {
                          ref is_const,
                          ref is_const2,
                          ref indirection } => {
-        let mut name = try!(base.last_name()).to_snake_case();
+
+        let mut name = if base.parts.len() == 1 {
+          base.parts[0].clone()
+        } else {
+          base.parts[1..].join("_")
+        }.to_snake_case();
         if let Some(ref args) = *generic_arguments {
           name = format!("{}_{}",
                          name,

@@ -1,6 +1,6 @@
 impl {trait_type} for {name} {{
-  fn to_flag_value(self) -> libc::c_int {{
-    self as libc::c_int
+  fn to_flag_value(self) -> ::libc::c_int {{
+    self as ::libc::c_int
   }}
   fn enum_name() -> &'static str {{
     "{name}"

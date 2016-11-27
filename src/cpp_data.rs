@@ -855,6 +855,7 @@ impl CppData {
     Ok(())
   }
 
+  /// Checks if `class_name` types inherits `base_name` type directly or indirectly.
   pub fn inherits(&self, class_name: &str, base_name: &str) -> bool {
     for types in self.dependencies.iter().map(|x| &x.types).chain(once(&self.types)) {
       if let Some(info) = types.iter().find(|x| &x.name == class_name) {

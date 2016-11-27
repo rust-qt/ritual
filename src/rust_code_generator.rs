@@ -6,7 +6,7 @@ use log;
 use rust_generator::RustGeneratorOutput;
 use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
                 RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope,
-                RustMethodArgument, TraitImpl, TraitImplExtra};
+                RustMethodArgument, TraitImpl, TraitImplExtra, RustQtReceiverType};
 use rust_type::{RustName, RustType, RustTypeIndirection, RustFFIFunction, RustToCTypeConversion};
 use string_utils::{JoinWithString, CaseOperations};
 use utils::{is_msvc, MapIfOk};
@@ -329,7 +329,7 @@ impl RustCodeGenerator {
             }
           }
           RustToCTypeConversion::QFlagsToUInt => {
-            code = format!("{}.to_int() as libc::c_uint", code);
+            code = format!("{}.to_int() as ::libc::c_uint", code);
           }
         }
         final_args[ffi_index as usize] = Some(code);
@@ -360,7 +360,7 @@ impl RustCodeGenerator {
         self.rust_type_to_code(&variant.return_type.rust_api_type)
       };
       result.push(format!("{{\nlet mut {var}: {t} = {unsafe_start}\
-                           cpp_utils::new_uninitialized::NewUninitialized::new_uninitialized()\
+                           ::cpp_utils::new_uninitialized::NewUninitialized::new_uninitialized()\
                            {unsafe_end};\n",
                           var = return_var_name,
                           t = struct_name,
@@ -674,7 +674,7 @@ impl RustCodeGenerator {
     for trait1 in trait_impls {
       let trait_content = if let Some(TraitImplExtra::CppDeletable { ref deleter_name }) =
                                  trait1.extra {
-        format!("fn deleter() -> cpp_utils::Deleter<Self> {{\n  ::ffi::{}\n}}\n",
+        format!("fn deleter() -> ::cpp_utils::Deleter<Self> {{\n  ::ffi::{}\n}}\n",
                 deleter_name)
       } else {
         try!(trait1.methods
@@ -693,23 +693,18 @@ impl RustCodeGenerator {
   #[cfg_attr(feature="clippy", allow(single_match_else))]
   fn generate_module_code(&self, data: &RustModule) -> Result<String> {
     let mut results = Vec::new();
-    let mut used_crates: Vec<_> =
-      self.config.dependencies.iter().map(|x| x.crate_name.as_ref()).collect();
-    used_crates.push("libc");
-    used_crates.push("cpp_utils");
-    used_crates.push("std");
-
-    results.push(format!("#[allow(unused_imports)]\nuse {{{}}};\n\n",
-                         used_crates.join(", ")));
-
     for type1 in &data.types {
       results.push(format_doc(&doc_formatter::type_doc(type1)));
       match type1.kind {
-        RustTypeDeclarationKind::CppTypeWrapper { ref kind, ref methods, ref trait_impls, .. } => {
+        RustTypeDeclarationKind::CppTypeWrapper { ref kind,
+                                                  ref methods,
+                                                  ref trait_impls,
+                                                  ref qt_receivers,
+                                                  .. } => {
           let r = match *kind {
             RustTypeWrapperKind::Enum { ref values, ref is_flaggable } => {
               let mut r = format!(include_str!("../templates/crate/enum_declaration.rs.in"),
-                                  name = type1.name,
+                                  name = try!(type1.name.last_name()),
                                   variants = values.iter()
                                     .map(|item| {
                                       format!("{}  {} = {}",
@@ -721,7 +716,7 @@ impl RustCodeGenerator {
               if *is_flaggable {
                 r = r +
                     &format!(include_str!("../templates/crate/impl_flaggable.rs.in"),
-                             name = type1.name,
+                             name = try!(type1.name.last_name()),
                              trait_type = try!(RustName::new(vec!["qt_core".to_string(),
                                                                   "flags".to_string(),
                                                                   "FlaggableEnum".to_string()]))
@@ -731,27 +726,84 @@ impl RustCodeGenerator {
             }
             RustTypeWrapperKind::Struct { ref size, .. } => {
               format!(include_str!("../templates/crate/struct_declaration.rs.in"),
-                      name = type1.name,
+                      name = try!(type1.name.last_name()),
                       size = size)
             }
-            RustTypeWrapperKind::EmptyEnum { .. } => format!("pub enum {} {{}}\n\n", type1.name),
+            RustTypeWrapperKind::EmptyEnum { .. } => format!("pub enum {} {{}}\n\n", try!(type1.name.last_name())),
           };
           results.push(r);
           if !methods.is_empty() {
             results.push(format!("impl {} {{\n{}}}\n\n",
-                                 type1.name,
+                                 try!(type1.name.last_name()),
                                  try!(methods.iter()
                                    .map_if_ok(|method| self.generate_rust_final_function(method)))
                                    .join("")));
           }
           results.push(try!(self.generate_trait_impls(trait_impls)));
-
+          if !qt_receivers.is_empty() {
+            let mut content = Vec::new();
+            let obj_name = type1.name.full_name(Some(&self.config.crate_name));
+            content.push("use ::cpp_utils::StaticCast;\n".to_string());
+            let mut type_impl_content = Vec::new();
+            for receiver_type in &[RustQtReceiverType::Signal, RustQtReceiverType::Slot] {
+              if qt_receivers.iter().any(|r| &r.receiver_type == receiver_type) {
+                let (struct_method, struct_type) = match *receiver_type {
+                  RustQtReceiverType::Signal => ("signals", "Signals"),
+                  RustQtReceiverType::Slot => ("slots", "Slots"),
+                };
+                let mut struct_content = Vec::new();
+                content.push(format!("pub struct {}<'a>(&'a {});\n", struct_type, obj_name));
+                for receiver in qt_receivers {
+                  if &receiver.receiver_type == receiver_type {
+                    let arg_texts: Vec<_> = receiver.arguments
+                      .iter()
+                      .map(|t| self.rust_type_to_code(t))
+                      .collect();
+                    let args_tuple = arg_texts.join(", ") +
+                                     if arg_texts.len() == 1 { "," } else { "" };
+                    content.push(format!("pub struct {}<'a>(&'a {});\n", receiver.type_name, obj_name));
+                    content.push(format!("\
+impl<'a> ::connections::Receiver for {type_name}<'a> {{
+  type Arguments = ({arguments});
+  fn object(&self) -> &::object::Object {{ self.0.static_cast() }}
+  fn receiver_id() -> &'static [u8] {{ b\"{receiver_id}\\0\" }}
+}}\n",
+                                         type_name = receiver.type_name,
+                                         arguments = args_tuple,
+                                         receiver_id = receiver.receiver_id));
+                    if *receiver_type == RustQtReceiverType::Signal {
+                      content.push(format!("impl<'a> ::connections::Signal for {}<'a> {{}}\n",
+                                           receiver.type_name));
+                    }
+                    struct_content.push(format!("\
+pub fn {method_name}(&self) -> {type_name} {{
+  {type_name}(self.0)
+}}\n",
+                                                type_name = receiver.type_name,
+                                                method_name = receiver.method_name));
+                  }
+                }
+                content.push(format!("impl<'a> {}<'a> {{\n{}\n}}\n",
+                                     struct_type,
+                                     struct_content.join("")));
+                type_impl_content.push(format!("\
+pub fn {struct_method}(&self) -> {struct_type} {{
+  {struct_type}(self)
+}}\n",
+                                               struct_method = struct_method,
+                                               struct_type = struct_type));
+              }
+            }
+            content.push(format!("impl {} {{\n{}\n}}\n", obj_name, type_impl_content.join("")));
+            results.push(format!("pub mod connections {{\n{}\n}}\n\n", content.join("")));
+          }
         }
         RustTypeDeclarationKind::MethodParametersTrait { ref shared_arguments,
                                                          ref impls,
                                                          ref lifetime,
                                                          ref return_type,
-                                                         ref is_unsafe, .. } => {
+                                                         ref is_unsafe,
+                                                         .. } => {
           let arg_list = self.arg_texts(shared_arguments, lifetime.as_ref()).join(", ");
           let trait_lifetime_specifier = match *lifetime {
             Some(ref lf) => format!("<'{}>", lf),
@@ -774,7 +826,7 @@ impl RustCodeGenerator {
               {return_type_decl}\
               fn exec(self, {arg_list}) -> {return_type_string};
             }}",
-                               name = type1.name,
+                               name = try!(type1.name.last_name()),
                                arg_list = arg_list,
                                trait_lifetime_specifier = trait_lifetime_specifier,
                                return_type_decl = return_type_decl,
@@ -838,7 +890,7 @@ impl RustCodeGenerator {
             results.push(format!(include_str!("../templates/crate/impl_overloading_trait.rs.in"),
                             lifetime_specifier = lifetime_specifier,
                             trait_lifetime_specifier = trait_lifetime_specifier,
-                            trait_name = type1.name,
+                            trait_name = try!(type1.name.last_name()),
                             final_arg_list = final_arg_list,
                             impl_type = if tuple_item_types.len() == 1 {
                               tuple_item_types[0].clone()
@@ -905,10 +957,6 @@ impl RustCodeGenerator {
     file_path.push("ffi.rs");
     {
       let mut file = try!(create_file(&file_path));
-      try!(file.write("use libc;\n\n"));
-      for dep in &self.config.dependencies {
-        try!(file.write(format!("use {};\n\n", &dep.crate_name)));
-      }
       for item in &self.config.link_items {
         match item.kind {
           RustLinkKind::SharedLibrary => {

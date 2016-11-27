@@ -5,7 +5,7 @@ use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase};
 use errors::{Result, unexpected};
 use string_utils::JoinWithString;
-
+use utils::MapIfOk;
 pub use serializable::{CppFunctionArgument, CppMethodKind, CppMethod, CppMethodClassMembership,
                        CppFieldAccessorType, FakeCppMethod, CppMethodDoc};
 
@@ -299,6 +299,27 @@ impl CppMethod {
     } else {
       None
     }
+  }
+
+  pub fn receiver_id(&self) -> Result<String> {
+    let type_num = if let Some(ref info) = self.class_membership {
+      if info.is_slot {
+        "1"
+      } else if info.is_signal {
+        "2"
+      } else {
+        return Err("not a signal or slot".into());
+      }
+    } else {
+      return Err("not a class method".into());
+    };
+    Ok(format!("{}{}({})",
+               type_num,
+               self.name,
+               try!(self.arguments
+                   .iter()
+                   .map_if_ok(|arg| arg.argument_type.to_cpp_code(None)))
+                 .join(",")))
   }
 
 

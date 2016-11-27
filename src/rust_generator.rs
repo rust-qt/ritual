@@ -11,11 +11,13 @@ use log;
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
                 RustMethodArguments, TraitImpl, TraitImplExtra, RustEnumValue,
-                RustMethodSelfArgKind, RustProcessedTypeInfo, RustMethodDocItem};
+                RustMethodSelfArgKind, RustProcessedTypeInfo, RustMethodDocItem,
+                RustQtReceiverDeclaration, RustQtReceiverType};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
 use string_utils::{CaseOperations, VecCaseOperations, WordIterator};
 use utils::{add_to_multihash, MapIfOk};
+use string_utils::JoinWithString;
 use doc_formatter;
 use std::collections::{HashMap, HashSet, hash_map};
 
@@ -843,7 +845,7 @@ impl RustGenerator {
       RustTypeWrapperKind::Enum { .. } => {
         (ProcessTypeResult {
           main_type: RustTypeDeclaration {
-            name: try!(info.rust_name.last_name()).clone(),
+            name: info.rust_name.clone(),
             kind: RustTypeDeclarationKind::CppTypeWrapper {
               kind: info.kind.clone(),
               cpp_type_name: info.cpp_name.clone(),
@@ -852,6 +854,7 @@ impl RustGenerator {
               methods: Vec::new(),
               trait_impls: Vec::new(),
               rust_cross_references: Vec::new(),
+              qt_receivers: Vec::new(),
             },
           },
           overloading_types: Vec::new(),
@@ -887,9 +890,68 @@ impl RustGenerator {
         cpp_methods = tmp_cpp_methods;
         let functions_result =
           try!(self.process_functions(good_methods.into_iter(), &methods_scope));
+
+        let mut qt_receivers_by_name: HashMap<String, Vec<_>> = HashMap::new();
+        if self.input_data.cpp_data.inherits(&info.cpp_name, "QObject") {
+          for method in &self.input_data.cpp_data.methods {
+            if let Some(ref info) = method.class_membership {
+              if &info.class_type == &class_type && (info.is_signal || info.is_slot) {
+                add_to_multihash(&mut qt_receivers_by_name,
+                                 method.name.clone(),
+                                 RustQtReceiverDeclaration {
+                                   type_name: method.name.to_class_case(),
+                                   method_name: method.name.to_snake_case(),
+                                   receiver_type: if info.is_signal {
+                                     RustQtReceiverType::Signal
+                                   } else {
+                                     RustQtReceiverType::Slot
+                                   },
+                                   receiver_id: try!(method.receiver_id()),
+                                   arguments: try!(method.arguments
+                                     .iter()
+                                     .map_if_ok(|arg| -> Result<_> {
+                      Ok(try!(complete_type(&self.processed_types,
+                                            &self.dependency_types,
+                                            &try!(arg.argument_type
+                                              .to_cpp_ffi_type(CppTypeRole::NotReturnType)),
+                                            &CppFfiArgumentMeaning::Argument(0),
+                                            &ReturnValueAllocationPlace::NotApplicable))
+                        .rust_api_type
+                        .with_lifetime("static".to_string()))
+                    })),
+                                 });
+              }
+            }
+          }
+        }
+        let qt_receivers = qt_receivers_by_name.into_iter()
+          .flat_map(|(_, receivers)| {
+            if receivers.len() == 1 {
+              receivers
+            } else {
+              receivers.into_iter()
+                .map(|r| {
+                  let name =
+                    format!("{}_{}",
+                            r.method_name,
+                            r.arguments
+                              .iter()
+                              .map(|x| x.caption().expect("receiver argument caption failed"))
+                              .join("_"));
+                  RustQtReceiverDeclaration {
+                    type_name: name.to_class_case(),
+                    method_name: name.to_snake_case(),
+                    ..r
+                  }
+                })
+                .collect()
+            }
+          })
+          .collect();
+
         (ProcessTypeResult {
           main_type: RustTypeDeclaration {
-            name: try!(info.rust_name.last_name()).clone(),
+            name: info.rust_name.clone(),
             kind: RustTypeDeclarationKind::CppTypeWrapper {
               kind: info.kind.clone(),
               cpp_type_name: info.cpp_name.clone(),
@@ -898,6 +960,7 @@ impl RustGenerator {
               methods: functions_result.methods,
               trait_impls: functions_result.trait_impls,
               rust_cross_references: Vec::new(),
+              qt_receivers: qt_receivers,
             },
           },
           overloading_types: functions_result.overloading_types,
@@ -1480,7 +1543,13 @@ impl RustGenerator {
         None
       };
       type_declaration = Some(RustTypeDeclaration {
-        name: trait_name.clone(),
+        name: {
+          let mut name = first_method.name.clone();
+          name.parts.pop().unwrap();
+          name.parts.push("overloading".to_string());
+          name.parts.push(trait_name.clone());
+          name
+        },
         kind: RustTypeDeclarationKind::MethodParametersTrait {
           shared_arguments: shared_arguments_for_trait,
           impls: args_variants,

@@ -160,7 +160,21 @@ pub struct RustCrossReference {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-#[allow(dead_code)]
+pub enum RustQtReceiverType {
+  Signal,
+  Slot,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct RustQtReceiverDeclaration {
+  pub type_name: String,
+  pub method_name: String,
+  pub receiver_type: RustQtReceiverType,
+  pub receiver_id: String,
+  pub arguments: Vec<RustType>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RustTypeDeclarationKind {
   CppTypeWrapper {
     kind: RustTypeWrapperKind,
@@ -170,6 +184,7 @@ pub enum RustTypeDeclarationKind {
     rust_cross_references: Vec<RustCrossReference>,
     methods: Vec<RustMethod>,
     trait_impls: Vec<TraitImpl>,
+    qt_receivers: Vec<RustQtReceiverDeclaration>,
   },
   MethodParametersTrait {
     lifetime: Option<String>,
@@ -184,7 +199,7 @@ pub enum RustTypeDeclarationKind {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustTypeDeclaration {
-  pub name: String,
+  pub name: RustName,
   pub kind: RustTypeDeclarationKind,
 }
 

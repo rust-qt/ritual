@@ -964,7 +964,7 @@ impl<'a> CppParser<'a> {
       }
       _ => None,
     };
-
+    let mut is_signal = false;
     for (argument_number, argument_entity) in argument_entities.into_iter()
       .enumerate() {
       let name = argument_entity.get_name()
@@ -973,6 +973,10 @@ impl<'a> CppParser<'a> {
         format!("failed to get type from argument entity: {:?}",
                 argument_entity)
       }));
+      if clang_type.get_display_name().ends_with("::QPrivateSignal") {
+        is_signal = true;
+        continue;
+      }
       let argument_type = try!(self.parse_type(clang_type, class_entity, Some(entity))
         .chain_err(|| {
           format!("Can't parse argument type: {}: {}",
@@ -1135,7 +1139,8 @@ impl<'a> CppParser<'a> {
               Accessibility::Protected => CppVisibility::Protected,
               Accessibility::Private => CppVisibility::Private,
             },
-            is_signal: false,
+            // not all signals are detected here! see CppData::detect_signals_and_slots
+            is_signal: is_signal,
             is_slot: false,
             class_type: match self.find_type(|x| &x.name == &class_name) {
               Some(info) => try!(info.default_class_type()),
