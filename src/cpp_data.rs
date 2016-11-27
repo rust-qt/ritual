@@ -19,6 +19,36 @@ pub use serializable::{CppEnumValue, CppClassField, CppTypeKind, CppOriginLocati
 extern crate regex;
 use self::regex::Regex;
 
+pub fn create_cast_method(name: &str,
+                          from: &CppType,
+                          to: &CppType,
+                          is_unsafe_static_cast: bool,
+                          include_file: &str)
+                          -> CppMethod {
+  CppMethod {
+    name: name.to_string(),
+    class_membership: None,
+    operator: None,
+    return_type: to.clone(),
+    arguments: vec![CppFunctionArgument {
+                      name: "ptr".to_string(),
+                      argument_type: from.clone(),
+                      has_default_value: false,
+                    }],
+    arguments_before_omitting: None,
+    allows_variadic_arguments: false,
+    include_file: include_file.to_string(),
+    origin_location: None,
+    template_arguments: None,
+    template_arguments_values: Some(vec![to.clone()]),
+    declaration_code: None,
+    doc: None,
+    inheritance_chain: Vec::new(),
+    is_ffi_whitelisted: true,
+    is_unsafe_static_cast: is_unsafe_static_cast,
+  }
+}
+
 fn apply_instantiations_to_method(method: &CppMethod,
                                   nested_level: i32,
                                   template_instantiations: &[CppTemplateInstantiation])
@@ -795,37 +825,24 @@ impl CppData {
       is_const: false,
       is_const2: false,
     };
-    let create_method =
-      |name: &str, from: &CppType, to: &CppType, is_unsafe_static_cast: bool| {
-        CppMethod {
-          name: name.to_string(),
-          class_membership: None,
-          operator: None,
-          return_type: to.clone(),
-          arguments: vec![CppFunctionArgument {
-                            name: "ptr".to_string(),
-                            argument_type: from.clone(),
-                            has_default_value: false,
-                          }],
-          arguments_before_omitting: None,
-          allows_variadic_arguments: false,
-          include_file: type_info.include_file.clone(),
-          origin_location: None,
-          template_arguments: None,
-          template_arguments_values: Some(vec![to.clone()]),
-          declaration_code: None,
-          doc: None,
-          inheritance_chain: Vec::new(),
-          is_ffi_whitelisted: true,
-          is_unsafe_static_cast: is_unsafe_static_cast,
-        }
-      };
     let mut new_methods = Vec::new();
-    new_methods.push(create_method("static_cast", &base_ptr_type, &target_ptr_type, true));
-    new_methods.push(create_method("static_cast", &target_ptr_type, &base_ptr_type, false));
+    new_methods.push(create_cast_method("static_cast",
+                                        &base_ptr_type,
+                                        &target_ptr_type,
+                                        true,
+                                        &type_info.include_file));
+    new_methods.push(create_cast_method("static_cast",
+                                        &target_ptr_type,
+                                        &base_ptr_type,
+                                        false,
+                                        &type_info.include_file));
     if let CppTypeBase::Class(ref base) = base_type.base {
       if self.is_polymorphic_type(&base.name) {
-        new_methods.push(create_method("dynamic_cast", &base_ptr_type, &target_ptr_type, false));
+        new_methods.push(create_cast_method("dynamic_cast",
+                                            &base_ptr_type,
+                                            &target_ptr_type,
+                                            false,
+                                            &type_info.include_file));
       }
     }
 

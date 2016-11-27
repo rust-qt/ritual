@@ -12,7 +12,7 @@ use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKin
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
                 RustMethodArguments, TraitImpl, TraitImplExtra, RustEnumValue,
                 RustMethodSelfArgKind, RustProcessedTypeInfo, RustMethodDocItem,
-                RustQtReceiverDeclaration, RustQtReceiverType};
+                RustQtReceiverDeclaration, RustQtReceiverType, RustQtSlotWrapper};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
 use string_utils::{CaseOperations, VecCaseOperations, WordIterator};
@@ -380,7 +380,7 @@ fn process_types(input_data: &CppAndFfiData,
         continue;
       }
     }
-    result.push(RustProcessedTypeInfo {
+    let rust_type_info = RustProcessedTypeInfo {
       cpp_name: type_info.name.clone(),
       cpp_doc: type_info.doc.clone(),
       cpp_template_arguments: None,
@@ -428,7 +428,8 @@ fn process_types(input_data: &CppAndFfiData,
                                           false,
                                           None,
                                           config)),
-    });
+    };
+    result.push(rust_type_info);
   }
   let template_final_name =
     |result: &Vec<RustProcessedTypeInfo>, item: &RustProcessedTypeInfo| -> Result<RustName> {
@@ -528,7 +529,7 @@ fn process_types(input_data: &CppAndFfiData,
       } else {
         arg_names.join("_")
       };
-      result.push(RustProcessedTypeInfo {
+      let rust_type_info = RustProcessedTypeInfo {
         cpp_name: qt_slot_wrapper.class_name.clone(),
         cpp_template_arguments: None,
         cpp_doc: None, // TODO: do we need doc for this?
@@ -537,8 +538,25 @@ fn process_types(input_data: &CppAndFfiData,
                                             false,
                                             None,
                                             config)),
-        kind: RustTypeWrapperKind::EmptyEnum { is_deletable: true },
-      });
+        kind: RustTypeWrapperKind::EmptyEnum {
+          is_deletable: true,
+          slot_wrapper: Some(RustQtSlotWrapper {
+            arguments: try!(qt_slot_wrapper.arguments
+              .iter()
+              .map_if_ok(|t| -> Result<_> {
+                Ok(try!(complete_type(&result,
+                                      dependency_types,
+                                      t,
+                                      &CppFfiArgumentMeaning::Argument(0),
+                                      &ReturnValueAllocationPlace::NotApplicable))
+                  .rust_api_type
+                  .with_lifetime("static".to_string()))
+              })),
+            receiver_id: qt_slot_wrapper.receiver_id.clone(),
+          }),
+        },
+      };
+      result.push(rust_type_info);
     }
   }
   Ok(result)
@@ -587,7 +605,7 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
                                              |x| &x.rust_name == base) {
             match info.kind {
               RustTypeWrapperKind::Struct { ref is_deletable, .. } |
-              RustTypeWrapperKind::EmptyEnum { ref is_deletable } => {
+              RustTypeWrapperKind::EmptyEnum { ref is_deletable, .. } => {
                 if !*is_deletable {
                   return Err(format!("{} is not deletable", base.full_name(None)).into());
                 }

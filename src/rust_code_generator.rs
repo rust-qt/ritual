@@ -729,7 +729,32 @@ impl RustCodeGenerator {
                       name = try!(type1.name.last_name()),
                       size = size)
             }
-            RustTypeWrapperKind::EmptyEnum { .. } => format!("pub enum {} {{}}\n\n", try!(type1.name.last_name())),
+            RustTypeWrapperKind::EmptyEnum { ref slot_wrapper, .. } => {
+              let mut r = format!("pub enum {} {{}}\n\n", try!(type1.name.last_name()));
+              if let Some(ref slot_wrapper) = *slot_wrapper {
+                let arg_texts: Vec<_> = slot_wrapper.arguments
+                  .iter()
+                  .map(|t| self.rust_type_to_code(t))
+                  .collect();
+                let args_tuple = arg_texts.join(", ") + if arg_texts.len() == 1 { "," } else { "" };
+
+                r.push_str(&format!("\
+impl ::connections::Receiver for {type_name} {{
+  type Arguments = ({args});
+  fn object(&self) -> &::object::Object {{
+    ::cpp_utils::StaticCast::static_cast(self)
+  }}
+  fn receiver_id() -> &'static [u8] {{
+    b\"{receiver_id}\\0\"
+  }}
+}}\n",
+                                    type_name = type1.name
+                                      .full_name(Some(&self.config.crate_name)),
+                                    args = args_tuple,
+                                    receiver_id = slot_wrapper.receiver_id));
+              }
+              r
+            }
           };
           results.push(r);
           if !methods.is_empty() {

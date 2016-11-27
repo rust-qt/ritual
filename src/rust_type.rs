@@ -6,17 +6,8 @@ use utils::MapIfOk;
 
 extern crate libc;
 
-pub use serializable::RustName;
+pub use serializable::{RustName, RustTypeIndirection, RustType};
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-#[allow(dead_code)]
-pub enum RustTypeIndirection {
-  None,
-  Ptr,
-  Ref { lifetime: Option<String> },
-  PtrPtr,
-  PtrRef { lifetime: Option<String> },
-}
 
 impl RustName {
   pub fn new(parts: Vec<String>) -> Result<RustName> {
@@ -122,21 +113,7 @@ impl ToRustName for f64 {
 
 
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub enum RustType {
-  Void,
-  Common {
-    base: RustName,
-    generic_arguments: Option<Vec<RustType>>,
-    is_const: bool,
-    is_const2: bool,
-    indirection: RustTypeIndirection,
-  },
-  FunctionPointer {
-    return_type: Box<RustType>,
-    arguments: Vec<RustType>,
-  },
-}
+
 
 impl RustType {
   #[allow(dead_code)]
@@ -150,10 +127,11 @@ impl RustType {
                          ref indirection } => {
 
         let mut name = if base.parts.len() == 1 {
-          base.parts[0].clone()
-        } else {
-          base.parts[1..].join("_")
-        }.to_snake_case();
+            base.parts[0].clone()
+          } else {
+            base.parts[1..].join("_")
+          }
+          .to_snake_case();
         if let Some(ref args) = *generic_arguments {
           name = format!("{}_{}",
                          name,

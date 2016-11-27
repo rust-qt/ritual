@@ -1,4 +1,4 @@
-class {class_name} : QObject {{
+class {class_name} : public QObject {{
   Q_OBJECT
 public:
   {class_name}() : m_func(0), m_data(0) {{ }}

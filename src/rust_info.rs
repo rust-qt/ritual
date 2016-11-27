@@ -7,7 +7,7 @@ use utils::MapIfOk;
 use cpp_method::CppMethodDoc;
 use cpp_data::CppTypeDoc;
 pub use serializable::{RustEnumValue, RustTypeWrapperKind, RustProcessedTypeInfo, RustExportInfo,
-                       CppEnumValueDocItem};
+                       CppEnumValueDocItem, RustQtSlotWrapper};
 
 use std::collections::HashMap;
 

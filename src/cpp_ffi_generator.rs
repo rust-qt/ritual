@@ -1,5 +1,5 @@
 use caption_strategy::{TypeCaptionStrategy, MethodCaptionStrategy};
-use cpp_data::{CppData, CppVisibility, CppFunctionPointerType};
+use cpp_data::{CppData, CppVisibility, CppFunctionPointerType, create_cast_method};
 use cpp_type::{CppTypeRole, CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
 use cpp_ffi_data::{CppAndFfiMethod, c_base_name, CppFfiHeaderData, QtSlotWrapper};
 use cpp_method::{CppMethod, CppMethodKind, CppFunctionArgument, CppMethodClassMembership,
@@ -233,22 +233,18 @@ impl<'a> CGenerator<'a> {
       let func_arguments = once(void_ptr.clone())
         .chain(ffi_types.iter().map(|t| t.ffi_type.clone()))
         .collect();
-      let class_name = format!("{}_QtSlotWrapper_{}", self.c_lib_name, args_caption);
+      let class_name = format!("{}_SlotWrapper_{}", self.c_lib_name, args_caption);
       let function_type = CppFunctionPointerType {
         return_type: Box::new(CppType::void()),
         arguments: func_arguments,
         allows_variadic_arguments: false,
       };
-      qt_slot_wrappers.push(QtSlotWrapper {
-        class_name: class_name.clone(),
-        arguments: ffi_types,
-        function_type: function_type.clone(),
-      });
       let create_function = |kind: CppMethodKind,
                              name: String,
+                             is_slot: bool,
                              arguments: Vec<CppFunctionArgument>|
-                             -> Result<CppAndFfiMethod> {
-        let method = CppMethod {
+                             -> CppMethod {
+        CppMethod {
           name: name,
           class_membership: Some(CppMethodClassMembership {
             class_type: CppTypeClassBase {
@@ -261,7 +257,7 @@ impl<'a> CGenerator<'a> {
             is_static: false,
             visibility: CppVisibility::Public,
             is_signal: false,
-            is_slot: false,
+            is_slot: is_slot,
             kind: kind,
             fake: None,
           }),
@@ -279,21 +275,16 @@ impl<'a> CGenerator<'a> {
           inheritance_chain: Vec::new(),
           is_ffi_whitelisted: false,
           is_unsafe_static_cast: false,
-        };
-        let mut result = try!(self.process_methods(include_file_name, once(&method)))
-          .into_iter()
-          .filter(|x| x.allocation_place != ReturnValueAllocationPlace::Stack);
-        let result_method = try!(result.next().chain_err(|| "failed to get FFI method"));
-        if result.next().is_some() {
-          return Err("too many FFI methods".into());
         }
-        Ok(result_method)
       };
-      let method_constructor =
-        try!(create_function(CppMethodKind::Constructor, class_name.clone(), vec![]));
-      let method_destructor = try!(create_function(CppMethodKind::Destructor,
-                                                   format!("~{}", class_name),
-                                                   vec![]));
+      methods.push(create_function(CppMethodKind::Constructor,
+                                   class_name.clone(),
+                                   false,
+                                   vec![]));
+      methods.push(create_function(CppMethodKind::Destructor,
+                                   format!("~{}", class_name),
+                                   false,
+                                   vec![]));
       let method_set_args = vec![CppFunctionArgument {
                                    name: "func".to_string(),
                                    argument_type: CppType {
@@ -309,29 +300,62 @@ impl<'a> CGenerator<'a> {
                                    argument_type: void_ptr.clone(),
                                    has_default_value: false,
                                  }];
-      let method_set =
-        try!(create_function(CppMethodKind::Regular, "set".to_string(), method_set_args));
+      methods.push(create_function(CppMethodKind::Regular,
+                                   "set".to_string(),
+                                   false,
+                                   method_set_args));
 
-      let method_custom_slot = try!(create_function(CppMethodKind::Regular,
-                                                    "custom_slot".to_string(),
-                                                    types.iter()
-                                                      .enumerate()
-                                                      .map(|(num, t)| {
+      let method_custom_slot = create_function(CppMethodKind::Regular,
+                                               "custom_slot".to_string(),
+                                               true,
+                                               types.iter()
+                                                 .enumerate()
+                                                 .map(|(num, t)| {
           CppFunctionArgument {
             name: format!("arg{}", num),
             argument_type: t.clone(),
             has_default_value: false,
           }
         })
-                                                      .collect()));
-      methods.push(method_constructor);
-      methods.push(method_destructor);
-      methods.push(method_set);
+                                                 .collect());
+      let receiver_id = try!(method_custom_slot.receiver_id());
       methods.push(method_custom_slot);
+      qt_slot_wrappers.push(QtSlotWrapper {
+        class_name: class_name.clone(),
+        arguments: ffi_types,
+        function_type: function_type.clone(),
+        receiver_id: receiver_id,
+      });
+      let cast_from = CppType {
+        base: CppTypeBase::Class(CppTypeClassBase {
+          name: class_name.clone(),
+          template_arguments: None,
+        }),
+        indirection: CppTypeIndirection::Ptr,
+        is_const: false,
+        is_const2: false,
+      };
+      let cast_to = CppType {
+        base: CppTypeBase::Class(CppTypeClassBase {
+          name: "QObject".to_string(),
+          template_arguments: None,
+        }),
+        indirection: CppTypeIndirection::Ptr,
+        is_const: false,
+        is_const2: false,
+      };
+      methods.push(create_cast_method("static_cast",
+                                      &cast_from,
+                                      &cast_to,
+                                      false,
+                                      include_file_name));
     }
     Ok(Some(CppFfiHeaderData {
       include_file_base_name: include_file_name.to_string(),
-      methods: methods,
+      methods: try!(self.process_methods(include_file_name, methods.iter()))
+        .into_iter()
+        .filter(|x| x.allocation_place != ReturnValueAllocationPlace::Stack)
+        .collect(),
       qt_slot_wrappers: qt_slot_wrappers,
     }))
   }

@@ -663,6 +663,40 @@ pub struct RustEnumValue {
   pub is_dummy: bool,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize)]
+pub enum RustTypeIndirection {
+  None,
+  Ptr,
+  Ref { lifetime: Option<String> },
+  PtrPtr,
+  PtrRef { lifetime: Option<String> },
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize)]
+pub enum RustType {
+  Void,
+  Common {
+    base: RustName,
+    generic_arguments: Option<Vec<RustType>>,
+    is_const: bool,
+    is_const2: bool,
+    indirection: RustTypeIndirection,
+  },
+  FunctionPointer {
+    return_type: Box<RustType>,
+    arguments: Vec<RustType>,
+  },
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct RustQtSlotWrapper {
+  pub arguments: Vec<RustType>,
+  pub receiver_id: String,
+}
+
 /// Information about a Rust type wrapper
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[derive(Serialize, Deserialize)]
@@ -687,6 +721,7 @@ pub enum RustTypeWrapperKind {
   /// Pointer-only type wrapper
   EmptyEnum {
     is_deletable: bool,
+    slot_wrapper: Option<RustQtSlotWrapper>,
   }
 }
 

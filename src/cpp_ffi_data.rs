@@ -279,6 +279,7 @@ pub struct QtSlotWrapper {
   pub class_name: String,
   pub arguments: Vec<CppFfiType>,
   pub function_type: CppFunctionPointerType,
+  pub receiver_id: String,
 }
 
 #[derive(Debug, Clone)]
