@@ -1,5 +1,5 @@
 #[repr(C)]
-pub struct {name} {{
+{maybe_pub}struct {name} {{
   _buffer: [u8; {size}],
 }}
 

@@ -210,7 +210,7 @@ impl<'a> CGenerator<'a> {
   }
 
   fn generate_slot_wrappers(&'a self) -> Result<Option<CppFfiHeaderData>> {
-    let include_file_name = "QtSlotWrappers";
+    let include_file_name = "slots";
     if self.cpp_data.signal_argument_types.is_empty() {
       return Ok(None);
     }

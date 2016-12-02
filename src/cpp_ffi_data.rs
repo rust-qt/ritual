@@ -6,6 +6,8 @@ use cpp_data::{CppFunctionPointerType, CppData};
 use errors::Result;
 use utils::MapIfOk;
 
+pub use serializable::IndirectionChange;
+
 /// Information that indicates how the FFI function argument
 /// should be interpreted
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -134,22 +136,7 @@ impl CppFfiFunctionSignature {
   }
 }
 
-/// Relation between original C++ method's argument value
-/// and corresponding FFI function's argument value
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum IndirectionChange {
-  /// Argument types are identical
-  NoChange,
-  /// C++ argument is a class value (like QPoint)
-  /// and FFI argument is a pointer (like QPoint*)
-  ValueToPointer,
-  /// C++ argument is a reference (like QPoint&)
-  /// and FFI argument is a pointer (like QPoint*)
-  ReferenceToPointer,
-  /// C++ argument is QFlags<T>
-  /// and FFI argument is uint
-  QFlagsToUInt,
-}
+
 
 /// FFI function type with attached information about
 /// corresponding original C++ type and their relation

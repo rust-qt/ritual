@@ -9,7 +9,9 @@ public:
 
 public slots:
   void custom_slot({method_args}) {{
-    m_func({func_args});
+    if (m_func) {{
+      m_func({func_args});
+    }}
   }}
 
 private:

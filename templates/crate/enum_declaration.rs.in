@@ -1,6 +1,6 @@
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[repr(C)]
-pub enum {name} {{
+{maybe_pub}enum {name} {{
   {variants}
 }}
 

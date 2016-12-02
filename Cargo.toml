@@ -1,6 +1,6 @@
 [package]
 name = "cpp_to_rust"
-version = "0.5.2"
+version = "0.5.3"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 build = "build.rs"
 description = "Automatic generator of C++ library wrappers"
@@ -35,5 +35,3 @@ clippy = {version = "0.0", optional = true} # linter
 [build-dependencies]
 serde_codegen = "0.8"
 
-[profile.dev]
-#opt-level = 3

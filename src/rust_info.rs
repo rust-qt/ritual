@@ -199,6 +199,7 @@ pub enum RustTypeDeclarationKind {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustTypeDeclaration {
+  pub is_public: bool,
   pub name: RustName,
   pub kind: RustTypeDeclarationKind,
 }

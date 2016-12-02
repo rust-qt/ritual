@@ -7,7 +7,8 @@ use rust_generator::RustGeneratorOutput;
 use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
                 RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope,
                 RustMethodArgument, TraitImpl, TraitImplExtra, RustQtReceiverType};
-use rust_type::{RustName, RustType, RustTypeIndirection, RustFFIFunction, RustToCTypeConversion};
+use rust_type::{RustName, RustType, RustTypeIndirection, RustFFIFunction, RustToCTypeConversion,
+                CompleteType};
 use string_utils::{JoinWithString, CaseOperations};
 use utils::{is_msvc, MapIfOk};
 use doc_formatter;
@@ -263,6 +264,86 @@ impl RustCodeGenerator {
             })
   }
 
+  fn convert_type_from_ffi(&self,
+                           type1: &CompleteType,
+                           expression: String,
+                           in_unsafe_context: bool,
+                           use_ffi_result_var: bool)
+                           -> Result<String> {
+    let (unsafe_start, unsafe_end) = if in_unsafe_context {
+      ("", "")
+    } else {
+      ("unsafe { ", " }")
+    };
+    if type1.rust_api_to_c_conversion == RustToCTypeConversion::None {
+      return Ok(expression);
+    }
+
+    let (code1, source_expr) = if use_ffi_result_var {
+      (format!("let ffi_result = {};\n", expression), "ffi_result".to_string())
+    } else {
+      (String::new(), expression)
+    };
+    let code2 = match type1.rust_api_to_c_conversion {
+      RustToCTypeConversion::None => unreachable!(),
+      RustToCTypeConversion::RefToPtr |
+      RustToCTypeConversion::OptionRefToPtr => {
+        let api_is_const = if type1.rust_api_to_c_conversion ==
+                              RustToCTypeConversion::OptionRefToPtr {
+          if let RustType::Common { ref generic_arguments, .. } = type1.rust_api_type {
+            let args = try!(generic_arguments.as_ref()
+              .chain_err(|| "Option with no generic_arguments"));
+            if args.len() != 1 {
+              return Err("Option with invalid args count".into());
+            }
+            try!(args[0].last_is_const())
+          } else {
+            return Err("Option type expected".into());
+          }
+        } else {
+          try!(type1.rust_api_type.last_is_const())
+        };
+        let unwrap_code = match type1.rust_api_to_c_conversion {
+          RustToCTypeConversion::RefToPtr => {
+            ".expect(\"Attempted to convert null pointer to reference\")"
+          }
+          RustToCTypeConversion::OptionRefToPtr => "",
+          _ => unreachable!(),
+        };
+        format!("{unsafe_start}{}.{}(){unsafe_end}{}",
+                source_expr,
+                if api_is_const { "as_ref" } else { "as_mut" },
+                unwrap_code,
+                unsafe_start = unsafe_start,
+                unsafe_end = unsafe_end)
+      }
+      RustToCTypeConversion::ValueToPtr => {
+        format!("{unsafe_start}*{}{unsafe_end}",
+                source_expr,
+                unsafe_start = unsafe_start,
+                unsafe_end = unsafe_end)
+      }
+      RustToCTypeConversion::CppBoxToPtr => {
+        format!("{unsafe_start}::cpp_utils::CppBox::new({}){unsafe_end}",
+                source_expr,
+                unsafe_start = unsafe_start,
+                unsafe_end = unsafe_end)
+      }
+      RustToCTypeConversion::QFlagsToUInt => {
+        let mut qflags_type = type1.rust_api_type.clone();
+        if let RustType::Common { ref mut generic_arguments, .. } = qflags_type {
+          *generic_arguments = None;
+        } else {
+          unreachable!();
+        }
+        format!("{}::from_int({} as i32)",
+                self.rust_type_to_code(&qflags_type),
+                source_expr)
+      }
+    };
+    Ok(code1 + &code2)
+  }
+
   fn generate_ffi_call(&self,
                        variant: &RustMethodArgumentsVariant,
                        shared_arguments: &[RustMethodArgument],
@@ -385,69 +466,12 @@ impl RustCodeGenerator {
     if let Some(ref name) = maybe_result_var_name {
       result.push(format!("{}\n}}", name));
     }
-    let mut code = result.join("");
-    match variant.return_type.rust_api_to_c_conversion {
-      RustToCTypeConversion::None => {}
-      RustToCTypeConversion::RefToPtr |
-      RustToCTypeConversion::OptionRefToPtr => {
-        let api_is_const = if variant.return_type.rust_api_to_c_conversion ==
-                              RustToCTypeConversion::OptionRefToPtr {
-          if let RustType::Common { ref generic_arguments, .. } = variant.return_type
-            .rust_api_type {
-            let args = try!(generic_arguments.as_ref()
-              .chain_err(|| "Option with no generic_arguments"));
-            if args.len() != 1 {
-              return Err("Option with invalid args count".into());
-            }
-            try!(args[0].last_is_const())
-          } else {
-            return Err("Option type expected".into());
-          }
-        } else {
-          try!(variant.return_type.rust_api_type.last_is_const())
-        };
-        let unwrap_code = match variant.return_type.rust_api_to_c_conversion {
-          RustToCTypeConversion::RefToPtr => {
-            ".expect(\"Attempted to convert null pointer to reference\")"
-          }
-          RustToCTypeConversion::OptionRefToPtr => "",
-          _ => unreachable!(),
-        };
-        code = format!("let ffi_result = {};\n{unsafe_start}ffi_result.{}(){unsafe_end}{}",
-                       code,
-                       if api_is_const { "as_ref" } else { "as_mut" },
-                       unwrap_code,
-                       unsafe_start = unsafe_start,
-                       unsafe_end = unsafe_end);
-      }
-      RustToCTypeConversion::ValueToPtr => {
-        if maybe_result_var_name.is_none() {
-          code = format!("let ffi_result = {};\n{unsafe_start}*ffi_result{unsafe_end}",
-                         code,
-                         unsafe_start = unsafe_start,
-                         unsafe_end = unsafe_end);
-        }
-      }
-      RustToCTypeConversion::CppBoxToPtr => {
-        code = format!("let ffi_result = {};\n\
-                        {unsafe_start}::cpp_utils::CppBox::new(ffi_result){unsafe_end}",
-                       code,
-                       unsafe_start = unsafe_start,
-                       unsafe_end = unsafe_end);
-      }
-      RustToCTypeConversion::QFlagsToUInt => {
-        let mut qflags_type = variant.return_type.rust_api_type.clone();
-        if let RustType::Common { ref mut generic_arguments, .. } = qflags_type {
-          *generic_arguments = None;
-        } else {
-          unreachable!();
-        }
-        code = format!("let ffi_result = {};\n{}::from_int(ffi_result as i32)",
-                       code,
-                       self.rust_type_to_code(&qflags_type));
-      }
+    let code = result.join("");
+    if maybe_result_var_name.is_none() {
+      self.convert_type_from_ffi(&variant.return_type, code, in_unsafe_context, true)
+    } else {
+      Ok(code)
     }
-    Ok(code)
   }
 
   fn arg_texts(&self, args: &[RustMethodArgument], lifetime: Option<&String>) -> Vec<String> {
@@ -695,6 +719,7 @@ impl RustCodeGenerator {
     let mut results = Vec::new();
     for type1 in &data.types {
       results.push(format_doc(&doc_formatter::type_doc(type1)));
+      let maybe_pub = if type1.is_public { "pub " } else { "" };
       match type1.kind {
         RustTypeDeclarationKind::CppTypeWrapper { ref kind,
                                                   ref methods,
@@ -704,6 +729,7 @@ impl RustCodeGenerator {
           let r = match *kind {
             RustTypeWrapperKind::Enum { ref values, ref is_flaggable } => {
               let mut r = format!(include_str!("../templates/crate/enum_declaration.rs.in"),
+                                  maybe_pub = maybe_pub,
                                   name = try!(type1.name.last_name()),
                                   variants = values.iter()
                                     .map(|item| {
@@ -726,32 +752,54 @@ impl RustCodeGenerator {
             }
             RustTypeWrapperKind::Struct { ref size, .. } => {
               format!(include_str!("../templates/crate/struct_declaration.rs.in"),
+                      maybe_pub = maybe_pub,
                       name = try!(type1.name.last_name()),
                       size = size)
             }
             RustTypeWrapperKind::EmptyEnum { ref slot_wrapper, .. } => {
-              let mut r = format!("pub enum {} {{}}\n\n", try!(type1.name.last_name()));
+              let mut r = format!("{maybe_pub}enum {} {{}}\n\n",
+                                  try!(type1.name.last_name()),
+                                  maybe_pub = maybe_pub);
               if let Some(ref slot_wrapper) = *slot_wrapper {
                 let arg_texts: Vec<_> = slot_wrapper.arguments
                   .iter()
-                  .map(|t| self.rust_type_to_code(t))
+                  .map(|t| self.rust_type_to_code(&t.rust_api_type))
                   .collect();
-                let args_tuple = arg_texts.join(", ") + if arg_texts.len() == 1 { "," } else { "" };
-
-                r.push_str(&format!("\
-impl ::connections::Receiver for {type_name} {{
-  type Arguments = ({args});
-  fn object(&self) -> &::object::Object {{
-    ::cpp_utils::StaticCast::static_cast(self)
-  }}
-  fn receiver_id() -> &'static [u8] {{
-    b\"{receiver_id}\\0\"
-  }}
-}}\n",
+                let args = arg_texts.join(", ");
+                let args_tuple = format!("{}{}", args, if arg_texts.len() == 1 { "," } else { "" });
+                let connections_mod = try!(RustName::new(vec!["qt_core".to_string(),
+                                                              "connections".to_string()]))
+                  .full_name(Some(&self.config.crate_name));
+                let object_type_name = try!(RustName::new(vec!["qt_core".to_string(),
+                                                               "object".to_string(),
+                                                               "Object".to_string()]))
+                  .full_name(Some(&self.config.crate_name));
+                let callback_args = slot_wrapper.arguments
+                  .iter()
+                  .enumerate()
+                  .map(|(num, t)| {
+                    format!("arg{}: {}", num, self.rust_type_to_code(&t.rust_ffi_type))
+                  })
+                  .join(", ");
+                let func_args = try!(slot_wrapper.arguments
+                    .iter()
+                    .enumerate()
+                    .map_if_ok(|(num, t)| {
+                      self.convert_type_from_ffi(t, format!("arg{}", num), false, false)
+                    }))
+                  .join(", ");
+                r.push_str(&format!(include_str!("../templates/crate/slot_wrapper_extras.rs.in"),
                                     type_name = type1.name
                                       .full_name(Some(&self.config.crate_name)),
-                                    args = args_tuple,
-                                    receiver_id = slot_wrapper.receiver_id));
+                                    pub_type_name = slot_wrapper.public_type_name,
+                                    callback_name = slot_wrapper.callback_name,
+                                    args = args,
+                                    args_tuple = args_tuple,
+                                    receiver_id = slot_wrapper.receiver_id,
+                                    connections_mod = connections_mod,
+                                    object_type_name = object_type_name,
+                                    func_args = func_args,
+                                    callback_args = callback_args));
               }
               r
             }
@@ -766,6 +814,13 @@ impl ::connections::Receiver for {type_name} {{
           }
           results.push(try!(self.generate_trait_impls(trait_impls)));
           if !qt_receivers.is_empty() {
+            let connections_mod = try!(RustName::new(vec!["qt_core".to_string(),
+                                                          "connections".to_string()]))
+              .full_name(Some(&self.config.crate_name));
+            let object_type_name = try!(RustName::new(vec!["qt_core".to_string(),
+                                                           "object".to_string(),
+                                                           "Object".to_string()]))
+              .full_name(Some(&self.config.crate_name));
             let mut content = Vec::new();
             let obj_name = type1.name.full_name(Some(&self.config.crate_name));
             content.push("use ::cpp_utils::StaticCast;\n".to_string());
@@ -788,17 +843,20 @@ impl ::connections::Receiver for {type_name} {{
                                      if arg_texts.len() == 1 { "," } else { "" };
                     content.push(format!("pub struct {}<'a>(&'a {});\n", receiver.type_name, obj_name));
                     content.push(format!("\
-impl<'a> ::connections::Receiver for {type_name}<'a> {{
+impl<'a> {connections_mod}::Receiver for {type_name}<'a> {{
   type Arguments = ({arguments});
-  fn object(&self) -> &::object::Object {{ self.0.static_cast() }}
+  fn object(&self) -> &{object_type_name} {{ self.0.static_cast() }}
   fn receiver_id() -> &'static [u8] {{ b\"{receiver_id}\\0\" }}
 }}\n",
                                          type_name = receiver.type_name,
                                          arguments = args_tuple,
+                                         connections_mod = connections_mod,
+                                         object_type_name = object_type_name,
                                          receiver_id = receiver.receiver_id));
                     if *receiver_type == RustQtReceiverType::Signal {
-                      content.push(format!("impl<'a> ::connections::Signal for {}<'a> {{}}\n",
-                                           receiver.type_name));
+                      content.push(format!("impl<'a> {connections_mod}::Signal for {}<'a> {{}}\n",
+                                           receiver.type_name,
+                                           connections_mod = connections_mod));
                     }
                     struct_content.push(format!("\
 pub fn {method_name}(&self) -> {type_name} {{

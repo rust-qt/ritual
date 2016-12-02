@@ -1,12 +1,11 @@
-use cpp_ffi_data::IndirectionChange;
-use cpp_type::CppType;
 use errors::{Result, unexpected, ChainErr};
 use string_utils::CaseOperations;
 use utils::MapIfOk;
 
 extern crate libc;
 
-pub use serializable::{RustName, RustTypeIndirection, RustType};
+pub use serializable::{RustName, RustTypeIndirection, RustType, CompleteType,
+                       RustToCTypeConversion};
 
 
 impl RustName {
@@ -273,27 +272,6 @@ impl RustType {
       }
     })
   }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-#[allow(dead_code)]
-pub enum RustToCTypeConversion {
-  None,
-  RefToPtr,
-  OptionRefToPtr,
-  ValueToPtr,
-  CppBoxToPtr,
-  QFlagsToUInt,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct CompleteType {
-  pub cpp_type: CppType,
-  pub cpp_ffi_type: CppType,
-  pub cpp_to_ffi_conversion: IndirectionChange,
-  pub rust_ffi_type: RustType,
-  pub rust_api_type: RustType,
-  pub rust_api_to_c_conversion: RustToCTypeConversion,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

@@ -34,7 +34,7 @@ Many things are directly translated from C++ to Rust:
 - Destructors are mapped to `Drop` and `CppDeletable` implementations.
 - Function pointer types are mapped to Rust's equivalent representation. Function pointers with references or class values are not supported.
 - `QFlags<Enum>` types are converted to Rust's own similar implementation.
-- `static_cast`, `dynamic_cast` and `qobject_cast` are available in Rust through corresponding traits.
+- `static_cast` and `dynamic_cast` are available in Rust through corresponding traits.
 
 Names of Rust identifiers are modified according to Rust's naming conventions.
 

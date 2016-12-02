@@ -428,6 +428,7 @@ fn process_types(input_data: &CppAndFfiData,
                                           false,
                                           None,
                                           config)),
+      is_public: true,
     };
     result.push(rust_type_info);
   }
@@ -480,6 +481,7 @@ fn process_types(input_data: &CppAndFfiData,
                                             false,
                                             None,
                                             config)),
+        is_public: true,
       });
     }
   }
@@ -533,26 +535,29 @@ fn process_types(input_data: &CppAndFfiData,
         cpp_name: qt_slot_wrapper.class_name.clone(),
         cpp_template_arguments: None,
         cpp_doc: None, // TODO: do we need doc for this?
-        rust_name: try!(calculate_rust_name(&format!("slot_wrapper_{}", args_text),
+        rust_name: try!(calculate_rust_name(&format!("extern_slot_{}", args_text),
                                             &header.include_file_base_name,
                                             false,
                                             None,
                                             config)),
+        is_public: true,
         kind: RustTypeWrapperKind::EmptyEnum {
           is_deletable: true,
           slot_wrapper: Some(RustQtSlotWrapper {
             arguments: try!(qt_slot_wrapper.arguments
               .iter()
               .map_if_ok(|t| -> Result<_> {
-                Ok(try!(complete_type(&result,
-                                      dependency_types,
-                                      t,
-                                      &CppFfiArgumentMeaning::Argument(0),
-                                      &ReturnValueAllocationPlace::NotApplicable))
-                  .rust_api_type
-                  .with_lifetime("static".to_string()))
+                let mut t = try!(complete_type(&result,
+                                               dependency_types,
+                                               t,
+                                               &CppFfiArgumentMeaning::Argument(0),
+                                               &ReturnValueAllocationPlace::NotApplicable));
+                t.rust_api_type = t.rust_api_type.with_lifetime("static".to_string());
+                Ok(t)
               })),
             receiver_id: qt_slot_wrapper.receiver_id.clone(),
+            public_type_name: format!("slot_{}", args_text).to_class_case(),
+            callback_name: format!("slot_{}_callback", args_text).to_snake_case(),
           }),
         },
       };
@@ -874,6 +879,7 @@ impl RustGenerator {
               rust_cross_references: Vec::new(),
               qt_receivers: Vec::new(),
             },
+            is_public: info.is_public,
           },
           overloading_types: Vec::new(),
         },
@@ -980,6 +986,7 @@ impl RustGenerator {
               rust_cross_references: Vec::new(),
               qt_receivers: qt_receivers,
             },
+            is_public: info.is_public,
           },
           overloading_types: functions_result.overloading_types,
         },
@@ -1358,7 +1365,9 @@ impl RustGenerator {
           } else {
             args.return_type.rust_api_to_c_conversion = RustToCTypeConversion::OptionRefToPtr;
             args.return_type.rust_api_type = RustType::Common {
-              base: try!(RustName::new(vec!["Option".to_string()])),
+              base: try!(RustName::new(vec!["std".to_string(),
+                                            "option".to_string(),
+                                            "Option".to_string()])),
               indirection: RustTypeIndirection::None,
               is_const: false,
               is_const2: false,
@@ -1577,6 +1586,7 @@ impl RustGenerator {
           method_scope: first_method.scope.clone(),
           is_unsafe: false,
         },
+        is_public: true,
       });
 
       RustMethod {

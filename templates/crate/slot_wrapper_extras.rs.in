@@ -1,0 +1,56 @@
+impl {connections_mod}::Receiver for {type_name} {{
+  type Arguments = ({args_tuple});
+  fn object(&self) -> &{object_type_name} {{
+    ::cpp_utils::StaticCast::static_cast(self)
+  }}
+  fn receiver_id() -> &'static [u8] {{
+    b"{receiver_id}\0"
+  }}
+}}
+
+pub struct {pub_type_name}<'a> {{
+  wrapper: ::cpp_utils::CppBox<{type_name}>,
+  func: ::std::option::Option<Box<Box<FnMut({args}) + 'a>>>,
+}}
+
+impl<'a> {pub_type_name}<'a> {{
+  pub fn new<F: FnMut({args}) + 'a>(f: F) -> {pub_type_name}<'a> {{
+    let mut obj = {pub_type_name}::default();
+    obj.set(f);
+    obj
+  }}
+  pub fn set<F: FnMut({args}) + 'a>(&mut self, f: F) {{
+    self.clear();
+    let mut func_box: Box<Box<FnMut({args}) + 'a>> = Box::new(Box::new(f));
+    self.wrapper.set({callback_name}, unsafe {{ ::std::mem::transmute(func_box.as_mut()) }});
+    self.func = Some(func_box);
+  }}
+  pub fn clear(&mut self) {{
+    if self.func.is_some() {{
+      self.wrapper.set(unsafe {{ ::std::mem::transmute(0usize) }}, ::std::ptr::null_mut());
+      self.func = None;
+    }}
+  }}
+}}
+impl<'a> Default for {pub_type_name}<'a> {{
+  fn default() -> Self {{
+    {pub_type_name} {{
+      wrapper: {type_name}::new(),
+      func: None,
+    }}
+  }}
+}}
+impl<'a> {connections_mod}::Receiver for {pub_type_name}<'a> {{
+  type Arguments = ({args_tuple});
+  fn object(&self) -> &{object_type_name} {{
+    {connections_mod}::Receiver::object(self.wrapper.as_ref())
+  }}
+  fn receiver_id() -> &'static [u8] {{
+    <{type_name} as {connections_mod}::Receiver>::receiver_id()
+  }}
+}}
+
+extern "C" fn {callback_name}(data: *mut ::libc::c_void, {callback_args}) {{
+  let func: &mut Box<FnMut({args})> = unsafe {{ ::std::mem::transmute(data) }};
+  func({func_args});
+}}
