@@ -5,8 +5,13 @@ include_directories(${{CMAKE_CURRENT_SOURCE_DIR}}/include ${{CMAKE_CURRENT_BINAR
 
 file(GLOB sources src/*.cpp)
 file(GLOB headers include/*.h)
-add_library({lib_name_lowercase} {library_type} ${{sources}})
-{target_link_libraries}
+if(NOT(${{LIBRARY_TYPE}} EQUAL "SHARED" OR ${{LIBRARY_TYPE}} EQUAL "STATIC")
+  message(FATAL_ERROR "LIBRARY_TYPE must be either SHARED or STATIC." )
+endif()
+add_library({lib_name_lowercase} ${{LIBRARY_TYPE}} ${{sources}})
+if(${{LIBRARY_TYPE}} EQUAL "SHARED")
+  target_link_libraries({lib_name_lowercase} {target_link_libraries})
+endif()
 include_directories({include_directories})
 add_definitions(-D{lib_name_uppercase}_LIBRARY)
 

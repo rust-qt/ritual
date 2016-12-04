@@ -1,9 +1,7 @@
 use cpp_ffi_data::CppAndFfiMethod;
 use cpp_type::CppType;
-use errors::{Result, ChainErr, unexpected};
-use file_utils::load_toml;
+use errors::{Result, unexpected};
 use rust_type::{RustName, CompleteType, RustType, RustTypeIndirection};
-use utils::MapIfOk;
 use cpp_method::CppMethodDoc;
 use cpp_data::CppTypeDoc;
 pub use serializable::{RustEnumValue, RustTypeWrapperKind, RustProcessedTypeInfo, RustExportInfo,
@@ -211,53 +209,4 @@ pub struct RustModule {
   pub functions: Vec<RustMethod>,
   pub trait_impls: Vec<TraitImpl>,
   pub submodules: Vec<RustModule>,
-}
-
-
-use std::path::PathBuf;
-
-pub struct InputCargoTomlData {
-  /// Name of the crate
-  pub name: String,
-  /// Version of the crate
-  pub version: String,
-  /// Authors of the crate
-  pub authors: Vec<String>,
-  /// Name of the C++ library
-  pub links: Option<String>,
-}
-
-
-impl InputCargoTomlData {
-  pub fn from_file(path: &PathBuf) -> Result<InputCargoTomlData> {
-    let value = try!(load_toml(path));
-    let package = try!(value.get("package")
-      .chain_err(|| "'package' field not found in Cargo.toml"));
-    let package = try!(package.as_table().chain_err(|| "'package' must be a table"));
-    Ok(InputCargoTomlData {
-      name: {
-        let name = try!(package.get("name")
-          .chain_err(|| "'package.name' field not found in Cargo.toml"));
-        try!(name.as_str().chain_err(|| "'package.name' must be a string")).to_string()
-      },
-      version: {
-        let version = try!(package.get("version")
-          .chain_err(|| "'package.version' field not found in Cargo.toml"));
-        try!(version.as_str().chain_err(|| "'package.version' must be a string")).to_string()
-      },
-      authors: if let Some(authors) = package.get("authors") {
-        let authors = try!(authors.as_slice().chain_err(|| "'package.authors' must be an array"));
-        try!(authors.iter().map_if_ok(|x| -> Result<_> {
-          Ok(try!(x.as_str().chain_err(|| "'package.authors[i]' must be a string")).to_string())
-        }))
-      } else {
-        Vec::new()
-      },
-      links: if let Some(links) = package.get("links") {
-        Some(try!(links.as_str().chain_err(|| "'package.links' must be a string")).to_string())
-      } else {
-        None
-      },
-    })
-  }
 }

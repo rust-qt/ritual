@@ -25,6 +25,19 @@ impl ::std::fmt::Debug for CppDataFilter {
   }
 }
 
+/// Information about the generated crate
+#[derive(Default, Debug, Clone)]
+pub struct CrateProperties {
+  /// Name of the crate
+  pub name: String,
+  /// Version of the crate (must be in compliance with cargo requirements)
+  pub version: String,
+  /// Authors of the crate
+  pub authors: Vec<String>,
+  /// Name of the C++ library
+  pub links: Option<String>,
+}
+
 
 /// The starting point of `cpp_to_rust` API.
 /// Create a `Config` object, set its properties,
@@ -33,6 +46,11 @@ impl ::std::fmt::Debug for CppDataFilter {
 #[derive(Default, Debug)]
 pub struct Config {
   // see documentation for setters
+  crate_properties: Option<CrateProperties>,
+  output_dir_path: Option<PathBuf>,
+  cache_dir_path: Option<PathBuf>,
+  crate_template_path: Option<PathBuf>,
+  dependency_paths: Vec<PathBuf>,
   linked_libs: Vec<String>,
   lib_paths: Vec<PathBuf>,
   linked_frameworks: Vec<String>,
@@ -51,6 +69,31 @@ impl Config {
   /// Creates an empty `Config`.
   pub fn new() -> Config {
     Config::default()
+  }
+
+  /// Sets properties for Cargo.toml of the generated crate.
+  pub fn set_crate_properties(&mut self, value: CrateProperties) {
+    self.crate_properties = Some(value);
+  }
+
+  /// Sets the directory where new crate will be generated.
+  pub fn set_output_dir_path<P: Into<PathBuf>>(&mut self, path: P) {
+    self.output_dir_path = Some(path.into());
+  }
+
+  /// Sets the directory for temporary files and cache.
+  pub fn set_cache_dir_path<P: Into<PathBuf>>(&mut self, path: P) {
+    self.cache_dir_path = Some(path.into());
+  }
+
+  /// Sets the directory containing additional Rust code for the crate.
+  pub fn set_crate_template_path<P: Into<PathBuf>>(&mut self, path: P) {
+    self.crate_template_path = Some(path.into());
+  }
+
+  /// Sets list of paths to cache directories of processed dependencies.
+  pub fn set_dependency_paths(&mut self, paths: Vec<PathBuf>) {
+    self.dependency_paths = paths;
   }
 
   /// Adds a library for linking. Used as `-l` option to the linker.
@@ -194,7 +237,27 @@ impl Config {
   /// }
   /// ```
   pub fn exec(self) -> Result<()> {
-    ::launcher::run_from_build_script(self)
+    ::launcher::run(self)
+  }
+
+  pub fn crate_properties(&self) -> &CrateProperties {
+    self.crate_properties.as_ref().expect("crate_properties must be set")
+  }
+
+  pub fn output_dir_path(&self) -> &PathBuf {
+    self.output_dir_path.as_ref().expect("output_dir_path must be set")
+  }
+
+  pub fn cache_dir_path(&self) -> &PathBuf {
+    self.cache_dir_path.as_ref().expect("cache_dir_path must be set")
+  }
+
+  pub fn crate_template_path(&self) -> Option<&PathBuf> {
+    self.crate_template_path.as_ref()
+  }
+
+  pub fn dependency_paths(&self) -> &[PathBuf] {
+    &self.dependency_paths
   }
 
   pub fn linked_libs(&self) -> &[String] {
@@ -245,3 +308,5 @@ impl Config {
     self.cpp_data_filters.iter().map(|x| &x.0).collect()
   }
 }
+
+pub use launcher::is_completed;

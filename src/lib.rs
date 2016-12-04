@@ -44,4 +44,4 @@ pub mod string_utils;
 #[cfg(test)]
 mod tests;
 
-pub use launcher::is_processing_skipped;
+pub use launcher::is_completed;

@@ -31,17 +31,16 @@ pub struct RustLinkItem {
   pub kind: RustLinkKind,
 }
 
+use config::CrateProperties;
+
 pub struct RustCodeGeneratorConfig {
-  pub crate_name: String,
-  pub crate_version: String,
-  pub crate_authors: Vec<String>,
+  pub crate_properties: CrateProperties,
   pub output_path: PathBuf,
-  pub final_output_path: PathBuf,
-  pub template_path: PathBuf,
+  pub template_path: Option<PathBuf>,
   pub c_lib_name: String,
-  pub c_lib_is_shared: bool,
   pub link_items: Vec<RustLinkItem>,
-  pub framework_dirs: Vec<String>,
+  pub cpp_lib_paths: Vec<String>,
+  pub framework_paths: Vec<String>,
   pub rustfmt_config_path: Option<PathBuf>,
   pub dependencies: Vec<RustCodeGeneratorDependency>,
 }
@@ -170,26 +169,29 @@ impl RustCodeGenerator {
 
     {
       let mut build_rs_file = try!(create_file(self.config.output_path.with_added("build.rs")));
-      let extra = self.config
-        .framework_dirs
-        .iter()
-        .map(|x| {
-          format!("  println!(\"cargo:rustc-link-search=framework={{}}\", \"{}\");",
-                  x)
-        })
-        .join("\n");
-      try!(build_rs_file.write(format!(include_str!("../templates/crate/build.rs"), extra = extra)));
+      let mut extra = Vec::new();
+      for path in &self.config.cpp_lib_paths {
+        extra.push(format!("  println!(\"cargo:rustc-link-search=native={{}}\", \"{}\");",
+                           path));
+      }
+      for path in &self.config.framework_paths {
+        extra.push(format!("  println!(\"cargo:rustc-link-search=framework={{}}\", \"{}\");",
+                           path));
+      }
+      try!(build_rs_file.write(format!(include_str!("../templates/crate/build.rs"),
+                                       extra = extra.join("\n"))));
     }
 
     let cargo_toml_data = toml::Value::Table({
       let package = toml::Value::Table({
         let mut table = toml::Table::new();
         table.insert("name".to_string(),
-                     toml::Value::String(self.config.crate_name.clone()));
+                     toml::Value::String(self.config.crate_properties.name.clone()));
         table.insert("version".to_string(),
-                     toml::Value::String(self.config.crate_version.clone()));
+                     toml::Value::String(self.config.crate_properties.version.clone()));
         let authors = self.config
-          .crate_authors
+          .crate_properties
+          .authors
           .iter()
           .map(|x| toml::Value::String(x.clone()))
           .collect();
@@ -204,6 +206,7 @@ impl RustCodeGenerator {
         table.insert("cpp_utils".to_string(),
                      toml::Value::String("0.1".to_string()));
         for dep in &self.config.dependencies {
+          // TODO: use dependency version instead
           let mut table_dep = toml::Table::new();
           table_dep.insert("path".to_string(),
                            toml::Value::String(try!(path_to_str(&dep.crate_path)).to_string()));
@@ -230,11 +233,13 @@ impl RustCodeGenerator {
     let mut cargo_toml_file = try!(create_file(self.config.output_path.with_added("Cargo.toml")));
     try!(cargo_toml_file.write(cargo_toml_data.to_string()));
 
-    for name in &["src", "tests"] {
-      let template_item_path = self.config.template_path.with_added(&name);
-      if template_item_path.as_path().exists() {
-        try!(copy_recursively(&template_item_path,
-                              &self.config.output_path.with_added(&name)));
+    if let Some(ref template_path) = self.config.template_path {
+      for name in &["src", "tests", "examples"] {
+        let template_item_path = template_path.with_added(&name);
+        if template_item_path.as_path().exists() {
+          try!(copy_recursively(&template_item_path,
+                                &self.config.output_path.with_added(&name)));
+        }
       }
     }
     if !self.config.output_path.with_added("src").exists() {
@@ -244,7 +249,7 @@ impl RustCodeGenerator {
   }
 
   fn rust_type_to_code(&self, rust_type: &RustType) -> String {
-    rust_type_to_code(rust_type, &self.config.crate_name)
+    rust_type_to_code(rust_type, &self.config.crate_properties.name)
   }
 
   fn rust_ffi_function_to_code(&self, func: &RustFFIFunction) -> String {
@@ -620,73 +625,51 @@ impl RustCodeGenerator {
     if lib_file_path.as_path().exists() {
       try!(remove_file(&lib_file_path));
     }
-    #[derive(PartialEq, Eq)]
-    enum Mode {
-      LibInRs,
-      LibRs,
-    }
-    for mode in &[Mode::LibInRs, Mode::LibRs] {
-      let lib_file_path = match *mode {
-        Mode::LibInRs => self.config.output_path.with_added("lib.in.rs"),
-        Mode::LibRs => src_path.with_added("lib.rs"),
-      };
-      {
-        let mut lib_file = try!(create_file(&lib_file_path));
-        try!(lib_file.write("pub extern crate libc;\n"));
-        try!(lib_file.write("pub extern crate cpp_utils;\n\n"));
-        for dep in &self.config.dependencies {
-          try!(lib_file.write(format!("pub extern crate {};\n\n", &dep.crate_name)));
-        }
-        let mut extra_modules = vec!["ffi".to_string()];
+    let lib_file_path = src_path.with_added("lib.rs");
+    {
+      let mut lib_file = try!(create_file(&lib_file_path));
+      try!(lib_file.write("pub extern crate libc;\n"));
+      try!(lib_file.write("pub extern crate cpp_utils;\n\n"));
+      for dep in &self.config.dependencies {
+        try!(lib_file.write(format!("pub extern crate {};\n\n", &dep.crate_name)));
+      }
+      let mut extra_modules = vec!["ffi".to_string()];
 
-        if mode == &Mode::LibRs {
-          if self.config.template_path.with_added("src").exists() {
-            for item in try!(read_dir(&self.config.template_path.with_added("src"))) {
-              let item = try!(item);
-              let path = item.path();
-              let file_name = try!(os_string_into_string(item.file_name()));
-              if file_name == "lib.rs" {
-                continue;
-              }
-              if item.path().is_dir() {
-                extra_modules.push(file_name.to_string());
-              } else if let Some(ext) = item.path().extension() {
-                if ext == "rs" {
-                  let stem = try!(path.file_stem().chain_err(|| "file_stem() failed for .rs file"));
-                  extra_modules.push(try!(os_str_to_str(stem)).to_string());
-                }
+      if let Some(ref template_path) = self.config.template_path {
+        if template_path.with_added("src").exists() {
+          for item in try!(read_dir(template_path.with_added("src"))) {
+            let item = try!(item);
+            let path = item.path();
+            let file_name = try!(os_string_into_string(item.file_name()));
+            if file_name == "lib.rs" {
+              continue;
+            }
+            if item.path().is_dir() {
+              extra_modules.push(file_name.to_string());
+            } else if let Some(ext) = item.path().extension() {
+              if ext == "rs" {
+                let stem = try!(path.file_stem().chain_err(|| "file_stem() failed for .rs file"));
+                extra_modules.push(try!(os_str_to_str(stem)).to_string());
               }
             }
           }
         }
-        for module in &extra_modules {
-          if modules.iter().any(|x| x.as_ref() as &str == module) {
-            panic!("module name conflict");
-          }
+      }
+      for module in &extra_modules {
+        if modules.iter().any(|x| x.as_ref() as &str == module) {
+          panic!("module name conflict");
         }
-        let all_modules = extra_modules.iter().chain(modules.iter().map(|x| *x));
-        for module in all_modules {
-          let mut maybe_pub = "pub ";
-          if module == "ffi" {
-            maybe_pub = "";
-            // some ffi functions are not used because
-            // some Rust methods are filtered
-            try!(lib_file.write("#[allow(dead_code)]\n"));
-          }
-          match *mode {
-            Mode::LibInRs => {
-              let mut file_path = self.config.final_output_path.clone();
-              file_path.push("src");
-              file_path.push(format!("{}.rs", module));
-              try!(lib_file.write(format!("{maybe_pub}mod {name} {{ \n  \
-                                           include!(\"{path}\");\n}}\n",
-                                          path = try!(path_to_str(&file_path)).replace("\\", "\\\\"),
-                                          name = module,
-                                          maybe_pub = maybe_pub)))
-            }
-            Mode::LibRs => try!(lib_file.write(format!("{}mod {};\n", maybe_pub, module))),
-          }
+      }
+      let all_modules = extra_modules.iter().chain(modules.iter().map(|x| *x));
+      for module in all_modules {
+        let mut maybe_pub = "pub ";
+        if module == "ffi" {
+          maybe_pub = "";
+          // some ffi functions are not used because
+          // some Rust methods are filtered
+          try!(lib_file.write("#[allow(dead_code)]\n"));
         }
+        try!(lib_file.write(format!("{}mod {};\n", maybe_pub, module)));
       }
       self.call_rustfmt(&lib_file_path);
     }
@@ -746,7 +729,7 @@ impl RustCodeGenerator {
                              trait_type = try!(RustName::new(vec!["qt_core".to_string(),
                                                                   "flags".to_string(),
                                                                   "FlaggableEnum".to_string()]))
-                               .full_name(Some(&self.config.crate_name)));
+                               .full_name(Some(&self.config.crate_properties.name)));
               }
               r
             }
@@ -769,11 +752,11 @@ impl RustCodeGenerator {
                 let args_tuple = format!("{}{}", args, if arg_texts.len() == 1 { "," } else { "" });
                 let connections_mod = try!(RustName::new(vec!["qt_core".to_string(),
                                                               "connections".to_string()]))
-                  .full_name(Some(&self.config.crate_name));
+                  .full_name(Some(&self.config.crate_properties.name));
                 let object_type_name = try!(RustName::new(vec!["qt_core".to_string(),
                                                                "object".to_string(),
                                                                "Object".to_string()]))
-                  .full_name(Some(&self.config.crate_name));
+                  .full_name(Some(&self.config.crate_properties.name));
                 let callback_args = slot_wrapper.arguments
                   .iter()
                   .enumerate()
@@ -790,7 +773,7 @@ impl RustCodeGenerator {
                   .join(", ");
                 r.push_str(&format!(include_str!("../templates/crate/slot_wrapper_extras.rs.in"),
                                     type_name = type1.name
-                                      .full_name(Some(&self.config.crate_name)),
+                                      .full_name(Some(&self.config.crate_properties.name)),
                                     pub_type_name = slot_wrapper.public_type_name,
                                     callback_name = slot_wrapper.callback_name,
                                     args = args,
@@ -816,13 +799,13 @@ impl RustCodeGenerator {
           if !qt_receivers.is_empty() {
             let connections_mod = try!(RustName::new(vec!["qt_core".to_string(),
                                                           "connections".to_string()]))
-              .full_name(Some(&self.config.crate_name));
+              .full_name(Some(&self.config.crate_properties.name));
             let object_type_name = try!(RustName::new(vec!["qt_core".to_string(),
                                                            "object".to_string(),
                                                            "Object".to_string()]))
-              .full_name(Some(&self.config.crate_name));
+              .full_name(Some(&self.config.crate_properties.name));
             let mut content = Vec::new();
-            let obj_name = type1.name.full_name(Some(&self.config.crate_name));
+            let obj_name = type1.name.full_name(Some(&self.config.crate_properties.name));
             content.push("use ::cpp_utils::StaticCast;\n".to_string());
             let mut type_impl_content = Vec::new();
             for receiver_type in &[RustQtReceiverType::Signal, RustQtReceiverType::Slot] {
@@ -1053,12 +1036,12 @@ pub fn {struct_method}(&self) -> {struct_type} {{
       if !is_msvc() {
         try!(file.write("#[link(name = \"stdc++\")]\n"));
       }
-      if self.config.c_lib_is_shared {
-        try!(file.write(format!("#[link(name = \"{}\")]\n", &self.config.c_lib_name)));
-      } else {
-        try!(file.write(format!("#[link(name = \"{}\", kind = \"static\")]\n",
-                                &self.config.c_lib_name)));
-      }
+      // TODO: build script must decide is c_lib is shared
+      // if self.config.c_lib_is_shared {
+      //  try!(file.write(format!("#[link(name = \"{}\")]\n", &self.config.c_lib_name)));
+      try!(file.write(format!("#[link(name = \"{}\", kind = \"static\")]\n",
+                              &self.config.c_lib_name)));
+
       try!(file.write("extern \"C\" {\n"));
 
       for &(ref include_file, ref functions) in functions {

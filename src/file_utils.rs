@@ -232,9 +232,9 @@ impl Iterator for ReadDirWrapper {
   }
 }
 
-pub fn canonicalize(path: &PathBuf) -> Result<PathBuf> {
-  let r = try!(fs::canonicalize(path)
-    .chain_err(|| format!("failed to canonicalize {}", path.display())));
+pub fn canonicalize<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
+  let r = try!(fs::canonicalize(path.as_ref())
+    .chain_err(|| format!("failed to canonicalize {}", path.as_ref().display())));
   {
     let str = try!(path_to_str(&r));
     if str.starts_with(r"\\?\") {

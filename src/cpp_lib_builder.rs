@@ -10,7 +10,7 @@ pub struct CppLibBuilder<'a> {
   pub build_dir: &'a PathBuf,
   pub install_dir: &'a PathBuf,
   pub num_jobs: i32,
-  pub linker_env_library_dirs: Option<&'a Vec<PathBuf>>,
+  pub linker_env_library_dirs: Option<&'a [PathBuf]>,
   pub pipe_output: bool,
 }
 
@@ -45,7 +45,7 @@ impl<'a> CppLibBuilder<'a> {
     if let Some(linker_env_library_dirs) = self.linker_env_library_dirs {
       if !linker_env_library_dirs.is_empty() {
         for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB"] {
-          let value = try!(add_env_path_item(name, (*linker_env_library_dirs).clone()));
+          let value = try!(add_env_path_item(name, Vec::from(linker_env_library_dirs)));
           make_command.env(name, value);
         }
       }
