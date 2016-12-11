@@ -1,0 +1,33 @@
+[package]
+name = "cpp_to_rust_generator"
+version = "0.5.3"
+authors = ["Pavel Strakhov <ri@idzaaus.org>"]
+build = "build.rs"
+description = "Automatic generator of C++ library wrappers"
+license = "MIT"
+repository = "https://github.com/rust-qt/cpp_to_rust"
+exclude = ["scripts/**/*", "test_assets/**/*"]
+
+[dependencies]
+
+libc = "0.2"
+regex = "0.1"
+
+serde = "0.8"       # serialization
+serde_json = "0.8"
+
+clang = "0.14"    # C++ parsing
+toml = "0.2" # toml generation
+select = "0.3.0"    # html parsing
+
+tempdir = "0.3.5"   # temporary directory creation
+num_cpus = "1.0.0"  # detect preferred task count
+
+rustfmt = "0.6"     # Rust code formatting
+
+clippy = {version = "0.0", optional = true} # linter
+
+cpp_to_rust_common = { path = "../cpp_to_rust_common" }
+
+[build-dependencies]
+serde_codegen = "0.8"

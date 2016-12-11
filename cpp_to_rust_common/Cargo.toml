@@ -1,0 +1,15 @@
+[package]
+name = "cpp_to_rust_common"
+version = "0.0.0"
+authors = ["Ri <ri@idzaaus.org>"]
+
+[dependencies]
+error-chain = "0.5" # error handling
+backtrace = "0.2.1" # error backtrace manipulation
+
+regex = "0.1"
+
+serde = "0.8"       # serialization
+serde_json = "0.8"
+
+ansi_term = "0.7"   # colored output
