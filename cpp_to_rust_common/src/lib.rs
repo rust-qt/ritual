@@ -18,3 +18,5 @@ pub mod utils;
 pub mod cpp_build_config;
 pub mod cpp_lib_builder;
 pub mod target;
+
+mod serializable;

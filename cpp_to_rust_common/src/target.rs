@@ -1,14 +1,5 @@
-#[allow(non_camel_case_types)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Arch {
-  X86,
-  X86_64,
-  Mips,
-  PowerPC,
-  PowerPC64,
-  Arm,
-  AArch64,
-}
+pub use serializable::{Arch, OS, Family, Env, PointerWidth, Endian, Target, Condition};
+
 
 #[cfg(target_arch = "x86")]
 pub fn current_arch() -> Arch {
@@ -39,19 +30,6 @@ pub fn current_arch() -> Arch {
   Arch::AArch64
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OS {
-  Windows,
-  MacOS,
-  IOS,
-  Linux,
-  Android,
-  FreeBSD,
-  DragonFly,
-  Bitrig,
-  OpenBSD,
-  NetBSD,
-}
 
 #[cfg(target_os = "windows")]
 pub fn current_os() -> OS {
@@ -94,11 +72,6 @@ pub fn current_os() -> OS {
   OS::NetBSD
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Family {
-  Windows,
-  Unix,
-}
 
 #[cfg(target_family = "unix")]
 pub fn current_family() -> Family {
@@ -109,13 +82,6 @@ pub fn current_family() -> Family {
   Family::Windows
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Env {
-  Gnu,
-  Msvc,
-  Musl,
-  None,
-}
 #[cfg(target_env = "gnu")]
 pub fn current_env() -> Env {
   Env::Gnu
@@ -133,11 +99,6 @@ pub fn current_env() -> Env {
   Env::None
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PointerWidth {
-  P64,
-  P32,
-}
 #[cfg(target_pointer_width = "32")]
 pub fn current_pointer_width() -> PointerWidth {
   PointerWidth::P32
@@ -166,11 +127,6 @@ pub fn current_pointer_width() -> PointerWidth {
 //  Vendor::Unknown
 //}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Endian {
-  Little,
-  Big,
-}
 #[cfg(target_endian = "little")]
 pub fn current_endian() -> Endian {
   Endian::Little
@@ -180,16 +136,6 @@ pub fn current_endian() -> Endian {
   Endian::Big
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Target {
-  pub arch: Arch,
-  pub os: OS,
-  pub family: Family,
-  pub env: Env,
-  pub pointer_width: PointerWidth,
-  //pub vendor: Vendor,
-  pub endian: Endian,
-}
 
 pub fn current_target() -> Target {
   Target {
@@ -203,21 +149,6 @@ pub fn current_target() -> Target {
   }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Condition {
-  Arch(Arch),
-  OS(OS),
-  Family(Family),
-  Env(Env),
-  PointerWidth(PointerWidth),
-  //Vendor(Vendor),
-  Endian(Endian),
-  And(Vec<Condition>),
-  Or(Vec<Condition>),
-  Not(Box<Condition>),
-  True,
-  False,
-}
 
 impl Condition {
   pub fn eval(&self, target: &Target) -> bool {

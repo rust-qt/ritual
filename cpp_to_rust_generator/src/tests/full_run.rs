@@ -26,10 +26,10 @@ fn build_cpp_lib() -> tempdir::TempDir {
   create_dir(&build_dir).unwrap();
   create_dir(&install_dir).unwrap();
   fancy_unwrap(CppLibBuilder {
-      cmake_source_dir: &cpp_lib_source_dir,
-      build_dir: &build_dir,
-      install_dir: &install_dir,
-      num_jobs: 1,
+      cmake_source_dir: cpp_lib_source_dir,
+      build_dir: build_dir,
+      install_dir: install_dir,
+      num_jobs: None,
       cmake_vars: Vec::new(),
       pipe_output: true,
     }

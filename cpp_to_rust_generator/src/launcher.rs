@@ -1,14 +1,14 @@
-use config::{Config};
+use config::Config;
 use cpp_code_generator::CppCodeGenerator;
 use cpp_data::CppData;
 use cpp_ffi_data::CppAndFfiData;
 use cpp_ffi_generator;
 use cpp_parser;
 use common::errors::{Result, ChainErr};
-use common::file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json, canonicalize,
-                 remove_dir_all, remove_dir, read_dir, create_file};
+use common::file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json,
+                         canonicalize, remove_dir_all, remove_dir, read_dir, create_file};
 use common::log;
-use rust_code_generator::{RustCodeGeneratorDependency};
+use rust_code_generator::RustCodeGeneratorDependency;
 use rust_code_generator;
 use rust_generator;
 use rust_info::RustExportInfo;
@@ -207,8 +207,7 @@ pub fn run(config: Config) -> Result<()> {
     .chain_err(|| "FFI generator failed"));
 
   log::info(format!("Generating C wrapper code."));
-  let code_gen = CppCodeGenerator::new(c_lib_name.clone(),
-                                       c_lib_tmp_path.clone());
+  let code_gen = CppCodeGenerator::new(c_lib_name.clone(), c_lib_tmp_path.clone());
   try!(code_gen.generate_template_files(config.include_directives()));
   try!(code_gen.generate_files(&cpp_ffi_headers));
   if c_lib_path_existed {
@@ -279,6 +278,8 @@ pub fn run(config: Config) -> Result<()> {
     }
     try!(remove_dir(&crate_new_path));
   }
+  try!(save_json(config.output_dir_path().with_added("cpp_build_config.json"),
+                 config.cpp_build_config()));
   try!(create_file(config.cache_dir_path().with_added(COMPLETED_MARKER_FILE_NAME)));
   Ok(())
 }
