@@ -21,7 +21,6 @@ toml = "0.2" # toml generation
 select = "0.3.0"    # html parsing
 
 tempdir = "0.3.5"   # temporary directory creation
-num_cpus = "1.0.0"  # detect preferred task count
 
 rustfmt = "0.6"     # Rust code formatting
 

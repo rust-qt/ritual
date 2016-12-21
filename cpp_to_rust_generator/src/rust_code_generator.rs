@@ -1,7 +1,7 @@
 use common::errors::{Result, ChainErr, unexpected};
-use common::file_utils::{PathBufWithAdded, copy_recursively, file_to_string, copy_file, create_file,
-                 path_to_str, create_dir_all, remove_file, read_dir, os_str_to_str,
-                 os_string_into_string};
+use common::file_utils::{PathBufWithAdded, copy_recursively, file_to_string, copy_file,
+                         create_file, path_to_str, create_dir_all, remove_file, read_dir,
+                         os_str_to_str, os_string_into_string};
 use common::log;
 use rust_generator::RustGeneratorOutput;
 use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
@@ -22,26 +22,13 @@ pub struct RustCodeGeneratorDependency {
   pub crate_path: PathBuf,
 }
 
-pub enum RustLinkKind {
-  SharedLibrary,
-  Framework,
-}
-pub struct RustLinkItem {
-  pub name: String,
-  pub kind: RustLinkKind,
-}
-
 use config::CrateProperties;
 
 pub struct RustCodeGeneratorConfig {
   pub crate_properties: CrateProperties,
   pub output_path: PathBuf,
-  pub template_path: Option<PathBuf>,
+  pub crate_template_path: Option<PathBuf>,
   pub c_lib_name: String,
-  pub link_items: Vec<RustLinkItem>,
-  pub cpp_lib_paths: Vec<String>,
-  pub framework_paths: Vec<String>,
-  pub rustfmt_config_path: Option<PathBuf>,
   pub dependencies: Vec<RustCodeGeneratorDependency>,
 }
 
@@ -129,12 +116,20 @@ pub fn rust_type_to_code(rust_type: &RustType, crate_name: &str) -> String {
 
 
 pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) -> Result<()> {
-  let rustfmt_config_data = match config.rustfmt_config_path {
-    Some(ref path) => {
-      log::info(format!("Using rustfmt config file: {:?}", path));
-      try!(file_to_string(path))
+  let template_rustfmt_config_path = config.crate_template_path.as_ref().and_then(|crate_template_path| {
+    let template_rustfmt_config_path = crate_template_path.with_added("rustfmt.toml");
+    if template_rustfmt_config_path.exists() {
+      Some(template_rustfmt_config_path)
+    } else {
+      None
     }
-    None => include_str!("../templates/crate/rustfmt.toml").to_string(),
+  });
+
+  let rustfmt_config_data = if let Some(template_rustfmt_config_path) = template_rustfmt_config_path {
+    log::info(format!("Using rustfmt config file: {:?}", template_rustfmt_config_path));
+    try!(file_to_string(template_rustfmt_config_path))
+  } else {
+    include_str!("../templates/crate/rustfmt.toml").to_string()
   };
   let rustfmt_config = rustfmt::config::Config::from_toml(&rustfmt_config_data);
   let generator = RustCodeGenerator {
@@ -160,27 +155,50 @@ pub struct RustCodeGenerator {
 impl RustCodeGenerator {
   /// Generates cargo file and skeleton of the crate
   pub fn generate_template(&self) -> Result<()> {
-    if let Some(ref path) = self.config.rustfmt_config_path {
-      try!(copy_file(path, self.config.output_path.with_added("rustfmt.toml")));
+    let template_rustfmt_config_path = self.config.crate_template_path.as_ref().and_then(|crate_template_path| {
+      let template_rustfmt_config_path = crate_template_path.with_added("rustfmt.toml");
+      if template_rustfmt_config_path.exists() {
+        Some(template_rustfmt_config_path)
+      } else {
+        None
+      }
+    });
+    let output_rustfmt_config_path = self.config.output_path.with_added("rustfmt.toml");
+    if let Some(ref template_rustfmt_config_path) = template_rustfmt_config_path {
+      try!(copy_file(template_rustfmt_config_path, output_rustfmt_config_path));
     } else {
-      let mut rustfmt_file = try!(create_file(self.config.output_path.with_added("rustfmt.toml")));
+      let mut rustfmt_file = try!(create_file(output_rustfmt_config_path));
       try!(rustfmt_file.write(include_str!("../templates/crate/rustfmt.toml")));
-    };
-
-    {
-      let mut build_rs_file = try!(create_file(self.config.output_path.with_added("build.rs")));
-      let mut extra = Vec::new();
-      for path in &self.config.cpp_lib_paths {
-        extra.push(format!("  println!(\"cargo:rustc-link-search=native={{}}\", \"{}\");",
-                           path));
-      }
-      for path in &self.config.framework_paths {
-        extra.push(format!("  println!(\"cargo:rustc-link-search=framework={{}}\", \"{}\");",
-                           path));
-      }
-      try!(build_rs_file.write(format!(include_str!("../templates/crate/build.rs"),
-                                       extra = extra.join("\n"))));
     }
+
+    let template_build_rs_path = self.config.crate_template_path.as_ref().and_then(|crate_template_path| {
+      let template_build_rs_path = crate_template_path.with_added("build.rs");
+      if template_build_rs_path.exists() {
+        Some(template_build_rs_path)
+      } else {
+        None
+      }
+    });
+    let output_build_rs_path = self.config.output_path.with_added("build.rs");
+    if let Some(ref template_build_rs_path) = template_build_rs_path {
+      try!(copy_file(template_build_rs_path, output_build_rs_path));
+    } else {
+      {
+        let mut rustfmt_file = try!(create_file(&output_build_rs_path));
+        try!(rustfmt_file.write(include_str!("../templates/crate/build.rs")));
+      }
+      self.call_rustfmt(&output_build_rs_path);
+    }
+    // TODO: move output to new build script utility
+    /*
+    for path in &self.config.cpp_lib_paths {
+      extra.push(format!("  println!(\"cargo:rustc-link-search=native={{}}\", \"{}\");",
+                         path));
+    }
+    for path in &self.config.framework_paths {
+      extra.push(format!("  println!(\"cargo:rustc-link-search=framework={{}}\", \"{}\");",
+                         path));
+    }*/
 
     let cargo_toml_data = toml::Value::Table({
       let package = toml::Value::Table({
@@ -214,9 +232,15 @@ impl RustCodeGenerator {
         }
         table
       });
+      let build_dependencies = toml::Value::Table({
+        let mut table = toml::Table::new();
+        table.insert("cpp_to_rust_build_tools".to_string(), toml::Value::String("0.0".to_string()));
+        table
+      });
       let mut table = toml::Table::new();
       table.insert("package".to_string(), package);
       table.insert("dependencies".to_string(), dependencies);
+      table.insert("build-dependencies".to_string(), build_dependencies);
       if is_msvc() {
         // LNK1189 (too many members) in MSVC with static linking,
         // so we use dynamic linking
@@ -233,7 +257,7 @@ impl RustCodeGenerator {
     let mut cargo_toml_file = try!(create_file(self.config.output_path.with_added("Cargo.toml")));
     try!(cargo_toml_file.write(cargo_toml_data.to_string()));
 
-    if let Some(ref template_path) = self.config.template_path {
+    if let Some(ref template_path) = self.config.crate_template_path {
       for name in &["src", "tests", "examples"] {
         let template_item_path = template_path.with_added(&name);
         if template_item_path.as_path().exists() {
@@ -635,7 +659,7 @@ impl RustCodeGenerator {
       }
       let mut extra_modules = vec!["ffi".to_string()];
 
-      if let Some(ref template_path) = self.config.template_path {
+      if let Some(ref template_path) = self.config.crate_template_path {
         if template_path.with_added("src").exists() {
           for item in try!(read_dir(template_path.with_added("src"))) {
             let item = try!(item);
@@ -1018,11 +1042,12 @@ pub fn {struct_method}(&self) -> {struct_type} {{
   }
 
   pub fn generate_ffi_file(&self, functions: &[(String, Vec<RustFFIFunction>)]) -> Result<()> {
-    let mut file_path = self.config.output_path.clone();
-    file_path.push("src");
-    file_path.push("ffi.rs");
+    let src_dir_path = self.config.output_path.with_added("src");
+    let file_path = src_dir_path.with_added("ffi.rs.in");
     {
       let mut file = try!(create_file(&file_path));
+      // TODO: generate ffi.rs with appropriate link directives
+      /*
       for item in &self.config.link_items {
         match item.kind {
           RustLinkKind::SharedLibrary => {
@@ -1036,11 +1061,12 @@ pub fn {struct_method}(&self) -> {struct_type} {{
       if !is_msvc() {
         try!(file.write("#[link(name = \"stdc++\")]\n"));
       }
-      // TODO: build script must decide is c_lib is shared
-      // if self.config.c_lib_is_shared {
-      //  try!(file.write(format!("#[link(name = \"{}\")]\n", &self.config.c_lib_name)));
-      try!(file.write(format!("#[link(name = \"{}\", kind = \"static\")]\n",
-                              &self.config.c_lib_name)));
+      if self.config.c_lib_is_shared {
+        try!(file.write(format!("#[link(name = \"{}\")]\n", &self.config.c_lib_name)));
+      } else {
+        try!(file.write(format!("#[link(name = \"{}\", kind = \"static\")]\n",
+                                &self.config.c_lib_name)));
+      }*/
 
       try!(file.write("extern \"C\" {\n"));
 
@@ -1054,6 +1080,12 @@ pub fn {struct_method}(&self) -> {struct_type} {{
       try!(file.write("}\n"));
     }
     // no rustfmt for ffi file
+    let rs_file_path = src_dir_path.with_added("ffi.rs");
+    {
+      let mut file = try!(create_file(&rs_file_path));
+      try!(file.write("include!(concat!(env!(\"OUT_DIR\"), \"/ffi.rs\"));"));
+    }
+
     Ok(())
   }
 }

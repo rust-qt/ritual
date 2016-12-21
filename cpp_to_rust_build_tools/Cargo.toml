@@ -1,7 +1,10 @@
 [package]
 name = "cpp_to_rust_build_tools"
-version = "0.1.0"
+version = "0.0.0"
 authors = ["Ri <ri@idzaaus.org>"]
 
+description = "Build script implementation for C++ library wrappers"
+license = "MIT"
+
 [dependencies]
-cpp_to_rust_common = { path = "../cpp_to_rust_common" }
+cpp_to_rust_common = "0.0"

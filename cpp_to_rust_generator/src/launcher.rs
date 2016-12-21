@@ -1,5 +1,3 @@
-extern crate num_cpus;
-
 use config::{Config};
 use cpp_code_generator::CppCodeGenerator;
 use cpp_data::CppData;
@@ -8,13 +6,12 @@ use cpp_ffi_generator;
 use cpp_parser;
 use common::errors::{Result, ChainErr};
 use common::file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json, canonicalize,
-                 remove_dir_all, remove_dir, read_dir, path_to_str, create_file};
+                 remove_dir_all, remove_dir, read_dir, create_file};
 use common::log;
-use rust_code_generator::{RustCodeGeneratorDependency, RustLinkItem, RustLinkKind};
+use rust_code_generator::{RustCodeGeneratorDependency};
 use rust_code_generator;
 use rust_generator;
 use rust_info::RustExportInfo;
-use common::utils::{MapIfOk};
 
 use std::path::{Path, PathBuf};
 
@@ -77,12 +74,6 @@ fn check_all_paths(config: &Config) -> Result<()> {
     check_dir(path)?;
   }
   for path in config.dependency_paths() {
-    check_dir(path)?;
-  }
-  for path in config.lib_paths() {
-    check_dir(path)?;
-  }
-  for path in config.framework_paths() {
     check_dir(path)?;
   }
   for path in config.include_paths() {
@@ -173,20 +164,8 @@ pub fn run(config: Config) -> Result<()> {
     return Ok(());
   }
   check_all_paths(&config)?;
-  let mut link_items = Vec::new();
-  for item in config.linked_libs() {
-    link_items.push(RustLinkItem {
-      name: item.to_string(),
-      kind: RustLinkKind::SharedLibrary,
-    });
-  }
-  for item in config.linked_frameworks() {
-    link_items.push(RustLinkItem {
-      name: item.to_string(),
-      kind: RustLinkKind::Framework,
-    });
-  }
-  let remove_qt_prefix = link_items.iter().any(|x| x.name.starts_with("Qt"));
+  // TODO: allow to remove any prefix through `Config`
+  let remove_qt_prefix = config.crate_properties().name.starts_with("qt_");
 
   if !config.dependency_paths().is_empty() {
     log::info("Loading dependencies");
@@ -229,18 +208,8 @@ pub fn run(config: Config) -> Result<()> {
 
   log::info(format!("Generating C wrapper code."));
   let code_gen = CppCodeGenerator::new(c_lib_name.clone(),
-                                       c_lib_tmp_path.clone(),
-                                       Vec::from(config.linked_libs()));
-  let include_dirs_str = try!(config.include_paths()
-    .iter()
-    .map_if_ok(|x| -> Result<_> { Ok(try!(path_to_str(x)).to_string()) }));
-  let framework_dirs_str = try!(config.framework_paths()
-    .iter()
-    .map_if_ok(|x| -> Result<_> { Ok(try!(path_to_str(x)).to_string()) }));
-  try!(code_gen.generate_template_files(config.include_directives(),
-                                        &include_dirs_str,
-                                        &framework_dirs_str,
-                                        config.cpp_compiler_flags()));
+                                       c_lib_tmp_path.clone());
+  try!(code_gen.generate_template_files(config.include_directives()));
   try!(code_gen.generate_files(&cpp_ffi_headers));
   if c_lib_path_existed {
     try!(move_files(&c_lib_tmp_path, &c_lib_path));
@@ -257,25 +226,11 @@ pub fn run(config: Config) -> Result<()> {
     config.output_dir_path().clone()
   };
   try!(create_dir_all(&crate_new_path));
-  let rustfmt_config_path = config.crate_template_path().and_then(|path| {
-    let path = path.with_added("rustfmt.toml");
-    if path.exists() {
-      Some(path)
-    } else {
-      None
-    }
-  });
   let rust_config = rust_code_generator::RustCodeGeneratorConfig {
     crate_properties: config.crate_properties().clone(),
     output_path: crate_new_path.clone(),
-    template_path: config.crate_template_path().cloned(),
+    crate_template_path: config.crate_template_path().cloned(),
     c_lib_name: c_lib_name,
-    link_items: link_items,
-    cpp_lib_paths: config.lib_paths()
-      .iter()
-      .map_if_ok(|x| -> Result<_> { Ok(path_to_str(x)?.to_string()) })?,
-    framework_paths: framework_dirs_str,
-    rustfmt_config_path: rustfmt_config_path,
     dependencies: dependencies.iter()
       .map(|x| {
         RustCodeGeneratorDependency {
@@ -311,8 +266,6 @@ pub fn run(config: Config) -> Result<()> {
                    &RustExportInfo {
                      crate_name: config.crate_properties().name.clone(),
                      rust_types: rust_data.processed_types,
-                     linked_libs: Vec::from(config.linked_libs()),
-                     linked_frameworks: Vec::from(config.linked_frameworks()),
                    }));
     log::info(format!("Rust export info is saved to file: {}",
                       rust_export_path.display()));

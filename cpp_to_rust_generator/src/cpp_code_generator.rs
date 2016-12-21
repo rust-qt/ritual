@@ -21,19 +21,17 @@ pub struct CppCodeGenerator {
   lib_name_upper: String,
   /// Path to the directory where the library is generated
   lib_path: ::std::path::PathBuf,
-  linked_libs: Vec<String>,
 }
 
 impl CppCodeGenerator {
   /// Creates a generator for a library.
   /// lib_name: library name
   /// lib_path: path to the directory where the library is generated
-  pub fn new(lib_name: String, lib_path: ::std::path::PathBuf, linked_libs: Vec<String>) -> Self {
+  pub fn new(lib_name: String, lib_path: ::std::path::PathBuf) -> Self {
     CppCodeGenerator {
       lib_name: lib_name.clone(),
       lib_name_upper: lib_name.to_uppercase(),
       lib_path: lib_path,
-      linked_libs: linked_libs,
     }
   }
 
@@ -315,28 +313,20 @@ impl CppCodeGenerator {
 
   /// Generates main files and directories of the library.
   pub fn generate_template_files(&self,
-                                 include_directives: &[PathBuf],
-                                 include_directories: &[String],
-                                 framework_directories: &[String],
-                                 cpp_compiler_flags: &[String])
+                                 include_directives: &[PathBuf])
                                  -> Result<()> {
     let name_upper = self.lib_name.to_uppercase();
     let cmakelists_path = self.lib_path.with_added("CMakeLists.txt");
     let mut cmakelists_file = try!(create_file(&cmakelists_path));
 
-    let mut all_cpp_flags = Vec::from(cpp_compiler_flags);
+    /*let mut all_cpp_flags = Vec::from(cpp_compiler_flags);
     for dir in framework_directories {
       all_cpp_flags.push(format!("-F\"{}\"", dir));
     }
-    let all_cpp_flags_text = all_cpp_flags.iter().map(|x| x.replace("\"", "\\\"")).join(" ");
+    let all_cpp_flags_text = all_cpp_flags.iter().map(|x| x.replace("\"", "\\\"")).join(" ");*/
     try!(cmakelists_file.write(format!(include_str!("../templates/c_lib/CMakeLists.txt"),
                                        lib_name_lowercase = &self.lib_name,
-                                       lib_name_uppercase = name_upper,
-                                       include_directories = include_directories.into_iter()
-                                         .map(|x| format!("\"{}\"", x.replace(r"\", r"\\")))
-                                         .join(" "),
-                                       target_link_libraries = self.linked_libs.join(" "),
-                                       cxx_flags = all_cpp_flags_text)));
+                                       lib_name_uppercase = name_upper)));
     let src_dir = self.lib_path.with_added("src");
     try!(create_dir_all(&src_dir));
 

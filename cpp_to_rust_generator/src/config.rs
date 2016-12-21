@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use common::errors::Result;
 use cpp_method::CppMethod;
 use cpp_data::CppData;
+use common::cpp_build_config::CppBuildConfig;
 
 /// Function type used in `Config::add_cpp_ffi_generator_filter`.
 pub type CppFfiGeneratorFilterFn = Fn(&CppMethod) -> Result<bool>;
@@ -39,51 +40,58 @@ pub struct CrateProperties {
 }
 
 
+
+
+
 /// The starting point of `cpp_to_rust` API.
 /// Create a `Config` object, set its properties,
 /// add custom functions if necessary, and start
 /// the processing with `Config::exec`.
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct Config {
   // see documentation for setters
-  crate_properties: Option<CrateProperties>,
-  output_dir_path: Option<PathBuf>,
-  cache_dir_path: Option<PathBuf>,
+  crate_properties: CrateProperties,
+  output_dir_path: PathBuf,
+  cache_dir_path: PathBuf,
   crate_template_path: Option<PathBuf>,
   dependency_paths: Vec<PathBuf>,
-  linked_libs: Vec<String>,
-  lib_paths: Vec<PathBuf>,
-  linked_frameworks: Vec<String>,
-  framework_paths: Vec<PathBuf>,
   include_paths: Vec<PathBuf>,
+  framework_paths: Vec<PathBuf>,
   target_include_paths: Vec<PathBuf>,
   include_directives: Vec<PathBuf>,
   cpp_parser_flags: Vec<String>,
-  cpp_compiler_flags: Vec<String>,
   cpp_parser_blocked_names: Vec<String>,
   cpp_ffi_generator_filters: Vec<CppFfiGeneratorFilter>,
   cpp_data_filters: Vec<CppDataFilter>,
+  cpp_build_config: CppBuildConfig, // TODO: add CppBuildPaths when needed
 }
 
 impl Config {
-  /// Creates an empty `Config`.
-  pub fn new() -> Config {
-    Config::default()
-  }
-
-  /// Sets properties for Cargo.toml of the generated crate.
-  pub fn set_crate_properties(&mut self, value: CrateProperties) {
-    self.crate_properties = Some(value);
-  }
-
-  /// Sets the directory where new crate will be generated.
-  pub fn set_output_dir_path<P: Into<PathBuf>>(&mut self, path: P) {
-    self.output_dir_path = Some(path.into());
-  }
-
-  /// Sets the directory for temporary files and cache.
-  pub fn set_cache_dir_path<P: Into<PathBuf>>(&mut self, path: P) {
-    self.cache_dir_path = Some(path.into());
+  /// Creates a `Config`.
+  /// `crate_properties` are used in Cargo.toml of the generated crate.
+  /// `output_dir_path` will contain the generated crate.
+  /// `cache_dir_path` will be used for cache, temporary files and
+  /// inter-library information files.
+  pub fn new<P1: Into<PathBuf>, P2: Into<PathBuf>>(output_dir_path: P1,
+                                                   cache_dir_path: P2,
+                                                   crate_properties: CrateProperties)
+                                                   -> Config {
+    Config {
+      crate_properties: crate_properties,
+      output_dir_path: output_dir_path.into(),
+      cache_dir_path: cache_dir_path.into(),
+      crate_template_path: Default::default(),
+      dependency_paths: Default::default(),
+      include_paths: Default::default(),
+      framework_paths: Default::default(),
+      target_include_paths: Default::default(),
+      include_directives: Default::default(),
+      cpp_parser_flags: Default::default(),
+      cpp_parser_blocked_names: Default::default(),
+      cpp_ffi_generator_filters: Default::default(),
+      cpp_data_filters: Default::default(),
+      cpp_build_config: Default::default(),
+    }
   }
 
   /// Sets the directory containing additional Rust code for the crate.
@@ -96,15 +104,6 @@ impl Config {
     self.dependency_paths = paths;
   }
 
-  /// Adds a library for linking. Used as `-l` option to the linker.
-  pub fn add_linked_lib<P: Into<String>>(&mut self, lib: P) {
-    self.linked_libs.push(lib.into());
-  }
-
-  /// Adds a framework for linking (OS X specific). Used as `-f` option to the linker.
-  pub fn add_linked_framework<P: Into<String>>(&mut self, lib: P) {
-    self.linked_frameworks.push(lib.into());
-  }
 
   /// Adds a C++ identifier that should be skipped
   /// by the C++ parser. Identifier can contain namespaces
@@ -145,39 +144,19 @@ impl Config {
     }
   }
 
-  /// Adds a command line argument for the C++ compiler.
-  pub fn add_cpp_compiler_flag<P: Into<String>>(&mut self, lib: P) {
-    self.cpp_compiler_flags.push(lib.into());
-  }
-
-  /// Adds multiple flags. See `Config::add_cpp_compiler_flag`.
-  pub fn add_cpp_compiler_flags<Item, Iter>(&mut self, items: Iter)
-    where Item: Into<String>,
-          Iter: IntoIterator<Item = Item>
-  {
-    for item in items {
-      self.cpp_compiler_flags.push(item.into());
-    }
-  }
 
   /// Adds path to an include directory.
-  /// It's supplied to the C++ parser
-  /// and the C++ compiler via `-I` option.
+  /// It's supplied to the C++ parser via `-I` option.
   pub fn add_include_path<P: Into<PathBuf>>(&mut self, path: P) {
     self.include_paths.push(path.into());
   }
 
-  /// Adds path to a lib directory.
-  /// It's supplied to the linker via `-L` option or environment variables.
-  pub fn add_lib_path<P: Into<PathBuf>>(&mut self, path: P) {
-    self.lib_paths.push(path.into());
-  }
-
   /// Adds path to a framework directory (OS X specific).
-  /// It's supplied to the linker via `-F` option or environment variables.
+  /// It's supplied to the C++ parser via `-F` option.
   pub fn add_framework_path<P: Into<PathBuf>>(&mut self, path: P) {
     self.framework_paths.push(path.into());
   }
+
 
   /// Adds path to an include directory or an include file
   /// of the target library.
@@ -222,6 +201,10 @@ impl Config {
     self.cpp_data_filters.push(CppDataFilter(f));
   }
 
+  pub fn set_cpp_build_config(&mut self, cpp_build_config: CppBuildConfig) {
+    self.cpp_build_config = cpp_build_config;
+  }
+
   /// Starts execution of the generator.
   /// This function will print the necessary build script output to stdout.
   /// It also displays some debugging output that can be made visible by
@@ -241,15 +224,15 @@ impl Config {
   }
 
   pub fn crate_properties(&self) -> &CrateProperties {
-    self.crate_properties.as_ref().expect("crate_properties must be set")
+    &self.crate_properties
   }
 
   pub fn output_dir_path(&self) -> &PathBuf {
-    self.output_dir_path.as_ref().expect("output_dir_path must be set")
+    &self.output_dir_path
   }
 
   pub fn cache_dir_path(&self) -> &PathBuf {
-    self.cache_dir_path.as_ref().expect("cache_dir_path must be set")
+    &self.cache_dir_path
   }
 
   pub fn crate_template_path(&self) -> Option<&PathBuf> {
@@ -260,14 +243,6 @@ impl Config {
     &self.dependency_paths
   }
 
-  pub fn linked_libs(&self) -> &[String] {
-    &self.linked_libs
-  }
-
-  pub fn linked_frameworks(&self) -> &[String] {
-    &self.linked_frameworks
-  }
-
   pub fn cpp_parser_blocked_names(&self) -> &[String] {
     &self.cpp_parser_blocked_names
   }
@@ -276,16 +251,8 @@ impl Config {
     &self.cpp_parser_flags
   }
 
-  pub fn cpp_compiler_flags(&self) -> &[String] {
-    &self.cpp_compiler_flags
-  }
-
   pub fn include_paths(&self) -> &[PathBuf] {
     &self.include_paths
-  }
-
-  pub fn lib_paths(&self) -> &[PathBuf] {
-    &self.lib_paths
   }
 
   pub fn framework_paths(&self) -> &[PathBuf] {
@@ -306,6 +273,10 @@ impl Config {
 
   pub fn cpp_data_filters(&self) -> Vec<&Box<CppDataFilterFn>> {
     self.cpp_data_filters.iter().map(|x| &x.0).collect()
+  }
+
+  pub fn cpp_build_config(&self) -> &CppBuildConfig {
+    &self.cpp_build_config
   }
 }
 

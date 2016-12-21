@@ -3,6 +3,8 @@ use common::utils::{run_command, add_env_path_item};
 use common::cpp_lib_builder::CppLibBuilder;
 use common::errors::fancy_unwrap;
 use config::{Config, CrateProperties};
+use common::cpp_build_config::{CppBuildConfig, CppBuildConfigData};
+use common::target;
 
 use std::process::Command;
 use std::path::PathBuf;
@@ -17,7 +19,6 @@ fn build_cpp_lib() -> tempdir::TempDir {
     path.push("cpp");
     path
   };
-  println!("??? {}", cpp_lib_source_dir.display());
   assert!(cpp_lib_source_dir.exists());
   let temp_dir = tempdir::TempDir::new("test_full_run").unwrap();
   let build_dir = temp_dir.path().with_added("build");
@@ -29,7 +30,7 @@ fn build_cpp_lib() -> tempdir::TempDir {
       build_dir: &build_dir,
       install_dir: &install_dir,
       num_jobs: 1,
-      linker_env_library_dirs: None,
+      cmake_vars: Vec::new(),
       pipe_output: true,
     }
     .run());
@@ -46,7 +47,12 @@ fn full_run() {
   let cpp_install_lib_dir = temp_dir.path().with_added("install").with_added("lib");
   assert!(cpp_install_lib_dir.exists());
 
-  let mut config = Config::new();
+  let mut config = Config::new(&crate_dir, temp_dir.path().with_added("cache"), CrateProperties {
+    authors: Vec::new(),
+    links: Some("ctrt1".to_string()),
+    name: "ctrt1".to_string(),
+    version: "0.0.0".to_string(),
+  });
   config.add_include_directive("ctrt1/all.h");
   let include_path = {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -66,19 +72,19 @@ fn full_run() {
   assert!(include_path.exists());
   config.add_include_path(&include_path);
   config.add_target_include_path(&include_path);
-  config.add_linked_lib("ctrt1");
-  if !::common::utils::is_msvc() {
-    config.add_cpp_compiler_flag("-fPIC");
+
+  let mut cpp_build_config = CppBuildConfig::new();
+  {
+    let mut data = CppBuildConfigData::new();
+    data.add_linked_lib("ctrt1");
+    cpp_build_config.add(target::Condition::True, data);
   }
-  config.set_cache_dir_path(temp_dir.path().with_added("cache"));
-  config.set_output_dir_path(&crate_dir);
+  {
+    let mut data = CppBuildConfigData::new();
+    data.add_cpp_compiler_flag("-fPIC");
+    cpp_build_config.add(target::Condition::Env(target::Env::Msvc).negate(), data);
+  }
   config.set_crate_template_path(&crate_template_path);
-  config.set_crate_properties(CrateProperties {
-    authors: Vec::new(),
-    links: Some("ctrt1".to_string()),
-    name: "ctrt1".to_string(),
-    version: "0.0.0".to_string(),
-  });
   temp_dir.into_path(); //DEBUG: prevent deletion
   fancy_unwrap(config.exec());
   assert!(crate_dir.exists());

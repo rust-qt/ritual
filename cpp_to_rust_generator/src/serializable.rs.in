@@ -799,8 +799,4 @@ pub struct RustExportInfo {
   pub crate_name: String,
   /// List of generated types
   pub rust_types: Vec<RustProcessedTypeInfo>,
-  /// As in `Config`
-  pub linked_libs: Vec<String>,
-  /// As in `Config`
-  pub linked_frameworks: Vec<String>,
 }
