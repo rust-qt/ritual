@@ -15,6 +15,7 @@
 
 extern crate toml;
 extern crate rustfmt;
+extern crate tempdir;
 
 extern crate cpp_to_rust_common as common;
 

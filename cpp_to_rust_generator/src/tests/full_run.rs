@@ -8,10 +8,9 @@ use common::target;
 
 use std::process::Command;
 use std::path::PathBuf;
+use tests::TempTestDir;
 
-extern crate tempdir;
-
-fn build_cpp_lib() -> tempdir::TempDir {
+fn build_cpp_lib() -> TempTestDir {
   let cpp_lib_source_dir = {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("test_assets");
@@ -20,11 +19,15 @@ fn build_cpp_lib() -> tempdir::TempDir {
     path
   };
   assert!(cpp_lib_source_dir.exists());
-  let temp_dir = tempdir::TempDir::new("test_full_run").unwrap();
+  let temp_dir = TempTestDir::new("test_full_run");
   let build_dir = temp_dir.path().with_added("build");
   let install_dir = temp_dir.path().with_added("install");
-  create_dir(&build_dir).unwrap();
-  create_dir(&install_dir).unwrap();
+  if !build_dir.exists() {
+    create_dir(&build_dir).unwrap();
+  }
+  if !install_dir.exists() {
+    create_dir(&install_dir).unwrap();
+  }
   fancy_unwrap(CppLibBuilder {
       cmake_source_dir: cpp_lib_source_dir,
       build_dir: build_dir,
@@ -81,11 +84,10 @@ fn full_run() {
   }
   {
     let mut data = CppBuildConfigData::new();
-    data.add_cpp_compiler_flag("-fPIC");
+    data.add_compiler_flag("-fPIC");
     cpp_build_config.add(target::Condition::Env(target::Env::Msvc).negate(), data);
   }
   config.set_crate_template_path(&crate_template_path);
-  temp_dir.into_path(); //DEBUG: prevent deletion
   fancy_unwrap(config.exec());
   assert!(crate_dir.exists());
   // we need to add root folder to cargo paths to force test crate
