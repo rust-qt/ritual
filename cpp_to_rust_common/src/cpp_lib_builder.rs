@@ -1,5 +1,5 @@
 use errors::Result;
-use file_utils::path_to_str;
+use file_utils::{create_dir_all, path_to_str};
 use utils::{is_msvc, run_command};
 
 use std::process::Command;
@@ -22,6 +22,9 @@ pub struct CppLibBuilder {
 
 impl CppLibBuilder {
   pub fn run(self) -> Result<()> {
+    if !self.build_dir.exists() {
+      create_dir_all(&self.build_dir)?;
+    }
     let mut cmake_command = Command::new("cmake");
     cmake_command.arg(self.cmake_source_dir)
       .arg(format!("-DCMAKE_INSTALL_PREFIX={}",
