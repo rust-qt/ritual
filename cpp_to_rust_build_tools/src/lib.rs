@@ -1,8 +1,9 @@
 pub extern crate cpp_to_rust_common as common;
 use common::errors::{fancy_unwrap, ChainErr, Result};
-use common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
+use common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
 use common::file_utils::{PathBufWithAdded, load_json};
-use common::cpp_lib_builder::CppLibBuilder;
+use common::cpp_lib_builder::{CppLibBuilder, CMakeVar};
+use common::target::current_target;
 
 use std::path::PathBuf;
 
@@ -38,19 +39,30 @@ impl Config {
   }
 
   pub fn run_and_return(self) -> Result<()> {
-    let cpp_build_paths = self.cpp_build_paths.unwrap_or_default();
+    let mut cpp_build_paths = self.cpp_build_paths.unwrap_or_default();
+    cpp_build_paths.apply_env();
     let cpp_build_config = if let Some(x) = self.cpp_build_config {
       x
     } else {
       default_cpp_build_config()?
     };
+    let cpp_build_config_data = cpp_build_config.eval(&current_target())?;
+    let mut cmake_vars = Vec::new();
+    cmake_vars.push(CMakeVar::new("C2R_LIBRARY_TYPE",
+                                  match cpp_build_config_data.library_type() {
+                                    Some(CppLibraryType::Shared) => "SHARED",
+                                    Some(CppLibraryType::Static) | None => "STATIC",
+                                  }));
+    cmake_vars.push(CMakeVar::new_path_list(
+      "C2R_INCLUDE_PATHS",
+      cpp_build_paths.include_paths())?);
     CppLibBuilder {
       cmake_source_dir: manifest_dir()?.with_added("c_lib"),
       build_dir: out_dir()?.with_added("c_lib_build"),
       install_dir: out_dir()?.with_added("c_lib_install"),
       num_jobs: std::env::var("NUM_JOBS").ok().and_then(|x| x.parse().ok()),
       pipe_output: false,
-      cmake_vars: Vec::new(),
+      cmake_vars: cmake_vars,
     }.run()?;
 
     // TODO: get struct sizes

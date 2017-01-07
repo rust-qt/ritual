@@ -1,4 +1,4 @@
-pub use serializable::{CppBuildConfig, CppBuildConfigData};
+pub use serializable::{CppBuildConfig, CppBuildConfigData, CppLibraryType};
 
 use std::path::PathBuf;
 
@@ -33,6 +33,19 @@ impl CppBuildPaths {
   /// and the C++ compiler via `-I` option.
   pub fn add_include_path<P: Into<PathBuf>>(&mut self, path: P) {
     self.include_paths.push(path.into());
+  }
+
+  pub fn apply_env(&mut self) {
+    use ::std::env;
+    if let Ok(paths) = env::var("CPP_TO_RUST_LIB_PATHS") {
+      self.lib_paths = env::split_paths(&paths).collect();
+    }
+    if let Ok(paths) = env::var("CPP_TO_RUST_FRAMEWORK_PATHS") {
+      self.framework_paths = env::split_paths(&paths).collect();
+    }
+    if let Ok(paths) = env::var("CPP_TO_RUST_INCLUDE_PATHS") {
+      self.include_paths = env::split_paths(&paths).collect();
+    }
   }
 
   pub fn lib_paths(&self) -> &[PathBuf] {

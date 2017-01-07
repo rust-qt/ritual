@@ -1,6 +1,7 @@
 use errors::Result;
 use file_utils::{create_dir_all, path_to_str};
 use utils::{is_msvc, run_command};
+use utils::MapIfOk;
 
 use std::process::Command;
 use std::path::PathBuf;
@@ -8,6 +9,25 @@ use std::path::PathBuf;
 pub struct CMakeVar {
   pub name: String,
   pub value: String,
+}
+impl CMakeVar {
+  pub fn new<S1: Into<String>, S2: Into<String>>(name: S1, value: S2) -> CMakeVar {
+    CMakeVar {
+      name: name.into(),
+      value: value.into(),
+    }
+  }
+  pub fn new_path_list<S1: Into<String>>(name: S1, paths: &[PathBuf]) -> Result<CMakeVar> {
+    let value = paths.map_if_ok(|x| -> Result<_> {
+      let s = path_to_str(x)?;
+      Ok(if s.contains(" ") {
+        format!("\"{}\"", s)
+      } else {
+        s.to_string()
+      })
+    })?.join(" ");
+    Ok(CMakeVar::new(name, value))
+  }
 }
 
 pub struct CppLibBuilder {

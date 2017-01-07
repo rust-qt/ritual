@@ -195,13 +195,13 @@ impl CppBuildConfig {
       data: data,
     });
   }
-  pub fn eval(&self, target: &::target::Target) -> CppBuildConfigData {
+  pub fn eval(&self, target: &::target::Target) -> Result<CppBuildConfigData> {
     let mut data = CppBuildConfigData::default();
     for item in &self.items {
       if item.condition.eval(target) {
-        data.add_from(&item.data);
+        data.add_from(&item.data)?;
       }
     }
-    data
+    Ok(data)
   }
 }

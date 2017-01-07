@@ -119,16 +119,13 @@ fn full_run() {
   for cargo_cmd in &["update", "build", "test", "doc"] {
     let mut command = Command::new("cargo");
     command.arg(cargo_cmd);
-    command.arg("--verbose");
+    command.arg("-vv");
     if *cargo_cmd != "update" {
       command.arg("-j1");
     }
     command.current_dir(&crate_dir);
-
-    for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB", "PATH"] {
-      let value = add_env_path_item(name, vec![cpp_install_lib_dir.clone()]).unwrap();
-      command.env(name, value);
-    }
+    command.env("CPP_TO_RUST_INCLUDE_PATHS", &include_path);
+    command.env("CPP_TO_RUST_LIB_PATHS", &cpp_install_lib_dir);
     run_command(&mut command, false, false).unwrap();
   }
 }
