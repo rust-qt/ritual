@@ -23,7 +23,7 @@ fn out_dir() -> Result<PathBuf> {
 
 
 pub fn default_cpp_build_config() -> Result<CppBuildConfig> {
-  load_json(manifest_dir()?.with_added("rust_export_info.json"))
+  load_json(manifest_dir()?.with_added("cpp_build_config.json"))
 }
 
 impl Config {
