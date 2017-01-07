@@ -5,7 +5,7 @@ include_directories(${{CMAKE_CURRENT_SOURCE_DIR}}/include ${{CMAKE_CURRENT_BINAR
 
 file(GLOB sources src/*.cpp)
 file(GLOB headers include/*.h)
-if(NOT(${{C2R_LIBRARY_TYPE}} EQUAL "SHARED" OR ${{C2R_LIBRARY_TYPE}} EQUAL "STATIC")
+if(NOT("${{C2R_LIBRARY_TYPE}}" EQUAL "SHARED" OR "${{C2R_LIBRARY_TYPE}}" EQUAL "STATIC"))
   message(FATAL_ERROR "C2R_LIBRARY_TYPE must be either SHARED or STATIC." )
 endif()
 add_library({lib_name_lowercase} ${{C2R_LIBRARY_TYPE}} ${{sources}})
