@@ -1,3 +1,4 @@
+use errors::Result;
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -99,18 +100,23 @@ struct CppBuildConfigItem {
   data: CppBuildConfigData,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Deserialize)]
+pub enum CppLibraryType {
+  Shared,
+  Static,
+}
+
 /// Platform-specific information
 /// required to build the C++ wrapper library.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone, Default)]
 #[derive(Serialize, Deserialize)]
 pub struct CppBuildConfigData {
   linked_libs: Vec<String>,
   linked_frameworks: Vec<String>,
-  cpp_compiler_flags: Vec<String>,
+  compiler_flags: Vec<String>,
+  library_type: Option<CppLibraryType>,
 }
-
-
-
 
 impl CppBuildConfigData {
   pub fn new() -> CppBuildConfigData {
@@ -128,18 +134,24 @@ impl CppBuildConfigData {
   }
 
   /// Adds a command line argument for the C++ compiler.
-  pub fn add_cpp_compiler_flag<P: Into<String>>(&mut self, lib: P) {
-    self.cpp_compiler_flags.push(lib.into());
+  pub fn add_compiler_flag<P: Into<String>>(&mut self, lib: P) {
+    self.compiler_flags.push(lib.into());
   }
 
   /// Adds multiple flags. See `CppBuildConfigData::add_cpp_compiler_flag`.
-  pub fn add_cpp_compiler_flags<Item, Iter>(&mut self, items: Iter)
+  pub fn add_compiler_flags<Item, Iter>(&mut self, items: Iter)
     where Item: Into<String>,
           Iter: IntoIterator<Item = Item>
   {
     for item in items {
-      self.cpp_compiler_flags.push(item.into());
+      self.compiler_flags.push(item.into());
     }
+  }
+
+  /// Sets library type. C++ wrapper is static by default.
+  /// Shared library can be used to work around MSVC linker's limitations.
+  pub fn set_library_type(&mut self, t: CppLibraryType) {
+    self.library_type = Some(t);
   }
 
   pub fn linked_libs(&self) -> &[String] {
@@ -150,15 +162,26 @@ impl CppBuildConfigData {
     &self.linked_frameworks
   }
 
-  pub fn cpp_compiler_flags(&self) -> &[String] {
-    &self.cpp_compiler_flags
+  pub fn compiler_flags(&self) -> &[String] {
+    &self.compiler_flags
   }
 
+  pub fn library_type(&self) -> Option<CppLibraryType> {
+    self.library_type
+  }
 
-  fn add_from(&mut self, other: &CppBuildConfigData) {
+  fn add_from(&mut self, other: &CppBuildConfigData) -> Result<()> {
     self.linked_libs.append(&mut other.linked_libs.clone());
     self.linked_frameworks.append(&mut other.linked_frameworks.clone());
-    self.cpp_compiler_flags.append(&mut other.cpp_compiler_flags.clone());
+    self.compiler_flags.append(&mut other.compiler_flags.clone());
+    if self.library_type.is_some() {
+      if other.library_type.is_some() && other.library_type != self.library_type {
+        return Err("conflicting library types specified".into());
+      }
+    } else {
+      self.library_type = other.library_type;
+    }
+    Ok(())
   }
 }
 
