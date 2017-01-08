@@ -51,17 +51,17 @@ pub fn run_command(command: &mut Command, fetch_stdout: bool, pipe_output: bool)
   // command.output() must be called before command.status()
   // to avoid freezes on Windows
   let output = if pipe_output || fetch_stdout {
-    Some(try!(command.output().chain_err(|| format!("command execution failed: {:?}", command))))
+    Some(command.output().chain_err(|| format!("command execution failed: {:?}", command))?)
   } else {
     None
   };
 
-  let status = try!(command.status()
-    .chain_err(|| format!("command execution failed: {:?}", command)));
+  let status = command.status()
+      .chain_err(|| format!("command execution failed: {:?}", command))?;
   if status.success() {
     Ok(if let Some(output) = output {
       if fetch_stdout {
-        try!(String::from_utf8(output.stdout).chain_err(|| "comand output is not valid unicode"))
+        String::from_utf8(output.stdout).chain_err(|| "comand output is not valid unicode")?
       } else {
         String::new()
       }
@@ -72,9 +72,9 @@ pub fn run_command(command: &mut Command, fetch_stdout: bool, pipe_output: bool)
     if let Some(output) = output {
       use std::io::Write;
       log::error("Stdout:");
-      try!(std::io::stderr().write_all(&output.stdout).chain_err(|| "output failed"));
+      std::io::stderr().write_all(&output.stdout).chain_err(|| "output failed")?;
       log::error("Stderr:");
-      try!(std::io::stderr().write_all(&output.stderr).chain_err(|| "output failed"));
+      std::io::stderr().write_all(&output.stderr).chain_err(|| "output failed")?;
     }
     Err(format!("command failed with status {:?}: {:?}", status, command).into())
   }
@@ -105,7 +105,7 @@ impl<A, T: IntoIterator<Item = A>> MapIfOk<A> for T {
                                                             -> std::result::Result<Vec<B>, E> {
     let mut r = Vec::new();
     for item in self {
-      r.push(try!(f(item)));
+      r.push(f(item)?);
     }
     Ok(r)
   }

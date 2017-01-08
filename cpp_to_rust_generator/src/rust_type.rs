@@ -134,7 +134,7 @@ impl RustType {
         if let Some(ref args) = *generic_arguments {
           name = format!("{}_{}",
                          name,
-                         try!(args.iter().map_if_ok(|x| x.caption())).join("_"));
+                         args.iter().map_if_ok(|x| x.caption())?.join("_"));
         }
         let mut_text = if *is_const { "" } else { "_mut" };
         match *indirection {
@@ -254,7 +254,7 @@ impl RustType {
             _ => return Err(unexpected(format!("unknown libc type: {:?}", base)).into()),
           };
           RustType::Common {
-            base: try!(real_name),
+            base: real_name?,
             generic_arguments: generic_arguments.clone(),
             is_const: *is_const,
             is_const2: *is_const2,
@@ -266,8 +266,8 @@ impl RustType {
       }
       RustType::FunctionPointer { ref return_type, ref arguments } => {
         RustType::FunctionPointer {
-          return_type: Box::new(try!(return_type.as_ref().dealias_libc())),
-          arguments: try!(arguments.iter().map_if_ok(|arg| arg.dealias_libc())),
+          return_type: Box::new(return_type.as_ref().dealias_libc()?),
+          arguments: arguments.iter().map_if_ok(|arg| arg.dealias_libc())?,
         }
       }
     })

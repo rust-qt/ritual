@@ -145,22 +145,22 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
                                             cpp_code: Option<String>,
                                             f: F)
                                             -> Result<R> {
-  let clang = try!(init_clang());
+  let clang = init_clang()?;
   let index = Index::new(&clang, false, false);
   {
-    let mut tmp_file = try!(create_file(&config.tmp_cpp_path));
+    let mut tmp_file = create_file(&config.tmp_cpp_path)?;
     for directive in &config.include_directives {
-      try!(tmp_file.write(format!("#include \"{}\"\n", try!(path_to_str(directive)))));
+      tmp_file.write(format!("#include \"{}\"\n", path_to_str(directive)?))?;
     }
     if let Some(cpp_code) = cpp_code {
-      try!(tmp_file.write(cpp_code));
+      tmp_file.write(cpp_code)?;
     }
   }
   // TODO: PIC and additional args should be moved to lib spec (#13)
   let mut args = vec!["-Xclang".to_string(), "-detailed-preprocessing-record".to_string()];
   args.append(&mut config.flags.clone());
   for dir in &config.include_paths {
-    let str = try!(path_to_str(dir));
+    let str = path_to_str(dir)?;
     args.push("-I".to_string());
     args.push(str.to_string());
   }
@@ -169,16 +169,16 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
     args.push(path);
   }
   for dir in &config.framework_paths {
-    let str = try!(path_to_str(dir));
+    let str = path_to_str(dir)?;
     args.push("-F".to_string());
     args.push(str.to_string());
   }
   log::info(format!("clang arguments: {:?}", args));
 
-  let tu = try!(index.parser(&config.tmp_cpp_path)
+  let tu = index.parser(&config.tmp_cpp_path)
     .arguments(&args)
     .parse()
-    .map_err(|err| format!("clang parse failed: {:?}", err)));
+    .map_err(|err| format!("clang parse failed: {:?}", err))?;
   let translation_unit = tu.get_entity();
   assert!(translation_unit.get_kind() == EntityKind::TranslationUnit);
   {
@@ -197,7 +197,7 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
     }
   }
   let result = f(translation_unit);
-  try!(remove_file(&config.tmp_cpp_path));
+  remove_file(&config.tmp_cpp_path)?;
   result
 }
 
@@ -205,7 +205,7 @@ pub fn run(config: CppParserConfig, dependencies_data: Vec<CppData>) -> Result<C
   log::info(get_version());
   log::info("Initializing clang...");
   let (types, methods, insts) = {
-    let (mut parser, methods) = try!(run_clang(&config, None, |translation_unit| {
+    let (mut parser, methods) = run_clang(&config, None, |translation_unit| {
       let mut parser = CppParser {
         types: Vec::new(),
         config: config.clone(),
@@ -216,7 +216,7 @@ pub fn run(config: CppParserConfig, dependencies_data: Vec<CppData>) -> Result<C
       log::info("Parsing methods...");
       let methods = parser.parse_methods(translation_unit);
       Ok((parser, methods))
-    }));
+    })?;
     log::info("Checking integrity...");
     let (good_methods, good_types) = parser.check_integrity(methods);
     parser.types = good_types;
@@ -253,7 +253,7 @@ impl<'a> CppParser<'a> {
                           context_class: Option<Entity>,
                           context_method: Option<Entity>)
                           -> Result<CppType> {
-    let template_class_regex = try!(Regex::new(r"^([\w:]+)<(.+)>$"));
+    let template_class_regex = Regex::new(r"^([\w:]+)<(.+)>$")?;
     let (is_const, name) = if let Some(type1) = type1 {
       let is_const = type1.is_const_qualified();
       let mut name = type1.get_display_name();
@@ -296,7 +296,7 @@ impl<'a> CppParser<'a> {
             }
             return Ok(CppType {
               base: CppTypeBase::Class(CppTypeClassBase {
-                name: try!(get_full_name(declaration)),
+                name: get_full_name(declaration)?,
                 template_arguments: Some(arg_types),
               }),
               is_const: is_const,
@@ -320,19 +320,17 @@ impl<'a> CppParser<'a> {
     } else {
       return Err("parse_unexposed_type: either type or string must be present".into());
     };
-    let re = try!(Regex::new(r"^type-parameter-(\d+)-(\d+)$"));
+    let re = Regex::new(r"^type-parameter-(\d+)-(\d+)$")?;
     if let Some(matches) = re.captures(name.as_ref()) {
       if matches.len() < 3 {
         return Err("invalid matches len in regexp".into());
       }
       return Ok(CppType {
         base: CppTypeBase::TemplateParameter {
-          nested_level: try!(matches[1]
-            .parse()
-            .chain_err(|| "encountered not a number while parsing type-parameter-X-X")),
-          index: try!(matches[2]
-            .parse()
-            .chain_err(|| "encountered not a number while parsing type-parameter-X-X")),
+          nested_level: matches[1].parse()
+            .chain_err(|| "encountered not a number while parsing type-parameter-X-X")?,
+          index: matches[2].parse()
+            .chain_err(|| "encountered not a number while parsing type-parameter-X-X")?,
         },
         is_const: is_const,
         is_const2: false,
@@ -399,9 +397,9 @@ impl<'a> CppParser<'a> {
                                                      Some(remaining_name.to_string()),
                                                      context_class,
                                                      context_method) {
-        let mut new_indirection = try!(CppTypeIndirection::combine(&subtype.indirection,
-                                                                   &result_type.indirection)
-          .map_err(|e| e.to_string()));
+        let mut new_indirection = CppTypeIndirection::combine(&subtype.indirection,
+                                                              &result_type.indirection)
+            .map_err(|e| e.to_string())?;
         if new_indirection == CppTypeIndirection::Ptr {
           if let CppTypeBase::FunctionPointer(..) = subtype.base {
             new_indirection = CppTypeIndirection::None;
@@ -484,7 +482,7 @@ impl<'a> CppParser<'a> {
     }
 
     let parsed =
-      try!(self.parse_canonical_type(type1.get_canonical_type(), context_class, context_method));
+      self.parse_canonical_type(type1.get_canonical_type(), context_class, context_method)?;
     if let CppTypeBase::BuiltInNumeric(..) = parsed.base {
       if parsed.indirection == CppTypeIndirection::None {
         let mut name = type1.get_display_name();
@@ -649,7 +647,7 @@ impl<'a> CppParser<'a> {
       TypeKind::Enum => {
         if let Some(declaration) = type1.get_declaration() {
           Ok(CppType {
-            base: CppTypeBase::Enum { name: try!(get_full_name(declaration)) },
+            base: CppTypeBase::Enum { name: get_full_name(declaration)? },
             is_const: is_const,
             is_const2: false,
             indirection: CppTypeIndirection::None,
@@ -666,7 +664,7 @@ impl<'a> CppParser<'a> {
                                get_full_name(declaration).unwrap_or("unnamed".to_string()))
               .into());
           }
-          let declaration_name = try!(get_full_name(declaration));
+          let declaration_name = get_full_name(declaration)?;
           let template_arguments = match type1.get_template_argument_types() {
             None => None,
             Some(arg_types) => {
@@ -764,9 +762,9 @@ impl<'a> CppParser<'a> {
                   _ => unreachable!(),
                 };
 
-                let mut new_indirection = try!(CppTypeIndirection::combine(&subtype.indirection,
-                                                   &original_type_indirection)
-                    .map_err(|e| e.to_string()));
+                let mut new_indirection = CppTypeIndirection::combine(&subtype.indirection,
+                                                                      &original_type_indirection)
+                    .map_err(|e| e.to_string())?;
                 if new_indirection == CppTypeIndirection::Ptr {
                   if let CppTypeBase::FunctionPointer(..) = subtype.base {
                     new_indirection = CppTypeIndirection::None;
@@ -869,25 +867,27 @@ impl<'a> CppParser<'a> {
         .enumerate() {
       let name = argument_entity.get_name()
         .unwrap_or_else(|| format!("arg{}", argument_number + 1));
-      let clang_type = try!(argument_entity.get_type().chain_err(|| {
-        format!("failed to get type from argument entity: {:?}",
-                argument_entity)
-      }));
+      let clang_type = argument_entity.get_type()
+        .chain_err(|| {
+          format!("failed to get type from argument entity: {:?}",
+                  argument_entity)
+        })?;
       if clang_type.get_display_name().ends_with("::QPrivateSignal") {
         is_signal = true;
         continue;
       }
-      let argument_type = try!(self.parse_type(clang_type, class_entity, Some(entity))
+      let argument_type = self.parse_type(clang_type, class_entity, Some(entity))
         .chain_err(|| {
           format!("Can't parse argument type: {}: {}",
                   name,
                   clang_type.get_display_name())
-        }));
+        })?;
       let mut has_default_value = false;
-      for token in try!(argument_entity.get_range().chain_err(|| {
+      for token in argument_entity.get_range()
+        .chain_err(|| {
           format!("failed to get range from argument entity: {:?}",
                   argument_entity)
-        }))
+        })?
         .tokenize() {
         let spelling = token.get_spelling();
         if spelling == "=" {
@@ -905,21 +905,21 @@ impl<'a> CppParser<'a> {
         has_default_value: has_default_value,
       });
     }
-    let mut name = try!(entity.get_name().chain_err(|| "failed to get function name"));
+    let mut name = entity.get_name().chain_err(|| "failed to get function name")?;
     if name.contains('<') {
-      let regex = try!(Regex::new(r"^([\w~]+)<[^<>]+>$"));
+      let regex = Regex::new(r"^([\w~]+)<[^<>]+>$")?;
       if let Some(matches) = regex.captures(name.clone().as_ref()) {
         log::warning(format!("Fixing malformed method name: {}", name));
-        name = try!(matches.at(1).chain_err(|| "invalid matches count")).to_string();
+        name = matches.at(1).chain_err(|| "invalid matches count")?.to_string();
       }
     }
     let mut name_with_namespace = name.clone();
     if let Some(parent) = entity.get_semantic_parent() {
       if parent.get_kind() == EntityKind::Namespace {
-        name_with_namespace = format!("{}::{}",
-                                      try!(get_full_name(parent)
-                                        .chain_err(|| "failed to get full name of parent entity")),
-                                      name);
+        name_with_namespace =
+          format!("{}::{}",
+                  get_full_name(parent).chain_err(|| "failed to get full name of parent entity")?,
+                  name);
       }
     }
     let allows_variadic_arguments = entity.is_variadic();
@@ -956,7 +956,7 @@ impl<'a> CppParser<'a> {
 
       }
     }
-    let source_range = try!(entity.get_range().chain_err(|| "failed to get range of the function"));
+    let source_range = entity.get_range().chain_err(|| "failed to get range of the function")?;
     let tokens = source_range.tokenize();
     let declaration_code = if tokens.is_empty() {
       log::noisy(format!("Failed to tokenize method {} at {:?}",
@@ -964,7 +964,7 @@ impl<'a> CppParser<'a> {
                          source_range));
       let start = source_range.get_start().get_file_location();
       let end = source_range.get_end().get_file_location();
-      let file = try!(open_file(start.file.get_path()));
+      let file = open_file(start.file.get_path())?;
       let reader = BufReader::new(file.into_file());
       let mut result = String::new();
       let range_line1 = (start.line - 1) as usize;
@@ -972,10 +972,10 @@ impl<'a> CppParser<'a> {
       let range_col1 = (start.column - 1) as usize;
       let range_col2 = (end.column - 1) as usize;
       for (line_num, line) in reader.lines().enumerate() {
-        let line = try!(line.chain_err(|| {
-          format!("failed while reading lines from {}",
-                  start.file.get_path().display())
-        }));
+        let line = line.chain_err(|| {
+            format!("failed while reading lines from {}",
+                    start.file.get_path().display())
+          })?;
         if line_num >= range_line1 && line_num <= range_line2 {
           let start_column = if line_num == range_line1 {
             range_col1
@@ -1043,7 +1043,7 @@ impl<'a> CppParser<'a> {
             is_signal: is_signal,
             is_slot: false,
             class_type: match self.find_type(|x| &x.name == &class_name) {
-              Some(info) => try!(info.default_class_type()),
+              Some(info) => info.default_class_type()?,
               None => return Err(format!("Unknown class type: {}", class_name).into()),
             },
             fake: None,
@@ -1055,8 +1055,8 @@ impl<'a> CppParser<'a> {
       arguments_before_omitting: None,
       allows_variadic_arguments: allows_variadic_arguments,
       return_type: return_type_parsed,
-      include_file: try!(self.entity_include_file(entity)),
-      origin_location: Some(try!(get_origin_location(entity))),
+      include_file: self.entity_include_file(entity)?,
+      origin_location: Some(get_origin_location(entity)?),
       template_arguments: template_arguments,
       template_arguments_values: None,
       declaration_code: declaration_code,
@@ -1068,41 +1068,42 @@ impl<'a> CppParser<'a> {
   }
 
   fn parse_enum(&self, entity: Entity) -> Result<CppTypeData> {
-    let include_file = try!(self.entity_include_file(entity).chain_err(|| {
-      format!("Origin of type is unknown: {}; entity: {:?}",
-              get_full_name(entity).unwrap_or("?".into()),
-              entity)
-    }));
+    let include_file = self.entity_include_file(entity)
+      .chain_err(|| {
+        format!("Origin of type is unknown: {}; entity: {:?}",
+                get_full_name(entity).unwrap_or("?".into()),
+                entity)
+      })?;
     let mut values = Vec::new();
     for child in entity.get_children() {
       if child.get_kind() == EntityKind::EnumConstantDecl {
-        let val = try!(child.get_enum_constant_value()
-          .chain_err(|| "failed to get value of enum variant"));
+        let val = child.get_enum_constant_value()
+          .chain_err(|| "failed to get value of enum variant")?;
         values.push(CppEnumValue {
-          name: try!(child.get_name().chain_err(|| "failed to get name of enum variant")),
+          name: child.get_name().chain_err(|| "failed to get name of enum variant")?,
           value: val.0,
           doc: None,
         });
       }
     }
     Ok(CppTypeData {
-      name: try!(get_full_name(entity)),
+      name: get_full_name(entity)?,
       include_file: include_file,
-      origin_location: try!(get_origin_location(entity)),
+      origin_location: get_origin_location(entity)?,
       kind: CppTypeKind::Enum { values: values },
       doc: None,
     })
   }
 
   fn parse_class_field(&self, entity: Entity) -> Result<CppClassField> {
-    let field_name = try!(entity.get_name().chain_err(|| "failed to get field name"));
-    let field_clang_type = try!(entity.get_type().chain_err(|| "failed to get field type"));
-    let field_type = try!(self.parse_type(field_clang_type, Some(entity), None)
+    let field_name = entity.get_name().chain_err(|| "failed to get field name")?;
+    let field_clang_type = entity.get_type().chain_err(|| "failed to get field type")?;
+    let field_type = self.parse_type(field_clang_type, Some(entity), None)
       .chain_err(|| {
         format!("failed to parse field type: {}::{}",
                 get_full_name(entity).unwrap_or("?".into()),
                 field_name)
-      }));
+      })?;
     Ok(CppClassField {
       size: match field_clang_type.get_sizeof() {
         Ok(size) => Some(size as i32),
@@ -1119,12 +1120,13 @@ impl<'a> CppParser<'a> {
   }
 
   fn parse_class(&self, entity: Entity) -> Result<CppTypeData> {
-    let include_file = try!(self.entity_include_file(entity).chain_err(|| {
-      format!("Origin of type is unknown: {}; entity: {:?}",
-              get_full_name(entity).unwrap_or("?".into()),
-              entity)
-    }));
-    let full_name = try!(get_full_name(entity));
+    let include_file = self.entity_include_file(entity)
+      .chain_err(|| {
+        format!("Origin of type is unknown: {}; entity: {:?}",
+                get_full_name(entity).unwrap_or("?".into()),
+                entity)
+      })?;
+    let full_name = get_full_name(entity)?;
     let mut fields = Vec::new();
     let mut bases = Vec::new();
     let using_directives = entity.get_children()
@@ -1226,9 +1228,9 @@ impl<'a> CppParser<'a> {
   }
 
   fn entity_include_file(&self, entity: Entity) -> Result<String> {
-    let file_path_buf = PathBuf::from(try!(self.entity_include_path(entity)));
-    let file_name = try!(file_path_buf.file_name().chain_err(|| "no file name in file path"));
-    Ok(try!(os_str_to_str(file_name)).to_string())
+    let file_path_buf = PathBuf::from(self.entity_include_path(entity)?);
+    let file_name = file_path_buf.file_name().chain_err(|| "no file name in file path")?;
+    Ok(os_str_to_str(file_name)?.to_string())
   }
 
   fn should_process_entity(&self, entity: Entity) -> bool {

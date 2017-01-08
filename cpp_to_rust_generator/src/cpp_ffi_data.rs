@@ -54,11 +54,11 @@ impl CppFfiFunctionArgument {
     Ok(match strategy {
       ArgumentCaptionStrategy::NameOnly => self.name.clone(),
       ArgumentCaptionStrategy::TypeOnly(type_strategy) => {
-        try!(self.argument_type.original_type.caption(type_strategy))
+        self.argument_type.original_type.caption(type_strategy)?
       }
       ArgumentCaptionStrategy::TypeAndName(type_strategy) => {
         format!("{}_{}",
-                try!(self.argument_type.original_type.caption(type_strategy)),
+                self.argument_type.original_type.caption(type_strategy)?,
                 self.name)
       }
     })
@@ -68,10 +68,10 @@ impl CppFfiFunctionArgument {
   /// corresponding to this argument
   pub fn to_cpp_code(&self) -> Result<String> {
     if let CppTypeBase::FunctionPointer(..) = self.argument_type.ffi_type.base {
-      Ok(try!(self.argument_type.ffi_type.to_cpp_code(Some(&self.name))))
+      Ok(self.argument_type.ffi_type.to_cpp_code(Some(&self.name))?)
     } else {
       Ok(format!("{} {}",
-                 try!(self.argument_type.ffi_type.to_cpp_code(None)),
+                 self.argument_type.ffi_type.to_cpp_code(None)?,
                  self.name))
     }
   }
@@ -101,10 +101,10 @@ impl CppFfiFunctionSignature {
   /// Used to generate FFI methods with different names
   /// for overloaded functions.
   pub fn arguments_caption(&self, strategy: ArgumentCaptionStrategy) -> Result<String> {
-    let r = try!(self.arguments
+    let r = self.arguments
       .iter()
       .filter(|x| x.meaning.is_argument())
-      .map_if_ok(|arg| arg.caption(strategy.clone())));
+      .map_if_ok(|arg| arg.caption(strategy.clone()))?;
     Ok(if r.is_empty() {
       "no_args".to_string()
     } else {
@@ -116,7 +116,7 @@ impl CppFfiFunctionSignature {
   /// to avoid name conflict.
   pub fn caption(&self, strategy: MethodCaptionStrategy) -> Result<String> {
     Ok(match strategy {
-      MethodCaptionStrategy::ArgumentsOnly(s) => try!(self.arguments_caption(s)),
+      MethodCaptionStrategy::ArgumentsOnly(s) => self.arguments_caption(s)?,
       MethodCaptionStrategy::ConstOnly => {
         if self.has_const_this() {
           "const".to_string()
@@ -130,7 +130,7 @@ impl CppFfiFunctionSignature {
         } else {
           "".to_string()
         };
-        r + &try!(self.arguments_caption(s))
+        r + &self.arguments_caption(s)?
       }
     })
   }
@@ -195,7 +195,7 @@ pub fn c_base_name(cpp_method: &CppMethod,
                    include_file: &str)
                    -> Result<String> {
   let scope_prefix = match cpp_method.class_membership {
-    Some(ref info) => format!("{}_", try!(info.class_type.caption())),
+    Some(ref info) => format!("{}_", info.class_type.caption()?),
     None => format!("{}_G_", include_file),
   };
 
@@ -227,9 +227,9 @@ pub fn c_base_name(cpp_method: &CppMethod,
     add_place_note(match *operator {
       CppOperator::Conversion(ref cpp_type) => {
         format!("convert_to_{}",
-                try!(cpp_type.caption(TypeCaptionStrategy::Full)))
+                cpp_type.caption(TypeCaptionStrategy::Full)?)
       }
-      _ => format!("operator_{}", try!(operator.c_name())),
+      _ => format!("operator_{}", operator.c_name()?),
     })
   } else {
     add_place_note(cpp_method.name.replace("::", "_"))
@@ -237,7 +237,7 @@ pub fn c_base_name(cpp_method: &CppMethod,
   let template_args_text = match cpp_method.template_arguments_values {
     Some(ref args) => {
       format!("_{}",
-              try!(args.iter().map_if_ok(|x| x.caption(TypeCaptionStrategy::Full))).join("_"))
+              args.iter().map_if_ok(|x| x.caption(TypeCaptionStrategy::Full))?.join("_"))
     }
     None => String::new(),
   };

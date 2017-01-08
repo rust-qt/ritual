@@ -31,8 +31,7 @@ pub fn run(cpp_data: &CppData,
   };
 
   let mut c_headers = Vec::new();
-  let mut include_name_list: Vec<_> =
-    try!(generator.cpp_data.all_include_files()).into_iter().collect();
+  let mut include_name_list: Vec<_> = generator.cpp_data.all_include_files()?.into_iter().collect();
   include_name_list.sort();
 
   for include_file in &include_name_list {
@@ -41,11 +40,11 @@ pub fn run(cpp_data: &CppData,
     if let Some(index) = include_file_base_name.find('.') {
       include_file_base_name = include_file_base_name[0..index].to_string();
     }
-    let methods = try!(generator.process_methods(&include_file_base_name,
-                                                 generator.cpp_data
-                                                   .methods
-                                                   .iter()
-                                                   .filter(|x| &x.include_file == include_file)));
+    let methods = generator.process_methods(&include_file_base_name,
+                       generator.cpp_data
+                         .methods
+                         .iter()
+                         .filter(|x| &x.include_file == include_file))?;
     if methods.is_empty() {
       log::info(format!("Skipping empty include file {}", include_file));
     } else {
@@ -56,7 +55,7 @@ pub fn run(cpp_data: &CppData,
       });
     }
   }
-  if let Some(header) = try!(generator.generate_slot_wrappers()) {
+  if let Some(header) = generator.generate_slot_wrappers()? {
     c_headers.push(header);
   }
   if c_headers.is_empty() {
@@ -71,7 +70,7 @@ impl<'a> CGenerator<'a> {
   fn should_process_method(&self, method: &CppMethod) -> Result<bool> {
     let class_name = method.class_name().unwrap_or(&String::new()).clone();
     for filter in &self.filters {
-      let allowed = try!(filter(method).chain_err(|| "cpp_ffi_generator_filter failed"));
+      let allowed = filter(method).chain_err(|| "cpp_ffi_generator_filter failed")?;
       if !allowed {
         log::info(format!("Skipping blacklisted method: \n{}\n", method.short_text()));
         return Ok(false);
@@ -132,7 +131,7 @@ impl<'a> CGenerator<'a> {
       //      if method.name == "static_cast" {
       //        println!("OK1!!! {:?}", method);
       //      }
-      if !try!(self.should_process_method(method)) {
+      if !self.should_process_method(method)? {
         continue;
       }
       match method.to_ffi_signatures() {
@@ -174,7 +173,7 @@ impl<'a> CGenerator<'a> {
         let mut type_captions = HashSet::new();
         let mut ok = true;
         for value in &values {
-          let caption = try!(value.c_signature.caption(strategy.clone()));
+          let caption = value.c_signature.caption(strategy.clone())?;
           if type_captions.contains(&caption) {
             ok = false;
             break;
@@ -188,7 +187,7 @@ impl<'a> CGenerator<'a> {
       }
       if let Some(strategy) = found_strategy {
         for x in values {
-          let caption = try!(x.c_signature.caption(strategy.clone()));
+          let caption = x.c_signature.caption(strategy.clone())?;
           let final_name = if caption.is_empty() {
             key.clone()
           } else {
@@ -217,8 +216,8 @@ impl<'a> CGenerator<'a> {
     let mut qt_slot_wrappers = Vec::new();
     let mut methods = Vec::new();
     for types in &self.cpp_data.signal_argument_types {
-      let ffi_types = try!(types.map_if_ok(|t| t.to_cpp_ffi_type(CppTypeRole::NotReturnType)));
-      let args_captions = try!(types.map_if_ok(|t| t.caption(TypeCaptionStrategy::Full)));
+      let ffi_types = types.map_if_ok(|t| t.to_cpp_ffi_type(CppTypeRole::NotReturnType))?;
+      let args_captions = types.map_if_ok(|t| t.caption(TypeCaptionStrategy::Full))?;
       let args_caption = if args_captions.is_empty() {
         "no_args".to_string()
       } else {
@@ -318,7 +317,7 @@ impl<'a> CGenerator<'a> {
           }
         })
                                                  .collect());
-      let receiver_id = try!(method_custom_slot.receiver_id());
+      let receiver_id = method_custom_slot.receiver_id()?;
       methods.push(method_custom_slot);
       qt_slot_wrappers.push(QtSlotWrapper {
         class_name: class_name.clone(),
@@ -352,7 +351,7 @@ impl<'a> CGenerator<'a> {
     }
     Ok(Some(CppFfiHeaderData {
       include_file_base_name: include_file_name.to_string(),
-      methods: try!(self.process_methods(include_file_name, methods.iter()))
+      methods: self.process_methods(include_file_name, methods.iter())?
         .into_iter()
         .filter(|x| x.allocation_place != ReturnValueAllocationPlace::Stack)
         .collect(),

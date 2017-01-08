@@ -98,7 +98,7 @@ impl CppTypeClassBase {
       Some(ref args) => {
         let mut arg_texts = Vec::new();
         for arg in args {
-          arg_texts.push(try!(arg.to_cpp_code(None)));
+          arg_texts.push(arg.to_cpp_code(None)?);
         }
         Ok(format!("{}< {} >", self.name, arg_texts.join(", ")))
       }
@@ -112,7 +112,7 @@ impl CppTypeClassBase {
       Some(ref args) => {
         format!("{}_{}",
                 name_caption,
-                try!(args.iter().map_if_ok(|arg| arg.caption(TypeCaptionStrategy::Full))).join("_"))
+                args.iter().map_if_ok(|arg| arg.caption(TypeCaptionStrategy::Full))?.join("_"))
       }
       None => name_caption,
     })
@@ -128,7 +128,7 @@ impl CppTypeClassBase {
         Some(ref template_arguments) => {
           let mut args = Vec::new();
           for arg in template_arguments {
-            args.push(try!(arg.instantiate(nested_level1, template_arguments1)));
+            args.push(arg.instantiate(nested_level1, template_arguments1)?);
           }
           Some(args)
         }
@@ -215,11 +215,11 @@ impl CppTypeBase {
         }
         let mut arg_texts = Vec::new();
         for arg in arguments {
-          arg_texts.push(try!(arg.to_cpp_code(None)));
+          arg_texts.push(arg.to_cpp_code(None)?);
         }
         if let Some(function_pointer_inner_text) = function_pointer_inner_text {
           Ok(format!("{} (*{})({})",
-                     try!(return_type.as_ref().to_cpp_code(None)),
+                     return_type.as_ref().to_cpp_code(None)?,
                      function_pointer_inner_text,
                      arg_texts.join(", ")))
         } else {
@@ -249,7 +249,7 @@ impl CppTypeBase {
       CppTypeBase::SpecificNumeric { ref name, .. } |
       CppTypeBase::PointerSizedInteger { ref name, .. } => name.clone(),
       CppTypeBase::Enum { ref name } => name.replace("::", "_"),
-      CppTypeBase::Class(ref data) => try!(data.caption()),
+      CppTypeBase::Class(ref data) => data.caption()?,
       CppTypeBase::TemplateParameter { .. } => {
         return Err("template parameters are not allowed to have captions".into());
       }
@@ -260,8 +260,8 @@ impl CppTypeBase {
           TypeCaptionStrategy::Short => "func".to_string(),
           TypeCaptionStrategy::Full => {
             format!("{}_func_{}",
-                    try!(return_type.caption(strategy.clone())),
-                    try!(arguments.iter().map_if_ok(|x| x.caption(strategy.clone()))).join("_"))
+                    return_type.caption(strategy.clone())?,
+                    arguments.iter().map_if_ok(|x| x.caption(strategy.clone()))?.join("_"))
           }
         }
       }
@@ -320,7 +320,7 @@ impl CppType {
   }
 
   pub fn to_cpp_code(&self, function_pointer_inner_text: Option<&str>) -> Result<String> {
-    let base_code = try!(self.base.to_cpp_code(function_pointer_inner_text));
+    let base_code = self.base.to_cpp_code(function_pointer_inner_text)?;
     Ok(self.to_cpp_code_intermediate(&base_code))
   }
 
@@ -443,9 +443,9 @@ impl CppType {
   /// used to generate FFI function names
   pub fn caption(&self, strategy: TypeCaptionStrategy) -> Result<String> {
     Ok(match strategy {
-      TypeCaptionStrategy::Short => try!(self.base.caption(strategy.clone())),
+      TypeCaptionStrategy::Short => self.base.caption(strategy.clone())?,
       TypeCaptionStrategy::Full => {
-        let mut r = try!(self.base.caption(strategy.clone()));
+        let mut r = self.base.caption(strategy.clone())?;
         match self.indirection {
           CppTypeIndirection::None => {}
           CppTypeIndirection::Ptr => r = format!("{}_ptr", r),
@@ -538,7 +538,7 @@ impl CppType {
       indirection: self.indirection.clone(),
       base: match self.base {
         CppTypeBase::Class(ref data) => {
-          CppTypeBase::Class(try!(data.instantiate_class(nested_level1, template_arguments1)))
+          CppTypeBase::Class(data.instantiate_class(nested_level1, template_arguments1)?)
         }
         _ => self.base.clone(),
       },

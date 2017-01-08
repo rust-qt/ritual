@@ -40,14 +40,14 @@ impl CppCodeGenerator {
   fn function_signature(&self, method: &CppAndFfiMethod) -> Result<String> {
     let mut arg_texts = Vec::new();
     for arg in &method.c_signature.arguments {
-      arg_texts.push(try!(arg.to_cpp_code()));
+      arg_texts.push(arg.to_cpp_code()?);
     }
     let name_with_args = format!("{}({})", method.c_name, arg_texts.join(", "));
     let return_type = &method.c_signature.return_type.ffi_type;
     let r = if let CppTypeBase::FunctionPointer(..) = return_type.base {
-      try!(return_type.to_cpp_code(Some(&name_with_args)))
+      return_type.to_cpp_code(Some(&name_with_args))?
     } else {
-      format!("{} {}", try!(return_type.to_cpp_code(None)), name_with_args)
+      format!("{} {}", return_type.to_cpp_code(None)?, name_with_args)
     };
     Ok(r)
   }
@@ -56,7 +56,7 @@ impl CppCodeGenerator {
   fn function_declaration(&self, method: &CppAndFfiMethod) -> Result<String> {
     Ok(format!("{}_EXPORT {};\n",
                self.lib_name_upper,
-               try!(self.function_signature(method))))
+               self.function_signature(method)?))
   }
 
   fn qt_slot_wrapper(&self, wrapper: &QtSlotWrapper) -> Result<String> {
@@ -66,23 +66,23 @@ impl CppCodeGenerator {
       is_const: false,
       is_const2: false,
     };
-    let method_args = try!(wrapper.arguments
-        .iter()
-        .enumerate()
-        .map_if_ok(|(num, t)| -> Result<_> {
-          Ok(format!("{} arg{}", try!(t.original_type.to_cpp_code(None)), num))
-        }))
+    let method_args = wrapper.arguments
+      .iter()
+      .enumerate()
+      .map_if_ok(|(num, t)| -> Result<_> {
+        Ok(format!("{} arg{}", t.original_type.to_cpp_code(None)?, num))
+      })?
       .join(", ");
     let func_args = once("m_data".to_string())
-      .chain(try!(wrapper.arguments
+      .chain(wrapper.arguments
         .iter()
         .enumerate()
-        .map_if_ok(|(num, t)| self.convert_type_to_ffi(t, format!("arg{}", num)))))
+        .map_if_ok(|(num, t)| self.convert_type_to_ffi(t, format!("arg{}", num)))?)
       .join(", ");
     Ok(format!(include_str!("../templates/c_lib/qt_slot_wrapper.h"),
                class_name = &wrapper.class_name,
-               func_arg = try!(func_type.to_cpp_code(Some("func"))),
-               func_field = try!(func_type.to_cpp_code(Some("m_func"))),
+               func_arg = func_type.to_cpp_code(Some("func"))?,
+               func_field = func_type.to_cpp_code(Some("m_func"))?,
                method_args = method_args,
                func_args = func_args))
 
@@ -95,7 +95,7 @@ impl CppCodeGenerator {
       IndirectionChange::NoChange => expression,
       IndirectionChange::ValueToPointer => {
         format!("new {}({})",
-                try!(type1.original_type.base.to_cpp_code(None)),
+                type1.original_type.base.to_cpp_code(None)?,
                 expression)
       }
       IndirectionChange::ReferenceToPointer => format!("&{}", expression),
@@ -123,7 +123,7 @@ impl CppCodeGenerator {
             // so no conversion is necessary for constructors.
             if !method.cpp_method.is_constructor() {
               result = format!("new {}({})",
-                               try!(method.cpp_method.return_type.base.to_cpp_code(None)),
+                               method.cpp_method.return_type.base.to_cpp_code(None)?,
                                result);
             }
           }
@@ -145,7 +145,7 @@ impl CppCodeGenerator {
         .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
         result = format!("new({}) {}({})",
                          arg.name,
-                         try!(method.cpp_method.return_type.base.to_cpp_code(None)),
+                         method.cpp_method.return_type.base.to_cpp_code(None)?,
                          result);
       }
     }
@@ -172,9 +172,9 @@ impl CppCodeGenerator {
               let mut fake_type = cpp_argument.argument_type.clone();
               fake_type.is_const = false;
               fake_type.indirection = CppTypeIndirection::None;
-              try!(fake_type.to_cpp_code(None))
+              fake_type.to_cpp_code(None)?
             } else {
-              try!(cpp_argument.argument_type.to_cpp_code(None))
+              cpp_argument.argument_type.to_cpp_code(None)?
             };
             result = format!("{}({})", type_text, result);
           }
@@ -210,13 +210,13 @@ impl CppCodeGenerator {
               .arguments
               .iter()
               .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue) {
-              format!("new({}) {}", arg.name, try!(class_type.to_cpp_code()))
+              format!("new({}) {}", arg.name, class_type.to_cpp_code()?)
             } else {
               return Err(unexpected(format!("return value argument not found\n{:?}", method))
                 .into());
             }
           }
-          ReturnValueAllocationPlace::Heap => format!("new {}", try!(class_type.to_cpp_code())),
+          ReturnValueAllocationPlace::Heap => format!("new {}", class_type.to_cpp_code()?),
           ReturnValueAllocationPlace::NotApplicable => {
             return Err(unexpected("NotApplicable in constructor").into());
           }
@@ -226,7 +226,7 @@ impl CppCodeGenerator {
           method.cpp_method
             .class_membership {
           if class_membership.is_static {
-            format!("{}::", try!(class_membership.class_type.to_cpp_code()))
+            format!("{}::", class_membership.class_type.to_cpp_code()?)
           } else {
             if let Some(arg) = method.c_signature
               .arguments
@@ -244,7 +244,7 @@ impl CppCodeGenerator {
           Some(ref args) => {
             let mut texts = Vec::new();
             for arg in args {
-              texts.push(try!(arg.to_cpp_code(None)));
+              texts.push(arg.to_cpp_code(None)?);
             }
             format!("<{}>", texts.join(", "))
           }
@@ -260,7 +260,7 @@ impl CppCodeGenerator {
             format!("{}{} = {}",
                     scope_specifier,
                     field_name,
-                    try!(self.arguments_values(method)))
+                    self.arguments_values(method)?)
           } else {
             format!("{}{}", scope_specifier, field_name)
           }
@@ -276,7 +276,7 @@ impl CppCodeGenerator {
       } else {
         format!("{}({})",
                 result_without_args,
-                try!(self.arguments_values(method)))
+                self.arguments_values(method)?)
       }
     };
     self.convert_return_type(method, result)
@@ -301,59 +301,59 @@ impl CppCodeGenerator {
                  } else {
                    "return "
                  },
-                 try!(self.returned_expression(&method))))
+                 self.returned_expression(&method)?))
     }
   }
 
   /// Generates implementation of the FFI method for the source file.
   fn function_implementation(&self, method: &CppAndFfiMethod) -> Result<String> {
     Ok(format!("{} {{\n  {}}}\n\n",
-               try!(self.function_signature(method)),
-               try!(self.source_body(&method))))
+               self.function_signature(method)?,
+               self.source_body(&method)?))
   }
 
   /// Generates main files and directories of the library.
   pub fn generate_template_files(&self, include_directives: &[PathBuf]) -> Result<()> {
     let name_upper = self.lib_name.to_uppercase();
     let cmakelists_path = self.lib_path.with_added("CMakeLists.txt");
-    let mut cmakelists_file = try!(create_file(&cmakelists_path));
+    let mut cmakelists_file = create_file(&cmakelists_path)?;
 
     // let mut all_cpp_flags = Vec::from(cpp_compiler_flags);
     // for dir in framework_directories {
     // all_cpp_flags.push(format!("-F\"{}\"", dir));
     // }
     // let all_cpp_flags_text = all_cpp_flags.iter().map(|x| x.replace("\"", "\\\"")).join(" ");
-    try!(cmakelists_file.write(format!(include_str!("../templates/c_lib/CMakeLists.txt"),
-                                       lib_name_lowercase = &self.lib_name,
-                                       lib_name_uppercase = name_upper)));
+    cmakelists_file.write(format!(include_str!("../templates/c_lib/CMakeLists.txt"),
+                     lib_name_lowercase = &self.lib_name,
+                     lib_name_uppercase = name_upper))?;
     let src_dir = self.lib_path.with_added("src");
-    try!(create_dir_all(&src_dir));
+    create_dir_all(&src_dir)?;
 
     let include_dir = self.lib_path.with_added("include");
-    try!(create_dir_all(&include_dir));
+    create_dir_all(&include_dir)?;
     let exports_file_path = include_dir.with_added(format!("{}_exports.h", &self.lib_name));
-    let mut exports_file = try!(create_file(&exports_file_path));
-    try!(exports_file.write(format!(include_str!("../templates/c_lib/exports.h"),
-                                    lib_name_uppercase = name_upper)));
+    let mut exports_file = create_file(&exports_file_path)?;
+    exports_file.write(format!(include_str!("../templates/c_lib/exports.h"),
+                     lib_name_uppercase = name_upper))?;
 
-    let include_directives_code = try!(include_directives.map_if_ok(|d| -> Result<_> {
-        Ok(format!("#include \"{}\"", try!(path_to_str(d))))
-      }))
+    let include_directives_code = include_directives.map_if_ok(|d| -> Result<_> {
+      Ok(format!("#include \"{}\"", path_to_str(d)?))
+    })?
       .join("\n");
 
     let global_file_path = include_dir.with_added(format!("{}_global.h", &self.lib_name));
-    let mut global_file = try!(create_file(&global_file_path));
-    try!(global_file.write(format!(include_str!("../templates/c_lib/global.h"),
-                                   lib_name_lowercase = &self.lib_name,
-                                   lib_name_uppercase = name_upper,
-                                   include_directives_code = include_directives_code)));
+    let mut global_file = create_file(&global_file_path)?;
+    global_file.write(format!(include_str!("../templates/c_lib/global.h"),
+                     lib_name_lowercase = &self.lib_name,
+                     lib_name_uppercase = name_upper,
+                     include_directives_code = include_directives_code))?;
     Ok(())
   }
 
   pub fn generate_files(&self, data: &[CppFfiHeaderData]) -> Result<()> {
-    try!(self.generate_all_headers_file(data.iter().map(|x| &x.include_file_base_name)));
+    self.generate_all_headers_file(data.iter().map(|x| &x.include_file_base_name))?;
     for item in data {
-      try!(self.generate_one(item).chain_err(|| "C++ code generator failed"));
+      self.generate_one(item).chain_err(|| "C++ code generator failed")?;
     }
     Ok(())
   }
@@ -363,12 +363,12 @@ impl CppCodeGenerator {
     let mut h_path = self.lib_path.clone();
     h_path.push("include");
     h_path.push(format!("{}.h", &self.lib_name));
-    let mut all_header_file = try!(create_file(&h_path));
-    try!(all_header_file.write(format!("#ifndef {0}_H\n#define {0}_H\n\n", &self.lib_name_upper)));
+    let mut all_header_file = create_file(&h_path)?;
+    all_header_file.write(format!("#ifndef {0}_H\n#define {0}_H\n\n", &self.lib_name_upper))?;
     for name in names {
-      try!(all_header_file.write(format!("#include \"{}_{}.h\"\n", &self.lib_name, name)));
+      all_header_file.write(format!("#include \"{}_{}.h\"\n", &self.lib_name, name))?;
     }
-    try!(all_header_file.write(format!("#endif // {}_H\n", &self.lib_name_upper)));
+    all_header_file.write(format!("#endif // {}_H\n", &self.lib_name_upper))?;
     Ok(())
   }
 
@@ -385,35 +385,35 @@ impl CppCodeGenerator {
     let h_path = self.lib_path.with_added("include").with_added(&ffi_include_file);
     log::noisy(format!("Generating header file: {:?}", h_path));
 
-    let mut cpp_file = try!(create_file(&cpp_path));
+    let mut cpp_file = create_file(&cpp_path)?;
     {
-      let mut h_file = try!(create_file(&h_path));
+      let mut h_file = create_file(&h_path)?;
 
-      try!(cpp_file.write(format!("#include \"{}\"\n\n", ffi_include_file)));
+      cpp_file.write(format!("#include \"{}\"\n\n", ffi_include_file))?;
       let include_guard_name = ffi_include_file.replace(".", "_").to_uppercase();
-      try!(h_file.write(format!("#ifndef {}\n#define {}\n\n",
-                                include_guard_name,
-                                include_guard_name)));
+      h_file.write(format!("#ifndef {}\n#define {}\n\n",
+                       include_guard_name,
+                       include_guard_name))?;
 
-      try!(h_file.write(format!("#include \"{}_global.h\"\n\n", &self.lib_name)));
+      h_file.write(format!("#include \"{}_global.h\"\n\n", &self.lib_name))?;
       for wrapper in &data.qt_slot_wrappers {
-        try!(h_file.write(try!(self.qt_slot_wrapper(wrapper))));
+        h_file.write(self.qt_slot_wrapper(wrapper)?)?;
       }
-      try!(h_file.write("extern \"C\" {\n\n"));
+      h_file.write("extern \"C\" {\n\n")?;
       for method in &data.methods {
-        try!(h_file.write(try!(self.function_declaration(method))));
-        try!(cpp_file.write(try!(self.function_implementation(method))));
+        h_file.write(self.function_declaration(method)?)?;
+        cpp_file.write(self.function_implementation(method)?)?;
       }
 
-      try!(h_file.write("\n} // extern \"C\"\n\n"));
+      h_file.write("\n} // extern \"C\"\n\n")?;
 
-      try!(h_file.write(format!("#endif // {}\n", include_guard_name)));
+      h_file.write(format!("#endif // {}\n", include_guard_name))?;
     }
     if !data.qt_slot_wrappers.is_empty() {
-      let moc_output = try!(run_command(Command::new("moc").arg("-i").arg(&h_path), true, false));
+      let moc_output = run_command(Command::new("moc").arg("-i").arg(&h_path), true, false)?;
       println!("moc ok!");
-      try!(cpp_file.write(format!("// start of MOC generated code\n\
-        {}\n// end of MOC generated code\n", moc_output)));
+      cpp_file.write(format!("// start of MOC generated code\n{}\n// end of MOC generated code\n",
+                       moc_output))?;
     }
     Ok(())
   }

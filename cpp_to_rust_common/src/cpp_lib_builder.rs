@@ -57,7 +57,7 @@ impl CppLibBuilder {
     let mut cmake_command = Command::new("cmake");
     cmake_command.arg(self.cmake_source_dir)
       .arg(format!("-DCMAKE_INSTALL_PREFIX={}",
-                   try!(path_to_str(&self.install_dir))))
+                   path_to_str(&self.install_dir)?))
       .current_dir(&self.build_dir);
     if is_msvc() {
       cmake_command.arg("-G").arg("NMake Makefiles");
@@ -70,7 +70,7 @@ impl CppLibBuilder {
     }
     // TODO: enable release mode on other platforms if cargo is in release mode
     // (maybe build C library in both debug and release in separate folders)
-    try!(run_command(&mut cmake_command, false, self.pipe_output));
+    run_command(&mut cmake_command, false, self.pipe_output)?;
 
     let make_command_name = if is_msvc() { "nmake" } else { "make" }.to_string();
     let mut make_args = Vec::new();
@@ -88,17 +88,7 @@ impl CppLibBuilder {
     let mut make_command = Command::new(make_command_name);
     make_command.args(&make_args)
       .current_dir(self.build_dir);
-    // TODO: use link_directories() cmake directive
-
-//    if let Some(linker_env_library_dirs) = self.linker_env_library_dirs {
-//      if !linker_env_library_dirs.is_empty() {
-//        for name in &["LIBRARY_PATH", "LD_LIBRARY_PATH", "LIB"] {
-//          let value = try!(add_env_path_item(name, Vec::from(linker_env_library_dirs)));
-//          make_command.env(name, value);
-//        }
-//      }
-//    }
-    try!(run_command(&mut make_command, false, self.pipe_output));
+    run_command(&mut make_command, false, self.pipe_output)?;
     Ok(())
   }
 }

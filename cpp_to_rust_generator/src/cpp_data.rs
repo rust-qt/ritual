@@ -71,8 +71,8 @@ fn apply_instantiations_to_method(method: &CppMethod,
       new_method.arguments.push(CppFunctionArgument {
         name: arg.name.clone(),
         has_default_value: arg.has_default_value,
-        argument_type: try!(arg.argument_type
-          .instantiate(nested_level, &ins.template_arguments)),
+        argument_type: arg.argument_type
+          .instantiate(nested_level, &ins.template_arguments)?,
       });
     }
     if let Some(ref args) = method.arguments_before_omitting {
@@ -81,22 +81,22 @@ fn apply_instantiations_to_method(method: &CppMethod,
         new_args.push(CppFunctionArgument {
           name: arg.name.clone(),
           has_default_value: arg.has_default_value,
-          argument_type: try!(arg.argument_type
-            .instantiate(nested_level, &ins.template_arguments)),
+          argument_type: arg.argument_type
+            .instantiate(nested_level, &ins.template_arguments)?,
         });
       }
       new_method.arguments_before_omitting = Some(new_args);
     }
-    new_method.return_type = try!(method.return_type
-      .instantiate(nested_level, &ins.template_arguments));
+    new_method.return_type = method.return_type
+      .instantiate(nested_level, &ins.template_arguments)?;
     if let Some(ref mut info) = new_method.class_membership {
-      info.class_type = try!(info.class_type
-        .instantiate_class(nested_level, &ins.template_arguments));
+      info.class_type = info.class_type
+        .instantiate_class(nested_level, &ins.template_arguments)?;
     }
     let mut conversion_type = None;
     if let Some(ref mut operator) = new_method.operator {
       if let CppOperator::Conversion(ref mut cpp_type) = *operator {
-        let r = try!(cpp_type.instantiate(nested_level, &ins.template_arguments));
+        let r = cpp_type.instantiate(nested_level, &ins.template_arguments)?;
         *cpp_type = r.clone();
         conversion_type = Some(r);
       }
@@ -109,7 +109,7 @@ fn apply_instantiations_to_method(method: &CppMethod,
         .into());
     } else {
       if let Some(conversion_type) = conversion_type {
-        new_method.name = format!("operator {}", try!(conversion_type.to_cpp_code(None)));
+        new_method.name = format!("operator {}", conversion_type.to_cpp_code(None)?);
       }
       log::noisy(format!("success: {}", new_method.short_text()));
       new_methods.push(new_method);
@@ -230,7 +230,7 @@ impl CppData {
           self.methods.push(CppMethod {
             name: format!("~{}", class_name),
             class_membership: Some(CppMethodClassMembership {
-              class_type: try!(type1.default_class_type()),
+              class_type: type1.default_class_type()?,
               is_virtual: is_virtual,
               is_pure_virtual: false,
               is_const: false,
@@ -330,7 +330,7 @@ impl CppData {
                   if ok {
                     let mut new_method: CppMethod = (*base_class_method).clone();
                     if let Some(ref mut info) = new_method.class_membership {
-                      info.class_type = try!(type1.default_class_type());
+                      info.class_type = type1.default_class_type()?;
                     } else {
                       return Err(unexpected("no class membership").into());
                     }
@@ -345,9 +345,9 @@ impl CppData {
                     current_new_methods.push(new_method.clone());
                   }
                 }
-                new_methods.append(&mut try!(self.inherited_methods_from(derived_name,
-                                                                         &current_new_methods.iter()
-                                                                           .collect::<Vec<_>>())));
+                new_methods.append(&mut self.inherited_methods_from(derived_name,
+                                          &current_new_methods.iter()
+                                            .collect::<Vec<_>>())?);
                 new_methods.append(&mut current_new_methods);
               }
             }
@@ -389,8 +389,8 @@ impl CppData {
                   false
                 }
               });
-            all_new_methods.append(&mut try!(self.inherited_methods_from(&type1.name,
-                                                                    &base_methods.collect::<Vec<_>>())));
+            all_new_methods.append(&mut self.inherited_methods_from(&type1.name,
+                                                                    &base_methods.collect::<Vec<_>>())?);
           }
         }
       }
@@ -523,8 +523,8 @@ impl CppData {
       }
     }
     for instantiations in &self.template_instantiations {
-      let type_info = try!(self.find_type_info(|x| &x.name == &instantiations.class_name)
-        .chain_err(|| format!("type info not found for {}", &instantiations.class_name)));
+      let type_info = self.find_type_info(|x| &x.name == &instantiations.class_name)
+        .chain_err(|| format!("type info not found for {}", &instantiations.class_name))?;
       if !result.contains(&type_info.include_file) {
         result.insert(type_info.include_file.clone());
       }
@@ -610,7 +610,7 @@ impl CppData {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
         for base in bases {
           if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
-            for method in try!(self.get_all_methods(name)) {
+            for method in self.get_all_methods(name)? {
               if own_methods.iter()
                 .find(|m| m.name == method.name && m.argument_types_equal(method))
                 .is_none() {
@@ -653,7 +653,7 @@ impl CppData {
           return Err(format!("type not available: {:?}", type1).into());
         }
         for arg in template_arguments {
-          try!(self.check_template_type(arg));
+          self.check_template_type(arg)?;
         }
       }
     }
@@ -733,7 +733,7 @@ impl CppData {
               Ok(CppMethod {
                 name: name,
                 class_membership: Some(CppMethodClassMembership {
-                  class_type: try!(type_info.default_class_type()),
+                  class_type: type_info.default_class_type()?,
                   kind: CppMethodKind::Regular,
                   is_virtual: false,
                   is_pure_virtual: false,
@@ -778,29 +778,29 @@ impl CppData {
               let mut type2_mut = field.field_type.clone();
               type2_mut.is_const = false;
               type2_mut.indirection = CppTypeIndirection::Ref;
-              new_methods.push(try!(create_method(field.name.clone(),
-                                                  CppFieldAccessorType::ConstRefGetter,
-                                                  type2_const,
-                                                  Vec::new())));
-              new_methods.push(try!(create_method(format!("{}_mut", field.name),
-                                                  CppFieldAccessorType::MutRefGetter,
-                                                  type2_mut,
-                                                  Vec::new())));
+              new_methods.push(create_method(field.name.clone(),
+                                             CppFieldAccessorType::ConstRefGetter,
+                                             type2_const,
+                                             Vec::new())?);
+              new_methods.push(create_method(format!("{}_mut", field.name),
+                                             CppFieldAccessorType::MutRefGetter,
+                                             type2_mut,
+                                             Vec::new())?);
             } else {
-              new_methods.push(try!(create_method(field.name.clone(),
-                                                  CppFieldAccessorType::CopyGetter,
-                                                  field.field_type.clone(),
-                                                  Vec::new())));
+              new_methods.push(create_method(field.name.clone(),
+                                             CppFieldAccessorType::CopyGetter,
+                                             field.field_type.clone(),
+                                             Vec::new())?);
             }
             let arg = CppFunctionArgument {
               argument_type: field.field_type.clone(),
               name: "value".to_string(),
               has_default_value: false,
             };
-            new_methods.push(try!(create_method(format!("set_{}", field.name),
-                                                CppFieldAccessorType::Setter,
-                                                CppType::void(),
-                                                vec![arg])));
+            new_methods.push(create_method(format!("set_{}", field.name),
+                                           CppFieldAccessorType::Setter,
+                                           CppType::void(),
+                                           vec![arg])?);
           }
         }
       }
@@ -813,8 +813,8 @@ impl CppData {
                    target_type: &CppTypeClassBase,
                    base_type: &CppType)
                    -> Result<Vec<CppMethod>> {
-    let type_info = try!(self.find_type_info(|x| x.name == target_type.name)
-      .chain_err(|| "type info not found"));
+    let type_info = self.find_type_info(|x| x.name == target_type.name)
+      .chain_err(|| "type info not found")?;
     let target_ptr_type = CppType {
       base: CppTypeBase::Class(target_type.clone()),
       indirection: CppTypeIndirection::Ptr,
@@ -852,7 +852,7 @@ impl CppData {
       if let Some(type_info) = self.find_type_info(|x| x.name == base.name) {
         if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
           for base in bases {
-            new_methods.append(&mut try!(self.add_casts_one(target_type, &base.base_type)));
+            new_methods.append(&mut self.add_casts_one(target_type, &base.base_type)?);
           }
         }
       }
@@ -864,9 +864,9 @@ impl CppData {
     let mut new_methods = Vec::new();
     for type_info in &self.types {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
-        let t = try!(type_info.default_class_type());
+        let t = type_info.default_class_type()?;
         for base in bases {
-          new_methods.append(&mut try!(self.add_casts_one(&t, &base.base_type)));
+          new_methods.append(&mut self.add_casts_one(&t, &base.base_type)?);
         }
       }
     }
@@ -920,19 +920,18 @@ impl CppData {
       return Ok(());
     }
     log::info("Detecting signals and slots");
-    let re_signals = try!(Regex::new(r"(signals|Q_SIGNALS)\s*:"));
-    let re_slots = try!(Regex::new(r"(slots|Q_SLOTS)\s*:"));
-    let re_other = try!(Regex::new(r"(public|protected|private)\s*:"));
+    let re_signals = Regex::new(r"(signals|Q_SIGNALS)\s*:")?;
+    let re_slots = Regex::new(r"(slots|Q_SLOTS)\s*:")?;
+    let re_other = Regex::new(r"(public|protected|private)\s*:")?;
     let mut sections = HashMap::new();
 
     for file_path in files {
       let mut file_sections = Vec::new();
       log::info(format!("File: {}", &file_path));
-      let file = try!(open_file(&file_path));
+      let file = open_file(&file_path)?;
       let reader = BufReader::new(file.into_file());
       for (line_num, line) in reader.lines().enumerate() {
-        let line =
-          try!(line.chain_err(|| format!("failed while reading lines from {}", &file_path)));
+        let line = line.chain_err(|| format!("failed while reading lines from {}", &file_path))?;
         let section_type = if re_signals.is_match(&line) {
           Some(SectionType::Signals)
         } else if re_slots.is_match(&line) {
@@ -1036,13 +1035,13 @@ impl CppData {
   /// Performs data conversion to make it more suitable
   /// for further wrapper generation.
   pub fn post_process(&mut self) -> Result<()> {
-    try!(self.detect_signals_and_slots());
-    try!(self.ensure_explicit_destructors());
+    self.detect_signals_and_slots()?;
+    self.ensure_explicit_destructors()?;
     self.generate_methods_with_omitted_args();
-    try!(self.instantiate_templates());
-    try!(self.add_inherited_methods()); // TODO: add inherited fields too
-    try!(self.add_field_accessors()); // TODO: fix doc generator for field accessors
-    try!(self.add_casts());
+    self.instantiate_templates()?;
+    self.add_inherited_methods()?; // TODO: add inherited fields too
+    self.add_field_accessors()?; // TODO: fix doc generator for field accessors
+    self.add_casts()?;
     Ok(())
   }
 }

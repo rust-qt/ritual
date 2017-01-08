@@ -43,13 +43,13 @@ fn load_dependency(path: &PathBuf) -> Result<(RustExportInfo, CppData)> {
   if !cpp_data_path.exists() {
     return Err(format!("file not found: {}", cpp_data_path.display()).into());
   }
-  let cpp_data = try!(load_json(&cpp_data_path));
+  let cpp_data = load_json(&cpp_data_path)?;
 
   let rust_export_info_path = path.with_added("rust_export_info.json");
   if !rust_export_info_path.exists() {
     return Err(format!("file not found: {}", rust_export_info_path.display()).into());
   }
-  let rust_export_info = try!(load_json(&rust_export_info_path));
+  let rust_export_info = load_json(&rust_export_info_path)?;
   Ok((rust_export_info, cpp_data))
 }
 
@@ -137,9 +137,9 @@ fn load_or_create_cpp_data(config: &Config,
       name_blacklist: Vec::from(config.cpp_parser_blocked_names()),
       flags: Vec::from(config.cpp_parser_flags()),
     };
-    let cpp_data = try!(cpp_parser::run(parser_config, dependencies_cpp_data)
-      .chain_err(|| "C++ parser failed"));
-    try!(save_json(&raw_cpp_data_cache_file_path, &cpp_data));
+    let cpp_data =
+      cpp_parser::run(parser_config, dependencies_cpp_data).chain_err(|| "C++ parser failed")?;
+    save_json(&raw_cpp_data_cache_file_path, &cpp_data)?;
     log::info(format!("Raw C++ data is saved to file: {}",
                       raw_cpp_data_cache_file_path.display()));
     cpp_data
@@ -147,11 +147,11 @@ fn load_or_create_cpp_data(config: &Config,
   if !cpp_data_processed {
     log::info("Post-processing parse result.");
     for filter in config.cpp_data_filters() {
-      try!(filter(&mut cpp_data).chain_err(|| "cpp_data_filter failed"));
+      filter(&mut cpp_data).chain_err(|| "cpp_data_filter failed")?;
     }
-    try!(cpp_data.post_process());
+    cpp_data.post_process()?;
 
-    try!(save_json(&cpp_data_cache_file_path, &cpp_data));
+    save_json(&cpp_data_cache_file_path, &cpp_data)?;
     log::info(format!("C++ data is saved to file: {}",
                       cpp_data_cache_file_path.display()));
   };
@@ -175,8 +175,8 @@ pub fn run(config: Config) -> Result<()> {
   let mut dependencies = Vec::new();
   let mut dependencies_cpp_data = Vec::new();
   for path in config.dependency_paths() {
-    let (info, cpp_data) = try!(load_dependency(&try!(canonicalize(path)))
-      .chain_err(|| "failed to load dependency"));
+    let (info, cpp_data) =
+      load_dependency(&canonicalize(path)?).chain_err(|| "failed to load dependency")?;
     dependencies.push(DependencyInfo {
       path: path.clone(),
       rust_export_info: info,
@@ -194,36 +194,36 @@ pub fn run(config: Config) -> Result<()> {
   let c_lib_tmp_path = if c_lib_path_existed {
     let path = config.cache_dir_path().with_added("c_lib.new");
     if path.exists() {
-      try!(remove_dir_all(&path));
+      remove_dir_all(&path)?;
     }
     path
   } else {
     c_lib_path.clone()
   };
-  try!(create_dir_all(&c_lib_tmp_path));
+  create_dir_all(&c_lib_tmp_path)?;
   log::info(format!("Generating C wrapper library ({}).", c_lib_name));
 
-  let cpp_ffi_headers = try!(cpp_ffi_generator::run(&cpp_data,
-                                                    c_lib_name.clone(),
-                                                    config.cpp_ffi_generator_filters())
-    .chain_err(|| "FFI generator failed"));
+  let cpp_ffi_headers = cpp_ffi_generator::run(&cpp_data,
+                                               c_lib_name.clone(),
+                                               config.cpp_ffi_generator_filters())
+      .chain_err(|| "FFI generator failed")?;
 
   log::info(format!("Generating C wrapper code."));
   let code_gen = CppCodeGenerator::new(c_lib_name.clone(), c_lib_tmp_path.clone());
-  try!(code_gen.generate_template_files(config.include_directives()));
-  try!(code_gen.generate_files(&cpp_ffi_headers));
+  code_gen.generate_template_files(config.include_directives())?;
+  code_gen.generate_files(&cpp_ffi_headers)?;
 
   let crate_new_path = if output_path_existed {
     let path = config.cache_dir_path()
       .with_added(format!("{}.new", &config.crate_properties().name));
     if path.as_path().exists() {
-      try!(remove_dir_all(&path));
+      remove_dir_all(&path)?;
     }
     path
   } else {
     config.output_dir_path().clone()
   };
-  try!(create_dir_all(&crate_new_path));
+  create_dir_all(&crate_new_path)?;
   let rust_config = rust_code_generator::RustCodeGeneratorConfig {
     crate_properties: config.crate_properties().clone(),
     output_path: crate_new_path.clone(),
@@ -243,21 +243,19 @@ pub fn run(config: Config) -> Result<()> {
     dependency_rust_types.extend_from_slice(&dep.rust_export_info.rust_types);
   }
   log::info("Preparing Rust functions");
-  let rust_data = try!(rust_generator::run(CppAndFfiData {
-                                             cpp_data: cpp_data,
-                                             cpp_ffi_headers: cpp_ffi_headers,
-                                           },
-                                           dependency_rust_types,
-                                           rust_generator::RustGeneratorConfig {
-                                             crate_name: config.crate_properties().name.clone(),
-                                             // TODO: more universal prefix removal
-                                             remove_qt_prefix: remove_qt_prefix,
-                                           })
-    .chain_err(|| "Rust data generator failed"));
+  let rust_data = rust_generator::run(CppAndFfiData {
+                                        cpp_data: cpp_data,
+                                        cpp_ffi_headers: cpp_ffi_headers,
+                                      },
+                                      dependency_rust_types,
+                                      rust_generator::RustGeneratorConfig {
+                                        crate_name: config.crate_properties().name.clone(),
+                                        // TODO: more universal prefix removal
+                                        remove_qt_prefix: remove_qt_prefix,
+                                      }).chain_err(|| "Rust data generator failed")?;
   log::info(format!("Generating Rust crate code ({}).",
                     &config.crate_properties().name));
-  try!(rust_code_generator::run(rust_config, &rust_data)
-    .chain_err(|| "Rust code generator failed"));
+  rust_code_generator::run(rust_config, &rust_data).chain_err(|| "Rust code generator failed")?;
   let mut cpp_type_size_requests = Vec::new();
   for type1 in &rust_data.processed_types {
     if let RustTypeWrapperKind::Struct { ref size_const_name, .. } = type1.kind {
@@ -276,32 +274,32 @@ pub fn run(config: Config) -> Result<()> {
                                               config.include_directives())?)?;
   }
   if c_lib_path_existed {
-    try!(move_files(&c_lib_tmp_path, &c_lib_path));
+    move_files(&c_lib_tmp_path, &c_lib_path)?;
   }
   {
     let rust_export_path = config.cache_dir_path().with_added("rust_export_info.json");
-    try!(save_json(&rust_export_path,
-                   &RustExportInfo {
-                     crate_name: config.crate_properties().name.clone(),
-                     rust_types: rust_data.processed_types,
-                   }));
+    save_json(&rust_export_path,
+              &RustExportInfo {
+                crate_name: config.crate_properties().name.clone(),
+                rust_types: rust_data.processed_types,
+              })?;
     log::info(format!("Rust export info is saved to file: {}",
                       rust_export_path.display()));
   }
 
   if output_path_existed {
-    for item in try!(read_dir(&crate_new_path)) {
-      let item = try!(item);
-      try!(move_files(&crate_new_path.with_added(item.file_name()),
-                      &config.output_dir_path().with_added(item.file_name())));
+    for item in read_dir(&crate_new_path)? {
+      let item = item?;
+      move_files(&crate_new_path.with_added(item.file_name()),
+                 &config.output_dir_path().with_added(item.file_name()))?;
     }
-    try!(remove_dir(&crate_new_path));
+    remove_dir(&crate_new_path)?;
   }
-  try!(save_json(config.output_dir_path().with_added("build_script_data.json"),
-                 &BuildScriptData {
-                   cpp_build_config: config.cpp_build_config().clone(),
-                   cpp_wrapper_lib_name: c_lib_name,
-                 }));
-  try!(create_file(config.cache_dir_path().with_added(COMPLETED_MARKER_FILE_NAME)));
+  save_json(config.output_dir_path().with_added("build_script_data.json"),
+            &BuildScriptData {
+              cpp_build_config: config.cpp_build_config().clone(),
+              cpp_wrapper_lib_name: c_lib_name,
+            })?;
+  create_file(config.cache_dir_path().with_added(COMPLETED_MARKER_FILE_NAME))?;
   Ok(())
 }

@@ -91,19 +91,18 @@ impl CppMethod {
       if !info.is_static && info.kind != CppMethodKind::Constructor {
         r.arguments.push(CppFfiFunctionArgument {
           name: "this_ptr".to_string(),
-          argument_type: try!(CppType {
+          argument_type: CppType {
               base: CppTypeBase::Class(info.class_type.clone()),
               is_const: info.is_const,
               is_const2: false,
               indirection: CppTypeIndirection::Ptr,
-            }
-            .to_cpp_ffi_type(CppTypeRole::NotReturnType)),
+            }.to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
           meaning: CppFfiArgumentMeaning::This,
         });
       }
     }
     for (index, arg) in self.arguments.iter().enumerate() {
-      let c_type = try!(arg.argument_type.to_cpp_ffi_type(CppTypeRole::NotReturnType));
+      let c_type = arg.argument_type.to_cpp_ffi_type(CppTypeRole::NotReturnType)?;
       r.arguments.push(CppFfiFunctionArgument {
         name: arg.name.clone(),
         argument_type: c_type,
@@ -120,7 +119,7 @@ impl CppMethod {
     } else {
       self.return_type.clone()
     };
-    let c_type = try!(real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType));
+    let c_type = real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
     if real_return_type.needs_allocation_place_variants() {
       match allocation_place {
         ReturnValueAllocationPlace::Stack => {
@@ -155,7 +154,7 @@ impl CppMethod {
     };
     let mut results = Vec::new();
     for place in places {
-      let c_signature = try!(self.c_signature(place.clone()));
+      let c_signature = self.c_signature(place.clone())?;
       results.push(CppMethodWithFfiSignature {
         cpp_method: self.clone(),
         allocation_place: place,
@@ -316,9 +315,9 @@ impl CppMethod {
     Ok(format!("{}{}({})",
                type_num,
                self.name,
-               try!(self.arguments
-                   .iter()
-                   .map_if_ok(|arg| arg.argument_type.to_cpp_code(None)))
+               self.arguments
+                 .iter()
+                 .map_if_ok(|arg| arg.argument_type.to_cpp_code(None))?
                  .join(",")))
   }
 
