@@ -222,8 +222,9 @@ impl CppCodeGenerator {
           }
         }
       } else {
-        let scope_specifier = if let Some(ref class_membership) = method.cpp_method
-          .class_membership {
+        let scope_specifier = if let Some(ref class_membership) =
+          method.cpp_method
+            .class_membership {
           if class_membership.is_static {
             format!("{}::", try!(class_membership.class_type.to_cpp_code()))
           } else {
@@ -250,10 +251,10 @@ impl CppCodeGenerator {
           None => String::new(),
         };
         if let Some(&Some(FakeCppMethod::FieldAccessor { ref accessor_type, ref field_name })) =
-               method.cpp_method
-          .class_membership
-          .as_ref()
-          .map(|x| &x.fake) {
+          method.cpp_method
+            .class_membership
+            .as_ref()
+            .map(|x| &x.fake) {
           is_field_accessor = true;
           if accessor_type == &CppFieldAccessorType::Setter {
             format!("{}{} = {}",
@@ -312,18 +313,16 @@ impl CppCodeGenerator {
   }
 
   /// Generates main files and directories of the library.
-  pub fn generate_template_files(&self,
-                                 include_directives: &[PathBuf])
-                                 -> Result<()> {
+  pub fn generate_template_files(&self, include_directives: &[PathBuf]) -> Result<()> {
     let name_upper = self.lib_name.to_uppercase();
     let cmakelists_path = self.lib_path.with_added("CMakeLists.txt");
     let mut cmakelists_file = try!(create_file(&cmakelists_path));
 
-    /*let mut all_cpp_flags = Vec::from(cpp_compiler_flags);
-    for dir in framework_directories {
-      all_cpp_flags.push(format!("-F\"{}\"", dir));
-    }
-    let all_cpp_flags_text = all_cpp_flags.iter().map(|x| x.replace("\"", "\\\"")).join(" ");*/
+    // let mut all_cpp_flags = Vec::from(cpp_compiler_flags);
+    // for dir in framework_directories {
+    // all_cpp_flags.push(format!("-F\"{}\"", dir));
+    // }
+    // let all_cpp_flags_text = all_cpp_flags.iter().map(|x| x.replace("\"", "\\\"")).join(" ");
     try!(cmakelists_file.write(format!(include_str!("../templates/c_lib/CMakeLists.txt"),
                                        lib_name_lowercase = &self.lib_name,
                                        lib_name_uppercase = name_upper)));
@@ -427,17 +426,17 @@ pub struct CppTypeSizeRequest {
 }
 
 pub fn generate_cpp_type_size_requester(requests: &[CppTypeSizeRequest],
-                                        include_directives: &[PathBuf]) -> Result<String> {
+                                        include_directives: &[PathBuf])
+                                        -> Result<String> {
   let mut result = Vec::new();
   for dir in include_directives {
     result.push(format!("#include <{}>\n", path_to_str(dir)?));
   }
   result.push("#include <iostream>\n\nint main() {\n".to_string());
   for request in requests {
-    result.push(format!(
-      "  std::cout << \"pub const {}: usize = \" << sizeof({}) << \";\\n\";\n",
-      request.size_const_name,
-      request.cpp_code));
+    result.push(format!("  std::cout << \"pub const {}: usize = \" << sizeof({}) << \";\\n\";\n",
+                        request.size_const_name,
+                        request.cpp_code));
   }
   result.push("}\n".to_string());
   Ok(result.join(""))

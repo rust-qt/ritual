@@ -1,5 +1,5 @@
 use common::file_utils::{PathBufWithAdded, create_dir, create_file};
-use common::utils::{run_command};
+use common::utils::run_command;
 use common::cpp_lib_builder::CppLibBuilder;
 use common::errors::fancy_unwrap;
 use config::{Config, CrateProperties};
@@ -50,12 +50,14 @@ fn full_run() {
   let cpp_install_lib_dir = temp_dir.path().with_added("install").with_added("lib");
   assert!(cpp_install_lib_dir.exists());
 
-  let mut config = Config::new(&crate_dir, temp_dir.path().with_added("cache"), CrateProperties {
-    authors: Vec::new(),
-    links: Some("ctrt1".to_string()),
-    name: "rust_ctrt1".to_string(),
-    version: "0.0.0".to_string(),
-  });
+  let mut config = Config::new(&crate_dir,
+                               temp_dir.path().with_added("cache"),
+                               CrateProperties {
+                                 authors: Vec::new(),
+                                 links: Some("ctrt1".to_string()),
+                                 name: "rust_ctrt1".to_string(),
+                                 version: "0.0.0".to_string(),
+                               });
   config.add_include_directive("ctrt1/all.h");
   let include_path = {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

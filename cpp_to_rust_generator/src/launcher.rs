@@ -1,6 +1,5 @@
 use config::Config;
-use cpp_code_generator::{CppCodeGenerator, generate_cpp_type_size_requester,
-                         CppTypeSizeRequest};
+use cpp_code_generator::{CppCodeGenerator, generate_cpp_type_size_requester, CppTypeSizeRequest};
 use cpp_type::CppTypeClassBase;
 use cpp_data::CppData;
 use cpp_ffi_data::CppAndFfiData;
@@ -9,9 +8,9 @@ use cpp_parser;
 use common::errors::{Result, ChainErr};
 use common::file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json,
                          canonicalize, remove_dir_all, remove_dir, read_dir, create_file};
-use common::build_script_data::{BuildScriptData};
+use common::build_script_data::BuildScriptData;
 use common::log;
-use rust_code_generator::{RustCodeGeneratorDependency};
+use rust_code_generator::RustCodeGeneratorDependency;
 use rust_code_generator;
 use rust_generator;
 use rust_info::{RustTypeWrapperKind, RustExportInfo};
@@ -264,17 +263,17 @@ pub fn run(config: Config) -> Result<()> {
     if let RustTypeWrapperKind::Struct { ref size_const_name, .. } = type1.kind {
       cpp_type_size_requests.push(CppTypeSizeRequest {
         cpp_code: CppTypeClassBase {
-          name: type1.cpp_name.clone(),
-          template_arguments: type1.cpp_template_arguments.clone(),
-        }.to_cpp_code()?,
+            name: type1.cpp_name.clone(),
+            template_arguments: type1.cpp_template_arguments.clone(),
+          }.to_cpp_code()?,
         size_const_name: size_const_name.clone(),
       });
     }
   }
   {
     let mut file = create_file(c_lib_tmp_path.with_added("type_sizes.cpp"))?;
-    file.write(generate_cpp_type_size_requester(
-      &cpp_type_size_requests, config.include_directives())?)?;
+    file.write(generate_cpp_type_size_requester(&cpp_type_size_requests,
+                                              config.include_directives())?)?;
   }
   if c_lib_path_existed {
     try!(move_files(&c_lib_tmp_path, &c_lib_path));

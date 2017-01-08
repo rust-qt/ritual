@@ -116,17 +116,20 @@ pub fn rust_type_to_code(rust_type: &RustType, crate_name: &str) -> String {
 
 
 pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) -> Result<()> {
-  let template_rustfmt_config_path = config.crate_template_path.as_ref().and_then(|crate_template_path| {
-    let template_rustfmt_config_path = crate_template_path.with_added("rustfmt.toml");
-    if template_rustfmt_config_path.exists() {
-      Some(template_rustfmt_config_path)
-    } else {
-      None
-    }
-  });
+  let template_rustfmt_config_path =
+    config.crate_template_path.as_ref().and_then(|crate_template_path| {
+      let template_rustfmt_config_path = crate_template_path.with_added("rustfmt.toml");
+      if template_rustfmt_config_path.exists() {
+        Some(template_rustfmt_config_path)
+      } else {
+        None
+      }
+    });
 
-  let rustfmt_config_data = if let Some(template_rustfmt_config_path) = template_rustfmt_config_path {
-    log::info(format!("Using rustfmt config file: {:?}", template_rustfmt_config_path));
+  let rustfmt_config_data = if let Some(template_rustfmt_config_path) =
+    template_rustfmt_config_path {
+    log::info(format!("Using rustfmt config file: {:?}",
+                      template_rustfmt_config_path));
     try!(file_to_string(template_rustfmt_config_path))
   } else {
     include_str!("../templates/crate/rustfmt.toml").to_string()
@@ -155,14 +158,15 @@ pub struct RustCodeGenerator {
 impl RustCodeGenerator {
   /// Generates cargo file and skeleton of the crate
   pub fn generate_template(&self) -> Result<()> {
-    let template_rustfmt_config_path = self.config.crate_template_path.as_ref().and_then(|crate_template_path| {
-      let template_rustfmt_config_path = crate_template_path.with_added("rustfmt.toml");
-      if template_rustfmt_config_path.exists() {
-        Some(template_rustfmt_config_path)
-      } else {
-        None
-      }
-    });
+    let template_rustfmt_config_path =
+      self.config.crate_template_path.as_ref().and_then(|crate_template_path| {
+        let template_rustfmt_config_path = crate_template_path.with_added("rustfmt.toml");
+        if template_rustfmt_config_path.exists() {
+          Some(template_rustfmt_config_path)
+        } else {
+          None
+        }
+      });
     let output_rustfmt_config_path = self.config.output_path.with_added("rustfmt.toml");
     if let Some(ref template_rustfmt_config_path) = template_rustfmt_config_path {
       try!(copy_file(template_rustfmt_config_path, output_rustfmt_config_path));
@@ -171,14 +175,15 @@ impl RustCodeGenerator {
       try!(rustfmt_file.write(include_str!("../templates/crate/rustfmt.toml")));
     }
 
-    let template_build_rs_path = self.config.crate_template_path.as_ref().and_then(|crate_template_path| {
-      let template_build_rs_path = crate_template_path.with_added("build.rs");
-      if template_build_rs_path.exists() {
-        Some(template_build_rs_path)
-      } else {
-        None
-      }
-    });
+    let template_build_rs_path =
+      self.config.crate_template_path.as_ref().and_then(|crate_template_path| {
+        let template_build_rs_path = crate_template_path.with_added("build.rs");
+        if template_build_rs_path.exists() {
+          Some(template_build_rs_path)
+        } else {
+          None
+        }
+      });
     let output_build_rs_path = self.config.output_path.with_added("build.rs");
     if let Some(ref template_build_rs_path) = template_build_rs_path {
       try!(copy_file(template_build_rs_path, output_build_rs_path));
@@ -190,15 +195,16 @@ impl RustCodeGenerator {
       self.call_rustfmt(&output_build_rs_path);
     }
     // TODO: move output to new build script utility
-    /*
-    for path in &self.config.cpp_lib_paths {
-      extra.push(format!("  println!(\"cargo:rustc-link-search=native={{}}\", \"{}\");",
-                         path));
-    }
-    for path in &self.config.framework_paths {
-      extra.push(format!("  println!(\"cargo:rustc-link-search=framework={{}}\", \"{}\");",
-                         path));
-    }*/
+    //
+    // for path in &self.config.cpp_lib_paths {
+    // extra.push(format!("  println!(\"cargo:rustc-link-search=native={{}}\", \"{}\");",
+    // path));
+    // }
+    // for path in &self.config.framework_paths {
+    // extra.push(format!("  println!(\"cargo:rustc-link-search=framework={{}}\", \"{}\");",
+    // path));
+    // }
+
 
     let cargo_toml_data = toml::Value::Table({
       let package = toml::Value::Table({
@@ -234,7 +240,8 @@ impl RustCodeGenerator {
       });
       let build_dependencies = toml::Value::Table({
         let mut table = toml::Table::new();
-        table.insert("cpp_to_rust_build_tools".to_string(), toml::Value::String("0.0".to_string()));
+        table.insert("cpp_to_rust_build_tools".to_string(),
+                     toml::Value::String("0.0".to_string()));
         table
       });
       let mut table = toml::Table::new();
@@ -418,8 +425,8 @@ impl RustCodeGenerator {
           RustToCTypeConversion::CppBoxToPtr => {
             let is_const =
               if let RustType::Common { ref is_const, ref is_const2, ref indirection, .. } =
-                     arg.argument_type
-                .rust_ffi_type {
+                arg.argument_type
+                  .rust_ffi_type {
                 match *indirection {
                   RustTypeIndirection::PtrPtr { .. } |
                   RustTypeIndirection::PtrRef { .. } => *is_const2,
@@ -528,12 +535,14 @@ impl RustCodeGenerator {
           }
         } else {
           let mut maybe_mut_declaration = "";
-          if let RustType::Common { ref indirection, .. } = arg.argument_type
-            .rust_api_type {
+          if let RustType::Common { ref indirection, .. } =
+            arg.argument_type
+              .rust_api_type {
             if *indirection == RustTypeIndirection::None &&
                arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr {
-              if let RustType::Common { ref is_const, .. } = arg.argument_type
-                .rust_ffi_type {
+              if let RustType::Common { ref is_const, .. } =
+                arg.argument_type
+                  .rust_ffi_type {
                 if !is_const {
                   maybe_mut_declaration = "mut ";
                 }
@@ -711,7 +720,7 @@ impl RustCodeGenerator {
     let mut results = Vec::new();
     for trait1 in trait_impls {
       let trait_content = if let Some(TraitImplExtra::CppDeletable { ref deleter_name }) =
-                                 trait1.extra {
+        trait1.extra {
         format!("fn deleter() -> ::cpp_utils::Deleter<Self> {{\n  ::ffi::{}\n}}\n",
                 deleter_name)
       } else {

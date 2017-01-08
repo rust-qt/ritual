@@ -210,15 +210,9 @@ impl Config {
   /// It also displays some debugging output that can be made visible by
   /// running cargo commands with `-vv` option.
   ///
-  /// The result of this function must be checked. The recommended way:
-  ///
-  /// ```rust,should_panic
-  /// # let config = cpp_to_rust::config::Config::new();
-  /// if let Err(err) = config.exec() {
-  ///   err.display_report();
-  ///   std::process::exit(1);
-  /// }
-  /// ```
+  /// The result of this function must be checked. You can use
+  /// `::errors::fancy_unwrap` to check the result and display
+  /// additional error information.
   pub fn exec(self) -> Result<()> {
     ::launcher::run(self)
   }

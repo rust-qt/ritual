@@ -385,10 +385,10 @@ fn process_types(input_data: &CppAndFfiData,
       }
     }
     let rust_name = calculate_rust_name(&type_info.name,
-                                             &type_info.include_file,
-                                             false,
-                                             None,
-                                             config)?;
+                                        &type_info.include_file,
+                                        false,
+                                        None,
+                                        config)?;
     let rust_type_info = RustProcessedTypeInfo {
       cpp_name: type_info.name.clone(),
       cpp_doc: type_info.doc.clone(),
@@ -414,10 +414,11 @@ fn process_types(input_data: &CppAndFfiData,
           };
 
           for flag_owner_name in &["QFlags", "QUrlTwoFlags"] {
-            if let Some(instantiations) = input_data.cpp_data
-              .template_instantiations
-              .iter()
-              .find(|x| &x.class_name == &flag_owner_name.to_string()) {
+            if let Some(instantiations) =
+              input_data.cpp_data
+                .template_instantiations
+                .iter()
+                .find(|x| &x.class_name == &flag_owner_name.to_string()) {
               if instantiations.instantiations
                 .iter()
                 .any(|ins| ins.template_arguments.iter().any(|arg| arg == &template_arg_sample)) {
@@ -471,10 +472,10 @@ fn process_types(input_data: &CppAndFfiData,
     }
     for ins in &template_instantiations.instantiations {
       let rust_name = calculate_rust_name(&template_instantiations.class_name,
-                                               &type_info.include_file,
-                                               false,
-                                               None,
-                                               config)?;
+                                          &type_info.include_file,
+                                          false,
+                                          None,
+                                          config)?;
       unnamed_items.push(RustProcessedTypeInfo {
         cpp_name: template_instantiations.class_name.clone(),
         cpp_doc: type_info.doc.clone(),
@@ -681,7 +682,7 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
   if cpp_ffi_type.conversion == IndirectionChange::QFlagsToUInt {
     rust_api_to_c_conversion = RustToCTypeConversion::QFlagsToUInt;
     let enum_type = if let CppTypeBase::Class(CppTypeClassBase { ref template_arguments, .. }) =
-                           cpp_ffi_type.original_type.base {
+      cpp_ffi_type.original_type.base {
       let args = try!(template_arguments.as_ref()
         .chain_err(|| "QFlags type must have template arguments"));
       if args.len() != 1 {
@@ -873,22 +874,22 @@ impl RustGenerator {
     Ok(match info.kind {
       RustTypeWrapperKind::Enum { .. } => {
         (ProcessTypeResult {
-          main_type: RustTypeDeclaration {
-            name: info.rust_name.clone(),
-            kind: RustTypeDeclarationKind::CppTypeWrapper {
-              kind: info.kind.clone(),
-              cpp_type_name: info.cpp_name.clone(),
-              cpp_template_arguments: None,
-              cpp_doc: info.cpp_doc.clone(),
-              methods: Vec::new(),
-              trait_impls: Vec::new(),
-              rust_cross_references: Vec::new(),
-              qt_receivers: Vec::new(),
-            },
-            is_public: info.is_public,
-          },
-          overloading_types: Vec::new(),
-        },
+           main_type: RustTypeDeclaration {
+             name: info.rust_name.clone(),
+             kind: RustTypeDeclarationKind::CppTypeWrapper {
+               kind: info.kind.clone(),
+               cpp_type_name: info.cpp_name.clone(),
+               cpp_template_arguments: None,
+               cpp_doc: info.cpp_doc.clone(),
+               methods: Vec::new(),
+               trait_impls: Vec::new(),
+               rust_cross_references: Vec::new(),
+               qt_receivers: Vec::new(),
+             },
+             is_public: info.is_public,
+           },
+           overloading_types: Vec::new(),
+         },
          cpp_methods)
       }
       RustTypeWrapperKind::Struct { .. } |
@@ -980,22 +981,22 @@ impl RustGenerator {
           .collect();
 
         (ProcessTypeResult {
-          main_type: RustTypeDeclaration {
-            name: info.rust_name.clone(),
-            kind: RustTypeDeclarationKind::CppTypeWrapper {
-              kind: info.kind.clone(),
-              cpp_type_name: info.cpp_name.clone(),
-              cpp_template_arguments: info.cpp_template_arguments.clone(),
-              cpp_doc: info.cpp_doc.clone(),
-              methods: functions_result.methods,
-              trait_impls: functions_result.trait_impls,
-              rust_cross_references: Vec::new(),
-              qt_receivers: qt_receivers,
-            },
-            is_public: info.is_public,
-          },
-          overloading_types: functions_result.overloading_types,
-        },
+           main_type: RustTypeDeclaration {
+             name: info.rust_name.clone(),
+             kind: RustTypeDeclarationKind::CppTypeWrapper {
+               kind: info.kind.clone(),
+               cpp_type_name: info.cpp_name.clone(),
+               cpp_template_arguments: info.cpp_template_arguments.clone(),
+               cpp_doc: info.cpp_doc.clone(),
+               methods: functions_result.methods,
+               trait_impls: functions_result.trait_impls,
+               rust_cross_references: Vec::new(),
+               qt_receivers: qt_receivers,
+             },
+             is_public: info.is_public,
+           },
+           overloading_types: functions_result.overloading_types,
+         },
          cpp_methods)
       }
     })
@@ -1129,11 +1130,12 @@ impl RustGenerator {
         });
       }
     }
-    let (mut return_type, return_arg_index) = if let Some((arg_index, arg)) = method.c_signature
-      .arguments
-      .iter()
-      .enumerate()
-      .find(|&(_arg_index, arg)| arg.meaning == CppFfiArgumentMeaning::ReturnValue) {
+    let (mut return_type, return_arg_index) = if let Some((arg_index, arg)) =
+      method.c_signature
+        .arguments
+        .iter()
+        .enumerate()
+        .find(|&(_arg_index, arg)| arg.meaning == CppFfiArgumentMeaning::ReturnValue) {
       // an argument has return value meaning, so
       // FFI return type must be void
       assert!(method.c_signature.return_type == CppFfiType::void());
