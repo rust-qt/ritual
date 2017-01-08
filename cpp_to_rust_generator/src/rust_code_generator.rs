@@ -657,7 +657,20 @@ impl RustCodeGenerator {
       for dep in &self.config.dependencies {
         try!(lib_file.write(format!("pub extern crate {};\n\n", &dep.crate_name)));
       }
-      let mut extra_modules = vec!["ffi".to_string()];
+
+      // some ffi functions are not used because
+      // some Rust methods are filtered
+      try!(lib_file.write("\
+        #[allow(dead_code)]\n\
+        mod ffi { \n\
+          include!(concat!(env!(\"OUT_DIR\"), \"/ffi.rs\")); \n\
+        }\n\n"));
+      try!(lib_file.write("\
+        mod type_sizes { \n\
+          include!(concat!(env!(\"OUT_DIR\"), \"/type_sizes.rs\")); \n\
+        }\n\n"));
+
+      let mut extra_modules = Vec::new();
 
       if let Some(ref template_path) = self.config.crate_template_path {
         if template_path.with_added("src").exists() {
@@ -686,13 +699,7 @@ impl RustCodeGenerator {
       }
       let all_modules = extra_modules.iter().chain(modules.iter().map(|x| *x));
       for module in all_modules {
-        let mut maybe_pub = "pub ";
-        if module == "ffi" {
-          maybe_pub = "";
-          // some ffi functions are not used because
-          // some Rust methods are filtered
-          try!(lib_file.write("#[allow(dead_code)]\n"));
-        }
+        let maybe_pub = "pub ";
         try!(lib_file.write(format!("{}mod {};\n", maybe_pub, module)));
       }
       self.call_rustfmt(&lib_file_path);
@@ -757,11 +764,11 @@ impl RustCodeGenerator {
               }
               r
             }
-            RustTypeWrapperKind::Struct { ref size, .. } => {
+            RustTypeWrapperKind::Struct { ref size_const_name, .. } => {
               format!(include_str!("../templates/crate/struct_declaration.rs.in"),
                       maybe_pub = maybe_pub,
                       name = try!(type1.name.last_name()),
-                      size = size)
+                      size_const_name = size_const_name)
             }
             RustTypeWrapperKind::EmptyEnum { ref slot_wrapper, .. } => {
               let mut r = format!("{maybe_pub}enum {} {{}}\n\n",
@@ -1058,12 +1065,6 @@ pub fn {struct_method}(&self) -> {struct_type} {{
       try!(file.write("}\n"));
     }
     // no rustfmt for ffi file
-    let rs_file_path = src_dir_path.with_added("ffi.rs");
-    {
-      let mut file = try!(create_file(&rs_file_path));
-      try!(file.write("include!(concat!(env!(\"OUT_DIR\"), \"/ffi.rs\"));"));
-    }
-
     Ok(())
   }
 }

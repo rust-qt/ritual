@@ -1,5 +1,7 @@
 use config::Config;
-use cpp_code_generator::CppCodeGenerator;
+use cpp_code_generator::{CppCodeGenerator, generate_cpp_type_size_requester,
+                         CppTypeSizeRequest};
+use cpp_type::CppTypeClassBase;
 use cpp_data::CppData;
 use cpp_ffi_data::CppAndFfiData;
 use cpp_ffi_generator;
@@ -7,12 +9,12 @@ use cpp_parser;
 use common::errors::{Result, ChainErr};
 use common::file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json,
                          canonicalize, remove_dir_all, remove_dir, read_dir, create_file};
-use common::cpp_build_config::BuildScriptData;
+use common::build_script_data::{BuildScriptData};
 use common::log;
-use rust_code_generator::RustCodeGeneratorDependency;
+use rust_code_generator::{RustCodeGeneratorDependency};
 use rust_code_generator;
 use rust_generator;
-use rust_info::RustExportInfo;
+use rust_info::{RustTypeWrapperKind, RustExportInfo};
 
 use std::path::{Path, PathBuf};
 
@@ -211,9 +213,6 @@ pub fn run(config: Config) -> Result<()> {
   let code_gen = CppCodeGenerator::new(c_lib_name.clone(), c_lib_tmp_path.clone());
   try!(code_gen.generate_template_files(config.include_directives()));
   try!(code_gen.generate_files(&cpp_ffi_headers));
-  if c_lib_path_existed {
-    try!(move_files(&c_lib_tmp_path, &c_lib_path));
-  }
 
   let crate_new_path = if output_path_existed {
     let path = config.cache_dir_path()
@@ -260,6 +259,26 @@ pub fn run(config: Config) -> Result<()> {
                     &config.crate_properties().name));
   try!(rust_code_generator::run(rust_config, &rust_data)
     .chain_err(|| "Rust code generator failed"));
+  let mut cpp_type_size_requests = Vec::new();
+  for type1 in &rust_data.processed_types {
+    if let RustTypeWrapperKind::Struct { ref size_const_name, .. } = type1.kind {
+      cpp_type_size_requests.push(CppTypeSizeRequest {
+        cpp_code: CppTypeClassBase {
+          name: type1.cpp_name.clone(),
+          template_arguments: type1.cpp_template_arguments.clone(),
+        }.to_cpp_code()?,
+        size_const_name: size_const_name.clone(),
+      });
+    }
+  }
+  {
+    let mut file = create_file(c_lib_tmp_path.with_added("type_sizes.cpp"))?;
+    file.write(generate_cpp_type_size_requester(
+      &cpp_type_size_requests, config.include_directives())?)?;
+  }
+  if c_lib_path_existed {
+    try!(move_files(&c_lib_tmp_path, &c_lib_path));
+  }
   {
     let rust_export_path = config.cache_dir_path().with_added("rust_export_info.json");
     try!(save_json(&rust_export_path,
@@ -282,7 +301,7 @@ pub fn run(config: Config) -> Result<()> {
   try!(save_json(config.output_dir_path().with_added("build_script_data.json"),
                  &BuildScriptData {
                    cpp_build_config: config.cpp_build_config().clone(),
-                   cpp_wrapper_lib_name: c_lib_name
+                   cpp_wrapper_lib_name: c_lib_name,
                  }));
   try!(create_file(config.cache_dir_path().with_added(COMPLETED_MARKER_FILE_NAME)));
   Ok(())

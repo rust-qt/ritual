@@ -113,12 +113,9 @@ impl<'a> Iterator for WordIterator<'a> {
 }
 
 pub trait CaseOperations {
-  fn to_class_case(&self) -> String;
-  fn to_snake_case(&self) -> String;
-}
-pub trait VecCaseOperations {
   fn to_class_case(self) -> String;
   fn to_snake_case(self) -> String;
+  fn to_upper_case_words(self) -> String;
 }
 
 
@@ -133,6 +130,10 @@ fn iterator_to_class_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String
 
 fn iterator_to_snake_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {
   it.map(|x| x.as_ref().to_lowercase()).join("_")
+}
+
+fn iterator_to_upper_case_words<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {
+  it.map(|x| x.as_ref().to_uppercase()).join("_")
 }
 
 #[cfg_attr(feature="clippy", allow(needless_range_loop))]
@@ -156,23 +157,29 @@ fn replace_all_sub_vecs(parts: &mut Vec<String>, needle: Vec<&str>) {
   }
 }
 
-impl CaseOperations for String {
-  fn to_class_case(&self) -> Self {
+impl<'a> CaseOperations for &'a str {
+  fn to_class_case(self) -> String {
     iterator_to_class_case(WordIterator::new(self))
   }
-  fn to_snake_case(&self) -> Self {
+  fn to_snake_case(self) -> String {
     let mut parts: Vec<_> = WordIterator::new(self).map(|x| x.to_lowercase()).collect();
     replace_all_sub_vecs(&mut parts, vec!["na", "n"]);
     replace_all_sub_vecs(&mut parts, vec!["open", "g", "l"]);
     parts.join("_")
   }
+  fn to_upper_case_words(self) -> String {
+    iterator_to_upper_case_words(WordIterator::new(self))
+  }
 }
 
-impl<'a> VecCaseOperations for Vec<&'a str> {
+impl<'a> CaseOperations for Vec<&'a str> {
   fn to_class_case(self) -> String {
     iterator_to_class_case(self.into_iter())
   }
   fn to_snake_case(self) -> String {
     iterator_to_snake_case(self.into_iter())
+  }
+  fn to_upper_case_words(self) -> String {
+    iterator_to_upper_case_words(self.into_iter())
   }
 }

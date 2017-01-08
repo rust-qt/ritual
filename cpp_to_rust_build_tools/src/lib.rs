@@ -1,11 +1,14 @@
 pub extern crate cpp_to_rust_common as common;
 use common::errors::{fancy_unwrap, ChainErr, Result};
-use common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType, BuildScriptData};
+use common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
+use common::build_script_data::BuildScriptData;
 use common::file_utils::{PathBufWithAdded, load_json, create_file, file_to_string, path_to_str};
 use common::cpp_lib_builder::{CppLibBuilder, CMakeVar};
 use common::target::current_target;
+use common::utils::{run_command, exe_suffix};
 
 use std::path::PathBuf;
+use std::process::Command;
 
 #[derive(Debug, Default)]
 pub struct Config {
@@ -86,27 +89,36 @@ impl Config {
       pipe_output: false,
       cmake_vars: cmake_vars,
     }.run()?;
+    {
+      let mut ffi_file = create_file(out_dir.with_added("ffi.rs"))?;
+      for name in cpp_build_config_data.linked_libs() {
+        ffi_file.write(format!("#[link(name = \"{}\")]\n", name))?;
+      }
+      for name in cpp_build_config_data.linked_frameworks() {
+        ffi_file.write(format!("#[link(name = \"{}\", kind = \"framework\")]\n", name))?;
+      }
+      if !::common::utils::is_msvc() {
+        // TODO: make it configurable
+        ffi_file.write("#[link(name = \"stdc++\")]\n")?;
+      }
+      if cpp_build_config_data.library_type() == Some(CppLibraryType::Shared) {
+        ffi_file.write(format!("#[link(name = \"{}\")]\n",
+                               &build_script_data.cpp_wrapper_lib_name))?;
+      } else {
+        ffi_file.write(format!("#[link(name = \"{}\", kind = \"static\")]\n",
+                                &build_script_data.cpp_wrapper_lib_name))?;
+      }
+      ffi_file.write(
+        file_to_string(manifest_dir.with_added("src").with_added("ffi.in.rs"))?)?;
+    }
+    {
 
-    let mut ffi_file = create_file(out_dir.with_added("ffi.rs"))?;
-    for name in cpp_build_config_data.linked_libs() {
-      ffi_file.write(format!("#[link(name = \"{}\")]\n", name))?;
+      let mut command = Command::new(c_lib_install_dir
+          .with_added("lib")
+          .with_added(format!("type_sizes{}", exe_suffix())));
+      let mut file = create_file(out_dir.with_added("type_sizes.rs"))?;
+      file.write(run_command(&mut command, true, true)?)?;
     }
-    for name in cpp_build_config_data.linked_frameworks() {
-      ffi_file.write(format!("#[link(name = \"{}\", kind = \"framework\")]\n", name))?;
-    }
-    if !::common::utils::is_msvc() {
-      // TODO: make it configurable
-      ffi_file.write("#[link(name = \"stdc++\")]\n")?;
-    }
-    if cpp_build_config_data.library_type() == Some(CppLibraryType::Shared) {
-      ffi_file.write(format!("#[link(name = \"{}\")]\n",
-                             &build_script_data.cpp_wrapper_lib_name))?;
-    } else {
-      ffi_file.write(format!("#[link(name = \"{}\", kind = \"static\")]\n",
-                              &build_script_data.cpp_wrapper_lib_name))?;
-    }
-    ffi_file.write(
-      file_to_string(manifest_dir.with_added("src").with_added("ffi.in.rs"))?)?;
 
     for path in cpp_build_paths.lib_paths() {
       println!("cargo:rustc-link-search=native={}", path_to_str(path)?);

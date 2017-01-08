@@ -15,11 +15,15 @@ use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKin
                 RustQtReceiverDeclaration, RustQtReceiverType, RustQtSlotWrapper};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
-use common::string_utils::{CaseOperations, VecCaseOperations, WordIterator};
+use common::string_utils::{CaseOperations, WordIterator};
 use common::utils::{add_to_multihash, MapIfOk};
 use common::string_utils::JoinWithString;
 use doc_formatter;
 use std::collections::{HashMap, HashSet, hash_map};
+
+fn size_const_name(type_name: &RustName) -> String {
+  type_name.parts.iter().map(|x| x.to_upper_case_words()).join("_")
+}
 
 impl RustProcessedTypeInfo {
   fn is_declared_in(&self, modules: &[RustModule]) -> bool {
@@ -380,14 +384,19 @@ fn process_types(input_data: &CppAndFfiData,
         continue;
       }
     }
+    let rust_name = calculate_rust_name(&type_info.name,
+                                             &type_info.include_file,
+                                             false,
+                                             None,
+                                             config)?;
     let rust_type_info = RustProcessedTypeInfo {
       cpp_name: type_info.name.clone(),
       cpp_doc: type_info.doc.clone(),
       cpp_template_arguments: None,
       kind: match type_info.kind {
-        CppTypeKind::Class { ref size, .. } => {
+        CppTypeKind::Class { .. } => {
           RustTypeWrapperKind::Struct {
-            size: try!(size.chain_err(|| "size must be present")),
+            size_const_name: size_const_name(&rust_name),
             is_deletable: input_data.cpp_data.has_public_destructor(&CppTypeClassBase {
               name: type_info.name.clone(),
               template_arguments: None,
@@ -423,11 +432,7 @@ fn process_types(input_data: &CppAndFfiData,
           }
         }
       },
-      rust_name: try!(calculate_rust_name(&type_info.name,
-                                          &type_info.include_file,
-                                          false,
-                                          None,
-                                          config)),
+      rust_name: rust_name,
       is_public: true,
     };
     result.push(rust_type_info);
@@ -465,22 +470,23 @@ fn process_types(input_data: &CppAndFfiData,
       continue;
     }
     for ins in &template_instantiations.instantiations {
+      let rust_name = calculate_rust_name(&template_instantiations.class_name,
+                                               &type_info.include_file,
+                                               false,
+                                               None,
+                                               config)?;
       unnamed_items.push(RustProcessedTypeInfo {
         cpp_name: template_instantiations.class_name.clone(),
         cpp_doc: type_info.doc.clone(),
         cpp_template_arguments: Some(ins.template_arguments.clone()),
         kind: RustTypeWrapperKind::Struct {
-          size: ins.size,
+          size_const_name: size_const_name(&rust_name),
           is_deletable: input_data.cpp_data.has_public_destructor(&CppTypeClassBase {
             name: template_instantiations.class_name.clone(),
             template_arguments: Some(ins.template_arguments.clone()),
           }),
         },
-        rust_name: try!(calculate_rust_name(&template_instantiations.class_name,
-                                            &type_info.include_file,
-                                            false,
-                                            None,
-                                            config)),
+        rust_name: rust_name,
         is_public: true,
       });
     }

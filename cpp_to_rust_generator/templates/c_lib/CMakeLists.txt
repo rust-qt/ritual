@@ -25,14 +25,6 @@ endif()
 
 add_definitions(-D{lib_name_uppercase}_LIBRARY)
 
-install(TARGETS {lib_name_lowercase}
-  LIBRARY DESTINATION lib
-  ARCHIVE DESTINATION lib
-  RUNTIME DESTINATION lib
-)
-
-install(FILES ${{headers}} DESTINATION include)
-
 if(${{CMAKE_COMPILER_IS_GNUCXX}})
   set(CMAKE_CXX_FLAGS "${{CMAKE_CXX_FLAGS}} -Wall -Wextra -Werror=return-type")
 endif()
@@ -41,3 +33,12 @@ if(C2R_COMPILER_FLAGS)
   set (CMAKE_CXX_FLAGS "${{CMAKE_CXX_FLAGS}} ${{C2R_COMPILER_FLAGS}}")
 endif()
 
+add_executable(type_sizes type_sizes.cpp)
+
+install(TARGETS {lib_name_lowercase} type_sizes
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION lib
+)
+
+install(FILES ${{headers}} DESTINATION include)

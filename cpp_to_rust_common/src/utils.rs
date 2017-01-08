@@ -17,6 +17,14 @@ pub fn is_msvc() -> bool {
   false
 }
 
+
+#[cfg(windows)]
+pub fn exe_suffix() -> &'static str { return ".exe"; }
+
+#[cfg(not(windows))]
+pub fn exe_suffix() -> &'static str { return ""; }
+
+
 pub fn add_to_multihash<K: Eq + Hash + Clone, T, V: Default + Extend<T>>(hash: &mut HashMap<K, V>,
                                                                          key: K,
                                                                          value: T) {

@@ -63,15 +63,11 @@ pub enum CppTypeKind {
   },
   /// Class declaration
   Class {
-    /// Size of type in bytes;
-    /// can be None if the type doesn't have known size,
-    /// e.g. it's a template class
-    size: Option<i32>,
     /// List of class types this class is derived from
     bases: Vec<CppBaseSpecifier>,
     /// List of class fields
     fields: Vec<CppClassField>,
-
+    /// Information about template arguments of this type.
     template_arguments: Option<TemplateArgumentsDeclaration>,
     /// List of using directives, like "using BaseClass::method1;"
     using_directives: Vec<CppClassUsingDirective>,
@@ -158,8 +154,6 @@ pub struct TemplateArgumentsDeclaration {
 pub struct CppTemplateInstantiation {
   /// List of template arguments used in this instantiation
   pub template_arguments: Vec<CppType>,
-  /// Size of resulted type in bytes
-  pub size: i32,
 }
 
 /// List of template instantiations of
@@ -755,8 +749,10 @@ pub enum RustTypeWrapperKind {
   },
   /// Struct wrapper
   Struct {
-    /// Size of the buffer in bytes
-    size: i32,
+    /// Name of the constant containing size of the corresponding
+    /// C++ type in bytes. Value of the constant is determined at
+    /// crate compile time.
+    size_const_name: String,
     /// True if `CppDeletable` trait is implemented
     /// for this type, i.e. if this C++ type has public destructor.
     is_deletable: bool,

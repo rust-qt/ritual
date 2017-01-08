@@ -419,3 +419,26 @@ impl CppCodeGenerator {
     Ok(())
   }
 }
+
+#[derive(Debug, Clone)]
+pub struct CppTypeSizeRequest {
+  pub cpp_code: String,
+  pub size_const_name: String,
+}
+
+pub fn generate_cpp_type_size_requester(requests: &[CppTypeSizeRequest],
+                                        include_directives: &[PathBuf]) -> Result<String> {
+  let mut result = Vec::new();
+  for dir in include_directives {
+    result.push(format!("#include <{}>\n", path_to_str(dir)?));
+  }
+  result.push("#include <iostream>\n\nint main() {\n".to_string());
+  for request in requests {
+    result.push(format!(
+      "  std::cout << \"pub const {}: usize = \" << sizeof({}) << \";\\n\";\n",
+      request.size_const_name,
+      request.cpp_code));
+  }
+  result.push("}\n".to_string());
+  Ok(result.join(""))
+}
