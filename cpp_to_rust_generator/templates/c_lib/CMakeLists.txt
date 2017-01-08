@@ -9,12 +9,20 @@ if(NOT(("${{C2R_LIBRARY_TYPE}}" STREQUAL "SHARED") OR ("${{C2R_LIBRARY_TYPE}}" S
   message(FATAL_ERROR "C2R_LIBRARY_TYPE must be either SHARED or STATIC." )
 endif()
 add_library({lib_name_lowercase} ${{C2R_LIBRARY_TYPE}} ${{sources}})
-if(C2R_LINK_LIBRARIES)
-  target_link_libraries({lib_name_lowercase} ${{C2R_LINK_LIBRARIES}})
+if(C2R_LINKED_LIBS)
+  target_link_libraries({lib_name_lowercase} ${{C2R_LINKED_LIBS}})
+endif()
+if(C2R_LINKED_FRAMEWORKS)
+  target_link_libraries({lib_name_lowercase} ${{C2R_LINKED_FRAMEWORKS}})
 endif()
 if(C2R_INCLUDE_PATHS)
   include_directories(${{C2R_INCLUDE_PATHS}})
 endif()
+if(C2R_LIB_PATHS)
+  link_directories(${{C2R_LIB_PATHS}})
+endif()
+# TODO: use C2R_FRAMEWORK_PATHS
+
 add_definitions(-D{lib_name_uppercase}_LIBRARY)
 
 install(TARGETS {lib_name_lowercase}
@@ -29,4 +37,7 @@ if(${{CMAKE_COMPILER_IS_GNUCXX}})
   set(CMAKE_CXX_FLAGS "${{CMAKE_CXX_FLAGS}} -Wall -Wextra -Werror=return-type")
 endif()
 
-set (CMAKE_CXX_FLAGS "${{CMAKE_CXX_FLAGS}} ${{C2R_CPP_FLAGS}}")
+if(C2R_COMPILER_FLAGS)
+  set (CMAKE_CXX_FLAGS "${{CMAKE_CXX_FLAGS}} ${{C2R_COMPILER_FLAGS}}")
+endif()
+

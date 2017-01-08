@@ -1,4 +1,4 @@
-pub use serializable::{CppBuildConfig, CppBuildConfigData, CppLibraryType};
+pub use serializable::{CppBuildConfig, CppBuildConfigData, CppLibraryType, BuildScriptData};
 
 use std::path::PathBuf;
 

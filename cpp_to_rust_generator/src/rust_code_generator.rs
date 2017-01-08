@@ -1043,31 +1043,9 @@ pub fn {struct_method}(&self) -> {struct_type} {{
 
   pub fn generate_ffi_file(&self, functions: &[(String, Vec<RustFFIFunction>)]) -> Result<()> {
     let src_dir_path = self.config.output_path.with_added("src");
-    let file_path = src_dir_path.with_added("ffi.rs.in");
+    let file_path = src_dir_path.with_added("ffi.in.rs");
     {
       let mut file = try!(create_file(&file_path));
-      // TODO: generate ffi.rs with appropriate link directives
-      /*
-      for item in &self.config.link_items {
-        match item.kind {
-          RustLinkKind::SharedLibrary => {
-            try!(file.write(format!("#[link(name = \"{}\")]\n", item.name)));
-          }
-          RustLinkKind::Framework => {
-            try!(file.write(format!("#[link(name = \"{}\", kind = \"framework\")]\n", item.name)));
-          }
-        }
-      }
-      if !is_msvc() {
-        try!(file.write("#[link(name = \"stdc++\")]\n"));
-      }
-      if self.config.c_lib_is_shared {
-        try!(file.write(format!("#[link(name = \"{}\")]\n", &self.config.c_lib_name)));
-      } else {
-        try!(file.write(format!("#[link(name = \"{}\", kind = \"static\")]\n",
-                                &self.config.c_lib_name)));
-      }*/
-
       try!(file.write("extern \"C\" {\n"));
 
       for &(ref include_file, ref functions) in functions {

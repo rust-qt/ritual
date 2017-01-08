@@ -1,5 +1,5 @@
 use common::file_utils::{PathBufWithAdded, create_dir, create_file};
-use common::utils::{run_command, add_env_path_item};
+use common::utils::{run_command};
 use common::cpp_lib_builder::CppLibBuilder;
 use common::errors::fancy_unwrap;
 use config::{Config, CrateProperties};
@@ -53,7 +53,7 @@ fn full_run() {
   let mut config = Config::new(&crate_dir, temp_dir.path().with_added("cache"), CrateProperties {
     authors: Vec::new(),
     links: Some("ctrt1".to_string()),
-    name: "ctrt1".to_string(),
+    name: "rust_ctrt1".to_string(),
     version: "0.0.0".to_string(),
   });
   config.add_include_directive("ctrt1/all.h");
@@ -88,6 +88,7 @@ fn full_run() {
     cpp_build_config.add(target::Condition::Env(target::Env::Msvc).negate(), data);
   }
   config.set_crate_template_path(&crate_template_path);
+  config.set_cpp_build_config(cpp_build_config);
   fancy_unwrap(config.exec());
   assert!(crate_dir.exists());
   // we need to add root folder to cargo paths to force test crate

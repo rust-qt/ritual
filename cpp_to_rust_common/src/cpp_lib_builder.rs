@@ -2,9 +2,9 @@ use errors::Result;
 use file_utils::{create_dir_all, path_to_str};
 use utils::{is_msvc, run_command};
 use utils::MapIfOk;
-
+use string_utils::JoinWithString;
 use std::process::Command;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub struct CMakeVar {
   pub name: String,
@@ -17,16 +17,25 @@ impl CMakeVar {
       value: value.into(),
     }
   }
-  pub fn new_path_list<S1: Into<String>>(name: S1, paths: &[PathBuf]) -> Result<CMakeVar> {
-    let value = paths.map_if_ok(|x| -> Result<_> {
-      let s = path_to_str(x)?;
-      Ok(if s.contains(" ") {
-        format!("\"{}\"", s)
+  pub fn new_list<I, S, L>(name: S, paths: L) -> CMakeVar
+    where S: Into<String>, I: AsRef<str>, L: IntoIterator<Item=I>
+  {
+    let value = paths.into_iter().map(|s| {
+      if s.as_ref().contains(' ') {
+        format!("\"{}\"", s.as_ref())
       } else {
-        s.to_string()
-      })
-    })?.join(" ");
-    Ok(CMakeVar::new(name, value))
+        s.as_ref().to_string()
+      }
+    }).join(" ");
+    CMakeVar::new(name, value)
+  }
+
+  pub fn new_path_list<I, S, L>(name: S, paths: L) -> Result<CMakeVar>
+    where S: Into<String>, I: AsRef<Path>, L: IntoIterator<Item=I>
+  {
+    Ok(CMakeVar::new_list(name, paths.into_iter().map_if_ok(|x| {
+      path_to_str(x.as_ref()).map(|x| x.to_string())
+    })?))
   }
 }
 

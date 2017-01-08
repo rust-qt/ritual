@@ -205,3 +205,11 @@ impl CppBuildConfig {
     Ok(data)
   }
 }
+
+
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct BuildScriptData {
+  pub cpp_build_config: CppBuildConfig,
+  pub cpp_wrapper_lib_name: String,
+}

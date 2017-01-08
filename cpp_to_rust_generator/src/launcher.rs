@@ -7,6 +7,7 @@ use cpp_parser;
 use common::errors::{Result, ChainErr};
 use common::file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json,
                          canonicalize, remove_dir_all, remove_dir, read_dir, create_file};
+use common::cpp_build_config::BuildScriptData;
 use common::log;
 use rust_code_generator::RustCodeGeneratorDependency;
 use rust_code_generator;
@@ -229,7 +230,7 @@ pub fn run(config: Config) -> Result<()> {
     crate_properties: config.crate_properties().clone(),
     output_path: crate_new_path.clone(),
     crate_template_path: config.crate_template_path().cloned(),
-    c_lib_name: c_lib_name,
+    c_lib_name: c_lib_name.clone(),
     dependencies: dependencies.iter()
       .map(|x| {
         RustCodeGeneratorDependency {
@@ -278,8 +279,11 @@ pub fn run(config: Config) -> Result<()> {
     }
     try!(remove_dir(&crate_new_path));
   }
-  try!(save_json(config.output_dir_path().with_added("cpp_build_config.json"),
-                 config.cpp_build_config()));
+  try!(save_json(config.output_dir_path().with_added("build_script_data.json"),
+                 &BuildScriptData {
+                   cpp_build_config: config.cpp_build_config().clone(),
+                   cpp_wrapper_lib_name: c_lib_name
+                 }));
   try!(create_file(config.cache_dir_path().with_added(COMPLETED_MARKER_FILE_NAME)));
   Ok(())
 }
