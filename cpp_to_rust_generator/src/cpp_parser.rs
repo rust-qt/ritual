@@ -916,8 +916,7 @@ impl<'a> CppParser<'a> {
     let mut name_with_namespace = name.clone();
     if let Some(parent) = entity.get_semantic_parent() {
       if parent.get_kind() == EntityKind::Namespace {
-        name_with_namespace =
-          format!("{}::{}",
+        name_with_namespace = format!("{}::{}",
                   get_full_name(parent).chain_err(|| "failed to get full name of parent entity")?,
                   name);
       }

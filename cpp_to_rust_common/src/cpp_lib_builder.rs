@@ -6,6 +6,7 @@ use string_utils::JoinWithString;
 use std::process::Command;
 use std::path::{Path, PathBuf};
 
+#[derive(Debug, Clone)]
 pub struct CMakeVar {
   pub name: String,
   pub value: String,
@@ -39,12 +40,19 @@ impl CMakeVar {
   }
 }
 
+#[derive(Debug, Clone)]
+pub enum BuildType {
+  Debug,
+  Release
+}
+
+#[derive(Debug, Clone)]
 pub struct CppLibBuilder {
   pub cmake_source_dir: PathBuf,
   pub build_dir: PathBuf,
   pub install_dir: PathBuf,
   pub num_jobs: Option<i32>,
-//  pub linker_env_library_dirs: Option<&'a [PathBuf]>,
+  pub build_type: BuildType,
   pub pipe_output: bool,
   pub cmake_vars: Vec<CMakeVar>,
 }
@@ -56,20 +64,28 @@ impl CppLibBuilder {
     }
     let mut cmake_command = Command::new("cmake");
     cmake_command.arg(self.cmake_source_dir)
-      .arg(format!("-DCMAKE_INSTALL_PREFIX={}",
-                   path_to_str(&self.install_dir)?))
       .current_dir(&self.build_dir);
-    if is_msvc() {
-      cmake_command.arg("-G").arg("NMake Makefiles");
+    let actual_build_type = if is_msvc() {
       // Rust always links to release version of MSVC runtime, so
       // link will fail if C library is built in debug mode
-      cmake_command.arg("-DCMAKE_BUILD_TYPE=Release");
+      BuildType::Release
+    } else {
+      self.build_type
+    };
+    if is_msvc() {
+      cmake_command.arg("-G").arg("NMake Makefiles");
     }
-    for var in self.cmake_vars {
+    let mut actual_cmake_vars = self.cmake_vars.clone();
+    actual_cmake_vars.push(CMakeVar::new("CMAKE_BUILD_TYPE", match actual_build_type {
+      BuildType::Release => "Release",
+      BuildType::Debug => "Debug",
+    }));
+    actual_cmake_vars.push(CMakeVar::new("CMAKE_INSTALL_PREFIX",
+                                         path_to_str(&self.install_dir)?));
+
+    for var in actual_cmake_vars {
       cmake_command.arg(format!("-D{}={}", var.name, var.value));
     }
-    // TODO: enable release mode on other platforms if cargo is in release mode
-    // (maybe build C library in both debug and release in separate folders)
     run_command(&mut cmake_command, false, self.pipe_output)?;
 
     let make_command_name = if is_msvc() { "nmake" } else { "make" }.to_string();

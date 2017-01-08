@@ -3,7 +3,7 @@ use common::errors::{fancy_unwrap, ChainErr, Result};
 use common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
 use common::build_script_data::BuildScriptData;
 use common::file_utils::{PathBufWithAdded, load_json, create_file, file_to_string, path_to_str};
-use common::cpp_lib_builder::{CppLibBuilder, CMakeVar};
+use common::cpp_lib_builder::{CppLibBuilder, CMakeVar, BuildType};
 use common::target::current_target;
 use common::utils::{run_command, exe_suffix};
 
@@ -81,6 +81,7 @@ impl Config {
     let out_dir = out_dir()?;
     let c_lib_install_dir = out_dir.with_added("c_lib_install");
     let manifest_dir = manifest_dir()?;
+    let profile = std::env::var("PROFILE").chain_err(|| "PROFILE env var is missing")?;
     CppLibBuilder {
       cmake_source_dir: manifest_dir.with_added("c_lib"),
       build_dir: out_dir.with_added("c_lib_build"),
@@ -88,6 +89,11 @@ impl Config {
       num_jobs: std::env::var("NUM_JOBS").ok().and_then(|x| x.parse().ok()),
       pipe_output: false,
       cmake_vars: cmake_vars,
+      build_type: match profile.as_str() {
+        "debug" => BuildType::Debug,
+        "release" => BuildType::Release,
+        _ => return Err(format!("unknown value of PROFILE env var: {}", profile).into()),
+      }
     }.run()?;
     {
       let mut ffi_file = create_file(out_dir.with_added("ffi.rs"))?;
@@ -128,9 +134,6 @@ impl Config {
     }
     println!("cargo:rustc-link-search=native={}",
              path_to_str(&c_lib_install_dir.with_added("lib"))?);
-
-    // TODO: get struct sizes
-    // TODO: output build script variables for cargo
     Ok(())
   }
   pub fn run(self) -> ! {

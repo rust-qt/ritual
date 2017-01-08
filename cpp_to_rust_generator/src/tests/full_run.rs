@@ -1,6 +1,6 @@
 use common::file_utils::{PathBufWithAdded, create_dir, create_file};
 use common::utils::run_command;
-use common::cpp_lib_builder::CppLibBuilder;
+use common::cpp_lib_builder::{CppLibBuilder, BuildType};
 use common::errors::fancy_unwrap;
 use config::{Config, CrateProperties};
 use common::cpp_build_config::{CppBuildConfig, CppBuildConfigData};
@@ -31,6 +31,7 @@ fn build_cpp_lib() -> TempTestDir {
   fancy_unwrap(CppLibBuilder {
       cmake_source_dir: cpp_lib_source_dir,
       build_dir: build_dir,
+      build_type: BuildType::Release,
       install_dir: install_dir,
       num_jobs: None,
       cmake_vars: Vec::new(),
@@ -46,7 +47,6 @@ extern crate toml;
 fn full_run() {
   let temp_dir = build_cpp_lib();
   let crate_dir = temp_dir.path().with_added("crate");
-  // TODO: maybe override output dir to avoid conflicts
   let cpp_install_lib_dir = temp_dir.path().with_added("install").with_added("lib");
   assert!(cpp_install_lib_dir.exists());
 
