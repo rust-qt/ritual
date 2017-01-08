@@ -69,7 +69,6 @@ pub fn type_doc(type1: &RustTypeDeclaration) -> String {
         .to_cpp_pseudo_code();
       let mut doc = format!("C++ type: {}", wrap_inline_cpp_code(&cpp_type_code));
       if let Some(ref cpp_doc) = *cpp_doc {
-        // TODO: use doc_formatter
         doc += &format!("\n\n<a href=\"{}\">C++ documentation:</a> {}",
                         cpp_doc.url,
                         wrap_cpp_doc_block(&cpp_doc.html));

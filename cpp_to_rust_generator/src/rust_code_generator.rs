@@ -194,18 +194,6 @@ impl RustCodeGenerator {
       }
       self.call_rustfmt(&output_build_rs_path);
     }
-    // TODO: move output to new build script utility
-    //
-    // for path in &self.config.cpp_lib_paths {
-    // extra.push(format!("  println!(\"cargo:rustc-link-search=native={{}}\", \"{}\");",
-    // path));
-    // }
-    // for path in &self.config.framework_paths {
-    // extra.push(format!("  println!(\"cargo:rustc-link-search=framework={{}}\", \"{}\");",
-    // path));
-    // }
-
-
     let cargo_toml_data = toml::Value::Table({
       let package = toml::Value::Table({
         let mut table = toml::Table::new();
@@ -230,7 +218,7 @@ impl RustCodeGenerator {
         table.insert("cpp_utils".to_string(),
                      toml::Value::String("0.1".to_string()));
         for dep in &self.config.dependencies {
-          // TODO: use dependency version instead
+          // TODO: use dependency version instead of path (and add a path override)
           let mut table_dep = toml::Table::new();
           table_dep.insert("path".to_string(),
                            toml::Value::String(path_to_str(&dep.crate_path)?.to_string()));
@@ -240,6 +228,7 @@ impl RustCodeGenerator {
       });
       let build_dependencies = toml::Value::Table({
         let mut table = toml::Table::new();
+        // TODO: automatically insert actual version of cpp_to_rust_build_tools
         table.insert("cpp_to_rust_build_tools".to_string(),
                      toml::Value::String("0.0".to_string()));
         table

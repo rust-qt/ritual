@@ -156,7 +156,6 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
       tmp_file.write(cpp_code)?;
     }
   }
-  // TODO: PIC and additional args should be moved to lib spec (#13)
   let mut args = vec!["-Xclang".to_string(), "-detailed-preprocessing-record".to_string()];
   args.append(&mut config.flags.clone());
   for dir in &config.include_paths {

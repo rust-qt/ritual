@@ -166,7 +166,7 @@ pub fn run(config: Config) -> Result<()> {
     return Ok(());
   }
   check_all_paths(&config)?;
-  // TODO: allow to remove any prefix through `Config`
+  // TODO: allow to remove any prefix through `Config` (#25)
   let remove_qt_prefix = config.crate_properties().name.starts_with("qt_");
 
   if !config.dependency_paths().is_empty() {
@@ -250,7 +250,7 @@ pub fn run(config: Config) -> Result<()> {
                                       dependency_rust_types,
                                       rust_generator::RustGeneratorConfig {
                                         crate_name: config.crate_properties().name.clone(),
-                                        // TODO: more universal prefix removal
+                                        // TODO: more universal prefix removal (#25)
                                         remove_qt_prefix: remove_qt_prefix,
                                       }).chain_err(|| "Rust data generator failed")?;
   log::info(format!("Generating Rust crate code ({}).",
