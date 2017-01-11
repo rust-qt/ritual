@@ -12,8 +12,6 @@
 // #![warn(result_unwrap_used)]
 // #![warn(print_stdout)]
 
-
-extern crate toml;
 extern crate rustfmt;
 extern crate tempdir;
 
@@ -36,6 +34,7 @@ mod rust_info;
 mod rust_type;
 mod cpp_parser;
 mod serializable;
+mod versions;
 
 #[cfg(test)]
 mod tests;

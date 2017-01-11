@@ -1,10 +1,11 @@
-use common::file_utils::{PathBufWithAdded, create_dir, create_file};
+use common::file_utils::{PathBufWithAdded, create_dir};
 use common::utils::run_command;
 use common::cpp_lib_builder::{CppLibBuilder, BuildType};
 use common::errors::fancy_unwrap;
 use config::{Config, CrateProperties};
-use common::cpp_build_config::{CppBuildConfig, CppBuildConfigData};
+use common::cpp_build_config::{CppBuildConfigData};
 use common::target;
+use common::cargo_override::set_cargo_override;
 
 use std::process::Command;
 use std::path::PathBuf;
@@ -40,8 +41,6 @@ fn build_cpp_lib() -> TempTestDir {
     .run());
   temp_dir
 }
-
-extern crate toml;
 
 #[test]
 fn full_run() {
@@ -88,32 +87,15 @@ fn full_run() {
   config.set_crate_template_path(&crate_template_path);
   fancy_unwrap(config.exec());
   assert!(crate_dir.exists());
-  // we need to add root folder to cargo paths to force test crate
-  // to use current version of cpp_to_rust
-  let crate_cargo_dir = crate_dir.with_added(".cargo");
-  if !crate_cargo_dir.exists() {
-    create_dir(&crate_cargo_dir).unwrap();
-  }
-  let crate_cargo_config_path = crate_cargo_dir.with_added("config");
-  if !crate_cargo_config_path.exists() {
+  {
     let manifest_parent_path =
       PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf();
     assert!(manifest_parent_path.exists());
     let dep_paths = vec![manifest_parent_path.with_added("cpp_to_rust_build_tools"),
                          manifest_parent_path.with_added("cpp_to_rust_common")];
-
-    let mut file = create_file(crate_cargo_config_path).unwrap();
-    file.write({
-          let mut table = toml::Table::new();
-          table.insert("paths".to_string(),
-                       toml::Value::Array(dep_paths.iter()
-                         .map(|p| toml::Value::String(p.to_str().unwrap().to_string()))
-                         .collect()));
-          toml::Value::Table(table)
-        }
-        .to_string())
-      .unwrap();
+    set_cargo_override(crate_dir.with_added("Cargo.toml"), &dep_paths).unwrap();
   }
+
   for cargo_cmd in &["update", "build", "test", "doc"] {
     let mut command = Command::new("cargo");
     command.arg(cargo_cmd);

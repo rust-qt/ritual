@@ -7,6 +7,7 @@ extern crate serde;
 extern crate serde_json;
 extern crate ansi_term;
 extern crate num_cpus;
+pub extern crate toml;
 
 pub mod log;
 pub mod errors;
@@ -19,5 +20,6 @@ pub mod cpp_build_config;
 pub mod cpp_lib_builder;
 pub mod target;
 pub mod build_script_data;
+pub mod cargo_override;
 
 mod serializable;

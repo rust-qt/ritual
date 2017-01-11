@@ -1,7 +1,7 @@
 use common::errors::{Result, ChainErr, unexpected};
 use common::file_utils::{PathBufWithAdded, copy_recursively, file_to_string, copy_file,
                          create_file, create_dir_all, remove_file, read_dir,
-                         os_str_to_str, os_string_into_string};
+                         os_str_to_str, os_string_into_string, save_toml};
 use common::log;
 use rust_generator::RustGeneratorOutput;
 use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
@@ -14,8 +14,9 @@ use common::utils::{is_msvc, MapIfOk};
 use doc_formatter;
 use std::path::PathBuf;
 
-use toml;
+use common::toml;
 use rustfmt;
+use versions;
 
 use config::{CrateProperties, CrateDependency};
 
@@ -189,7 +190,7 @@ impl RustCodeGenerator {
       }
       self.call_rustfmt(&output_build_rs_path);
     }
-    let cargo_toml_data = toml::Value::Table({
+    let cargo_toml_data = {
       let package = toml::Value::Table({
         let mut table = toml::Table::new();
         table.insert("name".to_string(),
@@ -210,9 +211,9 @@ impl RustCodeGenerator {
       let dependencies = toml::Value::Table({
         let mut table = toml::Table::new();
         if !self.config.crate_properties.should_remove_default_dependencies() {
-          table.insert("libc".to_string(), toml::Value::String("0.2".to_string()));
+          table.insert("libc".to_string(), toml::Value::String(versions::LIBC_VERSION.to_string()));
           table.insert("cpp_utils".to_string(),
-                       toml::Value::String("0.1".to_string()));
+                       toml::Value::String(versions::CPP_UTILS_VERSION.to_string()));
           for dep in &self.config.dependencies {
             // TODO: add a path override
             table.insert(dep.name.clone(), toml::Value::String(dep.version.clone()));
@@ -225,10 +226,9 @@ impl RustCodeGenerator {
       });
       let build_dependencies = toml::Value::Table({
         let mut table = toml::Table::new();
-        // TODO: automatically insert actual version of cpp_to_rust_build_tools
         if !self.config.crate_properties.should_remove_default_build_dependencies() {
           table.insert("cpp_to_rust_build_tools".to_string(),
-                       toml::Value::String("0.0".to_string()));
+                       toml::Value::String(versions::BUILD_TOOLS_VERSION.to_string()));
         }
         for dep in self.config.crate_properties.build_dependencies() {
           table.insert(dep.name.clone(), toml::Value::String(dep.version.clone()));
@@ -251,9 +251,8 @@ impl RustCodeGenerator {
         table.insert("lib".to_string(), lib);
       }
       table
-    });
-    let mut cargo_toml_file = create_file(self.config.output_path.with_added("Cargo.toml"))?;
-    cargo_toml_file.write(cargo_toml_data.to_string())?;
+    };
+    save_toml(self.config.output_path.with_added("Cargo.toml"), cargo_toml_data)?;
 
     if let Some(ref template_path) = self.config.crate_template_path {
       for name in &["src", "tests", "examples"] {

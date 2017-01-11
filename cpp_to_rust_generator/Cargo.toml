@@ -17,7 +17,7 @@ serde = "0.8"       # serialization
 serde_json = "0.8"
 
 clang = "0.14"    # C++ parsing
-toml = "0.2" # toml generation
+
 select = "0.3.0"    # html parsing
 
 tempdir = "0.3.5"   # temporary directory creation

@@ -4,6 +4,7 @@ use errors::{Result, ChainErr};
 use std::path::{Path, PathBuf};
 use std::fs;
 use std::io::Read;
+use toml;
 
 pub fn move_files(src: &PathBuf, dst: &PathBuf) -> Result<()> {
   let err = || format!("failed: move_files({:?}, {:?})", src, dst);
@@ -119,6 +120,8 @@ pub fn load_json<P: AsRef<Path>, T: ::serde::Deserialize>(path: P) -> Result<T> 
     .chain_err(|| format!("failed to parse file as JSON: {}", path.as_ref().display()))
 }
 
+
+
 pub fn save_json<P: AsRef<Path>, T: ::serde::Serialize>(path: P, value: &T) -> Result<()> {
   let file = create_file(path.as_ref())?;
   ::serde_json::to_writer(&mut file.into_file(), value).chain_err(|| {
@@ -126,6 +129,21 @@ pub fn save_json<P: AsRef<Path>, T: ::serde::Serialize>(path: P, value: &T) -> R
             path.as_ref().display())
   })
 }
+
+pub fn load_toml<P: AsRef<Path>>(path: P) -> Result<toml::Table> {
+  let data = file_to_string(path.as_ref())?;
+  let mut parser = toml::Parser::new(&data);
+  parser.parse().chain_err(|| format!("failed to parse TOML file: {}", path.as_ref().display()))
+}
+
+pub fn save_toml<P: AsRef<Path>>(path: P, data: toml::Table) -> Result<()> {
+  let mut file = create_file(path.as_ref())?;
+  file.write(toml::Value::Table(data).to_string()).chain_err(|| {
+    format!("failed to write to TOML file: {}",
+            path.as_ref().display())
+  })
+}
+
 
 pub fn file_to_string<P: AsRef<Path>>(path: P) -> Result<String> {
   let mut f = open_file(path)?;
