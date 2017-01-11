@@ -26,17 +26,92 @@ impl ::std::fmt::Debug for CppDataFilter {
   }
 }
 
+#[derive(Default, Debug, Clone)]
+pub struct CrateDependency {
+  pub name: String,
+  pub version: String,
+}
+
 /// Information about the generated crate
 #[derive(Default, Debug, Clone)]
 pub struct CrateProperties {
   /// Name of the crate
-  pub name: String,
+  name: String,
   /// Version of the crate (must be in compliance with cargo requirements)
-  pub version: String,
+  version: String,
   /// Authors of the crate
-  pub authors: Vec<String>,
+  authors: Vec<String>,
   /// Name of the C++ library
-  pub links: Option<String>,
+  links: Option<String>,
+  dependencies: Vec<CrateDependency>,
+  build_dependencies: Vec<CrateDependency>,
+  remove_default_dependencies: bool,
+  remove_default_build_dependencies: bool,
+}
+
+impl CrateProperties {
+  pub fn new<S1: Into<String>, S2: Into<String>>(name: S1, version: S2) -> CrateProperties {
+    CrateProperties {
+      name: name.into(),
+      version: version.into(),
+      authors: Vec::new(),
+      links: None,
+      dependencies: Vec::new(),
+      build_dependencies: Vec::new(),
+      remove_default_dependencies: false,
+      remove_default_build_dependencies: false,
+    }
+  }
+
+  pub fn add_author<S: Into<String>>(&mut self, author: S) {
+    self.authors.push(author.into());
+  }
+  pub fn set_links_attribute<S: Into<String>>(&mut self, links: S) {
+    self.links = Some(links.into());
+  }
+  pub fn add_dependency<S1: Into<String>, S2: Into<String>>(&mut self, name: S1, version: S2) {
+    self.dependencies.push(CrateDependency {
+      name: name.into(),
+      version: version.into(),
+    });
+  }
+  pub fn add_build_dependency<S1: Into<String>, S2: Into<String>>(&mut self, name: S1, version: S2) {
+    self.build_dependencies.push(CrateDependency {
+      name: name.into(),
+      version: version.into(),
+    });
+  }
+  pub fn remove_default_dependencies(&mut self) {
+    self.remove_default_dependencies = true;
+  }
+  pub fn remove_default_build_dependencies(&mut self) {
+    self.remove_default_build_dependencies = true;
+  }
+
+  pub fn name(&self) -> &String {
+    &self.name
+  }
+  pub fn version(&self) -> &String {
+    &self.version
+  }
+  pub fn authors(&self) -> &Vec<String> {
+    &self.authors
+  }
+  pub fn links_attribute(&self) -> Option<&String> {
+    self.links.as_ref()
+  }
+  pub fn dependencies(&self) -> &Vec<CrateDependency> {
+    &self.dependencies
+  }
+  pub fn build_dependencies(&self) -> &Vec<CrateDependency> {
+    &self.build_dependencies
+  }
+  pub fn should_remove_default_dependencies(&self) -> bool {
+    self.remove_default_dependencies
+  }
+  pub fn should_remove_default_build_dependencies(&self) -> bool {
+    self.remove_default_build_dependencies
+  }
 }
 
 
@@ -203,6 +278,10 @@ impl Config {
 
   pub fn set_cpp_build_config(&mut self, cpp_build_config: CppBuildConfig) {
     self.cpp_build_config = cpp_build_config;
+  }
+
+  pub fn cpp_build_config_mut(&mut self) -> &mut CppBuildConfig {
+    &mut self.cpp_build_config
   }
 
   /// Starts execution of the generator.

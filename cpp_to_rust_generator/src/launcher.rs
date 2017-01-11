@@ -1,4 +1,4 @@
-use config::Config;
+use config::{CrateDependency, Config};
 use cpp_code_generator::{CppCodeGenerator, generate_cpp_type_size_requester, CppTypeSizeRequest};
 use cpp_type::CppTypeClassBase;
 use cpp_data::CppData;
@@ -10,7 +10,6 @@ use common::file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json
                          canonicalize, remove_dir_all, remove_dir, read_dir, create_file};
 use common::build_script_data::BuildScriptData;
 use common::log;
-use rust_code_generator::RustCodeGeneratorDependency;
 use rust_code_generator;
 use rust_generator;
 use rust_info::{RustTypeWrapperKind, RustExportInfo};
@@ -167,7 +166,7 @@ pub fn run(config: Config) -> Result<()> {
   }
   check_all_paths(&config)?;
   // TODO: allow to remove any prefix through `Config` (#25)
-  let remove_qt_prefix = config.crate_properties().name.starts_with("qt_");
+  let remove_qt_prefix = config.crate_properties().name().starts_with("qt_");
 
   if !config.dependency_paths().is_empty() {
     log::info("Loading dependencies");
@@ -190,7 +189,7 @@ pub fn run(config: Config) -> Result<()> {
   let c_lib_path_existed = c_lib_path.exists();
 
 
-  let c_lib_name = format!("{}_c", &config.crate_properties().name);
+  let c_lib_name = format!("{}_c", &config.crate_properties().name());
   let c_lib_tmp_path = if c_lib_path_existed {
     let path = config.cache_dir_path().with_added("c_lib.new");
     if path.exists() {
@@ -215,7 +214,7 @@ pub fn run(config: Config) -> Result<()> {
 
   let crate_new_path = if output_path_existed {
     let path = config.cache_dir_path()
-      .with_added(format!("{}.new", &config.crate_properties().name));
+      .with_added(format!("{}.new", &config.crate_properties().name()));
     if path.as_path().exists() {
       remove_dir_all(&path)?;
     }
@@ -231,9 +230,9 @@ pub fn run(config: Config) -> Result<()> {
     c_lib_name: c_lib_name.clone(),
     dependencies: dependencies.iter()
       .map(|x| {
-        RustCodeGeneratorDependency {
-          crate_name: x.rust_export_info.crate_name.clone(),
-          crate_path: x.path.clone(),
+        CrateDependency {
+          name: x.rust_export_info.crate_name.clone(),
+          version: x.rust_export_info.crate_version.clone(),
         }
       })
       .collect(),
@@ -249,12 +248,12 @@ pub fn run(config: Config) -> Result<()> {
                                       },
                                       dependency_rust_types,
                                       rust_generator::RustGeneratorConfig {
-                                        crate_name: config.crate_properties().name.clone(),
+                                        crate_name: config.crate_properties().name().clone(),
                                         // TODO: more universal prefix removal (#25)
                                         remove_qt_prefix: remove_qt_prefix,
                                       }).chain_err(|| "Rust data generator failed")?;
   log::info(format!("Generating Rust crate code ({}).",
-                    &config.crate_properties().name));
+                    &config.crate_properties().name()));
   rust_code_generator::run(rust_config, &rust_data).chain_err(|| "Rust code generator failed")?;
   let mut cpp_type_size_requests = Vec::new();
   for type1 in &rust_data.processed_types {
@@ -280,7 +279,8 @@ pub fn run(config: Config) -> Result<()> {
     let rust_export_path = config.cache_dir_path().with_added("rust_export_info.json");
     save_json(&rust_export_path,
               &RustExportInfo {
-                crate_name: config.crate_properties().name.clone(),
+                crate_name: config.crate_properties().name().clone(),
+                crate_version: config.crate_properties().version().clone(),
                 rust_types: rust_data.processed_types,
               })?;
     log::info(format!("Rust export info is saved to file: {}",
@@ -288,6 +288,8 @@ pub fn run(config: Config) -> Result<()> {
   }
 
   if output_path_existed {
+    // move all generated top level files and folders (and delete corresponding old folders)
+    // but keep existing unknown top level files and folders, such as "target" or ".cargo"
     for item in read_dir(&crate_new_path)? {
       let item = item?;
       move_files(&crate_new_path.with_added(item.file_name()),
@@ -301,5 +303,6 @@ pub fn run(config: Config) -> Result<()> {
               cpp_wrapper_lib_name: c_lib_name,
             })?;
   create_file(config.cache_dir_path().with_added(COMPLETED_MARKER_FILE_NAME))?;
+  log::info("cpp_to_rust generator finished");
   Ok(())
 }

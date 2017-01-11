@@ -18,25 +18,25 @@ impl CMakeVar {
       value: value.into(),
     }
   }
-  pub fn new_list<I, S, L>(name: S, paths: L) -> CMakeVar
+  pub fn new_list<I, S, L>(name: S, paths: L) -> Result<CMakeVar>
     where S: Into<String>, I: AsRef<str>, L: IntoIterator<Item=I>
   {
-    let value = paths.into_iter().map(|s| {
-      if s.as_ref().contains(' ') {
-        format!("\"{}\"", s.as_ref())
+    let value = paths.into_iter().map_if_ok(|s| -> Result<_> {
+      if s.as_ref().contains(';') {
+        Err(format!("can't pass value to cmake because ';' symbol is reserved: {}", s.as_ref()).into())
       } else {
-        s.as_ref().to_string()
+        Ok(s)
       }
-    }).join(" ");
-    CMakeVar::new(name, value)
+    })?.into_iter().join(";");
+    Ok(CMakeVar::new(name, value))
   }
 
   pub fn new_path_list<I, S, L>(name: S, paths: L) -> Result<CMakeVar>
     where S: Into<String>, I: AsRef<Path>, L: IntoIterator<Item=I>
   {
-    Ok(CMakeVar::new_list(name, paths.into_iter().map_if_ok(|x| {
+    CMakeVar::new_list(name, paths.into_iter().map_if_ok(|x| {
       path_to_str(x.as_ref()).map(|x| x.to_string())
-    })?))
+    })?)
   }
 }
 

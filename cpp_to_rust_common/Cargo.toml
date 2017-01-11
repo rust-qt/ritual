@@ -1,7 +1,7 @@
 [package]
 name = "cpp_to_rust_common"
 version = "0.0.0"
-authors = ["Ri <ri@idzaaus.org>"]
+authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 build = "build.rs"
 description = "Common utilities for cpp_to_rust_generator and cpp_to_rust_build_tools"
 license = "MIT"

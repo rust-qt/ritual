@@ -1052,3 +1052,6 @@ impl TemplateArgumentsDeclaration {
     self.names.len() as i32
   }
 }
+
+//fn diff_cpp_data(data1: &CppData, data2: &CppData) {
+//}

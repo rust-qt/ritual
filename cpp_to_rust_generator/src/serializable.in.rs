@@ -793,6 +793,8 @@ pub struct RustProcessedTypeInfo {
 pub struct RustExportInfo {
   /// Name of the crate
   pub crate_name: String,
+  /// Version of the crate
+  pub crate_version: String,
   /// List of generated types
   pub rust_types: Vec<RustProcessedTypeInfo>,
 }

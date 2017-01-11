@@ -49,15 +49,12 @@ fn full_run() {
   let crate_dir = temp_dir.path().with_added("crate");
   let cpp_install_lib_dir = temp_dir.path().with_added("install").with_added("lib");
   assert!(cpp_install_lib_dir.exists());
+  let mut crate_properties = CrateProperties::new("rust_ctrt1", "0.0.0");
+  crate_properties.set_links_attribute("ctrt1");
 
   let mut config = Config::new(&crate_dir,
                                temp_dir.path().with_added("cache"),
-                               CrateProperties {
-                                 authors: Vec::new(),
-                                 links: Some("ctrt1".to_string()),
-                                 name: "rust_ctrt1".to_string(),
-                                 version: "0.0.0".to_string(),
-                               });
+                               crate_properties);
   config.add_include_directive("ctrt1/all.h");
   let include_path = {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -78,19 +75,17 @@ fn full_run() {
   config.add_include_path(&include_path);
   config.add_target_include_path(&include_path);
 
-  let mut cpp_build_config = CppBuildConfig::new();
   {
     let mut data = CppBuildConfigData::new();
     data.add_linked_lib("ctrt1");
-    cpp_build_config.add(target::Condition::True, data);
+    config.cpp_build_config_mut().add(target::Condition::True, data);
   }
   {
     let mut data = CppBuildConfigData::new();
     data.add_compiler_flag("-fPIC");
-    cpp_build_config.add(target::Condition::Env(target::Env::Msvc).negate(), data);
+    config.cpp_build_config_mut().add(target::Condition::Env(target::Env::Msvc).negate(), data);
   }
   config.set_crate_template_path(&crate_template_path);
-  config.set_cpp_build_config(cpp_build_config);
   fancy_unwrap(config.exec());
   assert!(crate_dir.exists());
   // we need to add root folder to cargo paths to force test crate

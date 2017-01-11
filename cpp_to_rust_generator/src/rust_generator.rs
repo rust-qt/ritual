@@ -480,7 +480,7 @@ fn process_types(input_data: &CppAndFfiData,
         cpp_doc: type_info.doc.clone(),
         cpp_template_arguments: Some(ins.template_arguments.clone()),
         kind: RustTypeWrapperKind::Struct {
-          size_const_name: size_const_name(&rust_name),
+          size_const_name: String::new(),
           is_deletable: input_data.cpp_data.has_public_destructor(&CppTypeClassBase {
             name: template_instantiations.class_name.clone(),
             template_arguments: Some(ins.template_arguments.clone()),
@@ -512,7 +512,10 @@ fn process_types(input_data: &CppAndFfiData,
     for mut r in unnamed_items {
       match template_final_name(&result, &r) {
         Ok(name) => {
-          r.rust_name = name;
+          r.rust_name = name.clone();
+          if let RustTypeWrapperKind::Struct { ref mut size_const_name, .. } = r.kind {
+            *size_const_name = self::size_const_name(&name);
+          }
           result.push(r);
           any_success = true;
         }

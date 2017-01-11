@@ -1,6 +1,6 @@
 use common::errors::{Result, ChainErr, unexpected};
 use common::file_utils::{PathBufWithAdded, copy_recursively, file_to_string, copy_file,
-                         create_file, path_to_str, create_dir_all, remove_file, read_dir,
+                         create_file, create_dir_all, remove_file, read_dir,
                          os_str_to_str, os_string_into_string};
 use common::log;
 use rust_generator::RustGeneratorOutput;
@@ -17,19 +17,14 @@ use std::path::PathBuf;
 use toml;
 use rustfmt;
 
-pub struct RustCodeGeneratorDependency {
-  pub crate_name: String,
-  pub crate_path: PathBuf,
-}
-
-use config::CrateProperties;
+use config::{CrateProperties, CrateDependency};
 
 pub struct RustCodeGeneratorConfig {
   pub crate_properties: CrateProperties,
   pub output_path: PathBuf,
   pub crate_template_path: Option<PathBuf>,
   pub c_lib_name: String,
-  pub dependencies: Vec<RustCodeGeneratorDependency>,
+  pub dependencies: Vec<CrateDependency>,
 }
 
 fn format_doc(doc: &str) -> String {
@@ -198,12 +193,12 @@ impl RustCodeGenerator {
       let package = toml::Value::Table({
         let mut table = toml::Table::new();
         table.insert("name".to_string(),
-                     toml::Value::String(self.config.crate_properties.name.clone()));
+                     toml::Value::String(self.config.crate_properties.name().clone()));
         table.insert("version".to_string(),
-                     toml::Value::String(self.config.crate_properties.version.clone()));
+                     toml::Value::String(self.config.crate_properties.version().clone()));
         let authors = self.config
           .crate_properties
-          .authors
+          .authors()
           .iter()
           .map(|x| toml::Value::String(x.clone()))
           .collect();
@@ -214,23 +209,30 @@ impl RustCodeGenerator {
       });
       let dependencies = toml::Value::Table({
         let mut table = toml::Table::new();
-        table.insert("libc".to_string(), toml::Value::String("0.2".to_string()));
-        table.insert("cpp_utils".to_string(),
-                     toml::Value::String("0.1".to_string()));
-        for dep in &self.config.dependencies {
-          // TODO: use dependency version instead of path (and add a path override)
-          let mut table_dep = toml::Table::new();
-          table_dep.insert("path".to_string(),
-                           toml::Value::String(path_to_str(&dep.crate_path)?.to_string()));
-          table.insert(dep.crate_name.clone(), toml::Value::Table(table_dep));
+        if !self.config.crate_properties.should_remove_default_dependencies() {
+          table.insert("libc".to_string(), toml::Value::String("0.2".to_string()));
+          table.insert("cpp_utils".to_string(),
+                       toml::Value::String("0.1".to_string()));
+          for dep in &self.config.dependencies {
+            // TODO: add a path override
+            table.insert(dep.name.clone(), toml::Value::String(dep.version.clone()));
+          }
+        }
+        for dep in self.config.crate_properties.dependencies() {
+          table.insert(dep.name.clone(), toml::Value::String(dep.version.clone()));
         }
         table
       });
       let build_dependencies = toml::Value::Table({
         let mut table = toml::Table::new();
         // TODO: automatically insert actual version of cpp_to_rust_build_tools
-        table.insert("cpp_to_rust_build_tools".to_string(),
-                     toml::Value::String("0.0".to_string()));
+        if !self.config.crate_properties.should_remove_default_build_dependencies() {
+          table.insert("cpp_to_rust_build_tools".to_string(),
+                       toml::Value::String("0.0".to_string()));
+        }
+        for dep in self.config.crate_properties.build_dependencies() {
+          table.insert(dep.name.clone(), toml::Value::String(dep.version.clone()));
+        }
         table
       });
       let mut table = toml::Table::new();
@@ -269,7 +271,7 @@ impl RustCodeGenerator {
   }
 
   fn rust_type_to_code(&self, rust_type: &RustType) -> String {
-    rust_type_to_code(rust_type, &self.config.crate_properties.name)
+    rust_type_to_code(rust_type, &self.config.crate_properties.name())
   }
 
   fn rust_ffi_function_to_code(&self, func: &RustFFIFunction) -> String {
@@ -653,7 +655,7 @@ impl RustCodeGenerator {
       lib_file.write("pub extern crate libc;\n")?;
       lib_file.write("pub extern crate cpp_utils;\n\n")?;
       for dep in &self.config.dependencies {
-        lib_file.write(format!("pub extern crate {};\n\n", &dep.crate_name))?;
+        lib_file.write(format!("pub extern crate {};\n\n", &dep.name))?;
       }
 
       // some ffi functions are not used because
@@ -756,7 +758,7 @@ impl RustCodeGenerator {
                                                              "flags".to_string(),
                                                              "FlaggableEnum".to_string()])
                                ?
-                               .full_name(Some(&self.config.crate_properties.name)));
+                               .full_name(Some(&self.config.crate_properties.name())));
               }
               r
             }
@@ -780,12 +782,12 @@ impl RustCodeGenerator {
                 let connections_mod = RustName::new(vec!["qt_core".to_string(),
                                                          "connections".to_string()])
                   ?
-                  .full_name(Some(&self.config.crate_properties.name));
+                  .full_name(Some(&self.config.crate_properties.name()));
                 let object_type_name = RustName::new(vec!["qt_core".to_string(),
                                                           "object".to_string(),
                                                           "Object".to_string()])
                   ?
-                  .full_name(Some(&self.config.crate_properties.name));
+                  .full_name(Some(&self.config.crate_properties.name()));
                 let callback_args = slot_wrapper.arguments
                   .iter()
                   .enumerate()
@@ -802,7 +804,7 @@ impl RustCodeGenerator {
                   .join(", ");
                 r.push_str(&format!(include_str!("../templates/crate/slot_wrapper_extras.rs.in"),
                                     type_name = type1.name
-                                      .full_name(Some(&self.config.crate_properties.name)),
+                                      .full_name(Some(&self.config.crate_properties.name())),
                                     pub_type_name = slot_wrapper.public_type_name,
                                     callback_name = slot_wrapper.callback_name,
                                     args = args,
@@ -829,14 +831,14 @@ impl RustCodeGenerator {
             let connections_mod = RustName::new(vec!["qt_core".to_string(),
                                                      "connections".to_string()])
               ?
-              .full_name(Some(&self.config.crate_properties.name));
+              .full_name(Some(&self.config.crate_properties.name()));
             let object_type_name = RustName::new(vec!["qt_core".to_string(),
                                                       "object".to_string(),
                                                       "Object".to_string()])
               ?
-              .full_name(Some(&self.config.crate_properties.name));
+              .full_name(Some(&self.config.crate_properties.name()));
             let mut content = Vec::new();
-            let obj_name = type1.name.full_name(Some(&self.config.crate_properties.name));
+            let obj_name = type1.name.full_name(Some(&self.config.crate_properties.name()));
             content.push("use ::cpp_utils::StaticCast;\n".to_string());
             let mut type_impl_content = Vec::new();
             for receiver_type in &[RustQtReceiverType::Signal, RustQtReceiverType::Slot] {

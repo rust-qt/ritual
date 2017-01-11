@@ -10,10 +10,10 @@ use common::utils::{run_command, exe_suffix};
 use std::path::PathBuf;
 use std::process::Command;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Config {
-  cpp_build_paths: Option<CppBuildPaths>,
-  cpp_build_config: Option<CppBuildConfig>,
+  cpp_build_paths: CppBuildPaths,
+  cpp_build_config: CppBuildConfig,
 }
 
 fn manifest_dir() -> Result<PathBuf> {
@@ -29,31 +29,37 @@ fn build_script_data() -> Result<BuildScriptData> {
   load_json(manifest_dir()?.with_added("build_script_data.json"))
 }
 
-pub fn default_cpp_build_config() -> Result<CppBuildConfig> {
-  Ok(build_script_data()?.cpp_build_config)
-}
-
 impl Config {
-  pub fn new() -> Config {
-    Config::default()
+  pub fn new() -> Result<Config> {
+    Ok(Config {
+      cpp_build_config: build_script_data()?.cpp_build_config,
+      cpp_build_paths: CppBuildPaths::default(),
+    })
   }
-  pub fn override_cpp_build_config(&mut self, config: CppBuildConfig) {
-    self.cpp_build_config = Some(config);
+  pub fn cpp_build_config(&self) -> &CppBuildConfig {
+    &self.cpp_build_config
+  }
+  pub fn cpp_build_config_mut(&mut self) -> &mut CppBuildConfig {
+    &mut self.cpp_build_config
+  }
+  pub fn set_cpp_build_config(&mut self, config: CppBuildConfig) {
+    self.cpp_build_config = config;
+  }
+  pub fn cpp_build_paths(&self) -> &CppBuildPaths {
+    &self.cpp_build_paths
+  }
+  pub fn cpp_build_paths_mut(&mut self) -> &mut CppBuildPaths {
+    &mut self.cpp_build_paths
   }
   pub fn set_cpp_build_paths(&mut self, config: CppBuildPaths) {
-    self.cpp_build_paths = Some(config);
+    self.cpp_build_paths = config;
   }
 
-  pub fn run_and_return(self) -> Result<()> {
-    let mut cpp_build_paths = self.cpp_build_paths.unwrap_or_default();
-    cpp_build_paths.apply_env();
+
+  pub fn run_and_return(mut self) -> Result<()> {
+    self.cpp_build_paths.apply_env();
     let build_script_data = build_script_data()?;
-    let cpp_build_config = if let Some(x) = self.cpp_build_config {
-      x
-    } else {
-      build_script_data.cpp_build_config
-    };
-    let cpp_build_config_data = cpp_build_config.eval(&current_target())?;
+    let cpp_build_config_data = self.cpp_build_config.eval(&current_target())?;
     let mut cmake_vars = Vec::new();
     cmake_vars.push(CMakeVar::new("C2R_LIBRARY_TYPE",
                                   match cpp_build_config_data.library_type() {
@@ -62,22 +68,22 @@ impl Config {
                                   }));
     cmake_vars.push(CMakeVar::new_path_list(
       "C2R_INCLUDE_PATHS",
-      cpp_build_paths.include_paths())?);
+      self.cpp_build_paths.include_paths())?);
     cmake_vars.push(CMakeVar::new_path_list(
       "C2R_LIB_PATHS",
-      cpp_build_paths.lib_paths())?);
+      self.cpp_build_paths.lib_paths())?);
     cmake_vars.push(CMakeVar::new_path_list(
       "C2R_FRAMEWORK_PATHS",
-      cpp_build_paths.framework_paths())?);
+      self.cpp_build_paths.framework_paths())?);
     cmake_vars.push(CMakeVar::new_list(
       "C2R_LINKED_LIBS",
-      cpp_build_config_data.linked_libs()));
+      cpp_build_config_data.linked_libs())?);
     cmake_vars.push(CMakeVar::new_list(
       "C2R_LINKED_FRAMEWORKS",
-      cpp_build_config_data.linked_frameworks()));
-    cmake_vars.push(CMakeVar::new_list(
+      cpp_build_config_data.linked_frameworks())?);
+    cmake_vars.push(CMakeVar::new(
       "C2R_COMPILER_FLAGS",
-      cpp_build_config_data.compiler_flags()));
+      cpp_build_config_data.compiler_flags().join(" ")));
     let out_dir = out_dir()?;
     let c_lib_install_dir = out_dir.with_added("c_lib_install");
     let manifest_dir = manifest_dir()?;
@@ -126,10 +132,10 @@ impl Config {
       file.write(run_command(&mut command, true, true)?)?;
     }
 
-    for path in cpp_build_paths.lib_paths() {
+    for path in self.cpp_build_paths.lib_paths() {
       println!("cargo:rustc-link-search=native={}", path_to_str(path)?);
     }
-    for path in cpp_build_paths.framework_paths() {
+    for path in self.cpp_build_paths.framework_paths() {
       println!("cargo:rustc-link-search=framework={}", path_to_str(path)?);
     }
     println!("cargo:rustc-link-search=native={}",
@@ -144,9 +150,10 @@ impl Config {
 
 
 pub fn run_and_return() -> Result<()> {
-  Config::default().run_and_return()
+  Config::new()?.run_and_return()
 }
 
 pub fn run() -> ! {
-  Config::default().run()
+  let config = fancy_unwrap(Config::new());
+  config.run()
 }

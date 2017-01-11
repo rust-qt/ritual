@@ -1,7 +1,7 @@
 [package]
 name = "cpp_to_rust_build_tools"
 version = "0.0.0"
-authors = ["Ri <ri@idzaaus.org>"]
+authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 
 description = "Build script implementation for C++ library wrappers"
 license = "MIT"
