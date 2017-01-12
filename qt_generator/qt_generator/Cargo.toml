@@ -1,0 +1,17 @@
+[package]
+name = "qt_generator"
+version = "0.0.0"
+authors = ["Pavel Strakhov <ri@idzaaus.org>"]
+license = "MIT"
+description = "Generator of Rust crates for Qt"
+
+[dependencies]
+cpp_to_rust_generator = "0.0"
+cpp_to_rust_common = "0.0"
+qt_generator_common = "0.0"
+
+clap = "~2.10.0"    # command line args parsing
+regex = "0.1"
+rusqlite = "0.7"
+compress = "0.1.2"
+select = "0.3.0"    # html parsing
