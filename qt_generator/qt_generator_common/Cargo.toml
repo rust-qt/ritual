@@ -6,5 +6,4 @@ license = "MIT"
 description = "Common utilities for generating and building Rust crates for Qt"
 
 [dependencies]
-#cpp_to_rust_generator = { path = "../../cpp_to_rust/cpp_to_rust_generator" }
-cpp_to_rust_common = "0.0"
+cpp_to_rust_common = { version = "0.0", path = "../../cpp_to_rust/cpp_to_rust_common" }

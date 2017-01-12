@@ -1,4 +1,4 @@
-use config::{CrateDependency, Config};
+use config::{Config};
 use cpp_code_generator::{CppCodeGenerator, generate_cpp_type_size_requester, CppTypeSizeRequest};
 use cpp_type::CppTypeClassBase;
 use cpp_data::CppData;
@@ -12,7 +12,7 @@ use common::build_script_data::BuildScriptData;
 use common::log;
 use rust_code_generator;
 use rust_generator;
-use rust_info::{RustTypeWrapperKind, RustExportInfo};
+use rust_info::{RustTypeWrapperKind, RustExportInfo, DependencyInfo};
 
 use std::path::{Path, PathBuf};
 
@@ -30,11 +30,6 @@ pub fn is_completed<P: AsRef<Path>>(cache_dir: P) -> bool {
     log::info(format!("Remove \"{}\" file to force processing.", path.display()));
   }
   result
-}
-
-struct DependencyInfo {
-  pub rust_export_info: RustExportInfo,
-  pub path: PathBuf,
 }
 
 fn load_dependency(path: &PathBuf) -> Result<(RustExportInfo, CppData)> {
@@ -228,14 +223,7 @@ pub fn run(config: Config) -> Result<()> {
     output_path: crate_new_path.clone(),
     crate_template_path: config.crate_template_path().cloned(),
     c_lib_name: c_lib_name.clone(),
-    dependencies: dependencies.iter()
-      .map(|x| {
-        CrateDependency {
-          name: x.rust_export_info.crate_name.clone(),
-          version: x.rust_export_info.crate_version.clone(),
-        }
-      })
-      .collect(),
+    dependencies: &dependencies,
   };
   let mut dependency_rust_types = Vec::new();
   for dep in &dependencies {

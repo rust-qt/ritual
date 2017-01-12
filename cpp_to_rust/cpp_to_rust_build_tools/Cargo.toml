@@ -7,4 +7,4 @@ description = "Build script implementation for C++ library wrappers"
 license = "MIT"
 
 [dependencies]
-cpp_to_rust_common = "0.0"
+cpp_to_rust_common = { version = "0.0", path = "../../cpp_to_rust/cpp_to_rust_common" }

@@ -1,12 +1,12 @@
 use common::errors::{Result, ChainErr, unexpected};
 use common::file_utils::{PathBufWithAdded, copy_recursively, file_to_string, copy_file,
-                         create_file, create_dir_all, remove_file, read_dir,
-                         os_str_to_str, os_string_into_string, save_toml};
+                         create_file, create_dir_all, remove_file, read_dir, os_str_to_str,
+                         os_string_into_string, save_toml, path_to_str, open_file_with_options};
 use common::log;
 use rust_generator::RustGeneratorOutput;
 use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
                 RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope,
-                RustMethodArgument, TraitImpl, TraitImplExtra, RustQtReceiverType};
+                RustMethodArgument, TraitImpl, TraitImplExtra, RustQtReceiverType, DependencyInfo};
 use rust_type::{RustName, RustType, RustTypeIndirection, RustFFIFunction, RustToCTypeConversion,
                 CompleteType};
 use common::string_utils::{JoinWithString, CaseOperations};
@@ -18,14 +18,14 @@ use common::toml;
 use rustfmt;
 use versions;
 
-use config::{CrateProperties, CrateDependency};
+use config::{CrateProperties};
 
-pub struct RustCodeGeneratorConfig {
+pub struct RustCodeGeneratorConfig<'a> {
   pub crate_properties: CrateProperties,
   pub output_path: PathBuf,
   pub crate_template_path: Option<PathBuf>,
   pub c_lib_name: String,
-  pub dependencies: Vec<CrateDependency>,
+  pub dependencies: &'a [DependencyInfo],
 }
 
 fn format_doc(doc: &str) -> String {
@@ -123,7 +123,7 @@ pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) -> Resul
     });
 
   let rustfmt_config_data = if let Some(template_rustfmt_config_path) =
-    template_rustfmt_config_path {
+                                   template_rustfmt_config_path {
     log::info(format!("Using rustfmt config file: {:?}",
                       template_rustfmt_config_path));
     file_to_string(template_rustfmt_config_path)?
@@ -143,15 +143,16 @@ pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) -> Resul
   module_names.sort();
   generator.generate_ffi_file(&data.ffi_functions)?;
   generator.generate_lib_file(&module_names)?;
+  generator.append_from_template()?;
   Ok(())
 }
 
-pub struct RustCodeGenerator {
-  config: RustCodeGeneratorConfig,
+pub struct RustCodeGenerator<'a> {
+  config: RustCodeGeneratorConfig<'a>,
   pub rustfmt_config: rustfmt::config::Config,
 }
 
-impl RustCodeGenerator {
+impl<'a> RustCodeGenerator<'a> {
   /// Generates cargo file and skeleton of the crate
   pub fn generate_template(&self) -> Result<()> {
     let template_rustfmt_config_path =
@@ -211,12 +212,19 @@ impl RustCodeGenerator {
       let dependencies = toml::Value::Table({
         let mut table = toml::Table::new();
         if !self.config.crate_properties.should_remove_default_dependencies() {
-          table.insert("libc".to_string(), toml::Value::String(versions::LIBC_VERSION.to_string()));
+          table.insert("libc".to_string(),
+                       toml::Value::String(versions::LIBC_VERSION.to_string()));
           table.insert("cpp_utils".to_string(),
                        toml::Value::String(versions::CPP_UTILS_VERSION.to_string()));
-          for dep in &self.config.dependencies {
-            // TODO: add a path override
-            table.insert(dep.name.clone(), toml::Value::String(dep.version.clone()));
+          for dep in self.config.dependencies {
+            let mut value = toml::Table::new();
+            value.insert("version".to_string(),
+                         toml::Value::String(dep.rust_export_info.crate_version.clone()));
+            value.insert("path".to_string(),
+                         toml::Value::String(path_to_str(&dep.path)?.to_string()));
+
+            table.insert(dep.rust_export_info.crate_name.clone(),
+                         toml::Value::Table(value));
           }
         }
         for dep in self.config.crate_properties.dependencies() {
@@ -252,7 +260,8 @@ impl RustCodeGenerator {
       }
       table
     };
-    save_toml(self.config.output_path.with_added("Cargo.toml"), cargo_toml_data)?;
+    save_toml(self.config.output_path.with_added("Cargo.toml"),
+              cargo_toml_data)?;
 
     if let Some(ref template_path) = self.config.crate_template_path {
       for name in &["src", "tests", "examples"] {
@@ -415,8 +424,8 @@ impl RustCodeGenerator {
           RustToCTypeConversion::CppBoxToPtr => {
             let is_const =
               if let RustType::Common { ref is_const, ref is_const2, ref indirection, .. } =
-                arg.argument_type
-                  .rust_ffi_type {
+                     arg.argument_type
+                .rust_ffi_type {
                 match *indirection {
                   RustTypeIndirection::PtrPtr { .. } |
                   RustTypeIndirection::PtrRef { .. } => *is_const2,
@@ -525,14 +534,12 @@ impl RustCodeGenerator {
           }
         } else {
           let mut maybe_mut_declaration = "";
-          if let RustType::Common { ref indirection, .. } =
-            arg.argument_type
-              .rust_api_type {
+          if let RustType::Common { ref indirection, .. } = arg.argument_type
+            .rust_api_type {
             if *indirection == RustTypeIndirection::None &&
                arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr {
-              if let RustType::Common { ref is_const, .. } =
-                arg.argument_type
-                  .rust_ffi_type {
+              if let RustType::Common { ref is_const, .. } = arg.argument_type
+                .rust_ffi_type {
                 if !is_const {
                   maybe_mut_declaration = "mut ";
                 }
@@ -653,8 +660,8 @@ impl RustCodeGenerator {
       let mut lib_file = create_file(&lib_file_path)?;
       lib_file.write("pub extern crate libc;\n")?;
       lib_file.write("pub extern crate cpp_utils;\n\n")?;
-      for dep in &self.config.dependencies {
-        lib_file.write(format!("pub extern crate {};\n\n", &dep.name))?;
+      for dep in self.config.dependencies {
+        lib_file.write(format!("pub extern crate {};\n\n", &dep.rust_export_info.crate_name))?;
       }
 
       // some ffi functions are not used because
@@ -666,6 +673,17 @@ impl RustCodeGenerator {
         mod type_sizes { \ninclude!(concat!(env!(\"OUT_DIR\"), \
                 \"/type_sizes.rs\")); \n}\n\n")?;
 
+      for name in &["ffi", "type_sizes"] {
+        if modules.iter().any(|x| &x.as_str() == name) {
+          return Err(format!("Automatically generated module '{}' conflicts with a mandatory module", name).into());
+        }
+      }
+      for name in &["lib", "main"] {
+        if modules.iter().any(|x| &x.as_str() == name) {
+          return Err(format!("Automatically generated module '{}' conflicts with a reserved name", name).into());
+        }
+      }
+
       let mut extra_modules = Vec::new();
 
       if let Some(ref template_path) = self.config.crate_template_path {
@@ -674,8 +692,8 @@ impl RustCodeGenerator {
             let item = item?;
             let path = item.path();
             let file_name = os_string_into_string(item.file_name())?;
-            if file_name == "lib.rs" {
-              continue;
+            if file_name == "lib.rs" || file_name == "ffi.rs" {
+              return Err(format!("src/{} in crate template is not allowed", file_name).into());
             }
             if item.path().is_dir() {
               extra_modules.push(file_name.to_string());
@@ -689,8 +707,10 @@ impl RustCodeGenerator {
         }
       }
       for module in &extra_modules {
-        if modules.iter().any(|x| x.as_ref() as &str == module) {
-          panic!("module name conflict");
+        if modules.iter().any(|x| x.as_str() == module) {
+          return Err(format!("Crate template contains '{}' module but there is an automatically \
+                              generated module with the same name",
+                             module).into());
         }
       }
       let all_modules = extra_modules.iter().chain(modules.iter().map(|x| *x));
@@ -707,7 +727,7 @@ impl RustCodeGenerator {
     let mut results = Vec::new();
     for trait1 in trait_impls {
       let trait_content = if let Some(TraitImplExtra::CppDeletable { ref deleter_name }) =
-        trait1.extra {
+                                 trait1.extra {
         format!("fn deleter() -> ::cpp_utils::Deleter<Self> {{\n  ::ffi::{}\n}}\n",
                 deleter_name)
       } else {
@@ -1066,6 +1086,38 @@ pub fn {struct_method}(&self) -> {struct_type} {{
       file.write("}\n")?;
     }
     // no rustfmt for ffi file
+    Ok(())
+  }
+
+  fn append_from_template(&self) -> Result<()> {
+    if let Some(ref template_path) = self.config.crate_template_path {
+      let src_append_path = template_path.with_added("src_append");
+      if src_append_path.exists() {
+        if !src_append_path.is_dir() {
+          return Err(format!("Path is expected to be a directory: {}",
+                             src_append_path.display()).into());
+        }
+        for item in read_dir(template_path.with_added("src_append"))? {
+          let item = item?;
+          let path = item.path();
+          if !path.is_file() {
+            return Err(format!("Path is expected to be a file: {}", path.display()).into());
+          }
+          let file_name = item.file_name();
+          let output_path = self.config.output_path.with_added("src").with_added(&file_name);
+          if !output_path.exists() {
+            return Err(format!("Failed to append content from '{}' file because '{}' file does \
+                                not exist",
+                               path.display(),
+                               output_path.display()).into());
+          }
+          let mut file = open_file_with_options(output_path,
+                                                ::std::fs::OpenOptions::new().append(true))?;
+          file.write(file_to_string(path)?)?;
+          log::info(format!("Adding code from {}", os_str_to_str(&file_name)?));
+        }
+      }
+    }
     Ok(())
   }
 }

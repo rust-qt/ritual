@@ -158,6 +158,14 @@ pub fn create_file<P: AsRef<Path>>(path: P) -> Result<FileWrapper> {
   })
 }
 
+pub fn open_file_with_options<P: AsRef<Path>>(path: P, options: &fs::OpenOptions) -> Result<FileWrapper> {
+  Ok(FileWrapper {
+    file: options.open(path.as_ref())
+        .chain_err(|| format!("Failed to open file: {:?}", path.as_ref()))?,
+    path: path.as_ref().to_path_buf(),
+  })
+}
+
 impl FileWrapper {
   pub fn read_all(&mut self) -> Result<String> {
     let mut r = String::new();

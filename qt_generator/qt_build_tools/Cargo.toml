@@ -6,6 +6,6 @@ license = "MIT"
 description = "Build script implementation for Rust Qt crates"
 
 [dependencies]
-cpp_to_rust_build_tools = "0.0"
-cpp_to_rust_common = "0.0"
-qt_generator_common = "0.0"
+cpp_to_rust_build_tools = { version = "0.0", path = "../../cpp_to_rust/cpp_to_rust_build_tools" }
+cpp_to_rust_common = { version = "0.0", path = "../../cpp_to_rust/cpp_to_rust_common" }
+qt_generator_common = { version = "0.0", path = "../qt_generator_common" }

@@ -8,6 +8,7 @@ pub use serializable::{RustEnumValue, RustTypeWrapperKind, RustProcessedTypeInfo
                        CppEnumValueDocItem, RustQtSlotWrapper};
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustMethodDocItem {
@@ -210,4 +211,10 @@ pub struct RustModule {
   pub functions: Vec<RustMethod>,
   pub trait_impls: Vec<TraitImpl>,
   pub submodules: Vec<RustModule>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DependencyInfo {
+  pub rust_export_info: RustExportInfo,
+  pub path: PathBuf,
 }
