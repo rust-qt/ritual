@@ -453,8 +453,8 @@ fn simple_class_method() {
   assert!(data.template_instantiations.is_empty());
   assert!(data.types.len() == 1);
   assert_eq!(data.types[0].name, "MyClass");
-  if let CppTypeKind::Class { ref bases, ref fields, ref template_arguments, .. } =
-    data.types[0].kind {
+  if let CppTypeKind::Class { ref bases, ref fields, ref template_arguments, .. } = data.types[0]
+    .kind {
     assert!(template_arguments.is_none());
     assert!(bases.is_empty());
     assert!(fields.len() == 1);
@@ -606,8 +606,8 @@ fn template_class_method() {
   assert!(data.template_instantiations.is_empty());
   assert!(data.types.len() == 1);
   assert_eq!(data.types[0].name, "MyVector");
-  if let CppTypeKind::Class { ref bases, ref fields, ref template_arguments, .. } =
-    data.types[0].kind {
+  if let CppTypeKind::Class { ref bases, ref fields, ref template_arguments, .. } = data.types[0]
+    .kind {
     assert_eq!(template_arguments,
                &Some(TemplateArgumentsDeclaration {
                  nested_level: 0,

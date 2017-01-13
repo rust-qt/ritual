@@ -19,10 +19,14 @@ pub fn is_msvc() -> bool {
 
 
 #[cfg(windows)]
-pub fn exe_suffix() -> &'static str { return ".exe"; }
+pub fn exe_suffix() -> &'static str {
+  return ".exe";
+}
 
 #[cfg(not(windows))]
-pub fn exe_suffix() -> &'static str { return ""; }
+pub fn exe_suffix() -> &'static str {
+  return "";
+}
 
 
 pub fn add_to_multihash<K: Eq + Hash + Clone, T, V: Default + Extend<T>>(hash: &mut HashMap<K, V>,
@@ -57,7 +61,7 @@ pub fn run_command(command: &mut Command, fetch_stdout: bool, pipe_output: bool)
   };
 
   let status = command.status()
-      .chain_err(|| format!("command execution failed: {:?}", command))?;
+    .chain_err(|| format!("command execution failed: {:?}", command))?;
   if status.success() {
     Ok(if let Some(output) = output {
       if fetch_stdout {

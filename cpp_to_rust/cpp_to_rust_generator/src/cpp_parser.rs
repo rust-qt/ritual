@@ -861,9 +861,8 @@ impl<'a> CppParser<'a> {
       _ => None,
     };
     let mut is_signal = false;
-    for (argument_number, argument_entity) in
-      argument_entities.into_iter()
-        .enumerate() {
+    for (argument_number, argument_entity) in argument_entities.into_iter()
+      .enumerate() {
       let name = argument_entity.get_name()
         .unwrap_or_else(|| format!("arg{}", argument_number + 1));
       let clang_type = argument_entity.get_type()
@@ -1127,28 +1126,28 @@ impl<'a> CppParser<'a> {
     let full_name = get_full_name(entity)?;
     let mut fields = Vec::new();
     let mut bases = Vec::new();
-    let using_directives = entity.get_children()
-      .into_iter()
-      .filter(|c| c.get_kind() == EntityKind::UsingDeclaration)
-      .filter_map(|child| {
-        let type_ref =
-          if let Some(x) =
-            child.get_children().into_iter().find(|c| {
+    let using_directives =
+      entity.get_children()
+        .into_iter()
+        .filter(|c| c.get_kind() == EntityKind::UsingDeclaration)
+        .filter_map(|child| {
+          let type_ref =
+            if let Some(x) = child.get_children().into_iter().find(|c| {
               c.get_kind() == EntityKind::TypeRef || c.get_kind() == EntityKind::TemplateRef
             }) {
-            x
-          } else {
-            log::warning("Failed to parse UsingDeclaration: class type not found".to_string());
-            dump_entity(child, 0);
-            return None;
-          };
-        let type_def = type_ref.get_definition().expect("TypeRef definition not found");
-        Some(CppClassUsingDirective {
-          class_name: get_full_name(type_def).expect("class_name get_full_name failed"),
-          method_name: child.get_name().expect("method_name failed"),
+              x
+            } else {
+              log::warning("Failed to parse UsingDeclaration: class type not found".to_string());
+              dump_entity(child, 0);
+              return None;
+            };
+          let type_def = type_ref.get_definition().expect("TypeRef definition not found");
+          Some(CppClassUsingDirective {
+            class_name: get_full_name(type_def).expect("class_name get_full_name failed"),
+            method_name: child.get_name().expect("method_name failed"),
+          })
         })
-      })
-      .collect();
+        .collect();
     for child in entity.get_children() {
       if child.get_kind() == EntityKind::FieldDecl {
         match self.parse_class_field(child) {
@@ -1364,7 +1363,7 @@ impl<'a> CppParser<'a> {
         if let Some(name) = entity.get_display_name() {
           if let Ok(parent_type) = self.parse_unexposed_type(None, Some(name.clone()), None, None) {
             if let CppTypeBase::Class(CppTypeClassBase { ref template_arguments, .. }) =
-              parent_type.base {
+                   parent_type.base {
               if let Some(ref template_arguments) = *template_arguments {
                 if template_arguments.iter().any(|x| !x.base.is_template_parameter()) {
                   log::warning(format!("skipping template partial specialization: {}", name));
@@ -1492,7 +1491,7 @@ impl<'a> CppParser<'a> {
 
     fn check_type(type1: &CppType, deps: &[CppData], result: &mut Vec<CppTemplateInstantiations>) {
       if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
-        type1.base {
+             type1.base {
         if let Some(ref template_arguments) = *template_arguments {
           if !template_arguments.iter().any(|x| x.base.is_or_contains_template_parameter()) {
             if !result.iter().any(|x| &x.class_name == name) {

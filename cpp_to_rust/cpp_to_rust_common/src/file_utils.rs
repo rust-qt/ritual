@@ -138,10 +138,8 @@ pub fn load_toml<P: AsRef<Path>>(path: P) -> Result<toml::Table> {
 
 pub fn save_toml<P: AsRef<Path>>(path: P, data: toml::Table) -> Result<()> {
   let mut file = create_file(path.as_ref())?;
-  file.write(toml::Value::Table(data).to_string()).chain_err(|| {
-    format!("failed to write to TOML file: {}",
-            path.as_ref().display())
-  })
+  file.write(toml::Value::Table(data).to_string())
+    .chain_err(|| format!("failed to write to TOML file: {}", path.as_ref().display()))
 }
 
 
@@ -158,10 +156,12 @@ pub fn create_file<P: AsRef<Path>>(path: P) -> Result<FileWrapper> {
   })
 }
 
-pub fn open_file_with_options<P: AsRef<Path>>(path: P, options: &fs::OpenOptions) -> Result<FileWrapper> {
+pub fn open_file_with_options<P: AsRef<Path>>(path: P,
+                                              options: &fs::OpenOptions)
+                                              -> Result<FileWrapper> {
   Ok(FileWrapper {
     file: options.open(path.as_ref())
-        .chain_err(|| format!("Failed to open file: {:?}", path.as_ref()))?,
+      .chain_err(|| format!("Failed to open file: {:?}", path.as_ref()))?,
     path: path.as_ref().to_path_buf(),
   })
 }
@@ -170,8 +170,8 @@ impl FileWrapper {
   pub fn read_all(&mut self) -> Result<String> {
     let mut r = String::new();
     self.file
-        .read_to_string(&mut r)
-        .chain_err(|| format!("Failed to read from file: {:?}", self.path))?;
+      .read_to_string(&mut r)
+      .chain_err(|| format!("Failed to read from file: {:?}", self.path))?;
     Ok(r)
   }
 
@@ -233,8 +233,8 @@ pub struct ReadDirWrapper {
 
 pub fn read_dir<P: AsRef<Path>>(path: P) -> Result<ReadDirWrapper> {
   Ok(ReadDirWrapper {
-    read_dir: fs::read_dir(path.as_ref())
-        .chain_err(|| format!("Failed to read dir: {:?}", path.as_ref()))?,
+    read_dir:
+      fs::read_dir(path.as_ref()).chain_err(|| format!("Failed to read dir: {:?}", path.as_ref()))?,
     path: path.as_ref().to_path_buf(),
   })
 }
@@ -272,4 +272,15 @@ pub fn os_str_to_str(os_str: &OsStr) -> Result<&str> {
 pub fn os_string_into_string(s: OsString) -> Result<String> {
   s.into_string()
     .map_err(|s| format!("String is not valid unicode: {}", s.to_string_lossy()).into())
+}
+
+pub fn repo_crate_local_path(relative_path: &str) -> Result<PathBuf> {
+  let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+  let parent = path.parent().chain_err(|| "failed to get parent directory")?;
+  let parent2 = parent.parent().chain_err(|| "failed to get parent directory")?;
+  let result = parent2.with_added(relative_path);
+  if !result.exists() {
+    return Err(format!("detected path does not exist: {}", result.display()).into());
+  }
+  Ok(result)
 }

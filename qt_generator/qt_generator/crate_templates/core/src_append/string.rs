@@ -1,6 +1,6 @@
 use ::cpp_utils::AsStruct;
 use ::libc::{c_char, c_int};
-use std;
+use ::std;
 
 impl<'a> From<&'a str> for ::string::String {
   fn from(s: &'a str) -> ::string::String {
@@ -8,8 +8,8 @@ impl<'a> From<&'a str> for ::string::String {
   }
 }
 
-impl<'a> From<&'a ::string::String> for String {
-  fn from(s: &'a ::string::String) -> String {
+impl<'a> From<&'a ::string::String> for ::std::string::String {
+  fn from(s: &'a ::string::String) -> ::std::string::String {
     s.to_std_string()
   }
 }

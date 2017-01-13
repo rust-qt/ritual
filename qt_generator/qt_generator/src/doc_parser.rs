@@ -204,18 +204,18 @@ impl DocParser {
 
   pub fn doc_for_type(&mut self, name: &str) -> Result<(CppTypeDoc, Vec<DocForEnumVariant>)> {
     let index_item = self.doc_data
-        .index
-        .iter()
-        .find(|item| &item.name == &name)
-        .chain_err(|| format!("No documentation entry for {}", name))?
+      .index
+      .iter()
+      .find(|item| &item.name == &name)
+      .chain_err(|| format!("No documentation entry for {}", name))?
       .clone();
     if let Some(ref anchor) = index_item.anchor {
       let (result, file_name) = {
         let file_data = self.file_data(index_item.document_id)?;
         let result = file_data.item_docs
-            .iter()
-            .find(|x| &x.anchor == anchor)
-            .chain_err(|| format!("no such anchor: {}", anchor))?;
+          .iter()
+          .find(|x| &x.anchor == anchor)
+          .chain_err(|| format!("no such anchor: {}", anchor))?;
         (result.clone(), file_data.file_name.clone())
       };
       return Ok((CppTypeDoc {
@@ -229,18 +229,18 @@ impl DocParser {
     let mut url = self.base_url.clone();
     {
       let file_data = self.file_data(index_item.document_id)
-          .chain_err(|| "failed to get document")?;
+        .chain_err(|| "failed to get document")?;
       url.push_str(&file_data.file_name);
       let doc = &file_data.document;
       use html_parser::predicate::{And, Name, Class};
       let div_r = doc.find(And(Name("div"), Class("descr")));
       let div = div_r.iter()
-          .next()
-          .chain_err(|| "no div.descr")?;
+        .next()
+        .chain_err(|| "no div.descr")?;
       let h2_r = div.find(Name("h2"));
       let h2 = h2_r.iter()
-          .next()
-          .chain_err(|| "no div.descr h2")?;
+        .next()
+        .chain_err(|| "no div.descr h2")?;
       let mut node = h2.next().chain_err(|| "no next() for div.descr h2")?;
       loop {
         if node.name() == Some("h3") {
@@ -371,7 +371,7 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
       continue;
     };
     let anchor_text = anchor_node.attr("name")
-        .chain_err(|| "anchor_node doesn't have name attribute")?
+      .chain_err(|| "anchor_node doesn't have name attribute")?
       .to_string();
     let mut main_declaration = h3.text()
       .replace("[static]", "static")

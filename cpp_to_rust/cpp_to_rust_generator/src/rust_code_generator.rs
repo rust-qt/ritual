@@ -1,7 +1,8 @@
 use common::errors::{Result, ChainErr, unexpected};
 use common::file_utils::{PathBufWithAdded, copy_recursively, file_to_string, copy_file,
                          create_file, create_dir_all, remove_file, read_dir, os_str_to_str,
-                         os_string_into_string, save_toml, path_to_str, open_file_with_options};
+                         os_string_into_string, save_toml, path_to_str, open_file_with_options,
+                         repo_crate_local_path};
 use common::log;
 use rust_generator::RustGeneratorOutput;
 use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
@@ -18,7 +19,7 @@ use common::toml;
 use rustfmt;
 use versions;
 
-use config::{CrateProperties};
+use config::CrateProperties;
 
 pub struct RustCodeGeneratorConfig<'a> {
   pub crate_properties: CrateProperties,
@@ -26,6 +27,7 @@ pub struct RustCodeGeneratorConfig<'a> {
   pub crate_template_path: Option<PathBuf>,
   pub c_lib_name: String,
   pub dependencies: &'a [DependencyInfo],
+  pub write_dependencies_local_paths: bool,
 }
 
 fn format_doc(doc: &str) -> String {
@@ -152,6 +154,7 @@ pub struct RustCodeGenerator<'a> {
   pub rustfmt_config: rustfmt::config::Config,
 }
 
+
 impl<'a> RustCodeGenerator<'a> {
   /// Generates cargo file and skeleton of the crate
   pub fn generate_template(&self) -> Result<()> {
@@ -209,26 +212,42 @@ impl<'a> RustCodeGenerator<'a> {
                      toml::Value::String("build.rs".to_string()));
         table
       });
+      let dep_value = |version: &str, local_path: Option<PathBuf>| -> Result<toml::Value> {
+        Ok(if local_path.is_none() || !self.config.write_dependencies_local_paths {
+          toml::Value::String(version.to_string())
+        } else {
+          toml::Value::Table({
+            let mut value = toml::Table::new();
+            value.insert("version".to_string(),
+                         toml::Value::String(version.to_string()));
+            value.insert("path".to_string(),
+                         toml::Value::String(path_to_str(&local_path.expect("checked above"))
+                           ?
+                           .to_string()));
+            value
+          })
+        })
+      };
       let dependencies = toml::Value::Table({
         let mut table = toml::Table::new();
         if !self.config.crate_properties.should_remove_default_dependencies() {
           table.insert("libc".to_string(),
                        toml::Value::String(versions::LIBC_VERSION.to_string()));
           table.insert("cpp_utils".to_string(),
-                       toml::Value::String(versions::CPP_UTILS_VERSION.to_string()));
+                       dep_value(versions::CPP_UTILS_VERSION,
+                                 if self.config.write_dependencies_local_paths {
+                                   Some(repo_crate_local_path("cpp_to_rust/cpp_utils")?)
+                                 } else {
+                                   None
+                                 })?);
           for dep in self.config.dependencies {
-            let mut value = toml::Table::new();
-            value.insert("version".to_string(),
-                         toml::Value::String(dep.rust_export_info.crate_version.clone()));
-            value.insert("path".to_string(),
-                         toml::Value::String(path_to_str(&dep.path)?.to_string()));
-
             table.insert(dep.rust_export_info.crate_name.clone(),
-                         toml::Value::Table(value));
+                         dep_value(&dep.rust_export_info.crate_version, Some(dep.path.clone()))?);
           }
         }
         for dep in self.config.crate_properties.dependencies() {
-          table.insert(dep.name.clone(), toml::Value::String(dep.version.clone()));
+          table.insert(dep.name.clone(),
+                       dep_value(&dep.version, dep.local_path.clone())?);
         }
         table
       });
@@ -236,10 +255,16 @@ impl<'a> RustCodeGenerator<'a> {
         let mut table = toml::Table::new();
         if !self.config.crate_properties.should_remove_default_build_dependencies() {
           table.insert("cpp_to_rust_build_tools".to_string(),
-                       toml::Value::String(versions::BUILD_TOOLS_VERSION.to_string()));
+                       dep_value(versions::BUILD_TOOLS_VERSION,
+                                 if self.config.write_dependencies_local_paths {
+                                   Some(repo_crate_local_path("cpp_to_rust/cpp_to_rust_build_tools")?)
+                                 } else {
+                                   None
+                                 })?);
         }
         for dep in self.config.crate_properties.build_dependencies() {
-          table.insert(dep.name.clone(), toml::Value::String(dep.version.clone()));
+          table.insert(dep.name.clone(),
+                       dep_value(&dep.version, dep.local_path.clone())?);
         }
         table
       });
@@ -675,12 +700,17 @@ impl<'a> RustCodeGenerator<'a> {
 
       for name in &["ffi", "type_sizes"] {
         if modules.iter().any(|x| &x.as_str() == name) {
-          return Err(format!("Automatically generated module '{}' conflicts with a mandatory module", name).into());
+          return Err(format!("Automatically generated module '{}' conflicts with a mandatory \
+                              module",
+                             name)
+            .into());
         }
       }
       for name in &["lib", "main"] {
         if modules.iter().any(|x| &x.as_str() == name) {
-          return Err(format!("Automatically generated module '{}' conflicts with a reserved name", name).into());
+          return Err(format!("Automatically generated module '{}' conflicts with a reserved name",
+                             name)
+            .into());
         }
       }
 
@@ -710,7 +740,8 @@ impl<'a> RustCodeGenerator<'a> {
         if modules.iter().any(|x| x.as_str() == module) {
           return Err(format!("Crate template contains '{}' module but there is an automatically \
                               generated module with the same name",
-                             module).into());
+                             module)
+            .into());
         }
       }
       let all_modules = extra_modules.iter().chain(modules.iter().map(|x| *x));
@@ -1095,7 +1126,8 @@ pub fn {struct_method}(&self) -> {struct_type} {{
       if src_append_path.exists() {
         if !src_append_path.is_dir() {
           return Err(format!("Path is expected to be a directory: {}",
-                             src_append_path.display()).into());
+                             src_append_path.display())
+            .into());
         }
         for item in read_dir(template_path.with_added("src_append"))? {
           let item = item?;
@@ -1109,7 +1141,8 @@ pub fn {struct_method}(&self) -> {struct_type} {{
             return Err(format!("Failed to append content from '{}' file because '{}' file does \
                                 not exist",
                                path.display(),
-                               output_path.display()).into());
+                               output_path.display())
+              .into());
           }
           let mut file = open_file_with_options(output_path,
                                                 ::std::fs::OpenOptions::new().append(true))?;

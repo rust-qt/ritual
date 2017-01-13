@@ -1,7 +1,7 @@
-use cpp_to_rust_common::errors::{Result};
+use cpp_to_rust_common::errors::Result;
 use cpp_to_rust_common::log;
 use cpp_to_rust_common::utils::is_msvc;
-use cpp_to_rust_common::file_utils::PathBufWithAdded;
+use cpp_to_rust_common::file_utils::{PathBufWithAdded, repo_crate_local_path};
 use cpp_to_rust_generator::config::Config;
 use cpp_to_rust_common::cpp_build_config::CppBuildConfigData;
 use cpp_to_rust_common::target;
@@ -17,8 +17,13 @@ use cpp_to_rust_generator::config::{CrateProperties, is_completed};
 use doc_decoder::decode_doc;
 use lib_configs;
 
-pub fn exec_all(libs: Vec<String>, cache_dir: PathBuf, output_dir: PathBuf) -> Result<()> {
-  let crate_templates_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_added("crate_templates");
+pub fn exec_all(libs: Vec<String>,
+                cache_dir: PathBuf,
+                output_dir: PathBuf,
+                no_local_paths: bool)
+                -> Result<()> {
+  let crate_templates_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    .with_added("crate_templates");
   for sublib_name in libs {
     let lib_cache_dir = cache_dir.with_added(&sublib_name);
     let lib_crate_templates_path = crate_templates_path.with_added(&sublib_name);
@@ -40,11 +45,16 @@ pub fn exec_all(libs: Vec<String>, cache_dir: PathBuf, output_dir: PathBuf) -> R
                            sublib_name,
                            dep,
                            path.display())
-            .into());
+          .into());
       }
       dependency_paths.push(path);
     }
-    exec(&sublib_name, lib_cache_dir, lib_output_dir, lib_crate_templates_path, dependency_paths)?;
+    exec(&sublib_name,
+         lib_cache_dir,
+         lib_output_dir,
+         lib_crate_templates_path,
+         dependency_paths,
+         no_local_paths)?;
   }
   Ok(())
 }
@@ -53,7 +63,9 @@ fn exec(sublib_name: &str,
         cache_dir: PathBuf,
         output_dir: PathBuf,
         crate_templates_path: PathBuf,
-        dependency_paths: Vec<PathBuf>) -> Result<()> {
+        dependency_paths: Vec<PathBuf>,
+        no_local_paths: bool)
+        -> Result<()> {
   if is_completed(&cache_dir) {
     return Ok(());
   }
@@ -63,12 +75,24 @@ fn exec(sublib_name: &str,
   crate_properties.add_author("Pavel Strakhov <ri@idzaaus.org>");
   crate_properties.set_links_attribute(qt_lib_name.clone());
   crate_properties.remove_default_build_dependencies();
-  crate_properties.add_build_dependency("qt_build_tools", "0.1");
+  crate_properties.add_build_dependency("qt_build_tools", "0.1", if no_local_paths {
+    None
+  } else {
+    Some(repo_crate_local_path("qt_generator/qt_build_tools")?)
+  });
   let mut config = Config::new(&output_dir, &cache_dir, crate_properties);
   let installation_data = get_installation_data(sublib_name)?;
   config.add_include_path(&installation_data.root_include_path);
   config.add_include_path(&installation_data.lib_include_path);
   config.add_target_include_path(&installation_data.lib_include_path);
+  config.set_write_dependencies_local_paths(!no_local_paths);
+  if no_local_paths {
+    log::info("Local paths will not be written to the output crate. Make sure all dependencies \
+               are published before trying to compile the crate.");
+  } else {
+    log::info("Output Cargo.toml file will contain local paths of used dependencies \
+               (use --no-local-paths to disable).");
+  }
   // TODO: does parsing work on MacOS without adding "-F"?
 
   config.add_include_directive(&lib_folder_name(sublib_name));
@@ -156,4 +180,3 @@ fn find_methods_docs(cpp_methods: &mut [CppMethod], data: &mut DocParser) -> Res
   }
   Ok(())
 }
-

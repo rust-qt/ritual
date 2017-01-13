@@ -274,7 +274,7 @@ impl CppData {
         if let CppTypeKind::Class { ref bases, ref using_directives, .. } = type1.kind {
           for base in bases {
             if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
-              base.base_type.base {
+                   base.base_type.base {
               if name == base_name {
                 log::noisy(format!("Adding inherited methods from {} to {}",
                                    base_name,
@@ -366,11 +366,10 @@ impl CppData {
   pub fn add_inherited_methods(&mut self) -> Result<()> {
     log::info("Adding inherited methods");
     let mut all_new_methods = Vec::new();
-    for (is_self, cpp_data) in
-      self.dependencies
-        .iter()
-        .map(|x| (false, x))
-        .chain(once((true, self as &_))) {
+    for (is_self, cpp_data) in self.dependencies
+      .iter()
+      .map(|x| (false, x))
+      .chain(once((true, self as &_))) {
       for type1 in &cpp_data.types {
         if type1.is_class() {
           let mut interesting_cpp_datas: Vec<&CppData> = vec![cpp_data];
@@ -542,7 +541,7 @@ impl CppData {
         }
         for base in bases {
           if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
-            base.base_type.base {
+                 base.base_type.base {
             if template_arguments.is_some() {
               return true;
             }
@@ -668,16 +667,15 @@ impl CppData {
       for method in &cpp_data.methods {
         for type1 in method.all_involved_types() {
           if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
-            type1.base {
+                 type1.base {
             if let Some(ref template_arguments) = *template_arguments {
               assert!(!template_arguments.is_empty());
               if template_arguments.iter().all(|x| x.base.is_template_parameter()) {
-                if let Some(template_instantiations) =
-                  self.template_instantiations
-                    .iter()
-                    .find(|x| &x.class_name == name) {
+                if let Some(template_instantiations) = self.template_instantiations
+                  .iter()
+                  .find(|x| &x.class_name == name) {
                   let nested_level = if let CppTypeBase::TemplateParameter { nested_level, .. } =
-                    template_arguments[0].base {
+                                            template_arguments[0].base {
                     nested_level
                   } else {
                     return Err("only template parameters can be here".into());
@@ -1053,5 +1051,5 @@ impl TemplateArgumentsDeclaration {
   }
 }
 
-//fn diff_cpp_data(data1: &CppData, data2: &CppData) {
-//}
+// fn diff_cpp_data(data1: &CppData, data2: &CppData) {
+// }

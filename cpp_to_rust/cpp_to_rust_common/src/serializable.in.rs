@@ -62,7 +62,7 @@ pub struct Target {
   pub family: Family,
   pub env: Env,
   pub pointer_width: PointerWidth,
-  //pub vendor: Vendor,
+  // pub vendor: Vendor,
   pub endian: Endian,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,7 +73,7 @@ pub enum Condition {
   Family(Family),
   Env(Env),
   PointerWidth(PointerWidth),
-  //Vendor(Vendor),
+  // Vendor(Vendor),
   Endian(Endian),
   And(Vec<Condition>),
   Or(Vec<Condition>),

@@ -3,7 +3,7 @@ use common::utils::run_command;
 use common::cpp_lib_builder::{CppLibBuilder, BuildType};
 use common::errors::fancy_unwrap;
 use config::{Config, CrateProperties};
-use common::cpp_build_config::{CppBuildConfigData};
+use common::cpp_build_config::CppBuildConfigData;
 use common::target;
 use common::cargo_override::set_cargo_override;
 

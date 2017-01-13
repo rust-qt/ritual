@@ -108,24 +108,24 @@ pub fn current_pointer_width() -> PointerWidth {
   PointerWidth::P64
 }
 
-//#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-//pub enum Vendor {
+// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// pub enum Vendor {
 //  Apple,
 //  PC,
 //  Unknown,
-//}
-//#[cfg(target_vendor = "apple")]
-//pub fn current_vendor() -> Vendor {
+// }
+// #[cfg(target_vendor = "apple")]
+// pub fn current_vendor() -> Vendor {
 //  Vendor::Apple
-//}
-//#[cfg(target_vendor = "pc")]
-//pub fn current_vendor() -> Vendor {
+// }
+// #[cfg(target_vendor = "pc")]
+// pub fn current_vendor() -> Vendor {
 //  Vendor::PC
-//}
-//#[cfg(target_vendor = "unknown")]
-//pub fn current_vendor() -> Vendor {
+// }
+// #[cfg(target_vendor = "unknown")]
+// pub fn current_vendor() -> Vendor {
 //  Vendor::Unknown
-//}
+// }
 
 #[cfg(target_endian = "little")]
 pub fn current_endian() -> Endian {
@@ -144,7 +144,7 @@ pub fn current_target() -> Target {
     family: current_family(),
     env: current_env(),
     pointer_width: current_pointer_width(),
-    //vendor: current_vendor(),
+    // vendor: current_vendor(),
     endian: current_endian(),
   }
 }
@@ -159,7 +159,7 @@ impl Condition {
       Family(ref family) => &target.family == family,
       Env(ref env) => &target.env == env,
       PointerWidth(ref pointer_width) => &target.pointer_width == pointer_width,
-      //Vendor(ref vendor) => &target.vendor == vendor,
+      // Vendor(ref vendor) => &target.vendor == vendor,
       Endian(ref endian) => &target.endian == endian,
       And(ref conditions) => conditions.iter().all(|c| c.eval(target)),
       Or(ref conditions) => conditions.iter().any(|c| c.eval(target)),

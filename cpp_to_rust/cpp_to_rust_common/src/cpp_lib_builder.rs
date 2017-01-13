@@ -19,31 +19,40 @@ impl CMakeVar {
     }
   }
   pub fn new_list<I, S, L>(name: S, paths: L) -> Result<CMakeVar>
-    where S: Into<String>, I: AsRef<str>, L: IntoIterator<Item=I>
+    where S: Into<String>,
+          I: AsRef<str>,
+          L: IntoIterator<Item = I>
   {
-    let value = paths.into_iter().map_if_ok(|s| -> Result<_> {
-      if s.as_ref().contains(';') {
-        Err(format!("can't pass value to cmake because ';' symbol is reserved: {}", s.as_ref()).into())
-      } else {
-        Ok(s)
-      }
-    })?.into_iter().join(";");
+    let value = paths.into_iter()
+      .map_if_ok(|s| -> Result<_> {
+        if s.as_ref().contains(';') {
+          Err(format!("can't pass value to cmake because ';' symbol is reserved: {}",
+                      s.as_ref())
+            .into())
+        } else {
+          Ok(s)
+        }
+      })?
+      .into_iter()
+      .join(";");
     Ok(CMakeVar::new(name, value))
   }
 
   pub fn new_path_list<I, S, L>(name: S, paths: L) -> Result<CMakeVar>
-    where S: Into<String>, I: AsRef<Path>, L: IntoIterator<Item=I>
+    where S: Into<String>,
+          I: AsRef<Path>,
+          L: IntoIterator<Item = I>
   {
-    CMakeVar::new_list(name, paths.into_iter().map_if_ok(|x| {
-      path_to_str(x.as_ref()).map(|x| x.to_string())
-    })?)
+    CMakeVar::new_list(name,
+                       paths.into_iter()
+                         .map_if_ok(|x| path_to_str(x.as_ref()).map(|x| x.to_string()))?)
   }
 }
 
 #[derive(Debug, Clone)]
 pub enum BuildType {
   Debug,
-  Release
+  Release,
 }
 
 #[derive(Debug, Clone)]
@@ -76,12 +85,12 @@ impl CppLibBuilder {
       cmake_command.arg("-G").arg("NMake Makefiles");
     }
     let mut actual_cmake_vars = self.cmake_vars.clone();
-    actual_cmake_vars.push(CMakeVar::new("CMAKE_BUILD_TYPE", match actual_build_type {
-      BuildType::Release => "Release",
-      BuildType::Debug => "Debug",
-    }));
-    actual_cmake_vars.push(CMakeVar::new("CMAKE_INSTALL_PREFIX",
-                                         path_to_str(&self.install_dir)?));
+    actual_cmake_vars.push(CMakeVar::new("CMAKE_BUILD_TYPE",
+                                         match actual_build_type {
+                                           BuildType::Release => "Release",
+                                           BuildType::Debug => "Debug",
+                                         }));
+    actual_cmake_vars.push(CMakeVar::new("CMAKE_INSTALL_PREFIX", path_to_str(&self.install_dir)?));
 
     for var in actual_cmake_vars {
       cmake_command.arg(format!("-D{}={}", var.name, var.value));

@@ -14,5 +14,3 @@ fn vector1() {
   assert_eq!(vec.at(1), &2);
   assert_eq!(vec.at(2), &4);
 }
-
-

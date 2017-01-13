@@ -7,9 +7,7 @@ use qt_gui::cpp_utils::*;
 
 #[test]
 fn window1() {
-  let _app = GuiApplication::new((&mut 0i32,
-                                  &mut (&mut 0i8 as *mut i8) as *mut *mut i8,
-                                  AsBox));
+  let _app = GuiApplication::new((&mut 0i32, &mut (&mut 0i8 as *mut i8) as *mut *mut i8, AsBox));
 
   let mut a = Window::new(AsBox);
   let mut b = Window::new((a.as_mut_ptr(), AsBox));

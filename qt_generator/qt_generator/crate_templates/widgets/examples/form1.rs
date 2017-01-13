@@ -49,15 +49,14 @@ impl<'a> Form<'a> {
       line_edit: line_edit,
       button_clicked: SlotNoArgs::new(move || {
         let text = uref(line_edit1).text(AsStruct);
-        MessageBox::information((
-          widget1,
-          &String::from_std_str("My title"),
-          &String::from_std_str("Text: \"%1\". Congratulations!").arg((&text, AsStruct))));
+        MessageBox::information((widget1,
+                                 &String::from_std_str("My title"),
+                                 &String::from_std_str("Text: \"%1\". Congratulations!")
+          .arg((&text, AsStruct))));
       }),
       line_edit_edited: SlotNoArgs::new(move || {
-        uref(button1).set_enabled(
-          !uref(line_edit1).text(AsStruct).is_empty());
-      })
+        uref(button1).set_enabled(!uref(line_edit1).text(AsStruct).is_empty());
+      }),
     };
     uref(button).signals().clicked().connect(&form.button_clicked);
     uref(line_edit).signals().text_edited().connect(&form.line_edit_edited);

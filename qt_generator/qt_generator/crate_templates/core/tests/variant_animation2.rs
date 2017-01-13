@@ -10,7 +10,8 @@ use qt_core::slots::SlotVariantVariantRef;
 fn variant_animation2() {
   CoreApplication::create_and_exit(|app| {
     let slot1 = SlotVariantVariantRef::new(|value| {
-      println!("value_changed: {}", value.to_string(AsStruct).to_std_string());
+      println!("value_changed: {}",
+               value.to_string(AsStruct).to_std_string());
     });
 
     let mut animation = VariantAnimation::new(AsBox);

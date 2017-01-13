@@ -81,9 +81,8 @@ impl RustMethod {
     };
     Ok(if let Some(arg) = args.get(0) {
       if arg.name == "self" {
-        if let RustType::Common { ref indirection, ref is_const, .. } =
-          arg.argument_type
-            .rust_api_type {
+        if let RustType::Common { ref indirection, ref is_const, .. } = arg.argument_type
+          .rust_api_type {
           match *indirection {
             RustTypeIndirection::Ref { .. } => {
               if *is_const {

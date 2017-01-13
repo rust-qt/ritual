@@ -1,1 +1,1 @@
-pub use serializable::{BuildScriptData};
+pub use serializable::BuildScriptData;

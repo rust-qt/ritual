@@ -30,6 +30,7 @@ impl ::std::fmt::Debug for CppDataFilter {
 pub struct CrateDependency {
   pub name: String,
   pub version: String,
+  pub local_path: Option<PathBuf>,
 }
 
 /// Information about the generated crate
@@ -69,16 +70,24 @@ impl CrateProperties {
   pub fn set_links_attribute<S: Into<String>>(&mut self, links: S) {
     self.links = Some(links.into());
   }
-  pub fn add_dependency<S1: Into<String>, S2: Into<String>>(&mut self, name: S1, version: S2) {
+  pub fn add_dependency<S1: Into<String>, S2: Into<String>>(&mut self,
+                                                            name: S1,
+                                                            version: S2,
+                                                            local_path: Option<PathBuf>) {
     self.dependencies.push(CrateDependency {
       name: name.into(),
       version: version.into(),
+      local_path: local_path,
     });
   }
-  pub fn add_build_dependency<S1: Into<String>, S2: Into<String>>(&mut self, name: S1, version: S2) {
+  pub fn add_build_dependency<S1: Into<String>, S2: Into<String>>(&mut self,
+                                                                  name: S1,
+                                                                  version: S2,
+                                                                  local_path: Option<PathBuf>) {
     self.build_dependencies.push(CrateDependency {
       name: name.into(),
       version: version.into(),
+      local_path: local_path,
     });
   }
   pub fn remove_default_dependencies(&mut self) {
@@ -139,6 +148,7 @@ pub struct Config {
   cpp_ffi_generator_filters: Vec<CppFfiGeneratorFilter>,
   cpp_data_filters: Vec<CppDataFilter>,
   cpp_build_config: CppBuildConfig, // TODO: add CppBuildPaths when needed
+  write_dependencies_local_paths: bool,
 }
 
 impl Config {
@@ -166,6 +176,7 @@ impl Config {
       cpp_ffi_generator_filters: Default::default(),
       cpp_data_filters: Default::default(),
       cpp_build_config: Default::default(),
+      write_dependencies_local_paths: true,
     }
   }
 
@@ -350,6 +361,13 @@ impl Config {
 
   pub fn cpp_build_config(&self) -> &CppBuildConfig {
     &self.cpp_build_config
+  }
+
+  pub fn set_write_dependencies_local_paths(&mut self, value: bool) {
+    self.write_dependencies_local_paths = value;
+  }
+  pub fn write_dependencies_local_paths(&self) -> bool {
+    self.write_dependencies_local_paths
   }
 }
 

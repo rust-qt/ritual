@@ -8,9 +8,10 @@ use qt_core::connections::Signal;
 use qt_core::libc::c_void;
 use qt_core::slots::ExternSlotVariantVariantRef;
 
-extern fn value_changed(_data: *mut c_void, value: *const Variant) {
+extern "C" fn value_changed(_data: *mut c_void, value: *const Variant) {
   let value = unsafe { value.as_ref() }.expect("value must not be null");
-  println!("value_changed: {}", value.to_string(AsStruct).to_std_string());
+  println!("value_changed: {}",
+           value.to_string(AsStruct).to_std_string());
 }
 
 #[test]

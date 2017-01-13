@@ -1,4 +1,4 @@
-use config::{Config};
+use config::Config;
 use cpp_code_generator::{CppCodeGenerator, generate_cpp_type_size_requester, CppTypeSizeRequest};
 use cpp_type::CppTypeClassBase;
 use cpp_data::CppData;
@@ -224,6 +224,7 @@ pub fn run(config: Config) -> Result<()> {
     crate_template_path: config.crate_template_path().cloned(),
     c_lib_name: c_lib_name.clone(),
     dependencies: &dependencies,
+    write_dependencies_local_paths: config.write_dependencies_local_paths(),
   };
   let mut dependency_rust_types = Vec::new();
   for dep in &dependencies {

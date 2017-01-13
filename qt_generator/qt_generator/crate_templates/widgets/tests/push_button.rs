@@ -15,5 +15,3 @@ fn push_button1() {
     0
   })
 }
-
-

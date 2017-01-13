@@ -25,14 +25,13 @@ pub fn set_cargo_override<P1: AsRef<Path>, P: AsRef<Path>>(cargo_toml_location: 
                     .chain_err(|| "no 'package.version' in Cargo.toml")?;
                   let key = format!("{}:{}",
                                     name.as_str()
-                                        .chain_err(|| "'package.name' must be a string")?,
+                                      .chain_err(|| "'package.name' must be a string")?,
                                     version.as_str()
-                                        .chain_err(|| "'package.version' must be a string")?);
+                                      .chain_err(|| "'package.version' must be a string")?);
                   let mut value = toml::Table::new();
                   value.insert("path".to_string(),
                                toml::Value::String(path_to_str(path.as_ref())?.to_string()));
-                  table.insert(key,
-                               toml::Value::Table(value));
+                  table.insert(key, toml::Value::Table(value));
                 }
                 table
               }));

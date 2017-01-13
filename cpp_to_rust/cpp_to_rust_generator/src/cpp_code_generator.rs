@@ -222,9 +222,8 @@ impl CppCodeGenerator {
           }
         }
       } else {
-        let scope_specifier = if let Some(ref class_membership) =
-          method.cpp_method
-            .class_membership {
+        let scope_specifier = if let Some(ref class_membership) = method.cpp_method
+          .class_membership {
           if class_membership.is_static {
             format!("{}::", class_membership.class_type.to_cpp_code()?)
           } else {
@@ -251,10 +250,10 @@ impl CppCodeGenerator {
           None => String::new(),
         };
         if let Some(&Some(FakeCppMethod::FieldAccessor { ref accessor_type, ref field_name })) =
-          method.cpp_method
-            .class_membership
-            .as_ref()
-            .map(|x| &x.fake) {
+               method.cpp_method
+          .class_membership
+          .as_ref()
+          .map(|x| &x.fake) {
           is_field_accessor = true;
           if accessor_type == &CppFieldAccessorType::Setter {
             format!("{}{} = {}",

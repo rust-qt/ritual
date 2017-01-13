@@ -21,9 +21,7 @@ mod tests {
   #[test]
   fn test_drop_calls_deleter() {
     let value1 = Rc::new(RefCell::new(10));
-    let mut object1 = Struct1 {
-      value: value1.clone()
-    };
+    let mut object1 = Struct1 { value: value1.clone() };
     assert!(value1.borrow().clone() == 10);
     unsafe {
       CppBox::new(&mut object1 as *mut _);
@@ -49,10 +47,9 @@ pub type Deleter<T> = unsafe extern "C" fn(this_ptr: *mut T);
 ///   }
 /// }
 /// ```
-pub trait CppDeletable : Sized {
+pub trait CppDeletable: Sized {
   /// Returns deleter function for this type.
   fn deleter() -> Deleter<Self>;
-
 }
 
 /// A C++ pointer wrapper to manage deletion of objects.
@@ -101,7 +98,7 @@ impl<T: CppDeletable> CppBox<T> {
   pub unsafe fn new(ptr: *mut T) -> CppBox<T> {
     CppBox {
       ptr: ptr,
-      deleter: CppDeletable::deleter()
+      deleter: CppDeletable::deleter(),
     }
   }
 }
@@ -109,34 +106,26 @@ impl<T: CppDeletable> CppBox<T> {
 
 impl<T> AsRef<T> for CppBox<T> {
   fn as_ref(&self) -> &T {
-    unsafe {
-      &*self.ptr
-    }
+    unsafe { &*self.ptr }
   }
 }
 
 impl<T> AsMut<T> for CppBox<T> {
   fn as_mut(&mut self) -> &mut T {
-    unsafe {
-      &mut *self.ptr
-    }
+    unsafe { &mut *self.ptr }
   }
 }
 
 impl<T> std::ops::Deref for CppBox<T> {
   type Target = T;
   fn deref(&self) -> &T {
-    unsafe {
-      &*self.ptr
-    }
+    unsafe { &*self.ptr }
   }
 }
 
 impl<T> std::ops::DerefMut for CppBox<T> {
   fn deref_mut(&mut self) -> &mut T {
-    unsafe {
-      &mut *self.ptr
-    }
+    unsafe { &mut *self.ptr }
   }
 }
 
@@ -295,15 +284,8 @@ pub unsafe fn dynamic_cast<R, T: DynamicCast<R>>(ptr: *const T) -> *const R {
 /// Returns null pointer if `ptr` does not point to an instance of `R`.
 /// If `ptr` is null, this function does nothing and returns null pointer.
 pub unsafe fn dynamic_cast_mut<R, T: DynamicCast<R>>(ptr: *mut T) -> *mut R {
-  ptr.as_mut().and_then(|x| x.dynamic_cast_mut()).map(|x| x as *mut R).unwrap_or(std::ptr::null_mut())
+  ptr.as_mut()
+    .and_then(|x| x.dynamic_cast_mut())
+    .map(|x| x as *mut R)
+    .unwrap_or(std::ptr::null_mut())
 }
-
-
-
-
-
-
-
-
-
-

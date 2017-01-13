@@ -227,7 +227,7 @@ pub enum CppFieldAccessorType {
   /// Returns mutable reference to the field
   MutRefGetter,
   /// Copies value from its argument to the field
-  Setter
+  Setter,
 }
 
 /// Information about automatically generated method
@@ -761,7 +761,7 @@ pub enum RustTypeWrapperKind {
   EmptyEnum {
     is_deletable: bool,
     slot_wrapper: Option<RustQtSlotWrapper>,
-  }
+  },
 }
 
 // -------------------------

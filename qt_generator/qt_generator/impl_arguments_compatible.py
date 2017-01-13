@@ -1,9 +1,12 @@
+#!/usr/bin/env python
 
 def types_list(nums):
   r = ", ".join("T%d" % x for x in nums)
   if len(nums) == 1:
     r += ","
   return r
+
+print "// generated with impl_arguments_compatible.py script\n"
 
 for i in range(0, 17):
   for j in range(0, i + 1):

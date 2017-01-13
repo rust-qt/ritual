@@ -6,7 +6,7 @@ use qt_core::connections::Signal;
 
 use qt_core::libc::c_void;
 use qt_core::slots::ExternSlotNoArgs;
-extern fn func1(data: *mut c_void) {
+extern "C" fn func1(data: *mut c_void) {
   let data: usize = unsafe { std::mem::transmute(data) };
   println!("about_to_quit: {}", data);
 }
