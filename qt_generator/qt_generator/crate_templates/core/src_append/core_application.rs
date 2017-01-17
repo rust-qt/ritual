@@ -49,9 +49,6 @@ impl ::core_application::CoreApplication {
   }
 }
 
-
-// TODO: the same for QGuiApplication
-
 // pub trait ClosureAsSlot {
 //  type Slot;
 //  fn as_slot(self) -> Self::Slot;
