@@ -1494,26 +1494,35 @@ impl<'a> CppParser<'a> {
              type1.base {
         if let Some(ref template_arguments) = *template_arguments {
           if !template_arguments.iter().any(|x| x.base.is_or_contains_template_parameter()) {
-            if !result.iter().any(|x| &x.class_name == name) {
-              log::noisy(format!("Found template instantiation: {}<{:?}>",
-                                 name,
-                                 template_arguments));
-              result.push(CppTemplateInstantiations {
-                class_name: name.clone(),
-                instantiations: vec![CppTemplateInstantiation {
-                                       template_arguments: template_arguments.clone(),
-                                     }],
-              });
-            } else {
-              let item =
-                result.iter_mut().find(|x| &x.class_name == name).expect("previously found");
-              if !item.instantiations.iter().any(|x| &x.template_arguments == template_arguments) {
+            if !deps.iter().any(|data| {
+              data.template_instantiations.iter().any(|i| {
+                &i.class_name == name &&
+                i.instantiations.iter().any(|x| &x.template_arguments == template_arguments)
+              })
+            }) {
+              if !result.iter().any(|x| &x.class_name == name) {
                 log::noisy(format!("Found template instantiation: {}<{:?}>",
                                    name,
                                    template_arguments));
-                item.instantiations.push(CppTemplateInstantiation {
-                  template_arguments: template_arguments.clone(),
+                result.push(CppTemplateInstantiations {
+                  class_name: name.clone(),
+                  instantiations: vec![CppTemplateInstantiation {
+                                         template_arguments: template_arguments.clone(),
+                                       }],
                 });
+              } else {
+                let item =
+                  result.iter_mut().find(|x| &x.class_name == name).expect("previously found");
+                if !item.instantiations
+                  .iter()
+                  .any(|x| &x.template_arguments == template_arguments) {
+                  log::noisy(format!("Found template instantiation: {}<{:?}>",
+                                     name,
+                                     template_arguments));
+                  item.instantiations.push(CppTemplateInstantiation {
+                    template_arguments: template_arguments.clone(),
+                  });
+                }
               }
             }
           }
