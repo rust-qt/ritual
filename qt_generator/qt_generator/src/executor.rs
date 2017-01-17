@@ -13,7 +13,7 @@ use doc_parser::DocParser;
 use fix_header_names::fix_header_names;
 use cpp_to_rust_generator::cpp_method::CppMethod;
 use cpp_to_rust_generator::cpp_data::CppTypeKind;
-use cpp_to_rust_generator::config::{CrateProperties, is_completed};
+use cpp_to_rust_generator::config::{CrateProperties, is_completed, completed_marker_path};
 use doc_decoder::decode_doc;
 use lib_configs;
 
@@ -67,6 +67,8 @@ fn exec(sublib_name: &str,
         no_local_paths: bool)
         -> Result<()> {
   if is_completed(&cache_dir) {
+    log::info("No processing! cpp_to_rust uses previous results.");
+    log::info(format!("Remove \"{}\" file to force processing.", completed_marker_path(&cache_dir)));
     return Ok(());
   }
   log::info(format!("Processing library: {}", sublib_name));
@@ -158,7 +160,7 @@ fn exec(sublib_name: &str,
     _ => return Err(format!("Unknown lib name: {}", sublib_name).into()),
   }
 
-  config.set_dependency_paths(dependency_paths);
+  config.set_dependency_cache_paths(dependency_paths);
   config.exec()?;
   Ok(())
 }

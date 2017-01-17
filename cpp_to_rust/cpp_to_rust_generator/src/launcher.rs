@@ -7,7 +7,7 @@ use cpp_ffi_generator;
 use cpp_parser;
 use common::errors::{Result, ChainErr};
 use common::file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json,
-                         canonicalize, remove_dir_all, remove_dir, read_dir, create_file};
+                         canonicalize, remove_dir_all, remove_dir, read_dir, create_file, path_to_str};
 use common::build_script_data::BuildScriptData;
 use common::log;
 use rust_code_generator;
@@ -16,20 +16,16 @@ use rust_info::{RustTypeWrapperKind, RustExportInfo, DependencyInfo};
 
 use std::path::{Path, PathBuf};
 
-const COMPLETED_MARKER_FILE_NAME: &'static str = "cpp_to_rust_completed";
+pub fn completed_marker_path<P: AsRef<Path>>(cache_dir: P) -> PathBuf {
+  cache_dir.as_ref().with_added("cpp_to_rust_completed")
+}
 
 /// Returns true if a library was already processed in this `cache_dir`.
 /// cpp_to_rust won't process this project again until the completed marker file
 /// is removed. You can use this function to skip heavy preparation steps
 /// and avoid constructing a Config object.
 pub fn is_completed<P: AsRef<Path>>(cache_dir: P) -> bool {
-  let path = cache_dir.as_ref().with_added(COMPLETED_MARKER_FILE_NAME);
-  let result = path.exists();
-  if result {
-    log::info("No processing! cpp_to_rust uses previous results.");
-    log::info(format!("Remove \"{}\" file to force processing.", path.display()));
-  }
-  result
+  completed_marker_path(cache_dir).exists()
 }
 
 fn load_dependency(path: &PathBuf) -> Result<(RustExportInfo, CppData)> {
@@ -69,7 +65,7 @@ fn check_all_paths(config: &Config) -> Result<()> {
   if let Some(path) = config.crate_template_path() {
     check_dir(path)?;
   }
-  for path in config.dependency_paths() {
+  for path in config.dependency_cache_paths() {
     check_dir(path)?;
   }
   for path in config.include_paths() {
@@ -163,16 +159,16 @@ pub fn run(config: Config) -> Result<()> {
   // TODO: allow to remove any prefix through `Config` (#25)
   let remove_qt_prefix = config.crate_properties().name().starts_with("qt_");
 
-  if !config.dependency_paths().is_empty() {
+  if !config.dependency_cache_paths().is_empty() {
     log::info("Loading dependencies");
   }
   let mut dependencies = Vec::new();
   let mut dependencies_cpp_data = Vec::new();
-  for path in config.dependency_paths() {
+  for cache_path in config.dependency_cache_paths() {
     let (info, cpp_data) =
-      load_dependency(&canonicalize(path)?).chain_err(|| "failed to load dependency")?;
+      load_dependency(&canonicalize(cache_path)?).chain_err(|| "failed to load dependency")?;
     dependencies.push(DependencyInfo {
-      path: path.clone(),
+      cache_path: cache_path.clone(),
       rust_export_info: info,
     });
     dependencies_cpp_data.push(cpp_data);
@@ -223,7 +219,7 @@ pub fn run(config: Config) -> Result<()> {
     output_path: crate_new_path.clone(),
     crate_template_path: config.crate_template_path().cloned(),
     c_lib_name: c_lib_name.clone(),
-    dependencies: &dependencies,
+    generator_dependencies: &dependencies,
     write_dependencies_local_paths: config.write_dependencies_local_paths(),
   };
   let mut dependency_rust_types = Vec::new();
@@ -271,6 +267,7 @@ pub fn run(config: Config) -> Result<()> {
                 crate_name: config.crate_properties().name().clone(),
                 crate_version: config.crate_properties().version().clone(),
                 rust_types: rust_data.processed_types,
+                output_path: path_to_str(config.output_dir_path())?.to_string(),
               })?;
     log::info(format!("Rust export info is saved to file: {}",
                       rust_export_path.display()));
@@ -291,7 +288,7 @@ pub fn run(config: Config) -> Result<()> {
               cpp_build_config: config.cpp_build_config().clone(),
               cpp_wrapper_lib_name: c_lib_name,
             })?;
-  create_file(config.cache_dir_path().with_added(COMPLETED_MARKER_FILE_NAME))?;
+  create_file(completed_marker_path(config.cache_dir_path()))?;
   log::info("cpp_to_rust generator finished");
   Ok(())
 }

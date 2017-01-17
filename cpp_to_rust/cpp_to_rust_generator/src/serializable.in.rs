@@ -795,6 +795,8 @@ pub struct RustExportInfo {
   pub crate_name: String,
   /// Version of the crate
   pub crate_version: String,
+  /// Directory with the generated crate
+  pub output_path: String,
   /// List of generated types
   pub rust_types: Vec<RustProcessedTypeInfo>,
 }

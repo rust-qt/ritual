@@ -138,7 +138,7 @@ pub struct Config {
   output_dir_path: PathBuf,
   cache_dir_path: PathBuf,
   crate_template_path: Option<PathBuf>,
-  dependency_paths: Vec<PathBuf>,
+  dependency_cache_paths: Vec<PathBuf>,
   include_paths: Vec<PathBuf>,
   framework_paths: Vec<PathBuf>,
   target_include_paths: Vec<PathBuf>,
@@ -166,7 +166,7 @@ impl Config {
       output_dir_path: output_dir_path.into(),
       cache_dir_path: cache_dir_path.into(),
       crate_template_path: Default::default(),
-      dependency_paths: Default::default(),
+      dependency_cache_paths: Default::default(),
       include_paths: Default::default(),
       framework_paths: Default::default(),
       target_include_paths: Default::default(),
@@ -186,8 +186,8 @@ impl Config {
   }
 
   /// Sets list of paths to cache directories of processed dependencies.
-  pub fn set_dependency_paths(&mut self, paths: Vec<PathBuf>) {
-    self.dependency_paths = paths;
+  pub fn set_dependency_cache_paths(&mut self, paths: Vec<PathBuf>) {
+    self.dependency_cache_paths = paths;
   }
 
 
@@ -323,8 +323,8 @@ impl Config {
     self.crate_template_path.as_ref()
   }
 
-  pub fn dependency_paths(&self) -> &[PathBuf] {
-    &self.dependency_paths
+  pub fn dependency_cache_paths(&self) -> &[PathBuf] {
+    &self.dependency_cache_paths
   }
 
   pub fn cpp_parser_blocked_names(&self) -> &[String] {
@@ -371,4 +371,4 @@ impl Config {
   }
 }
 
-pub use launcher::is_completed;
+pub use launcher::{is_completed, completed_marker_path};

@@ -215,5 +215,5 @@ pub struct RustModule {
 #[derive(Debug, Clone)]
 pub struct DependencyInfo {
   pub rust_export_info: RustExportInfo,
-  pub path: PathBuf,
+  pub cache_path: PathBuf,
 }

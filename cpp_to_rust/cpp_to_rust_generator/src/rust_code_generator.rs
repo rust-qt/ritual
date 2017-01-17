@@ -26,7 +26,7 @@ pub struct RustCodeGeneratorConfig<'a> {
   pub output_path: PathBuf,
   pub crate_template_path: Option<PathBuf>,
   pub c_lib_name: String,
-  pub dependencies: &'a [DependencyInfo],
+  pub generator_dependencies: &'a [DependencyInfo],
   pub write_dependencies_local_paths: bool,
 }
 
@@ -240,9 +240,10 @@ impl<'a> RustCodeGenerator<'a> {
                                  } else {
                                    None
                                  })?);
-          for dep in self.config.dependencies {
+          for dep in self.config.generator_dependencies {
             table.insert(dep.rust_export_info.crate_name.clone(),
-                         dep_value(&dep.rust_export_info.crate_version, Some(dep.path.clone()))?);
+                         dep_value(&dep.rust_export_info.crate_version,
+                                   Some(PathBuf::from(&dep.rust_export_info.output_path)))?);
           }
         }
         for dep in self.config.crate_properties.dependencies() {
@@ -685,7 +686,7 @@ impl<'a> RustCodeGenerator<'a> {
       let mut lib_file = create_file(&lib_file_path)?;
       lib_file.write("pub extern crate libc;\n")?;
       lib_file.write("pub extern crate cpp_utils;\n\n")?;
-      for dep in self.config.dependencies {
+      for dep in self.config.generator_dependencies {
         lib_file.write(format!("pub extern crate {};\n\n", &dep.rust_export_info.crate_name))?;
       }
 
