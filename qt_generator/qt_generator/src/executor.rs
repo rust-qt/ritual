@@ -5,7 +5,7 @@ use cpp_to_rust_common::file_utils::{PathBufWithAdded, repo_crate_local_path};
 use cpp_to_rust_generator::config::Config;
 use cpp_to_rust_common::cpp_build_config::{CppBuildConfigData, CppLibraryType};
 use cpp_to_rust_common::target;
-use qt_generator_common::qmake_query::{get_installation_data, real_lib_name, lib_folder_name};
+use qt_generator_common::{get_installation_data, real_lib_name, lib_folder_name, lib_dependencies};
 use std::path::PathBuf;
 
 
@@ -29,15 +29,8 @@ pub fn exec_all(libs: Vec<String>,
     let lib_crate_templates_path = crate_templates_path.with_added(&sublib_name);
     let lib_output_dir = output_dir.with_added(format!("qt_{}", sublib_name));
 
-
-    let dependency_names = match sublib_name.as_str() {
-      "core" => vec![],
-      "gui" => vec!["core"],
-      "widgets" => vec!["core", "gui"],
-      _ => return Err(format!("Unknown lib name: {}", sublib_name).into()),
-    };
     let mut dependency_paths = Vec::new();
-    for dep in dependency_names {
+    for dep in lib_dependencies(&sublib_name)? {
       let path = cache_dir.with_added(dep);
       if !is_completed(&path) {
         return Err(format!("\"{}\" depends on \"{}\" but processing \
