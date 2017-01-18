@@ -68,7 +68,7 @@ fn exec(sublib_name: &str,
         -> Result<()> {
   if is_completed(&cache_dir) {
     log::info("No processing! cpp_to_rust uses previous results.");
-    log::info(format!("Remove \"{}\" file to force processing.", completed_marker_path(&cache_dir)));
+    log::info(format!("Remove \"{}\" file to force processing.", completed_marker_path(&cache_dir).display()));
     return Ok(());
   }
   log::info(format!("Processing library: {}", sublib_name));
