@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::process::Command;
 
+// TODO: remove is_msvc and use ::target instead
 #[cfg(all(windows, target_env = "msvc"))]
 pub fn is_msvc() -> bool {
   true
@@ -43,46 +44,37 @@ pub fn add_to_multihash<K: Eq + Hash + Clone, T, V: Default + Extend<T>>(hash: &
   }
 }
 
-/// Runs a command, checks that it is successful, and
-/// returns its output if requested
-pub fn run_command(command: &mut Command, fetch_stdout: bool, pipe_output: bool) -> Result<String> {
-  if pipe_output {
-    command.stdout(std::process::Stdio::piped());
-    command.stderr(std::process::Stdio::piped());
-  }
+
+
+/// Runs a command and checks that it was successful
+pub fn run_command(command: &mut Command) -> Result<()> {
   log::info(format!("Executing command: {:?}", command));
-
-  // command.output() must be called before command.status()
-  // to avoid freezes on Windows
-  let output = if pipe_output || fetch_stdout {
-    Some(command.output().chain_err(|| format!("command execution failed: {:?}", command))?)
-  } else {
-    None
-  };
-
-  let status = command.status()
-    .chain_err(|| format!("command execution failed: {:?}", command))?;
+  let status = command.status().chain_err(|| format!("failed to run command: {:?}", command))?;
   if status.success() {
-    Ok(if let Some(output) = output {
-      if fetch_stdout {
-        String::from_utf8(output.stdout).chain_err(|| "comand output is not valid unicode")?
-      } else {
-        String::new()
-      }
-    } else {
-      String::new()
-    })
+    Ok(())
   } else {
-    if let Some(output) = output {
-      use std::io::Write;
-      log::error("Stdout:");
-      std::io::stderr().write_all(&output.stdout).chain_err(|| "output failed")?;
-      log::error("Stderr:");
-      std::io::stderr().write_all(&output.stderr).chain_err(|| "output failed")?;
-    }
-    Err(format!("command failed with status {:?}: {:?}", status, command).into())
+    Err(format!("command failed with {}: {:?}", status, command).into())
+  }  
+}
+
+/// Runs a command and returns its stdout if it was successful
+pub fn get_command_output(command: &mut Command) -> Result<String> {
+  log::info(format!("Executing command: {:?}", command));
+  command.stdout(std::process::Stdio::piped());
+  command.stderr(std::process::Stdio::piped());
+  let output = command.output().chain_err(|| format!("failed to run command: {:?}", command))?;  
+  if output.status.success() {
+    String::from_utf8(output.stdout).chain_err(|| "comand output is not valid unicode")
+  } else {
+    use std::io::Write;
+    log::error("Stdout:");
+    std::io::stderr().write_all(&output.stdout).chain_err(|| "output failed")?;
+    log::error("Stderr:");
+    std::io::stderr().write_all(&output.stderr).chain_err(|| "output failed")?;
+    Err(format!("command failed with {}: {:?}", output.status, command).into())
   }
 }
+
 
 #[cfg_attr(feature="clippy", allow(or_fun_call))]
 pub fn add_env_path_item(env_var_name: &'static str,

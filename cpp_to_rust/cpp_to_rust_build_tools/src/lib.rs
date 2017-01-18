@@ -5,7 +5,7 @@ use common::build_script_data::BuildScriptData;
 use common::file_utils::{PathBufWithAdded, load_json, create_file, file_to_string, path_to_str};
 use common::cpp_lib_builder::{CppLibBuilder, CMakeVar, BuildType};
 use common::target::current_target;
-use common::utils::{run_command, exe_suffix};
+use common::utils::{get_command_output, exe_suffix};
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -83,6 +83,7 @@ impl Config {
     let c_lib_install_dir = out_dir.with_added("c_lib_install");
     let manifest_dir = manifest_dir()?;
     let profile = std::env::var("PROFILE").chain_err(|| "PROFILE env var is missing")?;
+    log::info("Building C++ wrapper library.");
     CppLibBuilder {
         cmake_source_dir: manifest_dir.with_added("c_lib"),
         build_dir: out_dir.with_added("c_lib_build"),
@@ -97,6 +98,7 @@ impl Config {
         },
       }.run()?;
     {
+      log::info("Generating ffi.rs file.");
       let mut ffi_file = create_file(out_dir.with_added("ffi.rs"))?;
       for name in cpp_build_config_data.linked_libs() {
         ffi_file.write(format!("#[link(name = \"{}\")]\n", name))?;
@@ -118,11 +120,11 @@ impl Config {
       ffi_file.write(file_to_string(manifest_dir.with_added("src").with_added("ffi.in.rs"))?)?;
     }
     {
-
+      log::info("Requesting type sizes.");
       let mut command = Command::new(c_lib_install_dir.with_added("lib")
         .with_added(format!("type_sizes{}", exe_suffix())));
       let mut file = create_file(out_dir.with_added("type_sizes.rs"))?;
-      file.write(run_command(&mut command, true, true)?)?;
+      file.write(get_command_output(&mut command)?)?;
     }
 
     for path in self.cpp_build_paths.lib_paths() {
@@ -133,6 +135,7 @@ impl Config {
     }
     println!("cargo:rustc-link-search=native={}",
              path_to_str(&c_lib_install_dir.with_added("lib"))?);
+    log::info("cpp_to_rust build script finished.");
     Ok(())
   }
   pub fn run(self) -> ! {

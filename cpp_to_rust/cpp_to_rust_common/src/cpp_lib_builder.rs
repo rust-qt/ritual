@@ -95,7 +95,7 @@ impl CppLibBuilder {
     for var in actual_cmake_vars {
       cmake_command.arg(format!("-D{}={}", var.name, var.value));
     }
-    run_command(&mut cmake_command, false, self.pipe_output)?;
+    run_command(&mut cmake_command)?;
 
     let make_command_name = if is_msvc() { "nmake" } else { "make" }.to_string();
     let mut make_args = Vec::new();
@@ -113,7 +113,7 @@ impl CppLibBuilder {
     let mut make_command = Command::new(make_command_name);
     make_command.args(&make_args)
       .current_dir(self.build_dir);
-    run_command(&mut make_command, false, self.pipe_output)?;
+    run_command(&mut make_command)?;
     Ok(())
   }
 }

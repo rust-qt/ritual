@@ -3,7 +3,7 @@ use cpp_to_rust_common::log;
 use cpp_to_rust_common::utils::is_msvc;
 use cpp_to_rust_common::file_utils::{PathBufWithAdded, repo_crate_local_path};
 use cpp_to_rust_generator::config::Config;
-use cpp_to_rust_common::cpp_build_config::CppBuildConfigData;
+use cpp_to_rust_common::cpp_build_config::{CppBuildConfigData, CppLibraryType};
 use cpp_to_rust_common::target;
 use qt_generator_common::qmake_query::{get_installation_data, real_lib_name, lib_folder_name};
 use std::path::PathBuf;
@@ -106,6 +106,11 @@ fn exec(sublib_name: &str,
     let mut data = CppBuildConfigData::new();
     data.add_compiler_flags(vec!["-fPIC", "-std=gnu++11"]);
     config.cpp_build_config_mut().add(target::Condition::Env(target::Env::Msvc).negate(), data);
+  }
+  {
+    let mut data = CppBuildConfigData::new();
+    data.set_library_type(CppLibraryType::Shared);
+    config.cpp_build_config_mut().add(target::Condition::Env(target::Env::Msvc), data);
   }
 
   if is_msvc() {

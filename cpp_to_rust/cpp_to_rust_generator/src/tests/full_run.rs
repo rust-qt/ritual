@@ -106,6 +106,6 @@ fn full_run() {
     command.current_dir(&crate_dir);
     command.env("CPP_TO_RUST_INCLUDE_PATHS", &include_path);
     command.env("CPP_TO_RUST_LIB_PATHS", &cpp_install_lib_dir);
-    run_command(&mut command, false, false).unwrap();
+    run_command(&mut command).unwrap();
   }
 }

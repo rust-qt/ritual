@@ -7,7 +7,7 @@ use common::file_utils::{PathBufWithAdded, create_dir_all, create_file, path_to_
 use common::log;
 use common::string_utils::JoinWithString;
 use common::utils::MapIfOk;
-use common::utils::run_command;
+use common::utils::get_command_output;
 
 use std::path::PathBuf;
 use std::iter::once;
@@ -409,7 +409,7 @@ impl CppCodeGenerator {
       h_file.write(format!("#endif // {}\n", include_guard_name))?;
     }
     if !data.qt_slot_wrappers.is_empty() {
-      let moc_output = run_command(Command::new("moc").arg("-i").arg(&h_path), true, false)?;
+      let moc_output = get_command_output(Command::new("moc").arg("-i").arg(&h_path))?;
       println!("moc ok!");
       cpp_file.write(format!("// start of MOC generated code\n{}\n// end of MOC generated code\n",
                        moc_output))?;

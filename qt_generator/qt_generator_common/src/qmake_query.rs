@@ -1,4 +1,4 @@
-use cpp_to_rust_common::utils::run_command;
+use cpp_to_rust_common::utils::get_command_output;
 use cpp_to_rust_common::file_utils::PathBufWithAdded;
 use cpp_to_rust_common::string_utils::CaseOperations;
 use cpp_to_rust_common::errors::Result;
@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 pub fn run_qmake_query(arg: &str) -> Result<PathBuf> {
-  let result = run_command(Command::new("qmake").arg("-query").arg(arg), true, true)?;
+  let result = get_command_output(Command::new("qmake").arg("-query").arg(arg))?;
   Ok(PathBuf::from(result.trim()))
 }
 
