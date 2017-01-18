@@ -15,7 +15,7 @@ regex = "0.1"
 serde = "0.8"       # serialization
 serde_json = "0.8"
 
-ansi_term = "0.7"   # colored output
+term-painter = "0.2.3"   # colored output
 
 num_cpus = "1.0.0"  # detect preferred task count
 

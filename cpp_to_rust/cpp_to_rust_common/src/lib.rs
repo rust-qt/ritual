@@ -5,7 +5,7 @@ extern crate backtrace;
 extern crate regex;
 extern crate serde;
 extern crate serde_json;
-extern crate ansi_term;
+extern crate term_painter;
 extern crate num_cpus;
 pub extern crate toml;
 
