@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.0.0 FATAL_ERROR)
 project ({lib_name_lowercase})
 
 include_directories(${{CMAKE_CURRENT_SOURCE_DIR}}/include ${{CMAKE_CURRENT_BINARY_DIR}})
+if(C2R_LIB_PATHS)
+  link_directories(${{C2R_LIB_PATHS}})
+endif()
+# TODO: use C2R_FRAMEWORK_PATHS
 
 file(GLOB sources src/*.cpp)
 file(GLOB headers include/*.h)
@@ -18,10 +22,6 @@ endif()
 if(C2R_INCLUDE_PATHS)
   include_directories(${{C2R_INCLUDE_PATHS}})
 endif()
-if(C2R_LIB_PATHS)
-  link_directories(${{C2R_LIB_PATHS}})
-endif()
-# TODO: use C2R_FRAMEWORK_PATHS
 
 add_definitions(-D{lib_name_uppercase}_LIBRARY)
 

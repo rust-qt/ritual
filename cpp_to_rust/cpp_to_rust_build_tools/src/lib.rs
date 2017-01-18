@@ -6,6 +6,7 @@ use common::file_utils::{PathBufWithAdded, load_json, create_file, file_to_strin
 use common::cpp_lib_builder::{CppLibBuilder, CMakeVar, BuildType};
 use common::target::current_target;
 use common::utils::{get_command_output, exe_suffix};
+use common::log;
 
 use std::path::PathBuf;
 use std::process::Command;

@@ -410,7 +410,7 @@ impl CppCodeGenerator {
     }
     if !data.qt_slot_wrappers.is_empty() {
       let moc_output = get_command_output(Command::new("moc").arg("-i").arg(&h_path))?;
-      println!("moc ok!");
+      //println!("moc ok!");
       cpp_file.write(format!("// start of MOC generated code\n{}\n// end of MOC generated code\n",
                        moc_output))?;
     }
