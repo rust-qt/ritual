@@ -34,6 +34,12 @@ if(C2R_COMPILER_FLAGS)
 endif()
 
 add_executable(type_sizes type_sizes.cpp)
+if(C2R_LINKED_LIBS)
+  target_link_libraries(type_sizes ${{C2R_LINKED_LIBS}})
+endif()
+if(C2R_LINKED_FRAMEWORKS)
+  target_link_libraries(type_sizes ${{C2R_LINKED_FRAMEWORKS}})
+endif()
 
 install(TARGETS {lib_name_lowercase} type_sizes
   LIBRARY DESTINATION lib

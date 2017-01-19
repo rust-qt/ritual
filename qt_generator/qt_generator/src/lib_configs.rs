@@ -73,11 +73,18 @@ pub fn core(config: &mut Config) -> Result<()> {
                                            "QBasicAtomicInteger",
                                            "QVariant::Private",
                                            "QVariant::PrivateShared",
-                                           "_GUID"]);
-                                           
+                                           "_GUID",
+                                           "qvsnprintf",
+                                           "QString::vsprintf",
+                                           "QString::vasprintf"]);
+
   // TODO: the following items should be conditionally available on Windows
   config.add_cpp_parser_blocked_names(vec!["QWinEventNotifier",
-                                           "QProcess::CreateProcessArguments"]);
+                                           "QProcess::CreateProcessArguments",
+                                           "QProcess::nativeArguments",
+                                           "QProcess::setNativeArguments",
+                                           "QProcess::createProcessArgumentsModifier",
+                                           "QProcess::setCreateProcessArgumentsModifier"]);
                                            
   exclude_qvector_eq_based_methods(config, &["QStaticPlugin", "QTimeZone::OffsetData"]);
   exclude_qlist_eq_based_methods(config,
