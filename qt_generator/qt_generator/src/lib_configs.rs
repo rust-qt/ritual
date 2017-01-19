@@ -72,7 +72,13 @@ pub fn core(config: &mut Config) -> Result<()> {
                                            "QMessageLogContext::copy",
                                            "QBasicAtomicInteger",
                                            "QVariant::Private",
-                                           "QVariant::PrivateShared"]);
+                                           "QVariant::PrivateShared",
+                                           "_GUID"]);
+                                           
+  // TODO: the following items should be conditionally available on Windows
+  config.add_cpp_parser_blocked_names(vec!["QWinEventNotifier",
+                                           "QProcess::CreateProcessArguments"]);
+                                           
   exclude_qvector_eq_based_methods(config, &["QStaticPlugin", "QTimeZone::OffsetData"]);
   exclude_qlist_eq_based_methods(config,
                                  &["QAbstractEventDispatcher::TimerInfo", "QCommandLineOption"]);
@@ -172,9 +178,11 @@ pub fn gui(config: &mut Config) -> Result<()> {
         }
         _ => {}
       }
-      if method.is_constructor() && info.class_type.name.starts_with("QOpenGLFunctions_") &&
+      if info.class_type.name.starts_with("QOpenGLFunctions_") &&
          (info.class_type.name.ends_with("_CoreBackend") |
-          info.class_type.name.ends_with("_DeprecatedBackend")) {
+          info.class_type.name.ends_with("_CoreBackend::Functions") |
+          info.class_type.name.ends_with("_DeprecatedBackend") |
+          info.class_type.name.ends_with("_DeprecatedBackend::Functions")) {
         return Ok(false);
       }
     }

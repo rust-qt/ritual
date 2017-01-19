@@ -18,6 +18,7 @@ pub fn run_and_return(sublib_name: &str) -> Result<()> {
   if installation_data.is_framework {
     config.cpp_build_paths_mut().add_framework_path(&installation_data.lib_path);
     cpp_build_config_data.add_linked_framework(framework_name(sublib_name));
+    // TODO: add frameworks for dependencies?
   } else {
     config.cpp_build_paths_mut().add_lib_path(&installation_data.lib_path);
     cpp_build_config_data.add_linked_lib(real_lib_name(sublib_name));

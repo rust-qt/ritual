@@ -489,56 +489,56 @@ impl<'a> CppParser<'a> {
           name = name[6..].trim().to_string();
         }
         let real_type = match name.as_ref() {
-          "qint8" | "int8_t" => {
+          "qint8" | "int8_t" | "GLbyte" => {
             Some(CppTypeBase::SpecificNumeric {
               name: name.to_string(),
               bits: 8,
               kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
             })
           }
-          "quint8" | "uint8_t" => {
+          "quint8" | "uint8_t" | "GLubyte" => {
             Some(CppTypeBase::SpecificNumeric {
               name: name.to_string(),
               bits: 8,
               kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
             })
           }
-          "qint16" | "int16_t" => {
+          "qint16" | "int16_t" | "GLshort" => {
             Some(CppTypeBase::SpecificNumeric {
               name: name.to_string(),
               bits: 16,
               kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
             })
           }
-          "quint16" | "uint16_t" => {
+          "quint16" | "uint16_t" | "GLushort" => {
             Some(CppTypeBase::SpecificNumeric {
               name: name.to_string(),
               bits: 16,
               kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
             })
           }
-          "qint32" | "int32_t" => {
+          "qint32" | "int32_t" | "GLint" => {
             Some(CppTypeBase::SpecificNumeric {
               name: name.to_string(),
               bits: 32,
               kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
             })
           }
-          "quint32" | "uint32_t" => {
+          "quint32" | "uint32_t" | "GLuint" => {
             Some(CppTypeBase::SpecificNumeric {
               name: name.to_string(),
               bits: 32,
               kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
             })
           }
-          "qint64" | "int64_t" | "qlonglong" => {
+          "qint64" | "int64_t" | "qlonglong" | "GLint64" => {
             Some(CppTypeBase::SpecificNumeric {
               name: name.to_string(),
               bits: 64,
               kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
             })
           }
-          "quint64" | "uint64_t" | "qulonglong" => {
+          "quint64" | "uint64_t" | "qulonglong" | "GLuint64" => {
             Some(CppTypeBase::SpecificNumeric {
               name: name.to_string(),
               bits: 64,
@@ -547,7 +547,7 @@ impl<'a> CppParser<'a> {
           }
           "qintptr" |
           "qptrdiff" |
-          "QList_difference_type" => {
+          "QList::difference_type" => {
             Some(CppTypeBase::PointerSizedInteger {
               name: name.to_string(),
               is_signed: true,
