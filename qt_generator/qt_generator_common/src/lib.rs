@@ -72,13 +72,13 @@ pub fn framework_name(sublib_name: &str) -> String {
 }
 
 pub fn lib_dependencies(sublib_name: &str) -> Result<&'static [&'static str]> {
-  const core_depenencies: &'static [&'static str] = &[];
-  const gui_depenencies: &'static [&'static str] = &["core"];
-  const widgets_depenencies: &'static [&'static str] = &["core", "gui"];
+  const CORE: &'static [&'static str] = &[];
+  const GUI: &'static [&'static str] = &["core"];
+  const WIDGETS: &'static [&'static str] = &["core", "gui"];
   Ok(match sublib_name {
-    "core" => core_depenencies,
-    "gui" => gui_depenencies,
-    "widgets" => widgets_depenencies,
+    "core" => CORE,
+    "gui" => GUI,
+    "widgets" => WIDGETS,
     _ => return Err(format!("Unknown lib name: {}", sublib_name).into()),
   })
 }

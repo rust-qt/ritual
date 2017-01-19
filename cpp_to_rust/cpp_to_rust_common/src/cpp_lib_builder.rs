@@ -1,11 +1,12 @@
 use errors::Result;
 use file_utils::{create_dir_all, path_to_str};
-use utils::{is_msvc, run_command};
+use utils::{run_command};
 use utils::MapIfOk;
 use string_utils::JoinWithString;
 use std::process::Command;
 use std::path::{Path, PathBuf};
 use log;
+use target;
 
 #[derive(Debug, Clone)]
 pub struct CMakeVar {
@@ -75,15 +76,23 @@ impl CppLibBuilder {
     let mut cmake_command = Command::new("cmake");
     cmake_command.arg(self.cmake_source_dir)
       .current_dir(&self.build_dir);
-    let actual_build_type = if is_msvc() {
+    let actual_build_type = if target::current_env() == target::Env::Msvc {
       // Rust always links to release version of MSVC runtime, so
       // link will fail if C library is built in debug mode
       BuildType::Release
     } else {
       self.build_type
     };
-    if is_msvc() {
-      cmake_command.arg("-G").arg("NMake Makefiles");
+    if target::current_os() == target::OS::Windows {
+      match target::current_env() {
+        target::Env::Msvc => {
+          cmake_command.arg("-G").arg("NMake Makefiles");
+        }
+        target::Env::Gnu => {
+          cmake_command.arg("-G").arg("MinGW Makefiles");
+        }
+        _ => {},
+      }
     }
     let mut actual_cmake_vars = self.cmake_vars.clone();
     actual_cmake_vars.push(CMakeVar::new("CMAKE_BUILD_TYPE",
@@ -98,25 +107,34 @@ impl CppLibBuilder {
     }
     run_command(&mut cmake_command)?;
 
-    let mut make_command_name = if is_msvc() { "nmake" } else { "make" }.to_string();
+    let mut make_command_name = if target::current_os() == target::OS::Windows {
+      match target::current_env() {
+        target::Env::Msvc => "nmake",
+        target::Env::Gnu => "mingw32-make",
+        _ => "make",
+      }
+    } else {
+      "make"
+    };
+
     let mut make_args = Vec::new();
     let num_jobs = if let Some(x) = self.num_jobs {
       x
     } else {
       ::num_cpus::get() as i32
     };
-    if is_msvc() && num_jobs > 1 {
+    if target::current_env() == target::Env::Msvc && num_jobs > 1 {
       log::info("Checking for jom...");
       if run_command(&mut Command::new("jom").arg("/version")).is_ok() {
         log::info("jom will be used instead of nmake.");
-        make_command_name = "jom".to_string();
+        make_command_name = "jom";
         make_args.push("/J".to_string());
         make_args.push(num_jobs.to_string());
       } else {
         log::info("jom not found in PATH. Using nmake.")
       }
     }
-    if !is_msvc() {
+    if target::current_env() != target::Env::Msvc {
       make_args.push(format!("-j{}", num_jobs));
     }
     make_args.push("install".to_string());

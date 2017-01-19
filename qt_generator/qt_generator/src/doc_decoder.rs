@@ -1,5 +1,5 @@
 
-use qt_generator_common::qmake_query::run_qmake_query;
+use qt_generator_common::run_qmake_query;
 use cpp_to_rust_common::errors::{Result, ChainErr};
 use cpp_to_rust_common::file_utils::PathBufWithAdded;
 use cpp_to_rust_common::log;

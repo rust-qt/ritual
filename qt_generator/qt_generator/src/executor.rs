@@ -97,8 +97,14 @@ fn exec(sublib_name: &str,
   config.add_cpp_parser_flags(vec!["-fPIC", "-fcxx-exceptions"]);
   {
     let mut data = CppBuildConfigData::new();
-    data.add_compiler_flags(vec!["-fPIC", "-std=gnu++11"]);
+    data.add_compiler_flag("-std=gnu++11");
     config.cpp_build_config_mut().add(target::Condition::Env(target::Env::Msvc).negate(), data);
+  }
+  {
+    let mut data = CppBuildConfigData::new();
+    data.add_compiler_flag("-fPIC");
+    // msvc and mingw don't need this
+    config.cpp_build_config_mut().add(target::Condition::OS(target::OS::Windows).negate(), data);
   }
   {
     let mut data = CppBuildConfigData::new();

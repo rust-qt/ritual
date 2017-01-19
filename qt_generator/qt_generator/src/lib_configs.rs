@@ -70,7 +70,9 @@ pub fn core(config: &mut Config) -> Result<()> {
                                            "QBasicAtomicInteger",
                                            "qt_check_for_QGADGET_macro",
                                            "QMessageLogContext::copy",
-                                           "QBasicAtomicInteger"]);
+                                           "QBasicAtomicInteger",
+                                           "QVariant::Private",
+                                           "QVariant::PrivateShared"]);
   exclude_qvector_eq_based_methods(config, &["QStaticPlugin", "QTimeZone::OffsetData"]);
   exclude_qlist_eq_based_methods(config,
                                  &["QAbstractEventDispatcher::TimerInfo", "QCommandLineOption"]);
@@ -103,6 +105,24 @@ pub fn core(config: &mut Config) -> Result<()> {
             if !info.is_const {
               return Ok(false);
             }
+          }
+          _ => {}
+        }
+      }
+      if info.class_type.name == "QMetaType" {
+        match method.name.as_ref() {
+          "registerConverterFunction" | "unregisterConverterFunction" => {
+            // only public on msvc for some technical reason
+            return Ok(false);
+          }
+          _ => {}
+        }
+      }
+      if info.class_type.name == "QVariant" {
+        match method.name.as_ref() {
+          "create" | "cmp" | "compare" | "convert" => {
+            // only public on msvc for some technical reason
+            return Ok(false);
           }
           _ => {}
         }
