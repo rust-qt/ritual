@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.0.0 FATAL_ERROR)
 project ({lib_name_lowercase})
 
 include_directories(${{CMAKE_CURRENT_SOURCE_DIR}}/include ${{CMAKE_CURRENT_BINARY_DIR}})
+if(C2R_INCLUDE_PATHS)
+  include_directories(${{C2R_INCLUDE_PATHS}})
+endif()
 if(C2R_LIB_PATHS)
   link_directories(${{C2R_LIB_PATHS}})
 endif()
@@ -19,9 +22,7 @@ endif()
 if(C2R_LINKED_FRAMEWORKS)
   target_link_libraries({lib_name_lowercase} ${{C2R_LINKED_FRAMEWORKS}})
 endif()
-if(C2R_INCLUDE_PATHS)
-  include_directories(${{C2R_INCLUDE_PATHS}})
-endif()
+
 
 add_definitions(-D{lib_name_uppercase}_LIBRARY)
 
@@ -34,12 +35,10 @@ if(C2R_COMPILER_FLAGS)
 endif()
 
 add_executable(type_sizes type_sizes.cpp)
-if(C2R_LINKED_LIBS)
-  target_link_libraries(type_sizes ${{C2R_LINKED_LIBS}})
-endif()
-if(C2R_LINKED_FRAMEWORKS)
-  target_link_libraries(type_sizes ${{C2R_LINKED_FRAMEWORKS}})
-endif()
+
+# disable qt verision tagging to allow compiling type_sizes without
+# linking to the libraries
+target_compile_definitions(type_sizes PRIVATE QT_NO_VERSION_TAGGING)
 
 install(TARGETS {lib_name_lowercase} type_sizes
   LIBRARY DESTINATION lib

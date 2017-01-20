@@ -1085,3 +1085,26 @@ fn non_type_template_parameter() {
   template<> struct QAtomicOpsSupport<4> { enum { IsSupported = 1 }; };");
   assert!(data.types.is_empty());
 }
+
+#[test]
+fn fixed_size_integers() {
+  let data = run_parser("
+  typedef GLuint64 unsigned long long int;
+  template<typename T> class QVector {};
+  GLuint64 f1();
+  QVector<GLuint64> f2();
+  ");
+  assert_eq!(data.methods.len(), 2);
+  assert_eq!(&data.methods[0].name, "f1");
+  assert_eq!(&data.methods[0].return_type, &CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    is_const2: false,
+    base: CppTypeBase::SpecificNumeric {
+      name: "GLuint64".to_string(),
+      bits: 64,
+      kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
+    },
+  });
+}
+
