@@ -390,6 +390,10 @@ impl<'a> CppParser<'a> {
       result_type.base = CppTypeBase::BuiltInNumeric(x.clone());
       return Ok(result_type);
     }
+    if let Some(base) = self.parse_special_typedef(remaining_name) {
+      result_type.base = base;
+      return Ok(result_type);      
+    }    
     if result_type.indirection == CppTypeIndirection::Ptr ||
        result_type.indirection == CppTypeIndirection::Ref {
       if let Ok(subtype) = self.parse_unexposed_type(None,
@@ -469,122 +473,45 @@ impl<'a> CppParser<'a> {
   }
 
   fn parse_type(&self,
-                type1: Type,
-                context_class: Option<Entity>,
-                context_method: Option<Entity>)
-                -> Result<CppType> {
+                          type1: Type,
+                          context_class: Option<Entity>,
+                          context_method: Option<Entity>)
+                          -> Result<CppType> {      
+    //println!("TEST1 parse type {:?}", type1);                        
+    //println!("TEST2 canonical type {:?}", type1.get_canonical_type());                        
+    //println!("TEST3 args {:?}", type1.get_template_argument_types());                        
+    if type1.is_volatile_qualified() {
+      return Err("Volatile type".into());
+    }
     let display_name = type1.get_display_name();
     if &display_name == "std::list<T>" {
       return Err(format!("Type blacklisted because it causes crash on Windows: {}",
                          display_name)
         .into());
     }
-
-    let parsed =
-      self.parse_canonical_type(type1.get_canonical_type(), context_class, context_method)?;
-    if let CppTypeBase::BuiltInNumeric(..) = parsed.base {
-      if parsed.indirection == CppTypeIndirection::None {
-        let mut name = type1.get_display_name();
-        if name.starts_with("const ") {
-          name = name[6..].trim().to_string();
-        }
-        let real_type = match name.as_ref() {
-          "qint8" | "int8_t" | "GLbyte" => {
-            Some(CppTypeBase::SpecificNumeric {
-              name: name.to_string(),
-              bits: 8,
-              kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
-            })
-          }
-          "quint8" | "uint8_t" | "GLubyte" => {
-            Some(CppTypeBase::SpecificNumeric {
-              name: name.to_string(),
-              bits: 8,
-              kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
-            })
-          }
-          "qint16" | "int16_t" | "GLshort" => {
-            Some(CppTypeBase::SpecificNumeric {
-              name: name.to_string(),
-              bits: 16,
-              kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
-            })
-          }
-          "quint16" | "uint16_t" | "GLushort" => {
-            Some(CppTypeBase::SpecificNumeric {
-              name: name.to_string(),
-              bits: 16,
-              kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
-            })
-          }
-          "qint32" | "int32_t" | "GLint" => {
-            Some(CppTypeBase::SpecificNumeric {
-              name: name.to_string(),
-              bits: 32,
-              kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
-            })
-          }
-          "quint32" | "uint32_t" | "GLuint" => {
-            Some(CppTypeBase::SpecificNumeric {
-              name: name.to_string(),
-              bits: 32,
-              kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
-            })
-          }
-          "qint64" | "int64_t" | "qlonglong" | "GLint64" => {
-            Some(CppTypeBase::SpecificNumeric {
-              name: name.to_string(),
-              bits: 64,
-              kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
-            })
-          }
-          "quint64" | "uint64_t" | "qulonglong" | "GLuint64" => {
-            Some(CppTypeBase::SpecificNumeric {
-              name: name.to_string(),
-              bits: 64,
-              kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
-            })
-          }
-          "qintptr" |
-          "qptrdiff" |
-          "QList::difference_type" => {
-            Some(CppTypeBase::PointerSizedInteger {
-              name: name.to_string(),
-              is_signed: true,
-            })
-          }
-          "quintptr" => {
-            Some(CppTypeBase::PointerSizedInteger {
-              name: name.to_string(),
-              is_signed: false,
-            })
-          }
-          _ => None,
-        };
-        if let Some(real_type) = real_type {
-          return Ok(CppType {
-            base: real_type,
-            indirection: parsed.indirection,
-            is_const: parsed.is_const,
-            is_const2: parsed.is_const2,
-          });
-        }
-      }
-    }
-    Ok(parsed)
-  }
-
-
-  fn parse_canonical_type(&self,
-                          type1: Type,
-                          context_class: Option<Entity>,
-                          context_method: Option<Entity>)
-                          -> Result<CppType> {
-    if type1.is_volatile_qualified() {
-      return Err("Volatile type".into());
-    }
     let is_const = type1.is_const_qualified();
     match type1.get_kind() {
+      TypeKind::Typedef => {
+        let parsed = self.parse_type(type1.get_canonical_type(), context_class, context_method)?;
+        if let CppTypeBase::BuiltInNumeric(..) = parsed.base {
+          if parsed.indirection == CppTypeIndirection::None {
+            let mut name = type1.get_display_name();
+            if name.starts_with("const ") {
+              name = name[6..].trim().to_string();
+            }
+            if let Some(r) = self.parse_special_typedef(&name) {
+              return Ok(CppType {
+                base: r,
+                indirection: parsed.indirection,
+                is_const: parsed.is_const,
+                is_const2: parsed.is_const2,
+              });
+            }
+          }
+        }
+        Ok(parsed)
+        
+      }
       TypeKind::Void => {
         Ok(CppType {
           base: CppTypeBase::Void,
@@ -675,6 +602,7 @@ impl<'a> CppParser<'a> {
                 match arg_type {
                   None => return Err("Template argument is None".into()),
                   Some(arg_type) => {
+                    println!("TEST1 arg type: {:?}", arg_type);
                     match self.parse_type(arg_type, context_class, context_method) {
                       Ok(parsed_type) => r.push(parsed_type),
                       Err(msg) => {
@@ -788,9 +716,112 @@ impl<'a> CppParser<'a> {
         }
       }
       TypeKind::Unexposed => {
-        self.parse_unexposed_type(Some(type1), None, context_class, context_method)
+        let canonical = type1.get_canonical_type();
+        if canonical.get_kind() != TypeKind::Unexposed {
+          let mut parsed_canonical = self.parse_type(canonical, context_class, context_method);
+          if let Ok(parsed_unexposed) = self.parse_unexposed_type(Some(type1), None, context_class, context_method) {
+            if let CppTypeBase::Class(CppTypeClassBase { ref template_arguments, .. }) = parsed_unexposed.base {
+              if let Some(ref template_arguments) = *template_arguments {
+                let template_arguments_unexposed = template_arguments;
+                if template_arguments_unexposed.iter().any(|x| match x.base {
+                  CppTypeBase::SpecificNumeric { .. } | CppTypeBase::PointerSizedInteger { .. } => true,
+                  _ => false
+                }) {
+                  if let Ok(ref mut parsed_canonical) = parsed_canonical {
+                    if let CppTypeBase::Class(CppTypeClassBase { ref mut template_arguments, .. }) = parsed_canonical.base {
+                      if let Some(ref mut template_arguments) = *template_arguments {
+                        template_arguments.clone_from(template_arguments_unexposed);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            println!("TEST4 OK: {:?}", parsed_canonical);
+            println!("TEST4 OK2: {:?}", parsed_unexposed);
+          }
+          parsed_canonical
+        } else {
+          self.parse_unexposed_type(Some(type1), None, context_class, context_method)
+        }
       }
       _ => Err(format!("Unsupported kind of type: {:?}", type1.get_kind()).into()),
+    }
+  }
+  
+  fn parse_special_typedef(&self, name: &str) -> Option<CppTypeBase> {
+    match name {
+      "qint8" | "int8_t" | "GLbyte" => {
+        Some(CppTypeBase::SpecificNumeric {
+          name: name.to_string(),
+          bits: 8,
+          kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
+        })
+      }
+      "quint8" | "uint8_t" | "GLubyte" => {
+        Some(CppTypeBase::SpecificNumeric {
+          name: name.to_string(),
+          bits: 8,
+          kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
+        })
+      }
+      "qint16" | "int16_t" | "GLshort" => {
+        Some(CppTypeBase::SpecificNumeric {
+          name: name.to_string(),
+          bits: 16,
+          kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
+        })
+      }
+      "quint16" | "uint16_t" | "GLushort" => {
+        Some(CppTypeBase::SpecificNumeric {
+          name: name.to_string(),
+          bits: 16,
+          kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
+        })
+      }
+      "qint32" | "int32_t" | "GLint" => {
+        Some(CppTypeBase::SpecificNumeric {
+          name: name.to_string(),
+          bits: 32,
+          kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
+        })
+      }
+      "quint32" | "uint32_t" | "GLuint" => {
+        Some(CppTypeBase::SpecificNumeric {
+          name: name.to_string(),
+          bits: 32,
+          kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
+        })
+      }
+      "qint64" | "int64_t" | "qlonglong" | "GLint64" => {
+        Some(CppTypeBase::SpecificNumeric {
+          name: name.to_string(),
+          bits: 64,
+          kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
+        })
+      }
+      "quint64" | "uint64_t" | "qulonglong" | "GLuint64" => {
+        Some(CppTypeBase::SpecificNumeric {
+          name: name.to_string(),
+          bits: 64,
+          kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
+        })
+      }
+      "qintptr" |
+      "qptrdiff" |
+      "QList::difference_type" => {
+        Some(CppTypeBase::PointerSizedInteger {
+          name: name.to_string(),
+          is_signed: true,
+        })
+      }
+      "quintptr" => {
+        Some(CppTypeBase::PointerSizedInteger {
+          name: name.to_string(),
+          is_signed: false,
+        })
+      }
+      _ => None,
     }
   }
 

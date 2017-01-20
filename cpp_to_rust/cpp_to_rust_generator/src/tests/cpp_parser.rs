@@ -1089,14 +1089,14 @@ fn non_type_template_parameter() {
 #[test]
 fn fixed_size_integers() {
   let data = run_parser("
-  typedef GLuint64 unsigned long long int;
+  typedef unsigned long long int GLuint64;
   template<typename T> class QVector {};
   GLuint64 f1();
   QVector<GLuint64> f2();
   ");
   assert_eq!(data.methods.len(), 2);
   assert_eq!(&data.methods[0].name, "f1");
-  assert_eq!(&data.methods[0].return_type, &CppType {
+  let type1 = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
@@ -1105,6 +1105,19 @@ fn fixed_size_integers() {
       bits: 64,
       kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
     },
+  };
+  assert_eq!(&data.methods[0].return_type, &type1);
+
+  assert_eq!(&data.methods[1].name, "f2");
+  assert_eq!(&data.methods[1].return_type, &CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    is_const2: false,
+    base: CppTypeBase::Class(CppTypeClassBase {
+      name: "QVector".to_string(),
+      template_arguments: Some(vec![type1.clone()]),
+    }),
   });
+
 }
 
