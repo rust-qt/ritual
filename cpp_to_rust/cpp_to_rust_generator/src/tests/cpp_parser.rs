@@ -1121,3 +1121,43 @@ fn fixed_size_integers() {
 
 }
 
+
+#[test]
+fn template_class_with_base() {
+  let data = run_parser("
+  template<class T>
+  class C1 {};
+  
+  template<class T>
+  class C2: public C1<T> {};
+  ");
+  assert!(data.template_instantiations.is_empty());
+  assert!(data.types.len() == 2);
+  assert_eq!(data.types[0].name, "C1");
+  if let CppTypeKind::Class { ref bases, ref fields, ref template_arguments, .. } = data.types[0]
+    .kind {
+    assert_eq!(template_arguments,
+               &Some(TemplateArgumentsDeclaration {
+                 nested_level: 0,
+                 names: vec!["T".to_string()],
+               }));
+    assert!(bases.is_empty());
+    assert!(fields.is_empty());
+  } else {
+    panic!("invalid type kind");
+  }
+
+  assert_eq!(data.types[1].name, "C2");
+  if let CppTypeKind::Class { ref bases, ref fields, ref template_arguments, .. } = data.types[1]
+    .kind {
+    assert_eq!(template_arguments,
+               &Some(TemplateArgumentsDeclaration {
+                 nested_level: 0,
+                 names: vec!["T".to_string()],
+               }));
+    assert_eq!(bases.len(), 1);
+    assert!(fields.is_empty());
+  } else {
+    panic!("invalid type kind");
+  }
+}

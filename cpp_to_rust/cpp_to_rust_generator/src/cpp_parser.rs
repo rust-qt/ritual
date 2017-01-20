@@ -602,7 +602,7 @@ impl<'a> CppParser<'a> {
                 match arg_type {
                   None => return Err("Template argument is None".into()),
                   Some(arg_type) => {
-                    println!("TEST1 arg type: {:?}", arg_type);
+                    //println!("TEST1 arg type: {:?}", arg_type);
                     match self.parse_type(arg_type, context_class, context_method) {
                       Ok(parsed_type) => r.push(parsed_type),
                       Err(msg) => {
@@ -737,8 +737,8 @@ impl<'a> CppParser<'a> {
                 }
               }
             }
-            println!("TEST4 OK: {:?}", parsed_canonical);
-            println!("TEST4 OK2: {:?}", parsed_unexposed);
+            //println!("TEST4 OK: {:?}", parsed_canonical);
+            //println!("TEST4 OK2: {:?}", parsed_unexposed);
           }
           parsed_canonical
         } else {
@@ -1190,7 +1190,7 @@ impl<'a> CppParser<'a> {
         }
       }
       if child.get_kind() == EntityKind::BaseSpecifier {
-        let base_type = match self.parse_type(child.get_type().unwrap(), None, None) {
+        let base_type = match self.parse_type(child.get_type().unwrap(), Some(entity), None) {
           Ok(r) => r,
           Err(msg) => return Err(format!("Can't parse base class type: {}", msg).into()),
         };
