@@ -1748,41 +1748,12 @@ impl RustGenerator {
         };
 
         assert!(!overloaded_methods.is_empty());
-        // Step 3: remove method duplicates with the same argument types. For example,
-        // there can be method1(libc::c_int) and method1(i32). It's valid in C++,
-        // but can't be overloaded in Rust if types are the same.
-        let mut all_real_args = HashMap::new();
-        all_real_args.insert(ReturnValueAllocationPlace::Stack, HashSet::new());
-        all_real_args.insert(ReturnValueAllocationPlace::Heap, HashSet::new());
-        all_real_args.insert(ReturnValueAllocationPlace::NotApplicable, HashSet::new());
-        let mut filtered_methods = Vec::new();
-        for method in overloaded_methods {
-          let ok = if let RustMethodArguments::SingleVariant(ref args) = method.arguments {
-            let real_args: Vec<_> = args.arguments
-              .iter()
-              .map_if_ok(|x| x.argument_type.rust_api_type.dealias_libc())?;
-            let set = all_real_args.get_mut(&args.cpp_method.allocation_place)
-              .chain_err(|| "all_real_args must contain every possible allocation place")?;
-            if set.contains(&real_args) {
-              log::warning(format!("Removing method because another method with the same \
-                                    argument types exists:\n{:?}",
-                                   args.cpp_method.short_text()));
-              false
-            } else {
-              set.insert(real_args);
-              true
-            }
-          } else {
-            unreachable!()
-          };
-          if ok {
-            filtered_methods.push(method);
-          }
-        }
+        // Step 3 was removed
+
         // Step 4: generate overloaded method if count of methods is still > 1,
         // or accept a single method without change.
         let (method, type_declaration) =
-          self.process_method(filtered_methods, scope, key_caption)?;
+          self.process_method(overloaded_methods, scope, key_caption)?;
         if method.docs.is_empty() {
           return Err(unexpected(format!("docs are empty! {:?}", method)).into());
         }

@@ -2,8 +2,6 @@ use common::errors::{Result, unexpected, ChainErr};
 use common::string_utils::CaseOperations;
 use common::utils::MapIfOk;
 
-extern crate libc;
-
 pub use serializable::{RustName, RustTypeIndirection, RustType, CompleteType,
                        RustToCTypeConversion};
 
@@ -226,52 +224,6 @@ impl RustType {
     }
   }
 
-  pub fn dealias_libc(&self) -> Result<RustType> {
-    Ok(match *self {
-      RustType::Void => self.clone(),
-      RustType::Common { ref base,
-                         ref generic_arguments,
-                         ref is_const,
-                         ref is_const2,
-                         ref indirection } => {
-        if base.parts.len() == 2 && &base.parts[0] == "libc" {
-          let real_name = match base.parts[1].as_ref() {
-            "c_void" => return Ok(self.clone()),
-            "c_schar" => libc::c_schar::to_rust_name(),
-            "c_char" => libc::c_char::to_rust_name(),
-            "c_uchar" => libc::c_uchar::to_rust_name(),
-            "wchar_t" => libc::wchar_t::to_rust_name(),
-            "c_short" => libc::c_short::to_rust_name(),
-            "c_ushort" => libc::c_ushort::to_rust_name(),
-            "c_int" => libc::c_int::to_rust_name(),
-            "c_uint" => libc::c_uint::to_rust_name(),
-            "c_long" => libc::c_long::to_rust_name(),
-            "c_ulong" => libc::c_ulong::to_rust_name(),
-            "c_longlong" => libc::c_longlong::to_rust_name(),
-            "c_ulonglong" => libc::c_ulonglong::to_rust_name(),
-            "c_float" => libc::c_float::to_rust_name(),
-            "c_double" => libc::c_double::to_rust_name(),
-            _ => return Err(unexpected(format!("unknown libc type: {:?}", base)).into()),
-          };
-          RustType::Common {
-            base: real_name?,
-            generic_arguments: generic_arguments.clone(),
-            is_const: *is_const,
-            is_const2: *is_const2,
-            indirection: indirection.clone(),
-          }
-        } else {
-          self.clone()
-        }
-      }
-      RustType::FunctionPointer { ref return_type, ref arguments } => {
-        RustType::FunctionPointer {
-          return_type: Box::new(return_type.as_ref().dealias_libc()?),
-          arguments: arguments.iter().map_if_ok(|arg| arg.dealias_libc())?,
-        }
-      }
-    })
-  }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
