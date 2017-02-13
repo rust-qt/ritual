@@ -82,7 +82,13 @@ fn full_run() {
   {
     let mut data = CppBuildConfigData::new();
     data.add_compiler_flag("-fPIC");
+    data.add_compiler_flag("-std=gnu++11");
     config.cpp_build_config_mut().add(target::Condition::Env(target::Env::Msvc).negate(), data);
+  }
+  if target::current_env() == target::Env::Msvc {
+    config.add_cpp_parser_flag("-std=c++14");
+  } else {
+    config.add_cpp_parser_flag("-std=gnu++11");
   }
   config.set_crate_template_path(&crate_template_path);
   fancy_unwrap(config.exec());

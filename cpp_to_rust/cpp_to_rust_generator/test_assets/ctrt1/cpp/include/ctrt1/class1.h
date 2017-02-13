@@ -1,4 +1,5 @@
 #include "ctrt1/exports.h"
+#include <cstdint>
 
 class CTRT1_EXPORT Class1_F {
 public:
@@ -36,6 +37,9 @@ public:
 
   Class1& ov3(int) { return *this; }
   Class1& ov3(double) { return *this; }
+
+  void ov4(uint32_t a) {}
+  void ov4(uint16_t a) {}
 
 
 private:

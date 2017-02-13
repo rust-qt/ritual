@@ -545,4 +545,22 @@ impl CppType {
     })
 
   }
+
+  pub fn is_platform_dependent(&self) -> bool {
+    if let CppTypeBase::Class(CppTypeClassBase { ref template_arguments, .. }) = self.base {
+      if let Some(ref template_arguments) = *template_arguments {
+        for arg in template_arguments {
+          if arg.is_platform_dependent() {
+            return true;
+          }
+        }
+      }
+    }
+    if let CppTypeBase::BuiltInNumeric(ref data) = self.base {
+      if data != &CppBuiltInNumericType::Bool {
+        return true;
+      }
+    }
+    false
+  }
 }

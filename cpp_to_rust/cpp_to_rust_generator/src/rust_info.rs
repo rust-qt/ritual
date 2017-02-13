@@ -42,6 +42,14 @@ pub struct RustMethodArgumentsVariant {
   pub return_type: CompleteType,
 }
 
+impl RustMethodArgumentsVariant {
+  pub fn has_unportable_arg_types(&self) -> bool {
+    self.arguments.iter().any(|arg| {
+      arg.argument_type.cpp_type.is_platform_dependent()
+    })
+  }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[allow(dead_code)]
 pub enum RustMethodArguments {

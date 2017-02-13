@@ -1421,7 +1421,7 @@ impl RustGenerator {
   fn process_method(&self,
                     mut filtered_methods: Vec<RustMethod>,
                     scope: &RustMethodScope,
-                    self_arg_kind_caption: Option<&'static str>)
+                    self_arg_kind_caption: Option<String>)
                     -> Result<(RustMethod, Option<RustTypeDeclaration>)> {
     filtered_methods.sort_by(|a, b| {
       if let RustMethodArguments::SingleVariant(ref args) = a.arguments {
@@ -1685,25 +1685,66 @@ impl RustGenerator {
       // Step 2: for each method name, split methods by type of
       // their self argument. Overloading can't be emulated if self types
       // differ.
+
+      #[derive(PartialEq, Eq, Hash, Clone)]
+      struct UnoverloadableKey {
+        self_arg_kind: RustMethodSelfArgKind,
+        argument_types_if_unportable: Option<Vec<RustType>>,
+      };
+
       let mut self_kind_to_methods: HashMap<_, Vec<_>> = HashMap::new();
       for method in current_methods {
-        add_to_multihash(&mut self_kind_to_methods, method.self_arg_kind()?, method);
+        let key = if let RustMethodArguments::SingleVariant(ref var) = method.arguments {
+          UnoverloadableKey {
+            self_arg_kind: method.self_arg_kind()?,
+            argument_types_if_unportable: if var.has_unportable_arg_types() {
+              Some(var.arguments.iter().filter(|arg| &arg.name != "self").map(|arg| arg.argument_type.rust_api_type.clone()).collect())
+            } else {
+              None
+            }
+          }
+        } else {
+          return Err(unexpected("SingleVariant expected here").into());
+        };
+        add_to_multihash(&mut self_kind_to_methods, key, method);
       }
-      let all_self_args: Vec<_> = self_kind_to_methods.keys().cloned().collect();
-      for (self_arg_kind, overloaded_methods) in self_kind_to_methods {
+      let all_self_args: HashSet<_> = self_kind_to_methods.keys().map(|x| x.self_arg_kind.clone()).collect();
+      let all_keys: Vec<_> = self_kind_to_methods.keys().cloned().collect();
+      for (key, overloaded_methods) in self_kind_to_methods {
         let self_arg_kind_caption = if all_self_args.len() == 1 ||
-                                       self_arg_kind == RustMethodSelfArgKind::ConstRef {
+                                       key.self_arg_kind == RustMethodSelfArgKind::ConstRef {
           None
-        } else if self_arg_kind == RustMethodSelfArgKind::Static {
+        } else if key.self_arg_kind == RustMethodSelfArgKind::Static {
           Some("static")
-        } else if self_arg_kind == RustMethodSelfArgKind::MutRef {
-          if all_self_args.iter().any(|x| *x == RustMethodSelfArgKind::ConstRef) {
+        } else if key.self_arg_kind == RustMethodSelfArgKind::MutRef {
+          if all_self_args.contains(&RustMethodSelfArgKind::ConstRef) {
             Some("mut")
           } else {
             None
           }
         } else {
           return Err("unsupported self arg kinds combination".into());
+        };
+        let arg_types_caption = if let Some(ref arg_types) = key.argument_types_if_unportable {
+          if all_keys.iter().filter(|k| &k.self_arg_kind == &key.self_arg_kind).count() == 1 {
+            None
+          } else {
+            Some(arg_types.iter().map_if_ok(|t| t.caption())?.join("_"))
+          }
+        } else {
+          None
+        };
+        let mut key_caption_items = Vec::new();
+        if let Some(c) = self_arg_kind_caption {
+          key_caption_items.push(c.to_string());
+        }
+        if let Some(c) = arg_types_caption {
+          key_caption_items.push(c);
+        }
+        let key_caption = if key_caption_items.is_empty() {
+          None
+        } else {
+          Some(key_caption_items.join("_"))
         };
 
         assert!(!overloaded_methods.is_empty());
@@ -1741,7 +1782,7 @@ impl RustGenerator {
         // Step 4: generate overloaded method if count of methods is still > 1,
         // or accept a single method without change.
         let (method, type_declaration) =
-          self.process_method(filtered_methods, scope, self_arg_kind_caption)?;
+          self.process_method(filtered_methods, scope, key_caption)?;
         if method.docs.is_empty() {
           return Err(unexpected(format!("docs are empty! {:?}", method)).into());
         }
