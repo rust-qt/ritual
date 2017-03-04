@@ -54,7 +54,7 @@ pub fn run_command(command: &mut Command) -> Result<()> {
     Ok(())
   } else {
     Err(format!("command failed with {}: {:?}", status, command).into())
-  }  
+  }
 }
 
 /// Runs a command and returns its stdout if it was successful
@@ -62,7 +62,7 @@ pub fn get_command_output(command: &mut Command) -> Result<String> {
   log::info(format!("Executing command: {:?}", command));
   command.stdout(std::process::Stdio::piped());
   command.stderr(std::process::Stdio::piped());
-  let output = command.output().chain_err(|| format!("failed to run command: {:?}", command))?;  
+  let output = command.output().chain_err(|| format!("failed to run command: {:?}", command))?;
   if output.status.success() {
     String::from_utf8(output.stdout).chain_err(|| "comand output is not valid unicode")
   } else {

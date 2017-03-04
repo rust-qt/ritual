@@ -11,8 +11,9 @@ use common::log;
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
                 RustMethodArguments, TraitImpl, TraitImplExtra, RustEnumValue,
-                RustMethodSelfArgKind, RustProcessedTypeInfo, RustMethodDocItem,
-                RustQtReceiverDeclaration, RustQtReceiverType, RustQtSlotWrapper};
+                RustProcessedTypeInfo, RustMethodDocItem,
+                RustQtReceiverDeclaration, RustQtReceiverType, RustQtSlotWrapper,
+                RustSingleMethod, RustMethodCaptionStrategy, allocation_place_marker};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
 use common::string_utils::{CaseOperations, WordIterator};
@@ -24,6 +25,9 @@ use std::collections::{HashMap, HashSet, hash_map};
 fn size_const_name(type_name: &RustName) -> String {
   type_name.parts.iter().map(|x| x.to_upper_case_words()).join("_")
 }
+
+
+
 
 impl RustProcessedTypeInfo {
   fn is_declared_in(&self, modules: &[RustModule]) -> bool {
@@ -1106,12 +1110,12 @@ impl RustGenerator {
                         &self.config)
   }
 
-  /// Converts one function to a RustMethod
+  /// Converts one function to a RustSingleMethod
   fn generate_function(&self,
                        method: &CppAndFfiMethod,
                        scope: &RustMethodScope,
                        generate_doc: bool)
-                       -> Result<RustMethod> {
+                       -> Result<RustSingleMethod> {
     let mut arguments = Vec::new();
     for (arg_index, arg) in method.c_signature.arguments.iter().enumerate() {
       if arg.meaning != CppFfiArgumentMeaning::ReturnValue {
@@ -1186,26 +1190,26 @@ impl RustGenerator {
       }
     }
 
-    let docs = if generate_doc {
-      vec![RustMethodDocItem {
-             cpp_fn: method.short_text(),
-             rust_fns: Vec::new(),
-             doc: method.cpp_method.doc.clone(),
-             rust_cross_references: Vec::new(),
-           }]
+    let doc = if generate_doc {
+      Some(RustMethodDocItem {
+        cpp_fn: method.short_text(),
+        rust_fns: Vec::new(),
+        doc: method.cpp_method.doc.clone(),
+        rust_cross_references: Vec::new(),
+      })
     } else {
-      Vec::new()
+      None
     };
-    Ok(RustMethod {
+    Ok(RustSingleMethod {
       name: self.method_rust_name(method)?,
       scope: scope.clone(),
-      arguments: RustMethodArguments::SingleVariant(RustMethodArgumentsVariant {
+      arguments: RustMethodArgumentsVariant {
         arguments: arguments,
         cpp_method: method.clone(),
         return_type: return_type,
         return_type_ffi_index: return_arg_index,
-      }),
-      docs: docs,
+      },
+      doc: doc,
       is_unsafe: false,
     })
   }
@@ -1311,7 +1315,7 @@ impl RustGenerator {
               generic_arguments: None,
             },
             extra: None,
-            methods: vec![method],
+            methods: vec![method.to_rust_method()],
           })
         }
         ReturnValueAllocationPlace::Heap => {
@@ -1337,79 +1341,72 @@ impl RustGenerator {
     }
   }
 
-  fn process_cpp_cast(&self, method: RustMethod) -> Result<TraitImpl> {
+  fn process_cpp_cast(&self, method: RustSingleMethod) -> Result<TraitImpl> {
     // TODO: qobject_cast
     let mut final_methods = vec![(method.clone(), false), (method.clone(), true)];
-    if let RustMethodArguments::SingleVariant(ref args) = method.arguments {
-      let trait_name = match args.cpp_method.cpp_method.name.as_str() {
-        "static_cast" => {
-          if args.cpp_method.cpp_method.is_unsafe_static_cast {
-            vec!["cpp_utils".to_string(), "UnsafeStaticCast".to_string()]
-          } else {
-            vec!["cpp_utils".to_string(), "StaticCast".to_string()]
-          }
-        }
-        "dynamic_cast" => vec!["cpp_utils".to_string(), "DynamicCast".to_string()],
-        "qobject_cast" => {
-          vec!["qt_core".to_string(), "object".to_string(), "QObjectCast".to_string()]
-        }
-        _ => return Err("invalid method name".into()),
-      };
-      for &mut (ref mut final_method, ref mut final_is_const) in &mut final_methods {
-        let method_name = if *final_is_const {
-          args.cpp_method.cpp_method.name.clone()
-        } else {
-          format!("{}_mut", args.cpp_method.cpp_method.name)
-        };
-        final_method.scope = RustMethodScope::TraitImpl;
-        final_method.name = RustName::new(vec![method_name])?;
+    let args = &method.arguments;
+    let trait_name = match args.cpp_method.cpp_method.name.as_str() {
+      "static_cast" => {
         if args.cpp_method.cpp_method.is_unsafe_static_cast {
-          final_method.is_unsafe = true;
-        }
-        if let RustMethodArguments::SingleVariant(ref mut args) = final_method.arguments {
-          let return_ref_type = args.return_type.ptr_to_ref(*final_is_const)?;
-          if &args.cpp_method.cpp_method.name == "static_cast" {
-            args.return_type = return_ref_type;
-          } else {
-            args.return_type.rust_api_to_c_conversion = RustToCTypeConversion::OptionRefToPtr;
-            args.return_type.rust_api_type = RustType::Common {
-              base: RustName::new(vec!["std".to_string(),
-                                       "option".to_string(),
-                                       "Option".to_string()])?,
-              indirection: RustTypeIndirection::None,
-              is_const: false,
-              is_const2: false,
-              generic_arguments: Some(vec![return_ref_type.rust_api_type]),
-            }
-          };
-          args.arguments[0].argument_type = args.arguments[0].argument_type
-            .ptr_to_ref(*final_is_const)?;
-          args.arguments[0].name = "self".to_string();
+          vec!["cpp_utils".to_string(), "UnsafeStaticCast".to_string()]
         } else {
-          unreachable!()
-        };
+          vec!["cpp_utils".to_string(), "StaticCast".to_string()]
+        }
       }
-      if args.arguments.len() != 1 {
-        return Err(unexpected("1 argument expected").into());
+      "dynamic_cast" => vec!["cpp_utils".to_string(), "DynamicCast".to_string()],
+      "qobject_cast" => {
+        vec!["qt_core".to_string(), "object".to_string(), "QObjectCast".to_string()]
       }
-      let from_type = &args.arguments[0].argument_type;
-      let to_type = &args.return_type;
-      let trait_type = RustType::Common {
-        base: RustName::new(trait_name)?,
-        indirection: RustTypeIndirection::None,
-        is_const: false,
-        is_const2: false,
-        generic_arguments: Some(vec![to_type.ptr_to_value()?.rust_api_type]),
+      _ => return Err("invalid method name".into()),
+    };
+    for &mut (ref mut final_method, ref mut final_is_const) in &mut final_methods {
+      let method_name = if *final_is_const {
+        args.cpp_method.cpp_method.name.clone()
+      } else {
+        format!("{}_mut", args.cpp_method.cpp_method.name)
       };
-      Ok(TraitImpl {
-        target_type: from_type.ptr_to_value()?.rust_api_type,
-        trait_type: trait_type,
-        extra: None,
-        methods: final_methods.into_iter().map(|x| x.0).collect(),
-      })
-    } else {
-      return Err(unexpected("SingleVariant expected").into());
+      final_method.scope = RustMethodScope::TraitImpl;
+      final_method.name = RustName::new(vec![method_name])?;
+      if args.cpp_method.cpp_method.is_unsafe_static_cast {
+        final_method.is_unsafe = true;
+      }
+      let return_ref_type = args.return_type.ptr_to_ref(*final_is_const)?;
+      if &final_method.arguments.cpp_method.cpp_method.name == "static_cast" {
+        final_method.arguments.return_type = return_ref_type;
+      } else {
+        final_method.arguments.return_type.rust_api_to_c_conversion =
+          RustToCTypeConversion::OptionRefToPtr;
+        final_method.arguments.return_type.rust_api_type = RustType::Common {
+          base: RustName::new(vec!["std".to_string(), "option".to_string(), "Option".to_string()])?,
+          indirection: RustTypeIndirection::None,
+          is_const: false,
+          is_const2: false,
+          generic_arguments: Some(vec![return_ref_type.rust_api_type]),
+        }
+      };
+      final_method.arguments.arguments[0].argument_type =
+        final_method.arguments.arguments[0].argument_type
+          .ptr_to_ref(*final_is_const)?;
+      final_method.arguments.arguments[0].name = "self".to_string();
     }
+    if args.arguments.len() != 1 {
+      return Err(unexpected("1 argument expected").into());
+    }
+    let from_type = &args.arguments[0].argument_type;
+    let to_type = &args.return_type;
+    let trait_type = RustType::Common {
+      base: RustName::new(trait_name)?,
+      indirection: RustTypeIndirection::None,
+      is_const: false,
+      is_const2: false,
+      generic_arguments: Some(vec![to_type.ptr_to_value()?.rust_api_type]),
+    };
+    Ok(TraitImpl {
+      target_type: from_type.ptr_to_value()?.rust_api_type,
+      trait_type: trait_type,
+      extra: None,
+      methods: final_methods.into_iter().map(|x| x.0.to_rust_method()).collect(),
+    })
   }
 
   // Generates a single overloaded method from all specified methods or
@@ -1419,37 +1416,24 @@ impl RustGenerator {
   // - they must have the same self argument type;
   // - they must not have exactly the same argument types.
   fn process_method(&self,
-                    mut filtered_methods: Vec<RustMethod>,
+                    mut filtered_methods: Vec<RustSingleMethod>,
                     scope: &RustMethodScope,
                     self_arg_kind_caption: Option<String>)
                     -> Result<(RustMethod, Option<RustTypeDeclaration>)> {
     filtered_methods.sort_by(|a, b| {
-      if let RustMethodArguments::SingleVariant(ref args) = a.arguments {
-        let a_args = args;
-        if let RustMethodArguments::SingleVariant(ref args) = b.arguments {
-          a_args.cpp_method.c_name.cmp(&args.cpp_method.c_name)
-        } else {
-          unreachable!()
-        }
-      } else {
-        unreachable!()
-      }
+      a.arguments.cpp_method.c_name.cmp(&b.arguments.cpp_method.c_name)
     });
     let methods_count = filtered_methods.len();
     let mut type_declaration = None;
     let method = if methods_count > 1 {
       let first_method = filtered_methods[0].clone();
-      let (self_argument, cpp_method_name) =
-        if let RustMethodArguments::SingleVariant(ref args) = first_method.arguments {
-          let self_argument = if !args.arguments.is_empty() && args.arguments[0].name == "self" {
-            Some(args.arguments[0].clone())
-          } else {
-            None
-          };
-          (self_argument, args.cpp_method.cpp_method.full_name())
-        } else {
-          unreachable!()
-        };
+      let self_argument = if !first_method.arguments.arguments.is_empty() &&
+                             first_method.arguments.arguments[0].name == "self" {
+        Some(first_method.arguments.arguments[0].clone())
+      } else {
+        None
+      };
+      let cpp_method_name = first_method.arguments.cpp_method.cpp_method.full_name();
       let mut args_variants = Vec::new();
       let mut method_name = first_method.name.clone();
       let mut trait_name = first_method.name.last_name()?.clone();
@@ -1468,53 +1452,24 @@ impl RustGenerator {
         trait_name = format!("{}{}", target_type_name, trait_name);
       }
       let mut grouped_by_cpp_method: HashMap<_, Vec<_>> = HashMap::new();
-      for method in filtered_methods {
+      for mut method in filtered_methods {
         assert!(method.name == first_method.name);
         assert!(method.scope == first_method.scope);
-        if let RustMethodArguments::SingleVariant(mut args) = method.arguments {
-          if let Some(ref self_argument) = self_argument {
-            assert!(args.arguments.len() > 0 && &args.arguments[0] == self_argument);
-            args.arguments.remove(0);
-          }
-          fn allocation_place_marker(marker_name: &'static str) -> Result<RustMethodArgument> {
-            Ok(RustMethodArgument {
-              name: "allocation_place_marker".to_string(),
-              ffi_index: None,
-              argument_type: CompleteType {
-                cpp_type: CppType::void(),
-                cpp_ffi_type: CppType::void(),
-                cpp_to_ffi_conversion: IndirectionChange::NoChange,
-                rust_ffi_type: RustType::Void,
-                rust_api_type: RustType::Common {
-                  base: RustName::new(vec!["cpp_utils".to_string(), marker_name.to_string()])?,
-                  generic_arguments: None,
-                  is_const: false,
-                  is_const2: false,
-                  indirection: RustTypeIndirection::None,
-                },
-                rust_api_to_c_conversion: RustToCTypeConversion::None,
-              },
-            })
-          }
-          match args.cpp_method.allocation_place {
-            ReturnValueAllocationPlace::Stack => {
-              args.arguments.push(allocation_place_marker("AsStruct")?);
-            }
-            ReturnValueAllocationPlace::Heap => {
-              args.arguments.push(allocation_place_marker("AsBox")?);
-            }
-            ReturnValueAllocationPlace::NotApplicable => {}
-          }
-          let mut cpp_method_key = args.cpp_method.cpp_method.clone();
-          if let Some(v) = cpp_method_key.arguments_before_omitting {
-            cpp_method_key.arguments = v;
-            cpp_method_key.arguments_before_omitting = None;
-          }
-          add_to_multihash(&mut grouped_by_cpp_method, cpp_method_key, args.clone());
-          args_variants.push(args);
-        } else {
-          unreachable!()
+        if let Some(ref self_argument) = self_argument {
+          assert!(method.arguments.arguments.len() > 0 &&
+                  &method.arguments.arguments[0] == self_argument);
+          method.arguments.arguments.remove(0);
         }
+
+        let mut cpp_method_key = method.arguments.cpp_method.cpp_method.clone();
+        if let Some(v) = cpp_method_key.arguments_before_omitting {
+          cpp_method_key.arguments = v;
+          cpp_method_key.arguments_before_omitting = None;
+        }
+        add_to_multihash(&mut grouped_by_cpp_method,
+                         cpp_method_key,
+                         method.arguments.clone());
+        args_variants.push(method.arguments);
       }
 
       let mut doc_items = Vec::new();
@@ -1619,21 +1574,69 @@ impl RustGenerator {
         method.name.parts.push(format!("{}_{}", name, self_arg_kind_caption));
       }
 
-      if let RustMethodArguments::SingleVariant(ref args) = method.arguments {
-        let doc_item = RustMethodDocItem {
-          cpp_fn: args.cpp_method.cpp_method.short_text(),
-          rust_fns: Vec::new(),
-          doc: args.cpp_method.cpp_method.doc.clone(),
-          rust_cross_references: Vec::new(),
-        };
-        method.docs = vec![doc_item];
-      } else {
-        unreachable!();
-      }
-
-      method
+      method.doc = Some(RustMethodDocItem {
+        cpp_fn: method.arguments.cpp_method.cpp_method.short_text(),
+        rust_fns: Vec::new(),
+        doc: method.arguments.cpp_method.cpp_method.doc.clone(),
+        rust_cross_references: Vec::new(),
+      });
+      method.to_rust_method()
     };
     Ok((method, type_declaration))
+  }
+
+  fn overload_functions(&self,
+                        methods: Vec<RustSingleMethod>)
+                        -> Result<Vec<(Option<String>, Vec<RustSingleMethod>)>> {
+    let mut buckets: Vec<Vec<RustSingleMethod>> = Vec::new();
+    for method in methods {
+      if let Some(mut b) = buckets.iter_mut()
+        .find(|b| b.iter().all(|m| m.can_be_overloaded_with(&method).unwrap())) {
+        b.push(method);
+        continue;
+      }
+      buckets.push(vec![method]);
+    }
+    let mut all_self_args: HashSet<_> = HashSet::new();
+    for bucket in &buckets {
+      all_self_args.insert(bucket[0].self_arg_kind()?.clone());
+    }
+
+    let mut final_names = None;
+    {
+      let try_strategy = |strategy| -> Result<Vec<Option<String>>> {
+        let mut result = Vec::new();
+        for (bucket_index, bucket) in buckets.iter().enumerate() {
+          let mut bucket_caption: Option<Option<String>> = None;
+          for method in bucket {
+            let caption = method.name_suffix(strategy, &all_self_args, bucket_index)?;
+            if bucket_caption.is_none() {
+              bucket_caption = Some(caption);
+            } else if Some(caption) != bucket_caption {
+              return Err("different captions within a bucket".into());
+            }
+          }
+          let bucket_caption = bucket_caption.expect("can't be None here");
+          if result.iter().any(|c| c == &bucket_caption) {
+            return Err("same captions for two buckets".into());
+          }
+          result.push(bucket_caption);
+        }
+        Ok(result)
+      };
+
+      for strategy in RustMethodCaptionStrategy::all() {
+        if let Ok(names) = try_strategy(&strategy) {
+          final_names = Some(names);
+          break;
+        }
+      }
+    }
+    if let Some(final_names) = final_names {
+      return Ok(final_names.into_iter().zip(buckets.into_iter()).collect());
+    } else {
+      return Err(unexpected("all Rust caption strategies failed").into());
+    }
   }
 
   /// Generates methods, trait implementations and overloading types
@@ -1648,7 +1651,7 @@ impl RustGenerator {
   {
     // Step 1: convert all methods to SingleVariant Rust methods and
     // split them by last name.
-    let mut single_rust_methods: HashMap<String, Vec<RustMethod>> = HashMap::new();
+    let mut single_rust_methods: HashMap<String, Vec<RustSingleMethod>> = HashMap::new();
     let mut result = ProcessFunctionsResult::default();
     for method in methods {
       if method.cpp_method.is_destructor() {
@@ -1680,80 +1683,23 @@ impl RustGenerator {
         Err(err) => log::warning(err.to_string()),
       }
     }
-    for (_, current_methods) in single_rust_methods {
+    for (_, mut current_methods) in single_rust_methods {
       assert!(!current_methods.is_empty());
-      // Step 2: for each method name, split methods by type of
-      // their self argument. Overloading can't be emulated if self types
-      // differ.
-
-      #[derive(PartialEq, Eq, Hash, Clone)]
-      struct UnoverloadableKey {
-        self_arg_kind: RustMethodSelfArgKind,
-        argument_types_if_unportable: Option<Vec<RustType>>,
-      };
-
-      let mut self_kind_to_methods: HashMap<_, Vec<_>> = HashMap::new();
-      for method in current_methods {
-        let key = if let RustMethodArguments::SingleVariant(ref var) = method.arguments {
-          UnoverloadableKey {
-            self_arg_kind: method.self_arg_kind()?,
-            argument_types_if_unportable: if var.has_unportable_arg_types() {
-              Some(var.arguments.iter().filter(|arg| &arg.name != "self").map(|arg| arg.argument_type.rust_api_type.clone()).collect())
-            } else {
-              None
-            }
+      for method in &mut current_methods {
+        match method.arguments.cpp_method.allocation_place {
+          ReturnValueAllocationPlace::Stack => {
+            method.arguments.arguments.push(allocation_place_marker("AsStruct")?);
           }
-        } else {
-          return Err(unexpected("SingleVariant expected here").into());
-        };
-        add_to_multihash(&mut self_kind_to_methods, key, method);
+          ReturnValueAllocationPlace::Heap => {
+            method.arguments.arguments.push(allocation_place_marker("AsBox")?);
+          }
+          ReturnValueAllocationPlace::NotApplicable => {}
+        }
       }
-      let all_self_args: HashSet<_> = self_kind_to_methods.keys().map(|x| x.self_arg_kind.clone()).collect();
-      let all_keys: Vec<_> = self_kind_to_methods.keys().cloned().collect();
-      for (key, overloaded_methods) in self_kind_to_methods {
-        let self_arg_kind_caption = if all_self_args.len() == 1 ||
-                                       key.self_arg_kind == RustMethodSelfArgKind::ConstRef {
-          None
-        } else if key.self_arg_kind == RustMethodSelfArgKind::Static {
-          Some("static")
-        } else if key.self_arg_kind == RustMethodSelfArgKind::MutRef {
-          if all_self_args.contains(&RustMethodSelfArgKind::ConstRef) {
-            Some("mut")
-          } else {
-            None
-          }
-        } else {
-          return Err("unsupported self arg kinds combination".into());
-        };
-        let arg_types_caption = if let Some(ref arg_types) = key.argument_types_if_unportable {
-          if all_keys.iter().filter(|k| &k.self_arg_kind == &key.self_arg_kind).count() == 1 {
-            None
-          } else {
-            Some(arg_types.iter().map_if_ok(|t| t.caption())?.join("_"))
-          }
-        } else {
-          None
-        };
-        let mut key_caption_items = Vec::new();
-        if let Some(c) = self_arg_kind_caption {
-          key_caption_items.push(c.to_string());
-        }
-        if let Some(c) = arg_types_caption {
-          key_caption_items.push(c);
-        }
-        let key_caption = if key_caption_items.is_empty() {
-          None
-        } else {
-          Some(key_caption_items.join("_"))
-        };
 
-        assert!(!overloaded_methods.is_empty());
-        // Step 3 was removed
-
-        // Step 4: generate overloaded method if count of methods is still > 1,
-        // or accept a single method without change.
+      for (name_suffix, overloaded_methods) in self.overload_functions(current_methods)? {
         let (method, type_declaration) =
-          self.process_method(overloaded_methods, scope, key_caption)?;
+          self.process_method(overloaded_methods, scope, name_suffix)?;
         if method.docs.is_empty() {
           return Err(unexpected(format!("docs are empty! {:?}", method)).into());
         }

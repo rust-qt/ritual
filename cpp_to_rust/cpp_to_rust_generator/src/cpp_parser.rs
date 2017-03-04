@@ -392,8 +392,8 @@ impl<'a> CppParser<'a> {
     }
     if let Some(base) = self.parse_special_typedef(remaining_name) {
       result_type.base = base;
-      return Ok(result_type);      
-    }    
+      return Ok(result_type);
+    }
     if result_type.indirection == CppTypeIndirection::Ptr ||
        result_type.indirection == CppTypeIndirection::Ref {
       if let Ok(subtype) = self.parse_unexposed_type(None,
@@ -473,13 +473,13 @@ impl<'a> CppParser<'a> {
   }
 
   fn parse_type(&self,
-                          type1: Type,
-                          context_class: Option<Entity>,
-                          context_method: Option<Entity>)
-                          -> Result<CppType> {      
-    //println!("TEST1 parse type {:?}", type1);                        
-    //println!("TEST2 canonical type {:?}", type1.get_canonical_type());                        
-    //println!("TEST3 args {:?}", type1.get_template_argument_types());                        
+                type1: Type,
+                context_class: Option<Entity>,
+                context_method: Option<Entity>)
+                -> Result<CppType> {
+    // println!("TEST1 parse type {:?}", type1);
+    // println!("TEST2 canonical type {:?}", type1.get_canonical_type());
+    // println!("TEST3 args {:?}", type1.get_template_argument_types());
     if type1.is_volatile_qualified() {
       return Err("Volatile type".into());
     }
@@ -510,7 +510,7 @@ impl<'a> CppParser<'a> {
           }
         }
         Ok(parsed)
-        
+
       }
       TypeKind::Void => {
         Ok(CppType {
@@ -602,7 +602,7 @@ impl<'a> CppParser<'a> {
                 match arg_type {
                   None => return Err("Template argument is None".into()),
                   Some(arg_type) => {
-                    //println!("TEST1 arg type: {:?}", arg_type);
+                    // println!("TEST1 arg type: {:?}", arg_type);
                     match self.parse_type(arg_type, context_class, context_method) {
                       Ok(parsed_type) => r.push(parsed_type),
                       Err(msg) => {
@@ -719,13 +719,16 @@ impl<'a> CppParser<'a> {
         let canonical = type1.get_canonical_type();
         if canonical.get_kind() != TypeKind::Unexposed {
           let mut parsed_canonical = self.parse_type(canonical, context_class, context_method);
-          if let Ok(parsed_unexposed) = self.parse_unexposed_type(Some(type1), None, context_class, context_method) {
-            if let CppTypeBase::Class(CppTypeClassBase { ref template_arguments, .. }) = parsed_unexposed.base {
+          if let Ok(parsed_unexposed) =
+                 self.parse_unexposed_type(Some(type1), None, context_class, context_method) {
+            if let CppTypeBase::Class(CppTypeClassBase { ref template_arguments, .. }) =
+                   parsed_unexposed.base {
               if let Some(ref template_arguments) = *template_arguments {
                 let template_arguments_unexposed = template_arguments;
                 if template_arguments_unexposed.iter().any(|x| match x.base {
-                  CppTypeBase::SpecificNumeric { .. } | CppTypeBase::PointerSizedInteger { .. } => true,
-                  _ => false
+                  CppTypeBase::SpecificNumeric { .. } |
+                  CppTypeBase::PointerSizedInteger { .. } => true,
+                  _ => false,
                 }) {
                   if let Ok(ref mut parsed_canonical) = parsed_canonical {
                     if let CppTypeBase::Class(CppTypeClassBase { ref mut template_arguments, .. }) = parsed_canonical.base {
@@ -737,8 +740,8 @@ impl<'a> CppParser<'a> {
                 }
               }
             }
-            //println!("TEST4 OK: {:?}", parsed_canonical);
-            //println!("TEST4 OK2: {:?}", parsed_unexposed);
+            // println!("TEST4 OK: {:?}", parsed_canonical);
+            // println!("TEST4 OK2: {:?}", parsed_unexposed);
           }
           parsed_canonical
         } else {
@@ -748,7 +751,7 @@ impl<'a> CppParser<'a> {
       _ => Err(format!("Unsupported kind of type: {:?}", type1.get_kind()).into()),
     }
   }
-  
+
   fn parse_special_typedef(&self, name: &str) -> Option<CppTypeBase> {
     match name {
       "qint8" | "int8_t" | "GLbyte" => {

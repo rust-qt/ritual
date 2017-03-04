@@ -11,7 +11,7 @@ use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMe
 use rust_type::{RustName, RustType, RustTypeIndirection, RustFFIFunction, RustToCTypeConversion,
                 CompleteType};
 use common::string_utils::{JoinWithString, CaseOperations};
-use common::utils::{MapIfOk};
+use common::utils::MapIfOk;
 use doc_formatter;
 use std::path::PathBuf;
 
@@ -275,14 +275,14 @@ impl<'a> RustCodeGenerator<'a> {
       table.insert("build-dependencies".to_string(), build_dependencies);
       // LNK1189 (too many members) in MSVC with static linking,
       // so we use dynamic linking
-      
-      /*table.insert("lib".to_string(), toml::Value::Table({
-        let mut table = toml::Table::new();
-        table.insert("crate-type".to_string(),
-                     toml::Value::Array(vec![toml::Value::String("lib".to_string()),
-                                             toml::Value::String("dylib".to_string())]));
-        table
-      })); */
+
+      // table.insert("lib".to_string(), toml::Value::Table({
+      // let mut table = toml::Table::new();
+      // table.insert("crate-type".to_string(),
+      // toml::Value::Array(vec![toml::Value::String("lib".to_string()),
+      // toml::Value::String("dylib".to_string())]));
+      // table
+      // }));
       table
     };
     save_toml(self.config.output_path.with_added("Cargo.toml"),

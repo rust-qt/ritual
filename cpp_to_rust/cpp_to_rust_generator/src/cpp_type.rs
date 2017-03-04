@@ -43,51 +43,68 @@ impl CppTypeIndirection {
 
 impl CppBuiltInNumericType {
   pub fn to_cpp_code(&self) -> &'static str {
+    use serializable::CppBuiltInNumericType::*;
     match *self {
-      CppBuiltInNumericType::Bool => "bool",
-      CppBuiltInNumericType::Char => "char",
-      CppBuiltInNumericType::SChar => "signed char",
-      CppBuiltInNumericType::UChar => "unsigned char",
-      CppBuiltInNumericType::WChar => "wchar_t",
-      CppBuiltInNumericType::Char16 => "char16_t",
-      CppBuiltInNumericType::Char32 => "char32_t",
-      CppBuiltInNumericType::Short => "short",
-      CppBuiltInNumericType::UShort => "unsigned short",
-      CppBuiltInNumericType::Int => "int",
-      CppBuiltInNumericType::UInt => "unsigned int",
-      CppBuiltInNumericType::Long => "long",
-      CppBuiltInNumericType::ULong => "unsigned long",
-      CppBuiltInNumericType::LongLong => "long long",
-      CppBuiltInNumericType::ULongLong => "unsigned long long",
-      CppBuiltInNumericType::Int128 => "__int128_t",
-      CppBuiltInNumericType::UInt128 => "__uint128_t",
-      CppBuiltInNumericType::Float => "float",
-      CppBuiltInNumericType::Double => "double",
-      CppBuiltInNumericType::LongDouble => "long double",
+      Bool => "bool",
+      Char => "char",
+      SChar => "signed char",
+      UChar => "unsigned char",
+      WChar => "wchar_t",
+      Char16 => "char16_t",
+      Char32 => "char32_t",
+      Short => "short",
+      UShort => "unsigned short",
+      Int => "int",
+      UInt => "unsigned int",
+      Long => "long",
+      ULong => "unsigned long",
+      LongLong => "long long",
+      ULongLong => "unsigned long long",
+      Int128 => "__int128_t",
+      UInt128 => "__uint128_t",
+      Float => "float",
+      Double => "double",
+      LongDouble => "long double",
     }
   }
 
+  pub fn is_float(&self) -> bool {
+    use serializable::CppBuiltInNumericType::*;
+    match *self {
+      Float | Double | LongDouble => true,
+      _ => false,
+    }
+  }
+
+  pub fn is_signed_integer(&self) -> bool {
+    use serializable::CppBuiltInNumericType::*;
+    match *self {
+      SChar | Short | Int | Long | LongLong | Int128 => true,
+      _ => false,
+    }
+  }
+
+  pub fn is_unsigned_integer(&self) -> bool {
+    use serializable::CppBuiltInNumericType::*;
+    match *self {
+      UChar | Char16 | Char32 | UShort | UInt | ULong | ULongLong | UInt128 => true,
+      _ => false,
+    }
+  }
+
+  pub fn is_integer_with_undefined_signedness(&self) -> bool {
+    use serializable::CppBuiltInNumericType::*;
+    match *self {
+      Char | WChar => true,
+      _ => false,
+    }
+  }
+
+
   pub fn all() -> [CppBuiltInNumericType; 20] {
-    [CppBuiltInNumericType::Bool,
-     CppBuiltInNumericType::Char,
-     CppBuiltInNumericType::SChar,
-     CppBuiltInNumericType::UChar,
-     CppBuiltInNumericType::WChar,
-     CppBuiltInNumericType::Char16,
-     CppBuiltInNumericType::Char32,
-     CppBuiltInNumericType::Short,
-     CppBuiltInNumericType::UShort,
-     CppBuiltInNumericType::Int,
-     CppBuiltInNumericType::UInt,
-     CppBuiltInNumericType::Long,
-     CppBuiltInNumericType::ULong,
-     CppBuiltInNumericType::LongLong,
-     CppBuiltInNumericType::ULongLong,
-     CppBuiltInNumericType::Int128,
-     CppBuiltInNumericType::UInt128,
-     CppBuiltInNumericType::Float,
-     CppBuiltInNumericType::Double,
-     CppBuiltInNumericType::LongDouble]
+    use serializable::CppBuiltInNumericType::*;
+    [Bool, Char, SChar, UChar, WChar, Char16, Char32, Short, UShort, Int, UInt, Long, ULong,
+     LongLong, ULongLong, Int128, UInt128, Float, Double, LongDouble]
   }
 }
 
@@ -559,6 +576,73 @@ impl CppType {
     if let CppTypeBase::BuiltInNumeric(ref data) = self.base {
       if data != &CppBuiltInNumericType::Bool {
         return true;
+      }
+    }
+    false
+  }
+
+  pub fn can_be_the_same_as(&self, other_type: &CppType) -> bool {
+    if self == other_type {
+      return true;
+    }
+    if self.indirection != other_type.indirection || self.is_const != other_type.is_const ||
+       self.is_const2 != other_type.is_const2 {
+      return false;
+    }
+    if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments, .. }) =
+           self.base {
+      if let Some(ref template_arguments) = *template_arguments {
+        let name1 = name;
+        let args1 = template_arguments;
+        if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments, .. }) =
+               other_type.base {
+          if let Some(ref template_arguments) = *template_arguments {
+            return name1 == name && args1.len() == template_arguments.len() &&
+                   args1.iter()
+              .zip(template_arguments.iter())
+              .all(|(a1, a2)| a1.can_be_the_same_as(a2));
+          }
+        }
+      }
+    }
+    if let CppTypeBase::BuiltInNumeric(ref data) = self.base {
+      let data1 = data;
+      if let CppTypeBase::BuiltInNumeric(ref data) = other_type.base {
+        if data1.is_float() {
+          return data.is_float();
+        } else if data1.is_signed_integer() {
+          return data.is_signed_integer() || data.is_integer_with_undefined_signedness();
+        } else if data1.is_unsigned_integer() {
+          return data.is_unsigned_integer() || data.is_integer_with_undefined_signedness();
+        } else if data1.is_integer_with_undefined_signedness() {
+          return data.is_signed_integer() || data.is_unsigned_integer() ||
+                 data.is_integer_with_undefined_signedness();
+        } else {
+          return false;
+        }
+      }
+      if let CppTypeBase::SpecificNumeric { ref kind, .. } = other_type.base {
+        if data1.is_float() {
+          return kind == &CppSpecificNumericTypeKind::FloatingPoint;
+        } else if data1.is_signed_integer() {
+          return kind == &CppSpecificNumericTypeKind::Integer { is_signed: true };
+        } else if data1.is_unsigned_integer() {
+          return kind == &CppSpecificNumericTypeKind::Integer { is_signed: false };
+        } else if data1.is_integer_with_undefined_signedness() {
+          if let CppSpecificNumericTypeKind::Integer { .. } = *kind {
+            return true;
+          } else {
+            return false;
+          }
+        } else {
+          return false;
+        }
+      }
+      return false;
+    }
+    if let CppTypeBase::BuiltInNumeric(..) = other_type.base {
+      if let CppTypeBase::SpecificNumeric { .. } = self.base {
+        return other_type.can_be_the_same_as(self);
       }
     }
     false

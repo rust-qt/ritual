@@ -41,6 +41,9 @@ public:
   void ov4(uint32_t a) {}
   void ov4(uint16_t a) {}
 
+  void ov5(int a) {}
+  void ov5(uint16_t b) {}
+
 
 private:
   int m_x;

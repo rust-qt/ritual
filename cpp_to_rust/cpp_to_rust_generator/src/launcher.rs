@@ -7,7 +7,8 @@ use cpp_ffi_generator;
 use cpp_parser;
 use common::errors::{Result, ChainErr};
 use common::file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json,
-                         canonicalize, remove_dir_all, remove_dir, read_dir, create_file, path_to_str};
+                         canonicalize, remove_dir_all, remove_dir, read_dir, create_file,
+                         path_to_str};
 use common::build_script_data::BuildScriptData;
 use common::log;
 use rust_code_generator;

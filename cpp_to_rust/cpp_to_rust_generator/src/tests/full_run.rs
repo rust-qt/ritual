@@ -6,7 +6,7 @@ use config::{Config, CrateProperties};
 use common::cpp_build_config::CppBuildConfigData;
 use common::target;
 use common::cargo_override::set_cargo_override;
-
+use common::log;
 use std::process::Command;
 use std::path::PathBuf;
 use tests::TempTestDir;
@@ -54,6 +54,12 @@ fn full_run() {
   let mut config = Config::new(&crate_dir,
                                temp_dir.path().with_added("cache"),
                                crate_properties);
+  if config.is_completed() {
+    log::info("No processing! cpp_to_rust uses previous results.");
+    log::info(format!("Remove \"{}\" file to force processing.",
+                      config.completed_marker_path().display()));
+    return;
+  }
   config.add_include_directive("ctrt1/all.h");
   let include_path = {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

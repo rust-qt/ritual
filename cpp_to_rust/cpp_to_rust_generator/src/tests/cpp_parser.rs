@@ -1109,15 +1109,16 @@ fn fixed_size_integers() {
   assert_eq!(&data.methods[0].return_type, &type1);
 
   assert_eq!(&data.methods[1].name, "f2");
-  assert_eq!(&data.methods[1].return_type, &CppType {
-    indirection: CppTypeIndirection::None,
-    is_const: false,
-    is_const2: false,
-    base: CppTypeBase::Class(CppTypeClassBase {
-      name: "QVector".to_string(),
-      template_arguments: Some(vec![type1.clone()]),
-    }),
-  });
+  assert_eq!(&data.methods[1].return_type,
+             &CppType {
+               indirection: CppTypeIndirection::None,
+               is_const: false,
+               is_const2: false,
+               base: CppTypeBase::Class(CppTypeClassBase {
+                 name: "QVector".to_string(),
+                 template_arguments: Some(vec![type1.clone()]),
+               }),
+             });
 
 }
 

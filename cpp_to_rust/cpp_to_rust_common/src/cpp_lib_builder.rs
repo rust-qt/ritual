@@ -1,6 +1,6 @@
 use errors::Result;
 use file_utils::{create_dir_all, path_to_str};
-use utils::{run_command};
+use utils::run_command;
 use utils::MapIfOk;
 use string_utils::JoinWithString;
 use std::process::Command;
@@ -91,7 +91,7 @@ impl CppLibBuilder {
         target::Env::Gnu => {
           cmake_command.arg("-G").arg("MinGW Makefiles");
         }
-        _ => {},
+        _ => {}
       }
     }
     let mut actual_cmake_vars = self.cmake_vars.clone();

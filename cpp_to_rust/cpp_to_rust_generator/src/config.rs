@@ -180,6 +180,13 @@ impl Config {
     }
   }
 
+  pub fn is_completed(&self) -> bool {
+    ::launcher::is_completed(&self.cache_dir_path)
+  }
+  pub fn completed_marker_path(&self) -> PathBuf {
+    ::launcher::completed_marker_path(&self.cache_dir_path)
+  }
+
   /// Sets the directory containing additional Rust code for the crate.
   pub fn set_crate_template_path<P: Into<PathBuf>>(&mut self, path: P) {
     self.crate_template_path = Some(path.into());

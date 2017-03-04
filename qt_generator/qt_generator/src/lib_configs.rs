@@ -85,7 +85,7 @@ pub fn core(config: &mut Config) -> Result<()> {
                                            "QProcess::setNativeArguments",
                                            "QProcess::createProcessArgumentsModifier",
                                            "QProcess::setCreateProcessArgumentsModifier"]);
-                                           
+
   exclude_qvector_eq_based_methods(config, &["QStaticPlugin", "QTimeZone::OffsetData"]);
   exclude_qlist_eq_based_methods(config,
                                  &["QAbstractEventDispatcher::TimerInfo", "QCommandLineOption"]);
@@ -124,7 +124,8 @@ pub fn core(config: &mut Config) -> Result<()> {
       }
       if info.class_type.name == "QMetaType" {
         match method.name.as_ref() {
-          "registerConverterFunction" | "unregisterConverterFunction" => {
+          "registerConverterFunction" |
+          "unregisterConverterFunction" => {
             // only public on msvc for some technical reason
             return Ok(false);
           }
