@@ -44,11 +44,11 @@ pub struct RustMethodArgumentsVariant {
   pub return_type: CompleteType,
 }
 
-//impl RustMethodArgumentsVariant {
+// impl RustMethodArgumentsVariant {
 //  pub fn has_unportable_arg_types(&self) -> bool {
 //    self.arguments.iter().any(|arg| arg.argument_type.cpp_type.is_platform_dependent())
 //  }
-//}
+// }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[allow(dead_code)]
@@ -119,13 +119,13 @@ fn detect_self_arg_kind(args: &[RustMethodArgument]) -> Result<RustMethodSelfArg
 }
 
 impl RustMethod {
-//  pub fn self_arg_kind(&self) -> Result<RustMethodSelfArgKind> {
-//    let args = match self.arguments {
-//      RustMethodArguments::SingleVariant(ref var) => &var.arguments,
-//      RustMethodArguments::MultipleVariants { ref shared_arguments, .. } => shared_arguments,
-//    };
-//    detect_self_arg_kind(args)
-//  }
+  //  pub fn self_arg_kind(&self) -> Result<RustMethodSelfArgKind> {
+  //    let args = match self.arguments {
+  //      RustMethodArguments::SingleVariant(ref var) => &var.arguments,
+  //      RustMethodArguments::MultipleVariants { ref shared_arguments, .. } => shared_arguments,
+  //    };
+  //    detect_self_arg_kind(args)
+  //  }
 
   #[allow(dead_code)]
   pub fn cpp_cross_references(&self) -> Vec<String> {
@@ -174,22 +174,26 @@ impl RustSingleMethod {
   }
 
   pub fn can_be_overloaded_with(&self, other_method: &RustSingleMethod) -> Result<bool> {
-    //println!("can_be_overloaded_with {:?} | {:?}", self, other_method);
+    // println!("can_be_overloaded_with {:?} | {:?}", self, other_method);
     if self.self_arg_kind()? != other_method.self_arg_kind()? {
-      //println!("false1");
+      // println!("false1");
       return Ok(false);
     }
     if self.arguments.arguments.len() == other_method.arguments.arguments.len() {
-      if self.arguments.arguments.iter().zip(other_method.arguments.arguments.iter()).all(|(arg1, arg2)| {
-        arg1.argument_type.cpp_type.can_be_the_same_as(&arg2.argument_type.cpp_type) &&
-            !(arg1.name == "allocation_place_marker" && arg2.name == "allocation_place_marker" &&
-                arg1 != arg2)
-      }) {
-        //println!("false2");
+      if self.arguments
+        .arguments
+        .iter()
+        .zip(other_method.arguments.arguments.iter())
+        .all(|(arg1, arg2)| {
+          arg1.argument_type.cpp_type.can_be_the_same_as(&arg2.argument_type.cpp_type) &&
+          !(arg1.name == "allocation_place_marker" && arg2.name == "allocation_place_marker" &&
+            arg1 != arg2)
+        }) {
+        // println!("false2");
         return Ok(false);
       }
     }
-    //println!("true0");
+    // println!("true0");
     Ok(true)
   }
 
@@ -228,7 +232,11 @@ impl RustSingleMethod {
           if self.arguments.arguments.is_empty() {
             Some("no_args".to_string())
           } else {
-            Some(self.arguments.arguments.iter().map_if_ok(|t| t.argument_type.rust_api_type.caption())?.join("_"))
+            Some(self.arguments
+              .arguments
+              .iter()
+              .map_if_ok(|t| t.argument_type.rust_api_type.caption())?
+              .join("_"))
           }
         }
       };

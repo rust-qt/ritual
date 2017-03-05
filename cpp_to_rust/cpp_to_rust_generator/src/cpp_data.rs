@@ -14,7 +14,8 @@ use common::string_utils::JoinWithString;
 pub use serializable::{CppEnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
                        CppTypeData, CppTypeDoc, CppData, CppTemplateInstantiation,
                        CppTemplateInstantiations, CppClassUsingDirective, CppBaseSpecifier,
-                       TemplateArgumentsDeclaration, CppFunctionPointerType};
+                       TemplateArgumentsDeclaration, CppFunctionPointerType,
+                       CppTypeAllocationPlace};
 
 extern crate regex;
 use self::regex::Regex;
@@ -585,6 +586,35 @@ impl CppData {
     false
   }
 
+  /// Checks if specified class has virtual destructor (own or inherited).
+  pub fn has_virtual_methods(&self, class_name: &str) -> bool {
+    for method in &self.methods {
+      if let Some(ref info) = method.class_membership {
+        if &info.class_type.name == class_name && info.is_virtual {
+          return true;
+        }
+      }
+    }
+    if let Some(type_info) = self.types.iter().find(|t| &t.name == class_name) {
+      if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
+        for base in bases {
+          if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
+            if self.has_virtual_methods(name) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    for dep in &self.dependencies {
+      if dep.has_virtual_methods(class_name) {
+        return true;
+      }
+    }
+    false
+  }
+
+
   /// Checks if specified class has public destructor.
   pub fn has_public_destructor(&self, class_type: &CppTypeClassBase) -> bool {
     for method in &self.methods {
@@ -1030,9 +1060,119 @@ impl CppData {
     Ok(())
   }
 
+  fn choose_allocation_places(&mut self) -> Result<()> {
+    log::info("Detecting type allocation places");
+
+    #[derive(Default)]
+    struct TypeStats {
+      //has_derived_classes: bool,
+      has_virtual_methods: bool,
+      pointers_count: i32,
+      not_pointers_count: i32,
+    };
+    fn check_type(cpp_type: &CppType, data: &mut HashMap<String, TypeStats>) {
+      if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
+             cpp_type.base {
+        if !data.contains_key(name) {
+          data.insert(name.clone(), TypeStats::default());
+        }
+        match cpp_type.indirection {
+          CppTypeIndirection::None | CppTypeIndirection::Ref => {
+            data.get_mut(name).unwrap().not_pointers_count += 1
+          }
+          CppTypeIndirection::Ptr => data.get_mut(name).unwrap().pointers_count += 1,
+          _ => {}
+        }
+        if let Some(ref args) = *template_arguments {
+          for arg in args {
+            check_type(arg, data);
+          }
+        }
+      }
+    }
+
+    let mut data = HashMap::new();
+    for type1 in &self.types {
+      if let CppTypeKind::Class { ref bases, .. } = type1.kind {
+        if self.has_virtual_methods(&type1.name) {
+          if !data.contains_key(&type1.name) {
+            data.insert(type1.name.clone(), TypeStats::default());
+          }
+          data.get_mut(&type1.name).unwrap().has_virtual_methods = true;
+        }
+        /*
+        for base in bases {
+          if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
+            if self.types.iter().any(|t| &t.name == name) {
+              if !data.contains_key(name) {
+                data.insert(name.clone(), TypeStats::default());
+              }
+              data.get_mut(name).unwrap().has_derived_classes = true;
+            }
+          }
+        }*/
+      }
+    }
+    for method in &self.methods {
+      check_type(&method.return_type, &mut data);
+      for arg in &method.arguments {
+        check_type(&arg.argument_type, &mut data);
+      }
+    }
+    let mut results = HashMap::new();
+    for (name, stats) in &data {
+      println!("{}\t{}\t{}\t{}",
+               name,
+               stats.has_virtual_methods,
+               stats.pointers_count,
+               stats.not_pointers_count);
+    }
+
+    for (name, stats) in data {
+      let result = if stats.has_virtual_methods {
+        CppTypeAllocationPlace::Heap
+      } else if stats.pointers_count == 0 {
+        CppTypeAllocationPlace::Stack
+      } else {
+        let min_safe_data_count = 5;
+        let min_not_pointers_percent = 0.3;
+        if stats.pointers_count + stats.not_pointers_count < min_safe_data_count {
+          log::warning(format!("Can't determine type allocation place for '{}':", name));
+          log::warning(format!("  Not enough data (pointers={}, not pointers={})",
+                               stats.pointers_count,
+                               stats.not_pointers_count));
+        } else if stats.not_pointers_count as f32 /
+                  (stats.pointers_count + stats.not_pointers_count) as f32 >
+                  min_not_pointers_percent {
+          log::warning(format!("Can't determine type allocation place for '{}':", name));
+          log::warning(format!("  Many not pointers (pointers={}, not pointers={})",
+                               stats.pointers_count,
+                               stats.not_pointers_count));
+        }
+        CppTypeAllocationPlace::Heap
+      };
+      results.insert(name, result);
+    }
+    log::info(format!("Allocation place is heap for: {}",
+                      results.iter()
+                        .filter(|&(_, v)| v == &CppTypeAllocationPlace::Heap)
+                        .map(|(k, _)| k)
+                        .join(", ")));
+    log::info(format!("Allocation place is stack for: {}",
+                      results.iter()
+                        .filter(|&(_, v)| v == &CppTypeAllocationPlace::Stack)
+                        .map(|(k, _)| k)
+                        .join(", ")));
+
+    self.type_allocation_places = results;
+    panic!("check me!");
+    Ok(())
+  }
+
   /// Performs data conversion to make it more suitable
   /// for further wrapper generation.
   pub fn post_process(&mut self) -> Result<()> {
+    self.choose_allocation_places()?;
     self.detect_signals_and_slots()?;
     self.ensure_explicit_destructors()?;
     self.generate_methods_with_omitted_args();

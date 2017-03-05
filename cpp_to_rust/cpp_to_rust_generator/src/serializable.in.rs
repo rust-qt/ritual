@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 // ------------------------------
 // from cpp_data
 
@@ -167,6 +168,13 @@ pub struct CppTemplateInstantiations {
   pub instantiations: Vec<CppTemplateInstantiation>,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub enum CppTypeAllocationPlace {
+  Heap,
+  Stack,
+}
+
 /// C++ parser output
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 #[derive(Serialize, Deserialize)]
@@ -182,6 +190,8 @@ pub struct CppData {
   /// including variations with omitted arguments,
   /// but excluding argument types from dependencies.
   pub signal_argument_types: Vec<Vec<CppType>>,
+
+  pub type_allocation_places: HashMap<String, CppTypeAllocationPlace>,
   /// Data of dependencies
   pub dependencies: Vec<CppData>,
 }

@@ -11,9 +11,9 @@ use common::log;
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
                 RustMethodArguments, TraitImpl, TraitImplExtra, RustEnumValue,
-                RustProcessedTypeInfo, RustMethodDocItem,
-                RustQtReceiverDeclaration, RustQtReceiverType, RustQtSlotWrapper,
-                RustSingleMethod, RustMethodCaptionStrategy, allocation_place_marker};
+                RustProcessedTypeInfo, RustMethodDocItem, RustQtReceiverDeclaration,
+                RustQtReceiverType, RustQtSlotWrapper, RustSingleMethod,
+                RustMethodCaptionStrategy, allocation_place_marker};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
 use common::string_utils::{CaseOperations, WordIterator};

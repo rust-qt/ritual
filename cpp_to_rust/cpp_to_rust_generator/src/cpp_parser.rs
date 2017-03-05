@@ -12,6 +12,7 @@ use common::log;
 
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
+use std::collections::HashMap;
 
 extern crate clang;
 use self::clang::*;
@@ -229,6 +230,7 @@ pub fn run(config: CppParserConfig, dependencies_data: Vec<CppData>) -> Result<C
     methods: methods,
     template_instantiations: insts,
     signal_argument_types: Vec::new(),
+    type_allocation_places: HashMap::new(),
     dependencies: dependencies_data,
   })
 }

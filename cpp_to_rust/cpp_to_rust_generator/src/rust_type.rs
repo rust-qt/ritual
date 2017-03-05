@@ -223,7 +223,6 @@ impl RustType {
       _ => Err("not a Common type".into()),
     }
   }
-
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

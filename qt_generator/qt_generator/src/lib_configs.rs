@@ -63,20 +63,26 @@ fn exclude_qvector_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(co
 }
 
 
+#[cfg_attr(rustfmt, rustfmt_skip)]
 pub fn core(config: &mut Config) -> Result<()> {
-  config.add_cpp_parser_blocked_names(vec!["QtMetaTypePrivate",
-                                           "QtPrivate",
-                                           "QFlag",
-                                           "QBasicAtomicInteger",
-                                           "qt_check_for_QGADGET_macro",
-                                           "QMessageLogContext::copy",
-                                           "QBasicAtomicInteger",
-                                           "QVariant::Private",
-                                           "QVariant::PrivateShared",
-                                           "_GUID",
-                                           "qvsnprintf",
-                                           "QString::vsprintf",
-                                           "QString::vasprintf"]);
+  config.add_cpp_parser_blocked_names(vec![
+    "_GUID", "QAbstractConcatenable", "QArrayData", "QArrayDataPointer", "QArrayDataPointerRef",
+    "QAtomicAdditiveType", "QAtomicInt", "QAtomicInteger", "QAtomicOps", "QAtomicPointer",
+    "QBasicAtomicInteger", "QBasicAtomicInteger", "QBasicAtomicPointer", "QByteArrayDataPtr",
+    "QConcatenable", "QConstOverload", "QContiguousCacheData", "QContiguousCacheTypedData",
+    "QEnableSharedFromThis", "QException", "QFlag", "QForeachContainer", "QGenericAtomicOps",
+    "QHashData",
+    "QHashDummyValue", "QHashNode", "QHashNode", "QIncompatibleFlag", "QInternal", "QJsonValuePtr",
+    "QJsonValueRefPtr", "QLinkedListData", "QLinkedListNode", "QListData", "QMapData",
+    "QMapDataBase", "QMapNode",
+    "QMapNodeBase", "QMessageLogContext::copy", "QMetaTypeId", "QMetaTypeId2", "QNoDebug",
+    "QNonConstOverload", "QObjectData", "QObjectUserData", "QObjectUserData", "QString::Null",
+    "QString::vasprintf", "QString::vsprintf", "QStringDataPtr", "Qt::Initialization",
+    "qt_check_for_QGADGET_macro", "QtGlobalStatic", "QThreadStorageData", "QtMetaTypePrivate",
+    "QtPrivate", "QtSharedPointer", "QTypedArrayData", "QTypeInfo", "QTypeInfoMerger",
+    "QTypeInfoQuery", "QVariant::Handler", "QVariant::Private", "QVariant::PrivateShared",
+    "QVariantComparisonHelper", "qvsnprintf"
+  ]);
 
   // TODO: the following items should be conditionally available on Windows
   config.add_cpp_parser_blocked_names(vec!["QWinEventNotifier",
@@ -89,6 +95,11 @@ pub fn core(config: &mut Config) -> Result<()> {
   exclude_qvector_eq_based_methods(config, &["QStaticPlugin", "QTimeZone::OffsetData"]);
   exclude_qlist_eq_based_methods(config,
                                  &["QAbstractEventDispatcher::TimerInfo", "QCommandLineOption"]);
+
+  // TODO: set type allocation places:
+  // stack: QByteArray, QChar, QItemSelection, QJsonArray, QJsonObject, QJsonParseError,
+  // QJsonValue, QJsonValueRef, QList, QLoggingCategory, QPointF, QRegularExpressionMatch, QString
+
   config.add_cpp_ffi_generator_filter(Box::new(|method| {
     if let Some(ref info) = method.class_membership {
       if info.class_type.to_cpp_pseudo_code() == "QFuture<void>" {
