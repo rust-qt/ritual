@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use common::errors::Result;
 use cpp_method::CppMethod;
-use cpp_data::{CppData};
+use cpp_data::CppData;
 pub use cpp_data::CppTypeAllocationPlace;
 use common::cpp_build_config::CppBuildConfig;
 use std::collections::HashMap;

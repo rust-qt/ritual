@@ -9,22 +9,22 @@ use qt_core::qt::ItemDataRole;
 
 #[test]
 fn models_and_casts() {
-  let mut string_list = StringList::new(AsStruct);
+  let mut string_list = StringList::new(());
   string_list.append(&String::from("text1"));
   string_list.append(&String::from("text2"));
-  let mut string_list_model = StringListModel::new((&string_list, AsBox));
+  let mut string_list_model = StringListModel::new(&string_list);
   assert_eq!(string_list_model.row_count(()), 2);
   {
-    let index = string_list_model.index((0, 0, AsStruct));
-    assert_eq!(string_list_model.data((&index, ItemDataRole::Display as i32, AsStruct))
-                 .to_string(AsStruct)
+    let index = string_list_model.index((0, 0));
+    assert_eq!(string_list_model.data(&index, ItemDataRole::Display as i32)
+                 .to_string()
                  .to_std_string(),
                "text1");
   }
   {
-    let index = string_list_model.index((1, 0, AsStruct));
-    assert_eq!(string_list_model.data((&index, ItemDataRole::Display as i32, AsStruct))
-                 .to_string(AsStruct)
+    let index = string_list_model.index((1, 0));
+    assert_eq!(string_list_model.data(&index, ItemDataRole::Display as i32)
+                 .to_string()
                  .to_std_string(),
                "text2");
   }

@@ -3,12 +3,11 @@ use cpp_type::CppType;
 use common::errors::{Result, unexpected};
 use common::string_utils::JoinWithString;
 use common::utils::MapIfOk;
-use rust_type::{RustName, CompleteType, RustType, RustTypeIndirection, RustToCTypeConversion};
+use rust_type::{RustName, CompleteType, RustType, RustTypeIndirection};
 use cpp_method::CppMethodDoc;
 use cpp_data::CppTypeDoc;
 pub use serializable::{RustEnumValue, RustTypeWrapperKind, RustProcessedTypeInfo, RustExportInfo,
                        CppEnumValueDocItem, RustQtSlotWrapper};
-use cpp_ffi_data::IndirectionChange;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
@@ -357,23 +356,3 @@ impl RustMethodCaptionStrategy {
   }
 }
 
-pub fn allocation_place_marker(marker_name: &'static str) -> Result<RustMethodArgument> {
-  Ok(RustMethodArgument {
-    name: "allocation_place_marker".to_string(),
-    ffi_index: None,
-    argument_type: CompleteType {
-      cpp_type: CppType::void(),
-      cpp_ffi_type: CppType::void(),
-      cpp_to_ffi_conversion: IndirectionChange::NoChange,
-      rust_ffi_type: RustType::Void,
-      rust_api_type: RustType::Common {
-        base: RustName::new(vec!["cpp_utils".to_string(), marker_name.to_string()])?,
-        generic_arguments: None,
-        is_const: false,
-        is_const2: false,
-        indirection: RustTypeIndirection::None,
-      },
-      rust_api_to_c_conversion: RustToCTypeConversion::None,
-    },
-  })
-}

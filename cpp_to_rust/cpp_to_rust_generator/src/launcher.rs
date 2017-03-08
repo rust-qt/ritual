@@ -144,6 +144,7 @@ fn load_or_create_cpp_data(config: &Config,
 
     cpp_data.post_process()?;
 
+    log::info("Saving C++ data");
     save_json(&cpp_data_cache_file_path, &cpp_data)?;
     log::info(format!("C++ data is saved to file: {}",
                       cpp_data_cache_file_path.display()));

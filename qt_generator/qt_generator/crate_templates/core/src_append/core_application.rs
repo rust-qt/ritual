@@ -20,8 +20,8 @@ impl CoreApplicationArgs {
   pub fn empty() -> CoreApplicationArgs {
     CoreApplicationArgs::from(Vec::new())
   }
-  pub fn get(&mut self) -> (&mut ::libc::c_int, *mut *mut ::libc::c_char, ::cpp_utils::AsBox) {
-    (self.argc.as_mut(), self.argv.as_mut_ptr(), ::cpp_utils::AsBox)
+  pub fn get(&mut self) -> (&mut ::libc::c_int, *mut *mut ::libc::c_char) {
+    (self.argc.as_mut(), self.argv.as_mut_ptr())
   }
 
   #[cfg(unix)]

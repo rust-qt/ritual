@@ -1,13 +1,15 @@
-use cpp_data::CppVisibility;
+use cpp_data::{CppVisibility, CppTypeAllocationPlace};
 use cpp_ffi_data::{CppMethodWithFfiSignature, CppFfiType, CppFfiFunctionSignature,
                    CppFfiFunctionArgument, CppFfiArgumentMeaning};
 use cpp_operator::CppOperator;
-use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase};
-use common::errors::{Result, unexpected};
+use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase, CppTypeClassBase};
+use common::errors::{Result, unexpected, ChainErr};
 use common::string_utils::JoinWithString;
 use common::utils::MapIfOk;
 pub use serializable::{CppFunctionArgument, CppMethodKind, CppMethod, CppMethodClassMembership,
                        CppFieldAccessorType, FakeCppMethod, CppMethodDoc};
+use std::collections::HashMap;
+
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ReturnValueAllocationPlace {
@@ -63,16 +65,15 @@ impl CppMethod {
 
   /// Checks if this method would need
   /// to have 2 wrappers with 2 different return value allocation places
-  pub fn needs_allocation_place_variants(&self) -> bool {
-    if self.is_constructor() || self.is_destructor() {
-      return true;
-    }
-    if self.return_type.needs_allocation_place_variants() {
-      return true;
-    }
-    false
-  }
-
+  // pub fn needs_allocation_place_variants(&self) -> bool {
+  // if self.is_constructor() || self.is_destructor() {
+  // return true;
+  // }
+  // if self.return_type.needs_allocation_place_variants() {
+  // return true;
+  // }
+  // false
+  // }
   /// Creates FFI method signature for this method:
   /// - converts all types to FFI types;
   /// - adds "this" argument explicitly if present;
@@ -146,22 +147,42 @@ impl CppMethod {
 
   /// Generates either one or two FFI signatures for this method,
   /// depending on its return type.
-  pub fn to_ffi_signatures(&self) -> Result<Vec<CppMethodWithFfiSignature>> {
-    let places = if self.needs_allocation_place_variants() {
-      vec![ReturnValueAllocationPlace::Heap, ReturnValueAllocationPlace::Stack]
-    } else {
-      vec![ReturnValueAllocationPlace::NotApplicable]
+  pub fn to_ffi_signature(&self,
+                          type_allocation_places: &HashMap<String, CppTypeAllocationPlace>,
+                          type_allocation_places_override: Option<CppTypeAllocationPlace>)
+                          -> Result<CppMethodWithFfiSignature> {
+    let get_place = |name| -> Result<ReturnValueAllocationPlace> {
+      let v = if let Some(ref x) = type_allocation_places_override {
+        x
+      } else {
+        type_allocation_places.get(name)
+          .chain_err(|| format!("no type allocation place for type: '{}'", name))?
+      };
+      Ok(match *v {
+        CppTypeAllocationPlace::Heap => ReturnValueAllocationPlace::Heap,
+        CppTypeAllocationPlace::Stack => ReturnValueAllocationPlace::Stack,
+      })
     };
-    let mut results = Vec::new();
-    for place in places {
-      let c_signature = self.c_signature(place.clone())?;
-      results.push(CppMethodWithFfiSignature {
-        cpp_method: self.clone(),
-        allocation_place: place,
-        c_signature: c_signature,
-      });
-    }
-    Ok(results)
+
+    let place = if self.is_constructor() || self.is_destructor() {
+      let info = self.class_membership.as_ref().expect("class info expected here");
+      get_place(&info.class_type.name)?
+    } else if self.return_type.needs_allocation_place_variants() {
+      if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = self.return_type.base {
+        get_place(name)?
+      } else {
+        return Err(unexpected("class type expected here").into());
+      }
+    } else {
+      ReturnValueAllocationPlace::NotApplicable
+    };
+
+    let c_signature = self.c_signature(place.clone())?;
+    Ok(CppMethodWithFfiSignature {
+      cpp_method: self.clone(),
+      allocation_place: place,
+      c_signature: c_signature,
+    })
   }
 
   pub fn full_name(&self) -> String {

@@ -71,15 +71,15 @@ pub fn core(config: &mut Config) -> Result<()> {
     "QBasicAtomicInteger", "QBasicAtomicInteger", "QBasicAtomicPointer", "QByteArrayDataPtr",
     "QConcatenable", "QConstOverload", "QContiguousCacheData", "QContiguousCacheTypedData",
     "QEnableSharedFromThis", "QException", "QFlag", "QForeachContainer", "QGenericAtomicOps",
-    "QHashData",
+    "qGreater", "QHashData",
     "QHashDummyValue", "QHashNode", "QHashNode", "QIncompatibleFlag", "QInternal", "QJsonValuePtr",
-    "QJsonValueRefPtr", "QLinkedListData", "QLinkedListNode", "QListData", "QMapData",
+    "QJsonValueRefPtr", "qLess", "QLinkedListData", "QLinkedListNode", "QListData", "QMapData",
     "QMapDataBase", "QMapNode",
     "QMapNodeBase", "QMessageLogContext::copy", "QMetaTypeId", "QMetaTypeId2", "QNoDebug",
     "QNonConstOverload", "QObjectData", "QObjectUserData", "QObjectUserData", "QString::Null",
     "QString::vasprintf", "QString::vsprintf", "QStringDataPtr", "Qt::Initialization",
     "qt_check_for_QGADGET_macro", "QtGlobalStatic", "QThreadStorageData", "QtMetaTypePrivate",
-    "QtPrivate", "QtSharedPointer", "QTypedArrayData", "QTypeInfo", "QTypeInfoMerger",
+    "QtPrivate", "QtSharedPointer", "QtStringBuilder", "QTypedArrayData", "QTypeInfo", "QTypeInfoMerger",
     "QTypeInfoQuery", "QVariant::Handler", "QVariant::Private", "QVariant::PrivateShared",
     "QVariantComparisonHelper", "qvsnprintf"
   ]);
@@ -97,13 +97,10 @@ pub fn core(config: &mut Config) -> Result<()> {
                                  &["QAbstractEventDispatcher::TimerInfo", "QCommandLineOption"]);
 
   config.set_types_allocation_place(CppTypeAllocationPlace::Stack, vec![
-    "QByteArray", "QChar", "QItemSelection", "QJsonArray", "QJsonObject", "QJsonParseError",
-    "QJsonValue", "QJsonValueRef", "QList", "QLoggingCategory", "QPointF", "QRegularExpressionMatch",
-    "QString"]);
-
-  // TODO: set type allocation places:
-  // stack: QByteArray, QChar, QItemSelection, QJsonArray, QJsonObject, QJsonParseError,
-  // QJsonValue, QJsonValueRef, QList, QLoggingCategory, QPointF, QRegularExpressionMatch, QString
+    "QAssociativeIterable", "QByteArray", "QChar", "QItemSelection", "QJsonArray",
+    "QJsonObject", "QJsonParseError",
+    "QJsonValue", "QJsonValueRef", "QList", "QLoggingCategory", "QMultiHash",
+    "QPointF", "QRegularExpressionMatch", "QResource", "QSequentialIterable", "QString"]);
 
   config.add_cpp_ffi_generator_filter(Box::new(|method| {
     if let Some(ref info) = method.class_membership {

@@ -13,7 +13,7 @@ use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKin
                 RustMethodArguments, TraitImpl, TraitImplExtra, RustEnumValue,
                 RustProcessedTypeInfo, RustMethodDocItem, RustQtReceiverDeclaration,
                 RustQtReceiverType, RustQtSlotWrapper, RustSingleMethod,
-                RustMethodCaptionStrategy, allocation_place_marker};
+                RustMethodCaptionStrategy};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
 use common::string_utils::{CaseOperations, WordIterator};
@@ -1683,19 +1683,19 @@ impl RustGenerator {
         Err(err) => log::warning(err.to_string()),
       }
     }
-    for (_, mut current_methods) in single_rust_methods {
+    for (_, current_methods) in single_rust_methods {
       assert!(!current_methods.is_empty());
-      for method in &mut current_methods {
-        match method.arguments.cpp_method.allocation_place {
-          ReturnValueAllocationPlace::Stack => {
-            method.arguments.arguments.push(allocation_place_marker("AsStruct")?);
-          }
-          ReturnValueAllocationPlace::Heap => {
-            method.arguments.arguments.push(allocation_place_marker("AsBox")?);
-          }
-          ReturnValueAllocationPlace::NotApplicable => {}
-        }
-      }
+      // for method in &mut current_methods {
+      // match method.arguments.cpp_method.allocation_place {
+      // ReturnValueAllocationPlace::Stack => {
+      // method.arguments.arguments.push(allocation_place_marker("AsStruct")?);
+      // }
+      // ReturnValueAllocationPlace::Heap => {
+      // method.arguments.arguments.push(allocation_place_marker("AsBox")?);
+      // }
+      // ReturnValueAllocationPlace::NotApplicable => {}
+      // }
+      // }
 
       for (name_suffix, overloaded_methods) in self.overload_functions(current_methods)? {
         let (method, type_declaration) =

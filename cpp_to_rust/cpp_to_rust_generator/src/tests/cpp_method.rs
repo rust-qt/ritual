@@ -1,10 +1,9 @@
 use cpp_method::*;
-use cpp_operator::CppOperator;
-use cpp_data::CppVisibility;
+use cpp_data::{CppVisibility, CppTypeAllocationPlace};
 use cpp_type::*;
 use cpp_ffi_data::CppFfiArgumentMeaning;
 use cpp_ffi_data::IndirectionChange;
-
+use std::collections::HashMap;
 
 #[test]
 fn cpp_method_kind() {
@@ -232,59 +231,59 @@ fn argument_types_equal8() {
   assert!(method1.argument_types_equal(&method2));
   assert!(method2.argument_types_equal(&method1));
 }
-
-#[test]
-fn needs_allocation_place_variants() {
-  let mut method1 = empty_regular_method();
-  assert!(!method1.needs_allocation_place_variants());
-  method1.class_membership = Some(empty_membership("Class1"));
-  if let Some(ref mut info) = method1.class_membership {
-    info.kind = CppMethodKind::Constructor;
-  }
-  assert!(method1.needs_allocation_place_variants());
-  if let Some(ref mut info) = method1.class_membership {
-    info.kind = CppMethodKind::Destructor;
-  }
-  assert!(method1.needs_allocation_place_variants());
-  if let Some(ref mut info) = method1.class_membership {
-    info.kind = CppMethodKind::Regular;
-  }
-  method1.operator = Some(CppOperator::Assignment);
-  assert!(!method1.needs_allocation_place_variants());
-  method1.return_type = CppType {
-    indirection: CppTypeIndirection::None,
-    is_const: false,
-    is_const2: false,
-    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-  };
-  assert!(!method1.needs_allocation_place_variants());
-  method1.return_type = CppType {
-    indirection: CppTypeIndirection::None,
-    is_const: false,
-    is_const2: false,
-    base: CppTypeBase::Class(CppTypeClassBase {
-      name: "QRect".to_string(),
-      template_arguments: None,
-    }),
-  };
-  assert!(method1.needs_allocation_place_variants());
-  method1.return_type = CppType {
-    indirection: CppTypeIndirection::Ptr,
-    is_const: false,
-    is_const2: false,
-    base: CppTypeBase::Class(CppTypeClassBase {
-      name: "QRect".to_string(),
-      template_arguments: None,
-    }),
-  };
-  assert!(!method1.needs_allocation_place_variants());
-  if let Some(ref mut info) = method1.class_membership {
-    info.kind = CppMethodKind::Regular;
-  }
-  method1.operator = None;
-  method1.return_type = CppType::void();
-  assert!(!method1.needs_allocation_place_variants());
-}
+// #[test]
+// fn needs_allocation_place_variants() {
+// let mut method1 = empty_regular_method();
+// assert!(!method1.needs_allocation_place_variants());
+// method1.class_membership = Some(empty_membership("Class1"));
+// if let Some(ref mut info) = method1.class_membership {
+// info.kind = CppMethodKind::Constructor;
+// }
+// assert!(method1.needs_allocation_place_variants());
+// if let Some(ref mut info) = method1.class_membership {
+// info.kind = CppMethodKind::Destructor;
+// }
+// assert!(method1.needs_allocation_place_variants());
+// if let Some(ref mut info) = method1.class_membership {
+// info.kind = CppMethodKind::Regular;
+// }
+// method1.operator = Some(CppOperator::Assignment);
+// assert!(!method1.needs_allocation_place_variants());
+// method1.return_type = CppType {
+// indirection: CppTypeIndirection::None,
+// is_const: false,
+// is_const2: false,
+// base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+// };
+// assert!(!method1.needs_allocation_place_variants());
+// method1.return_type = CppType {
+// indirection: CppTypeIndirection::None,
+// is_const: false,
+// is_const2: false,
+// base: CppTypeBase::Class(CppTypeClassBase {
+// name: "QRect".to_string(),
+// template_arguments: None,
+// }),
+// };
+// assert!(method1.needs_allocation_place_variants());
+// method1.return_type = CppType {
+// indirection: CppTypeIndirection::Ptr,
+// is_const: false,
+// is_const2: false,
+// base: CppTypeBase::Class(CppTypeClassBase {
+// name: "QRect".to_string(),
+// template_arguments: None,
+// }),
+// };
+// assert!(!method1.needs_allocation_place_variants());
+// if let Some(ref mut info) = method1.class_membership {
+// info.kind = CppMethodKind::Regular;
+// }
+// method1.operator = None;
+// method1.return_type = CppType::void();
+// assert!(!method1.needs_allocation_place_variants());
+// }
+//
 
 #[test]
 fn c_signature_empty() {
@@ -653,17 +652,25 @@ fn to_ffi_signatures_destructor() {
     info.kind = CppMethodKind::Destructor;
     info
   });
-  let result = method1.to_ffi_signatures().unwrap();
-  assert_eq!(result.len(), 2);
-  assert_eq!(result[0].c_signature,
-             method1.c_signature(ReturnValueAllocationPlace::Heap).unwrap());
-  assert_eq!(result[0].cpp_method, method1);
-  assert_eq!(result[0].allocation_place, ReturnValueAllocationPlace::Heap);
-  assert_eq!(result[1].c_signature,
-             method1.c_signature(ReturnValueAllocationPlace::Stack).unwrap());
-  assert_eq!(result[1].cpp_method, method1);
-  assert_eq!(result[1].allocation_place,
-             ReturnValueAllocationPlace::Stack);
+  {
+    let mut places = HashMap::new();
+    places.insert("MyClass".to_string(), CppTypeAllocationPlace::Heap);
+
+    let result = method1.to_ffi_signature(&places, None).unwrap();
+    assert_eq!(result.c_signature,
+               method1.c_signature(ReturnValueAllocationPlace::Heap).unwrap());
+    assert_eq!(result.cpp_method, method1);
+    assert_eq!(result.allocation_place, ReturnValueAllocationPlace::Heap);
+  }
+  {
+    let mut places = HashMap::new();
+    places.insert("MyClass".to_string(), CppTypeAllocationPlace::Stack);
+    let result = method1.to_ffi_signature(&places, None).unwrap();
+    assert_eq!(result.c_signature,
+               method1.c_signature(ReturnValueAllocationPlace::Stack).unwrap());
+    assert_eq!(result.cpp_method, method1);
+    assert_eq!(result.allocation_place, ReturnValueAllocationPlace::Stack);
+  }
 }
 
 #[test]
@@ -685,12 +692,12 @@ fn to_ffi_signatures_simple_func() {
     name: "arg1".to_string(),
     has_default_value: false,
   });
-  let result = method1.to_ffi_signatures().unwrap();
-  assert_eq!(result.len(), 1);
-  assert_eq!(result[0].c_signature,
+
+  let result = method1.to_ffi_signature(&HashMap::new(), None).unwrap();
+  assert_eq!(result.c_signature,
              method1.c_signature(ReturnValueAllocationPlace::NotApplicable).unwrap());
-  assert_eq!(result[0].cpp_method, method1);
-  assert_eq!(result[0].allocation_place,
+  assert_eq!(result.cpp_method, method1);
+  assert_eq!(result.allocation_place,
              ReturnValueAllocationPlace::NotApplicable);
 }
 

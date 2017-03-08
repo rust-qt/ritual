@@ -9,8 +9,8 @@ use qt_widgets::libc::{c_char, c_int};
 #[test]
 fn push_button1() {
   Application::create_and_exit(|_| {
-    let btn = PushButton::new((&String::from_std_str("first_button"), AsBox));
-    let text = btn.text(AsStruct).to_std_string();
+    let btn = PushButton::new(&String::from_std_str("first_button"));
+    let text = btn.text().to_std_string();
     assert_eq!(&text, "first_button");
     0
   })

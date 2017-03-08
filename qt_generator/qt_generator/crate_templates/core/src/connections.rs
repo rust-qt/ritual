@@ -46,7 +46,6 @@ pub trait Signal: Receiver {
     ::object::Object::connect_static((self.object() as *const ::object::Object,
                                       Self::receiver_id().as_ptr() as *const c_char,
                                       receiver.object() as *const ::object::Object,
-                                      R::receiver_id().as_ptr() as *const c_char,
-                                      ::cpp_utils::AsStruct))
+                                      R::receiver_id().as_ptr() as *const c_char))
   }
 }

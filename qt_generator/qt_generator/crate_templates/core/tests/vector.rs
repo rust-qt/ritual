@@ -1,11 +1,10 @@
 extern crate qt_core;
 
 use qt_core::vector::*;
-use qt_core::cpp_utils::*;
 
 #[test]
 fn vector1() {
-  let mut vec = VectorCInt::new(AsStruct);
+  let mut vec = VectorCInt::new(());
   vec.append(&1);
   vec.append(&2);
   vec.append(&4);

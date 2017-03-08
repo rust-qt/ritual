@@ -485,7 +485,7 @@ impl CppData {
         }
       }
     }
-    log::info("Finished adding inherited methods");
+    //log::info("Finished adding inherited methods");
     Ok(())
   }
 
@@ -752,6 +752,7 @@ impl CppData {
   }
 
   pub fn add_field_accessors(&mut self) -> Result<()> {
+    log::info("Adding field accessors");
     let mut new_methods = Vec::new();
     for type_info in &self.types {
       if let CppTypeKind::Class { ref fields, .. } = type_info.kind {
@@ -889,6 +890,7 @@ impl CppData {
   }
 
   fn add_casts(&mut self) -> Result<()> {
+    log::info("Adding cast functions");
     let mut new_methods = Vec::new();
     for type_info in &self.types {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
@@ -1095,24 +1097,24 @@ impl CppData {
 
     let mut data = HashMap::new();
     for type1 in &self.types {
-      if let CppTypeKind::Class { ref bases, .. } = type1.kind {
-        if self.has_virtual_methods(&type1.name) {
-          if !data.contains_key(&type1.name) {
-            data.insert(type1.name.clone(), TypeStats::default());
-          }
-          data.get_mut(&type1.name).unwrap().has_virtual_methods = true;
+      if self.has_virtual_methods(&type1.name) {
+        if !data.contains_key(&type1.name) {
+          data.insert(type1.name.clone(), TypeStats::default());
         }
-        // for base in bases {
-        // if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
-        // if self.types.iter().any(|t| &t.name == name) {
-        // if !data.contains_key(name) {
-        // data.insert(name.clone(), TypeStats::default());
-        // }
-        // data.get_mut(name).unwrap().has_derived_classes = true;
-        // }
-        // }
-        // }
+        data.get_mut(&type1.name).unwrap().has_virtual_methods = true;
       }
+      // if let CppTypeKind::Class { ref bases, .. } = type1.kind {
+      // for base in bases {
+      // if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
+      // if self.types.iter().any(|t| &t.name == name) {
+      // if !data.contains_key(name) {
+      // data.insert(name.clone(), TypeStats::default());
+      // }
+      // data.get_mut(name).unwrap().has_derived_classes = true;
+      // }
+      // }
+      // }
+      // }
     }
     for method in &self.methods {
       check_type(&method.return_type, &mut data);
@@ -1129,32 +1131,42 @@ impl CppData {
                stats.not_pointers_count);
     }
 
-    for (name, stats) in data {
-      let result = if overrides.contains_key(&name) {
-        overrides[&name].clone()
-      } else if stats.has_virtual_methods {
-        CppTypeAllocationPlace::Heap
-      } else if stats.pointers_count == 0 {
-        CppTypeAllocationPlace::Stack
-      } else {
-        let min_safe_data_count = 5;
-        let min_not_pointers_percent = 0.3;
-        if stats.pointers_count + stats.not_pointers_count < min_safe_data_count {
-          log::warning(format!("Can't determine type allocation place for '{}':", name));
-          log::warning(format!("  Not enough data (pointers={}, not pointers={})",
-                               stats.pointers_count,
-                               stats.not_pointers_count));
-        } else if stats.not_pointers_count as f32 /
-                  (stats.pointers_count + stats.not_pointers_count) as f32 >
-                  min_not_pointers_percent {
-          log::warning(format!("Can't determine type allocation place for '{}':", name));
-          log::warning(format!("  Many not pointers (pointers={}, not pointers={})",
-                               stats.pointers_count,
-                               stats.not_pointers_count));
+    for type1 in &self.types {
+      if !type1.is_class() {
+        continue;
+      }
+      let name = &type1.name;
+      let result = if overrides.contains_key(name) {
+        overrides[name].clone()
+      } else if let Some(ref stats) = data.get(name) {
+        if stats.has_virtual_methods {
+          CppTypeAllocationPlace::Heap
+        } else if stats.pointers_count == 0 {
+          CppTypeAllocationPlace::Stack
+        } else {
+          let min_safe_data_count = 5;
+          let min_not_pointers_percent = 0.3;
+          if stats.pointers_count + stats.not_pointers_count < min_safe_data_count {
+            log::warning(format!("Can't determine type allocation place for '{}':", name));
+            log::warning(format!("  Not enough data (pointers={}, not pointers={})",
+                                 stats.pointers_count,
+                                 stats.not_pointers_count));
+          } else if stats.not_pointers_count as f32 /
+                    (stats.pointers_count + stats.not_pointers_count) as f32 >
+                    min_not_pointers_percent {
+            log::warning(format!("Can't determine type allocation place for '{}':", name));
+            log::warning(format!("  Many not pointers (pointers={}, not pointers={})",
+                                 stats.pointers_count,
+                                 stats.not_pointers_count));
+          }
+          CppTypeAllocationPlace::Heap
         }
+      } else {
+        log::warning(format!("Can't determine type allocation place for '{}' (no data)",
+                             name));
         CppTypeAllocationPlace::Heap
       };
-      results.insert(name, result);
+      results.insert(name.clone(), result);
     }
     log::info(format!("Allocation place is heap for: {}",
                       results.iter()
@@ -1168,7 +1180,6 @@ impl CppData {
                         .join(", ")));
 
     self.type_allocation_places = results;
-    panic!("check me!");
     Ok(())
   }
 

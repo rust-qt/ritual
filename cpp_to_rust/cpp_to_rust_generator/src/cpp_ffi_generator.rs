@@ -1,9 +1,9 @@
 use caption_strategy::{TypeCaptionStrategy, MethodCaptionStrategy};
-use cpp_data::{CppData, CppVisibility, CppFunctionPointerType, create_cast_method};
+use cpp_data::{CppData, CppVisibility, CppFunctionPointerType, create_cast_method,
+               CppTypeAllocationPlace};
 use cpp_type::{CppTypeRole, CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
 use cpp_ffi_data::{CppAndFfiMethod, c_base_name, CppFfiHeaderData, QtSlotWrapper};
-use cpp_method::{CppMethod, CppMethodKind, CppFunctionArgument, CppMethodClassMembership,
-                 ReturnValueAllocationPlace};
+use cpp_method::{CppMethod, CppMethodKind, CppFunctionArgument, CppMethodClassMembership};
 use common::errors::{Result, ChainErr, unexpected};
 use common::log;
 use common::utils::{MapIfOk, add_to_multihash};
@@ -41,6 +41,7 @@ pub fn run(cpp_data: &CppData,
       include_file_base_name = include_file_base_name[0..index].to_string();
     }
     let methods = generator.process_methods(&include_file_base_name,
+                       None,
                        generator.cpp_data
                          .methods
                          .iter()
@@ -120,10 +121,13 @@ impl<'a> CGenerator<'a> {
 
   /// Generates FFI wrappers for all specified methods,
   /// resolving all name conflicts using additional method captions.
-  fn process_methods<'b, I: Iterator<Item = &'b CppMethod>>(&self,
-                                                            include_file_base_name: &str,
-                                                            methods: I)
-                                                            -> Result<Vec<CppAndFfiMethod>> {
+  fn process_methods<'b, I>(&self,
+                            include_file_base_name: &str,
+                            type_allocation_places_override: Option<CppTypeAllocationPlace>,
+                            methods: I)
+                            -> Result<Vec<CppAndFfiMethod>>
+    where I: Iterator<Item = &'b CppMethod>
+  {
     log::info(format!("Generating C++ FFI methods for header: {}",
                       include_file_base_name));
     let mut hash_name_to_methods: HashMap<String, Vec<_>> = HashMap::new();
@@ -134,28 +138,27 @@ impl<'a> CGenerator<'a> {
       if !self.should_process_method(method)? {
         continue;
       }
-      match method.to_ffi_signatures() {
+      match method.to_ffi_signature(&self.cpp_data.type_allocation_places,
+                                    type_allocation_places_override.clone()) {
         Err(msg) => {
           log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
                                method.short_text(),
                                msg));
         }
-        Ok(results) => {
-          for result in results {
-            match c_base_name(&result.cpp_method,
-                              &result.allocation_place,
-                              include_file_base_name) {
-              Err(msg) => {
-                log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
-                                     method.short_text(),
-                                     msg));
-              }
-              Ok(name) => {
+        Ok(result) => {
+          match c_base_name(&result.cpp_method,
+                            &result.allocation_place,
+                            include_file_base_name) {
+            Err(msg) => {
+              log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
+                                   method.short_text(),
+                                   msg));
+            }
+            Ok(name) => {
 
-                add_to_multihash(&mut hash_name_to_methods,
-                                 format!("{}_{}", &self.c_lib_name, name),
-                                 result);
-              }
+              add_to_multihash(&mut hash_name_to_methods,
+                               format!("{}_{}", &self.c_lib_name, name),
+                               result);
             }
           }
         }
@@ -351,10 +354,9 @@ impl<'a> CGenerator<'a> {
     }
     Ok(Some(CppFfiHeaderData {
       include_file_base_name: include_file_name.to_string(),
-      methods: self.process_methods(include_file_name, methods.iter())?
-        .into_iter()
-        .filter(|x| x.allocation_place != ReturnValueAllocationPlace::Stack)
-        .collect(),
+      methods: self.process_methods(include_file_name,
+                         Some(CppTypeAllocationPlace::Heap),
+                         methods.iter())?,
       qt_slot_wrappers: qt_slot_wrappers,
     }))
   }
