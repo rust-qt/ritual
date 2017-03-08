@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 use common::errors::Result;
 use cpp_method::CppMethod;
-use cpp_data::CppData;
+use cpp_data::{CppData};
+pub use cpp_data::CppTypeAllocationPlace;
 use common::cpp_build_config::CppBuildConfig;
+use std::collections::HashMap;
 
 /// Function type used in `Config::add_cpp_ffi_generator_filter`.
 pub type CppFfiGeneratorFilterFn = Fn(&CppMethod) -> Result<bool>;
@@ -149,6 +151,7 @@ pub struct Config {
   cpp_data_filters: Vec<CppDataFilter>,
   cpp_build_config: CppBuildConfig, // TODO: add CppBuildPaths when needed
   write_dependencies_local_paths: bool,
+  type_allocation_places: HashMap<String, CppTypeAllocationPlace>,
 }
 
 impl Config {
@@ -176,6 +179,7 @@ impl Config {
       cpp_ffi_generator_filters: Default::default(),
       cpp_data_filters: Default::default(),
       cpp_build_config: Default::default(),
+      type_allocation_places: Default::default(),
       write_dependencies_local_paths: true,
     }
   }
@@ -294,6 +298,20 @@ impl Config {
     self.cpp_data_filters.push(CppDataFilter(f));
   }
 
+  pub fn set_type_allocation_place<S: Into<String>>(&mut self,
+                                                    place: CppTypeAllocationPlace,
+                                                    type_name: S) {
+    self.type_allocation_places.insert(type_name.into(), place);
+  }
+  pub fn set_types_allocation_place<SI, S>(&mut self, place: CppTypeAllocationPlace, types: SI)
+    where SI: IntoIterator<Item = S>,
+          S: Into<String>
+  {
+    for t in types {
+      self.type_allocation_places.insert(t.into(), place.clone());
+    }
+  }
+
   pub fn set_cpp_build_config(&mut self, cpp_build_config: CppBuildConfig) {
     self.cpp_build_config = cpp_build_config;
   }
@@ -368,6 +386,9 @@ impl Config {
 
   pub fn cpp_build_config(&self) -> &CppBuildConfig {
     &self.cpp_build_config
+  }
+  pub fn type_allocation_places(&self) -> &HashMap<String, CppTypeAllocationPlace> {
+    &self.type_allocation_places
   }
 
   pub fn set_write_dependencies_local_paths(&mut self, value: bool) {

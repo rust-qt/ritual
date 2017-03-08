@@ -140,6 +140,8 @@ fn load_or_create_cpp_data(config: &Config,
     for filter in config.cpp_data_filters() {
       filter(&mut cpp_data).chain_err(|| "cpp_data_filter failed")?;
     }
+    cpp_data.choose_allocation_places(config.type_allocation_places())?;
+
     cpp_data.post_process()?;
 
     save_json(&cpp_data_cache_file_path, &cpp_data)?;

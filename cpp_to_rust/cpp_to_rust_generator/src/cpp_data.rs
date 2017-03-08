@@ -1060,12 +1060,14 @@ impl CppData {
     Ok(())
   }
 
-  fn choose_allocation_places(&mut self) -> Result<()> {
+  pub fn choose_allocation_places(&mut self,
+                                  overrides: &HashMap<String, CppTypeAllocationPlace>)
+                                  -> Result<()> {
     log::info("Detecting type allocation places");
 
     #[derive(Default)]
     struct TypeStats {
-      //has_derived_classes: bool,
+      // has_derived_classes: bool,
       has_virtual_methods: bool,
       pointers_count: i32,
       not_pointers_count: i32,
@@ -1100,17 +1102,16 @@ impl CppData {
           }
           data.get_mut(&type1.name).unwrap().has_virtual_methods = true;
         }
-        /*
-        for base in bases {
-          if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
-            if self.types.iter().any(|t| &t.name == name) {
-              if !data.contains_key(name) {
-                data.insert(name.clone(), TypeStats::default());
-              }
-              data.get_mut(name).unwrap().has_derived_classes = true;
-            }
-          }
-        }*/
+        // for base in bases {
+        // if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
+        // if self.types.iter().any(|t| &t.name == name) {
+        // if !data.contains_key(name) {
+        // data.insert(name.clone(), TypeStats::default());
+        // }
+        // data.get_mut(name).unwrap().has_derived_classes = true;
+        // }
+        // }
+        // }
       }
     }
     for method in &self.methods {
@@ -1129,7 +1130,9 @@ impl CppData {
     }
 
     for (name, stats) in data {
-      let result = if stats.has_virtual_methods {
+      let result = if overrides.contains_key(&name) {
+        overrides[&name].clone()
+      } else if stats.has_virtual_methods {
         CppTypeAllocationPlace::Heap
       } else if stats.pointers_count == 0 {
         CppTypeAllocationPlace::Stack
@@ -1172,7 +1175,6 @@ impl CppData {
   /// Performs data conversion to make it more suitable
   /// for further wrapper generation.
   pub fn post_process(&mut self) -> Result<()> {
-    self.choose_allocation_places()?;
     self.detect_signals_and_slots()?;
     self.ensure_explicit_destructors()?;
     self.generate_methods_with_omitted_args();

@@ -1,5 +1,5 @@
 use cpp_to_rust_common::errors::{Result, ChainErr};
-use cpp_to_rust_generator::config::Config;
+use cpp_to_rust_generator::config::{Config, CppTypeAllocationPlace};
 
 fn exclude_qlist_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(config: &mut Config,
                                                                             types: I) {
@@ -95,6 +95,11 @@ pub fn core(config: &mut Config) -> Result<()> {
   exclude_qvector_eq_based_methods(config, &["QStaticPlugin", "QTimeZone::OffsetData"]);
   exclude_qlist_eq_based_methods(config,
                                  &["QAbstractEventDispatcher::TimerInfo", "QCommandLineOption"]);
+
+  config.set_types_allocation_place(CppTypeAllocationPlace::Stack, vec![
+    "QByteArray", "QChar", "QItemSelection", "QJsonArray", "QJsonObject", "QJsonParseError",
+    "QJsonValue", "QJsonValueRef", "QList", "QLoggingCategory", "QPointF", "QRegularExpressionMatch",
+    "QString"]);
 
   // TODO: set type allocation places:
   // stack: QByteArray, QChar, QItemSelection, QJsonArray, QJsonObject, QJsonParseError,
