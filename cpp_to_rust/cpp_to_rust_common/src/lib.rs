@@ -7,6 +7,10 @@ extern crate serde;
 extern crate serde_json;
 extern crate term_painter;
 extern crate num_cpus;
+
+#[macro_use]
+extern crate lazy_static;
+
 pub extern crate toml;
 
 pub mod log;

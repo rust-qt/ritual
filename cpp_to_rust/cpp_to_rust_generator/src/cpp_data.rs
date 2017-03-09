@@ -365,7 +365,7 @@ impl CppData {
   /// operators are also not added. This reflects C++'s method inheritance rules.
   #[cfg_attr(feature="clippy", allow(block_in_if_condition_stmt))]
   pub fn add_inherited_methods(&mut self) -> Result<()> {
-    log::info("Adding inherited methods");
+    log::status("Adding inherited methods");
     let mut all_new_methods = Vec::new();
     for (is_self, cpp_data) in self.dependencies
       .iter()
@@ -485,7 +485,7 @@ impl CppData {
         }
       }
     }
-    //log::info("Finished adding inherited methods");
+    // log::info("Finished adding inherited methods");
     Ok(())
   }
 
@@ -690,7 +690,7 @@ impl CppData {
   }
 
   fn instantiate_templates(&mut self) -> Result<()> {
-    log::info("Instantiating templates.");
+    log::status("Instantiating templates");
     let mut new_methods = Vec::new();
 
     for cpp_data in self.dependencies.iter().chain(once(self as &_)) {
@@ -752,7 +752,7 @@ impl CppData {
   }
 
   pub fn add_field_accessors(&mut self) -> Result<()> {
-    log::info("Adding field accessors");
+    log::status("Adding field accessors");
     let mut new_methods = Vec::new();
     for type_info in &self.types {
       if let CppTypeKind::Class { ref fields, .. } = type_info.kind {
@@ -890,7 +890,7 @@ impl CppData {
   }
 
   fn add_casts(&mut self) -> Result<()> {
-    log::info("Adding cast functions");
+    log::status("Adding cast functions");
     let mut new_methods = Vec::new();
     for type_info in &self.types {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
@@ -949,7 +949,7 @@ impl CppData {
     if files.is_empty() {
       return Ok(());
     }
-    log::info("Detecting signals and slots");
+    log::status("Detecting signals and slots");
     let re_signals = Regex::new(r"(signals|Q_SIGNALS)\s*:")?;
     let re_slots = Regex::new(r"(slots|Q_SLOTS)\s*:")?;
     let re_other = Regex::new(r"(public|protected|private)\s*:")?;
@@ -957,7 +957,7 @@ impl CppData {
 
     for file_path in files {
       let mut file_sections = Vec::new();
-      log::info(format!("File: {}", &file_path));
+      log::debug(format!("File: {}", &file_path));
       let file = open_file(&file_path)?;
       let reader = BufReader::new(file.into_file());
       for (line_num, line) in reader.lines().enumerate() {
@@ -1002,7 +1002,7 @@ impl CppData {
                   section_type = section.section_type.clone();
                   match section.section_type {
                     SectionType::Signals => {
-                      log::info(format!("Found signal: {}", method.short_text()));
+                      log::debug(format!("Found signal: {}", method.short_text()));
                       let types: Vec<_> =
                         method.arguments.iter().map(|x| x.argument_type.clone()).collect();
                       if !all_types.contains(&types) &&
@@ -1013,7 +1013,7 @@ impl CppData {
                       }
                     }
                     SectionType::Slots => {
-                      log::info(format!("Found slot: {}", method.short_text()));
+                      log::debug(format!("Found slot: {}", method.short_text()));
                     }
                     SectionType::Other => {}
                   }
@@ -1065,7 +1065,7 @@ impl CppData {
   pub fn choose_allocation_places(&mut self,
                                   overrides: &HashMap<String, CppTypeAllocationPlace>)
                                   -> Result<()> {
-    log::info("Detecting type allocation places");
+    log::status("Detecting type allocation places");
 
     #[derive(Default)]
     struct TypeStats {
@@ -1168,12 +1168,12 @@ impl CppData {
       };
       results.insert(name.clone(), result);
     }
-    log::info(format!("Allocation place is heap for: {}",
+    log::debug(format!("Allocation place is heap for: {}",
                       results.iter()
                         .filter(|&(_, v)| v == &CppTypeAllocationPlace::Heap)
                         .map(|(k, _)| k)
                         .join(", ")));
-    log::info(format!("Allocation place is stack for: {}",
+    log::debug(format!("Allocation place is stack for: {}",
                       results.iter()
                         .filter(|&(_, v)| v == &CppTypeAllocationPlace::Stack)
                         .map(|(k, _)| k)

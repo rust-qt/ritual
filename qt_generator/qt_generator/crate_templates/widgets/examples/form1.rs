@@ -28,7 +28,7 @@ fn uref<T>(ptr: *mut T) -> &'static mut T {
 impl<'a> Form<'a> {
   fn new() -> Form<'a> {
     let mut widget = Widget::new();
-    let mut layout = VBoxLayout::new((widget.as_mut_ptr(), ));
+    let mut layout = VBoxLayout::new((widget.as_mut_ptr(),));
     let mut line_edit = LineEdit::new();
     layout.add_widget(line_edit.static_cast_mut() as *mut _);
     let line_edit = line_edit.into_raw();
@@ -51,8 +51,7 @@ impl<'a> Form<'a> {
         let text = uref(line_edit1).text();
         MessageBox::information((widget1,
                                  &String::from_std_str("My title"),
-                                 &String::from_std_str("Text: \"%1\". Congratulations!")
-          .arg(&text)));
+                                 &String::from_std_str("Text: \"%1\". Congratulations!").arg(&text)));
       }),
       line_edit_edited: SlotNoArgs::new(move || {
         uref(button1).set_enabled(!uref(line_edit1).text().is_empty());

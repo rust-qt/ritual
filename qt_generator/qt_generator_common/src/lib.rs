@@ -23,12 +23,12 @@ pub struct InstallationData {
 }
 
 pub fn get_installation_data(sublib_name: &str) -> Result<InstallationData> {
-  log::info("Detecting Qt directories...");
+  log::status("Detecting Qt directories");
 
   let root_include_path = run_qmake_query("QT_INSTALL_HEADERS")?;
-  log::info(format!("QT_INSTALL_HEADERS = \"{}\"", root_include_path.display()));
+  log::status(format!("QT_INSTALL_HEADERS = \"{}\"", root_include_path.display()));
   let lib_path = run_qmake_query("QT_INSTALL_LIBS")?;
-  log::info(format!("QT_INSTALL_LIBS = \"{}\"", lib_path.display()));
+  log::status(format!("QT_INSTALL_LIBS = \"{}\"", lib_path.display()));
   let folder_name = lib_folder_name(sublib_name);
   let dir = root_include_path.with_added(&folder_name);
   if dir.exists() {

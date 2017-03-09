@@ -86,7 +86,7 @@ fn load_or_create_cpp_data(config: &Config,
   let mut loaded_cpp_data = if cpp_data_cache_file_path.as_path().is_file() {
     match load_json(&cpp_data_cache_file_path) {
       Ok(r) => {
-        log::info(format!("C++ data is loaded from file: {}",
+        log::status(format!("C++ data is loaded from file: {}",
                           cpp_data_cache_file_path.display()));
         cpp_data_processed = true;
         Some(r)
@@ -104,7 +104,7 @@ fn load_or_create_cpp_data(config: &Config,
   if loaded_cpp_data.is_none() {
     loaded_cpp_data = match load_json(&raw_cpp_data_cache_file_path) {
       Ok(r) => {
-        log::info(format!("Raw C++ data is loaded from file: {}",
+        log::status(format!("Raw C++ data is loaded from file: {}",
                           cpp_data_cache_file_path.display()));
         Some(r)
       }
@@ -118,7 +118,7 @@ fn load_or_create_cpp_data(config: &Config,
   let mut cpp_data = if let Some(r) = loaded_cpp_data {
     r
   } else {
-    log::info("Running C++ parser.");
+    log::status("Running C++ parser");
     let parser_config = cpp_parser::CppParserConfig {
       include_paths: Vec::from(config.include_paths()),
       framework_paths: Vec::from(config.framework_paths()),
@@ -130,13 +130,14 @@ fn load_or_create_cpp_data(config: &Config,
     };
     let cpp_data =
       cpp_parser::run(parser_config, dependencies_cpp_data).chain_err(|| "C++ parser failed")?;
+    log::status("Saving raw C++ data");
     save_json(&raw_cpp_data_cache_file_path, &cpp_data)?;
-    log::info(format!("Raw C++ data is saved to file: {}",
+    log::status(format!("Raw C++ data is saved to file: {}",
                       raw_cpp_data_cache_file_path.display()));
     cpp_data
   };
   if !cpp_data_processed {
-    log::info("Post-processing parse result.");
+    log::status("Post-processing parse result");
     for filter in config.cpp_data_filters() {
       filter(&mut cpp_data).chain_err(|| "cpp_data_filter failed")?;
     }
@@ -144,9 +145,9 @@ fn load_or_create_cpp_data(config: &Config,
 
     cpp_data.post_process()?;
 
-    log::info("Saving C++ data");
+    log::status("Saving C++ data");
     save_json(&cpp_data_cache_file_path, &cpp_data)?;
-    log::info(format!("C++ data is saved to file: {}",
+    log::status(format!("C++ data is saved to file: {}",
                       cpp_data_cache_file_path.display()));
   };
   Ok(cpp_data)
@@ -164,7 +165,7 @@ pub fn run(config: Config) -> Result<()> {
   let remove_qt_prefix = config.crate_properties().name().starts_with("qt_");
 
   if !config.dependency_cache_paths().is_empty() {
-    log::info("Loading dependencies");
+    log::status("Loading dependencies");
   }
   let mut dependencies = Vec::new();
   let mut dependencies_cpp_data = Vec::new();
@@ -195,14 +196,14 @@ pub fn run(config: Config) -> Result<()> {
     c_lib_path.clone()
   };
   create_dir_all(&c_lib_tmp_path)?;
-  log::info(format!("Generating C wrapper library ({}).", c_lib_name));
+  log::status(format!("Generating C++ wrapper library ({})", c_lib_name));
 
   let cpp_ffi_headers = cpp_ffi_generator::run(&cpp_data,
                                                c_lib_name.clone(),
                                                config.cpp_ffi_generator_filters())
       .chain_err(|| "FFI generator failed")?;
 
-  log::info(format!("Generating C wrapper code."));
+  log::status(format!("Generating C++ wrapper code"));
   let code_gen = CppCodeGenerator::new(c_lib_name.clone(), c_lib_tmp_path.clone());
   code_gen.generate_template_files(config.include_directives())?;
   code_gen.generate_files(&cpp_ffi_headers)?;
@@ -230,7 +231,7 @@ pub fn run(config: Config) -> Result<()> {
   for dep in &dependencies {
     dependency_rust_types.extend_from_slice(&dep.rust_export_info.rust_types);
   }
-  log::info("Preparing Rust functions");
+  log::status("Preparing Rust functions");
   let rust_data = rust_generator::run(CppAndFfiData {
                                         cpp_data: cpp_data,
                                         cpp_ffi_headers: cpp_ffi_headers,
@@ -241,7 +242,7 @@ pub fn run(config: Config) -> Result<()> {
                                         // TODO: more universal prefix removal (#25)
                                         remove_qt_prefix: remove_qt_prefix,
                                       }).chain_err(|| "Rust data generator failed")?;
-  log::info(format!("Generating Rust crate code ({}).",
+  log::status(format!("Generating Rust crate code ({})",
                     &config.crate_properties().name()));
   rust_code_generator::run(rust_config, &rust_data).chain_err(|| "Rust code generator failed")?;
   let mut cpp_type_size_requests = Vec::new();
@@ -266,6 +267,7 @@ pub fn run(config: Config) -> Result<()> {
   }
   {
     let rust_export_path = config.cache_dir_path().with_added("rust_export_info.json");
+    log::status("Saving Rust export info");
     save_json(&rust_export_path,
               &RustExportInfo {
                 crate_name: config.crate_properties().name().clone(),
@@ -273,7 +275,7 @@ pub fn run(config: Config) -> Result<()> {
                 rust_types: rust_data.processed_types,
                 output_path: path_to_str(config.output_dir_path())?.to_string(),
               })?;
-    log::info(format!("Rust export info is saved to file: {}",
+    log::status(format!("Rust export info is saved to file: {}",
                       rust_export_path.display()));
   }
 
@@ -293,6 +295,6 @@ pub fn run(config: Config) -> Result<()> {
               cpp_wrapper_lib_name: c_lib_name,
             })?;
   create_file(completed_marker_path(config.cache_dir_path()))?;
-  log::info("cpp_to_rust generator finished");
+  log::status("cpp_to_rust generator finished");
   Ok(())
 }

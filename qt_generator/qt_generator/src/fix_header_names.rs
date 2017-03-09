@@ -31,7 +31,7 @@ impl HeaderNameMap {
   fn new(headers_dir: &PathBuf) -> Result<HeaderNameMap> {
     let re = ::regex::Regex::new(r#"^#include "([a-zA-Z._]+)"$"#)?;
     let mut map_real_to_all_fancy: HashMap<_, Vec<_>> = HashMap::new();
-    log::info("Detecting fancy Qt header names.");
+    log::status("Detecting fancy Qt header names");
     for header in read_dir(headers_dir)? {
       let header = header?;
       let header_path = header.path();
@@ -68,11 +68,11 @@ impl HeaderNameMap {
           }
         }
         if !ok {
-          log::info(format!("{} -> {:?} (detect failed)", real_header, fancy_headers));
+          log::debug(format!("{} -> {:?} (detect failed)", real_header, fancy_headers));
         }
         result
       };
-      log::info(format!("{} -> {}", real_header, fancy_header));
+      log::debug(format!("{} -> {}", real_header, fancy_header));
       map_real_to_fancy.insert(real_header.clone(), fancy_header);
     }
     Ok(HeaderNameMap {

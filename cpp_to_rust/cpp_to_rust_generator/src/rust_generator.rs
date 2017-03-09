@@ -12,8 +12,7 @@ use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKin
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
                 RustMethodArguments, TraitImpl, TraitImplExtra, RustEnumValue,
                 RustProcessedTypeInfo, RustMethodDocItem, RustQtReceiverDeclaration,
-                RustQtReceiverType, RustQtSlotWrapper, RustSingleMethod,
-                RustMethodCaptionStrategy};
+                RustQtReceiverType, RustQtSlotWrapper, RustSingleMethod, RustMethodCaptionStrategy};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
 use common::string_utils::{CaseOperations, WordIterator};
@@ -287,7 +286,7 @@ pub fn run(input_data: CppAndFfiData,
     module_names.sort();
     let module_count = module_names.len();
     for (i, module_name) in module_names.into_iter().enumerate() {
-      log::info(format!("({}/{}) Generating module: {}",
+      log::status(format!("({}/{}) Generating module: {}",
                         i + 1,
                         module_count,
                         module_name));
@@ -1015,7 +1014,7 @@ impl RustGenerator {
                                  mut cpp_methods: Vec<&'a CppAndFfiMethod>,
                                  module_name: &'b RustName)
                                  -> Result<(Option<RustModule>, Vec<&'a CppAndFfiMethod>)> {
-    log::info(format!("Generating Rust module {}", module_name.full_name(None)));
+    //log::info(format!("Generating Rust module {}", module_name.full_name(None)));
 
     let mut direct_submodules = HashSet::new();
     let mut module = RustModule {
@@ -1718,7 +1717,7 @@ impl RustGenerator {
 
   /// Generates Rust representations of all FFI functions
   pub fn ffi(&self) -> Vec<(String, Vec<RustFFIFunction>)> {
-    log::info("Generating Rust FFI functions.");
+    log::status("Generating Rust FFI functions");
     let mut ffi_functions = Vec::new();
 
     for header in &self.input_data.cpp_ffi_headers {

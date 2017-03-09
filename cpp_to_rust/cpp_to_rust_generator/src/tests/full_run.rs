@@ -55,8 +55,8 @@ fn full_run() {
                                temp_dir.path().with_added("cache"),
                                crate_properties);
   if config.is_completed() {
-    log::info("No processing! cpp_to_rust uses previous results.");
-    log::info(format!("Remove \"{}\" file to force processing.",
+    log::status("No processing! cpp_to_rust uses previous results.");
+    log::status(format!("Remove \"{}\" file to force processing.",
                       config.completed_marker_path().display()));
     return;
   }

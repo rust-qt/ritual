@@ -84,7 +84,7 @@ impl Config {
     let c_lib_install_dir = out_dir.with_added("c_lib_install");
     let manifest_dir = manifest_dir()?;
     let profile = std::env::var("PROFILE").chain_err(|| "PROFILE env var is missing")?;
-    log::info("Building C++ wrapper library.");
+    log::status("Building C++ wrapper library");
     CppLibBuilder {
         cmake_source_dir: manifest_dir.with_added("c_lib"),
         build_dir: out_dir.with_added("c_lib_build"),
@@ -99,7 +99,7 @@ impl Config {
         },
       }.run()?;
     {
-      log::info("Generating ffi.rs file.");
+      log::status("Generating ffi.rs file");
       let mut ffi_file = create_file(out_dir.with_added("ffi.rs"))?;
       for name in cpp_build_config_data.linked_libs() {
         ffi_file.write(format!("#[link(name = \"{}\")]\n", name))?;
@@ -121,7 +121,7 @@ impl Config {
       ffi_file.write(file_to_string(manifest_dir.with_added("src").with_added("ffi.in.rs"))?)?;
     }
     {
-      log::info("Requesting type sizes.");
+      log::status("Requesting type sizes");
       let mut command = Command::new(c_lib_install_dir.with_added("lib")
         .with_added(format!("type_sizes{}", exe_suffix())));
       let mut file = create_file(out_dir.with_added("type_sizes.rs"))?;
@@ -136,7 +136,7 @@ impl Config {
     }
     println!("cargo:rustc-link-search=native={}",
              path_to_str(&c_lib_install_dir.with_added("lib"))?);
-    log::info("cpp_to_rust build script finished.");
+    log::status("cpp_to_rust build script finished.");
     Ok(())
   }
   pub fn run(self) -> ! {

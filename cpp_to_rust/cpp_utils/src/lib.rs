@@ -140,12 +140,10 @@ impl<T> Drop for CppBox<T> {
 }
 
 /// Additional argument for a function that returns a C++ object as Rust struct.
-//pub struct AsStruct;
-
+// pub struct AsStruct;
 /// Additional argument for a function that returns a C++ object as a pointer
 /// enclosed in a CppBox.
-//pub struct AsBox;
-
+// pub struct AsBox;
 /// This module contains `NewUninitialized` trait which should not be used directly.
 pub mod new_uninitialized {
 

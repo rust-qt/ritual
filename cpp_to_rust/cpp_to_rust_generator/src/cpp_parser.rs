@@ -173,7 +173,7 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
     args.push("-F".to_string());
     args.push(str.to_string());
   }
-  log::info(format!("clang arguments: {:?}", args));
+  log::status(format!("clang arguments: {:?}", args));
 
   let tu = index.parser(&config.tmp_cpp_path)
     .arguments(&args)
@@ -202,8 +202,8 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
 }
 
 pub fn run(config: CppParserConfig, dependencies_data: Vec<CppData>) -> Result<CppData> {
-  log::info(get_version());
-  log::info("Initializing clang...");
+  log::status(get_version());
+  log::status("Initializing clang...");
   let (types, methods, insts) = {
     let (mut parser, methods) = run_clang(&config, None, |translation_unit| {
       let mut parser = CppParser {
@@ -211,18 +211,17 @@ pub fn run(config: CppParserConfig, dependencies_data: Vec<CppData>) -> Result<C
         config: config.clone(),
         dependencies_data: &dependencies_data,
       };
-      log::info("Parsing types...");
+      log::status("Parsing types");
       parser.parse_types(translation_unit);
-      log::info("Parsing methods...");
+      log::status("Parsing methods");
       let methods = parser.parse_methods(translation_unit);
       Ok((parser, methods))
     })?;
-    log::info("Checking integrity...");
+    log::status("Checking integrity");
     let (good_methods, good_types) = parser.check_integrity(methods);
     parser.types = good_types;
-    log::info("Searching for template instantiations...");
+    log::status("Searching for template instantiations");
     let template_instantiations = parser.find_template_instantiations(&good_methods);
-    log::info("C++ parser finished.");
     (parser.types, good_methods, template_instantiations)
   };
   Ok(CppData {
@@ -1280,13 +1279,13 @@ impl<'a> CppParser<'a> {
         }
       }
       if self.config.name_blacklist.iter().any(|x| x == &full_name) {
-        log::info(format!("Skipping blacklisted entity: {}", full_name));
+        log::debug(format!("Skipping blacklisted entity: {}", full_name));
         return false;
       }
     }
     if let Some(name) = entity.get_name() {
       if self.config.name_blacklist.iter().any(|x| x == &name) {
-        log::info(format!("Skipping blacklisted entity: {}",
+        log::debug(format!("Skipping blacklisted entity: {}",
                           get_full_name(entity).unwrap_or("?".into())));
         return false;
       }
@@ -1464,7 +1463,7 @@ impl<'a> CppParser<'a> {
   }
 
   fn check_integrity(&self, methods: Vec<CppMethod>) -> (Vec<CppMethod>, Vec<CppTypeData>) {
-    log::info("Checking data integrity");
+    log::status("Checking data integrity");
     let good_methods = methods.into_iter()
       .filter(|method| {
         if let Err(msg) = self.check_type_integrity(&method.return_type

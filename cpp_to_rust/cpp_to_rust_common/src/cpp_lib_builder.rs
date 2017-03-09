@@ -124,14 +124,14 @@ impl CppLibBuilder {
       ::num_cpus::get() as i32
     };
     if target::current_env() == target::Env::Msvc && num_jobs > 1 {
-      log::info("Checking for jom...");
+      log::status("Checking for jom");
       if run_command(&mut Command::new("jom").arg("/version")).is_ok() {
-        log::info("jom will be used instead of nmake.");
+        log::status("jom will be used instead of nmake.");
         make_command_name = "jom";
         make_args.push("/J".to_string());
         make_args.push(num_jobs.to_string());
       } else {
-        log::info("jom not found in PATH. Using nmake.")
+        log::status("jom not found in PATH. Using nmake.")
       }
     }
     if target::current_env() != target::Env::Msvc {

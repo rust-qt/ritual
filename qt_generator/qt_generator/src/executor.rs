@@ -60,12 +60,12 @@ fn exec(sublib_name: &str,
         no_local_paths: bool)
         -> Result<()> {
   if is_completed(&cache_dir) {
-    log::info("No processing! cpp_to_rust uses previous results.");
-    log::info(format!("Remove \"{}\" file to force processing.",
+    log::status("No processing! cpp_to_rust uses previous results.");
+    log::status(format!("Remove \"{}\" file to force processing.",
                       completed_marker_path(&cache_dir).display()));
     return Ok(());
   }
-  log::info(format!("Processing library: {}", sublib_name));
+  log::status(format!("Processing library: {}", sublib_name));
   let qt_lib_name = real_lib_name(sublib_name);
   let mut crate_properties = CrateProperties::new(format!("qt_{}", sublib_name), "0.1.5");
   crate_properties.add_author("Pavel Strakhov <ri@idzaaus.org>");
@@ -83,10 +83,10 @@ fn exec(sublib_name: &str,
   config.add_target_include_path(&installation_data.lib_include_path);
   config.set_write_dependencies_local_paths(!no_local_paths);
   if no_local_paths {
-    log::info("Local paths will not be written to the output crate. Make sure all dependencies \
+    log::status("Local paths will not be written to the output crate. Make sure all dependencies \
                are published before trying to compile the crate.");
   } else {
-    log::info("Output Cargo.toml file will contain local paths of used dependencies \
+    log::status("Output Cargo.toml file will contain local paths of used dependencies \
                (use --no-local-paths to disable).");
   }
   // TODO: does parsing work on MacOS without adding "-F"?
@@ -128,7 +128,7 @@ fn exec(sublib_name: &str,
         for type1 in &mut cpp_data.types {
           match parser.doc_for_type(&type1.name) {
             Ok(doc) => {
-              log::info(format!("Found doc for type: {}", type1.name));
+              log::debug(format!("Found doc for type: {}", type1.name));
               type1.doc = Some(doc.0);
               if let CppTypeKind::Enum { ref mut values } = type1.kind {
                 for value in values {

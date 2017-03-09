@@ -48,7 +48,7 @@ pub fn add_to_multihash<K: Eq + Hash + Clone, T, V: Default + Extend<T>>(hash: &
 
 /// Runs a command and checks that it was successful
 pub fn run_command(command: &mut Command) -> Result<()> {
-  log::info(format!("Executing command: {:?}", command));
+  log::status(format!("Executing command: {:?}", command));
   let status = command.status().chain_err(|| format!("failed to run command: {:?}", command))?;
   if status.success() {
     Ok(())
@@ -59,7 +59,7 @@ pub fn run_command(command: &mut Command) -> Result<()> {
 
 /// Runs a command and returns its stdout if it was successful
 pub fn get_command_output(command: &mut Command) -> Result<String> {
-  log::info(format!("Executing command: {:?}", command));
+  log::status(format!("Executing command: {:?}", command));
   command.stdout(std::process::Stdio::piped());
   command.stderr(std::process::Stdio::piped());
   let output = command.output().chain_err(|| format!("failed to run command: {:?}", command))?;

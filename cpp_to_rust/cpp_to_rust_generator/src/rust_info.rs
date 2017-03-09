@@ -355,4 +355,3 @@ impl RustMethodCaptionStrategy {
     return LIST;
   }
 }
-

@@ -9,8 +9,7 @@ use qt_core::slots::ExternSlotVariantVariantRef;
 
 extern "C" fn value_changed(_data: *mut c_void, value: *const Variant) {
   let value = unsafe { value.as_ref() }.expect("value must not be null");
-  println!("value_changed: {}",
-           value.to_string().to_std_string());
+  println!("value_changed: {}", value.to_string().to_std_string());
 }
 
 #[test]

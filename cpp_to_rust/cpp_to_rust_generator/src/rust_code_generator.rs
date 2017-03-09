@@ -126,7 +126,7 @@ pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) -> Resul
 
   let rustfmt_config_data = if let Some(template_rustfmt_config_path) =
                                    template_rustfmt_config_path {
-    log::info(format!("Using rustfmt config file: {:?}",
+    log::status(format!("Using rustfmt config file: {:?}",
                       template_rustfmt_config_path));
     file_to_string(template_rustfmt_config_path)?
   } else {
@@ -1129,6 +1129,7 @@ pub fn {struct_method}(&self) -> {struct_type} {{
                              src_append_path.display())
             .into());
         }
+        log::status(format!("Adding code from 'src_append' directory"));
         for item in read_dir(template_path.with_added("src_append"))? {
           let item = item?;
           let path = item.path();
@@ -1147,7 +1148,7 @@ pub fn {struct_method}(&self) -> {struct_type} {{
           let mut file = open_file_with_options(output_path,
                                                 ::std::fs::OpenOptions::new().append(true))?;
           file.write(file_to_string(path)?)?;
-          log::info(format!("Adding code from {}", os_str_to_str(&file_name)?));
+
         }
       }
     }

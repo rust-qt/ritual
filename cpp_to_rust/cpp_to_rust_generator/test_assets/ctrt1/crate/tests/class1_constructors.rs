@@ -1,5 +1,5 @@
 extern crate rust_ctrt1;
-use rust_ctrt1::cpp_utils::{CppBox};
+use rust_ctrt1::cpp_utils::CppBox;
 use rust_ctrt1::class1::Class1;
 
 #[test]

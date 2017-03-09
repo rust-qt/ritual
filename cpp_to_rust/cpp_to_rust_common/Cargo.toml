@@ -20,6 +20,7 @@ term-painter = "0.2.3"   # colored output
 num_cpus = "1.0.0"  # detect preferred task count
 
 toml = "0.2" # toml generation and parsing
+lazy_static = "0.2"
 
 [build-dependencies]
 serde_codegen = "0.8"

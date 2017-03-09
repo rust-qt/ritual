@@ -47,7 +47,7 @@ pub fn run(cpp_data: &CppData,
                          .iter()
                          .filter(|x| &x.include_file == include_file))?;
     if methods.is_empty() {
-      log::info(format!("Skipping empty include file {}", include_file));
+      log::debug(format!("Skipping empty include file {}", include_file));
     } else {
       c_headers.push(CppFfiHeaderData {
         include_file_base_name: include_file_base_name,
@@ -73,7 +73,7 @@ impl<'a> CGenerator<'a> {
     for filter in &self.filters {
       let allowed = filter(method).chain_err(|| "cpp_ffi_generator_filter failed")?;
       if !allowed {
-        log::info(format!("Skipping blacklisted method: \n{}\n", method.short_text()));
+        log::debug(format!("Skipping blacklisted method: \n{}\n", method.short_text()));
         return Ok(false);
       }
     }
@@ -128,7 +128,7 @@ impl<'a> CGenerator<'a> {
                             -> Result<Vec<CppAndFfiMethod>>
     where I: Iterator<Item = &'b CppMethod>
   {
-    log::info(format!("Generating C++ FFI methods for header: {}",
+    log::status(format!("Generating C++ FFI methods for header: {}",
                       include_file_base_name));
     let mut hash_name_to_methods: HashMap<String, Vec<_>> = HashMap::new();
     for method in methods {
