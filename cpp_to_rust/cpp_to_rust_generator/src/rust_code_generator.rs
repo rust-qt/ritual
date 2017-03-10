@@ -127,7 +127,7 @@ pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) -> Resul
   let rustfmt_config_data = if let Some(template_rustfmt_config_path) =
                                    template_rustfmt_config_path {
     log::status(format!("Using rustfmt config file: {:?}",
-                      template_rustfmt_config_path));
+                        template_rustfmt_config_path));
     file_to_string(template_rustfmt_config_path)?
   } else {
     include_str!("../templates/crate/rustfmt.toml").to_string()
@@ -1069,7 +1069,7 @@ pub fn {struct_method}(&self) -> {struct_type} {{
   }
 
   fn call_rustfmt(&self, path: &PathBuf) {
-    log::noisy(format!("Formatting {}", path.display()));
+    // log::noisy(format!("Formatting {}", path.display()));
     let result = ::std::panic::catch_unwind(|| {
       rustfmt::format_input(rustfmt::Input::File(path.clone()),
                             &self.rustfmt_config,
@@ -1078,11 +1078,11 @@ pub fn {struct_method}(&self) -> {struct_type} {{
     match result {
       Ok(rustfmt_result) => {
         if rustfmt_result.is_err() {
-          log::warning(format!("rustfmt returned Err on file: {:?}", path));
+          log::error(format!("rustfmt returned Err on file: {:?}", path));
         }
       }
       Err(cause) => {
-        log::warning(format!("rustfmt paniced on file: {:?}: {:?}", path, cause));
+        log::error(format!("rustfmt paniced on file: {:?}: {:?}", path, cause));
       }
     }
     assert!(path.as_path().is_file());

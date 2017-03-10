@@ -68,11 +68,13 @@ impl HeaderNameMap {
           }
         }
         if !ok {
-          log::debug(format!("{} -> {:?} (detect failed)", real_header, fancy_headers));
+          log::llog(log::DebugQtHeaderNames,
+                    || format!("{} -> {:?} (detect failed)", real_header, fancy_headers));
         }
         result
       };
-      log::debug(format!("{} -> {}", real_header, fancy_header));
+      log::llog(log::DebugQtHeaderNames,
+                || format!("{} -> {}", real_header, fancy_header));
       map_real_to_fancy.insert(real_header.clone(), fancy_header);
     }
     Ok(HeaderNameMap {

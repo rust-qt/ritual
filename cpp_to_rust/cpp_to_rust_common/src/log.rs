@@ -4,15 +4,28 @@ use std::fs::OpenOptions;
 use std::path::PathBuf;
 use std::collections::HashMap;
 use std::sync::{Mutex, MutexGuard};
+use std::borrow::Borrow;
+// use ::term_painter::{Color, ToStyle};
+use std;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum LoggerCategory {
   Status,
-  FatalError,
+  Error,
   DebugGeneral,
-  DebugCppParser,
-  DebugCppFfiGenerator,
+  DebugMoveFiles,
+  DebugTemplateInstantiation,
+  DebugInheritance,
+  DebugParserSkips,
+  DebugParser,
+  DebugFfiSkips,
+  DebugSignals,
+  DebugAllocationPlace,
+  DebugRustSkips,
+  DebugQtDoc,
+  DebugQtHeaderNames,
 }
+pub use self::LoggerCategory::*;
 
 #[derive(Debug)]
 pub struct LoggerSettings {
@@ -27,6 +40,11 @@ impl Default for LoggerSettings {
     }
   }
 }
+impl LoggerSettings {
+  fn is_on(&self) -> bool {
+    self.write_to_stderr || self.file_path.is_some()
+  }
+}
 
 #[derive(Default)]
 pub struct Logger {
@@ -35,49 +53,54 @@ pub struct Logger {
   files: HashMap<LoggerCategory, File>,
 }
 
-pub struct SubLogger<'a> {
-  settings: &'a LoggerSettings,
-  file: Option<&'a mut File>,
-}
-
 impl Logger {
   pub fn new() -> Logger {
     Logger::default()
   }
 
-  pub fn get(&mut self, category: LoggerCategory) -> Option<SubLogger> {
+  pub fn is_on(&self, category: LoggerCategory) -> bool {
+    self.settings(category).is_on()
+  }
+
+  pub fn llog<T: Borrow<str>, F: FnOnce() -> T>(&mut self, category: LoggerCategory, f: F) {
     let settings = if let Some(data) = self.category_settings.get(&category) {
       data
     } else {
       &self.default_settings
     };
-    if settings.file_path.is_none() && !settings.write_to_stderr {
-      return None;
+    if !settings.is_on() {
+      return;
     }
-    let file = if let Some(ref path) = settings.file_path {
+    let text = f();
+    if settings.write_to_stderr {
+      std::io::stderr().write(text.borrow().as_bytes()).unwrap();
+      std::io::stderr().write(b"\n").unwrap();
+    }
+    if let Some(ref path) = settings.file_path {
       if !self.files.contains_key(&category) {
-        let file = OpenOptions::new().write(true).append(true).open(path)
-            .unwrap_or_else(|err| panic!("failed to open log file '{}': {}", path.display(), err));
+        let file = OpenOptions::new()
+          .write(true)
+          .create(true)
+          .append(true)
+          .open(path)
+          .unwrap_or_else(|err| panic!("failed to open log file '{}': {}", path.display(), err));
         self.files.insert(category, file);
       }
-      self.files.get_mut(&category)
-    } else {
-      None
-    };
-    Some(SubLogger {
-      settings: settings,
-      file: file,
-    })
-  }
-}
-
-impl<'a> SubLogger<'a> {
-  pub fn log<T: Borrow<str>>(&mut self, text: T) {
-    if self.settings.write_to_stderr {
-      std::io::stderr().write(text.borrow().as_bytes()).unwrap();
-    }
-    if let Some(ref mut file) = self.file {
+      let mut file = self.files.get_mut(&category).unwrap();
       file.write(text.borrow().as_bytes()).unwrap();
+      file.write(b"\n").unwrap();
+    }
+  }
+
+  pub fn log<T: Borrow<str>>(&mut self, category: LoggerCategory, text: T) {
+    self.llog(category, move || text);
+  }
+
+  fn settings(&self, category: LoggerCategory) -> &LoggerSettings {
+    if let Some(data) = self.category_settings.get(&category) {
+      data
+    } else {
+      &self.default_settings
     }
   }
 }
@@ -92,32 +115,17 @@ pub fn default_logger() -> MutexGuard<'static, Logger> {
 }
 
 pub fn status<T: Borrow<str>>(text: T) {
-  if let Some(mut log) = default_logger().get(LoggerCategory::Status) {
-    log.log(text);
-  }
+  default_logger().log(LoggerCategory::Status, text);
 }
-
-
-//use ::term_painter::{Color, ToStyle};
-use std::borrow::Borrow;
-use std;
 
 pub fn error<T: Borrow<str>>(text: T) {
-  // println!("{}", Color::Red.paint(text.borrow()));
-  println!("{}", text.borrow());
-}
-pub fn warning<T: Borrow<str>>(text: T) {
-  if std::env::var("CPP_TO_RUST_QUIET").is_err() {
-    // println!("{}", Color::Magenta.paint(text.borrow()));
-    println!("{}", text.borrow());
-  }
+  default_logger().log(LoggerCategory::Error, text);
 }
 
-pub fn debug<T: Borrow<str>>(text: T) {
-  if std::env::var("CPP_TO_RUST_QUIET").is_err() {
-    println!("{}", text.borrow());
-  }
+pub fn log<T: Borrow<str>>(category: LoggerCategory, text: T) {
+  default_logger().log(category, text);
 }
 
-#[allow(unused_variables)]
-pub fn noisy<T: Borrow<str>>(text: T) {}
+pub fn llog<T: Borrow<str>, F: FnOnce() -> T>(category: LoggerCategory, f: F) {
+  default_logger().llog(category, f);
+}

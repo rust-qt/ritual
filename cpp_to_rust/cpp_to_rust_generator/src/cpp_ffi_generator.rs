@@ -47,7 +47,8 @@ pub fn run(cpp_data: &CppData,
                          .iter()
                          .filter(|x| &x.include_file == include_file))?;
     if methods.is_empty() {
-      log::debug(format!("Skipping empty include file {}", include_file));
+      log::llog(log::DebugFfiSkips,
+                || format!("Skipping empty include file {}", include_file));
     } else {
       c_headers.push(CppFfiHeaderData {
         include_file_base_name: include_file_base_name,
@@ -73,7 +74,8 @@ impl<'a> CGenerator<'a> {
     for filter in &self.filters {
       let allowed = filter(method).chain_err(|| "cpp_ffi_generator_filter failed")?;
       if !allowed {
-        log::debug(format!("Skipping blacklisted method: \n{}\n", method.short_text()));
+        log::llog(log::DebugFfiSkips,
+                  || format!("Skipping blacklisted method: \n{}\n", method.short_text()));
         return Ok(false);
       }
     }
@@ -83,37 +85,44 @@ impl<'a> CGenerator<'a> {
     if let Some(ref membership) = method.class_membership {
       if membership.kind == CppMethodKind::Constructor &&
          self.cpp_data.has_pure_virtual_methods(&class_name) {
-        log::noisy(format!("Method is skipped:\n{}\nConstructors are not allowed for abstract \
-                            classes.\n",
-                           method.short_text()));
+        log::llog(log::DebugFfiSkips, || {
+          format!("Method is skipped:\n{}\nConstructors are not allowed for abstract classes.\n",
+                  method.short_text())
+        });
         return Ok(false);
       }
       if membership.visibility == CppVisibility::Private {
         return Ok(false);
       }
       if membership.visibility == CppVisibility::Protected {
-        log::noisy(format!("Skipping protected method: \n{}\n", method.short_text()));
+        log::llog(log::DebugFfiSkips,
+                  || format!("Skipping protected method: \n{}\n", method.short_text()));
         return Ok(false);
       }
       if membership.is_signal {
-        log::warning(format!("Skipping signal: \n{}\n", method.short_text()));
+        log::llog(log::DebugFfiSkips,
+                  || format!("Skipping signal: \n{}\n", method.short_text()));
         return Ok(false);
       }
     }
     if method.template_arguments.is_some() {
-      log::noisy(format!("Skipping template method: \n{}\n", method.short_text()));
+      log::llog(log::DebugFfiSkips,
+                || format!("Skipping template method: \n{}\n", method.short_text()));
       return Ok(false);
     }
     if method.template_arguments_values.is_some() && !method.is_ffi_whitelisted {
       // TODO: re-enable after template test compilation (#24) is implemented
-      log::noisy(format!("Skipping template method: \n{}\n", method.short_text()));
+      log::llog(log::DebugFfiSkips,
+                || format!("Skipping template method: \n{}\n", method.short_text()));
       return Ok(false);
     }
     if method.all_involved_types()
       .iter()
       .any(|x| x.base.is_or_contains_template_parameter()) {
-      log::noisy(format!("Skipping method containing template parameters: \n{}\n",
-                         method.short_text()));
+      log::llog(log::DebugFfiSkips, || {
+        format!("Skipping method containing template parameters: \n{}\n",
+                method.short_text())
+      });
       return Ok(false);
     }
     Ok(true)
@@ -129,7 +138,7 @@ impl<'a> CGenerator<'a> {
     where I: Iterator<Item = &'b CppMethod>
   {
     log::status(format!("Generating C++ FFI methods for header: {}",
-                      include_file_base_name));
+                        include_file_base_name));
     let mut hash_name_to_methods: HashMap<String, Vec<_>> = HashMap::new();
     for method in methods {
       //      if method.name == "static_cast" {
@@ -141,18 +150,22 @@ impl<'a> CGenerator<'a> {
       match method.to_ffi_signature(&self.cpp_data.type_allocation_places,
                                     type_allocation_places_override.clone()) {
         Err(msg) => {
-          log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
-                               method.short_text(),
-                               msg));
+          log::llog(log::DebugFfiSkips, || {
+            format!("Unable to produce C function for method:\n{}\nError:{}\n",
+                    method.short_text(),
+                    msg)
+          });
         }
         Ok(result) => {
           match c_base_name(&result.cpp_method,
                             &result.allocation_place,
                             include_file_base_name) {
             Err(msg) => {
-              log::warning(format!("Unable to produce C function for method:\n{}\nError:{}\n",
-                                   method.short_text(),
-                                   msg));
+              log::llog(log::DebugFfiSkips, || {
+                format!("Unable to produce C function for method:\n{}\nError:{}\n",
+                        method.short_text(),
+                        msg)
+              });
             }
             Ok(name) => {
 

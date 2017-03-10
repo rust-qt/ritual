@@ -10,7 +10,8 @@ pub fn move_files(src: &PathBuf, dst: &PathBuf) -> Result<()> {
   let err = || format!("failed: move_files({:?}, {:?})", src, dst);
   if src.as_path().is_dir() {
     if !dst.as_path().is_dir() {
-      log::noisy(format!("New dir created: {}", dst.display()));
+      log::llog(log::DebugMoveFiles,
+                || format!("New dir created: {}", dst.display()));
       create_dir(dst).chain_err(&err)?;
     }
 
@@ -19,10 +20,12 @@ pub fn move_files(src: &PathBuf, dst: &PathBuf) -> Result<()> {
       if !src.with_added(item.file_name()).as_path().exists() {
         let path = item.path();
         if path.as_path().is_dir() {
-          log::noisy(format!("Old dir removed: {}", path.display()));
+          log::llog(log::DebugMoveFiles,
+                    || format!("Old dir removed: {}", path.display()));
           remove_dir_all(&path).chain_err(&err)?;
         } else {
-          log::noisy(format!("Old file removed: {}", path.display()));
+          log::llog(log::DebugMoveFiles,
+                    || format!("Old file removed: {}", path.display()));
           remove_file(&path).chain_err(&err)?;
         }
       }
@@ -72,10 +75,12 @@ pub fn move_one_file(old_path: &PathBuf, new_path: &PathBuf) -> Result<()> {
       remove_file(&new_path).chain_err(&err)?;
     }
     rename_file(&old_path, &new_path).chain_err(&err)?;
-    log::noisy(format!("File changed: {}", new_path.display()));
+    log::llog(log::DebugMoveFiles,
+              || format!("File changed: {}", new_path.display()));
   } else {
     remove_file(&old_path).chain_err(&err)?;
-    log::noisy(format!("File not changed: {}", new_path.display()));
+    log::llog(log::DebugMoveFiles,
+              || format!("File not changed: {}", new_path.display()));
   }
   Ok(())
 }

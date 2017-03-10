@@ -264,9 +264,9 @@ pub fn run(input_data: CppAndFfiData,
             t.cpp_name == info.class_type.name &&
             t.cpp_template_arguments == info.class_type.template_arguments
           }) {
-            log::warning("Warning: method is skipped because class type is not \
-                                  available in Rust:");
-            log::warning(format!("{}\n", method.short_text()));
+            log::llog(log::DebugRustSkips,
+                      || "Warning: method is skipped because class type is not available in Rust:");
+            log::llog(log::DebugRustSkips, || format!("{}\n", method.short_text()));
             return false;
           }
         }
@@ -287,9 +287,9 @@ pub fn run(input_data: CppAndFfiData,
     let module_count = module_names.len();
     for (i, module_name) in module_names.into_iter().enumerate() {
       log::status(format!("({}/{}) Generating module: {}",
-                        i + 1,
-                        module_count,
-                        module_name));
+                          i + 1,
+                          module_count,
+                          module_name));
       let full_module_name = RustName::new(vec![generator.config.crate_name.clone(), module_name])?;
       let (module, tmp_cpp_methods) = generator.generate_module(cpp_methods, &full_module_name)?;
       cpp_methods = tmp_cpp_methods;
@@ -298,19 +298,19 @@ pub fn run(input_data: CppAndFfiData,
       }
     }
     if !cpp_methods.is_empty() {
-      log::warning("unprocessed cpp methods left:");
+      log::error("unprocessed cpp methods left:");
       for method in cpp_methods {
-        log::warning(format!("  {}", method.cpp_method.short_text()));
+        log::error(format!("  {}", method.cpp_method.short_text()));
         if let Some(ref info) = method.cpp_method.class_membership {
           let rust_name = calculate_rust_name(&info.class_type.name,
                                               &method.cpp_method.include_file,
                                               false,
                                               None,
                                               &generator.config)?;
-          log::warning(format!("  -> {}", rust_name.full_name(None)));
+          log::error(format!("  -> {}", rust_name.full_name(None)));
         } else {
           let rust_name = generator.calculate_rust_name_for_free_function(&method.cpp_method)?;
-          log::warning(format!("  -> {}", rust_name.full_name(None)));
+          log::error(format!("  -> {}", rust_name.full_name(None)));
         }
       }
       return Err(unexpected("unprocessed cpp methods left").into());
@@ -319,7 +319,7 @@ pub fn run(input_data: CppAndFfiData,
   let mut any_not_declared = false;
   for type1 in &generator.processed_types {
     if !type1.is_declared_in(&modules) {
-      log::warning(format!("type is not processed: {:?}", type1));
+      log::error(format!("type is not processed: {:?}", type1));
       any_not_declared = true;
     }
   }
@@ -496,16 +496,15 @@ fn process_types(input_data: &CppAndFfiData,
   let mut any_success = true;
   while !unnamed_items.is_empty() {
     if !any_success {
-      log::warning("Failed to generate Rust names for template types:");
+      log::error("Failed to generate Rust names for template types:");
       for r in unnamed_items {
-        log::warning(format!("  {:?}\n  {}\n\n",
-                             r,
-                             if let Err(err) = template_final_name(&result, &r) {
-                               err
-                             } else {
-                               return Err("template_final_name must return Err at this stage"
-                                 .into());
-                             }));
+        log::error(format!("  {:?}\n  {}\n\n",
+                           r,
+                           if let Err(err) = template_final_name(&result, &r) {
+                             err
+                           } else {
+                             return Err("template_final_name must return Err at this stage".into());
+                           }));
       }
       break;
     }
@@ -1014,7 +1013,7 @@ impl RustGenerator {
                                  mut cpp_methods: Vec<&'a CppAndFfiMethod>,
                                  module_name: &'b RustName)
                                  -> Result<(Option<RustModule>, Vec<&'a CppAndFfiMethod>)> {
-    //log::info(format!("Generating Rust module {}", module_name.full_name(None)));
+    // log::info(format!("Generating Rust module {}", module_name.full_name(None)));
 
     let mut direct_submodules = HashSet::new();
     let mut module = RustModule {
@@ -1095,7 +1094,8 @@ impl RustGenerator {
     module.types.sort_by(|a, b| a.name.cmp(&b.name));
     module.submodules.sort_by(|a, b| a.name.cmp(&b.name));
     if module.types.is_empty() && module.functions.is_empty() && module.submodules.is_empty() {
-      log::warning(format!("Skipping empty module: {}", module.name));
+      log::llog(log::DebugRustSkips,
+                || format!("Skipping empty module: {}", module.name));
       return Ok((None, cpp_methods));
     }
     Ok((Some(module), cpp_methods))
@@ -1178,9 +1178,12 @@ impl RustGenerator {
           }
         }
         let return_lifetime = if next_lifetime_num == 0 {
-          log::warning(format!("Method returns a reference but doesn't receive a reference: {}",
-                               method.short_text()));
-          log::warning("Assuming static lifetime of return value.");
+          log::llog(log::DebugGeneral, || {
+            format!("Method returns a reference but doesn't receive a reference: {}",
+                    method.short_text())
+          });
+          log::llog(log::DebugGeneral,
+                    || "Assuming static lifetime of return value.");
           "static".to_string()
         } else {
           "l0".to_string()
@@ -1657,7 +1660,8 @@ impl RustGenerator {
         match self.process_destructor(method, scope) {
           Ok(r) => result.trait_impls.push(r),
           Err(msg) => {
-            log::warning(format!("Failed to generate destructor: {}\n{:?}\n", msg, method))
+            log::llog(log::DebugRustSkips,
+                      || format!("Failed to generate destructor: {}\n{:?}\n", msg, method))
           }
         }
         continue;
@@ -1671,7 +1675,8 @@ impl RustGenerator {
             match self.process_cpp_cast(rust_method) {
               Ok(r) => result.trait_impls.push(r),
               Err(msg) => {
-                log::warning(format!("Failed to generate cast wrapper: {}\n{:?}\n", msg, method))
+                log::llog(log::DebugRustSkips,
+                          || format!("Failed to generate cast wrapper: {}\n{:?}\n", msg, method))
               }
             }
           } else {
@@ -1679,7 +1684,10 @@ impl RustGenerator {
             add_to_multihash(&mut single_rust_methods, name, rust_method);
           }
         }
-        Err(err) => log::warning(err.to_string()),
+        Err(err) => {
+          log::llog(log::DebugRustSkips,
+                    || format!("failed to generate Rust function: {}", err))
+        }
       }
     }
     for (_, current_methods) in single_rust_methods {
@@ -1728,9 +1736,11 @@ impl RustGenerator {
             functions.push(function);
           }
           Err(msg) => {
-            log::warning(format!("Can't generate Rust FFI function for method:\n{}\n{}\n",
-                                 method.short_text(),
-                                 msg));
+            log::llog(log::DebugRustSkips, || {
+              format!("Can't generate Rust FFI function for method:\n{}\n{}\n",
+                      method.short_text(),
+                      msg)
+            });
           }
         }
       }

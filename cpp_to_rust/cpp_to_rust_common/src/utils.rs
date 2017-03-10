@@ -67,10 +67,11 @@ pub fn get_command_output(command: &mut Command) -> Result<String> {
     String::from_utf8(output.stdout).chain_err(|| "comand output is not valid unicode")
   } else {
     use std::io::Write;
-    log::error("Stdout:");
-    std::io::stderr().write_all(&output.stdout).chain_err(|| "output failed")?;
-    log::error("Stderr:");
-    std::io::stderr().write_all(&output.stderr).chain_err(|| "output failed")?;
+    let mut stderr = std::io::stderr();
+    writeln!(stderr, "Stdout:")?;
+    stderr.write_all(&output.stdout).chain_err(|| "output failed")?;
+    writeln!(stderr, "Stderr:")?;
+    stderr.write_all(&output.stderr).chain_err(|| "output failed")?;
     Err(format!("command failed with {}: {:?}", output.status, command).into())
   }
 }

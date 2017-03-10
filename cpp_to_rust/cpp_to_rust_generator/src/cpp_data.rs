@@ -56,7 +56,8 @@ fn apply_instantiations_to_method(method: &CppMethod,
                                   -> Result<Vec<CppMethod>> {
   let mut new_methods = Vec::new();
   for ins in template_instantiations {
-    log::noisy(format!("instantiation: {:?}", ins.template_arguments));
+    log::llog(log::DebugTemplateInstantiation,
+              || format!("instantiation: {:?}", ins.template_arguments));
     let mut new_method = method.clone();
     if let Some(ref args) = method.template_arguments {
       if args.nested_level == nested_level {
@@ -112,7 +113,8 @@ fn apply_instantiations_to_method(method: &CppMethod,
       if let Some(conversion_type) = conversion_type {
         new_method.name = format!("operator {}", conversion_type.to_cpp_code(None)?);
       }
-      log::noisy(format!("success: {}", new_method.short_text()));
+      log::llog(log::DebugTemplateInstantiation,
+                || format!("success: {}", new_method.short_text()));
       new_methods.push(new_method);
     }
   }
@@ -277,9 +279,11 @@ impl CppData {
             if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments }) =
                    base.base_type.base {
               if name == base_name {
-                log::noisy(format!("Adding inherited methods from {} to {}",
-                                   base_name,
-                                   type1.name));
+                log::llog(log::DebugInheritance, || {
+                  format!("Adding inherited methods from {} to {}",
+                          base_name,
+                          type1.name)
+                });
                 let derived_name = &type1.name;
                 let base_template_arguments = template_arguments;
                 let base_methods = all_base_methods.into_iter().filter(|method| {
@@ -296,12 +300,16 @@ impl CppData {
                   for dir in using_directives {
                     if &dir.method_name == &base_class_method.name {
                       if &dir.class_name == base_name {
-                        log::noisy(format!("UsingDirective enables inheritance of {}",
-                                           base_class_method.short_text()));
+                        log::llog(log::DebugInheritance, || {
+                          format!("UsingDirective enables inheritance of {}",
+                                  base_class_method.short_text())
+                        });
                         using_directive_enables = true;
                       } else {
-                        log::noisy(format!("UsingDirective disables inheritance of {}",
-                                           base_class_method.short_text()));
+                        log::llog(log::DebugInheritance, || {
+                          format!("UsingDirective disables inheritance of {}",
+                                  base_class_method.short_text())
+                        });
                         using_directive_disables = true;
                       }
                     }
@@ -320,9 +328,12 @@ impl CppData {
                       // disables inheritance of base class method.
                       if !using_directive_enables ||
                          method.argument_types_equal(base_class_method) {
-                        log::noisy("Method is not added because it's overriden in derived class");
-                        log::noisy(format!("Base method: {}", base_class_method.short_text()));
-                        log::noisy(format!("Derived method: {}\n", method.short_text()));
+                        log::llog(log::DebugInheritance,
+                                  || "Method is not added because it's overriden in derived class");
+                        log::llog(log::DebugInheritance,
+                                  || format!("Base method: {}", base_class_method.short_text()));
+                        log::llog(log::DebugInheritance,
+                                  || format!("Derived method: {}\n", method.short_text()));
                         ok = false;
                       }
                       break;
@@ -339,10 +350,13 @@ impl CppData {
                     new_method.origin_location = None;
                     new_method.declaration_code = None;
                     new_method.inheritance_chain.push(base.clone());
-                    log::noisy(format!("Method added: {}", new_method.short_text()));
-                    log::noisy(format!("Base method: {} ({:?})\n",
-                                       base_class_method.short_text(),
-                                       base_class_method.origin_location));
+                    log::llog(log::DebugInheritance,
+                              || format!("Method added: {}", new_method.short_text()));
+                    log::llog(log::DebugInheritance, || {
+                      format!("Base method: {} ({:?})\n",
+                              base_class_method.short_text(),
+                              base_class_method.origin_location)
+                    });
                     current_new_methods.push(new_method.clone());
                   }
                 }
@@ -452,11 +466,12 @@ impl CppData {
             }
           }
           if allow_method {
-            log::noisy("Allowing duplicated inherited method (virtual diamond \
-                                inheritance)");
-            log::noisy(duplicates[0].short_text());
+            log::llog(log::DebugInheritance,
+                      || "Allowing duplicated inherited method (virtual diamond inheritance)");
+            log::llog(log::DebugInheritance, || duplicates[0].short_text());
             for duplicate in &duplicates {
-              log::noisy(format!("  {}", duplicate.inheritance_chain_text()));
+              log::llog(log::DebugInheritance,
+                        || format!("  {}", duplicate.inheritance_chain_text()));
             }
             if let Some(mut final_method) = duplicates.pop() {
               if let Some(ref mut info) = final_method.class_membership {
@@ -469,16 +484,20 @@ impl CppData {
               return Err(unexpected("duplicates can't be empty").into());
             }
           } else {
-            log::noisy("Removed ambiguous inherited methods (presumed inaccessible):");
+            log::llog(log::DebugInheritance,
+                      || "Removed ambiguous inherited methods (presumed inaccessible):");
             if signature_mismatch {
               for duplicate in &duplicates {
-                log::noisy(format!("  {}", duplicate.short_text()));
-                log::noisy(format!("  {}", duplicate.inheritance_chain_text()));
+                log::llog(log::DebugInheritance,
+                          || format!("  {}", duplicate.short_text()));
+                log::llog(log::DebugInheritance,
+                          || format!("  {}", duplicate.inheritance_chain_text()));
               }
             } else {
-              log::noisy(duplicates[0].short_text());
+              log::llog(log::DebugInheritance, || duplicates[0].short_text());
               for duplicate in &duplicates {
-                log::noisy(format!("  {}", duplicate.inheritance_chain_text()));
+                log::llog(log::DebugInheritance,
+                          || format!("  {}", duplicate.inheritance_chain_text()));
               }
             }
           }
@@ -553,7 +572,8 @@ impl CppData {
         }
       }
     } else {
-      log::warning(format!("Unknown type assumed to be non-template: {}", name));
+      log::llog(log::DebugGeneral,
+                || format!("Unknown type assumed to be non-template: {}", name));
     }
     false
   }
@@ -652,7 +672,8 @@ impl CppData {
         return Err("get_all_methods: not a class".into());
       }
     } else {
-      log::warning(format!("get_all_methods: no type info for {:?}", class_name));
+      log::llog(log::DebugGeneral,
+                || format!("get_all_methods: no type info for {:?}", class_name));
     }
     for method in own_methods {
       inherited_methods.push(method);
@@ -710,10 +731,13 @@ impl CppData {
                   } else {
                     return Err("only template parameters can be here".into());
                   };
-                  log::noisy("");
-                  log::noisy(format!("method: {}", method.short_text()));
-                  log::noisy(format!("found template instantiations: {:?}",
-                                     template_instantiations));
+                  log::llog(log::DebugTemplateInstantiation, || "");
+                  log::llog(log::DebugTemplateInstantiation,
+                            || format!("method: {}", method.short_text()));
+                  log::llog(log::DebugTemplateInstantiation, || {
+                    format!("found template instantiations: {:?}",
+                            template_instantiations)
+                  });
                   match apply_instantiations_to_method(method,
                                                        nested_level,
                                                        &template_instantiations.instantiations) {
@@ -725,9 +749,10 @@ impl CppData {
                             Ok(_) => {}
                             Err(msg) => {
                               ok = false;
-                              log::noisy(format!("method is not accepted: {}",
-                                                 method.short_text()));
-                              log::noisy(format!("  {}", msg));
+                              log::llog(log::DebugTemplateInstantiation, || {
+                                format!("method is not accepted: {}", method.short_text())
+                              });
+                              log::llog(log::DebugTemplateInstantiation, || format!("  {}", msg));
                             }
                           }
                         }
@@ -737,7 +762,10 @@ impl CppData {
                       }
                       break;
                     }
-                    Err(msg) => log::noisy(format!("failed: {}", msg)),
+                    Err(msg) => {
+                      log::llog(log::DebugTemplateInstantiation,
+                                || format!("failed: {}", msg))
+                    }
                   }
                   break;
                 }
@@ -957,7 +985,7 @@ impl CppData {
 
     for file_path in files {
       let mut file_sections = Vec::new();
-      log::debug(format!("File: {}", &file_path));
+      // log::debug(format!("File: {}", &file_path));
       let file = open_file(&file_path)?;
       let reader = BufReader::new(file.into_file());
       for (line_num, line) in reader.lines().enumerate() {
@@ -978,7 +1006,7 @@ impl CppData {
           });
         }
       }
-      println!("sections: {:?}", file_sections);
+      // println!("sections: {:?}", file_sections);
       if !file_sections.is_empty() {
         sections.insert(file_path, file_sections);
       }
@@ -1002,7 +1030,8 @@ impl CppData {
                   section_type = section.section_type.clone();
                   match section.section_type {
                     SectionType::Signals => {
-                      log::debug(format!("Found signal: {}", method.short_text()));
+                      log::llog(log::DebugSignals,
+                                || format!("Found signal: {}", method.short_text()));
                       let types: Vec<_> =
                         method.arguments.iter().map(|x| x.argument_type.clone()).collect();
                       if !all_types.contains(&types) &&
@@ -1013,7 +1042,8 @@ impl CppData {
                       }
                     }
                     SectionType::Slots => {
-                      log::debug(format!("Found slot: {}", method.short_text()));
+                      log::llog(log::DebugSignals,
+                                || format!("Found slot: {}", method.short_text()));
                     }
                     SectionType::Other => {}
                   }
@@ -1053,10 +1083,12 @@ impl CppData {
     //    if all_types.is_empty() {
     //      return Ok(());
     //    }
-    println!("Signal argument types:");
+    log::llog(log::DebugSignals, || "Signal argument types:");
     for t in &all_types {
-      println!("  ({})",
-               t.iter().map(|x| x.to_cpp_pseudo_code()).join(", "));
+      log::llog(log::DebugSignals, || {
+        format!("  ({})",
+                t.iter().map(|x| x.to_cpp_pseudo_code()).join(", "))
+      });
     }
     self.signal_argument_types = all_types.into_iter().collect();
     Ok(())
@@ -1123,12 +1155,18 @@ impl CppData {
       }
     }
     let mut results = HashMap::new();
-    for (name, stats) in &data {
-      println!("{}\t{}\t{}\t{}",
-               name,
-               stats.has_virtual_methods,
-               stats.pointers_count,
-               stats.not_pointers_count);
+    {
+      let mut logger = log::default_logger();
+      if logger.is_on(log::DebugAllocationPlace) {
+        for (name, stats) in &data {
+          logger.log(log::DebugAllocationPlace,
+                     format!("{}\t{}\t{}\t{}",
+                             name,
+                             stats.has_virtual_methods,
+                             stats.pointers_count,
+                             stats.not_pointers_count));
+        }
+      }
     }
 
     for type1 in &self.types {
@@ -1147,37 +1185,49 @@ impl CppData {
           let min_safe_data_count = 5;
           let min_not_pointers_percent = 0.3;
           if stats.pointers_count + stats.not_pointers_count < min_safe_data_count {
-            log::warning(format!("Can't determine type allocation place for '{}':", name));
-            log::warning(format!("  Not enough data (pointers={}, not pointers={})",
-                                 stats.pointers_count,
-                                 stats.not_pointers_count));
+            log::llog(log::DebugAllocationPlace,
+                      || format!("Can't determine type allocation place for '{}':", name));
+            log::llog(log::DebugAllocationPlace, || {
+              format!("  Not enough data (pointers={}, not pointers={})",
+                      stats.pointers_count,
+                      stats.not_pointers_count)
+            });
           } else if stats.not_pointers_count as f32 /
                     (stats.pointers_count + stats.not_pointers_count) as f32 >
                     min_not_pointers_percent {
-            log::warning(format!("Can't determine type allocation place for '{}':", name));
-            log::warning(format!("  Many not pointers (pointers={}, not pointers={})",
-                                 stats.pointers_count,
-                                 stats.not_pointers_count));
+            log::llog(log::DebugAllocationPlace,
+                      || format!("Can't determine type allocation place for '{}':", name));
+            log::llog(log::DebugAllocationPlace, || {
+              format!("  Many not pointers (pointers={}, not pointers={})",
+                      stats.pointers_count,
+                      stats.not_pointers_count)
+            });
           }
           CppTypeAllocationPlace::Heap
         }
       } else {
-        log::warning(format!("Can't determine type allocation place for '{}' (no data)",
-                             name));
+        log::llog(log::DebugAllocationPlace, || {
+          format!("Can't determine type allocation place for '{}' (no data)",
+                  name)
+        });
         CppTypeAllocationPlace::Heap
       };
       results.insert(name.clone(), result);
     }
-    log::debug(format!("Allocation place is heap for: {}",
-                      results.iter()
-                        .filter(|&(_, v)| v == &CppTypeAllocationPlace::Heap)
-                        .map(|(k, _)| k)
-                        .join(", ")));
-    log::debug(format!("Allocation place is stack for: {}",
-                      results.iter()
-                        .filter(|&(_, v)| v == &CppTypeAllocationPlace::Stack)
-                        .map(|(k, _)| k)
-                        .join(", ")));
+    log::llog(log::DebugAllocationPlace, || {
+      format!("Allocation place is heap for: {}",
+              results.iter()
+                .filter(|&(_, v)| v == &CppTypeAllocationPlace::Heap)
+                .map(|(k, _)| k)
+                .join(", "))
+    });
+    log::llog(log::DebugAllocationPlace, || {
+      format!("Allocation place is stack for: {}",
+              results.iter()
+                .filter(|&(_, v)| v == &CppTypeAllocationPlace::Stack)
+                .map(|(k, _)| k)
+                .join(", "))
+    });
 
     self.type_allocation_places = results;
     Ok(())

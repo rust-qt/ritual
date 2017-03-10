@@ -4,7 +4,6 @@ use cpp_method::{ReturnValueAllocationPlace, CppFieldAccessorType, FakeCppMethod
 use cpp_type::{CppTypeIndirection, CppTypeBase, CppType};
 use common::errors::{Result, ChainErr, unexpected};
 use common::file_utils::{PathBufWithAdded, create_dir_all, create_file, path_to_str};
-use common::log;
 use common::string_utils::JoinWithString;
 use common::utils::MapIfOk;
 use common::utils::get_command_output;
@@ -379,10 +378,10 @@ impl CppCodeGenerator {
     let cpp_path = self.lib_path
       .with_added("src")
       .with_added(format!("{}_{}.cpp", &self.lib_name, data.include_file_base_name));
-    log::noisy(format!("Generating source file: {:?}", cpp_path));
+    // log::noisy(format!("Generating source file: {:?}", cpp_path));
 
     let h_path = self.lib_path.with_added("include").with_added(&ffi_include_file);
-    log::noisy(format!("Generating header file: {:?}", h_path));
+    // log::noisy(format!("Generating header file: {:?}", h_path));
 
     let mut cpp_file = create_file(&cpp_path)?;
     {

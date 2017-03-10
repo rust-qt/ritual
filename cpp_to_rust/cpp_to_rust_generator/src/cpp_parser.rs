@@ -29,9 +29,9 @@ struct CppParser<'a> {
 #[allow(dead_code)]
 fn dump_entity(entity: Entity, level: i32) {
   for _ in 0..level {
-    print!(". ");
+    log::llog(log::DebugParser, || ". ");
   }
-  println!("{:?}", entity);
+  log::llog(log::DebugParser, || format!("{:?}", entity));
   if level <= 5 {
     for child in entity.get_children() {
       dump_entity(child, level + 1);
@@ -184,9 +184,9 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
   {
     let diagnostics = tu.get_diagnostics();
     if !diagnostics.is_empty() {
-      log::warning("Diagnostics:");
+      log::llog(log::DebugParser, || "Diagnostics:");
       for diag in &diagnostics {
-        log::warning(format!("{}", diag));
+        log::llog(log::DebugParser, || format!("{}", diag));
       }
     }
     if diagnostics.iter().any(|d| {
@@ -942,7 +942,8 @@ impl<'a> CppParser<'a> {
     if name.contains('<') {
       let regex = Regex::new(r"^([\w~]+)<[^<>]+>$")?;
       if let Some(matches) = regex.captures(name.clone().as_ref()) {
-        log::warning(format!("Fixing malformed method name: {}", name));
+        log::llog(log::DebugParser,
+                  || format!("Fixing malformed method name: {}", name));
         name = matches.at(1).chain_err(|| "invalid matches count")?.to_string();
       }
     }
@@ -991,9 +992,11 @@ impl<'a> CppParser<'a> {
     let source_range = entity.get_range().chain_err(|| "failed to get range of the function")?;
     let tokens = source_range.tokenize();
     let declaration_code = if tokens.is_empty() {
-      log::noisy(format!("Failed to tokenize method {} at {:?}",
-                         name_with_namespace,
-                         source_range));
+      log::llog(log::DebugParser, || {
+        format!("Failed to tokenize method {} at {:?}",
+                name_with_namespace,
+                source_range)
+      });
       let start = source_range.get_start().get_file_location();
       let end = source_range.get_end().get_file_location();
       let file = open_file(start.file.get_path())?;
@@ -1031,9 +1034,11 @@ impl<'a> CppParser<'a> {
       if let Some(index) = result.find(';') {
         result = result[0..index].to_string();
       }
-      log::noisy(format!("The code extracted directly from header: {:?}", result));
+      log::llog(log::DebugParser,
+                || format!("The code extracted directly from header: {:?}", result));
       if result.contains("volatile") {
-        log::warning("Warning: volatile method is detected based on source code".to_string());
+        log::llog(log::DebugParser,
+                  || "Warning: volatile method is detected based on source code".to_string());
         return Err("Probably a volatile method.".into());
       }
       Some(result)
@@ -1172,7 +1177,8 @@ impl<'a> CppParser<'a> {
             }) {
               x
             } else {
-              log::warning("Failed to parse UsingDeclaration: class type not found".to_string());
+              log::llog(log::DebugParser,
+                        || "Failed to parse UsingDeclaration: class type not found".to_string());
               dump_entity(child, 0);
               return None;
             };
@@ -1188,7 +1194,8 @@ impl<'a> CppParser<'a> {
         match self.parse_class_field(child) {
           Ok(field) => fields.push(field),
           Err(err) => {
-            log::warning(format!("failed to parse class field: {}", err));
+            log::llog(log::DebugParserSkips,
+                      || format!("failed to parse class field: {}", err));
             err.discard_expected();
           }
         }
@@ -1274,19 +1281,23 @@ impl<'a> CppParser<'a> {
         let file_path_buf = PathBuf::from(&file_path);
         if !self.config.target_include_paths.is_empty() &&
            !self.config.target_include_paths.iter().any(|x| file_path_buf.starts_with(x)) {
-          log::noisy(format!("skipping entities from {}", file_path));
+          log::llog(log::DebugParserSkips,
+                    || format!("skipping entities from {}", file_path));
           return false;
         }
       }
       if self.config.name_blacklist.iter().any(|x| x == &full_name) {
-        log::debug(format!("Skipping blacklisted entity: {}", full_name));
+        log::llog(log::DebugParserSkips,
+                  || format!("Skipping blacklisted entity: {}", full_name));
         return false;
       }
     }
     if let Some(name) = entity.get_name() {
       if self.config.name_blacklist.iter().any(|x| x == &name) {
-        log::debug(format!("Skipping blacklisted entity: {}",
-                          get_full_name(entity).unwrap_or("?".into())));
+        log::llog(log::DebugParserSkips, || {
+          format!("Skipping blacklisted entity: {}",
+                  get_full_name(entity).unwrap_or("?".into()))
+        });
         return false;
       }
     }
@@ -1307,18 +1318,22 @@ impl<'a> CppParser<'a> {
           match self.parse_enum(entity) {
             Ok(r) => {
               if let Some(info) = self.find_type(|x| x.name == r.name).cloned() {
-                log::warning(format!("repeating enum declaration: {:?}\nold declaration: {:?}",
-                                     entity,
-                                     info));
+                log::llog(log::DebugParser, || {
+                  format!("repeating enum declaration: {:?}\nold declaration: {:?}",
+                          entity,
+                          info)
+                });
               } else {
                 self.types.push(r);
               }
             }
             Err(error) => {
-              log::warning(format!("Failed to parse enum: {}\nentity: {:?}\nerror: {}\n",
-                                   get_full_name(entity).unwrap_or("?".into()),
-                                   entity,
-                                   error));
+              log::llog(log::DebugParserSkips, || {
+                format!("Failed to parse enum: {}\nentity: {:?}\nerror: {}\n",
+                        get_full_name(entity).unwrap_or("?".into()),
+                        entity,
+                        error)
+              });
               error.discard_expected();
             }
           }
@@ -1337,18 +1352,22 @@ impl<'a> CppParser<'a> {
           match self.parse_class(entity) {
             Ok(r) => {
               if let Some(info) = self.find_type(|x| x.name == r.name).cloned() {
-                log::warning(format!("repeating class declaration: {:?}\nold declaration: {:?}",
-                                     entity,
-                                     info));
+                log::llog(log::DebugParser, || {
+                  format!("repeating class declaration: {:?}\nold declaration: {:?}",
+                          entity,
+                          info)
+                });
               } else {
                 self.types.push(r);
               }
             }
             Err(msg) => {
-              log::warning(format!("Failed to parse class: {}\nentity: {:?}\nerror: {}\n",
-                                   get_full_name(entity).unwrap_or("?".into()),
-                                   entity,
-                                   msg));
+              log::llog(log::DebugParserSkips, || {
+                format!("Failed to parse class: {}\nentity: {:?}\nerror: {}\n",
+                        get_full_name(entity).unwrap_or("?".into()),
+                        entity,
+                        msg)
+              });
             }
           }
         }
@@ -1357,7 +1376,7 @@ impl<'a> CppParser<'a> {
     }
     for c in entity.get_children() {
       if c.get_kind() == EntityKind::BinaryOperator && c.get_location() == entity.get_location() {
-        log::warning("get_children refers to itself!");
+        log::llog(log::DebugParser, || "get_children refers to itself!");
         continue;
       }
       self.parse_types(c);
@@ -1382,11 +1401,12 @@ impl<'a> CppParser<'a> {
               methods.push(r);
             }
             Err(msg) => {
-              let message = format!("Failed to parse method: {}\nentity: {:?}\nerror: {}\n",
-                                    get_full_name(entity).unwrap_or("?".into()),
-                                    entity,
-                                    msg);
-              log::warning(message.as_ref());
+              log::llog(log::DebugParserSkips, || {
+                format!("Failed to parse method: {}\nentity: {:?}\nerror: {}\n",
+                        get_full_name(entity).unwrap_or("?".into()),
+                        entity,
+                        msg)
+              });
             }
           }
         }
@@ -1401,7 +1421,8 @@ impl<'a> CppParser<'a> {
                    parent_type.base {
               if let Some(ref template_arguments) = *template_arguments {
                 if template_arguments.iter().any(|x| !x.base.is_template_parameter()) {
-                  log::warning(format!("skipping template partial specialization: {}", name));
+                  log::llog(log::DebugParserSkips,
+                            || format!("skipping template partial specialization: {}", name));
                   return methods;
                 }
               }
@@ -1414,7 +1435,7 @@ impl<'a> CppParser<'a> {
     // TODO: check children only if it makes sense for the entity kind
     for c in entity.get_children() {
       if c.get_kind() == EntityKind::BinaryOperator && c.get_location() == entity.get_location() {
-        log::warning("get_children refers to itself!");
+        log::llog(log::DebugParser, || "get_children refers to itself!");
         continue;
       }
       methods.append(&mut self.parse_methods(c));
@@ -1468,12 +1489,14 @@ impl<'a> CppParser<'a> {
       .filter(|method| {
         if let Err(msg) = self.check_type_integrity(&method.return_type
           .clone()) {
-          log::warning(format!("Method is removed: {}: {}", method.short_text(), msg));
+          log::llog(log::DebugParserSkips,
+                    || format!("Method is removed: {}: {}", method.short_text(), msg));
           return false;
         }
         for arg in &method.arguments {
           if let Err(msg) = self.check_type_integrity(&arg.argument_type) {
-            log::warning(format!("Method is removed: {}: {}", method.short_text(), msg));
+            log::llog(log::DebugParserSkips,
+                      || format!("Method is removed: {}: {}", method.short_text(), msg));
             return false;
           }
         }
@@ -1488,11 +1511,12 @@ impl<'a> CppParser<'a> {
         let mut valid_bases = Vec::new();
         for base in bases.iter() {
           if let Err(msg) = self.check_type_integrity(&base.base_type) {
-            log::warning(format!("Class {}: base class removed because type is not available: \
-                                  {:?}: {}",
-                                 t.name,
-                                 base,
-                                 msg));
+            log::llog(log::DebugParserSkips, || {
+              format!("Class {}: base class removed because type is not available: {:?}: {}",
+                      t.name,
+                      base,
+                      msg)
+            });
           } else {
             valid_bases.push(base.clone());
           }
@@ -1503,11 +1527,12 @@ impl<'a> CppParser<'a> {
         let mut valid_fields = Vec::new();
         for field in fields.iter() {
           if let Err(msg) = self.check_type_integrity(&field.field_type) {
-            log::warning(format!("Class {}: field removed because type is not available: \
-                                  {:?}: {}",
-                                 t.name,
-                                 field,
-                                 msg));
+            log::llog(log::DebugParserSkips, || {
+              format!("Class {}: field removed because type is not available: {:?}: {}",
+                      t.name,
+                      field,
+                      msg)
+            });
           } else {
             valid_fields.push(field.clone());
           }
@@ -1536,9 +1561,11 @@ impl<'a> CppParser<'a> {
               })
             }) {
               if !result.iter().any(|x| &x.class_name == name) {
-                log::noisy(format!("Found template instantiation: {}<{:?}>",
-                                   name,
-                                   template_arguments));
+                log::llog(log::DebugParser, || {
+                  format!("Found template instantiation: {}<{:?}>",
+                          name,
+                          template_arguments)
+                });
                 result.push(CppTemplateInstantiations {
                   class_name: name.clone(),
                   instantiations: vec![CppTemplateInstantiation {
@@ -1551,9 +1578,11 @@ impl<'a> CppParser<'a> {
                 if !item.instantiations
                   .iter()
                   .any(|x| &x.template_arguments == template_arguments) {
-                  log::noisy(format!("Found template instantiation: {}<{:?}>",
-                                     name,
-                                     template_arguments));
+                  log::llog(log::DebugParser, || {
+                    format!("Found template instantiation: {}<{:?}>",
+                            name,
+                            template_arguments)
+                  });
                   item.instantiations.push(CppTemplateInstantiation {
                     template_arguments: template_arguments.clone(),
                   });

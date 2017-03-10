@@ -169,14 +169,14 @@ impl DocParser {
       }
     }
     if candidates.len() == 1 {
-      log::warning(format!("\
-          Declaration mismatch ignored because there is only one method.\n\
-          Declaration 1: {}\n\
-          Declaration 2: {}\n\
-          Doc declaration: {:?}\n",
-                           declaration1,
-                           declaration2,
-                           candidates[0].declarations));
+      log::llog(log::DebugQtDoc, || {
+        format!("\
+          Declaration mismatch ignored because there is only one \
+                 method.\nDeclaration 1: {}\nDeclaration 2: {}\nDoc declaration: {:?}\n",
+                declaration1,
+                declaration2,
+                candidates[0].declarations)
+      });
 
       if candidates[0].html.is_empty() {
         return Err("found empty documentation".into());
@@ -189,16 +189,16 @@ impl DocParser {
         cross_references: candidates[0].cross_references.clone(),
       });
     }
-    log::warning(format!("Declaration mismatch!\n\
-          Declaration 1: {}\n\
-          Declaration 2: {}",
-                         declaration1,
-                         declaration2));
-    log::warning("Candidates:");
+    log::llog(log::DebugQtDoc, || {
+      format!("Declaration mismatch!\nDeclaration 1: {}\nDeclaration 2: {}",
+              declaration1,
+              declaration2)
+    });
+    log::llog(log::DebugQtDoc, || "Candidates:");
     for item in &candidates {
-      log::warning(format!("  {:?}", item.declarations));
+      log::llog(log::DebugQtDoc, || format!("  {:?}", item.declarations));
     }
-    log::warning("");
+    log::llog(log::DebugQtDoc, || "");
     Err("Declaration mismatch".into())
   }
 
@@ -367,7 +367,7 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
     let anchor_node = if let Some(r) = anchor.iter().next() {
       r
     } else {
-      log::warning("Failed to get anchor_node");
+      log::llog(log::DebugGeneral, || "Failed to get anchor_node");
       continue;
     };
     let anchor_text = anchor_node.attr("name")
@@ -388,7 +388,8 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
     let mut node = if let Some(r) = h3.next() {
       r
     } else {
-      log::warning("Failed to find element next to h3_node");
+      log::llog(log::DebugGeneral,
+                || "Failed to find element next to h3_node");
       continue;
     };
     let mut enum_variants = Vec::new();

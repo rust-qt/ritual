@@ -62,7 +62,7 @@ fn exec(sublib_name: &str,
   if is_completed(&cache_dir) {
     log::status("No processing! cpp_to_rust uses previous results.");
     log::status(format!("Remove \"{}\" file to force processing.",
-                      completed_marker_path(&cache_dir).display()));
+                        completed_marker_path(&cache_dir).display()));
     return Ok(());
   }
   log::status(format!("Processing library: {}", sublib_name));
@@ -128,28 +128,32 @@ fn exec(sublib_name: &str,
         for type1 in &mut cpp_data.types {
           match parser.doc_for_type(&type1.name) {
             Ok(doc) => {
-              log::debug(format!("Found doc for type: {}", type1.name));
+              // log::debug(format!("Found doc for type: {}", type1.name));
               type1.doc = Some(doc.0);
               if let CppTypeKind::Enum { ref mut values } = type1.kind {
                 for value in values {
                   if let Some(r) = doc.1.iter().find(|x| x.name == value.name) {
                     value.doc = Some(r.html.clone());
                   } else {
-                    log::warning(format!("Not found doc for enum variant: {}::{}",
-                                         type1.name,
-                                         value.name));
+                    let type_name = &type1.name;
+                    log::llog(log::DebugQtDoc, || {
+                      format!("Not found doc for enum variant: {}::{}",
+                              type_name,
+                              &value.name)
+                    });
                   }
                 }
               }
             }
             Err(err) => {
-              log::warning(format!("Not found doc for type: {}: {}", type1.name, err));
+              log::llog(log::DebugQtDoc,
+                        || format!("Not found doc for type: {}: {}", type1.name, err));
             }
           }
         }
       }
       Err(err) => {
-        log::warning(format!("Failed to get Qt documentation: {}", err));
+        log::error(format!("Failed to get Qt documentation: {}", err));
         err.discard_expected();
       }
     }
@@ -178,9 +182,11 @@ fn find_methods_docs(cpp_methods: &mut [CppMethod], data: &mut DocParser) -> Res
                                 &cpp_method.short_text()) {
         Ok(doc) => cpp_method.doc = Some(doc),
         Err(msg) => {
-          log::warning(format!("Failed to get documentation for method: {}: {}",
-                               &cpp_method.short_text(),
-                               msg));
+          log::llog(log::DebugQtDoc, || {
+            format!("Failed to get documentation for method: {}: {}",
+                    &cpp_method.short_text(),
+                    msg)
+          });
         }
       }
     }

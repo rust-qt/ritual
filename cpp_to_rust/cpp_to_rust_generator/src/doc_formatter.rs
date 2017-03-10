@@ -123,7 +123,7 @@ pub fn enum_value_doc(value: &RustEnumValue) -> String {
       .to_string();
   }
   if value.cpp_docs.is_empty() {
-    log::warning("enum_value_doc: cpp_docs is empty");
+    log::llog(log::DebugGeneral, || "enum_value_doc: cpp_docs is empty");
     return String::new();
   }
   if value.cpp_docs.len() > 1 {

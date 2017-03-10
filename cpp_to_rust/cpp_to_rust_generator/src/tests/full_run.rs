@@ -57,7 +57,7 @@ fn full_run() {
   if config.is_completed() {
     log::status("No processing! cpp_to_rust uses previous results.");
     log::status(format!("Remove \"{}\" file to force processing.",
-                      config.completed_marker_path().display()));
+                        config.completed_marker_path().display()));
     return;
   }
   config.add_include_directive("ctrt1/all.h");

@@ -65,12 +65,12 @@ impl Error {
             }
             log::error(format!("{:>w$}: {}", next_frame_num, name, w = 4));
             log::error(format!("      at {}:{}",
-                              path.display(),
-                              if let Some(n) = symbol.lineno() {
-                                n.to_string()
-                              } else {
-                                "<no lineno>".to_string()
-                              }));
+                               path.display(),
+                               if let Some(n) = symbol.lineno() {
+                                 n.to_string()
+                               } else {
+                                 "<no lineno>".to_string()
+                               }));
             log::error("");
             next_frame_num += 1;
           }

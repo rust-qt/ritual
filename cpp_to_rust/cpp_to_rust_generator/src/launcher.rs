@@ -6,6 +6,7 @@ use cpp_ffi_data::CppAndFfiData;
 use cpp_ffi_generator;
 use cpp_parser;
 use common::errors::{Result, ChainErr};
+use common::string_utils::CaseOperations;
 use common::file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json,
                          canonicalize, remove_dir_all, remove_dir, read_dir, create_file,
                          path_to_str};
@@ -87,12 +88,12 @@ fn load_or_create_cpp_data(config: &Config,
     match load_json(&cpp_data_cache_file_path) {
       Ok(r) => {
         log::status(format!("C++ data is loaded from file: {}",
-                          cpp_data_cache_file_path.display()));
+                            cpp_data_cache_file_path.display()));
         cpp_data_processed = true;
         Some(r)
       }
       Err(err) => {
-        log::warning(format!("Failed to load C++ data: {}", err));
+        log::status(format!("Failed to load C++ data: {}", err));
         err.discard_expected();
         None
       }
@@ -105,11 +106,11 @@ fn load_or_create_cpp_data(config: &Config,
     loaded_cpp_data = match load_json(&raw_cpp_data_cache_file_path) {
       Ok(r) => {
         log::status(format!("Raw C++ data is loaded from file: {}",
-                          cpp_data_cache_file_path.display()));
+                            cpp_data_cache_file_path.display()));
         Some(r)
       }
       Err(err) => {
-        log::warning(format!("Failed to load raw C++ data: {}", err));
+        log::status(format!("Failed to load raw C++ data: {}", err));
         err.discard_expected();
         None
       }
@@ -133,7 +134,7 @@ fn load_or_create_cpp_data(config: &Config,
     log::status("Saving raw C++ data");
     save_json(&raw_cpp_data_cache_file_path, &cpp_data)?;
     log::status(format!("Raw C++ data is saved to file: {}",
-                      raw_cpp_data_cache_file_path.display()));
+                        raw_cpp_data_cache_file_path.display()));
     cpp_data
   };
   if !cpp_data_processed {
@@ -148,7 +149,7 @@ fn load_or_create_cpp_data(config: &Config,
     log::status("Saving C++ data");
     save_json(&cpp_data_cache_file_path, &cpp_data)?;
     log::status(format!("C++ data is saved to file: {}",
-                      cpp_data_cache_file_path.display()));
+                        cpp_data_cache_file_path.display()));
   };
   Ok(cpp_data)
 }
@@ -161,6 +162,54 @@ pub fn run(config: Config) -> Result<()> {
     return Ok(());
   }
   check_all_paths(&config)?;
+  {
+    let mut logger = log::default_logger();
+    logger.default_settings.write_to_stderr = false;
+    logger.category_settings.clear();
+    for category in &[log::Status, log::Error] {
+      logger.category_settings.insert(*category,
+                                      log::LoggerSettings {
+                                        file_path: None,
+                                        write_to_stderr: true,
+                                      });
+    }
+    const NO_LOG_VAR_NAME: &'static str = "CPP_TO_RUST_NO_LOG";
+    if ::std::env::var(NO_LOG_VAR_NAME).is_ok() {
+      logger.log(log::Status,
+                 format!("Debug log is disabled with {} env var.", NO_LOG_VAR_NAME));
+    } else {
+      let logs_dir = config.cache_dir_path().with_added("log");
+      logger.log(log::Status,
+                 format!("Debug log will be saved to {}", logs_dir.display()));
+      logger.log(log::Status,
+                 format!("Set {} env var to disable debug log.", NO_LOG_VAR_NAME));
+      if logs_dir.exists() {
+        remove_dir_all(&logs_dir)?;
+      }
+      create_dir_all(&logs_dir)?;
+      for category in &[log::DebugGeneral,
+                        log::DebugMoveFiles,
+                        log::DebugTemplateInstantiation,
+                        log::DebugInheritance,
+                        log::DebugParserSkips,
+                        log::DebugParser,
+                        log::DebugFfiSkips,
+                        log::DebugSignals,
+                        log::DebugAllocationPlace,
+                        log::DebugRustSkips,
+                        log::DebugQtDoc,
+                        log::DebugQtHeaderNames] {
+        let name = format!("{:?}", *category).to_snake_case();
+        let path = logs_dir.with_added(format!("{}.log", name));
+        logger.category_settings.insert(*category,
+                                        log::LoggerSettings {
+                                          file_path: Some(path),
+                                          write_to_stderr: false,
+                                        });
+      }
+    }
+  }
+
   // TODO: allow to remove any prefix through `Config` (#25)
   let remove_qt_prefix = config.crate_properties().name().starts_with("qt_");
 
@@ -243,7 +292,7 @@ pub fn run(config: Config) -> Result<()> {
                                         remove_qt_prefix: remove_qt_prefix,
                                       }).chain_err(|| "Rust data generator failed")?;
   log::status(format!("Generating Rust crate code ({})",
-                    &config.crate_properties().name()));
+                      &config.crate_properties().name()));
   rust_code_generator::run(rust_config, &rust_data).chain_err(|| "Rust code generator failed")?;
   let mut cpp_type_size_requests = Vec::new();
   for type1 in &rust_data.processed_types {
@@ -276,7 +325,7 @@ pub fn run(config: Config) -> Result<()> {
                 output_path: path_to_str(config.output_dir_path())?.to_string(),
               })?;
     log::status(format!("Rust export info is saved to file: {}",
-                      rust_export_path.display()));
+                        rust_export_path.display()));
   }
 
   if output_path_existed {
