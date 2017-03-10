@@ -1374,12 +1374,22 @@ impl<'a> CppParser<'a> {
       }
       _ => {}
     }
-    for c in entity.get_children() {
-      if c.get_kind() == EntityKind::BinaryOperator && c.get_location() == entity.get_location() {
-        log::llog(log::DebugParser, || "get_children refers to itself!");
-        continue;
+    match entity.get_kind() {
+      EntityKind::TranslationUnit |
+      EntityKind::Namespace |
+      EntityKind::StructDecl |
+      EntityKind::ClassDecl |
+      EntityKind::UnexposedDecl |
+      EntityKind::ClassTemplate => {
+        for c in entity.get_children() {
+//          if c.get_kind() == EntityKind::BinaryOperator && c.get_location() == entity.get_location() {
+//            log::llog(log::DebugParser, || "get_children refers to itself!");
+//            continue;
+//          }
+          self.parse_types(c);
+        }
       }
-      self.parse_types(c);
+      _ => {}
     }
   }
 
@@ -1432,14 +1442,24 @@ impl<'a> CppParser<'a> {
       }
       _ => {}
     }
-    // TODO: check children only if it makes sense for the entity kind
-    for c in entity.get_children() {
-      if c.get_kind() == EntityKind::BinaryOperator && c.get_location() == entity.get_location() {
-        log::llog(log::DebugParser, || "get_children refers to itself!");
-        continue;
+    match entity.get_kind() {
+      EntityKind::TranslationUnit |
+      EntityKind::Namespace |
+      EntityKind::StructDecl |
+      EntityKind::ClassDecl |
+      EntityKind::UnexposedDecl |
+      EntityKind::ClassTemplate => {
+        for c in entity.get_children() {
+//          if c.get_kind() == EntityKind::BinaryOperator && c.get_location() == entity.get_location() {
+//            log::llog(log::DebugParser, || "get_children refers to itself!");
+//            continue;
+//          }
+          methods.append(&mut self.parse_methods(c));
+        }
       }
-      methods.append(&mut self.parse_methods(c));
+      _ => {}
     }
+
     methods
   }
 
