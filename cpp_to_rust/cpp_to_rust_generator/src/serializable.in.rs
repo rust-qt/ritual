@@ -357,6 +357,7 @@ pub struct CppMethod {
   /// List of base classes this method was inferited from.
   /// The first item is the most base class.
   pub inheritance_chain: Vec<CppBaseSpecifier>, /* TODO: fill inheritance_chain for explicitly redeclared methods (#23) */
+  pub is_fake_inherited_method: bool,
   /// C++ documentation data for this method
   pub doc: Option<CppMethodDoc>,
   /// If true, FFI generator skips some checks

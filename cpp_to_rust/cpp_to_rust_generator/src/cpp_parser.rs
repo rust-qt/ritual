@@ -1099,6 +1099,7 @@ impl<'a> CppParser<'a> {
       declaration_code: declaration_code,
       doc: None,
       inheritance_chain: Vec::new(),
+      is_fake_inherited_method: false,
       is_ffi_whitelisted: false,
       is_unsafe_static_cast: false,
     })
@@ -1382,10 +1383,10 @@ impl<'a> CppParser<'a> {
       EntityKind::UnexposedDecl |
       EntityKind::ClassTemplate => {
         for c in entity.get_children() {
-//          if c.get_kind() == EntityKind::BinaryOperator && c.get_location() == entity.get_location() {
-//            log::llog(log::DebugParser, || "get_children refers to itself!");
-//            continue;
-//          }
+          //          if c.get_kind() == EntityKind::BinaryOperator && c.get_location() == entity.get_location() {
+          //            log::llog(log::DebugParser, || "get_children refers to itself!");
+          //            continue;
+          //          }
           self.parse_types(c);
         }
       }
@@ -1450,10 +1451,10 @@ impl<'a> CppParser<'a> {
       EntityKind::UnexposedDecl |
       EntityKind::ClassTemplate => {
         for c in entity.get_children() {
-//          if c.get_kind() == EntityKind::BinaryOperator && c.get_location() == entity.get_location() {
-//            log::llog(log::DebugParser, || "get_children refers to itself!");
-//            continue;
-//          }
+          //          if c.get_kind() == EntityKind::BinaryOperator && c.get_location() == entity.get_location() {
+          //            log::llog(log::DebugParser, || "get_children refers to itself!");
+          //            continue;
+          //          }
           methods.append(&mut self.parse_methods(c));
         }
       }

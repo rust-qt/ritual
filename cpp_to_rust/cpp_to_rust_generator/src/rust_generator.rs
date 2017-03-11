@@ -450,6 +450,7 @@ fn process_types(input_data: &CppAndFfiData,
                                         dependency_types,
                                         &x.to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
                                         &CppFfiArgumentMeaning::Argument(0),
+                                        true,
                                         &ReturnValueAllocationPlace::NotApplicable)?;
           arg_captions.push(rust_type.rust_api_type.caption()?.to_class_case());
         }
@@ -535,6 +536,7 @@ fn process_types(input_data: &CppAndFfiData,
                                         dependency_types,
                                         x,
                                         &CppFfiArgumentMeaning::Argument(0),
+                                        false,
                                         &ReturnValueAllocationPlace::NotApplicable)?;
           rust_type.rust_api_type.caption()
         })?;
@@ -563,6 +565,7 @@ fn process_types(input_data: &CppAndFfiData,
                                           dependency_types,
                                           t,
                                           &CppFfiArgumentMeaning::Argument(0),
+                                          false,
                                           &ReturnValueAllocationPlace::NotApplicable)?;
                 t.rust_api_type = t.rust_api_type.with_lifetime("static".to_string());
                 Ok(t)
@@ -596,6 +599,7 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
                  dependency_types: &[RustProcessedTypeInfo],
                  cpp_ffi_type: &CppFfiType,
                  argument_meaning: &CppFfiArgumentMeaning,
+                 is_template_argument: bool,
                  allocation_place: &ReturnValueAllocationPlace)
                  -> Result<CompleteType> {
   let rust_ffi_type = ffi_type(processed_types, dependency_types, &cpp_ffi_type.ffi_type)?;
@@ -663,10 +667,12 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
             }
           }
         } else {
-          *indirection = RustTypeIndirection::Ref { lifetime: None };
-          *is_const = true;
-          *is_const2 = true;
-          rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
+          if !is_template_argument {
+            *indirection = RustTypeIndirection::Ref { lifetime: None };
+            *is_const = true;
+            *is_const2 = true;
+            rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
+          }
         }
       }
       IndirectionChange::ReferenceToPointer => {
@@ -948,6 +954,7 @@ impl RustGenerator {
                                        &arg.argument_type
                                          .to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
                                        &CppFfiArgumentMeaning::Argument(0),
+                                       false,
                                        &ReturnValueAllocationPlace::NotApplicable)
                         ?
                         .rust_api_type
@@ -1122,6 +1129,7 @@ impl RustGenerator {
                                      &self.dependency_types,
                                      &arg.argument_type,
                                      &arg.meaning,
+                                     false,
                                      &method.allocation_place)?;
         arguments.push(RustMethodArgument {
           ffi_index: Some(arg_index as i32),
@@ -1146,6 +1154,7 @@ impl RustGenerator {
                      &self.dependency_types,
                      &arg.argument_type,
                      &arg.meaning,
+                     false,
                      &method.allocation_place)?,
        Some(arg_index as i32))
     } else {
@@ -1155,6 +1164,7 @@ impl RustGenerator {
                                       &self.dependency_types,
                                       &method.c_signature.return_type,
                                       &CppFfiArgumentMeaning::ReturnValue,
+                                      false,
                                       &method.allocation_place)?;
       (return_type, None)
     };

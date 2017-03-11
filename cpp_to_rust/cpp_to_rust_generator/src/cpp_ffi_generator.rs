@@ -70,6 +70,9 @@ impl<'a> CGenerator<'a> {
   /// Returns false if the method is excluded from processing
   /// for some reason
   fn should_process_method(&self, method: &CppMethod) -> Result<bool> {
+    if method.is_fake_inherited_method {
+      return Ok(false);
+    }
     let class_name = method.class_name().unwrap_or(&String::new()).clone();
     for filter in &self.filters {
       let allowed = filter(method).chain_err(|| "cpp_ffi_generator_filter failed")?;
@@ -290,6 +293,7 @@ impl<'a> CGenerator<'a> {
           inheritance_chain: Vec::new(),
           is_ffi_whitelisted: false,
           is_unsafe_static_cast: false,
+          is_fake_inherited_method: false,
         }
       };
       methods.push(create_function(CppMethodKind::Constructor,

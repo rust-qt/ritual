@@ -78,6 +78,7 @@ fn simple_func() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
+               is_fake_inherited_method: false,
                allows_variadic_arguments: false,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -119,6 +120,7 @@ fn simple_func_with_default_value() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
+               is_fake_inherited_method: false,
                allows_variadic_arguments: false,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -197,6 +199,7 @@ fn functions_with_class_arg() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
+               is_fake_inherited_method: false,
                allows_variadic_arguments: false,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -233,6 +236,7 @@ fn functions_with_class_arg() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
+               is_fake_inherited_method: false,
                allows_variadic_arguments: false,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -269,6 +273,7 @@ fn functions_with_class_arg() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
+               is_fake_inherited_method: false,
                allows_variadic_arguments: false,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -318,6 +323,7 @@ fn variadic_func() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
+               is_fake_inherited_method: false,
                allows_variadic_arguments: true,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -365,6 +371,7 @@ fn free_template_func() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
+               is_fake_inherited_method: false,
                allows_variadic_arguments: false,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -430,6 +437,7 @@ fn free_func_operator_sub() {
                  arguments_before_omitting: None,
                  doc: None,
                  inheritance_chain: Vec::new(),
+                 is_fake_inherited_method: false,
                  allows_variadic_arguments: false,
                  include_file: "myfakelib.h".to_string(),
                  origin_location: None,
@@ -500,6 +508,7 @@ fn simple_class_method() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
+               is_fake_inherited_method: false,
                allows_variadic_arguments: false,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -668,6 +677,7 @@ fn template_class_method() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
+               is_fake_inherited_method: false,
                allows_variadic_arguments: false,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -1128,7 +1138,7 @@ fn template_class_with_base() {
   let data = run_parser("
   template<class T>
   class C1 {};
-  
+
   template<class T>
   class C2: public C1<T> {};
   ");

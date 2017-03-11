@@ -45,6 +45,7 @@ pub fn create_cast_method(name: &str,
     declaration_code: None,
     doc: None,
     inheritance_chain: Vec::new(),
+    is_fake_inherited_method: false,
     is_ffi_whitelisted: true,
     is_unsafe_static_cast: is_unsafe_static_cast,
   }
@@ -256,6 +257,7 @@ impl CppData {
             declaration_code: None,
             doc: None,
             inheritance_chain: Vec::new(),
+            is_fake_inherited_method: false,
             is_ffi_whitelisted: false,
             is_unsafe_static_cast: false,
           });
@@ -350,6 +352,7 @@ impl CppData {
                     new_method.origin_location = None;
                     new_method.declaration_code = None;
                     new_method.inheritance_chain.push(base.clone());
+                    new_method.is_fake_inherited_method = true;
                     log::llog(log::DebugInheritance,
                               || format!("Method added: {}", new_method.short_text()));
                     log::llog(log::DebugInheritance, || {
@@ -821,6 +824,7 @@ impl CppData {
                 declaration_code: None,
                 doc: None,
                 inheritance_chain: Vec::new(),
+                is_fake_inherited_method: false,
                 is_ffi_whitelisted: false,
                 is_unsafe_static_cast: false,
               })
