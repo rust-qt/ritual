@@ -76,12 +76,13 @@ pub fn core(config: &mut Config) -> Result<()> {
     "QJsonValueRefPtr", "qLess", "QLinkedListData", "QLinkedListNode", "QListData", "QMapData",
     "QMapDataBase", "QMapNode",
     "QMapNodeBase", "QMessageLogContext::copy", "QMetaTypeId", "QMetaTypeId2", "QNoDebug",
-    "QNonConstOverload", "QObjectData", "QObjectUserData", "QObjectUserData", "QString::Null",
+    "QNonConstOverload", "QObjectData", "QObjectUserData", "QObjectUserData", "QScopedPointerPodDeleter",
+    "QString::Null",
     "QString::vasprintf", "QString::vsprintf", "QStringDataPtr", "Qt::Initialization",
     "qt_check_for_QGADGET_macro", "QtGlobalStatic", "QThreadStorageData", "QtMetaTypePrivate",
     "QtPrivate", "QtSharedPointer", "QtStringBuilder", "QTypedArrayData", "QTypeInfo", "QTypeInfoMerger",
     "QTypeInfoQuery", "QVariant::Handler", "QVariant::Private", "QVariant::PrivateShared",
-    "QVariantComparisonHelper", "qvsnprintf"
+    "QVariantComparisonHelper", "qvsnprintf", "QUnhandledException"
   ]);
 
   // TODO: the following items should be conditionally available on Windows
@@ -91,6 +92,10 @@ pub fn core(config: &mut Config) -> Result<()> {
                                            "QProcess::setNativeArguments",
                                            "QProcess::createProcessArgumentsModifier",
                                            "QProcess::setCreateProcessArgumentsModifier"]);
+
+  // QProcess::pid returns different types on different platforms,
+  // but this method is obsolete anyway
+  config.add_cpp_parser_blocked_names(vec!["QProcess::pid"]);
 
   exclude_qvector_eq_based_methods(config, &["QStaticPlugin", "QTimeZone::OffsetData"]);
   exclude_qlist_eq_based_methods(config,
