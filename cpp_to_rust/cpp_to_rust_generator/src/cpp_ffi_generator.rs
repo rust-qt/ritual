@@ -293,6 +293,7 @@ impl<'a> CGenerator<'a> {
           inheritance_chain: Vec::new(),
           is_ffi_whitelisted: false,
           is_unsafe_static_cast: false,
+          is_direct_static_cast: false,
           is_fake_inherited_method: false,
         }
       };
@@ -367,6 +368,7 @@ impl<'a> CGenerator<'a> {
                                       &cast_from,
                                       &cast_to,
                                       false,
+                                      true,
                                       include_file_name));
     }
     Ok(Some(CppFfiHeaderData {

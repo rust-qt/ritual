@@ -757,6 +757,11 @@ impl<'a> RustCodeGenerator<'a> {
   fn generate_trait_impls(&self, trait_impls: &[TraitImpl]) -> Result<String> {
     let mut results = Vec::new();
     for trait1 in trait_impls {
+      let associated_types_text = trait1.associated_types
+        .iter()
+        .map(|t| format!("type {} = {};", t.name, self.rust_type_to_code(&t.value)))
+        .join("\n");
+
       let trait_content = if let Some(TraitImplExtra::CppDeletable { ref deleter_name }) =
                                  trait1.extra {
         format!("fn deleter() -> ::cpp_utils::Deleter<Self> {{\n  ::ffi::{}\n}}\n",
@@ -767,9 +772,10 @@ impl<'a> RustCodeGenerator<'a> {
           .map_if_ok(|method| self.generate_rust_final_function(method))?
           .join("")
       };
-      results.push(format!("impl {} for {} {{\n{}}}\n\n",
+      results.push(format!("impl {} for {} {{\n{}{}}}\n\n",
                            self.rust_type_to_code(&trait1.trait_type),
                            self.rust_type_to_code(&trait1.target_type),
+                           associated_types_text,
                            trait_content));
     }
     Ok(results.join(""))

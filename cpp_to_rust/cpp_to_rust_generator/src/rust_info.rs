@@ -261,8 +261,15 @@ pub enum TraitImplExtra {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub struct TraitAssociatedType {
+  pub name: String,
+  pub value: RustType,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TraitImpl {
   pub target_type: RustType,
+  pub associated_types: Vec<TraitAssociatedType>,
   pub trait_type: RustType,
   pub extra: Option<TraitImplExtra>,
   pub methods: Vec<RustMethod>,

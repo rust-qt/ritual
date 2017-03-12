@@ -1102,6 +1102,7 @@ impl<'a> CppParser<'a> {
       is_fake_inherited_method: false,
       is_ffi_whitelisted: false,
       is_unsafe_static_cast: false,
+      is_direct_static_cast: false,
     })
   }
 

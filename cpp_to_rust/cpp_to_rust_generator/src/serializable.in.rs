@@ -364,6 +364,7 @@ pub struct CppMethod {
   pub is_ffi_whitelisted: bool,
   // If true, this is an unsafe (from base to derived) static_cast wrapper.
   pub is_unsafe_static_cast: bool,
+  pub is_direct_static_cast: bool,
 }
 
 // ------------------------------

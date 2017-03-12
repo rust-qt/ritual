@@ -24,6 +24,7 @@ pub fn create_cast_method(name: &str,
                           from: &CppType,
                           to: &CppType,
                           is_unsafe_static_cast: bool,
+                          is_direct_static_cast: bool,
                           include_file: &str)
                           -> CppMethod {
   CppMethod {
@@ -48,6 +49,7 @@ pub fn create_cast_method(name: &str,
     is_fake_inherited_method: false,
     is_ffi_whitelisted: true,
     is_unsafe_static_cast: is_unsafe_static_cast,
+    is_direct_static_cast: is_direct_static_cast,
   }
 }
 
@@ -260,6 +262,7 @@ impl CppData {
             is_fake_inherited_method: false,
             is_ffi_whitelisted: false,
             is_unsafe_static_cast: false,
+            is_direct_static_cast: false,
           });
         }
       }
@@ -827,6 +830,7 @@ impl CppData {
                 is_fake_inherited_method: false,
                 is_ffi_whitelisted: false,
                 is_unsafe_static_cast: false,
+                is_direct_static_cast: false,
               })
             };
           if field.visibility == CppVisibility::Public {
@@ -872,7 +876,8 @@ impl CppData {
 
   fn add_casts_one(&self,
                    target_type: &CppTypeClassBase,
-                   base_type: &CppType)
+                   base_type: &CppType,
+                   is_direct: bool)
                    -> Result<Vec<CppMethod>> {
     let type_info = self.find_type_info(|x| x.name == target_type.name)
       .chain_err(|| "type info not found")?;
@@ -893,17 +898,20 @@ impl CppData {
                                         &base_ptr_type,
                                         &target_ptr_type,
                                         true,
+                                        is_direct,
                                         &type_info.include_file));
     new_methods.push(create_cast_method("static_cast",
                                         &target_ptr_type,
                                         &base_ptr_type,
                                         false,
+                                        is_direct,
                                         &type_info.include_file));
     if let CppTypeBase::Class(ref base) = base_type.base {
       if self.is_polymorphic_type(&base.name) {
         new_methods.push(create_cast_method("dynamic_cast",
                                             &base_ptr_type,
                                             &target_ptr_type,
+                                            false,
                                             false,
                                             &type_info.include_file));
       }
@@ -913,7 +921,7 @@ impl CppData {
       if let Some(type_info) = self.find_type_info(|x| x.name == base.name) {
         if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
           for base in bases {
-            new_methods.append(&mut self.add_casts_one(target_type, &base.base_type)?);
+            new_methods.append(&mut self.add_casts_one(target_type, &base.base_type, false)?);
           }
         }
       }
@@ -927,8 +935,9 @@ impl CppData {
     for type_info in &self.types {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
         let t = type_info.default_class_type()?;
+        let single_base = bases.len() == 1;
         for base in bases {
-          new_methods.append(&mut self.add_casts_one(&t, &base.base_type)?);
+          new_methods.append(&mut self.add_casts_one(&t, &base.base_type, single_base)?);
         }
       }
     }

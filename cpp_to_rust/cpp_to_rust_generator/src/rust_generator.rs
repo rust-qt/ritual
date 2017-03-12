@@ -12,7 +12,8 @@ use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKin
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
                 RustMethodArguments, TraitImpl, TraitImplExtra, RustEnumValue,
                 RustProcessedTypeInfo, RustMethodDocItem, RustQtReceiverDeclaration,
-                RustQtReceiverType, RustQtSlotWrapper, RustSingleMethod, RustMethodCaptionStrategy};
+                RustQtReceiverType, RustQtSlotWrapper, RustSingleMethod,
+                RustMethodCaptionStrategy, TraitAssociatedType};
 use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFunction,
                 RustFFIArgument, RustToCTypeConversion};
 use common::string_utils::{CaseOperations, WordIterator};
@@ -1319,6 +1320,7 @@ impl RustGenerator {
           method.scope = RustMethodScope::TraitImpl;
           Ok(TraitImpl {
             target_type: target_type.clone(),
+            associated_types: Vec::new(),
             trait_type: RustType::Common {
               base: RustName::new(vec!["Drop".to_string()])?,
               indirection: RustTypeIndirection::None,
@@ -1333,6 +1335,7 @@ impl RustGenerator {
         ReturnValueAllocationPlace::Heap => {
           Ok(TraitImpl {
             target_type: target_type.clone(),
+            associated_types: Vec::new(),
             trait_type: RustType::Common {
               base: RustName::new(vec!["cpp_utils".to_string(), "CppDeletable".to_string()])?,
               indirection: RustTypeIndirection::None,
@@ -1353,7 +1356,8 @@ impl RustGenerator {
     }
   }
 
-  fn process_cpp_cast(&self, method: RustSingleMethod) -> Result<TraitImpl> {
+  fn process_cpp_cast(&self, method: RustSingleMethod) -> Result<Vec<TraitImpl>> {
+    let mut results = Vec::new();
     // TODO: qobject_cast
     let mut final_methods = vec![(method.clone(), false), (method.clone(), true)];
     let args = &method.arguments;
@@ -1371,6 +1375,13 @@ impl RustGenerator {
       }
       _ => return Err("invalid method name".into()),
     };
+
+    if args.arguments.len() != 1 {
+      return Err(unexpected("1 argument expected").into());
+    }
+    let from_type = &args.arguments[0].argument_type;
+    let to_type = &args.return_type;
+
     for &mut (ref mut final_method, ref mut final_is_const) in &mut final_methods {
       let method_name = if *final_is_const {
         args.cpp_method.cpp_method.name.clone()
@@ -1400,12 +1411,42 @@ impl RustGenerator {
         final_method.arguments.arguments[0].argument_type
           .ptr_to_ref(*final_is_const)?;
       final_method.arguments.arguments[0].name = "self".to_string();
+
+      if !args.cpp_method.cpp_method.is_unsafe_static_cast &&
+         args.cpp_method.cpp_method.is_direct_static_cast {
+
+        let mut deref_method = final_method.clone();
+        deref_method.name = RustName::new(vec![if *final_is_const {
+          "deref"
+        } else {
+          "deref_mut"
+        }
+            .to_string()])?;
+        let deref_trait_name = if *final_is_const { "Deref" } else { "DerefMut" }.to_string();
+        let associated_types = if *final_is_const {
+          vec![TraitAssociatedType {
+            name: "Target".to_string(),
+            value: to_type.ptr_to_value()?.rust_api_type,
+          }]
+        } else {
+          Vec::new()
+        };
+        results.push(TraitImpl {
+          target_type: from_type.ptr_to_value()?.rust_api_type,
+          associated_types: associated_types,
+          trait_type: RustType::Common {
+            base: RustName::new(vec!["std".to_string(), "ops".to_string(), deref_trait_name])?,
+            indirection: RustTypeIndirection::None,
+            is_const: false,
+            is_const2: false,
+            generic_arguments: None,
+          },
+          extra: None,
+          methods: vec![deref_method.to_rust_method()],
+        });
+
+      }
     }
-    if args.arguments.len() != 1 {
-      return Err(unexpected("1 argument expected").into());
-    }
-    let from_type = &args.arguments[0].argument_type;
-    let to_type = &args.return_type;
     let trait_type = RustType::Common {
       base: RustName::new(trait_name)?,
       indirection: RustTypeIndirection::None,
@@ -1413,12 +1454,14 @@ impl RustGenerator {
       is_const2: false,
       generic_arguments: Some(vec![to_type.ptr_to_value()?.rust_api_type]),
     };
-    Ok(TraitImpl {
+    results.push(TraitImpl {
       target_type: from_type.ptr_to_value()?.rust_api_type,
+      associated_types: Vec::new(),
       trait_type: trait_type,
       extra: None,
       methods: final_methods.into_iter().map(|x| x.0.to_rust_method()).collect(),
-    })
+    });
+    Ok(results)
   }
 
   // Generates a single overloaded method from all specified methods or
@@ -1683,7 +1726,7 @@ impl RustGenerator {
               &method.cpp_method.name == "qobject_cast") &&
              method.cpp_method.class_membership.is_none() {
             match self.process_cpp_cast(rust_method) {
-              Ok(r) => result.trait_impls.push(r),
+              Ok(mut r) => result.trait_impls.append(&mut r),
               Err(msg) => {
                 log::llog(log::DebugRustSkips,
                           || format!("Failed to generate cast wrapper: {}\n{:?}\n", msg, method))
