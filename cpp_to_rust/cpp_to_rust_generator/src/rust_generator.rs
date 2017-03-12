@@ -668,12 +668,15 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
             }
           }
         } else {
-          if !is_template_argument {
+          if is_template_argument {
+            *indirection = RustTypeIndirection::None;
+            rust_api_to_c_conversion = RustToCTypeConversion::ValueToPtr;
+          } else {
             *indirection = RustTypeIndirection::Ref { lifetime: None };
-            *is_const = true;
-            *is_const2 = true;
             rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
           }
+          *is_const = true;
+          *is_const2 = true;
         }
       }
       IndirectionChange::ReferenceToPointer => {
