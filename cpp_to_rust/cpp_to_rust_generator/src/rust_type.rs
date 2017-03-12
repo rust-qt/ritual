@@ -114,7 +114,7 @@ impl ToRustName for f64 {
 
 impl RustType {
   #[allow(dead_code)]
-  pub fn caption(&self) -> Result<String> {
+  pub fn caption(&self, context: &RustName) -> Result<String> {
     Ok(match *self {
       RustType::Void => "void".to_string(),
       RustType::Common { ref base,
@@ -124,15 +124,39 @@ impl RustType {
                          ref indirection } => {
 
         let mut name = if base.parts.len() == 1 {
-            base.parts[0].clone()
-          } else {
-            base.parts[1..].join("_")
+          base.parts[0].to_snake_case()
+        } else {
+//          println!("caption! name: {:?}, context: {:?}",
+//                   &base.parts,
+//                   &context.parts);
+          let mut remaining_context: &[String] = &context.parts;
+          let mut parts: &[String] = &base.parts;
+          if &parts[0] == "libc" {
+            parts = &parts[1..];
+          };
+          let mut good_parts = Vec::new();
+          for part in parts {
+            if !remaining_context.is_empty() && part == &remaining_context[0] {
+              remaining_context = &remaining_context[1..];
+//              println!("skipping (same context): {}", part);
+            } else {
+              remaining_context = &[];
+              let snake_part = part.to_snake_case();
+              if good_parts.last() != Some(&snake_part) {
+                good_parts.push(snake_part);
+              } else {
+//                println!("skipping (repeated part): {}", part);
+              }
+            }
           }
-          .to_snake_case();
+//          println!("final good_parts: {:?}", good_parts);
+//          println!("");
+          good_parts.join("_")
+        };
         if let Some(ref args) = *generic_arguments {
           name = format!("{}_{}",
                          name,
-                         args.iter().map_if_ok(|x| x.caption())?.join("_"));
+                         args.iter().map_if_ok(|x| x.caption(context))?.join("_"));
         }
         let mut_text = if *is_const { "" } else { "_mut" };
         match *indirection {

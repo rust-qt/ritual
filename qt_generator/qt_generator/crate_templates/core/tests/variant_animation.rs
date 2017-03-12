@@ -5,7 +5,7 @@ use qt_core::variant_animation::VariantAnimation;
 use qt_core::connections::Signal;
 
 use qt_core::libc::c_void;
-use qt_core::slots::ExternSlotVariantVariantRef;
+use qt_core::slots::ExternSlotVariantRef;
 
 extern "C" fn value_changed(_data: *mut c_void, value: *const Variant) {
   let value = unsafe { value.as_ref() }.expect("value must not be null");
@@ -15,7 +15,7 @@ extern "C" fn value_changed(_data: *mut c_void, value: *const Variant) {
 #[test]
 fn variant_animation() {
   CoreApplication::create_and_exit(|app| {
-    let mut slot1 = ExternSlotVariantVariantRef::new();
+    let mut slot1 = ExternSlotVariantRef::new();
     slot1.set(value_changed, std::ptr::null_mut());
 
     let mut animation = VariantAnimation::new(());

@@ -3,12 +3,12 @@ use qt_core::core_application::CoreApplication;
 use qt_core::variant::Variant;
 use qt_core::variant_animation::VariantAnimation;
 use qt_core::connections::Signal;
-use qt_core::slots::SlotVariantVariantRef;
+use qt_core::slots::SlotVariantRef;
 
 #[test]
 fn variant_animation2() {
   CoreApplication::create_and_exit(|app| {
-    let slot1 = SlotVariantVariantRef::new(|value| {
+    let slot1 = SlotVariantRef::new(|value| {
       println!("value_changed: {}", value.to_string().to_std_string());
     });
 

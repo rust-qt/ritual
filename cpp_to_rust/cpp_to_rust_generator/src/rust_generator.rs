@@ -453,7 +453,7 @@ fn process_types(input_data: &CppAndFfiData,
                                         &CppFfiArgumentMeaning::Argument(0),
                                         true,
                                         &ReturnValueAllocationPlace::NotApplicable)?;
-          arg_captions.push(rust_type.rust_api_type.caption()?.to_class_case());
+          arg_captions.push(rust_type.rust_api_type.caption(&name)?.to_class_case());
         }
       } else {
         return Err("template arguments expected".into());
@@ -530,6 +530,11 @@ fn process_types(input_data: &CppAndFfiData,
   }
   for header in &input_data.cpp_ffi_headers {
     for qt_slot_wrapper in &header.qt_slot_wrappers {
+      let incomplete_rust_name = calculate_rust_name(&format!("extern_slot"),
+                                                     &header.include_file_base_name,
+                                                     false,
+                                                     None,
+                                                     config)?;
       let arg_names = qt_slot_wrapper.arguments
         .iter()
         .map_if_ok(|x| -> Result<_> {
@@ -539,7 +544,7 @@ fn process_types(input_data: &CppAndFfiData,
                                         &CppFfiArgumentMeaning::Argument(0),
                                         false,
                                         &ReturnValueAllocationPlace::NotApplicable)?;
-          rust_type.rust_api_type.caption()
+          rust_type.rust_api_type.caption(&incomplete_rust_name)
         })?;
       let args_text = if arg_names.is_empty() {
         "no_args".to_string()
@@ -976,13 +981,15 @@ impl RustGenerator {
             } else {
               receivers.into_iter()
                 .map(|r| {
-                  let name =
-                    format!("{}_{}",
-                            r.method_name,
-                            r.arguments
-                              .iter()
-                              .map(|x| x.caption().expect("receiver argument caption failed"))
-                              .join("_"));
+                  let name = format!("{}_{}",
+                                     r.method_name,
+                                     r.arguments
+                                       .iter()
+                                       .map(|x| {
+                                         x.caption(&info.rust_name)
+                                           .expect("receiver argument caption failed")
+                                       })
+                                       .join("_"));
                   RustQtReceiverDeclaration {
                     type_name: name.to_class_case(),
                     method_name: name.to_snake_case(),
@@ -1420,17 +1427,17 @@ impl RustGenerator {
 
         let mut deref_method = final_method.clone();
         deref_method.name = RustName::new(vec![if *final_is_const {
-          "deref"
-        } else {
-          "deref_mut"
-        }
-            .to_string()])?;
+                                                   "deref"
+                                                 } else {
+                                                   "deref_mut"
+                                                 }
+                                                 .to_string()])?;
         let deref_trait_name = if *final_is_const { "Deref" } else { "DerefMut" }.to_string();
         let associated_types = if *final_is_const {
           vec![TraitAssociatedType {
-            name: "Target".to_string(),
-            value: to_type.ptr_to_value()?.rust_api_type,
-          }]
+                 name: "Target".to_string(),
+                 value: to_type.ptr_to_value()?.rust_api_type,
+               }]
         } else {
           Vec::new()
         };

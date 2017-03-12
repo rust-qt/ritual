@@ -228,13 +228,27 @@ impl RustSingleMethod {
           }
         }
         RustMethodCaptionStrategy::ArgTypes => {
+          let context = match self.scope {
+            RustMethodScope::Free => &self.name,
+            RustMethodScope::Impl { ref target_type } => {
+              if let RustType::Common { ref base, .. } = *target_type {
+                base
+              } else {
+                return Err("unexpected uncommon Rust type".into());
+              }
+            }
+            RustMethodScope::TraitImpl => {
+              return Err("can't generate Rust method caption for a trait impl method".into())
+            }
+          };
+
           if self.arguments.arguments.is_empty() {
             Some("no_args".to_string())
           } else {
             Some(self.arguments
               .arguments
               .iter()
-              .map_if_ok(|t| t.argument_type.rust_api_type.caption())?
+              .map_if_ok(|t| t.argument_type.rust_api_type.caption(context))?
               .join("_"))
           }
         }
