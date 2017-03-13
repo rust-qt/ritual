@@ -19,8 +19,24 @@ add_library({lib_name_lowercase} ${{C2R_LIBRARY_TYPE}} ${{sources}})
 if(C2R_LINKED_LIBS)
   target_link_libraries({lib_name_lowercase} ${{C2R_LINKED_LIBS}})
 endif()
+
+macro(add_osx_framework fwname target)
+  find_library(FRAMEWORK_${{fwname}}
+    NAMES ${{fwname}}
+    PATHS ${{C2R_FRAMEWORK_PATHS}}
+    NO_DEFAULT_PATH)
+  if( ${{FRAMEWORK_${{fwname}}}} STREQUAL FRAMEWORK_${{fwname}}-NOTFOUND)
+    message(FATAL_ERROR "Framework not found: ${{fwname}} (paths: ${{C2R_FRAMEWORK_PATHS}})")
+  else()
+    target_link_libraries(${{target}} "${{FRAMEWORK_${{fwname}}}}/${{fwname}}")
+    message(STATUS "Framework ${{fwname}} found at ${{FRAMEWORK_${{fwname}}}}")
+  endif()
+endmacro(ADD_OSX_FRAMEWORK)
+
 if(C2R_LINKED_FRAMEWORKS)
-  target_link_libraries({lib_name_lowercase} ${{C2R_LINKED_FRAMEWORKS}})
+  foreach(framework ${{C2R_LINKED_FRAMEWORKS}})
+    ADD_OSX_FRAMEWORK(${{framework}} {lib_name_lowercase})
+  endforeach()
 endif()
 
 
@@ -35,6 +51,13 @@ if(C2R_COMPILER_FLAGS)
 endif()
 
 add_executable(type_sizes type_sizes.cpp)
+
+if(C2R_LINKED_FRAMEWORKS)
+  foreach(framework ${{C2R_LINKED_FRAMEWORKS}})
+    ADD_OSX_FRAMEWORK(${{framework}} type_sizes)
+  endforeach()
+endif()
+
 
 # disable qt verision tagging to allow compiling type_sizes without
 # linking to the libraries

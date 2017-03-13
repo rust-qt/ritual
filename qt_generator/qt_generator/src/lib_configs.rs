@@ -1,5 +1,6 @@
 use cpp_to_rust_common::errors::{Result, ChainErr};
 use cpp_to_rust_generator::config::{Config, CppTypeAllocationPlace};
+use cpp_to_rust_generator::cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection};
 
 fn exclude_qlist_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(config: &mut Config,
                                                                             types: I) {
@@ -159,6 +160,17 @@ pub fn core(config: &mut Config) -> Result<()> {
           _ => {}
         }
       }
+    }
+    let long_double = CppType {
+         indirection: CppTypeIndirection::None,
+         is_const: false,
+         is_const2: false,
+         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::LongDouble),
+       };
+    if &method.name == "qHash" && method.class_membership.is_none() &&
+       (method.arguments.len() == 1 || method.arguments.len() == 2) &&
+       &method.arguments[0].argument_type == &long_double {
+      return Ok(false); // produces error on MacOS
     }
     Ok(true)
   }));
