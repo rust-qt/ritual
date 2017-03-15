@@ -79,7 +79,7 @@ pub fn decode_doc(qt_sub_lib_name: &str) -> Result<DocData> {
                        doc_file_path.display())
       .into());
   }
-  log::status(format!("Loading Qt documentation from {}", doc_file_path.display()));
+  log::status(format!("Adding Qt documentation from {}", doc_file_path.display()));
   let connection = rusqlite::Connection::open_with_flags(&doc_file_path,
                                                          rusqlite::SQLITE_OPEN_READ_ONLY)
       .convert_err()?;

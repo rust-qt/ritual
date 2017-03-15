@@ -112,7 +112,7 @@ fn core_cpp_parser_blocked_names() -> Vec<&'static str> {
     "qt_metacast", "qt_noop", "qt_qFindChild_helper", "qt_qFindChildren_helper",
     "qt_sharedpointer_cast_check", "qvsnprintf", "std",
     "qThreadStorage_deleteData", "QStringBuilderCommon", "QStringBuilderBase", "QStringBuilder",
-    "QFutureInterfaceBase", "QFutureInterface",
+    "QFutureInterfaceBase", "QFutureInterface", "QFutureWatcherBase", "QFutureWatcher"
   ]
   //next: QAbstractItemModel
 }
@@ -121,14 +121,14 @@ pub fn core(config: &mut Config) -> Result<()> {
   config.add_cpp_parser_blocked_names(core_cpp_parser_blocked_names());
 
   // TODO: the following items should be conditionally available on Windows;
-  // also QAbstractEventDispatcher::registerEventNotifier,
-  // QAbstractEventDispatcher::unregisterEventNotifier
   config.add_cpp_parser_blocked_names(vec!["QWinEventNotifier",
                                            "QProcess::CreateProcessArguments",
                                            "QProcess::nativeArguments",
                                            "QProcess::setNativeArguments",
                                            "QProcess::createProcessArgumentsModifier",
-                                           "QProcess::setCreateProcessArgumentsModifier"]);
+                                           "QProcess::setCreateProcessArgumentsModifier",
+                                           "QAbstractEventDispatcher::registerEventNotifier",
+                                           "QAbstractEventDispatcher::unregisterEventNotifier"]);
 
   // QProcess::pid returns different types on different platforms,
   // but this method is obsolete anyway

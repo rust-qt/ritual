@@ -277,6 +277,11 @@ impl DocParser {
     logger.log(log::DebugQtDoc, "Unused entries in Qt documentation:");
     for item in &self.doc_data.index {
       if !item.accessed {
+        if let Ok(file_name) = self.doc_data.file_name(item.document_id) {
+          if file_name.ends_with("-obsolete.html") || file_name.ends_with("-compat.html") {
+            continue;
+          }
+        }
         logger.log(log::DebugQtDoc, item.name.as_str());
       }
     }
