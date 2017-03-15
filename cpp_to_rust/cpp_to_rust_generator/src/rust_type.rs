@@ -126,9 +126,9 @@ impl RustType {
         let mut name = if base.parts.len() == 1 {
           base.parts[0].to_snake_case()
         } else {
-//          println!("caption! name: {:?}, context: {:?}",
-//                   &base.parts,
-//                   &context.parts);
+          //          println!("caption! name: {:?}, context: {:?}",
+          //                   &base.parts,
+          //                   &context.parts);
           let mut remaining_context: &[String] = &context.parts;
           let mut parts: &[String] = &base.parts;
           if &parts[0] == "libc" {
@@ -138,19 +138,19 @@ impl RustType {
           for part in parts {
             if !remaining_context.is_empty() && part == &remaining_context[0] {
               remaining_context = &remaining_context[1..];
-//              println!("skipping (same context): {}", part);
+              //              println!("skipping (same context): {}", part);
             } else {
               remaining_context = &[];
               let snake_part = part.to_snake_case();
               if good_parts.last() != Some(&snake_part) {
                 good_parts.push(snake_part);
               } else {
-//                println!("skipping (repeated part): {}", part);
+                //                println!("skipping (repeated part): {}", part);
               }
             }
           }
-//          println!("final good_parts: {:?}", good_parts);
-//          println!("");
+          //          println!("final good_parts: {:?}", good_parts);
+          //          println!("");
           good_parts.join("_")
         };
         if let Some(ref args) = *generic_arguments {

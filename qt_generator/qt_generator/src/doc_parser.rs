@@ -78,12 +78,11 @@ impl DocParser {
       name_parts.remove(0);
     }
     let corrected_name = name_parts.join("::");
-    let index_item = (*self.doc_data
-        .index
-        .iter()
-        .find(|item| &item.name == &corrected_name && item.anchor.is_some())
-        .chain_err(|| format!("No documentation entry for {}", corrected_name))?)
-      .clone();
+    let index_item = self.doc_data
+      .find_index_item(|item| {
+        &item.name == &corrected_name && (item.anchor.is_some() || anchor_override.is_some())
+      })
+      .chain_err(|| format!("No documentation entry for {}", corrected_name))?;
     let anchor = match anchor_override {
       Some(x) => x,
       None => index_item.anchor.clone().chain_err(|| unexpected("anchor is expected here!"))?,
@@ -169,7 +168,7 @@ impl DocParser {
       }
     }
     if candidates.len() == 1 {
-      log::llog(log::DebugQtDoc, || {
+      log::llog(log::DebugQtDocDeclarations, || {
         format!("\
           Declaration mismatch ignored because there is only one \
                  method.\nDeclaration 1: {}\nDeclaration 2: {}\nDoc declaration: {:?}\n",
@@ -189,26 +188,24 @@ impl DocParser {
         cross_references: candidates[0].cross_references.clone(),
       });
     }
-    log::llog(log::DebugQtDoc, || {
+    log::llog(log::DebugQtDocDeclarations, || {
       format!("Declaration mismatch!\nDeclaration 1: {}\nDeclaration 2: {}",
               declaration1,
               declaration2)
     });
-    log::llog(log::DebugQtDoc, || "Candidates:");
+    log::llog(log::DebugQtDocDeclarations, || "Candidates:");
     for item in &candidates {
-      log::llog(log::DebugQtDoc, || format!("  {:?}", item.declarations));
+      log::llog(log::DebugQtDocDeclarations,
+                || format!("  {:?}", item.declarations));
     }
-    log::llog(log::DebugQtDoc, || "");
+    log::llog(log::DebugQtDocDeclarations, || "");
     Err("Declaration mismatch".into())
   }
 
   pub fn doc_for_type(&mut self, name: &str) -> Result<(CppTypeDoc, Vec<DocForEnumVariant>)> {
     let index_item = self.doc_data
-      .index
-      .iter()
-      .find(|item| &item.name == &name)
-      .chain_err(|| format!("No documentation entry for {}", name))?
-      .clone();
+      .find_index_item(|item| &item.name == &name)
+      .chain_err(|| format!("No documentation entry for {}", name))?;
     if let Some(ref anchor) = index_item.anchor {
       let (result, file_name) = {
         let file_data = self.file_data(index_item.document_id)?;
@@ -262,6 +259,28 @@ impl DocParser {
       cross_references: cross_references.into_iter().collect(),
     },
         Vec::new()))
+  }
+
+  pub fn mark_enum_variant_used(&mut self, full_name: &str) {
+    if self.doc_data.find_index_item(|item| &item.name == &full_name).is_none() {
+      log::llog(log::DebugQtDoc,
+                || format!("mark_enum_variant_used failed for {}", full_name));
+
+    }
+  }
+
+  pub fn report_unused_anchors(&self) {
+    let mut logger = log::default_logger();
+    if !logger.is_on(log::DebugQtDoc) {
+      return;
+    }
+    logger.log(log::DebugQtDoc, "Unused entries in Qt documentation:");
+    for item in &self.doc_data.index {
+      if !item.accessed {
+        logger.log(log::DebugQtDoc, item.name.as_str());
+      }
+    }
+    logger.log(log::DebugQtDoc, "");
   }
 }
 

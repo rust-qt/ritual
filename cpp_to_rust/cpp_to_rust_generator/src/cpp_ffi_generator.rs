@@ -88,44 +88,42 @@ impl<'a> CGenerator<'a> {
     if let Some(ref membership) = method.class_membership {
       if membership.kind == CppMethodKind::Constructor &&
          self.cpp_data.has_pure_virtual_methods(&class_name) {
-        log::llog(log::DebugFfiSkips, || {
-          format!("Method is skipped:\n{}\nConstructors are not allowed for abstract classes.\n",
-                  method.short_text())
-        });
+        log::llog(log::DebugFfiSkips,
+                  || format!("Skipping constructor of abstract class {}", class_name));
         return Ok(false);
       }
       if membership.visibility == CppVisibility::Private {
         return Ok(false);
       }
       if membership.visibility == CppVisibility::Protected {
-        log::llog(log::DebugFfiSkips,
-                  || format!("Skipping protected method: \n{}\n", method.short_text()));
+        //        log::llog(log::DebugFfiSkips,
+        //                  || format!("Skipping protected method: \n{}\n", method.short_text()));
         return Ok(false);
       }
       if membership.is_signal {
-        log::llog(log::DebugFfiSkips,
-                  || format!("Skipping signal: \n{}\n", method.short_text()));
+        //        log::llog(log::DebugFfiSkips,
+        //                  || format!("Skipping signal: \n{}\n", method.short_text()));
         return Ok(false);
       }
     }
     if method.template_arguments.is_some() {
-      log::llog(log::DebugFfiSkips,
-                || format!("Skipping template method: \n{}\n", method.short_text()));
+      //      log::llog(log::DebugFfiSkips,
+      //                || format!("Skipping template method: \n{}\n", method.short_text()));
       return Ok(false);
     }
     if method.template_arguments_values.is_some() && !method.is_ffi_whitelisted {
+      //      log::llog(log::DebugFfiSkips,
+      //                || format!("Skipping template method: \n{}\n", method.short_text()));
       // TODO: re-enable after template test compilation (#24) is implemented
-      log::llog(log::DebugFfiSkips,
-                || format!("Skipping template method: \n{}\n", method.short_text()));
       return Ok(false);
     }
     if method.all_involved_types()
       .iter()
       .any(|x| x.base.is_or_contains_template_parameter()) {
-      log::llog(log::DebugFfiSkips, || {
-        format!("Skipping method containing template parameters: \n{}\n",
-                method.short_text())
-      });
+      //      log::llog(log::DebugFfiSkips, || {
+      //        format!("Skipping method containing template parameters: \n{}\n",
+      //                method.short_text())
+      //      });
       return Ok(false);
     }
     Ok(true)

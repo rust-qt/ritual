@@ -289,7 +289,7 @@ impl CppTypeBase {
   pub fn to_cpp_pseudo_code(&self) -> String {
     match *self {
       CppTypeBase::TemplateParameter { ref nested_level, ref index } => {
-        return format!("T_{}_{}", nested_level, index);
+        return format!("T{}_{}", nested_level, index);
       }
       CppTypeBase::Class(ref base) => return base.to_cpp_pseudo_code(),
       CppTypeBase::FunctionPointer(..) => {

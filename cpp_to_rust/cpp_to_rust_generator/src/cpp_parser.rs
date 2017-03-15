@@ -1283,23 +1283,23 @@ impl<'a> CppParser<'a> {
         let file_path_buf = PathBuf::from(&file_path);
         if !self.config.target_include_paths.is_empty() &&
            !self.config.target_include_paths.iter().any(|x| file_path_buf.starts_with(x)) {
-          log::llog(log::DebugParserSkips,
-                    || format!("skipping entities from {}", file_path));
+          //          log::llog(log::DebugParserSkips,
+          //                    || format!("skipping entities from {}", file_path));
           return false;
         }
       }
       if self.config.name_blacklist.iter().any(|x| x == &full_name) {
-        log::llog(log::DebugParserSkips,
-                  || format!("Skipping blacklisted entity: {}", full_name));
+        //        log::llog(log::DebugParserSkips,
+        //                  || format!("Skipping blacklisted entity: {}", full_name));
         return false;
       }
     }
     if let Some(name) = entity.get_name() {
       if self.config.name_blacklist.iter().any(|x| x == &name) {
-        log::llog(log::DebugParserSkips, || {
-          format!("Skipping blacklisted entity: {}",
-                  get_full_name(entity).unwrap_or("?".into()))
-        });
+        //        log::llog(log::DebugParserSkips, || {
+        //          format!("Skipping blacklisted entity: {}",
+        //                  get_full_name(entity).unwrap_or("?".into()))
+        //        });
         return false;
       }
     }

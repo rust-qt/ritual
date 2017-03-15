@@ -23,6 +23,7 @@ pub enum LoggerCategory {
   DebugAllocationPlace,
   DebugRustSkips,
   DebugQtDoc,
+  DebugQtDocDeclarations,
   DebugQtHeaderNames,
 }
 pub use self::LoggerCategory::*;

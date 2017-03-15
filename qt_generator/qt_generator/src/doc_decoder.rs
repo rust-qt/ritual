@@ -27,6 +27,7 @@ pub struct DocIndexItem {
   pub name: String,
   pub document_id: i32,
   pub anchor: Option<String>,
+  pub accessed: bool,
 }
 
 use std::io::Read;
@@ -55,6 +56,13 @@ impl DocData {
     let row = result.next().chain_err(|| "invalid file id")?;
     let row = row.convert_err()?;
     row.get_checked(0).convert_err()
+  }
+
+  pub fn find_index_item<F: Fn(&DocIndexItem) -> bool>(&mut self, f: F) -> Option<DocIndexItem> {
+    self.index.iter_mut().find(|item| f(item)).and_then(|mut item| {
+      item.accessed = true;
+      Some(item.clone())
+    })
   }
 }
 
@@ -91,6 +99,7 @@ pub fn decode_doc(qt_sub_lib_name: &str) -> Result<DocData> {
         name: name,
         document_id: file_id,
         anchor: anchor,
+        accessed: false,
       });
     }
   }

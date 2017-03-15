@@ -3,6 +3,7 @@ use cpp_to_rust_common::log;
 use cpp_to_rust_common::utils::is_msvc;
 use cpp_to_rust_common::file_utils::{PathBufWithAdded, repo_crate_local_path};
 use cpp_to_rust_generator::config::Config;
+use cpp_to_rust_generator::cpp_data::CppVisibility;
 use cpp_to_rust_common::cpp_build_config::{CppBuildConfigData, CppLibraryType};
 use cpp_to_rust_common::target;
 use qt_generator_common::{get_installation_data, real_lib_name, lib_folder_name, lib_dependencies};
@@ -25,7 +26,7 @@ pub fn exec_all(libs: Vec<String>,
   let crate_templates_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
     .with_added("crate_templates");
   for sublib_name in libs {
-    let lib_cache_dir = cache_dir.with_added(&sublib_name);
+    let lib_cache_dir = cache_dir.with_added(format!("qt_{}", sublib_name));
     let lib_crate_templates_path = crate_templates_path.with_added(&sublib_name);
     let lib_output_dir = output_dir.with_added(format!("qt_{}", sublib_name));
 
@@ -131,9 +132,19 @@ fn exec(sublib_name: &str,
               // log::debug(format!("Found doc for type: {}", type1.name));
               type1.doc = Some(doc.0);
               if let CppTypeKind::Enum { ref mut values } = type1.kind {
+                let enum_namespace = if let Some(index) = type1.name.rfind("::") {
+                  type1.name[0..index + 2].to_string()
+                } else {
+                  String::new()
+                };
                 for value in values {
                   if let Some(r) = doc.1.iter().find(|x| x.name == value.name) {
                     value.doc = Some(r.html.clone());
+
+                    // let full_name = format!("{}::{}", enum_namespace, &value.name);
+                    // println!("full name: {}", full_name);
+                    parser.mark_enum_variant_used(&format!("{}{}", enum_namespace, &value.name));
+
                   } else {
                     let type_name = &type1.name;
                     log::llog(log::DebugQtDoc, || {
@@ -151,6 +162,7 @@ fn exec(sublib_name: &str,
             }
           }
         }
+        parser.report_unused_anchors();
       }
       Err(err) => {
         log::error(format!("Failed to get Qt documentation: {}", err));
@@ -176,17 +188,28 @@ fn exec(sublib_name: &str,
 
 fn find_methods_docs(cpp_methods: &mut [CppMethod], data: &mut DocParser) -> Result<()> {
   for cpp_method in cpp_methods {
+    if let Some(ref info) = cpp_method.class_membership {
+      if info.visibility == CppVisibility::Private {
+        continue;
+      }
+    }
     if let Some(ref declaration_code) = cpp_method.declaration_code {
       match data.doc_for_method(&cpp_method.doc_id(),
                                 declaration_code,
                                 &cpp_method.short_text()) {
         Ok(doc) => cpp_method.doc = Some(doc),
         Err(msg) => {
-          log::llog(log::DebugQtDoc, || {
-            format!("Failed to get documentation for method: {}: {}",
-                    &cpp_method.short_text(),
-                    msg)
-          });
+          if cpp_method.class_membership.is_some() &&
+             (&cpp_method.name == "tr" || &cpp_method.name == "trUtf8" ||
+              &cpp_method.name == "metaObject") {
+            // no error message
+          } else {
+            log::llog(log::DebugQtDoc, || {
+              format!("Failed to get documentation for method: {}: {}",
+                      &cpp_method.short_text(),
+                      msg)
+            });
+          }
         }
       }
     }

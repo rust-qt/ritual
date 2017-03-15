@@ -1,6 +1,7 @@
 use cpp_to_rust_common::errors::{Result, ChainErr};
 use cpp_to_rust_generator::config::{Config, CppTypeAllocationPlace};
-use cpp_to_rust_generator::cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection};
+use cpp_to_rust_generator::cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType,
+                                      CppTypeIndirection};
 
 fn exclude_qlist_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(config: &mut Config,
                                                                             types: I) {
@@ -63,30 +64,65 @@ fn exclude_qvector_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(co
   }));
 }
 
-
 #[cfg_attr(rustfmt, rustfmt_skip)]
-pub fn core(config: &mut Config) -> Result<()> {
-  config.add_cpp_parser_blocked_names(vec![
-    "_GUID", "QAbstractConcatenable", "QArrayData", "QArrayDataPointer", "QArrayDataPointerRef",
-    "QAtomicAdditiveType", "QAtomicInt", "QAtomicInteger", "QAtomicOps", "QAtomicPointer",
-    "QBasicAtomicInteger", "QBasicAtomicInteger", "QBasicAtomicPointer", "QByteArrayDataPtr",
-    "QConcatenable", "QConstOverload", "QContiguousCacheData", "QContiguousCacheTypedData",
-    "QEnableSharedFromThis", "QException", "QFlag", "QForeachContainer", "QGenericAtomicOps",
-    "qGreater", "QHashData",
-    "QHashDummyValue", "QHashNode", "QHashNode", "QIncompatibleFlag", "QInternal", "QJsonValuePtr",
-    "QJsonValueRefPtr", "qLess", "QLinkedListData", "QLinkedListNode", "QListData", "QMapData",
-    "QMapDataBase", "QMapNode",
-    "QMapNodeBase", "QMessageLogContext::copy", "QMetaTypeId", "QMetaTypeId2", "QNoDebug",
-    "QNonConstOverload", "QObjectData", "QObjectUserData", "QObjectUserData", "QScopedPointerPodDeleter",
-    "QString::Null",
-    "QString::vasprintf", "QString::vsprintf", "QStringDataPtr", "Qt::Initialization",
-    "qt_check_for_QGADGET_macro", "QtGlobalStatic", "QThreadStorageData", "QtMetaTypePrivate",
-    "QtPrivate", "QtSharedPointer", "QtStringBuilder", "QTypedArrayData", "QTypeInfo", "QTypeInfoMerger",
-    "QTypeInfoQuery", "QVariant::Handler", "QVariant::Private", "QVariant::PrivateShared",
-    "QVariantComparisonHelper", "qvsnprintf", "QUnhandledException"
-  ]);
+fn core_cpp_parser_blocked_names() -> Vec<&'static str> {
+  vec![
+    "QAbstractConcatenable", "QAlgorithmsPrivate", "QArrayData",
+    "QArrayDataPointer", "QArrayDataPointerRef", "QAtomicAdditiveType",
+    "QAtomicInt", "QAtomicInteger", "QAtomicOps", "QAtomicPointer",
+    "QBasicAtomicInteger", "QBasicAtomicInteger", "QBasicAtomicPointer",
+    "QBitArray::detach", "QBitArray::isDetached", "QByteArray::detach",
+    "QByteArray::isDetached", "QByteArray::isSharedWith", "QByteArrayDataPtr",
+    "QConcatenable", "QConstOverload", "QContiguousCache::detach",
+    "QContiguousCache::isDetached", "QContiguousCache::setSharable",
+    "QContiguousCacheData", "QContiguousCacheTypedData", "QEnableSharedFromThis",
+    "QException", "QFlag", "QForeachContainer", "QGenericAtomicOps",
+    "QHash::detach", "QHash::isDetached", "QHash::setSharable", "QHashData",
+    "QHashDummyValue", "QHashNode", "QHashNode", "QIncompatibleFlag", "QInternal",
+    "QJsonValuePtr", "QJsonValueRefPtr", "QLinkedList::detach",
+    "QLinkedList::isDetached", "QLinkedList::isSharedWith",
+    "QLinkedList::setSharable", "QLinkedListData", "QLinkedListNode",
+    "QList::detach", "QList::detachShared", "QList::isDetached",
+    "QList::isSharedWith", "QList::setSharable", "QListData", "QMap::detach",
+    "QMap::isDetached", "QMap::isSharedWith", "QMap::setSharable", "QMapData",
+    "QMapDataBase", "QMapNode", "QMapNodeBase", "QMessageLogContext::copy",
+    "QMetaObject::Connection::isConnected_helper", "QMetaTypeId", "QMetaTypeId2",
+    "QNoDebug", "QNonConstOverload", "QObject::registerUserData", "QObjectData",
+    "QObjectUserData", "QObjectUserData", "QPersistentModelIndex::internalId",
+    "QPersistentModelIndex::internalPointer", "QScopedPointerArrayDeleter",
+    "QScopedPointerDeleter", "QScopedPointerObjectDeleteLater",
+    "QScopedPointerPodDeleter", "QSet::detach", "QSet::isDetached",
+    "QSet::setSharable", "QString::Null", "QString::detach",
+    "QString::isDetached", "QString::isSharedWith", "QString::isSimpleText",
+    "QString::vasprintf", "QString::vsprintf", "QStringDataPtr",
+    "QThreadStorageData", "QTypeInfo", "QTypeInfoMerger", "QTypeInfoQuery",
+    "QTypedArrayData", "QUnhandledException", "QUrl::detach", "QUrl::isDetached",
+    "QUrlQuery::isDetached", "QVariant::Handler", "QVariant::Private",
+    "QVariant::PrivateShared", "QVariant::constData", "QVariant::data",
+    "QVariant::detach", "QVariant::isDetached", "QVariantComparisonHelper",
+    "QVector::detach", "QVector::isDetached", "QVector::isSharedWith",
+    "QVector::setSharable", "Qt::Initialization", "QtGlobalStatic",
+    "QtMetaTypePrivate", "QtPrivate", "QtSharedPointer", "QtStringBuilder",
+    "_GUID", "qBadAlloc", "qErrnoWarning", "qFlagLocation", "qGreater", "qLess",
+    "qMapLessThanKey", "qSharedBuild", "qYouForgotTheQ_OBJECT_Macro",
+    "qbswap_helper", "qobject_interface_iid", "qt_QMetaEnum_debugOperator",
+    "qt_QMetaEnum_flagDebugOperator", "qt_assert", "qt_assert_x",
+    "qt_check_for_QGADGET_macro", "qt_check_for_QOBJECT_macro",
+    "qt_check_pointer", "qt_hash", "qt_message_output", "qt_metacall",
+    "qt_metacast", "qt_noop", "qt_qFindChild_helper", "qt_qFindChildren_helper",
+    "qt_sharedpointer_cast_check", "qvsnprintf", "std",
+    "qThreadStorage_deleteData", "QStringBuilderCommon", "QStringBuilderBase", "QStringBuilder",
+    "QFutureInterfaceBase", "QFutureInterface",
+  ]
+  //next: QAbstractItemModel
+}
 
-  // TODO: the following items should be conditionally available on Windows
+pub fn core(config: &mut Config) -> Result<()> {
+  config.add_cpp_parser_blocked_names(core_cpp_parser_blocked_names());
+
+  // TODO: the following items should be conditionally available on Windows;
+  // also QAbstractEventDispatcher::registerEventNotifier,
+  // QAbstractEventDispatcher::unregisterEventNotifier
   config.add_cpp_parser_blocked_names(vec!["QWinEventNotifier",
                                            "QProcess::CreateProcessArguments",
                                            "QProcess::nativeArguments",
@@ -102,11 +138,24 @@ pub fn core(config: &mut Config) -> Result<()> {
   exclude_qlist_eq_based_methods(config,
                                  &["QAbstractEventDispatcher::TimerInfo", "QCommandLineOption"]);
 
-  config.set_types_allocation_place(CppTypeAllocationPlace::Stack, vec![
-    "QAssociativeIterable", "QByteArray", "QChar", "QItemSelection", "QJsonArray",
-    "QJsonObject", "QJsonParseError",
-    "QJsonValue", "QJsonValueRef", "QList", "QLoggingCategory", "QMultiHash",
-    "QPointF", "QRegularExpressionMatch", "QResource", "QSequentialIterable", "QString"]);
+  config.set_types_allocation_place(CppTypeAllocationPlace::Stack,
+                                    vec!["QAssociativeIterable",
+                                         "QByteArray",
+                                         "QChar",
+                                         "QItemSelection",
+                                         "QJsonArray",
+                                         "QJsonObject",
+                                         "QJsonParseError",
+                                         "QJsonValue",
+                                         "QJsonValueRef",
+                                         "QList",
+                                         "QLoggingCategory",
+                                         "QMultiHash",
+                                         "QPointF",
+                                         "QRegularExpressionMatch",
+                                         "QResource",
+                                         "QSequentialIterable",
+                                         "QString"]);
 
   config.add_cpp_ffi_generator_filter(Box::new(|method| {
     if let Some(ref info) = method.class_membership {
@@ -162,11 +211,11 @@ pub fn core(config: &mut Config) -> Result<()> {
       }
     }
     let long_double = CppType {
-         indirection: CppTypeIndirection::None,
-         is_const: false,
-         is_const2: false,
-         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::LongDouble),
-       };
+      indirection: CppTypeIndirection::None,
+      is_const: false,
+      is_const2: false,
+      base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::LongDouble),
+    };
     if &method.name == "qHash" && method.class_membership.is_none() &&
        (method.arguments.len() == 1 || method.arguments.len() == 2) &&
        &method.arguments[0].argument_type == &long_double {
