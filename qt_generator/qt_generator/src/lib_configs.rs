@@ -229,7 +229,9 @@ pub fn core(config: &mut Config) -> Result<()> {
 pub fn gui(config: &mut Config) -> Result<()> {
   config.add_cpp_parser_blocked_names(vec!["QAbstractOpenGLFunctionsPrivate",
                                            "QOpenGLFunctionsPrivate",
-                                           "QOpenGLExtraFunctionsPrivate"]);
+                                           "QOpenGLExtraFunctionsPrivate",
+
+  "QKeySequence::isDetached"]);
   exclude_qvector_eq_based_methods(config,
                                    &["QTextLayout::FormatRange",
                                      "QAbstractTextDocumentLayout::Selection"]);

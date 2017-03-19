@@ -32,7 +32,7 @@ pub fn exec_all(libs: Vec<String>,
 
     let mut dependency_paths = Vec::new();
     for dep in lib_dependencies(&sublib_name)? {
-      let path = cache_dir.with_added(dep);
+      let path = cache_dir.with_added(format!("qt_{}", dep));
       if !is_completed(&path) {
         return Err(format!("\"{}\" depends on \"{}\" but processing \
           in \"{}\" directory is not completed.",

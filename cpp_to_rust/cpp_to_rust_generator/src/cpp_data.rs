@@ -17,8 +17,7 @@ pub use serializable::{CppEnumValue, CppClassField, CppTypeKind, CppOriginLocati
                        TemplateArgumentsDeclaration, CppFunctionPointerType,
                        CppTypeAllocationPlace};
 
-extern crate regex;
-use self::regex::Regex;
+use regex::Regex;
 
 pub fn create_cast_method(name: &str,
                           from: &CppType,

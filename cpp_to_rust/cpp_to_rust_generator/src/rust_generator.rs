@@ -5,7 +5,7 @@ use cpp_ffi_data::{CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiType, Indirecti
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
-               CppSpecificNumericTypeKind, CppTypeClassBase, CppTypeRole};
+               CppSpecificNumericTypeKind, CppSpecificNumericType, CppTypeClassBase, CppTypeRole};
 use common::errors::{Result, ChainErr, unexpected};
 use common::log;
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
@@ -793,7 +793,7 @@ fn ffi_type(processed_types: &[RustProcessedTypeInfo],
         RustName::new(vec!["libc".to_string(), own_name.to_string()])?
       }
     }
-    CppTypeBase::SpecificNumeric { ref bits, ref kind, .. } => {
+    CppTypeBase::SpecificNumeric(CppSpecificNumericType { ref bits, ref kind, .. }) => {
       let letter = match *kind {
         CppSpecificNumericTypeKind::Integer { ref is_signed } => if *is_signed { "i" } else { "u" },
         CppSpecificNumericTypeKind::FloatingPoint => "f",

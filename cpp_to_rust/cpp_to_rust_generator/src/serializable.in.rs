@@ -558,6 +558,18 @@ pub struct CppFunctionPointerType {
   pub allows_variadic_arguments: bool,
 }
 
+#[derive(Debug, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppSpecificNumericType {
+  /// Type identifier (most likely a typedef name)
+  pub name: String,
+  /// Size of type in bits
+  pub bits: i32,
+  /// Information about the type (float or integer,
+  /// signed or unsigned)
+  pub kind: CppSpecificNumericTypeKind,
+}
+
 /// Base C++ type. `CppType` can add indirection
 /// and constness to `CppTypeBase`, but otherwise
 /// this enum lists all supported types.
@@ -570,15 +582,7 @@ pub enum CppTypeBase {
   BuiltInNumeric(CppBuiltInNumericType),
   /// Fixed-size primitive type, like qint64 or int64_t
   /// (may be translated to Rust's i64)
-  SpecificNumeric {
-    /// Type identifier (most likely a typedef name)
-    name: String,
-    /// Size of type in bits
-    bits: i32,
-    /// Information about the type (float or integer,
-    /// signed or unsigned)
-    kind: CppSpecificNumericTypeKind,
-  },
+  SpecificNumeric(CppSpecificNumericType),
   /// Pointer sized integer, like qintptr
   /// (may be translated to Rust's isize)
   PointerSizedInteger { name: String, is_signed: bool },

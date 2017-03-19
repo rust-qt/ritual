@@ -14,6 +14,8 @@
 
 extern crate rustfmt;
 extern crate tempdir;
+extern crate regex;
+extern crate clang;
 
 extern crate cpp_to_rust_common as common;
 

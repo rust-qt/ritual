@@ -5,20 +5,20 @@ use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, CppEnumValue, C
 use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind, CppMethodClassMembership};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
-               CppSpecificNumericTypeKind, CppTypeClassBase};
+               CppSpecificNumericTypeKind, CppTypeClassBase, CppSpecificNumericType};
 use common::errors::{Result, ChainErr, unexpected};
 use common::file_utils::{remove_file, open_file, create_file, path_to_str, os_str_to_str};
+use common::string_utils::JoinWithString;
 use common::log;
 
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::collections::HashMap;
 
-extern crate clang;
-use self::clang::*;
+use clang::*;
+use clang;
 
-extern crate regex;
-use self::regex::Regex;
+use regex::Regex;
 
 struct CppParser<'a> {
   config: CppParserConfig,
@@ -193,7 +193,7 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
       d.get_severity() == clang::diagnostic::Severity::Error ||
       d.get_severity() == clang::diagnostic::Severity::Fatal
     }) {
-      return Err("fatal clang error".into());
+      return Err(format!("fatal clang error:\n{}", diagnostics.iter().map(|d| d.to_string()).join("\n")).into());
     }
   }
   let result = f(translation_unit);
@@ -756,60 +756,60 @@ impl<'a> CppParser<'a> {
   fn parse_special_typedef(&self, name: &str) -> Option<CppTypeBase> {
     match name {
       "qint8" | "int8_t" | "GLbyte" => {
-        Some(CppTypeBase::SpecificNumeric {
+        Some(CppTypeBase::SpecificNumeric(CppSpecificNumericType {
           name: name.to_string(),
           bits: 8,
           kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
-        })
+        }))
       }
       "quint8" | "uint8_t" | "GLubyte" => {
-        Some(CppTypeBase::SpecificNumeric {
+        Some(CppTypeBase::SpecificNumeric(CppSpecificNumericType {
           name: name.to_string(),
           bits: 8,
           kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
-        })
+        }))
       }
       "qint16" | "int16_t" | "GLshort" => {
-        Some(CppTypeBase::SpecificNumeric {
+        Some(CppTypeBase::SpecificNumeric(CppSpecificNumericType {
           name: name.to_string(),
           bits: 16,
           kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
-        })
+        }))
       }
       "quint16" | "uint16_t" | "GLushort" => {
-        Some(CppTypeBase::SpecificNumeric {
+        Some(CppTypeBase::SpecificNumeric(CppSpecificNumericType {
           name: name.to_string(),
           bits: 16,
           kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
-        })
+        }))
       }
       "qint32" | "int32_t" | "GLint" => {
-        Some(CppTypeBase::SpecificNumeric {
+        Some(CppTypeBase::SpecificNumeric(CppSpecificNumericType {
           name: name.to_string(),
           bits: 32,
           kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
-        })
+        }))
       }
       "quint32" | "uint32_t" | "GLuint" => {
-        Some(CppTypeBase::SpecificNumeric {
+        Some(CppTypeBase::SpecificNumeric(CppSpecificNumericType {
           name: name.to_string(),
           bits: 32,
           kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
-        })
+        }))
       }
       "qint64" | "int64_t" | "qlonglong" | "GLint64" => {
-        Some(CppTypeBase::SpecificNumeric {
+        Some(CppTypeBase::SpecificNumeric(CppSpecificNumericType {
           name: name.to_string(),
           bits: 64,
           kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
-        })
+        }))
       }
       "quint64" | "uint64_t" | "qulonglong" | "GLuint64" => {
-        Some(CppTypeBase::SpecificNumeric {
+        Some(CppTypeBase::SpecificNumeric(CppSpecificNumericType {
           name: name.to_string(),
           bits: 64,
           kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
-        })
+        }))
       }
       "qintptr" |
       "qptrdiff" |

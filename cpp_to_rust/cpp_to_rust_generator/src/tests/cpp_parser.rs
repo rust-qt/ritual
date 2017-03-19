@@ -1120,11 +1120,11 @@ fn fixed_size_integers() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::SpecificNumeric {
+    base: CppTypeBase::SpecificNumeric(CppSpecificNumericType {
       name: "GLuint64".to_string(),
       bits: 64,
       kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
-    },
+    }),
   };
   assert_eq!(&data.methods[0].return_type, &type1);
 

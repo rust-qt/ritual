@@ -5,10 +5,8 @@ use common::errors::{Result, ChainErr, Error, unexpected};
 use common::string_utils::JoinWithString;
 use common::utils::MapIfOk;
 
-extern crate regex;
-
 pub use serializable::{CppBuiltInNumericType, CppSpecificNumericTypeKind, CppTypeBase, CppType,
-                       CppTypeIndirection, CppTypeClassBase};
+                       CppTypeIndirection, CppTypeClassBase, CppSpecificNumericType};
 
 impl CppTypeIndirection {
   pub fn combine(left: &CppTypeIndirection,
@@ -216,7 +214,7 @@ impl CppTypeBase {
       CppTypeBase::Void => Ok("void".to_string()),
       CppTypeBase::BuiltInNumeric(ref t) => Ok(t.to_cpp_code().to_string()),
       CppTypeBase::Enum { ref name } |
-      CppTypeBase::SpecificNumeric { ref name, .. } |
+      CppTypeBase::SpecificNumeric(CppSpecificNumericType { ref name, .. }) |
       CppTypeBase::PointerSizedInteger { ref name, .. } => Ok(name.clone()),
       //      CppTypeBase::SpecificNumeric { ref name, .. } => Ok(name.clone()),
       //      CppTypeBase::PointerSizedInteger { ref name, .. } => Ok(name.clone()),
@@ -249,7 +247,7 @@ impl CppTypeBase {
   #[allow(dead_code)]
   pub fn maybe_name(&self) -> Option<&String> {
     match *self {
-      CppTypeBase::SpecificNumeric { ref name, .. } |
+      CppTypeBase::SpecificNumeric(CppSpecificNumericType { ref name, .. }) |
       CppTypeBase::PointerSizedInteger { ref name, .. } |
       CppTypeBase::Enum { ref name } |
       CppTypeBase::Class(CppTypeClassBase { ref name, .. }) => Some(name),
@@ -263,7 +261,7 @@ impl CppTypeBase {
     Ok(match *self {
       CppTypeBase::Void => "void".to_string(),
       CppTypeBase::BuiltInNumeric(ref t) => t.to_cpp_code().to_string().replace(" ", "_"),
-      CppTypeBase::SpecificNumeric { ref name, .. } |
+      CppTypeBase::SpecificNumeric(CppSpecificNumericType { ref name, .. }) |
       CppTypeBase::PointerSizedInteger { ref name, .. } => name.clone(),
       CppTypeBase::Enum { ref name } => name.replace("::", "_"),
       CppTypeBase::Class(ref data) => data.caption()?,
@@ -621,7 +619,7 @@ impl CppType {
           return false;
         }
       }
-      if let CppTypeBase::SpecificNumeric { ref kind, .. } = other_type.base {
+      if let CppTypeBase::SpecificNumeric(CppSpecificNumericType { ref kind, .. }) = other_type.base {
         if data1.is_float() {
           return kind == &CppSpecificNumericTypeKind::FloatingPoint;
         } else if data1.is_signed_integer() {
@@ -648,3 +646,11 @@ impl CppType {
     false
   }
 }
+
+impl PartialEq for CppSpecificNumericType {
+  fn eq(&self, other: &CppSpecificNumericType) -> bool {
+    // name field is ignored
+    self.bits == other.bits && self.kind == other.kind
+  }
+}
+impl Eq for CppSpecificNumericType {}

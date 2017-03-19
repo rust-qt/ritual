@@ -1,5 +1,5 @@
 use cpp_type::{CppType, CppTypeRole, CppTypeIndirection, CppTypeBase, CppBuiltInNumericType,
-               CppSpecificNumericTypeKind, CppTypeClassBase};
+               CppSpecificNumericTypeKind, CppTypeClassBase, CppSpecificNumericType};
 use cpp_data::CppFunctionPointerType;
 use caption_strategy::TypeCaptionStrategy;
 use cpp_ffi_data::IndirectionChange;
@@ -142,11 +142,11 @@ fn qint64() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::SpecificNumeric {
+    base: CppTypeBase::SpecificNumeric(CppSpecificNumericType {
       name: "qint64".to_string(),
       bits: 64,
       kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
-    },
+    }),
   };
   assert_eq!(type1.is_void(), false);
   assert_eq!(type1.base.is_void(), false);
