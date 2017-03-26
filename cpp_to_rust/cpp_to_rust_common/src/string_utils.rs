@@ -19,17 +19,10 @@ impl<S, S2, X> JoinWithString<S2> for X
   }
 }
 
-#[derive(PartialEq, Debug)]
-enum WordCase {
-  Upper,
-  Lower,
-  Capitalized,
-}
 
 pub struct WordIterator<'a> {
   string: &'a str,
   index: usize,
-  previous_word_case: Option<WordCase>,
 }
 
 impl<'a> WordIterator<'a> {
@@ -37,7 +30,6 @@ impl<'a> WordIterator<'a> {
     WordIterator {
       string: string,
       index: 0,
-      previous_word_case: None,
     }
   }
 }
@@ -58,56 +50,16 @@ impl<'a> Iterator for WordIterator<'a> {
     if self.index >= self.string.len() {
       return None;
     }
-    let mut i = self.index;
-    let mut word_case = WordCase::Lower;
+    let mut i = self.index + 1;
     while i < self.string.len() {
       let current = char_at(self.string, i);
-      if current == '_' {
+      if current == '_' || current.is_uppercase() {
         break;
-      }
-      if i - self.index == 0 {
-        // first letter
-        if current.is_uppercase() {
-          word_case = WordCase::Capitalized;
-        } else {
-          word_case = WordCase::Lower;
-        }
-      } else if i - self.index == 1 {
-        if current.is_uppercase() {
-          if word_case == WordCase::Capitalized {
-            let next_not_upper = if i + 1 < self.string.len() {
-              !char_at(self.string, i + 1).is_uppercase()
-            } else {
-              true
-            };
-            if next_not_upper || self.previous_word_case == Some(WordCase::Capitalized) {
-              break;
-            } else {
-              word_case = WordCase::Upper;
-            }
-          } else if word_case == WordCase::Lower {
-            break;
-          }
-        }
-      } else {
-        match word_case {
-          WordCase::Lower | WordCase::Capitalized => {
-            if current.is_uppercase() {
-              break;
-            }
-          }
-          WordCase::Upper => {
-            if !current.is_uppercase() {
-              break;
-            }
-          }
-        }
       }
       i += 1;
     }
     let result = &self.string[self.index..i];
     self.index = i;
-    self.previous_word_case = Some(word_case);
     Some(result)
   }
 }
@@ -129,7 +81,11 @@ fn iterator_to_class_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String
 }
 
 fn iterator_to_snake_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {
-  it.map(|x| x.as_ref().to_lowercase()).join("_")
+  let mut parts: Vec<_> = it.map(|x| x.as_ref().to_lowercase()).collect();
+  replace_all_sub_vecs(&mut parts, vec!["na", "n"]);
+  replace_all_sub_vecs(&mut parts, vec!["open", "g", "l"]);
+  replace_all_sub_vecs(&mut parts, vec!["i", "o"]);
+  parts.join("_")
 }
 
 fn iterator_to_upper_case_words<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {
@@ -162,10 +118,7 @@ impl<'a> CaseOperations for &'a str {
     iterator_to_class_case(WordIterator::new(self))
   }
   fn to_snake_case(self) -> String {
-    let mut parts: Vec<_> = WordIterator::new(self).map(|x| x.to_lowercase()).collect();
-    replace_all_sub_vecs(&mut parts, vec!["na", "n"]);
-    replace_all_sub_vecs(&mut parts, vec!["open", "g", "l"]);
-    parts.join("_")
+    iterator_to_snake_case(WordIterator::new(self))
   }
   fn to_upper_case_words(self) -> String {
     iterator_to_upper_case_words(WordIterator::new(self))

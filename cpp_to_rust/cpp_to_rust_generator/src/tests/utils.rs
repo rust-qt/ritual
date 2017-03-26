@@ -99,4 +99,15 @@ fn case_operations() {
   assert_eq!(s8.to_class_case(), "OpenGLFunctions");
   assert_eq!(s8.to_snake_case(), "opengl_functions");
 
+  let s9 = "QIODevice".to_string();
+  assert_eq!(s9.to_class_case(), "QIODevice");
+  assert_eq!(s9.to_snake_case(), "q_io_device");
+
+  let s10 = "defineIOHandler".to_string();
+  assert_eq!(s10.to_class_case(), "DefineIOHandler");
+  assert_eq!(s10.to_snake_case(), "define_io_handler");
+
+  let s11 = "QOpenGLFunctions".to_string();
+  assert_eq!(s11.to_class_case(), "QOpenGLFunctions");
+  assert_eq!(s11.to_snake_case(), "q_opengl_functions");
 }

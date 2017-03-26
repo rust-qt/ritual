@@ -768,13 +768,11 @@ pub enum RustTypeWrapperKind {
     /// Name of the constant containing size of the corresponding
     /// C++ type in bytes. Value of the constant is determined at
     /// crate compile time.
-    size_const_name: String,
+    /// If None, this struct can only be used as pointer, like an
+    /// empty enum.
+    size_const_name: Option<String>,
     /// True if `CppDeletable` trait is implemented
     /// for this type, i.e. if this C++ type has public destructor.
-    is_deletable: bool,
-  },
-  /// Pointer-only type wrapper
-  EmptyEnum {
     is_deletable: bool,
     slot_wrapper: Option<RustQtSlotWrapper>,
   },

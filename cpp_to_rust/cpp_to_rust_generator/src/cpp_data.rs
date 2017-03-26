@@ -1245,6 +1245,18 @@ impl CppData {
     Ok(())
   }
 
+  pub fn type_allocation_place(&self, class_name: &str) -> Result<CppTypeAllocationPlace> {
+    if let Some(r) = self.type_allocation_places.get(class_name) {
+      return Ok(r.clone());
+    }
+    for dep in &self.dependencies {
+      if let Ok(r) = dep.type_allocation_place(class_name) {
+        return Ok(r);
+      }
+    }
+    Err(format!("no type allocation place information for {}", class_name).into())
+  }
+
   /// Performs data conversion to make it more suitable
   /// for further wrapper generation.
   pub fn post_process(&mut self) -> Result<()> {

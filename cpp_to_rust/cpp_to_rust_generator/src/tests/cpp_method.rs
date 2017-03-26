@@ -1,9 +1,8 @@
 use cpp_method::*;
-use cpp_data::{CppVisibility, CppTypeAllocationPlace};
+use cpp_data::{CppVisibility};
 use cpp_type::*;
 use cpp_ffi_data::CppFfiArgumentMeaning;
 use cpp_ffi_data::IndirectionChange;
-use std::collections::HashMap;
 
 #[test]
 fn cpp_method_kind() {
@@ -645,7 +644,7 @@ fn c_signature_method_returning_class() {
   assert_eq!(r_heap.return_type.conversion,
              IndirectionChange::ValueToPointer);
 }
-
+/*
 #[test]
 fn to_ffi_signatures_destructor() {
   let mut method1 = empty_regular_method();
@@ -702,7 +701,7 @@ fn to_ffi_signatures_simple_func() {
   assert_eq!(result.allocation_place,
              ReturnValueAllocationPlace::NotApplicable);
 }
-
+*/
 #[test]
 fn full_name_free_function_in_namespace() {
   let mut method1 = empty_regular_method();

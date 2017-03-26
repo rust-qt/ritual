@@ -148,7 +148,7 @@ impl<'a> CGenerator<'a> {
       if !self.should_process_method(method)? {
         continue;
       }
-      match method.to_ffi_signature(&self.cpp_data.type_allocation_places,
+      match method.to_ffi_signature(&self.cpp_data,
                                     type_allocation_places_override.clone()) {
         Err(msg) => {
           log::llog(log::DebugFfiSkips, || {

@@ -297,13 +297,15 @@ pub fn run(config: Config) -> Result<()> {
   let mut cpp_type_size_requests = Vec::new();
   for type1 in &rust_data.processed_types {
     if let RustTypeWrapperKind::Struct { ref size_const_name, .. } = type1.kind {
-      cpp_type_size_requests.push(CppTypeSizeRequest {
-        cpp_code: CppTypeClassBase {
-            name: type1.cpp_name.clone(),
-            template_arguments: type1.cpp_template_arguments.clone(),
-          }.to_cpp_code()?,
-        size_const_name: size_const_name.clone(),
-      });
+      if let Some(ref size_const_name) = *size_const_name {
+        cpp_type_size_requests.push(CppTypeSizeRequest {
+          cpp_code: CppTypeClassBase {
+              name: type1.cpp_name.clone(),
+              template_arguments: type1.cpp_template_arguments.clone(),
+            }.to_cpp_code()?,
+          size_const_name: size_const_name.clone(),
+        });
+      }
     }
   }
   {

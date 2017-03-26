@@ -1,5 +1,5 @@
 use caption_strategy::TypeCaptionStrategy;
-use cpp_data::{CppTypeKind, CppEnumValue, CppFunctionPointerType};
+use cpp_data::{CppTypeKind, CppEnumValue, CppFunctionPointerType, CppTypeAllocationPlace};
 use cpp_ffi_data::{CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiType, IndirectionChange,
                    CppAndFfiData};
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
@@ -398,12 +398,23 @@ fn process_types(input_data: &CppAndFfiData,
       cpp_template_arguments: None,
       kind: match type_info.kind {
         CppTypeKind::Class { .. } => {
-          RustTypeWrapperKind::Struct {
-            size_const_name: size_const_name(&rust_name),
-            is_deletable: input_data.cpp_data.has_public_destructor(&CppTypeClassBase {
-              name: type_info.name.clone(),
-              template_arguments: None,
-            }),
+          match input_data.cpp_data.type_allocation_place(&type_info.name) {
+            Err(err) => {
+              log::llog(log::DebugRustSkips,
+                        || format!("Can't process type: {}: {}", type_info.name, err));
+              continue;
+            }
+            Ok(place) => RustTypeWrapperKind::Struct {
+              size_const_name: match place {
+                CppTypeAllocationPlace::Stack => Some(size_const_name(&rust_name)),
+                CppTypeAllocationPlace::Heap => None,
+              },
+              is_deletable: input_data.cpp_data.has_public_destructor(&CppTypeClassBase {
+                name: type_info.name.clone(),
+                template_arguments: None,
+              }),
+              slot_wrapper: None,
+            }
           }
         }
         CppTypeKind::Enum { ref values } => {
@@ -484,11 +495,12 @@ fn process_types(input_data: &CppAndFfiData,
         cpp_doc: type_info.doc.clone(),
         cpp_template_arguments: Some(ins.template_arguments.clone()),
         kind: RustTypeWrapperKind::Struct {
-          size_const_name: String::new(),
+          size_const_name: None,
           is_deletable: input_data.cpp_data.has_public_destructor(&CppTypeClassBase {
             name: template_instantiations.class_name.clone(),
             template_arguments: Some(ins.template_arguments.clone()),
           }),
+          slot_wrapper: None,
         },
         rust_name: rust_name,
         is_public: true,
@@ -517,7 +529,21 @@ fn process_types(input_data: &CppAndFfiData,
         Ok(name) => {
           r.rust_name = name.clone();
           if let RustTypeWrapperKind::Struct { ref mut size_const_name, .. } = r.kind {
-            *size_const_name = self::size_const_name(&name);
+            match input_data.cpp_data.type_allocation_place(&r.cpp_name) {
+              Err(err) => {
+                log::log(log::DebugRustSkips,
+                         format!("Can't process type: {}: {}", r.cpp_name, err));
+                continue;
+              }
+              Ok(place) => {
+                *size_const_name = match place {
+                  CppTypeAllocationPlace::Stack => Some(self::size_const_name(&name)),
+                  CppTypeAllocationPlace::Heap => None,
+                };
+              }
+            }
+          } else {
+            unreachable!();
           }
           result.push(r);
           any_success = true;
@@ -561,7 +587,8 @@ fn process_types(input_data: &CppAndFfiData,
                                        None,
                                        config)?,
         is_public: true,
-        kind: RustTypeWrapperKind::EmptyEnum {
+        kind: RustTypeWrapperKind::Struct {
+          size_const_name: None,
           is_deletable: true,
           slot_wrapper: Some(RustQtSlotWrapper {
             arguments: qt_slot_wrapper.arguments
@@ -631,8 +658,7 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
                                              dependency_types,
                                              |x| &x.rust_name == base) {
             match info.kind {
-              RustTypeWrapperKind::Struct { ref is_deletable, .. } |
-              RustTypeWrapperKind::EmptyEnum { ref is_deletable, .. } => {
+              RustTypeWrapperKind::Struct { ref is_deletable, .. } => {
                 if !*is_deletable {
                   return Err(format!("{} is not deletable", base.full_name(None)).into());
                 }
@@ -910,8 +936,7 @@ impl RustGenerator {
         },
          cpp_methods)
       }
-      RustTypeWrapperKind::Struct { .. } |
-      RustTypeWrapperKind::EmptyEnum { .. } => {
+      RustTypeWrapperKind::Struct { .. } => {
         let methods_scope = RustMethodScope::Impl {
           target_type: RustType::Common {
             base: info.rust_name.clone(),

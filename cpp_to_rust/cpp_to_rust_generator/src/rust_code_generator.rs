@@ -818,16 +818,18 @@ impl<'a> RustCodeGenerator<'a> {
               }
               r
             }
-            RustTypeWrapperKind::Struct { ref size_const_name, .. } => {
-              format!(include_str!("../templates/crate/struct_declaration.rs.in"),
-                      maybe_pub = maybe_pub,
-                      name = type1.name.last_name()?,
-                      size_const_name = size_const_name)
-            }
-            RustTypeWrapperKind::EmptyEnum { ref slot_wrapper, .. } => {
-              let mut r = format!("{maybe_pub}enum {} {{}}\n\n",
+            RustTypeWrapperKind::Struct { ref size_const_name, ref slot_wrapper, .. } => {
+              let mut r = if let Some(ref size_const_name) = *size_const_name {
+                format!(include_str!("../templates/crate/struct_declaration.rs.in"),
+                        maybe_pub = maybe_pub,
+                        name = type1.name.last_name()?,
+                        size_const_name = size_const_name)
+              } else {
+                format!("#[repr(C)]\n{maybe_pub}struct {}(u8);\n\n",
                                   type1.name.last_name()?,
-                                  maybe_pub = maybe_pub);
+                                  maybe_pub = maybe_pub)
+              };
+
               if let Some(ref slot_wrapper) = *slot_wrapper {
                 let arg_texts: Vec<_> = slot_wrapper.arguments
                   .iter()

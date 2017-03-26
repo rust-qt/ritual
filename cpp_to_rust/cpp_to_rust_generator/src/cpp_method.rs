@@ -1,14 +1,14 @@
-use cpp_data::{CppVisibility, CppTypeAllocationPlace};
+use cpp_data::{CppVisibility, CppTypeAllocationPlace, CppData};
 use cpp_ffi_data::{CppMethodWithFfiSignature, CppFfiType, CppFfiFunctionSignature,
                    CppFfiFunctionArgument, CppFfiArgumentMeaning};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase, CppTypeClassBase};
-use common::errors::{Result, unexpected, ChainErr};
+use common::errors::{Result, unexpected};
 use common::string_utils::JoinWithString;
 use common::utils::MapIfOk;
 pub use serializable::{CppFunctionArgument, CppMethodKind, CppMethod, CppMethodClassMembership,
                        CppFieldAccessorType, FakeCppMethod, CppMethodDoc};
-use std::collections::HashMap;
+
 
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -148,17 +148,16 @@ impl CppMethod {
   /// Generates either one or two FFI signatures for this method,
   /// depending on its return type.
   pub fn to_ffi_signature(&self,
-                          type_allocation_places: &HashMap<String, CppTypeAllocationPlace>,
+                          cpp_data: &CppData,
                           type_allocation_places_override: Option<CppTypeAllocationPlace>)
                           -> Result<CppMethodWithFfiSignature> {
     let get_place = |name| -> Result<ReturnValueAllocationPlace> {
       let v = if let Some(ref x) = type_allocation_places_override {
-        x
+        x.clone()
       } else {
-        type_allocation_places.get(name)
-          .chain_err(|| format!("no type allocation place for type: '{}'", name))?
+        cpp_data.type_allocation_place(name)?
       };
-      Ok(match *v {
+      Ok(match v {
         CppTypeAllocationPlace::Heap => ReturnValueAllocationPlace::Heap,
         CppTypeAllocationPlace::Stack => ReturnValueAllocationPlace::Stack,
       })

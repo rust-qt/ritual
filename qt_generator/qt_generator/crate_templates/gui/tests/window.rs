@@ -9,7 +9,7 @@ use qt_gui::cpp_utils::*;
 fn window1() {
   let _app = GuiApplication::new((&mut 0i32, &mut (&mut 0i8 as *mut i8) as *mut *mut i8));
 
-  let mut a = Window::new();
+  let mut a = Window::new(());
   let mut b = Window::new(a.as_mut_ptr());
   let mut c = Window::new(b.as_mut_ptr());
   a.set_geometry((10, 10, 300, 300));
