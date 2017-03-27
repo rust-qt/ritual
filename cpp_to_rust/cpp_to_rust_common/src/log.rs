@@ -49,14 +49,23 @@ impl LoggerSettings {
 
 #[derive(Default)]
 pub struct Logger {
-  pub default_settings: LoggerSettings,
-  pub category_settings: HashMap<LoggerCategory, LoggerSettings>,
+  default_settings: LoggerSettings,
+  category_settings: HashMap<LoggerCategory, LoggerSettings>,
   files: HashMap<LoggerCategory, File>,
 }
 
 impl Logger {
   pub fn new() -> Logger {
     Logger::default()
+  }
+
+  pub fn set_default_settings(&mut self, value: LoggerSettings) {
+    self.default_settings = value;
+    self.files.clear();
+  }
+  pub fn set_category_settings(&mut self, value: HashMap<LoggerCategory, LoggerSettings>) {
+    self.category_settings = value;
+    self.files.clear();
   }
 
   pub fn is_on(&self, category: LoggerCategory) -> bool {

@@ -17,6 +17,7 @@ use rust_generator;
 use rust_info::{RustTypeWrapperKind, RustExportInfo, DependencyInfo};
 
 use std::path::{Path, PathBuf};
+use std::collections::HashMap;
 
 pub fn completed_marker_path<P: AsRef<Path>>(cache_dir: P) -> PathBuf {
   cache_dir.as_ref().with_added("cpp_to_rust_completed")
@@ -164,10 +165,13 @@ pub fn run(config: Config) -> Result<()> {
   check_all_paths(&config)?;
   {
     let mut logger = log::default_logger();
-    logger.default_settings.write_to_stderr = false;
-    logger.category_settings.clear();
+    logger.set_default_settings(log::LoggerSettings {
+      file_path: None,
+      write_to_stderr: false,
+    });
+    let mut category_settings = HashMap::new();
     for category in &[log::Status, log::Error] {
-      logger.category_settings.insert(*category,
+      category_settings.insert(*category,
                                       log::LoggerSettings {
                                         file_path: None,
                                         write_to_stderr: true,
@@ -201,13 +205,14 @@ pub fn run(config: Config) -> Result<()> {
                         log::DebugQtHeaderNames] {
         let name = format!("{:?}", *category).to_snake_case();
         let path = logs_dir.with_added(format!("{}.log", name));
-        logger.category_settings.insert(*category,
+        category_settings.insert(*category,
                                         log::LoggerSettings {
                                           file_path: Some(path),
                                           write_to_stderr: false,
                                         });
       }
     }
+    logger.set_category_settings(category_settings);
   }
 
   // TODO: allow to remove any prefix through `Config` (#25)
