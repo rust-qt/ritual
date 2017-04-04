@@ -53,7 +53,7 @@ impl<'a> Iterator for WordIterator<'a> {
     let mut i = self.index + 1;
     while i < self.string.len() {
       let current = char_at(self.string, i);
-      if current == '_' || current.is_uppercase() {
+      if current == '_' || current.is_uppercase() || current.is_digit(10) {
         break;
       }
       i += 1;
@@ -85,7 +85,20 @@ fn iterator_to_snake_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String
   replace_all_sub_vecs(&mut parts, vec!["na", "n"]);
   replace_all_sub_vecs(&mut parts, vec!["open", "g", "l"]);
   replace_all_sub_vecs(&mut parts, vec!["i", "o"]);
-  parts.join("_")
+  replace_all_sub_vecs(&mut parts, vec!["2", "d"]);
+  replace_all_sub_vecs(&mut parts, vec!["3", "d"]);
+  replace_all_sub_vecs(&mut parts, vec!["4", "d"]);
+  let mut str = String::new();
+  for (i, part) in parts.into_iter().enumerate() {
+    if part.is_empty() {
+      continue;
+    }
+    if i > 0 && !part.chars().all(|c| c.is_digit(10)) {
+      str.push('_');
+    }
+    str.push_str(&part);
+  }
+  str
 }
 
 fn iterator_to_upper_case_words<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {

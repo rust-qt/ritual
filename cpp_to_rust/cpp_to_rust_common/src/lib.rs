@@ -27,3 +27,6 @@ pub mod build_script_data;
 pub mod cargo_override;
 
 mod serializable;
+
+#[cfg(test)]
+mod tests;

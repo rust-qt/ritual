@@ -1,6 +1,6 @@
 #[test]
 fn join() {
-  use common::string_utils::JoinWithString;
+  use string_utils::JoinWithString;
   let a1 = vec!["a", "b", "c"];
   assert_eq!(a1.join(""), "abc");
   assert_eq!(a1.join("_"), "a_b_c");
@@ -18,7 +18,7 @@ fn join() {
 
 #[test]
 fn path_buf_with_added() {
-  use common::file_utils::PathBufWithAdded;
+  use file_utils::PathBufWithAdded;
   use std::path::PathBuf;
   let x = PathBuf::from("/tmp");
   let mut y = x.clone();
@@ -29,7 +29,7 @@ fn path_buf_with_added() {
 
 #[test]
 fn word_iterator() {
-  use common::string_utils::WordIterator;
+  use string_utils::WordIterator;
   let string = "one_two_three".to_string();
   let mut a1 = WordIterator::new(&string);
   assert_eq!(a1.next(), Some("one"));
@@ -40,7 +40,7 @@ fn word_iterator() {
 
 #[test]
 fn word_iterator2() {
-  use common::string_utils::WordIterator;
+  use string_utils::WordIterator;
   let string = "RustIsAwesome".to_string();
   let mut a1 = WordIterator::new(&string);
   assert_eq!(a1.next(), Some("Rust"));
@@ -50,14 +50,14 @@ fn word_iterator2() {
 }
 
 fn split_to_words(s: &'static str) -> Vec<&'static str> {
-  use common::string_utils::WordIterator;
+  use string_utils::WordIterator;
   WordIterator::new(s).collect()
 }
 
 #[test]
 fn word_iterator3() {
   assert_eq!(split_to_words("one_two"), vec!["one", "two"]);
-  assert_eq!(split_to_words("ONE_two"), vec!["ONE", "two"]);
+  assert_eq!(split_to_words("ONE_two"), vec!["O", "N", "E", "two"]);
   assert_eq!(split_to_words("OneXTwo"), vec!["One", "X", "Two"]);
   assert_eq!(split_to_words("QThreadPool"), vec!["Q", "Thread", "Pool"]);
 }
@@ -65,7 +65,7 @@ fn word_iterator3() {
 
 #[test]
 fn case_operations() {
-  use common::string_utils::CaseOperations;
+  use string_utils::CaseOperations;
 
   let s1 = "first_second_last".to_string();
   assert_eq!(s1.to_class_case(), "FirstSecondLast");
@@ -110,4 +110,12 @@ fn case_operations() {
   let s11 = "QOpenGLFunctions".to_string();
   assert_eq!(s11.to_class_case(), "QOpenGLFunctions");
   assert_eq!(s11.to_snake_case(), "q_opengl_functions");
+
+  let s12 = "QVector2D".to_string();
+  assert_eq!(s12.to_class_case(), "QVector2D");
+  assert_eq!(s12.to_snake_case(), "q_vector_2d");
+
+  let s13 = "OneTwo2Three".to_string();
+  assert_eq!(s13.to_class_case(), "OneTwo2Three");
+  assert_eq!(s13.to_snake_case(), "one_two2_three");
 }

@@ -29,7 +29,7 @@ impl HeaderNameMap {
   }
 
   fn new(headers_dir: &PathBuf) -> Result<HeaderNameMap> {
-    let re = ::regex::Regex::new(r#"^#include "([a-zA-Z._]+)"$"#)?;
+    let re = ::regex::Regex::new(r#"^#include "([a-zA-Z0-9._]+)"$"#)?;
     let mut map_real_to_all_fancy: HashMap<_, Vec<_>> = HashMap::new();
     log::status("Detecting fancy Qt header names");
     for header in read_dir(headers_dir)? {
