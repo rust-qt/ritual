@@ -1530,7 +1530,7 @@ impl RustGenerator {
       if let Some(self_arg_kind_caption) = self_arg_kind_caption {
         trait_name = format!("{}_{}", trait_name, self_arg_kind_caption);
         let name = method_name.parts.pop().chain_err(|| "name can't be empty")?;
-        method_name.parts.push(format!("{}_{}", name, self_arg_kind_caption));
+        method_name.parts.push(vec![name.as_ref(), self_arg_kind_caption.as_ref()].to_snake_case());
       }
       trait_name = trait_name.to_class_case() + "Args";
       if let RustMethodScope::Impl { ref target_type } = *scope {

@@ -6,7 +6,7 @@ use qt_widgets::qt_core::connections::Signal;
 use qt_widgets::widget::Widget;
 use qt_widgets::push_button::PushButton;
 use qt_widgets::line_edit::LineEdit;
-use qt_widgets::qvb_ox_layout::QvbOxLayout as VBoxLayout;
+use qt_widgets::v_box_layout::VBoxLayout;
 use qt_widgets::qt_core::string::String;
 use qt_widgets::qt_core::slots::SlotNoArgs;
 use qt_widgets::message_box::MessageBox;
@@ -27,9 +27,9 @@ fn uref<T>(ptr: *mut T) -> &'static mut T {
 
 impl<'a> Form<'a> {
   fn new() -> Form<'a> {
-    let mut widget = Widget::new();
-    let mut layout = VBoxLayout::new((widget.as_mut_ptr(),));
-    let mut line_edit = LineEdit::new();
+    let mut widget = Widget::new(());
+    let mut layout = VBoxLayout::new(widget.as_mut_ptr());
+    let mut line_edit = LineEdit::new(());
     layout.add_widget(line_edit.static_cast_mut() as *mut _);
     let line_edit = line_edit.into_raw();
     let mut button = PushButton::new(&String::from_std_str("Start"));
@@ -51,7 +51,7 @@ impl<'a> Form<'a> {
         let text = uref(line_edit1).text();
         MessageBox::information((widget1,
                                  &String::from_std_str("My title"),
-                                 &String::from_std_str("Text: \"%1\". Congratulations!").arg(&text)));
+                                 &String::from_std_str("Text: \"%1\". Congratulations!").arg0(&text)));
       }),
       line_edit_edited: SlotNoArgs::new(move || {
         uref(button1).set_enabled(!uref(line_edit1).text().is_empty());

@@ -31,7 +31,7 @@ macro(add_osx_framework fwname target)
     target_link_libraries(${{target}} "${{FRAMEWORK_${{fwname}}}}/${{fwname}}")
     message(STATUS "Framework ${{fwname}} found at ${{FRAMEWORK_${{fwname}}}}")
   endif()
-endmacro(ADD_OSX_FRAMEWORK)
+endmacro(add_osx_framework)
 
 if(C2R_LINKED_FRAMEWORKS)
   foreach(framework ${{C2R_LINKED_FRAMEWORKS}})

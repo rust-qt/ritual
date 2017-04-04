@@ -292,6 +292,17 @@ pub fn gui(config: &mut Config) -> Result<()> {
   Ok(())
 }
 pub fn widgets(config: &mut Config) -> Result<()> {
+  config.add_cpp_parser_blocked_names(vec![
+    "QWidgetData",
+    "QWidgetItemV2"
+  ]);
+
+  // TODO: Mac specific:
+  config.add_cpp_parser_blocked_names(vec![
+    "QMacCocoaViewContainer",
+    "QMacNativeWidget"
+  ]);
+
   exclude_qlist_eq_based_methods(config,
                                  &["QTableWidgetSelectionRange", "QTextEdit::ExtraSelection"]);
   config.add_cpp_ffi_generator_filter(Box::new(|method| {
