@@ -75,10 +75,12 @@ pub fn lib_dependencies(sublib_name: &str) -> Result<&'static [&'static str]> {
   const CORE: &'static [&'static str] = &[];
   const GUI: &'static [&'static str] = &["core"];
   const WIDGETS: &'static [&'static str] = &["core", "gui"];
+  const UI_TOOLS: &'static [&'static str] = &["core", "gui", "widgets"];
   Ok(match sublib_name {
        "core" => CORE,
        "gui" => GUI,
        "widgets" => WIDGETS,
+       "ui_tools" => UI_TOOLS,
        _ => return Err(format!("Unknown lib name: {}", sublib_name).into()),
      })
 }

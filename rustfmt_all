@@ -1,0 +1,4 @@
+#!/bin/bash
+export PATH=$PATH:$HOME/.cargo/bin
+
+find . -name "*.rs" -not -path "**/target/**" -exec rustfmt --config-path rustfmt.toml {} \;

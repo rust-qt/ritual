@@ -185,6 +185,7 @@ fn exec(sublib_name: &str,
     "core" => lib_configs::core(&mut config)?,
     "gui" => lib_configs::gui(&mut config)?,
     "widgets" => lib_configs::widgets(&mut config)?,
+    "ui_tools" => {}
     _ => return Err(format!("Unknown lib name: {}", sublib_name).into()),
   }
 

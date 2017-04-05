@@ -222,7 +222,7 @@ pub fn run(config: CppParserConfig, dependencies_data: Vec<CppData>) -> Result<C
       let methods = parser.parse_methods(translation_unit);
       Ok((parser, methods))
     })?;
-    log::status("Checking integrity");
+    log::status("Checking data integrity");
     let (good_methods, good_types) = parser.check_integrity(methods);
     parser.types = good_types;
     log::status("Searching for template instantiations");
@@ -1589,7 +1589,6 @@ impl<'a> CppParser<'a> {
   }
 
   fn check_integrity(&self, methods: Vec<CppMethod>) -> (Vec<CppMethod>, Vec<CppTypeData>) {
-    log::status("Checking data integrity");
     let good_methods = methods
       .into_iter()
       .filter(|method| {
