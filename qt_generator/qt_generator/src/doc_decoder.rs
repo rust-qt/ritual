@@ -59,10 +59,14 @@ impl DocData {
   }
 
   pub fn find_index_item<F: Fn(&DocIndexItem) -> bool>(&mut self, f: F) -> Option<DocIndexItem> {
-    self.index.iter_mut().find(|item| f(item)).and_then(|mut item| {
-      item.accessed = true;
-      Some(item.clone())
-    })
+    self
+      .index
+      .iter_mut()
+      .find(|item| f(item))
+      .and_then(|mut item| {
+                  item.accessed = true;
+                  Some(item.clone())
+                })
   }
 }
 
@@ -71,13 +75,13 @@ pub fn decode_doc(qt_sub_lib_name: &str) -> Result<DocData> {
   if !doc_path.exists() {
     return Err(format!("Documentation directory does not exist: {}",
                        doc_path.display())
-      .into());
+                   .into());
   }
   let doc_file_path = doc_path.with_added(format!("qt{}.qch", qt_sub_lib_name));
   if !doc_file_path.exists() {
     return Err(format!("Documentation file does not exist: {}",
                        doc_file_path.display())
-      .into());
+                   .into());
   }
   log::status(format!("Adding Qt documentation from {}", doc_file_path.display()));
   let connection = rusqlite::Connection::open_with_flags(&doc_file_path,
@@ -96,15 +100,15 @@ pub fn decode_doc(qt_sub_lib_name: &str) -> Result<DocData> {
       let file_id: i32 = index_row.get_checked(1).convert_err()?;
       let anchor: Option<String> = index_row.get_checked(2).convert_err()?;
       index_data.push(DocIndexItem {
-        name: name,
-        document_id: file_id,
-        anchor: anchor,
-        accessed: false,
-      });
+                        name: name,
+                        document_id: file_id,
+                        anchor: anchor,
+                        accessed: false,
+                      });
     }
   }
   Ok(DocData {
-    index: index_data,
-    connection: connection,
-  })
+       index: index_data,
+       connection: connection,
+     })
 }

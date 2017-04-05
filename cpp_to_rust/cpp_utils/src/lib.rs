@@ -189,13 +189,17 @@ pub trait StaticCast<T> {
 /// Converts type of a const pointer using `StaticCast` implementation of the type.
 /// If `ptr` is null, this function does nothing and returns null pointer.
 pub fn static_cast<R, T: StaticCast<R>>(ptr: *const T) -> *const R {
-  unsafe { ptr.as_ref() }.map(|x| x.static_cast() as *const R).unwrap_or(std::ptr::null())
+  unsafe { ptr.as_ref() }
+    .map(|x| x.static_cast() as *const R)
+    .unwrap_or(std::ptr::null())
 }
 
 /// Converts type of a mutable pointer using `StaticCast` implementation of the type.
 /// If `ptr` is null, this function does nothing and returns null pointer.
 pub fn static_cast_mut<R, T: StaticCast<R>>(ptr: *mut T) -> *mut R {
-  unsafe { ptr.as_mut() }.map(|x| x.static_cast_mut() as *mut R).unwrap_or(std::ptr::null_mut())
+  unsafe { ptr.as_mut() }
+    .map(|x| x.static_cast_mut() as *mut R)
+    .unwrap_or(std::ptr::null_mut())
 }
 
 /// Provides access to C++ `static_cast` conversion from base class to derived class.
@@ -231,7 +235,10 @@ pub trait UnsafeStaticCast<T> {
 /// or a class derived from `R`.
 /// If `ptr` is null, this function does nothing and returns null pointer.
 pub unsafe fn unsafe_static_cast<R, T: UnsafeStaticCast<R>>(ptr: *const T) -> *const R {
-  ptr.as_ref().map(|x| x.static_cast() as *const R).unwrap_or(std::ptr::null())
+  ptr
+    .as_ref()
+    .map(|x| x.static_cast() as *const R)
+    .unwrap_or(std::ptr::null())
 }
 
 /// Converts type of a mutable pointer using `UnsafeStaticCast` implementation of the type.
@@ -239,7 +246,10 @@ pub unsafe fn unsafe_static_cast<R, T: UnsafeStaticCast<R>>(ptr: *const T) -> *c
 /// or a class derived from `R`.
 /// If `ptr` is null, this function does nothing and returns null pointer.
 pub unsafe fn unsafe_static_cast_mut<R, T: UnsafeStaticCast<R>>(ptr: *mut T) -> *mut R {
-  ptr.as_mut().map(|x| x.static_cast_mut() as *mut R).unwrap_or(std::ptr::null_mut())
+  ptr
+    .as_mut()
+    .map(|x| x.static_cast_mut() as *mut R)
+    .unwrap_or(std::ptr::null_mut())
 }
 
 
@@ -273,7 +283,11 @@ pub trait DynamicCast<T> {
 /// a class derived from `R`.
 /// If `ptr` is null, this function does nothing and returns null pointer.
 pub unsafe fn dynamic_cast<R, T: DynamicCast<R>>(ptr: *const T) -> *const R {
-  ptr.as_ref().and_then(|x| x.dynamic_cast()).map(|x| x as *const R).unwrap_or(std::ptr::null())
+  ptr
+    .as_ref()
+    .and_then(|x| x.dynamic_cast())
+    .map(|x| x as *const R)
+    .unwrap_or(std::ptr::null())
 }
 
 /// Converts type of a mutable pointer using `DynamicCast` implementation of the type.
@@ -282,7 +296,8 @@ pub unsafe fn dynamic_cast<R, T: DynamicCast<R>>(ptr: *const T) -> *const R {
 /// Returns null pointer if `ptr` does not point to an instance of `R`.
 /// If `ptr` is null, this function does nothing and returns null pointer.
 pub unsafe fn dynamic_cast_mut<R, T: DynamicCast<R>>(ptr: *mut T) -> *mut R {
-  ptr.as_mut()
+  ptr
+    .as_mut()
     .and_then(|x| x.dynamic_cast_mut())
     .map(|x| x as *mut R)
     .unwrap_or(std::ptr::null_mut())

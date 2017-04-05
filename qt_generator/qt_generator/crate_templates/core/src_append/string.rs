@@ -1,6 +1,6 @@
 
-use ::libc::{c_char, c_int};
-use ::std;
+use libc::{c_char, c_int};
+use std;
 
 impl<'a> From<&'a str> for ::string::String {
   fn from(s: &'a str) -> ::string::String {

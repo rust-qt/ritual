@@ -25,12 +25,13 @@ impl CMakeVar {
           I: AsRef<str>,
           L: IntoIterator<Item = I>
   {
-    let value = paths.into_iter()
+    let value = paths
+      .into_iter()
       .map_if_ok(|s| -> Result<_> {
         if s.as_ref().contains(';') {
           Err(format!("can't pass value to cmake because ';' symbol is reserved: {}",
                       s.as_ref())
-            .into())
+                  .into())
         } else {
           Ok(s)
         }
@@ -74,7 +75,8 @@ impl CppLibBuilder {
       create_dir_all(&self.build_dir)?;
     }
     let mut cmake_command = Command::new("cmake");
-    cmake_command.arg(self.cmake_source_dir)
+    cmake_command
+      .arg(self.cmake_source_dir)
       .current_dir(&self.build_dir);
     let actual_build_type = if target::current_env() == target::Env::Msvc {
       // Rust always links to release version of MSVC runtime, so
@@ -139,8 +141,7 @@ impl CppLibBuilder {
     }
     make_args.push("install".to_string());
     let mut make_command = Command::new(make_command_name);
-    make_command.args(&make_args)
-      .current_dir(self.build_dir);
+    make_command.args(&make_args).current_dir(self.build_dir);
     run_command(&mut make_command)?;
     Ok(())
   }

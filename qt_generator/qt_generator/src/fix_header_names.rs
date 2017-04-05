@@ -16,8 +16,10 @@ impl HeaderNameMap {
   fn real_to_fancy(&self, real_header: &str, class_name: Option<&str>) -> String {
     if let Some(class_name) = class_name {
       if let Some(fancy_headers) = self.map_real_to_all_fancy.get(real_header) {
-        if let Some(x) = fancy_headers.iter()
-          .find(|&x| x == class_name || class_name.starts_with(&format!("{}::", x))) {
+        if let Some(x) =
+          fancy_headers
+            .iter()
+            .find(|&x| x == class_name || class_name.starts_with(&format!("{}::", x))) {
           return x.clone();
         }
       }
@@ -43,7 +45,10 @@ impl HeaderNameMap {
       if metadata.len() < 100 {
         let file_content = file_to_string(&header_path)?;
         if let Some(matches) = re.captures(file_content.trim()) {
-          let real_header = matches.at(1).chain_err(|| "invalid regexp matches")?.to_string();
+          let real_header = matches
+            .at(1)
+            .chain_err(|| "invalid regexp matches")?
+            .to_string();
           let fancy_header = os_str_to_str(&header.file_name())?.to_string();
           add_to_multihash(&mut map_real_to_all_fancy, real_header, fancy_header);
         }
@@ -78,9 +83,9 @@ impl HeaderNameMap {
       map_real_to_fancy.insert(real_header.clone(), fancy_header);
     }
     Ok(HeaderNameMap {
-      map_real_to_all_fancy: map_real_to_all_fancy,
-      map_real_to_fancy: map_real_to_fancy,
-    })
+         map_real_to_all_fancy: map_real_to_all_fancy,
+         map_real_to_fancy: map_real_to_fancy,
+       })
   }
 }
 
@@ -99,9 +104,9 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) -> Result<()>
 #[test]
 fn test_qt_fix_header_names() {
   let map = HeaderNameMap::new(&PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-      .with_added("test_assets")
-      .with_added("qt_headers"))
-    .unwrap();
+                                  .with_added("test_assets")
+                                  .with_added("qt_headers"))
+      .unwrap();
   assert_eq!(map.real_to_fancy("qfile.h", None), "QFile");
   assert_eq!(map.real_to_fancy("qfile.h", Some("QFile")), "QFile");
   assert_eq!(map.real_to_fancy("qnotmap.h", None), "qnotmap.h");

@@ -14,28 +14,28 @@ impl CppTypeIndirection {
                  -> Result<CppTypeIndirection> {
     let err = || format!("too much indirection: {:?} to {:?}", left, right).into();
     Ok(match *left {
-      CppTypeIndirection::None => right.clone(),
-      CppTypeIndirection::Ptr => {
-        match *right {
-          CppTypeIndirection::None => CppTypeIndirection::Ptr,
-          CppTypeIndirection::Ptr => CppTypeIndirection::PtrPtr,
-          CppTypeIndirection::Ref => CppTypeIndirection::PtrRef,
-          _ => return Err(err()),
-        }
-      }
-      CppTypeIndirection::Ref => {
-        match *right {
-          CppTypeIndirection::None => CppTypeIndirection::Ref,
-          _ => return Err(err()),
-        }
-      }
-      _ => {
-        match *right {
-          CppTypeIndirection::None => left.clone(),
-          _ => return Err(err()),
-        }
-      }
-    })
+         CppTypeIndirection::None => right.clone(),
+         CppTypeIndirection::Ptr => {
+           match *right {
+             CppTypeIndirection::None => CppTypeIndirection::Ptr,
+             CppTypeIndirection::Ptr => CppTypeIndirection::PtrPtr,
+             CppTypeIndirection::Ref => CppTypeIndirection::PtrRef,
+             _ => return Err(err()),
+           }
+         }
+         CppTypeIndirection::Ref => {
+           match *right {
+             CppTypeIndirection::None => CppTypeIndirection::Ref,
+             _ => return Err(err()),
+           }
+         }
+         _ => {
+           match *right {
+             CppTypeIndirection::None => left.clone(),
+             _ => return Err(err()),
+           }
+         }
+       })
   }
 }
 
@@ -124,13 +124,16 @@ impl CppTypeClassBase {
   pub fn caption(&self) -> Result<String> {
     let name_caption = self.name.replace("::", "_");
     Ok(match self.template_arguments {
-      Some(ref args) => {
-        format!("{}_{}",
-                name_caption,
-                args.iter().map_if_ok(|arg| arg.caption(TypeCaptionStrategy::Full))?.join("_"))
-      }
-      None => name_caption,
-    })
+         Some(ref args) => {
+           format!("{}_{}",
+                   name_caption,
+                   args
+                     .iter()
+                     .map_if_ok(|arg| arg.caption(TypeCaptionStrategy::Full))?
+                     .join("_"))
+         }
+         None => name_caption,
+       })
   }
 
   pub fn instantiate_class(&self,
@@ -138,25 +141,26 @@ impl CppTypeClassBase {
                            template_arguments1: &[CppType])
                            -> Result<CppTypeClassBase> {
     Ok(CppTypeClassBase {
-      name: self.name.clone(),
-      template_arguments: match self.template_arguments {
-        Some(ref template_arguments) => {
-          let mut args = Vec::new();
-          for arg in template_arguments {
-            args.push(arg.instantiate(nested_level1, template_arguments1)?);
-          }
-          Some(args)
-        }
-        None => None,
-      },
-    })
+         name: self.name.clone(),
+         template_arguments: match self.template_arguments {
+           Some(ref template_arguments) => {
+      let mut args = Vec::new();
+      for arg in template_arguments {
+        args.push(arg.instantiate(nested_level1, template_arguments1)?);
+      }
+      Some(args)
+    }
+           None => None,
+         },
+       })
   }
 
   pub fn to_cpp_pseudo_code(&self) -> String {
     if let Some(ref template_arguments) = self.template_arguments {
       format!("{}<{}>",
               self.name,
-              template_arguments.iter()
+              template_arguments
+                .iter()
                 .map(|x| x.to_cpp_pseudo_code())
                 .join(", "))
     } else {
@@ -196,7 +200,8 @@ impl CppTypeBase {
       CppTypeBase::TemplateParameter { .. } => true,
       CppTypeBase::Class(CppTypeClassBase { ref template_arguments, .. }) => {
         if let Some(ref template_arguments) = *template_arguments {
-          template_arguments.iter()
+          template_arguments
+            .iter()
             .any(|arg| arg.base.is_or_contains_template_parameter())
         } else {
           false
@@ -222,9 +227,11 @@ impl CppTypeBase {
       CppTypeBase::TemplateParameter { .. } => {
         Err("template parameters are not allowed in C++ code generator".into())
       }
-      CppTypeBase::FunctionPointer(CppFunctionPointerType { ref return_type,
-                                                            ref arguments,
-                                                            ref allows_variadic_arguments }) => {
+      CppTypeBase::FunctionPointer(CppFunctionPointerType {
+                                     ref return_type,
+                                     ref arguments,
+                                     ref allows_variadic_arguments,
+                                   }) => {
         if *allows_variadic_arguments {
           return Err("function pointers with variadic arguments are not supported".into());
         }
@@ -259,43 +266,55 @@ impl CppTypeBase {
   /// used to generate FFI function names
   pub fn caption(&self, strategy: TypeCaptionStrategy) -> Result<String> {
     Ok(match *self {
-      CppTypeBase::Void => "void".to_string(),
-      CppTypeBase::BuiltInNumeric(ref t) => t.to_cpp_code().to_string().replace(" ", "_"),
-      CppTypeBase::SpecificNumeric(CppSpecificNumericType { ref name, .. }) |
-      CppTypeBase::PointerSizedInteger { ref name, .. } => name.clone(),
-      CppTypeBase::Enum { ref name } => name.replace("::", "_"),
-      CppTypeBase::Class(ref data) => data.caption()?,
-      CppTypeBase::TemplateParameter { .. } => {
-        return Err("template parameters are not allowed to have captions".into());
-      }
-      CppTypeBase::FunctionPointer(CppFunctionPointerType { ref return_type,
-                                                            ref arguments,
-                                                            .. }) => {
-        match strategy {
-          TypeCaptionStrategy::Short => "func".to_string(),
-          TypeCaptionStrategy::Full => {
-            format!("{}_func_{}",
-                    return_type.caption(strategy.clone())?,
-                    arguments.iter().map_if_ok(|x| x.caption(strategy.clone()))?.join("_"))
-          }
-        }
-      }
+         CppTypeBase::Void => "void".to_string(),
+         CppTypeBase::BuiltInNumeric(ref t) => t.to_cpp_code().to_string().replace(" ", "_"),
+         CppTypeBase::SpecificNumeric(CppSpecificNumericType { ref name, .. }) |
+         CppTypeBase::PointerSizedInteger { ref name, .. } => name.clone(),
+         CppTypeBase::Enum { ref name } => name.replace("::", "_"),
+         CppTypeBase::Class(ref data) => data.caption()?,
+         CppTypeBase::TemplateParameter { .. } => {
+      return Err("template parameters are not allowed to have captions".into());
+    }
+         CppTypeBase::FunctionPointer(CppFunctionPointerType {
+                                        ref return_type,
+                                        ref arguments,
+                                        ..
+                                      }) => {
+           match strategy {
+             TypeCaptionStrategy::Short => "func".to_string(),
+             TypeCaptionStrategy::Full => {
+               format!("{}_func_{}",
+                       return_type.caption(strategy.clone())?,
+                       arguments
+                         .iter()
+                         .map_if_ok(|x| x.caption(strategy.clone()))?
+                         .join("_"))
+             }
+           }
+         }
 
-    })
+       })
   }
 
   pub fn to_cpp_pseudo_code(&self) -> String {
     match *self {
-      CppTypeBase::TemplateParameter { ref nested_level, ref index } => {
+      CppTypeBase::TemplateParameter {
+        ref nested_level,
+        ref index,
+      } => {
         return format!("T{}_{}", nested_level, index);
       }
       CppTypeBase::Class(ref base) => return base.to_cpp_pseudo_code(),
       CppTypeBase::FunctionPointer(..) => {
-        return self.to_cpp_code(Some(&"FN_PTR".to_string())).unwrap_or_else(|_| "[?]".to_string())
+        return self
+                 .to_cpp_code(Some(&"FN_PTR".to_string()))
+                 .unwrap_or_else(|_| "[?]".to_string())
       }
       _ => {}
     };
-    self.to_cpp_code(None).unwrap_or_else(|_| "[?]".to_string())
+    self
+      .to_cpp_code(None)
+      .unwrap_or_else(|_| "[?]".to_string())
   }
 }
 
@@ -354,12 +373,14 @@ impl CppType {
       CppTypeBase::TemplateParameter { .. } => {
         return Err(Error::from("template parameters cannot be expressed in FFI")).chain_err(&err);
       }
-      CppTypeBase::FunctionPointer(CppFunctionPointerType { ref return_type,
-                                                            ref arguments,
-                                                            ref allows_variadic_arguments }) => {
+      CppTypeBase::FunctionPointer(CppFunctionPointerType {
+                                     ref return_type,
+                                     ref arguments,
+                                     ref allows_variadic_arguments,
+                                   }) => {
         if *allows_variadic_arguments {
           return Err(Error::from("function pointers with variadic arguments are not supported"))
-            .chain_err(&err);
+                   .chain_err(&err);
         }
         let mut all_types: Vec<&CppType> = arguments.iter().collect();
         all_types.push(return_type.as_ref());
@@ -368,12 +389,12 @@ impl CppType {
             CppTypeBase::TemplateParameter { .. } => {
               return Err(Error::from("function pointers containing template parameters are not \
                                       supported"))
-                .chain_err(&err);
+                         .chain_err(&err);
             }
             CppTypeBase::FunctionPointer(..) => {
               return Err(Error::from("function pointers containing nested function pointers are \
                                       not supported"))
-                .chain_err(&err);
+                         .chain_err(&err);
             }
             _ => {}
           }
@@ -382,7 +403,7 @@ impl CppType {
             CppTypeIndirection::PtrRef |
             CppTypeIndirection::RValueRef => {
               return Err(Error::from("Function pointers containing references are not supported"))
-                .chain_err(&err);
+                       .chain_err(&err);
             }
             CppTypeIndirection::Ptr |
             CppTypeIndirection::PtrPtr => {}
@@ -390,16 +411,16 @@ impl CppType {
               if arg.base.is_class() {
                 return Err(Error::from("Function pointers containing classes by value are not \
                                         supported"))
-                  .chain_err(&err);
+                           .chain_err(&err);
               }
             }
           }
         }
         return Ok(CppFfiType {
-          ffi_type: self.clone(),
-          conversion: IndirectionChange::NoChange,
-          original_type: self.clone(),
-        });
+                    ffi_type: self.clone(),
+                    conversion: IndirectionChange::NoChange,
+                    original_type: self.clone(),
+                  });
       }
       _ => {}
     }
@@ -430,7 +451,7 @@ impl CppType {
           return Err(Error::from(format!("QFlags type can only be values or const references: \
                                           {:?}",
                                          self)))
-            .chain_err(&err);
+                     .chain_err(&err);
         }
         conversion = IndirectionChange::QFlagsToUInt;
         result.base = CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::UInt);
@@ -448,39 +469,39 @@ impl CppType {
       }
     }
     Ok(CppFfiType {
-      ffi_type: result,
-      conversion: conversion,
-      original_type: self.clone(),
-    })
+         ffi_type: result,
+         conversion: conversion,
+         original_type: self.clone(),
+       })
   }
 
   /// Generates alphanumeric representation of self
   /// used to generate FFI function names
   pub fn caption(&self, strategy: TypeCaptionStrategy) -> Result<String> {
     Ok(match strategy {
-      TypeCaptionStrategy::Short => self.base.caption(strategy.clone())?,
-      TypeCaptionStrategy::Full => {
-        let mut r = self.base.caption(strategy.clone())?;
-        match self.indirection {
-          CppTypeIndirection::None => {}
-          CppTypeIndirection::Ptr => r = format!("{}_ptr", r),
-          CppTypeIndirection::Ref => r = format!("{}_ref", r),
-          CppTypeIndirection::PtrRef => r = format!("{}_ptr_ref", r),
-          CppTypeIndirection::PtrPtr => {
-            if self.is_const2 {
-              r = format!("{}_ptr_const_ptr", r);
-            } else {
-              r = format!("{}_ptr_ptr", r);
-            }
+         TypeCaptionStrategy::Short => self.base.caption(strategy.clone())?,
+         TypeCaptionStrategy::Full => {
+      let mut r = self.base.caption(strategy.clone())?;
+      match self.indirection {
+        CppTypeIndirection::None => {}
+        CppTypeIndirection::Ptr => r = format!("{}_ptr", r),
+        CppTypeIndirection::Ref => r = format!("{}_ref", r),
+        CppTypeIndirection::PtrRef => r = format!("{}_ptr_ref", r),
+        CppTypeIndirection::PtrPtr => {
+          if self.is_const2 {
+            r = format!("{}_ptr_const_ptr", r);
+          } else {
+            r = format!("{}_ptr_ptr", r);
           }
-          CppTypeIndirection::RValueRef => r = format!("{}_rvalue_ref", r),
         }
-        if self.is_const {
-          r = format!("const_{}", r);
-        }
-        r
+        CppTypeIndirection::RValueRef => r = format!("{}_rvalue_ref", r),
       }
-    })
+      if self.is_const {
+        r = format!("const_{}", r);
+      }
+      r
+    }
+       })
   }
 
   /// Checks if a function with this return type would need
@@ -499,7 +520,10 @@ impl CppType {
                      nested_level1: i32,
                      template_arguments1: &[CppType])
                      -> Result<CppType> {
-    if let CppTypeBase::TemplateParameter { nested_level, index } = self.base {
+    if let CppTypeBase::TemplateParameter {
+             nested_level,
+             index,
+           } = self.base {
       if nested_level == nested_level1 {
         if index < 0 {
           return Err(unexpected("CppType::instantiate: index < 0").into());
@@ -527,7 +551,7 @@ impl CppType {
               new_type.is_const = arg.is_const;
             } else {
               return Err(unexpected("CppType::instantiate: one of types must be ptr or ref!")
-                .into());
+                           .into());
             }
           }
           CppTypeIndirection::PtrPtr |
@@ -548,16 +572,16 @@ impl CppType {
       }
     }
     Ok(CppType {
-      is_const: self.is_const,
-      is_const2: self.is_const2,
-      indirection: self.indirection.clone(),
-      base: match self.base {
-        CppTypeBase::Class(ref data) => {
-          CppTypeBase::Class(data.instantiate_class(nested_level1, template_arguments1)?)
-        }
-        _ => self.base.clone(),
-      },
-    })
+         is_const: self.is_const,
+         is_const2: self.is_const2,
+         indirection: self.indirection.clone(),
+         base: match self.base {
+           CppTypeBase::Class(ref data) => {
+             CppTypeBase::Class(data.instantiate_class(nested_level1, template_arguments1)?)
+           }
+           _ => self.base.clone(),
+         },
+       })
 
   }
 
@@ -587,18 +611,25 @@ impl CppType {
        self.is_const2 != other_type.is_const2 {
       return false;
     }
-    if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments, .. }) =
-           self.base {
+    if let CppTypeBase::Class(CppTypeClassBase {
+                                ref name,
+                                ref template_arguments,
+                                ..
+                              }) = self.base {
       if let Some(ref template_arguments) = *template_arguments {
         let name1 = name;
         let args1 = template_arguments;
-        if let CppTypeBase::Class(CppTypeClassBase { ref name, ref template_arguments, .. }) =
-               other_type.base {
+        if let CppTypeBase::Class(CppTypeClassBase {
+                                    ref name,
+                                    ref template_arguments,
+                                    ..
+                                  }) = other_type.base {
           if let Some(ref template_arguments) = *template_arguments {
             return name1 == name && args1.len() == template_arguments.len() &&
-                   args1.iter()
-              .zip(template_arguments.iter())
-              .all(|(a1, a2)| a1.can_be_the_same_as(a2));
+                   args1
+                     .iter()
+                     .zip(template_arguments.iter())
+                     .all(|(a1, a2)| a1.can_be_the_same_as(a2));
           }
         }
       }
@@ -619,7 +650,8 @@ impl CppType {
           return false;
         }
       }
-      if let CppTypeBase::SpecificNumeric(CppSpecificNumericType { ref kind, .. }) = other_type.base {
+      if let CppTypeBase::SpecificNumeric(CppSpecificNumericType { ref kind, .. }) =
+        other_type.base {
         if data1.is_float() {
           return kind == &CppSpecificNumericTypeKind::FloatingPoint;
         } else if data1.is_signed_integer() {

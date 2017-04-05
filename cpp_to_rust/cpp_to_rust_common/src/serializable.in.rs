@@ -172,8 +172,12 @@ impl CppBuildConfigData {
 
   fn add_from(&mut self, other: &CppBuildConfigData) -> Result<()> {
     self.linked_libs.append(&mut other.linked_libs.clone());
-    self.linked_frameworks.append(&mut other.linked_frameworks.clone());
-    self.compiler_flags.append(&mut other.compiler_flags.clone());
+    self
+      .linked_frameworks
+      .append(&mut other.linked_frameworks.clone());
+    self
+      .compiler_flags
+      .append(&mut other.compiler_flags.clone());
     if self.library_type.is_some() {
       if other.library_type.is_some() && other.library_type != self.library_type {
         return Err("conflicting library types specified".into());
@@ -190,10 +194,12 @@ impl CppBuildConfig {
     CppBuildConfig::default()
   }
   pub fn add(&mut self, condition: ::target::Condition, data: CppBuildConfigData) {
-    self.items.push(CppBuildConfigItem {
-      condition: condition,
-      data: data,
-    });
+    self
+      .items
+      .push(CppBuildConfigItem {
+              condition: condition,
+              data: data,
+            });
   }
   pub fn eval(&self, target: &::target::Target) -> Result<CppBuildConfigData> {
     let mut data = CppBuildConfigData::default();

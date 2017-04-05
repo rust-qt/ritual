@@ -152,7 +152,7 @@ pub fn current_target() -> Target {
 
 impl Condition {
   pub fn eval(&self, target: &Target) -> bool {
-    use ::target::Condition::*;
+    use target::Condition::*;
     match *self {
       Arch(ref arch) => &target.arch == arch,
       OS(ref os) => &target.os == os,

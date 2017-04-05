@@ -30,15 +30,15 @@ fn build_cpp_lib() -> TempTestDir {
     create_dir(&install_dir).unwrap();
   }
   fancy_unwrap(CppLibBuilder {
-      cmake_source_dir: cpp_lib_source_dir,
-      build_dir: build_dir,
-      build_type: BuildType::Release,
-      install_dir: install_dir,
-      num_jobs: None,
-      cmake_vars: Vec::new(),
-      pipe_output: true,
-    }
-    .run());
+                   cmake_source_dir: cpp_lib_source_dir,
+                   build_dir: build_dir,
+                   build_type: BuildType::Release,
+                   install_dir: install_dir,
+                   num_jobs: None,
+                   cmake_vars: Vec::new(),
+                   pipe_output: true,
+                 }
+                 .run());
   temp_dir
 }
 
@@ -83,13 +83,17 @@ fn full_run() {
   {
     let mut data = CppBuildConfigData::new();
     data.add_linked_lib("ctrt1");
-    config.cpp_build_config_mut().add(target::Condition::True, data);
+    config
+      .cpp_build_config_mut()
+      .add(target::Condition::True, data);
   }
   {
     let mut data = CppBuildConfigData::new();
     data.add_compiler_flag("-fPIC");
     data.add_compiler_flag("-std=gnu++11");
-    config.cpp_build_config_mut().add(target::Condition::Env(target::Env::Msvc).negate(), data);
+    config
+      .cpp_build_config_mut()
+      .add(target::Condition::Env(target::Env::Msvc).negate(), data);
   }
   if target::current_env() == target::Env::Msvc {
     config.add_cpp_parser_flag("-std=c++14");
@@ -100,8 +104,10 @@ fn full_run() {
   fancy_unwrap(config.exec());
   assert!(crate_dir.exists());
   {
-    let manifest_parent_path =
-      PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf();
+    let manifest_parent_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+      .parent()
+      .unwrap()
+      .to_path_buf();
     assert!(manifest_parent_path.exists());
     let dep_paths = vec![manifest_parent_path.with_added("cpp_to_rust_build_tools"),
                          manifest_parent_path.with_added("cpp_to_rust_common")];

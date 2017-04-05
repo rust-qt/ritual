@@ -90,25 +90,28 @@ impl CppMethod {
     };
     if let Some(ref info) = self.class_membership {
       if !info.is_static && info.kind != CppMethodKind::Constructor {
-        r.arguments.push(CppFfiFunctionArgument {
-          name: "this_ptr".to_string(),
-          argument_type: CppType {
-              base: CppTypeBase::Class(info.class_type.clone()),
-              is_const: info.is_const,
-              is_const2: false,
-              indirection: CppTypeIndirection::Ptr,
-            }.to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
-          meaning: CppFfiArgumentMeaning::This,
-        });
+        r.arguments
+          .push(CppFfiFunctionArgument {
+                  name: "this_ptr".to_string(),
+                  argument_type: CppType {
+                      base: CppTypeBase::Class(info.class_type.clone()),
+                      is_const: info.is_const,
+                      is_const2: false,
+                      indirection: CppTypeIndirection::Ptr,
+                    }.to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
+                  meaning: CppFfiArgumentMeaning::This,
+                });
       }
     }
     for (index, arg) in self.arguments.iter().enumerate() {
-      let c_type = arg.argument_type.to_cpp_ffi_type(CppTypeRole::NotReturnType)?;
-      r.arguments.push(CppFfiFunctionArgument {
-        name: arg.name.clone(),
-        argument_type: c_type,
-        meaning: CppFfiArgumentMeaning::Argument(index as i8),
-      });
+      let c_type = arg.argument_type
+        .to_cpp_ffi_type(CppTypeRole::NotReturnType)?;
+      r.arguments
+        .push(CppFfiFunctionArgument {
+                name: arg.name.clone(),
+                argument_type: c_type,
+                meaning: CppFfiArgumentMeaning::Argument(index as i8),
+              });
     }
     let real_return_type = if let Some(info) = self.class_info_if_constructor() {
       CppType {
@@ -124,11 +127,12 @@ impl CppMethod {
     if real_return_type.needs_allocation_place_variants() {
       match allocation_place {
         ReturnValueAllocationPlace::Stack => {
-          r.arguments.push(CppFfiFunctionArgument {
-            name: "output".to_string(),
-            argument_type: c_type,
-            meaning: CppFfiArgumentMeaning::ReturnValue,
-          });
+          r.arguments
+            .push(CppFfiFunctionArgument {
+                    name: "output".to_string(),
+                    argument_type: c_type,
+                    meaning: CppFfiArgumentMeaning::ReturnValue,
+                  });
         }
         ReturnValueAllocationPlace::Heap => {
           r.return_type = c_type;
@@ -136,7 +140,7 @@ impl CppMethod {
         ReturnValueAllocationPlace::NotApplicable => {
           return Err(unexpected("NotApplicable encountered but return value needs \
                                  allocation_place variants")
-            .into());
+                         .into());
         }
       }
     } else {
@@ -158,13 +162,16 @@ impl CppMethod {
         cpp_data.type_allocation_place(name)?
       };
       Ok(match v {
-        CppTypeAllocationPlace::Heap => ReturnValueAllocationPlace::Heap,
-        CppTypeAllocationPlace::Stack => ReturnValueAllocationPlace::Stack,
-      })
+           CppTypeAllocationPlace::Heap => ReturnValueAllocationPlace::Heap,
+           CppTypeAllocationPlace::Stack => ReturnValueAllocationPlace::Stack,
+         })
     };
 
     let place = if self.is_constructor() || self.is_destructor() {
-      let info = self.class_membership.as_ref().expect("class info expected here");
+      let info = self
+        .class_membership
+        .as_ref()
+        .expect("class info expected here");
       get_place(&info.class_type.name)?
     } else if self.return_type.needs_allocation_place_variants() {
       if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = self.return_type.base {
@@ -178,10 +185,10 @@ impl CppMethod {
 
     let c_signature = self.c_signature(place.clone())?;
     Ok(CppMethodWithFfiSignature {
-      cpp_method: self.clone(),
-      allocation_place: place,
-      c_signature: c_signature,
-    })
+         cpp_method: self.clone(),
+         allocation_place: place,
+         c_signature: c_signature,
+       })
   }
 
   pub fn full_name(&self) -> String {
@@ -250,18 +257,19 @@ impl CppMethod {
     }
     s = format!("{}({})",
                 s,
-                self.arguments
+                self
+                  .arguments
                   .iter()
                   .map(|arg| {
-        format!("{} {}{}",
-                arg.argument_type.to_cpp_pseudo_code(),
-                arg.name,
-                if arg.has_default_value {
-                  " = ?".to_string()
-                } else {
-                  String::new()
-                })
-      })
+      format!("{} {}{}",
+              arg.argument_type.to_cpp_pseudo_code(),
+              arg.name,
+              if arg.has_default_value {
+                " = ?".to_string()
+              } else {
+                String::new()
+              })
+    })
                   .join(", "));
     if let Some(ref info) = self.class_membership {
       if info.is_const {
@@ -272,7 +280,8 @@ impl CppMethod {
   }
 
   pub fn inheritance_chain_text(&self) -> String {
-    self.inheritance_chain
+    self
+      .inheritance_chain
       .iter()
       .map(|x| {
         let mut text = x.base_type.to_cpp_pseudo_code();
@@ -335,7 +344,8 @@ impl CppMethod {
     Ok(format!("{}{}({})",
                type_num,
                self.name,
-               self.arguments
+               self
+                 .arguments
                  .iter()
                  .map_if_ok(|arg| arg.argument_type.to_cpp_code(None))?
                  .join(",")))
@@ -352,11 +362,11 @@ impl CppMethod {
     let mut result: Vec<CppType> = Vec::new();
     if let Some(ref class_membership) = self.class_membership {
       result.push(CppType {
-        base: CppTypeBase::Class(class_membership.class_type.clone()),
-        is_const: class_membership.is_const,
-        is_const2: false,
-        indirection: CppTypeIndirection::Ptr,
-      });
+                    base: CppTypeBase::Class(class_membership.class_type.clone()),
+                    is_const: class_membership.is_const,
+                    is_const2: false,
+                    indirection: CppTypeIndirection::Ptr,
+                  });
     }
     for t in self.arguments.iter().map(|x| x.argument_type.clone()) {
       result.push(t);

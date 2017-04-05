@@ -31,7 +31,11 @@ pub fn run(cpp_data: &CppData,
   };
 
   let mut c_headers = Vec::new();
-  let mut include_name_list: Vec<_> = generator.cpp_data.all_include_files()?.into_iter().collect();
+  let mut include_name_list: Vec<_> = generator
+    .cpp_data
+    .all_include_files()?
+    .into_iter()
+    .collect();
   include_name_list.sort();
 
   for include_file in &include_name_list {
@@ -42,7 +46,8 @@ pub fn run(cpp_data: &CppData,
     }
     let methods = generator.process_methods(&include_file_base_name,
                        None,
-                       generator.cpp_data
+                       generator
+                         .cpp_data
                          .methods
                          .iter()
                          .filter(|x| &x.include_file == include_file))?;
@@ -51,10 +56,10 @@ pub fn run(cpp_data: &CppData,
                 || format!("Skipping empty include file {}", include_file));
     } else {
       c_headers.push(CppFfiHeaderData {
-        include_file_base_name: include_file_base_name,
-        methods: methods,
-        qt_slot_wrappers: Vec::new(),
-      });
+                       include_file_base_name: include_file_base_name,
+                       methods: methods,
+                       qt_slot_wrappers: Vec::new(),
+                     });
     }
   }
   if let Some(header) = generator.generate_slot_wrappers()? {
@@ -117,9 +122,10 @@ impl<'a> CGenerator<'a> {
       // TODO: re-enable after template test compilation (#24) is implemented
       return Ok(false);
     }
-    if method.all_involved_types()
-      .iter()
-      .any(|x| x.base.is_or_contains_template_parameter()) {
+    if method
+         .all_involved_types()
+         .iter()
+         .any(|x| x.base.is_or_contains_template_parameter()) {
       //      log::llog(log::DebugFfiSkips, || {
       //        format!("Skipping method containing template parameters: \n{}\n",
       //                method.short_text())
@@ -148,8 +154,7 @@ impl<'a> CGenerator<'a> {
       if !self.should_process_method(method)? {
         continue;
       }
-      match method.to_ffi_signature(&self.cpp_data,
-                                    type_allocation_places_override.clone()) {
+      match method.to_ffi_signature(&self.cpp_data, type_allocation_places_override.clone()) {
         Err(msg) => {
           log::llog(log::DebugFfiSkips, || {
             format!("Unable to produce C function for method:\n{}\nError:{}\n",
@@ -259,24 +264,24 @@ impl<'a> CGenerator<'a> {
                              name: String,
                              is_slot: bool,
                              arguments: Vec<CppFunctionArgument>|
-                             -> CppMethod {
+       -> CppMethod {
         CppMethod {
           name: name,
           class_membership: Some(CppMethodClassMembership {
-            class_type: CppTypeClassBase {
-              name: class_name.clone(),
-              template_arguments: None,
-            },
-            is_virtual: true,
-            is_pure_virtual: false,
-            is_const: false,
-            is_static: false,
-            visibility: CppVisibility::Public,
-            is_signal: false,
-            is_slot: is_slot,
-            kind: kind,
-            fake: None,
-          }),
+                                   class_type: CppTypeClassBase {
+                                     name: class_name.clone(),
+                                     template_arguments: None,
+                                   },
+                                   is_virtual: true,
+                                   is_pure_virtual: false,
+                                   is_const: false,
+                                   is_static: false,
+                                   visibility: CppVisibility::Public,
+                                   is_signal: false,
+                                   is_slot: is_slot,
+                                   kind: kind,
+                                   fake: None,
+                                 }),
           operator: None,
           return_type: CppType::void(),
           arguments: arguments,
@@ -326,38 +331,39 @@ impl<'a> CGenerator<'a> {
       let method_custom_slot = create_function(CppMethodKind::Regular,
                                                "custom_slot".to_string(),
                                                true,
-                                               types.iter()
+                                               types
+                                                 .iter()
                                                  .enumerate()
                                                  .map(|(num, t)| {
-          CppFunctionArgument {
-            name: format!("arg{}", num),
-            argument_type: t.clone(),
-            has_default_value: false,
-          }
-        })
+                                                        CppFunctionArgument {
+                                                          name: format!("arg{}", num),
+                                                          argument_type: t.clone(),
+                                                          has_default_value: false,
+                                                        }
+                                                      })
                                                  .collect());
       let receiver_id = method_custom_slot.receiver_id()?;
       methods.push(method_custom_slot);
       qt_slot_wrappers.push(QtSlotWrapper {
-        class_name: class_name.clone(),
-        arguments: ffi_types,
-        function_type: function_type.clone(),
-        receiver_id: receiver_id,
-      });
+                              class_name: class_name.clone(),
+                              arguments: ffi_types,
+                              function_type: function_type.clone(),
+                              receiver_id: receiver_id,
+                            });
       let cast_from = CppType {
         base: CppTypeBase::Class(CppTypeClassBase {
-          name: class_name.clone(),
-          template_arguments: None,
-        }),
+                                   name: class_name.clone(),
+                                   template_arguments: None,
+                                 }),
         indirection: CppTypeIndirection::Ptr,
         is_const: false,
         is_const2: false,
       };
       let cast_to = CppType {
         base: CppTypeBase::Class(CppTypeClassBase {
-          name: "QObject".to_string(),
-          template_arguments: None,
-        }),
+                                   name: "QObject".to_string(),
+                                   template_arguments: None,
+                                 }),
         indirection: CppTypeIndirection::Ptr,
         is_const: false,
         is_const2: false,
@@ -370,11 +376,11 @@ impl<'a> CGenerator<'a> {
                                       include_file_name));
     }
     Ok(Some(CppFfiHeaderData {
-      include_file_base_name: include_file_name.to_string(),
-      methods: self.process_methods(include_file_name,
-                         Some(CppTypeAllocationPlace::Heap),
-                         methods.iter())?,
-      qt_slot_wrappers: qt_slot_wrappers,
-    }))
+              include_file_base_name: include_file_name.to_string(),
+              methods: self.process_methods(include_file_name,
+                                 Some(CppTypeAllocationPlace::Heap),
+                                 methods.iter())?,
+              qt_slot_wrappers: qt_slot_wrappers,
+            }))
   }
 }

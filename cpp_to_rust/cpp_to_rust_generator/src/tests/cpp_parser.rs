@@ -34,7 +34,7 @@ fn run_parser(code: &'static str) -> CppData {
                                      flags: Vec::new(),
                                    },
                                    Vec::new())
-    .unwrap();
+      .unwrap();
   for method in &mut result.methods {
     if let Some(ref mut origin_location) = method.origin_location {
       assert_eq!(origin_location.include_file_path,
@@ -143,10 +143,12 @@ fn functions_with_class_arg() {
   assert!(data.template_instantiations.is_empty());
   assert_eq!(data.types.len(), 1);
   assert_eq!(data.types[0].name, "Magic");
-  if let CppTypeKind::Class { ref bases,
-                              ref fields,
-                              ref template_arguments,
-                              ref using_directives } = data.types[0].kind {
+  if let CppTypeKind::Class {
+           ref bases,
+           ref fields,
+           ref template_arguments,
+           ref using_directives,
+         } = data.types[0].kind {
     assert!(template_arguments.is_none());
     assert!(using_directives.is_empty());
     assert!(bases.is_empty());
@@ -192,9 +194,9 @@ fn functions_with_class_arg() {
                                    is_const: false,
                                    is_const2: false,
                                    base: CppTypeBase::Class(CppTypeClassBase {
-                                     name: "Magic".to_string(),
-                                     template_arguments: None,
-                                   }),
+                                                              name: "Magic".to_string(),
+                                                              template_arguments: None,
+                                                            }),
                                  },
                                  has_default_value: false,
                                }],
@@ -230,9 +232,9 @@ fn functions_with_class_arg() {
                                    is_const: false,
                                    is_const2: false,
                                    base: CppTypeBase::Class(CppTypeClassBase {
-                                     name: "Magic".to_string(),
-                                     template_arguments: None,
-                                   }),
+                                                              name: "Magic".to_string(),
+                                                              template_arguments: None,
+                                                            }),
                                  },
                                  has_default_value: false,
                                }],
@@ -268,9 +270,9 @@ fn functions_with_class_arg() {
                                    is_const: true,
                                    is_const2: false,
                                    base: CppTypeBase::Class(CppTypeClassBase {
-                                     name: "Magic".to_string(),
-                                     template_arguments: None,
-                                   }),
+                                                              name: "Magic".to_string(),
+                                                              template_arguments: None,
+                                                            }),
                                  },
                                  has_default_value: false,
                                }],
@@ -382,9 +384,9 @@ fn free_template_func() {
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
                template_arguments: Some(TemplateArgumentsDeclaration {
-                 nested_level: 0,
-                 names: vec!["T".to_string()],
-               }),
+                                          nested_level: 0,
+                                          names: vec!["T".to_string()],
+                                        }),
                template_arguments_values: None,
                declaration_code: Some("template < typename T > T abs ( T value )".to_string()),
                is_ffi_whitelisted: false,
@@ -411,9 +413,9 @@ fn free_func_operator_sub() {
                    is_const: false,
                    is_const2: false,
                    base: CppTypeBase::Class(CppTypeClassBase {
-                     name: "C1".to_string(),
-                     template_arguments: None,
-                   }),
+                                              name: "C1".to_string(),
+                                              template_arguments: None,
+                                            }),
                  },
                  arguments: vec![CppFunctionArgument {
                                    name: "a".to_string(),
@@ -422,9 +424,9 @@ fn free_func_operator_sub() {
                                      is_const: false,
                                      is_const2: false,
                                      base: CppTypeBase::Class(CppTypeClassBase {
-                                       name: "C1".to_string(),
-                                       template_arguments: None,
-                                     }),
+                                                                name: "C1".to_string(),
+                                                                template_arguments: None,
+                                                              }),
                                    },
                                    has_default_value: false,
                                  },
@@ -435,9 +437,9 @@ fn free_func_operator_sub() {
                                      is_const: false,
                                      is_const2: false,
                                      base: CppTypeBase::Class(CppTypeClassBase {
-                                       name: "C1".to_string(),
-                                       template_arguments: None,
-                                     }),
+                                                                name: "C1".to_string(),
+                                                                template_arguments: None,
+                                                              }),
                                    },
                                    has_default_value: false,
                                  }],
@@ -469,8 +471,12 @@ fn simple_class_method() {
   assert!(data.template_instantiations.is_empty());
   assert!(data.types.len() == 1);
   assert_eq!(data.types[0].name, "MyClass");
-  if let CppTypeKind::Class { ref bases, ref fields, ref template_arguments, .. } = data.types[0]
-    .kind {
+  if let CppTypeKind::Class {
+           ref bases,
+           ref fields,
+           ref template_arguments,
+           ..
+         } = data.types[0].kind {
     assert!(template_arguments.is_none());
     assert!(bases.is_empty());
     assert!(fields.len() == 1);
@@ -482,20 +488,20 @@ fn simple_class_method() {
              CppMethod {
                name: "func1".to_string(),
                class_membership: Some(CppMethodClassMembership {
-                 class_type: CppTypeClassBase {
-                   name: "MyClass".to_string(),
-                   template_arguments: None,
-                 },
-                 kind: CppMethodKind::Regular,
-                 is_virtual: false,
-                 is_pure_virtual: false,
-                 is_const: false,
-                 is_static: false,
-                 visibility: CppVisibility::Public,
-                 is_signal: false,
-                 is_slot: false,
-                 fake: None,
-               }),
+                                        class_type: CppTypeClassBase {
+                                          name: "MyClass".to_string(),
+                                          template_arguments: None,
+                                        },
+                                        kind: CppMethodKind::Regular,
+                                        is_virtual: false,
+                                        is_pure_virtual: false,
+                                        is_const: false,
+                                        is_static: false,
+                                        visibility: CppVisibility::Public,
+                                        is_signal: false,
+                                        is_slot: false,
+                                        fake: None,
+                                      }),
                operator: None,
                return_type: CppType {
                  indirection: CppTypeIndirection::None,
@@ -548,35 +554,81 @@ fn advanced_class_methods() {
     };");
   assert_eq!(data.methods.len(), 8);
   assert_eq!(data.methods[0].name, "MyClass");
-  assert!(data.methods[0].class_membership.as_ref().unwrap().kind.is_constructor());
+  assert!(data.methods[0]
+            .class_membership
+            .as_ref()
+            .unwrap()
+            .kind
+            .is_constructor());
   assert_eq!(data.methods[0].arguments.len(), 3);
   assert_eq!(data.methods[0].return_type, CppType::void());
 
   assert_eq!(data.methods[1].name, "~MyClass");
-  assert!(data.methods[1].class_membership.as_ref().unwrap().kind.is_destructor());
+  assert!(data.methods[1]
+            .class_membership
+            .as_ref()
+            .unwrap()
+            .kind
+            .is_destructor());
   assert_eq!(data.methods[1].arguments.len(), 0);
   assert_eq!(data.methods[1].return_type, CppType::void());
 
   assert_eq!(data.methods[2].name, "func1");
-  assert!(data.methods[2].class_membership.as_ref().unwrap().is_static);
+  assert!(data.methods[2]
+            .class_membership
+            .as_ref()
+            .unwrap()
+            .is_static);
 
   assert_eq!(data.methods[3].name, "func2");
-  assert!(data.methods[3].class_membership.as_ref().unwrap().is_virtual);
-  assert!(!data.methods[3].class_membership.as_ref().unwrap().is_pure_virtual);
-  assert_eq!(data.methods[3].class_membership.as_ref().unwrap().visibility,
+  assert!(data.methods[3]
+            .class_membership
+            .as_ref()
+            .unwrap()
+            .is_virtual);
+  assert!(!data.methods[3]
+             .class_membership
+             .as_ref()
+             .unwrap()
+             .is_pure_virtual);
+  assert_eq!(data.methods[3]
+               .class_membership
+               .as_ref()
+               .unwrap()
+               .visibility,
              CppVisibility::Public);
 
   assert_eq!(data.methods[4].name, "func3");
-  assert!(data.methods[4].class_membership.as_ref().unwrap().is_virtual);
-  assert!(data.methods[4].class_membership.as_ref().unwrap().is_pure_virtual);
-  assert_eq!(data.methods[4].class_membership.as_ref().unwrap().visibility,
+  assert!(data.methods[4]
+            .class_membership
+            .as_ref()
+            .unwrap()
+            .is_virtual);
+  assert!(data.methods[4]
+            .class_membership
+            .as_ref()
+            .unwrap()
+            .is_pure_virtual);
+  assert_eq!(data.methods[4]
+               .class_membership
+               .as_ref()
+               .unwrap()
+               .visibility,
              CppVisibility::Protected);
 
   assert_eq!(data.methods[5].name, "func4");
-  assert!(data.methods[5].class_membership.as_ref().unwrap().is_const);
+  assert!(data.methods[5]
+            .class_membership
+            .as_ref()
+            .unwrap()
+            .is_const);
 
   assert_eq!(data.methods[6].name, "operator bool");
-  assert!(data.methods[6].class_membership.as_ref().unwrap().is_const);
+  assert!(data.methods[6]
+            .class_membership
+            .as_ref()
+            .unwrap()
+            .is_const);
   assert_eq!(data.methods[6].operator,
              Some(CppOperator::Conversion(CppType {
                indirection: CppTypeIndirection::None,
@@ -595,9 +647,9 @@ fn advanced_class_methods() {
   assert_eq!(data.methods[7].name, "func6");
   assert_eq!(data.methods[7].template_arguments,
              Some(TemplateArgumentsDeclaration {
-               nested_level: 0,
-               names: vec!["K".to_string(), "V".to_string()],
-             }));
+                    nested_level: 0,
+                    names: vec!["K".to_string(), "V".to_string()],
+                  }));
   assert_eq!(data.methods[7].arguments.len(), 1);
   assert_eq!(data.methods[7].arguments[0].argument_type,
              CppType {
@@ -624,13 +676,17 @@ fn template_class_method() {
   assert!(data.template_instantiations.is_empty());
   assert!(data.types.len() == 1);
   assert_eq!(data.types[0].name, "MyVector");
-  if let CppTypeKind::Class { ref bases, ref fields, ref template_arguments, .. } = data.types[0]
-    .kind {
+  if let CppTypeKind::Class {
+           ref bases,
+           ref fields,
+           ref template_arguments,
+           ..
+         } = data.types[0].kind {
     assert_eq!(template_arguments,
                &Some(TemplateArgumentsDeclaration {
-                 nested_level: 0,
-                 names: vec!["T".to_string()],
-               }));
+                       nested_level: 0,
+                       names: vec!["T".to_string()],
+                     }));
     assert!(bases.is_empty());
     assert!(fields.is_empty());
   } else {
@@ -641,9 +697,9 @@ fn template_class_method() {
              CppMethod {
                name: "get".to_string(),
                class_membership: Some(CppMethodClassMembership {
-                 class_type: CppTypeClassBase {
-                   name: "MyVector".to_string(),
-                   template_arguments: Some(vec![CppType {
+                                        class_type: CppTypeClassBase {
+                                          name: "MyVector".to_string(),
+                                          template_arguments: Some(vec![CppType {
                                                    indirection: CppTypeIndirection::None,
                                                    is_const: false,
                                                    is_const2: false,
@@ -652,17 +708,17 @@ fn template_class_method() {
                                                      index: 0,
                                                    },
                                                  }]),
-                 },
-                 kind: CppMethodKind::Regular,
-                 is_virtual: false,
-                 is_pure_virtual: false,
-                 is_const: false,
-                 is_static: false,
-                 visibility: CppVisibility::Public,
-                 is_signal: false,
-                 is_slot: false,
-                 fake: None,
-               }),
+                                        },
+                                        kind: CppMethodKind::Regular,
+                                        is_virtual: false,
+                                        is_pure_virtual: false,
+                                        is_const: false,
+                                        is_static: false,
+                                        visibility: CppVisibility::Public,
+                                        is_signal: false,
+                                        is_slot: false,
+                                        fake: None,
+                                      }),
                operator: None,
                return_type: CppType {
                  indirection: CppTypeIndirection::None,
@@ -713,9 +769,9 @@ fn template_class_template_method() {
   assert_eq!(data.methods[0].name, "get_f");
   assert_eq!(data.methods[0].template_arguments,
              Some(TemplateArgumentsDeclaration {
-               nested_level: 1,
-               names: vec!["F".to_string()],
-             }));
+                    nested_level: 1,
+                    names: vec!["F".to_string()],
+                  }));
   assert_eq!(data.methods[0].return_type,
              CppType {
                indirection: CppTypeIndirection::None,
@@ -820,25 +876,31 @@ fn template_instantiation() {
                is_const: false,
                is_const2: false,
                base: CppTypeBase::Class(CppTypeClassBase {
-                 name: "Vector".to_string(),
-                 template_arguments: Some(vec![int.clone()]),
-               }),
+                                          name: "Vector".to_string(),
+                                          template_arguments: Some(vec![int.clone()]),
+                                        }),
              });
-  assert!(data.template_instantiations.iter().find(|x| &x.class_name == "Vector").is_some());
-  assert!(data.template_instantiations
-    .iter()
-    .find(|x| &x.class_name == "Vector")
-    .unwrap()
-    .instantiations
-    .len() == 1);
-  assert!(&data.template_instantiations
-    .iter()
-    .find(|x| &x.class_name == "Vector")
-    .unwrap()
-    .instantiations
-    .get(0)
-    .unwrap()
-    .template_arguments == &vec![int]);
+  assert!(data
+            .template_instantiations
+            .iter()
+            .find(|x| &x.class_name == "Vector")
+            .is_some());
+  assert!(data
+            .template_instantiations
+            .iter()
+            .find(|x| &x.class_name == "Vector")
+            .unwrap()
+            .instantiations
+            .len() == 1);
+  assert!(&data
+             .template_instantiations
+             .iter()
+             .find(|x| &x.class_name == "Vector")
+             .unwrap()
+             .instantiations
+             .get(0)
+             .unwrap()
+             .template_arguments == &vec![int]);
 }
 
 #[test]
@@ -860,9 +922,9 @@ fn derived_class_simple() {
                          is_const: false,
                          is_const2: false,
                          base: CppTypeBase::Class(CppTypeClassBase {
-                           name: "Base".to_string(),
-                           template_arguments: None,
-                         }),
+                                                    name: "Base".to_string(),
+                                                    template_arguments: None,
+                                                  }),
                        },
                        is_virtual: false,
                        visibility: CppVisibility::Public,
@@ -891,9 +953,9 @@ fn derived_class_simple_private() {
                          is_const: false,
                          is_const2: false,
                          base: CppTypeBase::Class(CppTypeClassBase {
-                           name: "Base".to_string(),
-                           template_arguments: None,
-                         }),
+                                                    name: "Base".to_string(),
+                                                    template_arguments: None,
+                                                  }),
                        },
                        is_virtual: false,
                        visibility: CppVisibility::Private,
@@ -922,9 +984,9 @@ fn derived_class_simple_virtual() {
                          is_const: false,
                          is_const2: false,
                          base: CppTypeBase::Class(CppTypeClassBase {
-                           name: "Base".to_string(),
-                           template_arguments: None,
-                         }),
+                                                    name: "Base".to_string(),
+                                                    template_arguments: None,
+                                                  }),
                        },
                        is_virtual: true,
                        visibility: CppVisibility::Public,
@@ -951,9 +1013,9 @@ fn derived_class_multiple() {
                          is_const: false,
                          is_const2: false,
                          base: CppTypeBase::Class(CppTypeClassBase {
-                           name: "Base2".to_string(),
-                           template_arguments: None,
-                         }),
+                                                    name: "Base2".to_string(),
+                                                    template_arguments: None,
+                                                  }),
                        },
                        is_virtual: false,
                        visibility: CppVisibility::Public,
@@ -964,9 +1026,9 @@ fn derived_class_multiple() {
                          is_const: false,
                          is_const2: false,
                          base: CppTypeBase::Class(CppTypeClassBase {
-                           name: "Base1".to_string(),
-                           template_arguments: None,
-                         }),
+                                                    name: "Base1".to_string(),
+                                                    template_arguments: None,
+                                                  }),
                        },
                        is_virtual: false,
                        visibility: CppVisibility::Public,
@@ -1014,74 +1076,74 @@ fn complex_const_types() {
   assert_eq!(data.methods.len(), 10);
   assert_eq!(&data.methods[0].return_type,
              &CppType {
-               base: base.clone(),
-               indirection: CppTypeIndirection::None,
-               is_const: false,
-               is_const2: false,
-             });
+                base: base.clone(),
+                indirection: CppTypeIndirection::None,
+                is_const: false,
+                is_const2: false,
+              });
   assert_eq!(&data.methods[1].return_type,
              &CppType {
-               base: base.clone(),
-               indirection: CppTypeIndirection::None,
-               is_const: true,
-               is_const2: false,
-             });
+                base: base.clone(),
+                indirection: CppTypeIndirection::None,
+                is_const: true,
+                is_const2: false,
+              });
   assert_eq!(&data.methods[2].return_type,
              &CppType {
-               base: base.clone(),
-               indirection: CppTypeIndirection::Ptr,
-               is_const: false,
-               is_const2: false,
-             });
+                base: base.clone(),
+                indirection: CppTypeIndirection::Ptr,
+                is_const: false,
+                is_const2: false,
+              });
   assert_eq!(&data.methods[3].return_type,
              &CppType {
-               base: base.clone(),
-               indirection: CppTypeIndirection::Ptr,
-               is_const: true,
-               is_const2: false,
-             });
+                base: base.clone(),
+                indirection: CppTypeIndirection::Ptr,
+                is_const: true,
+                is_const2: false,
+              });
   assert_eq!(&data.methods[4].return_type,
              &CppType {
-               base: base.clone(),
-               indirection: CppTypeIndirection::Ptr,
-               is_const: false,
-               is_const2: false,
-             });
+                base: base.clone(),
+                indirection: CppTypeIndirection::Ptr,
+                is_const: false,
+                is_const2: false,
+              });
   assert_eq!(&data.methods[5].return_type,
              &CppType {
-               base: base.clone(),
-               indirection: CppTypeIndirection::PtrPtr,
-               is_const: false,
-               is_const2: false,
-             });
+                base: base.clone(),
+                indirection: CppTypeIndirection::PtrPtr,
+                is_const: false,
+                is_const2: false,
+              });
   assert_eq!(&data.methods[6].return_type,
              &CppType {
-               base: base.clone(),
-               indirection: CppTypeIndirection::PtrPtr,
-               is_const: false,
-               is_const2: true,
-             });
+                base: base.clone(),
+                indirection: CppTypeIndirection::PtrPtr,
+                is_const: false,
+                is_const2: true,
+              });
   assert_eq!(&data.methods[7].return_type,
              &CppType {
-               base: base.clone(),
-               indirection: CppTypeIndirection::PtrPtr,
-               is_const: true,
-               is_const2: true,
-             });
+                base: base.clone(),
+                indirection: CppTypeIndirection::PtrPtr,
+                is_const: true,
+                is_const2: true,
+              });
   assert_eq!(&data.methods[8].return_type,
              &CppType {
-               base: base.clone(),
-               indirection: CppTypeIndirection::PtrPtr,
-               is_const: true,
-               is_const2: true,
-             });
+                base: base.clone(),
+                indirection: CppTypeIndirection::PtrPtr,
+                is_const: true,
+                is_const2: true,
+              });
   assert_eq!(&data.methods[9].return_type,
              &CppType {
-               base: base.clone(),
-               indirection: CppTypeIndirection::PtrPtr,
-               is_const: true,
-               is_const2: true,
-             });
+                base: base.clone(),
+                indirection: CppTypeIndirection::PtrPtr,
+                is_const: true,
+                is_const2: true,
+              });
 }
 
 #[test]
@@ -1121,24 +1183,26 @@ fn fixed_size_integers() {
     is_const: false,
     is_const2: false,
     base: CppTypeBase::SpecificNumeric(CppSpecificNumericType {
-      name: "GLuint64".to_string(),
-      bits: 64,
-      kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
-    }),
+                                         name: "GLuint64".to_string(),
+                                         bits: 64,
+                                         kind: CppSpecificNumericTypeKind::Integer {
+                                           is_signed: false,
+                                         },
+                                       }),
   };
   assert_eq!(&data.methods[0].return_type, &type1);
 
   assert_eq!(&data.methods[1].name, "f2");
   assert_eq!(&data.methods[1].return_type,
              &CppType {
-               indirection: CppTypeIndirection::None,
-               is_const: false,
-               is_const2: false,
-               base: CppTypeBase::Class(CppTypeClassBase {
-                 name: "QVector".to_string(),
-                 template_arguments: Some(vec![type1.clone()]),
-               }),
-             });
+                indirection: CppTypeIndirection::None,
+                is_const: false,
+                is_const2: false,
+                base: CppTypeBase::Class(CppTypeClassBase {
+                                           name: "QVector".to_string(),
+                                           template_arguments: Some(vec![type1.clone()]),
+                                         }),
+              });
 
 }
 
@@ -1155,13 +1219,17 @@ fn template_class_with_base() {
   assert!(data.template_instantiations.is_empty());
   assert!(data.types.len() == 2);
   assert_eq!(data.types[0].name, "C1");
-  if let CppTypeKind::Class { ref bases, ref fields, ref template_arguments, .. } = data.types[0]
-    .kind {
+  if let CppTypeKind::Class {
+           ref bases,
+           ref fields,
+           ref template_arguments,
+           ..
+         } = data.types[0].kind {
     assert_eq!(template_arguments,
                &Some(TemplateArgumentsDeclaration {
-                 nested_level: 0,
-                 names: vec!["T".to_string()],
-               }));
+                       nested_level: 0,
+                       names: vec!["T".to_string()],
+                     }));
     assert!(bases.is_empty());
     assert!(fields.is_empty());
   } else {
@@ -1169,13 +1237,17 @@ fn template_class_with_base() {
   }
 
   assert_eq!(data.types[1].name, "C2");
-  if let CppTypeKind::Class { ref bases, ref fields, ref template_arguments, .. } = data.types[1]
-    .kind {
+  if let CppTypeKind::Class {
+           ref bases,
+           ref fields,
+           ref template_arguments,
+           ..
+         } = data.types[1].kind {
     assert_eq!(template_arguments,
                &Some(TemplateArgumentsDeclaration {
-                 nested_level: 0,
-                 names: vec!["T".to_string()],
-               }));
+                       nested_level: 0,
+                       names: vec!["T".to_string()],
+                     }));
     assert_eq!(bases.len(), 1);
     assert!(fields.is_empty());
   } else {

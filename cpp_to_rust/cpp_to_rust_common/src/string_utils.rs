@@ -73,10 +73,10 @@ pub trait CaseOperations {
 
 fn iterator_to_class_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {
   it.map(|x| {
-      format!("{}{}",
-              x.as_ref()[0..1].to_uppercase(),
-              x.as_ref()[1..].to_lowercase())
-    })
+           format!("{}{}",
+                   x.as_ref()[0..1].to_uppercase(),
+                   x.as_ref()[1..].to_lowercase())
+         })
     .join("")
 }
 

@@ -76,21 +76,25 @@ impl CrateProperties {
                                                             name: S1,
                                                             version: S2,
                                                             local_path: Option<PathBuf>) {
-    self.dependencies.push(CrateDependency {
-      name: name.into(),
-      version: version.into(),
-      local_path: local_path,
-    });
+    self
+      .dependencies
+      .push(CrateDependency {
+              name: name.into(),
+              version: version.into(),
+              local_path: local_path,
+            });
   }
   pub fn add_build_dependency<S1: Into<String>, S2: Into<String>>(&mut self,
                                                                   name: S1,
                                                                   version: S2,
                                                                   local_path: Option<PathBuf>) {
-    self.build_dependencies.push(CrateDependency {
-      name: name.into(),
-      version: version.into(),
-      local_path: local_path,
-    });
+    self
+      .build_dependencies
+      .push(CrateDependency {
+              name: name.into(),
+              version: version.into(),
+              local_path: local_path,
+            });
   }
   pub fn remove_default_dependencies(&mut self) {
     self.remove_default_dependencies = true;
@@ -288,7 +292,9 @@ impl Config {
   /// - `Ok(false)` blocks the method. Remaining filter functions are not run
   /// on this method.
   pub fn add_cpp_ffi_generator_filter(&mut self, f: Box<CppFfiGeneratorFilterFn>) {
-    self.cpp_ffi_generator_filters.push(CppFfiGeneratorFilter(f));
+    self
+      .cpp_ffi_generator_filters
+      .push(CppFfiGeneratorFilter(f));
   }
 
   /// Adds a custom function that visits `&mut CppData` and can perform any changes
@@ -301,14 +307,18 @@ impl Config {
   pub fn set_type_allocation_place<S: Into<String>>(&mut self,
                                                     place: CppTypeAllocationPlace,
                                                     type_name: S) {
-    self.type_allocation_places.insert(type_name.into(), place);
+    self
+      .type_allocation_places
+      .insert(type_name.into(), place);
   }
   pub fn set_types_allocation_place<SI, S>(&mut self, place: CppTypeAllocationPlace, types: SI)
     where SI: IntoIterator<Item = S>,
           S: Into<String>
   {
     for t in types {
-      self.type_allocation_places.insert(t.into(), place.clone());
+      self
+        .type_allocation_places
+        .insert(t.into(), place.clone());
     }
   }
 
@@ -377,7 +387,11 @@ impl Config {
   }
 
   pub fn cpp_ffi_generator_filters(&self) -> Vec<&Box<CppFfiGeneratorFilterFn>> {
-    self.cpp_ffi_generator_filters.iter().map(|x| &x.0).collect()
+    self
+      .cpp_ffi_generator_filters
+      .iter()
+      .map(|x| &x.0)
+      .collect()
   }
 
   pub fn cpp_data_filters(&self) -> Vec<&Box<CppDataFilterFn>> {

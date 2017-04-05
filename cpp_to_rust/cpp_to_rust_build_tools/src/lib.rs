@@ -34,9 +34,9 @@ fn build_script_data() -> Result<BuildScriptData> {
 impl Config {
   pub fn new() -> Result<Config> {
     Ok(Config {
-      cpp_build_config: build_script_data()?.cpp_build_config,
-      cpp_build_paths: CppBuildPaths::default(),
-    })
+         cpp_build_config: build_script_data()?.cpp_build_config,
+         cpp_build_paths: CppBuildPaths::default(),
+       })
   }
   pub fn cpp_build_config(&self) -> &CppBuildConfig {
     &self.cpp_build_config
@@ -69,9 +69,8 @@ impl Config {
                                     Some(CppLibraryType::Static) |
                                     None => "STATIC",
                                   }));
-    cmake_vars.push(CMakeVar::new_path_list(
-      "C2R_INCLUDE_PATHS",
-      self.cpp_build_paths.include_paths())?);
+    cmake_vars.push(CMakeVar::new_path_list("C2R_INCLUDE_PATHS",
+                                            self.cpp_build_paths.include_paths())?);
     cmake_vars.push(CMakeVar::new_path_list("C2R_LIB_PATHS", self.cpp_build_paths.lib_paths())?);
     cmake_vars.push(CMakeVar::new_path_list("C2R_FRAMEWORK_PATHS",
                                             self.cpp_build_paths.framework_paths())?);
@@ -89,7 +88,9 @@ impl Config {
         cmake_source_dir: manifest_dir.with_added("c_lib"),
         build_dir: out_dir.with_added("c_lib_build"),
         install_dir: c_lib_install_dir.clone(),
-        num_jobs: std::env::var("NUM_JOBS").ok().and_then(|x| x.parse().ok()),
+        num_jobs: std::env::var("NUM_JOBS")
+          .ok()
+          .and_then(|x| x.parse().ok()),
         pipe_output: false,
         cmake_vars: cmake_vars,
         build_type: match profile.as_str() {
@@ -122,8 +123,9 @@ impl Config {
     }
     {
       log::status("Requesting type sizes");
-      let mut command = Command::new(c_lib_install_dir.with_added("lib")
-        .with_added(format!("type_sizes{}", exe_suffix())));
+      let mut command = Command::new(c_lib_install_dir
+                                       .with_added("lib")
+                                       .with_added(format!("type_sizes{}", exe_suffix())));
       let mut file = create_file(out_dir.with_added("type_sizes.rs"))?;
       file.write(get_command_output(&mut command)?)?;
     }

@@ -18,13 +18,18 @@ mod fix_header_names;
 mod lib_configs;
 
 fn run(matches: clap::ArgMatches) -> Result<()> {
-  let libs: Vec<_> =
-    matches.values_of("libs").chain_err(|| "clap arg missing")?.map(|s| s.to_lowercase()).collect();
-  let output_dir = PathBuf::from(matches.value_of("output-dir").chain_err(|| "clap arg missing")?);
+  let libs: Vec<_> = matches
+    .values_of("libs")
+    .chain_err(|| "clap arg missing")?
+    .map(|s| s.to_lowercase())
+    .collect();
+  let output_dir = PathBuf::from(matches.value_of("output-dir")
+                                   .chain_err(|| "clap arg missing")?);
   if !output_dir.exists() {
     create_dir_all(&output_dir)?;
   }
-  let cache_dir = PathBuf::from(matches.value_of("cache-dir").chain_err(|| "clap arg missing")?);
+  let cache_dir = PathBuf::from(matches.value_of("cache-dir")
+                                  .chain_err(|| "clap arg missing")?);
   if !cache_dir.exists() {
     create_dir_all(&cache_dir)?;
   }
@@ -46,33 +51,33 @@ fn main() {
                                      core, gui, widgets.";
 
     run(App::new("cpp_to_rust")
-      .about(ABOUT)
-      .after_help(AFTER_HELP)
-      .arg(Arg::with_name("cache-dir")
-        .short("c")
-        .long("cache-dir")
-        .value_name("DIR")
-        .help(CACHE_DIR_HELP)
-        .takes_value(true)
-        .required(true))
-      .arg(Arg::with_name("output-dir")
-        .short("o")
-        .long("output-dir")
-        .value_name("DIR")
-        .help(OUTPUT_DIR_HELP)
-        .takes_value(true)
-        .required(true))
-      .arg(Arg::with_name("libs")
-        .short("l")
-        .long("libs")
-        .value_name("LIB1 LIB2 LIB3")
-        .help(LIBS_HELP)
-        .takes_value(true)
-        .required(true)
-        .multiple(true)
-        .use_delimiter(false))
-      .arg(Arg::with_name("no-local-paths").long("no-local-paths"))
-      .get_matches())
+          .about(ABOUT)
+          .after_help(AFTER_HELP)
+          .arg(Arg::with_name("cache-dir")
+                 .short("c")
+                 .long("cache-dir")
+                 .value_name("DIR")
+                 .help(CACHE_DIR_HELP)
+                 .takes_value(true)
+                 .required(true))
+          .arg(Arg::with_name("output-dir")
+                 .short("o")
+                 .long("output-dir")
+                 .value_name("DIR")
+                 .help(OUTPUT_DIR_HELP)
+                 .takes_value(true)
+                 .required(true))
+          .arg(Arg::with_name("libs")
+                 .short("l")
+                 .long("libs")
+                 .value_name("LIB1 LIB2 LIB3")
+                 .help(LIBS_HELP)
+                 .takes_value(true)
+                 .required(true)
+                 .multiple(true)
+                 .use_delimiter(false))
+          .arg(Arg::with_name("no-local-paths").long("no-local-paths"))
+          .get_matches())
   };
   if let Err(err) = result {
     err.display_report();

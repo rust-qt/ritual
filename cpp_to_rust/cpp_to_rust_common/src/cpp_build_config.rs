@@ -36,7 +36,7 @@ impl CppBuildPaths {
   }
 
   pub fn apply_env(&mut self) {
-    use ::std::env;
+    use std::env;
     if let Ok(paths) = env::var("CPP_TO_RUST_LIB_PATHS") {
       self.lib_paths = env::split_paths(&paths).collect();
     }

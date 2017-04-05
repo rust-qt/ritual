@@ -23,8 +23,8 @@ pub fn exec_all(libs: Vec<String>,
                 output_dir: PathBuf,
                 no_local_paths: bool)
                 -> Result<()> {
-  let crate_templates_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-    .with_added("crate_templates");
+  let crate_templates_path =
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_added("crate_templates");
   for sublib_name in libs {
     let lib_cache_dir = cache_dir.with_added(format!("qt_{}", sublib_name));
     let lib_crate_templates_path = crate_templates_path.with_added(&sublib_name);
@@ -39,7 +39,7 @@ pub fn exec_all(libs: Vec<String>,
                            sublib_name,
                            dep,
                            path.display())
-          .into());
+                       .into());
       }
       dependency_paths.push(path);
     }
@@ -94,24 +94,31 @@ fn exec(sublib_name: &str,
 
   config.add_include_directive(&lib_folder_name(sublib_name));
   config.add_cpp_data_filter(Box::new(move |cpp_data| {
-    fix_header_names(cpp_data, &installation_data.lib_include_path)
-  }));
+                                        fix_header_names(cpp_data,
+                                                         &installation_data.lib_include_path)
+                                      }));
   config.add_cpp_parser_flags(vec!["-fPIC", "-fcxx-exceptions"]);
   {
     let mut data = CppBuildConfigData::new();
     data.add_compiler_flag("-std=gnu++11");
-    config.cpp_build_config_mut().add(target::Condition::Env(target::Env::Msvc).negate(), data);
+    config
+      .cpp_build_config_mut()
+      .add(target::Condition::Env(target::Env::Msvc).negate(), data);
   }
   {
     let mut data = CppBuildConfigData::new();
     data.add_compiler_flag("-fPIC");
     // msvc and mingw don't need this
-    config.cpp_build_config_mut().add(target::Condition::OS(target::OS::Windows).negate(), data);
+    config
+      .cpp_build_config_mut()
+      .add(target::Condition::OS(target::OS::Windows).negate(), data);
   }
   {
     let mut data = CppBuildConfigData::new();
     data.set_library_type(CppLibraryType::Shared);
-    config.cpp_build_config_mut().add(target::Condition::Env(target::Env::Msvc), data);
+    config
+      .cpp_build_config_mut()
+      .add(target::Condition::Env(target::Env::Msvc), data);
   }
 
   if is_msvc() {

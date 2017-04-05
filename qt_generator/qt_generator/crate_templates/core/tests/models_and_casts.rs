@@ -16,14 +16,16 @@ fn models_and_casts() {
   assert_eq!(string_list_model.row_count(()), 2);
   {
     let index = string_list_model.index((0, 0));
-    assert_eq!(string_list_model.data(&index, ItemDataRole::Display as i32)
+    assert_eq!(string_list_model
+                 .data(&index, ItemDataRole::Display as i32)
                  .to_string()
                  .to_std_string(),
                "text1");
   }
   {
     let index = string_list_model.index((1, 0));
-    assert_eq!(string_list_model.data(&index, ItemDataRole::Display as i32)
+    assert_eq!(string_list_model
+                 .data(&index, ItemDataRole::Display as i32)
                  .to_string()
                  .to_std_string(),
                "text2");
@@ -32,8 +34,10 @@ fn models_and_casts() {
   let abstract_model: &mut AbstractItemModel = string_list_model.static_cast_mut();
   assert_eq!(abstract_model.row_count(()), 2);
   {
-    let string_list_model_back: &mut StringListModel = abstract_model.dynamic_cast_mut()
-      .expect("dynamic_cast should be successful");
+    let string_list_model_back: &mut StringListModel =
+      abstract_model
+        .dynamic_cast_mut()
+        .expect("dynamic_cast should be successful");
     assert_eq!(string_list_model_back.row_count(()), 2);
   }
 

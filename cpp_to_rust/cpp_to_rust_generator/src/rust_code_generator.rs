@@ -34,32 +34,38 @@ fn format_doc(doc: &str) -> String {
   if doc.is_empty() {
     return String::new();
   }
-  doc.split('\n')
+  doc
+    .split('\n')
     .map(|x| {
-      let mut line = format!("/// {}\n", x);
-      if line.starts_with("///     ") {
-        // block doc tests
-        line = line.replace("///     ", "/// &#32;   ");
-      }
-      line
-    })
+           let mut line = format!("/// {}\n", x);
+           if line.starts_with("///     ") {
+             // block doc tests
+             line = line.replace("///     ", "/// &#32;   ");
+           }
+           line
+         })
     .join("")
 }
 
 pub fn rust_type_to_code(rust_type: &RustType, crate_name: &str) -> String {
   match *rust_type {
     RustType::Void => "()".to_string(),
-    RustType::Common { ref base,
-                       ref is_const,
-                       ref is_const2,
-                       ref indirection,
-                       ref generic_arguments,
-                       .. } => {
+    RustType::Common {
+      ref base,
+      ref is_const,
+      ref is_const2,
+      ref indirection,
+      ref generic_arguments,
+      ..
+    } => {
       let mut base_s = base.full_name(Some(crate_name));
       if let Some(ref args) = *generic_arguments {
         base_s = format!("{}<{}>",
                          base_s,
-                         args.iter().map(|x| rust_type_to_code(x, crate_name)).join(", "));
+                         args
+                           .iter()
+                           .map(|x| rust_type_to_code(x, crate_name))
+                           .join(", "));
       }
       match *indirection {
         RustTypeIndirection::None => base_s,
@@ -101,9 +107,15 @@ pub fn rust_type_to_code(rust_type: &RustType, crate_name: &str) -> String {
         }
       }
     }
-    RustType::FunctionPointer { ref return_type, ref arguments } => {
+    RustType::FunctionPointer {
+      ref return_type,
+      ref arguments,
+    } => {
       format!("extern \"C\" fn({}){}",
-              arguments.iter().map(|arg| rust_type_to_code(arg, crate_name)).join(", "),
+              arguments
+                .iter()
+                .map(|arg| rust_type_to_code(arg, crate_name))
+                .join(", "),
               match return_type.as_ref() {
                 &RustType::Void => String::new(),
                 return_type => format!(" -> {}", rust_type_to_code(return_type, crate_name)),
@@ -114,18 +126,20 @@ pub fn rust_type_to_code(rust_type: &RustType, crate_name: &str) -> String {
 
 
 pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) -> Result<()> {
-  let template_rustfmt_config_path =
-    config.crate_template_path.as_ref().and_then(|crate_template_path| {
-      let template_rustfmt_config_path = crate_template_path.with_added("rustfmt.toml");
-      if template_rustfmt_config_path.exists() {
-        Some(template_rustfmt_config_path)
-      } else {
-        None
-      }
-    });
+  let template_rustfmt_config_path = config
+    .crate_template_path
+    .as_ref()
+    .and_then(|crate_template_path| {
+                let template_rustfmt_config_path = crate_template_path.with_added("rustfmt.toml");
+                if template_rustfmt_config_path.exists() {
+                  Some(template_rustfmt_config_path)
+                } else {
+                  None
+                }
+              });
 
   let rustfmt_config_data = if let Some(template_rustfmt_config_path) =
-                                   template_rustfmt_config_path {
+    template_rustfmt_config_path {
     log::status(format!("Using rustfmt config file: {:?}",
                         template_rustfmt_config_path));
     file_to_string(template_rustfmt_config_path)?
@@ -158,15 +172,18 @@ pub struct RustCodeGenerator<'a> {
 impl<'a> RustCodeGenerator<'a> {
   /// Generates cargo file and skeleton of the crate
   pub fn generate_template(&self) -> Result<()> {
-    let template_rustfmt_config_path =
-      self.config.crate_template_path.as_ref().and_then(|crate_template_path| {
-        let template_rustfmt_config_path = crate_template_path.with_added("rustfmt.toml");
-        if template_rustfmt_config_path.exists() {
-          Some(template_rustfmt_config_path)
-        } else {
-          None
-        }
-      });
+    let template_rustfmt_config_path = self
+      .config
+      .crate_template_path
+      .as_ref()
+      .and_then(|crate_template_path| {
+                  let template_rustfmt_config_path = crate_template_path.with_added("rustfmt.toml");
+                  if template_rustfmt_config_path.exists() {
+                    Some(template_rustfmt_config_path)
+                  } else {
+                    None
+                  }
+                });
     let output_rustfmt_config_path = self.config.output_path.with_added("rustfmt.toml");
     if let Some(ref template_rustfmt_config_path) = template_rustfmt_config_path {
       copy_file(template_rustfmt_config_path, output_rustfmt_config_path)?;
@@ -175,15 +192,18 @@ impl<'a> RustCodeGenerator<'a> {
       rustfmt_file.write(include_str!("../templates/crate/rustfmt.toml"))?;
     }
 
-    let template_build_rs_path =
-      self.config.crate_template_path.as_ref().and_then(|crate_template_path| {
-        let template_build_rs_path = crate_template_path.with_added("build.rs");
-        if template_build_rs_path.exists() {
-          Some(template_build_rs_path)
-        } else {
-          None
-        }
-      });
+    let template_build_rs_path = self
+      .config
+      .crate_template_path
+      .as_ref()
+      .and_then(|crate_template_path| {
+                  let template_build_rs_path = crate_template_path.with_added("build.rs");
+                  if template_build_rs_path.exists() {
+                    Some(template_build_rs_path)
+                  } else {
+                    None
+                  }
+                });
     let output_build_rs_path = self.config.output_path.with_added("build.rs");
     if let Some(ref template_build_rs_path) = template_build_rs_path {
       copy_file(template_build_rs_path, output_build_rs_path)?;
@@ -196,79 +216,98 @@ impl<'a> RustCodeGenerator<'a> {
     }
     let cargo_toml_data = {
       let package = toml::Value::Table({
-        let mut table = toml::Table::new();
-        table.insert("name".to_string(),
-                     toml::Value::String(self.config.crate_properties.name().clone()));
-        table.insert("version".to_string(),
-                     toml::Value::String(self.config.crate_properties.version().clone()));
-        let authors = self.config
-          .crate_properties
-          .authors()
-          .iter()
-          .map(|x| toml::Value::String(x.clone()))
-          .collect();
-        table.insert("authors".to_string(), toml::Value::Array(authors));
-        table.insert("build".to_string(),
-                     toml::Value::String("build.rs".to_string()));
-        table
-      });
+                                         let mut table = toml::Table::new();
+                                         table.insert("name".to_string(),
+                                                      toml::Value::String(self
+                                                                            .config
+                                                                            .crate_properties
+                                                                            .name()
+                                                                            .clone()));
+                                         table.insert("version".to_string(),
+                                                      toml::Value::String(self
+                                                                            .config
+                                                                            .crate_properties
+                                                                            .version()
+                                                                            .clone()));
+                                         let authors = self
+                                           .config
+                                           .crate_properties
+                                           .authors()
+                                           .iter()
+                                           .map(|x| toml::Value::String(x.clone()))
+                                           .collect();
+                                         table.insert("authors".to_string(),
+                                                      toml::Value::Array(authors));
+                                         table.insert("build".to_string(),
+                                                      toml::Value::String("build.rs".to_string()));
+                                         table
+                                       });
       let dep_value = |version: &str, local_path: Option<PathBuf>| -> Result<toml::Value> {
         Ok(if local_path.is_none() || !self.config.write_dependencies_local_paths {
-          toml::Value::String(version.to_string())
-        } else {
-          toml::Value::Table({
-            let mut value = toml::Table::new();
-            value.insert("version".to_string(),
-                         toml::Value::String(version.to_string()));
-            value.insert("path".to_string(),
+             toml::Value::String(version.to_string())
+           } else {
+             toml::Value::Table({
+                                  let mut value = toml::Table::new();
+                                  value.insert("version".to_string(),
+                                               toml::Value::String(version.to_string()));
+                                  value.insert("path".to_string(),
                          toml::Value::String(path_to_str(&local_path.expect("checked above"))
                            ?
                            .to_string()));
-            value
-          })
-        })
+                                  value
+                                })
+           })
       };
-      let dependencies = toml::Value::Table({
-        let mut table = toml::Table::new();
-        if !self.config.crate_properties.should_remove_default_dependencies() {
-          table.insert("libc".to_string(),
-                       toml::Value::String(versions::LIBC_VERSION.to_string()));
-          table.insert("cpp_utils".to_string(),
+      let dependencies =
+        toml::Value::Table({
+                             let mut table = toml::Table::new();
+                             if !self
+                                   .config
+                                   .crate_properties
+                                   .should_remove_default_dependencies() {
+                               table.insert("libc".to_string(),
+                                            toml::Value::String(versions::LIBC_VERSION
+                                                                  .to_string()));
+                               table.insert("cpp_utils".to_string(),
                        dep_value(versions::CPP_UTILS_VERSION,
                                  if self.config.write_dependencies_local_paths {
                                    Some(repo_crate_local_path("cpp_to_rust/cpp_utils")?)
                                  } else {
                                    None
                                  })?);
-          for dep in self.config.generator_dependencies {
-            table.insert(dep.rust_export_info.crate_name.clone(),
+                               for dep in self.config.generator_dependencies {
+                                 table.insert(dep.rust_export_info.crate_name.clone(),
                          dep_value(&dep.rust_export_info.crate_version,
                                    Some(PathBuf::from(&dep.rust_export_info.output_path)))?);
-          }
-        }
-        for dep in self.config.crate_properties.dependencies() {
-          table.insert(dep.name.clone(),
-                       dep_value(&dep.version, dep.local_path.clone())?);
-        }
-        table
-      });
-      let build_dependencies = toml::Value::Table({
-        let mut table = toml::Table::new();
-        if !self.config.crate_properties.should_remove_default_build_dependencies() {
-          table.insert("cpp_to_rust_build_tools".to_string(),
+                               }
+                             }
+                             for dep in self.config.crate_properties.dependencies() {
+                               table.insert(dep.name.clone(),
+                                            dep_value(&dep.version, dep.local_path.clone())?);
+                             }
+                             table
+                           });
+      let build_dependencies =
+        toml::Value::Table({
+                             let mut table = toml::Table::new();
+                             if !self
+                                   .config
+                                   .crate_properties
+                                   .should_remove_default_build_dependencies() {
+                               table.insert("cpp_to_rust_build_tools".to_string(),
                        dep_value(versions::BUILD_TOOLS_VERSION,
                                  if self.config.write_dependencies_local_paths {
                                    Some(repo_crate_local_path("cpp_to_rust/cpp_to_rust_build_tools")?)
                                  } else {
                                    None
                                  })?);
-        }
-        for dep in self.config.crate_properties.build_dependencies() {
-          table.insert(dep.name.clone(),
-                       dep_value(&dep.version, dep.local_path.clone())?);
-        }
-        table
-      });
+                             }
+                             for dep in self.config.crate_properties.build_dependencies() {
+                               table.insert(dep.name.clone(),
+                                            dep_value(&dep.version, dep.local_path.clone())?);
+                             }
+                             table
+                           });
       let mut table = toml::Table::new();
       table.insert("package".to_string(), package);
       table.insert("dependencies".to_string(), dependencies);
@@ -308,13 +347,14 @@ impl<'a> RustCodeGenerator<'a> {
   }
 
   fn rust_ffi_function_to_code(&self, func: &RustFFIFunction) -> String {
-    let args = func.arguments
+    let args = func
+      .arguments
       .iter()
       .map(|arg| {
-        format!("{}: {}",
-                arg.name,
-                self.rust_type_to_code(&arg.argument_type))
-      });
+             format!("{}: {}",
+                     arg.name,
+                     self.rust_type_to_code(&arg.argument_type))
+           });
     format!("  pub fn {}({}){};\n",
             func.name,
             args.join(", "),
@@ -364,9 +404,7 @@ impl<'a> RustCodeGenerator<'a> {
           type1.rust_api_type.last_is_const()?
         };
         let unwrap_code = match type1.rust_api_to_c_conversion {
-          RustToCTypeConversion::RefToPtr => {
-            ".expect(\"Attempted to convert null pointer to reference\")"
-          }
+          RustToCTypeConversion::RefToPtr => ".expect(\"Attempted to convert null pointer to reference\")",
           RustToCTypeConversion::OptionRefToPtr => "",
           _ => unreachable!(),
         };
@@ -447,18 +485,20 @@ impl<'a> RustCodeGenerator<'a> {
           }
           RustToCTypeConversion::ValueToPtr |
           RustToCTypeConversion::CppBoxToPtr => {
-            let is_const =
-              if let RustType::Common { ref is_const, ref is_const2, ref indirection, .. } =
-                     arg.argument_type
-                .rust_ffi_type {
-                match *indirection {
-                  RustTypeIndirection::PtrPtr { .. } |
-                  RustTypeIndirection::PtrRef { .. } => *is_const2,
-                  _ => *is_const,
-                }
-              } else {
-                return Err(unexpected("void is not expected here at all!").into());
-              };
+            let is_const = if let RustType::Common {
+                     ref is_const,
+                     ref is_const2,
+                     ref indirection,
+                     ..
+                   } = arg.argument_type.rust_ffi_type {
+              match *indirection {
+                RustTypeIndirection::PtrPtr { .. } |
+                RustTypeIndirection::PtrRef { .. } => *is_const2,
+                _ => *is_const,
+              }
+            } else {
+              return Err(unexpected("void is not expected here at all!").into());
+            };
             if arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::CppBoxToPtr {
               let method = if is_const { "as_ptr" } else { "as_mut_ptr" };
               code = format!("{}.{}()", code, method);
@@ -482,7 +522,10 @@ impl<'a> RustCodeGenerator<'a> {
     if let Some(ref i) = variant.return_type_ffi_index {
       let mut return_var_name = "object".to_string();
       let mut ii = 1;
-      while variant.arguments.iter().any(|x| &x.name == &return_var_name) {
+      while variant
+              .arguments
+              .iter()
+              .any(|x| &x.name == &return_var_name) {
         ii += 1;
         return_var_name = format!("object{}", ii);
       }
@@ -535,56 +578,63 @@ impl<'a> RustCodeGenerator<'a> {
   }
 
   fn arg_texts(&self, args: &[RustMethodArgument], lifetime: Option<&String>) -> Vec<String> {
-    args.iter()
-      .map(|arg| {
-        if &arg.name == "self" {
-          let self_type = match lifetime {
-            Some(lifetime) => arg.argument_type.rust_api_type.with_lifetime(lifetime.clone()),
-            None => arg.argument_type.rust_api_type.clone(),
-          };
-          if let RustType::Common { ref indirection, ref is_const, .. } = self_type {
-            let maybe_mut = if *is_const { "" } else { "mut " };
-            match *indirection {
-              RustTypeIndirection::None => "self".to_string(),
-              RustTypeIndirection::Ref { ref lifetime } => {
-                match *lifetime {
-                  Some(ref lifetime) => format!("&'{} {}self", lifetime, maybe_mut),
-                  None => format!("&{}self", maybe_mut),
-                }
-              }
-              _ => panic!("invalid self argument type (indirection)"),
-            }
-          } else {
-            panic!("invalid self argument type (not Common)");
-          }
-        } else {
-          let mut maybe_mut_declaration = "";
-          if let RustType::Common { ref indirection, .. } = arg.argument_type
-            .rust_api_type {
-            if *indirection == RustTypeIndirection::None &&
-               arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr {
-              if let RustType::Common { ref is_const, .. } = arg.argument_type
-                .rust_ffi_type {
-                if !is_const {
-                  maybe_mut_declaration = "mut ";
-                }
-              }
-            }
-          }
+    args
+      .iter()
+      .map(|arg| if &arg.name == "self" {
+             let self_type = match lifetime {
+               Some(lifetime) => {
+                 arg
+                   .argument_type
+                   .rust_api_type
+                   .with_lifetime(lifetime.clone())
+               }
+               None => arg.argument_type.rust_api_type.clone(),
+             };
+             if let RustType::Common {
+                      ref indirection,
+                      ref is_const,
+                      ..
+                    } = self_type {
+               let maybe_mut = if *is_const { "" } else { "mut " };
+               match *indirection {
+                 RustTypeIndirection::None => "self".to_string(),
+                 RustTypeIndirection::Ref { ref lifetime } => {
+                   match *lifetime {
+                     Some(ref lifetime) => format!("&'{} {}self", lifetime, maybe_mut),
+                     None => format!("&{}self", maybe_mut),
+                   }
+                 }
+                 _ => panic!("invalid self argument type (indirection)"),
+               }
+             } else {
+               panic!("invalid self argument type (not Common)");
+             }
+           } else {
+             let mut maybe_mut_declaration = "";
+             if let RustType::Common { ref indirection, .. } = arg.argument_type.rust_api_type {
+               if *indirection == RustTypeIndirection::None &&
+                  arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::ValueToPtr {
+                 if let RustType::Common { ref is_const, .. } = arg.argument_type.rust_ffi_type {
+                   if !is_const {
+                     maybe_mut_declaration = "mut ";
+                   }
+                 }
+               }
+             }
 
-          format!("{}{}: {}",
-                  maybe_mut_declaration,
-                  arg.name,
-                  match lifetime {
-                    Some(lifetime) => {
-                      self.rust_type_to_code(&arg.argument_type
-                        .rust_api_type
-                        .with_lifetime(lifetime.clone()))
-                    }
-                    None => self.rust_type_to_code(&arg.argument_type.rust_api_type),
-                  })
-        }
-      })
+             format!("{}{}: {}",
+                     maybe_mut_declaration,
+                     arg.name,
+                     match lifetime {
+                       Some(lifetime) => {
+                         self.rust_type_to_code(&arg
+                                                   .argument_type
+                                                   .rust_api_type
+                                                   .with_lifetime(lifetime.clone()))
+                       }
+                       None => self.rust_type_to_code(&arg.argument_type.rust_api_type),
+                     })
+           })
       .collect()
   }
 
@@ -596,81 +646,94 @@ impl<'a> RustCodeGenerator<'a> {
     };
     let maybe_unsafe = if func.is_unsafe { "unsafe " } else { "" };
     Ok(match func.arguments {
-      RustMethodArguments::SingleVariant(ref variant) => {
-        let body = self.generate_ffi_call(variant, &Vec::new(), func.is_unsafe)?;
-        let return_type_for_signature = if variant.return_type.rust_api_type == RustType::Void {
-          String::new()
-        } else {
-          format!(" -> {}",
-                  self.rust_type_to_code(&variant.return_type.rust_api_type))
-        };
-        let all_lifetimes: Vec<_> = variant.arguments
-          .iter()
-          .filter_map(|x| x.argument_type.rust_api_type.lifetime())
-          .collect();
-        let lifetimes_text = if all_lifetimes.is_empty() {
-          String::new()
-        } else {
-          format!("<{}>",
-                  all_lifetimes.iter().map(|x| format!("'{}", x)).join(", "))
-        };
+         RustMethodArguments::SingleVariant(ref variant) => {
+      let body = self.generate_ffi_call(variant, &Vec::new(), func.is_unsafe)?;
+      let return_type_for_signature = if variant.return_type.rust_api_type == RustType::Void {
+        String::new()
+      } else {
+        format!(" -> {}",
+                self.rust_type_to_code(&variant.return_type.rust_api_type))
+      };
+      let all_lifetimes: Vec<_> = variant
+        .arguments
+        .iter()
+        .filter_map(|x| x.argument_type.rust_api_type.lifetime())
+        .collect();
+      let lifetimes_text = if all_lifetimes.is_empty() {
+        String::new()
+      } else {
+        format!("<{}>",
+                all_lifetimes
+                  .iter()
+                  .map(|x| format!("'{}", x))
+                  .join(", "))
+      };
 
-        format!("{doc}{maybe_pub}{maybe_unsafe}fn {name}{lifetimes_text}({args}){return_type} \
+      format!("{doc}{maybe_pub}{maybe_unsafe}fn {name}{lifetimes_text}({args}){return_type} \
                  {{\n{body}}}\n\n",
-                doc = format_doc(&doc_formatter::method_doc(&func)),
-                maybe_pub = maybe_pub,
-                maybe_unsafe = maybe_unsafe,
-                lifetimes_text = lifetimes_text,
-                name = func.name.last_name()?,
-                args = self.arg_texts(&variant.arguments, None).join(", "),
-                return_type = return_type_for_signature,
-                body = body)
-      }
-      RustMethodArguments::MultipleVariants { ref params_trait_name,
-                                              ref params_trait_lifetime,
-                                              ref params_trait_return_type,
-                                              ref shared_arguments,
-                                              ref variant_argument_name,
-                                              .. } => {
-        let tpl_type = variant_argument_name.to_class_case();
-        let body = format!("{}.exec({})",
-                           variant_argument_name,
-                           shared_arguments.iter().map(|arg| arg.name.clone()).join(", "));
-        let mut all_lifetimes: Vec<_> = shared_arguments.iter()
-          .filter_map(|x| x.argument_type.rust_api_type.lifetime())
-          .collect();
-        if let Some(ref params_trait_lifetime) = *params_trait_lifetime {
-          if !all_lifetimes.iter().any(|x| x == &params_trait_lifetime) {
-            all_lifetimes.push(params_trait_lifetime);
-          }
+              doc = format_doc(&doc_formatter::method_doc(&func)),
+              maybe_pub = maybe_pub,
+              maybe_unsafe = maybe_unsafe,
+              lifetimes_text = lifetimes_text,
+              name = func.name.last_name()?,
+              args = self.arg_texts(&variant.arguments, None).join(", "),
+              return_type = return_type_for_signature,
+              body = body)
+    }
+         RustMethodArguments::MultipleVariants {
+           ref params_trait_name,
+           ref params_trait_lifetime,
+           ref params_trait_return_type,
+           ref shared_arguments,
+           ref variant_argument_name,
+           ..
+         } => {
+      let tpl_type = variant_argument_name.to_class_case();
+      let body = format!("{}.exec({})",
+                         variant_argument_name,
+                         shared_arguments
+                           .iter()
+                           .map(|arg| arg.name.clone())
+                           .join(", "));
+      let mut all_lifetimes: Vec<_> = shared_arguments
+        .iter()
+        .filter_map(|x| x.argument_type.rust_api_type.lifetime())
+        .collect();
+      if let Some(ref params_trait_lifetime) = *params_trait_lifetime {
+        if !all_lifetimes.iter().any(|x| x == &params_trait_lifetime) {
+          all_lifetimes.push(params_trait_lifetime);
         }
-        let mut tpl_decl_texts: Vec<_> = all_lifetimes.iter().map(|x| format!("'{}", x)).collect();
-        tpl_decl_texts.push(tpl_type.clone());
-        let tpl_decl = tpl_decl_texts.join(", ");
-        let trait_lifetime_arg = match *params_trait_lifetime {
-          Some(ref lifetime) => format!("<'{}>", lifetime),
-          None => String::new(),
-        };
-        let mut args = self.arg_texts(shared_arguments, None);
-        args.push(format!("{}: {}", variant_argument_name, tpl_type));
-        let return_type_string = if let Some(ref t) = *params_trait_return_type {
-          self.rust_type_to_code(t)
-        } else {
-          format!("{}::ReturnType", tpl_type)
-        };
-        format!(include_str!("../templates/crate/overloaded_function.rs.in"),
-                doc = format_doc(&doc_formatter::method_doc(&func)),
-                maybe_pub = maybe_pub,
-                tpl_decl = tpl_decl,
-                trait_lifetime_arg = trait_lifetime_arg,
-                name = func.name.last_name()?,
-                trait_name = params_trait_name,
-                tpl_type = tpl_type,
-                args = args.join(", "),
-                body = body,
-                return_type_string = return_type_string)
       }
-    })
+      let mut tpl_decl_texts: Vec<_> = all_lifetimes
+        .iter()
+        .map(|x| format!("'{}", x))
+        .collect();
+      tpl_decl_texts.push(tpl_type.clone());
+      let tpl_decl = tpl_decl_texts.join(", ");
+      let trait_lifetime_arg = match *params_trait_lifetime {
+        Some(ref lifetime) => format!("<'{}>", lifetime),
+        None => String::new(),
+      };
+      let mut args = self.arg_texts(shared_arguments, None);
+      args.push(format!("{}: {}", variant_argument_name, tpl_type));
+      let return_type_string = if let Some(ref t) = *params_trait_return_type {
+        self.rust_type_to_code(t)
+      } else {
+        format!("{}::ReturnType", tpl_type)
+      };
+      format!(include_str!("../templates/crate/overloaded_function.rs.in"),
+              doc = format_doc(&doc_formatter::method_doc(&func)),
+              maybe_pub = maybe_pub,
+              tpl_decl = tpl_decl,
+              trait_lifetime_arg = trait_lifetime_arg,
+              name = func.name.last_name()?,
+              trait_name = params_trait_name,
+              tpl_type = tpl_type,
+              args = args.join(", "),
+              body = body,
+              return_type_string = return_type_string)
+    }
+       })
   }
 
   #[cfg_attr(feature="clippy", allow(collapsible_if))]
@@ -703,14 +766,14 @@ impl<'a> RustCodeGenerator<'a> {
           return Err(format!("Automatically generated module '{}' conflicts with a mandatory \
                               module",
                              name)
-            .into());
+                         .into());
         }
       }
       for name in &["lib", "main"] {
         if modules.iter().any(|x| &x.as_str() == name) {
           return Err(format!("Automatically generated module '{}' conflicts with a reserved name",
                              name)
-            .into());
+                         .into());
         }
       }
 
@@ -729,7 +792,8 @@ impl<'a> RustCodeGenerator<'a> {
               extra_modules.push(file_name.to_string());
             } else if let Some(ext) = item.path().extension() {
               if ext == "rs" {
-                let stem = path.file_stem().chain_err(|| "file_stem() failed for .rs file")?;
+                let stem = path.file_stem()
+                  .chain_err(|| "file_stem() failed for .rs file")?;
                 extra_modules.push(os_str_to_str(stem)?.to_string());
               }
             }
@@ -741,7 +805,7 @@ impl<'a> RustCodeGenerator<'a> {
           return Err(format!("Crate template contains '{}' module but there is an automatically \
                               generated module with the same name",
                              module)
-            .into());
+                         .into());
         }
       }
       let all_modules = extra_modules.iter().chain(modules.iter().map(|x| *x));
@@ -757,17 +821,19 @@ impl<'a> RustCodeGenerator<'a> {
   fn generate_trait_impls(&self, trait_impls: &[TraitImpl]) -> Result<String> {
     let mut results = Vec::new();
     for trait1 in trait_impls {
-      let associated_types_text = trait1.associated_types
+      let associated_types_text = trait1
+        .associated_types
         .iter()
         .map(|t| format!("type {} = {};", t.name, self.rust_type_to_code(&t.value)))
         .join("\n");
 
       let trait_content = if let Some(TraitImplExtra::CppDeletable { ref deleter_name }) =
-                                 trait1.extra {
+        trait1.extra {
         format!("fn deleter() -> ::cpp_utils::Deleter<Self> {{\n  ::ffi::{}\n}}\n",
                 deleter_name)
       } else {
-        trait1.methods
+        trait1
+          .methods
           .iter()
           .map_if_ok(|method| self.generate_rust_final_function(method))?
           .join("")
@@ -788,37 +854,48 @@ impl<'a> RustCodeGenerator<'a> {
       results.push(format_doc(&doc_formatter::type_doc(type1)));
       let maybe_pub = if type1.is_public { "pub " } else { "" };
       match type1.kind {
-        RustTypeDeclarationKind::CppTypeWrapper { ref kind,
-                                                  ref methods,
-                                                  ref trait_impls,
-                                                  ref qt_receivers,
-                                                  .. } => {
+        RustTypeDeclarationKind::CppTypeWrapper {
+          ref kind,
+          ref methods,
+          ref trait_impls,
+          ref qt_receivers,
+          ..
+        } => {
           let r = match *kind {
-            RustTypeWrapperKind::Enum { ref values, ref is_flaggable } => {
+            RustTypeWrapperKind::Enum {
+              ref values,
+              ref is_flaggable,
+            } => {
               let mut r = format!(include_str!("../templates/crate/enum_declaration.rs.in"),
                                   maybe_pub = maybe_pub,
                                   name = type1.name.last_name()?,
-                                  variants = values.iter()
+                                  variants = values
+                                    .iter()
                                     .map(|item| {
-                                      format!("{}  {} = {}",
+                                           format!("{}  {} = {}",
                                               format_doc(&doc_formatter::enum_value_doc(&item)),
                                               item.name,
                                               item.value)
-                                    })
+                                         })
                                     .join(", \n"));
               if *is_flaggable {
                 r = r +
                     &format!(include_str!("../templates/crate/impl_flaggable.rs.in"),
                              name = type1.name.last_name()?,
-                             trait_type = RustName::new(vec!["qt_core".to_string(),
-                                                             "flags".to_string(),
-                                                             "FlaggableEnum".to_string()])
-                               ?
-                               .full_name(Some(&self.config.crate_properties.name())));
+                             trait_type =
+                               RustName::new(vec!["qt_core".to_string(),
+                                                  "flags".to_string(),
+                                                  "FlaggableEnum".to_string()])
+                                   ?
+                                   .full_name(Some(&self.config.crate_properties.name())));
               }
               r
             }
-            RustTypeWrapperKind::Struct { ref size_const_name, ref slot_wrapper, .. } => {
+            RustTypeWrapperKind::Struct {
+              ref size_const_name,
+              ref slot_wrapper,
+              ..
+            } => {
               let mut r = if let Some(ref size_const_name) = *size_const_name {
                 format!(include_str!("../templates/crate/struct_declaration.rs.in"),
                         maybe_pub = maybe_pub,
@@ -826,12 +903,13 @@ impl<'a> RustCodeGenerator<'a> {
                         size_const_name = size_const_name)
               } else {
                 format!("#[repr(C)]\n{maybe_pub}struct {}(u8);\n\n",
-                                  type1.name.last_name()?,
-                                  maybe_pub = maybe_pub)
+                        type1.name.last_name()?,
+                        maybe_pub = maybe_pub)
               };
 
               if let Some(ref slot_wrapper) = *slot_wrapper {
-                let arg_texts: Vec<_> = slot_wrapper.arguments
+                let arg_texts: Vec<_> = slot_wrapper
+                  .arguments
                   .iter()
                   .map(|t| self.rust_type_to_code(&t.rust_api_type))
                   .collect();
@@ -839,30 +917,34 @@ impl<'a> RustCodeGenerator<'a> {
                 let args_tuple = format!("{}{}", args, if arg_texts.len() == 1 { "," } else { "" });
                 let connections_mod = RustName::new(vec!["qt_core".to_string(),
                                                          "connections".to_string()])
-                  ?
-                  .full_name(Some(&self.config.crate_properties.name()));
+                    ?
+                    .full_name(Some(&self.config.crate_properties.name()));
                 let object_type_name = RustName::new(vec!["qt_core".to_string(),
                                                           "object".to_string(),
                                                           "Object".to_string()])
-                  ?
-                  .full_name(Some(&self.config.crate_properties.name()));
-                let callback_args = slot_wrapper.arguments
+                    ?
+                    .full_name(Some(&self.config.crate_properties.name()));
+                let callback_args = slot_wrapper
+                  .arguments
                   .iter()
                   .enumerate()
                   .map(|(num, t)| {
-                    format!("arg{}: {}", num, self.rust_type_to_code(&t.rust_ffi_type))
-                  })
+                         format!("arg{}: {}", num, self.rust_type_to_code(&t.rust_ffi_type))
+                       })
                   .join(", ");
-                let func_args = slot_wrapper.arguments
+                let func_args = slot_wrapper
+                  .arguments
                   .iter()
                   .enumerate()
                   .map_if_ok(|(num, t)| {
-                    self.convert_type_from_ffi(t, format!("arg{}", num), false, false)
-                  })?
+                               self.convert_type_from_ffi(t, format!("arg{}", num), false, false)
+                             })?
                   .join(", ");
                 r.push_str(&format!(include_str!("../templates/crate/slot_wrapper_extras.rs.in"),
-                                    type_name = type1.name
-                                      .full_name(Some(&self.config.crate_properties.name())),
+                                    type_name =
+                                      type1
+                                        .name
+                                        .full_name(Some(&self.config.crate_properties.name())),
                                     pub_type_name = slot_wrapper.public_type_name,
                                     callback_name = slot_wrapper.callback_name,
                                     args = args,
@@ -880,27 +962,34 @@ impl<'a> RustCodeGenerator<'a> {
           if !methods.is_empty() {
             results.push(format!("impl {} {{\n{}}}\n\n",
                                  type1.name.last_name()?,
-                                 methods.iter()
-                                   .map_if_ok(|method| self.generate_rust_final_function(method))?
+                                 methods
+                                   .iter()
+                                   .map_if_ok(|method| {
+                                                self.generate_rust_final_function(method)
+                                              })?
                                    .join("")));
           }
           results.push(self.generate_trait_impls(trait_impls)?);
           if !qt_receivers.is_empty() {
             let connections_mod = RustName::new(vec!["qt_core".to_string(),
                                                      "connections".to_string()])
-              ?
-              .full_name(Some(&self.config.crate_properties.name()));
+                ?
+                .full_name(Some(&self.config.crate_properties.name()));
             let object_type_name = RustName::new(vec!["qt_core".to_string(),
                                                       "object".to_string(),
                                                       "Object".to_string()])
-              ?
-              .full_name(Some(&self.config.crate_properties.name()));
+                ?
+                .full_name(Some(&self.config.crate_properties.name()));
             let mut content = Vec::new();
-            let obj_name = type1.name.full_name(Some(&self.config.crate_properties.name()));
+            let obj_name = type1
+              .name
+              .full_name(Some(&self.config.crate_properties.name()));
             content.push("use ::cpp_utils::StaticCast;\n".to_string());
             let mut type_impl_content = Vec::new();
             for receiver_type in &[RustQtReceiverType::Signal, RustQtReceiverType::Slot] {
-              if qt_receivers.iter().any(|r| &r.receiver_type == receiver_type) {
+              if qt_receivers
+                   .iter()
+                   .any(|r| &r.receiver_type == receiver_type) {
                 let (struct_method, struct_type) = match *receiver_type {
                   RustQtReceiverType::Signal => ("signals", "Signals"),
                   RustQtReceiverType::Slot => ("slots", "Slots"),
@@ -909,13 +998,16 @@ impl<'a> RustCodeGenerator<'a> {
                 content.push(format!("pub struct {}<'a>(&'a {});\n", struct_type, obj_name));
                 for receiver in qt_receivers {
                   if &receiver.receiver_type == receiver_type {
-                    let arg_texts: Vec<_> = receiver.arguments
+                    let arg_texts: Vec<_> = receiver
+                      .arguments
                       .iter()
                       .map(|t| self.rust_type_to_code(t))
                       .collect();
                     let args_tuple = arg_texts.join(", ") +
                                      if arg_texts.len() == 1 { "," } else { "" };
-                    content.push(format!("pub struct {}<'a>(&'a {});\n", receiver.type_name, obj_name));
+                    content.push(format!("pub struct {}<'a>(&'a {});\n",
+                                         receiver.type_name,
+                                         obj_name));
                     content.push(format!("\
 impl<'a> {connections_mod}::Receiver for {type_name}<'a> {{
   type Arguments = ({arguments});
@@ -955,13 +1047,17 @@ pub fn {struct_method}(&self) -> {struct_type} {{
             results.push(format!("pub mod connections {{\n{}\n}}\n\n", content.join("")));
           }
         }
-        RustTypeDeclarationKind::MethodParametersTrait { ref shared_arguments,
-                                                         ref impls,
-                                                         ref lifetime,
-                                                         ref return_type,
-                                                         ref is_unsafe,
-                                                         .. } => {
-          let arg_list = self.arg_texts(shared_arguments, lifetime.as_ref()).join(", ");
+        RustTypeDeclarationKind::MethodParametersTrait {
+          ref shared_arguments,
+          ref impls,
+          ref lifetime,
+          ref return_type,
+          ref is_unsafe,
+          ..
+        } => {
+          let arg_list = self
+            .arg_texts(shared_arguments, lifetime.as_ref())
+            .join(", ");
           let trait_lifetime_specifier = match *lifetime {
             Some(ref lf) => format!("<'{}>", lf),
             None => String::new(),
@@ -989,32 +1085,33 @@ pub fn {struct_method}(&self) -> {struct_type} {{
                                return_type_decl = return_type_decl,
                                return_type_string = return_type_string));
           for variant in impls {
-            let final_lifetime =
-              if lifetime.is_none() &&
-                 (variant.arguments.iter().any(|t| t.argument_type.rust_api_type.is_ref()) ||
-                  variant.return_type.rust_api_type.is_ref()) {
-                Some("a".to_string())
-              } else {
-                lifetime.clone()
-              };
+            let final_lifetime = if lifetime.is_none() &&
+                                    (variant
+                                       .arguments
+                                       .iter()
+                                       .any(|t| t.argument_type.rust_api_type.is_ref()) ||
+                                     variant.return_type.rust_api_type.is_ref()) {
+              Some("a".to_string())
+            } else {
+              lifetime.clone()
+            };
             let lifetime_specifier = match final_lifetime {
               Some(ref lf) => format!("<'{}>", lf),
               None => String::new(),
             };
-            let final_arg_list = self.arg_texts(shared_arguments, final_lifetime.as_ref())
+            let final_arg_list = self
+              .arg_texts(shared_arguments, final_lifetime.as_ref())
               .join(", ");
-            let tuple_item_types: Vec<_> = variant.arguments
+            let tuple_item_types: Vec<_> = variant
+              .arguments
               .iter()
-              .map(|t| {
-                if let Some(ref lifetime) = final_lifetime {
-                  self.rust_type_to_code(&t.argument_type
-                    .rust_api_type
-                    .with_lifetime(lifetime.to_string()))
-                } else {
-                  self.rust_type_to_code(&t.argument_type
-                    .rust_api_type)
-                }
-              })
+              .map(|t| if let Some(ref lifetime) = final_lifetime {
+                     self.rust_type_to_code(&t.argument_type
+                                               .rust_api_type
+                                               .with_lifetime(lifetime.to_string()))
+                   } else {
+                     self.rust_type_to_code(&t.argument_type.rust_api_type)
+                   })
               .collect();
             let mut tmp_vars = Vec::new();
             if variant.arguments.len() == 1 {
@@ -1030,14 +1127,12 @@ pub fn {struct_method}(&self) -> {struct_type} {{
             }
             let return_type_string = match final_lifetime {
               Some(ref lifetime) => {
-                self.rust_type_to_code(&variant.return_type
-                  .rust_api_type
-                  .with_lifetime(lifetime.to_string()))
+                self.rust_type_to_code(&variant
+                                          .return_type
+                                          .rust_api_type
+                                          .with_lifetime(lifetime.to_string()))
               }
-              None => {
-                self.rust_type_to_code(&variant.return_type
-                  .rust_api_type)
-              }
+              None => self.rust_type_to_code(&variant.return_type.rust_api_type),
             };
             let return_type_decl = if return_type.is_some() {
               String::new()
@@ -1079,10 +1174,10 @@ pub fn {struct_method}(&self) -> {struct_type} {{
   fn call_rustfmt(&self, path: &PathBuf) {
     // log::noisy(format!("Formatting {}", path.display()));
     let result = ::std::panic::catch_unwind(|| {
-      rustfmt::format_input(rustfmt::Input::File(path.clone()),
+                                              rustfmt::format_input(rustfmt::Input::File(path.clone()),
                             &self.rustfmt_config,
                             Some(&mut ::std::io::stdout()))
-    });
+                                            });
     match result {
       Ok(rustfmt_result) => {
         if rustfmt_result.is_err() {
@@ -1135,7 +1230,7 @@ pub fn {struct_method}(&self) -> {struct_type} {{
         if !src_append_path.is_dir() {
           return Err(format!("Path is expected to be a directory: {}",
                              src_append_path.display())
-            .into());
+                         .into());
         }
         log::status(format!("Adding code from 'src_append' directory"));
         for item in read_dir(template_path.with_added("src_append"))? {
@@ -1145,13 +1240,17 @@ pub fn {struct_method}(&self) -> {struct_type} {{
             return Err(format!("Path is expected to be a file: {}", path.display()).into());
           }
           let file_name = item.file_name();
-          let output_path = self.config.output_path.with_added("src").with_added(&file_name);
+          let output_path = self
+            .config
+            .output_path
+            .with_added("src")
+            .with_added(&file_name);
           if !output_path.exists() {
             return Err(format!("Failed to append content from '{}' file because '{}' file does \
                                 not exist",
                                path.display(),
                                output_path.display())
-              .into());
+                           .into());
           }
           let mut file = open_file_with_options(output_path,
                                                 ::std::fs::OpenOptions::new().append(true))?;

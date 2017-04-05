@@ -17,7 +17,7 @@ error_chain! {
   }
 }
 
-use ::backtrace::Symbol;
+use backtrace::Symbol;
 
 impl Error {
   pub fn is_unexpected(&self) -> bool {
@@ -45,14 +45,15 @@ impl Error {
       for frame in backtrace.frames() {
         for symbol in frame.symbols() {
           if let Some(path) = symbol.filename() {
-            if path.components().any(|x| {
-              if let Some(x) = x.as_os_str().to_str() {
-                x == "libstd" || x == "libpanic_unwind" || x == "libcore" || x == "errors.rs" ||
-                x.starts_with("backtrace") || x.starts_with("error-chain")
-              } else {
-                false
-              }
-            }) {
+            if path
+                 .components()
+                 .any(|x| if let Some(x) = x.as_os_str().to_str() {
+                        x == "libstd" || x == "libpanic_unwind" || x == "libcore" ||
+                        x == "errors.rs" || x.starts_with("backtrace") ||
+                        x.starts_with("error-chain")
+                      } else {
+                        false
+                      }) {
               continue;
             }
             let name = if let Some(name) = symbol.name() {

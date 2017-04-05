@@ -19,8 +19,14 @@ fn variant_animation() {
     slot1.set(value_changed, std::ptr::null_mut());
 
     let mut animation = VariantAnimation::new(());
-    animation.signals().value_changed().connect(slot1.as_ref());
-    animation.signals().finished().connect(&app.slots().quit());
+    animation
+      .signals()
+      .value_changed()
+      .connect(slot1.as_ref());
+    animation
+      .signals()
+      .finished()
+      .connect(&app.slots().quit());
     animation.set_start_value(&Variant::new0(1));
     animation.set_end_value(&Variant::new0(5));
     animation.set_duration(5000);

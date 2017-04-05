@@ -5,7 +5,10 @@ use cpp_to_rust_generator::cpp_type::{CppType, CppTypeBase, CppBuiltInNumericTyp
 
 fn exclude_qlist_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(config: &mut Config,
                                                                             types: I) {
-  let types: Vec<String> = types.into_iter().map(|x| x.as_ref().to_string()).collect();
+  let types: Vec<String> = types
+    .into_iter()
+    .map(|x| x.as_ref().to_string())
+    .collect();
   config.add_cpp_ffi_generator_filter(Box::new(move |method| {
     if let Some(ref info) = method.class_membership {
       if info.class_type.name == "QList" {
@@ -36,7 +39,10 @@ fn exclude_qlist_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(conf
 
 fn exclude_qvector_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(config: &mut Config,
                                                                               types: I) {
-  let types: Vec<String> = types.into_iter().map(|x| x.as_ref().to_string()).collect();
+  let types: Vec<String> = types
+    .into_iter()
+    .map(|x| x.as_ref().to_string())
+    .collect();
   config.add_cpp_ffi_generator_filter(Box::new(move |method| {
     if let Some(ref info) = method.class_membership {
       if info.class_type.name == "QVector" {
@@ -227,22 +233,21 @@ pub fn core(config: &mut Config) -> Result<()> {
 }
 
 pub fn gui(config: &mut Config) -> Result<()> {
-  config.add_cpp_parser_blocked_names(vec![
-    "QAbstractOpenGLFunctionsPrivate",
-    "QOpenGLFunctionsPrivate",
-    "QOpenGLExtraFunctionsPrivate",
-    "QKeySequence::isDetached", "QBrushData",
-    "QAccessible::ActivationObserver",
-    "QAccessibleImageInterface",
-    "QAccessibleBridge",
-    "QAccessibleBridgePlugin",
-    "QAccessibleApplication",
-    "QOpenGLVersionStatus",
-    "QOpenGLVersionFunctionsBackend",
-    "QOpenGLVersionFunctionsStorage",
-    "QOpenGLTexture::TextureFormatClass",
-    "QTextFrameLayoutData"
-  ]);
+  config.add_cpp_parser_blocked_names(vec!["QAbstractOpenGLFunctionsPrivate",
+                                           "QOpenGLFunctionsPrivate",
+                                           "QOpenGLExtraFunctionsPrivate",
+                                           "QKeySequence::isDetached",
+                                           "QBrushData",
+                                           "QAccessible::ActivationObserver",
+                                           "QAccessibleImageInterface",
+                                           "QAccessibleBridge",
+                                           "QAccessibleBridgePlugin",
+                                           "QAccessibleApplication",
+                                           "QOpenGLVersionStatus",
+                                           "QOpenGLVersionFunctionsBackend",
+                                           "QOpenGLVersionFunctionsStorage",
+                                           "QOpenGLTexture::TextureFormatClass",
+                                           "QTextFrameLayoutData"]);
   exclude_qvector_eq_based_methods(config,
                                    &["QTextLayout::FormatRange",
                                      "QAbstractTextDocumentLayout::Selection"]);
@@ -280,9 +285,15 @@ pub fn gui(config: &mut Config) -> Result<()> {
       }
       if info.class_type.name.starts_with("QOpenGLFunctions_") &&
          (info.class_type.name.ends_with("_CoreBackend") |
-          info.class_type.name.ends_with("_CoreBackend::Functions") |
+          info
+            .class_type
+            .name
+            .ends_with("_CoreBackend::Functions") |
           info.class_type.name.ends_with("_DeprecatedBackend") |
-          info.class_type.name.ends_with("_DeprecatedBackend::Functions")) {
+          info
+            .class_type
+            .name
+            .ends_with("_DeprecatedBackend::Functions")) {
         return Ok(false);
       }
     }
@@ -292,16 +303,10 @@ pub fn gui(config: &mut Config) -> Result<()> {
   Ok(())
 }
 pub fn widgets(config: &mut Config) -> Result<()> {
-  config.add_cpp_parser_blocked_names(vec![
-    "QWidgetData",
-    "QWidgetItemV2"
-  ]);
+  config.add_cpp_parser_blocked_names(vec!["QWidgetData", "QWidgetItemV2"]);
 
   // TODO: Mac specific:
-  config.add_cpp_parser_blocked_names(vec![
-    "QMacCocoaViewContainer",
-    "QMacNativeWidget"
-  ]);
+  config.add_cpp_parser_blocked_names(vec!["QMacCocoaViewContainer", "QMacNativeWidget"]);
 
   exclude_qlist_eq_based_methods(config,
                                  &["QTableWidgetSelectionRange", "QTextEdit::ExtraSelection"]);

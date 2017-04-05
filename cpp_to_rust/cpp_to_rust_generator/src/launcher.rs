@@ -7,10 +7,9 @@ use cpp_ffi_generator;
 use cpp_parser;
 use common::errors::{Result, ChainErr};
 use common::string_utils::CaseOperations;
-use common::file_utils::{PathBufWithAdded, move_files, create_dir_all, save_json,
-                         load_bincode, save_bincode,
-                         canonicalize, remove_dir_all, remove_dir, read_dir, create_file,
-                         path_to_str};
+use common::file_utils::{PathBufWithAdded, move_files, create_dir_all, save_json, load_bincode,
+                         save_bincode, canonicalize, remove_dir_all, remove_dir, read_dir,
+                         create_file, path_to_str};
 use common::build_script_data::BuildScriptData;
 use common::log;
 use rust_code_generator;
@@ -52,7 +51,7 @@ fn check_all_paths(config: &Config) -> Result<()> {
     if !path.is_absolute() {
       return Err(format!("Only absolute paths allowed. Relative path: {}",
                          path.display())
-        .into());
+                     .into());
     }
     if !path.exists() {
       return Err(format!("Directory doesn't exist: {}", path.display()).into());
@@ -167,16 +166,16 @@ pub fn run(config: Config) -> Result<()> {
   {
     let mut logger = log::default_logger();
     logger.set_default_settings(log::LoggerSettings {
-      file_path: None,
-      write_to_stderr: false,
-    });
+                                  file_path: None,
+                                  write_to_stderr: false,
+                                });
     let mut category_settings = HashMap::new();
     for category in &[log::Status, log::Error] {
       category_settings.insert(*category,
-                                      log::LoggerSettings {
-                                        file_path: None,
-                                        write_to_stderr: true,
-                                      });
+                               log::LoggerSettings {
+                                 file_path: None,
+                                 write_to_stderr: true,
+                               });
     }
     const NO_LOG_VAR_NAME: &'static str = "CPP_TO_RUST_NO_LOG";
     if ::std::env::var(NO_LOG_VAR_NAME).is_ok() {
@@ -207,10 +206,10 @@ pub fn run(config: Config) -> Result<()> {
         let name = format!("{:?}", *category).to_snake_case();
         let path = logs_dir.with_added(format!("{}.log", name));
         category_settings.insert(*category,
-                                        log::LoggerSettings {
-                                          file_path: Some(path),
-                                          write_to_stderr: false,
-                                        });
+                                 log::LoggerSettings {
+                                   file_path: Some(path),
+                                   write_to_stderr: false,
+                                 });
       }
     }
     logger.set_category_settings(category_settings);
@@ -228,9 +227,9 @@ pub fn run(config: Config) -> Result<()> {
     let (info, cpp_data) =
       load_dependency(&canonicalize(cache_path)?).chain_err(|| "failed to load dependency")?;
     dependencies.push(DependencyInfo {
-      cache_path: cache_path.clone(),
-      rust_export_info: info,
-    });
+                        cache_path: cache_path.clone(),
+                        rust_export_info: info,
+                      });
     dependencies_cpp_data.push(cpp_data);
   }
   let cpp_data = load_or_create_cpp_data(&config, dependencies_cpp_data)?;
@@ -264,7 +263,8 @@ pub fn run(config: Config) -> Result<()> {
   code_gen.generate_files(&cpp_ffi_headers)?;
 
   let crate_new_path = if output_path_existed {
-    let path = config.cache_dir_path()
+    let path = config
+      .cache_dir_path()
       .with_added(format!("{}.new", &config.crate_properties().name()));
     if path.as_path().exists() {
       remove_dir_all(&path)?;
@@ -287,16 +287,17 @@ pub fn run(config: Config) -> Result<()> {
     dependency_rust_types.extend_from_slice(&dep.rust_export_info.rust_types);
   }
   log::status("Preparing Rust functions");
-  let rust_data = rust_generator::run(CppAndFfiData {
-                                        cpp_data: cpp_data,
-                                        cpp_ffi_headers: cpp_ffi_headers,
-                                      },
-                                      dependency_rust_types,
-                                      rust_generator::RustGeneratorConfig {
-                                        crate_name: config.crate_properties().name().clone(),
-                                        // TODO: more universal prefix removal (#25)
-                                        remove_qt_prefix: remove_qt_prefix,
-                                      }).chain_err(|| "Rust data generator failed")?;
+  let rust_data =
+    rust_generator::run(CppAndFfiData {
+                          cpp_data: cpp_data,
+                          cpp_ffi_headers: cpp_ffi_headers,
+                        },
+                        dependency_rust_types,
+                        rust_generator::RustGeneratorConfig {
+                          crate_name: config.crate_properties().name().clone(),
+                          // TODO: more universal prefix removal (#25)
+                          remove_qt_prefix: remove_qt_prefix,
+                        }).chain_err(|| "Rust data generator failed")?;
   log::status(format!("Generating Rust crate code ({})",
                       &config.crate_properties().name()));
   rust_code_generator::run(rust_config, &rust_data).chain_err(|| "Rust code generator failed")?;
@@ -305,12 +306,12 @@ pub fn run(config: Config) -> Result<()> {
     if let RustTypeWrapperKind::Struct { ref size_const_name, .. } = type1.kind {
       if let Some(ref size_const_name) = *size_const_name {
         cpp_type_size_requests.push(CppTypeSizeRequest {
-          cpp_code: CppTypeClassBase {
-              name: type1.cpp_name.clone(),
-              template_arguments: type1.cpp_template_arguments.clone(),
-            }.to_cpp_code()?,
-          size_const_name: size_const_name.clone(),
-        });
+                                      cpp_code: CppTypeClassBase {
+                                          name: type1.cpp_name.clone(),
+                                          template_arguments: type1.cpp_template_arguments.clone(),
+                                        }.to_cpp_code()?,
+                                      size_const_name: size_const_name.clone(),
+                                    });
       }
     }
   }
@@ -323,15 +324,17 @@ pub fn run(config: Config) -> Result<()> {
     move_files(&c_lib_tmp_path, &c_lib_path)?;
   }
   {
-    let rust_export_path = config.cache_dir_path().with_added("rust_export_info.bin");
+    let rust_export_path = config
+      .cache_dir_path()
+      .with_added("rust_export_info.bin");
     log::status("Saving Rust export info");
     save_bincode(&rust_export_path,
-              &RustExportInfo {
-                crate_name: config.crate_properties().name().clone(),
-                crate_version: config.crate_properties().version().clone(),
-                rust_types: rust_data.processed_types,
-                output_path: path_to_str(config.output_dir_path())?.to_string(),
-              })?;
+                 &RustExportInfo {
+                    crate_name: config.crate_properties().name().clone(),
+                    crate_version: config.crate_properties().version().clone(),
+                    rust_types: rust_data.processed_types,
+                    output_path: path_to_str(config.output_dir_path())?.to_string(),
+                  })?;
     log::status(format!("Rust export info is saved to file: {}",
                         rust_export_path.display()));
   }
@@ -346,11 +349,13 @@ pub fn run(config: Config) -> Result<()> {
     }
     remove_dir(&crate_new_path)?;
   }
-  save_json(config.output_dir_path().with_added("build_script_data.json"),
+  save_json(config
+              .output_dir_path()
+              .with_added("build_script_data.json"),
             &BuildScriptData {
-              cpp_build_config: config.cpp_build_config().clone(),
-              cpp_wrapper_lib_name: c_lib_name,
-            })?;
+               cpp_build_config: config.cpp_build_config().clone(),
+               cpp_wrapper_lib_name: c_lib_name,
+             })?;
   create_file(completed_marker_path(config.cache_dir_path()))?;
   log::status("cpp_to_rust generator finished");
   Ok(())

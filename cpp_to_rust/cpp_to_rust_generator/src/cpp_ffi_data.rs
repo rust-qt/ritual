@@ -52,23 +52,29 @@ impl CppFfiFunctionArgument {
   /// for overloaded functions.
   pub fn caption(&self, strategy: ArgumentCaptionStrategy) -> Result<String> {
     Ok(match strategy {
-      ArgumentCaptionStrategy::NameOnly => self.name.clone(),
-      ArgumentCaptionStrategy::TypeOnly(type_strategy) => {
-        self.argument_type.original_type.caption(type_strategy)?
-      }
-      ArgumentCaptionStrategy::TypeAndName(type_strategy) => {
-        format!("{}_{}",
-                self.argument_type.original_type.caption(type_strategy)?,
-                self.name)
-      }
-    })
+         ArgumentCaptionStrategy::NameOnly => self.name.clone(),
+         ArgumentCaptionStrategy::TypeOnly(type_strategy) => {
+           self.argument_type
+             .original_type
+             .caption(type_strategy)?
+         }
+         ArgumentCaptionStrategy::TypeAndName(type_strategy) => {
+           format!("{}_{}",
+                   self.argument_type
+                     .original_type
+                     .caption(type_strategy)?,
+                   self.name)
+         }
+       })
   }
 
   /// Generates C++ code for the part of FFI function signature
   /// corresponding to this argument
   pub fn to_cpp_code(&self) -> Result<String> {
     if let CppTypeBase::FunctionPointer(..) = self.argument_type.ffi_type.base {
-      Ok(self.argument_type.ffi_type.to_cpp_code(Some(&self.name))?)
+      Ok(self.argument_type
+           .ffi_type
+           .to_cpp_code(Some(&self.name))?)
     } else {
       Ok(format!("{} {}",
                  self.argument_type.ffi_type.to_cpp_code(None)?,
@@ -92,7 +98,8 @@ impl CppFfiFunctionSignature {
   /// indicating that original C++ method has const attribute.
   /// Returns false if there is no this argument or it's not const.
   pub fn has_const_this(&self) -> bool {
-    self.arguments
+    self
+      .arguments
       .iter()
       .any(|arg| arg.meaning == CppFfiArgumentMeaning::This && arg.argument_type.ffi_type.is_const)
   }
@@ -106,33 +113,33 @@ impl CppFfiFunctionSignature {
       .filter(|x| x.meaning.is_argument())
       .map_if_ok(|arg| arg.caption(strategy.clone()))?;
     Ok(if r.is_empty() {
-      "no_args".to_string()
-    } else {
-      r.join("_")
-    })
+         "no_args".to_string()
+       } else {
+         r.join("_")
+       })
   }
 
   /// Generates a caption for this method using specified strategy
   /// to avoid name conflict.
   pub fn caption(&self, strategy: MethodCaptionStrategy) -> Result<String> {
     Ok(match strategy {
-      MethodCaptionStrategy::ArgumentsOnly(s) => self.arguments_caption(s)?,
-      MethodCaptionStrategy::ConstOnly => {
-        if self.has_const_this() {
-          "const".to_string()
-        } else {
-          "".to_string()
-        }
-      }
-      MethodCaptionStrategy::ConstAndArguments(s) => {
-        let r = if self.has_const_this() {
-          "const_".to_string()
-        } else {
-          "".to_string()
-        };
-        r + &self.arguments_caption(s)?
-      }
-    })
+         MethodCaptionStrategy::ArgumentsOnly(s) => self.arguments_caption(s)?,
+         MethodCaptionStrategy::ConstOnly => {
+           if self.has_const_this() {
+             "const".to_string()
+           } else {
+             "".to_string()
+           }
+         }
+         MethodCaptionStrategy::ConstAndArguments(s) => {
+      let r = if self.has_const_this() {
+        "const_".to_string()
+      } else {
+        "".to_string()
+      };
+      r + &self.arguments_caption(s)?
+    }
+       })
   }
 }
 
@@ -199,12 +206,10 @@ pub fn c_base_name(cpp_method: &CppMethod,
     None => format!("{}_G_", include_file),
   };
 
-  let add_place_note = |name| {
-    match *allocation_place {
-      ReturnValueAllocationPlace::Stack => format!("{}_to_output", name),
-      ReturnValueAllocationPlace::Heap => format!("{}_as_ptr", name),
-      ReturnValueAllocationPlace::NotApplicable => name,
-    }
+  let add_place_note = |name| match *allocation_place {
+    ReturnValueAllocationPlace::Stack => format!("{}_to_output", name),
+    ReturnValueAllocationPlace::Heap => format!("{}_as_ptr", name),
+    ReturnValueAllocationPlace::NotApplicable => name,
   };
 
   let method_name = if cpp_method.is_constructor() {
@@ -225,19 +230,22 @@ pub fn c_base_name(cpp_method: &CppMethod,
     }
   } else if let Some(ref operator) = cpp_method.operator {
     add_place_note(match *operator {
-      CppOperator::Conversion(ref cpp_type) => {
-        format!("convert_to_{}",
-                cpp_type.caption(TypeCaptionStrategy::Full)?)
-      }
-      _ => format!("operator_{}", operator.c_name()?),
-    })
+                     CppOperator::Conversion(ref cpp_type) => {
+                       format!("convert_to_{}",
+                               cpp_type.caption(TypeCaptionStrategy::Full)?)
+                     }
+                     _ => format!("operator_{}", operator.c_name()?),
+                   })
   } else {
     add_place_note(cpp_method.name.replace("::", "_"))
   };
   let template_args_text = match cpp_method.template_arguments_values {
     Some(ref args) => {
       format!("_{}",
-              args.iter().map_if_ok(|x| x.caption(TypeCaptionStrategy::Full))?.join("_"))
+              args
+                .iter()
+                .map_if_ok(|x| x.caption(TypeCaptionStrategy::Full))?
+                .join("_"))
     }
     None => String::new(),
   };

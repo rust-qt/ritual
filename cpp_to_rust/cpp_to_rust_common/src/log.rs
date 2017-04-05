@@ -83,17 +83,20 @@ impl Logger {
     }
     let text = f();
     if settings.write_to_stderr {
-      std::io::stderr().write(text.borrow().as_bytes()).unwrap();
+      std::io::stderr()
+        .write(text.borrow().as_bytes())
+        .unwrap();
       std::io::stderr().write(b"\n").unwrap();
     }
     if let Some(ref path) = settings.file_path {
       if !self.files.contains_key(&category) {
-        let file = OpenOptions::new()
-          .write(true)
-          .create(true)
-          .append(true)
-          .open(path)
-          .unwrap_or_else(|err| panic!("failed to open log file '{}': {}", path.display(), err));
+        let file =
+          OpenOptions::new()
+            .write(true)
+            .create(true)
+            .append(true)
+            .open(path)
+            .unwrap_or_else(|err| panic!("failed to open log file '{}': {}", path.display(), err));
         self.files.insert(category, file);
       }
       let mut file = self.files.get_mut(&category).unwrap();

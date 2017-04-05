@@ -33,25 +33,25 @@ pub fn get_installation_data(sublib_name: &str) -> Result<InstallationData> {
   let dir = root_include_path.with_added(&folder_name);
   if dir.exists() {
     Ok(InstallationData {
-      root_include_path: root_include_path,
-      lib_path: lib_path,
-      lib_include_path: dir,
-      is_framework: false,
-    })
+         root_include_path: root_include_path,
+         lib_path: lib_path,
+         lib_include_path: dir,
+         is_framework: false,
+       })
   } else {
     let dir2 = lib_path.with_added(format!("{}.framework/Headers", folder_name));
     if dir2.exists() {
       Ok(InstallationData {
-        root_include_path: root_include_path,
-        lib_path: lib_path,
-        lib_include_path: dir2,
-        is_framework: true,
-      })
+           root_include_path: root_include_path,
+           lib_path: lib_path,
+           lib_include_path: dir2,
+           is_framework: true,
+         })
     } else {
       Err(format!("extra header dir not found (tried: {}, {})",
                   dir.display(),
                   dir2.display())
-        .into())
+              .into())
     }
   }
 }
@@ -76,9 +76,9 @@ pub fn lib_dependencies(sublib_name: &str) -> Result<&'static [&'static str]> {
   const GUI: &'static [&'static str] = &["core"];
   const WIDGETS: &'static [&'static str] = &["core", "gui"];
   Ok(match sublib_name {
-    "core" => CORE,
-    "gui" => GUI,
-    "widgets" => WIDGETS,
-    _ => return Err(format!("Unknown lib name: {}", sublib_name).into()),
-  })
+       "core" => CORE,
+       "gui" => GUI,
+       "widgets" => WIDGETS,
+       _ => return Err(format!("Unknown lib name: {}", sublib_name).into()),
+     })
 }

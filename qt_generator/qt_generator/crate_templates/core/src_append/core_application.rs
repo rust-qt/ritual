@@ -13,7 +13,10 @@ impl CoreApplicationArgs {
     }
     CoreApplicationArgs {
       argc: Box::new(args.len() as ::libc::c_int),
-      argv: args.iter_mut().map(|x| x.as_mut_ptr() as *mut ::libc::c_char).collect(),
+      argv: args
+        .iter_mut()
+        .map(|x| x.as_mut_ptr() as *mut ::libc::c_char)
+        .collect(),
       _values: args,
     }
   }
@@ -26,7 +29,7 @@ impl CoreApplicationArgs {
 
   #[cfg(unix)]
   pub fn from_real() -> CoreApplicationArgs {
-    use ::std::os::unix::ffi::OsStringExt;
+    use std::os::unix::ffi::OsStringExt;
     let args = ::std::env::args_os().map(|arg| arg.into_vec()).collect();
     CoreApplicationArgs::from(args)
   }

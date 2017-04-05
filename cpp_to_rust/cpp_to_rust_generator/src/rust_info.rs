@@ -92,29 +92,32 @@ pub enum RustMethodSelfArgKind {
 
 fn detect_self_arg_kind(args: &[RustMethodArgument]) -> Result<RustMethodSelfArgKind> {
   Ok(if let Some(arg) = args.get(0) {
-    if arg.name == "self" {
-      if let RustType::Common { ref indirection, ref is_const, .. } = arg.argument_type
-        .rust_api_type {
-        match *indirection {
-          RustTypeIndirection::Ref { .. } => {
-            if *is_const {
-              RustMethodSelfArgKind::ConstRef
-            } else {
-              RustMethodSelfArgKind::MutRef
-            }
-          }
-          RustTypeIndirection::None => RustMethodSelfArgKind::Value,
-          _ => return Err(unexpected("invalid self argument type").into()),
-        }
-      } else {
-        return Err(unexpected("invalid self argument type").into());
-      }
-    } else {
-      RustMethodSelfArgKind::Static
-    }
-  } else {
-    RustMethodSelfArgKind::Static
-  })
+       if arg.name == "self" {
+         if let RustType::Common {
+                  ref indirection,
+                  ref is_const,
+                  ..
+                } = arg.argument_type.rust_api_type {
+           match *indirection {
+             RustTypeIndirection::Ref { .. } => {
+               if *is_const {
+                 RustMethodSelfArgKind::ConstRef
+               } else {
+                 RustMethodSelfArgKind::MutRef
+               }
+             }
+             RustTypeIndirection::None => RustMethodSelfArgKind::Value,
+             _ => return Err(unexpected("invalid self argument type").into()),
+           }
+         } else {
+           return Err(unexpected("invalid self argument type").into());
+         }
+       } else {
+         RustMethodSelfArgKind::Static
+       }
+     } else {
+       RustMethodSelfArgKind::Static
+     })
 }
 
 impl RustMethod {
@@ -179,15 +182,19 @@ impl RustSingleMethod {
       return Ok(false);
     }
     if self.arguments.arguments.len() == other_method.arguments.arguments.len() {
-      if self.arguments
-        .arguments
-        .iter()
-        .zip(other_method.arguments.arguments.iter())
-        .all(|(arg1, arg2)| {
-          arg1.argument_type.cpp_type.can_be_the_same_as(&arg2.argument_type.cpp_type) &&
-          !(arg1.name == "allocation_place_marker" && arg2.name == "allocation_place_marker" &&
-            arg1 != arg2)
-        }) {
+      if self
+           .arguments
+           .arguments
+           .iter()
+           .zip(other_method.arguments.arguments.iter())
+           .all(|(arg1, arg2)| {
+                  arg1
+                    .argument_type
+                    .cpp_type
+                    .can_be_the_same_as(&arg2.argument_type.cpp_type) &&
+                  !(arg1.name == "allocation_place_marker" &&
+                    arg2.name == "allocation_place_marker" && arg1 != arg2)
+                }) {
         // println!("false2");
         return Ok(false);
       }
@@ -202,11 +209,11 @@ impl RustSingleMethod {
                      index: usize)
                      -> Result<Option<String>> {
     Ok({
-      let self_arg_kind = self.self_arg_kind()?;
-      let self_arg_kind_caption = if all_self_args.len() == 1 ||
-                                     self_arg_kind == RustMethodSelfArgKind::ConstRef {
-        None
-      } else if self_arg_kind == RustMethodSelfArgKind::Static {
+         let self_arg_kind = self.self_arg_kind()?;
+         let self_arg_kind_caption = if all_self_args.len() == 1 ||
+                                        self_arg_kind == RustMethodSelfArgKind::ConstRef {
+           None
+         } else if self_arg_kind == RustMethodSelfArgKind::Static {
         Some("static")
       } else if self_arg_kind == RustMethodSelfArgKind::MutRef {
         if all_self_args.contains(&RustMethodSelfArgKind::ConstRef) {
@@ -217,55 +224,61 @@ impl RustSingleMethod {
       } else {
         return Err("unsupported self arg kinds combination".into());
       };
-      let other_caption = match *caption_strategy {
-        RustMethodCaptionStrategy::NoArgs => None,
-        RustMethodCaptionStrategy::Index => Some(index.to_string()),
-        RustMethodCaptionStrategy::ArgNames => {
-          if self.arguments.arguments.is_empty() {
-            Some("no_args".to_string())
-          } else {
-            Some(self.arguments.arguments.iter().map(|a| &a.name).join("_"))
+         let other_caption = match *caption_strategy {
+           RustMethodCaptionStrategy::NoArgs => None,
+           RustMethodCaptionStrategy::Index => Some(index.to_string()),
+           RustMethodCaptionStrategy::ArgNames => {
+             if self.arguments.arguments.is_empty() {
+               Some("no_args".to_string())
+             } else {
+               Some(self
+                      .arguments
+                      .arguments
+                      .iter()
+                      .map(|a| &a.name)
+                      .join("_"))
+             }
+           }
+           RustMethodCaptionStrategy::ArgTypes => {
+        let context = match self.scope {
+          RustMethodScope::Free => &self.name,
+          RustMethodScope::Impl { ref target_type } => {
+            if let RustType::Common { ref base, .. } = *target_type {
+              base
+            } else {
+              return Err("unexpected uncommon Rust type".into());
+            }
           }
-        }
-        RustMethodCaptionStrategy::ArgTypes => {
-          let context = match self.scope {
-            RustMethodScope::Free => &self.name,
-            RustMethodScope::Impl { ref target_type } => {
-              if let RustType::Common { ref base, .. } = *target_type {
-                base
-              } else {
-                return Err("unexpected uncommon Rust type".into());
-              }
-            }
-            RustMethodScope::TraitImpl => {
-              return Err("can't generate Rust method caption for a trait impl method".into())
-            }
-          };
+          RustMethodScope::TraitImpl => {
+            return Err("can't generate Rust method caption for a trait impl method".into())
+          }
+        };
 
-          if self.arguments.arguments.is_empty() {
-            Some("no_args".to_string())
-          } else {
-            Some(self.arguments
-              .arguments
-              .iter()
-              .map_if_ok(|t| t.argument_type.rust_api_type.caption(context))?
-              .join("_"))
-          }
+        if self.arguments.arguments.is_empty() {
+          Some("no_args".to_string())
+        } else {
+          Some(self
+                 .arguments
+                 .arguments
+                 .iter()
+                 .map_if_ok(|t| t.argument_type.rust_api_type.caption(context))?
+                 .join("_"))
         }
-      };
-      let mut key_caption_items = Vec::new();
-      if let Some(c) = self_arg_kind_caption {
-        key_caption_items.push(c.to_string());
       }
-      if let Some(c) = other_caption {
-        key_caption_items.push(c);
-      }
-      if key_caption_items.is_empty() {
-        None
-      } else {
-        Some(key_caption_items.join("_"))
-      }
-    })
+         };
+         let mut key_caption_items = Vec::new();
+         if let Some(c) = self_arg_kind_caption {
+           key_caption_items.push(c.to_string());
+         }
+         if let Some(c) = other_caption {
+           key_caption_items.push(c);
+         }
+         if key_caption_items.is_empty() {
+           None
+         } else {
+           Some(key_caption_items.join("_"))
+         }
+       })
   }
 }
 
