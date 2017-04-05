@@ -1,6 +1,0 @@
-build_script: ci\appveyor\run.bat
-
-cache:
-- 'target'
-- '%USERPROFILE%\.cargo'
-- '%USERPROFILE%\.multirust'
