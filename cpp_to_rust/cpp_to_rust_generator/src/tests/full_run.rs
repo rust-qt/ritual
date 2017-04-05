@@ -117,7 +117,7 @@ fn full_run() {
   for cargo_cmd in &["update", "build", "test", "doc"] {
     let mut command = Command::new("cargo");
     command.arg(cargo_cmd);
-    command.arg("-vv");
+    command.arg("-v");
     if *cargo_cmd != "update" {
       command.arg("-j1");
     }

@@ -10,3 +10,4 @@ cache:
 - 'qt_generator\qt_generator_common\target'
 - '%USERPROFILE%\.cargo'
 - '%USERPROFILE%\.multirust'
+

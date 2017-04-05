@@ -1,7 +1,17 @@
 __common: &common
   language: rust
   rust: stable
-  cache: cargo
+  cache:
+    directories:
+    - $HOME/.cargo
+    - cpp_to_rust/cpp_to_rust_build_tools/target
+    - cpp_to_rust/cpp_to_rust_common/target
+    - cpp_to_rust/cpp_to_rust_generator/target
+    - cpp_to_rust/cpp_utils/target
+    - qt_generator/qt_build_tools/target
+    - qt_generator/qt_generator/target
+    - qt_generator/qt_generator_common/target
+
 
 matrix:
   include:

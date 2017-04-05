@@ -4,6 +4,8 @@ set -o errexit
 
 export CPP_TO_RUST_QUIET=1
 export RUST_BACKTRACE=1
+export CPP_TO_RUST_TEMP_TEST_DIR=$HOME/cpp_to_rust_temp_test_dir
+mkdir -p "$CPP_TO_RUST_TEMP_TEST_DIR"
 
 source "$TRAVIS_BUILD_DIR/ci/travis/setup_clang.bash"
 
