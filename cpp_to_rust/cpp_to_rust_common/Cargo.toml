@@ -12,8 +12,9 @@ backtrace = "0.2.1" # error backtrace manipulation
 
 regex = "0.1"
 
-serde = "0.8"       # serialization
-serde_json = "0.8"
+serde = "0.9"       # serialization
+serde_json = "0.9"
+bincode = "1.0.0-alpha6"
 
 term-painter = "0.2.3"   # colored output
 
@@ -23,4 +24,4 @@ toml = "0.2" # toml generation and parsing
 lazy_static = "0.2"
 
 [build-dependencies]
-serde_codegen = "0.8"
+serde_codegen = "0.9"

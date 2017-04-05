@@ -7,7 +7,8 @@ use cpp_ffi_generator;
 use cpp_parser;
 use common::errors::{Result, ChainErr};
 use common::string_utils::CaseOperations;
-use common::file_utils::{PathBufWithAdded, move_files, create_dir_all, load_json, save_json,
+use common::file_utils::{PathBufWithAdded, move_files, create_dir_all, save_json,
+                         load_bincode, save_bincode,
                          canonicalize, remove_dir_all, remove_dir, read_dir, create_file,
                          path_to_str};
 use common::build_script_data::BuildScriptData;
@@ -32,17 +33,17 @@ pub fn is_completed<P: AsRef<Path>>(cache_dir: P) -> bool {
 }
 
 fn load_dependency(path: &PathBuf) -> Result<(RustExportInfo, CppData)> {
-  let cpp_data_path = path.with_added("cpp_data.json");
+  let cpp_data_path = path.with_added("cpp_data.bin");
   if !cpp_data_path.exists() {
     return Err(format!("file not found: {}", cpp_data_path.display()).into());
   }
-  let cpp_data = load_json(&cpp_data_path)?;
+  let cpp_data = load_bincode(&cpp_data_path)?;
 
-  let rust_export_info_path = path.with_added("rust_export_info.json");
+  let rust_export_info_path = path.with_added("rust_export_info.bin");
   if !rust_export_info_path.exists() {
     return Err(format!("file not found: {}", rust_export_info_path.display()).into());
   }
-  let rust_export_info = load_json(&rust_export_info_path)?;
+  let rust_export_info = load_bincode(&rust_export_info_path)?;
   Ok((rust_export_info, cpp_data))
 }
 
@@ -83,10 +84,10 @@ fn check_all_paths(config: &Config) -> Result<()> {
 fn load_or_create_cpp_data(config: &Config,
                            dependencies_cpp_data: Vec<CppData>)
                            -> Result<CppData> {
-  let cpp_data_cache_file_path = config.cache_dir_path().with_added("cpp_data.json");
+  let cpp_data_cache_file_path = config.cache_dir_path().with_added("cpp_data.bin");
   let mut cpp_data_processed = false;
   let mut loaded_cpp_data = if cpp_data_cache_file_path.as_path().is_file() {
-    match load_json(&cpp_data_cache_file_path) {
+    match load_bincode(&cpp_data_cache_file_path) {
       Ok(r) => {
         log::status(format!("C++ data is loaded from file: {}",
                             cpp_data_cache_file_path.display()));
@@ -102,9 +103,9 @@ fn load_or_create_cpp_data(config: &Config,
   } else {
     None
   };
-  let raw_cpp_data_cache_file_path = config.cache_dir_path().with_added("raw_cpp_data.json");
+  let raw_cpp_data_cache_file_path = config.cache_dir_path().with_added("raw_cpp_data.bin");
   if loaded_cpp_data.is_none() {
-    loaded_cpp_data = match load_json(&raw_cpp_data_cache_file_path) {
+    loaded_cpp_data = match load_bincode(&raw_cpp_data_cache_file_path) {
       Ok(r) => {
         log::status(format!("Raw C++ data is loaded from file: {}",
                             cpp_data_cache_file_path.display()));
@@ -133,7 +134,7 @@ fn load_or_create_cpp_data(config: &Config,
     let cpp_data =
       cpp_parser::run(parser_config, dependencies_cpp_data).chain_err(|| "C++ parser failed")?;
     log::status("Saving raw C++ data");
-    save_json(&raw_cpp_data_cache_file_path, &cpp_data)?;
+    save_bincode(&raw_cpp_data_cache_file_path, &cpp_data)?;
     log::status(format!("Raw C++ data is saved to file: {}",
                         raw_cpp_data_cache_file_path.display()));
     cpp_data
@@ -148,7 +149,7 @@ fn load_or_create_cpp_data(config: &Config,
     cpp_data.post_process()?;
 
     log::status("Saving C++ data");
-    save_json(&cpp_data_cache_file_path, &cpp_data)?;
+    save_bincode(&cpp_data_cache_file_path, &cpp_data)?;
     log::status(format!("C++ data is saved to file: {}",
                         cpp_data_cache_file_path.display()));
   };
@@ -322,9 +323,9 @@ pub fn run(config: Config) -> Result<()> {
     move_files(&c_lib_tmp_path, &c_lib_path)?;
   }
   {
-    let rust_export_path = config.cache_dir_path().with_added("rust_export_info.json");
+    let rust_export_path = config.cache_dir_path().with_added("rust_export_info.bin");
     log::status("Saving Rust export info");
-    save_json(&rust_export_path,
+    save_bincode(&rust_export_path,
               &RustExportInfo {
                 crate_name: config.crate_properties().name().clone(),
                 crate_version: config.crate_properties().version().clone(),

@@ -5,6 +5,7 @@ extern crate backtrace;
 extern crate regex;
 extern crate serde;
 extern crate serde_json;
+extern crate bincode;
 extern crate term_painter;
 extern crate num_cpus;
 

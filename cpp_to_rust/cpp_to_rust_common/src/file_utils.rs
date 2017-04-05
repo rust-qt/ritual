@@ -135,15 +135,32 @@ pub fn save_json<P: AsRef<Path>, T: ::serde::Serialize>(path: P, value: &T) -> R
   })
 }
 
+pub fn load_bincode<P: AsRef<Path>, T: ::serde::Deserialize>(path: P) -> Result<T> {
+  let mut file = open_file(path.as_ref())?.into_file();
+  ::bincode::deserialize_from(&mut file, ::bincode::Infinite)
+      .chain_err(|| format!("load_bincode failed: {}", path.as_ref().display()))
+}
+
+pub fn save_bincode<P: AsRef<Path>, T: ::serde::Serialize>(path: P, value: &T) -> Result<()> {
+  let mut file = create_file(path.as_ref())?.into_file();
+  ::bincode::serialize_into(&mut file, value, ::bincode::Infinite)
+      .chain_err(|| { format!("save_bincode failed: {}",  path.as_ref().display())
+  })
+}
+
+
 pub fn load_toml<P: AsRef<Path>>(path: P) -> Result<toml::Table> {
   let data = file_to_string(path.as_ref())?;
   let mut parser = toml::Parser::new(&data);
-  parser.parse().chain_err(|| format!("failed to parse TOML file: {}", path.as_ref().display()))
+  parser
+    .parse()
+    .chain_err(|| format!("failed to parse TOML file: {}", path.as_ref().display()))
 }
 
 pub fn save_toml<P: AsRef<Path>>(path: P, data: toml::Table) -> Result<()> {
   let mut file = create_file(path.as_ref())?;
-  file.write(toml::Value::Table(data).to_string())
+  file
+    .write(toml::Value::Table(data).to_string())
     .chain_err(|| format!("failed to write to TOML file: {}", path.as_ref().display()))
 }
 
@@ -165,10 +182,10 @@ pub fn open_file_with_options<P: AsRef<Path>>(path: P,
                                               options: &fs::OpenOptions)
                                               -> Result<FileWrapper> {
   Ok(FileWrapper {
-    file: options.open(path.as_ref())
-      .chain_err(|| format!("Failed to open file: {:?}", path.as_ref()))?,
-    path: path.as_ref().to_path_buf(),
-  })
+       file: options.open(path.as_ref())
+         .chain_err(|| format!("Failed to open file: {:?}", path.as_ref()))?,
+       path: path.as_ref().to_path_buf(),
+     })
 }
 
 impl FileWrapper {
@@ -182,7 +199,8 @@ impl FileWrapper {
 
   pub fn write<S: AsRef<str>>(&mut self, text: S) -> Result<()> {
     use std::io::Write;
-    self.file
+    self
+      .file
       .write_all(text.as_ref().as_bytes())
       .chain_err(|| format!("Failed to write to file: {:?}", self.path))
   }
@@ -207,8 +225,10 @@ pub fn remove_dir<P: AsRef<Path>>(path: P) -> Result<()> {
 }
 
 pub fn remove_dir_all<P: AsRef<Path>>(path: P) -> Result<()> {
-  fs::remove_dir_all(path.as_ref())
-    .chain_err(|| format!("Failed to remove dir (recursively): {:?}", path.as_ref()))
+  fs::remove_dir_all(path.as_ref()).chain_err(|| {
+                                                format!("Failed to remove dir (recursively): {:?}",
+                                                        path.as_ref())
+                                              })
 }
 
 pub fn remove_file<P: AsRef<Path>>(path: P) -> Result<()> {
@@ -224,11 +244,13 @@ pub fn rename_file<P: AsRef<Path>, P2: AsRef<Path>>(path1: P, path2: P2) -> Resu
 }
 
 pub fn copy_file<P: AsRef<Path>, P2: AsRef<Path>>(path1: P, path2: P2) -> Result<()> {
-  fs::copy(path1.as_ref(), path2.as_ref()).map(|_| ()).chain_err(|| {
-    format!("Failed to copy file from {:?} to {:?}",
-            path1.as_ref(),
-            path2.as_ref())
-  })
+  fs::copy(path1.as_ref(), path2.as_ref())
+    .map(|_| ())
+    .chain_err(|| {
+                 format!("Failed to copy file from {:?} to {:?}",
+                         path1.as_ref(),
+                         path2.as_ref())
+               })
 }
 
 pub struct ReadDirWrapper {
@@ -247,7 +269,8 @@ pub fn read_dir<P: AsRef<Path>>(path: P) -> Result<ReadDirWrapper> {
 impl Iterator for ReadDirWrapper {
   type Item = Result<fs::DirEntry>;
   fn next(&mut self) -> Option<Result<fs::DirEntry>> {
-    self.read_dir
+    self
+      .read_dir
       .next()
       .map(|value| value.chain_err(|| format!("Failed to read dir (in item): {:?}", self.path)))
   }
@@ -266,12 +289,16 @@ pub fn canonicalize<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
 }
 
 pub fn path_to_str(path: &Path) -> Result<&str> {
-  path.to_str().chain_err(|| format!("Path is not valid unicode: {}", path.display()))
+  path
+    .to_str()
+    .chain_err(|| format!("Path is not valid unicode: {}", path.display()))
 }
 
 use std::ffi::{OsStr, OsString};
 pub fn os_str_to_str(os_str: &OsStr) -> Result<&str> {
-  os_str.to_str().chain_err(|| format!("String is not valid unicode: {}", os_str.to_string_lossy()))
+  os_str
+    .to_str()
+    .chain_err(|| format!("String is not valid unicode: {}", os_str.to_string_lossy()))
 }
 
 pub fn os_string_into_string(s: OsString) -> Result<String> {
@@ -281,8 +308,10 @@ pub fn os_string_into_string(s: OsString) -> Result<String> {
 
 pub fn repo_crate_local_path(relative_path: &str) -> Result<PathBuf> {
   let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-  let parent = path.parent().chain_err(|| "failed to get parent directory")?;
-  let parent2 = parent.parent().chain_err(|| "failed to get parent directory")?;
+  let parent = path.parent()
+    .chain_err(|| "failed to get parent directory")?;
+  let parent2 = parent.parent()
+    .chain_err(|| "failed to get parent directory")?;
   let result = parent2.with_added(relative_path);
   if !result.exists() {
     return Err(format!("detected path does not exist: {}", result.display()).into());
