@@ -2,11 +2,10 @@ use common::file_utils::{PathBufWithAdded, create_dir};
 use common::utils::run_command;
 use common::cpp_lib_builder::{CppLibBuilder, BuildType};
 use common::errors::fancy_unwrap;
-use config::{Config, CrateProperties};
+use config::{Config, CrateProperties, CacheUsage};
 use common::cpp_build_config::CppBuildConfigData;
 use common::target;
 use common::cargo_override::set_cargo_override;
-use common::log;
 use std::process::Command;
 use std::path::PathBuf;
 use tests::TempTestDir;
@@ -54,12 +53,6 @@ fn full_run() {
   let mut config = Config::new(&crate_dir,
                                temp_dir.path().with_added("cache"),
                                crate_properties);
-  if config.is_completed() {
-    log::status("No processing! cpp_to_rust uses previous results.");
-    log::status(format!("Remove \"{}\" file to force processing.",
-                        config.completed_marker_path().display()));
-    return;
-  }
   config.add_include_directive("ctrt1/all.h");
   let include_path = {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -101,6 +94,7 @@ fn full_run() {
     config.add_cpp_parser_flag("-std=gnu++11");
   }
   config.set_crate_template_path(&crate_template_path);
+  config.set_cache_usage(CacheUsage::None);
   fancy_unwrap(config.exec());
   assert!(crate_dir.exists());
   {

@@ -1,6 +1,7 @@
 build_script: ci\appveyor\run.bat
 
 cache:
+- '%USERPROFILE%\cpp_to_rust_temp_test_dir'
 - 'cpp_to_rust\cpp_to_rust_build_tools\target'
 - 'cpp_to_rust\cpp_to_rust_common\target'
 - 'cpp_to_rust\cpp_to_rust_generator\target'

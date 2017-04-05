@@ -129,7 +129,28 @@ impl CrateProperties {
   }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CacheUsage {
+  Full,
+  CppDataOnly,
+  RawCppDataOnly,
+  None,
+}
 
+impl CacheUsage {
+  pub fn can_use_raw_cpp_data(&self) -> bool {
+    self != &CacheUsage::None
+  }
+  pub fn can_use_cpp_data(&self) -> bool {
+    match *self {
+      CacheUsage::Full | CacheUsage::CppDataOnly => true,
+      _ => false,
+    }
+  }
+  pub fn can_skip_all(&self) -> bool {
+    self == &CacheUsage::Full
+  }
+}
 
 
 
@@ -140,6 +161,7 @@ impl CrateProperties {
 #[derive(Debug)]
 pub struct Config {
   // see documentation for setters
+  cache_usage: CacheUsage,
   crate_properties: CrateProperties,
   output_dir_path: PathBuf,
   cache_dir_path: PathBuf,
@@ -169,6 +191,7 @@ impl Config {
                                                    crate_properties: CrateProperties)
                                                    -> Config {
     Config {
+      cache_usage: CacheUsage::Full,
       crate_properties: crate_properties,
       output_dir_path: output_dir_path.into(),
       cache_dir_path: cache_dir_path.into(),
@@ -193,6 +216,9 @@ impl Config {
   }
   pub fn completed_marker_path(&self) -> PathBuf {
     ::launcher::completed_marker_path(&self.cache_dir_path)
+  }
+  pub fn set_cache_usage(&mut self, value: CacheUsage) {
+    self.cache_usage = value;
   }
 
   /// Sets the directory containing additional Rust code for the crate.
@@ -340,6 +366,10 @@ impl Config {
   /// additional error information.
   pub fn exec(self) -> Result<()> {
     ::launcher::run(self)
+  }
+
+  pub fn cache_usage(&self) -> &CacheUsage {
+    &self.cache_usage
   }
 
   pub fn crate_properties(&self) -> &CrateProperties {

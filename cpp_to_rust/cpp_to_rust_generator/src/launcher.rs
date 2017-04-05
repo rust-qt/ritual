@@ -85,7 +85,8 @@ fn load_or_create_cpp_data(config: &Config,
                            -> Result<CppData> {
   let cpp_data_cache_file_path = config.cache_dir_path().with_added("cpp_data.bin");
   let mut cpp_data_processed = false;
-  let mut loaded_cpp_data = if cpp_data_cache_file_path.as_path().is_file() {
+  let mut loaded_cpp_data = if config.cache_usage().can_use_cpp_data() &&
+                               cpp_data_cache_file_path.as_path().is_file() {
     match load_bincode(&cpp_data_cache_file_path) {
       Ok(r) => {
         log::status(format!("C++ data is loaded from file: {}",
@@ -103,7 +104,8 @@ fn load_or_create_cpp_data(config: &Config,
     None
   };
   let raw_cpp_data_cache_file_path = config.cache_dir_path().with_added("raw_cpp_data.bin");
-  if loaded_cpp_data.is_none() {
+  if loaded_cpp_data.is_none() && config.cache_usage().can_use_raw_cpp_data() &&
+     raw_cpp_data_cache_file_path.is_file() {
     loaded_cpp_data = match load_bincode(&raw_cpp_data_cache_file_path) {
       Ok(r) => {
         log::status(format!("Raw C++ data is loaded from file: {}",
@@ -159,7 +161,7 @@ fn load_or_create_cpp_data(config: &Config,
 // TODO: simplify this function
 #[cfg_attr(feature="clippy", allow(cyclomatic_complexity))]
 pub fn run(config: Config) -> Result<()> {
-  if is_completed(config.cache_dir_path()) {
+  if config.cache_usage().can_skip_all() && is_completed(config.cache_dir_path()) {
     return Ok(());
   }
   check_all_paths(&config)?;

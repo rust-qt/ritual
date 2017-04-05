@@ -11,9 +11,3 @@ fn class1_constructor1() {
   assert_eq!(v.field1(), 3);
 
 }
-
-#[test]
-fn class1_constructor2() {
-  let mut v: CppBox<Class1> = Class1::new((1, AsBox));
-  assert_eq!(v.x(), 1);
-}
