@@ -103,6 +103,7 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) -> Result<()>
 
 #[test]
 fn test_qt_fix_header_names() {
+  use cpp_to_rust_common::file_utils::PathBufWithAdded;
   let map = HeaderNameMap::new(&PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                                   .with_added("test_assets")
                                   .with_added("qt_headers"))
