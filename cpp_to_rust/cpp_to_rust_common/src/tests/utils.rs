@@ -118,4 +118,15 @@ fn case_operations() {
   let s13 = "OneTwo2Three".to_string();
   assert_eq!(s13.to_class_case(), "OneTwo2Three");
   assert_eq!(s13.to_snake_case(), "one_two2_three");
+
+  let v1 = vec!["from_utf8", "0"];
+  assert_eq!(v1.to_snake_case(), "from_utf8_0");
+  let v2 = vec!["from_utf8", "1"];
+  assert_eq!(v2.to_snake_case(), "from_utf8_1");
+
+  let v3 = vec!["count", "0"];
+  assert_eq!(v3.to_snake_case(), "count0");
+  let v4 = vec!["count", "1"];
+  assert_eq!(v4.to_snake_case(), "count1");
+
 }

@@ -1,6 +1,6 @@
 impl{lifetime_specifier} {trait_name}{trait_lifetime_specifier} for {impl_type} {{
   {return_type_decl}
-  fn exec(self, {final_arg_list}) -> {return_type_string} {{
+  {maybe_unsafe}fn exec(self, {final_arg_list}) -> {return_type_string} {{
     {tmp_vars}
     {body}
   }}

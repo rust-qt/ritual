@@ -43,9 +43,11 @@ pub trait Signal: Receiver {
   {
     // TODO: allow to change connection type
     // TODO: meta_object::Connection should have operator bool()
-    ::object::Object::connect_static((self.object() as *const ::object::Object,
-                                      Self::receiver_id().as_ptr() as *const c_char,
-                                      receiver.object() as *const ::object::Object,
-                                      R::receiver_id().as_ptr() as *const c_char))
+    unsafe {
+      ::object::Object::connect_static((self.object() as *const ::object::Object,
+                                        Self::receiver_id().as_ptr() as *const c_char,
+                                        receiver.object() as *const ::object::Object,
+                                        R::receiver_id().as_ptr() as *const c_char))
+    }
   }
 }

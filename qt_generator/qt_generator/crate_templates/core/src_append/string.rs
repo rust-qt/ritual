@@ -17,7 +17,9 @@ impl<'a> From<&'a ::string::String> for ::std::string::String {
 impl ::string::String {
   pub fn from_std_str<S: AsRef<str>>(s: S) -> ::string::String {
     let slice = s.as_ref().as_bytes();
-    ::string::String::from_utf8((slice.as_ptr() as *const c_char, slice.len() as c_int))
+    unsafe {
+      ::string::String::from_utf8_unsafe((slice.as_ptr() as *const c_char, slice.len() as c_int))
+    }
   }
 
   pub fn to_std_string(&self) -> std::string::String {

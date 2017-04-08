@@ -22,12 +22,16 @@ impl<'a> {pub_type_name}<'a> {{
   pub fn set<F: FnMut({args}) + 'a>(&mut self, f: F) {{
     self.clear();
     let mut func_box: Box<Box<FnMut({args}) + 'a>> = Box::new(Box::new(f));
-    self.wrapper.set({callback_name}, unsafe {{ ::std::mem::transmute(func_box.as_mut()) }});
+    unsafe {{
+      self.wrapper.set({callback_name}, ::std::mem::transmute(func_box.as_mut()));
+    }}
     self.func = Some(func_box);
   }}
   pub fn clear(&mut self) {{
     if self.func.is_some() {{
-      self.wrapper.set(unsafe {{ ::std::mem::transmute(0usize) }}, ::std::ptr::null_mut());
+      unsafe {{
+        self.wrapper.set( ::std::mem::transmute(0usize), ::std::ptr::null_mut());
+      }}
       self.func = None;
     }}
   }}

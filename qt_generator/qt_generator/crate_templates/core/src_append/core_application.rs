@@ -45,7 +45,7 @@ impl ::core_application::CoreApplication {
   pub fn create_and_exit<F: FnOnce(&mut ::core_application::CoreApplication) -> i32>(f: F) -> ! {
     let exit_code = {
       let mut args = CoreApplicationArgs::from_real();
-      let mut app = ::core_application::CoreApplication::new(args.get());
+      let mut app = unsafe { ::core_application::CoreApplication::new(args.get()) };
       f(app.as_mut())
     };
     ::std::process::exit(exit_code)

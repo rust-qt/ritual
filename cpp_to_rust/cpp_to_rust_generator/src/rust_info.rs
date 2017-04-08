@@ -176,9 +176,10 @@ impl RustSingleMethod {
   }
 
   pub fn can_be_overloaded_with(&self, other_method: &RustSingleMethod) -> Result<bool> {
-    // println!("can_be_overloaded_with {:?} | {:?}", self, other_method);
+    if self.is_unsafe != other_method.is_unsafe {
+      return Ok(false);
+    }
     if self.self_arg_kind()? != other_method.self_arg_kind()? {
-      // println!("false1");
       return Ok(false);
     }
     if self.arguments.arguments.len() == other_method.arguments.arguments.len() {
@@ -195,11 +196,9 @@ impl RustSingleMethod {
                   !(arg1.name == "allocation_place_marker" &&
                     arg2.name == "allocation_place_marker" && arg1 != arg2)
                 }) {
-        // println!("false2");
         return Ok(false);
       }
     }
-    // println!("true0");
     Ok(true)
   }
 
@@ -208,12 +207,19 @@ impl RustSingleMethod {
                      all_self_args: &HashSet<RustMethodSelfArgKind>,
                      index: usize)
                      -> Result<Option<String>> {
-    Ok({
-         let self_arg_kind = self.self_arg_kind()?;
-         let self_arg_kind_caption = if all_self_args.len() == 1 ||
-                                        self_arg_kind == RustMethodSelfArgKind::ConstRef {
-           None
-         } else if self_arg_kind == RustMethodSelfArgKind::Static {
+    if caption_strategy == &RustMethodCaptionStrategy::UnsafeOnly {
+      return Ok(if self.is_unsafe {
+                  Some("unsafe".to_string())
+                } else {
+                  None
+                });
+    }
+    let result = {
+      let self_arg_kind = self.self_arg_kind()?;
+      let self_arg_kind_caption = if all_self_args.len() == 1 ||
+                                     self_arg_kind == RustMethodSelfArgKind::ConstRef {
+        None
+      } else if self_arg_kind == RustMethodSelfArgKind::Static {
         Some("static")
       } else if self_arg_kind == RustMethodSelfArgKind::MutRef {
         if all_self_args.contains(&RustMethodSelfArgKind::ConstRef) {
@@ -224,61 +230,63 @@ impl RustSingleMethod {
       } else {
         return Err("unsupported self arg kinds combination".into());
       };
-         let other_caption = match *caption_strategy {
-           RustMethodCaptionStrategy::NoArgs => None,
-           RustMethodCaptionStrategy::Index => Some(index.to_string()),
-           RustMethodCaptionStrategy::ArgNames => {
-             if self.arguments.arguments.is_empty() {
-               Some("no_args".to_string())
-             } else {
-               Some(self
-                      .arguments
-                      .arguments
-                      .iter()
-                      .map(|a| &a.name)
-                      .join("_"))
-             }
-           }
-           RustMethodCaptionStrategy::ArgTypes => {
-        let context = match self.scope {
-          RustMethodScope::Free => &self.name,
-          RustMethodScope::Impl { ref target_type } => {
-            if let RustType::Common { ref base, .. } = *target_type {
-              base
-            } else {
-              return Err("unexpected uncommon Rust type".into());
-            }
+      let other_caption = match *caption_strategy {
+        RustMethodCaptionStrategy::NoCaption => None,
+        RustMethodCaptionStrategy::UnsafeOnly => unreachable!(),
+        RustMethodCaptionStrategy::Index => Some(index.to_string()),
+        RustMethodCaptionStrategy::ArgNames => {
+          if self.arguments.arguments.is_empty() {
+            Some("no_args".to_string())
+          } else {
+            Some(self
+                   .arguments
+                   .arguments
+                   .iter()
+                   .map(|a| &a.name)
+                   .join("_"))
           }
-          RustMethodScope::TraitImpl => {
-            return Err("can't generate Rust method caption for a trait impl method".into())
-          }
-        };
-
-        if self.arguments.arguments.is_empty() {
-          Some("no_args".to_string())
-        } else {
-          Some(self
-                 .arguments
-                 .arguments
-                 .iter()
-                 .map_if_ok(|t| t.argument_type.rust_api_type.caption(context))?
-                 .join("_"))
         }
+        RustMethodCaptionStrategy::ArgTypes => {
+          let context = match self.scope {
+            RustMethodScope::Free => &self.name,
+            RustMethodScope::Impl { ref target_type } => {
+              if let RustType::Common { ref base, .. } = *target_type {
+                base
+              } else {
+                return Err("unexpected uncommon Rust type".into());
+              }
+            }
+            RustMethodScope::TraitImpl => {
+              return Err("can't generate Rust method caption for a trait impl method".into())
+            }
+          };
+
+          if self.arguments.arguments.is_empty() {
+            Some("no_args".to_string())
+          } else {
+            Some(self
+                   .arguments
+                   .arguments
+                   .iter()
+                   .map_if_ok(|t| t.argument_type.rust_api_type.caption(context))?
+                   .join("_"))
+          }
+        }
+      };
+      let mut key_caption_items = Vec::new();
+      if let Some(c) = self_arg_kind_caption {
+        key_caption_items.push(c.to_string());
       }
-         };
-         let mut key_caption_items = Vec::new();
-         if let Some(c) = self_arg_kind_caption {
-           key_caption_items.push(c.to_string());
-         }
-         if let Some(c) = other_caption {
-           key_caption_items.push(c);
-         }
-         if key_caption_items.is_empty() {
-           None
-         } else {
-           Some(key_caption_items.join("_"))
-         }
-       })
+      if let Some(c) = other_caption {
+        key_caption_items.push(c);
+      }
+      if key_caption_items.is_empty() {
+        None
+      } else {
+        Some(key_caption_items.join("_"))
+      }
+    };
+    Ok(result)
   }
 }
 
@@ -375,9 +383,10 @@ pub struct DependencyInfo {
   pub cache_path: PathBuf,
 }
 
-
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RustMethodCaptionStrategy {
-  NoArgs,
+  NoCaption,
+  UnsafeOnly,
   ArgTypes,
   ArgNames,
   Index,
@@ -385,7 +394,8 @@ pub enum RustMethodCaptionStrategy {
 impl RustMethodCaptionStrategy {
   pub fn all() -> &'static [RustMethodCaptionStrategy] {
     use self::RustMethodCaptionStrategy::*;
-    const LIST: &'static [RustMethodCaptionStrategy] = &[NoArgs, ArgTypes, ArgNames, Index];
+    const LIST: &'static [RustMethodCaptionStrategy] = &[NoCaption, UnsafeOnly, ArgTypes,
+                                                         ArgNames, Index];
     return LIST;
   }
 }

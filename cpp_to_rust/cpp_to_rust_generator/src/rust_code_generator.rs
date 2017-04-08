@@ -724,6 +724,7 @@ impl<'a> RustCodeGenerator<'a> {
       format!(include_str!("../templates/crate/overloaded_function.rs.in"),
               doc = format_doc(&doc_formatter::method_doc(&func)),
               maybe_pub = maybe_pub,
+              maybe_unsafe = maybe_unsafe,
               tpl_decl = tpl_decl,
               trait_lifetime_arg = trait_lifetime_arg,
               name = func.name.last_name()?,
@@ -1075,11 +1076,13 @@ pub fn {struct_method}(&self) -> {struct_type} {{
           } else {
             "Self::ReturnType".to_string()
           };
-          results.push(format!("pub trait {name}{trait_lifetime_specifier} {{
-              {return_type_decl}\
-              fn exec(self, {arg_list}) -> {return_type_string};
+          let maybe_unsafe = if *is_unsafe { "unsafe " } else { "" };
+          results.push(format!("pub trait {name}{trait_lifetime_specifier} {{\n\
+              {return_type_decl}\n\
+              {maybe_unsafe}fn exec(self, {arg_list}) -> {return_type_string};
             }}",
                                name = type1.name.last_name()?,
+                               maybe_unsafe = maybe_unsafe,
                                arg_list = arg_list,
                                trait_lifetime_specifier = trait_lifetime_specifier,
                                return_type_decl = return_type_decl,
@@ -1140,6 +1143,7 @@ pub fn {struct_method}(&self) -> {struct_type} {{
               format!("type ReturnType = {};", return_type_string)
             };
             results.push(format!(include_str!("../templates/crate/impl_overloading_trait.rs.in"),
+                                 maybe_unsafe = maybe_unsafe,
                                  lifetime_specifier = lifetime_specifier,
                                  trait_lifetime_specifier = trait_lifetime_specifier,
                                  trait_name = type1.name.last_name()?,

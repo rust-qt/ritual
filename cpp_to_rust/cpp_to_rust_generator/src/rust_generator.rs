@@ -1304,6 +1304,9 @@ impl RustGenerator {
     } else {
       None
     };
+    let is_unsafe = arguments
+      .iter()
+      .any(|arg| arg.argument_type.rust_api_type.is_unsafe_argument());
     Ok(RustSingleMethod {
          name: self.method_rust_name(method)?,
          scope: scope.clone(),
@@ -1314,7 +1317,7 @@ impl RustGenerator {
            return_type_ffi_index: return_arg_index,
          },
          doc: doc,
-         is_unsafe: false,
+         is_unsafe: is_unsafe,
        })
   }
   // fn rustdoc_path_for_type(&self, type1: &RustProcessedTypeInfo) -> String {
@@ -1379,7 +1382,7 @@ impl RustGenerator {
   /// include class name and scope. For free functions, the name includes
   /// modules.
   fn method_rust_name(&self, method: &CppAndFfiMethod) -> Result<RustName> {
-    let mut name = if method.cpp_method.class_membership.is_none() {
+    let name = if method.cpp_method.class_membership.is_none() {
       self.calculate_rust_name_for_free_function(&method.cpp_method)?
     } else {
       let x = if method.cpp_method.is_constructor() {
@@ -1391,11 +1394,11 @@ impl RustGenerator {
       };
       RustName::new(vec![x])?
     };
-    let sanitized = sanitize_rust_identifier(name.last_name()?);
-    if &sanitized != name.last_name()? {
-      name.parts.pop().chain_err(|| "name can't be empty")?;
-      name.parts.push(sanitized);
-    }
+    //    let sanitized = sanitize_rust_identifier(name.last_name()?);
+    //    if &sanitized != name.last_name()? {
+    //      name.parts.pop().chain_err(|| "name can't be empty")?;
+    //      name.parts.push(sanitized);
+    //    }
     Ok(name)
   }
 
@@ -1461,9 +1464,7 @@ impl RustGenerator {
         }
       }
       "dynamic_cast" => vec!["cpp_utils".to_string(), "DynamicCast".to_string()],
-      "qobject_cast" => {
-        vec!["qt_core".to_string(), "object".to_string(), "QObjectCast".to_string()]
-      }
+      "qobject_cast" => vec!["qt_core".to_string(), "object".to_string(), "Cast".to_string()],
       _ => return Err("invalid method name".into()),
     };
 
@@ -1481,9 +1482,11 @@ impl RustGenerator {
       };
       final_method.scope = RustMethodScope::TraitImpl;
       final_method.name = RustName::new(vec![method_name])?;
-      if args.cpp_method.cpp_method.is_unsafe_static_cast {
-        final_method.is_unsafe = true;
-      }
+      final_method.is_unsafe = if &args.cpp_method.cpp_method.name == "static_cast" {
+        args.cpp_method.cpp_method.is_unsafe_static_cast
+      } else {
+        false
+      };
       let return_ref_type = args.return_type.ptr_to_ref(*final_is_const)?;
       if &final_method.arguments.cpp_method.cpp_method.name == "static_cast" {
         final_method.arguments.return_type = return_ref_type;
@@ -1566,6 +1569,7 @@ impl RustGenerator {
   // All passed methods must be valid for overloading:
   // - they must have the same name and be in the same scope;
   // - they must have the same self argument type;
+  // - they must be all safe or all unsafe;
   // - they must not have exactly the same argument types.
   fn process_method(&self,
                     mut filtered_methods: Vec<RustSingleMethod>,
@@ -1595,17 +1599,16 @@ impl RustGenerator {
         .full_name();
       let mut args_variants = Vec::new();
       let mut method_name = first_method.name.clone();
-      let mut trait_name = first_method.name.last_name()?.clone();
+      let mut method_last_name = method_name.parts
+        .pop()
+        .chain_err(|| "name can't be empty")?;
       if let Some(self_arg_kind_caption) = self_arg_kind_caption {
-        trait_name = format!("{}_{}", trait_name, self_arg_kind_caption);
-        let name = method_name.parts
-          .pop()
-          .chain_err(|| "name can't be empty")?;
-        method_name
-          .parts
-          .push(vec![name.as_ref(), self_arg_kind_caption.as_ref()].to_snake_case());
+        method_last_name = vec![method_last_name.as_ref(), self_arg_kind_caption.as_ref()]
+          .to_snake_case();
       }
-      trait_name = trait_name.to_class_case() + "Args";
+      let mut trait_name = method_last_name.to_class_case() + "Args";
+      method_last_name = sanitize_rust_identifier(&method_last_name);
+      method_name.parts.push(method_last_name);
       if let RustMethodScope::Impl { ref target_type } = *scope {
         let target_type_name = if let RustType::Common { ref base, .. } = *target_type {
           base.last_name()
@@ -1715,7 +1718,7 @@ impl RustGenerator {
                                   return_type: trait_return_type.clone(),
                                   method_name: method_name.clone(),
                                   method_scope: first_method.scope.clone(),
-                                  is_unsafe: false,
+                                  is_unsafe: first_method.is_unsafe,
                                 },
                                 is_public: true,
                               });
@@ -1732,21 +1735,22 @@ impl RustGenerator {
           cpp_method_name: cpp_method_name,
         },
         docs: doc_items,
-        is_unsafe: false,
+        is_unsafe: first_method.is_unsafe,
       }
     } else {
       let mut method = filtered_methods.pop()
         .chain_err(|| "filtered_methods can't be empty")?;
+      let mut last_name = method.name
+        .parts
+        .pop()
+        .chain_err(|| "name can't be empty")?;
       if let Some(self_arg_kind_caption) = self_arg_kind_caption {
-        let name = method.name
-          .parts
-          .pop()
-          .chain_err(|| "name can't be empty")?;
-        method
-          .name
-          .parts
-          .push(format!("{}_{}", name, self_arg_kind_caption));
+        last_name = vec![last_name.as_ref(), self_arg_kind_caption.as_ref()].to_snake_case();
       }
+      method
+        .name
+        .parts
+        .push(sanitize_rust_identifier(&last_name));
 
       method.doc = Some(RustMethodDocItem {
                           cpp_fn: method.arguments.cpp_method.cpp_method.short_text(),

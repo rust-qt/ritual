@@ -51,9 +51,13 @@ impl<'a> Iterator for WordIterator<'a> {
       return None;
     }
     let mut i = self.index + 1;
+    let current_word_is_number = i < self.string.len() && char_at(self.string, i).is_digit(10);
     while i < self.string.len() {
       let current = char_at(self.string, i);
-      if current == '_' || current.is_uppercase() || current.is_digit(10) {
+      if current == '_' || current.is_uppercase() {
+        break;
+      }
+      if !current_word_is_number && current.is_digit(10) {
         break;
       }
       i += 1;
@@ -80,6 +84,19 @@ fn iterator_to_class_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String
     .join("")
 }
 
+fn ends_with_digit<S: AsRef<str>>(s: S) -> bool {
+  let str = s.as_ref();
+  if str.len() > 0 {
+    str[str.len() - 1..str.len()]
+      .chars()
+      .next()
+      .unwrap()
+      .is_digit(10)
+  } else {
+    false
+  }
+}
+
 fn iterator_to_snake_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {
   let mut parts: Vec<_> = it.map(|x| x.as_ref().to_lowercase()).collect();
   replace_all_sub_vecs(&mut parts, vec!["na", "n"]);
@@ -93,7 +110,7 @@ fn iterator_to_snake_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String
     if part.is_empty() {
       continue;
     }
-    if i > 0 && !part.chars().all(|c| c.is_digit(10)) {
+    if i > 0 && !(part.chars().all(|c| c.is_digit(10)) && !ends_with_digit(&str)) {
       str.push('_');
     }
     str.push_str(&part);

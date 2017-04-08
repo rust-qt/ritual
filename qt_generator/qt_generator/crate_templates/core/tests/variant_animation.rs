@@ -16,9 +16,11 @@ extern "C" fn value_changed(_data: *mut c_void, value: *const Variant) {
 fn variant_animation() {
   CoreApplication::create_and_exit(|app| {
     let mut slot1 = ExternSlotVariantRef::new();
-    slot1.set(value_changed, std::ptr::null_mut());
+    unsafe {
+      slot1.set(value_changed, std::ptr::null_mut());
+    }
 
-    let mut animation = VariantAnimation::new(());
+    let mut animation = VariantAnimation::new();
     animation
       .signals()
       .value_changed()

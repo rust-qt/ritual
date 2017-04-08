@@ -131,9 +131,6 @@ impl RustType {
       let mut name = if base.parts.len() == 1 {
         base.parts[0].to_snake_case()
       } else {
-        //          println!("caption! name: {:?}, context: {:?}",
-        //                   &base.parts,
-        //                   &context.parts);
         let mut remaining_context: &[String] = &context.parts;
         let mut parts: &[String] = &base.parts;
         if &parts[0] == "libc" {
@@ -143,19 +140,15 @@ impl RustType {
         for part in parts {
           if !remaining_context.is_empty() && part == &remaining_context[0] {
             remaining_context = &remaining_context[1..];
-            //              println!("skipping (same context): {}", part);
           } else {
             remaining_context = &[];
             let snake_part = part.to_snake_case();
             if good_parts.last() != Some(&snake_part) {
               good_parts.push(snake_part);
             } else {
-              //                println!("skipping (repeated part): {}", part);
             }
           }
         }
-        //          println!("final good_parts: {:?}", good_parts);
-        //          println!("");
         good_parts.join("_")
       };
       if let Some(ref args) = *generic_arguments {
@@ -258,6 +251,39 @@ impl RustType {
         Ok(())
       }
       _ => Err("not a Common type".into()),
+    }
+  }
+
+  pub fn is_unsafe_argument(&self) -> bool {
+    match *self {
+      RustType::Common {
+        ref indirection,
+        ref base,
+        ref generic_arguments,
+        ..
+      } => {
+        match *indirection {
+          RustTypeIndirection::None |
+          RustTypeIndirection::Ref { .. } => {}
+          RustTypeIndirection::Ptr |
+          RustTypeIndirection::PtrPtr |
+          RustTypeIndirection::PtrRef { .. } => {
+            return true;
+          }
+        }
+        if base.full_name(None) == "std::option::Option" {
+          if let Some(ref args) = *generic_arguments {
+            if let Some(ref arg) = args.get(0) {
+              if arg.is_unsafe_argument() {
+                return true;
+              }
+            }
+          }
+        }
+        false
+      }
+      RustType::Void => false,
+      RustType::FunctionPointer { .. } => true,
     }
   }
 }

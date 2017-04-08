@@ -10,7 +10,7 @@ cpp_to_rust_generator = { version = "0.0", path = "../../cpp_to_rust/cpp_to_rust
 cpp_to_rust_common = { version = "0.0", path = "../../cpp_to_rust/cpp_to_rust_common" }
 qt_generator_common = { version = "0.0", path = "../qt_generator_common" }
 
-clap = "~2.10.0"    # command line args parsing
+clap = "2.23.1"    # command line args parsing
 regex = "0.1"
 rusqlite = "0.7"
 compress = "0.1.2"

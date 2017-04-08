@@ -13,7 +13,7 @@ fn variant_animation2() {
                                                value.to_string().to_std_string());
                                     });
 
-    let mut animation = VariantAnimation::new(());
+    let mut animation = VariantAnimation::new();
     animation.signals().value_changed().connect(&slot1);
     animation
       .signals()

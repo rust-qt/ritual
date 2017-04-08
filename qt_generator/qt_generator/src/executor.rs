@@ -2,7 +2,7 @@ use cpp_to_rust_common::errors::Result;
 use cpp_to_rust_common::log;
 use cpp_to_rust_common::utils::is_msvc;
 use cpp_to_rust_common::file_utils::{PathBufWithAdded, repo_crate_local_path};
-use cpp_to_rust_generator::config::Config;
+use cpp_to_rust_generator::config::{Config, CacheUsage};
 use cpp_to_rust_generator::cpp_data::CppVisibility;
 use cpp_to_rust_common::cpp_build_config::{CppBuildConfigData, CppLibraryType};
 use cpp_to_rust_common::target;
@@ -14,14 +14,15 @@ use doc_parser::DocParser;
 use fix_header_names::fix_header_names;
 use cpp_to_rust_generator::cpp_method::CppMethod;
 use cpp_to_rust_generator::cpp_data::CppTypeKind;
-use cpp_to_rust_generator::config::{CrateProperties, is_completed, completed_marker_path};
+use cpp_to_rust_generator::config::{CrateProperties, is_completed};
 use doc_decoder::decode_doc;
 use lib_configs;
 
 pub fn exec_all(libs: Vec<String>,
                 cache_dir: PathBuf,
                 output_dir: PathBuf,
-                no_local_paths: bool)
+                no_local_paths: bool,
+                cache_usage: CacheUsage)
                 -> Result<()> {
   let crate_templates_path =
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_added("crate_templates");
@@ -48,7 +49,8 @@ pub fn exec_all(libs: Vec<String>,
          lib_output_dir,
          lib_crate_templates_path,
          dependency_paths,
-         no_local_paths)?;
+         no_local_paths,
+         cache_usage.clone())?;
   }
   Ok(())
 }
@@ -58,12 +60,12 @@ fn exec(sublib_name: &str,
         output_dir: PathBuf,
         crate_templates_path: PathBuf,
         dependency_paths: Vec<PathBuf>,
-        no_local_paths: bool)
+        no_local_paths: bool,
+        cache_usage: CacheUsage)
         -> Result<()> {
-  if is_completed(&cache_dir) {
+  if is_completed(&cache_dir) && cache_usage.can_skip_all() {
     log::status("No processing! cpp_to_rust uses previous results.");
-    log::status(format!("Remove \"{}\" file to force processing.",
-                        completed_marker_path(&cache_dir).display()));
+    log::status("Run with -C0 to force full processing.");
     return Ok(());
   }
   log::status(format!("Processing library: {}", sublib_name));
@@ -78,6 +80,7 @@ fn exec(sublib_name: &str,
     Some(repo_crate_local_path("qt_generator/qt_build_tools")?)
   });
   let mut config = Config::new(&output_dir, &cache_dir, crate_properties);
+  config.set_cache_usage(cache_usage);
   let installation_data = get_installation_data(sublib_name)?;
   config.add_include_path(&installation_data.root_include_path);
   config.add_include_path(&installation_data.lib_include_path);
