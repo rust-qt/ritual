@@ -102,12 +102,6 @@ impl Config {
     {
       log::status("Generating ffi.rs file");
       let mut ffi_file = create_file(out_dir.with_added("ffi.rs"))?;
-      for name in cpp_build_config_data.linked_libs() {
-        ffi_file.write(format!("#[link(name = \"{}\")]\n", name))?;
-      }
-      for name in cpp_build_config_data.linked_frameworks() {
-        ffi_file.write(format!("#[link(name = \"{}\", kind = \"framework\")]\n", name))?;
-      }
       if !::common::utils::is_msvc() {
         // TODO: make it configurable
         ffi_file.write("#[link(name = \"stdc++\")]\n")?;
@@ -130,6 +124,12 @@ impl Config {
       file.write(get_command_output(&mut command)?)?;
     }
 
+    for name in cpp_build_config_data.linked_libs() {
+      println!("cargo:rustc-link-lib={}", name);
+    }
+    for name in cpp_build_config_data.linked_frameworks() {
+      println!("cargo:rustc-link-lib=framework={}", name);
+    }
     for path in self.cpp_build_paths.lib_paths() {
       println!("cargo:rustc-link-search=native={}", path_to_str(path)?);
     }
