@@ -268,6 +268,7 @@ impl RustSingleMethod {
                    .arguments
                    .arguments
                    .iter()
+                   .filter(|t| &t.name != "self")
                    .map_if_ok(|t| t.argument_type.rust_api_type.caption(context))?
                    .join("_"))
           }

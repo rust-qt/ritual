@@ -149,7 +149,11 @@ impl RustType {
             }
           }
         }
-        good_parts.join("_")
+        if good_parts.is_empty() {
+          base.last_name()?.clone()
+        } else {
+          good_parts.join("_")
+        }
       };
       if let Some(ref args) = *generic_arguments {
         name = format!("{}_{}",

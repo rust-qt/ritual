@@ -16,7 +16,7 @@ fn timer_quit() {
   CoreApplication::create_and_exit(|app| {
     let mut slot1 = ExternSlotNoArgs::new();
     unsafe {
-      slot1.set(func1, unsafe { std::mem::transmute(42usize) });
+      slot1.set(func1, std::mem::transmute(42usize));
     }
     app.signals().about_to_quit().connect(slot1.as_ref());
 
