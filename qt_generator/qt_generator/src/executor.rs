@@ -2,7 +2,7 @@ use cpp_to_rust_common::errors::Result;
 use cpp_to_rust_common::log;
 use cpp_to_rust_common::utils::is_msvc;
 use cpp_to_rust_common::file_utils::{PathBufWithAdded, repo_crate_local_path};
-use cpp_to_rust_generator::config::{Config, CacheUsage};
+use cpp_to_rust_generator::config::{Config, CacheUsage, DebugLoggingConfig};
 use cpp_to_rust_generator::cpp_data::CppVisibility;
 use cpp_to_rust_common::cpp_build_config::{CppBuildConfigData, CppLibraryType};
 use cpp_to_rust_common::target;
@@ -18,12 +18,29 @@ use cpp_to_rust_generator::config::{CrateProperties, is_completed};
 use doc_decoder::decode_doc;
 use lib_configs;
 
+pub struct ExecConfig {
+  pub write_dependencies_local_paths: bool,
+  pub cache_usage: CacheUsage,
+  pub write_cache: bool,
+  pub debug_logging_config: DebugLoggingConfig,
+  pub quiet_mode: bool,
+}
+
 pub fn exec_all(libs: Vec<String>,
                 cache_dir: PathBuf,
                 output_dir: PathBuf,
-                no_local_paths: bool,
-                cache_usage: CacheUsage)
+                config: ExecConfig)
                 -> Result<()> {
+  if config.quiet_mode {
+    let mut logger = log::default_logger();
+
+    logger.set_category_settings(log::Status,
+                                 log::LoggerSettings {
+                                   file_path: None,
+                                   write_to_stderr: false,
+                                 });
+  }
+
   let crate_templates_path =
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_added("crate_templates");
   for sublib_name in libs {
@@ -49,8 +66,7 @@ pub fn exec_all(libs: Vec<String>,
          lib_output_dir,
          lib_crate_templates_path,
          dependency_paths,
-         no_local_paths,
-         cache_usage.clone())?;
+         &config)?;
   }
   Ok(())
 }
@@ -60,10 +76,9 @@ fn exec(sublib_name: &str,
         output_dir: PathBuf,
         crate_templates_path: PathBuf,
         dependency_paths: Vec<PathBuf>,
-        no_local_paths: bool,
-        cache_usage: CacheUsage)
+        exec_config: &ExecConfig)
         -> Result<()> {
-  if is_completed(&cache_dir) && cache_usage.can_skip_all() {
+  if is_completed(&cache_dir) && exec_config.cache_usage.can_skip_all() {
     log::status("No processing! cpp_to_rust uses previous results.");
     log::status("Run with -C0 to force full processing.");
     return Ok(());
@@ -74,24 +89,28 @@ fn exec(sublib_name: &str,
   crate_properties.add_author("Pavel Strakhov <ri@idzaaus.org>");
   crate_properties.set_links_attribute(qt_lib_name.clone());
   crate_properties.remove_default_build_dependencies();
-  crate_properties.add_build_dependency("qt_build_tools", "0.1", if no_local_paths {
-    None
-  } else {
+  let qt_build_tools_path = if exec_config.write_dependencies_local_paths {
     Some(repo_crate_local_path("qt_generator/qt_build_tools")?)
-  });
+  } else {
+    None
+  };
+  crate_properties.add_build_dependency("qt_build_tools", "0.1", qt_build_tools_path);
   let mut config = Config::new(&output_dir, &cache_dir, crate_properties);
-  config.set_cache_usage(cache_usage);
   let installation_data = get_installation_data(sublib_name)?;
   config.add_include_path(&installation_data.root_include_path);
   config.add_include_path(&installation_data.lib_include_path);
   config.add_target_include_path(&installation_data.lib_include_path);
-  config.set_write_dependencies_local_paths(!no_local_paths);
-  if no_local_paths {
-    log::status("Local paths will not be written to the output crate. Make sure all dependencies \
-               are published before trying to compile the crate.");
-  } else {
+  config.set_cache_usage(exec_config.cache_usage.clone());
+  config.set_write_dependencies_local_paths(exec_config.write_dependencies_local_paths);
+  config.set_write_cache(exec_config.write_cache);
+  config.set_quiet_mode(exec_config.quiet_mode);
+  config.set_debug_logging_config(exec_config.debug_logging_config.clone());
+  if exec_config.write_dependencies_local_paths {
     log::status("Output Cargo.toml file will contain local paths of used dependencies \
                (use --no-local-paths to disable).");
+  } else {
+    log::status("Local paths will not be written to the output crate. Make sure all dependencies \
+               are published before trying to compile the crate.");
   }
   // TODO: does parsing work on MacOS without adding "-F"?
 

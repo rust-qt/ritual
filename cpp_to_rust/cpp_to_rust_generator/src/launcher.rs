@@ -1,4 +1,4 @@
-use config::Config;
+use config::{Config, DebugLoggingConfig};
 use cpp_code_generator::{CppCodeGenerator, generate_cpp_type_size_requester, CppTypeSizeRequest};
 use cpp_type::CppTypeClassBase;
 use cpp_data::CppData;
@@ -134,10 +134,12 @@ fn load_or_create_cpp_data(config: &Config,
     };
     let cpp_data =
       cpp_parser::run(parser_config, dependencies_cpp_data).chain_err(|| "C++ parser failed")?;
-    log::status("Saving raw C++ data");
-    save_bincode(&raw_cpp_data_cache_file_path, &cpp_data)?;
-    log::status(format!("Raw C++ data is saved to file: {}",
-                        raw_cpp_data_cache_file_path.display()));
+    if config.write_cache() {
+      log::status("Saving raw C++ data");
+      save_bincode(&raw_cpp_data_cache_file_path, &cpp_data)?;
+      log::status(format!("Raw C++ data is saved to file: {}",
+                          raw_cpp_data_cache_file_path.display()));
+    }
     cpp_data
   };
   if !cpp_data_processed {
@@ -149,10 +151,12 @@ fn load_or_create_cpp_data(config: &Config,
 
     cpp_data.post_process()?;
 
-    log::status("Saving C++ data");
-    save_bincode(&cpp_data_cache_file_path, &cpp_data)?;
-    log::status(format!("C++ data is saved to file: {}",
-                        cpp_data_cache_file_path.display()));
+    if config.write_cache() {
+      log::status("Saving C++ data");
+      save_bincode(&cpp_data_cache_file_path, &cpp_data)?;
+      log::status(format!("C++ data is saved to file: {}",
+                          cpp_data_cache_file_path.display()));
+    }
   };
   Ok(cpp_data)
 }
@@ -172,49 +176,62 @@ pub fn run(config: Config) -> Result<()> {
                                   write_to_stderr: false,
                                 });
     let mut category_settings = HashMap::new();
+    let mut debug_categories = vec![log::DebugGeneral,
+                                    log::DebugMoveFiles,
+                                    log::DebugTemplateInstantiation,
+                                    log::DebugInheritance,
+                                    log::DebugParserSkips,
+                                    log::DebugParser,
+                                    log::DebugFfiSkips,
+                                    log::DebugSignals,
+                                    log::DebugAllocationPlace,
+                                    log::DebugRustSkips,
+                                    log::DebugQtDoc,
+                                    log::DebugQtHeaderNames];
     for category in &[log::Status, log::Error] {
-      category_settings.insert(*category,
-                               log::LoggerSettings {
-                                 file_path: None,
-                                 write_to_stderr: true,
-                               });
+      if config.quiet_mode() {
+        debug_categories.push(*category);
+      } else {
+        category_settings.insert(*category,
+                                 log::LoggerSettings {
+                                   file_path: None,
+                                   write_to_stderr: true,
+                                 });
+      }
     }
-    const NO_LOG_VAR_NAME: &'static str = "CPP_TO_RUST_NO_LOG";
-    if ::std::env::var(NO_LOG_VAR_NAME).is_ok() {
-      logger.log(log::Status,
-                 format!("Debug log is disabled with {} env var.", NO_LOG_VAR_NAME));
+    let debug_logging_config = if config.debug_logging_config() == &DebugLoggingConfig::Print &&
+                                  config.quiet_mode() {
+      DebugLoggingConfig::SaveToFile
     } else {
+      config.debug_logging_config().clone()
+    };
+    if debug_logging_config == DebugLoggingConfig::SaveToFile {
       let logs_dir = config.cache_dir_path().with_added("log");
       logger.log(log::Status,
                  format!("Debug log will be saved to {}", logs_dir.display()));
-      logger.log(log::Status,
-                 format!("Set {} env var to disable debug log.", NO_LOG_VAR_NAME));
       if logs_dir.exists() {
         remove_dir_all(&logs_dir)?;
       }
       create_dir_all(&logs_dir)?;
-      for category in &[log::DebugGeneral,
-                        log::DebugMoveFiles,
-                        log::DebugTemplateInstantiation,
-                        log::DebugInheritance,
-                        log::DebugParserSkips,
-                        log::DebugParser,
-                        log::DebugFfiSkips,
-                        log::DebugSignals,
-                        log::DebugAllocationPlace,
-                        log::DebugRustSkips,
-                        log::DebugQtDoc,
-                        log::DebugQtHeaderNames] {
-        let name = format!("{:?}", *category).to_snake_case();
+      for category in debug_categories {
+        let name = format!("{:?}", category).to_snake_case();
         let path = logs_dir.with_added(format!("{}.log", name));
-        category_settings.insert(*category,
+        category_settings.insert(category,
                                  log::LoggerSettings {
                                    file_path: Some(path),
                                    write_to_stderr: false,
                                  });
       }
+    } else if debug_logging_config == DebugLoggingConfig::Print {
+      for category in debug_categories {
+        category_settings.insert(category,
+                                 log::LoggerSettings {
+                                   file_path: None,
+                                   write_to_stderr: true,
+                                 });
+      }
     }
-    logger.set_category_settings(category_settings);
+    logger.set_all_category_settings(category_settings);
   }
 
   // TODO: allow to remove any prefix through `Config` (#25)
@@ -325,7 +342,7 @@ pub fn run(config: Config) -> Result<()> {
   if c_lib_path_existed {
     move_files(&c_lib_tmp_path, &c_lib_path)?;
   }
-  {
+  if config.write_cache() {
     let rust_export_path = config
       .cache_dir_path()
       .with_added("rust_export_info.bin");
@@ -358,7 +375,9 @@ pub fn run(config: Config) -> Result<()> {
                cpp_build_config: config.cpp_build_config().clone(),
                cpp_wrapper_lib_name: c_lib_name,
              })?;
-  create_file(completed_marker_path(config.cache_dir_path()))?;
+  if config.write_cache() {
+    create_file(completed_marker_path(config.cache_dir_path()))?;
+  }
   log::status("cpp_to_rust generator finished");
   Ok(())
 }

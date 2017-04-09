@@ -152,7 +152,25 @@ impl CacheUsage {
   }
 }
 
+impl Default for CacheUsage {
+  fn default() -> CacheUsage {
+    CacheUsage::Full
+  }
+}
 
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum DebugLoggingConfig {
+  Print,
+  SaveToFile,
+  Disable,
+}
+
+impl Default for DebugLoggingConfig {
+  fn default() -> DebugLoggingConfig {
+    DebugLoggingConfig::Disable
+  }
+}
 
 /// The starting point of `cpp_to_rust` API.
 /// Create a `Config` object, set its properties,
@@ -178,6 +196,9 @@ pub struct Config {
   cpp_build_config: CppBuildConfig, // TODO: add CppBuildPaths when needed
   write_dependencies_local_paths: bool,
   type_allocation_places: HashMap<String, CppTypeAllocationPlace>,
+  debug_logging_config: DebugLoggingConfig,
+  quiet_mode: bool,
+  write_cache: bool,
 }
 
 impl Config {
@@ -191,7 +212,6 @@ impl Config {
                                                    crate_properties: CrateProperties)
                                                    -> Config {
     Config {
-      cache_usage: CacheUsage::Full,
       crate_properties: crate_properties,
       output_dir_path: output_dir_path.into(),
       cache_dir_path: cache_dir_path.into(),
@@ -208,6 +228,10 @@ impl Config {
       cpp_build_config: Default::default(),
       type_allocation_places: Default::default(),
       write_dependencies_local_paths: true,
+      cache_usage: CacheUsage::default(),
+      debug_logging_config: DebugLoggingConfig::default(),
+      quiet_mode: false,
+      write_cache: true,
     }
   }
 
@@ -348,6 +372,18 @@ impl Config {
     }
   }
 
+  pub fn set_debug_logging_config(&mut self, config: DebugLoggingConfig) {
+    self.debug_logging_config = config;
+  }
+
+  pub fn set_quiet_mode(&mut self, quiet_mode: bool) {
+    self.quiet_mode = quiet_mode;
+  }
+
+  pub fn set_write_cache(&mut self, write_cache: bool) {
+    self.write_cache = write_cache;
+  }
+
   pub fn set_cpp_build_config(&mut self, cpp_build_config: CppBuildConfig) {
     self.cpp_build_config = cpp_build_config;
   }
@@ -440,6 +476,15 @@ impl Config {
   }
   pub fn write_dependencies_local_paths(&self) -> bool {
     self.write_dependencies_local_paths
+  }
+  pub fn debug_logging_config(&self) -> &DebugLoggingConfig {
+    &self.debug_logging_config
+  }
+  pub fn quiet_mode(&self) -> bool {
+    self.quiet_mode
+  }
+  pub fn write_cache(&self) -> bool {
+    self.write_cache
   }
 }
 

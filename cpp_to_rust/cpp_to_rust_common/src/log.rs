@@ -63,9 +63,13 @@ impl Logger {
     self.default_settings = value;
     self.files.clear();
   }
-  pub fn set_category_settings(&mut self, value: HashMap<LoggerCategory, LoggerSettings>) {
+  pub fn set_all_category_settings(&mut self, value: HashMap<LoggerCategory, LoggerSettings>) {
     self.category_settings = value;
     self.files.clear();
+  }
+  pub fn set_category_settings(&mut self, category: LoggerCategory, value: LoggerSettings) {
+    self.category_settings.insert(category, value);
+    self.files.remove(&category);
   }
 
   pub fn is_on(&self, category: LoggerCategory) -> bool {
