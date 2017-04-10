@@ -9,7 +9,7 @@ use common::log;
 use std::collections::{HashSet, HashMap};
 use std::iter::once;
 use std::io::{BufRead, BufReader};
-use common::string_utils::JoinWithString;
+use common::string_utils::JoinWithSeparator;
 
 pub use serializable::{CppEnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
                        CppTypeData, CppTypeDoc, CppData, CppTemplateInstantiation,

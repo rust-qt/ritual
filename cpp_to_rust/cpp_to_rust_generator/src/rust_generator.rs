@@ -18,7 +18,7 @@ use rust_type::{RustName, RustType, CompleteType, RustTypeIndirection, RustFFIFu
                 RustFFIArgument, RustToCTypeConversion};
 use common::string_utils::{CaseOperations, WordIterator};
 use common::utils::{add_to_multihash, MapIfOk};
-use common::string_utils::JoinWithString;
+use common::string_utils::JoinWithSeparator;
 use doc_formatter;
 use std::collections::{HashMap, HashSet, hash_map};
 

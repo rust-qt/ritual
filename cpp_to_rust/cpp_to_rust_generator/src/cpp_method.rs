@@ -4,7 +4,7 @@ use cpp_ffi_data::{CppMethodWithFfiSignature, CppFfiType, CppFfiFunctionSignatur
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase, CppTypeClassBase};
 use common::errors::{Result, unexpected};
-use common::string_utils::JoinWithString;
+use common::string_utils::JoinWithSeparator;
 use common::utils::MapIfOk;
 pub use serializable::{CppFunctionArgument, CppMethodKind, CppMethod, CppMethodClassMembership,
                        CppFieldAccessorType, FakeCppMethod, CppMethodDoc};

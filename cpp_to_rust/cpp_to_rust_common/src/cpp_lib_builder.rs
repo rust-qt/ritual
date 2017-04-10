@@ -1,31 +1,36 @@
+//! Implements building a CMake-based C++ library.
+
 use errors::Result;
 use file_utils::{create_dir_all, path_to_str};
 use utils::run_command;
 use utils::MapIfOk;
-use string_utils::JoinWithString;
+use string_utils::JoinWithSeparator;
 use std::process::Command;
 use std::path::{Path, PathBuf};
 use log;
 use target;
 
+/// A CMake variable with a name and a value.
 #[derive(Debug, Clone)]
 pub struct CMakeVar {
   pub name: String,
   pub value: String,
 }
 impl CMakeVar {
+  /// Creates a new variable.
   pub fn new<S1: Into<String>, S2: Into<String>>(name: S1, value: S2) -> CMakeVar {
     CMakeVar {
       name: name.into(),
       value: value.into(),
     }
   }
-  pub fn new_list<I, S, L>(name: S, paths: L) -> Result<CMakeVar>
+  /// Creates a new variable containing a list of values.
+  pub fn new_list<I, S, L>(name: S, values: L) -> Result<CMakeVar>
     where S: Into<String>,
           I: AsRef<str>,
           L: IntoIterator<Item = I>
   {
-    let value = paths
+    let value = values
       .into_iter()
       .map_if_ok(|s| -> Result<_> {
         if s.as_ref().contains(';') {
@@ -41,6 +46,7 @@ impl CMakeVar {
     Ok(CMakeVar::new(name, value))
   }
 
+  /// Creates a new variable containing a list of paths.
   pub fn new_path_list<I, S, L>(name: S, paths: L) -> Result<CMakeVar>
     where S: Into<String>,
           I: AsRef<Path>,
@@ -52,24 +58,34 @@ impl CMakeVar {
   }
 }
 
+/// CMake build type (Debug or Release)
 #[derive(Debug, Clone)]
 pub enum BuildType {
   Debug,
   Release,
 }
 
+/// Implements building a CMake-based C++ library.
+/// Construct a value and call `run()` to execute building.
 #[derive(Debug, Clone)]
 pub struct CppLibBuilder {
+  /// Path to the source directory containing CMake config file
   pub cmake_source_dir: PathBuf,
+  /// Path to the build directory (may not exist before building)
   pub build_dir: PathBuf,
+  /// Path to the install directory (may not exist before building)
   pub install_dir: PathBuf,
+  /// Number of threads used to build the library. If `None` is supplied,
+  /// number of threads will be detected automatically.
   pub num_jobs: Option<i32>,
+  /// CMake build type (Debug or Release)
   pub build_type: BuildType,
-  pub pipe_output: bool,
+  /// Additional variables passed to CMake
   pub cmake_vars: Vec<CMakeVar>,
 }
 
 impl CppLibBuilder {
+  /// Builds the library.
   pub fn run(self) -> Result<()> {
     if !self.build_dir.exists() {
       create_dir_all(&self.build_dir)?;

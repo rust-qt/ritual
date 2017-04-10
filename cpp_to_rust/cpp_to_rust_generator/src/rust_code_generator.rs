@@ -10,7 +10,7 @@ use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMe
                 RustMethodArgument, TraitImpl, TraitImplExtra, RustQtReceiverType, DependencyInfo};
 use rust_type::{RustName, RustType, RustTypeIndirection, RustFFIFunction, RustToCTypeConversion,
                 CompleteType};
-use common::string_utils::{JoinWithString, CaseOperations};
+use common::string_utils::{JoinWithSeparator, CaseOperations};
 use common::utils::MapIfOk;
 use doc_formatter;
 use std::path::PathBuf;

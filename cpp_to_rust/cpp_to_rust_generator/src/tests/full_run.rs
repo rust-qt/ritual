@@ -97,16 +97,6 @@ fn full_run() {
   config.set_cache_usage(CacheUsage::None);
   fancy_unwrap(config.exec());
   assert!(crate_dir.exists());
-  {
-    let manifest_parent_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-      .parent()
-      .unwrap()
-      .to_path_buf();
-    assert!(manifest_parent_path.exists());
-    let dep_paths = vec![manifest_parent_path.with_added("cpp_to_rust_build_tools"),
-                         manifest_parent_path.with_added("cpp_to_rust_common")];
-    set_cargo_override(crate_dir.with_added("Cargo.toml"), &dep_paths).unwrap();
-  }
 
   for cargo_cmd in &["update", "build", "test", "doc"] {
     let mut command = Command::new("cargo");

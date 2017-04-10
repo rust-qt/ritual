@@ -1,5 +1,6 @@
 use errors::Result;
 
+/// CPU architecture, as reported by `target_arch`.
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[derive(Serialize, Deserialize)]
@@ -12,6 +13,8 @@ pub enum Arch {
   Arm,
   AArch64,
 }
+
+/// Operating system, as reported by `target_os`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[derive(Serialize, Deserialize)]
 pub enum OS {
@@ -26,6 +29,8 @@ pub enum OS {
   OpenBSD,
   NetBSD,
 }
+
+/// Operating system family, as reported by `target_family`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[derive(Serialize, Deserialize)]
 pub enum Family {
@@ -33,6 +38,8 @@ pub enum Family {
   Unix,
 }
 
+/// Further disambiguates the target platform with information about the ABI/libc,
+/// as reported by `target_env`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[derive(Serialize, Deserialize)]
 pub enum Env {
@@ -41,6 +48,9 @@ pub enum Env {
   Musl,
   None,
 }
+
+/// Pointer width in bits,
+/// as reported by `target_pointer_width`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[derive(Serialize, Deserialize)]
 pub enum PointerWidth {
@@ -48,23 +58,41 @@ pub enum PointerWidth {
   P32,
 }
 
+/// CPU endianness, as reported by `target_endian`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[derive(Serialize, Deserialize)]
 pub enum Endian {
   Little,
   Big,
 }
+
+/// Combined information about a target, as reported by configuration
+/// values of the Rust compiler.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[derive(Serialize, Deserialize)]
 pub struct Target {
+  /// CPU architecture
   pub arch: Arch,
+  /// Operating system
   pub os: OS,
+  /// Operating system family
   pub family: Family,
+  /// Further disambiguates the target platform with information about the ABI/libc,
   pub env: Env,
+  /// Pointer width in bits,
   pub pointer_width: PointerWidth,
-  // pub vendor: Vendor,
+  /// Endianness of the target CPU
   pub endian: Endian,
 }
+
+/// Condition on properties of the target. Simple conditions
+/// are considered true if the property of the current platform
+/// is the same as the associated value of the enum. For
+/// example, `Condition::OS(OS::Windows)` will be true on Windows
+/// and false otherwise. `And`, `Or` and `Not` variants provide
+/// logical operations on nested conditions. `True` and `False`
+/// variants provide conditions which are always true and false,
+/// respectively.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[derive(Serialize, Deserialize)]
 pub enum Condition {
@@ -86,7 +114,24 @@ pub enum Condition {
 // -------------
 
 /// Information required to build the C++ wrapper library
-/// on every supported platform.
+/// on every supported platform. it contains list of linked
+/// libraries, frameworks, compiler types and selected type of
+/// C++ wrapper library (shared or static). Default value of this
+/// object is set before generation of the crate using
+/// `cpp_to_rust_generator::config::Config::set_cpp_build_config` or
+/// `cpp_build_config_mut` and intended to be cross-platform.
+///
+/// In order to allow target-dependent build configuration,
+/// multiple configurations can be added to one `CppBuildConfig` object,
+/// each with a condition.
+/// During evaluation, each configuration item
+/// will only be used if the associated condition is currently true.
+/// All properties from all matching configuration are combined.
+///
+/// If this conditional evaluation is not enough, a custom build script
+/// can modify this config during build script execution using
+/// `cpp_to_rust_build_tools::Config::set_cpp_build_config` or
+/// `cpp_build_config_mut`.
 #[derive(Default, Debug, Clone)]
 #[derive(Serialize, Deserialize)]
 pub struct CppBuildConfig {
@@ -100,6 +145,7 @@ struct CppBuildConfigItem {
   data: CppBuildConfigData,
 }
 
+/// Type of a C++ library (shared or static).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[derive(Serialize, Deserialize)]
 pub enum CppLibraryType {
@@ -109,6 +155,7 @@ pub enum CppLibraryType {
 
 /// Platform-specific information
 /// required to build the C++ wrapper library.
+/// This type contains one configuration item of `CppBuildConfig`.
 #[derive(Debug, Clone, Default)]
 #[derive(Serialize, Deserialize)]
 pub struct CppBuildConfigData {
@@ -119,6 +166,7 @@ pub struct CppBuildConfigData {
 }
 
 impl CppBuildConfigData {
+  /// Constructs an empty object.
   pub fn new() -> CppBuildConfigData {
     CppBuildConfigData::default()
   }
@@ -154,18 +202,22 @@ impl CppBuildConfigData {
     self.library_type = Some(t);
   }
 
+  /// Returns names of linked libraries.
   pub fn linked_libs(&self) -> &[String] {
     &self.linked_libs
   }
 
+  /// Returns names of linked frameworks.
   pub fn linked_frameworks(&self) -> &[String] {
     &self.linked_frameworks
   }
 
+  /// Returns C++ compiler flags.
   pub fn compiler_flags(&self) -> &[String] {
     &self.compiler_flags
   }
 
+  /// Returns type of C++ wrapper libary (shared or static).
   pub fn library_type(&self) -> Option<CppLibraryType> {
     self.library_type
   }
@@ -190,9 +242,11 @@ impl CppBuildConfigData {
 }
 
 impl CppBuildConfig {
+  /// Create an empty configuration
   pub fn new() -> CppBuildConfig {
     CppBuildConfig::default()
   }
+  /// Add `data` with `condition`.
   pub fn add(&mut self, condition: ::target::Condition, data: CppBuildConfigData) {
     self
       .items
@@ -201,6 +255,8 @@ impl CppBuildConfig {
               data: data,
             });
   }
+  /// Select all conditions that are true on `target`, combine all corresponding
+  /// configuration items and return the result.
   pub fn eval(&self, target: &::target::Target) -> Result<CppBuildConfigData> {
     let mut data = CppBuildConfigData::default();
     for item in &self.items {
@@ -212,10 +268,13 @@ impl CppBuildConfig {
   }
 }
 
-
+/// This type contains data serialized by the generator and placed to the
+/// generated crate's directory. The build script reads and uses this value.
 #[derive(Debug, Clone)]
 #[derive(Serialize, Deserialize)]
 pub struct BuildScriptData {
+  /// Information required to build the C++ wrapper library
   pub cpp_build_config: CppBuildConfig,
+  /// Name of C++ wrapper library
   pub cpp_wrapper_lib_name: String,
 }

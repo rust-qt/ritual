@@ -10,7 +10,7 @@ use common::string_utils::CaseOperations;
 use common::file_utils::{PathBufWithAdded, move_files, create_dir_all, save_json, load_bincode,
                          save_bincode, canonicalize, remove_dir_all, remove_dir, read_dir,
                          create_file, path_to_str};
-use common::build_script_data::BuildScriptData;
+use common::BuildScriptData;
 use common::log;
 use rust_code_generator;
 use rust_generator;

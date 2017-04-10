@@ -1,6 +1,6 @@
 #[test]
 fn join() {
-  use string_utils::JoinWithString;
+  use string_utils::JoinWithSeparator;
   let a1 = vec!["a", "b", "c"];
   assert_eq!(a1.join(""), "abc");
   assert_eq!(a1.join("_"), "a_b_c");

@@ -2,7 +2,7 @@ use caption_strategy::TypeCaptionStrategy;
 use cpp_data::CppFunctionPointerType;
 use cpp_ffi_data::{CppFfiType, IndirectionChange};
 use common::errors::{Result, ChainErr, Error, unexpected};
-use common::string_utils::JoinWithString;
+use common::string_utils::JoinWithSeparator;
 use common::utils::MapIfOk;
 
 pub use serializable::{CppBuiltInNumericType, CppSpecificNumericTypeKind, CppTypeBase, CppType,

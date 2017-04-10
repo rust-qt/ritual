@@ -1,4 +1,9 @@
 #![recursion_limit = "1024"] // for error_chain
+
+//! Utility types and functions used by `cpp_to_rust_generator` and
+//! `cpp_to_rust_build_tools` crates.
+
+
 #[macro_use]
 extern crate error_chain;
 extern crate backtrace;
@@ -24,8 +29,9 @@ pub mod utils;
 pub mod cpp_build_config;
 pub mod cpp_lib_builder;
 pub mod target;
-pub mod build_script_data;
-pub mod cargo_override;
+
+pub use serializable::BuildScriptData;
+
 
 mod serializable;
 

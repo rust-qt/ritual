@@ -1,5 +1,7 @@
 #![cfg_attr(feature="clippy", allow(redundant_closure))]
 
+//! Error handling types based on `error_chain` crate.
+
 use std;
 
 
@@ -20,6 +22,8 @@ error_chain! {
 use backtrace::Symbol;
 
 impl Error {
+  /// Returns true if this error was not deemed possible
+  /// during development.
   pub fn is_unexpected(&self) -> bool {
     if let ErrorKind::Unexpected(..) = *self.kind() {
       true
@@ -28,6 +32,8 @@ impl Error {
     }
   }
 
+  /// Panics if the error is unexpected.
+  /// Does nothing otherwise.
   pub fn discard_expected(&self) {
     if self.is_unexpected() {
       self.display_report();
@@ -36,6 +42,8 @@ impl Error {
     }
   }
 
+  /// Outputs formatted stack trace and
+  /// chained error messages to the `Error` logging channel.
   pub fn display_report(&self) {
     use log;
     if let Some(backtrace) = self.backtrace() {
@@ -45,15 +53,13 @@ impl Error {
       for frame in backtrace.frames() {
         for symbol in frame.symbols() {
           if let Some(path) = symbol.filename() {
-            if path
-                 .components()
-                 .any(|x| if let Some(x) = x.as_os_str().to_str() {
-                        x == "libstd" || x == "libpanic_unwind" || x == "libcore" ||
-                        x == "errors.rs" || x.starts_with("backtrace") ||
-                        x.starts_with("error-chain")
-                      } else {
-                        false
-                      }) {
+            let path_is_good = |x: std::path::Component| if let Some(x) = x.as_os_str().to_str() {
+              x == "libstd" || x == "libpanic_unwind" || x == "libcore" || x == "errors.rs" ||
+              x.starts_with("backtrace") || x.starts_with("error-chain")
+            } else {
+              false
+            };
+            if path.components().any(path_is_good) {
               continue;
             }
             let name = if let Some(name) = symbol.name() {
@@ -65,13 +71,12 @@ impl Error {
               log::error("Best of stack backtrace:");
             }
             log::error(format!("{:>w$}: {}", next_frame_num, name, w = 4));
-            log::error(format!("      at {}:{}",
-                               path.display(),
-                               if let Some(n) = symbol.lineno() {
-                                 n.to_string()
-                               } else {
-                                 "<no lineno>".to_string()
-                               }));
+            let line = if let Some(n) = symbol.lineno() {
+              n.to_string()
+            } else {
+              "<no lineno>".to_string()
+            };
+            log::error(format!("      at {}:{}", path.display(), line));
             log::error("");
             next_frame_num += 1;
           }
@@ -89,6 +94,7 @@ impl Error {
   }
 }
 
+/// Constructs an unexpected error
 pub fn unexpected<S: Into<String>>(text: S) -> ErrorKind {
   ErrorKind::Unexpected(text.into())
 }
@@ -105,6 +111,9 @@ impl<T> ChainErr<T> for Option<T> {
   }
 }
 
+/// Works like `unwrap()`, but in case of an error,
+/// outputs formatted stack trace and
+/// chained error messages to the `Error` logging channel.
 pub fn fancy_unwrap<T>(value: Result<T>) -> T {
   if let Err(ref err) = value {
     err.display_report();

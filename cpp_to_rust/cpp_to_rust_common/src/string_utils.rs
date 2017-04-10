@@ -1,12 +1,19 @@
-pub trait JoinWithString<S> {
-  fn join(self, separator: S) -> String;
+//! Various utilities for string operations.
+
+/// Join items of a collection with separator.
+pub trait JoinWithSeparator<S> {
+  /// Result type of the operation
+  type Output;
+  /// Join items of `self` with `separator`.
+  fn join(self, separator: S) -> Self::Output;
 }
 
-impl<S, S2, X> JoinWithString<S2> for X
+impl<S, S2, X> JoinWithSeparator<S2> for X
   where S: AsRef<str>,
         S2: AsRef<str>,
         X: Iterator<Item = S>
 {
+  type Output = String;
   fn join(self, separator: S2) -> String {
     self.fold("".to_string(), |a, b| {
       let m = if a.is_empty() {
@@ -19,13 +26,15 @@ impl<S, S2, X> JoinWithString<S2> for X
   }
 }
 
-
+/// Iterator over words in a camel-case
+/// or snake-case string.
 pub struct WordIterator<'a> {
   string: &'a str,
   index: usize,
 }
 
 impl<'a> WordIterator<'a> {
+  /// Create iterator over `string`.
   pub fn new(string: &str) -> WordIterator {
     WordIterator {
       string: string,
@@ -68,9 +77,13 @@ impl<'a> Iterator for WordIterator<'a> {
   }
 }
 
+/// Convert to string with different cases
 pub trait CaseOperations {
+  /// Convert to class-case string ("WordWordWord")
   fn to_class_case(self) -> String;
+  /// Convert to snake-case string ("word_word_word")
   fn to_snake_case(self) -> String;
+  /// Convert to upper-case string ("WORD_WORD_WORD")
   fn to_upper_case_words(self) -> String;
 }
 

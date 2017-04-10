@@ -1,7 +1,7 @@
 pub extern crate cpp_to_rust_common as common;
 use common::errors::{fancy_unwrap, ChainErr, Result};
 use common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
-use common::build_script_data::BuildScriptData;
+use common::BuildScriptData;
 use common::file_utils::{PathBufWithAdded, load_json, create_file, file_to_string, path_to_str};
 use common::cpp_lib_builder::{CppLibBuilder, CMakeVar, BuildType};
 use common::target::current_target;
@@ -102,7 +102,7 @@ impl Config {
     {
       log::status("Generating ffi.rs file");
       let mut ffi_file = create_file(out_dir.with_added("ffi.rs"))?;
-      if !::common::utils::is_msvc() {
+      if ::common::target::current_env() != ::common::target::Env::Msvc {
         // TODO: make it configurable
         ffi_file.write("#[link(name = \"stdc++\")]\n")?;
       }

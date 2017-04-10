@@ -1,6 +1,5 @@
 use cpp_to_rust_common::errors::Result;
 use cpp_to_rust_common::log;
-use cpp_to_rust_common::utils::is_msvc;
 use cpp_to_rust_common::file_utils::{PathBufWithAdded, repo_crate_local_path};
 use cpp_to_rust_generator::config::{Config, CacheUsage, DebugLoggingConfig};
 use cpp_to_rust_generator::cpp_data::CppVisibility;
@@ -143,7 +142,7 @@ fn exec(sublib_name: &str,
       .add(target::Condition::Env(target::Env::Msvc), data);
   }
 
-  if is_msvc() {
+  if target::current_env() == target::Env::Msvc {
     config.add_cpp_parser_flag("-std=c++14");
   } else {
     config.add_cpp_parser_flag("-std=gnu++11");

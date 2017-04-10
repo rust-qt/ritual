@@ -1,3 +1,5 @@
+//! Logger implementation
+
 use std::fs::File;
 use std::io::Write;
 use std::fs::OpenOptions;
@@ -5,9 +7,10 @@ use std::path::PathBuf;
 use std::collections::HashMap;
 use std::sync::{Mutex, MutexGuard};
 use std::borrow::Borrow;
-// use ::term_painter::{Color, ToStyle};
 use std;
 
+/// Logger category. Logger can be configured to save
+/// messages of each category to a separate file.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum LoggerCategory {
   Status,
@@ -28,10 +31,14 @@ pub enum LoggerCategory {
 }
 pub use self::LoggerCategory::*;
 
+/// Specifies where the logging messages should be sent.
 #[derive(Debug)]
 pub struct LoggerSettings {
+  /// Write messages to specified file path. If `None`,
+  /// logging to file is disabled.
   pub file_path: Option<PathBuf>,
-  pub write_to_stderr: bool, // stderr_color: Option<()>,
+  /// Write messages to stderr.
+  pub write_to_stderr: bool,
 }
 impl Default for LoggerSettings {
   fn default() -> LoggerSettings {
@@ -41,12 +48,19 @@ impl Default for LoggerSettings {
     }
   }
 }
+
 impl LoggerSettings {
+  /// Returns false if messages are ignored. This function
+  /// can be used to skip expensive construction of messages.
   fn is_on(&self) -> bool {
     self.write_to_stderr || self.file_path.is_some()
   }
 }
 
+/// Logger object. One logger manages messages of all categories.
+/// It's possible to use multiple loggers independently.
+/// Use `default_logger()` to get global `Logger` instance.
+/// Note that the instance is mutex-guarded.
 #[derive(Default)]
 pub struct Logger {
   default_settings: LoggerSettings,
@@ -55,27 +69,36 @@ pub struct Logger {
 }
 
 impl Logger {
+  /// Creates a new logger.
   pub fn new() -> Logger {
     Logger::default()
   }
 
+  /// Set settings for all categories that don't have specific category settings.
   pub fn set_default_settings(&mut self, value: LoggerSettings) {
     self.default_settings = value;
     self.files.clear();
   }
-  pub fn set_all_category_settings(&mut self, value: HashMap<LoggerCategory, LoggerSettings>) {
-    self.category_settings = value;
-    self.files.clear();
-  }
+  /// Set settings for `category`.
   pub fn set_category_settings(&mut self, category: LoggerCategory, value: LoggerSettings) {
     self.category_settings.insert(category, value);
     self.files.remove(&category);
   }
 
+  /// Set all specific category settings. Old category settings are removed.
+  pub fn set_all_category_settings(&mut self, value: HashMap<LoggerCategory, LoggerSettings>) {
+    self.category_settings = value;
+    self.files.clear();
+  }
+
+  /// Returns false if messages of `category` are ignored. This function
+  /// can be used to skip expensive construction of messages.
   pub fn is_on(&self, category: LoggerCategory) -> bool {
     self.settings(category).is_on()
   }
 
+  /// Lazy-log. If messages of `category` are not ignored, calls the passed closure
+  /// and uses its output value as a message in that category.
   pub fn llog<T: Borrow<str>, F: FnOnce() -> T>(&mut self, category: LoggerCategory, f: F) {
     let settings = if let Some(data) = self.category_settings.get(&category) {
       data
@@ -109,10 +132,12 @@ impl Logger {
     }
   }
 
+  /// Log a message `text` to `category`.
   pub fn log<T: Borrow<str>>(&mut self, category: LoggerCategory, text: T) {
     self.llog(category, move || text);
   }
 
+  /// Returns settings for `category`.
   fn settings(&self, category: LoggerCategory) -> &LoggerSettings {
     if let Some(data) = self.category_settings.get(&category) {
       data
@@ -127,22 +152,29 @@ lazy_static! {
 
 }
 
+/// Returns global instance of `Logger`.
 pub fn default_logger() -> MutexGuard<'static, Logger> {
   DEFAULT_LOGGER.lock().unwrap()
 }
 
+/// Convenience method to log status messages to the default logger.
 pub fn status<T: Borrow<str>>(text: T) {
   default_logger().log(LoggerCategory::Status, text);
 }
 
+/// Convenience method to log error messages to the default logger.
 pub fn error<T: Borrow<str>>(text: T) {
   default_logger().log(LoggerCategory::Error, text);
 }
 
+/// Convenience method to log messages to the default logger and specified `category`.
 pub fn log<T: Borrow<str>>(category: LoggerCategory, text: T) {
   default_logger().log(category, text);
 }
 
+/// Convenience method to lazy-log messages to the default logger and specified `category`.
+/// If messages of `category` are not ignored, calls the passed closure
+/// and uses its output value as a message in that category.
 pub fn llog<T: Borrow<str>, F: FnOnce() -> T>(category: LoggerCategory, f: F) {
   default_logger().llog(category, f);
 }

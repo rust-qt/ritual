@@ -1,3 +1,5 @@
+//! Various utilities.
+
 use errors::{Result, ChainErr};
 use log;
 
@@ -7,29 +9,22 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::process::Command;
 
-// TODO: remove is_msvc and use ::target instead
-#[cfg(all(windows, target_env = "msvc"))]
-pub fn is_msvc() -> bool {
-  true
-}
-
-#[cfg(not(all(windows, target_env = "msvc")))]
-pub fn is_msvc() -> bool {
-  false
-}
-
-
 #[cfg(windows)]
+/// Returns proper executable file suffix on current platform.
+/// Returns `".exe"` on Windows and `""` on other platforms.
 pub fn exe_suffix() -> &'static str {
   return ".exe";
 }
 
 #[cfg(not(windows))]
+/// Returns proper executable file suffix on current platform.
+/// Returns `".exe"` on Windows and `""` on other platforms.
 pub fn exe_suffix() -> &'static str {
   return "";
 }
 
-
+/// Creates and empty collection at `hash[key]` if there isn't one already.
+/// Adds `value` to `hash[key]` collection.
 pub fn add_to_multihash<K: Eq + Hash + Clone, T, V: Default + Extend<T>>(hash: &mut HashMap<K, V>,
                                                                          key: K,
                                                                          value: T) {
@@ -80,21 +75,11 @@ pub fn get_command_output(command: &mut Command) -> Result<String> {
   }
 }
 
-
-#[cfg_attr(feature="clippy", allow(or_fun_call))]
-pub fn add_env_path_item(env_var_name: &'static str,
-                         mut new_paths: Vec<PathBuf>)
-                         -> Result<std::ffi::OsString> {
-  use std::env;
-  for path in env::split_paths(&env::var(env_var_name).unwrap_or(String::new())) {
-    if new_paths.iter().find(|&x| x == &path).is_none() {
-      new_paths.push(path);
-    }
-  }
-  env::join_paths(new_paths).chain_err(|| "env::join_paths failed")
-}
-
+/// Perform a map operation that can fail
 pub trait MapIfOk<A> {
+  /// Call closure `f` on each element of the collection and return
+  /// `Vec` of values returned by the closure. If closure returns `Err`
+  /// at some iteration, return that `Err` instead.
   fn map_if_ok<B, E, F: Fn(A) -> std::result::Result<B, E>>(self,
                                                             f: F)
                                                             -> std::result::Result<Vec<B>, E>;

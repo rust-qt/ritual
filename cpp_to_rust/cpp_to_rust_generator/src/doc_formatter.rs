@@ -4,7 +4,7 @@ use rust_info::{RustMethodSelfArgKind, RustMethodArgumentsVariant, RustTypeDecla
                 RustTypeDeclarationKind, RustMethodScope, RustEnumValue, RustMethod,
                 RustMethodArguments, RustMethodDocItem};
 use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
-use common::string_utils::JoinWithString;
+use common::string_utils::JoinWithSeparator;
 use common::log;
 
 pub fn rust_method_variant(args: &RustMethodArgumentsVariant,

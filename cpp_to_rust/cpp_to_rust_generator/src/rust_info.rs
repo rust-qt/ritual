@@ -1,7 +1,7 @@
 use cpp_ffi_data::CppAndFfiMethod;
 use cpp_type::CppType;
 use common::errors::{Result, unexpected};
-use common::string_utils::JoinWithString;
+use common::string_utils::JoinWithSeparator;
 use common::utils::MapIfOk;
 use rust_type::{RustName, CompleteType, RustType, RustTypeIndirection};
 use cpp_method::CppMethodDoc;

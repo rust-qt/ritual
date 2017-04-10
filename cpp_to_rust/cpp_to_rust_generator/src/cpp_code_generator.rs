@@ -4,7 +4,7 @@ use cpp_method::{ReturnValueAllocationPlace, CppFieldAccessorType, FakeCppMethod
 use cpp_type::{CppTypeIndirection, CppTypeBase, CppType};
 use common::errors::{Result, ChainErr, unexpected};
 use common::file_utils::{PathBufWithAdded, create_dir_all, create_file, path_to_str};
-use common::string_utils::JoinWithString;
+use common::string_utils::JoinWithSeparator;
 use common::utils::MapIfOk;
 use common::utils::get_command_output;
 
