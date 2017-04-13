@@ -5,7 +5,6 @@ use common::errors::fancy_unwrap;
 use config::{Config, CrateProperties, CacheUsage};
 use common::cpp_build_config::CppBuildConfigData;
 use common::target;
-use common::cargo_override::set_cargo_override;
 use std::process::Command;
 use std::path::PathBuf;
 use tests::TempTestDir;
