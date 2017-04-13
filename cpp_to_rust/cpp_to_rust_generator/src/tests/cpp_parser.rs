@@ -1,7 +1,3 @@
-
-// make sure to add test calls to tests() func
-#![forbid(dead_code)]
-
 extern crate tempdir;
 
 use cpp_parser;

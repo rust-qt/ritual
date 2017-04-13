@@ -168,10 +168,18 @@ pub struct CppTemplateInstantiations {
   pub instantiations: Vec<CppTemplateInstantiation>,
 }
 
+/// Type allocation place of a C++ type.
+///
+/// The generator chooses type allocation place for each C++ type based on the library's API.
+/// This value can be overriden using `Config::set_type_allocation_place`.
+///
+/// See `cpp_to_rust_generator`'s `README.md` for detailed description.
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[derive(Serialize, Deserialize)]
 pub enum CppTypeAllocationPlace {
+  /// Values are stored on C++ heap and used as `CppBox<T>`.
   Heap,
+  /// Values are stored on Rust stack and used as `T`.
   Stack,
 }
 

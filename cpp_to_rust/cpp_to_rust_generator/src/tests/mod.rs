@@ -31,20 +31,3 @@ impl TempTestDir {
     }
   }
 }
-
-// Testing plan:
-//
-// - qt_specific
-// - main (refactor)
-// - cpp_data
-// - cpp_ffi_generator
-// - cpp_code_generator
-//
-// - utils (file operations)
-//
-// - rust_type
-// - rust_info
-// - rust_generator
-// - rust_code_generator
-//
-//

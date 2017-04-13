@@ -4,7 +4,6 @@ use errors::{Result, ChainErr};
 use log;
 
 use std;
-use std::path::PathBuf;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::process::Command;

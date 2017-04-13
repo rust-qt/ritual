@@ -124,6 +124,7 @@ fn core_cpp_parser_blocked_names() -> Vec<&'static str> {
 }
 
 pub fn core(config: &mut Config) -> Result<()> {
+  // TODO: replace QVariant::Type with QMetaType::Type?
   config.add_cpp_parser_blocked_names(core_cpp_parser_blocked_names());
 
   // TODO: the following items should be conditionally available on Windows;

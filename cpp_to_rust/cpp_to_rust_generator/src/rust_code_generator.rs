@@ -282,8 +282,8 @@ impl<'a> RustCodeGenerator<'a> {
                                }
                              }
                              for dep in self.config.crate_properties.dependencies() {
-                               table.insert(dep.name.clone(),
-                                            dep_value(&dep.version, dep.local_path.clone())?);
+                               table.insert(dep.name().to_string(),
+                                            dep_value(dep.version(), dep.local_path().cloned())?);
                              }
                              table
                            });
@@ -303,8 +303,8 @@ impl<'a> RustCodeGenerator<'a> {
                                  })?);
                              }
                              for dep in self.config.crate_properties.build_dependencies() {
-                               table.insert(dep.name.clone(),
-                                            dep_value(&dep.version, dep.local_path.clone())?);
+                               table.insert(dep.name().to_string(),
+                                            dep_value(dep.version(), dep.local_path().cloned())?);
                              }
                              table
                            });
@@ -312,16 +312,6 @@ impl<'a> RustCodeGenerator<'a> {
       table.insert("package".to_string(), package);
       table.insert("dependencies".to_string(), dependencies);
       table.insert("build-dependencies".to_string(), build_dependencies);
-      // LNK1189 (too many members) in MSVC with static linking,
-      // so we use dynamic linking
-
-      // table.insert("lib".to_string(), toml::Value::Table({
-      // let mut table = toml::Table::new();
-      // table.insert("crate-type".to_string(),
-      // toml::Value::Array(vec![toml::Value::String("lib".to_string()),
-      // toml::Value::String("dylib".to_string())]));
-      // table
-      // }));
       table
     };
     save_toml(self.config.output_path.with_added("Cargo.toml"),

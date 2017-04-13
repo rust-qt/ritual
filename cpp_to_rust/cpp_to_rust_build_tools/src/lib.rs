@@ -1,3 +1,10 @@
+//! Implementation of `cpp_to_rust`'s build script.
+//! Default generated build script uses this crate as a build dependency
+//! and just calls `cpp_to_rust_build_tools::run()`.
+//! If a custom build script is used, it should use this crate's API
+//! to perform necessary build steps.
+
+
 pub extern crate cpp_to_rust_common as common;
 use common::errors::{fancy_unwrap, ChainErr, Result};
 use common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
@@ -11,6 +18,7 @@ use common::log;
 use std::path::PathBuf;
 use std::process::Command;
 
+/// Configuration of the build script.
 #[derive(Debug)]
 pub struct Config {
   cpp_build_paths: CppBuildPaths,
@@ -32,32 +40,43 @@ fn build_script_data() -> Result<BuildScriptData> {
 }
 
 impl Config {
+  /// Constructs default configuration state based on
+  /// information in the generated `build_script_data.json` file
+  /// located at the crate root. The caller may change
+  /// `CppBuildPaths` and `CppBuildConfig` values stored in this object
+  /// and call `config.run()` to apply them.
   pub fn new() -> Result<Config> {
     Ok(Config {
          cpp_build_config: build_script_data()?.cpp_build_config,
          cpp_build_paths: CppBuildPaths::default(),
        })
   }
+  /// Returns current `CppBuildConfig` data.
   pub fn cpp_build_config(&self) -> &CppBuildConfig {
     &self.cpp_build_config
   }
+  /// Returns mutable `CppBuildConfig` data.
   pub fn cpp_build_config_mut(&mut self) -> &mut CppBuildConfig {
     &mut self.cpp_build_config
   }
+  /// Sets new `CppBuildConfig` data.
   pub fn set_cpp_build_config(&mut self, config: CppBuildConfig) {
     self.cpp_build_config = config;
   }
+  /// Returns current `CppBuildPaths` data.
   pub fn cpp_build_paths(&self) -> &CppBuildPaths {
     &self.cpp_build_paths
   }
+  /// Returns mutable `CppBuildPaths` data.
   pub fn cpp_build_paths_mut(&mut self) -> &mut CppBuildPaths {
     &mut self.cpp_build_paths
   }
+  /// Sets new `CppBuildPaths` data.
   pub fn set_cpp_build_paths(&mut self, config: CppBuildPaths) {
     self.cpp_build_paths = config;
   }
 
-
+  /// Same as `run()`, but result of the operation is returned to the caller.
   pub fn run_and_return(mut self) -> Result<()> {
     self.cpp_build_paths.apply_env();
     let build_script_data = build_script_data()?;
@@ -91,7 +110,6 @@ impl Config {
         num_jobs: std::env::var("NUM_JOBS")
           .ok()
           .and_then(|x| x.parse().ok()),
-        pipe_output: false,
         cmake_vars: cmake_vars,
         build_type: match profile.as_str() {
           "debug" => BuildType::Debug,
@@ -141,6 +159,16 @@ impl Config {
     log::status("cpp_to_rust build script finished.");
     Ok(())
   }
+  /// Starts build script with current configuration.
+  /// The build script performs the following operations:
+  ///
+  /// - Build the C++ wrapper library;
+  /// - Generate `ffi.rs` file with actual link attributes;
+  /// - Determine C++ type sizes on current platform and generate `type_sizes.rs`;
+  /// - Report linking information to `cargo`.
+  ///
+  /// This function ends the process with the appropriate error code and never
+  /// returns to the caller.
   pub fn run(self) -> ! {
     fancy_unwrap(self.run_and_return());
     std::process::exit(0)
@@ -148,10 +176,13 @@ impl Config {
 }
 
 
+/// Same as `run()`, but result of the operation is returned to the caller.
 pub fn run_and_return() -> Result<()> {
   Config::new()?.run_and_return()
 }
 
+/// Runs the build script with default configuration.
+/// See `Config::run` for more information.
 pub fn run() -> ! {
   let config = fancy_unwrap(Config::new());
   config.run()
