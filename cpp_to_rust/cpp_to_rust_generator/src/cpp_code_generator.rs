@@ -58,6 +58,7 @@ impl CppCodeGenerator {
                self.function_signature(method)?))
   }
 
+  /// Generates code for a Qt slot wrapper
   fn qt_slot_wrapper(&self, wrapper: &QtSlotWrapper) -> Result<String> {
     let func_type = CppType {
       base: CppTypeBase::FunctionPointer(wrapper.function_type.clone()),
@@ -90,6 +91,8 @@ impl CppCodeGenerator {
 
   }
 
+  /// Generates code that wraps `expression` of type `type1.original_type` and
+  /// converts it to type `type1.ffi_type`
   fn convert_type_to_ffi(&self, type1: &CppFfiType, expression: String) -> Result<String> {
     Ok(match type1.conversion {
          IndirectionChange::NoChange => expression,
@@ -103,7 +106,7 @@ impl CppCodeGenerator {
        })
   }
 
-  /// Wraps expression returned by the original method to
+  /// Wraps `expression` returned by the original C++ method to
   /// convert it to return type of the FFI method.
   fn convert_return_type(&self, method: &CppAndFfiMethod, expression: String) -> Result<String> {
     let mut result = expression;
@@ -325,11 +328,6 @@ impl CppCodeGenerator {
     let cmakelists_path = self.lib_path.with_added("CMakeLists.txt");
     let mut cmakelists_file = create_file(&cmakelists_path)?;
 
-    // let mut all_cpp_flags = Vec::from(cpp_compiler_flags);
-    // for dir in framework_directories {
-    // all_cpp_flags.push(format!("-F\"{}\"", dir));
-    // }
-    // let all_cpp_flags_text = all_cpp_flags.iter().map(|x| x.replace("\"", "\\\"")).join(" ");
     cmakelists_file.write(format!(include_str!("../templates/c_lib/CMakeLists.txt"),
                      lib_name_lowercase = &self.lib_name,
                      lib_name_uppercase = name_upper))?;
@@ -356,6 +354,7 @@ impl CppCodeGenerator {
     Ok(())
   }
 
+  /// Generates all regular files of the C++ wrapper library
   pub fn generate_files(&self, data: &[CppFfiHeaderData]) -> Result<()> {
     self.generate_all_headers_file(data.iter().map(|x| &x.include_file_base_name))?;
     for item in data {
@@ -388,13 +387,11 @@ impl CppCodeGenerator {
       .lib_path
       .with_added("src")
       .with_added(format!("{}_{}.cpp", &self.lib_name, data.include_file_base_name));
-    // log::noisy(format!("Generating source file: {:?}", cpp_path));
 
     let h_path = self
       .lib_path
       .with_added("include")
       .with_added(&ffi_include_file);
-    // log::noisy(format!("Generating header file: {:?}", h_path));
 
     let mut cpp_file = create_file(&cpp_path)?;
     {
@@ -422,7 +419,6 @@ impl CppCodeGenerator {
     }
     if !data.qt_slot_wrappers.is_empty() {
       let moc_output = get_command_output(Command::new("moc").arg("-i").arg(&h_path))?;
-      // println!("moc ok!");
       cpp_file.write(format!("// start of MOC generated code\n{}\n// end of MOC generated code\n",
                        moc_output))?;
     }
@@ -430,12 +426,20 @@ impl CppCodeGenerator {
   }
 }
 
+/// Entry about a Rust struct with a buffer that must have the exact same size
+/// as its corresponding C++ class. This information is required for the C++ program
+/// that is launched by the build script to determine type sizes and generate `type_sizes.rs`.
 #[derive(Debug, Clone)]
 pub struct CppTypeSizeRequest {
+  /// C++ code representing the type. Used as argument to `sizeof`.
   pub cpp_code: String,
+  /// Name of the constant in `type_sizes.rs`.
   pub size_const_name: String,
 }
 
+/// Generates a C++ program that determines sizes of target C++ types
+/// on the current platform and outputs the Rust code for `type_sizes.rs` module
+/// to the standard output.
 pub fn generate_cpp_type_size_requester(requests: &[CppTypeSizeRequest],
                                         include_directives: &[PathBuf])
                                         -> Result<String> {

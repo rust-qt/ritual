@@ -19,14 +19,25 @@ use rust_info::{RustTypeWrapperKind, RustExportInfo, DependencyInfo};
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 
+
+/// Returns path to the completion marker file
+/// indicating that processing of the library in this `cache_dir`
+/// was completed before.
+/// This function can be used to skip heavy preparation steps
+/// and avoid constructing a `Config` object.
+/// Note that the marker is not created if
+/// `write_cache` was set to false in `Config` during a previous run.
+/// The marker should only be used if cache usage is set to `CacheUsage::Full`.
 pub fn completed_marker_path<P: AsRef<Path>>(cache_dir: P) -> PathBuf {
   cache_dir.as_ref().with_added("cpp_to_rust_completed")
 }
 
 /// Returns true if a library was already processed in this `cache_dir`.
-/// cpp_to_rust won't process this project again until the completed marker file
-/// is removed. You can use this function to skip heavy preparation steps
-/// and avoid constructing a Config object.
+/// This function can be used to skip heavy preparation steps
+/// and avoid constructing a `Config` object.
+/// Note that the marker is not created if
+/// `write_cache` was set to false in `Config` during a previous run.
+/// The marker should only be used if cache usage is set to `CacheUsage::Full`.
 pub fn is_completed<P: AsRef<Path>>(cache_dir: P) -> bool {
   completed_marker_path(cache_dir).exists()
 }

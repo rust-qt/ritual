@@ -19,6 +19,10 @@ pub use serializable::{CppEnumValue, CppClassField, CppTypeKind, CppOriginLocati
 
 use regex::Regex;
 
+/// Convenience function to create `CppMethod` object for
+/// `static_cast` or `dynamic_cast` from type `from` to type `to`.
+/// See `CppMethod`'s documentation for more information
+/// about `is_unsafe_static_cast` and `is_direct_static_cast`.
 pub fn create_cast_method(name: &str,
                           from: &CppType,
                           to: &CppType,
@@ -52,6 +56,10 @@ pub fn create_cast_method(name: &str,
   }
 }
 
+/// Tries to apply each of `template_instantiations` to `method`.
+/// Only types at the specified `nested_level` are replaced.
+/// Returns `Err` if any of `template_instantiations` is incompatible
+/// with the method.
 fn apply_instantiations_to_method(method: &CppMethod,
                                   nested_level: i32,
                                   template_instantiations: &[CppTemplateInstantiation])
@@ -206,6 +214,7 @@ impl CppTypeData {
 }
 
 impl CppData {
+  /// Search for a `CppTypeData` object in this `CppData` and all dependencies.
   pub fn find_type_info<F>(&self, f: F) -> Option<&CppTypeData>
     where F: Fn(&&CppTypeData) -> bool
   {
@@ -215,6 +224,8 @@ impl CppData {
       .find(f)
   }
 
+  /// Returns true if C++ type `name` is polymorphic, i.e. has
+  /// at least one virtual function.
   pub fn is_polymorphic_type(&self, name: &str) -> bool {
     self
       .methods
@@ -537,7 +548,6 @@ impl CppData {
         }
       }
     }
-    // log::info("Finished adding inherited methods");
     Ok(())
   }
 
@@ -562,6 +572,8 @@ impl CppData {
     self.methods.append(&mut new_methods);
   }
 
+  /// Returns all include files found within this `CppData`
+  /// (excluding dependencies).
   pub fn all_include_files(&self) -> Result<HashSet<String>> {
     let mut result = HashSet::new();
     for method in &self.methods {
@@ -646,7 +658,7 @@ impl CppData {
     false
   }
 
-  /// Checks if specified class has virtual destructor (own or inherited).
+  /// Checks if specified class has any virtual methods (own or inherited).
   pub fn has_virtual_methods(&self, class_name: &str) -> bool {
     for method in &self.methods {
       if let Some(ref info) = method.class_membership {
@@ -687,42 +699,7 @@ impl CppData {
     false
   }
 
-
-  #[allow(dead_code)]
-  pub fn get_all_methods(&self, class_name: &str) -> Result<Vec<&CppMethod>> {
-    let own_methods: Vec<_> = self
-      .methods
-      .iter()
-      .filter(|m| m.class_name().map(|x| x.as_ref()) == Some(class_name))
-      .collect();
-    let mut inherited_methods = Vec::new();
-    if let Some(type_info) = self.types.iter().find(|t| &t.name == class_name) {
-      if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
-        for base in bases {
-          if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
-            for method in self.get_all_methods(name)? {
-              if own_methods
-                   .iter()
-                   .find(|m| m.name == method.name && m.argument_types_equal(method))
-                   .is_none() {
-                inherited_methods.push(method);
-              }
-            }
-          }
-        }
-      } else {
-        return Err("get_all_methods: not a class".into());
-      }
-    } else {
-      log::llog(log::DebugGeneral,
-                || format!("get_all_methods: no type info for {:?}", class_name));
-    }
-    for method in own_methods {
-      inherited_methods.push(method);
-    }
-    Ok(inherited_methods)
-  }
-
+  /// Checks if specified class has any pure virtual methods.
   pub fn has_pure_virtual_methods(&self, class_name: &str) -> bool {
     self
       .methods
@@ -733,6 +710,7 @@ impl CppData {
            })
   }
 
+  /// Returns true if `type1` is a known template instantiation.
   fn check_template_type(&self, type1: &CppType) -> Result<()> {
     if let CppTypeBase::Class(CppTypeClassBase {
                                 ref name,
@@ -766,6 +744,8 @@ impl CppData {
     Ok(())
   }
 
+  /// Adds methods produced as template instantiations of
+  /// methods of existing template classes and existing template methods.
   fn instantiate_templates(&mut self) -> Result<()> {
     log::status("Instantiating templates");
     let mut new_methods = Vec::new();
@@ -842,6 +822,7 @@ impl CppData {
     Ok(())
   }
 
+  /// Adds fictional getter and setter methods for each known public field of each class.
   pub fn add_field_accessors(&mut self) -> Result<()> {
     log::status("Adding field accessors");
     let mut new_methods = Vec::new();
@@ -931,6 +912,10 @@ impl CppData {
     Ok(())
   }
 
+  /// Performs a portion of `add_casts` operation.
+  /// Adds casts between `target_type` and `base_type` and calls
+  /// `add_casts_one` recursively to add casts between `target_type`
+  /// and base types of `base_type`.
   fn add_casts_one(&self,
                    target_type: &CppTypeClassBase,
                    base_type: &CppType,
@@ -986,6 +971,8 @@ impl CppData {
     Ok(new_methods)
   }
 
+  /// Adds `static_cast` and `dynamic_cast` functions for all appropriate pairs of types
+  /// in this `CppData`.
   fn add_casts(&mut self) -> Result<()> {
     log::status("Adding cast functions");
     let mut new_methods = Vec::new();
@@ -1027,6 +1014,7 @@ impl CppData {
     false
   }
 
+  /// Parses include files to detect which methods are signals or slots.
   fn detect_signals_and_slots(&mut self) -> Result<()> {
     let mut files = HashSet::new();
     for type1 in &self.types {
@@ -1059,7 +1047,6 @@ impl CppData {
 
     for file_path in files {
       let mut file_sections = Vec::new();
-      // log::debug(format!("File: {}", &file_path));
       let file = open_file(&file_path)?;
       let reader = BufReader::new(file.into_file());
       for (line_num, line) in reader.lines().enumerate() {
@@ -1163,10 +1150,6 @@ impl CppData {
     }
     all_types.extend(types_with_omitted_args.into_iter());
 
-
-    //    if all_types.is_empty() {
-    //      return Ok(());
-    //    }
     log::llog(log::DebugSignals, || "Signal argument types:");
     for t in &all_types {
       log::llog(log::DebugSignals, || {
@@ -1178,6 +1161,10 @@ impl CppData {
     Ok(())
   }
 
+  /// Detects the preferred type allocation place for each type based on
+  /// API of all known methods. Keys of `overrides` are C++ type names.
+  /// If `overrides` contains type allocation place for a type, it's used instead of
+  /// the place that would be automatically selected.
   pub fn choose_allocation_places(&mut self,
                                   overrides: &HashMap<String, CppTypeAllocationPlace>)
                                   -> Result<()> {
@@ -1221,18 +1208,6 @@ impl CppData {
         }
         data.get_mut(&type1.name).unwrap().has_virtual_methods = true;
       }
-      // if let CppTypeKind::Class { ref bases, .. } = type1.kind {
-      // for base in bases {
-      // if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
-      // if self.types.iter().any(|t| &t.name == name) {
-      // if !data.contains_key(name) {
-      // data.insert(name.clone(), TypeStats::default());
-      // }
-      // data.get_mut(name).unwrap().has_derived_classes = true;
-      // }
-      // }
-      // }
-      // }
     }
     for method in &self.methods {
       check_type(&method.return_type, &mut data);
@@ -1321,6 +1296,7 @@ impl CppData {
     Ok(())
   }
 
+  /// Returns selected type allocation place for type `class_name`.
   pub fn type_allocation_place(&self, class_name: &str) -> Result<CppTypeAllocationPlace> {
     if let Some(r) = self.type_allocation_places.get(class_name) {
       return Ok(r.clone());
@@ -1348,11 +1324,9 @@ impl CppData {
 }
 
 impl TemplateArgumentsDeclaration {
+  /// Returns count of the template arguments.
   #[allow(dead_code)]
   pub fn count(&self) -> i32 {
     self.names.len() as i32
   }
 }
-
-// fn diff_cpp_data(data1: &CppData, data2: &CppData) {
-// }

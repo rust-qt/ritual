@@ -296,13 +296,16 @@ impl Config {
   /// Returns true if a completion marker exists in the cache directory,
   /// indicating that processing of the library in this cache directory
   /// was completed before. Note that the marker is not created if
-  /// `write_cache` was set to false.
+  /// `write_cache` was set to false. The marker will only be used if
+  /// cache usage is set to `CacheUsage::Full`.
   pub fn is_completed(&self) -> bool {
     ::launcher::is_completed(&self.cache_dir_path)
   }
   /// Returns path to the completion marker file
   /// indicating that processing of the library in this cache directory
-  /// was completed before.
+  /// was completed before. Note that the marker is not created if
+  /// `write_cache` was set to false. The marker will only be used if
+  /// cache usage is set to `CacheUsage::Full`.
   pub fn completed_marker_path(&self) -> PathBuf {
     ::launcher::completed_marker_path(&self.cache_dir_path)
   }
@@ -456,7 +459,7 @@ impl Config {
     }
   }
 
-  /// Changes how debug logs are handled.
+  /// Changes how debug logs are handled. See `DebugLoggingConfig` for more information.
   pub fn set_debug_logging_config(&mut self, config: DebugLoggingConfig) {
     self.debug_logging_config = config;
   }
@@ -546,22 +549,28 @@ impl Config {
     &self.cpp_parser_flags
   }
 
+
+  /// Returns values added by `Config::add_include_path`.
   pub fn include_paths(&self) -> &[PathBuf] {
     &self.include_paths
   }
 
+  /// Returns values added by `Config::add_framework_path`.
   pub fn framework_paths(&self) -> &[PathBuf] {
     &self.framework_paths
   }
 
+  /// Returns values added by `Config::add_target_include_path`.
   pub fn target_include_paths(&self) -> &[PathBuf] {
     &self.target_include_paths
   }
 
+  /// Returns values added by `Config::add_include_directive`.
   pub fn include_directives(&self) -> &[PathBuf] {
     &self.include_directives
   }
 
+  /// Returns values added by `Config::add_cpp_ffi_generator_filter`.
   pub fn cpp_ffi_generator_filters(&self) -> Vec<&Box<CppFfiGeneratorFilterFn>> {
     self
       .cpp_ffi_generator_filters
@@ -570,29 +579,41 @@ impl Config {
       .collect()
   }
 
+  /// Returns values added by `Config::add_cpp_data_filter`.
   pub fn cpp_data_filters(&self) -> Vec<&Box<CppDataFilterFn>> {
     self.cpp_data_filters.iter().map(|x| &x.0).collect()
   }
 
+  /// Returns current `CppBuildConfig` value.
   pub fn cpp_build_config(&self) -> &CppBuildConfig {
     &self.cpp_build_config
   }
+  /// Returns values added by `Config::set_type_allocation_place`.
+  /// Keys of the hash map are names of C++ types.
   pub fn type_allocation_places(&self) -> &HashMap<String, CppTypeAllocationPlace> {
     &self.type_allocation_places
   }
 
+  /// If `value` is `true`, the generated `Cargo.toml` will specify
+  /// both versions and local paths of all dependencies. If `value` is `false`,
+  /// only version will be specified, so publishing all dependencies would be
+  /// required to build the crate.
   pub fn set_write_dependencies_local_paths(&mut self, value: bool) {
     self.write_dependencies_local_paths = value;
   }
+  /// Returns value set by `Config::set_write_dependencies_local_paths`.
   pub fn write_dependencies_local_paths(&self) -> bool {
     self.write_dependencies_local_paths
   }
+  /// Returns value set by `Config::set_debug_logging_config`.
   pub fn debug_logging_config(&self) -> &DebugLoggingConfig {
     &self.debug_logging_config
   }
+  /// Returns value set by `Config::set_quiet_mode`.
   pub fn quiet_mode(&self) -> bool {
     self.quiet_mode
   }
+  /// Returns value set by `Config::set_write_cache`.
   pub fn write_cache(&self) -> bool {
     self.write_cache
   }
