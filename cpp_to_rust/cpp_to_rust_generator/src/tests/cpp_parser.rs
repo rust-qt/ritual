@@ -27,7 +27,7 @@ fn run_parser(code: &'static str) -> CppData {
                                      tmp_cpp_path: dir.path().with_added("1.cpp"),
                                      name_blacklist: Vec::new(),
                                      framework_paths: Vec::new(),
-                                     flags: Vec::new(),
+                                     clang_arguments: Vec::new(),
                                    },
                                    Vec::new())
       .unwrap();
