@@ -4,7 +4,6 @@ use caption_strategy::*;
 use tests::cpp_method::{empty_regular_method, empty_membership};
 use cpp_method::{CppMethodKind, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
-use cpp_data::CppFunctionPointerType;
 
 #[test]
 fn argument_meaning() {
@@ -35,7 +34,7 @@ fn argument_int() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
-      conversion: IndirectionChange::NoChange,
+      conversion: CppIndirectionChange::NoChange,
     },
     meaning: CppFfiArgumentMeaning::Argument(0),
   };
@@ -77,7 +76,7 @@ fn argument_int_ptr() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
-      conversion: IndirectionChange::NoChange,
+      conversion: CppIndirectionChange::NoChange,
     },
     meaning: CppFfiArgumentMeaning::Argument(0),
   };
@@ -136,7 +135,7 @@ fn argument_func() {
     argument_type: CppFfiType {
       original_type: type1.clone(),
       ffi_type: type1.clone(),
-      conversion: IndirectionChange::NoChange,
+      conversion: CppIndirectionChange::NoChange,
     },
     meaning: CppFfiArgumentMeaning::Argument(0),
   };
@@ -179,7 +178,7 @@ fn signature_two_numbers() {
                           is_const2: false,
                           base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
                         },
-                        conversion: IndirectionChange::NoChange,
+                        conversion: CppIndirectionChange::NoChange,
                       },
                       meaning: CppFfiArgumentMeaning::Argument(0),
                     },
@@ -198,7 +197,7 @@ fn signature_two_numbers() {
                           is_const2: false,
                           base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
                         },
-                        conversion: IndirectionChange::NoChange,
+                        conversion: CppIndirectionChange::NoChange,
                       },
                       meaning: CppFfiArgumentMeaning::Argument(0),
                     }],
@@ -265,7 +264,7 @@ fn signature_class_method() {
                                                      template_arguments: None,
                                                    }),
                         },
-                        conversion: IndirectionChange::NoChange,
+                        conversion: CppIndirectionChange::NoChange,
                       },
                       meaning: CppFfiArgumentMeaning::This,
                     },
@@ -284,7 +283,7 @@ fn signature_class_method() {
                           is_const2: false,
                           base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
                         },
-                        conversion: IndirectionChange::NoChange,
+                        conversion: CppIndirectionChange::NoChange,
                       },
                       meaning: CppFfiArgumentMeaning::Argument(0),
                     }],
@@ -337,7 +336,7 @@ fn signature_class_method_const() {
                                                      template_arguments: None,
                                                    }),
                         },
-                        conversion: IndirectionChange::NoChange,
+                        conversion: CppIndirectionChange::NoChange,
                       },
                       meaning: CppFfiArgumentMeaning::This,
                     },
@@ -356,7 +355,7 @@ fn signature_class_method_const() {
                           is_const2: false,
                           base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
                         },
-                        conversion: IndirectionChange::NoChange,
+                        conversion: CppIndirectionChange::NoChange,
                       },
                       meaning: CppFfiArgumentMeaning::Argument(0),
                     }],
@@ -419,7 +418,7 @@ fn cpp_ffi_type_void() {
   let t = CppFfiType::void();
   assert!(t.original_type.is_void());
   assert!(t.ffi_type.is_void());
-  assert_eq!(t.conversion, IndirectionChange::NoChange);
+  assert_eq!(t.conversion, CppIndirectionChange::NoChange);
 }
 
 #[test]

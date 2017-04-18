@@ -6,10 +6,107 @@ use common::utils::MapIfOk;
 use rust_type::{RustName, CompleteType, RustType, RustTypeIndirection};
 use cpp_method::CppMethodDoc;
 use cpp_data::CppTypeDoc;
-pub use serializable::{RustEnumValue, RustTypeWrapperKind, RustProcessedTypeInfo, RustExportInfo,
-                       CppEnumValueDocItem, RustQtSlotWrapper};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+
+/// One variant of a Rust enum
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct RustEnumValue {
+  /// Identifier
+  pub name: String,
+  /// Corresponding value
+  pub value: i64,
+  /// Documentation of corresponding C++ variants
+  pub cpp_docs: Vec<CppEnumValueDocItem>,
+  /// True if this variant was added because enums with
+  /// one variant are not supported
+  pub is_dummy: bool,
+}
+
+
+/// C++ documentation data for a enum variant
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct CppEnumValueDocItem {
+  /// C++ name of the variant
+  pub variant_name: String,
+  /// HTML content
+  pub doc: Option<String>,
+}
+
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct RustQtSlotWrapper {
+  pub arguments: Vec<CompleteType>,
+  pub receiver_id: String,
+  pub public_type_name: String,
+  pub callback_name: String,
+}
+
+/// Information about a Rust type wrapper
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub enum RustTypeWrapperKind {
+  /// Enum wrapper
+  Enum {
+    /// List of enum values
+    values: Vec<RustEnumValue>,
+    /// True if `FlaggableEnum` trait is implemented
+    /// for this type, i.e. if `QFlags<T>` with this C++ type
+    /// is used in API.
+    is_flaggable: bool,
+  },
+  /// Struct wrapper
+  Struct {
+    /// Name of the constant containing size of the corresponding
+    /// C++ type in bytes. Value of the constant is determined at
+    /// crate compile time.
+    /// If None, this struct can only be used as pointer, like an
+    /// empty enum.
+    size_const_name: Option<String>,
+    /// True if `CppDeletable` trait is implemented
+    /// for this type, i.e. if this C++ type has public destructor.
+    is_deletable: bool,
+    slot_wrapper: Option<RustQtSlotWrapper>,
+  },
+}
+
+/// Exported information about a Rust wrapper type
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct RustProcessedTypeInfo {
+  /// Full name of corresponding C++ type (class or enum).
+  pub cpp_name: String,
+  /// C++ documentation for this type
+  pub cpp_doc: Option<CppTypeDoc>,
+  /// Template arguments. None if C++ type is not a template class.
+  pub cpp_template_arguments: Option<Vec<CppType>>,
+  /// Kind of the type and additional information.
+  pub kind: RustTypeWrapperKind,
+  /// Identifier of Rust type
+  pub rust_name: RustName,
+  /// Indicates whether this type is public
+  pub is_public: bool,
+}
+
+
+
+/// Exported information about generated crate
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct RustExportInfo {
+  /// Name of the crate
+  pub crate_name: String,
+  /// Version of the crate
+  pub crate_version: String,
+  /// Directory with the generated crate
+  pub output_path: String,
+  /// List of generated types
+  pub rust_types: Vec<RustProcessedTypeInfo>,
+}
+
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustMethodDocItem {

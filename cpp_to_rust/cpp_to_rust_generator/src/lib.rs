@@ -42,7 +42,6 @@ mod rust_code_generator;
 mod rust_info;
 mod rust_type;
 mod cpp_parser;
-mod serializable;
 mod versions;
 
 #[cfg(test)]

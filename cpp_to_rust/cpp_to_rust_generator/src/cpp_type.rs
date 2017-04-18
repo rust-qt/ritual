@@ -1,14 +1,159 @@
 //! Types for handling information about C++ types.
 
 use caption_strategy::TypeCaptionStrategy;
-use cpp_data::CppFunctionPointerType;
-use cpp_ffi_data::{CppFfiType, IndirectionChange};
+use cpp_ffi_data::{CppFfiType, CppIndirectionChange};
 use common::errors::{Result, ChainErr, Error, unexpected};
 use common::string_utils::JoinWithSeparator;
 use common::utils::MapIfOk;
 
-pub use serializable::{CppBuiltInNumericType, CppSpecificNumericTypeKind, CppTypeBase, CppType,
-                       CppTypeIndirection, CppTypeClassBase, CppSpecificNumericType};
+/// C++ type variants based on indirection
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+#[allow(dead_code)]
+pub enum CppTypeIndirection {
+  /// No indirection
+  None,
+  /// Pointer, like int*
+  Ptr,
+  /// Reference, like int&
+  Ref,
+  /// Reference to pointer, like int*&
+  PtrRef,
+  /// Pointer to pointer, like int**
+  PtrPtr,
+  /// R-value reference, like Class&&
+  RValueRef,
+}
+
+/// Available built-in C++ numeric types.
+/// All these types have corresponding
+/// `clang::TypeKind` values (except for `CharS` and `CharU`
+/// which map to `CppBuiltInNumericType::Char`)
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub enum CppBuiltInNumericType {
+  Bool,
+  Char,
+  SChar,
+  UChar,
+  WChar,
+  Char16,
+  Char32,
+  Short,
+  UShort,
+  Int,
+  UInt,
+  Long,
+  ULong,
+  LongLong,
+  ULongLong,
+  Int128,
+  UInt128,
+  Float,
+  Double,
+  LongDouble,
+}
+
+/// Information about a fixed-size primitive type
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+#[allow(dead_code)]
+pub enum CppSpecificNumericTypeKind {
+  Integer { is_signed: bool },
+  FloatingPoint,
+}
+
+/// Information about base C++ class type
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppTypeClassBase {
+  /// Name, including namespaces and nested classes
+  pub name: String,
+  /// For template classes, C++ types used as template
+  /// arguments in this type,
+  /// like [QString, int] in QHash<QString, int>
+  pub template_arguments: Option<Vec<CppType>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppFunctionPointerType {
+  /// Return type of the function
+  pub return_type: Box<CppType>,
+  /// Arguments of the function
+  pub arguments: Vec<CppType>,
+  /// Whether arguments are terminated with "..."
+  pub allows_variadic_arguments: bool,
+}
+
+#[derive(Debug, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppSpecificNumericType {
+  /// Type identifier (most likely a typedef name)
+  pub name: String,
+  /// Size of type in bits
+  pub bits: i32,
+  /// Information about the type (float or integer,
+  /// signed or unsigned)
+  pub kind: CppSpecificNumericTypeKind,
+}
+
+/// Base C++ type. `CppType` can add indirection
+/// and constness to `CppTypeBase`, but otherwise
+/// this enum lists all supported types.
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub enum CppTypeBase {
+  /// Void
+  Void,
+  /// Built-in C++ primitive type, like int
+  BuiltInNumeric(CppBuiltInNumericType),
+  /// Fixed-size primitive type, like qint64 or int64_t
+  /// (may be translated to Rust's i64)
+  SpecificNumeric(CppSpecificNumericType),
+  /// Pointer sized integer, like qintptr
+  /// (may be translated to Rust's isize)
+  PointerSizedInteger { name: String, is_signed: bool },
+  /// Enum type
+  Enum {
+    /// Name, including namespaces and nested classes
+    name: String,
+  },
+  /// Class type
+  Class(CppTypeClassBase),
+  /// Template parameter, like "T" anywhere inside
+  /// QVector<T> declaration
+  TemplateParameter {
+    /// Template instantiation level. For example,
+    /// if there is a template class and a template method in it,
+    /// the class's template parameters will have level = 0 and
+    /// the method's template parameters will have level = 1.
+    /// If only the class or only the method is a template,
+    /// the level will be 0.
+    nested_level: i32,
+    /// Index of the parameter. In QHash<K, V> "K" has index = 0
+    /// and "V" has index = 1.
+    index: i32,
+  },
+  /// Function pointer type
+  FunctionPointer(CppFunctionPointerType),
+}
+
+/// Information about a C++ type
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppType {
+  /// Information about base type
+  pub base: CppTypeBase,
+  /// Indirection applied to base type
+  pub indirection: CppTypeIndirection,
+  /// If the type has const qualifier. Defaults to false
+  /// when not applicable.
+  pub is_const: bool,
+  /// If 2nd indirection part of the type is const, e.g.
+  /// true for "int* const*".
+  pub is_const2: bool,
+}
 
 impl CppTypeIndirection {
   /// Returns the result of applying `left` to `right`.
@@ -45,7 +190,7 @@ impl CppTypeIndirection {
 impl CppBuiltInNumericType {
   /// Returns C++ code representing this type.
   pub fn to_cpp_code(&self) -> &'static str {
-    use serializable::CppBuiltInNumericType::*;
+    use self::CppBuiltInNumericType::*;
     match *self {
       Bool => "bool",
       Char => "char",
@@ -72,7 +217,7 @@ impl CppBuiltInNumericType {
 
   /// Returns true if this type is some sort of floating point type.
   pub fn is_float(&self) -> bool {
-    use serializable::CppBuiltInNumericType::*;
+    use self::CppBuiltInNumericType::*;
     match *self {
       Float | Double | LongDouble => true,
       _ => false,
@@ -81,7 +226,7 @@ impl CppBuiltInNumericType {
 
   /// Returns true if this type is a signed integer.
   pub fn is_signed_integer(&self) -> bool {
-    use serializable::CppBuiltInNumericType::*;
+    use self::CppBuiltInNumericType::*;
     match *self {
       SChar | Short | Int | Long | LongLong | Int128 => true,
       _ => false,
@@ -90,7 +235,7 @@ impl CppBuiltInNumericType {
 
   /// Returns true if this type is an unsigned integer.
   pub fn is_unsigned_integer(&self) -> bool {
-    use serializable::CppBuiltInNumericType::*;
+    use self::CppBuiltInNumericType::*;
     match *self {
       UChar | Char16 | Char32 | UShort | UInt | ULong | ULongLong | UInt128 => true,
       _ => false,
@@ -100,7 +245,7 @@ impl CppBuiltInNumericType {
   /// Returns true if this type is integer but may be signed or
   /// unsigned, depending on the platform.
   pub fn is_integer_with_undefined_signedness(&self) -> bool {
-    use serializable::CppBuiltInNumericType::*;
+    use self::CppBuiltInNumericType::*;
     match *self {
       Char | WChar => true,
       _ => false,
@@ -109,7 +254,7 @@ impl CppBuiltInNumericType {
 
   /// Returns all supported types.
   pub fn all() -> &'static [CppBuiltInNumericType] {
-    use serializable::CppBuiltInNumericType::*;
+    use self::CppBuiltInNumericType::*;
     static LIST: &'static [CppBuiltInNumericType] = &[Bool, Char, SChar, UChar, WChar, Char16, Char32, Short, UShort, Int, UInt, Long, ULong,
      LongLong, ULongLong, Int128, UInt128, Float, Double, LongDouble];
     return LIST;
@@ -442,14 +587,14 @@ impl CppType {
         }
         return Ok(CppFfiType {
                     ffi_type: self.clone(),
-                    conversion: IndirectionChange::NoChange,
+                    conversion: CppIndirectionChange::NoChange,
                     original_type: self.clone(),
                   });
       }
       _ => {}
     }
     let mut result = self.clone();
-    let mut conversion = IndirectionChange::NoChange;
+    let mut conversion = CppIndirectionChange::NoChange;
     match self.indirection {
       CppTypeIndirection::None |
       CppTypeIndirection::Ptr |
@@ -458,11 +603,11 @@ impl CppType {
       }
       CppTypeIndirection::Ref => {
         result.indirection = CppTypeIndirection::Ptr;
-        conversion = IndirectionChange::ReferenceToPointer;
+        conversion = CppIndirectionChange::ReferenceToPointer;
       }
       CppTypeIndirection::PtrRef => {
         result.indirection = CppTypeIndirection::PtrPtr;
-        conversion = IndirectionChange::ReferenceToPointer;
+        conversion = CppIndirectionChange::ReferenceToPointer;
       }
       CppTypeIndirection::RValueRef => {
         return Err(Error::from("rvalue references are not supported")).chain_err(&err);
@@ -477,7 +622,7 @@ impl CppType {
                                          self)))
                      .chain_err(&err);
         }
-        conversion = IndirectionChange::QFlagsToUInt;
+        conversion = CppIndirectionChange::QFlagsToUInt;
         result.base = CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::UInt);
         result.is_const = false;
         result.indirection = CppTypeIndirection::None;
@@ -485,7 +630,7 @@ impl CppType {
         // structs can't be passed by value
         if self.indirection == CppTypeIndirection::None {
           result.indirection = CppTypeIndirection::Ptr;
-          conversion = IndirectionChange::ValueToPointer;
+          conversion = CppIndirectionChange::ValueToPointer;
 
           // "const Rect" return type should not be translated to const pointer
           result.is_const = role != CppTypeRole::ReturnType;

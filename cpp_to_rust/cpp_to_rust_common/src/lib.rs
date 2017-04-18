@@ -30,10 +30,16 @@ pub mod cpp_build_config;
 pub mod cpp_lib_builder;
 pub mod target;
 
-pub use serializable::BuildScriptData;
-
-
-mod serializable;
+/// This type contains data serialized by the generator and placed to the
+/// generated crate's directory. The build script reads and uses this value.
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct BuildScriptData {
+  /// Information required to build the C++ wrapper library
+  pub cpp_build_config: cpp_build_config::CppBuildConfig,
+  /// Name of C++ wrapper library
+  pub cpp_wrapper_lib_name: String,
+}
 
 #[cfg(test)]
 mod tests;

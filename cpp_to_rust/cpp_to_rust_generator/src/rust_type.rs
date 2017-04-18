@@ -1,9 +1,74 @@
 use common::errors::{Result, unexpected, ChainErr};
 use common::string_utils::CaseOperations;
 use common::utils::MapIfOk;
+use cpp_type::CppType;
+use cpp_ffi_data::CppIndirectionChange;
 
-pub use serializable::{RustName, RustTypeIndirection, RustType, CompleteType,
-                       RustToCTypeConversion};
+/// Rust identifier. Represented by
+/// a vector of name parts. For a regular name,
+/// first part is name of the crate,
+/// last part is own name of the entity,
+/// and intermediate names are module names.
+/// Built-in types are represented
+/// by a single vector item, like `vec!["i32"]`.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize)]
+pub struct RustName {
+  /// Parts of the name
+  pub parts: Vec<String>,
+}
+
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize)]
+#[allow(dead_code)]
+pub enum RustToCTypeConversion {
+  None,
+  RefToPtr,
+  OptionRefToPtr,
+  ValueToPtr,
+  CppBoxToPtr,
+  QFlagsToUInt,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize)]
+pub struct CompleteType {
+  pub cpp_type: CppType,
+  pub cpp_ffi_type: CppType,
+  pub cpp_to_ffi_conversion: CppIndirectionChange,
+  pub rust_ffi_type: RustType,
+  pub rust_api_type: RustType,
+  pub rust_api_to_c_conversion: RustToCTypeConversion,
+}
+
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize)]
+pub enum RustTypeIndirection {
+  None,
+  Ptr,
+  Ref { lifetime: Option<String> },
+  PtrPtr,
+  PtrRef { lifetime: Option<String> },
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize)]
+pub enum RustType {
+  Void,
+  Common {
+    base: RustName,
+    generic_arguments: Option<Vec<RustType>>,
+    is_const: bool,
+    is_const2: bool,
+    indirection: RustTypeIndirection,
+  },
+  FunctionPointer {
+    return_type: Box<RustType>,
+    arguments: Vec<RustType>,
+  },
+}
 
 
 impl RustName {

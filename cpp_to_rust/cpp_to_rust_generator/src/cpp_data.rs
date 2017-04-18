@@ -14,13 +14,210 @@ use std::iter::once;
 use std::io::{BufRead, BufReader};
 use common::string_utils::JoinWithSeparator;
 
-pub use serializable::{CppEnumValue, CppClassField, CppTypeKind, CppOriginLocation, CppVisibility,
-                       CppTypeData, CppTypeDoc, CppData, CppTemplateInstantiation,
-                       CppTemplateInstantiations, CppClassUsingDirective, CppBaseSpecifier,
-                       TemplateArgumentsDeclaration, CppFunctionPointerType,
-                       CppTypeAllocationPlace};
-
 use regex::Regex;
+
+/// One item of a C++ enum declaration
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct CppEnumValue {
+  /// Identifier
+  pub name: String,
+  /// Corresponding value
+  pub value: i64,
+  /// C++ documentation for this item in HTML
+  pub doc: Option<String>,
+}
+
+/// Member field of a C++ class declaration
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppClassField {
+  /// Identifier
+  pub name: String,
+  /// Field type
+  pub field_type: CppType,
+  /// Visibility
+  pub visibility: CppVisibility,
+  /// Size of type in bytes
+  pub size: Option<i32>,
+}
+
+/// A "using" directive inside a class definition,
+/// indicating that the class should inherite a
+/// certain method of a base class.
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppClassUsingDirective {
+  /// Name of the base class
+  pub class_name: String,
+  /// Name of the method
+  pub method_name: String,
+}
+
+/// Item of base class list in a class declaration
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppBaseSpecifier {
+  /// Base class type (can include template arguments)
+  pub base_type: CppType,
+  /// True if this base is virtual
+  pub is_virtual: bool,
+  /// Base visibility (public, protected or private)
+  pub visibility: CppVisibility,
+}
+
+
+/// Information about a C++ type declaration
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub enum CppTypeKind {
+  /// Enum declaration
+  Enum {
+    /// List of items
+    values: Vec<CppEnumValue>,
+  },
+  /// Class declaration
+  Class {
+    /// List of class types this class is derived from
+    bases: Vec<CppBaseSpecifier>,
+    /// List of class fields
+    fields: Vec<CppClassField>,
+    /// Information about template arguments of this type.
+    template_arguments: Option<TemplateArgumentsDeclaration>,
+    /// List of using directives, like "using BaseClass::method1;"
+    using_directives: Vec<CppClassUsingDirective>,
+  },
+}
+
+/// Location of a C++ type's definition in header files.
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppOriginLocation {
+  // Full path to the include file
+  pub include_file_path: String,
+  /// Line of the file
+  pub line: u32,
+  /// Column of the file
+  pub column: u32,
+}
+
+/// Visibility of a C++ entity. Defaults to `Public`
+/// for entities that can't have visibility (like free functions)
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub enum CppVisibility {
+  Public,
+  Protected,
+  Private,
+}
+
+/// C++ documentation for a type
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct CppTypeDoc {
+  /// HTML content
+  pub html: String,
+  /// Absolute URL to online documentation page for this type
+  pub url: String,
+  /// Absolute documentation URLs encountered in the content
+  pub cross_references: Vec<String>,
+}
+
+/// Information about a C++ type declaration
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct CppTypeData {
+  /// Identifier, including namespaces and nested classes
+  /// (separated with "::", like in C++)
+  pub name: String,
+  /// File name of the include file (without full path)
+  pub include_file: String,
+  /// Exact location of the declaration
+  pub origin_location: CppOriginLocation,
+  /// Type information
+  pub kind: CppTypeKind,
+  /// C++ documentation data for this type
+  pub doc: Option<CppTypeDoc>,
+}
+
+/// Information about template arguments of a C++ class type
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct TemplateArgumentsDeclaration {
+  /// Indicates how many template types this type is nested into.
+  ///
+  /// In the following example class `A`
+  /// has level 0, and class `B` has level 1.
+  ///
+  /// ```C++
+  /// template<class T>
+  /// class A {
+  ///   template<class T2>
+  ///   class B {};
+  /// };
+  /// ```
+  pub nested_level: i32,
+  /// Names of template arguments. Names themselves are
+  /// not particularly important, but their count is.
+  pub names: Vec<String>,
+}
+
+/// Information about a C++ template class
+/// instantiation.
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(Serialize, Deserialize)]
+pub struct CppTemplateInstantiation {
+  /// List of template arguments used in this instantiation
+  pub template_arguments: Vec<CppType>,
+}
+
+/// List of template instantiations of
+/// a template class.
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(Serialize, Deserialize)]
+pub struct CppTemplateInstantiations {
+  /// Template class name
+  pub class_name: String,
+  /// List of encountered instantiations
+  pub instantiations: Vec<CppTemplateInstantiation>,
+}
+
+/// Type allocation place of a C++ type.
+///
+/// The generator chooses type allocation place for each C++ type based on the library's API.
+/// This value can be overriden using `Config::set_type_allocation_place`.
+///
+/// See `cpp_to_rust_generator`'s `README.md` for detailed description.
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub enum CppTypeAllocationPlace {
+  /// Values are stored on C++ heap and used as `CppBox<T>`.
+  Heap,
+  /// Values are stored on Rust stack and used as `T`.
+  Stack,
+}
+
+/// C++ parser output
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(Serialize, Deserialize)]
+pub struct CppData {
+  /// List of found type declarations
+  pub types: Vec<CppTypeData>,
+  /// List of found methods
+  pub methods: Vec<CppMethod>,
+  /// List of found template instantiations. Key is name of
+  /// the template class, value is list of instantiations.
+  pub template_instantiations: Vec<CppTemplateInstantiations>,
+  /// List of all argument types used by signals,
+  /// including variations with omitted arguments,
+  /// but excluding argument types from dependencies.
+  pub signal_argument_types: Vec<Vec<CppType>>,
+
+  pub type_allocation_places: HashMap<String, CppTypeAllocationPlace>,
+  /// Data of dependencies
+  pub dependencies: Vec<CppData>,
+}
+
 
 /// Convenience function to create `CppMethod` object for
 /// `static_cast` or `dynamic_cast` from type `from` to type `to`.

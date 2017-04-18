@@ -1,6 +1,114 @@
 //! Types for expressing properties of different target platforms and platform-based conditions
 
-pub use serializable::{Arch, OS, Family, Env, PointerWidth, Endian, Target, Condition};
+/// CPU architecture, as reported by `target_arch`.
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Deserialize)]
+pub enum Arch {
+  X86,
+  X86_64,
+  Mips,
+  PowerPC,
+  PowerPC64,
+  Arm,
+  AArch64,
+}
+
+/// Operating system, as reported by `target_os`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Deserialize)]
+pub enum OS {
+  Windows,
+  MacOS,
+  IOS,
+  Linux,
+  Android,
+  FreeBSD,
+  DragonFly,
+  Bitrig,
+  OpenBSD,
+  NetBSD,
+}
+
+/// Operating system family, as reported by `target_family`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Deserialize)]
+pub enum Family {
+  Windows,
+  Unix,
+}
+
+/// Further disambiguates the target platform with information about the ABI/libc,
+/// as reported by `target_env`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Deserialize)]
+pub enum Env {
+  Gnu,
+  Msvc,
+  Musl,
+  None,
+}
+
+/// Pointer width in bits,
+/// as reported by `target_pointer_width`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Deserialize)]
+pub enum PointerWidth {
+  P64,
+  P32,
+}
+
+/// CPU endianness, as reported by `target_endian`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Deserialize)]
+pub enum Endian {
+  Little,
+  Big,
+}
+
+/// Combined information about a target, as reported by configuration
+/// values of the Rust compiler.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize)]
+pub struct Target {
+  /// CPU architecture
+  pub arch: Arch,
+  /// Operating system
+  pub os: OS,
+  /// Operating system family
+  pub family: Family,
+  /// Further disambiguates the target platform with information about the ABI/libc,
+  pub env: Env,
+  /// Pointer width in bits,
+  pub pointer_width: PointerWidth,
+  /// Endianness of the target CPU
+  pub endian: Endian,
+}
+
+/// Condition on properties of the target. Simple conditions
+/// are considered true if the property of the current platform
+/// is the same as the associated value of the enum. For
+/// example, `Condition::OS(OS::Windows)` will be true on Windows
+/// and false otherwise. `And`, `Or` and `Not` variants provide
+/// logical operations on nested conditions. `True` and `False`
+/// variants provide conditions which are always true and false,
+/// respectively.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize)]
+pub enum Condition {
+  Arch(Arch),
+  OS(OS),
+  Family(Family),
+  Env(Env),
+  PointerWidth(PointerWidth),
+  // Vendor(Vendor),
+  Endian(Endian),
+  And(Vec<Condition>),
+  Or(Vec<Condition>),
+  Not(Box<Condition>),
+  True,
+  False,
+}
 
 #[cfg(target_arch = "x86")]
 /// Returns current CPU architecture

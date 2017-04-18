@@ -1,11 +1,11 @@
 use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, CppEnumValue, CppOriginLocation,
                CppVisibility, CppTemplateInstantiation, CppTemplateInstantiations,
-               CppClassUsingDirective, CppBaseSpecifier, TemplateArgumentsDeclaration,
-               CppFunctionPointerType};
+               CppClassUsingDirective, CppBaseSpecifier, TemplateArgumentsDeclaration};
 use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind, CppMethodClassMembership};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
-               CppSpecificNumericTypeKind, CppTypeClassBase, CppSpecificNumericType};
+               CppSpecificNumericTypeKind, CppTypeClassBase, CppSpecificNumericType,
+               CppFunctionPointerType};
 use common::errors::{Result, ChainErr, unexpected};
 use common::file_utils::{remove_file, open_file, create_file, path_to_str, os_str_to_str};
 use common::string_utils::JoinWithSeparator;

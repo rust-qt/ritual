@@ -2,7 +2,7 @@ use cpp_method::*;
 use cpp_data::CppVisibility;
 use cpp_type::*;
 use cpp_ffi_data::CppFfiArgumentMeaning;
-use cpp_ffi_data::IndirectionChange;
+use cpp_ffi_data::CppIndirectionChange;
 
 #[test]
 fn cpp_method_kind() {
@@ -297,10 +297,10 @@ fn c_signature_simple_func() {
   assert_eq!(r.arguments[0].argument_type.ffi_type,
              method1.arguments[0].argument_type);
   assert_eq!(r.arguments[0].argument_type.conversion,
-             IndirectionChange::NoChange);
+             CppIndirectionChange::NoChange);
   assert_eq!(r.arguments[0].meaning, CppFfiArgumentMeaning::Argument(0));
   assert_eq!(r.return_type.ffi_type, method1.return_type);
-  assert_eq!(r.return_type.conversion, IndirectionChange::NoChange);
+  assert_eq!(r.return_type.conversion, CppIndirectionChange::NoChange);
 }
 
 #[test]
@@ -349,7 +349,7 @@ fn c_signature_method_with_this() {
   assert_eq!(r.arguments[0].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r.arguments[0].argument_type.conversion,
-             IndirectionChange::NoChange);
+             CppIndirectionChange::NoChange);
   assert_eq!(r.arguments[0].meaning, CppFfiArgumentMeaning::This);
 
   assert_eq!(r.arguments[1].name, "my_arg");
@@ -358,7 +358,7 @@ fn c_signature_method_with_this() {
   assert_eq!(r.arguments[1].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r.arguments[1].argument_type.conversion,
-             IndirectionChange::ValueToPointer);
+             CppIndirectionChange::ValueToPointer);
   assert_eq!(r.arguments[1].meaning, CppFfiArgumentMeaning::Argument(0));
   assert_eq!(r.return_type.ffi_type, method1.return_type);
 }
@@ -397,7 +397,7 @@ fn c_signature_static_method() {
   assert_eq!(r.arguments[0].argument_type.ffi_type,
              method1.arguments[0].argument_type);
   assert_eq!(r.arguments[0].argument_type.conversion,
-             IndirectionChange::NoChange);
+             CppIndirectionChange::NoChange);
   assert_eq!(r.arguments[0].meaning, CppFfiArgumentMeaning::Argument(0));
   assert_eq!(r.return_type.ffi_type, method1.return_type);
 }
@@ -442,7 +442,7 @@ fn c_signature_constructor() {
                base: CppTypeBase::Enum { name: "Enum1".to_string() },
              });
   assert_eq!(r_stack.arguments[0].argument_type.conversion,
-             IndirectionChange::ReferenceToPointer);
+             CppIndirectionChange::ReferenceToPointer);
   assert_eq!(r_stack.arguments[0].meaning,
              CppFfiArgumentMeaning::Argument(0));
 
@@ -458,7 +458,7 @@ fn c_signature_constructor() {
                                         }),
              });
   assert_eq!(r_stack.arguments[1].argument_type.conversion,
-             IndirectionChange::ValueToPointer);
+             CppIndirectionChange::ValueToPointer);
   assert_eq!(r_stack.arguments[1].meaning,
              CppFfiArgumentMeaning::ReturnValue);
 
@@ -477,7 +477,7 @@ fn c_signature_constructor() {
                base: CppTypeBase::Enum { name: "Enum1".to_string() },
              });
   assert_eq!(r_heap.arguments[0].argument_type.conversion,
-             IndirectionChange::ReferenceToPointer);
+             CppIndirectionChange::ReferenceToPointer);
   assert_eq!(r_heap.arguments[0].meaning,
              CppFfiArgumentMeaning::Argument(0));
   assert_eq!(r_heap.return_type.ffi_type,
@@ -491,7 +491,7 @@ fn c_signature_constructor() {
                                         }),
              });
   assert_eq!(r_heap.return_type.conversion,
-             IndirectionChange::ValueToPointer);
+             CppIndirectionChange::ValueToPointer);
 }
 
 #[test]
@@ -523,7 +523,7 @@ fn c_signature_destructor() {
   assert_eq!(r_stack.arguments[0].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r_stack.arguments[0].argument_type.conversion,
-             IndirectionChange::NoChange);
+             CppIndirectionChange::NoChange);
   assert_eq!(r_stack.arguments[0].meaning, CppFfiArgumentMeaning::This);
 
   assert!(r_stack.return_type.ffi_type.is_void());
@@ -543,7 +543,7 @@ fn c_signature_destructor() {
   assert_eq!(r_heap.arguments[0].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r_heap.arguments[0].argument_type.conversion,
-             IndirectionChange::NoChange);
+             CppIndirectionChange::NoChange);
   assert_eq!(r_heap.arguments[0].meaning, CppFfiArgumentMeaning::This);
 
   assert!(r_heap.return_type.ffi_type.is_void());
@@ -592,7 +592,7 @@ fn c_signature_method_returning_class() {
   assert_eq!(r_stack.arguments[0].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r_stack.arguments[0].argument_type.conversion,
-             IndirectionChange::NoChange);
+             CppIndirectionChange::NoChange);
   assert_eq!(r_stack.arguments[0].meaning, CppFfiArgumentMeaning::This);
 
   assert_eq!(r_stack.arguments[1].name, "my_arg");
@@ -601,7 +601,7 @@ fn c_signature_method_returning_class() {
   assert_eq!(r_stack.arguments[1].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r_stack.arguments[1].argument_type.conversion,
-             IndirectionChange::ValueToPointer);
+             CppIndirectionChange::ValueToPointer);
   assert_eq!(r_stack.arguments[1].meaning,
              CppFfiArgumentMeaning::Argument(0));
 
@@ -617,7 +617,7 @@ fn c_signature_method_returning_class() {
                                         }),
              });
   assert_eq!(r_stack.arguments[2].argument_type.conversion,
-             IndirectionChange::ValueToPointer);
+             CppIndirectionChange::ValueToPointer);
   assert_eq!(r_stack.arguments[2].meaning,
              CppFfiArgumentMeaning::ReturnValue);
 
@@ -638,7 +638,7 @@ fn c_signature_method_returning_class() {
   assert_eq!(r_heap.arguments[0].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r_heap.arguments[0].argument_type.conversion,
-             IndirectionChange::NoChange);
+             CppIndirectionChange::NoChange);
   assert_eq!(r_heap.arguments[0].meaning, CppFfiArgumentMeaning::This);
 
   assert_eq!(r_heap.arguments[1].name, "my_arg");
@@ -647,7 +647,7 @@ fn c_signature_method_returning_class() {
   assert_eq!(r_heap.arguments[1].argument_type.ffi_type.indirection,
              CppTypeIndirection::Ptr);
   assert_eq!(r_heap.arguments[1].argument_type.conversion,
-             IndirectionChange::ValueToPointer);
+             CppIndirectionChange::ValueToPointer);
   assert_eq!(r_heap.arguments[1].meaning,
              CppFfiArgumentMeaning::Argument(0));
 
@@ -662,7 +662,7 @@ fn c_signature_method_returning_class() {
                                         }),
              });
   assert_eq!(r_heap.return_type.conversion,
-             IndirectionChange::ValueToPointer);
+             CppIndirectionChange::ValueToPointer);
 }
 
 #[test]

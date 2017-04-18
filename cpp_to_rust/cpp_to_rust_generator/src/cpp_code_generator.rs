@@ -1,4 +1,4 @@
-use cpp_ffi_data::{QtSlotWrapper, IndirectionChange, CppAndFfiMethod, CppFfiArgumentMeaning,
+use cpp_ffi_data::{QtSlotWrapper, CppIndirectionChange, CppAndFfiMethod, CppFfiArgumentMeaning,
                    CppFfiHeaderData, CppFfiType};
 use cpp_method::{ReturnValueAllocationPlace, CppFieldAccessorType, FakeCppMethod};
 use cpp_type::{CppTypeIndirection, CppTypeBase, CppType};
@@ -95,14 +95,14 @@ impl CppCodeGenerator {
   /// converts it to type `type1.ffi_type`
   fn convert_type_to_ffi(&self, type1: &CppFfiType, expression: String) -> Result<String> {
     Ok(match type1.conversion {
-         IndirectionChange::NoChange => expression,
-         IndirectionChange::ValueToPointer => {
+         CppIndirectionChange::NoChange => expression,
+         CppIndirectionChange::ValueToPointer => {
            format!("new {}({})",
                    type1.original_type.base.to_cpp_code(None)?,
                    expression)
          }
-         IndirectionChange::ReferenceToPointer => format!("&{}", expression),
-         IndirectionChange::QFlagsToUInt => format!("uint({})", expression),
+         CppIndirectionChange::ReferenceToPointer => format!("&{}", expression),
+         CppIndirectionChange::QFlagsToUInt => format!("uint({})", expression),
        })
   }
 
@@ -111,8 +111,8 @@ impl CppCodeGenerator {
   fn convert_return_type(&self, method: &CppAndFfiMethod, expression: String) -> Result<String> {
     let mut result = expression;
     match method.c_signature.return_type.conversion {
-      IndirectionChange::NoChange => {}
-      IndirectionChange::ValueToPointer => {
+      CppIndirectionChange::NoChange => {}
+      CppIndirectionChange::ValueToPointer => {
         match method.allocation_place {
           ReturnValueAllocationPlace::Stack => {
             return Err(unexpected("stack allocated wrappers are expected to return void").into());
@@ -132,10 +132,10 @@ impl CppCodeGenerator {
           }
         }
       }
-      IndirectionChange::ReferenceToPointer => {
+      CppIndirectionChange::ReferenceToPointer => {
         result = format!("&{}", result);
       }
-      IndirectionChange::QFlagsToUInt => {
+      CppIndirectionChange::QFlagsToUInt => {
         result = format!("uint({})", result);
       }
     }
@@ -167,10 +167,10 @@ impl CppCodeGenerator {
            .find(|x| x.meaning == CppFfiArgumentMeaning::Argument(i as i8)) {
         let mut result = c_argument.name.clone();
         match c_argument.argument_type.conversion {
-          IndirectionChange::ValueToPointer |
-          IndirectionChange::ReferenceToPointer => result = format!("*{}", result),
-          IndirectionChange::NoChange => {}
-          IndirectionChange::QFlagsToUInt => {
+          CppIndirectionChange::ValueToPointer |
+          CppIndirectionChange::ReferenceToPointer => result = format!("*{}", result),
+          CppIndirectionChange::NoChange => {}
+          CppIndirectionChange::QFlagsToUInt => {
             let type_text = if cpp_argument.argument_type.indirection == CppTypeIndirection::Ref &&
                                cpp_argument.argument_type.is_const {
               let mut fake_type = cpp_argument.argument_type.clone();

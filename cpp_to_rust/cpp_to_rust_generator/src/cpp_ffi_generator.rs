@@ -1,7 +1,7 @@
 use caption_strategy::{TypeCaptionStrategy, MethodCaptionStrategy};
-use cpp_data::{CppData, CppVisibility, CppFunctionPointerType, create_cast_method,
+use cpp_data::{CppData, CppVisibility, create_cast_method,
                CppTypeAllocationPlace};
-use cpp_type::{CppTypeRole, CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
+use cpp_type::{CppTypeRole, CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase, CppFunctionPointerType};
 use cpp_ffi_data::{CppAndFfiMethod, c_base_name, CppFfiHeaderData, QtSlotWrapper};
 use cpp_method::{CppMethod, CppMethodKind, CppFunctionArgument, CppMethodClassMembership};
 use common::errors::{Result, ChainErr, unexpected};

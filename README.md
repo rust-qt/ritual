@@ -99,7 +99,7 @@ Windows MinGW toolchain is partially supported.
   
 ## Dependencies
 
-All crates require stable Rust ≥ 1.12 and some dependencies delivered by `cargo` automatically.  
+All crates require stable Rust ≥ 1.15 and some dependencies delivered by `cargo` automatically.  
 
 The generator additionally requires:
 

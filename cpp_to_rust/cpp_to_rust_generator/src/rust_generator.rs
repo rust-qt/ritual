@@ -1,11 +1,12 @@
 use caption_strategy::TypeCaptionStrategy;
-use cpp_data::{CppTypeKind, CppEnumValue, CppFunctionPointerType, CppTypeAllocationPlace};
-use cpp_ffi_data::{CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiType, IndirectionChange,
+use cpp_data::{CppTypeKind, CppEnumValue, CppTypeAllocationPlace};
+use cpp_ffi_data::{CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiType, CppIndirectionChange,
                    CppAndFfiData};
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
-               CppSpecificNumericTypeKind, CppSpecificNumericType, CppTypeClassBase, CppTypeRole};
+               CppSpecificNumericTypeKind, CppSpecificNumericType, CppTypeClassBase, CppTypeRole,
+               CppFunctionPointerType};
 use common::errors::{Result, ChainErr, unexpected};
 use common::log;
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
@@ -688,14 +689,14 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
            ref mut is_const2,
          } = rust_api_type {
     match cpp_ffi_type.conversion {
-      IndirectionChange::NoChange => {
+      CppIndirectionChange::NoChange => {
         if argument_meaning == &CppFfiArgumentMeaning::This {
           assert!(indirection == &RustTypeIndirection::Ptr);
           *indirection = RustTypeIndirection::Ref { lifetime: None };
           rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
         }
       }
-      IndirectionChange::ValueToPointer => {
+      CppIndirectionChange::ValueToPointer => {
         assert!(indirection == &RustTypeIndirection::Ptr);
         if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
           if let Some(info) = find_type_info(processed_types,
@@ -754,7 +755,7 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
           *is_const2 = true;
         }
       }
-      IndirectionChange::ReferenceToPointer => {
+      CppIndirectionChange::ReferenceToPointer => {
         match *indirection {
           RustTypeIndirection::Ptr => {
             *indirection = RustTypeIndirection::Ref { lifetime: None };
@@ -766,10 +767,10 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
         }
         rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
       }
-      IndirectionChange::QFlagsToUInt => {}
+      CppIndirectionChange::QFlagsToUInt => {}
     }
   }
-  if cpp_ffi_type.conversion == IndirectionChange::QFlagsToUInt {
+  if cpp_ffi_type.conversion == CppIndirectionChange::QFlagsToUInt {
     rust_api_to_c_conversion = RustToCTypeConversion::QFlagsToUInt;
     let enum_type = if let CppTypeBase::Class(CppTypeClassBase {
                                                 ref template_arguments, ..

@@ -1,17 +1,188 @@
 //! Types for handling information about C++ methods.
 
 
-use cpp_data::{CppVisibility, CppTypeAllocationPlace, CppData};
+use cpp_data::{CppVisibility, CppTypeAllocationPlace, CppData, CppOriginLocation,
+               TemplateArgumentsDeclaration, CppBaseSpecifier};
 use cpp_ffi_data::{CppMethodWithFfiSignature, CppFfiType, CppFfiFunctionSignature,
                    CppFfiFunctionArgument, CppFfiArgumentMeaning};
 use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase, CppTypeClassBase};
 use common::errors::{Result, unexpected};
 use common::string_utils::JoinWithSeparator;
 use common::utils::MapIfOk;
-pub use serializable::{CppFunctionArgument, CppMethodKind, CppMethod, CppMethodClassMembership,
-                       CppFieldAccessorType, FakeCppMethod, CppMethodDoc};
 
 pub use cpp_operator::{CppOperator, CppOperatorInfo};
+
+/// Information about an argument of a C++ method
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppFunctionArgument {
+  /// Identifier. If the argument doesn't have a name
+  /// (which is allowed in C++), this field contains
+  /// generated name "argX" (X is position of the argument).
+  pub name: String,
+  /// Argument type
+  pub argument_type: CppType,
+  /// Flag indicating that the argument has default value and
+  /// therefore can be omitted when calling the method
+  pub has_default_value: bool,
+}
+
+/// Enumerator indicating special cases of C++ methods.
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub enum CppMethodKind {
+  /// Just a class method
+  Regular,
+  /// Constructor
+  Constructor,
+  /// Destructor
+  Destructor,
+}
+
+/// Variation of a field accessor method
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub enum CppFieldAccessorType {
+  /// Returns copy of the field
+  CopyGetter,
+  /// Returns const reference to the field
+  ConstRefGetter,
+  /// Returns mutable reference to the field
+  MutRefGetter,
+  /// Copies value from its argument to the field
+  Setter,
+}
+
+/// Information about automatically generated method
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub enum FakeCppMethod {
+  /// Method for accessing a public field of a class
+  FieldAccessor {
+    accessor_type: CppFieldAccessorType,
+    field_name: String,
+  },
+}
+
+
+/// for accessing a public field of a class
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppFieldAccessor {
+  /// Type of the accessor
+  pub accessor_type: CppFieldAccessorType,
+  /// Name of the C++ field
+  pub field_name: String,
+}
+
+/// Information about a C++ class member method
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppMethodClassMembership {
+  /// Type of the class where this method belong. This is used to construct
+  /// type of "this" pointer and return type of constructors.
+  pub class_type: CppTypeClassBase,
+  /// Whether this method is a constructor, a destructor or an operator
+  pub kind: CppMethodKind,
+  /// True if this is a virtual method
+  pub is_virtual: bool,
+  /// True if this is a pure virtual method (requires is_virtual = true)
+  pub is_pure_virtual: bool,
+  /// True if this is a const method, i.e. "this" pointer receives by
+  /// this method has const type
+  pub is_const: bool,
+  /// True if this is a static method, i.e. it doesn't receive "this" pointer at all.
+  pub is_static: bool,
+  /// Method visibility
+  pub visibility: CppVisibility,
+  /// True if the method is a Qt signal
+  pub is_signal: bool,
+  /// True if the method is a Qt slot
+  pub is_slot: bool,
+  /// If this method is a generated field accessor, this field contains
+  /// information about it. Field accessors do not have real C++ methods corresponding to them.
+  pub fake: Option<FakeCppMethod>,
+}
+
+/// C++ documentation for a method
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppMethodDoc {
+  /// HTML anchor of this documentation entry
+  /// (used to detect duplicates)
+  pub anchor: String,
+  /// HTML content
+  pub html: String,
+  /// If the documentation parser couldn't find documentation for the exact same
+  /// method, it can still provide documentation entry for the closest match.
+  /// In this case, this field should contain C++ declaration of the found method.
+  pub mismatched_declaration: Option<String>,
+  /// Absolute URL to online documentation page for this method
+  pub url: String,
+  /// Absolute documentation URLs encountered in the content
+  pub cross_references: Vec<String>,
+}
+
+/// Information about a C++ method
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub struct CppMethod {
+  /// Identifier. For class methods, this field includes
+  /// only the method's own name. For free functions,
+  /// this field also includes namespaces (if any).
+  pub name: String,
+  /// Additional information about a class member function
+  /// or None for free functions
+  pub class_membership: Option<CppMethodClassMembership>,
+  /// If the method is a C++ operator, indicates its kind
+  pub operator: Option<CppOperator>,
+  /// Return type of the method.
+  /// Return type is reported as void for constructors and destructors.
+  pub return_type: CppType,
+  /// List of the method's arguments
+  pub arguments: Vec<CppFunctionArgument>,
+  /// If Some, the method is derived from another method by omitting arguments,
+  /// and this field contains all arguments of the original method.
+  pub arguments_before_omitting: Option<Vec<CppFunctionArgument>>,
+  /// Whether the argument list is terminated with "..."
+  pub allows_variadic_arguments: bool,
+  /// File name of the include file where the method is defined
+  /// (without full path)
+  pub include_file: String,
+  /// Exact location of declaration of the method.
+  /// Can be None if the method is generated automatically
+  /// and doesn't have corresponding C++ declaration.
+  pub origin_location: Option<CppOriginLocation>,
+  /// Names of the method's template arguments.
+  /// None if this is not a template method.
+  /// If the method belongs to a template class,
+  /// the class's template arguments are not included here.
+  pub template_arguments: Option<TemplateArgumentsDeclaration>,
+  /// For an instantiated template method, this field contains the types
+  /// used for instantiation. For example, `T QObject::findChild<T>()` would have
+  /// no `template_arguments_values` because it's not instantiated, and
+  /// `QWidget* QObject::findChild<QWidget*>()` would have `QWidget*` type in
+  /// `template_arguments_values`.
+  pub template_arguments_values: Option<Vec<CppType>>,
+  /// C++ code of the method's declaration.
+  /// None if the method was not explicitly declared.
+  pub declaration_code: Option<String>,
+  /// List of base classes this method was inferited from.
+  /// The first item is the most base class.
+  pub inheritance_chain: Vec<CppBaseSpecifier>, /* TODO: fill inheritance_chain for explicitly redeclared methods (#23) */
+  pub is_fake_inherited_method: bool,
+  /// C++ documentation data for this method
+  pub doc: Option<CppMethodDoc>,
+  /// If true, FFI generator skips some checks
+  pub is_ffi_whitelisted: bool,
+  // If true, this is an unsafe (from base to derived) static_cast wrapper.
+  pub is_unsafe_static_cast: bool,
+  pub is_direct_static_cast: bool,
+}
+
+
+
+
 
 /// Chosen type allocation place for the method
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

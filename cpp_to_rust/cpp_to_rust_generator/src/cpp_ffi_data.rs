@@ -1,12 +1,28 @@
 use caption_strategy::{ArgumentCaptionStrategy, MethodCaptionStrategy, TypeCaptionStrategy};
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
-use cpp_type::{CppType, CppTypeBase};
-use cpp_data::{CppFunctionPointerType, CppData};
+use cpp_type::{CppType, CppTypeBase, CppFunctionPointerType};
+use cpp_data::{CppData};
 use common::errors::Result;
 use common::utils::MapIfOk;
 
-pub use serializable::IndirectionChange;
+/// Relation between original C++ method's argument value
+/// and corresponding FFI function's argument value
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize)]
+pub enum CppIndirectionChange {
+  /// Argument types are identical
+  NoChange,
+  /// C++ argument is a class value (like QPoint)
+  /// and FFI argument is a pointer (like QPoint*)
+  ValueToPointer,
+  /// C++ argument is a reference (like QPoint&)
+  /// and FFI argument is a pointer (like QPoint*)
+  ReferenceToPointer,
+  /// C++ argument is QFlags<T>
+  /// and FFI argument is uint
+  QFlagsToUInt,
+}
 
 /// Information that indicates how an FFI function argument
 /// should be interpreted
@@ -152,7 +168,7 @@ pub struct CppFfiType {
   /// FFI function type
   pub ffi_type: CppType,
   /// Relation
-  pub conversion: IndirectionChange,
+  pub conversion: CppIndirectionChange,
 }
 
 impl CppFfiType {
@@ -161,7 +177,7 @@ impl CppFfiType {
     CppFfiType {
       original_type: CppType::void(),
       ffi_type: CppType::void(),
-      conversion: IndirectionChange::NoChange,
+      conversion: CppIndirectionChange::NoChange,
     }
   }
 }
