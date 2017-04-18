@@ -49,7 +49,7 @@ fn format_doc(doc: &str) -> String {
 
 pub fn rust_type_to_code(rust_type: &RustType, crate_name: &str) -> String {
   match *rust_type {
-    RustType::Void => "()".to_string(),
+    RustType::EmptyTuple => "()".to_string(),
     RustType::Common {
       ref base,
       ref is_const,
@@ -117,7 +117,7 @@ pub fn rust_type_to_code(rust_type: &RustType, crate_name: &str) -> String {
                 .map(|arg| rust_type_to_code(arg, crate_name))
                 .join(", "),
               match return_type.as_ref() {
-                &RustType::Void => String::new(),
+                &RustType::EmptyTuple => String::new(),
                 return_type => format!(" -> {}", rust_type_to_code(return_type, crate_name)),
               })
     }
@@ -349,7 +349,7 @@ impl<'a> RustCodeGenerator<'a> {
             func.name,
             args.join(", "),
             match func.return_type {
-              RustType::Void => String::new(),
+              RustType::EmptyTuple => String::new(),
               _ => format!(" -> {}", self.rust_type_to_code(&func.return_type)),
             })
   }
@@ -638,7 +638,7 @@ impl<'a> RustCodeGenerator<'a> {
     Ok(match func.arguments {
          RustMethodArguments::SingleVariant(ref variant) => {
       let body = self.generate_ffi_call(variant, &Vec::new(), func.is_unsafe)?;
-      let return_type_for_signature = if variant.return_type.rust_api_type == RustType::Void {
+      let return_type_for_signature = if variant.return_type.rust_api_type == RustType::EmptyTuple {
         String::new()
       } else {
         format!(" -> {}",

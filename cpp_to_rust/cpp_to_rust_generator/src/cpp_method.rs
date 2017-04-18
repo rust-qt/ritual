@@ -53,7 +53,7 @@ pub enum CppFieldAccessorType {
   Setter,
 }
 
-/// Information about automatically generated method
+/// Information about an automatically generated method
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub enum FakeCppMethod {
@@ -170,13 +170,17 @@ pub struct CppMethod {
   /// List of base classes this method was inferited from.
   /// The first item is the most base class.
   pub inheritance_chain: Vec<CppBaseSpecifier>, /* TODO: fill inheritance_chain for explicitly redeclared methods (#23) */
+  /// If true, this method was not declared in headers but
+  /// added in the generator's preprocessing step.
   pub is_fake_inherited_method: bool,
   /// C++ documentation data for this method
   pub doc: Option<CppMethodDoc>,
   /// If true, FFI generator skips some checks
   pub is_ffi_whitelisted: bool,
-  // If true, this is an unsafe (from base to derived) static_cast wrapper.
+  /// If true, this is an unsafe (from base to derived) `static_cast` wrapper.
   pub is_unsafe_static_cast: bool,
+  /// If true, this is a wrapper of `static_cast` between a class and its
+  /// direct base.
   pub is_direct_static_cast: bool,
 }
 

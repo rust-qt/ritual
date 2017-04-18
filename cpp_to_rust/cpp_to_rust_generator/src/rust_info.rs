@@ -35,13 +35,17 @@ pub struct CppEnumValueDocItem {
   pub doc: Option<String>,
 }
 
-
+/// Information about a Qt slot wrapper on Rust side
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[derive(Serialize, Deserialize)]
 pub struct RustQtSlotWrapper {
+  /// Argument types of the slot
   pub arguments: Vec<CompleteType>,
+  /// Identifier of the slot for `QObject::connect`
   pub receiver_id: String,
+  /// Name of the public Rust struct of this wrapper
   pub public_type_name: String,
+  /// Name of the extern callback function of this wrapper
   pub callback_name: String,
 }
 
@@ -69,6 +73,7 @@ pub enum RustTypeWrapperKind {
     /// True if `CppDeletable` trait is implemented
     /// for this type, i.e. if this C++ type has public destructor.
     is_deletable: bool,
+    /// Additional information for a Qt slot wrapper struct
     slot_wrapper: Option<RustQtSlotWrapper>,
   },
 }

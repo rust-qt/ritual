@@ -836,7 +836,7 @@ fn ffi_type(processed_types: &[RustProcessedTypeInfo],
   let rust_name = match cpp_ffi_type.base {
     CppTypeBase::Void => {
       match cpp_ffi_type.indirection {
-        CppTypeIndirection::None => return Ok(RustType::Void),
+        CppTypeIndirection::None => return Ok(RustType::EmptyTuple),
         _ => RustName::new(vec!["libc".to_string(), "c_void".to_string()])?,
       }
     }

@@ -147,11 +147,17 @@ pub struct CppType {
   pub base: CppTypeBase,
   /// Indirection applied to base type
   pub indirection: CppTypeIndirection,
-  /// If the type has const qualifier. Defaults to false
-  /// when not applicable.
+  /// If the type has no indirection, `is_const`
+  /// indicates constness of the type itself (e.g. `int` vs `const int`).
+  /// For types that cannot be `const`, `is_const` defaults to `false`.
+  /// If the type has one level of indirection, `is_const`
+  /// indicates constness of that indirection, i.e. if the pointer or the reference
+  /// is const. If the type has two levels of indirection,
+  /// `is_const` indicates constness of indirection that is applied first.
   pub is_const: bool,
-  /// If 2nd indirection part of the type is const, e.g.
-  /// true for "int* const*".
+  /// If the type has two levels of indirection,
+  /// `is_const2` indicates constness of indirection that is applied second.
+  /// In other cases it is `false`.
   pub is_const2: bool,
 }
 

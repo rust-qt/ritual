@@ -212,7 +212,8 @@ pub struct CppData {
   /// including variations with omitted arguments,
   /// but excluding argument types from dependencies.
   pub signal_argument_types: Vec<Vec<CppType>>,
-
+  /// List of selected (automatically or in configuration)
+  /// type allocation places for all class types.
   pub type_allocation_places: HashMap<String, CppTypeAllocationPlace>,
   /// Data of dependencies
   pub dependencies: Vec<CppData>,

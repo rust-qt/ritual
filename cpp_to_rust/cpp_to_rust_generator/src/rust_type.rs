@@ -18,47 +18,73 @@ pub struct RustName {
   pub parts: Vec<String>,
 }
 
-
+/// Conversion from public Rust API type to
+/// the corresponding FFI type
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[derive(Serialize, Deserialize)]
 #[allow(dead_code)]
 pub enum RustToCTypeConversion {
+  /// Types are the same
   None,
+  /// `&T` to `*const T` (or similar mutable types)
   RefToPtr,
+  /// `Option<&T>` to `*const T` (or similar mutable types)
   OptionRefToPtr,
+  /// `T` to `*const T` (or similar mutable type)
   ValueToPtr,
+  /// `CppBox<T>` to `*const T` (or similar mutable type)
   CppBoxToPtr,
+  /// `qt_core::flags::Flags<T>` to `libc::c_uint`
   QFlagsToUInt,
 }
 
+/// Information about a completely processed type
+/// including its variations at each processing step.
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[derive(Serialize, Deserialize)]
 pub struct CompleteType {
+  /// Original C++ type used in the C++ library's API
   pub cpp_type: CppType,
+  /// C++ type used in the C++ wrapper library's API
   pub cpp_ffi_type: CppType,
+  /// Conversion from `cpp_type` to `cpp_ffi_type`
   pub cpp_to_ffi_conversion: CppIndirectionChange,
+  /// Rust type used in FFI functions
+  /// (must be exactly the same as `cpp_ffi_type`)
   pub rust_ffi_type: RustType,
+  /// Type used in public Rust API
   pub rust_api_type: RustType,
+  /// Conversion from `rust_api_type` to `rust_ffi_type`
   pub rust_api_to_c_conversion: RustToCTypeConversion,
 }
 
-
+/// Indirection of a Rust type
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 #[derive(Serialize, Deserialize)]
 pub enum RustTypeIndirection {
+  /// No indirection
   None,
+  /// Raw pointer
   Ptr,
+  /// Reference with a lifetime
   Ref { lifetime: Option<String> },
+  /// Raw pointer to raw pointer
   PtrPtr,
+  /// Raw pointer to reference
   PtrRef { lifetime: Option<String> },
 }
 
+/// A Rust type
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 #[derive(Serialize, Deserialize)]
 pub enum RustType {
-  Void,
+  /// Empty tuple `()`, used as the replacement of C++'s `void` type.
+  EmptyTuple,
+  /// A numeric, enum or struct type with some indirection
   Common {
+    /// Full name of the base type
     base: RustName,
+    /// Generic arguments, if any
     generic_arguments: Option<Vec<RustType>>,
     is_const: bool,
     is_const2: bool,
@@ -184,7 +210,7 @@ impl RustType {
   #[allow(dead_code)]
   pub fn caption(&self, context: &RustName) -> Result<String> {
     Ok(match *self {
-         RustType::Void => "void".to_string(),
+         RustType::EmptyTuple => "void".to_string(),
          RustType::Common {
            ref base,
            ref generic_arguments,
@@ -262,7 +288,7 @@ impl RustType {
           _ => false,
         }
       }
-      RustType::Void |
+      RustType::EmptyTuple |
       RustType::FunctionPointer { .. } => false,
     }
   }
@@ -351,7 +377,7 @@ impl RustType {
         }
         false
       }
-      RustType::Void => false,
+      RustType::EmptyTuple => false,
       RustType::FunctionPointer { .. } => true,
     }
   }
