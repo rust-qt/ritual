@@ -1,3 +1,5 @@
+//! Interface for configuring and running the generator.
+
 use std::path::PathBuf;
 use common::errors::Result;
 use cpp_method::CppMethod;
@@ -247,7 +249,7 @@ pub struct Config {
   framework_paths: Vec<PathBuf>,
   target_include_paths: Vec<PathBuf>,
   include_directives: Vec<PathBuf>,
-  cpp_parser_flags: Vec<String>,
+  cpp_parser_arguments: Vec<String>,
   cpp_parser_blocked_names: Vec<String>,
   cpp_ffi_generator_filters: Vec<CppFfiGeneratorFilter>,
   cpp_data_filters: Vec<CppDataFilter>,
@@ -279,7 +281,7 @@ impl Config {
       framework_paths: Default::default(),
       target_include_paths: Default::default(),
       include_directives: Default::default(),
-      cpp_parser_flags: Default::default(),
+      cpp_parser_arguments: Default::default(),
       cpp_parser_blocked_names: Default::default(),
       cpp_ffi_generator_filters: Default::default(),
       cpp_data_filters: Default::default(),
@@ -355,18 +357,18 @@ impl Config {
   /// Note that this value is not used when building the wrapper library.
   /// Use `Config::cpp_build_config_mut` or a similar method to
   /// configure building the wrapper library.
-  pub fn add_cpp_parser_flag<P: Into<String>>(&mut self, lib: P) {
-    self.cpp_parser_flags.push(lib.into());
+  pub fn add_cpp_parser_argument<P: Into<String>>(&mut self, lib: P) {
+    self.cpp_parser_arguments.push(lib.into());
   }
 
   /// Adds multiple command line arguments for clang C++ parser.
-  /// See `Config::add_cpp_parser_flag`.
-  pub fn add_cpp_parser_flags<Item, Iter>(&mut self, items: Iter)
+  /// See `Config::add_cpp_parser_argument`.
+  pub fn add_cpp_parser_arguments<Item, Iter>(&mut self, items: Iter)
     where Item: Into<String>,
           Iter: IntoIterator<Item = Item>
   {
     for item in items {
-      self.cpp_parser_flags.push(item.into());
+      self.cpp_parser_arguments.push(item.into());
     }
   }
 
@@ -543,10 +545,10 @@ impl Config {
     &self.cpp_parser_blocked_names
   }
 
-  /// Returns names added with `Config::add_cpp_parser_flag`
+  /// Returns names added with `Config::add_cpp_parser_argument`
   /// and similar methods.
-  pub fn cpp_parser_flags(&self) -> &[String] {
-    &self.cpp_parser_flags
+  pub fn cpp_parser_arguments(&self) -> &[String] {
+    &self.cpp_parser_arguments
   }
 
 

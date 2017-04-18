@@ -87,9 +87,9 @@ fn full_run() {
       .add(target::Condition::Env(target::Env::Msvc).negate(), data);
   }
   if target::current_env() == target::Env::Msvc {
-    config.add_cpp_parser_flag("-std=c++14");
+    config.add_cpp_parser_argument("-std=c++14");
   } else {
-    config.add_cpp_parser_flag("-std=gnu++11");
+    config.add_cpp_parser_argument("-std=gnu++11");
   }
   config.set_crate_template_path(&crate_template_path);
   config.set_cache_usage(CacheUsage::None);

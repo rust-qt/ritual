@@ -25,7 +25,7 @@ pub struct RustCodeGeneratorConfig<'a> {
   pub crate_properties: CrateProperties,
   pub output_path: PathBuf,
   pub crate_template_path: Option<PathBuf>,
-  pub c_lib_name: String,
+  pub cpp_ffi_lib_name: String,
   pub generator_dependencies: &'a [DependencyInfo],
   pub write_dependencies_local_paths: bool,
 }

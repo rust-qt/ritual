@@ -118,7 +118,7 @@ fn exec(sublib_name: &str,
                                         fix_header_names(cpp_data,
                                                          &installation_data.lib_include_path)
                                       }));
-  config.add_cpp_parser_flags(vec!["-fPIC", "-fcxx-exceptions"]);
+  config.add_cpp_parser_arguments(vec!["-fPIC", "-fcxx-exceptions"]);
   {
     let mut data = CppBuildConfigData::new();
     data.add_compiler_flag("-std=gnu++11");
@@ -143,9 +143,9 @@ fn exec(sublib_name: &str,
   }
 
   if target::current_env() == target::Env::Msvc {
-    config.add_cpp_parser_flag("-std=c++14");
+    config.add_cpp_parser_argument("-std=c++14");
   } else {
-    config.add_cpp_parser_flag("-std=gnu++11");
+    config.add_cpp_parser_argument("-std=gnu++11");
   }
   config.add_cpp_parser_blocked_name("qt_check_for_QGADGET_macro");
   let sublib_name_clone = sublib_name.to_string();

@@ -1,4 +1,6 @@
-// #![forbid(unused_must_use)]
+//! Implementation of `cpp_to_rust` generator that
+//! analyzes a C++ library and produces a Rust crate for it.
+//! See `README.md` for more information.
 
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
@@ -27,7 +29,7 @@ pub mod cpp_data;
 mod cpp_ffi_data;
 pub mod cpp_method;
 pub mod cpp_type;
-pub mod cpp_operator;
+mod cpp_operator;
 mod doc_formatter;
 mod launcher;
 mod rust_generator;
@@ -40,5 +42,3 @@ mod versions;
 
 #[cfg(test)]
 mod tests;
-
-pub use launcher::is_completed;

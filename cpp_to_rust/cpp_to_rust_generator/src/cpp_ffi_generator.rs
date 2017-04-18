@@ -11,22 +11,24 @@ use config::CppFfiGeneratorFilterFn;
 use std::collections::{HashSet, HashMap};
 use std::iter::once;
 
-struct CGenerator<'a> {
+/// This object generates the C++ wrapper library
+struct CppFfiGenerator<'a> {
+  /// Input C++ data
   cpp_data: &'a CppData,
-  c_lib_name: String,
+  /// Name of the wrapper library
+  cpp_ffi_lib_name: String,
+  /// FFI filters passed to `Config`
   filters: Vec<&'a Box<CppFfiGeneratorFilterFn>>,
 }
 
-
-
-/// Runs FFI generator
+/// Runs the FFI generator
 pub fn run(cpp_data: &CppData,
-           c_lib_name: String,
+           cpp_ffi_lib_name: String,
            filters: Vec<&Box<CppFfiGeneratorFilterFn>>)
            -> Result<Vec<CppFfiHeaderData>> {
-  let generator = CGenerator {
+  let generator = CppFfiGenerator {
     cpp_data: cpp_data,
-    c_lib_name: c_lib_name,
+    cpp_ffi_lib_name: cpp_ffi_lib_name,
     filters: filters,
   };
 
@@ -71,7 +73,7 @@ pub fn run(cpp_data: &CppData,
   Ok(c_headers)
 }
 
-impl<'a> CGenerator<'a> {
+impl<'a> CppFfiGenerator<'a> {
   /// Returns false if the method is excluded from processing
   /// for some reason
   fn should_process_method(&self, method: &CppMethod) -> Result<bool> {
@@ -101,35 +103,24 @@ impl<'a> CGenerator<'a> {
         return Ok(false);
       }
       if membership.visibility == CppVisibility::Protected {
-        //        log::llog(log::DebugFfiSkips,
-        //                  || format!("Skipping protected method: \n{}\n", method.short_text()));
         return Ok(false);
       }
       if membership.is_signal {
-        //        log::llog(log::DebugFfiSkips,
-        //                  || format!("Skipping signal: \n{}\n", method.short_text()));
         return Ok(false);
       }
     }
     if method.template_arguments.is_some() {
-      //      log::llog(log::DebugFfiSkips,
-      //                || format!("Skipping template method: \n{}\n", method.short_text()));
       return Ok(false);
     }
     if method.template_arguments_values.is_some() && !method.is_ffi_whitelisted {
-      //      log::llog(log::DebugFfiSkips,
-      //                || format!("Skipping template method: \n{}\n", method.short_text()));
       // TODO: re-enable after template test compilation (#24) is implemented
+      // TODO: QObject::findChild and QObject::findChildren should be allowed
       return Ok(false);
     }
     if method
          .all_involved_types()
          .iter()
          .any(|x| x.base.is_or_contains_template_parameter()) {
-      //      log::llog(log::DebugFfiSkips, || {
-      //        format!("Skipping method containing template parameters: \n{}\n",
-      //                method.short_text())
-      //      });
       return Ok(false);
     }
     Ok(true)
@@ -148,9 +139,6 @@ impl<'a> CGenerator<'a> {
                         include_file_base_name));
     let mut hash_name_to_methods: HashMap<String, Vec<_>> = HashMap::new();
     for method in methods {
-      //      if method.name == "static_cast" {
-      //        println!("OK1!!! {:?}", method);
-      //      }
       if !self.should_process_method(method)? {
         continue;
       }
@@ -176,7 +164,7 @@ impl<'a> CGenerator<'a> {
             Ok(name) => {
 
               add_to_multihash(&mut hash_name_to_methods,
-                               format!("{}_{}", &self.c_lib_name, name),
+                               format!("{}_{}", &self.cpp_ffi_lib_name, name),
                                result);
             }
           }
@@ -230,6 +218,8 @@ impl<'a> CGenerator<'a> {
     Ok(processed_methods)
   }
 
+  /// Generates slot wrappers for all encountered argument types
+  /// (excluding types already handled in the dependencies).
   fn generate_slot_wrappers(&'a self) -> Result<Option<CppFfiHeaderData>> {
     let include_file_name = "slots";
     if self.cpp_data.signal_argument_types.is_empty() {
@@ -254,7 +244,7 @@ impl<'a> CGenerator<'a> {
       let func_arguments = once(void_ptr.clone())
         .chain(ffi_types.iter().map(|t| t.ffi_type.clone()))
         .collect();
-      let class_name = format!("{}_SlotWrapper_{}", self.c_lib_name, args_caption);
+      let class_name = format!("{}_SlotWrapper_{}", self.cpp_ffi_lib_name, args_caption);
       let function_type = CppFunctionPointerType {
         return_type: Box::new(CppType::void()),
         arguments: func_arguments,

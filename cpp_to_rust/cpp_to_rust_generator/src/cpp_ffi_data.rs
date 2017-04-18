@@ -8,7 +8,7 @@ use common::utils::MapIfOk;
 
 pub use serializable::IndirectionChange;
 
-/// Information that indicates how the FFI function argument
+/// Information that indicates how an FFI function argument
 /// should be interpreted
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CppFfiArgumentMeaning {
@@ -25,7 +25,7 @@ pub enum CppFfiArgumentMeaning {
 }
 
 impl CppFfiArgumentMeaning {
-  /// Checks if this argument coresponds to an original
+  /// Checks if this argument corresponds to an original
   /// C++ method's argument
   pub fn is_argument(&self) -> bool {
     match *self {
@@ -142,8 +142,6 @@ impl CppFfiFunctionSignature {
        })
   }
 }
-
-
 
 /// FFI function type with attached information about
 /// corresponding original C++ type and their relation
@@ -263,28 +261,42 @@ impl CppAndFfiMethod {
     }
   }
 
-  /// Convenience function to call CppMethod::short_text.
+  /// Convenience function to call `CppMethod::short_text`.
   pub fn short_text(&self) -> String {
     self.cpp_method.short_text()
   }
 }
 
+/// Information about a Qt slot wrapper with
+/// certain slot arguments
 #[derive(Debug, Clone)]
 pub struct QtSlotWrapper {
+  /// Generated name of the wrapper class
   pub class_name: String,
+  /// Arguments of the slot.
   pub arguments: Vec<CppFfiType>,
+  /// The function pointer type accepted by this wrapper
   pub function_type: CppFunctionPointerType,
+  /// String identifier passed to `QObject::connect` function to
+  /// specify the object's slot.
   pub receiver_id: String,
 }
 
+/// Information about a header of the generated C++ wrapper library
 #[derive(Debug, Clone)]
 pub struct CppFfiHeaderData {
+  /// Name of the original include file without extension
   pub include_file_base_name: String,
+  /// Processed methods
   pub methods: Vec<CppAndFfiMethod>,
+  /// Generated Qt slot wrappers
   pub qt_slot_wrappers: Vec<QtSlotWrapper>,
 }
 
+/// Information about the generated C++ wrapper library
 pub struct CppAndFfiData {
+  /// Processed C++ data
   pub cpp_data: CppData,
+  /// Generated headers
   pub cpp_ffi_headers: Vec<CppFfiHeaderData>,
 }

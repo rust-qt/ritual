@@ -20,12 +20,19 @@ use clang;
 
 use regex::Regex;
 
+/// Implementation of the C++ parser that extracts information
+/// about the C++ library's API from its headers.
 struct CppParser<'a> {
+  /// Configuration of the parser
   config: CppParserConfig,
+  /// C++ types found by the parser
   types: Vec<CppTypeData>,
+  /// Processed C++ data of the dependencies
   dependencies_data: &'a [CppData],
 }
 
+/// Print representation of `entity` and its children to the log.
+/// `level` is current level of recursion.
 #[allow(dead_code)]
 fn dump_entity(entity: Entity, level: i32) {
   for _ in 0..level {
@@ -39,6 +46,7 @@ fn dump_entity(entity: Entity, level: i32) {
   }
 }
 
+/// Extract `clang`'s location information for `entity` to `CppOriginLocation`.
 fn get_origin_location(entity: Entity) -> Result<CppOriginLocation> {
   match entity.get_location() {
     Some(loc) => {
@@ -53,6 +61,7 @@ fn get_origin_location(entity: Entity) -> Result<CppOriginLocation> {
   }
 }
 
+/// Extract template argument declarations from a class or method definition `entity`.
 fn get_template_arguments(entity: Entity) -> Option<TemplateArgumentsDeclaration> {
   let mut nested_level = 0;
   if let Some(parent) = entity.get_semantic_parent() {
@@ -77,7 +86,7 @@ fn get_template_arguments(entity: Entity) -> Option<TemplateArgumentsDeclaration
   }
 }
 
-
+/// Returns fully qualified name of `entity`.
 fn get_full_name(entity: Entity) -> Result<String> {
   let mut current_entity = entity;
   if let Some(mut s) = entity.get_name() {
@@ -107,19 +116,25 @@ fn get_full_name(entity: Entity) -> Result<String> {
   }
 }
 
+/// C++ parser configuration
 #[derive(Clone, Debug)]
 pub struct CppParserConfig {
-  /// Include dirs passed to clang
+  /// Include dirs passed to `clang`
   pub include_paths: Vec<PathBuf>,
-  /// Frameworks passed to clang
+  /// Frameworks passed to `clang`
   pub framework_paths: Vec<PathBuf>,
-  /// Header name used in #include statement
+  /// Header name used in `#include` statement
   pub include_directives: Vec<PathBuf>,
   /// Directories and/or files containing headers of the target library.
   /// Only entities declared within these paths will be processed.
+  /// If empty, all entities will be processed.
   pub target_include_paths: Vec<PathBuf>,
-  pub flags: Vec<String>,
+  /// Arguments passed to `clang`.
+  pub clang_arguments: Vec<String>,
+  /// Path to a temporary file generated and used by the parser
   pub tmp_cpp_path: PathBuf,
+  /// List of names that should be excluded from the processing.
+  /// See `Config::add_cpp_parser_blocked_name` for more details.
   pub name_blacklist: Vec<String>,
 }
 
@@ -136,12 +151,16 @@ fn init_clang() -> Result<Clang> {
 }
 
 #[cfg(not(test))]
+/// Creates a `Clang` context.
 fn init_clang() -> Result<Clang> {
   Clang::new().map_err(|err| format!("clang init failed: {}", err).into())
 }
 
 
-
+/// Runs `clang` parser with `config`.
+/// If `cpp_code` is specified, it's written to the C++ file before parsing it.
+/// If successful, calls `f` and passes the topmost entity (the translation unit)
+/// as its argument. Returns output value of `f` or an error.
 #[cfg_attr(feature="clippy", allow(block_in_if_condition_stmt))]
 fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
                                             cpp_code: Option<String>,
@@ -159,7 +178,7 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
     }
   }
   let mut args = vec!["-Xclang".to_string(), "-detailed-preprocessing-record".to_string()];
-  args.append(&mut config.flags.clone());
+  args.append(&mut config.clang_arguments.clone());
   for dir in &config.include_paths {
     let str = path_to_str(dir)?;
     args.push("-I".to_string());
@@ -206,6 +225,7 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
   result
 }
 
+/// Runs the parser on specified data.
 pub fn run(config: CppParserConfig, dependencies_data: Vec<CppData>) -> Result<CppData> {
   log::status(get_version());
   log::status("Initializing clang...");
@@ -240,6 +260,8 @@ pub fn run(config: CppParserConfig, dependencies_data: Vec<CppData>) -> Result<C
 }
 
 impl<'a> CppParser<'a> {
+  /// Search for a C++ type information in the types found by the parser
+  /// and in types of the dependencies.
   fn find_type<F: Fn(&CppTypeData) -> bool>(&self, f: F) -> Option<&CppTypeData> {
     if let Some(r) = self.types.iter().find(|x| f(x)) {
       return Some(r);
@@ -252,6 +274,11 @@ impl<'a> CppParser<'a> {
     None
   }
 
+  /// Attempts to parse an unexposed type, i.e. a type the used `clang` API
+  /// is not able to describe. Either `type1` or `string` must be specified,
+  /// and both may be specified at the same time.
+  /// Surrounding class and/or
+  /// method may be specified in `context_class` and `context_method`.
   fn parse_unexposed_type(&self,
                           type1: Option<Type>,
                           string: Option<String>,
@@ -483,14 +510,14 @@ impl<'a> CppParser<'a> {
     Err(format!("Unrecognized unexposed type: {}", name).into())
   }
 
+  /// Parses type `type1`.
+  /// Surrounding class and/or
+  /// method may be specified in `context_class` and `context_method`.
   fn parse_type(&self,
                 type1: Type,
                 context_class: Option<Entity>,
                 context_method: Option<Entity>)
                 -> Result<CppType> {
-    // println!("TEST1 parse type {:?}", type1);
-    // println!("TEST2 canonical type {:?}", type1.get_canonical_type());
-    // println!("TEST3 args {:?}", type1.get_template_argument_types());
     if type1.is_volatile_qualified() {
       return Err("Volatile type".into());
     }
@@ -766,8 +793,6 @@ impl<'a> CppParser<'a> {
                 }
               }
             }
-            // println!("TEST4 OK: {:?}", parsed_canonical);
-            // println!("TEST4 OK2: {:?}", parsed_unexposed);
           }
           parsed_canonical
         } else {
@@ -778,6 +803,7 @@ impl<'a> CppParser<'a> {
     }
   }
 
+  /// Checks if the typedef `name` has a special meaning for the parser.
   fn parse_special_typedef(&self, name: &str) -> Option<CppTypeBase> {
     match name {
       "qint8" | "int8_t" | "GLbyte" => {
@@ -870,7 +896,7 @@ impl<'a> CppParser<'a> {
     }
   }
 
-  // TODO: simplify this function
+  /// Parses a function `entity`.
   #[cfg_attr(feature="clippy", allow(cyclomatic_complexity))]
   fn parse_function(&self, entity: Entity) -> Result<CppMethod> {
     let (class_name, class_entity) = match entity.get_semantic_parent() {
@@ -1162,6 +1188,7 @@ impl<'a> CppParser<'a> {
        })
   }
 
+  /// Parses an enum `entity`.
   fn parse_enum(&self, entity: Entity) -> Result<CppTypeData> {
     let include_file = self.entity_include_file(entity)
       .chain_err(|| {
@@ -1191,6 +1218,7 @@ impl<'a> CppParser<'a> {
        })
   }
 
+  /// Parses a class field `entity`.
   fn parse_class_field(&self, entity: Entity) -> Result<CppClassField> {
     let field_name = entity.get_name()
       .chain_err(|| "failed to get field name")?;
@@ -1219,6 +1247,7 @@ impl<'a> CppParser<'a> {
        })
   }
 
+  /// Parses a class or a struct `entity`.
   fn parse_class(&self, entity: Entity) -> Result<CppTypeData> {
     let include_file = self.entity_include_file(entity)
       .chain_err(|| {
@@ -1322,6 +1351,7 @@ impl<'a> CppParser<'a> {
        })
   }
 
+  /// Determines file path of the include file this `entity` is located in.
   fn entity_include_path(&self, entity: Entity) -> Result<String> {
     if let Some(location) = entity.get_location() {
       let file_path = location.get_presumed_location().0;
@@ -1335,6 +1365,7 @@ impl<'a> CppParser<'a> {
     }
   }
 
+  /// Determines file name of the include file this `entity` is located in.
   fn entity_include_file(&self, entity: Entity) -> Result<String> {
     let file_path_buf = PathBuf::from(self.entity_include_path(entity)?);
     let file_name = file_path_buf.file_name()
@@ -1342,6 +1373,7 @@ impl<'a> CppParser<'a> {
     Ok(os_str_to_str(file_name)?.to_string())
   }
 
+  /// Returns false if this `entity` was blacklisted in some way.
   fn should_process_entity(&self, entity: Entity) -> bool {
     if let Ok(full_name) = get_full_name(entity) {
       if full_name == "AllFields" {
@@ -1355,8 +1387,6 @@ impl<'a> CppParser<'a> {
               .target_include_paths
               .iter()
               .any(|x| file_path_buf.starts_with(x)) {
-          //          log::llog(log::DebugParserSkips,
-          //                    || format!("skipping entities from {}", file_path));
           return false;
         }
       }
@@ -1365,24 +1395,19 @@ impl<'a> CppParser<'a> {
            .name_blacklist
            .iter()
            .any(|x| x == &full_name) {
-        //        log::llog(log::DebugParserSkips,
-        //                  || format!("Skipping blacklisted entity: {}", full_name));
         return false;
       }
     }
     if let Some(name) = entity.get_name() {
       if self.config.name_blacklist.iter().any(|x| x == &name) {
-        //        log::llog(log::DebugParserSkips, || {
-        //          format!("Skipping blacklisted entity: {}",
-        //                  get_full_name(entity).unwrap_or("?".into()))
-        //        });
         return false;
       }
     }
     true
   }
 
-
+  /// Parses type declarations in translation unit `entity`
+  /// and saves them to `self`.
   fn parse_types(&mut self, entity: Entity) {
     if !self.should_process_entity(entity) {
       return;
@@ -1460,10 +1485,6 @@ impl<'a> CppParser<'a> {
       EntityKind::UnexposedDecl |
       EntityKind::ClassTemplate => {
         for c in entity.get_children() {
-          //          if c.get_kind() == EntityKind::BinaryOperator && c.get_location() == entity.get_location() {
-          //            log::llog(log::DebugParser, || "get_children refers to itself!");
-          //            continue;
-          //          }
           self.parse_types(c);
         }
       }
@@ -1471,6 +1492,7 @@ impl<'a> CppParser<'a> {
     }
   }
 
+  /// Parses methods in translation unit `entity`.
   fn parse_methods(&self, entity: Entity) -> Vec<CppMethod> {
     let mut methods = Vec::new();
     if !self.should_process_entity(entity) {
@@ -1530,10 +1552,6 @@ impl<'a> CppParser<'a> {
       EntityKind::UnexposedDecl |
       EntityKind::ClassTemplate => {
         for c in entity.get_children() {
-          //          if c.get_kind() == EntityKind::BinaryOperator && c.get_location() == entity.get_location() {
-          //            log::llog(log::DebugParser, || "get_children refers to itself!");
-          //            continue;
-          //          }
           methods.append(&mut self.parse_methods(c));
         }
       }
@@ -1543,6 +1561,8 @@ impl<'a> CppParser<'a> {
     methods
   }
 
+  /// Returns `Err` if `type1` or any of its components refer to
+  /// an unknown type.
   fn check_type_integrity(&self, type1: &CppType) -> Result<()> {
     match type1.base {
       CppTypeBase::Void |
@@ -1588,6 +1608,7 @@ impl<'a> CppParser<'a> {
     Ok(())
   }
 
+  /// Returns types and methods that don't refer to any unknown types.
   fn check_integrity(&self, methods: Vec<CppMethod>) -> (Vec<CppMethod>, Vec<CppTypeData>) {
     let good_methods = methods
       .into_iter()
@@ -1654,6 +1675,8 @@ impl<'a> CppParser<'a> {
     (good_methods, good_types)
   }
 
+  /// Searches for template instantiations in this library's API,
+  /// excluding results that were already processed in dependencies.
   #[cfg_attr(feature="clippy", allow(block_in_if_condition_stmt))]
   fn find_template_instantiations(&self, methods: &[CppMethod]) -> Vec<CppTemplateInstantiations> {
 

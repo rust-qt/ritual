@@ -5,7 +5,7 @@ pub use serializable::CppOperator;
 /// Constraints applied to a C++ operator method
 /// of a certain kind
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct OperatorInfo {
+pub struct CppOperatorInfo {
   /// String that must appear after "operator" in the method name,
   /// e.g. ">" for "operator>". "operator" prefix must
   /// be present for any operator. This field is None for
@@ -23,10 +23,10 @@ pub struct OperatorInfo {
 
 impl CppOperator {
   /// Reports information about this operator
-  pub fn info(&self) -> OperatorInfo {
+  pub fn info(&self) -> CppOperatorInfo {
     use self::CppOperator::*;
-    fn oi(suffix: &'static str, count: i32) -> OperatorInfo {
-      OperatorInfo {
+    fn oi(suffix: &'static str, count: i32) -> CppOperatorInfo {
+      CppOperatorInfo {
         function_name_suffix: Some(suffix),
         arguments_count: count,
         allows_variadic_arguments: false,
@@ -35,7 +35,7 @@ impl CppOperator {
 
     match *self {
       Conversion(..) => {
-        OperatorInfo {
+        CppOperatorInfo {
           function_name_suffix: None,
           arguments_count: 1,
           allows_variadic_arguments: false,
@@ -84,7 +84,7 @@ impl CppOperator {
       StructureDereference => oi("->", 1),
       PointerToMember => oi("->*", 2),
       FunctionCall => {
-        OperatorInfo {
+        CppOperatorInfo {
           function_name_suffix: Some("()"),
           arguments_count: 0,
           allows_variadic_arguments: true,

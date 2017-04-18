@@ -1,7 +1,9 @@
+//! Types for handling information about C++ methods.
+
+
 use cpp_data::{CppVisibility, CppTypeAllocationPlace, CppData};
 use cpp_ffi_data::{CppMethodWithFfiSignature, CppFfiType, CppFfiFunctionSignature,
                    CppFfiFunctionArgument, CppFfiArgumentMeaning};
-use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase, CppTypeClassBase};
 use common::errors::{Result, unexpected};
 use common::string_utils::JoinWithSeparator;
@@ -9,28 +11,31 @@ use common::utils::MapIfOk;
 pub use serializable::{CppFunctionArgument, CppMethodKind, CppMethod, CppMethodClassMembership,
                        CppFieldAccessorType, FakeCppMethod, CppMethodDoc};
 
+pub use cpp_operator::{CppOperator, CppOperatorInfo};
 
-
+/// Chosen type allocation place for the method
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ReturnValueAllocationPlace {
-  /// the method returns a class object by value (or is a constructor), and
+  /// The method returns a class object by value (or is a constructor), and
   /// it's translated to "output" FFI argument and placement new
   Stack,
-  /// the method returns a class object by value (or is a constructor), and
+  /// The method returns a class object by value (or is a constructor), and
   /// it's translated to pointer FFI return type and plain new
   Heap,
-  /// the method does not return a class object by value, so
-  /// there is only one FFI wrapper for it
+  /// The method does not return a class object by value, so
+  /// the direct equivalent of the value is used in FFI.
   NotApplicable,
 }
 
 impl CppMethodKind {
+  /// Returns true if this method is a constructor
   pub fn is_constructor(&self) -> bool {
     match *self {
       CppMethodKind::Constructor => true,
       _ => false,
     }
   }
+  /// Returns true if this method is a destructor
   pub fn is_destructor(&self) -> bool {
     match *self {
       CppMethodKind::Destructor => true,
@@ -38,6 +43,7 @@ impl CppMethodKind {
     }
   }
   #[allow(dead_code)]
+  /// Returns true if this method is a regular method or a free function
   pub fn is_regular(&self) -> bool {
     match *self {
       CppMethodKind::Regular => true,
@@ -63,21 +69,10 @@ impl CppMethod {
     true
   }
 
-  /// Checks if this method would need
-  /// to have 2 wrappers with 2 different return value allocation places
-  // pub fn needs_allocation_place_variants(&self) -> bool {
-  // if self.is_constructor() || self.is_destructor() {
-  // return true;
-  // }
-  // if self.return_type.needs_allocation_place_variants() {
-  // return true;
-  // }
-  // false
-  // }
   /// Creates FFI method signature for this method:
   /// - converts all types to FFI types;
   /// - adds "this" argument explicitly if present;
-  /// - adds "output" argument for return value if allocation_place is Stack.
+  /// - adds "output" argument for return value if `allocation_place` is `Stack`.
   pub fn c_signature(&self,
                      allocation_place: ReturnValueAllocationPlace)
                      -> Result<CppFfiFunctionSignature> {
@@ -149,8 +144,7 @@ impl CppMethod {
     Ok(r)
   }
 
-  /// Generates either one or two FFI signatures for this method,
-  /// depending on its return type.
+  /// Generates the FFI function signature for this method.
   pub fn to_ffi_signature(&self,
                           cpp_data: &CppData,
                           type_allocation_places_override: Option<CppTypeAllocationPlace>)
@@ -191,6 +185,9 @@ impl CppMethod {
        })
   }
 
+  /// Returns fully qualified C++ name of this method,
+  /// i.e. including namespaces and class name (if any).
+  /// This method is not suitable for code generation.
   pub fn full_name(&self) -> String {
     if let Some(ref info) = self.class_membership {
       format!("{}::{}",
@@ -201,6 +198,8 @@ impl CppMethod {
     }
   }
 
+  /// Returns the identifier this method would be presented with
+  /// in Qt documentation.
   pub fn doc_id(&self) -> String {
     if let Some(ref info) = self.class_membership {
       format!("{}::{}", info.class_type.name, self.name)
@@ -210,7 +209,7 @@ impl CppMethod {
   }
 
   /// Returns short text representing values in this method
-  /// (only for debug output purposes).
+  /// (only for debugging output).
   pub fn short_text(&self) -> String {
     let mut s = String::new();
     if let Some(ref info) = self.class_membership {
@@ -279,6 +278,7 @@ impl CppMethod {
     s.trim().to_string()
   }
 
+  /// Returns debugging output for `inheritance_chain` content.
   pub fn inheritance_chain_text(&self) -> String {
     self
       .inheritance_chain
@@ -298,6 +298,7 @@ impl CppMethod {
       .join(" -> ")
   }
 
+  /// Returns name of the class this method belongs to, if any.
   pub fn class_name(&self) -> Option<&String> {
     match self.class_membership {
       Some(ref info) => Some(&info.class_type.name),
@@ -305,18 +306,24 @@ impl CppMethod {
     }
   }
 
+  /// Returns true if this method is a constructor.
   pub fn is_constructor(&self) -> bool {
     match self.class_membership {
       Some(ref info) => info.kind.is_constructor(),
       None => false,
     }
   }
+
+  /// Returns true if this method is a destructor.
   pub fn is_destructor(&self) -> bool {
     match self.class_membership {
       Some(ref info) => info.kind.is_destructor(),
       None => false,
     }
   }
+
+  /// A convenience method. Returns `class_membership` if
+  /// the method is a constructor, and `None` otherwise.
   pub fn class_info_if_constructor(&self) -> Option<&CppMethodClassMembership> {
     if let Some(ref info) = self.class_membership {
       if info.kind.is_constructor() {
@@ -329,6 +336,8 @@ impl CppMethod {
     }
   }
 
+  /// Returns the identifier that should be used in `QObject::connect`
+  /// to specify this signal or slot.
   pub fn receiver_id(&self) -> Result<String> {
     let type_num = if let Some(ref info) = self.class_membership {
       if info.is_slot {
@@ -354,10 +363,13 @@ impl CppMethod {
 
 
   #[allow(dead_code)]
+  /// Returns true if this method is an operator.
   pub fn is_operator(&self) -> bool {
     self.operator.is_some()
   }
 
+  /// Returns collection of all types found in the signature of this method,
+  /// including argument types, return type and type of `this` implicit parameter.
   pub fn all_involved_types(&self) -> Vec<CppType> {
     let mut result: Vec<CppType> = Vec::new();
     if let Some(ref class_membership) = self.class_membership {
@@ -380,3 +392,4 @@ impl CppMethod {
     result
   }
 }
+

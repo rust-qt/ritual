@@ -1,3 +1,6 @@
+//! Types for handling information about C++ library APIs.
+
+
 use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership, CppFunctionArgument,
                  CppFieldAccessorType, FakeCppMethod};
 use cpp_operator::CppOperator;

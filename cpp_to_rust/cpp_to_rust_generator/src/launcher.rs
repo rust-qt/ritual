@@ -141,7 +141,7 @@ fn load_or_create_cpp_data(config: &Config,
       target_include_paths: Vec::from(config.target_include_paths()),
       tmp_cpp_path: config.cache_dir_path().with_added("1.cpp"),
       name_blacklist: Vec::from(config.cpp_parser_blocked_names()),
-      flags: Vec::from(config.cpp_parser_flags()),
+      clang_arguments: Vec::from(config.cpp_parser_arguments()),
     };
     let cpp_data =
       cpp_parser::run(parser_config, dependencies_cpp_data).chain_err(|| "C++ parser failed")?;
@@ -269,7 +269,7 @@ pub fn run(config: Config) -> Result<()> {
   let c_lib_path_existed = c_lib_path.exists();
 
 
-  let c_lib_name = format!("{}_c", &config.crate_properties().name());
+  let cpp_ffi_lib_name = format!("{}_c", &config.crate_properties().name());
   let c_lib_tmp_path = if c_lib_path_existed {
     let path = config.cache_dir_path().with_added("c_lib.new");
     if path.exists() {
@@ -280,15 +280,15 @@ pub fn run(config: Config) -> Result<()> {
     c_lib_path.clone()
   };
   create_dir_all(&c_lib_tmp_path)?;
-  log::status(format!("Generating C++ wrapper library ({})", c_lib_name));
+  log::status(format!("Generating C++ wrapper library ({})", cpp_ffi_lib_name));
 
   let cpp_ffi_headers = cpp_ffi_generator::run(&cpp_data,
-                                               c_lib_name.clone(),
+                                               cpp_ffi_lib_name.clone(),
                                                config.cpp_ffi_generator_filters())
       .chain_err(|| "FFI generator failed")?;
 
   log::status(format!("Generating C++ wrapper code"));
-  let code_gen = CppCodeGenerator::new(c_lib_name.clone(), c_lib_tmp_path.clone());
+  let code_gen = CppCodeGenerator::new(cpp_ffi_lib_name.clone(), c_lib_tmp_path.clone());
   code_gen.generate_template_files(config.include_directives())?;
   code_gen.generate_files(&cpp_ffi_headers)?;
 
@@ -308,7 +308,7 @@ pub fn run(config: Config) -> Result<()> {
     crate_properties: config.crate_properties().clone(),
     output_path: crate_new_path.clone(),
     crate_template_path: config.crate_template_path().cloned(),
-    c_lib_name: c_lib_name.clone(),
+    cpp_ffi_lib_name: cpp_ffi_lib_name.clone(),
     generator_dependencies: &dependencies,
     write_dependencies_local_paths: config.write_dependencies_local_paths(),
   };
@@ -384,7 +384,7 @@ pub fn run(config: Config) -> Result<()> {
               .with_added("build_script_data.json"),
             &BuildScriptData {
                cpp_build_config: config.cpp_build_config().clone(),
-               cpp_wrapper_lib_name: c_lib_name,
+               cpp_wrapper_lib_name: cpp_ffi_lib_name,
              })?;
   if config.write_cache() {
     create_file(completed_marker_path(config.cache_dir_path()))?;
