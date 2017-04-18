@@ -19,6 +19,11 @@ extern crate tempdir;
 extern crate regex;
 extern crate clang;
 
+#[macro_use]
+extern crate serde_derive;
+
+extern crate serde;
+
 extern crate cpp_to_rust_common as common;
 
 mod cpp_ffi_generator;
