@@ -1,3 +1,5 @@
+//! Types for describing C++ operators
+
 use common::errors::Result;
 use cpp_type::CppType;
 
@@ -111,9 +113,9 @@ pub enum CppOperator {
 /// of a certain kind
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CppOperatorInfo {
-  /// String that must appear after "operator" in the method name,
-  /// e.g. ">" for "operator>". "operator" prefix must
-  /// be present for any operator. This field is None for
+  /// String that must appear after `"operator"` in the method name,
+  /// e.g. `">"` for `"operator>"`. `"operator"` prefix must
+  /// be present for any operator. This field is `None` for
   /// conversion operator, as its name includes
   /// corresponding C++ type instead of a fixed string.
   pub function_name_suffix: Option<&'static str>,

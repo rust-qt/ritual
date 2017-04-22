@@ -75,6 +75,7 @@ pub struct CppTypeClassBase {
   pub template_arguments: Option<Vec<CppType>>,
 }
 
+/// Information about a C++ function pointer type
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub struct CppFunctionPointerType {
@@ -86,6 +87,9 @@ pub struct CppFunctionPointerType {
   pub allows_variadic_arguments: bool,
 }
 
+/// Information about a numeric C++ type that is
+/// guaranteed to be the same on all platforms,
+/// e.g. `uint32_t`.
 #[derive(Debug, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
 pub struct CppSpecificNumericType {
@@ -121,8 +125,8 @@ pub enum CppTypeBase {
   },
   /// Class type
   Class(CppTypeClassBase),
-  /// Template parameter, like "T" anywhere inside
-  /// QVector<T> declaration
+  /// Template parameter, like `"T"` anywhere inside
+  /// `QVector<T>` declaration
   TemplateParameter {
     /// Template instantiation level. For example,
     /// if there is a template class and a template method in it,
@@ -131,8 +135,8 @@ pub enum CppTypeBase {
     /// If only the class or only the method is a template,
     /// the level will be 0.
     nested_level: i32,
-    /// Index of the parameter. In QHash<K, V> "K" has index = 0
-    /// and "V" has index = 1.
+    /// Index of the parameter. In `QHash<K, V>` `"K"` has `index = 0`
+    /// and `"V"` has `index = 1`.
     index: i32,
   },
   /// Function pointer type
@@ -540,7 +544,6 @@ impl CppType {
   /// Converts this C++ type to its adaptation for FFI interface,
   /// removing all features not supported by C ABI
   /// (e.g. references and passing objects by value).
-  ///
   #[cfg_attr(feature="clippy", allow(collapsible_if))]
   pub fn to_cpp_ffi_type(&self, role: CppTypeRole) -> Result<CppFfiType> {
     let err = || format!("Can't express type to FFI: {:?}", self);
