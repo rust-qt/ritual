@@ -43,7 +43,8 @@ pub fn add_to_multihash<K: Eq + Hash + Clone, T, V: Default + Extend<T>>(hash: &
 /// Runs a command and checks that it was successful
 pub fn run_command(command: &mut Command) -> Result<()> {
   log::status(format!("Executing command: {:?}", command));
-  let status = command.status()
+  let status = command
+    .status()
     .chain_err(|| format!("failed to run command: {:?}", command))?;
   if status.success() {
     Ok(())
@@ -57,7 +58,8 @@ pub fn get_command_output(command: &mut Command) -> Result<String> {
   log::status(format!("Executing command: {:?}", command));
   command.stdout(std::process::Stdio::piped());
   command.stderr(std::process::Stdio::piped());
-  let output = command.output()
+  let output = command
+    .output()
     .chain_err(|| format!("failed to run command: {:?}", command))?;
   if output.status.success() {
     String::from_utf8(output.stdout).chain_err(|| "comand output is not valid unicode")
@@ -65,10 +67,12 @@ pub fn get_command_output(command: &mut Command) -> Result<String> {
     use std::io::Write;
     let mut stderr = std::io::stderr();
     writeln!(stderr, "Stdout:")?;
-    stderr.write_all(&output.stdout)
+    stderr
+      .write_all(&output.stdout)
       .chain_err(|| "output failed")?;
     writeln!(stderr, "Stderr:")?;
-    stderr.write_all(&output.stderr)
+    stderr
+      .write_all(&output.stderr)
       .chain_err(|| "output failed")?;
     Err(format!("command failed with {}: {:?}", output.status, command).into())
   }

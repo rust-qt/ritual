@@ -1,7 +1,7 @@
 use caption_strategy::{TypeCaptionStrategy, MethodCaptionStrategy};
-use cpp_data::{CppData, CppVisibility, create_cast_method,
-               CppTypeAllocationPlace};
-use cpp_type::{CppTypeRole, CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase, CppFunctionPointerType};
+use cpp_data::{CppData, CppVisibility, create_cast_method, CppTypeAllocationPlace};
+use cpp_type::{CppTypeRole, CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase,
+               CppFunctionPointerType};
 use cpp_ffi_data::{CppAndFfiMethod, c_base_name, CppFfiHeaderData, QtSlotWrapper};
 use cpp_method::{CppMethod, CppMethodKind, CppFunctionArgument, CppMethodClassMembership};
 use common::errors::{Result, ChainErr, unexpected};
@@ -46,7 +46,8 @@ pub fn run(cpp_data: &CppData,
     if let Some(index) = include_file_base_name.find('.') {
       include_file_base_name = include_file_base_name[0..index].to_string();
     }
-    let methods = generator.process_methods(&include_file_base_name,
+    let methods = generator
+      .process_methods(&include_file_base_name,
                        None,
                        generator
                          .cpp_data
@@ -82,7 +83,8 @@ impl<'a> CppFfiGenerator<'a> {
     }
     let class_name = method.class_name().unwrap_or(&String::new()).clone();
     for filter in &self.filters {
-      let allowed = filter(method).chain_err(|| "cpp_ffi_generator_filter failed")?;
+      let allowed = filter(method)
+        .chain_err(|| "cpp_ffi_generator_filter failed")?;
       if !allowed {
         log::llog(log::DebugFfiSkips,
                   || format!("Skipping blacklisted method: \n{}\n", method.short_text()));
@@ -228,8 +230,10 @@ impl<'a> CppFfiGenerator<'a> {
     let mut qt_slot_wrappers = Vec::new();
     let mut methods = Vec::new();
     for types in &self.cpp_data.signal_argument_types {
-      let ffi_types = types.map_if_ok(|t| t.to_cpp_ffi_type(CppTypeRole::NotReturnType))?;
-      let args_captions = types.map_if_ok(|t| t.caption(TypeCaptionStrategy::Full))?;
+      let ffi_types = types
+        .map_if_ok(|t| t.to_cpp_ffi_type(CppTypeRole::NotReturnType))?;
+      let args_captions = types
+        .map_if_ok(|t| t.caption(TypeCaptionStrategy::Full))?;
       let args_caption = if args_captions.is_empty() {
         "no_args".to_string()
       } else {
@@ -367,7 +371,8 @@ impl<'a> CppFfiGenerator<'a> {
     }
     Ok(Some(CppFfiHeaderData {
               include_file_base_name: include_file_name.to_string(),
-              methods: self.process_methods(include_file_name,
+              methods: self
+                .process_methods(include_file_name,
                                  Some(CppTypeAllocationPlace::Heap),
                                  methods.iter())?,
               qt_slot_wrappers: qt_slot_wrappers,

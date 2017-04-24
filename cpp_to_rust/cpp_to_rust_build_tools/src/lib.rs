@@ -26,12 +26,13 @@ pub struct Config {
 }
 
 fn manifest_dir() -> Result<PathBuf> {
-  let dir =
-    std::env::var("CARGO_MANIFEST_DIR").chain_err(|| "CARGO_MANIFEST_DIR env var is missing")?;
+  let dir = std::env::var("CARGO_MANIFEST_DIR")
+    .chain_err(|| "CARGO_MANIFEST_DIR env var is missing")?;
   Ok(PathBuf::from(dir))
 }
 fn out_dir() -> Result<PathBuf> {
-  let dir = std::env::var("OUT_DIR").chain_err(|| "OUT_DIR env var is missing")?;
+  let dir = std::env::var("OUT_DIR")
+    .chain_err(|| "OUT_DIR env var is missing")?;
   Ok(PathBuf::from(dir))
 }
 
@@ -101,7 +102,8 @@ impl Config {
     let out_dir = out_dir()?;
     let c_lib_install_dir = out_dir.with_added("c_lib_install");
     let manifest_dir = manifest_dir()?;
-    let profile = std::env::var("PROFILE").chain_err(|| "PROFILE env var is missing")?;
+    let profile = std::env::var("PROFILE")
+      .chain_err(|| "PROFILE env var is missing")?;
     log::status("Building C++ wrapper library");
     CppLibBuilder {
         cmake_source_dir: manifest_dir.with_added("c_lib"),
@@ -116,7 +118,8 @@ impl Config {
           "release" => BuildType::Release,
           _ => return Err(format!("unknown value of PROFILE env var: {}", profile).into()),
         },
-      }.run()?;
+      }
+      .run()?;
     {
       log::status("Generating ffi.rs file");
       let mut ffi_file = create_file(out_dir.with_added("ffi.rs"))?;
@@ -125,13 +128,16 @@ impl Config {
         ffi_file.write("#[link(name = \"stdc++\")]\n")?;
       }
       if cpp_build_config_data.library_type() == Some(CppLibraryType::Shared) {
-        ffi_file.write(format!("#[link(name = \"{}\")]\n",
+        ffi_file
+          .write(format!("#[link(name = \"{}\")]\n",
                          &build_script_data.cpp_wrapper_lib_name))?;
       } else {
-        ffi_file.write(format!("#[link(name = \"{}\", kind = \"static\")]\n",
+        ffi_file
+          .write(format!("#[link(name = \"{}\", kind = \"static\")]\n",
                          &build_script_data.cpp_wrapper_lib_name))?;
       }
-      ffi_file.write(file_to_string(manifest_dir.with_added("src").with_added("ffi.in.rs"))?)?;
+      ffi_file
+        .write(file_to_string(manifest_dir.with_added("src").with_added("ffi.in.rs"))?)?;
     }
     {
       log::status("Requesting type sizes");

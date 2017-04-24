@@ -118,10 +118,10 @@ pub struct FileWrapper {
 /// A wrapper over `std::fs::File::open` with better error reporting.
 pub fn open_file<P: AsRef<Path>>(path: P) -> Result<FileWrapper> {
   Ok(FileWrapper {
-    file: fs::File::open(path.as_ref())
-        .chain_err(|| format!("Failed to open file for reading: {:?}", path.as_ref()))?,
-    path: path.as_ref().to_path_buf(),
-  })
+       file: fs::File::open(path.as_ref())
+         .chain_err(|| format!("Failed to open file for reading: {:?}", path.as_ref()))?,
+       path: path.as_ref().to_path_buf(),
+     })
 }
 
 /// Returns content of the file `path` as a string.
@@ -133,10 +133,10 @@ pub fn file_to_string<P: AsRef<Path>>(path: P) -> Result<String> {
 /// A wrapper over `std::fs::File::create` with better error reporting.
 pub fn create_file<P: AsRef<Path>>(path: P) -> Result<FileWrapper> {
   Ok(FileWrapper {
-    file: fs::File::create(path.as_ref())
-        .chain_err(|| format!("Failed to create file: {:?}", path.as_ref()))?,
-    path: path.as_ref().to_path_buf(),
-  })
+       file: fs::File::create(path.as_ref())
+         .chain_err(|| format!("Failed to create file: {:?}", path.as_ref()))?,
+       path: path.as_ref().to_path_buf(),
+     })
 }
 
 /// A wrapper over `std::fs::OpenOptions::open` with better error reporting.
@@ -144,7 +144,8 @@ pub fn open_file_with_options<P: AsRef<Path>>(path: P,
                                               options: &fs::OpenOptions)
                                               -> Result<FileWrapper> {
   Ok(FileWrapper {
-       file: options.open(path.as_ref())
+       file: options
+         .open(path.as_ref())
          .chain_err(|| format!("Failed to open file: {:?}", path.as_ref()))?,
        path: path.as_ref().to_path_buf(),
      })
@@ -154,7 +155,8 @@ impl FileWrapper {
   /// Read content of the file to a string
   pub fn read_all(&mut self) -> Result<String> {
     let mut r = String::new();
-    self.file
+    self
+      .file
       .read_to_string(&mut r)
       .chain_err(|| format!("Failed to read from file: {:?}", self.path))?;
     Ok(r)
@@ -179,7 +181,7 @@ impl FileWrapper {
 pub fn load_json<P: AsRef<Path>, T: ::serde::Deserialize>(path: P) -> Result<T> {
   let file = open_file(path.as_ref())?;
   ::serde_json::from_reader(file.into_file())
-      .chain_err(|| format!("failed to parse file as JSON: {}", path.as_ref().display()))
+    .chain_err(|| format!("failed to parse file as JSON: {}", path.as_ref().display()))
 }
 
 /// Serialize `value` into JSON file `path`.
@@ -195,15 +197,14 @@ pub fn save_json<P: AsRef<Path>, T: ::serde::Serialize>(path: P, value: &T) -> R
 pub fn load_bincode<P: AsRef<Path>, T: ::serde::Deserialize>(path: P) -> Result<T> {
   let mut file = open_file(path.as_ref())?.into_file();
   ::bincode::deserialize_from(&mut file, ::bincode::Infinite)
-      .chain_err(|| format!("load_bincode failed: {}", path.as_ref().display()))
+    .chain_err(|| format!("load_bincode failed: {}", path.as_ref().display()))
 }
 
 /// Serialize `value` into binary file `path`.
 pub fn save_bincode<P: AsRef<Path>, T: ::serde::Serialize>(path: P, value: &T) -> Result<()> {
   let mut file = create_file(path.as_ref())?.into_file();
   ::bincode::serialize_into(&mut file, value, ::bincode::Infinite)
-      .chain_err(|| { format!("save_bincode failed: {}",  path.as_ref().display())
-      })
+    .chain_err(|| format!("save_bincode failed: {}", path.as_ref().display()))
 }
 
 /// Load data from a TOML file
@@ -283,10 +284,10 @@ pub struct ReadDirWrapper {
 /// A wrapper over `std::fs::read_dir` with better error reporting
 pub fn read_dir<P: AsRef<Path>>(path: P) -> Result<ReadDirWrapper> {
   Ok(ReadDirWrapper {
-    read_dir:
-      fs::read_dir(path.as_ref()).chain_err(|| format!("Failed to read dir: {:?}", path.as_ref()))?,
-    path: path.as_ref().to_path_buf(),
-  })
+       read_dir: fs::read_dir(path.as_ref())
+         .chain_err(|| format!("Failed to read dir: {:?}", path.as_ref()))?,
+       path: path.as_ref().to_path_buf(),
+     })
 }
 
 impl Iterator for ReadDirWrapper {
@@ -305,7 +306,7 @@ impl Iterator for ReadDirWrapper {
 /// CMake and compilers.
 pub fn canonicalize<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
   let r = fs::canonicalize(path.as_ref())
-      .chain_err(|| format!("failed to canonicalize {}", path.as_ref().display()))?;
+    .chain_err(|| format!("failed to canonicalize {}", path.as_ref().display()))?;
   {
     let str = path_to_str(&r)?;
     if str.starts_with(r"\\?\") {
@@ -341,9 +342,11 @@ pub fn os_string_into_string(s: OsString) -> Result<String> {
 /// `relative_path` is relative to the repository root.
 pub fn repo_crate_local_path(relative_path: &str) -> Result<PathBuf> {
   let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-  let parent = path.parent()
+  let parent = path
+    .parent()
     .chain_err(|| "failed to get parent directory")?;
-  let parent2 = parent.parent()
+  let parent2 = parent
+    .parent()
     .chain_err(|| "failed to get parent directory")?;
   let result = parent2.with_added(relative_path);
   if !result.exists() {

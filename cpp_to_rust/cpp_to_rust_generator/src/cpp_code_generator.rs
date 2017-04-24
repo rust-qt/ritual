@@ -75,7 +75,8 @@ impl CppCodeGenerator {
                  })?
       .join(", ");
     let func_args = once("m_data".to_string())
-      .chain(wrapper.arguments
+      .chain(wrapper
+               .arguments
                .iter()
                .enumerate()
                .map_if_ok(|(num, t)| self.convert_type_to_ffi(t, format!("arg{}", num)))?)
@@ -328,7 +329,8 @@ impl CppCodeGenerator {
     let cmakelists_path = self.lib_path.with_added("CMakeLists.txt");
     let mut cmakelists_file = create_file(&cmakelists_path)?;
 
-    cmakelists_file.write(format!(include_str!("../templates/c_lib/CMakeLists.txt"),
+    cmakelists_file
+      .write(format!(include_str!("../templates/c_lib/CMakeLists.txt"),
                      lib_name_lowercase = &self.lib_name,
                      lib_name_uppercase = name_upper))?;
     let src_dir = self.lib_path.with_added("src");
@@ -338,7 +340,8 @@ impl CppCodeGenerator {
     create_dir_all(&include_dir)?;
     let exports_file_path = include_dir.with_added(format!("{}_exports.h", &self.lib_name));
     let mut exports_file = create_file(&exports_file_path)?;
-    exports_file.write(format!(include_str!("../templates/c_lib/exports.h"),
+    exports_file
+      .write(format!(include_str!("../templates/c_lib/exports.h"),
                      lib_name_uppercase = name_upper))?;
 
     let include_directives_code = include_directives
@@ -347,7 +350,8 @@ impl CppCodeGenerator {
 
     let global_file_path = include_dir.with_added(format!("{}_global.h", &self.lib_name));
     let mut global_file = create_file(&global_file_path)?;
-    global_file.write(format!(include_str!("../templates/c_lib/global.h"),
+    global_file
+      .write(format!(include_str!("../templates/c_lib/global.h"),
                      lib_name_lowercase = &self.lib_name,
                      lib_name_uppercase = name_upper,
                      include_directives_code = include_directives_code))?;
@@ -356,9 +360,11 @@ impl CppCodeGenerator {
 
   /// Generates all regular files of the C++ wrapper library
   pub fn generate_files(&self, data: &[CppFfiHeaderData]) -> Result<()> {
-    self.generate_all_headers_file(data.iter().map(|x| &x.include_file_base_name))?;
+    self
+      .generate_all_headers_file(data.iter().map(|x| &x.include_file_base_name))?;
     for item in data {
-      self.generate_one(item)
+      self
+        .generate_one(item)
         .chain_err(|| "C++ code generator failed")?;
     }
     Ok(())
@@ -370,11 +376,14 @@ impl CppCodeGenerator {
     h_path.push("include");
     h_path.push(format!("{}.h", &self.lib_name));
     let mut all_header_file = create_file(&h_path)?;
-    all_header_file.write(format!("#ifndef {0}_H\n#define {0}_H\n\n", &self.lib_name_upper))?;
+    all_header_file
+      .write(format!("#ifndef {0}_H\n#define {0}_H\n\n", &self.lib_name_upper))?;
     for name in names {
-      all_header_file.write(format!("#include \"{}_{}.h\"\n", &self.lib_name, name))?;
+      all_header_file
+        .write(format!("#include \"{}_{}.h\"\n", &self.lib_name, name))?;
     }
-    all_header_file.write(format!("#endif // {}_H\n", &self.lib_name_upper))?;
+    all_header_file
+      .write(format!("#endif // {}_H\n", &self.lib_name_upper))?;
     Ok(())
   }
 
@@ -397,13 +406,16 @@ impl CppCodeGenerator {
     {
       let mut h_file = create_file(&h_path)?;
 
-      cpp_file.write(format!("#include \"{}\"\n\n", ffi_include_file))?;
+      cpp_file
+        .write(format!("#include \"{}\"\n\n", ffi_include_file))?;
       let include_guard_name = ffi_include_file.replace(".", "_").to_uppercase();
-      h_file.write(format!("#ifndef {}\n#define {}\n\n",
+      h_file
+        .write(format!("#ifndef {}\n#define {}\n\n",
                        include_guard_name,
                        include_guard_name))?;
 
-      h_file.write(format!("#include \"{}_global.h\"\n\n", &self.lib_name))?;
+      h_file
+        .write(format!("#include \"{}_global.h\"\n\n", &self.lib_name))?;
       for wrapper in &data.qt_slot_wrappers {
         h_file.write(self.qt_slot_wrapper(wrapper)?)?;
       }
@@ -415,11 +427,13 @@ impl CppCodeGenerator {
 
       h_file.write("\n} // extern \"C\"\n\n")?;
 
-      h_file.write(format!("#endif // {}\n", include_guard_name))?;
+      h_file
+        .write(format!("#endif // {}\n", include_guard_name))?;
     }
     if !data.qt_slot_wrappers.is_empty() {
       let moc_output = get_command_output(Command::new("moc").arg("-i").arg(&h_path))?;
-      cpp_file.write(format!("// start of MOC generated code\n{}\n// end of MOC generated code\n",
+      cpp_file
+        .write(format!("// start of MOC generated code\n{}\n// end of MOC generated code\n",
                        moc_output))?;
     }
     Ok(())

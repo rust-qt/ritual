@@ -316,7 +316,25 @@ impl Config {
     self.cache_usage = value;
   }
 
-  /// Sets the directory containing additional Rust code for the crate.
+  /// Sets the directory containing additional files for the crate.
+  /// Any files and directories found in the crate template will be copied
+  /// to the generated crate's directory, although some of them (such as `Cargo.toml`)
+  /// may be overwritten with the generates files. It's common to put `tests` and
+  /// `examples` subdirectories in the crate template so that `cargo` recognizes them
+  /// automatically in the generated crate.
+  ///
+  /// If you want to add some extra code
+  /// to the generated modules, put `src/module_name.rs` file in the crate template and
+  /// add `include_generated!();` line in the file. This line will be replaced with
+  /// the generated content. You can also add extra modules as separate files,
+  /// but you'll also need to create `src/lib.rs` in the crate template and
+  /// declare new module in it using `[pub] mod module_name;`. Use `include_generated!();`
+  /// in `src/lib.rs` to include declaration of automatically generated modules.
+  ///
+  /// If the crate template contains `rustfmt.toml` file, it's used to format the generated
+  /// Rust code instead of the default `rustfmt.toml`.
+  ///
+  /// Creating crate template is optional. The generator can make a crate without a template.
   pub fn set_crate_template_path<P: Into<PathBuf>>(&mut self, path: P) {
     self.crate_template_path = Some(path.into());
   }

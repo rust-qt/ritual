@@ -1,5 +1,6 @@
-// generated with impl_arguments_compatible.py script
+use connections::ArgumentsCompatible;
 
+// generated with impl_arguments_compatible.py script
 impl ArgumentsCompatible<()> for () {}
 
 impl<T1> ArgumentsCompatible<()> for (T1,) {}

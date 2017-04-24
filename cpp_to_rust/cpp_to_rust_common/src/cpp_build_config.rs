@@ -114,11 +114,11 @@ impl CppBuildConfigData {
   fn add_from(&mut self, other: &CppBuildConfigData) -> Result<()> {
     self.linked_libs.append(&mut other.linked_libs.clone());
     self
-        .linked_frameworks
-        .append(&mut other.linked_frameworks.clone());
+      .linked_frameworks
+      .append(&mut other.linked_frameworks.clone());
     self
-        .compiler_flags
-        .append(&mut other.compiler_flags.clone());
+      .compiler_flags
+      .append(&mut other.compiler_flags.clone());
     if self.library_type.is_some() {
       if other.library_type.is_some() && other.library_type != self.library_type {
         return Err("conflicting library types specified".into());
@@ -138,11 +138,11 @@ impl CppBuildConfig {
   /// Add `data` with `condition`.
   pub fn add(&mut self, condition: ::target::Condition, data: CppBuildConfigData) {
     self
-        .items
-        .push(CppBuildConfigItem {
-          condition: condition,
-          data: data,
-        });
+      .items
+      .push(CppBuildConfigItem {
+              condition: condition,
+              data: data,
+            });
   }
   /// Select all conditions that are true on `target`, combine all corresponding
   /// configuration items and return the result.

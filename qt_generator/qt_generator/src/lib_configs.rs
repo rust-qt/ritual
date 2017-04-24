@@ -12,7 +12,8 @@ fn exclude_qlist_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(conf
   config.add_cpp_ffi_generator_filter(Box::new(move |method| {
     if let Some(ref info) = method.class_membership {
       if info.class_type.name == "QList" {
-        let args = info.class_type
+        let args = info
+          .class_type
           .template_arguments
           .as_ref()
           .chain_err(|| "failed to get QList args")?;
@@ -46,7 +47,8 @@ fn exclude_qvector_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(co
   config.add_cpp_ffi_generator_filter(Box::new(move |method| {
     if let Some(ref info) = method.class_membership {
       if info.class_type.name == "QVector" {
-        let args = info.class_type
+        let args = info
+          .class_type
           .template_arguments
           .as_ref()
           .chain_err(|| "failed to get QVector args")?;

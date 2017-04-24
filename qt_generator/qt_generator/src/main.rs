@@ -24,19 +24,22 @@ fn run(matches: clap::ArgMatches) -> Result<()> {
     .chain_err(|| "clap arg missing")?
     .map(|s| s.to_lowercase())
     .collect();
-  let output_dir = PathBuf::from(matches.value_of("output-dir")
+  let output_dir = PathBuf::from(matches
+                                   .value_of("output-dir")
                                    .chain_err(|| "clap arg missing")?);
   if !output_dir.exists() {
     create_dir_all(&output_dir)?;
   }
-  let cache_dir = PathBuf::from(matches.value_of("cache-dir")
+  let cache_dir = PathBuf::from(matches
+                                  .value_of("cache-dir")
                                   .chain_err(|| "clap arg missing")?);
   if !cache_dir.exists() {
     create_dir_all(&cache_dir)?;
   }
   let config = executor::ExecConfig {
     write_dependencies_local_paths: !matches.is_present("no-local-paths"),
-    cache_usage: match matches.value_of("cache-usage")
+    cache_usage: match matches
+            .value_of("cache-usage")
             .chain_err(|| "mising value of cache-usage")? {
       "0" => CacheUsage::None,
       "1" => CacheUsage::RawCppDataOnly,
@@ -46,7 +49,8 @@ fn run(matches: clap::ArgMatches) -> Result<()> {
     },
     write_cache: !matches.is_present("dont-write-cache"),
     quiet_mode: matches.is_present("quiet"),
-    debug_logging_config: match matches.value_of("debug-logging")
+    debug_logging_config: match matches
+            .value_of("debug-logging")
             .chain_err(|| "mising value of debug-logging")? {
       "print" => DebugLoggingConfig::Print,
       "save" => DebugLoggingConfig::SaveToFile,
@@ -70,16 +74,11 @@ fn main() {
     const LIBS_HELP: &'static str = "Libraries (Qt modules) to process. Supported names: \
                                      core, gui, widgets, ui_tools.";
     const CACHE_USAGE_HELP: &'static str = "Cache usage for repeated execution";
-    const CACHE_USAGE_LONG_HELP: &'static str = "Cache usage for repeated execution:\n\
-      0 - no cache usage,\n\
-      1 - use raw C++ data,\n\
-      2 - use prepared C++ data,\n\
-      3 - use all and allow complete skips (default)";
+    const CACHE_USAGE_LONG_HELP: &'static str = "Cache usage for repeated execution:\n0 - no cache usage,\n1 - use raw C++ data,\n2 - use \
+       prepared C++ data,\n3 - use all and allow complete skips (default)";
     const DEBUG_LOGGING_HELP: &'static str = "Debug logging mode";
-    const DEBUG_LOGGING_LONG_HELP: &'static str = "Debug logging mode:\n\
-      \"print\" - print to stderr;\n\
-      \"save\" - save to cache directory;\n\
-      \"disable\" - disable (default)";
+    const DEBUG_LOGGING_LONG_HELP: &'static str = "Debug logging mode:\n\"print\" - print to stderr;\n\"save\" - save to cache \
+       directory;\n\"disable\" - disable (default)";
     const QUIET_HELP: &'static str = "Don't output status messages to stderr";
     const DONT_WRITE_CACHE_HELP: &'static str = "Don't write files for dependency processing";
     const NO_LOCAL_PATHS_HELP: &'static str = "Don't write local paths to output Cargo.toml file";

@@ -40,8 +40,8 @@ impl<'a> Form<'a> {
       widget: widget,
       check_box_toggled: SlotNoArgs::new(move || {}),
     };
-    //uref(button).signals().clicked().connect(&form.button_clicked);
-    //uref(line_edit).signals().text_edited().connect(&form.line_edit_edited);
+    // uref(button).signals().clicked().connect(&form.button_clicked);
+    // uref(line_edit).signals().text_edited().connect(&form.line_edit_edited);
     form
   }
 }

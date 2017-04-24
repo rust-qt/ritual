@@ -1,3 +1,5 @@
+//! Main function of the generator
+
 use config::{Config, DebugLoggingConfig};
 use cpp_code_generator::{CppCodeGenerator, generate_cpp_type_size_requester, CppTypeSizeRequest};
 use cpp_type::CppTypeClassBase;
@@ -42,6 +44,8 @@ pub fn is_completed<P: AsRef<Path>>(cache_dir: P) -> bool {
   completed_marker_path(cache_dir).exists()
 }
 
+/// Loads `RustExportInfo` and `CppData` or a dependency previously
+/// processed in the cache directory `path`.
 fn load_dependency(path: &PathBuf) -> Result<(RustExportInfo, CppData)> {
   let cpp_data_path = path.with_added("cpp_data.bin");
   if !cpp_data_path.exists() {
@@ -57,6 +61,8 @@ fn load_dependency(path: &PathBuf) -> Result<(RustExportInfo, CppData)> {
   Ok((rust_export_info, cpp_data))
 }
 
+/// Creates output and cache directories if they don't exist.
+/// Returns `Err` if any path in `config` is invalid or relative.
 fn check_all_paths(config: &Config) -> Result<()> {
   let check_dir = |path: &PathBuf| -> Result<()> {
     if !path.is_absolute() {
@@ -91,6 +97,9 @@ fn check_all_paths(config: &Config) -> Result<()> {
   Ok(())
 }
 
+/// Loads C++ data saved during a previous run of the generator
+/// from the cache directory if it's available and permitted by `config.cache_usage()`.
+/// Otherwise, performs necessary steps to parse and process C++ data.
 fn load_or_create_cpp_data(config: &Config,
                            dependencies_cpp_data: Vec<CppData>)
                            -> Result<CppData> {
@@ -143,8 +152,8 @@ fn load_or_create_cpp_data(config: &Config,
       name_blacklist: Vec::from(config.cpp_parser_blocked_names()),
       clang_arguments: Vec::from(config.cpp_parser_arguments()),
     };
-    let cpp_data =
-      cpp_parser::run(parser_config, dependencies_cpp_data).chain_err(|| "C++ parser failed")?;
+    let cpp_data = cpp_parser::run(parser_config, dependencies_cpp_data)
+      .chain_err(|| "C++ parser failed")?;
     if config.write_cache() {
       log::status("Saving raw C++ data");
       save_bincode(&raw_cpp_data_cache_file_path, &cpp_data)?;
@@ -156,9 +165,11 @@ fn load_or_create_cpp_data(config: &Config,
   if !cpp_data_processed {
     log::status("Post-processing parse result");
     for filter in config.cpp_data_filters() {
-      filter(&mut cpp_data).chain_err(|| "cpp_data_filter failed")?;
+      filter(&mut cpp_data)
+        .chain_err(|| "cpp_data_filter failed")?;
     }
-    cpp_data.choose_allocation_places(config.type_allocation_places())?;
+    cpp_data
+      .choose_allocation_places(config.type_allocation_places())?;
 
     cpp_data.post_process()?;
 
@@ -173,7 +184,7 @@ fn load_or_create_cpp_data(config: &Config,
 }
 
 
-// TODO: simplify this function
+/// Executes the generator.
 #[cfg_attr(feature="clippy", allow(cyclomatic_complexity))]
 pub fn run(config: Config) -> Result<()> {
   if config.cache_usage().can_skip_all() && is_completed(config.cache_dir_path()) {
@@ -254,8 +265,8 @@ pub fn run(config: Config) -> Result<()> {
   let mut dependencies = Vec::new();
   let mut dependencies_cpp_data = Vec::new();
   for cache_path in config.dependency_cache_paths() {
-    let (info, cpp_data) =
-      load_dependency(&canonicalize(cache_path)?).chain_err(|| "failed to load dependency")?;
+    let (info, cpp_data) = load_dependency(&canonicalize(cache_path)?)
+      .chain_err(|| "failed to load dependency")?;
     dependencies.push(DependencyInfo {
                         cache_path: cache_path.clone(),
                         rust_export_info: info,
@@ -289,7 +300,8 @@ pub fn run(config: Config) -> Result<()> {
 
   log::status(format!("Generating C++ wrapper code"));
   let code_gen = CppCodeGenerator::new(cpp_ffi_lib_name.clone(), c_lib_tmp_path.clone());
-  code_gen.generate_template_files(config.include_directives())?;
+  code_gen
+    .generate_template_files(config.include_directives())?;
   code_gen.generate_files(&cpp_ffi_headers)?;
 
   let crate_new_path = if output_path_existed {
@@ -317,20 +329,21 @@ pub fn run(config: Config) -> Result<()> {
     dependency_rust_types.extend_from_slice(&dep.rust_export_info.rust_types);
   }
   log::status("Preparing Rust functions");
-  let rust_data =
-    rust_generator::run(CppAndFfiData {
-                          cpp_data: cpp_data,
-                          cpp_ffi_headers: cpp_ffi_headers,
-                        },
-                        dependency_rust_types,
-                        rust_generator::RustGeneratorConfig {
-                          crate_name: config.crate_properties().name().clone(),
-                          // TODO: more universal prefix removal (#25)
-                          remove_qt_prefix: remove_qt_prefix,
-                        }).chain_err(|| "Rust data generator failed")?;
+  let rust_data = rust_generator::run(CppAndFfiData {
+                                        cpp_data: cpp_data,
+                                        cpp_ffi_headers: cpp_ffi_headers,
+                                      },
+                                      dependency_rust_types,
+                                      rust_generator::RustGeneratorConfig {
+                                        crate_name: config.crate_properties().name().clone(),
+                                        // TODO: more universal prefix removal (#25)
+                                        remove_qt_prefix: remove_qt_prefix,
+                                      })
+      .chain_err(|| "Rust data generator failed")?;
   log::status(format!("Generating Rust crate code ({})",
                       &config.crate_properties().name()));
-  rust_code_generator::run(rust_config, &rust_data).chain_err(|| "Rust code generator failed")?;
+  rust_code_generator::run(rust_config, &rust_data)
+    .chain_err(|| "Rust code generator failed")?;
   let mut cpp_type_size_requests = Vec::new();
   for type1 in &rust_data.processed_types {
     if let RustTypeWrapperKind::Struct { ref size_const_name, .. } = type1.kind {
@@ -339,7 +352,8 @@ pub fn run(config: Config) -> Result<()> {
                                       cpp_code: CppTypeClassBase {
                                           name: type1.cpp_name.clone(),
                                           template_arguments: type1.cpp_template_arguments.clone(),
-                                        }.to_cpp_code()?,
+                                        }
+                                        .to_cpp_code()?,
                                       size_const_name: size_const_name.clone(),
                                     });
       }
@@ -347,7 +361,8 @@ pub fn run(config: Config) -> Result<()> {
   }
   {
     let mut file = create_file(c_lib_tmp_path.with_added("type_sizes.cpp"))?;
-    file.write(generate_cpp_type_size_requester(&cpp_type_size_requests,
+    file
+      .write(generate_cpp_type_size_requester(&cpp_type_size_requests,
                                               config.include_directives())?)?;
   }
   if c_lib_path_existed {

@@ -265,8 +265,9 @@ impl CppBuiltInNumericType {
   /// Returns all supported types.
   pub fn all() -> &'static [CppBuiltInNumericType] {
     use self::CppBuiltInNumericType::*;
-    static LIST: &'static [CppBuiltInNumericType] = &[Bool, Char, SChar, UChar, WChar, Char16, Char32, Short, UShort, Int, UInt, Long, ULong,
-     LongLong, ULongLong, Int128, UInt128, Float, Double, LongDouble];
+    static LIST: &'static [CppBuiltInNumericType] =
+      &[Bool, Char, SChar, UChar, WChar, Char16, Char32, Short, UShort, Int, UInt, Long, ULong,
+        LongLong, ULongLong, Int128, UInt128, Float, Double, LongDouble];
     return LIST;
   }
 }
@@ -757,7 +758,8 @@ impl CppType {
          indirection: self.indirection.clone(),
          base: match self.base {
            CppTypeBase::Class(ref data) => {
-             CppTypeBase::Class(data.instantiate_class(nested_level1, template_arguments1)?)
+             CppTypeBase::Class(data
+                                  .instantiate_class(nested_level1, template_arguments1)?)
            }
            _ => self.base.clone(),
          },

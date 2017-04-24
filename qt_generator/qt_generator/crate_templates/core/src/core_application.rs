@@ -1,3 +1,5 @@
+include_generated!();
+
 pub struct CoreApplicationArgs {
   _values: Vec<Vec<u8>>,
   argc: Box<::libc::c_int>,
@@ -51,19 +53,3 @@ impl ::core_application::CoreApplication {
     ::std::process::exit(exit_code)
   }
 }
-
-// pub trait ClosureAsSlot {
-//  type Slot;
-//  fn as_slot(self) -> Self::Slot;
-// }
-//
-// pub fn slot<C: ClosureAsSlot>(c: C) -> C::Slot {
-//  c.as_slot()
-// }
-
-// impl<'a, T: FnMut(&::variant::Variant) + 'a> ClosureAsSlot for T {
-//  type Slot = SlotVariant<'a>;
-//  fn as_slot(self) -> SlotVariant<'a> {
-//    SlotVariant::new(self)
-//  }
-// }

@@ -68,7 +68,8 @@ impl DocParser {
     let anchor_override = if name_parts.len() >= 2 &&
                              name_parts[name_parts.len() - 1] == name_parts[name_parts.len() - 2] {
       // constructors are not in the index
-      let last_part = name_parts.pop()
+      let last_part = name_parts
+        .pop()
         .chain_err(|| "name_parts can't be empty")?;
       Some(last_part.to_string())
     } else {
@@ -79,7 +80,8 @@ impl DocParser {
       name_parts.remove(0);
     }
     let corrected_name = name_parts.join("::");
-    let index_item = self.doc_data
+    let index_item = self
+      .doc_data
       .find_index_item(|item| {
                          &item.name == &corrected_name &&
                          (item.anchor.is_some() || anchor_override.is_some())
@@ -88,7 +90,8 @@ impl DocParser {
     let anchor = match anchor_override {
       Some(x) => x,
       None => {
-        index_item.anchor
+        index_item
+          .anchor
           .clone()
           .chain_err(|| unexpected("anchor is expected here!"))?
       }
@@ -214,13 +217,15 @@ impl DocParser {
   }
 
   pub fn doc_for_type(&mut self, name: &str) -> Result<(CppTypeDoc, Vec<DocForEnumVariant>)> {
-    let index_item = self.doc_data
+    let index_item = self
+      .doc_data
       .find_index_item(|item| &item.name == &name)
       .chain_err(|| format!("No documentation entry for {}", name))?;
     if let Some(ref anchor) = index_item.anchor {
       let (result, file_name) = {
         let file_data = self.file_data(index_item.document_id)?;
-        let result = file_data.item_docs
+        let result = file_data
+          .item_docs
           .iter()
           .find(|x| &x.anchor == anchor)
           .chain_err(|| format!("no such anchor: {}", anchor))?;
@@ -236,7 +241,8 @@ impl DocParser {
     let mut result = String::new();
     let mut url = self.base_url.clone();
     {
-      let file_data = self.file_data(index_item.document_id)
+      let file_data = self
+        .file_data(index_item.document_id)
         .chain_err(|| "failed to get document")?;
       url.push_str(&file_data.file_name);
       let doc = &file_data.document;
@@ -381,9 +387,11 @@ fn qt_doc_parser_test() {
 }
 
 fn process_html(html: &str, base_url: &str) -> Result<(String, HashSet<String>)> {
-  let bad_subfolder_regex = Regex::new(r"^\.\./qt[^/]+/").chain_err(|| "invalid regex")?;
+  let bad_subfolder_regex = Regex::new(r"^\.\./qt[^/]+/")
+    .chain_err(|| "invalid regex")?;
 
-  let link_regex = Regex::new("(href|src)=\"([^\"]*)\"").chain_err(|| "invalid regex")?;
+  let link_regex = Regex::new("(href|src)=\"([^\"]*)\"")
+    .chain_err(|| "invalid regex")?;
   let mut cross_references = HashSet::new();
   let html = link_regex.replace_all(html.trim(), |captures: &::regex::Captures| {
     let mut link = bad_subfolder_regex.replace(&captures[2], "");

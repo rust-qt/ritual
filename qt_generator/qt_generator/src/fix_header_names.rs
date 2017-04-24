@@ -40,7 +40,8 @@ impl HeaderNameMap {
       if !header_path.is_file() {
         continue;
       }
-      let metadata = ::std::fs::metadata(&header_path)
+      let metadata =
+        ::std::fs::metadata(&header_path)
           .chain_err(|| format!("failed to get metadata for {}", header_path.display()))?;
       if metadata.len() < 100 {
         let file_content = file_to_string(&header_path)?;

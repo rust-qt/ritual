@@ -24,7 +24,8 @@ pub fn rust_method_variant(args: &RustMethodArgumentsVariant,
     RustMethodSelfArgKind::Value => "self, ",
   };
   let return_type_text = rust_type_to_code(&args.return_type.rust_api_type, crate_name);
-  let arg_texts = args.arguments
+  let arg_texts = args
+    .arguments
     .iter()
     .map(|x| rust_type_to_code(&x.argument_type.rust_api_type, crate_name))
     .join(", ");
@@ -52,15 +53,17 @@ pub fn wrap_cpp_doc_block(html: &str) -> String {
 
 pub fn type_doc(type1: &RustTypeDeclaration) -> String {
   match type1.kind {
-    RustTypeDeclarationKind::CppTypeWrapper { ref cpp_type_name,
-                                              ref cpp_template_arguments,
-                                              ref cpp_doc,
-                                              .. } => {
+    RustTypeDeclarationKind::CppTypeWrapper {
+      ref cpp_type_name,
+      ref cpp_template_arguments,
+      ref cpp_doc,
+      ..
+    } => {
       let cpp_type_code = CppType {
           base: CppTypeBase::Class(CppTypeClassBase {
-            name: cpp_type_name.clone(),
-            template_arguments: cpp_template_arguments.clone(),
-          }),
+                                     name: cpp_type_name.clone(),
+                                     template_arguments: cpp_template_arguments.clone(),
+                                   }),
           indirection: CppTypeIndirection::None,
           is_const: false,
           is_const2: false,
@@ -74,7 +77,11 @@ pub fn type_doc(type1: &RustTypeDeclaration) -> String {
       }
       doc
     }
-    RustTypeDeclarationKind::MethodParametersTrait { ref method_scope, ref method_name, .. } => {
+    RustTypeDeclarationKind::MethodParametersTrait {
+      ref method_scope,
+      ref method_name,
+      ..
+    } => {
       let method_name_with_scope = match *method_scope {
         RustMethodScope::Impl { ref target_type } => {
           format!("{}::{}",
@@ -119,7 +126,7 @@ pub fn enum_value_doc(value: &RustEnumValue) -> String {
   if value.is_dummy {
     return "This variant is added in Rust because \
             enums with one variant and C representation are not supported."
-      .to_string();
+               .to_string();
   }
   if value.cpp_docs.is_empty() {
     log::llog(log::DebugGeneral, || "enum_value_doc: cpp_docs is empty");
@@ -182,13 +189,17 @@ pub fn method_doc(method: &RustMethod) -> String {
     if let Some(ref item_doc) = doc_item.doc {
       if item_doc.mismatched_declaration.is_some() {
         let anchor = &item_doc.anchor;
-        if shown_docs.iter()
-          .any(|x| if let Some(ref xx) = x.doc {
-            &xx.anchor == anchor
-          } else {
-            false
-          }) {
-          shown_docs.push(RustMethodDocItem { doc: None, ..doc_item.clone() });
+        if shown_docs
+             .iter()
+             .any(|x| if let Some(ref xx) = x.doc {
+                    &xx.anchor == anchor
+                  } else {
+                    false
+                  }) {
+          shown_docs.push(RustMethodDocItem {
+                            doc: None,
+                            ..doc_item.clone()
+                          });
         } else {
           shown_docs.push(doc_item.clone());
         }
@@ -204,18 +215,19 @@ pub fn method_doc(method: &RustMethod) -> String {
     if overloaded {
       doc.push(format!("Rust arguments: {}{}\n",
                        if rust_count > 1 { "<br>" } else { "" },
-                       doc_item.rust_fns
+                       doc_item
+                         .rust_fns
                          .iter()
                          .enumerate()
                          .map(|(i, x)| {
-          format!("{}```{}```<br>",
-                  if rust_count > 1 {
-                    format!("{}) ", i + 1)
-                  } else {
-                    String::new()
-                  },
-                  x)
-        })
+        format!("{}```{}```<br>",
+                if rust_count > 1 {
+                  format!("{}) ", i + 1)
+                } else {
+                  String::new()
+                },
+                x)
+      })
                          .join("")));
     }
     doc.push(format!("C++ method: {}", wrap_inline_cpp_code(&doc_item.cpp_fn)));

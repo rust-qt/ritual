@@ -268,13 +268,15 @@ impl CppMethod {
                       is_const: info.is_const,
                       is_const2: false,
                       indirection: CppTypeIndirection::Ptr,
-                    }.to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
+                    }
+                    .to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
                   meaning: CppFfiArgumentMeaning::This,
                 });
       }
     }
     for (index, arg) in self.arguments.iter().enumerate() {
-      let c_type = arg.argument_type
+      let c_type = arg
+        .argument_type
         .to_cpp_ffi_type(CppTypeRole::NotReturnType)?;
       r.arguments
         .push(CppFfiFunctionArgument {
@@ -293,7 +295,8 @@ impl CppMethod {
     } else {
       self.return_type.clone()
     };
-    let c_type = real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
+    let c_type = real_return_type
+      .to_cpp_ffi_type(CppTypeRole::ReturnType)?;
     if real_return_type.needs_allocation_place_variants() {
       match allocation_place {
         ReturnValueAllocationPlace::Stack => {
@@ -567,4 +570,3 @@ impl CppMethod {
     result
   }
 }
-

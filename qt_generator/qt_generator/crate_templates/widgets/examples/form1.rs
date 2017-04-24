@@ -51,7 +51,8 @@ impl<'a> Form<'a> {
                                         let text = uref(line_edit1).text();
                                         MessageBox::information((widget1,
                                  &String::from_std_str("My title"),
-                                 &String::from_std_str("Text: \"%1\". Congratulations!").arg0(&text)));
+                                 &String::from_std_str("Text: \"%1\". Congratulations!")
+          .arg0(&text)));
                                       }),
       line_edit_edited: SlotNoArgs::new(move || {
                                           uref(button1).set_enabled(!uref(line_edit1)

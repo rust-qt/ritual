@@ -286,7 +286,8 @@ fn apply_instantiations_to_method(method: &CppMethod,
         .push(CppFunctionArgument {
                 name: arg.name.clone(),
                 has_default_value: arg.has_default_value,
-                argument_type: arg.argument_type
+                argument_type: arg
+                  .argument_type
                   .instantiate(nested_level, &ins.template_arguments)?,
               });
     }
@@ -296,22 +297,26 @@ fn apply_instantiations_to_method(method: &CppMethod,
         new_args.push(CppFunctionArgument {
                         name: arg.name.clone(),
                         has_default_value: arg.has_default_value,
-                        argument_type: arg.argument_type
+                        argument_type: arg
+                          .argument_type
                           .instantiate(nested_level, &ins.template_arguments)?,
                       });
       }
       new_method.arguments_before_omitting = Some(new_args);
     }
-    new_method.return_type = method.return_type
+    new_method.return_type = method
+      .return_type
       .instantiate(nested_level, &ins.template_arguments)?;
     if let Some(ref mut info) = new_method.class_membership {
-      info.class_type = info.class_type
+      info.class_type = info
+        .class_type
         .instantiate_class(nested_level, &ins.template_arguments)?;
     }
     let mut conversion_type = None;
     if let Some(ref mut operator) = new_method.operator {
       if let CppOperator::Conversion(ref mut cpp_type) = *operator {
-        let r = cpp_type.instantiate(nested_level, &ins.template_arguments)?;
+        let r = cpp_type
+          .instantiate(nested_level, &ins.template_arguments)?;
         *cpp_type = r.clone();
         conversion_type = Some(r);
       }
@@ -595,7 +600,8 @@ impl CppData {
                     current_new_methods.push(new_method.clone());
                   }
                 }
-                new_methods.append(&mut self.inherited_methods_from(derived_name,
+                new_methods.append(&mut self
+                                          .inherited_methods_from(derived_name,
                                                                   &current_new_methods
                                                                      .iter()
                                                                      .collect::<Vec<_>>())?);
@@ -640,7 +646,8 @@ impl CppData {
                       } else {
                         false
                       });
-            all_new_methods.append(&mut self.inherited_methods_from(&type1.name,
+            all_new_methods.append(&mut self
+                                          .inherited_methods_from(&type1.name,
                                                                   &base_methods
                                                                      .collect::<Vec<_>>())?);
           }
@@ -789,7 +796,8 @@ impl CppData {
     }
     for instantiations in &self.template_instantiations {
       let type_info =
-        self.find_type_info(|x| &x.name == &instantiations.class_name)
+        self
+          .find_type_info(|x| &x.name == &instantiations.class_name)
           .chain_err(|| format!("type info not found for {}", &instantiations.class_name))?;
       if !result.contains(&type_info.include_file) {
         result.insert(type_info.include_file.clone());
@@ -1122,7 +1130,8 @@ impl CppData {
                    base_type: &CppType,
                    is_direct: bool)
                    -> Result<Vec<CppMethod>> {
-    let type_info = self.find_type_info(|x| x.name == target_type.name)
+    let type_info = self
+      .find_type_info(|x| x.name == target_type.name)
       .chain_err(|| "type info not found")?;
     let target_ptr_type = CppType {
       base: CppTypeBase::Class(target_type.clone()),
@@ -1251,7 +1260,8 @@ impl CppData {
       let file = open_file(&file_path)?;
       let reader = BufReader::new(file.into_file());
       for (line_num, line) in reader.lines().enumerate() {
-        let line = line.chain_err(|| format!("failed while reading lines from {}", &file_path))?;
+        let line = line
+          .chain_err(|| format!("failed while reading lines from {}", &file_path))?;
         let section_type = if re_signals.is_match(&line) {
           Some(SectionType::Signals)
         } else if re_slots.is_match(&line) {

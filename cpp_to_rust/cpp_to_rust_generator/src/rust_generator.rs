@@ -296,7 +296,8 @@ pub fn run(input_data: CppAndFfiData,
       .collect();
     for method in cpp_methods.clone() {
       if method.cpp_method.class_membership.is_none() {
-        let rust_name = generator.calculate_rust_name_for_free_function(&method.cpp_method)?;
+        let rust_name = generator
+          .calculate_rust_name_for_free_function(&method.cpp_method)?;
         if !module_names_set.contains(&rust_name.parts[1]) {
           module_names_set.insert(rust_name.parts[1].clone());
         }
@@ -312,7 +313,8 @@ pub fn run(input_data: CppAndFfiData,
                           module_count,
                           module_name));
       let full_module_name = RustName::new(vec![generator.config.crate_name.clone(), module_name])?;
-      let (module, tmp_cpp_methods) = generator.generate_module(cpp_methods, &full_module_name)?;
+      let (module, tmp_cpp_methods) = generator
+        .generate_module(cpp_methods, &full_module_name)?;
       cpp_methods = tmp_cpp_methods;
       if let Some(module) = module {
         modules.push(module);
@@ -330,7 +332,8 @@ pub fn run(input_data: CppAndFfiData,
                                               &generator.config)?;
           log::error(format!("  -> {}", rust_name.full_name(None)));
         } else {
-          let rust_name = generator.calculate_rust_name_for_free_function(&method.cpp_method)?;
+          let rust_name = generator
+            .calculate_rust_name_for_free_function(&method.cpp_method)?;
           log::error(format!("  -> {}", rust_name.full_name(None)));
         }
       }
@@ -489,7 +492,8 @@ fn process_types(input_data: &CppAndFfiData,
   let template_final_name =
     |result: &Vec<RustProcessedTypeInfo>, item: &RustProcessedTypeInfo| -> Result<RustName> {
       let mut name = item.rust_name.clone();
-      let last_name = name.parts
+      let last_name = name
+        .parts
         .pop()
         .chain_err(|| "name.parts can't be empty")?;
       let mut arg_captions = Vec::new();
@@ -511,7 +515,8 @@ fn process_types(input_data: &CppAndFfiData,
     };
   let mut unnamed_items = Vec::new();
   for template_instantiations in &input_data.cpp_data.template_instantiations {
-    let type_info = input_data.cpp_data
+    let type_info = input_data
+      .cpp_data
       .find_type_info(|x| &x.name == &template_instantiations.class_name)
       .chain_err(|| {
                    format!("type info not found for {}",
@@ -603,7 +608,8 @@ fn process_types(input_data: &CppAndFfiData,
                                                      false,
                                                      None,
                                                      config)?;
-      let arg_names = qt_slot_wrapper.arguments
+      let arg_names = qt_slot_wrapper
+        .arguments
         .iter()
         .map_if_ok(|x| -> Result<_> {
           let rust_type = complete_type(&result,
@@ -633,7 +639,8 @@ fn process_types(input_data: &CppAndFfiData,
           size_const_name: None,
           is_deletable: true,
           slot_wrapper: Some(RustQtSlotWrapper {
-                               arguments: qt_slot_wrapper.arguments
+                               arguments: qt_slot_wrapper
+                                 .arguments
                                  .iter()
                                  .map_if_ok(|t| -> Result<_> {
             let mut t = complete_type(&result,
@@ -775,7 +782,8 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
     let enum_type = if let CppTypeBase::Class(CppTypeClassBase {
                                                 ref template_arguments, ..
                                               }) = cpp_ffi_type.original_type.base {
-      let args = template_arguments.as_ref()
+      let args = template_arguments
+        .as_ref()
         .chain_err(|| "QFlags type must have template arguments")?;
       if args.len() != 1 {
         return Err("QFlags type must have exactly 1 template argument".into());
@@ -792,7 +800,9 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
       return Err(unexpected("invalid original type for QFlags").into());
     };
     rust_api_type = RustType::Common {
-      base: RustName::new(vec!["qt_core".to_string(), "flags".to_string(), "Flags".to_string()])?,
+      base: RustName::new(vec!["qt_core".to_string(),
+                               "flags".to_string(),
+                               "Flags".to_string()])?,
       generic_arguments: Some(vec![RustType::Common {
                                      base: enum_type,
                                      generic_arguments: None,
@@ -1010,7 +1020,8 @@ impl RustGenerator {
         tmp_cpp_methods.push(method);
       }
       cpp_methods = tmp_cpp_methods;
-      let functions_result = self.process_functions(good_methods.into_iter(), &methods_scope)?;
+      let functions_result = self
+        .process_functions(good_methods.into_iter(), &methods_scope)?;
 
       let mut qt_receivers_by_name: HashMap<String, Vec<_>> = HashMap::new();
       if self
@@ -1031,17 +1042,18 @@ impl RustGenerator {
                                    RustQtReceiverType::Slot
                                  },
                                  receiver_id: method.receiver_id()?,
-                                 arguments: method.arguments
+                                 arguments: method
+                                   .arguments
                                    .iter()
                                    .map_if_ok(|arg| -> Result<_> {
                 Ok(complete_type(&self.processed_types,
                                  &self.dependency_types,
-                                 &arg.argument_type
+                                 &arg
+                                    .argument_type
                                     .to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
                                  &CppFfiArgumentMeaning::Argument(0),
                                  false,
-                                 &ReturnValueAllocationPlace::NotApplicable)
-                       ?
+                                 &ReturnValueAllocationPlace::NotApplicable)?
                        .rust_api_type
                        .with_lifetime("static".to_string()))
               })?,
@@ -1150,7 +1162,8 @@ impl RustGenerator {
       let mut tmp_cpp_methods = Vec::new();
       for method in cpp_methods {
         if method.cpp_method.class_membership.is_none() {
-          let rust_name = self.calculate_rust_name_for_free_function(&method.cpp_method)?;
+          let rust_name = self
+            .calculate_rust_name_for_free_function(&method.cpp_method)?;
 
           if check_name(&rust_name) {
             good_methods.push(method);
@@ -1171,7 +1184,8 @@ impl RustGenerator {
       }
     }
     let mut free_functions_result =
-      self.process_functions(good_methods.into_iter(), &RustMethodScope::Free)?;
+      self
+        .process_functions(good_methods.into_iter(), &RustMethodScope::Free)?;
     module.trait_impls = free_functions_result.trait_impls;
     module.functions = free_functions_result.methods;
     rust_overloading_types.append(&mut free_functions_result.overloading_types);
@@ -1384,7 +1398,8 @@ impl RustGenerator {
   /// modules.
   fn method_rust_name(&self, method: &CppAndFfiMethod) -> Result<RustName> {
     let name = if method.cpp_method.class_membership.is_none() {
-      self.calculate_rust_name_for_free_function(&method.cpp_method)?
+      self
+        .calculate_rust_name_for_free_function(&method.cpp_method)?
     } else {
       let x = if method.cpp_method.is_constructor() {
         "new".to_string()
@@ -1465,7 +1480,11 @@ impl RustGenerator {
         }
       }
       "dynamic_cast" => vec!["cpp_utils".to_string(), "DynamicCast".to_string()],
-      "qobject_cast" => vec!["qt_core".to_string(), "object".to_string(), "Cast".to_string()],
+      "qobject_cast" => {
+        vec!["qt_core".to_string(),
+             "object".to_string(),
+             "Cast".to_string()]
+      }
       _ => return Err("invalid method name".into()),
     };
 
@@ -1497,14 +1516,17 @@ impl RustGenerator {
           .return_type
           .rust_api_to_c_conversion = RustToCTypeConversion::OptionRefToPtr;
         final_method.arguments.return_type.rust_api_type = RustType::Common {
-          base: RustName::new(vec!["std".to_string(), "option".to_string(), "Option".to_string()])?,
+          base: RustName::new(vec!["std".to_string(),
+                                   "option".to_string(),
+                                   "Option".to_string()])?,
           indirection: RustTypeIndirection::None,
           is_const: false,
           is_const2: false,
           generic_arguments: Some(vec![return_ref_type.rust_api_type]),
         }
       };
-      final_method.arguments.arguments[0].argument_type = final_method.arguments.arguments[0].argument_type
+      final_method.arguments.arguments[0].argument_type = final_method.arguments.arguments[0]
+        .argument_type
         .ptr_to_ref(*final_is_const)?;
       final_method.arguments.arguments[0].name = "self".to_string();
 
@@ -1600,7 +1622,8 @@ impl RustGenerator {
         .full_name();
       let mut args_variants = Vec::new();
       let mut method_name = first_method.name.clone();
-      let mut method_last_name = method_name.parts
+      let mut method_last_name = method_name
+        .parts
         .pop()
         .chain_err(|| "name can't be empty")?;
       if let Some(self_arg_kind_caption) = self_arg_kind_caption {
@@ -1648,7 +1671,8 @@ impl RustGenerator {
         doc_items.push(RustMethodDocItem {
                          doc: cpp_method.doc.clone(),
                          cpp_fn: cpp_method.short_text(),
-                         rust_fns: variants.iter()
+                         rust_fns: variants
+                           .iter()
                            .map_if_ok(|args| -> Result<_> {
                                         Ok(doc_formatter::rust_method_variant(args,
                                                     method_name.last_name()?,
@@ -1739,9 +1763,11 @@ impl RustGenerator {
         is_unsafe: first_method.is_unsafe,
       }
     } else {
-      let mut method = filtered_methods.pop()
+      let mut method = filtered_methods
+        .pop()
         .chain_err(|| "filtered_methods can't be empty")?;
-      let mut last_name = method.name
+      let mut last_name = method
+        .name
         .parts
         .pop()
         .chain_err(|| "name can't be empty")?;
@@ -1792,7 +1818,8 @@ impl RustGenerator {
         for (bucket_index, bucket) in buckets.iter().enumerate() {
           let mut bucket_caption: Option<Option<String>> = None;
           for method in bucket {
-            let caption = method.name_suffix(strategy, &all_self_args, bucket_index)?;
+            let caption = method
+              .name_suffix(strategy, &all_self_args, bucket_index)?;
             if bucket_caption.is_none() {
               bucket_caption = Some(caption);
             } else if Some(caption) != bucket_caption {
@@ -1889,8 +1916,8 @@ impl RustGenerator {
       // }
 
       for (name_suffix, overloaded_methods) in self.overload_functions(current_methods)? {
-        let (method, type_declaration) =
-          self.process_method(overloaded_methods, scope, name_suffix)?;
+        let (method, type_declaration) = self
+          .process_method(overloaded_methods, scope, name_suffix)?;
         if method.docs.is_empty() {
           return Err(unexpected(format!("docs are empty! {:?}", method)).into());
         }

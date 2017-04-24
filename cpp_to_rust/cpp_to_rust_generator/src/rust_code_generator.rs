@@ -1,8 +1,9 @@
+//! Types and functions used for Rust code generation.
+
 use common::errors::{Result, ChainErr, unexpected};
 use common::file_utils::{PathBufWithAdded, copy_recursively, file_to_string, copy_file,
-                         create_file, create_dir_all, remove_file, read_dir, os_str_to_str,
-                         os_string_into_string, save_toml, path_to_str, open_file_with_options,
-                         repo_crate_local_path};
+                         create_file, create_dir_all, read_dir, os_str_to_str, save_toml,
+                         path_to_str, repo_crate_local_path};
 use common::log;
 use rust_generator::RustGeneratorOutput;
 use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
@@ -13,7 +14,7 @@ use rust_type::{RustName, RustType, RustTypeIndirection, RustFFIFunction, RustTo
 use common::string_utils::{JoinWithSeparator, CaseOperations};
 use common::utils::MapIfOk;
 use doc_formatter;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use common::toml;
 use rustfmt;
@@ -21,32 +22,43 @@ use versions;
 
 use config::CrateProperties;
 
+/// Data required for Rust code generation.
 pub struct RustCodeGeneratorConfig<'a> {
+  /// Crate properties, as in `Config`.
   pub crate_properties: CrateProperties,
+  /// Path to the generated crate's root.
   pub output_path: PathBuf,
+  /// Path to the crate template, as in `Config`.
+  /// May be `None` if it wasn't set in `Config`.
   pub crate_template_path: Option<PathBuf>,
+  /// Name of the C++ wrapper library.
   pub cpp_ffi_lib_name: String,
+  /// `cpp_to_rust` based dependencies of the generated crate.
   pub generator_dependencies: &'a [DependencyInfo],
+  /// As in `Config`.
   pub write_dependencies_local_paths: bool,
 }
 
+/// Generates documentation comments containing
+/// markdown code `doc`.
 fn format_doc(doc: &str) -> String {
-  if doc.is_empty() {
-    return String::new();
+  fn format_line(x: &str) -> String {
+    let mut line = format!("/// {}\n", x);
+    if line.starts_with("///     ") {
+      // block doc tests
+      line = line.replace("///     ", "/// &#32;   ");
+    }
+    line
   }
-  doc
-    .split('\n')
-    .map(|x| {
-           let mut line = format!("/// {}\n", x);
-           if line.starts_with("///     ") {
-             // block doc tests
-             line = line.replace("///     ", "/// &#32;   ");
-           }
-           line
-         })
-    .join("")
+  if doc.is_empty() {
+    String::new()
+  } else {
+    doc.split('\n').map(format_line).join("")
+  }
 }
 
+/// Generates Rust code representing type `rust_type` inside crate `crate_name`.
+/// Same as `RustCodeGenerator::rust_type_to_code`, but accessible by other modules.
 pub fn rust_type_to_code(rust_type: &RustType, crate_name: &str) -> String {
   match *rust_type {
     RustType::EmptyTuple => "()".to_string(),
@@ -124,7 +136,7 @@ pub fn rust_type_to_code(rust_type: &RustType, crate_name: &str) -> String {
   }
 }
 
-
+/// Executes the code generator with `config` on `data`.
 pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) -> Result<()> {
   let template_rustfmt_config_path = config
     .crate_template_path
@@ -159,18 +171,22 @@ pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) -> Resul
   module_names.sort();
   generator.generate_ffi_file(&data.ffi_functions)?;
   generator.generate_lib_file(&module_names)?;
-  generator.append_from_template()?;
   Ok(())
 }
 
-pub struct RustCodeGenerator<'a> {
+/// Instance of the Rust code generator.
+struct RustCodeGenerator<'a> {
+  /// Configuration of the generator.
   config: RustCodeGeneratorConfig<'a>,
-  pub rustfmt_config: rustfmt::config::Config,
+  /// Configuration of `rustfmt`.
+  rustfmt_config: rustfmt::config::Config,
 }
 
 
 impl<'a> RustCodeGenerator<'a> {
-  /// Generates cargo file and skeleton of the crate
+  /// Generates `Cargo.toml` file and skeleton of the crate.
+  /// If a crate template was supplied, files from it are
+  /// copied to the output location.
   pub fn generate_template(&self) -> Result<()> {
     let template_rustfmt_config_path = self
       .config
@@ -189,7 +205,8 @@ impl<'a> RustCodeGenerator<'a> {
       copy_file(template_rustfmt_config_path, output_rustfmt_config_path)?;
     } else {
       let mut rustfmt_file = create_file(output_rustfmt_config_path)?;
-      rustfmt_file.write(include_str!("../templates/crate/rustfmt.toml"))?;
+      rustfmt_file
+        .write(include_str!("../templates/crate/rustfmt.toml"))?;
     }
 
     let template_build_rs_path = self
@@ -210,7 +227,8 @@ impl<'a> RustCodeGenerator<'a> {
     } else {
       {
         let mut rustfmt_file = create_file(&output_build_rs_path)?;
-        rustfmt_file.write(include_str!("../templates/crate/build.rs"))?;
+        rustfmt_file
+          .write(include_str!("../templates/crate/build.rs"))?;
       }
       self.call_rustfmt(&output_build_rs_path);
     }
@@ -318,12 +336,10 @@ impl<'a> RustCodeGenerator<'a> {
               cargo_toml_data)?;
 
     if let Some(ref template_path) = self.config.crate_template_path {
-      for name in &["src", "tests", "examples"] {
-        let template_item_path = template_path.with_added(&name);
-        if template_item_path.as_path().exists() {
-          copy_recursively(&template_item_path,
-                           &self.config.output_path.with_added(&name))?;
-        }
+      for item in read_dir(template_path)? {
+        let item = item?;
+        copy_recursively(&item.path(),
+                         &self.config.output_path.with_added(item.file_name()))?;
       }
     }
     if !self.config.output_path.with_added("src").exists() {
@@ -332,10 +348,12 @@ impl<'a> RustCodeGenerator<'a> {
     Ok(())
   }
 
+  /// Generates Rust code representing type `rust_type`.
   fn rust_type_to_code(&self, rust_type: &RustType) -> String {
     rust_type_to_code(rust_type, &self.config.crate_properties.name())
   }
 
+  /// Generates Rust code containing declaration of a FFI function `func`.
   fn rust_ffi_function_to_code(&self, func: &RustFFIFunction) -> String {
     let args = func
       .arguments
@@ -354,6 +372,12 @@ impl<'a> RustCodeGenerator<'a> {
             })
   }
 
+  /// Wraps `expression` of type `type1.rust_ffi_type` to convert
+  /// it to type `type1.rust_api_type`.
+  /// If `in_unsafe_context` is `true`, the output code will be placed inside
+  /// an `unsafe` block.
+  /// If `use_ffi_result_var` is `true`, the output code will assign
+  /// the value to a temporary variable `ffi_result` and return it.
   fn convert_type_from_ffi(&self,
                            type1: &CompleteType,
                            expression: String,
@@ -381,7 +405,8 @@ impl<'a> RustCodeGenerator<'a> {
         let api_is_const = if type1.rust_api_to_c_conversion ==
                               RustToCTypeConversion::OptionRefToPtr {
           if let RustType::Common { ref generic_arguments, .. } = type1.rust_api_type {
-            let args = generic_arguments.as_ref()
+            let args = generic_arguments
+              .as_ref()
               .chain_err(|| "Option with no generic_arguments")?;
             if args.len() != 1 {
               return Err("Option with invalid args count".into());
@@ -432,6 +457,9 @@ impl<'a> RustCodeGenerator<'a> {
     Ok(code1 + &code2)
   }
 
+  /// Generates Rust code for calling an FFI function from a wrapper function.
+  /// If `in_unsafe_context` is `true`, the output code will be placed inside
+  /// an `unsafe` block.
   fn generate_ffi_call(&self,
                        variant: &RustMethodArgumentsVariant,
                        shared_arguments: &[RustMethodArgument],
@@ -522,9 +550,11 @@ impl<'a> RustCodeGenerator<'a> {
       let struct_name = if variant.return_type.rust_api_to_c_conversion ==
                            RustToCTypeConversion::CppBoxToPtr {
         if let RustType::Common { ref generic_arguments, .. } = variant.return_type.rust_api_type {
-          let generic_arguments = generic_arguments.as_ref()
+          let generic_arguments = generic_arguments
+            .as_ref()
             .chain_err(|| "CppBox must have generic_arguments")?;
-          let arg = generic_arguments.get(0)
+          let arg = generic_arguments
+            .get(0)
             .chain_err(|| "CppBox must have non-empty generic_arguments")?;
           self.rust_type_to_code(arg)
         } else {
@@ -543,7 +573,8 @@ impl<'a> RustCodeGenerator<'a> {
       final_args[*i as usize] = Some(format!("&mut {}", return_var_name));
       maybe_result_var_name = Some(return_var_name);
     }
-    let final_args = final_args.into_iter()
+    let final_args = final_args
+      .into_iter()
       .map_if_ok(|x| x.chain_err(|| "ffi argument is missing"))?;
 
     result.push(format!("{unsafe_start}::ffi::{}({}){maybe_semicolon}{unsafe_end}",
@@ -567,6 +598,7 @@ impl<'a> RustCodeGenerator<'a> {
     }
   }
 
+  /// Generates Rust code for declaring a function's arguments.
   fn arg_texts(&self, args: &[RustMethodArgument], lifetime: Option<&String>) -> Vec<String> {
     args
       .iter()
@@ -629,6 +661,7 @@ impl<'a> RustCodeGenerator<'a> {
   }
 
 
+  /// Generates complete code of a Rust wrapper function.
   fn generate_rust_final_function(&self, func: &RustMethod) -> Result<String> {
     let maybe_pub = match func.scope {
       RustMethodScope::TraitImpl => "",
@@ -637,8 +670,10 @@ impl<'a> RustCodeGenerator<'a> {
     let maybe_unsafe = if func.is_unsafe { "unsafe " } else { "" };
     Ok(match func.arguments {
          RustMethodArguments::SingleVariant(ref variant) => {
-      let body = self.generate_ffi_call(variant, &Vec::new(), func.is_unsafe)?;
-      let return_type_for_signature = if variant.return_type.rust_api_type == RustType::EmptyTuple {
+      let body = self
+        .generate_ffi_call(variant, &Vec::new(), func.is_unsafe)?;
+      let return_type_for_signature = if variant.return_type.rust_api_type ==
+                                         RustType::EmptyTuple {
         String::new()
       } else {
         format!(" -> {}",
@@ -727,88 +762,56 @@ impl<'a> RustCodeGenerator<'a> {
        })
   }
 
+  /// Generates `lib.rs` file.
   #[cfg_attr(feature="clippy", allow(collapsible_if))]
   pub fn generate_lib_file(&self, modules: &[&String]) -> Result<()> {
+    let mut code = String::new();
+
+
+    code.push_str("pub extern crate libc;\n");
+    code.push_str("pub extern crate cpp_utils;\n\n");
+    for dep in self.config.generator_dependencies {
+      code.push_str(&format!("pub extern crate {};\n\n", &dep.rust_export_info.crate_name));
+    }
+
+    // some ffi functions are not used because
+    // some Rust methods are filtered
+    code.push_str("\
+      #[allow(dead_code)]\nmod ffi { \ninclude!(concat!(env!(\"OUT_DIR\"), \
+              \"/ffi.rs\")); \n}\n\n");
+    code.push_str("\
+      mod type_sizes { \ninclude!(concat!(env!(\"OUT_DIR\"), \
+              \"/type_sizes.rs\")); \n}\n\n");
+
+    for name in &["ffi", "type_sizes"] {
+      if modules.iter().any(|x| &x.as_str() == name) {
+        return Err(format!("Automatically generated module '{}' conflicts with a mandatory \
+                            module",
+                           name)
+                       .into());
+      }
+    }
+    for name in &["lib", "main"] {
+      if modules.iter().any(|x| &x.as_str() == name) {
+        return Err(format!("Automatically generated module '{}' conflicts with a reserved name",
+                           name)
+                       .into());
+      }
+    }
+
+    for module in modules {
+      code.push_str(&format!("pub mod {};\n", module));
+    }
+
     let src_path = self.config.output_path.with_added("src");
     let lib_file_path = src_path.with_added("lib.rs");
-    if lib_file_path.as_path().exists() {
-      remove_file(&lib_file_path)?;
-    }
-    let lib_file_path = src_path.with_added("lib.rs");
-    {
-      let mut lib_file = create_file(&lib_file_path)?;
-      lib_file.write("pub extern crate libc;\n")?;
-      lib_file.write("pub extern crate cpp_utils;\n\n")?;
-      for dep in self.config.generator_dependencies {
-        lib_file.write(format!("pub extern crate {};\n\n", &dep.rust_export_info.crate_name))?;
-      }
 
-      // some ffi functions are not used because
-      // some Rust methods are filtered
-      lib_file.write("\
-        #[allow(dead_code)]\nmod ffi { \ninclude!(concat!(env!(\"OUT_DIR\"), \
-                \"/ffi.rs\")); \n}\n\n")?;
-      lib_file.write("\
-        mod type_sizes { \ninclude!(concat!(env!(\"OUT_DIR\"), \
-                \"/type_sizes.rs\")); \n}\n\n")?;
-
-      for name in &["ffi", "type_sizes"] {
-        if modules.iter().any(|x| &x.as_str() == name) {
-          return Err(format!("Automatically generated module '{}' conflicts with a mandatory \
-                              module",
-                             name)
-                         .into());
-        }
-      }
-      for name in &["lib", "main"] {
-        if modules.iter().any(|x| &x.as_str() == name) {
-          return Err(format!("Automatically generated module '{}' conflicts with a reserved name",
-                             name)
-                         .into());
-        }
-      }
-
-      let mut extra_modules = Vec::new();
-
-      if let Some(ref template_path) = self.config.crate_template_path {
-        if template_path.with_added("src").exists() {
-          for item in read_dir(template_path.with_added("src"))? {
-            let item = item?;
-            let path = item.path();
-            let file_name = os_string_into_string(item.file_name())?;
-            if file_name == "lib.rs" || file_name == "ffi.rs" {
-              return Err(format!("src/{} in crate template is not allowed", file_name).into());
-            }
-            if item.path().is_dir() {
-              extra_modules.push(file_name.to_string());
-            } else if let Some(ext) = item.path().extension() {
-              if ext == "rs" {
-                let stem = path.file_stem()
-                  .chain_err(|| "file_stem() failed for .rs file")?;
-                extra_modules.push(os_str_to_str(stem)?.to_string());
-              }
-            }
-          }
-        }
-      }
-      for module in &extra_modules {
-        if modules.iter().any(|x| x.as_str() == module) {
-          return Err(format!("Crate template contains '{}' module but there is an automatically \
-                              generated module with the same name",
-                             module)
-                         .into());
-        }
-      }
-      let all_modules = extra_modules.iter().chain(modules.iter().map(|x| *x));
-      for module in all_modules {
-        let maybe_pub = "pub ";
-        lib_file.write(format!("{}mod {};\n", maybe_pub, module))?;
-      }
-      self.call_rustfmt(&lib_file_path);
-    }
+    self.save_src_file(&lib_file_path, &code)?;
+    self.call_rustfmt(&lib_file_path);
     Ok(())
   }
 
+  /// Generates Rust code for given trait implementations.
   fn generate_trait_impls(&self, trait_impls: &[TraitImpl]) -> Result<String> {
     let mut results = Vec::new();
     for trait1 in trait_impls {
@@ -838,6 +841,8 @@ impl<'a> RustCodeGenerator<'a> {
     Ok(results.join(""))
   }
 
+  /// Generates code for a module of the output crate.
+  /// This may be a top level or nested module.
   #[cfg_attr(feature="clippy", allow(single_match_else))]
   fn generate_module_code(&self, data: &RustModule) -> Result<String> {
     let mut results = Vec::new();
@@ -876,8 +881,7 @@ impl<'a> RustCodeGenerator<'a> {
                              trait_type =
                                RustName::new(vec!["qt_core".to_string(),
                                                   "flags".to_string(),
-                                                  "FlaggableEnum".to_string()])
-                                   ?
+                                                  "FlaggableEnum".to_string()])?
                                    .full_name(Some(&self.config.crate_properties.name())));
               }
               r
@@ -907,13 +911,11 @@ impl<'a> RustCodeGenerator<'a> {
                 let args = arg_texts.join(", ");
                 let args_tuple = format!("{}{}", args, if arg_texts.len() == 1 { "," } else { "" });
                 let connections_mod = RustName::new(vec!["qt_core".to_string(),
-                                                         "connections".to_string()])
-                    ?
+                                                         "connections".to_string()])?
                     .full_name(Some(&self.config.crate_properties.name()));
                 let object_type_name = RustName::new(vec!["qt_core".to_string(),
                                                           "object".to_string(),
-                                                          "Object".to_string()])
-                    ?
+                                                          "Object".to_string()])?
                     .full_name(Some(&self.config.crate_properties.name()));
                 let callback_args = slot_wrapper
                   .arguments
@@ -963,13 +965,11 @@ impl<'a> RustCodeGenerator<'a> {
           results.push(self.generate_trait_impls(trait_impls)?);
           if !qt_receivers.is_empty() {
             let connections_mod = RustName::new(vec!["qt_core".to_string(),
-                                                     "connections".to_string()])
-                ?
+                                                     "connections".to_string()])?
                 .full_name(Some(&self.config.crate_properties.name()));
             let object_type_name = RustName::new(vec!["qt_core".to_string(),
                                                       "object".to_string(),
-                                                      "Object".to_string()])
-                ?
+                                                      "Object".to_string()])?
                 .full_name(Some(&self.config.crate_properties.name()));
             let mut content = Vec::new();
             let obj_name = type1
@@ -1147,7 +1147,8 @@ pub fn {struct_method}(&self) -> {struct_type} {{
                                  return_type_string = return_type_string,
                                  tmp_vars = tmp_vars.join("\n"),
                                  body =
-                                   self.generate_ffi_call(variant, shared_arguments, *is_unsafe)?));
+                                   self
+                                     .generate_ffi_call(variant, shared_arguments, *is_unsafe)?));
 
           }
         }
@@ -1165,8 +1166,8 @@ pub fn {struct_method}(&self) -> {struct_type} {{
     Ok(results.join(""))
   }
 
+  /// Runs `rustfmt` on a Rust file `path`.
   fn call_rustfmt(&self, path: &PathBuf) {
-    // log::noisy(format!("Formatting {}", path.display()));
     let result = ::std::panic::catch_unwind(|| {
                                               rustfmt::format_input(rustfmt::Input::File(path.clone()),
                             &self.rustfmt_config,
@@ -1185,73 +1186,59 @@ pub fn {struct_method}(&self) -> {struct_type} {{
     assert!(path.as_path().is_file());
   }
 
+  /// Creates a top level module file.
   pub fn generate_module_file(&self, data: &RustModule) -> Result<()> {
     let mut file_path = self.config.output_path.clone();
     file_path.push("src");
     file_path.push(format!("{}.rs", &data.name));
-    {
-      let mut file = create_file(&file_path)?;
-      file.write(self.generate_module_code(data)?)?;
-    }
+    self
+      .save_src_file(&file_path, &self.generate_module_code(data)?)?;
     self.call_rustfmt(&file_path);
     Ok(())
   }
 
+  /// Generates `ffi.in.rs` file.
   pub fn generate_ffi_file(&self, functions: &[(String, Vec<RustFFIFunction>)]) -> Result<()> {
+    let mut code = String::new();
+    code.push_str("extern \"C\" {\n");
+    for &(ref include_file, ref functions) in functions {
+      code.push_str(&format!("  // Header: {}\n", include_file));
+      for function in functions {
+        code.push_str(&self.rust_ffi_function_to_code(function));
+      }
+      code.push_str("\n");
+    }
+    code.push_str("}\n");
+
+
     let src_dir_path = self.config.output_path.with_added("src");
     let file_path = src_dir_path.with_added("ffi.in.rs");
-    {
-      let mut file = create_file(&file_path)?;
-      file.write("extern \"C\" {\n")?;
-
-      for &(ref include_file, ref functions) in functions {
-        file.write(format!("  // Header: {}\n", include_file))?;
-        for function in functions {
-          file.write(self.rust_ffi_function_to_code(function))?;
-        }
-        file.write("\n")?;
-      }
-      file.write("}\n")?;
-    }
+    self.save_src_file(&file_path, &code)?;
     // no rustfmt for ffi file
     Ok(())
   }
 
-  fn append_from_template(&self) -> Result<()> {
-    if let Some(ref template_path) = self.config.crate_template_path {
-      let src_append_path = template_path.with_added("src_append");
-      if src_append_path.exists() {
-        if !src_append_path.is_dir() {
-          return Err(format!("Path is expected to be a directory: {}",
-                             src_append_path.display())
-                         .into());
-        }
-        log::status(format!("Adding code from 'src_append' directory"));
-        for item in read_dir(template_path.with_added("src_append"))? {
-          let item = item?;
-          let path = item.path();
-          if !path.is_file() {
-            return Err(format!("Path is expected to be a file: {}", path.display()).into());
-          }
-          let file_name = item.file_name();
-          let output_path = self
-            .config
-            .output_path
-            .with_added("src")
-            .with_added(&file_name);
-          if !output_path.exists() {
-            return Err(format!("Failed to append content from '{}' file because '{}' file does \
-                                not exist",
-                               path.display(),
-                               output_path.display())
-                           .into());
-          }
-          let mut file = open_file_with_options(output_path,
-                                                ::std::fs::OpenOptions::new().append(true))?;
-          file.write(file_to_string(path)?)?;
-
-        }
+  /// Creates new Rust source file or merges it with the existing file.
+  fn save_src_file(&self, path: &Path, code: &str) -> Result<()> {
+    const MARKER: &'static str = "include_generated!();";
+    if path.exists() {
+      let template = file_to_string(path)?;
+      if let Some(index) = template.find(MARKER) {
+        let mut file = create_file(&path)?;
+        file.write(&template[0..index])?;
+        file.write(code)?;
+        file.write(&template[index + MARKER.len()..])?;
+      } else {
+        let name = os_str_to_str(path
+                                   .file_name()
+                                   .chain_err(|| unexpected("no file name in path"))?)?;
+        let e = format!("Generated source file {} conflicts with the crate template. Use \"include_generated!();\" macro in the crate template to merge files or block items of this module in the generator's configuration.",
+                        name);
+        return Err(e.into());
       }
+    } else {
+      let mut file = create_file(&path)?;
+      file.write(code)?;
     }
     Ok(())
   }

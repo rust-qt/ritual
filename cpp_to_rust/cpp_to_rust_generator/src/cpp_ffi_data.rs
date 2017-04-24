@@ -2,7 +2,7 @@ use caption_strategy::{ArgumentCaptionStrategy, MethodCaptionStrategy, TypeCapti
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppFunctionPointerType};
-use cpp_data::{CppData};
+use cpp_data::CppData;
 use common::errors::Result;
 use common::utils::MapIfOk;
 
@@ -70,13 +70,15 @@ impl CppFfiFunctionArgument {
     Ok(match strategy {
          ArgumentCaptionStrategy::NameOnly => self.name.clone(),
          ArgumentCaptionStrategy::TypeOnly(type_strategy) => {
-           self.argument_type
+           self
+             .argument_type
              .original_type
              .caption(type_strategy)?
          }
          ArgumentCaptionStrategy::TypeAndName(type_strategy) => {
            format!("{}_{}",
-                   self.argument_type
+                   self
+                     .argument_type
                      .original_type
                      .caption(type_strategy)?,
                    self.name)
@@ -88,7 +90,8 @@ impl CppFfiFunctionArgument {
   /// corresponding to this argument
   pub fn to_cpp_code(&self) -> Result<String> {
     if let CppTypeBase::FunctionPointer(..) = self.argument_type.ffi_type.base {
-      Ok(self.argument_type
+      Ok(self
+           .argument_type
            .ffi_type
            .to_cpp_code(Some(&self.name))?)
     } else {
@@ -124,7 +127,8 @@ impl CppFfiFunctionSignature {
   /// Used to generate FFI methods with different names
   /// for overloaded functions.
   pub fn arguments_caption(&self, strategy: ArgumentCaptionStrategy) -> Result<String> {
-    let r = self.arguments
+    let r = self
+      .arguments
       .iter()
       .filter(|x| x.meaning.is_argument())
       .map_if_ok(|arg| arg.caption(strategy.clone()))?;

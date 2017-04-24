@@ -53,7 +53,8 @@ impl CMakeVar {
           L: IntoIterator<Item = I>
   {
     CMakeVar::new_list(name,
-                       paths.into_iter()
+                       paths
+                         .into_iter()
                          .map_if_ok(|x| path_to_str(x.as_ref()).map(|x| x.to_string()))?)
   }
 }

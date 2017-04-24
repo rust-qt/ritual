@@ -1,3 +1,4 @@
+include_generated!();
 
 use libc::{c_char, c_int};
 use std;
