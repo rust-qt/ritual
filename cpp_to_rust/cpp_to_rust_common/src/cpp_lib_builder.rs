@@ -78,7 +78,7 @@ pub struct CppLibBuilder {
   pub install_dir: PathBuf,
   /// Number of threads used to build the library. If `None` is supplied,
   /// number of threads will be detected automatically.
-  pub num_jobs: Option<i32>,
+  pub num_jobs: Option<usize>,
   /// CMake build type (Debug or Release)
   pub build_type: BuildType,
   /// Additional variables passed to CMake
@@ -140,7 +140,7 @@ impl CppLibBuilder {
     let num_jobs = if let Some(x) = self.num_jobs {
       x
     } else {
-      ::num_cpus::get() as i32
+      ::num_cpus::get()
     };
     if target::current_env() == target::Env::Msvc && num_jobs > 1 {
       log::status("Checking for jom");

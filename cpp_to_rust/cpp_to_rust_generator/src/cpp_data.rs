@@ -39,7 +39,7 @@ pub struct CppClassField {
   /// Visibility
   pub visibility: CppVisibility,
   /// Size of type in bytes
-  pub size: Option<i32>,
+  pub size: Option<usize>,
 }
 
 /// A "using" directive inside a class definition,
@@ -156,7 +156,7 @@ pub struct TemplateArgumentsDeclaration {
   ///   class B {};
   /// };
   /// ```
-  pub nested_level: i32,
+  pub nested_level: usize,
   /// Names of template arguments. Names themselves are
   /// not particularly important, but their count is.
   pub names: Vec<String>,
@@ -262,7 +262,7 @@ pub fn create_cast_method(name: &str,
 /// Returns `Err` if any of `template_instantiations` is incompatible
 /// with the method.
 fn apply_instantiations_to_method(method: &CppMethod,
-                                  nested_level: i32,
+                                  nested_level: usize,
                                   template_instantiations: &[CppTemplateInstantiation])
                                   -> Result<Vec<CppMethod>> {
   let mut new_methods = Vec::new();
@@ -272,7 +272,7 @@ fn apply_instantiations_to_method(method: &CppMethod,
     let mut new_method = method.clone();
     if let Some(ref args) = method.template_arguments {
       if args.nested_level == nested_level {
-        if args.count() != ins.template_arguments.len() as i32 {
+        if args.count() != ins.template_arguments.len() {
           return Err("template arguments count mismatch".into());
         }
         new_method.template_arguments = None;
@@ -391,7 +391,7 @@ impl CppTypeData {
                 indirection: CppTypeIndirection::None,
                 base: CppTypeBase::TemplateParameter {
                   nested_level: arguments.nested_level,
-                  index: num as i32,
+                  index: num,
                 },
               }
             })
@@ -1242,7 +1242,7 @@ impl CppData {
     }
     #[derive(Debug)]
     struct Section {
-      line: i32,
+      line: usize,
       section_type: SectionType,
     }
 
@@ -1273,7 +1273,7 @@ impl CppData {
         };
         if let Some(section_type) = section_type {
           file_sections.push(Section {
-                               line: line_num as i32,
+                               line: line_num,
                                section_type: section_type,
                              });
         }
@@ -1288,7 +1288,7 @@ impl CppData {
       if let Some(sections) = sections.get(&type1.origin_location.include_file_path) {
         let sections: Vec<_> = sections
           .iter()
-          .filter(|x| x.line >= type1.origin_location.line as i32 - 1)
+          .filter(|x| x.line + 1 >= type1.origin_location.line as usize)
           .collect();
         for method in &mut self.methods {
           let mut section_type = SectionType::Other;
@@ -1298,7 +1298,7 @@ impl CppData {
                 let matching_sections: Vec<_> = sections
                   .clone()
                   .into_iter()
-                  .filter(|x| x.line <= location.line as i32 - 1)
+                  .filter(|x| x.line + 1 <= location.line as usize)
                   .collect();
                 if !matching_sections.is_empty() {
                   let section = matching_sections[matching_sections.len() - 1];
@@ -1385,8 +1385,8 @@ impl CppData {
     struct TypeStats {
       // has_derived_classes: bool,
       has_virtual_methods: bool,
-      pointers_count: i32,
-      not_pointers_count: i32,
+      pointers_count: usize,
+      not_pointers_count: usize,
     };
     fn check_type(cpp_type: &CppType, data: &mut HashMap<String, TypeStats>) {
       if let CppTypeBase::Class(CppTypeClassBase {
@@ -1537,7 +1537,7 @@ impl CppData {
 impl TemplateArgumentsDeclaration {
   /// Returns count of the template arguments.
   #[allow(dead_code)]
-  pub fn count(&self) -> i32 {
-    self.names.len() as i32
+  pub fn count(&self) -> usize {
+    self.names.len()
   }
 }

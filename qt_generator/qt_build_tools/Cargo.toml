@@ -4,6 +4,7 @@ version = "0.1.3"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 license = "MIT"
 description = "Build script implementation for Rust Qt crates"
+repository = "https://github.com/rust-qt/cpp_to_rust/tree/master/qt_generator/qt_build_tools"
 
 [dependencies]
 cpp_to_rust_build_tools = { version = "0.0", path = "../../cpp_to_rust/cpp_to_rust_build_tools" }

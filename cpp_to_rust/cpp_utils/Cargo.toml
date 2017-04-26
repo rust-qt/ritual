@@ -1,7 +1,10 @@
 [package]
 name = "cpp_utils"
+
+# Don't forget to update `cpp_to_rust/cpp_to_rust_generator/src/versions.rs`
+# when changing this version.
 version = "0.1.2"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 description = "Various C++-related types and functions needed for the cpp_to_rust project"
 license = "MIT"
-repository = "https://github.com/rust-qt/cpp_utils"
+repository = "https://github.com/rust-qt/cpp_to_rust/tree/master/cpp_to_rust/cpp_utils"

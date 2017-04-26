@@ -86,18 +86,32 @@ pub enum RustType {
     base: RustName,
     /// Generic arguments, if any
     generic_arguments: Option<Vec<RustType>>,
+    /// If the type has no indirection, `is_const`
+    /// indicates constness of the type itself (e.g. `i32` vs `mut i32`).
+    /// If the type has one level of indirection, `is_const`
+    /// indicates constness of that indirection, i.e. if the pointer or the reference
+    /// is const. If the type has two levels of indirection,
+    /// `is_const` indicates constness of indirection that is applied first.
     is_const: bool,
+    /// If the type has two levels of indirection,
+    /// `is_const2` indicates constness of indirection that is applied second.
+    /// In other cases it is `false`.
     is_const2: bool,
+    /// Indirection of this type.
     indirection: RustTypeIndirection,
   },
+  /// A function pointer type.
   FunctionPointer {
+    /// Return type of the function.
     return_type: Box<RustType>,
+    /// Argument types of the function.
     arguments: Vec<RustType>,
   },
 }
 
 
 impl RustName {
+  /// Creates new `RustName` consisting of `parts`.
   pub fn new(parts: Vec<String>) -> Result<RustName> {
     if parts.is_empty() {
       return Err(unexpected("RustName can't be empty").into());
@@ -105,6 +119,8 @@ impl RustName {
     Ok(RustName { parts: parts })
   }
 
+  /// Returns crate name of this name, or `None`
+  /// if this name does not contain the crate name.
   pub fn crate_name(&self) -> Option<&String> {
     assert!(self.parts.len() > 0);
     if self.parts.len() > 1 {
@@ -113,12 +129,18 @@ impl RustName {
       None
     }
   }
+
+  /// Returns last component of the name.
   pub fn last_name(&self) -> Result<&String> {
     self
       .parts
       .last()
       .chain_err(|| unexpected("RustName can't be empty"))
   }
+
+  /// Returns formatted name for using within `current_crate`.
+  /// If `current_crate` is `None`, it's assumed that the formatted name
+  /// will be used outside of the crate it belongs to.
   pub fn full_name(&self, current_crate: Option<&str>) -> String {
     if let Some(current_crate) = current_crate {
       if let Some(self_crate) = self.crate_name() {
@@ -134,83 +156,26 @@ impl RustName {
     }
   }
 
+  /// Returns true if `other` is nested within `self`.
   pub fn includes(&self, other: &RustName) -> bool {
     let extra_modules_count = other.parts.len() as isize - self.parts.len() as isize;
     extra_modules_count > 0 && other.parts[0..self.parts.len()] == self.parts[..]
   }
 
+  /// Returns true if `other` is a direct child of `self`.
   pub fn includes_directly(&self, other: &RustName) -> bool {
     let extra_modules_count = other.parts.len() as isize - self.parts.len() as isize;
     self.includes(other) && extra_modules_count == 1
   }
 }
 
-trait ToRustName {
-  fn to_rust_name() -> Result<RustName>;
-}
-
-impl ToRustName for u8 {
-  fn to_rust_name() -> Result<RustName> {
-    RustName::new(vec!["u8".to_string()])
-  }
-}
-impl ToRustName for i8 {
-  fn to_rust_name() -> Result<RustName> {
-    RustName::new(vec!["i8".to_string()])
-  }
-}
-impl ToRustName for u16 {
-  fn to_rust_name() -> Result<RustName> {
-    RustName::new(vec!["u16".to_string()])
-  }
-}
-impl ToRustName for i16 {
-  fn to_rust_name() -> Result<RustName> {
-    RustName::new(vec!["i16".to_string()])
-  }
-}
-impl ToRustName for u32 {
-  fn to_rust_name() -> Result<RustName> {
-    RustName::new(vec!["u32".to_string()])
-  }
-}
-impl ToRustName for i32 {
-  fn to_rust_name() -> Result<RustName> {
-    RustName::new(vec!["i32".to_string()])
-  }
-}
-impl ToRustName for u64 {
-  fn to_rust_name() -> Result<RustName> {
-    RustName::new(vec!["u64".to_string()])
-  }
-}
-impl ToRustName for i64 {
-  fn to_rust_name() -> Result<RustName> {
-    RustName::new(vec!["i64".to_string()])
-  }
-}
-impl ToRustName for f32 {
-  fn to_rust_name() -> Result<RustName> {
-    RustName::new(vec!["f32".to_string()])
-  }
-}
-impl ToRustName for f64 {
-  fn to_rust_name() -> Result<RustName> {
-    RustName::new(vec!["f64".to_string()])
-  }
-}
-
-
-
-
-
-
-
 impl RustType {
+  /// Returns alphanumeric description of this type
+  /// for purposes of name disambiguation.
   #[allow(dead_code)]
   pub fn caption(&self, context: &RustName) -> Result<String> {
     Ok(match *self {
-         RustType::EmptyTuple => "void".to_string(),
+         RustType::EmptyTuple => "empty".to_string(),
          RustType::Common {
            ref base,
            ref generic_arguments,
@@ -278,6 +243,7 @@ impl RustType {
        })
   }
 
+  /// Returns true if this type is a reference.
   #[allow(dead_code)]
   pub fn is_ref(&self) -> bool {
     match *self {
@@ -293,6 +259,7 @@ impl RustType {
     }
   }
 
+  /// Returns a copy of this type with `new_lifetime` added, if possible.
   pub fn with_lifetime(&self, new_lifetime: String) -> RustType {
     let mut r = self.clone();
     if let RustType::Common { ref mut indirection, .. } = r {
@@ -305,6 +272,8 @@ impl RustType {
     r
   }
 
+  /// Returns name of the lifetime of this type,
+  /// or `None` if there isn't any lifetime in this type.
   pub fn lifetime(&self) -> Option<&String> {
     match *self {
       RustType::Common { ref indirection, .. } => {
@@ -317,6 +286,7 @@ impl RustType {
       _ => None,
     }
   }
+  /// Returns true if indirection that is applied last has const qualifier.
   pub fn last_is_const(&self) -> Result<bool> {
     if let RustType::Common {
              ref is_const,
@@ -333,12 +303,16 @@ impl RustType {
       Err("not a Common type".into())
     }
   }
+
+  /// Returns true if this type (or first indirection of the type) is const.
   pub fn is_const(&self) -> Result<bool> {
     match *self {
       RustType::Common { ref is_const, .. } => Ok(*is_const),
       _ => Err("not a Common type".into()),
     }
   }
+
+  /// Sets value of `is_const` for a common type.
   pub fn set_const(&mut self, value: bool) -> Result<()> {
     match *self {
       RustType::Common { ref mut is_const, .. } => {
@@ -349,6 +323,9 @@ impl RustType {
     }
   }
 
+  /// Returns true if function with an argument of type `self`
+  /// should be assumed unsafe. Currently returns true if this type
+  /// is or contains a raw pointer.
   pub fn is_unsafe_argument(&self) -> bool {
     match *self {
       RustType::Common {
@@ -383,20 +360,10 @@ impl RustType {
   }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct RustFFIArgument {
-  pub name: String,
-  pub argument_type: RustType,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct RustFFIFunction {
-  pub return_type: RustType,
-  pub name: String,
-  pub arguments: Vec<RustFFIArgument>,
-}
-
 impl CompleteType {
+  /// Converts Rust API type from pointer to reference
+  /// and modifies `rust_api_to_c_conversion` accordingly.
+  /// `is_const1` specifies new constness of the created reference.
   pub fn ptr_to_ref(&self, is_const1: bool) -> Result<CompleteType> {
     let mut r = self.clone();
     if let RustType::Common {
@@ -418,6 +385,9 @@ impl CompleteType {
     r.rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
     Ok(r)
   }
+
+  /// Converts Rust API type from pointer to value
+  /// and modifies `rust_api_to_c_conversion` accordingly.
   pub fn ptr_to_value(&self) -> Result<CompleteType> {
     let mut r = self.clone();
     if let RustType::Common {

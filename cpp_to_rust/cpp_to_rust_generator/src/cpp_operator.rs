@@ -122,7 +122,7 @@ pub struct CppOperatorInfo {
   /// Total number of arguments, including implicit "this" argument.
   /// Most operators can be class members or free functions,
   /// but total number of arguments is the same in both cases.
-  pub arguments_count: i32,
+  pub arguments_count: usize,
   /// True if this kind of operator can have variadic arguments.
   /// Only the function call operator has this property.
   pub allows_variadic_arguments: bool,
@@ -132,7 +132,7 @@ impl CppOperator {
   /// Reports information about this operator
   pub fn info(&self) -> CppOperatorInfo {
     use self::CppOperator::*;
-    fn oi(suffix: &'static str, count: i32) -> CppOperatorInfo {
+    fn oi(suffix: &'static str, count: usize) -> CppOperatorInfo {
       CppOperatorInfo {
         function_name_suffix: Some(suffix),
         arguments_count: count,

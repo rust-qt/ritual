@@ -10,15 +10,15 @@ use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
 use common::string_utils::JoinWithSeparator;
 use common::log;
 
-/// Generates a part of documentation for a Rust method
-/// with emulated overloading.
+/// Generates pseudo-code illustrating argument types for one variant of
+/// a Rust method with emulated overloading.
 pub fn rust_method_variant(args: &RustMethodArgumentsVariant,
                            method_name: &str,
                            self_arg_kind: RustMethodSelfArgKind,
                            crate_name: &str)
                            -> String {
   let self_arg_doc_text = match self_arg_kind {
-    RustMethodSelfArgKind::Static => "",
+    RustMethodSelfArgKind::None => "",
     RustMethodSelfArgKind::ConstRef => "&self, ",
     RustMethodSelfArgKind::MutRef => "&mut self, ",
     RustMethodSelfArgKind::Value => "self, ",

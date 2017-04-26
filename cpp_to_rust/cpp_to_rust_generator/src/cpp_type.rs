@@ -96,7 +96,7 @@ pub struct CppSpecificNumericType {
   /// Type identifier (most likely a typedef name)
   pub name: String,
   /// Size of type in bits
-  pub bits: i32,
+  pub bits: usize,
   /// Information about the type (float or integer,
   /// signed or unsigned)
   pub kind: CppSpecificNumericTypeKind,
@@ -134,10 +134,10 @@ pub enum CppTypeBase {
     /// the method's template parameters will have level = 1.
     /// If only the class or only the method is a template,
     /// the level will be 0.
-    nested_level: i32,
+    nested_level: usize,
     /// Index of the parameter. In `QHash<K, V>` `"K"` has `index = 0`
     /// and `"V"` has `index = 1`.
-    index: i32,
+    index: usize,
   },
   /// Function pointer type
   FunctionPointer(CppFunctionPointerType),
@@ -308,7 +308,7 @@ impl CppTypeClassBase {
   /// Attempts to replace template types at `nested_level1`
   /// within this type with `template_arguments1`.
   pub fn instantiate_class(&self,
-                           nested_level1: i32,
+                           nested_level1: usize,
                            template_arguments1: &[CppType])
                            -> Result<CppTypeClassBase> {
     Ok(CppTypeClassBase {
@@ -698,7 +698,7 @@ impl CppType {
   /// within this type with `template_arguments1`.
   #[cfg_attr(feature="clippy", allow(if_not_else))]
   pub fn instantiate(&self,
-                     nested_level1: i32,
+                     nested_level1: usize,
                      template_arguments1: &[CppType])
                      -> Result<CppType> {
     if let CppTypeBase::TemplateParameter {
@@ -706,13 +706,10 @@ impl CppType {
              index,
            } = self.base {
       if nested_level == nested_level1 {
-        if index < 0 {
-          return Err(unexpected("CppType::instantiate: index < 0").into());
-        }
-        if index >= template_arguments1.len() as i32 {
+        if index >= template_arguments1.len() {
           return Err("not enough template arguments".into());
         }
-        let arg = &template_arguments1[index as usize];
+        let arg = &template_arguments1[index];
         let mut new_type = CppType::void();
         new_type.base = arg.base.clone();
         match CppTypeIndirection::combine(&arg.indirection, &self.indirection) {

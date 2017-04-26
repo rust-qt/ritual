@@ -8,9 +8,9 @@ use common::log;
 use rust_generator::RustGeneratorOutput;
 use rust_info::{RustTypeDeclarationKind, RustTypeWrapperKind, RustModule, RustMethod,
                 RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope,
-                RustMethodArgument, TraitImpl, TraitImplExtra, RustQtReceiverType, DependencyInfo};
-use rust_type::{RustName, RustType, RustTypeIndirection, RustFFIFunction, RustToCTypeConversion,
-                CompleteType};
+                RustMethodArgument, TraitImpl, TraitImplExtra, RustQtReceiverType, DependencyInfo,
+                RustFFIFunction};
+use rust_type::{RustName, RustType, RustTypeIndirection, RustToCTypeConversion, CompleteType};
 use common::string_utils::{JoinWithSeparator, CaseOperations};
 use common::utils::MapIfOk;
 use doc_formatter;
@@ -477,62 +477,60 @@ impl<'a> RustCodeGenerator<'a> {
       all_args.push(arg.clone());
     }
     for arg in &all_args {
-      if let Some(ffi_index) = arg.ffi_index {
-        assert!(ffi_index >= 0 && ffi_index < final_args.len() as i32);
-        let mut code = arg.name.clone();
-        match arg.argument_type.rust_api_to_c_conversion {
-          RustToCTypeConversion::None => {}
-          RustToCTypeConversion::OptionRefToPtr => {
-            return Err("OptionRefToPtr is not supported here yet".into());
-          }
-          RustToCTypeConversion::RefToPtr => {
-            if arg.argument_type.rust_api_type.is_const()? &&
-               !arg.argument_type.rust_ffi_type.is_const()? {
-              let mut intermediate_type = arg.argument_type.rust_ffi_type.clone();
-              intermediate_type.set_const(true)?;
-              code = format!("{} as {} as {}",
-                             code,
-                             self.rust_type_to_code(&intermediate_type),
-                             self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
+      assert!(arg.ffi_index < final_args.len());
+      let mut code = arg.name.clone();
+      match arg.argument_type.rust_api_to_c_conversion {
+        RustToCTypeConversion::None => {}
+        RustToCTypeConversion::OptionRefToPtr => {
+          return Err("OptionRefToPtr is not supported here yet".into());
+        }
+        RustToCTypeConversion::RefToPtr => {
+          if arg.argument_type.rust_api_type.is_const()? &&
+             !arg.argument_type.rust_ffi_type.is_const()? {
+            let mut intermediate_type = arg.argument_type.rust_ffi_type.clone();
+            intermediate_type.set_const(true)?;
+            code = format!("{} as {} as {}",
+                           code,
+                           self.rust_type_to_code(&intermediate_type),
+                           self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
 
-            } else {
-              code = format!("{} as {}",
-                             code,
-                             self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
-            }
-          }
-          RustToCTypeConversion::ValueToPtr |
-          RustToCTypeConversion::CppBoxToPtr => {
-            let is_const = if let RustType::Common {
-                     ref is_const,
-                     ref is_const2,
-                     ref indirection,
-                     ..
-                   } = arg.argument_type.rust_ffi_type {
-              match *indirection {
-                RustTypeIndirection::PtrPtr { .. } |
-                RustTypeIndirection::PtrRef { .. } => *is_const2,
-                _ => *is_const,
-              }
-            } else {
-              return Err(unexpected("void is not expected here at all!").into());
-            };
-            if arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::CppBoxToPtr {
-              let method = if is_const { "as_ptr" } else { "as_mut_ptr" };
-              code = format!("{}.{}()", code, method);
-            } else {
-              code = format!("{}{} as {}",
-                             if is_const { "&" } else { "&mut " },
-                             code,
-                             self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
-            }
-          }
-          RustToCTypeConversion::QFlagsToUInt => {
-            code = format!("{}.to_int() as ::libc::c_uint", code);
+          } else {
+            code = format!("{} as {}",
+                           code,
+                           self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
           }
         }
-        final_args[ffi_index as usize] = Some(code);
+        RustToCTypeConversion::ValueToPtr |
+        RustToCTypeConversion::CppBoxToPtr => {
+          let is_const = if let RustType::Common {
+                   ref is_const,
+                   ref is_const2,
+                   ref indirection,
+                   ..
+                 } = arg.argument_type.rust_ffi_type {
+            match *indirection {
+              RustTypeIndirection::PtrPtr { .. } |
+              RustTypeIndirection::PtrRef { .. } => *is_const2,
+              _ => *is_const,
+            }
+          } else {
+            return Err(unexpected("void is not expected here at all!").into());
+          };
+          if arg.argument_type.rust_api_to_c_conversion == RustToCTypeConversion::CppBoxToPtr {
+            let method = if is_const { "as_ptr" } else { "as_mut_ptr" };
+            code = format!("{}.{}()", code, method);
+          } else {
+            code = format!("{}{} as {}",
+                           if is_const { "&" } else { "&mut " },
+                           code,
+                           self.rust_type_to_code(&arg.argument_type.rust_ffi_type));
+          }
+        }
+        RustToCTypeConversion::QFlagsToUInt => {
+          code = format!("{}.to_int() as ::libc::c_uint", code);
+        }
       }
+      final_args[arg.ffi_index] = Some(code);
     }
 
     let mut result = Vec::new();
@@ -708,7 +706,7 @@ impl<'a> RustCodeGenerator<'a> {
          RustMethodArguments::MultipleVariants {
            ref params_trait_name,
            ref params_trait_lifetime,
-           ref params_trait_return_type,
+           ref common_return_type,
            ref shared_arguments,
            ref variant_argument_name,
            ..
@@ -741,7 +739,7 @@ impl<'a> RustCodeGenerator<'a> {
       };
       let mut args = self.arg_texts(shared_arguments, None);
       args.push(format!("{}: {}", variant_argument_name, tpl_type));
-      let return_type_string = if let Some(ref t) = *params_trait_return_type {
+      let return_type_string = if let Some(ref t) = *common_return_type {
         self.rust_type_to_code(t)
       } else {
         format!("{}::ReturnType", tpl_type)
@@ -1042,7 +1040,7 @@ pub fn {struct_method}(&self) -> {struct_type} {{
           ref shared_arguments,
           ref impls,
           ref lifetime,
-          ref return_type,
+          ref common_return_type,
           ref is_unsafe,
           ..
         } => {
@@ -1056,13 +1054,13 @@ pub fn {struct_method}(&self) -> {struct_type} {{
           if impls.is_empty() {
             return Err("MethodParametersTrait with empty impls".into());
           }
-          let return_type_decl = if return_type.is_some() {
+          let return_type_decl = if common_return_type.is_some() {
             ""
           } else {
             "type ReturnType;"
           };
-          let return_type_string = if let Some(ref return_type) = *return_type {
-            self.rust_type_to_code(return_type)
+          let return_type_string = if let Some(ref common_return_type) = *common_return_type {
+            self.rust_type_to_code(common_return_type)
           } else {
             "Self::ReturnType".to_string()
           };
@@ -1108,14 +1106,10 @@ pub fn {struct_method}(&self) -> {struct_type} {{
               .collect();
             let mut tmp_vars = Vec::new();
             if variant.arguments.len() == 1 {
-              if variant.arguments[0].ffi_index.is_some() {
-                tmp_vars.push(format!("let {} = self;", variant.arguments[0].name));
-              }
+              tmp_vars.push(format!("let {} = self;", variant.arguments[0].name));
             } else {
               for (index, arg) in variant.arguments.iter().enumerate() {
-                if arg.ffi_index.is_some() {
-                  tmp_vars.push(format!("let {} = self.{};", arg.name, index));
-                }
+                tmp_vars.push(format!("let {} = self.{};", arg.name, index));
               }
             }
             let return_type_string = match final_lifetime {
@@ -1127,7 +1121,7 @@ pub fn {struct_method}(&self) -> {struct_type} {{
               }
               None => self.rust_type_to_code(&variant.return_type.rust_api_type),
             };
-            let return_type_decl = if return_type.is_some() {
+            let return_type_decl = if common_return_type.is_some() {
               String::new()
             } else {
               format!("type ReturnType = {};", return_type_string)

@@ -60,7 +60,7 @@ struct CppParser<'a> {
 /// Print representation of `entity` and its children to the log.
 /// `level` is current level of recursion.
 #[allow(dead_code)]
-fn dump_entity(entity: Entity, level: i32) {
+fn dump_entity(entity: Entity, level: usize) {
   for _ in 0..level {
     log::llog(log::DebugParser, || ". ");
   }
@@ -409,7 +409,7 @@ impl<'a> CppParser<'a> {
           return Ok(CppType {
                       base: CppTypeBase::TemplateParameter {
                         nested_level: args.nested_level,
-                        index: index as i32,
+                        index: index,
                       },
                       is_const: is_const,
                       is_const2: false,
@@ -424,7 +424,7 @@ impl<'a> CppParser<'a> {
           return Ok(CppType {
                       base: CppTypeBase::TemplateParameter {
                         nested_level: args.nested_level,
-                        index: index as i32,
+                        index: index,
                       },
                       is_const: is_const,
                       is_const2: false,
@@ -1039,7 +1039,7 @@ impl<'a> CppParser<'a> {
     }
     let allows_variadic_arguments = entity.is_variadic();
     let has_this_argument = class_name.is_some() && !entity.is_static_method();
-    let real_arguments_count = arguments.len() as i32 + if has_this_argument { 1 } else { 0 };
+    let real_arguments_count = arguments.len() + if has_this_argument { 1 } else { 0 };
     let mut method_operator = None;
     if name.starts_with("operator") {
       let name_suffix = name["operator".len()..].trim();
@@ -1243,7 +1243,7 @@ impl<'a> CppParser<'a> {
                  })?;
     Ok(CppClassField {
          size: match field_clang_type.get_sizeof() {
-           Ok(size) => Some(size as i32),
+           Ok(size) => Some(size),
            Err(_) => None,
          },
          name: field_name,
@@ -1338,7 +1338,7 @@ impl<'a> CppParser<'a> {
       return Err(unexpected("unexpected template arguments").into());
     }
     let size = match entity.get_type() {
-      Some(type1) => type1.get_sizeof().ok().map(|x| x as i32),
+      Some(type1) => type1.get_sizeof().ok(),
       None => None,
     };
     if template_arguments.is_none() && size.is_none() {

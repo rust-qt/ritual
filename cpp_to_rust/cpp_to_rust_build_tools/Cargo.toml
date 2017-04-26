@@ -1,9 +1,13 @@
 [package]
 name = "cpp_to_rust_build_tools"
+
+# Don't forget to update `cpp_to_rust/cpp_to_rust_generator/src/versions.rs`
+# when changing this version.
 version = "0.0.0"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 
 description = "Build script implementation for C++ library wrappers"
+repository = "https://github.com/rust-qt/cpp_to_rust/tree/master/cpp_to_rust/cpp_to_rust_build_tools"
 license = "MIT"
 
 [dependencies]

@@ -1,12 +1,10 @@
+//! Types holding information about generates Rust API.
+
 use cpp_ffi_data::CppAndFfiMethod;
 use cpp_type::CppType;
-use common::errors::{Result, unexpected};
-use common::string_utils::JoinWithSeparator;
-use common::utils::MapIfOk;
-use rust_type::{RustName, CompleteType, RustType, RustTypeIndirection};
+use rust_type::{RustName, CompleteType, RustType};
 use cpp_method::CppMethodDoc;
 use cpp_data::CppTypeDoc;
-use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 /// One variant of a Rust enum
@@ -67,11 +65,12 @@ pub enum RustTypeWrapperKind {
     /// Name of the constant containing size of the corresponding
     /// C++ type in bytes. Value of the constant is determined at
     /// crate compile time.
-    /// If None, this struct can only be used as pointer, like an
+    /// If `None`, this struct can only be used as pointer, like an
     /// empty enum.
     size_const_name: Option<String>,
     /// True if `CppDeletable` trait is implemented
-    /// for this type, i.e. if this C++ type has public destructor.
+    /// for this type, i.e. if this C++ type has public destructor
+    /// and type allocation place was set to `Heap`.
     is_deletable: bool,
     /// Additional information for a Qt slot wrapper struct
     slot_wrapper: Option<RustQtSlotWrapper>,
@@ -99,6 +98,10 @@ pub struct RustProcessedTypeInfo {
 
 
 /// Exported information about generated crate
+/// for future use of it as a dependency. This information
+/// is saved to the cache directory but not to the
+/// output crate directory, so the crate's build script
+/// cannot access it (as opposed to `BuildScriptData`).
 #[derive(Debug, Clone)]
 #[derive(Serialize, Deserialize)]
 pub struct RustExportInfo {
@@ -112,393 +115,335 @@ pub struct RustExportInfo {
   pub rust_types: Vec<RustProcessedTypeInfo>,
 }
 
-
+/// Information for generating Rust documentation for a method
+/// or an item of information for an overloaded method.
+/// One value of `RustMethodDocItem` corresponds to a single
+/// C++ method.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustMethodDocItem {
+  /// C++ documentation of the corresponding C++ method.
   pub doc: Option<CppMethodDoc>,
+  /// Pseudo-code illustrating Rust argument types. There may be
+  /// multiple Rust variants for one C++ method if that method's
+  /// arguments have default values.
   pub rust_fns: Vec<String>,
+  /// C++ code containing declaration of the corresponding C++ method.
   pub cpp_fn: String,
-  pub rust_cross_references: Vec<RustCrossReference>,
 }
 
 
-
+/// Location of a Rust method.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RustMethodScope {
+  /// Inside `impl T {}`, where `T` is `target_type`.
   Impl { target_type: RustType },
+  /// Inside a trait implementation.
   TraitImpl,
+  /// A free function.
   Free,
 }
 
+/// Information about a Rust method argument.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustMethodArgument {
+  /// C++ and Rust types corresponding to this argument at all levels.
   pub argument_type: CompleteType,
+  /// Rust argument name.
   pub name: String,
-  pub ffi_index: Option<i32>,
+  /// Index of the corresponding argument of the FFI function.
+  pub ffi_index: usize,
 }
 
+/// Information about arguments of a Rust method without overloading
+/// or one variant of an overloaded method.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustMethodArgumentsVariant {
+  /// List of arguments. For an overloaded method, only the arguments
+  /// involved in the overloading are listed in this field.
+  /// There can also be arguments shared by all variants (typically the
+  /// `self` argument), and they are not listed in this field.
   pub arguments: Vec<RustMethodArgument>,
+  /// C++ method corresponding to this variant.
   pub cpp_method: CppAndFfiMethod,
-  pub return_type_ffi_index: Option<i32>,
+  /// Index of the FFI function argument used for acquiring the return value,
+  /// if any. `None` if the return value is passed normally (as the return value
+  /// of the FFI function).
+  pub return_type_ffi_index: Option<usize>,
+  /// C++ and Rust return types at all levels.
   pub return_type: CompleteType,
 }
 
-// impl RustMethodArgumentsVariant {
-//  pub fn has_unportable_arg_types(&self) -> bool {
-//    self.arguments.iter().any(|arg| arg.argument_type.cpp_type.is_platform_dependent())
-//  }
-// }
-
+/// Arguments of a Rust method
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[allow(dead_code)]
 pub enum RustMethodArguments {
+  /// Method without overloading
   SingleVariant(RustMethodArgumentsVariant),
+  /// Method with overloading emulation
   MultipleVariants {
+    /// Last name of the parameters trait
     params_trait_name: String,
+    /// Lifetime name of the parameters trait, if any.
     params_trait_lifetime: Option<String>,
-    params_trait_return_type: Option<RustType>,
+    /// Return type of all variants, or `None` if they have different return types.
+    common_return_type: Option<RustType>,
+    /// Arguments that don't participate in overloading
+    /// (typically `self` argument, if present).
     shared_arguments: Vec<RustMethodArgument>,
+    /// Name of the argument receiving overloaded values.
     variant_argument_name: String,
+    /// Fully qualified name of the corresponding C++ method
+    /// (used for generating documentation).
     cpp_method_name: String,
   },
 }
 
+/// Information about a public API method.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustMethod {
+  /// Location of the method.
   pub scope: RustMethodScope,
+  /// True if the method is `unsafe`.
   pub is_unsafe: bool,
+  /// Name of the method. For free functions, this is the full name.
+  /// for `impl` methods, this is only the method's own name.
   pub name: RustName,
+  /// Arguments of the method.
   pub arguments: RustMethodArguments,
+  /// Documentation data (one item per corresponding C++ method).
   pub docs: Vec<RustMethodDocItem>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct RustSingleMethod {
-  pub scope: RustMethodScope,
-  pub is_unsafe: bool,
-  pub name: RustName,
-  pub arguments: RustMethodArgumentsVariant,
-  pub doc: Option<RustMethodDocItem>,
-}
-
-
+/// Information about type of `self` argument of the method.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum RustMethodSelfArgKind {
-  Static,
+  /// No `self` argument (static method or a free function).
+  None,
+  /// `&self` argument.
   ConstRef,
+  /// `&mut self` argument.
   MutRef,
+  /// `self` argument.
   Value,
 }
 
-fn detect_self_arg_kind(args: &[RustMethodArgument]) -> Result<RustMethodSelfArgKind> {
-  Ok(if let Some(arg) = args.get(0) {
-       if arg.name == "self" {
-         if let RustType::Common {
-                  ref indirection,
-                  ref is_const,
-                  ..
-                } = arg.argument_type.rust_api_type {
-           match *indirection {
-             RustTypeIndirection::Ref { .. } => {
-               if *is_const {
-                 RustMethodSelfArgKind::ConstRef
-               } else {
-                 RustMethodSelfArgKind::MutRef
-               }
-             }
-             RustTypeIndirection::None => RustMethodSelfArgKind::Value,
-             _ => return Err(unexpected("invalid self argument type").into()),
-           }
-         } else {
-           return Err(unexpected("invalid self argument type").into());
-         }
-       } else {
-         RustMethodSelfArgKind::Static
-       }
-     } else {
-       RustMethodSelfArgKind::Static
-     })
-}
-
-impl RustMethod {
-  //  pub fn self_arg_kind(&self) -> Result<RustMethodSelfArgKind> {
-  //    let args = match self.arguments {
-  //      RustMethodArguments::SingleVariant(ref var) => &var.arguments,
-  //      RustMethodArguments::MultipleVariants { ref shared_arguments, .. } => shared_arguments,
-  //    };
-  //    detect_self_arg_kind(args)
-  //  }
-
-  #[allow(dead_code)]
-  pub fn cpp_cross_references(&self) -> Vec<String> {
-    let mut r = Vec::new();
-    for doc in &self.docs {
-      if let Some(ref doc) = doc.doc {
-        r.append(&mut doc.cross_references.clone());
-      }
-    }
-    r
-  }
-
-  #[allow(dead_code)]
-  pub fn add_rust_cross_references(&mut self, table: HashMap<String, RustCrossReference>) {
-    for doc in &mut self.docs {
-      let mut result = Vec::new();
-      if let Some(ref doc) = doc.doc {
-        for reference in &doc.cross_references {
-          if let Some(r) = table.get(reference) {
-            result.push(r.clone());
-          }
-        }
-      }
-      doc.rust_cross_references = result;
-    }
-  }
-}
-
-impl RustSingleMethod {
-  pub fn to_rust_method(&self) -> RustMethod {
-    RustMethod {
-      name: self.name.clone(),
-      arguments: RustMethodArguments::SingleVariant(self.arguments.clone()),
-      docs: if let Some(ref doc) = self.doc {
-        vec![doc.clone()]
-      } else {
-        Vec::new()
-      },
-      is_unsafe: self.is_unsafe,
-      scope: self.scope.clone(),
-    }
-  }
-
-  pub fn self_arg_kind(&self) -> Result<RustMethodSelfArgKind> {
-    detect_self_arg_kind(&self.arguments.arguments)
-  }
-
-  pub fn can_be_overloaded_with(&self, other_method: &RustSingleMethod) -> Result<bool> {
-    if self.is_unsafe != other_method.is_unsafe {
-      return Ok(false);
-    }
-    if self.self_arg_kind()? != other_method.self_arg_kind()? {
-      return Ok(false);
-    }
-    if self.arguments.arguments.len() == other_method.arguments.arguments.len() {
-      if self
-           .arguments
-           .arguments
-           .iter()
-           .zip(other_method.arguments.arguments.iter())
-           .all(|(arg1, arg2)| {
-                  arg1
-                    .argument_type
-                    .cpp_type
-                    .can_be_the_same_as(&arg2.argument_type.cpp_type) &&
-                  !(arg1.name == "allocation_place_marker" &&
-                    arg2.name == "allocation_place_marker" && arg1 != arg2)
-                }) {
-        return Ok(false);
-      }
-    }
-    Ok(true)
-  }
-
-  pub fn name_suffix(&self,
-                     caption_strategy: &RustMethodCaptionStrategy,
-                     all_self_args: &HashSet<RustMethodSelfArgKind>,
-                     index: usize)
-                     -> Result<Option<String>> {
-    if caption_strategy == &RustMethodCaptionStrategy::UnsafeOnly {
-      return Ok(if self.is_unsafe {
-                  Some("unsafe".to_string())
-                } else {
-                  None
-                });
-    }
-    let result = {
-      let self_arg_kind = self.self_arg_kind()?;
-      let self_arg_kind_caption = if all_self_args.len() == 1 ||
-                                     self_arg_kind == RustMethodSelfArgKind::ConstRef {
-        None
-      } else if self_arg_kind == RustMethodSelfArgKind::Static {
-        Some("static")
-      } else if self_arg_kind == RustMethodSelfArgKind::MutRef {
-        if all_self_args.contains(&RustMethodSelfArgKind::ConstRef) {
-          Some("mut")
-        } else {
-          None
-        }
-      } else {
-        return Err("unsupported self arg kinds combination".into());
-      };
-      let other_caption = match *caption_strategy {
-        RustMethodCaptionStrategy::NoCaption => None,
-        RustMethodCaptionStrategy::UnsafeOnly => unreachable!(),
-        RustMethodCaptionStrategy::Index => Some(index.to_string()),
-        RustMethodCaptionStrategy::ArgNames => {
-          if self.arguments.arguments.is_empty() {
-            Some("no_args".to_string())
-          } else {
-            Some(self
-                   .arguments
-                   .arguments
-                   .iter()
-                   .map(|a| &a.name)
-                   .join("_"))
-          }
-        }
-        RustMethodCaptionStrategy::ArgTypes => {
-          let context = match self.scope {
-            RustMethodScope::Free => &self.name,
-            RustMethodScope::Impl { ref target_type } => {
-              if let RustType::Common { ref base, .. } = *target_type {
-                base
-              } else {
-                return Err("unexpected uncommon Rust type".into());
-              }
-            }
-            RustMethodScope::TraitImpl => {
-              return Err("can't generate Rust method caption for a trait impl method".into())
-            }
-          };
-
-          if self.arguments.arguments.is_empty() {
-            Some("no_args".to_string())
-          } else {
-            Some(self
-                   .arguments
-                   .arguments
-                   .iter()
-                   .filter(|t| &t.name != "self")
-                   .map_if_ok(|t| t.argument_type.rust_api_type.caption(context))?
-                   .join("_"))
-          }
-        }
-      };
-      let mut key_caption_items = Vec::new();
-      if let Some(c) = self_arg_kind_caption {
-        key_caption_items.push(c.to_string());
-      }
-      if let Some(c) = other_caption {
-        key_caption_items.push(c);
-      }
-      if key_caption_items.is_empty() {
-        None
-      } else {
-        Some(key_caption_items.join("_"))
-      }
-    };
-    Ok(result)
-  }
-}
-
+/// Additional information about a trait implementation.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TraitImplExtra {
+  /// For `CppDeletable` trait implementation,
+  /// `deleter_name` contains name of the FFI function used as deleter.
   CppDeletable { deleter_name: String },
 }
 
+/// Information about an associated type value
+/// within a trait implementation.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TraitAssociatedType {
+  /// Name of the associated type.
   pub name: String,
+  /// Value of the associated type.
   pub value: RustType,
 }
 
+/// Information about a trait implementation.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TraitImpl {
+  /// Type the trait is implemented for.
   pub target_type: RustType,
-  pub associated_types: Vec<TraitAssociatedType>,
+  /// Type of the trait.
   pub trait_type: RustType,
+  /// Values of associated types of the trait.
+  pub associated_types: Vec<TraitAssociatedType>,
+  /// Extra information about the implementation.
   pub extra: Option<TraitImplExtra>,
+  /// List of methods.
   pub methods: Vec<RustMethod>,
 }
 
-#[allow(dead_code)]
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum RustCrossReferenceKind {
-  Method { scope: RustMethodScope },
-  Type,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct RustCrossReference {
-  name: RustName,
-  kind: RustCrossReferenceKind,
-}
-
+/// Type of a receiver in Qt connection system.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RustQtReceiverType {
   Signal,
   Slot,
 }
 
+/// Declaration of a Qt receiver type providing access to a signal
+/// or a slot of a built-in Qt class.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustQtReceiverDeclaration {
+  /// Name of the type.
   pub type_name: String,
+  /// Name of the method in `Signals` or `Slots` type that
+  /// creates an object of this type.
   pub method_name: String,
+  /// Type of the receiver.
   pub receiver_type: RustQtReceiverType,
+  /// Identifier of the signal or slot for passing to `QObject::connect`.
   pub receiver_id: String,
+  /// Types or arguments.
   pub arguments: Vec<RustType>,
 }
 
+/// Part of the information about a Rust type declaration.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RustTypeDeclarationKind {
+  /// Information about a Rust type for which a corresponding C++ type exists.
   CppTypeWrapper {
+    /// Information about the wrapper properties.
     kind: RustTypeWrapperKind,
+    /// Fully qualified name of the C++ type.
     cpp_type_name: String,
+    /// Values of template arguments of the C++ type.
+    /// `None` if the C++ type is not a template type.
     cpp_template_arguments: Option<Vec<CppType>>,
+    /// C++ documentation of the type.
     cpp_doc: Option<CppTypeDoc>,
-    rust_cross_references: Vec<RustCrossReference>,
+    /// Methods in direct `impl` for this type.
     methods: Vec<RustMethod>,
+    /// Trait implementations for this type.
     trait_impls: Vec<TraitImpl>,
+    /// List of Qt receiver types for signals and slots of
+    /// this C++ type.
     qt_receivers: Vec<RustQtReceiverDeclaration>,
   },
+  /// Information about a Rust trait created for overloading emulation.
   MethodParametersTrait {
+    /// Name of the lifetime parameter of the trait and all references within it,
+    /// or `None` if there are no references within it.
     lifetime: Option<String>,
-    shared_arguments: Vec<RustMethodArgument>,
-    return_type: Option<RustType>,
-    impls: Vec<RustMethodArgumentsVariant>,
-    method_scope: RustMethodScope,
-    method_name: RustName,
+    /// If true, the method of the trait is `unsafe`.
     is_unsafe: bool,
+    /// Common arguments of all method variants (typically the `self` argument
+    /// if present).
+    shared_arguments: Vec<RustMethodArgument>,
+    /// Common return type of all variants, or `None` if return types differ.
+    common_return_type: Option<RustType>,
+    /// List of argument variants for which the trait must be implemented.
+    impls: Vec<RustMethodArgumentsVariant>,
+    /// Scope of the public API method this trait was created for
+    /// (used for generating documentation).
+    method_scope: RustMethodScope,
+    /// Name of the public API method this trait was created for
+    /// (used for generating documentation).
+    method_name: RustName,
   },
 }
 
+/// Information about a Rust type declaration.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustTypeDeclaration {
+  /// True if this type should be declared with `pub`.
   pub is_public: bool,
+  /// Full name of the type.
   pub name: RustName,
+  /// Additional information depending on kind of the type.
   pub kind: RustTypeDeclarationKind,
 }
 
+/// Information about a Rust module.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RustModule {
+  /// Last name of the module.
   pub name: String,
+  /// Type declarations.
+  /// Each type may also contain its own functions
+  /// and trait implementations.
   pub types: Vec<RustTypeDeclaration>,
+  /// Free functions within the module.
   pub functions: Vec<RustMethod>,
+  /// Trait implementations associated with free functions.
   pub trait_impls: Vec<TraitImpl>,
+  /// Submodules of this module.
   pub submodules: Vec<RustModule>,
 }
 
+/// Information about a loaded dependency.
 #[derive(Debug, Clone)]
 pub struct DependencyInfo {
+  /// Information loaded from the cache directory of this dependency.
   pub rust_export_info: RustExportInfo,
+  /// Cache directory of this dependency.
   pub cache_path: PathBuf,
 }
 
+/// Method of generating name suffixes for disambiguating multiple Rust methods
+/// with the same name.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RustMethodCaptionStrategy {
-  NoCaption,
+  /// Only type of `self` is used.
+  SelfOnly,
+  /// Unsafe methods have `unsafe` suffix, and safe methods have no suffix.
   UnsafeOnly,
-  ArgTypes,
-  ArgNames,
-  Index,
+  /// Type of `self` and types of other arguments are used.
+  SelfAndArgTypes,
+  /// Type of `self` and names of other arguments are used.
+  SelfAndArgNames,
+  /// Type of `self` and index of method are used.
+  SelfAndIndex,
 }
+
 impl RustMethodCaptionStrategy {
+  /// Returns list of all available strategies sorted by priority
+  /// (more preferred strategies go first).
   pub fn all() -> &'static [RustMethodCaptionStrategy] {
     use self::RustMethodCaptionStrategy::*;
-    const LIST: &'static [RustMethodCaptionStrategy] = &[NoCaption, UnsafeOnly, ArgTypes,
-                                                         ArgNames, Index];
+    const LIST: &'static [RustMethodCaptionStrategy] = &[SelfOnly,
+                                                         UnsafeOnly,
+                                                         SelfAndArgTypes,
+                                                         SelfAndArgNames,
+                                                         SelfAndIndex];
     return LIST;
   }
+}
+
+
+impl RustProcessedTypeInfo {
+  /// Implements sanity check of the data.
+  /// Returns true if this type was properly declared within any of the modules.
+  pub fn is_declared_in(&self, modules: &[RustModule]) -> bool {
+    for module in modules {
+      if module
+           .types
+           .iter()
+           .any(|t| match t.kind {
+                  RustTypeDeclarationKind::CppTypeWrapper {
+                    ref cpp_type_name,
+                    ref cpp_template_arguments,
+                    ..
+                  } => {
+                    cpp_type_name == &self.cpp_name &&
+                    cpp_template_arguments == &self.cpp_template_arguments
+                  }
+                  _ => false,
+                }) {
+        return true;
+      }
+      if self.is_declared_in(&module.submodules) {
+        return true;
+      }
+    }
+    false
+  }
+}
+
+/// Information about an argument of a Rust FFI function.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct RustFFIArgument {
+  /// Name of the argument.
+  pub name: String,
+  /// Type of the argument.
+  pub argument_type: RustType,
+}
+
+/// Information about a Rust FFI function.
+/// Name and signature of this function must be the same
+/// as the corresponding C++ function on the other side of FFI.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct RustFFIFunction {
+  /// Return type of the function.
+  pub return_type: RustType,
+  /// Name of the function.
+  pub name: String,
+  /// Arguments of the function.
+  pub arguments: Vec<RustFFIArgument>,
 }
