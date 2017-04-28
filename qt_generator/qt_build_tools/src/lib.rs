@@ -1,3 +1,5 @@
+//! Implementation of build script for all Qt crates
+
 extern crate cpp_to_rust_build_tools;
 extern crate cpp_to_rust_common;
 extern crate qt_generator_common;
@@ -8,6 +10,7 @@ use cpp_to_rust_common::target;
 use cpp_to_rust_common::cpp_build_config::CppBuildConfigData;
 use qt_generator_common::{get_installation_data, real_lib_name, framework_name, lib_dependencies};
 
+/// Runs the build script.
 pub fn run_and_return(sublib_name: &str) -> Result<()> {
   let installation_data = get_installation_data(sublib_name)?;
 
@@ -55,6 +58,7 @@ pub fn run_and_return(sublib_name: &str) -> Result<()> {
   config.run_and_return()
 }
 
+/// Runs the build script and exits the process with an appropriate exit code.
 pub fn run(sublib_name: &str) -> ! {
   fancy_unwrap(run_and_return(sublib_name));
   std::process::exit(0)

@@ -1,3 +1,9 @@
+//! Common utilities for the generator and the build script for Qt crates.
+//!
+//! Qt modules are identified within this crate using snake case names without
+//! a prefix, e.g. `core` for QtCore and `ui_tools` for QtUiTools.
+//! `sublib_name` argument should be in this form.
+
 extern crate cpp_to_rust_common;
 
 use cpp_to_rust_common::utils::get_command_output;
@@ -9,25 +15,38 @@ use cpp_to_rust_common::log;
 use std::path::PathBuf;
 use std::process::Command;
 
-fn run_qmake_query(arg: &str) -> Result<PathBuf> {
-  let result = get_command_output(Command::new("qmake").arg("-query").arg(arg))?;
-  Ok(PathBuf::from(result.trim()))
+/// Makes a query to `qmake`.
+fn run_qmake_string_query(property: &str) -> Result<String> {
+  let result = get_command_output(Command::new("qmake").arg("-query").arg(property))?;
+  Ok(result.trim().to_string())
 }
 
 
+/// Makes a query to `qmake` and interprets its output as a path.
+fn run_qmake_query(property: &str) -> Result<PathBuf> {
+  Ok(PathBuf::from(run_qmake_string_query(property)?))
+}
+
+/// Properties of a Qt installation
 pub struct InstallationData {
+  /// Qt version.
   pub qt_version: String,
+  /// Path to the parent include directory of the installation.
   pub root_include_path: PathBuf,
+  /// Path to the include directory of the library that is being processed.
+  /// This is a direct subdirectory of `root_include_path`.
   pub lib_include_path: PathBuf,
+  /// Path to the directory containing library files for the linker.
   pub lib_path: PathBuf,
+  /// Path to the directory containing Qt documentation files.
   pub docs_path: PathBuf,
+  /// If true, this Qt library was built as a MacOS framework.
   pub is_framework: bool,
 }
 
+/// Detects properties of current Qt installation using `qmake` command line utility.
 pub fn get_installation_data(sublib_name: &str) -> Result<InstallationData> {
-  let qt_version = get_command_output(Command::new("qmake").arg("-query").arg("QT_VERSION"))?
-    .trim()
-    .to_string();
+  let qt_version = run_qmake_string_query("QT_VERSION")?;
   log::status(format!("QT_VERSION = \"{}\"", qt_version));
   log::status("Detecting Qt directories");
 
@@ -68,21 +87,27 @@ pub fn get_installation_data(sublib_name: &str) -> Result<InstallationData> {
   }
 }
 
+/// Returns library name of the specified module as
+/// should be passed to the linker, e.g. `"Qt5Core"`.
 pub fn real_lib_name(sublib_name: &str) -> String {
   let sublib_name_capitalized = sublib_name.to_class_case();
   format!("Qt5{}", sublib_name_capitalized)
 }
 
+/// Returns name of the module's include directory, e.g. `"QtCore"`.
 pub fn lib_folder_name(sublib_name: &str) -> String {
   let sublib_name_capitalized = sublib_name.to_class_case();
   format!("Qt{}", sublib_name_capitalized)
 }
 
+/// Returns MacOS framework name of the specified module as
+/// should be passed to the linker, e.g. `"QtCore"`.
 pub fn framework_name(sublib_name: &str) -> String {
   let sublib_name_capitalized = sublib_name.to_class_case();
   format!("Qt{}", sublib_name_capitalized)
 }
 
+/// Returns list of modules this module depends on.
 pub fn lib_dependencies(sublib_name: &str) -> Result<&'static [&'static str]> {
   const CORE: &'static [&'static str] = &[];
   const GUI: &'static [&'static str] = &["core"];

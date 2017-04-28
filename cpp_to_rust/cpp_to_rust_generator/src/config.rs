@@ -11,7 +11,7 @@ use std::collections::HashMap;
 /// Function type used in `Config::add_cpp_ffi_generator_filter`.
 pub type CppFfiGeneratorFilterFn = Fn(&CppMethod) -> Result<bool>;
 
-struct CppFfiGeneratorFilter(Box<CppFfiGeneratorFilterFn>);
+struct CppFfiGeneratorFilter(Box<Fn(&CppMethod) -> Result<bool>>);
 
 impl ::std::fmt::Debug for CppFfiGeneratorFilter {
   fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::result::Result<(), ::std::fmt::Error> {
@@ -446,17 +446,21 @@ impl Config {
   /// If all functions return `Ok(true)`, the method is accepted.
   /// - `Ok(false)` blocks the method. Remaining filter functions are not run
   /// on this method.
-  pub fn add_cpp_ffi_generator_filter(&mut self, f: Box<CppFfiGeneratorFilterFn>) {
+  pub fn add_cpp_ffi_generator_filter<F>(&mut self, f: F)
+    where F: Fn(&CppMethod) -> Result<bool> + 'static
+  {
     self
       .cpp_ffi_generator_filters
-      .push(CppFfiGeneratorFilter(f));
+      .push(CppFfiGeneratorFilter(Box::new(f)));
   }
 
   /// Adds a custom function that visits `&mut CppData` and can perform any changes
   /// in the output of the C++ parser. Filters are executed in the same order they
   /// were added. If the function returns `Err`, the processing is terminated.
-  pub fn add_cpp_data_filter(&mut self, f: Box<CppDataFilterFn>) {
-    self.cpp_data_filters.push(CppDataFilter(f));
+  pub fn add_cpp_data_filter<F>(&mut self, f: F)
+    where F: Fn(&mut CppData) -> Result<()> + 'static
+  {
+    self.cpp_data_filters.push(CppDataFilter(Box::new(f)));
   }
 
   /// Overrides automatic selection of type allocation place for `type_name` and uses `place`

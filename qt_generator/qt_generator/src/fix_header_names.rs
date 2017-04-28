@@ -1,3 +1,6 @@
+//! Function for replacing plain boring names of the header files with
+//! Qt's shortcut header names.
+
 use cpp_to_rust_generator::cpp_data::CppData;
 use cpp_to_rust_common::errors::{Result, ChainErr};
 use cpp_to_rust_common::file_utils::{read_dir, file_to_string, os_str_to_str};
@@ -90,6 +93,7 @@ impl HeaderNameMap {
   }
 }
 
+/// Replaces names of header files in `data` with Qt's shortcut headers.
 pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) -> Result<()> {
   let map = HeaderNameMap::new(headers_dir)?;
   for t in &mut data.types {

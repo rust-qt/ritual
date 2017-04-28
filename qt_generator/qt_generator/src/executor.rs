@@ -1,3 +1,5 @@
+//! Functions for setting configuration and executing the generator.
+
 use cpp_to_rust_common::errors::Result;
 use cpp_to_rust_common::log;
 use cpp_to_rust_common::file_utils::{PathBufWithAdded, repo_crate_local_path};
@@ -14,9 +16,11 @@ use fix_header_names::fix_header_names;
 use cpp_to_rust_generator::cpp_method::CppMethod;
 use cpp_to_rust_generator::cpp_data::CppTypeKind;
 use cpp_to_rust_generator::config::{CrateProperties, is_completed};
-use doc_decoder::decode_doc;
+use doc_decoder::DocData;
 use lib_configs;
 
+/// Options passed to `exec_all`,
+/// as in `cpp_to_rust_generator::config::Config`.
 pub struct ExecConfig {
   pub write_dependencies_local_paths: bool,
   pub cache_usage: CacheUsage,
@@ -25,6 +29,7 @@ pub struct ExecConfig {
   pub quiet_mode: bool,
 }
 
+/// Executes generator for `libs` with given configuration.
 pub fn exec_all(libs: Vec<String>,
                 cache_dir: PathBuf,
                 output_dir: PathBuf,
@@ -70,6 +75,7 @@ pub fn exec_all(libs: Vec<String>,
   Ok(())
 }
 
+/// Executes the generator for a single Qt module with given configuration.
 fn exec(sublib_name: &str,
         cache_dir: PathBuf,
         output_dir: PathBuf,
@@ -116,9 +122,7 @@ fn exec(sublib_name: &str,
 
   config.add_include_directive(&lib_folder_name(sublib_name));
   let lib_include_path = installation_data.lib_include_path.clone();
-  config.add_cpp_data_filter(Box::new(move |cpp_data| {
-                                        fix_header_names(cpp_data, &lib_include_path)
-                                      }));
+  config.add_cpp_data_filter(move |cpp_data| fix_header_names(cpp_data, &lib_include_path));
   config.add_cpp_parser_arguments(vec!["-fPIC", "-fcxx-exceptions"]);
   {
     let mut data = CppBuildConfigData::new();
@@ -152,8 +156,8 @@ fn exec(sublib_name: &str,
   let sublib_name_clone = sublib_name.to_string();
   let docs_path = installation_data.docs_path.clone();
 
-  config.add_cpp_data_filter(Box::new(move |cpp_data| {
-    match decode_doc(&sublib_name_clone, &docs_path) {
+  config.add_cpp_data_filter(move |cpp_data| {
+    match DocData::new(&sublib_name_clone, &docs_path) {
       Ok(doc_data) => {
         let mut parser = DocParser::new(doc_data);
         find_methods_docs(&mut cpp_data.methods, &mut parser)?;
@@ -201,8 +205,7 @@ fn exec(sublib_name: &str,
       }
     }
     Ok(())
-  }));
-
+  });
 
   config.set_crate_template_path(crate_templates_path);
   match sublib_name {
@@ -218,6 +221,7 @@ fn exec(sublib_name: &str,
   Ok(())
 }
 
+/// Adds documentation from `data` to `cpp_methods`.
 fn find_methods_docs(cpp_methods: &mut [CppMethod], data: &mut DocParser) -> Result<()> {
   for cpp_method in cpp_methods {
     if let Some(ref info) = cpp_method.class_membership {

@@ -18,6 +18,7 @@ mod doc_parser;
 mod fix_header_names;
 mod lib_configs;
 
+/// Interprets command line options and runs the generator.
 fn run(matches: clap::ArgMatches) -> Result<()> {
   let libs: Vec<_> = matches
     .values_of("libs")
