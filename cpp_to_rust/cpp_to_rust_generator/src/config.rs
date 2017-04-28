@@ -259,6 +259,7 @@ pub struct Config {
   debug_logging_config: DebugLoggingConfig,
   quiet_mode: bool,
   write_cache: bool,
+  cpp_lib_version: Option<String>,
 }
 
 impl Config {
@@ -292,6 +293,7 @@ impl Config {
       debug_logging_config: DebugLoggingConfig::default(),
       quiet_mode: false,
       write_cache: true,
+      cpp_lib_version: None,
     }
   }
 
@@ -513,6 +515,14 @@ impl Config {
   /// of the generated crate.
   pub fn cpp_build_config_mut(&mut self) -> &mut CppBuildConfig {
     &mut self.cpp_build_config
+  }
+
+  pub fn set_cpp_lib_version<S: Into<String>>(&mut self, version: S) {
+    self.cpp_lib_version = Some(version.into());
+  }
+
+  pub fn cpp_lib_version(&self) -> Option<&str> {
+    self.cpp_lib_version.as_ref().map(|x| x.as_str())
   }
 
   /// Starts execution of the generator.

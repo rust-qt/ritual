@@ -400,6 +400,7 @@ pub fn run(config: Config) -> Result<()> {
             &BuildScriptData {
                cpp_build_config: config.cpp_build_config().clone(),
                cpp_wrapper_lib_name: cpp_ffi_lib_name,
+               cpp_lib_version: config.cpp_lib_version().map(|s| s.to_string()),
              })?;
   if config.write_cache() {
     create_file(completed_marker_path(config.cache_dir_path()))?;

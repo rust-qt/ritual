@@ -22,7 +22,7 @@ use std::process::Command;
 #[derive(Debug)]
 pub struct Config {
   cpp_build_paths: CppBuildPaths,
-  cpp_build_config: CppBuildConfig,
+  build_script_data: BuildScriptData,
 }
 
 fn manifest_dir() -> Result<PathBuf> {
@@ -48,21 +48,33 @@ impl Config {
   /// and call `config.run()` to apply them.
   pub fn new() -> Result<Config> {
     Ok(Config {
-         cpp_build_config: build_script_data()?.cpp_build_config,
+         build_script_data: build_script_data()?,
          cpp_build_paths: CppBuildPaths::default(),
        })
   }
+
+  /// Returns version of the native C++ library used for generating this crate.
+  /// This is the value set with `Config::set_cpp_lib_version` during generation,
+  /// or `None` if the version was not set.
+  pub fn original_cpp_lib_version(&self) -> Option<&str> {
+    self
+      .build_script_data
+      .cpp_lib_version
+      .as_ref()
+      .map(|x| x.as_str())
+  }
+
   /// Returns current `CppBuildConfig` data.
   pub fn cpp_build_config(&self) -> &CppBuildConfig {
-    &self.cpp_build_config
+    &self.build_script_data.cpp_build_config
   }
   /// Returns mutable `CppBuildConfig` data.
   pub fn cpp_build_config_mut(&mut self) -> &mut CppBuildConfig {
-    &mut self.cpp_build_config
+    &mut self.build_script_data.cpp_build_config
   }
   /// Sets new `CppBuildConfig` data.
   pub fn set_cpp_build_config(&mut self, config: CppBuildConfig) {
-    self.cpp_build_config = config;
+    self.build_script_data.cpp_build_config = config;
   }
   /// Returns current `CppBuildPaths` data.
   pub fn cpp_build_paths(&self) -> &CppBuildPaths {
@@ -80,8 +92,10 @@ impl Config {
   /// Same as `run()`, but result of the operation is returned to the caller.
   pub fn run_and_return(mut self) -> Result<()> {
     self.cpp_build_paths.apply_env();
-    let build_script_data = build_script_data()?;
-    let cpp_build_config_data = self.cpp_build_config.eval(&current_target())?;
+    let cpp_build_config_data = self
+      .build_script_data
+      .cpp_build_config
+      .eval(&current_target())?;
     let mut cmake_vars = Vec::new();
     cmake_vars.push(CMakeVar::new("C2R_LIBRARY_TYPE",
                                   match cpp_build_config_data.library_type() {
@@ -130,11 +144,11 @@ impl Config {
       if cpp_build_config_data.library_type() == Some(CppLibraryType::Shared) {
         ffi_file
           .write(format!("#[link(name = \"{}\")]\n",
-                         &build_script_data.cpp_wrapper_lib_name))?;
+                         &self.build_script_data.cpp_wrapper_lib_name))?;
       } else {
         ffi_file
           .write(format!("#[link(name = \"{}\", kind = \"static\")]\n",
-                         &build_script_data.cpp_wrapper_lib_name))?;
+                         &self.build_script_data.cpp_wrapper_lib_name))?;
       }
       ffi_file
         .write(file_to_string(manifest_dir.with_added("src").with_added("ffi.in.rs"))?)?;
@@ -165,6 +179,7 @@ impl Config {
     log::status("cpp_to_rust build script finished.");
     Ok(())
   }
+
   /// Starts build script with current configuration.
   /// The build script performs the following operations:
   ///

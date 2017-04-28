@@ -9,34 +9,44 @@ use cpp_to_rust_common::log;
 use std::path::PathBuf;
 use std::process::Command;
 
-pub fn run_qmake_query(arg: &str) -> Result<PathBuf> {
+fn run_qmake_query(arg: &str) -> Result<PathBuf> {
   let result = get_command_output(Command::new("qmake").arg("-query").arg(arg))?;
   Ok(PathBuf::from(result.trim()))
 }
 
 
 pub struct InstallationData {
+  pub qt_version: String,
   pub root_include_path: PathBuf,
   pub lib_include_path: PathBuf,
   pub lib_path: PathBuf,
+  pub docs_path: PathBuf,
   pub is_framework: bool,
 }
 
 pub fn get_installation_data(sublib_name: &str) -> Result<InstallationData> {
+  let qt_version = get_command_output(Command::new("qmake").arg("-query").arg("QT_VERSION"))?
+    .trim()
+    .to_string();
+  log::status(format!("QT_VERSION = \"{}\"", qt_version));
   log::status("Detecting Qt directories");
 
   let root_include_path = run_qmake_query("QT_INSTALL_HEADERS")?;
   log::status(format!("QT_INSTALL_HEADERS = \"{}\"", root_include_path.display()));
   let lib_path = run_qmake_query("QT_INSTALL_LIBS")?;
   log::status(format!("QT_INSTALL_LIBS = \"{}\"", lib_path.display()));
+  let docs_path = run_qmake_query("QT_INSTALL_DOCS")?;
+  log::status(format!("QT_INSTALL_DOCS = \"{}\"", docs_path.display()));
   let folder_name = lib_folder_name(sublib_name);
   let dir = root_include_path.with_added(&folder_name);
   if dir.exists() {
     Ok(InstallationData {
          root_include_path: root_include_path,
          lib_path: lib_path,
+         docs_path: docs_path,
          lib_include_path: dir,
          is_framework: false,
+         qt_version: qt_version,
        })
   } else {
     let dir2 = lib_path.with_added(format!("{}.framework/Headers", folder_name));
@@ -44,8 +54,10 @@ pub fn get_installation_data(sublib_name: &str) -> Result<InstallationData> {
       Ok(InstallationData {
            root_include_path: root_include_path,
            lib_path: lib_path,
+           docs_path: docs_path,
            lib_include_path: dir2,
            is_framework: true,
+           qt_version: qt_version,
          })
     } else {
       Err(format!("extra header dir not found (tried: {}, {})",

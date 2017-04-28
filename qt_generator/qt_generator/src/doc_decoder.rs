@@ -1,10 +1,11 @@
 
-use qt_generator_common::run_qmake_query;
 use cpp_to_rust_common::errors::{Result, ChainErr};
 use cpp_to_rust_common::file_utils::PathBufWithAdded;
 use cpp_to_rust_common::log;
 use html_parser::document::Document;
 use rusqlite;
+
+use std::path::Path;
 
 trait ConvertError<T> {
   fn convert_err(self) -> Result<T>;
@@ -71,14 +72,13 @@ impl DocData {
   }
 }
 
-pub fn decode_doc(qt_sub_lib_name: &str) -> Result<DocData> {
-  let doc_path = run_qmake_query("QT_INSTALL_DOCS")?;
-  if !doc_path.exists() {
+pub fn decode_doc(qt_sub_lib_name: &str, docs_path: &Path) -> Result<DocData> {
+  if !docs_path.exists() {
     return Err(format!("Documentation directory does not exist: {}",
-                       doc_path.display())
+                       docs_path.display())
                    .into());
   }
-  let doc_file_path = doc_path.with_added(format!("qt{}.qch", qt_sub_lib_name));
+  let doc_file_path = docs_path.with_added(format!("qt{}.qch", qt_sub_lib_name));
   if !doc_file_path.exists() {
     return Err(format!("Documentation file does not exist: {}",
                        doc_file_path.display())

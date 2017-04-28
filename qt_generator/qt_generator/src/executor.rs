@@ -104,6 +104,7 @@ fn exec(sublib_name: &str,
   config.set_write_cache(exec_config.write_cache);
   config.set_quiet_mode(exec_config.quiet_mode);
   config.set_debug_logging_config(exec_config.debug_logging_config.clone());
+  config.set_cpp_lib_version(installation_data.qt_version.as_str());
   if exec_config.write_dependencies_local_paths {
     log::status("Output Cargo.toml file will contain local paths of used dependencies \
                (use --no-local-paths to disable).");
@@ -114,9 +115,9 @@ fn exec(sublib_name: &str,
   // TODO: does parsing work on MacOS without adding "-F"?
 
   config.add_include_directive(&lib_folder_name(sublib_name));
+  let lib_include_path = installation_data.lib_include_path.clone();
   config.add_cpp_data_filter(Box::new(move |cpp_data| {
-                                        fix_header_names(cpp_data,
-                                                         &installation_data.lib_include_path)
+                                        fix_header_names(cpp_data, &lib_include_path)
                                       }));
   config.add_cpp_parser_arguments(vec!["-fPIC", "-fcxx-exceptions"]);
   {
@@ -149,8 +150,10 @@ fn exec(sublib_name: &str,
   }
   config.add_cpp_parser_blocked_name("qt_check_for_QGADGET_macro");
   let sublib_name_clone = sublib_name.to_string();
+  let docs_path = installation_data.docs_path.clone();
+
   config.add_cpp_data_filter(Box::new(move |cpp_data| {
-    match decode_doc(&sublib_name_clone) {
+    match decode_doc(&sublib_name_clone, &docs_path) {
       Ok(doc_data) => {
         let mut parser = DocParser::new(doc_data);
         find_methods_docs(&mut cpp_data.methods, &mut parser)?;

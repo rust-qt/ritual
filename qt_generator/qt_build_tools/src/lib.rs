@@ -3,15 +3,26 @@ extern crate cpp_to_rust_common;
 extern crate qt_generator_common;
 
 use cpp_to_rust_build_tools::Config;
-use cpp_to_rust_common::errors::{fancy_unwrap, Result};
+use cpp_to_rust_common::errors::{fancy_unwrap, Result, ChainErr};
 use cpp_to_rust_common::target;
 use cpp_to_rust_common::cpp_build_config::CppBuildConfigData;
 use qt_generator_common::{get_installation_data, real_lib_name, framework_name, lib_dependencies};
 
 pub fn run_and_return(sublib_name: &str) -> Result<()> {
+  let installation_data = get_installation_data(sublib_name)?;
 
   let mut config = Config::new()?;
-  let installation_data = get_installation_data(sublib_name)?;
+  {
+    let original_qt_version = config
+      .original_cpp_lib_version()
+      .chain_err(|| "cpp_lib_version is expected in Config")?;
+
+    if original_qt_version != installation_data.qt_version {
+      println!("cargo:warning=This crate was generated for Qt {}, but Qt {} is currently in use.",
+               original_qt_version,
+               installation_data.qt_version);
+    }
+  }
   config
     .cpp_build_paths_mut()
     .add_include_path(&installation_data.root_include_path);
