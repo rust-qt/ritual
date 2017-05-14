@@ -48,6 +48,8 @@ Generated crates require:
 fatal error: 'stddef.h' file not found
 ```
 
+`CPP_TO_RUST_TEMP_TEST_DIR` variable may be used to specify location of the temporary directory used by tests. If the directory is preserved between test runs, tests will run faster.
+
 Build scripts of generated crates accept `CPP_TO_RUST_LIB_PATHS`, `CPP_TO_RUST_FRAMEWORK_PATHS`, `CPP_TO_RUST_INCLUDE_PATHS` environment variables. They can be used to override paths selected by the build script (if any). If multiple paths need to be specified, separate them in the same way `PATH` variable is separated on target platform. 
 
 C++ build tools and the linker may also read other environment variables, including `LIB`, `PATH`, `LIBRARY_PATH`, `LD_LIBRARY_PATH`, `DYLD_FRAMEWORK_PATH`. The generator has API for specifying library paths, passes them to `cmake` when building the C++ wrapper library, and reports the paths in build script's output, but it may not be enough for the linker to find the library, so you may need to set them manually.

@@ -210,7 +210,7 @@ impl CacheUsage {
 
 impl Default for CacheUsage {
   fn default() -> CacheUsage {
-    CacheUsage::Full
+    CacheUsage::None
   }
 }
 

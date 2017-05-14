@@ -7,6 +7,7 @@ use std;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::process::Command;
+use std::path::PathBuf;
 
 #[cfg(windows)]
 /// Returns proper executable file suffix on current platform.
@@ -98,4 +99,20 @@ impl<A, T: IntoIterator<Item = A>> MapIfOk<A> for T {
     }
     Ok(r)
   }
+}
+
+/// Reads environment variable `env_var_name`, adds `new_paths`
+/// to acquired list of paths and returns the list formatted as path list
+/// (without applying it).
+#[cfg_attr(feature="clippy", allow(or_fun_call))]
+pub fn add_env_path_item(env_var_name: &str,
+                         mut new_paths: Vec<PathBuf>)
+                         -> Result<std::ffi::OsString> {
+  use std::env;
+  for path in env::split_paths(&env::var(env_var_name).unwrap_or(String::new())) {
+    if new_paths.iter().find(|&x| x == &path).is_none() {
+      new_paths.push(path.into());
+    }
+  }
+  env::join_paths(new_paths).chain_err(|| "env::join_paths failed")
 }

@@ -1,5 +1,5 @@
 use common::file_utils::{PathBufWithAdded, create_dir};
-use common::utils::run_command;
+use common::utils::{run_command, add_env_path_item};
 use common::cpp_lib_builder::{CppLibBuilder, BuildType};
 use common::errors::fancy_unwrap;
 use config::{Config, CrateProperties, CacheUsage};
@@ -103,9 +103,17 @@ fn full_run() {
     if *cargo_cmd != "update" {
       command.arg("-j1");
     }
+    //    if *cargo_cmd == "test" {
+    //      command.arg("--");
+    //      command.arg("--nocapture");
+    //    }
     command.current_dir(&crate_dir);
     command.env("CPP_TO_RUST_INCLUDE_PATHS", &include_path);
     command.env("CPP_TO_RUST_LIB_PATHS", &cpp_install_lib_dir);
+    command.env("PATH",
+                add_env_path_item("PATH", vec![cpp_install_lib_dir.clone()]).unwrap());
+    command.env("LD_LIBRARY_PATH",
+                add_env_path_item("LD_LIBRARY_PATH", vec![cpp_install_lib_dir.clone()]).unwrap());
     run_command(&mut command).unwrap();
   }
 }
