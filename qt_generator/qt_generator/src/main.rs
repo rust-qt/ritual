@@ -72,11 +72,15 @@ fn main() {
     const AFTER_HELP: &'static str = "See https://github.com/rust-qt/cpp_to_rust for more details.";
     const CACHE_DIR_HELP: &'static str = "Directory for cache and temporary files";
     const OUTPUT_DIR_HELP: &'static str = "Directory for generated crates";
-    const LIBS_HELP: &'static str = "Libraries (Qt modules) to process. Supported names: \
-                                     core, gui, widgets, ui_tools.";
+    const LIBS_HELP: &'static str = "Libraries (Qt modules) to process. Specify \"all\" to process all\
+                                     supported modules or specify one or multiple of the following: \
+                                     core, gui, widgets, ui_tools, all.";
     const CACHE_USAGE_HELP: &'static str = "Cache usage for repeated execution";
-    const CACHE_USAGE_LONG_HELP: &'static str = "Cache usage for repeated execution:\n0 - no cache usage,\n1 - use raw C++ data,\n2 - use \
-       prepared C++ data,\n3 - use all and allow complete skips (default)";
+    const CACHE_USAGE_LONG_HELP: &'static str = "Cache usage for repeated execution:\n\
+                                                 0 - no cache usage (default),\n\
+                                                 1 - use raw C++ data,\n\
+                                                 2 - use prepared C++ data,\n\
+                                                 3 - use all and allow complete skips";
     const DEBUG_LOGGING_HELP: &'static str = "Debug logging mode";
     const DEBUG_LOGGING_LONG_HELP: &'static str = "Debug logging mode:\n\"print\" - print to stderr;\n\"save\" - save to cache \
        directory;\n\"disable\" - disable (default)";
@@ -116,7 +120,7 @@ fn main() {
                  .long("cache-usage")
                  .value_name("N")
                  .possible_values(&["0", "1", "2", "3"])
-                 .default_value("3")
+                 .default_value("0")
                  .hide_default_value(true)
                  .hide_possible_values(true)
                  .help(CACHE_USAGE_HELP)

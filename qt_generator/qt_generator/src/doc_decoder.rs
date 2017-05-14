@@ -128,8 +128,8 @@ impl DocData {
       }
     }
     Ok(DocData {
-     index: index_data,
-     connection: connection,
-    })
+         index: index_data,
+         connection: connection,
+       })
   }
 }

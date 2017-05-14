@@ -47,7 +47,15 @@ pub fn exec_all(libs: Vec<String>,
 
   let crate_templates_path =
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_added("crate_templates");
-  for sublib_name in libs {
+  let final_libs = if libs.iter().any(|x| x == "all") {
+    vec!["core".to_string(),
+         "gui".to_string(),
+         "widgets".to_string(),
+         "ui_tools".to_string()]
+  } else {
+    libs
+  };
+  for sublib_name in final_libs {
     let lib_cache_dir = cache_dir.with_added(format!("qt_{}", sublib_name));
     let lib_crate_templates_path = crate_templates_path.with_added(&sublib_name);
     let lib_output_dir = output_dir.with_added(format!("qt_{}", sublib_name));

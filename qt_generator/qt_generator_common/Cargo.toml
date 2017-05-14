@@ -3,7 +3,7 @@ name = "qt_generator_common"
 version = "0.0.0"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 license = "MIT"
-description = "Common utilities for generating and building Rust crates for Qt"
+description = "Common utilities for generating and building Rust-Qt crates"
 repository = "https://github.com/rust-qt/cpp_to_rust/tree/master/qt_generator/qt_generator_common"
 
 [dependencies]
