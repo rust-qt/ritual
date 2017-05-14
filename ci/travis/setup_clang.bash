@@ -14,6 +14,7 @@ if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
   set -x
   export LLVM_CONFIG_PATH=$CLANG_DIR/bin/llvm-config
   export CLANG_SYSTEM_INCLUDE_PATH=$CLANG_DIR/lib/clang/3.8.0/include
+  export LD_LIBRARY_PATH=$CLANG_DIR/lib
   set +x
 else
   set -x

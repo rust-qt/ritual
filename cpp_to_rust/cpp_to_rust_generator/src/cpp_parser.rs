@@ -1083,7 +1083,8 @@ impl<'a> CppParser<'a> {
       });
       let start = source_range.get_start().get_file_location();
       let end = source_range.get_end().get_file_location();
-      let file = open_file(start.file.get_path())?;
+      let file_path = start.file.chain_err(|| "no file in source location")?.get_path();
+      let file = open_file(&file_path)?;
       let reader = BufReader::new(file.into_file());
       let mut result = String::new();
       let range_line1 = (start.line - 1) as usize;
@@ -1094,7 +1095,7 @@ impl<'a> CppParser<'a> {
         let line = line
           .chain_err(|| {
                        format!("failed while reading lines from {}",
-                               start.file.get_path().display())
+                               file_path.display())
                      })?;
         if line_num >= range_line1 && line_num <= range_line2 {
           let start_column = if line_num == range_line1 {

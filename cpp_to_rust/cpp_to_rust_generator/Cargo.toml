@@ -14,7 +14,7 @@ regex = "0.1"
 serde = "0.9"       # serialization
 serde_derive = "0.9"
 
-clang = "0.14"    # C++ parsing
+clang = "0.16"    # C++ parsing
 
 select = "0.3.0"    # html parsing
 
