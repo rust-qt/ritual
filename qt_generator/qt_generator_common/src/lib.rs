@@ -3,6 +3,9 @@
 //! Qt modules are identified within this crate using snake case names without
 //! a prefix, e.g. `core` for QtCore and `ui_tools` for QtUiTools.
 //! `sublib_name` argument should be in this form.
+//!
+//! See [README](https://github.com/rust-qt/cpp_to_rust)
+//! for more information.
 
 extern crate cpp_to_rust_common;
 

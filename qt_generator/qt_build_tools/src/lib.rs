@@ -1,4 +1,7 @@
 //! Implementation of build script for all Qt crates
+//!
+//! See [README](https://github.com/rust-qt/cpp_to_rust)
+//! for more information.
 
 extern crate cpp_to_rust_build_tools;
 extern crate cpp_to_rust_common;

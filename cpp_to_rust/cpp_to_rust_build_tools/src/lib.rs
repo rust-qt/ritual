@@ -4,6 +4,9 @@
 //! If a custom build script is used, it should either
 //! use the same call to execute all operations normally
 //! or use `Config` type to change the build script's settings.
+//!
+//! See [README](https://github.com/rust-qt/cpp_to_rust)
+//! for more information.
 
 
 pub extern crate cpp_to_rust_common as common;

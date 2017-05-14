@@ -1,3 +1,9 @@
+//! Generator of Rust-Qt crates.
+//!
+//! See [README](https://github.com/rust-qt/cpp_to_rust/tree/master/qt_generator/qt_generator)
+//! for more information.
+
+
 extern crate clap;
 extern crate cpp_to_rust_generator;
 extern crate cpp_to_rust_common;

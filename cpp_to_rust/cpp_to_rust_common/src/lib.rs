@@ -2,8 +2,10 @@
 
 //! Utility types and functions used by `cpp_to_rust_generator` and
 //! `cpp_to_rust_build_tools` crates.
-
-
+//!
+//! See [README](https://github.com/rust-qt/cpp_to_rust)
+//! for more information.
+//!
 #[macro_use]
 extern crate error_chain;
 extern crate backtrace;

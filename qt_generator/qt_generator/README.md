@@ -3,9 +3,11 @@ qt_generator
 
 Generator of Rust-Qt crates.
 
+See [README](https://github.com/rust-qt/cpp_to_rust) of the repository root for more information about other parts of the project.
+
 ## Usage
 
-Clone the project, compile and run with `cargo`.
+Clone the project, compile and run with `cargo`:
 
 ```
 git clone https://github.com/rust-qt/cpp_to_rust.git

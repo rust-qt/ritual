@@ -1,6 +1,7 @@
 //! Implementation of `cpp_to_rust` generator that
 //! analyzes a C++ library and produces a Rust crate for it.
-//! See `README.md` for more information.
+//! See [README](https://github.com/rust-qt/cpp_to_rust/tree/master/cpp_to_rust/cpp_to_rust_generator)
+//! for more information.
 
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
