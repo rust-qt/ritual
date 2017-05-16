@@ -30,9 +30,8 @@ The generator additionally requires:
 
 The following environment variables may be required for `clang` parser to work correctly:
 
-- `CLANG_DIR`
-- `LLVM_CONFIG_PATH` (e.g. `LLVM_CONFIG_PATH=$CLANG_DIR/bin/llvm-config`)
-- `CLANG_SYSTEM_INCLUDE_PATH` (e.g. `CLANG_SYSTEM_INCLUDE_PATH=$CLANG_DIR/lib/clang/3.8.0/include`).
+- `LLVM_CONFIG_PATH` (path to `llvm-config` binary)
+- `CLANG_SYSTEM_INCLUDE_PATH` (e.g. `$CLANG_DIR/lib/clang/3.8.0/include` for `clang` 3.8.0).
 
 Generated crates require:
 

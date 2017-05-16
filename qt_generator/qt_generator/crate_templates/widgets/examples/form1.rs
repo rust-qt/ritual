@@ -11,12 +11,10 @@ use qt_widgets::qt_core::string::String;
 use qt_widgets::qt_core::slots::SlotNoArgs;
 use qt_widgets::message_box::MessageBox;
 
-use std::cell::RefCell;
-
 struct Form<'a> {
-  widget: CppBox<Widget>,
-  button: *mut PushButton,
-  line_edit: *mut LineEdit,
+  _widget: CppBox<Widget>,
+  _button: *mut PushButton,
+  _line_edit: *mut LineEdit,
   button_clicked: SlotNoArgs<'a>,
   line_edit_edited: SlotNoArgs<'a>,
 }
@@ -27,14 +25,18 @@ fn uref<T>(ptr: *mut T) -> &'static mut T {
 
 impl<'a> Form<'a> {
   fn new() -> Form<'a> {
-    let mut widget = Widget::new(());
-    let mut layout = VBoxLayout::new(widget.as_mut_ptr());
+    let mut widget = Widget::new();
+    let mut layout = unsafe { VBoxLayout::new_unsafe(widget.as_mut_ptr()) };
     let mut line_edit = LineEdit::new(());
-    layout.add_widget(line_edit.static_cast_mut() as *mut _);
+    unsafe {
+      layout.add_widget(line_edit.static_cast_mut() as *mut _);
+    }
     let line_edit = line_edit.into_raw();
     let mut button = PushButton::new(&String::from_std_str("Start"));
     button.set_enabled(false);
-    layout.add_widget(button.static_cast_mut() as *mut _);
+    unsafe {
+      layout.add_widget(button.static_cast_mut() as *mut _);
+    }
     let button = button.into_raw();
     layout.into_raw();
     widget.show();
@@ -44,16 +46,18 @@ impl<'a> Form<'a> {
     let widget1 = widget.as_mut_ptr();
 
     let form = Form {
-      widget: widget,
-      button: button,
-      line_edit: line_edit,
+      _widget: widget,
+      _button: button,
+      _line_edit: line_edit,
       button_clicked: SlotNoArgs::new(move || {
-                                        let text = uref(line_edit1).text();
-                                        MessageBox::information((widget1,
-                                 &String::from_std_str("My title"),
-                                 &String::from_std_str("Text: \"%1\". Congratulations!")
-          .arg0(&text)));
-                                      }),
+        let text = uref(line_edit1).text();
+        unsafe {
+          MessageBox::information((widget1,
+                                   &String::from_std_str("My title"),
+                                   &String::from_std_str("Text: \"%1\". Congratulations!")
+                                      .arg0(&text)));
+        }
+      }),
       line_edit_edited: SlotNoArgs::new(move || {
                                           uref(button1).set_enabled(!uref(line_edit1)
                                                                        .text()
