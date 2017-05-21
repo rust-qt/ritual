@@ -4,6 +4,6 @@
 
 include_generated!();
 
-pub mod connections;
+pub mod connection;
 pub mod flags;
 mod impl_arguments_compatible;

@@ -1,7 +1,7 @@
 extern crate qt_core;
 use qt_core::core_application::CoreApplication;
 use qt_core::timer::Timer;
-use qt_core::connections::Signal;
+use qt_core::connection::Signal;
 
 use qt_core::libc::c_void;
 use qt_core::slots::ExternSlotNoArgs;

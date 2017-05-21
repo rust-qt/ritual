@@ -3,8 +3,8 @@
 
 use doc_decoder::DocData;
 use std::collections::{hash_map, HashMap, HashSet};
-use cpp_to_rust_common::log;
-use cpp_to_rust_common::errors::{Result, ChainErr, unexpected};
+use cpp_to_rust_generator::common::log;
+use cpp_to_rust_generator::common::errors::{Result, ChainErr, unexpected};
 use cpp_to_rust_generator::cpp_method::CppMethodDoc;
 use cpp_to_rust_generator::cpp_data::CppTypeDoc;
 use html_parser::node::Node;

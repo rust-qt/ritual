@@ -217,10 +217,10 @@ pub fn load_toml<P: AsRef<Path>>(path: P) -> Result<toml::Table> {
 }
 
 /// Save `data` to a TOML file
-pub fn save_toml<P: AsRef<Path>>(path: P, data: toml::Table) -> Result<()> {
+pub fn save_toml<P: AsRef<Path>>(path: P, data: &toml::Value) -> Result<()> {
   let mut file = create_file(path.as_ref())?;
   file
-    .write(toml::Value::Table(data).to_string())
+    .write(data.to_string())
     .chain_err(|| format!("failed to write to TOML file: {}", path.as_ref().display()))
 }
 

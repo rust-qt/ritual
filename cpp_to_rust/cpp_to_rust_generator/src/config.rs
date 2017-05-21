@@ -7,6 +7,7 @@ use cpp_data::CppData;
 pub use cpp_data::CppTypeAllocationPlace;
 use common::cpp_build_config::CppBuildConfig;
 use std::collections::HashMap;
+use common;
 
 /// Function type used in `Config::add_cpp_ffi_generator_filter`.
 pub type CppFfiGeneratorFilterFn = Fn(&CppMethod) -> Result<bool>;
@@ -62,10 +63,8 @@ pub struct CrateProperties {
   name: String,
   /// Version of the crate (must be in compliance with cargo requirements)
   version: String,
-  /// Authors of the crate
-  authors: Vec<String>,
-  /// Name of the C++ library
-  links: Option<String>,
+  /// Extra properties to be merged with auto generated content of `Cargo.toml`
+  custom_fields: common::toml::Table,
   /// Extra dependencies for output `Cargo.toml`
   dependencies: Vec<CrateDependency>,
   /// Extra build dependencies for output `Cargo.toml`
@@ -82,8 +81,7 @@ impl CrateProperties {
     CrateProperties {
       name: name.into(),
       version: version.into(),
-      authors: Vec::new(),
-      links: None,
+      custom_fields: Default::default(),
       dependencies: Vec::new(),
       build_dependencies: Vec::new(),
       remove_default_dependencies: false,
@@ -91,15 +89,6 @@ impl CrateProperties {
     }
   }
 
-  /// Adds an author for `authors` field of `Cargo.toml`.
-  pub fn add_author<S: Into<String>>(&mut self, author: S) {
-    self.authors.push(author.into());
-  }
-  /// Sets value for `links` field of `Cargo.toml`.
-  /// Native name of the C++ library should be used here.
-  pub fn set_links_attribute<S: Into<String>>(&mut self, links: S) {
-    self.links = Some(links.into());
-  }
   /// Adds an extra non-`cpp_to_rust`-based dependency with
   /// `name`, `version` and optionally `local_path`.
   pub fn add_dependency<S1: Into<String>, S2: Into<String>>(&mut self,
@@ -140,6 +129,12 @@ impl CrateProperties {
     self.remove_default_build_dependencies = true;
   }
 
+  /// Sets custom fields for output `Cargo.toml`. These fields will
+  /// be added to auto-generated fields (or replace them in case of a name conflict).
+  pub fn set_custom_fields(&mut self, value: common::toml::Table) {
+    self.custom_fields = value;
+  }
+
   /// Name of the crate
   pub fn name(&self) -> &String {
     &self.name
@@ -148,14 +143,7 @@ impl CrateProperties {
   pub fn version(&self) -> &String {
     &self.version
   }
-  /// Authors of the crate
-  pub fn authors(&self) -> &Vec<String> {
-    &self.authors
-  }
-  /// `links` property of the crate
-  pub fn links_attribute(&self) -> Option<&String> {
-    self.links.as_ref()
-  }
+
   /// Extra non-`cpp_to_rust`-based dependencies of the crate
   pub fn dependencies(&self) -> &Vec<CrateDependency> {
     &self.dependencies
@@ -171,6 +159,10 @@ impl CrateProperties {
   /// Returns true if default build dependencies were removed.
   pub fn should_remove_default_build_dependencies(&self) -> bool {
     self.remove_default_build_dependencies
+  }
+
+  pub fn custom_fields(&self) -> &common::toml::Table {
+    &self.custom_fields
   }
 }
 

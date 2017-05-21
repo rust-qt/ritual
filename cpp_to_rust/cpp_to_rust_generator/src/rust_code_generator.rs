@@ -182,6 +182,37 @@ struct RustCodeGenerator<'a> {
   rustfmt_config: rustfmt::config::Config,
 }
 
+/// Merges `a` and `b` recursively. `b` take precedence over `a`.
+fn recursive_merge_toml(a: toml::Value, b: toml::Value) -> toml::Value {
+  if a.same_type(&b) {
+    if let toml::Value::Array(mut a_array) = a {
+      if let toml::Value::Array(mut b_array) = b {
+        a_array.append(&mut b_array);
+        toml::Value::Array(a_array)
+      } else {
+        unreachable!()
+      }
+    } else if let toml::Value::Table(mut a_table) = a {
+      if let toml::Value::Table(b_table) = b {
+        for (key, value) in b_table {
+          if let Some(old_value) = a_table.remove(&key) {
+            a_table.insert(key, recursive_merge_toml(old_value, value));
+          } else {
+            a_table.insert(key, value);
+          }
+        }
+        toml::Value::Table(a_table)
+      } else {
+        unreachable!()
+      }
+    } else {
+      b
+    }
+  } else {
+    b
+  }
+}
+
 
 impl<'a> RustCodeGenerator<'a> {
   /// Generates `Cargo.toml` file and skeleton of the crate.
@@ -247,15 +278,6 @@ impl<'a> RustCodeGenerator<'a> {
                                                                             .crate_properties
                                                                             .version()
                                                                             .clone()));
-                                         let authors = self
-                                           .config
-                                           .crate_properties
-                                           .authors()
-                                           .iter()
-                                           .map(|x| toml::Value::String(x.clone()))
-                                           .collect();
-                                         table.insert("authors".to_string(),
-                                                      toml::Value::Array(authors));
                                          table.insert("build".to_string(),
                                                       toml::Value::String("build.rs".to_string()));
                                          table
@@ -330,10 +352,11 @@ impl<'a> RustCodeGenerator<'a> {
       table.insert("package".to_string(), package);
       table.insert("dependencies".to_string(), dependencies);
       table.insert("build-dependencies".to_string(), build_dependencies);
-      table
+      recursive_merge_toml(toml::Value::Table(table),
+                           toml::Value::Table(self.config.crate_properties.custom_fields().clone()))
     };
     save_toml(self.config.output_path.with_added("Cargo.toml"),
-              cargo_toml_data)?;
+              &cargo_toml_data)?;
 
     if let Some(ref template_path) = self.config.crate_template_path {
       for item in read_dir(template_path)? {
@@ -909,7 +932,7 @@ impl<'a> RustCodeGenerator<'a> {
                 let args = arg_texts.join(", ");
                 let args_tuple = format!("{}{}", args, if arg_texts.len() == 1 { "," } else { "" });
                 let connections_mod = RustName::new(vec!["qt_core".to_string(),
-                                                         "connections".to_string()])?
+                                                         "connection".to_string()])?
                     .full_name(Some(&self.config.crate_properties.name()));
                 let object_type_name = RustName::new(vec!["qt_core".to_string(),
                                                           "object".to_string(),
@@ -963,7 +986,7 @@ impl<'a> RustCodeGenerator<'a> {
           results.push(self.generate_trait_impls(trait_impls)?);
           if !qt_receivers.is_empty() {
             let connections_mod = RustName::new(vec!["qt_core".to_string(),
-                                                     "connections".to_string()])?
+                                                     "connection".to_string()])?
                 .full_name(Some(&self.config.crate_properties.name()));
             let object_type_name = RustName::new(vec!["qt_core".to_string(),
                                                       "object".to_string(),
@@ -1033,7 +1056,7 @@ pub fn {struct_method}(&self) -> {struct_type} {{
               }
             }
             content.push(format!("impl {} {{\n{}\n}}\n", obj_name, type_impl_content.join("")));
-            results.push(format!("pub mod connections {{\n{}\n}}\n\n", content.join("")));
+            results.push(format!("pub mod connection {{\n{}\n}}\n\n", content.join("")));
           }
         }
         RustTypeDeclarationKind::MethodParametersTrait {

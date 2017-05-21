@@ -2,8 +2,9 @@
 name = "cpp_to_rust_build_tools"
 
 # Don't forget to update `cpp_to_rust/cpp_to_rust_generator/src/versions.rs`
+# and dependency version in qt_build_tools
 # when changing this version.
-version = "0.0.0"
+version = "0.2.0"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 
 description = "Build script implementation for C++ library wrappers"
@@ -11,4 +12,4 @@ repository = "https://github.com/rust-qt/cpp_to_rust/tree/master/cpp_to_rust/cpp
 license = "MIT"
 
 [dependencies]
-cpp_to_rust_common = { version = "0.0", path = "../../cpp_to_rust/cpp_to_rust_common" }
+cpp_to_rust_common = { version = "0.2.0", path = "../../cpp_to_rust/cpp_to_rust_common" }

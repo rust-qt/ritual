@@ -25,7 +25,7 @@ extern crate serde_derive;
 
 extern crate serde;
 
-extern crate cpp_to_rust_common as common;
+pub extern crate cpp_to_rust_common as common;
 
 mod cpp_ffi_generator;
 mod cpp_code_generator;

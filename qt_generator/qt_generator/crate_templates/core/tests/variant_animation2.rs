@@ -2,7 +2,7 @@ extern crate qt_core;
 use qt_core::core_application::CoreApplication;
 use qt_core::variant::Variant;
 use qt_core::variant_animation::VariantAnimation;
-use qt_core::connections::Signal;
+use qt_core::connection::Signal;
 use qt_core::slots::SlotVariantRef;
 
 #[test]

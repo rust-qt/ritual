@@ -115,7 +115,7 @@ Not planned to support:
 Implemented: 
 
 - `QFlags<Enum>` types are converted to Rust's own similar implementation located at `qt_core::flags`).
-- `qt_core::connections` implements a way to use signals and slots. It's possible to use signals and slots of the built-in Qt classes and create slots bound to an arbitrary closure from Rust code. Argument types compability is checked at compile time.
+- `qt_core::connection` implements a way to use signals and slots. It's possible to use signals and slots of the built-in Qt classes and create slots bound to an arbitrary closure from Rust code. Argument types compability is checked at compile time.
 
 Not implemented yet but planned:
 

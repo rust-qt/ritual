@@ -1,6 +1,6 @@
 //! Generator configurations specific for each Qt module.
 
-use cpp_to_rust_common::errors::{Result, ChainErr};
+use cpp_to_rust_generator::common::errors::{Result, ChainErr};
 use cpp_to_rust_generator::config::{Config, CppTypeAllocationPlace};
 use cpp_to_rust_generator::cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType,
                                       CppTypeIndirection};

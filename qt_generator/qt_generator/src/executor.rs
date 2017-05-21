@@ -1,15 +1,15 @@
 //! Functions for setting configuration and executing the generator.
 
-use cpp_to_rust_common::errors::Result;
-use cpp_to_rust_common::log;
-use cpp_to_rust_common::file_utils::{PathBufWithAdded, repo_crate_local_path};
+use cpp_to_rust_generator::common::errors::Result;
+use cpp_to_rust_generator::common::{log, toml};
+use cpp_to_rust_generator::common::file_utils::{PathBufWithAdded, repo_crate_local_path};
 use cpp_to_rust_generator::config::{Config, CacheUsage, DebugLoggingConfig};
 use cpp_to_rust_generator::cpp_data::CppVisibility;
-use cpp_to_rust_common::cpp_build_config::{CppBuildConfigData, CppLibraryType};
-use cpp_to_rust_common::target;
-use qt_generator_common::{get_installation_data, real_lib_name, lib_folder_name, lib_dependencies};
+use cpp_to_rust_generator::common::cpp_build_config::{CppBuildConfigData, CppLibraryType};
+use cpp_to_rust_generator::common::target;
+use qt_generator_common::{get_installation_data, lib_folder_name, lib_dependencies};
 use std::path::PathBuf;
-
+use versions;
 
 use doc_parser::DocParser;
 use fix_header_names::fix_header_names;
@@ -97,17 +97,35 @@ fn exec(sublib_name: &str,
     return Ok(());
   }
   log::status(format!("Processing library: {}", sublib_name));
-  let qt_lib_name = real_lib_name(sublib_name);
-  let mut crate_properties = CrateProperties::new(format!("qt_{}", sublib_name), "0.1.5");
-  crate_properties.add_author("Pavel Strakhov <ri@idzaaus.org>");
-  crate_properties.set_links_attribute(qt_lib_name.clone());
+  let crate_name = format!("qt_{}", sublib_name);
+  let mut crate_properties = CrateProperties::new(crate_name.clone(),
+                                                  versions::QT_OUTPUT_CRATES_VERSION);
+  let mut custom_fields = toml::Table::new();
+  let mut package_data = toml::Table::new();
+  package_data.insert("authors".to_string(),
+                      toml::Value::Array(vec![toml::Value::String("Pavel Strakhov <ri@idzaaus.org>"
+                                                                    .to_string())]));
+  let description = format!("Bindings for {} C++ library (generated automatically with cpp_to_rust project)",
+                            lib_folder_name(sublib_name));
+  package_data.insert("description".to_string(), toml::Value::String(description));
+  let doc_url = format!("https://rust-qt.github.io/rustdoc/qt/{}", &crate_name);
+  package_data.insert("documentation".to_string(), toml::Value::String(doc_url));
+  package_data.insert("repository".to_string(),
+                      toml::Value::String("https://github.com/rust-qt/cpp_to_rust".to_string()));
+  package_data.insert("license".to_string(),
+                      toml::Value::String("MIT".to_string()));
+
+  custom_fields.insert("package".to_string(), toml::Value::Table(package_data));
+  crate_properties.set_custom_fields(custom_fields);
   crate_properties.remove_default_build_dependencies();
   let qt_build_tools_path = if exec_config.write_dependencies_local_paths {
     Some(repo_crate_local_path("qt_generator/qt_build_tools")?)
   } else {
     None
   };
-  crate_properties.add_build_dependency("qt_build_tools", "0.1", qt_build_tools_path);
+  crate_properties.add_build_dependency("qt_build_tools",
+                                        versions::QT_BUILD_TOOLS_VERSION,
+                                        qt_build_tools_path);
   let mut config = Config::new(&output_dir, &cache_dir, crate_properties);
   let installation_data = get_installation_data(sublib_name)?;
   config.add_include_path(&installation_data.root_include_path);

@@ -2,10 +2,10 @@
 //! Qt's shortcut header names.
 
 use cpp_to_rust_generator::cpp_data::CppData;
-use cpp_to_rust_common::errors::{Result, ChainErr};
-use cpp_to_rust_common::file_utils::{read_dir, file_to_string, os_str_to_str};
-use cpp_to_rust_common::log;
-use cpp_to_rust_common::utils::add_to_multihash;
+use cpp_to_rust_generator::common::errors::{Result, ChainErr};
+use cpp_to_rust_generator::common::file_utils::{read_dir, file_to_string, os_str_to_str};
+use cpp_to_rust_generator::common::log;
+use cpp_to_rust_generator::common::utils::add_to_multihash;
 
 use std::path::PathBuf;
 use std::collections::HashMap;
@@ -108,7 +108,7 @@ pub fn fix_header_names(data: &mut CppData, headers_dir: &PathBuf) -> Result<()>
 
 #[test]
 fn test_qt_fix_header_names() {
-  use cpp_to_rust_common::file_utils::PathBufWithAdded;
+  use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
   let map = HeaderNameMap::new(&PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                                   .with_added("test_assets")
                                   .with_added("qt_headers"))
