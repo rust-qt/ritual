@@ -45,8 +45,7 @@ fn full_run() {
   let crate_dir = temp_dir.path().with_added("crate");
   let cpp_install_lib_dir = temp_dir.path().with_added("install").with_added("lib");
   assert!(cpp_install_lib_dir.exists());
-  let mut crate_properties = CrateProperties::new("rust_ctrt1", "0.0.0");
-  crate_properties.set_links_attribute("ctrt1");
+  let crate_properties = CrateProperties::new("rust_ctrt1", "0.0.0");
 
   let mut config = Config::new(&crate_dir,
                                temp_dir.path().with_added("cache"),
