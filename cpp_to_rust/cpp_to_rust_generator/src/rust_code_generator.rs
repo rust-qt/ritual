@@ -167,10 +167,10 @@ pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) -> Resul
   for module in &data.modules {
     generator.generate_module_file(module)?;
   }
-  let mut module_names: Vec<_> = data.modules.iter().map(|x| &x.name).collect();
-  module_names.sort();
+  //let mut module_names: Vec<_> = data.modules.iter().map(|x| &x.name).collect();
+  //module_names.sort();
   generator.generate_ffi_file(&data.ffi_functions)?;
-  generator.generate_lib_file(&module_names)?;
+  generator.generate_lib_file(&data.modules)?;
   Ok(())
 }
 
@@ -785,7 +785,7 @@ impl<'a> RustCodeGenerator<'a> {
 
   /// Generates `lib.rs` file.
   #[cfg_attr(feature="clippy", allow(collapsible_if))]
-  pub fn generate_lib_file(&self, modules: &[&String]) -> Result<()> {
+  pub fn generate_lib_file(&self, modules: &[RustModule]) -> Result<()> {
     let mut code = String::new();
 
 
@@ -805,7 +805,7 @@ impl<'a> RustCodeGenerator<'a> {
               \"/type_sizes.rs\")); \n}\n\n");
 
     for name in &["ffi", "type_sizes"] {
-      if modules.iter().any(|x| &x.as_str() == name) {
+      if modules.iter().any(|x| &x.name.as_str() == name) {
         return Err(format!("Automatically generated module '{}' conflicts with a mandatory \
                             module",
                            name)
@@ -813,7 +813,7 @@ impl<'a> RustCodeGenerator<'a> {
       }
     }
     for name in &["lib", "main"] {
-      if modules.iter().any(|x| &x.as_str() == name) {
+      if modules.iter().any(|x| &x.name.as_str() == name) {
         return Err(format!("Automatically generated module '{}' conflicts with a reserved name",
                            name)
                        .into());
@@ -821,7 +821,12 @@ impl<'a> RustCodeGenerator<'a> {
     }
 
     for module in modules {
-      code.push_str(&format!("pub mod {};\n", module));
+      let doc = module
+        .doc
+        .as_ref()
+        .map(|d| format_doc(d))
+        .unwrap_or_default();
+      code.push_str(&format!("{}pub mod {};\n", doc, &module.name));
     }
 
     let src_path = self.config.output_path.with_added("src");

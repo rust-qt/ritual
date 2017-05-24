@@ -220,6 +220,8 @@ pub struct RustGenerator {
   input_data: CppAndFfiData,
   /// Configuration of this generator
   config: RustGeneratorConfig,
+
+  top_module_names: HashMap<String, RustName>,
   /// Type wrappers created for this crate
   processed_types: Vec<RustProcessedTypeInfo>,
   /// Type wrappers found in all dependencies
@@ -254,12 +256,16 @@ pub fn run(input_data: CppAndFfiData,
            dependency_rust_types: Vec<RustProcessedTypeInfo>,
            config: RustGeneratorConfig)
            -> Result<RustGeneratorOutput> {
-  let generator = RustGenerator {
-    processed_types: process_types(&input_data, &config, &dependency_rust_types)?,
+  let mut generator = RustGenerator {
+    top_module_names: HashMap::new(),
+    processed_types: Vec::new(),
     dependency_types: dependency_rust_types,
     input_data: input_data,
     config: config,
   };
+  generator.top_module_names = generator.calc_top_module_names()?;
+
+  generator.processed_types = generator.calc_processed_types()?;
   let mut modules = Vec::new();
   {
     let mut cpp_methods: Vec<&CppAndFfiMethod> = Vec::new();
@@ -322,11 +328,11 @@ pub fn run(input_data: CppAndFfiData,
       for method in cpp_methods {
         log::error(format!("  {}", method.cpp_method.short_text()));
         if let Some(ref info) = method.cpp_method.class_membership {
-          let rust_name = calculate_rust_name(&info.class_type.name,
-                                              &method.cpp_method.include_file,
-                                              false,
-                                              None,
-                                              &generator.config)?;
+          let rust_name = generator
+            .calculate_rust_name(&info.class_type.name,
+                                 &method.cpp_method.include_file,
+                                 false,
+                                 None)?;
           log::error(format!("  -> {}", rust_name.full_name(None)));
         } else {
           let rust_name = generator.free_function_rust_name(&method.cpp_method)?;
@@ -353,313 +359,6 @@ pub fn run(input_data: CppAndFfiData,
      })
 }
 
-/// Generates `RustName` for specified function or type name,
-/// including crate name and modules list.
-fn calculate_rust_name(name: &str,
-                       include_file: &str,
-                       is_function: bool,
-                       operator: Option<&CppOperator>,
-                       config: &RustGeneratorConfig)
-                       -> Result<RustName> {
-  let mut split_parts: Vec<_> = name.split("::").collect();
-  let original_last_part = split_parts
-    .pop()
-    .chain_err(|| "split_parts can't be empty")?
-    .to_string();
-  let last_part = if let Some(operator) = operator {
-    operator_rust_name(operator)?
-  } else {
-    remove_qt_prefix_and_convert_case(&original_last_part,
-                                      if is_function {
-                                        Case::Snake
-                                      } else {
-                                        Case::Class
-                                      },
-                                      config.remove_qt_prefix)
-  };
-
-  let mut parts = Vec::new();
-  parts.push(config.crate_name.clone());
-  parts.push(include_file_to_module_name(include_file, config.remove_qt_prefix));
-  for part in split_parts {
-    parts.push(remove_qt_prefix_and_convert_case(&part.to_string(),
-                                                 Case::Snake,
-                                                 config.remove_qt_prefix));
-  }
-
-  if parts.len() > 2 && parts[1] == parts[2] {
-    // special case
-    parts.remove(2);
-  }
-  parts.push(last_part);
-  RustName::new(parts)
-}
-
-/// Generates Rust names and type information for all available C++ types.
-fn process_types(input_data: &CppAndFfiData,
-                 config: &RustGeneratorConfig,
-                 dependency_types: &[RustProcessedTypeInfo])
-                 -> Result<Vec<RustProcessedTypeInfo>> {
-  let mut result = Vec::new();
-  for type_info in &input_data.cpp_data.types {
-    if let CppTypeKind::Class { ref template_arguments, .. } = type_info.kind {
-      if template_arguments.is_some() {
-        continue;
-      }
-    }
-    let rust_name = calculate_rust_name(&type_info.name,
-                                        &type_info.include_file,
-                                        false,
-                                        None,
-                                        config)?;
-    let rust_type_info = RustProcessedTypeInfo {
-      cpp_name: type_info.name.clone(),
-      cpp_doc: type_info.doc.clone(),
-      cpp_template_arguments: None,
-      kind: match type_info.kind {
-        CppTypeKind::Class { .. } => {
-          match input_data
-                  .cpp_data
-                  .type_allocation_place(&type_info.name) {
-            Err(err) => {
-              log::llog(log::DebugRustSkips,
-                        || format!("Can't process type: {}: {}", type_info.name, err));
-              continue;
-            }
-            Ok(place) => {
-              RustTypeWrapperKind::Struct {
-                size_const_name: match place {
-                  CppTypeAllocationPlace::Stack => Some(size_const_name(&rust_name)),
-                  CppTypeAllocationPlace::Heap => None,
-                },
-                is_deletable: input_data
-                  .cpp_data
-                  .has_public_destructor(&CppTypeClassBase {
-                                            name: type_info.name.clone(),
-                                            template_arguments: None,
-                                          }),
-                slot_wrapper: None,
-              }
-            }
-          }
-        }
-        CppTypeKind::Enum { ref values } => {
-
-          let mut is_flaggable = false;
-          let template_arg_sample = CppType {
-            is_const: false,
-            is_const2: false,
-            indirection: CppTypeIndirection::None,
-            base: CppTypeBase::Enum { name: type_info.name.clone() },
-          };
-
-          for flag_owner_name in &["QFlags", "QUrlTwoFlags"] {
-            if let Some(instantiations) =
-              input_data
-                .cpp_data
-                .template_instantiations
-                .iter()
-                .find(|x| &x.class_name == &flag_owner_name.to_string()) {
-              if instantiations
-                   .instantiations
-                   .iter()
-                   .any(|ins| {
-                          ins
-                            .template_arguments
-                            .iter()
-                            .any(|arg| arg == &template_arg_sample)
-                        }) {
-                is_flaggable = true;
-                break;
-              }
-            }
-          }
-          RustTypeWrapperKind::Enum {
-            values: prepare_enum_values(values),
-            is_flaggable: is_flaggable,
-          }
-        }
-      },
-      rust_name: rust_name,
-      is_public: true,
-    };
-    result.push(rust_type_info);
-  }
-  let template_final_name =
-    |result: &Vec<RustProcessedTypeInfo>, item: &RustProcessedTypeInfo| -> Result<RustName> {
-      let mut name = item.rust_name.clone();
-      let last_name = name
-        .parts
-        .pop()
-        .chain_err(|| "name.parts can't be empty")?;
-      let mut arg_captions = Vec::new();
-      if let Some(ref args) = item.cpp_template_arguments {
-        for x in args {
-          let rust_type = complete_type(result,
-                                        dependency_types,
-                                        &x.to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
-                                        &CppFfiArgumentMeaning::Argument(0),
-                                        true,
-                                        &ReturnValueAllocationPlace::NotApplicable)?;
-          arg_captions.push(rust_type.rust_api_type.caption(&name)?.to_class_case());
-        }
-      } else {
-        return Err("template arguments expected".into());
-      }
-      name.parts.push(last_name + &arg_captions.join(""));
-      Ok(name)
-    };
-  let mut unnamed_items = Vec::new();
-  for template_instantiations in &input_data.cpp_data.template_instantiations {
-    let type_info = input_data
-      .cpp_data
-      .find_type_info(|x| &x.name == &template_instantiations.class_name)
-      .chain_err(|| {
-                   format!("type info not found for {}",
-                           &template_instantiations.class_name)
-                 })?;
-    if template_instantiations.class_name == "QFlags" {
-      // special processing is implemented for QFlags
-      continue;
-    }
-    for ins in &template_instantiations.instantiations {
-      let rust_name = calculate_rust_name(&template_instantiations.class_name,
-                                          &type_info.include_file,
-                                          false,
-                                          None,
-                                          config)?;
-      unnamed_items.push(RustProcessedTypeInfo {
-                           cpp_name: template_instantiations.class_name.clone(),
-                           cpp_doc: type_info.doc.clone(),
-                           cpp_template_arguments: Some(ins.template_arguments.clone()),
-                           kind: RustTypeWrapperKind::Struct {
-                             size_const_name: None,
-                             is_deletable: input_data
-                               .cpp_data
-                               .has_public_destructor(&CppTypeClassBase {
-                                                         name: template_instantiations
-                                                           .class_name
-                                                           .clone(),
-                                                         template_arguments:
-                                                           Some(ins.template_arguments.clone()),
-                                                       }),
-                             slot_wrapper: None,
-                           },
-                           rust_name: rust_name,
-                           is_public: true,
-                         });
-    }
-  }
-  let mut any_success = true;
-  while !unnamed_items.is_empty() {
-    if !any_success {
-      log::error("Failed to generate Rust names for template types:");
-      for r in unnamed_items {
-        log::error(format!("  {:?}\n  {}\n\n",
-                           r,
-                           if let Err(err) = template_final_name(&result, &r) {
-                             err
-                           } else {
-                             return Err("template_final_name must return Err at this stage".into());
-                           }));
-      }
-      break;
-    }
-    any_success = false;
-    let mut unnamed_items_new = Vec::new();
-    for mut r in unnamed_items {
-      match template_final_name(&result, &r) {
-        Ok(name) => {
-          r.rust_name = name.clone();
-          if let RustTypeWrapperKind::Struct { ref mut size_const_name, .. } = r.kind {
-            match input_data.cpp_data.type_allocation_place(&r.cpp_name) {
-              Err(err) => {
-                log::log(log::DebugRustSkips,
-                         format!("Can't process type: {}: {}", r.cpp_name, err));
-                continue;
-              }
-              Ok(place) => {
-                *size_const_name = match place {
-                  CppTypeAllocationPlace::Stack => Some(self::size_const_name(&name)),
-                  CppTypeAllocationPlace::Heap => None,
-                };
-              }
-            }
-          } else {
-            unreachable!();
-          }
-          result.push(r);
-          any_success = true;
-        }
-        Err(_) => unnamed_items_new.push(r),
-      }
-
-    }
-    unnamed_items = unnamed_items_new;
-  }
-  for header in &input_data.cpp_ffi_headers {
-    for qt_slot_wrapper in &header.qt_slot_wrappers {
-      let incomplete_rust_name = calculate_rust_name(&format!("extern_slot"),
-                                                     &header.include_file_base_name,
-                                                     false,
-                                                     None,
-                                                     config)?;
-      let arg_names = qt_slot_wrapper
-        .arguments
-        .iter()
-        .map_if_ok(|x| -> Result<_> {
-          let rust_type = complete_type(&result,
-                                        dependency_types,
-                                        x,
-                                        &CppFfiArgumentMeaning::Argument(0),
-                                        false,
-                                        &ReturnValueAllocationPlace::NotApplicable)?;
-          rust_type.rust_api_type.caption(&incomplete_rust_name)
-        })?;
-      let args_text = if arg_names.is_empty() {
-        "no_args".to_string()
-      } else {
-        arg_names.join("_")
-      };
-      let rust_type_info = RustProcessedTypeInfo {
-        cpp_name: qt_slot_wrapper.class_name.clone(),
-        cpp_template_arguments: None,
-        cpp_doc: None, // TODO: do we need doc for this?
-        rust_name: calculate_rust_name(&format!("extern_slot_{}", args_text),
-                                       &header.include_file_base_name,
-                                       false,
-                                       None,
-                                       config)?,
-        is_public: true,
-        kind: RustTypeWrapperKind::Struct {
-          size_const_name: None,
-          is_deletable: true,
-          slot_wrapper: Some(RustQtSlotWrapper {
-                               arguments: qt_slot_wrapper
-                                 .arguments
-                                 .iter()
-                                 .map_if_ok(|t| -> Result<_> {
-            let mut t = complete_type(&result,
-                                      dependency_types,
-                                      t,
-                                      &CppFfiArgumentMeaning::Argument(0),
-                                      false,
-                                      &ReturnValueAllocationPlace::NotApplicable)?;
-            t.rust_api_type = t.rust_api_type.with_lifetime("static".to_string());
-            Ok(t)
-          })?,
-                               receiver_id: qt_slot_wrapper.receiver_id.clone(),
-                               public_type_name: format!("slot_{}", args_text).to_class_case(),
-                               callback_name: format!("slot_{}_callback", args_text)
-                                 .to_snake_case(),
-                             }),
-        },
-      };
-      result.push(rust_type_info);
-    }
-  }
-  Ok(result)
-}
 
 /// Output data of `RustGenerator::generate_type` function.
 struct GenerateTypeResult {
@@ -944,6 +643,33 @@ fn ffi_type(processed_types: &[RustProcessedTypeInfo],
 
 
 impl RustGenerator {
+  fn calc_top_module_names(&self) -> Result<HashMap<String, RustName>> {
+    let mut result = HashMap::new();
+    {
+      let mut check_header = |header| -> Result<()> {
+        if !result.contains_key(header) {
+          let mut parts = Vec::new();
+          parts.push(self.config.crate_name.clone());
+          parts.push(include_file_to_module_name(header, self.config.remove_qt_prefix));
+          result.insert(header.to_string(), RustName::new(parts)?);
+        }
+        Ok(())
+      };
+
+      for method in &self.input_data.cpp_data.methods {
+        check_header(&method.include_file)?;
+      }
+      for method in &self.input_data.cpp_data.types {
+        check_header(&method.include_file)?;
+      }
+      for header in &self.input_data.cpp_ffi_headers {
+        check_header(&header.include_file_base_name)?;
+      }
+    }
+    Ok(result)
+  }
+
+
   /// Converts specified C++ type to Rust.
   /// Returns:
   /// - main_type - representation of the target type, including
@@ -1093,11 +819,10 @@ impl RustGenerator {
 
   /// Returns full name of the Rust method corresponding to `cpp_method`.
   fn free_function_rust_name(&self, cpp_method: &CppMethod) -> Result<RustName> {
-    calculate_rust_name(&cpp_method.name,
-                        &cpp_method.include_file,
-                        true,
-                        cpp_method.operator.as_ref(),
-                        &self.config)
+    self.calculate_rust_name(&cpp_method.name,
+                             &cpp_method.include_file,
+                             true,
+                             cpp_method.operator.as_ref())
   }
 
   /// Returns method name. For class member functions, the name doesn't
@@ -1767,12 +1492,28 @@ impl RustGenerator {
                                  module_name: &'b RustName)
                                  -> Result<(Option<RustModule>, Vec<&'a CppAndFfiMethod>)> {
     let mut direct_submodules = HashSet::new();
+    let cpp_header = if module_name.parts.len() == 2 {
+      self
+        .top_module_names
+        .iter()
+        .find(|&(_k, v)| v == module_name)
+        .and_then(|(k, _v)| Some(k.clone()))
+    } else {
+      None
+    };
     let mut module = RustModule {
       name: module_name.last_name()?.clone(),
       types: Vec::new(),
       functions: Vec::new(),
       submodules: Vec::new(),
       trait_impls: Vec::new(),
+      doc: cpp_header
+        .as_ref()
+        .map(|h| if h == "slots" {
+               "API for creating custom Qt slots".to_string()
+             } else {
+               format!("Entities from `{}` C++ header", h)
+             }),
     };
     let mut rust_overloading_types = Vec::new();
     let mut good_methods = Vec::new();
@@ -1799,6 +1540,20 @@ impl RustGenerator {
         if check_name(&type_data.rust_name) {
           let (mut result, tmp_cpp_methods) = self.generate_type(type_data, cpp_methods)?;
           cpp_methods = tmp_cpp_methods;
+          if let Some(ref cpp_header) = cpp_header {
+            if &type_data.cpp_name == cpp_header {
+              if let RustTypeDeclarationKind::CppTypeWrapper { ref cpp_doc, .. } =
+                result.main_type.kind {
+                if let Some(ref cpp_doc) = *cpp_doc {
+                  let mut doc = cpp_doc.html.as_str();
+                  if let Some(index) = doc.find("\n") {
+                    doc = &doc[0..index];
+                  }
+                  module.doc = Some(doc.to_string());
+                }
+              }
+            }
+          }
           module.types.push(result.main_type);
           rust_overloading_types.append(&mut result.overloading_types);
         }
@@ -1843,6 +1598,7 @@ impl RustGenerator {
                 functions: Vec::new(),
                 submodules: Vec::new(),
                 trait_impls: Vec::new(),
+                doc: Some(("Types for overloading emulation".into())),
               });
     }
     module.types.sort_by(|a, b| a.name.cmp(&b.name));
@@ -1901,6 +1657,324 @@ impl RustGenerator {
       ffi_functions.push((header.include_file_base_name.clone(), functions));
     }
     ffi_functions
+  }
+
+  /// Generates Rust names and type information for all available C++ types.
+  fn calc_processed_types(&self) -> Result<Vec<RustProcessedTypeInfo>> {
+    let mut result = Vec::new();
+    for type_info in &self.input_data.cpp_data.types {
+      if let CppTypeKind::Class { ref template_arguments, .. } = type_info.kind {
+        if template_arguments.is_some() {
+          continue;
+        }
+      }
+      let rust_name =
+        self
+          .calculate_rust_name(&type_info.name, &type_info.include_file, false, None)?;
+      let rust_type_info = RustProcessedTypeInfo {
+        cpp_name: type_info.name.clone(),
+        cpp_doc: type_info.doc.clone(),
+        cpp_template_arguments: None,
+        kind: match type_info.kind {
+          CppTypeKind::Class { .. } => {
+            match self
+                    .input_data
+                    .cpp_data
+                    .type_allocation_place(&type_info.name) {
+              Err(err) => {
+                log::llog(log::DebugRustSkips,
+                          || format!("Can't process type: {}: {}", type_info.name, err));
+                continue;
+              }
+              Ok(place) => {
+                RustTypeWrapperKind::Struct {
+                  size_const_name: match place {
+                    CppTypeAllocationPlace::Stack => Some(size_const_name(&rust_name)),
+                    CppTypeAllocationPlace::Heap => None,
+                  },
+                  is_deletable: self
+                    .input_data
+                    .cpp_data
+                    .has_public_destructor(&CppTypeClassBase {
+                                              name: type_info.name.clone(),
+                                              template_arguments: None,
+                                            }),
+                  slot_wrapper: None,
+                }
+              }
+            }
+          }
+          CppTypeKind::Enum { ref values } => {
+
+            let mut is_flaggable = false;
+            let template_arg_sample = CppType {
+              is_const: false,
+              is_const2: false,
+              indirection: CppTypeIndirection::None,
+              base: CppTypeBase::Enum { name: type_info.name.clone() },
+            };
+
+            for flag_owner_name in &["QFlags", "QUrlTwoFlags"] {
+              if let Some(instantiations) =
+                self
+                  .input_data
+                  .cpp_data
+                  .template_instantiations
+                  .iter()
+                  .find(|x| &x.class_name == &flag_owner_name.to_string()) {
+                if instantiations
+                     .instantiations
+                     .iter()
+                     .any(|ins| {
+                            ins
+                              .template_arguments
+                              .iter()
+                              .any(|arg| arg == &template_arg_sample)
+                          }) {
+                  is_flaggable = true;
+                  break;
+                }
+              }
+            }
+            RustTypeWrapperKind::Enum {
+              values: prepare_enum_values(values),
+              is_flaggable: is_flaggable,
+            }
+          }
+        },
+        rust_name: rust_name,
+        is_public: true,
+      };
+      result.push(rust_type_info);
+    }
+    let template_final_name =
+      |result: &Vec<RustProcessedTypeInfo>, item: &RustProcessedTypeInfo| -> Result<RustName> {
+        let mut name = item.rust_name.clone();
+        let last_name = name
+          .parts
+          .pop()
+          .chain_err(|| "name.parts can't be empty")?;
+        let mut arg_captions = Vec::new();
+        if let Some(ref args) = item.cpp_template_arguments {
+          for x in args {
+            let rust_type = complete_type(result,
+                                          &self.dependency_types,
+                                          &x.to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
+                                          &CppFfiArgumentMeaning::Argument(0),
+                                          true,
+                                          &ReturnValueAllocationPlace::NotApplicable)?;
+            arg_captions.push(rust_type.rust_api_type.caption(&name)?.to_class_case());
+          }
+        } else {
+          return Err("template arguments expected".into());
+        }
+        name.parts.push(last_name + &arg_captions.join(""));
+        Ok(name)
+      };
+    let mut unnamed_items = Vec::new();
+    for template_instantiations in &self.input_data.cpp_data.template_instantiations {
+      let type_info = self
+        .input_data
+        .cpp_data
+        .find_type_info(|x| &x.name == &template_instantiations.class_name)
+        .chain_err(|| {
+                     format!("type info not found for {}",
+                             &template_instantiations.class_name)
+                   })?;
+      if template_instantiations.class_name == "QFlags" {
+        // special processing is implemented for QFlags
+        continue;
+      }
+      for ins in &template_instantiations.instantiations {
+        let rust_name = self
+          .calculate_rust_name(&template_instantiations.class_name,
+                               &type_info.include_file,
+                               false,
+                               None)?;
+        unnamed_items.push(RustProcessedTypeInfo {
+                             cpp_name: template_instantiations.class_name.clone(),
+                             cpp_doc: type_info.doc.clone(),
+                             cpp_template_arguments: Some(ins.template_arguments.clone()),
+                             kind: RustTypeWrapperKind::Struct {
+                               size_const_name: None,
+                               is_deletable: self
+                                 .input_data
+                                 .cpp_data
+                                 .has_public_destructor(&CppTypeClassBase {
+                                                           name: template_instantiations
+                                                             .class_name
+                                                             .clone(),
+                                                           template_arguments:
+                                                             Some(ins.template_arguments.clone()),
+                                                         }),
+                               slot_wrapper: None,
+                             },
+                             rust_name: rust_name,
+                             is_public: true,
+                           });
+      }
+    }
+    let mut any_success = true;
+    while !unnamed_items.is_empty() {
+      if !any_success {
+        log::error("Failed to generate Rust names for template types:");
+        for r in unnamed_items {
+          log::error(format!("  {:?}\n  {}\n\n",
+                             r,
+                             if let Err(err) = template_final_name(&result, &r) {
+                               err
+                             } else {
+                               return Err("template_final_name must return Err at this stage"
+                                            .into());
+                             }));
+        }
+        break;
+      }
+      any_success = false;
+      let mut unnamed_items_new = Vec::new();
+      for mut r in unnamed_items {
+        match template_final_name(&result, &r) {
+          Ok(name) => {
+            r.rust_name = name.clone();
+            if let RustTypeWrapperKind::Struct { ref mut size_const_name, .. } = r.kind {
+              match self
+                      .input_data
+                      .cpp_data
+                      .type_allocation_place(&r.cpp_name) {
+                Err(err) => {
+                  log::log(log::DebugRustSkips,
+                           format!("Can't process type: {}: {}", r.cpp_name, err));
+                  continue;
+                }
+                Ok(place) => {
+                  *size_const_name = match place {
+                    CppTypeAllocationPlace::Stack => Some(self::size_const_name(&name)),
+                    CppTypeAllocationPlace::Heap => None,
+                  };
+                }
+              }
+            } else {
+              unreachable!();
+            }
+            result.push(r);
+            any_success = true;
+          }
+          Err(_) => unnamed_items_new.push(r),
+        }
+
+      }
+      unnamed_items = unnamed_items_new;
+    }
+    for header in &self.input_data.cpp_ffi_headers {
+      for qt_slot_wrapper in &header.qt_slot_wrappers {
+        let incomplete_rust_name = self
+          .calculate_rust_name(&format!("extern_slot"),
+                               &header.include_file_base_name,
+                               false,
+                               None)?;
+        let arg_names = qt_slot_wrapper
+          .arguments
+          .iter()
+          .map_if_ok(|x| -> Result<_> {
+            let rust_type = complete_type(&result,
+                                          &self.dependency_types,
+                                          x,
+                                          &CppFfiArgumentMeaning::Argument(0),
+                                          false,
+                                          &ReturnValueAllocationPlace::NotApplicable)?;
+            rust_type.rust_api_type.caption(&incomplete_rust_name)
+          })?;
+        let args_text = if arg_names.is_empty() {
+          "no_args".to_string()
+        } else {
+          arg_names.join("_")
+        };
+        let rust_type_info = RustProcessedTypeInfo {
+          cpp_name: qt_slot_wrapper.class_name.clone(),
+          cpp_template_arguments: None,
+          cpp_doc: None, // TODO: do we need doc for this?
+          rust_name: self
+            .calculate_rust_name(&format!("extern_slot_{}", args_text),
+                                 &header.include_file_base_name,
+                                 false,
+                                 None)?,
+          is_public: true,
+          kind: RustTypeWrapperKind::Struct {
+            size_const_name: None,
+            is_deletable: true,
+            slot_wrapper: Some(RustQtSlotWrapper {
+                                 arguments: qt_slot_wrapper
+                                   .arguments
+                                   .iter()
+                                   .map_if_ok(|t| -> Result<_> {
+              let mut t = complete_type(&result,
+                                        &self.dependency_types,
+                                        t,
+                                        &CppFfiArgumentMeaning::Argument(0),
+                                        false,
+                                        &ReturnValueAllocationPlace::NotApplicable)?;
+              t.rust_api_type = t.rust_api_type.with_lifetime("static".to_string());
+              Ok(t)
+            })?,
+                                 receiver_id: qt_slot_wrapper.receiver_id.clone(),
+                                 public_type_name: format!("slot_{}", args_text).to_class_case(),
+                                 callback_name: format!("slot_{}_callback", args_text)
+                                   .to_snake_case(),
+                               }),
+          },
+        };
+        result.push(rust_type_info);
+      }
+    }
+    Ok(result)
+  }
+
+  /// Generates `RustName` for specified function or type name,
+  /// including crate name and modules list.
+  fn calculate_rust_name(&self,
+                         name: &str,
+                         include_file: &str,
+                         is_function: bool,
+                         operator: Option<&CppOperator>)
+                         -> Result<RustName> {
+    let mut split_parts: Vec<_> = name.split("::").collect();
+    let original_last_part = split_parts
+      .pop()
+      .chain_err(|| "split_parts can't be empty")?
+      .to_string();
+    let last_part = if let Some(operator) = operator {
+      operator_rust_name(operator)?
+    } else {
+      remove_qt_prefix_and_convert_case(&original_last_part,
+                                        if is_function {
+                                          Case::Snake
+                                        } else {
+                                          Case::Class
+                                        },
+                                        self.config.remove_qt_prefix)
+    };
+
+    let module_name =
+      self
+        .top_module_names
+        .get(include_file)
+        .chain_err(|| format!("no top level module generated for header: {}", include_file))?;
+
+    let mut parts = module_name.parts.clone();
+    //    parts.push(config.crate_name.clone());
+    //    parts.push(include_file_to_module_name(include_file, config.remove_qt_prefix));
+    for part in split_parts {
+      parts.push(remove_qt_prefix_and_convert_case(&part.to_string(),
+                                                   Case::Snake,
+                                                   self.config.remove_qt_prefix));
+    }
+
+    if parts.len() > 2 && parts[1] == parts[2] {
+      // special case
+      parts.remove(2);
+    }
+    parts.push(last_part);
+    RustName::new(parts)
   }
 }
 

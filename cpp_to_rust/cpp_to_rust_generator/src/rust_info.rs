@@ -353,6 +353,8 @@ pub struct RustModule {
   pub functions: Vec<RustMethod>,
   /// Trait implementations associated with free functions.
   pub trait_impls: Vec<TraitImpl>,
+  /// Markdown content of Rust documentation for this module.
+  pub doc: Option<String>,
   /// Submodules of this module.
   pub submodules: Vec<RustModule>,
 }
