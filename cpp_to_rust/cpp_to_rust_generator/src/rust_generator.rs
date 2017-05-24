@@ -2005,15 +2005,32 @@ fn calculate_rust_name_test_part(name: &'static str,
                                  include_file: &'static str,
                                  is_function: bool,
                                  expected: &[&'static str]) {
-  assert_eq!(calculate_rust_name(&name.to_string(),
-                                 &include_file.to_string(),
-                                 is_function,
-                                 None,
-                                 &RustGeneratorConfig {
-                                    crate_name: "qt_core".to_string(),
-                                    remove_qt_prefix: true,
-                                  })
-                 .unwrap(),
+  let header = ::cpp_ffi_data::CppFfiHeaderData {
+    include_file_base_name: include_file.to_string(),
+    methods: Vec::new(),
+    qt_slot_wrappers: Vec::new(),
+  };
+  let mut generator = RustGenerator {
+    top_module_names: HashMap::new(),
+    processed_types: Vec::new(),
+    dependency_types: Vec::new(),
+    input_data: CppAndFfiData {
+      cpp_ffi_headers: vec![header],
+      cpp_data: Default::default(),
+    },
+    config: RustGeneratorConfig {
+      crate_name: "qt_core".to_string(),
+      remove_qt_prefix: true,
+    },
+  };
+  generator.top_module_names = generator.calc_top_module_names().unwrap();
+
+  assert_eq!(generator
+               .calculate_rust_name(&name.to_string(),
+                                    &include_file.to_string(),
+                                    is_function,
+                                    None)
+               .unwrap(),
              RustName::new(expected.into_iter().map(|x| x.to_string()).collect()).unwrap());
 }
 
