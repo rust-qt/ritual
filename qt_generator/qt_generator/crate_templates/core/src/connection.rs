@@ -1,3 +1,5 @@
+//! Types and functions for connecting Qt signals and slots.
+
 use libc::c_char;
 
 /// Argument types compatible for signal connection.
