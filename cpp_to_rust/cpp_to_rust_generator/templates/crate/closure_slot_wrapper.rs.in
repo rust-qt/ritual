@@ -1,12 +1,16 @@
-impl {connections_mod}::Receiver for {type_name} {{
-  type Arguments = ({args_tuple});
-  fn object(&self) -> &{object_type_name} {{
-    ::cpp_utils::StaticCast::static_cast(self)
-  }}
-  fn receiver_id() -> &'static [u8] {{
-    b"{receiver_id}\0"
-  }}
-}}
+/// Allows to bind Qt signals with arguments `({cpp_args})` to a Rust closure.
+///
+/// Create an object using `new()` and bind your closure using `set()`.
+/// The closure will be called with the signal's arguments when the slot is invoked.
+/// Use `connect()` method of a `qt_core::connection::Signal` object to connect the signal
+/// to this slot. The closure will be executed each time the slot is invoked
+/// until source signals are disconnected or the slot object is destroyed.
+///
+/// The slot object takes ownership of the passed closure. If `set()` is called again,
+/// previously set closure is dropped. Make sure that the slot object does not outlive
+/// objects referenced by the closure.
+///
+/// If `set()` was not called, slot invokation has no effect.
 
 pub struct {pub_type_name}<'a> {{
   wrapper: ::cpp_utils::CppBox<{type_name}>,
@@ -14,11 +18,14 @@ pub struct {pub_type_name}<'a> {{
 }}
 
 impl<'a> {pub_type_name}<'a> {{
+  /// Constructs a new object.
   pub fn new<F: FnMut({args}) + 'a>(f: F) -> {pub_type_name}<'a> {{
     let mut obj = {pub_type_name}::default();
     obj.set(f);
     obj
   }}
+
+  /// Sets `f` as the callback closure. If `set()` is called again, previous closure is dropped.
   pub fn set<F: FnMut({args}) + 'a>(&mut self, f: F) {{
     self.clear();
     let mut func_box: Box<Box<FnMut({args}) + 'a>> = Box::new(Box::new(f));
@@ -27,6 +34,9 @@ impl<'a> {pub_type_name}<'a> {{
     }}
     self.func = Some(func_box);
   }}
+
+  /// Drops the previously set closure, if any. After this, slot invokation will have no effect
+  /// until a new closure is set.
   pub fn clear(&mut self) {{
     if self.func.is_some() {{
       unsafe {{
@@ -36,6 +46,7 @@ impl<'a> {pub_type_name}<'a> {{
     }}
   }}
 }}
+
 impl<'a> Default for {pub_type_name}<'a> {{
   fn default() -> Self {{
     {pub_type_name} {{
@@ -44,6 +55,7 @@ impl<'a> Default for {pub_type_name}<'a> {{
     }}
   }}
 }}
+
 impl<'a> {connections_mod}::Receiver for {pub_type_name}<'a> {{
   type Arguments = ({args_tuple});
   fn object(&self) -> &{object_type_name} {{

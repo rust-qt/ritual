@@ -1,0 +1,9 @@
+impl {connections_mod}::Receiver for {type_name} {{
+  type Arguments = ({args_tuple});
+  fn object(&self) -> &{object_type_name} {{
+    ::cpp_utils::StaticCast::static_cast(self)
+  }}
+  fn receiver_id() -> &'static [u8] {{
+    b"{receiver_id}\0"
+  }}
+}}

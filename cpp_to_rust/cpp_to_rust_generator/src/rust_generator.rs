@@ -695,6 +695,7 @@ impl RustGenerator {
                   qt_receivers: Vec::new(),
                 },
                 is_public: info.is_public,
+                rust_doc: None,
               },
               overloading_types: Vec::new(),
             },
@@ -748,6 +749,7 @@ impl RustGenerator {
                                  } else {
                                    RustQtReceiverType::Slot
                                  },
+                                 original_method_name: method.name.clone(),
                                  receiver_id: method.receiver_id()?,
                                  arguments: method
                                    .arguments
@@ -809,6 +811,7 @@ impl RustGenerator {
              qt_receivers: qt_receivers,
            },
            is_public: info.is_public,
+           rust_doc: None,
          },
          overloading_types: functions_result.overloading_types,
        },
@@ -1295,6 +1298,7 @@ impl RustGenerator {
                                   is_unsafe: first_method.is_unsafe,
                                 },
                                 is_public: true,
+                                rust_doc: None,
                               });
 
       RustMethod {
@@ -1308,7 +1312,8 @@ impl RustGenerator {
           variant_argument_name: "args".to_string(),
           cpp_method_name: cpp_method_name,
         },
-        docs: doc_items,
+        variant_docs: doc_items,
+        common_doc: None,
         is_unsafe: first_method.is_unsafe,
       }
     } else {
@@ -1460,7 +1465,7 @@ impl RustGenerator {
         let (method, type_declaration) =
           self
             .generate_final_method(overloaded_methods, scope, name_suffix)?;
-        if method.docs.is_empty() {
+        if method.variant_docs.is_empty() {
           return Err(unexpected(format!("docs are empty! {:?}", method)).into());
         }
         result.methods.push(method);
@@ -1507,13 +1512,19 @@ impl RustGenerator {
       functions: Vec::new(),
       submodules: Vec::new(),
       trait_impls: Vec::new(),
-      doc: cpp_header
-        .as_ref()
-        .map(|h| if h == "slots" {
-               "API for creating custom Qt slots".to_string()
-             } else {
-               format!("Entities from `{}` C++ header", h)
-             }),
+      doc: if module_name.parts.len() >= 2 && module_name.parts[1] == "slots" {
+        if module_name.parts.len() == 3 && module_name.parts[2] == "raw" {
+          Some(doc_formatter::slots_raw_module_doc())
+        } else if module_name.parts.len() == 2 {
+          Some(doc_formatter::slots_module_doc())
+        } else {
+          return Err(unexpected("unknown slots submodule").into());
+        }
+      } else {
+        cpp_header
+          .as_ref()
+          .map(|h| format!("Entities from `{}` C++ header", h))
+      },
     };
     let mut rust_overloading_types = Vec::new();
     let mut good_methods = Vec::new();
@@ -1554,6 +1565,7 @@ impl RustGenerator {
               }
             }
           }
+          doc_formatter::add_special_type_docs(&mut result.main_type)?;
           module.types.push(result.main_type);
           rust_overloading_types.append(&mut result.overloading_types);
         }
@@ -1598,7 +1610,7 @@ impl RustGenerator {
                 functions: Vec::new(),
                 submodules: Vec::new(),
                 trait_impls: Vec::new(),
-                doc: Some(("Types for overloading emulation".into())),
+                doc: Some(doc_formatter::overloading_module_doc()),
               });
     }
     module.types.sort_by(|a, b| a.name.cmp(&b.name));
@@ -1868,7 +1880,7 @@ impl RustGenerator {
     for header in &self.input_data.cpp_ffi_headers {
       for qt_slot_wrapper in &header.qt_slot_wrappers {
         let incomplete_rust_name = self
-          .calculate_rust_name(&format!("extern_slot"),
+          .calculate_rust_name(&format!("raw_slot"),
                                &header.include_file_base_name,
                                false,
                                None)?;
@@ -1894,7 +1906,7 @@ impl RustGenerator {
           cpp_template_arguments: None,
           cpp_doc: None, // TODO: do we need doc for this?
           rust_name: self
-            .calculate_rust_name(&format!("extern_slot_{}", args_text),
+            .calculate_rust_name(&format!("raw_slot_{}", args_text),
                                  &header.include_file_base_name,
                                  false,
                                  None)?,
@@ -1961,6 +1973,9 @@ impl RustGenerator {
         .chain_err(|| format!("no top level module generated for header: {}", include_file))?;
 
     let mut parts = module_name.parts.clone();
+    if include_file == "slots" {
+      parts.push("raw".to_string());
+    }
     //    parts.push(config.crate_name.clone());
     //    parts.push(include_file_to_module_name(include_file, config.remove_qt_prefix));
     for part in split_parts {
@@ -2206,11 +2221,12 @@ impl RustSingleMethod {
     RustMethod {
       name: self.name.clone(),
       arguments: RustMethodArguments::SingleVariant(self.arguments.clone()),
-      docs: if let Some(ref doc) = self.doc {
+      variant_docs: if let Some(ref doc) = self.doc {
         vec![doc.clone()]
       } else {
         Vec::new()
       },
+      common_doc: None,
       is_unsafe: self.is_unsafe,
       scope: self.scope.clone(),
     }

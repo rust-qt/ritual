@@ -877,6 +877,7 @@ impl<'a> RustCodeGenerator<'a> {
       let maybe_pub = if type1.is_public { "pub " } else { "" };
       match type1.kind {
         RustTypeDeclarationKind::CppTypeWrapper {
+          ref cpp_type_name,
           ref kind,
           ref methods,
           ref trait_impls,
@@ -943,36 +944,15 @@ impl<'a> RustCodeGenerator<'a> {
                                                           "object".to_string(),
                                                           "Object".to_string()])?
                     .full_name(Some(&self.config.crate_properties.name()));
-                let callback_args = slot_wrapper
-                  .arguments
-                  .iter()
-                  .enumerate()
-                  .map(|(num, t)| {
-                         format!("arg{}: {}", num, self.rust_type_to_code(&t.rust_ffi_type))
-                       })
-                  .join(", ");
-                let func_args = slot_wrapper
-                  .arguments
-                  .iter()
-                  .enumerate()
-                  .map_if_ok(|(num, t)| {
-                               self.convert_type_from_ffi(t, format!("arg{}", num), false, false)
-                             })?
-                  .join(", ");
-                r.push_str(&format!(include_str!("../templates/crate/slot_wrapper_extras.rs.in"),
+                r.push_str(&format!(include_str!("../templates/crate/extern_slot_impl_receiver.rs.in"),
                                     type_name =
                                       type1
                                         .name
                                         .full_name(Some(&self.config.crate_properties.name())),
-                                    pub_type_name = slot_wrapper.public_type_name,
-                                    callback_name = slot_wrapper.callback_name,
-                                    args = args,
                                     args_tuple = args_tuple,
                                     receiver_id = slot_wrapper.receiver_id,
                                     connections_mod = connections_mod,
-                                    object_type_name = object_type_name,
-                                    func_args = func_args,
-                                    callback_args = callback_args));
+                                    object_type_name = object_type_name));
               }
               r
             }
@@ -1007,9 +987,13 @@ impl<'a> RustCodeGenerator<'a> {
               if qt_receivers
                    .iter()
                    .any(|r| &r.receiver_type == receiver_type) {
-                let (struct_method, struct_type) = match *receiver_type {
-                  RustQtReceiverType::Signal => ("signals", "Signals"),
-                  RustQtReceiverType::Slot => ("slots", "Slots"),
+                let (struct_method, struct_type, struct_method_doc) = match *receiver_type {
+                  RustQtReceiverType::Signal => {
+                    ("signals", "Signals", "Provides access to built-in Qt signals of this type")
+                  }
+                  RustQtReceiverType::Slot => {
+                    ("slots", "Slots", "Provides access to built-in Qt slots of this type")
+                  }
                 };
                 let mut struct_content = Vec::new();
                 content.push(format!("pub struct {}<'a>(&'a {});\n", struct_type, obj_name));
@@ -1022,7 +1006,9 @@ impl<'a> RustCodeGenerator<'a> {
                       .collect();
                     let args_tuple = arg_texts.join(", ") +
                                      if arg_texts.len() == 1 { "," } else { "" };
-                    content.push(format!("pub struct {}<'a>(&'a {});\n",
+                    content.push(format!("{}pub struct {}<'a>(&'a {});\n",
+                                         format_doc(&doc_formatter::doc_for_qt_builtin_receiver(cpp_type_name,
+                                                                                               type1.name.last_name()?, receiver)),
                                          receiver.type_name,
                                          obj_name));
                     content.push(format!("\
@@ -1042,26 +1028,31 @@ impl<'a> {connections_mod}::Receiver for {type_name}<'a> {{
                                            connections_mod = connections_mod));
                     }
                     struct_content.push(format!("\
-pub fn {method_name}(&self) -> {type_name} {{
+{doc}pub fn {method_name}(&self) -> {type_name} {{
   {type_name}(self.0)
 }}\n",
                                                 type_name = receiver.type_name,
-                                                method_name = receiver.method_name));
+                                                method_name = receiver.method_name,
+                    doc = format_doc(&doc_formatter::doc_for_qt_builtin_receiver_method(cpp_type_name,
+                                                                                        receiver)),
+                    ));
                   }
                 }
                 content.push(format!("impl<'a> {}<'a> {{\n{}\n}}\n",
                                      struct_type,
                                      struct_content.join("")));
                 type_impl_content.push(format!("\
-pub fn {struct_method}(&self) -> {struct_type} {{
+{doc}pub fn {struct_method}(&self) -> {struct_type} {{
   {struct_type}(self)
 }}\n",
                                                struct_method = struct_method,
-                                               struct_type = struct_type));
+                                               struct_type = struct_type,
+                                               doc = format_doc(struct_method_doc)));
               }
             }
             content.push(format!("impl {} {{\n{}\n}}\n", obj_name, type_impl_content.join("")));
-            results.push(format!("pub mod connection {{\n{}\n}}\n\n", content.join("")));
+            results.push(format!("/// Types for accessing built-in Qt signals and slots present in this module\n\
+              pub mod connection {{\n{}\n}}\n\n", content.join("")));
           }
         }
         RustTypeDeclarationKind::MethodParametersTrait {
@@ -1181,9 +1172,72 @@ pub fn {struct_method}(&self) -> {struct_type} {{
     }
     results.push(self.generate_trait_impls(&data.trait_impls)?);
     for submodule in &data.submodules {
-      results.push(format!("pub mod {} {{\n{}}}\n\n",
+      let submodule_doc = submodule
+        .doc
+        .as_ref()
+        .map(|d| format_doc(d))
+        .unwrap_or_default();
+      results.push(format!("{}pub mod {} {{\n{}}}\n\n",
+                           submodule_doc,
                            submodule.name,
                            self.generate_module_code(submodule)?));
+      for type1 in &submodule.types {
+        if let RustTypeDeclarationKind::CppTypeWrapper { ref kind, .. } = type1.kind {
+          if let RustTypeWrapperKind::Struct { ref slot_wrapper, .. } = *kind {
+            if let Some(ref slot_wrapper) = *slot_wrapper {
+              let arg_texts: Vec<_> = slot_wrapper
+                .arguments
+                .iter()
+                .map(|t| self.rust_type_to_code(&t.rust_api_type))
+                .collect();
+              let cpp_args = slot_wrapper
+                .arguments
+                .iter()
+                .map(|t| t.cpp_type.to_cpp_pseudo_code())
+                .join(", ");
+              let args = arg_texts.join(", ");
+              let args_tuple = format!("{}{}", args, if arg_texts.len() == 1 { "," } else { "" });
+              let connections_mod = RustName::new(vec!["qt_core".to_string(),
+                                                       "connection".to_string()])?
+                  .full_name(Some(&self.config.crate_properties.name()));
+              let object_type_name = RustName::new(vec!["qt_core".to_string(),
+                                                        "object".to_string(),
+                                                        "Object".to_string()])?
+                  .full_name(Some(&self.config.crate_properties.name()));
+              let callback_args = slot_wrapper
+                .arguments
+                .iter()
+                .enumerate()
+                .map(|(num, t)| {
+                       format!("arg{}: {}", num, self.rust_type_to_code(&t.rust_ffi_type))
+                     })
+                .join(", ");
+              let func_args = slot_wrapper
+                .arguments
+                .iter()
+                .enumerate()
+                .map_if_ok(|(num, t)| {
+                             self.convert_type_from_ffi(t, format!("arg{}", num), false, false)
+                           })?
+                .join(", ");
+              results.push(format!(include_str!("../templates/crate/closure_slot_wrapper.rs.in"),
+                                   type_name =
+                                     type1
+                                       .name
+                                       .full_name(Some(&self.config.crate_properties.name())),
+                                   pub_type_name = slot_wrapper.public_type_name,
+                                   callback_name = slot_wrapper.callback_name,
+                                   args = args,
+                                   args_tuple = args_tuple,
+                                   connections_mod = connections_mod,
+                                   object_type_name = object_type_name,
+                                   func_args = func_args,
+                                   callback_args = callback_args,
+                                   cpp_args = cpp_args));
+            }
+          }
+        }
+      }
     }
     Ok(results.join(""))
   }

@@ -4,7 +4,7 @@ use qt_core::timer::Timer;
 use qt_core::connection::Signal;
 
 use qt_core::libc::c_void;
-use qt_core::slots::ExternSlotNoArgs;
+use qt_core::slots::raw::RawSlotNoArgs;
 extern "C" fn func1(data: *mut c_void) {
   let data: usize = unsafe { std::mem::transmute(data) };
   println!("about_to_quit: {}", data);
@@ -14,7 +14,7 @@ extern "C" fn func1(data: *mut c_void) {
 fn timer_quit() {
   println!("timer_quit: Started");
   CoreApplication::create_and_exit(|app| {
-    let mut slot1 = ExternSlotNoArgs::new();
+    let mut slot1 = RawSlotNoArgs::new();
     unsafe {
       slot1.set(func1, std::mem::transmute(42usize));
     }

@@ -211,7 +211,9 @@ pub struct RustMethod {
   /// Arguments of the method.
   pub arguments: RustMethodArguments,
   /// Documentation data (one item per corresponding C++ method).
-  pub docs: Vec<RustMethodDocItem>,
+  pub variant_docs: Vec<RustMethodDocItem>,
+  /// Rustdoc content that will appear before documentation for variants.
+  pub common_doc: Option<String>,
 }
 
 /// Information about type of `self` argument of the method.
@@ -276,6 +278,8 @@ pub struct RustQtReceiverDeclaration {
   /// Name of the method in `Signals` or `Slots` type that
   /// creates an object of this type.
   pub method_name: String,
+  /// C++ name of the signal or slot
+  pub original_method_name: String,
   /// Type of the receiver.
   pub receiver_type: RustQtReceiverType,
   /// Identifier of the signal or slot for passing to `QObject::connect`.
@@ -338,6 +342,9 @@ pub struct RustTypeDeclaration {
   pub name: RustName,
   /// Additional information depending on kind of the type.
   pub kind: RustTypeDeclarationKind,
+  /// Additional documentation content that will appear before C++ documentation or any other
+  /// automatically generated content.
+  pub rust_doc: Option<String>,
 }
 
 /// Information about a Rust module.

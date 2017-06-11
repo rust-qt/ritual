@@ -81,7 +81,7 @@ pub trait EnumOrFlags<T: FlaggableEnum> {
 // TODO: use Into and From traits instead
 
 impl<T: FlaggableEnum> EnumOrFlags<T> for Flags<T>
-where T: Clone
+  where T: Clone
 {
   fn to_flags(self) -> Flags<T> {
     self.clone()
