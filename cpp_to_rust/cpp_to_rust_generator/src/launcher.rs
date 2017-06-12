@@ -323,6 +323,7 @@ pub fn run(config: Config) -> Result<()> {
     cpp_ffi_lib_name: cpp_ffi_lib_name.clone(),
     generator_dependencies: &dependencies,
     write_dependencies_local_paths: config.write_dependencies_local_paths(),
+    cpp_lib_version: config.cpp_lib_version().map(|s| s.into()),
   };
   let mut dependency_rust_types = Vec::new();
   for dep in &dependencies {

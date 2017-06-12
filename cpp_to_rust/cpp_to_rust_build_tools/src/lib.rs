@@ -141,10 +141,6 @@ impl Config {
     {
       log::status("Generating ffi.rs file");
       let mut ffi_file = create_file(out_dir.with_added("ffi.rs"))?;
-      if ::common::target::current_env() != ::common::target::Env::Msvc {
-        // TODO: make it configurable
-        ffi_file.write("#[link(name = \"stdc++\")]\n")?;
-      }
       if cpp_build_config_data.library_type() == Some(CppLibraryType::Shared) {
         ffi_file
           .write(format!("#[link(name = \"{}\")]\n",
@@ -168,6 +164,10 @@ impl Config {
 
     for name in cpp_build_config_data.linked_libs() {
       println!("cargo:rustc-link-lib={}", name);
+    }
+    if ::common::target::current_env() != ::common::target::Env::Msvc {
+      // TODO: make it configurable
+      println!("cargo:rustc-link-lib=stdc++");
     }
     for name in cpp_build_config_data.linked_frameworks() {
       println!("cargo:rustc-link-lib=framework={}", name);

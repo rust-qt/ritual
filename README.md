@@ -5,15 +5,37 @@
 
 `cpp_to_rust` allows to use C++ libraries from Rust. The main target of this project is Qt.
 
-## Directions
+## Using published Qt crates
 
-*(Coming soon. Latest versions of Qt crates are not published yet.)*
+This project maintains the following Qt crates (more will hopefully be added in the future):
 
-If you just want to use Qt crates, add them as dependencies to your `Cargo.toml` and see the crates' documentation for more information.
+| Crate       | Version |
+| ----------- | ------- |
+| qt_core     | [![](http://meritbadge.herokuapp.com/qt_core)](https://crates.io/crates/qt_core) |
+| qt_gui      | [![](http://meritbadge.herokuapp.com/qt_gui)](https://crates.io/crates/qt_gui) |
+| qt_widgets  | [![](http://meritbadge.herokuapp.com/qt_widgets)](https://crates.io/crates/qt_widgets) |
+| qt_ui_tools | [![](http://meritbadge.herokuapp.com/qt_ui_tools)](https://crates.io/crates/qt_ui_tools) |
 
-[Online documentation](#) of published Qt crates 
+If you just want to use these crates, add them as dependencies to your `Cargo.toml`, for example:
 
-Published crates required a certain Qt version (currently 5.8) and don't export platform-specific API.
+```
+[dependencies]
+qt_widgets = "0.2"
+```
+
+And add corresponding `extern crate` directives to the crate root (`main.rs` or `lib.rs`):
+
+```
+extern crate qt_widgets;
+```
+
+Each crate re-exports its depenencies, so, for example, you can access `qt_core` as `qt_widgets::qt_core` without adding an explicit dependency.
+
+[Online documentation](https://rust-qt.github.io/rustdoc/qt/qt_core) of published Qt crates (you may also run `cargo doc --open` to generate documentation for your crate's dependencies).
+
+Published crates required a certain Qt version (currently 5.8.0) and don't export platform-specific API.
+
+## Using the generator
 
 If you want to use another Qt version, access platform-specific Qt APIs or tweak the generator configuration, refer to README of [qt_generator](https://github.com/rust-qt/cpp_to_rust/tree/master/qt_generator/qt_generator) for more information.
 

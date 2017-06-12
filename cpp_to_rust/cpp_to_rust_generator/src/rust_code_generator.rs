@@ -33,6 +33,8 @@ pub struct RustCodeGeneratorConfig<'a> {
   pub crate_template_path: Option<PathBuf>,
   /// Name of the C++ wrapper library.
   pub cpp_ffi_lib_name: String,
+  /// Version of the original C++ library.
+  pub cpp_lib_version: Option<String>,
   /// `cpp_to_rust` based dependencies of the generated crate.
   pub generator_dependencies: &'a [DependencyInfo],
   /// As in `Config`.
@@ -996,7 +998,11 @@ impl<'a> RustCodeGenerator<'a> {
                   }
                 };
                 let mut struct_content = Vec::new();
-                content.push(format!("pub struct {}<'a>(&'a {});\n", struct_type, obj_name));
+                content.push(format!("{}pub struct {}<'a>(&'a {});\n",
+                                     format_doc(&doc_formatter::doc_for_qt_builtin_receivers_struct(
+                                       type1.name.last_name()?, struct_method)),
+
+                                                                                                   struct_type, obj_name));
                 for receiver in qt_receivers {
                   if &receiver.receiver_type == receiver_type {
                     let arg_texts: Vec<_> = receiver
@@ -1296,14 +1302,22 @@ impl<'a> {connections_mod}::Receiver for {type_name}<'a> {{
 
   /// Creates new Rust source file or merges it with the existing file.
   fn save_src_file(&self, path: &Path, code: &str) -> Result<()> {
-    const MARKER: &'static str = "include_generated!();";
+    const INCLUDE_GENERATED_MARKER: &'static str = "include_generated!();";
+    const CPP_LIB_VERSION_MARKER: &'static str = "{cpp_to_rust.cpp_lib_version}";
     if path.exists() {
-      let template = file_to_string(path)?;
-      if let Some(index) = template.find(MARKER) {
+      let mut template = file_to_string(path)?;
+      if template.contains(CPP_LIB_VERSION_MARKER) {
+        if let Some(ref cpp_lib_version) = self.config.cpp_lib_version {
+          template = template.replace(CPP_LIB_VERSION_MARKER, cpp_lib_version);
+        } else {
+          return Err("C++ library version was not set in configuration.".into());
+        }
+      }
+      if let Some(index) = template.find(INCLUDE_GENERATED_MARKER) {
         let mut file = create_file(&path)?;
         file.write(&template[0..index])?;
         file.write(code)?;
-        file.write(&template[index + MARKER.len()..])?;
+        file.write(&template[index + INCLUDE_GENERATED_MARKER.len()..])?;
       } else {
         let name = os_str_to_str(path
                                    .file_name()

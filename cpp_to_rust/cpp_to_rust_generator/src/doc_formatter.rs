@@ -326,6 +326,12 @@ pub fn doc_for_qt_builtin_receiver_method(cpp_type_name: &str,
           cpp_method = receiver.original_method_name)
 }
 
+pub fn doc_for_qt_builtin_receivers_struct(rust_type_name: &str, receiver_type: &str) -> String {
+  format!("Provides access to built-in Qt {} of `{}`.",
+          receiver_type,
+          rust_type_name)
+}
+
 pub fn add_special_type_docs(data: &mut RustTypeDeclaration) -> Result<()> {
   let mut type_doc = None;
   if let RustTypeDeclarationKind::CppTypeWrapper {
