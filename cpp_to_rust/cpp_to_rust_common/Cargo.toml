@@ -19,7 +19,7 @@ regex = "0.1"
 serde = "0.9"       # serialization
 serde_derive = "0.9"
 serde_json = "0.9"
-bincode = "1.0.0-alpha6"
+bincode = "0.7.0"
 
 term-painter = "0.2.3"   # colored output
 
