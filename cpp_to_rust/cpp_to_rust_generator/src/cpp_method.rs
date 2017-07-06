@@ -2,7 +2,7 @@
 
 
 use cpp_data::{CppVisibility, CppTypeAllocationPlace, CppData, CppOriginLocation,
-               TemplateArgumentsDeclaration, CppBaseSpecifier};
+               TemplateArgumentsDeclaration, CppBaseSpecifier, CppDataWithDeps};
 use cpp_ffi_data::{CppMethodWithFfiSignature, CppFfiType, CppFfiFunctionSignature,
                    CppFfiFunctionArgument, CppFfiArgumentMeaning};
 use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase, CppTypeClassBase};
@@ -324,7 +324,7 @@ impl CppMethod {
 
   /// Generates the FFI function signature for this method.
   pub fn to_ffi_signature(&self,
-                          cpp_data: &CppData,
+                          cpp_data: &CppDataWithDeps,
                           type_allocation_places_override: Option<CppTypeAllocationPlace>)
                           -> Result<CppMethodWithFfiSignature> {
     let get_place = |name| -> Result<ReturnValueAllocationPlace> {

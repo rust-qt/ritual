@@ -3,7 +3,7 @@
 use config::{Config, DebugLoggingConfig};
 use cpp_code_generator::{CppCodeGenerator, generate_cpp_type_size_requester, CppTypeSizeRequest};
 use cpp_type::CppTypeClassBase;
-use cpp_data::CppData;
+use cpp_data::{CppData, CppDataWithDeps, ParserCppData, ProcessedCppData};
 use cpp_ffi_data::CppAndFfiData;
 use cpp_ffi_generator;
 use cpp_parser;
@@ -103,19 +103,18 @@ fn check_all_paths(config: &Config) -> Result<()> {
 fn load_or_create_cpp_data(config: &Config,
                            dependencies_cpp_data: Vec<CppData>)
                            -> Result<CppData> {
-  let cpp_data_cache_file_path = config.cache_dir_path().with_added("cpp_data.bin");
-  let mut cpp_data_processed = false;
-  let mut loaded_cpp_data = if config.cache_usage().can_use_cpp_data() &&
-                               cpp_data_cache_file_path.as_path().is_file() {
-    match load_bincode(&cpp_data_cache_file_path) {
+  let parser_cpp_data_file_path = config.cache_dir_path().with_added("parser_cpp_data.bin");
+
+  let loaded_parser_cpp_data = if config.cache_usage().can_use_raw_cpp_data() &&
+                                  parser_cpp_data_file_path.as_path().is_file() {
+    match load_bincode(&parser_cpp_data_file_path) {
       Ok(r) => {
-        log::status(format!("C++ data is loaded from file: {}",
-                            cpp_data_cache_file_path.display()));
-        cpp_data_processed = true;
+        log::status(format!("C++ parser data is loaded from file: {}",
+                            parser_cpp_data_file_path.display()));
         Some(r)
       }
       Err(err) => {
-        log::status(format!("Failed to load C++ data: {}", err));
+        log::status(format!("Failed to load C++ parser data: {}", err));
         err.discard_expected();
         None
       }
@@ -123,24 +122,8 @@ fn load_or_create_cpp_data(config: &Config,
   } else {
     None
   };
-  let raw_cpp_data_cache_file_path = config.cache_dir_path().with_added("raw_cpp_data.bin");
-  if loaded_cpp_data.is_none() && config.cache_usage().can_use_raw_cpp_data() &&
-     raw_cpp_data_cache_file_path.is_file() {
-    loaded_cpp_data = match load_bincode(&raw_cpp_data_cache_file_path) {
-      Ok(r) => {
-        log::status(format!("Raw C++ data is loaded from file: {}",
-                            cpp_data_cache_file_path.display()));
-        Some(r)
-      }
-      Err(err) => {
-        log::status(format!("Failed to load raw C++ data: {}", err));
-        err.discard_expected();
-        None
-      }
-    }
-  }
-  let mut cpp_data = if let Some(r) = loaded_cpp_data {
-    r
+  let parser_cpp_data = if let Some(x) = loaded_parser_cpp_data {
+    x
   } else {
     log::status("Running C++ parser");
     let parser_config = cpp_parser::CppParserConfig {
@@ -152,35 +135,68 @@ fn load_or_create_cpp_data(config: &Config,
       name_blacklist: Vec::from(config.cpp_parser_blocked_names()),
       clang_arguments: Vec::from(config.cpp_parser_arguments()),
     };
-    let cpp_data = cpp_parser::run(parser_config, dependencies_cpp_data)
+    let mut parser_cpp_data = cpp_parser::run(parser_config, dependencies_cpp_data)
       .chain_err(|| "C++ parser failed")?;
-    if config.write_cache() {
-      log::status("Saving raw C++ data");
-      save_bincode(&raw_cpp_data_cache_file_path, &cpp_data)?;
-      log::status(format!("Raw C++ data is saved to file: {}",
-                          raw_cpp_data_cache_file_path.display()));
+    parser_cpp_data.detect_signals_and_slots()?;
+    // TODO: rename `cpp_data_filters` to `parser_cpp_data_filters`
+    if config.has_cpp_data_filters() {
+      log::status("Running custom filters for C++ parser data");
+      for filter in config.cpp_data_filters() {
+        filter(&mut parser_cpp_data)
+          .chain_err(|| "cpp_data_filter failed")?;
+      }
     }
-    cpp_data
+    if config.write_cache() {
+      log::status("Saving C++ parser data");
+      save_bincode(&parser_cpp_data_file_path, &parser_cpp_data)?;
+      log::status(format!("C++ parser data is saved to file: {}",
+                          parser_cpp_data_file_path.display()));
+    }
+    parser_cpp_data
   };
-  if !cpp_data_processed {
+
+  let processed_cpp_data_file_path = config
+    .cache_dir_path()
+    .with_added("processed_cpp_data.bin");
+
+  let loaded_processed_cpp_data = if config.cache_usage().can_use_cpp_data() &&
+                                     processed_cpp_data_file_path.as_path().is_file() {
+    match load_bincode(&processed_cpp_data_file_path) {
+      Ok(r) => {
+        log::status(format!("C++ processed data is loaded from file: {}",
+                            processed_cpp_data_file_path.display()));
+        Some(r)
+      }
+      Err(err) => {
+        log::status(format!("Failed to load C++ processed data: {}", err));
+        err.discard_expected();
+        None
+      }
+    }
+  } else {
+    None
+  };
+  let full_cpp_data = if let Some(x) = loaded_processed_cpp_data {
+    CppDataWithDeps {
+      current: CppData {
+        parser: parser_cpp_data,
+        processed: x,
+      },
+      dependencies: dependencies_cpp_data,
+    }
+  } else {
     log::status("Post-processing parse result");
-    for filter in config.cpp_data_filters() {
-      filter(&mut cpp_data)
-        .chain_err(|| "cpp_data_filter failed")?;
-    }
-    cpp_data
-      .choose_allocation_places(config.type_allocation_places())?;
-
-    cpp_data.post_process()?;
-
+    let r = parser_cpp_data
+      .post_process(dependencies_cpp_data, config.type_allocation_places())?;
     if config.write_cache() {
-      log::status("Saving C++ data");
-      save_bincode(&cpp_data_cache_file_path, &cpp_data)?;
-      log::status(format!("C++ data is saved to file: {}",
-                          cpp_data_cache_file_path.display()));
+      log::status("Saving processed C++ data");
+      save_bincode(&processed_cpp_data_file_path, &r)?;
+      log::status(format!("Processed C++ data is saved to file: {}",
+                          processed_cpp_data_file_path.display()));
     }
+    r
   };
-  Ok(cpp_data)
+  Ok(full_cpp_data)
 }
 
 

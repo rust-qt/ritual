@@ -1317,7 +1317,8 @@ impl<'a> {connections_mod}::Receiver for {type_name}<'a> {{
         let mut file = create_file(&path)?;
         file.write(&template[0..index])?;
         file.write(code)?;
-        file.write(&template[index + INCLUDE_GENERATED_MARKER.len()..])?;
+        file
+          .write(&template[index + INCLUDE_GENERATED_MARKER.len()..])?;
       } else {
         let name = os_str_to_str(path
                                    .file_name()

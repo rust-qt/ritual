@@ -200,7 +200,7 @@ pub enum CppTypeAllocationPlace {
 /// C++ parser output
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 #[derive(Serialize, Deserialize)]
-pub struct CppData {
+pub struct ParserCppData {
   /// List of found type declarations
   pub types: Vec<CppTypeData>,
   /// List of found methods
@@ -208,6 +208,15 @@ pub struct CppData {
   /// List of found template instantiations. Key is name of
   /// the template class, value is list of instantiations.
   pub template_instantiations: Vec<CppTemplateInstantiations>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(Serialize, Deserialize)]
+pub struct ProcessedCppData {
+  /// Automatically generated methods
+  pub extra_methods: Vec<CppMethod>,
+  /// Methods inherited from base classes (?)
+  pub inherited_methods: Vec<CppMethod>,
   /// List of all argument types used by signals,
   /// including variations with omitted arguments,
   /// but excluding argument types from dependencies.
@@ -215,9 +224,35 @@ pub struct CppData {
   /// List of selected (automatically or in configuration)
   /// type allocation places for all class types.
   pub type_allocation_places: HashMap<String, CppTypeAllocationPlace>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+pub struct CppData {
+  pub parser: ParserCppData,
+  pub processed: ProcessedCppData,
+}
+
+impl CppData {
+  pub fn all_methods
+    (&self)
+     -> ::std::iter::Chain<::std::slice::Iter<CppMethod>, ::std::slice::Iter<CppMethod>> {
+    self
+      .parser
+      .methods
+      .iter()
+      .chain(self.processed.extra_methods.iter())
+  }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+pub struct CppDataWithDeps {
+  pub current: CppData,
   /// Data of dependencies
   pub dependencies: Vec<CppData>,
 }
+
+
+
 
 
 /// Convenience function to create `CppMethod` object for
@@ -419,84 +454,468 @@ impl CppTypeData {
   }
 }
 
-impl CppData {
-  /// Search for a `CppTypeData` object in this `CppData` and all dependencies.
-  pub fn find_type_info<F>(&self, f: F) -> Option<&CppTypeData>
-    where F: Fn(&&CppTypeData) -> bool
-  {
-    once(&self.types)
-      .chain(self.dependencies.iter().map(|d| &d.types))
-      .flat_map(|x| x)
-      .find(f)
-  }
-
-  /// Returns true if C++ type `name` is polymorphic, i.e. has
-  /// at least one virtual function.
-  pub fn is_polymorphic_type(&self, name: &str) -> bool {
-    self
-      .methods
-      .iter()
-      .any(|m| if let Some(ref info) = m.class_membership {
-             info.is_virtual && &info.class_type.name == name
-           } else {
-             false
-           })
-  }
-
-  /// Adds destructors for every class that does not have explicitly
-  /// defined destructor, allowing to create wrappings for
-  /// destructors implicitly available in C++.
-  pub fn ensure_explicit_destructors(&mut self) -> Result<()> {
-    for type1 in &self.types {
-      if let CppTypeKind::Class { .. } = type1.kind {
-        let class_name = &type1.name;
-        let mut found_destructor = false;
-        for method in &self.methods {
-          if method.is_destructor() && method.class_name() == Some(class_name) {
-            found_destructor = true;
-            break;
+impl ParserCppData {
+  /// Checks if specified class is a template class.
+  #[allow(dead_code)]
+  pub fn is_template_class(&self, name: &str) -> bool {
+    if let Some(type_info) = self.types.iter().find(|t| &t.name == name) {
+      if let CppTypeKind::Class {
+               ref template_arguments,
+               ref bases,
+               ..
+             } = type_info.kind {
+        if template_arguments.is_some() {
+          return true;
+        }
+        for base in bases {
+          if let CppTypeBase::Class(CppTypeClassBase {
+                                      ref name,
+                                      ref template_arguments,
+                                    }) = base.base_type.base {
+            if template_arguments.is_some() {
+              return true;
+            }
+            if self.is_template_class(name) {
+              return true;
+            }
           }
         }
-        if !found_destructor {
-          let is_virtual = self.has_virtual_destructor(class_name);
-          self
-            .methods
-            .push(CppMethod {
-                    name: format!("~{}", class_name),
-                    class_membership: Some(CppMethodClassMembership {
-                                             class_type: type1.default_class_type()?,
-                                             is_virtual: is_virtual,
-                                             is_pure_virtual: false,
-                                             is_const: false,
-                                             is_static: false,
-                                             visibility: CppVisibility::Public,
-                                             is_signal: false,
-                                             is_slot: false,
-                                             kind: CppMethodKind::Destructor,
-                                             fake: None,
-                                           }),
-                    operator: None,
-                    return_type: CppType::void(),
-                    arguments: vec![],
-                    arguments_before_omitting: None,
-                    allows_variadic_arguments: false,
-                    include_file: type1.include_file.clone(),
-                    origin_location: None,
-                    template_arguments: None,
-                    template_arguments_values: None,
-                    declaration_code: None,
-                    doc: None,
-                    inheritance_chain: Vec::new(),
-                    is_fake_inherited_method: false,
-                    is_ffi_whitelisted: false,
-                    is_unsafe_static_cast: false,
-                    is_direct_static_cast: false,
-                  });
+      }
+    } else {
+      log::llog(log::DebugGeneral,
+                || format!("Unknown type assumed to be non-template: {}", name));
+    }
+    false
+  }
+
+  /// Checks if `class_name` types inherits `base_name` type directly or indirectly.
+  pub fn inherits(&self, class_name: &str, base_name: &str, dependencies: &[CppData]) -> bool {
+    for types in once(&self.types).chain(dependencies.iter().map(|c| &c.parser.types)) {
+      if let Some(info) = types.iter().find(|x| &x.name == class_name) {
+        if let CppTypeKind::Class { ref bases, .. } = info.kind {
+          for base1 in bases {
+            if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base1.base_type.base {
+              if name == base_name {
+                return true;
+              }
+              if self.inherits(name, base_name, dependencies) {
+                return true;
+              }
+            }
+          }
+        }
+      }
+    }
+    false
+  }
+
+
+
+  /// Parses include files to detect which methods are signals or slots.
+  pub fn detect_signals_and_slots(&mut self, dependencies: &[CppData]) -> Result<()> {
+    let mut files = HashSet::new();
+    for type1 in &self.types {
+      if self.inherits(&type1.name, "QObject", dependencies) &&
+         !files.contains(&type1.origin_location.include_file_path) {
+        files.insert(type1.origin_location.include_file_path.clone());
+      }
+    }
+
+    #[derive(Debug, Clone)]
+    enum SectionType {
+      Signals,
+      Slots,
+      Other,
+    }
+    #[derive(Debug)]
+    struct Section {
+      line: usize,
+      section_type: SectionType,
+    }
+
+    if files.is_empty() {
+      return Ok(());
+    }
+    log::status("Detecting signals and slots");
+    let re_signals = Regex::new(r"(signals|Q_SIGNALS)\s*:")?;
+    let re_slots = Regex::new(r"(slots|Q_SLOTS)\s*:")?;
+    let re_other = Regex::new(r"(public|protected|private)\s*:")?;
+    let mut sections = HashMap::new();
+
+    for file_path in files {
+      let mut file_sections = Vec::new();
+      let file = open_file(&file_path)?;
+      let reader = BufReader::new(file.into_file());
+      for (line_num, line) in reader.lines().enumerate() {
+        let line = line
+          .chain_err(|| format!("failed while reading lines from {}", &file_path))?;
+        let section_type = if re_signals.is_match(&line) {
+          Some(SectionType::Signals)
+        } else if re_slots.is_match(&line) {
+          Some(SectionType::Slots)
+        } else if re_other.is_match(&line) {
+          Some(SectionType::Other)
+        } else {
+          None
+        };
+        if let Some(section_type) = section_type {
+          file_sections.push(Section {
+                               line: line_num,
+                               section_type: section_type,
+                             });
+        }
+      }
+      // println!("sections: {:?}", file_sections);
+      if !file_sections.is_empty() {
+        sections.insert(file_path, file_sections);
+      }
+    }
+    for type1 in &self.types {
+      if let Some(sections) = sections.get(&type1.origin_location.include_file_path) {
+        let sections: Vec<_> = sections
+          .iter()
+          .filter(|x| x.line + 1 >= type1.origin_location.line as usize)
+          .collect();
+        for method in &mut self.methods {
+          let mut section_type = SectionType::Other;
+          if let Some(ref info) = method.class_membership {
+            if info.class_type.name == type1.name {
+              if let Some(ref location) = method.origin_location {
+                let matching_sections: Vec<_> = sections
+                  .clone()
+                  .into_iter()
+                  .filter(|x| x.line + 1 <= location.line as usize)
+                  .collect();
+                if !matching_sections.is_empty() {
+                  let section = matching_sections[matching_sections.len() - 1];
+                  section_type = section.section_type.clone();
+                  if log::is_on(log::DebugSignals) {
+                    match section.section_type {
+                      SectionType::Signals => {
+                        log::log(log::DebugSignals,
+                                 format!("Found signal: {}", method.short_text()));
+                      }
+                      SectionType::Slots => {
+                        log::log(log::DebugSignals,
+                                 format!("Found slot: {}", method.short_text()));
+                      }
+                      SectionType::Other => {}
+                    }
+                  }
+                }
+              }
+            }
+          }
+          if let Some(ref mut info) = method.class_membership {
+            match section_type {
+              SectionType::Signals => {
+                info.is_signal = true;
+              }
+              SectionType::Slots => {
+                info.is_slot = true;
+              }
+              SectionType::Other => {}
+            }
+          }
+
         }
       }
     }
     Ok(())
   }
+
+  /// Checks if specified class has explicitly declared protected or private destructor.
+  pub fn has_non_public_destructor(&self, class_type: &CppTypeClassBase) -> bool {
+    for method in &self.methods {
+      if let Some(ref info) = method.class_membership {
+        if info.kind == CppMethodKind::Destructor && &info.class_type == class_type {
+          return info.visibility != CppVisibility::Public;
+        }
+      }
+    }
+    false
+  }
+
+
+
+
+  /// Performs data conversion to make it more suitable
+  /// for further wrapper generation.
+  pub fn post_process(self,
+                      dependencies: Vec<CppData>,
+                      allocation_place_overrides: &HashMap<String, CppTypeAllocationPlace>)
+                      -> Result<CppDataWithDeps> {
+    let mut r = CppDataWithDeps {
+      current: CppData {
+        parser: self,
+        processed: ProcessedCppData {
+          extra_methods: Vec::new(),
+          inherited_methods: Vec::new(),
+          signal_argument_types: Vec::new(),
+          type_allocation_places: HashMap::new(),
+        },
+      },
+      dependencies: dependencies,
+    };
+
+    r.current.processed.type_allocation_places =
+      r.choose_allocation_places(allocation_place_overrides)?;
+    r.current.processed.signal_argument_types = r.detect_signal_argument_types()?;
+    r.current
+      .processed
+      .extra_methods
+      .append(&mut r.generate_methods_with_omitted_args());
+    r.current
+      .processed
+      .extra_methods
+      .append(&mut r.instantiate_templates()?);
+    r.current.processed.inherited_methods = unimplemented!(); //r.detect_inherited_methods()?;
+    r.current
+      .processed
+      .extra_methods
+      .append(&mut r.ensure_explicit_destructors()?);
+    // TODO: fix doc generator for field accessors
+    r.current
+      .processed
+      .extra_methods
+      .append(&mut r.add_field_accessors()?);
+    r.current
+      .processed
+      .extra_methods
+      .append(&mut r.add_casts()?);
+    Ok(r)
+  }
+}
+
+impl TemplateArgumentsDeclaration {
+  /// Returns count of the template arguments.
+  #[allow(dead_code)]
+  pub fn count(&self) -> usize {
+    self.names.len()
+  }
+}
+
+impl CppDataWithDeps {
+  /// Returns true if `type1` is a known template instantiation.
+  fn check_template_type(&self, type1: &CppType) -> Result<()> {
+    if let CppTypeBase::Class(CppTypeClassBase {
+                                ref name,
+                                ref template_arguments,
+                              }) = type1.base {
+      if let Some(ref template_arguments) = *template_arguments {
+        let is_valid = |cpp_data: &CppData| {
+          cpp_data
+            .parser
+            .template_instantiations
+            .iter()
+            .any(|inst| {
+                   &inst.class_name == name &&
+                   inst
+                     .instantiations
+                     .iter()
+                     .any(|x| &x.template_arguments == template_arguments)
+                 })
+        };
+        if !once(&self.current)
+              .chain(self.dependencies.iter())
+              .any(is_valid) {
+          return Err(format!("type not available: {:?}", type1).into());
+        }
+        for arg in template_arguments {
+          self.check_template_type(arg)?;
+        }
+      }
+    }
+    Ok(())
+  }
+
+  /// Adds methods produced as template instantiations of
+  /// methods of existing template classes and existing template methods.
+  fn instantiate_templates(&self) -> Result<Vec<CppMethod>> {
+    log::status("Instantiating templates");
+    let mut new_methods = Vec::new();
+
+    for cpp_data in self.dependencies.iter().chain(once(self as &_)) {
+      for method in &cpp_data.methods {
+        for type1 in method.all_involved_types() {
+          if let CppTypeBase::Class(CppTypeClassBase {
+                                      ref name,
+                                      ref template_arguments,
+                                    }) = type1.base {
+            if let Some(ref template_arguments) = *template_arguments {
+              assert!(!template_arguments.is_empty());
+              if template_arguments
+                   .iter()
+                   .all(|x| x.base.is_template_parameter()) {
+                if let Some(template_instantiations) =
+                  self
+                    .template_instantiations
+                    .iter()
+                    .find(|x| &x.class_name == name) {
+                  let nested_level = if let CppTypeBase::TemplateParameter {
+                           nested_level, ..
+                         } = template_arguments[0].base {
+                    nested_level
+                  } else {
+                    return Err("only template parameters can be here".into());
+                  };
+                  log::llog(log::DebugTemplateInstantiation, || "");
+                  log::llog(log::DebugTemplateInstantiation,
+                            || format!("method: {}", method.short_text()));
+                  log::llog(log::DebugTemplateInstantiation, || {
+                    format!("found template instantiations: {:?}",
+                            template_instantiations)
+                  });
+                  match apply_instantiations_to_method(method,
+                                                       nested_level,
+                                                       &template_instantiations.instantiations) {
+                    Ok(methods) => {
+                      for method in methods {
+                        let mut ok = true;
+                        for type1 in method.all_involved_types() {
+                          match self.check_template_type(&type1) {
+                            Ok(_) => {}
+                            Err(msg) => {
+                              ok = false;
+                              log::llog(log::DebugTemplateInstantiation, || {
+                                format!("method is not accepted: {}", method.short_text())
+                              });
+                              log::llog(log::DebugTemplateInstantiation, || format!("  {}", msg));
+                            }
+                          }
+                        }
+                        if ok {
+                          new_methods.push(method);
+                        }
+                      }
+                      break;
+                    }
+                    Err(msg) => {
+                      log::llog(log::DebugTemplateInstantiation,
+                                || format!("failed: {}", msg))
+                    }
+                  }
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    Ok(new_methods)
+  }
+
+
+
+
+  /// Returns all include files found within this `CppData`
+  /// (excluding dependencies).
+  pub fn all_include_files(&self) -> Result<HashSet<String>> {
+    let mut result = HashSet::new();
+    for method in &self.current.all_methods() {
+      if !result.contains(&method.include_file) {
+        result.insert(method.include_file.clone());
+      }
+    }
+    for tp in &self.types {
+      if !result.contains(&tp.include_file) {
+        result.insert(tp.include_file.clone());
+      }
+    }
+    for instantiations in &self.template_instantiations {
+      let type_info =
+        self
+          .find_type_info(|x| &x.name == &instantiations.class_name)
+          .chain_err(|| format!("type info not found for {}", &instantiations.class_name))?;
+      if !result.contains(&type_info.include_file) {
+        result.insert(type_info.include_file.clone());
+      }
+    }
+    Ok(result)
+  }
+
+  /// Returns selected type allocation place for type `class_name`.
+  pub fn type_allocation_place(&self, class_name: &str) -> Result<CppTypeAllocationPlace> {
+    if let Some(r) = self.type_allocation_places.get(class_name) {
+      return Ok(r.clone());
+    }
+    for dep in &self.dependencies {
+      if let Ok(r) = dep.type_allocation_place(class_name) {
+        return Ok(r);
+      }
+    }
+    Err(format!("no type allocation place information for {}", class_name).into())
+  }
+
+  /// Search for a `CppTypeData` object in this `CppData` and all dependencies.
+  pub fn find_type_info<F>(&self, f: F) -> Option<&CppTypeData>
+    where F: Fn(&&CppTypeData) -> bool
+  {
+    once(&self.current.parser.types)
+      .chain(self.dependencies.iter().map(|d| &d.parser.types))
+      .flat_map(|x| x)
+      .find(f)
+  }
+
+
+
+
+
+
+  /// Adds destructors for every class that does not have explicitly
+  /// defined destructor, allowing to create wrappings for
+  /// destructors implicitly available in C++.
+  fn ensure_explicit_destructors(&self) -> Result<Vec<CppMethod>> {
+    let mut methods = Vec::new();
+    for type1 in &self.types {
+      if let CppTypeKind::Class { .. } = type1.kind {
+        let class_name = &type1.name;
+        let found_destructor = self
+          .current
+          .parser
+          .methods
+          .iter()
+          .any(|m| m.is_destructor() && m.class_name() == Some(class_name));
+        if !found_destructor {
+          let is_virtual = self.has_virtual_destructor(class_name);
+          methods.push(CppMethod {
+                         name: format!("~{}", class_name),
+                         class_membership: Some(CppMethodClassMembership {
+                                                  class_type: type1.default_class_type()?,
+                                                  is_virtual: is_virtual,
+                                                  is_pure_virtual: false,
+                                                  is_const: false,
+                                                  is_static: false,
+                                                  visibility: CppVisibility::Public,
+                                                  is_signal: false,
+                                                  is_slot: false,
+                                                  kind: CppMethodKind::Destructor,
+                                                  fake: None,
+                                                }),
+                         operator: None,
+                         return_type: CppType::void(),
+                         arguments: vec![],
+                         arguments_before_omitting: None,
+                         allows_variadic_arguments: false,
+                         include_file: type1.include_file.clone(),
+                         origin_location: None,
+                         template_arguments: None,
+                         template_arguments_values: None,
+                         declaration_code: None,
+                         doc: None,
+                         inheritance_chain: Vec::new(),
+                         is_fake_inherited_method: false,
+                         is_ffi_whitelisted: false,
+                         is_unsafe_static_cast: false,
+                         is_direct_static_cast: false,
+                       });
+        }
+      }
+    }
+    Ok(methods)
+  }
+
 
   /// Helper function that performs a portion of add_inherited_methods implementation.
   fn inherited_methods_from(&self,
@@ -761,7 +1180,7 @@ impl CppData {
 
   /// Generates duplicate methods with fewer arguments for
   /// C++ methods with default argument values.
-  pub fn generate_methods_with_omitted_args(&mut self) {
+  fn generate_methods_with_omitted_args(&self) -> Vec<CppMethod> {
     let mut new_methods = Vec::new();
     for method in &self.methods {
       if let Some(last_arg) = method.arguments.last() {
@@ -777,608 +1196,16 @@ impl CppData {
         }
       }
     }
-    self.methods.append(&mut new_methods);
-  }
-
-  /// Returns all include files found within this `CppData`
-  /// (excluding dependencies).
-  pub fn all_include_files(&self) -> Result<HashSet<String>> {
-    let mut result = HashSet::new();
-    for method in &self.methods {
-      if !result.contains(&method.include_file) {
-        result.insert(method.include_file.clone());
-      }
-    }
-    for tp in &self.types {
-      if !result.contains(&tp.include_file) {
-        result.insert(tp.include_file.clone());
-      }
-    }
-    for instantiations in &self.template_instantiations {
-      let type_info =
-        self
-          .find_type_info(|x| &x.name == &instantiations.class_name)
-          .chain_err(|| format!("type info not found for {}", &instantiations.class_name))?;
-      if !result.contains(&type_info.include_file) {
-        result.insert(type_info.include_file.clone());
-      }
-    }
-    Ok(result)
-  }
-
-  /// Checks if specified class is a template class.
-  #[allow(dead_code)]
-  pub fn is_template_class(&self, name: &str) -> bool {
-    if let Some(type_info) = self.types.iter().find(|t| &t.name == name) {
-      if let CppTypeKind::Class {
-               ref template_arguments,
-               ref bases,
-               ..
-             } = type_info.kind {
-        if template_arguments.is_some() {
-          return true;
-        }
-        for base in bases {
-          if let CppTypeBase::Class(CppTypeClassBase {
-                                      ref name,
-                                      ref template_arguments,
-                                    }) = base.base_type.base {
-            if template_arguments.is_some() {
-              return true;
-            }
-            if self.is_template_class(name) {
-              return true;
-            }
-          }
-        }
-      }
-    } else {
-      log::llog(log::DebugGeneral,
-                || format!("Unknown type assumed to be non-template: {}", name));
-    }
-    false
-  }
-
-  /// Checks if specified class has virtual destructor (own or inherited).
-  pub fn has_virtual_destructor(&self, class_name: &str) -> bool {
-    for method in &self.methods {
-      if let Some(ref info) = method.class_membership {
-        if info.kind == CppMethodKind::Destructor && &info.class_type.name == class_name {
-          return info.is_virtual;
-        }
-      }
-    }
-    if let Some(type_info) = self.types.iter().find(|t| &t.name == class_name) {
-      if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
-        for base in bases {
-          if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
-            if self.has_virtual_destructor(name) {
-              return true;
-            }
-          }
-        }
-      }
-    }
-    for dep in &self.dependencies {
-      if dep.has_virtual_destructor(class_name) {
-        return true;
-      }
-    }
-    false
-  }
-
-  /// Checks if specified class has any virtual methods (own or inherited).
-  pub fn has_virtual_methods(&self, class_name: &str) -> bool {
-    for method in &self.methods {
-      if let Some(ref info) = method.class_membership {
-        if &info.class_type.name == class_name && info.is_virtual {
-          return true;
-        }
-      }
-    }
-    if let Some(type_info) = self.types.iter().find(|t| &t.name == class_name) {
-      if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
-        for base in bases {
-          if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base.base_type.base {
-            if self.has_virtual_methods(name) {
-              return true;
-            }
-          }
-        }
-      }
-    }
-    for dep in &self.dependencies {
-      if dep.has_virtual_methods(class_name) {
-        return true;
-      }
-    }
-    false
-  }
-
-
-  /// Checks if specified class has public destructor.
-  pub fn has_public_destructor(&self, class_type: &CppTypeClassBase) -> bool {
-    for method in &self.methods {
-      if let Some(ref info) = method.class_membership {
-        if info.kind == CppMethodKind::Destructor && &info.class_type == class_type {
-          return info.visibility == CppVisibility::Public;
-        }
-      }
-    }
-    false
-  }
-
-  /// Checks if specified class has any pure virtual methods.
-  pub fn has_pure_virtual_methods(&self, class_name: &str) -> bool {
-    self
-      .methods
-      .iter()
-      .any(|m| match m.class_membership {
-             Some(ref info) => &info.class_type.name == class_name && info.is_pure_virtual,
-             None => false,
-           })
-  }
-
-  /// Returns true if `type1` is a known template instantiation.
-  fn check_template_type(&self, type1: &CppType) -> Result<()> {
-    if let CppTypeBase::Class(CppTypeClassBase {
-                                ref name,
-                                ref template_arguments,
-                              }) = type1.base {
-      if let Some(ref template_arguments) = *template_arguments {
-        let is_valid = |cpp_data: &CppData| {
-          cpp_data
-            .template_instantiations
-            .iter()
-            .any(|inst| {
-                   &inst.class_name == name &&
-                   inst
-                     .instantiations
-                     .iter()
-                     .any(|x| &x.template_arguments == template_arguments)
-                 })
-        };
-        if !self
-              .dependencies
-              .iter()
-              .chain(once(self))
-              .any(is_valid) {
-          return Err(format!("type not available: {:?}", type1).into());
-        }
-        for arg in template_arguments {
-          self.check_template_type(arg)?;
-        }
-      }
-    }
-    Ok(())
-  }
-
-  /// Adds methods produced as template instantiations of
-  /// methods of existing template classes and existing template methods.
-  fn instantiate_templates(&mut self) -> Result<()> {
-    log::status("Instantiating templates");
-    let mut new_methods = Vec::new();
-
-    for cpp_data in self.dependencies.iter().chain(once(self as &_)) {
-      for method in &cpp_data.methods {
-        for type1 in method.all_involved_types() {
-          if let CppTypeBase::Class(CppTypeClassBase {
-                                      ref name,
-                                      ref template_arguments,
-                                    }) = type1.base {
-            if let Some(ref template_arguments) = *template_arguments {
-              assert!(!template_arguments.is_empty());
-              if template_arguments
-                   .iter()
-                   .all(|x| x.base.is_template_parameter()) {
-                if let Some(template_instantiations) =
-                  self
-                    .template_instantiations
-                    .iter()
-                    .find(|x| &x.class_name == name) {
-                  let nested_level = if let CppTypeBase::TemplateParameter {
-                           nested_level, ..
-                         } = template_arguments[0].base {
-                    nested_level
-                  } else {
-                    return Err("only template parameters can be here".into());
-                  };
-                  log::llog(log::DebugTemplateInstantiation, || "");
-                  log::llog(log::DebugTemplateInstantiation,
-                            || format!("method: {}", method.short_text()));
-                  log::llog(log::DebugTemplateInstantiation, || {
-                    format!("found template instantiations: {:?}",
-                            template_instantiations)
-                  });
-                  match apply_instantiations_to_method(method,
-                                                       nested_level,
-                                                       &template_instantiations.instantiations) {
-                    Ok(methods) => {
-                      for method in methods {
-                        let mut ok = true;
-                        for type1 in method.all_involved_types() {
-                          match self.check_template_type(&type1) {
-                            Ok(_) => {}
-                            Err(msg) => {
-                              ok = false;
-                              log::llog(log::DebugTemplateInstantiation, || {
-                                format!("method is not accepted: {}", method.short_text())
-                              });
-                              log::llog(log::DebugTemplateInstantiation, || format!("  {}", msg));
-                            }
-                          }
-                        }
-                        if ok {
-                          new_methods.push(method);
-                        }
-                      }
-                      break;
-                    }
-                    Err(msg) => {
-                      log::llog(log::DebugTemplateInstantiation,
-                                || format!("failed: {}", msg))
-                    }
-                  }
-                  break;
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    self.methods.append(&mut new_methods);
-    Ok(())
-  }
-
-  /// Adds fictional getter and setter methods for each known public field of each class.
-  pub fn add_field_accessors(&mut self) -> Result<()> {
-    log::status("Adding field accessors");
-    let mut new_methods = Vec::new();
-    for type_info in &self.types {
-      if let CppTypeKind::Class { ref fields, .. } = type_info.kind {
-        for field in fields {
-          let create_method =
-            |name, accessor_type, return_type, arguments| -> Result<CppMethod> {
-              Ok(CppMethod {
-                   name: name,
-                   class_membership: Some(CppMethodClassMembership {
-                                            class_type: type_info.default_class_type()?,
-                                            kind: CppMethodKind::Regular,
-                                            is_virtual: false,
-                                            is_pure_virtual: false,
-                                            is_const: match accessor_type {
-                                              CppFieldAccessorType::CopyGetter |
-                                              CppFieldAccessorType::ConstRefGetter => true,
-                                              CppFieldAccessorType::MutRefGetter |
-                                              CppFieldAccessorType::Setter => false,
-                                            },
-                                            is_static: false,
-                                            visibility: CppVisibility::Public,
-                                            is_signal: false,
-                                            is_slot: false,
-                                            fake: Some(FakeCppMethod::FieldAccessor {
-                                                         accessor_type: accessor_type,
-                                                         field_name: field.name.clone(),
-                                                       }),
-                                          }),
-                   operator: None,
-                   return_type: return_type,
-                   arguments: arguments,
-                   arguments_before_omitting: None,
-                   allows_variadic_arguments: false,
-                   include_file: type_info.include_file.clone(),
-                   origin_location: None,
-                   template_arguments: None,
-                   template_arguments_values: None,
-                   declaration_code: None,
-                   doc: None,
-                   inheritance_chain: Vec::new(),
-                   is_fake_inherited_method: false,
-                   is_ffi_whitelisted: false,
-                   is_unsafe_static_cast: false,
-                   is_direct_static_cast: false,
-                 })
-            };
-          if field.visibility == CppVisibility::Public {
-            if field.field_type.indirection == CppTypeIndirection::None &&
-               field.field_type.base.is_class() {
-
-              let mut type2_const = field.field_type.clone();
-              type2_const.is_const = true;
-              type2_const.indirection = CppTypeIndirection::Ref;
-              let mut type2_mut = field.field_type.clone();
-              type2_mut.is_const = false;
-              type2_mut.indirection = CppTypeIndirection::Ref;
-              new_methods.push(create_method(field.name.clone(),
-                                             CppFieldAccessorType::ConstRefGetter,
-                                             type2_const,
-                                             Vec::new())?);
-              new_methods.push(create_method(format!("{}_mut", field.name),
-                                             CppFieldAccessorType::MutRefGetter,
-                                             type2_mut,
-                                             Vec::new())?);
-            } else {
-              new_methods.push(create_method(field.name.clone(),
-                                             CppFieldAccessorType::CopyGetter,
-                                             field.field_type.clone(),
-                                             Vec::new())?);
-            }
-            let arg = CppFunctionArgument {
-              argument_type: field.field_type.clone(),
-              name: "value".to_string(),
-              has_default_value: false,
-            };
-            new_methods.push(create_method(format!("set_{}", field.name),
-                                           CppFieldAccessorType::Setter,
-                                           CppType::void(),
-                                           vec![arg])?);
-          }
-        }
-      }
-    }
-    self.methods.append(&mut new_methods);
-    Ok(())
-  }
-
-  /// Performs a portion of `add_casts` operation.
-  /// Adds casts between `target_type` and `base_type` and calls
-  /// `add_casts_one` recursively to add casts between `target_type`
-  /// and base types of `base_type`.
-  fn add_casts_one(&self,
-                   target_type: &CppTypeClassBase,
-                   base_type: &CppType,
-                   is_direct: bool)
-                   -> Result<Vec<CppMethod>> {
-    let type_info = self
-      .find_type_info(|x| x.name == target_type.name)
-      .chain_err(|| "type info not found")?;
-    let target_ptr_type = CppType {
-      base: CppTypeBase::Class(target_type.clone()),
-      indirection: CppTypeIndirection::Ptr,
-      is_const: false,
-      is_const2: false,
-    };
-    let base_ptr_type = CppType {
-      base: base_type.base.clone(),
-      indirection: CppTypeIndirection::Ptr,
-      is_const: false,
-      is_const2: false,
-    };
-    let mut new_methods = Vec::new();
-    new_methods.push(create_cast_method("static_cast",
-                                        &base_ptr_type,
-                                        &target_ptr_type,
-                                        true,
-                                        is_direct,
-                                        &type_info.include_file));
-    new_methods.push(create_cast_method("static_cast",
-                                        &target_ptr_type,
-                                        &base_ptr_type,
-                                        false,
-                                        is_direct,
-                                        &type_info.include_file));
-    if let CppTypeBase::Class(ref base) = base_type.base {
-      if self.is_polymorphic_type(&base.name) {
-        new_methods.push(create_cast_method("dynamic_cast",
-                                            &base_ptr_type,
-                                            &target_ptr_type,
-                                            false,
-                                            false,
-                                            &type_info.include_file));
-      }
-    }
-
-    if let CppTypeBase::Class(ref base) = base_type.base {
-      if let Some(type_info) = self.find_type_info(|x| x.name == base.name) {
-        if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
-          for base in bases {
-            new_methods.append(&mut self.add_casts_one(target_type, &base.base_type, false)?);
-          }
-        }
-      }
-    }
-    Ok(new_methods)
-  }
-
-  /// Adds `static_cast` and `dynamic_cast` functions for all appropriate pairs of types
-  /// in this `CppData`.
-  fn add_casts(&mut self) -> Result<()> {
-    log::status("Adding cast functions");
-    let mut new_methods = Vec::new();
-    for type_info in &self.types {
-      if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
-        let t = type_info.default_class_type()?;
-        let single_base = bases.len() == 1;
-        for base in bases {
-          new_methods.append(&mut self.add_casts_one(&t, &base.base_type, single_base)?);
-        }
-      }
-    }
-    self.methods.append(&mut new_methods);
-    Ok(())
-  }
-
-  /// Checks if `class_name` types inherits `base_name` type directly or indirectly.
-  pub fn inherits(&self, class_name: &str, base_name: &str) -> bool {
-    for types in self
-          .dependencies
-          .iter()
-          .map(|x| &x.types)
-          .chain(once(&self.types)) {
-      if let Some(info) = types.iter().find(|x| &x.name == class_name) {
-        if let CppTypeKind::Class { ref bases, .. } = info.kind {
-          for base1 in bases {
-            if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base1.base_type.base {
-              if name == base_name {
-                return true;
-              }
-              if self.inherits(name, base_name) {
-                return true;
-              }
-            }
-          }
-        }
-      }
-    }
-    false
-  }
-
-  /// Parses include files to detect which methods are signals or slots.
-  fn detect_signals_and_slots(&mut self) -> Result<()> {
-    let mut files = HashSet::new();
-    for type1 in &self.types {
-      if self.inherits(&type1.name, "QObject") &&
-         !files.contains(&type1.origin_location.include_file_path) {
-        files.insert(type1.origin_location.include_file_path.clone());
-      }
-    }
-
-    #[derive(Debug, Clone)]
-    enum SectionType {
-      Signals,
-      Slots,
-      Other,
-    }
-    #[derive(Debug)]
-    struct Section {
-      line: usize,
-      section_type: SectionType,
-    }
-
-    if files.is_empty() {
-      return Ok(());
-    }
-    log::status("Detecting signals and slots");
-    let re_signals = Regex::new(r"(signals|Q_SIGNALS)\s*:")?;
-    let re_slots = Regex::new(r"(slots|Q_SLOTS)\s*:")?;
-    let re_other = Regex::new(r"(public|protected|private)\s*:")?;
-    let mut sections = HashMap::new();
-
-    for file_path in files {
-      let mut file_sections = Vec::new();
-      let file = open_file(&file_path)?;
-      let reader = BufReader::new(file.into_file());
-      for (line_num, line) in reader.lines().enumerate() {
-        let line = line
-          .chain_err(|| format!("failed while reading lines from {}", &file_path))?;
-        let section_type = if re_signals.is_match(&line) {
-          Some(SectionType::Signals)
-        } else if re_slots.is_match(&line) {
-          Some(SectionType::Slots)
-        } else if re_other.is_match(&line) {
-          Some(SectionType::Other)
-        } else {
-          None
-        };
-        if let Some(section_type) = section_type {
-          file_sections.push(Section {
-                               line: line_num,
-                               section_type: section_type,
-                             });
-        }
-      }
-      // println!("sections: {:?}", file_sections);
-      if !file_sections.is_empty() {
-        sections.insert(file_path, file_sections);
-      }
-    }
-    let mut all_types = HashSet::new();
-    for type1 in &self.types {
-      if let Some(sections) = sections.get(&type1.origin_location.include_file_path) {
-        let sections: Vec<_> = sections
-          .iter()
-          .filter(|x| x.line + 1 >= type1.origin_location.line as usize)
-          .collect();
-        for method in &mut self.methods {
-          let mut section_type = SectionType::Other;
-          if let Some(ref info) = method.class_membership {
-            if info.class_type.name == type1.name {
-              if let Some(ref location) = method.origin_location {
-                let matching_sections: Vec<_> = sections
-                  .clone()
-                  .into_iter()
-                  .filter(|x| x.line + 1 <= location.line as usize)
-                  .collect();
-                if !matching_sections.is_empty() {
-                  let section = matching_sections[matching_sections.len() - 1];
-                  section_type = section.section_type.clone();
-                  match section.section_type {
-                    SectionType::Signals => {
-                      log::llog(log::DebugSignals,
-                                || format!("Found signal: {}", method.short_text()));
-                      let types: Vec<_> = method
-                        .arguments
-                        .iter()
-                        .map(|x| x.argument_type.clone())
-                        .collect();
-                      if !all_types.contains(&types) &&
-                         !self
-                            .dependencies
-                            .iter()
-                            .any(|d| d.signal_argument_types.iter().any(|t| t == &types)) {
-                        all_types.insert(types);
-                      }
-                    }
-                    SectionType::Slots => {
-                      log::llog(log::DebugSignals,
-                                || format!("Found slot: {}", method.short_text()));
-                    }
-                    SectionType::Other => {}
-                  }
-                }
-              }
-            }
-          }
-          if let Some(ref mut info) = method.class_membership {
-            match section_type {
-              SectionType::Signals => {
-                info.is_signal = true;
-              }
-              SectionType::Slots => {
-                info.is_slot = true;
-              }
-              SectionType::Other => {}
-            }
-          }
-
-        }
-      }
-    }
-
-    let mut types_with_omitted_args = HashSet::new();
-    for t in &all_types {
-      let mut types = t.clone();
-      while let Some(_) = types.pop() {
-        if !types_with_omitted_args.contains(&types) && !all_types.contains(&types) &&
-           !self
-              .dependencies
-              .iter()
-              .any(|d| d.signal_argument_types.iter().any(|t| t == &types)) {
-          types_with_omitted_args.insert(types.clone());
-        }
-      }
-    }
-    all_types.extend(types_with_omitted_args.into_iter());
-
-    log::llog(log::DebugSignals, || "Signal argument types:");
-    for t in &all_types {
-      log::llog(log::DebugSignals, || {
-        format!("  ({})",
-                t.iter().map(|x| x.to_cpp_pseudo_code()).join(", "))
-      });
-    }
-    self.signal_argument_types = all_types.into_iter().collect();
-    Ok(())
+    new_methods
   }
 
   /// Detects the preferred type allocation place for each type based on
   /// API of all known methods. Keys of `overrides` are C++ type names.
   /// If `overrides` contains type allocation place for a type, it's used instead of
   /// the place that would be automatically selected.
-  pub fn choose_allocation_places(&mut self,
+  pub fn choose_allocation_places(&self,
                                   overrides: &HashMap<String, CppTypeAllocationPlace>)
-                                  -> Result<()> {
+                                  -> Result<HashMap<String, CppTypeAllocationPlace>> {
     log::status("Detecting type allocation places");
 
     #[derive(Default)]
@@ -1503,41 +1330,303 @@ impl CppData {
                 .join(", "))
     });
 
-    self.type_allocation_places = results;
-    Ok(())
+    Ok(results)
   }
 
-  /// Returns selected type allocation place for type `class_name`.
-  pub fn type_allocation_place(&self, class_name: &str) -> Result<CppTypeAllocationPlace> {
-    if let Some(r) = self.type_allocation_places.get(class_name) {
-      return Ok(r.clone());
-    }
-    for dep in &self.dependencies {
-      if let Ok(r) = dep.type_allocation_place(class_name) {
-        return Ok(r);
+  /// Adds fictional getter and setter methods for each known public field of each class.
+  fn add_field_accessors(&self) -> Result<Vec<CppMethod>> {
+    log::status("Adding field accessors");
+    let mut new_methods = Vec::new();
+    for type_info in &self.types {
+      if let CppTypeKind::Class { ref fields, .. } = type_info.kind {
+        for field in fields {
+          let create_method =
+            |name, accessor_type, return_type, arguments| -> Result<CppMethod> {
+              Ok(CppMethod {
+                   name: name,
+                   class_membership: Some(CppMethodClassMembership {
+                                            class_type: type_info.default_class_type()?,
+                                            kind: CppMethodKind::Regular,
+                                            is_virtual: false,
+                                            is_pure_virtual: false,
+                                            is_const: match accessor_type {
+                                              CppFieldAccessorType::CopyGetter |
+                                              CppFieldAccessorType::ConstRefGetter => true,
+                                              CppFieldAccessorType::MutRefGetter |
+                                              CppFieldAccessorType::Setter => false,
+                                            },
+                                            is_static: false,
+                                            visibility: CppVisibility::Public,
+                                            is_signal: false,
+                                            is_slot: false,
+                                            fake: Some(FakeCppMethod::FieldAccessor {
+                                                         accessor_type: accessor_type,
+                                                         field_name: field.name.clone(),
+                                                       }),
+                                          }),
+                   operator: None,
+                   return_type: return_type,
+                   arguments: arguments,
+                   arguments_before_omitting: None,
+                   allows_variadic_arguments: false,
+                   include_file: type_info.include_file.clone(),
+                   origin_location: None,
+                   template_arguments: None,
+                   template_arguments_values: None,
+                   declaration_code: None,
+                   doc: None,
+                   inheritance_chain: Vec::new(),
+                   is_fake_inherited_method: false,
+                   is_ffi_whitelisted: false,
+                   is_unsafe_static_cast: false,
+                   is_direct_static_cast: false,
+                 })
+            };
+          if field.visibility == CppVisibility::Public {
+            if field.field_type.indirection == CppTypeIndirection::None &&
+               field.field_type.base.is_class() {
+
+              let mut type2_const = field.field_type.clone();
+              type2_const.is_const = true;
+              type2_const.indirection = CppTypeIndirection::Ref;
+              let mut type2_mut = field.field_type.clone();
+              type2_mut.is_const = false;
+              type2_mut.indirection = CppTypeIndirection::Ref;
+              new_methods.push(create_method(field.name.clone(),
+                                             CppFieldAccessorType::ConstRefGetter,
+                                             type2_const,
+                                             Vec::new())?);
+              new_methods.push(create_method(format!("{}_mut", field.name),
+                                             CppFieldAccessorType::MutRefGetter,
+                                             type2_mut,
+                                             Vec::new())?);
+            } else {
+              new_methods.push(create_method(field.name.clone(),
+                                             CppFieldAccessorType::CopyGetter,
+                                             field.field_type.clone(),
+                                             Vec::new())?);
+            }
+            let arg = CppFunctionArgument {
+              argument_type: field.field_type.clone(),
+              name: "value".to_string(),
+              has_default_value: false,
+            };
+            new_methods.push(create_method(format!("set_{}", field.name),
+                                           CppFieldAccessorType::Setter,
+                                           CppType::void(),
+                                           vec![arg])?);
+          }
+        }
       }
     }
-    Err(format!("no type allocation place information for {}", class_name).into())
+    Ok(new_methods)
   }
 
-  /// Performs data conversion to make it more suitable
-  /// for further wrapper generation.
-  pub fn post_process(&mut self) -> Result<()> {
-    self.detect_signals_and_slots()?;
-    self.ensure_explicit_destructors()?;
-    self.generate_methods_with_omitted_args();
-    self.instantiate_templates()?;
-    self.add_inherited_methods()?; // TODO: add inherited fields too
-    self.add_field_accessors()?; // TODO: fix doc generator for field accessors
-    self.add_casts()?;
-    Ok(())
+  /// Performs a portion of `add_casts` operation.
+  /// Adds casts between `target_type` and `base_type` and calls
+  /// `add_casts_one` recursively to add casts between `target_type`
+  /// and base types of `base_type`.
+  fn add_casts_one(&self,
+                   target_type: &CppTypeClassBase,
+                   base_type: &CppType,
+                   is_direct: bool)
+                   -> Result<Vec<CppMethod>> {
+    let type_info = self
+      .find_type_info(|x| x.name == target_type.name)
+      .chain_err(|| "type info not found")?;
+    let target_ptr_type = CppType {
+      base: CppTypeBase::Class(target_type.clone()),
+      indirection: CppTypeIndirection::Ptr,
+      is_const: false,
+      is_const2: false,
+    };
+    let base_ptr_type = CppType {
+      base: base_type.base.clone(),
+      indirection: CppTypeIndirection::Ptr,
+      is_const: false,
+      is_const2: false,
+    };
+    let mut new_methods = Vec::new();
+    new_methods.push(create_cast_method("static_cast",
+                                        &base_ptr_type,
+                                        &target_ptr_type,
+                                        true,
+                                        is_direct,
+                                        &type_info.include_file));
+    new_methods.push(create_cast_method("static_cast",
+                                        &target_ptr_type,
+                                        &base_ptr_type,
+                                        false,
+                                        is_direct,
+                                        &type_info.include_file));
+    if let CppTypeBase::Class(ref base) = base_type.base {
+      if self.has_virtual_methods(&base.name) {
+        new_methods.push(create_cast_method("dynamic_cast",
+                                            &base_ptr_type,
+                                            &target_ptr_type,
+                                            false,
+                                            false,
+                                            &type_info.include_file));
+      }
+    }
+
+    if let CppTypeBase::Class(ref base) = base_type.base {
+      if let Some(type_info) = self.find_type_info(|x| x.name == base.name) {
+        if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
+          for base in bases {
+            new_methods.append(&mut self.add_casts_one(target_type, &base.base_type, false)?);
+          }
+        }
+      }
+    }
+    Ok(new_methods)
+  }
+
+  /// Adds `static_cast` and `dynamic_cast` functions for all appropriate pairs of types
+  /// in this `CppData`.
+  fn add_casts(&self) -> Result<Vec<CppMethod>> {
+    log::status("Adding cast functions");
+    let mut new_methods = Vec::new();
+    for type_info in &self.types {
+      if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
+        let t = type_info.default_class_type()?;
+        let single_base = bases.len() == 1;
+        for base in bases {
+          new_methods.append(&mut self.add_casts_one(&t, &base.base_type, single_base)?);
+        }
+      }
+    }
+    Ok(new_methods)
+  }
+
+  /// Checks if `class_name` types inherits `base_name` type directly or indirectly.
+  pub fn inherits(&self, class_name: &str, base_name: &str) -> bool {
+    for types in self.all_types() {
+      if let Some(info) = types.iter().find(|x| &x.name == class_name) {
+        if let CppTypeKind::Class { ref bases, .. } = info.kind {
+          for base1 in bases {
+            if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = base1.base_type.base {
+              if name == base_name {
+                return true;
+              }
+              if self.inherits(name, base_name) {
+                return true;
+              }
+            }
+          }
+        }
+      }
+    }
+    false
+  }
+
+  fn detect_signal_argument_types(&self) -> Result<Vec<Vec<CppType>>> {
+    let mut all_types = HashSet::new();
+    for method in &self.current.parser.methods {
+      let types: Vec<_> = method
+        .arguments
+        .iter()
+        .map(|x| x.argument_type.clone())
+        .collect();
+      if !all_types.contains(&types) &&
+         !self
+            .dependencies
+            .iter()
+            .any(|d| d.signal_argument_types.iter().any(|t| t == &types)) {
+        all_types.insert(types);
+      }
+    }
+
+    let mut types_with_omitted_args = HashSet::new();
+    for t in &all_types {
+      let mut types = t.clone();
+      while let Some(_) = types.pop() {
+        if !types_with_omitted_args.contains(&types) && !all_types.contains(&types) &&
+           !self
+              .dependencies
+              .iter()
+              .any(|d| d.signal_argument_types.iter().any(|t| t == &types)) {
+          types_with_omitted_args.insert(types.clone());
+        }
+      }
+    }
+    all_types.extend(types_with_omitted_args.into_iter());
+
+    log::llog(log::DebugSignals, || "Signal argument types:");
+    for t in &all_types {
+      log::llog(log::DebugSignals, || {
+        format!("  ({})",
+                t.iter().map(|x| x.to_cpp_pseudo_code()).join(", "))
+      });
+    }
+    Ok(all_types.into_iter().collect())
+  }
+
+
+
+
+
+  /// Checks if specified class has virtual destructor (own or inherited).
+  pub fn has_virtual_destructor(&self, class_name: &str) -> bool {
+    for method in self
+          .current
+          .parser
+          .methods
+          .iter()
+          .chain(self.current.processed.inherited_methods.iter()) {
+      if let Some(ref info) = method.class_membership {
+        if info.kind == CppMethodKind::Destructor && &info.class_type.name == class_name {
+          return info.is_virtual;
+        }
+      }
+    }
+    false
+  }
+
+  /// Checks if specified class has any virtual methods (own or inherited).
+  pub fn has_virtual_methods(&self, class_name: &str) -> bool {
+    for method in self
+          .current
+          .parser
+          .methods
+          .iter()
+          .chain(self.current.processed.inherited_methods.iter()) {
+      if let Some(ref info) = method.class_membership {
+        if &info.class_type.name == class_name && info.is_virtual {
+          return true;
+        }
+      }
+    }
+    false
+  }
+  //
+  //  /// Returns true if C++ type `name` is polymorphic, i.e. has
+  ///// at least one virtual function.
+  //  pub fn is_polymorphic_type(&self, name: &str) -> bool {
+  //    self
+  //        .all_methods()
+  //        .any(|m| if let Some(ref info) = m.class_membership {
+  //          info.is_virtual && &info.class_type.name == name
+  //        } else {
+  //          false
+  //        })
+  //  }
+
+
+  pub fn all_types(&self) -> ::std::iter::Chain<i32, i32> {
+    once(&self.current.parser.types).chain(self.dependencies.iter().map(|x| &x.parser.types))
   }
 }
 
-impl TemplateArgumentsDeclaration {
-  /// Returns count of the template arguments.
-  #[allow(dead_code)]
-  pub fn count(&self) -> usize {
-    self.names.len()
+
+impl CppData {
+  /// Checks if specified class has any pure virtual methods.
+  pub fn has_pure_virtual_methods(&self, class_name: &str) -> bool {
+    self
+      .all_methods()
+      .any(|m| match m.class_membership {
+             Some(ref info) => &info.class_type.name == class_name && info.is_pure_virtual,
+             None => false,
+           })
   }
 }

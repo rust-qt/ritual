@@ -178,3 +178,8 @@ pub fn log<T: Borrow<str>>(category: LoggerCategory, text: T) {
 pub fn llog<T: Borrow<str>, F: FnOnce() -> T>(category: LoggerCategory, f: F) {
   default_logger().llog(category, f);
 }
+
+/// Convenience method to check if `category` is enabled in the default logger.
+pub fn is_on(category: LoggerCategory) -> bool {
+  default_logger().is_on(category)
+}

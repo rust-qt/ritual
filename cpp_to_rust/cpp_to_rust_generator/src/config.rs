@@ -605,6 +605,10 @@ impl Config {
       .collect()
   }
 
+  pub fn has_cpp_data_filters(&self) -> bool {
+    !self.cpp_data_filters.is_empty()
+  }
+
   /// Returns values added by `Config::add_cpp_data_filter`.
   pub fn cpp_data_filters(&self) -> Vec<&Box<CppDataFilterFn>> {
     self.cpp_data_filters.iter().map(|x| &x.0).collect()

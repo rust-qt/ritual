@@ -1,5 +1,5 @@
 use caption_strategy::{TypeCaptionStrategy, MethodCaptionStrategy};
-use cpp_data::{CppData, CppVisibility, create_cast_method, CppTypeAllocationPlace};
+use cpp_data::{CppData, CppVisibility, create_cast_method, CppTypeAllocationPlace, CppDataWithDeps};
 use cpp_type::{CppTypeRole, CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase,
                CppFunctionPointerType};
 use cpp_ffi_data::{CppAndFfiMethod, c_base_name, CppFfiHeaderData, QtSlotWrapper};
@@ -14,7 +14,7 @@ use std::iter::once;
 /// This object generates the C++ wrapper library
 struct CppFfiGenerator<'a> {
   /// Input C++ data
-  cpp_data: &'a CppData,
+  cpp_data: &'a CppDataWithDeps,
   /// Name of the wrapper library
   cpp_ffi_lib_name: String,
   /// FFI filters passed to `Config`
@@ -22,7 +22,7 @@ struct CppFfiGenerator<'a> {
 }
 
 /// Runs the FFI generator
-pub fn run(cpp_data: &CppData,
+pub fn run(cpp_data: &CppDataWithDeps,
            cpp_ffi_lib_name: String,
            filters: Vec<&Box<CppFfiGeneratorFilterFn>>)
            -> Result<Vec<CppFfiHeaderData>> {
@@ -51,8 +51,8 @@ pub fn run(cpp_data: &CppData,
                        None,
                        generator
                          .cpp_data
-                         .methods
-                         .iter()
+                         .current
+                         .all_methods()
                          .filter(|x| &x.include_file == include_file))?;
     if methods.is_empty() {
       log::llog(log::DebugFfiSkips,
@@ -96,7 +96,10 @@ impl<'a> CppFfiGenerator<'a> {
     }
     if let Some(ref membership) = method.class_membership {
       if membership.kind == CppMethodKind::Constructor &&
-         self.cpp_data.has_pure_virtual_methods(&class_name) {
+         self
+           .cpp_data
+           .current
+           .has_pure_virtual_methods(&class_name) {
         log::llog(log::DebugFfiSkips,
                   || format!("Skipping constructor of abstract class {}", class_name));
         return Ok(false);
@@ -224,12 +227,17 @@ impl<'a> CppFfiGenerator<'a> {
   /// (excluding types already handled in the dependencies).
   fn generate_slot_wrappers(&'a self) -> Result<Option<CppFfiHeaderData>> {
     let include_file_name = "slots";
-    if self.cpp_data.signal_argument_types.is_empty() {
+    if self
+         .cpp_data
+         .current
+         .processed
+         .signal_argument_types
+         .is_empty() {
       return Ok(None);
     }
     let mut qt_slot_wrappers = Vec::new();
     let mut methods = Vec::new();
-    for types in &self.cpp_data.signal_argument_types {
+    for types in &self.cpp_data.current.processed.signal_argument_types {
       let ffi_types = types
         .map_if_ok(|t| t.to_cpp_ffi_type(CppTypeRole::NotReturnType))?;
       let args_captions = types
