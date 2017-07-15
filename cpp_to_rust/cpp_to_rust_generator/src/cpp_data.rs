@@ -5,7 +5,7 @@ use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership, CppFunction
                  CppFieldAccessorType, FakeCppMethod};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
-use common::errors::{Result, unexpected, ChainErr};
+use common::errors::{Result, ChainErr};
 use common::file_utils::open_file;
 use common::log;
 
@@ -207,7 +207,7 @@ pub struct ParserCppData {
   pub methods: Vec<CppMethod>,
   /// List of found template instantiations. Key is name of
   /// the template class, value is list of instantiations.
-  pub template_instantiations: Vec<CppTemplateInstantiations>,
+  pub template_instantiations: Vec<CppTemplateInstantiations>, // TODO: move to processed?
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
@@ -661,28 +661,29 @@ impl ParserCppData {
     r.current.processed.type_allocation_places =
       r.choose_allocation_places(allocation_place_overrides)?;
     r.current.processed.signal_argument_types = r.detect_signal_argument_types()?;
-    r.current
-      .processed
-      .extra_methods
-      .append(&mut r.generate_methods_with_omitted_args());
-    r.current
-      .processed
-      .extra_methods
-      .append(&mut r.instantiate_templates()?);
+    {
+      let mut methods = r.generate_methods_with_omitted_args();
+      r.current.processed.extra_methods.append(&mut methods);
+    }
+    {
+      let mut methods = r.instantiate_templates()?;
+      r.current.processed.extra_methods.append(&mut methods);
+    }
     r.current.processed.inherited_methods = unimplemented!(); //r.detect_inherited_methods()?;
-    r.current
-      .processed
-      .extra_methods
-      .append(&mut r.ensure_explicit_destructors()?);
-    // TODO: fix doc generator for field accessors
-    r.current
-      .processed
-      .extra_methods
-      .append(&mut r.add_field_accessors()?);
-    r.current
-      .processed
-      .extra_methods
-      .append(&mut r.add_casts()?);
+    {
+      let mut methods = r.ensure_explicit_destructors()?;
+      r.current.processed.extra_methods.append(&mut methods);
+    }
+    {
+      // TODO: fix doc generator for field accessors
+      let mut methods = r.add_field_accessors()?;
+      r.current.processed.extra_methods.append(&mut methods);
+    }
+    {
+      // TODO: fix doc generator for field accessors
+      let mut methods = r.add_casts()?;
+      r.current.processed.extra_methods.append(&mut methods);
+    }
     Ok(r)
   }
 }
@@ -735,8 +736,8 @@ impl CppDataWithDeps {
     log::status("Instantiating templates");
     let mut new_methods = Vec::new();
 
-    for cpp_data in self.dependencies.iter().chain(once(self as &_)) {
-      for method in &cpp_data.methods {
+    for cpp_data in self.dependencies.iter().chain(once(&self.current)) {
+      for method in cpp_data.all_methods() {
         for type1 in method.all_involved_types() {
           if let CppTypeBase::Class(CppTypeClassBase {
                                       ref name,
@@ -749,7 +750,7 @@ impl CppDataWithDeps {
                    .all(|x| x.base.is_template_parameter()) {
                 if let Some(template_instantiations) =
                   self
-                    .template_instantiations
+                    .current.parser.template_instantiations
                     .iter()
                     .find(|x| &x.class_name == name) {
                   let nested_level = if let CppTypeBase::TemplateParameter {
@@ -809,40 +810,15 @@ impl CppDataWithDeps {
 
 
 
-  /// Returns all include files found within this `CppData`
-  /// (excluding dependencies).
-  pub fn all_include_files(&self) -> Result<HashSet<String>> {
-    let mut result = HashSet::new();
-    for method in &self.current.all_methods() {
-      if !result.contains(&method.include_file) {
-        result.insert(method.include_file.clone());
-      }
-    }
-    for tp in &self.types {
-      if !result.contains(&tp.include_file) {
-        result.insert(tp.include_file.clone());
-      }
-    }
-    for instantiations in &self.template_instantiations {
-      let type_info =
-        self
-          .find_type_info(|x| &x.name == &instantiations.class_name)
-          .chain_err(|| format!("type info not found for {}", &instantiations.class_name))?;
-      if !result.contains(&type_info.include_file) {
-        result.insert(type_info.include_file.clone());
-      }
-    }
-    Ok(result)
-  }
 
   /// Returns selected type allocation place for type `class_name`.
   pub fn type_allocation_place(&self, class_name: &str) -> Result<CppTypeAllocationPlace> {
-    if let Some(r) = self.type_allocation_places.get(class_name) {
+    if let Some(r) = self.current.processed.type_allocation_places.get(class_name) {
       return Ok(r.clone());
     }
     for dep in &self.dependencies {
-      if let Ok(r) = dep.type_allocation_place(class_name) {
-        return Ok(r);
+      if let Some(r) = dep.processed.type_allocation_places.get(class_name) {
+        return Ok(r.clone());
       }
     }
     Err(format!("no type allocation place information for {}", class_name).into())
@@ -868,7 +844,7 @@ impl CppDataWithDeps {
   /// destructors implicitly available in C++.
   fn ensure_explicit_destructors(&self) -> Result<Vec<CppMethod>> {
     let mut methods = Vec::new();
-    for type1 in &self.types {
+    for type1 in &self.current.parser.types {
       if let CppTypeKind::Class { .. } = type1.kind {
         let class_name = &type1.name;
         let found_destructor = self
@@ -916,7 +892,7 @@ impl CppDataWithDeps {
     Ok(methods)
   }
 
-
+/*
   /// Helper function that performs a portion of add_inherited_methods implementation.
   fn inherited_methods_from(&self,
                             base_name: &str,
@@ -925,7 +901,7 @@ impl CppDataWithDeps {
     // TODO: speed up this method (#12)
     let mut new_methods = Vec::new();
     {
-      for type1 in &self.types {
+      for type1 in &self.current.parser.types {
         if let CppTypeKind::Class {
                  ref bases,
                  ref using_directives,
@@ -977,7 +953,7 @@ impl CppDataWithDeps {
                   }
 
                   let mut ok = true;
-                  for method in &self.methods {
+                  for method in self.current.all_methods() {
                     if method.class_name() == Some(derived_name) &&
                        method.name == base_class_method.name {
                       // without using directive, any method with the same name
@@ -1176,13 +1152,13 @@ impl CppDataWithDeps {
       }
     }
     Ok(())
-  }
+  } */
 
   /// Generates duplicate methods with fewer arguments for
   /// C++ methods with default argument values.
   fn generate_methods_with_omitted_args(&self) -> Vec<CppMethod> {
     let mut new_methods = Vec::new();
-    for method in &self.methods {
+    for method in self.current.all_methods() {
       if let Some(last_arg) = method.arguments.last() {
         if last_arg.has_default_value {
           let mut method_copy = method.clone();
@@ -1239,7 +1215,7 @@ impl CppDataWithDeps {
     }
 
     let mut data = HashMap::new();
-    for type1 in &self.types {
+    for type1 in &self.current.parser.types {
       if self.has_virtual_methods(&type1.name) {
         if !data.contains_key(&type1.name) {
           data.insert(type1.name.clone(), TypeStats::default());
@@ -1247,7 +1223,7 @@ impl CppDataWithDeps {
         data.get_mut(&type1.name).unwrap().has_virtual_methods = true;
       }
     }
-    for method in &self.methods {
+    for method in self.current.all_methods() {
       check_type(&method.return_type, &mut data);
       for arg in &method.arguments {
         check_type(&arg.argument_type, &mut data);
@@ -1268,7 +1244,7 @@ impl CppDataWithDeps {
       }
     }
 
-    for type1 in &self.types {
+    for type1 in &self.current.parser.types {
       if !type1.is_class() {
         continue;
       }
@@ -1337,7 +1313,7 @@ impl CppDataWithDeps {
   fn add_field_accessors(&self) -> Result<Vec<CppMethod>> {
     log::status("Adding field accessors");
     let mut new_methods = Vec::new();
-    for type_info in &self.types {
+    for type_info in &self.current.parser.types {
       if let CppTypeKind::Class { ref fields, .. } = type_info.kind {
         for field in fields {
           let create_method =
@@ -1487,7 +1463,7 @@ impl CppDataWithDeps {
   fn add_casts(&self) -> Result<Vec<CppMethod>> {
     log::status("Adding cast functions");
     let mut new_methods = Vec::new();
-    for type_info in &self.types {
+    for type_info in &self.current.parser.types {
       if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
         let t = type_info.default_class_type()?;
         let single_base = bases.len() == 1;
@@ -1532,7 +1508,7 @@ impl CppDataWithDeps {
          !self
             .dependencies
             .iter()
-            .any(|d| d.signal_argument_types.iter().any(|t| t == &types)) {
+            .any(|d| d.processed.signal_argument_types.iter().any(|t| t == &types)) {
         all_types.insert(types);
       }
     }
@@ -1545,7 +1521,7 @@ impl CppDataWithDeps {
            !self
               .dependencies
               .iter()
-              .any(|d| d.signal_argument_types.iter().any(|t| t == &types)) {
+              .any(|d| d.processed.signal_argument_types.iter().any(|t| t == &types)) {
           types_with_omitted_args.insert(types.clone());
         }
       }
@@ -1613,9 +1589,37 @@ impl CppDataWithDeps {
   //  }
 
 
-  pub fn all_types(&self) -> ::std::iter::Chain<i32, i32> {
-    once(&self.current.parser.types).chain(self.dependencies.iter().map(|x| &x.parser.types))
+  pub fn all_types(&self) -> Vec<&Vec<CppTypeData>> {
+    once(&self.current.parser.types).chain(self.dependencies.iter().map(|x| &x.parser.types)).collect()
   }
+
+  /// Returns all include files found within this `CppData`
+/// (excluding dependencies).
+  pub fn all_include_files(&self) -> Result<HashSet<String>> {
+    let mut result = HashSet::new();
+    for method in self.current.all_methods() {
+      if !result.contains(&method.include_file) {
+        result.insert(method.include_file.clone());
+      }
+    }
+    for tp in &self.current.parser.types {
+      if !result.contains(&tp.include_file) {
+        result.insert(tp.include_file.clone());
+      }
+    }
+    for instantiations in &self.current.parser.template_instantiations {
+      let type_info =
+        self
+            .find_type_info(|x| &x.name == &instantiations.class_name)
+            .chain_err(|| format!("type info not found for {}", &instantiations.class_name))?;
+      if !result.contains(&type_info.include_file) {
+        result.insert(type_info.include_file.clone());
+      }
+    }
+    Ok(result)
+  }
+
+
 }
 
 
@@ -1629,4 +1633,6 @@ impl CppData {
              None => false,
            })
   }
+
+
 }

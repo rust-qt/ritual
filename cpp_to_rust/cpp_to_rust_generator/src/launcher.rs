@@ -3,7 +3,7 @@
 use config::{Config, DebugLoggingConfig};
 use cpp_code_generator::{CppCodeGenerator, generate_cpp_type_size_requester, CppTypeSizeRequest};
 use cpp_type::CppTypeClassBase;
-use cpp_data::{CppData, CppDataWithDeps, ParserCppData, ProcessedCppData};
+use cpp_data::{CppData, CppDataWithDeps, ParserCppData};
 use cpp_ffi_data::CppAndFfiData;
 use cpp_ffi_generator;
 use cpp_parser;
@@ -47,12 +47,23 @@ pub fn is_completed<P: AsRef<Path>>(cache_dir: P) -> bool {
 /// Loads `RustExportInfo` and `CppData` or a dependency previously
 /// processed in the cache directory `path`.
 fn load_dependency(path: &PathBuf) -> Result<(RustExportInfo, CppData)> {
-  let cpp_data_path = path.with_added("cpp_data.bin");
-  if !cpp_data_path.exists() {
-    return Err(format!("file not found: {}", cpp_data_path.display()).into());
+  let parser_cpp_data_path = path.with_added("parser_cpp_data.bin");
+  if !parser_cpp_data_path.exists() {
+    return Err(format!("file not found: {}", parser_cpp_data_path.display()).into());
   }
-  let cpp_data = load_bincode(&cpp_data_path)?;
+  let parser_cpp_data = load_bincode(&parser_cpp_data_path)?;
 
+
+
+  let processed_cpp_data_path = path.with_added("processed_cpp_data.bin");
+  if !processed_cpp_data_path.exists() {
+    return Err(format!("file not found: {}", processed_cpp_data_path.display()).into());
+  }
+  let processed_cpp_data = load_bincode(&processed_cpp_data_path)?;
+  let cpp_data = CppData {
+    parser: parser_cpp_data,
+    processed: processed_cpp_data,
+  };
   let rust_export_info_path = path.with_added("rust_export_info.bin");
   if !rust_export_info_path.exists() {
     return Err(format!("file not found: {}", rust_export_info_path.display()).into());
@@ -102,7 +113,7 @@ fn check_all_paths(config: &Config) -> Result<()> {
 /// Otherwise, performs necessary steps to parse and process C++ data.
 fn load_or_create_cpp_data(config: &Config,
                            dependencies_cpp_data: Vec<CppData>)
-                           -> Result<CppData> {
+                           -> Result<CppDataWithDeps> {
   let parser_cpp_data_file_path = config.cache_dir_path().with_added("parser_cpp_data.bin");
 
   let loaded_parser_cpp_data = if config.cache_usage().can_use_raw_cpp_data() &&
@@ -135,9 +146,9 @@ fn load_or_create_cpp_data(config: &Config,
       name_blacklist: Vec::from(config.cpp_parser_blocked_names()),
       clang_arguments: Vec::from(config.cpp_parser_arguments()),
     };
-    let mut parser_cpp_data = cpp_parser::run(parser_config, dependencies_cpp_data)
+    let mut parser_cpp_data: ParserCppData = cpp_parser::run(parser_config, &dependencies_cpp_data)
       .chain_err(|| "C++ parser failed")?;
-    parser_cpp_data.detect_signals_and_slots()?;
+    parser_cpp_data.detect_signals_and_slots(&dependencies_cpp_data)?;
     // TODO: rename `cpp_data_filters` to `parser_cpp_data_filters`
     if config.has_cpp_data_filters() {
       log::status("Running custom filters for C++ parser data");
@@ -190,7 +201,7 @@ fn load_or_create_cpp_data(config: &Config,
       .post_process(dependencies_cpp_data, config.type_allocation_places())?;
     if config.write_cache() {
       log::status("Saving processed C++ data");
-      save_bincode(&processed_cpp_data_file_path, &r)?;
+      save_bincode(&processed_cpp_data_file_path, &r.current.processed)?;
       log::status(format!("Processed C++ data is saved to file: {}",
                           processed_cpp_data_file_path.display()));
     }

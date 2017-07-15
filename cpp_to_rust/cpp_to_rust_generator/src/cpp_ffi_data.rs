@@ -2,7 +2,7 @@ use caption_strategy::{ArgumentCaptionStrategy, MethodCaptionStrategy, TypeCapti
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppFunctionPointerType};
-use cpp_data::CppData;
+use cpp_data::CppDataWithDeps;
 use common::errors::Result;
 use common::utils::MapIfOk;
 
@@ -316,7 +316,7 @@ pub struct CppFfiHeaderData {
 /// Information about the generated C++ wrapper library
 pub struct CppAndFfiData {
   /// Processed C++ data
-  pub cpp_data: CppData,
+  pub cpp_data: CppDataWithDeps,
   /// Generated headers
   pub cpp_ffi_headers: Vec<CppFfiHeaderData>,
 }

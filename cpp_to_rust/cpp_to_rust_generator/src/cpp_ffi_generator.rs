@@ -1,5 +1,5 @@
 use caption_strategy::{TypeCaptionStrategy, MethodCaptionStrategy};
-use cpp_data::{CppData, CppVisibility, create_cast_method, CppTypeAllocationPlace, CppDataWithDeps};
+use cpp_data::{CppVisibility, create_cast_method, CppTypeAllocationPlace, CppDataWithDeps};
 use cpp_type::{CppTypeRole, CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase,
                CppFunctionPointerType};
 use cpp_ffi_data::{CppAndFfiMethod, c_base_name, CppFfiHeaderData, QtSlotWrapper};

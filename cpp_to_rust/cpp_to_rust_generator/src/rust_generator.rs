@@ -656,10 +656,11 @@ impl RustGenerator {
         Ok(())
       };
 
-      for method in &self.input_data.cpp_data.methods {
+      // TODO: use cpp_data.all_include_files() ?
+      for method in self.input_data.cpp_data.current.all_methods() {
         check_header(&method.include_file)?;
       }
-      for method in &self.input_data.cpp_data.types {
+      for method in &self.input_data.cpp_data.current.parser.types {
         check_header(&method.include_file)?;
       }
       for header in &self.input_data.cpp_ffi_headers {
@@ -736,7 +737,7 @@ impl RustGenerator {
            .input_data
            .cpp_data
            .inherits(&info.cpp_name, "QObject") {
-        for method in &self.input_data.cpp_data.methods {
+        for method in self.input_data.cpp_data.current.all_methods() {
           if let Some(ref info) = method.class_membership {
             if &info.class_type == &class_type && (info.is_signal || info.is_slot) {
               add_to_multihash(&mut qt_receivers_by_name,
@@ -1674,7 +1675,7 @@ impl RustGenerator {
   /// Generates Rust names and type information for all available C++ types.
   fn calc_processed_types(&self) -> Result<Vec<RustProcessedTypeInfo>> {
     let mut result = Vec::new();
-    for type_info in &self.input_data.cpp_data.types {
+    for type_info in &self.input_data.cpp_data.current.parser.types {
       if let CppTypeKind::Class { ref template_arguments, .. } = type_info.kind {
         if template_arguments.is_some() {
           continue;
@@ -1704,10 +1705,10 @@ impl RustGenerator {
                     CppTypeAllocationPlace::Stack => Some(size_const_name(&rust_name)),
                     CppTypeAllocationPlace::Heap => None,
                   },
-                  is_deletable: self
+                  is_deletable: !self
                     .input_data
                     .cpp_data
-                    .has_public_destructor(&CppTypeClassBase {
+                    .current.parser.has_non_public_destructor(&CppTypeClassBase {
                                               name: type_info.name.clone(),
                                               template_arguments: None,
                                             }),
@@ -1731,7 +1732,7 @@ impl RustGenerator {
                 self
                   .input_data
                   .cpp_data
-                  .template_instantiations
+                  .current.parser.template_instantiations
                   .iter()
                   .find(|x| &x.class_name == &flag_owner_name.to_string()) {
                 if instantiations
@@ -1784,7 +1785,7 @@ impl RustGenerator {
         Ok(name)
       };
     let mut unnamed_items = Vec::new();
-    for template_instantiations in &self.input_data.cpp_data.template_instantiations {
+    for template_instantiations in &self.input_data.cpp_data.current.parser.template_instantiations {
       let type_info = self
         .input_data
         .cpp_data
@@ -1809,10 +1810,10 @@ impl RustGenerator {
                              cpp_template_arguments: Some(ins.template_arguments.clone()),
                              kind: RustTypeWrapperKind::Struct {
                                size_const_name: None,
-                               is_deletable: self
+                               is_deletable: !self
                                  .input_data
                                  .cpp_data
-                                 .has_public_destructor(&CppTypeClassBase {
+                                 .current.parser.has_non_public_destructor(&CppTypeClassBase {
                                                            name: template_instantiations
                                                              .class_name
                                                              .clone(),

@@ -1,4 +1,4 @@
-use cpp_data::{CppData, CppTypeData, CppTypeKind, CppClassField, CppEnumValue, CppOriginLocation,
+use cpp_data::{ParserCppData, CppData, CppTypeData, CppTypeKind, CppClassField, CppEnumValue, CppOriginLocation,
                CppVisibility, CppTemplateInstantiation, CppTemplateInstantiations,
                CppClassUsingDirective, CppBaseSpecifier, TemplateArgumentsDeclaration};
 use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind, CppMethodClassMembership};
@@ -13,7 +13,6 @@ use common::log;
 
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
-use std::collections::HashMap;
 
 use clang::*;
 use clang;
@@ -255,7 +254,7 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
 }
 
 /// Runs the parser on specified data.
-pub fn run(config: CppParserConfig, dependencies_data: Vec<CppData>) -> Result<CppData> {
+pub fn run(config: CppParserConfig, dependencies_data: &[CppData]) -> Result<ParserCppData> {
   log::status(get_version());
   log::status("Initializing clang...");
   let (types, methods, insts) = {
@@ -263,7 +262,7 @@ pub fn run(config: CppParserConfig, dependencies_data: Vec<CppData>) -> Result<C
       let mut parser = CppParser {
         types: Vec::new(),
         config: config.clone(),
-        dependencies_data: &dependencies_data,
+        dependencies_data: dependencies_data,
       };
       log::status("Parsing types");
       parser.parse_types(translation_unit);
@@ -278,13 +277,10 @@ pub fn run(config: CppParserConfig, dependencies_data: Vec<CppData>) -> Result<C
     let template_instantiations = parser.find_template_instantiations(&good_methods);
     (parser.types, good_methods, template_instantiations)
   };
-  Ok(CppData {
+  Ok(ParserCppData {
        types: types,
        methods: methods,
        template_instantiations: insts,
-       signal_argument_types: Vec::new(),
-       type_allocation_places: HashMap::new(),
-       dependencies: dependencies_data,
      })
 }
 
@@ -296,7 +292,7 @@ impl<'a> CppParser<'a> {
       return Some(r);
     }
     for data in self.dependencies_data {
-      if let Some(r) = data.types.iter().find(|&x| f(x)) {
+      if let Some(r) = data.parser.types.iter().find(|&x| f(x)) {
         return Some(r);
       }
     }
@@ -1708,7 +1704,7 @@ impl<'a> CppParser<'a> {
                   .iter()
                   .any(|data| {
               data
-                .template_instantiations
+                .parser.template_instantiations
                 .iter()
                 .any(|i| {
                        &i.class_name == name &&

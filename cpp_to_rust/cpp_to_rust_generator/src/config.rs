@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 use common::errors::Result;
 use cpp_method::CppMethod;
-use cpp_data::CppData;
+use cpp_data::ParserCppData;
 pub use cpp_data::CppTypeAllocationPlace;
 use common::cpp_build_config::CppBuildConfig;
 use std::collections::HashMap;
@@ -21,7 +21,7 @@ impl ::std::fmt::Debug for CppFfiGeneratorFilter {
 }
 
 /// Function type used in `Config::add_cpp_data_filter`.
-pub type CppDataFilterFn = Fn(&mut CppData) -> Result<()>;
+pub type CppDataFilterFn = Fn(&mut ParserCppData) -> Result<()>;
 
 struct CppDataFilter(Box<CppDataFilterFn>);
 
@@ -450,7 +450,7 @@ impl Config {
   /// in the output of the C++ parser. Filters are executed in the same order they
   /// were added. If the function returns `Err`, the processing is terminated.
   pub fn add_cpp_data_filter<F>(&mut self, f: F)
-    where F: Fn(&mut CppData) -> Result<()> + 'static
+    where F: Fn(&mut ParserCppData) -> Result<()> + 'static
   {
     self.cpp_data_filters.push(CppDataFilter(Box::new(f)));
   }

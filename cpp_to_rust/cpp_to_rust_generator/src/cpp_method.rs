@@ -1,7 +1,7 @@
 //! Types for handling information about C++ methods.
 
 
-use cpp_data::{CppVisibility, CppTypeAllocationPlace, CppData, CppOriginLocation,
+use cpp_data::{CppVisibility, CppTypeAllocationPlace, CppOriginLocation,
                TemplateArgumentsDeclaration, CppBaseSpecifier, CppDataWithDeps};
 use cpp_ffi_data::{CppMethodWithFfiSignature, CppFfiType, CppFfiFunctionSignature,
                    CppFfiFunctionArgument, CppFfiArgumentMeaning};
