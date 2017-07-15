@@ -3,7 +3,7 @@ name = "cpp_to_rust_common"
 
 # when changing version of this crate, change corresponding dependency version in
 # `cpp_to_rust_generator`, `cpp_to_rust_build_tools` and `qt_generator_common`
-version = "0.2.0"
+version = "0.2.1"
 
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 description = "Common utilities for cpp_to_rust_generator and cpp_to_rust_build_tools"
