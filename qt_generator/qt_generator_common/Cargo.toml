@@ -10,4 +10,4 @@ description = "Common utilities for generating and building Rust-Qt crates"
 repository = "https://github.com/rust-qt/cpp_to_rust/tree/master/qt_generator/qt_generator_common"
 
 [dependencies]
-cpp_to_rust_common = { version = "0.2.0", path = "../../cpp_to_rust/cpp_to_rust_common" }
+cpp_to_rust_common = { version = "0.2.1", path = "../../cpp_to_rust/cpp_to_rust_common" }
