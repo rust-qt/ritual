@@ -1,6 +1,7 @@
-use cpp_data::{ParserCppData, CppData, CppTypeData, CppTypeKind, CppClassField, CppEnumValue, CppOriginLocation,
-               CppVisibility, CppTemplateInstantiation, CppTemplateInstantiations,
-               CppClassUsingDirective, CppBaseSpecifier, TemplateArgumentsDeclaration};
+use cpp_data::{ParserCppData, CppData, CppTypeData, CppTypeKind, CppClassField, CppEnumValue,
+               CppOriginLocation, CppVisibility, CppTemplateInstantiation,
+               CppTemplateInstantiations, CppClassUsingDirective, CppBaseSpecifier,
+               TemplateArgumentsDeclaration};
 use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind, CppMethodClassMembership};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
@@ -1704,7 +1705,8 @@ impl<'a> CppParser<'a> {
                   .iter()
                   .any(|data| {
               data
-                .parser.template_instantiations
+                .parser
+                .template_instantiations
                 .iter()
                 .any(|i| {
                        &i.class_name == name &&

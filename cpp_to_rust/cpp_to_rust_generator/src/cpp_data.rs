@@ -637,8 +637,6 @@ impl ParserCppData {
   }
 
 
-
-
   /// Performs data conversion to make it more suitable
   /// for further wrapper generation.
   pub fn post_process(self,
@@ -669,7 +667,7 @@ impl ParserCppData {
       let mut methods = r.instantiate_templates()?;
       r.current.processed.extra_methods.append(&mut methods);
     }
-    r.current.processed.inherited_methods = unimplemented!(); //r.detect_inherited_methods()?;
+    r.current.processed.inherited_methods = r.detect_inherited_methods2()?;
     {
       let mut methods = r.ensure_explicit_destructors()?;
       r.current.processed.extra_methods.append(&mut methods);
@@ -750,7 +748,9 @@ impl CppDataWithDeps {
                    .all(|x| x.base.is_template_parameter()) {
                 if let Some(template_instantiations) =
                   self
-                    .current.parser.template_instantiations
+                    .current
+                    .parser
+                    .template_instantiations
                     .iter()
                     .find(|x| &x.class_name == name) {
                   let nested_level = if let CppTypeBase::TemplateParameter {
@@ -813,7 +813,11 @@ impl CppDataWithDeps {
 
   /// Returns selected type allocation place for type `class_name`.
   pub fn type_allocation_place(&self, class_name: &str) -> Result<CppTypeAllocationPlace> {
-    if let Some(r) = self.current.processed.type_allocation_places.get(class_name) {
+    if let Some(r) = self
+         .current
+         .processed
+         .type_allocation_places
+         .get(class_name) {
       return Ok(r.clone());
     }
     for dep in &self.dependencies {
@@ -892,7 +896,7 @@ impl CppDataWithDeps {
     Ok(methods)
   }
 
-/*
+  /*
   /// Helper function that performs a portion of add_inherited_methods implementation.
   fn inherited_methods_from(&self,
                             base_name: &str,
@@ -1508,7 +1512,12 @@ impl CppDataWithDeps {
          !self
             .dependencies
             .iter()
-            .any(|d| d.processed.signal_argument_types.iter().any(|t| t == &types)) {
+            .any(|d| {
+                   d.processed
+                     .signal_argument_types
+                     .iter()
+                     .any(|t| t == &types)
+                 }) {
         all_types.insert(types);
       }
     }
@@ -1521,7 +1530,12 @@ impl CppDataWithDeps {
            !self
               .dependencies
               .iter()
-              .any(|d| d.processed.signal_argument_types.iter().any(|t| t == &types)) {
+              .any(|d| {
+                     d.processed
+                       .signal_argument_types
+                       .iter()
+                       .any(|t| t == &types)
+                   }) {
           types_with_omitted_args.insert(types.clone());
         }
       }
@@ -1590,11 +1604,13 @@ impl CppDataWithDeps {
 
 
   pub fn all_types(&self) -> Vec<&Vec<CppTypeData>> {
-    once(&self.current.parser.types).chain(self.dependencies.iter().map(|x| &x.parser.types)).collect()
+    once(&self.current.parser.types)
+      .chain(self.dependencies.iter().map(|x| &x.parser.types))
+      .collect()
   }
 
   /// Returns all include files found within this `CppData`
-/// (excluding dependencies).
+  /// (excluding dependencies).
   pub fn all_include_files(&self) -> Result<HashSet<String>> {
     let mut result = HashSet::new();
     for method in self.current.all_methods() {
@@ -1610,8 +1626,8 @@ impl CppDataWithDeps {
     for instantiations in &self.current.parser.template_instantiations {
       let type_info =
         self
-            .find_type_info(|x| &x.name == &instantiations.class_name)
-            .chain_err(|| format!("type info not found for {}", &instantiations.class_name))?;
+          .find_type_info(|x| &x.name == &instantiations.class_name)
+          .chain_err(|| format!("type info not found for {}", &instantiations.class_name))?;
       if !result.contains(&type_info.include_file) {
         result.insert(type_info.include_file.clone());
       }
@@ -1619,7 +1635,116 @@ impl CppDataWithDeps {
     Ok(result)
   }
 
+  fn detect_inherited_methods2(&self) -> Result<Vec<CppMethod>> {
+    let mut remaining_classes: Vec<&CppTypeData> = self
+      .current
+      .parser
+      .types
+      .iter()
+      .filter(|t| if let CppTypeKind::Class { ref bases, .. } = t.kind {
+                !bases.is_empty()
+              } else {
+                false
+              })
+      .collect();
+    let mut ordered_classes = Vec::new();
+    while !remaining_classes.is_empty() {
+      let mut any_added = false;
+      let mut remaining_classes2 = Vec::new();
+      for class in &remaining_classes {
+        if let CppTypeKind::Class { ref bases, .. } = class.kind {
+          if bases
+               .iter()
+               .any(|base| if base.visibility != CppVisibility::Private &&
+                              base.base_type.indirection == CppTypeIndirection::None {
+                      if let CppTypeBase::Class(ref base_info) = base.base_type.base {
+                        remaining_classes
+                          .iter()
+                          .any(|c| c.name == base_info.name)
+                      } else {
+                        false
+                      }
+                    } else {
+                      false
+                    }) {
+            remaining_classes2.push(*class);
+          } else {
+            ordered_classes.push(*class);
+            any_added = true;
+          }
+        } else {
+          unreachable!()
+        }
+      }
+      remaining_classes = remaining_classes2;
+      if !any_added {
+        return Err("Cyclic dependency detected while detecting inherited methods".into());
+      }
+    }
 
+    for class in ordered_classes {
+      log::llog(log::DebugInheritance,
+                || format!("Detecting inherited methods for {}\n", class.name));
+      let own_methods = self
+        .current
+        .parser
+        .methods
+        .iter()
+        .filter(|m| m.class_name() == Some(&class.name));
+      let bases = if let CppTypeKind::Class { ref bases, .. } = class.kind {
+        bases
+      } else {
+        unreachable!()
+      };
+      let bases_with_methods: Vec<(&CppBaseSpecifier, Vec<&CppMethod>)> = bases
+        .iter()
+        .filter(|base| {
+                  base.visibility != CppVisibility::Private &&
+                  base.base_type.indirection == CppTypeIndirection::None
+                })
+        .map(|base| {
+          let methods = if let CppTypeBase::Class(ref base_class_base) = base.base_type.base {
+
+            once(&self.current.parser)
+              .chain(self.dependencies.iter().map(|d| &d.parser))
+              .map(|p| &p.methods)
+              .flat_map(|m| m)
+              .filter(|m| if let Some(ref info) = m.class_membership {
+                        &info.class_type == base_class_base
+                      } else {
+                        false
+                      })
+              .collect()
+          } else {
+            Vec::new()
+          };
+          (base, methods)
+        })
+        .filter(|x| !x.1.is_empty())
+        .collect();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    }
+
+    unimplemented!()
+  }
 }
 
 
@@ -1633,6 +1758,4 @@ impl CppData {
              None => false,
            })
   }
-
-
 }

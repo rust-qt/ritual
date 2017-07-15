@@ -1706,12 +1706,14 @@ impl RustGenerator {
                     CppTypeAllocationPlace::Heap => None,
                   },
                   is_deletable: !self
-                    .input_data
-                    .cpp_data
-                    .current.parser.has_non_public_destructor(&CppTypeClassBase {
-                                              name: type_info.name.clone(),
-                                              template_arguments: None,
-                                            }),
+                                   .input_data
+                                   .cpp_data
+                                   .current
+                                   .parser
+                                   .has_non_public_destructor(&CppTypeClassBase {
+                                                                 name: type_info.name.clone(),
+                                                                 template_arguments: None,
+                                                               }),
                   slot_wrapper: None,
                 }
               }
@@ -1732,7 +1734,9 @@ impl RustGenerator {
                 self
                   .input_data
                   .cpp_data
-                  .current.parser.template_instantiations
+                  .current
+                  .parser
+                  .template_instantiations
                   .iter()
                   .find(|x| &x.class_name == &flag_owner_name.to_string()) {
                 if instantiations
@@ -1785,7 +1789,13 @@ impl RustGenerator {
         Ok(name)
       };
     let mut unnamed_items = Vec::new();
-    for template_instantiations in &self.input_data.cpp_data.current.parser.template_instantiations {
+    for template_instantiations in
+      &self
+         .input_data
+         .cpp_data
+         .current
+         .parser
+         .template_instantiations {
       let type_info = self
         .input_data
         .cpp_data
@@ -1810,16 +1820,21 @@ impl RustGenerator {
                              cpp_template_arguments: Some(ins.template_arguments.clone()),
                              kind: RustTypeWrapperKind::Struct {
                                size_const_name: None,
-                               is_deletable: !self
-                                 .input_data
-                                 .cpp_data
-                                 .current.parser.has_non_public_destructor(&CppTypeClassBase {
-                                                           name: template_instantiations
-                                                             .class_name
-                                                             .clone(),
-                                                           template_arguments:
-                                                             Some(ins.template_arguments.clone()),
-                                                         }),
+                               is_deletable:
+                                 !self
+                                    .input_data
+                                    .cpp_data
+                                    .current
+                                    .parser
+                                    .has_non_public_destructor(&CppTypeClassBase {
+                                                                  name: template_instantiations
+                                                                    .class_name
+                                                                    .clone(),
+                                                                  template_arguments:
+                                                                    Some(ins
+                                                                           .template_arguments
+                                                                           .clone()),
+                                                                }),
                                slot_wrapper: None,
                              },
                              rust_name: rust_name,

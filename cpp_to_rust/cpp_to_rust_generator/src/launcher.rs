@@ -148,7 +148,8 @@ fn load_or_create_cpp_data(config: &Config,
     };
     let mut parser_cpp_data: ParserCppData = cpp_parser::run(parser_config, &dependencies_cpp_data)
       .chain_err(|| "C++ parser failed")?;
-    parser_cpp_data.detect_signals_and_slots(&dependencies_cpp_data)?;
+    parser_cpp_data
+      .detect_signals_and_slots(&dependencies_cpp_data)?;
     // TODO: rename `cpp_data_filters` to `parser_cpp_data_filters`
     if config.has_cpp_data_filters() {
       log::status("Running custom filters for C++ parser data");
