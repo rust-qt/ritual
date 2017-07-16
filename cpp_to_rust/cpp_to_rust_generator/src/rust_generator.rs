@@ -737,7 +737,18 @@ impl RustGenerator {
            .input_data
            .cpp_data
            .inherits(&info.cpp_name, "QObject") {
-        for method in self.input_data.cpp_data.current.all_methods() {
+        for method in self
+              .input_data
+              .cpp_data
+              .current
+              .all_methods()
+              .chain(self
+                       .input_data
+                       .cpp_data
+                       .current
+                       .processed
+                       .inherited_methods
+                       .iter()) {
           if let Some(ref info) = method.class_membership {
             if &info.class_type == &class_type && (info.is_signal || info.is_slot) {
               add_to_multihash(&mut qt_receivers_by_name,

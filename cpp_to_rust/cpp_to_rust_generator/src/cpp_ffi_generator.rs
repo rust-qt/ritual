@@ -78,9 +78,9 @@ impl<'a> CppFfiGenerator<'a> {
   /// Returns false if the method is excluded from processing
   /// for some reason
   fn should_process_method(&self, method: &CppMethod) -> Result<bool> {
-    if method.is_fake_inherited_method {
-      return Ok(false);
-    }
+    //    if method.is_fake_inherited_method {
+    //      return Ok(false);
+    //    }
     let class_name = method.class_name().unwrap_or(&String::new()).clone();
     for filter in &self.filters {
       let allowed = filter(method)
@@ -96,10 +96,7 @@ impl<'a> CppFfiGenerator<'a> {
     }
     if let Some(ref membership) = method.class_membership {
       if membership.kind == CppMethodKind::Constructor &&
-         self
-           .cpp_data
-           .current
-           .has_pure_virtual_methods(&class_name) {
+         self.cpp_data.has_pure_virtual_methods(&class_name) {
         log::llog(log::DebugFfiSkips,
                   || format!("Skipping constructor of abstract class {}", class_name));
         return Ok(false);
@@ -299,7 +296,7 @@ impl<'a> CppFfiGenerator<'a> {
           is_ffi_whitelisted: false,
           is_unsafe_static_cast: false,
           is_direct_static_cast: false,
-          is_fake_inherited_method: false,
+          //is_fake_inherited_method: false,
         }
       };
       methods.push(create_function(CppMethodKind::Constructor,

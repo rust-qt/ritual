@@ -1185,7 +1185,7 @@ impl<'a> CppParser<'a> {
          declaration_code: declaration_code,
          doc: None,
          inheritance_chain: Vec::new(),
-         is_fake_inherited_method: false,
+         //is_fake_inherited_method: false,
          is_ffi_whitelisted: false,
          is_unsafe_static_cast: false,
          is_direct_static_cast: false,

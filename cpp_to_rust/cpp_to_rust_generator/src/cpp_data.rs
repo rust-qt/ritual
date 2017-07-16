@@ -5,7 +5,7 @@ use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership, CppFunction
                  CppFieldAccessorType, FakeCppMethod};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
-use common::errors::{Result, ChainErr};
+use common::errors::{Result, ChainErr, unexpected};
 use common::file_utils::open_file;
 use common::log;
 
@@ -285,7 +285,7 @@ pub fn create_cast_method(name: &str,
     declaration_code: None,
     doc: None,
     inheritance_chain: Vec::new(),
-    is_fake_inherited_method: false,
+    //is_fake_inherited_method: false,
     is_ffi_whitelisted: true,
     is_unsafe_static_cast: is_unsafe_static_cast,
     is_direct_static_cast: is_direct_static_cast,
@@ -885,7 +885,7 @@ impl CppDataWithDeps {
                          declaration_code: None,
                          doc: None,
                          inheritance_chain: Vec::new(),
-                         is_fake_inherited_method: false,
+                         //is_fake_inherited_method: false,
                          is_ffi_whitelisted: false,
                          is_unsafe_static_cast: false,
                          is_direct_static_cast: false,
@@ -1320,48 +1320,47 @@ impl CppDataWithDeps {
     for type_info in &self.current.parser.types {
       if let CppTypeKind::Class { ref fields, .. } = type_info.kind {
         for field in fields {
-          let create_method =
-            |name, accessor_type, return_type, arguments| -> Result<CppMethod> {
-              Ok(CppMethod {
-                   name: name,
-                   class_membership: Some(CppMethodClassMembership {
-                                            class_type: type_info.default_class_type()?,
-                                            kind: CppMethodKind::Regular,
-                                            is_virtual: false,
-                                            is_pure_virtual: false,
-                                            is_const: match accessor_type {
-                                              CppFieldAccessorType::CopyGetter |
-                                              CppFieldAccessorType::ConstRefGetter => true,
-                                              CppFieldAccessorType::MutRefGetter |
-                                              CppFieldAccessorType::Setter => false,
-                                            },
-                                            is_static: false,
-                                            visibility: CppVisibility::Public,
-                                            is_signal: false,
-                                            is_slot: false,
-                                            fake: Some(FakeCppMethod::FieldAccessor {
-                                                         accessor_type: accessor_type,
-                                                         field_name: field.name.clone(),
-                                                       }),
-                                          }),
-                   operator: None,
-                   return_type: return_type,
-                   arguments: arguments,
-                   arguments_before_omitting: None,
-                   allows_variadic_arguments: false,
-                   include_file: type_info.include_file.clone(),
-                   origin_location: None,
-                   template_arguments: None,
-                   template_arguments_values: None,
-                   declaration_code: None,
-                   doc: None,
-                   inheritance_chain: Vec::new(),
-                   is_fake_inherited_method: false,
-                   is_ffi_whitelisted: false,
-                   is_unsafe_static_cast: false,
-                   is_direct_static_cast: false,
-                 })
-            };
+          let create_method = |name, accessor_type, return_type, arguments| -> Result<CppMethod> {
+            Ok(CppMethod {
+                 name: name,
+                 class_membership: Some(CppMethodClassMembership {
+                                          class_type: type_info.default_class_type()?,
+                                          kind: CppMethodKind::Regular,
+                                          is_virtual: false,
+                                          is_pure_virtual: false,
+                                          is_const: match accessor_type {
+                                            CppFieldAccessorType::CopyGetter |
+                                            CppFieldAccessorType::ConstRefGetter => true,
+                                            CppFieldAccessorType::MutRefGetter |
+                                            CppFieldAccessorType::Setter => false,
+                                          },
+                                          is_static: false,
+                                          visibility: CppVisibility::Public,
+                                          is_signal: false,
+                                          is_slot: false,
+                                          fake: Some(FakeCppMethod::FieldAccessor {
+                                                       accessor_type: accessor_type,
+                                                       field_name: field.name.clone(),
+                                                     }),
+                                        }),
+                 operator: None,
+                 return_type: return_type,
+                 arguments: arguments,
+                 arguments_before_omitting: None,
+                 allows_variadic_arguments: false,
+                 include_file: type_info.include_file.clone(),
+                 origin_location: None,
+                 template_arguments: None,
+                 template_arguments_values: None,
+                 declaration_code: None,
+                 doc: None,
+                 inheritance_chain: Vec::new(),
+                 //is_fake_inherited_method: false,
+                 is_ffi_whitelisted: false,
+                 is_unsafe_static_cast: false,
+                 is_direct_static_cast: false,
+               })
+          };
           if field.visibility == CppVisibility::Public {
             if field.field_type.indirection == CppTypeIndirection::None &&
                field.field_type.base.is_class() {
@@ -1503,22 +1502,26 @@ impl CppDataWithDeps {
   fn detect_signal_argument_types(&self) -> Result<Vec<Vec<CppType>>> {
     let mut all_types = HashSet::new();
     for method in &self.current.parser.methods {
-      let types: Vec<_> = method
-        .arguments
-        .iter()
-        .map(|x| x.argument_type.clone())
-        .collect();
-      if !all_types.contains(&types) &&
-         !self
-            .dependencies
+      if let Some(ref method_info) = method.class_membership {
+        if method_info.is_signal {
+          let types: Vec<_> = method
+            .arguments
             .iter()
-            .any(|d| {
-                   d.processed
-                     .signal_argument_types
-                     .iter()
-                     .any(|t| t == &types)
-                 }) {
-        all_types.insert(types);
+            .map(|x| x.argument_type.clone())
+            .collect();
+          if !all_types.contains(&types) &&
+             !self
+                .dependencies
+                .iter()
+                .any(|d| {
+                       d.processed
+                         .signal_argument_types
+                         .iter()
+                         .any(|t| t == &types)
+                     }) {
+            all_types.insert(types);
+          }
+        }
       }
     }
 
@@ -1589,6 +1592,25 @@ impl CppDataWithDeps {
     }
     false
   }
+
+  /// Checks if specified class has any virtual methods (own or inherited).
+  pub fn has_pure_virtual_methods(&self, class_name: &str) -> bool {
+    for method in self
+          .current
+          .parser
+          .methods
+          .iter()
+          .chain(self.current.processed.inherited_methods.iter()) {
+      if let Some(ref info) = method.class_membership {
+        if &info.class_type.name == class_name && info.is_pure_virtual {
+          return true;
+        }
+      }
+    }
+    false
+  }
+
+
   //
   //  /// Returns true if C++ type `name` is polymorphic, i.e. has
   ///// at least one virtual function.
@@ -1682,15 +1704,17 @@ impl CppDataWithDeps {
       }
     }
 
+    let mut result = Vec::new();
     for class in ordered_classes {
       log::llog(log::DebugInheritance,
                 || format!("Detecting inherited methods for {}\n", class.name));
-      let own_methods = self
+      let own_methods: Vec<&CppMethod> = self
         .current
         .parser
         .methods
         .iter()
-        .filter(|m| m.class_name() == Some(&class.name));
+        .filter(|m| m.class_name() == Some(&class.name))
+        .collect();
       let bases = if let CppTypeKind::Class { ref bases, .. } = class.kind {
         bases
       } else {
@@ -1723,39 +1747,66 @@ impl CppDataWithDeps {
         .filter(|x| !x.1.is_empty())
         .collect();
 
+      for &(ref base, ref methods) in &bases_with_methods {
+        if let CppTypeBase::Class(ref base_class_base) = base.base_type.base {
+          for method in methods {
+            if let CppTypeKind::Class { ref using_directives, .. } = class.kind {
+              let use_method = if using_directives
+                   .iter()
+                   .any(|dir| {
+                          dir.class_name == base_class_base.name && dir.method_name == method.name
+                        }) {
+                true // excplicitly inherited with a using directive
+              } else if own_methods.iter().any(|m| m.name == method.name) {
+                // not inherited because method with the same name exists in the derived class
+                false
+              } else if bases_with_methods
+                          .iter()
+                          .any(|&(ref base2, ref methods2)| {
+                                 base != base2 && methods2.iter().any(|m| m.name == method.name)
+                               }) {
+                // not inherited because method with the same name exists in one of
+                // the other bases
+                false
+              } else {
+                // no aliased method found and no using directives
+                true
+              };
+              // TODO: detect diamond inheritance
+              if use_method {
+                let mut new_method = (*method).clone();
+                if let Some(ref mut info) = new_method.class_membership {
+                  info.class_type = class.default_class_type()?;
+                } else {
+                  return Err(unexpected("no class membership").into());
+                }
+                new_method.include_file = class.include_file.clone();
+                new_method.origin_location = None;
+                new_method.declaration_code = None;
+                new_method.inheritance_chain.push((*base).clone());
+                //new_method.is_fake_inherited_method = true;
+                log::llog(log::DebugInheritance,
+                          || format!("Method added: {}", new_method.short_text()));
+                log::llog(log::DebugInheritance, || {
+                  format!("Base method: {} ({:?})\n",
+                          method.short_text(),
+                          method.origin_location)
+                });
+                result.push(new_method);
+              }
 
+            } else {
+              unreachable!()
+            }
 
+          }
+        } else {
+          unreachable!()
+        }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      }
 
     }
-
-    unimplemented!()
-  }
-}
-
-
-impl CppData {
-  /// Checks if specified class has any pure virtual methods.
-  pub fn has_pure_virtual_methods(&self, class_name: &str) -> bool {
-    self
-      .all_methods()
-      .any(|m| match m.class_membership {
-             Some(ref info) => &info.class_type.name == class_name && info.is_pure_virtual,
-             None => false,
-           })
+    Ok(result)
   }
 }
