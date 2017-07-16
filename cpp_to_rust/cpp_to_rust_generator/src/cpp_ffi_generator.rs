@@ -140,39 +140,72 @@ impl<'a> CppFfiGenerator<'a> {
     log::status(format!("Generating C++ FFI methods for header: {}",
                         include_file_base_name));
     let mut hash_name_to_methods: HashMap<String, Vec<_>> = HashMap::new();
-    for method in methods {
-      if !self.should_process_method(method)? {
-        continue;
-      }
-      match method.to_ffi_signature(&self.cpp_data, type_allocation_places_override.clone()) {
-        Err(msg) => {
-          log::llog(log::DebugFfiSkips, || {
-            format!("Unable to produce C function for method:\n{}\nError:{}\n",
-                    method.short_text(),
-                    msg)
-          });
-        }
-        Ok(result) => {
-          match c_base_name(&result.cpp_method,
-                            &result.allocation_place,
-                            include_file_base_name) {
-            Err(msg) => {
-              log::llog(log::DebugFfiSkips, || {
-                format!("Unable to produce C function for method:\n{}\nError:{}\n",
-                        method.short_text(),
-                        msg)
-              });
-            }
-            Ok(name) => {
+    {
+      let mut process_one = |method: &CppMethod| {
+        match method.to_ffi_signature(&self.cpp_data, type_allocation_places_override.clone()) {
+          Err(msg) => {
+            log::llog(log::DebugFfiSkips, || {
+              format!("Unable to produce C function for method:\n{}\nError:{}\n",
+                      method.short_text(),
+                      msg)
+            });
+          }
+          Ok(result) => {
+            match c_base_name(&result.cpp_method,
+                              &result.allocation_place,
+                              include_file_base_name) {
+              Err(msg) => {
+                log::llog(log::DebugFfiSkips, || {
+                  format!("Unable to produce C function for method:\n{}\nError:{}\n",
+                          method.short_text(),
+                          msg)
+                });
+              }
+              Ok(name) => {
 
-              add_to_multihash(&mut hash_name_to_methods,
-                               format!("{}_{}", &self.cpp_ffi_lib_name, name),
-                               result);
+                add_to_multihash(&mut hash_name_to_methods,
+                                 format!("{}_{}", &self.cpp_ffi_lib_name, name),
+                                 result);
+              }
             }
           }
         }
+      };
+
+      for method in methods {
+        if !self.should_process_method(method)? {
+          continue;
+        }
+        process_one(method);
+        // generate methods with omitted arguments
+        if let Some(last_arg) = method.arguments.last() {
+          if last_arg.has_default_value {
+            let mut method_copy = method.clone();
+            method_copy.arguments_before_omitting = Some(method.arguments.clone());
+            while let Some(arg) = method_copy.arguments.pop() {
+              if !arg.has_default_value {
+                break;
+              }
+              process_one(&method_copy);
+            }
+          }
+        }
+
+
+
+
+
+
+
+
+
       }
+
+
+
     }
+
+
 
     let mut processed_methods = Vec::new();
     for (key, mut values) in hash_name_to_methods {

@@ -663,10 +663,6 @@ impl ParserCppData {
       r.choose_allocation_places(allocation_place_overrides)?;
     r.current.processed.signal_argument_types = r.detect_signal_argument_types()?;
     {
-      let mut methods = r.generate_methods_with_omitted_args();
-      r.current.processed.extra_methods.append(&mut methods);
-    }
-    {
       let mut methods = r.instantiate_templates()?;
       r.current.processed.extra_methods.append(&mut methods);
     }
@@ -1254,27 +1250,6 @@ impl CppDataWithDeps {
     }
     Ok(())
   } */
-
-  /// Generates duplicate methods with fewer arguments for
-  /// C++ methods with default argument values.
-  fn generate_methods_with_omitted_args(&self) -> Vec<CppMethod> {
-    let mut new_methods = Vec::new();
-    for method in self.current.all_methods() {
-      if let Some(last_arg) = method.arguments.last() {
-        if last_arg.has_default_value {
-          let mut method_copy = method.clone();
-          method_copy.arguments_before_omitting = Some(method.arguments.clone());
-          while let Some(arg) = method_copy.arguments.pop() {
-            if !arg.has_default_value {
-              break;
-            }
-            new_methods.push(method_copy.clone());
-          }
-        }
-      }
-    }
-    new_methods
-  }
 
   /// Detects the preferred type allocation place for each type based on
   /// API of all known methods. Keys of `overrides` are C++ type names.
