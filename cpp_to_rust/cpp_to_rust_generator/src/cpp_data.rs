@@ -205,9 +205,6 @@ pub struct ParserCppData {
   pub types: Vec<CppTypeData>,
   /// List of found methods
   pub methods: Vec<CppMethod>,
-  /// List of found template instantiations. Key is name of
-  /// the template class, value is list of instantiations.
-  pub template_instantiations: Vec<CppTemplateInstantiations>, // TODO: move to processed?
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
@@ -217,6 +214,9 @@ pub struct ProcessedCppData {
   pub extra_methods: Vec<CppMethod>,
   /// Methods inherited from base classes (?)
   pub inherited_methods: Vec<CppMethod>,
+  /// List of found template instantiations. Key is name of
+  /// the template class, value is list of instantiations.
+  pub template_instantiations: Vec<CppTemplateInstantiations>,
   /// List of all argument types used by signals,
   /// including variations with omitted arguments,
   /// but excluding argument types from dependencies.
@@ -637,6 +637,7 @@ impl ParserCppData {
   }
 
 
+
   /// Performs data conversion to make it more suitable
   /// for further wrapper generation.
   pub fn post_process(self,
@@ -648,6 +649,7 @@ impl ParserCppData {
         parser: self,
         processed: ProcessedCppData {
           extra_methods: Vec::new(),
+          template_instantiations: Vec::new(),
           inherited_methods: Vec::new(),
           signal_argument_types: Vec::new(),
           type_allocation_places: HashMap::new(),
@@ -655,6 +657,7 @@ impl ParserCppData {
       },
       dependencies: dependencies,
     };
+    r.current.processed.template_instantiations = r.find_template_instantiations();
 
     r.current.processed.type_allocation_places =
       r.choose_allocation_places(allocation_place_overrides)?;
@@ -704,7 +707,7 @@ impl CppDataWithDeps {
       if let Some(ref template_arguments) = *template_arguments {
         let is_valid = |cpp_data: &CppData| {
           cpp_data
-            .parser
+            .processed
             .template_instantiations
             .iter()
             .any(|inst| {
@@ -728,6 +731,100 @@ impl CppDataWithDeps {
     Ok(())
   }
 
+  /// Searches for template instantiations in this library's API,
+  /// excluding results that were already processed in dependencies.
+  #[cfg_attr(feature="clippy", allow(block_in_if_condition_stmt))]
+  fn find_template_instantiations(&self) -> Vec<CppTemplateInstantiations> {
+
+    fn check_type(type1: &CppType, deps: &[CppData], result: &mut Vec<CppTemplateInstantiations>) {
+      if let CppTypeBase::Class(CppTypeClassBase {
+                                  ref name,
+                                  ref template_arguments,
+                                }) = type1.base {
+        if let Some(ref template_arguments) = *template_arguments {
+          if !template_arguments
+                .iter()
+                .any(|x| x.base.is_or_contains_template_parameter()) {
+            if !deps
+                  .iter()
+                  .any(|data| {
+              data
+                .processed
+                .template_instantiations
+                .iter()
+                .any(|i| {
+                       &i.class_name == name &&
+                       i.instantiations
+                         .iter()
+                         .any(|x| &x.template_arguments == template_arguments)
+                     })
+            }) {
+              if !result.iter().any(|x| &x.class_name == name) {
+                log::llog(log::DebugParser, || {
+                  format!("Found template instantiation: {}<{:?}>",
+                          name,
+                          template_arguments)
+                });
+                result.push(CppTemplateInstantiations {
+                              class_name: name.clone(),
+                              instantiations: vec![CppTemplateInstantiation {
+                                                     template_arguments: template_arguments.clone(),
+                                                   }],
+                            });
+              } else {
+                let item = result
+                  .iter_mut()
+                  .find(|x| &x.class_name == name)
+                  .expect("previously found");
+                if !item
+                      .instantiations
+                      .iter()
+                      .any(|x| &x.template_arguments == template_arguments) {
+                  log::llog(log::DebugParser, || {
+                    format!("Found template instantiation: {}<{:?}>",
+                            name,
+                            template_arguments)
+                  });
+                  item
+                    .instantiations
+                    .push(CppTemplateInstantiation {
+                            template_arguments: template_arguments.clone(),
+                          });
+                }
+              }
+            }
+          }
+          for arg in template_arguments {
+            check_type(arg, deps, result);
+          }
+        }
+      }
+    }
+    let mut result = Vec::new();
+    for m in &self.current.parser.methods {
+      check_type(&m.return_type, &self.dependencies, &mut result);
+      for arg in &m.arguments {
+        check_type(&arg.argument_type, &self.dependencies, &mut result);
+      }
+    }
+    for t in &self.current.parser.types {
+      if let CppTypeKind::Class {
+               ref bases,
+               ref fields,
+               ..
+             } = t.kind {
+        for base in bases {
+          check_type(&base.base_type, &self.dependencies, &mut result);
+        }
+        for field in fields {
+          check_type(&field.field_type, &self.dependencies, &mut result);
+        }
+      }
+    }
+    result
+  }
+
+
   /// Adds methods produced as template instantiations of
   /// methods of existing template classes and existing template methods.
   fn instantiate_templates(&self) -> Result<Vec<CppMethod>> {
@@ -749,7 +846,7 @@ impl CppDataWithDeps {
                 if let Some(template_instantiations) =
                   self
                     .current
-                    .parser
+                    .processed
                     .template_instantiations
                     .iter()
                     .find(|x| &x.class_name == name) {
@@ -1645,7 +1742,7 @@ impl CppDataWithDeps {
         result.insert(tp.include_file.clone());
       }
     }
-    for instantiations in &self.current.parser.template_instantiations {
+    for instantiations in &self.current.processed.template_instantiations {
       let type_info =
         self
           .find_type_info(|x| &x.name == &instantiations.class_name)

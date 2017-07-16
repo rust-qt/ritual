@@ -1,6 +1,5 @@
 use cpp_data::{ParserCppData, CppData, CppTypeData, CppTypeKind, CppClassField, CppEnumValue,
-               CppOriginLocation, CppVisibility, CppTemplateInstantiation,
-               CppTemplateInstantiations, CppClassUsingDirective, CppBaseSpecifier,
+               CppOriginLocation, CppVisibility, CppClassUsingDirective, CppBaseSpecifier,
                TemplateArgumentsDeclaration};
 use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind, CppMethodClassMembership};
 use cpp_operator::CppOperator;
@@ -258,30 +257,25 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
 pub fn run(config: CppParserConfig, dependencies_data: &[CppData]) -> Result<ParserCppData> {
   log::status(get_version());
   log::status("Initializing clang...");
-  let (types, methods, insts) = {
-    let (mut parser, methods) = run_clang(&config, None, |translation_unit| {
-      let mut parser = CppParser {
-        types: Vec::new(),
-        config: config.clone(),
-        dependencies_data: dependencies_data,
-      };
-      log::status("Parsing types");
-      parser.parse_types(translation_unit);
-      log::status("Parsing methods");
-      let methods = parser.parse_methods(translation_unit);
-      Ok((parser, methods))
-    })?;
-    log::status("Checking data integrity");
-    let (good_methods, good_types) = parser.check_integrity(methods);
-    parser.types = good_types;
-    log::status("Searching for template instantiations");
-    let template_instantiations = parser.find_template_instantiations(&good_methods);
-    (parser.types, good_methods, template_instantiations)
-  };
+  let (mut parser, methods) = run_clang(&config, None, |translation_unit| {
+    let mut parser = CppParser {
+      types: Vec::new(),
+      config: config.clone(),
+      dependencies_data: dependencies_data,
+    };
+    log::status("Parsing types");
+    parser.parse_types(translation_unit);
+    log::status("Parsing methods");
+    let methods = parser.parse_methods(translation_unit);
+    Ok((parser, methods))
+  })?;
+  log::status("Checking data integrity");
+  let (good_methods, good_types) = parser.check_integrity(methods);
+  parser.types = good_types;
+  log::status("Searching for template instantiations");
   Ok(ParserCppData {
-       types: types,
-       methods: methods,
-       template_instantiations: insts,
+       types: parser.types,
+       methods: good_methods,
      })
 }
 
@@ -1685,98 +1679,5 @@ impl<'a> CppParser<'a> {
       good_types.push(good_type);
     }
     (good_methods, good_types)
-  }
-
-  /// Searches for template instantiations in this library's API,
-  /// excluding results that were already processed in dependencies.
-  #[cfg_attr(feature="clippy", allow(block_in_if_condition_stmt))]
-  fn find_template_instantiations(&self, methods: &[CppMethod]) -> Vec<CppTemplateInstantiations> {
-
-    fn check_type(type1: &CppType, deps: &[CppData], result: &mut Vec<CppTemplateInstantiations>) {
-      if let CppTypeBase::Class(CppTypeClassBase {
-                                  ref name,
-                                  ref template_arguments,
-                                }) = type1.base {
-        if let Some(ref template_arguments) = *template_arguments {
-          if !template_arguments
-                .iter()
-                .any(|x| x.base.is_or_contains_template_parameter()) {
-            if !deps
-                  .iter()
-                  .any(|data| {
-              data
-                .parser
-                .template_instantiations
-                .iter()
-                .any(|i| {
-                       &i.class_name == name &&
-                       i.instantiations
-                         .iter()
-                         .any(|x| &x.template_arguments == template_arguments)
-                     })
-            }) {
-              if !result.iter().any(|x| &x.class_name == name) {
-                log::llog(log::DebugParser, || {
-                  format!("Found template instantiation: {}<{:?}>",
-                          name,
-                          template_arguments)
-                });
-                result.push(CppTemplateInstantiations {
-                              class_name: name.clone(),
-                              instantiations: vec![CppTemplateInstantiation {
-                                                     template_arguments: template_arguments.clone(),
-                                                   }],
-                            });
-              } else {
-                let item = result
-                  .iter_mut()
-                  .find(|x| &x.class_name == name)
-                  .expect("previously found");
-                if !item
-                      .instantiations
-                      .iter()
-                      .any(|x| &x.template_arguments == template_arguments) {
-                  log::llog(log::DebugParser, || {
-                    format!("Found template instantiation: {}<{:?}>",
-                            name,
-                            template_arguments)
-                  });
-                  item
-                    .instantiations
-                    .push(CppTemplateInstantiation {
-                            template_arguments: template_arguments.clone(),
-                          });
-                }
-              }
-            }
-          }
-          for arg in template_arguments {
-            check_type(arg, deps, result);
-          }
-        }
-      }
-    }
-    let mut result = Vec::new();
-    for m in methods {
-      check_type(&m.return_type, self.dependencies_data, &mut result);
-      for arg in &m.arguments {
-        check_type(&arg.argument_type, self.dependencies_data, &mut result);
-      }
-    }
-    for t in &self.types {
-      if let CppTypeKind::Class {
-               ref bases,
-               ref fields,
-               ..
-             } = t.kind {
-        for base in bases {
-          check_type(&base.base_type, self.dependencies_data, &mut result);
-        }
-        for field in fields {
-          check_type(&field.field_type, self.dependencies_data, &mut result);
-        }
-      }
-    }
-    result
   }
 }

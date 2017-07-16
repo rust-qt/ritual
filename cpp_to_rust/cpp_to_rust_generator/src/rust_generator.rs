@@ -1746,7 +1746,7 @@ impl RustGenerator {
                   .input_data
                   .cpp_data
                   .current
-                  .parser
+                  .processed
                   .template_instantiations
                   .iter()
                   .find(|x| &x.class_name == &flag_owner_name.to_string()) {
@@ -1805,7 +1805,7 @@ impl RustGenerator {
          .input_data
          .cpp_data
          .current
-         .parser
+         .processed
          .template_instantiations {
       let type_info = self
         .input_data
