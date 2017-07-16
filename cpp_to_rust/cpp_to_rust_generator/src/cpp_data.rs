@@ -662,25 +662,23 @@ impl ParserCppData {
     r.current.processed.type_allocation_places =
       r.choose_allocation_places(allocation_place_overrides)?;
     r.current.processed.signal_argument_types = r.detect_signal_argument_types()?;
-    {
-      let mut methods = r.instantiate_templates()?;
-      r.current.processed.extra_methods.append(&mut methods);
-    }
+//    {
+//      let mut methods = r.instantiate_templates()?;
+//      r.current.processed.extra_methods.append(&mut methods);
+//    }
     r.current.processed.inherited_methods = r.detect_inherited_methods2()?;
     {
       let mut methods = r.ensure_explicit_destructors()?;
       r.current.processed.extra_methods.append(&mut methods);
     }
-    {
-      // TODO: fix doc generator for field accessors
-      let mut methods = r.add_field_accessors()?;
-      r.current.processed.extra_methods.append(&mut methods);
-    }
-    {
-      // TODO: fix doc generator for field accessors
-      let mut methods = r.add_casts()?;
-      r.current.processed.extra_methods.append(&mut methods);
-    }
+//    {
+//      let mut methods = r.generate_field_accessors()?;
+//      r.current.processed.extra_methods.append(&mut methods);
+//    }
+//    {
+//      let mut methods = r.generate_casts()?;
+//      r.current.processed.extra_methods.append(&mut methods);
+//    }
     Ok(r)
   }
 }
@@ -823,7 +821,7 @@ impl CppDataWithDeps {
 
   /// Adds methods produced as template instantiations of
   /// methods of existing template classes and existing template methods.
-  fn instantiate_templates(&self) -> Result<Vec<CppMethod>> {
+  pub fn instantiate_templates(&self) -> Result<Vec<CppMethod>> {
     log::status("Instantiating templates");
     let mut new_methods = Vec::new();
 
@@ -1386,7 +1384,8 @@ impl CppDataWithDeps {
   }
 
   /// Adds fictional getter and setter methods for each known public field of each class.
-  fn add_field_accessors(&self) -> Result<Vec<CppMethod>> {
+  pub fn generate_field_accessors(&self) -> Result<Vec<CppMethod>> {
+    // TODO: fix doc generator for field accessors
     log::status("Adding field accessors");
     let mut new_methods = Vec::new();
     for type_info in &self.current.parser.types {
@@ -1473,11 +1472,11 @@ impl CppDataWithDeps {
     Ok(new_methods)
   }
 
-  /// Performs a portion of `add_casts` operation.
+  /// Performs a portion of `generate_casts` operation.
   /// Adds casts between `target_type` and `base_type` and calls
-  /// `add_casts_one` recursively to add casts between `target_type`
+  /// `generate_casts_one` recursively to add casts between `target_type`
   /// and base types of `base_type`.
-  fn add_casts_one(&self,
+  fn generate_casts_one(&self,
                    target_type: &CppTypeClassBase,
                    base_type: &CppType,
                    is_direct: bool)
@@ -1525,7 +1524,7 @@ impl CppDataWithDeps {
       if let Some(type_info) = self.find_type_info(|x| x.name == base.name) {
         if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
           for base in bases {
-            new_methods.append(&mut self.add_casts_one(target_type, &base.base_type, false)?);
+            new_methods.append(&mut self.generate_casts_one(target_type, &base.base_type, false)?);
           }
         }
       }
@@ -1535,7 +1534,7 @@ impl CppDataWithDeps {
 
   /// Adds `static_cast` and `dynamic_cast` functions for all appropriate pairs of types
   /// in this `CppData`.
-  fn add_casts(&self) -> Result<Vec<CppMethod>> {
+  pub fn generate_casts(&self) -> Result<Vec<CppMethod>> {
     log::status("Adding cast functions");
     let mut new_methods = Vec::new();
     for type_info in &self.current.parser.types {
@@ -1543,7 +1542,7 @@ impl CppDataWithDeps {
         let t = type_info.default_class_type()?;
         let single_base = bases.len() == 1;
         for base in bases {
-          new_methods.append(&mut self.add_casts_one(&t, &base.base_type, single_base)?);
+          new_methods.append(&mut self.generate_casts_one(&t, &base.base_type, single_base)?);
         }
       }
     }

@@ -40,6 +40,11 @@ pub fn run(cpp_data: &CppDataWithDeps,
     .collect();
   include_name_list.sort();
 
+  let mut extra_methods = Vec::new();
+  extra_methods.append(&mut generator.cpp_data.instantiate_templates()?);
+  extra_methods.append(&mut generator.cpp_data.generate_field_accessors()?);
+  extra_methods.append(&mut generator.cpp_data.generate_casts()?);
+
   for include_file in &include_name_list {
     let mut include_file_base_name = include_file.clone();
 
@@ -53,6 +58,7 @@ pub fn run(cpp_data: &CppDataWithDeps,
                          .cpp_data
                          .current
                          .all_methods()
+                         .chain(extra_methods.iter())
                          .filter(|x| &x.include_file == include_file))?;
     if methods.is_empty() {
       log::llog(log::DebugFfiSkips,
