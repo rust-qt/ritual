@@ -211,7 +211,7 @@ pub struct ParserCppData {
 #[derive(Serialize, Deserialize)]
 pub struct ProcessedCppData {
   /// Automatically generated methods
-  pub extra_methods: Vec<CppMethod>,
+  pub implicit_destructors: Vec<CppMethod>,
   /// Methods inherited from base classes (?)
   pub inherited_methods: Vec<CppMethod>,
   /// List of found template instantiations. Key is name of
@@ -233,14 +233,15 @@ pub struct CppData {
 }
 
 impl CppData {
-  pub fn all_methods
+  /// Returns an iterator over all explicitly declared methods and implicit destructors.
+  pub fn methods_and_implicit_destructors
     (&self)
      -> ::std::iter::Chain<::std::slice::Iter<CppMethod>, ::std::slice::Iter<CppMethod>> {
     self
       .parser
       .methods
       .iter()
-      .chain(self.processed.extra_methods.iter())
+      .chain(self.processed.implicit_destructors.iter())
   }
 }
 
@@ -648,7 +649,7 @@ impl ParserCppData {
       current: CppData {
         parser: self,
         processed: ProcessedCppData {
-          extra_methods: Vec::new(),
+          implicit_destructors: Vec::new(),
           template_instantiations: Vec::new(),
           inherited_methods: Vec::new(),
           signal_argument_types: Vec::new(),
@@ -662,23 +663,8 @@ impl ParserCppData {
     r.current.processed.type_allocation_places =
       r.choose_allocation_places(allocation_place_overrides)?;
     r.current.processed.signal_argument_types = r.detect_signal_argument_types()?;
-//    {
-//      let mut methods = r.instantiate_templates()?;
-//      r.current.processed.extra_methods.append(&mut methods);
-//    }
     r.current.processed.inherited_methods = r.detect_inherited_methods2()?;
-    {
-      let mut methods = r.ensure_explicit_destructors()?;
-      r.current.processed.extra_methods.append(&mut methods);
-    }
-//    {
-//      let mut methods = r.generate_field_accessors()?;
-//      r.current.processed.extra_methods.append(&mut methods);
-//    }
-//    {
-//      let mut methods = r.generate_casts()?;
-//      r.current.processed.extra_methods.append(&mut methods);
-//    }
+    r.current.processed.implicit_destructors = r.ensure_explicit_destructors()?;
     Ok(r)
   }
 }
@@ -819,14 +805,14 @@ impl CppDataWithDeps {
   }
 
 
-  /// Adds methods produced as template instantiations of
+  /// Generates methods as template instantiations of
   /// methods of existing template classes and existing template methods.
   pub fn instantiate_templates(&self) -> Result<Vec<CppMethod>> {
     log::status("Instantiating templates");
     let mut new_methods = Vec::new();
 
     for cpp_data in self.dependencies.iter().chain(once(&self.current)) {
-      for method in cpp_data.all_methods() {
+      for method in cpp_data.methods_and_implicit_destructors() {
         for type1 in method.all_involved_types() {
           if let CppTypeBase::Class(CppTypeClassBase {
                                       ref name,
@@ -1297,7 +1283,7 @@ impl CppDataWithDeps {
         data.get_mut(&type1.name).unwrap().has_virtual_methods = true;
       }
     }
-    for method in self.current.all_methods() {
+    for method in &self.current.parser.methods {
       check_type(&method.return_type, &mut data);
       for arg in &method.arguments {
         check_type(&arg.argument_type, &mut data);
@@ -1477,10 +1463,10 @@ impl CppDataWithDeps {
   /// `generate_casts_one` recursively to add casts between `target_type`
   /// and base types of `base_type`.
   fn generate_casts_one(&self,
-                   target_type: &CppTypeClassBase,
-                   base_type: &CppType,
-                   is_direct: bool)
-                   -> Result<Vec<CppMethod>> {
+                        target_type: &CppTypeClassBase,
+                        base_type: &CppType,
+                        is_direct: bool)
+                        -> Result<Vec<CppMethod>> {
     let type_info = self
       .find_type_info(|x| x.name == target_type.name)
       .chain_err(|| "type info not found")?;
@@ -1524,7 +1510,8 @@ impl CppDataWithDeps {
       if let Some(type_info) = self.find_type_info(|x| x.name == base.name) {
         if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
           for base in bases {
-            new_methods.append(&mut self.generate_casts_one(target_type, &base.base_type, false)?);
+            new_methods.append(&mut self
+                                      .generate_casts_one(target_type, &base.base_type, false)?);
           }
         }
       }
@@ -1542,7 +1529,8 @@ impl CppDataWithDeps {
         let t = type_info.default_class_type()?;
         let single_base = bases.len() == 1;
         for base in bases {
-          new_methods.append(&mut self.generate_casts_one(&t, &base.base_type, single_base)?);
+          new_methods.append(&mut self
+                                    .generate_casts_one(&t, &base.base_type, single_base)?);
         }
       }
     }
@@ -1706,7 +1694,7 @@ impl CppDataWithDeps {
   /// (excluding dependencies).
   pub fn all_include_files(&self) -> Result<HashSet<String>> {
     let mut result = HashSet::new();
-    for method in self.current.all_methods() {
+    for method in &self.current.parser.methods {
       if !result.contains(&method.include_file) {
         result.insert(method.include_file.clone());
       }

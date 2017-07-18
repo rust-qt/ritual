@@ -57,7 +57,7 @@ pub fn run(cpp_data: &CppDataWithDeps,
                        generator
                          .cpp_data
                          .current
-                         .all_methods()
+                         .methods_and_implicit_destructors()
                          .chain(extra_methods.iter())
                          .filter(|x| &x.include_file == include_file))?;
     if methods.is_empty() {

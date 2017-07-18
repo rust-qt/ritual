@@ -646,7 +646,7 @@ impl RustGenerator {
   fn calc_top_module_names(&self) -> Result<HashMap<String, RustName>> {
     let mut result = HashMap::new();
     {
-      let mut check_header = |header| -> Result<()> {
+      let mut check_header = |header: &str| -> Result<()> {
         if !result.contains_key(header) {
           let mut parts = Vec::new();
           parts.push(self.config.crate_name.clone());
@@ -655,13 +655,8 @@ impl RustGenerator {
         }
         Ok(())
       };
-
-      // TODO: use cpp_data.all_include_files() ?
-      for method in self.input_data.cpp_data.current.all_methods() {
-        check_header(&method.include_file)?;
-      }
-      for method in &self.input_data.cpp_data.current.parser.types {
-        check_header(&method.include_file)?;
+      for header in self.input_data.cpp_data.all_include_files()? {
+        check_header(&header)?;
       }
       for header in &self.input_data.cpp_ffi_headers {
         check_header(&header.include_file_base_name)?;
@@ -741,7 +736,9 @@ impl RustGenerator {
               .input_data
               .cpp_data
               .current
-              .all_methods()
+              .parser
+              .methods
+              .iter()
               .chain(self
                        .input_data
                        .cpp_data
