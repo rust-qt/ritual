@@ -7,6 +7,7 @@ use cpp_data::{CppData, CppDataWithDeps, ParserCppData};
 use cpp_ffi_data::CppAndFfiData;
 use cpp_ffi_generator;
 use cpp_parser;
+use cpp_post_processor::cpp_post_process;
 use common::errors::{Result, ChainErr};
 use common::string_utils::CaseOperations;
 use common::file_utils::{PathBufWithAdded, move_files, create_dir_all, save_json, load_bincode,
@@ -198,8 +199,7 @@ fn load_or_create_cpp_data(config: &Config,
     }
   } else {
     log::status("Post-processing parse result");
-    let r = parser_cpp_data
-      .post_process(dependencies_cpp_data, config.type_allocation_places())?;
+    let r = cpp_post_process(parser_cpp_data, dependencies_cpp_data, config.type_allocation_places())?;
     if config.write_cache() {
       log::status("Saving processed C++ data");
       save_bincode(&processed_cpp_data_file_path, &r.current.processed)?;

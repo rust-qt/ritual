@@ -32,6 +32,7 @@ mod cpp_code_generator;
 mod caption_strategy;
 pub mod config;
 pub mod cpp_data;
+mod cpp_post_processor;
 mod cpp_ffi_data;
 pub mod cpp_method;
 pub mod cpp_type;
