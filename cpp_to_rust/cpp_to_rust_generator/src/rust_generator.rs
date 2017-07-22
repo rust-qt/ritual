@@ -240,11 +240,11 @@ pub struct RustGeneratorOutput {
 /// Information required by Rust generator
 pub struct RustGeneratorInputData<'a> {
   /// Processed C++ data
-  pub cpp_data: &'a CppDataWithDeps,
+  pub cpp_data: &'a CppDataWithDeps<'a>,
   /// Generated headers
   pub cpp_ffi_headers: Vec<CppFfiHeaderData>,
   /// Type wrappers found in all dependencies
-  pub dependency_types: Vec<RustProcessedTypeInfo>,
+  pub dependency_types: Vec<&'a [RustProcessedTypeInfo]>,
   /// Name of generated crate
   pub crate_name: String,
   /// Flag instructing to remove leading "Q" and "Qt"
@@ -314,7 +314,8 @@ impl<'a> RustGeneratorInputData<'a> {
                             i + 1,
                             module_count,
                             module_name));
-        let full_module_name = RustName::new(vec![generator.input_data.crate_name.clone(), module_name])?;
+        let full_module_name = RustName::new(vec![generator.input_data.crate_name.clone(),
+                                                  module_name])?;
         let (module, tmp_cpp_methods) = generator
           .generate_module(cpp_methods, &full_module_name)?;
         cpp_methods = tmp_cpp_methods;
@@ -381,7 +382,7 @@ struct ProcessFunctionsResult {
 /// Generates `CompleteType` from `CppFfiType`, adding
 /// Rust API type, Rust FFI type and conversion between them.
 fn complete_type(processed_types: &[RustProcessedTypeInfo],
-                 dependency_types: &[RustProcessedTypeInfo],
+                 dependency_types: &[&[RustProcessedTypeInfo]],
                  cpp_ffi_type: &CppFfiType,
                  argument_meaning: &CppFfiArgumentMeaning,
                  is_template_argument: bool,
@@ -529,20 +530,27 @@ fn complete_type(processed_types: &[RustProcessedTypeInfo],
 }
 
 fn find_type_info<'a, F>(processed_types: &'a [RustProcessedTypeInfo],
-                         dependency_types: &'a [RustProcessedTypeInfo],
+                         dependency_types: &'a [&'a [RustProcessedTypeInfo]],
                          f: F)
                          -> Option<&'a RustProcessedTypeInfo>
   where F: Fn(&RustProcessedTypeInfo) -> bool
 {
   match processed_types.iter().find(|x| f(x)) {
-    None => dependency_types.iter().find(|x| f(x)),
+    None => {
+      for dep in dependency_types {
+        if let Some(r) = dep.iter().find(|x| f(x)) {
+          return Some(r);
+        }
+      }
+      None
+    }//dependency_types.iter().find(|x| x.iter().find(|y| f(y))),
     Some(info) => Some(info),
   }
 }
 
 /// Converts `CppType` to its exact Rust equivalent (FFI-compatible)
 fn ffi_type(processed_types: &[RustProcessedTypeInfo],
-            dependency_types: &[RustProcessedTypeInfo],
+            dependency_types: &[&[RustProcessedTypeInfo]],
             cpp_ffi_type: &CppType)
             -> Result<RustType> {
   let rust_name = match cpp_ffi_type.base {

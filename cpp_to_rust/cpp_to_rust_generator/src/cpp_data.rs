@@ -244,10 +244,10 @@ impl CppData {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
-pub struct CppDataWithDeps {
+pub struct CppDataWithDeps<'a> {
   pub current: CppData,
   /// Data of dependencies
-  pub dependencies: Vec<CppData>,
+  pub dependencies: Vec<&'a CppData>,
 }
 
 
@@ -370,7 +370,7 @@ impl ParserCppData {
   }
 
   /// Checks if `class_name` types inherits `base_name` type directly or indirectly.
-  pub fn inherits(&self, class_name: &str, base_name: &str, dependencies: &[CppData]) -> bool {
+  pub fn inherits(&self, class_name: &str, base_name: &str, dependencies: &[&CppData]) -> bool {
     for types in once(&self.types).chain(dependencies.iter().map(|c| &c.parser.types)) {
       if let Some(info) = types.iter().find(|x| &x.name == class_name) {
         if let CppTypeKind::Class { ref bases, .. } = info.kind {
@@ -393,7 +393,7 @@ impl ParserCppData {
 
 
   /// Parses include files to detect which methods are signals or slots.
-  pub fn detect_signals_and_slots(&mut self, dependencies: &[CppData]) -> Result<()> {
+  pub fn detect_signals_and_slots(&mut self, dependencies: &[&CppData]) -> Result<()> {
     let mut files = HashSet::new();
     for type1 in &self.types {
       if self.inherits(&type1.name, "QObject", dependencies) &&
@@ -529,7 +529,7 @@ impl TemplateArgumentsDeclaration {
 
 
 
-impl CppDataWithDeps {
+impl<'a> CppDataWithDeps<'a> {
   /// Returns true if `type1` is a known template instantiation.
   pub fn check_template_type(&self, type1: &CppType) -> Result<()> {
     if let CppTypeBase::Class(CppTypeClassBase {
@@ -551,7 +551,7 @@ impl CppDataWithDeps {
                  })
         };
         if !once(&self.current)
-              .chain(self.dependencies.iter())
+              .chain(self.dependencies.iter().map(|x| *x))
               .any(is_valid) {
           return Err(format!("type not available: {:?}", type1).into());
         }

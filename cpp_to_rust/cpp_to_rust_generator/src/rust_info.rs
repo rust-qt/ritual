@@ -2,6 +2,7 @@
 
 use cpp_ffi_data::CppAndFfiMethod;
 use cpp_type::CppType;
+use cpp_data::CppData;
 use rust_type::{RustName, CompleteType, RustType};
 use cpp_method::CppMethodDoc;
 use cpp_data::CppTypeDoc;
@@ -369,7 +370,9 @@ pub struct RustModule {
 /// Information about a loaded dependency.
 #[derive(Debug, Clone)]
 pub struct DependencyInfo {
-  /// Information loaded from the cache directory of this dependency.
+  /// C++ parser output for this dependency
+  pub cpp_data: CppData,
+  /// Rust generator output for this dependency
   pub rust_export_info: RustExportInfo,
   /// Cache directory of this dependency.
   pub cache_path: PathBuf,

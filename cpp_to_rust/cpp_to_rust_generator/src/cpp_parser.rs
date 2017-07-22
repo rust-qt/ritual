@@ -53,7 +53,7 @@ struct CppParser<'a> {
   /// C++ types found by the parser
   types: Vec<CppTypeData>,
   /// Processed C++ data of the dependencies
-  dependencies_data: &'a [CppData],
+  dependencies_data: &'a [&'a CppData],
 }
 
 /// Print representation of `entity` and its children to the log.
@@ -254,7 +254,7 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
 }
 
 /// Runs the parser on specified data.
-pub fn run(config: CppParserConfig, dependencies_data: &[CppData]) -> Result<ParserCppData> {
+pub fn run(config: CppParserConfig, dependencies_data: &[&CppData]) -> Result<ParserCppData> {
   log::status(get_version());
   log::status("Initializing clang...");
   let (mut parser, methods) = run_clang(&config, None, |translation_unit| {

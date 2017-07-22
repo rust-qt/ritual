@@ -80,11 +80,11 @@ pub fn exec_all(libs: Vec<String>,
       continue;
     }
     configs.push(make_config(&sublib_name,
-                lib_cache_dir,
-                lib_output_dir,
-                lib_crate_templates_path,
-                dependency_paths,
-                &config)?);
+                             lib_cache_dir,
+                             lib_output_dir,
+                             lib_crate_templates_path,
+                             dependency_paths,
+                             &config)?);
   }
   exec(configs.into_iter())?;
   Ok(())

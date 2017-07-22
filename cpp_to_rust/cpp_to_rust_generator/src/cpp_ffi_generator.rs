@@ -17,7 +17,7 @@ use std::iter::once;
 /// This object generates the C++ wrapper library
 struct CppFfiGenerator<'a> {
   /// Input C++ data
-  cpp_data: &'a CppDataWithDeps,
+  cpp_data: &'a CppDataWithDeps<'a>,
   /// Name of the wrapper library
   cpp_ffi_lib_name: String,
   /// FFI filters passed to `Config`
@@ -185,7 +185,7 @@ fn instantiate_templates(data: &CppDataWithDeps) -> Result<Vec<CppMethodWithKind
   log::status("Instantiating templates");
   let mut new_methods = Vec::new();
 
-  for cpp_data in data.dependencies.iter().chain(once(&data.current)) {
+  for cpp_data in data.dependencies.iter().chain(once(&&data.current)) {
     for method in cpp_data.methods_and_implicit_destructors() {
       for type1 in method.all_involved_types() {
         if let CppTypeBase::Class(CppTypeClassBase {
