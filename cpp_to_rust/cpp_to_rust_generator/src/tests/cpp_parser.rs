@@ -9,7 +9,7 @@ use common::file_utils::{create_dir, create_file, PathBufWithAdded};
 
 use std::path::PathBuf;
 
-fn run_parser(code: &'static str) -> CppData {
+fn run_parser(code: &'static str) -> ParserCppData {
   let dir = tempdir::TempDir::new("test_cpp_parser_run").unwrap();
   let include_dir = dir.path().with_added("include");
   create_dir(&include_dir).unwrap();
@@ -29,7 +29,7 @@ fn run_parser(code: &'static str) -> CppData {
                                      framework_paths: Vec::new(),
                                      clang_arguments: Vec::new(),
                                    },
-                                   Vec::new())
+                                   &[])
       .unwrap();
   for method in &mut result.methods {
     if let Some(ref mut origin_location) = method.origin_location {
@@ -47,7 +47,6 @@ fn run_parser(code: &'static str) -> CppData {
 #[test]
 fn simple_func() {
   let data = run_parser("int func1(int x);");
-  assert!(data.template_instantiations.is_empty());
   assert!(data.types.is_empty());
   assert!(data.methods.len() == 1);
   assert_eq!(data.methods[0],
@@ -74,7 +73,6 @@ fn simple_func() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
-               is_fake_inherited_method: false,
                allows_variadic_arguments: false,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -90,7 +88,6 @@ fn simple_func() {
 #[test]
 fn simple_func_with_default_value() {
   let data = run_parser("bool func1(int x = 42) {\nreturn false;\n}");
-  assert!(data.template_instantiations.is_empty());
   assert!(data.types.is_empty());
   assert!(data.methods.len() == 1);
   assert_eq!(data.methods[0],
@@ -117,7 +114,6 @@ fn simple_func_with_default_value() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
-               is_fake_inherited_method: false,
                allows_variadic_arguments: false,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -136,7 +132,6 @@ fn functions_with_class_arg() {
   bool func1(Magic x);
   bool func1(Magic* x);
   bool func2(const Magic&);");
-  assert!(data.template_instantiations.is_empty());
   assert_eq!(data.types.len(), 1);
   assert_eq!(data.types[0].name, "Magic");
   if let CppTypeKind::Class {
@@ -199,7 +194,6 @@ fn functions_with_class_arg() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
-               is_fake_inherited_method: false,
                allows_variadic_arguments: false,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -237,7 +231,6 @@ fn functions_with_class_arg() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
-               is_fake_inherited_method: false,
                allows_variadic_arguments: false,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -275,7 +268,6 @@ fn functions_with_class_arg() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
-               is_fake_inherited_method: false,
                allows_variadic_arguments: false,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -291,7 +283,6 @@ fn functions_with_class_arg() {
 #[test]
 fn func_with_unknown_type() {
   let data = run_parser("class SomeClass; \n int func1(SomeClass* x);");
-  assert!(data.template_instantiations.is_empty());
   assert!(data.types.is_empty());
   assert!(data.methods.is_empty());
 }
@@ -299,7 +290,6 @@ fn func_with_unknown_type() {
 #[test]
 fn variadic_func() {
   let data = run_parser("int my_printf ( const char * format, ... );");
-  assert!(data.template_instantiations.is_empty());
   assert!(data.types.is_empty());
   assert!(data.methods.len() == 1);
   assert_eq!(data.methods[0],
@@ -326,7 +316,6 @@ fn variadic_func() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
-               is_fake_inherited_method: false,
                allows_variadic_arguments: true,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -342,7 +331,6 @@ fn variadic_func() {
 #[test]
 fn free_template_func() {
   let data = run_parser("template<typename T> T abs(T value) { return 2*value; }");
-  assert!(data.template_instantiations.is_empty());
   assert!(data.types.is_empty());
   assert!(data.methods.len() == 1);
   assert_eq!(data.methods[0],
@@ -375,7 +363,6 @@ fn free_template_func() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
-               is_fake_inherited_method: false,
                allows_variadic_arguments: false,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -396,7 +383,6 @@ fn free_func_operator_sub() {
   for code in &["class C1 {}; \n C1 operator-(C1 a, C1 b);",
                 "class C1 {}; \n C1 operator -(C1 a, C1 b);"] {
     let data = run_parser(code);
-    assert!(data.template_instantiations.is_empty());
     assert!(data.types.len() == 1);
     assert!(data.methods.len() == 1);
     assert_eq!(data.methods[0],
@@ -442,7 +428,6 @@ fn free_func_operator_sub() {
                  arguments_before_omitting: None,
                  doc: None,
                  inheritance_chain: Vec::new(),
-                 is_fake_inherited_method: false,
                  allows_variadic_arguments: false,
                  include_file: "myfakelib.h".to_string(),
                  origin_location: None,
@@ -464,7 +449,6 @@ fn simple_class_method() {
     private:
       int m_x;
     };");
-  assert!(data.template_instantiations.is_empty());
   assert!(data.types.len() == 1);
   assert_eq!(data.types[0].name, "MyClass");
   if let CppTypeKind::Class {
@@ -518,7 +502,6 @@ fn simple_class_method() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
-               is_fake_inherited_method: false,
                allows_variadic_arguments: false,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -669,7 +652,6 @@ fn template_class_method() {
       T get(int index);
       Iterator begin();
     };");
-  assert!(data.template_instantiations.is_empty());
   assert!(data.types.len() == 1);
   assert_eq!(data.types[0].name, "MyVector");
   if let CppTypeKind::Class {
@@ -738,7 +720,6 @@ fn template_class_method() {
                arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
-               is_fake_inherited_method: false,
                allows_variadic_arguments: false,
                include_file: "myfakelib.h".to_string(),
                origin_location: None,
@@ -876,6 +857,8 @@ fn template_instantiation() {
                                           template_arguments: Some(vec![int.clone()]),
                                         }),
              });
+  // TODO: test template_instantiations
+  /*
   assert!(data
             .template_instantiations
             .iter()
@@ -896,7 +879,7 @@ fn template_instantiation() {
              .instantiations
              .get(0)
              .unwrap()
-             .template_arguments == &vec![int]);
+             .template_arguments == &vec![int]);*/
 }
 
 #[test]
@@ -1212,7 +1195,6 @@ fn template_class_with_base() {
   template<class T>
   class C2: public C1<T> {};
   ");
-  assert!(data.template_instantiations.is_empty());
   assert!(data.types.len() == 2);
   assert_eq!(data.types[0].name, "C1");
   if let CppTypeKind::Class {
