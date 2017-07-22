@@ -1,10 +1,86 @@
 use caption_strategy::{ArgumentCaptionStrategy, MethodCaptionStrategy, TypeCaptionStrategy};
-use cpp_method::{CppMethod, ReturnValueAllocationPlace};
+use cpp_method::{CppMethod, ReturnValueAllocationPlace, CppMethodArgument};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppFunctionPointerType};
 use cpp_data::CppDataWithDeps;
 use common::errors::Result;
 use common::utils::MapIfOk;
+
+/// Variation of a field accessor method
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Serialize, Deserialize)]
+pub enum CppFieldAccessorType {
+  /// Returns copy of the field
+  CopyGetter,
+  /// Returns const reference to the field
+  ConstRefGetter,
+  /// Returns mutable reference to the field
+  MutRefGetter,
+  /// Copies value from its argument to the field
+  Setter,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CppCast {
+  Static {
+    /// If true, this is an unsafe (from base to derived) `static_cast` wrapper.
+    is_unsafe: bool,
+    /// If true, this is a wrapper of `static_cast` between a class and its
+    /// direct base.
+    is_direct: bool,
+  },
+  Dynamic,
+  #[allow(unused)]
+  QObject,
+}
+
+impl CppCast {
+  pub fn cpp_method_name(&self) -> &'static str {
+    match *self {
+      CppCast::Static { .. } => "static_cast",
+      CppCast::Dynamic => "dynamic_cast",
+      CppCast::QObject => "qobject_cast",
+    }
+  }
+
+  pub fn is_unsafe_static_cast(&self) -> bool {
+    match *self {
+      CppCast::Static { ref is_unsafe, .. } => *is_unsafe,
+      _ => false,
+    }
+  }
+  pub fn is_direct_static_cast(&self) -> bool {
+    match *self {
+      CppCast::Static { ref is_direct, .. } => *is_direct,
+      _ => false,
+    }
+
+  }
+
+}
+
+/// Information about real nature of a C++ FFI method.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CppFfiMethodKind {
+  /// This is a real C++ method.
+  Real,
+  RealWithOmittedArguments {
+    /// If Some, the method is derived from another method by omitting arguments,
+    /// and this field contains all arguments of the original method.
+    arguments_before_omitting: Option<Vec<CppMethodArgument>>,
+  },
+  /// This is a field accessor, i.e. a non-existing getter or setter
+  /// method for a public field.
+  FieldAccessor {
+    /// Type of the accessor
+    accessor_type: CppFieldAccessorType,
+    /// Name of the C++ field
+    field_name: String,
+  },
+  /// This is an instance of `static_cast`, `dynamic_cast` or
+  /// `qobject_cast` function call.
+  Cast(CppCast),
+}
 
 /// Relation between original C++ method's argument value
 /// and corresponding FFI function's argument value
@@ -192,6 +268,8 @@ impl CppFfiType {
 pub struct CppMethodWithFfiSignature {
   /// Original C++ method
   pub cpp_method: CppMethod,
+  /// For fake C++ methods, this field describes how they were generated
+  pub kind: CppFfiMethodKind,
   /// Allocation place method used for converting
   /// the return type of the method
   pub allocation_place: ReturnValueAllocationPlace,
@@ -205,6 +283,8 @@ pub struct CppMethodWithFfiSignature {
 pub struct CppAndFfiMethod {
   /// Original C++ method
   pub cpp_method: CppMethod,
+  /// For fake C++ methods, this field describes how they were generated
+  pub kind: CppFfiMethodKind,
   /// Allocation place method used for converting
   /// the return type of the method
   pub allocation_place: ReturnValueAllocationPlace,
@@ -275,6 +355,7 @@ impl CppAndFfiMethod {
   pub fn new(data: CppMethodWithFfiSignature, c_name: String) -> CppAndFfiMethod {
     CppAndFfiMethod {
       cpp_method: data.cpp_method,
+      kind: data.kind,
       allocation_place: data.allocation_place,
       c_signature: data.c_signature,
       c_name: c_name,

@@ -1,9 +1,9 @@
 //! Types for handling information about C++ methods.
 
 
-use cpp_data::{CppVisibility, CppTypeAllocationPlace, CppOriginLocation,
-               TemplateArgumentsDeclaration, CppBaseSpecifier, CppDataWithDeps};
-use cpp_ffi_data::{CppMethodWithFfiSignature, CppFfiType, CppFfiMethodSignature,
+use cpp_data::{CppVisibility, CppOriginLocation,
+               TemplateArgumentsDeclaration, CppBaseSpecifier};
+use cpp_ffi_data::{CppFfiType, CppFfiMethodSignature,
                    CppFfiMethodArgument, CppFfiArgumentMeaning};
 use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase, CppTypeClassBase};
 use common::errors::{Result, unexpected};
@@ -39,42 +39,27 @@ pub enum CppMethodKind {
   Destructor,
 }
 
-/// Variation of a field accessor method
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-#[derive(Serialize, Deserialize)]
-pub enum CppFieldAccessorType {
-  /// Returns copy of the field
-  CopyGetter,
-  /// Returns const reference to the field
-  ConstRefGetter,
-  /// Returns mutable reference to the field
-  MutRefGetter,
-  /// Copies value from its argument to the field
-  Setter,
-}
+
 
 /// Information about an automatically generated method
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-#[derive(Serialize, Deserialize)]
-pub enum FakeCppMethod {
-  /// Method for accessing a public field of a class
-  FieldAccessor {
-    accessor_type: CppFieldAccessorType,
-    field_name: String,
-  },
-}
-
-
+//#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+//#[derive(Serialize, Deserialize)]
+//pub enum FakeCppMethod {
+//  /// Method for accessing a public field of a class
+//  FieldAccessor {
+//    accessor_type: CppFieldAccessorType,
+//    field_name: String,
+//  },
+//}
 /// for accessing a public field of a class
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-#[derive(Serialize, Deserialize)]
-pub struct CppFieldAccessor {
-  /// Type of the accessor
-  pub accessor_type: CppFieldAccessorType,
-  /// Name of the C++ field
-  pub field_name: String,
-}
-
+//#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+//#[derive(Serialize, Deserialize)]
+//pub struct CppFieldAccessor {
+//  /// Type of the accessor
+//  pub accessor_type: CppFieldAccessorType,
+//  /// Name of the C++ field
+//  pub field_name: String,
+//}
 /// Information about a C++ class member method
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
@@ -99,9 +84,10 @@ pub struct CppMethodClassMembership {
   pub is_signal: bool,
   /// True if the method is a Qt slot
   pub is_slot: bool,
-  /// If this method is a generated field accessor, this field contains
-  /// information about it. Field accessors do not have real C++ methods corresponding to them.
-  pub fake: Option<FakeCppMethod>,
+
+  // / If this method is a generated field accessor, this field contains
+  // / information about it. Field accessors do not have real C++ methods corresponding to them.
+  //pub fake: Option<FakeCppMethod>,
 }
 
 /// C++ documentation for a method
@@ -141,9 +127,9 @@ pub struct CppMethod {
   pub return_type: CppType,
   /// List of the method's arguments
   pub arguments: Vec<CppMethodArgument>,
-  /// If Some, the method is derived from another method by omitting arguments,
-  /// and this field contains all arguments of the original method.
-  pub arguments_before_omitting: Option<Vec<CppMethodArgument>>,
+  //  /// If Some, the method is derived from another method by omitting arguments,
+  //  /// and this field contains all arguments of the original method.
+  //  pub arguments_before_omitting: Option<Vec<CppMethodArgument>>,
   /// Whether the argument list is terminated with "..."
   pub allows_variadic_arguments: bool,
   /// File name of the include file where the method is defined
@@ -177,11 +163,6 @@ pub struct CppMethod {
   pub doc: Option<CppMethodDoc>,
   /// If true, FFI generator skips some checks
   pub is_ffi_whitelisted: bool,
-  /// If true, this is an unsafe (from base to derived) `static_cast` wrapper.
-  pub is_unsafe_static_cast: bool,
-  /// If true, this is a wrapper of `static_cast` between a class and its
-  /// direct base.
-  pub is_direct_static_cast: bool,
 }
 
 
@@ -322,46 +303,6 @@ impl CppMethod {
     Ok(r)
   }
 
-  /// Generates the FFI function signature for this method.
-  pub fn to_ffi_signature(&self,
-                          cpp_data: &CppDataWithDeps,
-                          type_allocation_places_override: Option<CppTypeAllocationPlace>)
-                          -> Result<CppMethodWithFfiSignature> {
-    let get_place = |name| -> Result<ReturnValueAllocationPlace> {
-      let v = if let Some(ref x) = type_allocation_places_override {
-        x.clone()
-      } else {
-        cpp_data.type_allocation_place(name)?
-      };
-      Ok(match v {
-           CppTypeAllocationPlace::Heap => ReturnValueAllocationPlace::Heap,
-           CppTypeAllocationPlace::Stack => ReturnValueAllocationPlace::Stack,
-         })
-    };
-
-    let place = if self.is_constructor() || self.is_destructor() {
-      let info = self
-        .class_membership
-        .as_ref()
-        .expect("class info expected here");
-      get_place(&info.class_type.name)?
-    } else if self.return_type.needs_allocation_place_variants() {
-      if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = self.return_type.base {
-        get_place(name)?
-      } else {
-        return Err(unexpected("class type expected here").into());
-      }
-    } else {
-      ReturnValueAllocationPlace::NotApplicable
-    };
-
-    let c_signature = self.c_signature(place.clone())?;
-    Ok(CppMethodWithFfiSignature {
-         cpp_method: self.clone(),
-         allocation_place: place,
-         c_signature: c_signature,
-       })
-  }
 
   /// Returns fully qualified C++ name of this method,
   /// i.e. including namespaces and class name (if any).

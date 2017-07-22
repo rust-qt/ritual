@@ -33,7 +33,6 @@ pub fn empty_membership(class_name: &'static str) -> CppMethodClassMembership {
       name: class_name.to_string(),
       template_arguments: None,
     },
-    fake: None,
   }
 }
 
@@ -43,7 +42,6 @@ pub fn empty_regular_method() -> CppMethod {
     class_membership: None,
     return_type: CppType::void(),
     arguments: vec![],
-    arguments_before_omitting: None,
     doc: None,
     inheritance_chain: Vec::new(),
     allows_variadic_arguments: false,
@@ -54,8 +52,6 @@ pub fn empty_regular_method() -> CppMethod {
     operator: None,
     declaration_code: None,
     is_ffi_whitelisted: false,
-    is_unsafe_static_cast: false,
-    is_direct_static_cast: false,
   }
 }
 
@@ -716,7 +712,6 @@ fn short_text1() {
                                name: "Class1".to_string(),
                                template_arguments: None,
                              },
-                             fake: None,
                            }),
     operator: None,
     return_type: CppType {
@@ -745,7 +740,6 @@ fn short_text1() {
                       name: "arg2".to_string(),
                       has_default_value: true,
                     }],
-    arguments_before_omitting: None,
     doc: None,
     inheritance_chain: Vec::new(),
     allows_variadic_arguments: false,
@@ -755,8 +749,6 @@ fn short_text1() {
     template_arguments_values: None,
     declaration_code: None,
     is_ffi_whitelisted: false,
-    is_unsafe_static_cast: false,
-    is_direct_static_cast: false,
   };
   assert_eq!(method.short_text(),
              "protected int Class1::method1(int arg1, double arg2 = ?) const");

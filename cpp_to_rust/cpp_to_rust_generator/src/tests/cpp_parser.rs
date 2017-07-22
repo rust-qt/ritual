@@ -70,7 +70,6 @@ fn simple_func() {
                                  },
                                  has_default_value: false,
                                }],
-               arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
                allows_variadic_arguments: false,
@@ -80,8 +79,6 @@ fn simple_func() {
                template_arguments_values: None,
                declaration_code: Some("int func1 ( int x )".to_string()),
                is_ffi_whitelisted: false,
-               is_unsafe_static_cast: false,
-               is_direct_static_cast: false,
              });
 }
 
@@ -111,7 +108,6 @@ fn simple_func_with_default_value() {
                                  },
                                  has_default_value: true,
                                }],
-               arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
                allows_variadic_arguments: false,
@@ -121,8 +117,6 @@ fn simple_func_with_default_value() {
                template_arguments_values: None,
                declaration_code: Some("bool func1 ( int x = 42 )".to_string()),
                is_ffi_whitelisted: false,
-               is_unsafe_static_cast: false,
-               is_direct_static_cast: false,
              });
 }
 
@@ -191,7 +185,6 @@ fn functions_with_class_arg() {
                                  },
                                  has_default_value: false,
                                }],
-               arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
                allows_variadic_arguments: false,
@@ -201,8 +194,6 @@ fn functions_with_class_arg() {
                template_arguments_values: None,
                declaration_code: Some("bool func1 ( Magic x )".to_string()),
                is_ffi_whitelisted: false,
-               is_unsafe_static_cast: false,
-               is_direct_static_cast: false,
              });
   assert_eq!(data.methods[1],
              CppMethod {
@@ -228,7 +219,6 @@ fn functions_with_class_arg() {
                                  },
                                  has_default_value: false,
                                }],
-               arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
                allows_variadic_arguments: false,
@@ -238,8 +228,6 @@ fn functions_with_class_arg() {
                template_arguments_values: None,
                declaration_code: Some("bool func1 ( Magic * x )".to_string()),
                is_ffi_whitelisted: false,
-               is_unsafe_static_cast: false,
-               is_direct_static_cast: false,
              });
   assert_eq!(data.methods[2],
              CppMethod {
@@ -265,7 +253,6 @@ fn functions_with_class_arg() {
                                  },
                                  has_default_value: false,
                                }],
-               arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
                allows_variadic_arguments: false,
@@ -275,8 +262,6 @@ fn functions_with_class_arg() {
                template_arguments_values: None,
                declaration_code: Some("bool func2 ( const Magic & )".to_string()),
                is_ffi_whitelisted: false,
-               is_unsafe_static_cast: false,
-               is_direct_static_cast: false,
              });
 }
 
@@ -313,7 +298,6 @@ fn variadic_func() {
                                  },
                                  has_default_value: false,
                                }],
-               arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
                allows_variadic_arguments: true,
@@ -323,8 +307,6 @@ fn variadic_func() {
                template_arguments_values: None,
                declaration_code: Some("int my_printf ( const char * format , ... )".to_string()),
                is_ffi_whitelisted: false,
-               is_unsafe_static_cast: false,
-               is_direct_static_cast: false,
              });
 }
 
@@ -360,7 +342,6 @@ fn free_template_func() {
                                  },
                                  has_default_value: false,
                                }],
-               arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
                allows_variadic_arguments: false,
@@ -373,8 +354,6 @@ fn free_template_func() {
                template_arguments_values: None,
                declaration_code: Some("template < typename T > T abs ( T value )".to_string()),
                is_ffi_whitelisted: false,
-               is_unsafe_static_cast: false,
-               is_direct_static_cast: false,
              });
 }
 
@@ -425,7 +404,6 @@ fn free_func_operator_sub() {
                                    },
                                    has_default_value: false,
                                  }],
-                 arguments_before_omitting: None,
                  doc: None,
                  inheritance_chain: Vec::new(),
                  allows_variadic_arguments: false,
@@ -435,8 +413,6 @@ fn free_func_operator_sub() {
                  template_arguments_values: None,
                  declaration_code: Some("C1 operator - ( C1 a , C1 b )".to_string()),
                  is_ffi_whitelisted: false,
-                 is_unsafe_static_cast: false,
-                 is_direct_static_cast: false,
                });
   }
 }
@@ -480,7 +456,6 @@ fn simple_class_method() {
                                         visibility: CppVisibility::Public,
                                         is_signal: false,
                                         is_slot: false,
-                                        fake: None,
                                       }),
                operator: None,
                return_type: CppType {
@@ -499,7 +474,6 @@ fn simple_class_method() {
                                  },
                                  has_default_value: false,
                                }],
-               arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
                allows_variadic_arguments: false,
@@ -509,8 +483,6 @@ fn simple_class_method() {
                template_arguments_values: None,
                declaration_code: Some("int func1 ( int x )".to_string()),
                is_ffi_whitelisted: false,
-               is_unsafe_static_cast: false,
-               is_direct_static_cast: false,
              });
 }
 
@@ -695,7 +667,6 @@ fn template_class_method() {
                                         visibility: CppVisibility::Public,
                                         is_signal: false,
                                         is_slot: false,
-                                        fake: None,
                                       }),
                operator: None,
                return_type: CppType {
@@ -717,7 +688,6 @@ fn template_class_method() {
                                  },
                                  has_default_value: false,
                                }],
-               arguments_before_omitting: None,
                doc: None,
                inheritance_chain: Vec::new(),
                allows_variadic_arguments: false,
@@ -727,8 +697,6 @@ fn template_class_method() {
                template_arguments_values: None,
                declaration_code: Some("T get ( int index )".to_string()),
                is_ffi_whitelisted: false,
-               is_unsafe_static_cast: false,
-               is_direct_static_cast: false,
              });
 }
 
@@ -880,6 +848,29 @@ fn template_instantiation() {
              .get(0)
              .unwrap()
              .template_arguments == &vec![int]);*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }
 
 #[test]

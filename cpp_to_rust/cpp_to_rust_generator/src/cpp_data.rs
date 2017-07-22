@@ -1,9 +1,8 @@
 //! Types for handling information about C++ library APIs.
 
 
-use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership, CppMethodArgument,
-                 CppFieldAccessorType, FakeCppMethod};
-use cpp_operator::CppOperator;
+use cpp_method::{CppMethod, CppMethodKind};
+pub use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
 use common::errors::{Result, ChainErr};
 use common::file_utils::open_file;
@@ -255,41 +254,6 @@ pub struct CppDataWithDeps {
 
 
 
-/// Convenience function to create `CppMethod` object for
-/// `static_cast` or `dynamic_cast` from type `from` to type `to`.
-/// See `CppMethod`'s documentation for more information
-/// about `is_unsafe_static_cast` and `is_direct_static_cast`.
-pub fn create_cast_method(name: &str,
-                          from: &CppType,
-                          to: &CppType,
-                          is_unsafe_static_cast: bool,
-                          is_direct_static_cast: bool,
-                          include_file: &str)
-                          -> CppMethod {
-  CppMethod {
-    name: name.to_string(),
-    class_membership: None,
-    operator: None,
-    return_type: to.clone(),
-    arguments: vec![CppMethodArgument {
-                      name: "ptr".to_string(),
-                      argument_type: from.clone(),
-                      has_default_value: false,
-                    }],
-    arguments_before_omitting: None,
-    allows_variadic_arguments: false,
-    include_file: include_file.to_string(),
-    origin_location: None,
-    template_arguments: None,
-    template_arguments_values: Some(vec![to.clone()]),
-    declaration_code: None,
-    doc: None,
-    inheritance_chain: Vec::new(),
-    is_ffi_whitelisted: true,
-    is_unsafe_static_cast: is_unsafe_static_cast,
-    is_direct_static_cast: is_direct_static_cast,
-  }
-}
 
 
 impl CppTypeData {
@@ -562,93 +526,12 @@ impl TemplateArgumentsDeclaration {
   }
 }
 
-/// Tries to apply each of `template_instantiations` to `method`.
-/// Only types at the specified `nested_level` are replaced.
-/// Returns `Err` if any of `template_instantiations` is incompatible
-/// with the method.
-fn apply_instantiations_to_method(method: &CppMethod,
-                                  nested_level: usize,
-                                  template_instantiations: &[CppTemplateInstantiation])
-                                  -> Result<Vec<CppMethod>> {
-  let mut new_methods = Vec::new();
-  for ins in template_instantiations {
-    log::llog(log::DebugTemplateInstantiation,
-              || format!("instantiation: {:?}", ins.template_arguments));
-    let mut new_method = method.clone();
-    if let Some(ref args) = method.template_arguments {
-      if args.nested_level == nested_level {
-        if args.count() != ins.template_arguments.len() {
-          return Err("template arguments count mismatch".into());
-        }
-        new_method.template_arguments = None;
-        new_method.template_arguments_values = Some(ins.template_arguments.clone());
-      }
-    }
-    new_method.arguments.clear();
-    for arg in &method.arguments {
-      new_method
-        .arguments
-        .push(CppMethodArgument {
-                name: arg.name.clone(),
-                has_default_value: arg.has_default_value,
-                argument_type: arg
-                  .argument_type
-                  .instantiate(nested_level, &ins.template_arguments)?,
-              });
-    }
-    if let Some(ref args) = method.arguments_before_omitting {
-      let mut new_args = Vec::new();
-      for arg in args {
-        new_args.push(CppMethodArgument {
-                        name: arg.name.clone(),
-                        has_default_value: arg.has_default_value,
-                        argument_type: arg
-                          .argument_type
-                          .instantiate(nested_level, &ins.template_arguments)?,
-                      });
-      }
-      new_method.arguments_before_omitting = Some(new_args);
-    }
-    new_method.return_type = method
-      .return_type
-      .instantiate(nested_level, &ins.template_arguments)?;
-    if let Some(ref mut info) = new_method.class_membership {
-      info.class_type = info
-        .class_type
-        .instantiate_class(nested_level, &ins.template_arguments)?;
-    }
-    let mut conversion_type = None;
-    if let Some(ref mut operator) = new_method.operator {
-      if let CppOperator::Conversion(ref mut cpp_type) = *operator {
-        let r = cpp_type
-          .instantiate(nested_level, &ins.template_arguments)?;
-        *cpp_type = r.clone();
-        conversion_type = Some(r);
-      }
-    }
-    if new_method
-         .all_involved_types()
-         .iter()
-         .any(|t| t.base.is_or_contains_template_parameter()) {
-      return Err(format!("extra template parameters left: {}",
-                         new_method.short_text())
-                     .into());
-    } else {
-      if let Some(conversion_type) = conversion_type {
-        new_method.name = format!("operator {}", conversion_type.to_cpp_code(None)?);
-      }
-      log::llog(log::DebugTemplateInstantiation,
-                || format!("success: {}", new_method.short_text()));
-      new_methods.push(new_method);
-    }
-  }
-  Ok(new_methods)
-}
+
 
 
 impl CppDataWithDeps {
   /// Returns true if `type1` is a known template instantiation.
-  fn check_template_type(&self, type1: &CppType) -> Result<()> {
+  pub fn check_template_type(&self, type1: &CppType) -> Result<()> {
     if let CppTypeBase::Class(CppTypeClassBase {
                                 ref name,
                                 ref template_arguments,
@@ -681,84 +564,6 @@ impl CppDataWithDeps {
   }
 
 
-  /// Generates methods as template instantiations of
-  /// methods of existing template classes and existing template methods.
-  pub fn instantiate_templates(&self) -> Result<Vec<CppMethod>> {
-    log::status("Instantiating templates");
-    let mut new_methods = Vec::new();
-
-    for cpp_data in self.dependencies.iter().chain(once(&self.current)) {
-      for method in cpp_data.methods_and_implicit_destructors() {
-        for type1 in method.all_involved_types() {
-          if let CppTypeBase::Class(CppTypeClassBase {
-                                      ref name,
-                                      ref template_arguments,
-                                    }) = type1.base {
-            if let Some(ref template_arguments) = *template_arguments {
-              assert!(!template_arguments.is_empty());
-              if template_arguments
-                   .iter()
-                   .all(|x| x.base.is_template_parameter()) {
-                if let Some(template_instantiations) =
-                  self
-                    .current
-                    .processed
-                    .template_instantiations
-                    .iter()
-                    .find(|x| &x.class_name == name) {
-                  let nested_level = if let CppTypeBase::TemplateParameter {
-                           nested_level, ..
-                         } = template_arguments[0].base {
-                    nested_level
-                  } else {
-                    return Err("only template parameters can be here".into());
-                  };
-                  log::llog(log::DebugTemplateInstantiation, || "");
-                  log::llog(log::DebugTemplateInstantiation,
-                            || format!("method: {}", method.short_text()));
-                  log::llog(log::DebugTemplateInstantiation, || {
-                    format!("found template instantiations: {:?}",
-                            template_instantiations)
-                  });
-                  match apply_instantiations_to_method(method,
-                                                       nested_level,
-                                                       &template_instantiations.instantiations) {
-                    Ok(methods) => {
-                      for method in methods {
-                        let mut ok = true;
-                        for type1 in method.all_involved_types() {
-                          match self.check_template_type(&type1) {
-                            Ok(_) => {}
-                            Err(msg) => {
-                              ok = false;
-                              log::llog(log::DebugTemplateInstantiation, || {
-                                format!("method is not accepted: {}", method.short_text())
-                              });
-                              log::llog(log::DebugTemplateInstantiation, || format!("  {}", msg));
-                            }
-                          }
-                        }
-                        if ok {
-                          new_methods.push(method);
-                        }
-                      }
-                      break;
-                    }
-                    Err(msg) => {
-                      log::llog(log::DebugTemplateInstantiation,
-                                || format!("failed: {}", msg))
-                    }
-                  }
-                  break;
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    Ok(new_methods)
-  }
 
 
 
@@ -1059,173 +864,6 @@ impl CppDataWithDeps {
   } */
 
 
-  /// Adds fictional getter and setter methods for each known public field of each class.
-  pub fn generate_field_accessors(&self) -> Result<Vec<CppMethod>> {
-    // TODO: fix doc generator for field accessors
-    log::status("Adding field accessors");
-    let mut new_methods = Vec::new();
-    for type_info in &self.current.parser.types {
-      if let CppTypeKind::Class { ref fields, .. } = type_info.kind {
-        for field in fields {
-          let create_method = |name, accessor_type, return_type, arguments| -> Result<CppMethod> {
-            Ok(CppMethod {
-                 name: name,
-                 class_membership: Some(CppMethodClassMembership {
-                                          class_type: type_info.default_class_type()?,
-                                          kind: CppMethodKind::Regular,
-                                          is_virtual: false,
-                                          is_pure_virtual: false,
-                                          is_const: match accessor_type {
-                                            CppFieldAccessorType::CopyGetter |
-                                            CppFieldAccessorType::ConstRefGetter => true,
-                                            CppFieldAccessorType::MutRefGetter |
-                                            CppFieldAccessorType::Setter => false,
-                                          },
-                                          is_static: false,
-                                          visibility: CppVisibility::Public,
-                                          is_signal: false,
-                                          is_slot: false,
-                                          fake: Some(FakeCppMethod::FieldAccessor {
-                                                       accessor_type: accessor_type,
-                                                       field_name: field.name.clone(),
-                                                     }),
-                                        }),
-                 operator: None,
-                 return_type: return_type,
-                 arguments: arguments,
-                 arguments_before_omitting: None,
-                 allows_variadic_arguments: false,
-                 include_file: type_info.include_file.clone(),
-                 origin_location: None,
-                 template_arguments: None,
-                 template_arguments_values: None,
-                 declaration_code: None,
-                 doc: None,
-                 inheritance_chain: Vec::new(),
-                 //is_fake_inherited_method: false,
-                 is_ffi_whitelisted: false,
-                 is_unsafe_static_cast: false,
-                 is_direct_static_cast: false,
-               })
-          };
-          if field.visibility == CppVisibility::Public {
-            if field.field_type.indirection == CppTypeIndirection::None &&
-               field.field_type.base.is_class() {
-
-              let mut type2_const = field.field_type.clone();
-              type2_const.is_const = true;
-              type2_const.indirection = CppTypeIndirection::Ref;
-              let mut type2_mut = field.field_type.clone();
-              type2_mut.is_const = false;
-              type2_mut.indirection = CppTypeIndirection::Ref;
-              new_methods.push(create_method(field.name.clone(),
-                                             CppFieldAccessorType::ConstRefGetter,
-                                             type2_const,
-                                             Vec::new())?);
-              new_methods.push(create_method(format!("{}_mut", field.name),
-                                             CppFieldAccessorType::MutRefGetter,
-                                             type2_mut,
-                                             Vec::new())?);
-            } else {
-              new_methods.push(create_method(field.name.clone(),
-                                             CppFieldAccessorType::CopyGetter,
-                                             field.field_type.clone(),
-                                             Vec::new())?);
-            }
-            let arg = CppMethodArgument {
-              argument_type: field.field_type.clone(),
-              name: "value".to_string(),
-              has_default_value: false,
-            };
-            new_methods.push(create_method(format!("set_{}", field.name),
-                                           CppFieldAccessorType::Setter,
-                                           CppType::void(),
-                                           vec![arg])?);
-          }
-        }
-      }
-    }
-    Ok(new_methods)
-  }
-
-  /// Performs a portion of `generate_casts` operation.
-  /// Adds casts between `target_type` and `base_type` and calls
-  /// `generate_casts_one` recursively to add casts between `target_type`
-  /// and base types of `base_type`.
-  fn generate_casts_one(&self,
-                        target_type: &CppTypeClassBase,
-                        base_type: &CppType,
-                        is_direct: bool)
-                        -> Result<Vec<CppMethod>> {
-    let type_info = self
-      .find_type_info(|x| x.name == target_type.name)
-      .chain_err(|| "type info not found")?;
-    let target_ptr_type = CppType {
-      base: CppTypeBase::Class(target_type.clone()),
-      indirection: CppTypeIndirection::Ptr,
-      is_const: false,
-      is_const2: false,
-    };
-    let base_ptr_type = CppType {
-      base: base_type.base.clone(),
-      indirection: CppTypeIndirection::Ptr,
-      is_const: false,
-      is_const2: false,
-    };
-    let mut new_methods = Vec::new();
-    new_methods.push(create_cast_method("static_cast",
-                                        &base_ptr_type,
-                                        &target_ptr_type,
-                                        true,
-                                        is_direct,
-                                        &type_info.include_file));
-    new_methods.push(create_cast_method("static_cast",
-                                        &target_ptr_type,
-                                        &base_ptr_type,
-                                        false,
-                                        is_direct,
-                                        &type_info.include_file));
-    if let CppTypeBase::Class(ref base) = base_type.base {
-      if self.has_virtual_methods(&base.name) {
-        new_methods.push(create_cast_method("dynamic_cast",
-                                            &base_ptr_type,
-                                            &target_ptr_type,
-                                            false,
-                                            false,
-                                            &type_info.include_file));
-      }
-    }
-
-    if let CppTypeBase::Class(ref base) = base_type.base {
-      if let Some(type_info) = self.find_type_info(|x| x.name == base.name) {
-        if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
-          for base in bases {
-            new_methods.append(&mut self
-                                      .generate_casts_one(target_type, &base.base_type, false)?);
-          }
-        }
-      }
-    }
-    Ok(new_methods)
-  }
-
-  /// Adds `static_cast` and `dynamic_cast` functions for all appropriate pairs of types
-  /// in this `CppData`.
-  pub fn generate_casts(&self) -> Result<Vec<CppMethod>> {
-    log::status("Adding cast functions");
-    let mut new_methods = Vec::new();
-    for type_info in &self.current.parser.types {
-      if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
-        let t = type_info.default_class_type()?;
-        let single_base = bases.len() == 1;
-        for base in bases {
-          new_methods.append(&mut self
-                                    .generate_casts_one(&t, &base.base_type, single_base)?);
-        }
-      }
-    }
-    Ok(new_methods)
-  }
 
   /// Checks if `class_name` types inherits `base_name` type directly or indirectly.
   pub fn inherits(&self, class_name: &str, base_name: &str) -> bool {

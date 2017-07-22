@@ -1,6 +1,6 @@
 use cpp_ffi_data::{QtSlotWrapper, CppIndirectionChange, CppAndFfiMethod, CppFfiArgumentMeaning,
-                   CppFfiHeaderData, CppFfiType};
-use cpp_method::{ReturnValueAllocationPlace, CppFieldAccessorType, FakeCppMethod};
+                   CppFfiHeaderData, CppFfiType, CppFieldAccessorType, CppFfiMethodKind};
+use cpp_method::ReturnValueAllocationPlace;
 use cpp_type::{CppTypeIndirection, CppTypeBase, CppType};
 use common::errors::{Result, ChainErr, unexpected};
 use common::file_utils::{PathBufWithAdded, create_dir_all, create_file, path_to_str};
@@ -256,15 +256,10 @@ impl CppCodeGenerator {
           }
           None => String::new(),
         };
-        if let Some(&Some(FakeCppMethod::FieldAccessor {
-                            ref accessor_type,
-                            ref field_name,
-                          })) =
-          method
-            .cpp_method
-            .class_membership
-            .as_ref()
-            .map(|x| &x.fake) {
+        if let CppFfiMethodKind::FieldAccessor {
+                 ref accessor_type,
+                 ref field_name,
+               } = method.kind {
           is_field_accessor = true;
           if accessor_type == &CppFieldAccessorType::Setter {
             format!("{}{} = {}",

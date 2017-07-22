@@ -28,7 +28,8 @@ pub fn cpp_post_process(parser_data: ParserCppData,
   let inherited_methods = processor.detect_inherited_methods2()?;
   let implicit_destructors = processor
     .ensure_explicit_destructors(&inherited_methods)?;
-  let type_allocation_places = processor
+  let type_allocation_places =
+    processor
       .choose_allocation_places(allocation_place_overrides, &inherited_methods)?;
 
   let result = ProcessedCppData {
@@ -69,10 +70,10 @@ impl CppPostProcessor {
   /// Checks if specified class has any virtual methods (own or inherited).
   pub fn has_virtual_methods(&self, class_name: &str, inherited_methods: &[CppMethod]) -> bool {
     for method in self
-        .parser_data
-        .methods
-        .iter()
-        .chain(inherited_methods.iter()) {
+          .parser_data
+          .methods
+          .iter()
+          .chain(inherited_methods.iter()) {
       if let Some(ref info) = method.class_membership {
         if &info.class_type.name == class_name && info.is_virtual {
           return true;
@@ -110,12 +111,10 @@ impl CppPostProcessor {
                                                   is_signal: false,
                                                   is_slot: false,
                                                   kind: CppMethodKind::Destructor,
-                                                  fake: None,
                                                 }),
                          operator: None,
                          return_type: CppType::void(),
                          arguments: vec![],
-                         arguments_before_omitting: None,
                          allows_variadic_arguments: false,
                          include_file: type1.include_file.clone(),
                          origin_location: None,
@@ -126,8 +125,6 @@ impl CppPostProcessor {
                          inheritance_chain: Vec::new(),
                          //is_fake_inherited_method: false,
                          is_ffi_whitelisted: false,
-                         is_unsafe_static_cast: false,
-                         is_direct_static_cast: false,
                        });
         }
       }
@@ -280,7 +277,6 @@ impl CppPostProcessor {
       log::llog(log::DebugInheritance,
                 || format!("Detecting inherited methods for {}\n", class.name));
       let own_methods: Vec<&CppMethod> = self
-
         .parser_data
         .methods
         .iter()
@@ -445,7 +441,8 @@ impl CppPostProcessor {
   /// If `overrides` contains type allocation place for a type, it's used instead of
   /// the place that would be automatically selected.
   pub fn choose_allocation_places(&self,
-                                  overrides: &HashMap<String, CppTypeAllocationPlace>, inherited_methods: &[CppMethod])
+                                  overrides: &HashMap<String, CppTypeAllocationPlace>,
+                                  inherited_methods: &[CppMethod])
                                   -> Result<HashMap<String, CppTypeAllocationPlace>> {
     log::status("Detecting type allocation places");
 

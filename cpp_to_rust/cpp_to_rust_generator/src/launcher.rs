@@ -199,7 +199,9 @@ fn load_or_create_cpp_data(config: &Config,
     }
   } else {
     log::status("Post-processing parse result");
-    let r = cpp_post_process(parser_cpp_data, dependencies_cpp_data, config.type_allocation_places())?;
+    let r = cpp_post_process(parser_cpp_data,
+                             dependencies_cpp_data,
+                             config.type_allocation_places())?;
     if config.write_cache() {
       log::status("Saving processed C++ data");
       save_bincode(&processed_cpp_data_file_path, &r.current.processed)?;

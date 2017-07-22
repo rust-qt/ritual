@@ -3,7 +3,7 @@
 use caption_strategy::TypeCaptionStrategy;
 use cpp_data::{CppTypeKind, CppEnumValue, CppTypeAllocationPlace};
 use cpp_ffi_data::{CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiType, CppIndirectionChange,
-                   CppAndFfiData};
+                   CppAndFfiData, CppFfiMethodKind, CppCast};
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
@@ -1030,23 +1030,26 @@ impl RustGenerator {
     // TODO: qobject_cast
     let mut final_methods = vec![(method.clone(), false), (method.clone(), true)];
     let args = &method.arguments;
-    let trait_name = match args.cpp_method.cpp_method.name.as_str() {
-      "static_cast" => {
-        if args.cpp_method.cpp_method.is_unsafe_static_cast {
+    let cpp_cast = if let CppFfiMethodKind::Cast(ref cast) = args.cpp_method.kind {
+      cast
+    } else {
+      return Err("not a cast method".into());
+    };
+    let trait_name = match *cpp_cast {
+      CppCast::Static { ref is_unsafe, .. } => {
+        if *is_unsafe {
           vec!["cpp_utils".to_string(), "UnsafeStaticCast".to_string()]
         } else {
           vec!["cpp_utils".to_string(), "StaticCast".to_string()]
         }
-      }
-      "dynamic_cast" => vec!["cpp_utils".to_string(), "DynamicCast".to_string()],
-      "qobject_cast" => {
+      },
+      CppCast::Dynamic => vec!["cpp_utils".to_string(), "DynamicCast".to_string()],
+      CppCast::QObject => {
         vec!["qt_core".to_string(),
              "object".to_string(),
              "Cast".to_string()]
       }
-      _ => return Err("invalid method name".into()),
     };
-
     if args.arguments.len() != 1 {
       return Err(unexpected("1 argument expected").into());
     }
@@ -1061,11 +1064,7 @@ impl RustGenerator {
       };
       final_method.scope = RustMethodScope::TraitImpl;
       final_method.name = RustName::new(vec![method_name])?;
-      final_method.is_unsafe = if &args.cpp_method.cpp_method.name == "static_cast" {
-        args.cpp_method.cpp_method.is_unsafe_static_cast
-      } else {
-        false
-      };
+      final_method.is_unsafe = cpp_cast.is_unsafe_static_cast();
       let return_ref_type = args.return_type.ptr_to_ref(*final_is_const)?;
       if &final_method.arguments.cpp_method.cpp_method.name == "static_cast" {
         final_method.arguments.return_type = return_ref_type;
@@ -1089,8 +1088,8 @@ impl RustGenerator {
         .ptr_to_ref(*final_is_const)?;
       final_method.arguments.arguments[0].name = "self".to_string();
 
-      if !args.cpp_method.cpp_method.is_unsafe_static_cast &&
-         args.cpp_method.cpp_method.is_direct_static_cast {
+      if !cpp_cast.is_unsafe_static_cast() &&
+          cpp_cast.is_direct_static_cast() {
 
         let mut deref_method = final_method.clone();
         deref_method.name = RustName::new(vec![if *final_is_const {
@@ -1213,11 +1212,11 @@ impl RustGenerator {
           method.arguments.arguments.remove(0);
         }
 
-        let mut cpp_method_key = method.arguments.cpp_method.cpp_method.clone();
-        if let Some(v) = cpp_method_key.arguments_before_omitting {
-          cpp_method_key.arguments = v;
-          cpp_method_key.arguments_before_omitting = None;
-        }
+        let cpp_method_key = method.arguments.cpp_method.cpp_method.clone();
+//        if let Some(v) = cpp_method_key.arguments_before_omitting {
+//          cpp_method_key.arguments = v;
+//          cpp_method_key.arguments_before_omitting = None;
+//        }
         add_to_multihash(&mut grouped_by_cpp_method,
                          cpp_method_key,
                          method.arguments.clone());

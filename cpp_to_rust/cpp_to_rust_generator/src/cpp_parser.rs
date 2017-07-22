@@ -1163,13 +1163,11 @@ impl<'a> CppParser<'a> {
                Some(info) => info.default_class_type()?,
                None => return Err(format!("Unknown class type: {}", class_name).into()),
              },
-             fake: None,
            })
     }
            None => None,
          },
          arguments: arguments,
-         arguments_before_omitting: None,
          allows_variadic_arguments: allows_variadic_arguments,
          return_type: return_type_parsed,
          include_file: self.entity_include_file(entity)?,
@@ -1181,8 +1179,6 @@ impl<'a> CppParser<'a> {
          inheritance_chain: Vec::new(),
          //is_fake_inherited_method: false,
          is_ffi_whitelisted: false,
-         is_unsafe_static_cast: false,
-         is_direct_static_cast: false,
        })
   }
 
