@@ -3,8 +3,8 @@
 
 use cpp_data::{CppVisibility, CppTypeAllocationPlace, CppOriginLocation,
                TemplateArgumentsDeclaration, CppBaseSpecifier, CppDataWithDeps};
-use cpp_ffi_data::{CppMethodWithFfiSignature, CppFfiType, CppFfiFunctionSignature,
-                   CppFfiFunctionArgument, CppFfiArgumentMeaning};
+use cpp_ffi_data::{CppMethodWithFfiSignature, CppFfiType, CppFfiMethodSignature,
+                   CppFfiMethodArgument, CppFfiArgumentMeaning};
 use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase, CppTypeClassBase};
 use common::errors::{Result, unexpected};
 use common::string_utils::JoinWithSeparator;
@@ -15,7 +15,7 @@ pub use cpp_operator::{CppOperator, CppOperatorInfo};
 /// Information about an argument of a C++ method
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[derive(Serialize, Deserialize)]
-pub struct CppFunctionArgument {
+pub struct CppMethodArgument {
   /// Identifier. If the argument doesn't have a name
   /// (which is allowed in C++), this field contains
   /// generated name "argX" (X is position of the argument).
@@ -140,10 +140,10 @@ pub struct CppMethod {
   /// Return type is reported as void for constructors and destructors.
   pub return_type: CppType,
   /// List of the method's arguments
-  pub arguments: Vec<CppFunctionArgument>,
+  pub arguments: Vec<CppMethodArgument>,
   /// If Some, the method is derived from another method by omitting arguments,
   /// and this field contains all arguments of the original method.
-  pub arguments_before_omitting: Option<Vec<CppFunctionArgument>>,
+  pub arguments_before_omitting: Option<Vec<CppMethodArgument>>,
   /// Whether the argument list is terminated with "..."
   pub allows_variadic_arguments: bool,
   /// File name of the include file where the method is defined
@@ -250,18 +250,18 @@ impl CppMethod {
   /// - adds "output" argument for return value if `allocation_place` is `Stack`.
   pub fn c_signature(&self,
                      allocation_place: ReturnValueAllocationPlace)
-                     -> Result<CppFfiFunctionSignature> {
+                     -> Result<CppFfiMethodSignature> {
     if self.allows_variadic_arguments {
       return Err("Variable arguments are not supported".into());
     }
-    let mut r = CppFfiFunctionSignature {
+    let mut r = CppFfiMethodSignature {
       arguments: Vec::new(),
       return_type: CppFfiType::void(),
     };
     if let Some(ref info) = self.class_membership {
       if !info.is_static && info.kind != CppMethodKind::Constructor {
         r.arguments
-          .push(CppFfiFunctionArgument {
+          .push(CppFfiMethodArgument {
                   name: "this_ptr".to_string(),
                   argument_type: CppType {
                       base: CppTypeBase::Class(info.class_type.clone()),
@@ -279,7 +279,7 @@ impl CppMethod {
         .argument_type
         .to_cpp_ffi_type(CppTypeRole::NotReturnType)?;
       r.arguments
-        .push(CppFfiFunctionArgument {
+        .push(CppFfiMethodArgument {
                 name: arg.name.clone(),
                 argument_type: c_type,
                 meaning: CppFfiArgumentMeaning::Argument(index as i8),
@@ -301,7 +301,7 @@ impl CppMethod {
       match allocation_place {
         ReturnValueAllocationPlace::Stack => {
           r.arguments
-            .push(CppFfiFunctionArgument {
+            .push(CppFfiMethodArgument {
                     name: "output".to_string(),
                     argument_type: c_type,
                     meaning: CppFfiArgumentMeaning::ReturnValue,

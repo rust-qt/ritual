@@ -1,7 +1,7 @@
 use cpp_data::{ParserCppData, CppData, CppTypeData, CppTypeKind, CppClassField, CppEnumValue,
                CppOriginLocation, CppVisibility, CppClassUsingDirective, CppBaseSpecifier,
                TemplateArgumentsDeclaration};
-use cpp_method::{CppMethod, CppFunctionArgument, CppMethodKind, CppMethodClassMembership};
+use cpp_method::{CppMethod, CppMethodArgument, CppMethodKind, CppMethodClassMembership};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
                CppSpecificNumericTypeKind, CppTypeClassBase, CppSpecificNumericType,
@@ -999,7 +999,7 @@ impl<'a> CppParser<'a> {
           break;
         }
       }
-      arguments.push(CppFunctionArgument {
+      arguments.push(CppMethodArgument {
                        name: name,
                        argument_type: argument_type,
                        has_default_value: has_default_value,

@@ -1,7 +1,7 @@
 //! Types for handling information about C++ library APIs.
 
 
-use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership, CppFunctionArgument,
+use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership, CppMethodArgument,
                  CppFieldAccessorType, FakeCppMethod};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
@@ -271,7 +271,7 @@ pub fn create_cast_method(name: &str,
     class_membership: None,
     operator: None,
     return_type: to.clone(),
-    arguments: vec![CppFunctionArgument {
+    arguments: vec![CppMethodArgument {
                       name: "ptr".to_string(),
                       argument_type: from.clone(),
                       has_default_value: false,
@@ -588,7 +588,7 @@ fn apply_instantiations_to_method(method: &CppMethod,
     for arg in &method.arguments {
       new_method
         .arguments
-        .push(CppFunctionArgument {
+        .push(CppMethodArgument {
                 name: arg.name.clone(),
                 has_default_value: arg.has_default_value,
                 argument_type: arg
@@ -599,7 +599,7 @@ fn apply_instantiations_to_method(method: &CppMethod,
     if let Some(ref args) = method.arguments_before_omitting {
       let mut new_args = Vec::new();
       for arg in args {
-        new_args.push(CppFunctionArgument {
+        new_args.push(CppMethodArgument {
                         name: arg.name.clone(),
                         has_default_value: arg.has_default_value,
                         argument_type: arg
@@ -1132,7 +1132,7 @@ impl CppDataWithDeps {
                                              field.field_type.clone(),
                                              Vec::new())?);
             }
-            let arg = CppFunctionArgument {
+            let arg = CppMethodArgument {
               argument_type: field.field_type.clone(),
               name: "value".to_string(),
               has_default_value: false,

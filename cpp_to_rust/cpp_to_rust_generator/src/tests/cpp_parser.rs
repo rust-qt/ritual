@@ -60,7 +60,7 @@ fn simple_func() {
                  is_const2: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
                },
-               arguments: vec![CppFunctionArgument {
+               arguments: vec![CppMethodArgument {
                                  name: "x".to_string(),
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::None,
@@ -101,7 +101,7 @@ fn simple_func_with_default_value() {
                  is_const2: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
                },
-               arguments: vec![CppFunctionArgument {
+               arguments: vec![CppMethodArgument {
                                  name: "x".to_string(),
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::None,
@@ -178,7 +178,7 @@ fn functions_with_class_arg() {
                  is_const2: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
                },
-               arguments: vec![CppFunctionArgument {
+               arguments: vec![CppMethodArgument {
                                  name: "x".to_string(),
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::None,
@@ -215,7 +215,7 @@ fn functions_with_class_arg() {
                  is_const2: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
                },
-               arguments: vec![CppFunctionArgument {
+               arguments: vec![CppMethodArgument {
                                  name: "x".to_string(),
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::Ptr,
@@ -252,7 +252,7 @@ fn functions_with_class_arg() {
                  is_const2: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
                },
-               arguments: vec![CppFunctionArgument {
+               arguments: vec![CppMethodArgument {
                                  name: "arg1".to_string(),
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::Ref,
@@ -303,7 +303,7 @@ fn variadic_func() {
                  is_const2: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
                },
-               arguments: vec![CppFunctionArgument {
+               arguments: vec![CppMethodArgument {
                                  name: "format".to_string(),
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::Ptr,
@@ -347,7 +347,7 @@ fn free_template_func() {
                    index: 0,
                  },
                },
-               arguments: vec![CppFunctionArgument {
+               arguments: vec![CppMethodArgument {
                                  name: "value".to_string(),
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::None,
@@ -399,7 +399,7 @@ fn free_func_operator_sub() {
                                               template_arguments: None,
                                             }),
                  },
-                 arguments: vec![CppFunctionArgument {
+                 arguments: vec![CppMethodArgument {
                                    name: "a".to_string(),
                                    argument_type: CppType {
                                      indirection: CppTypeIndirection::None,
@@ -412,7 +412,7 @@ fn free_func_operator_sub() {
                                    },
                                    has_default_value: false,
                                  },
-                                 CppFunctionArgument {
+                                 CppMethodArgument {
                                    name: "b".to_string(),
                                    argument_type: CppType {
                                      indirection: CppTypeIndirection::None,
@@ -489,7 +489,7 @@ fn simple_class_method() {
                  is_const2: false,
                  base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
                },
-               arguments: vec![CppFunctionArgument {
+               arguments: vec![CppMethodArgument {
                                  name: "x".to_string(),
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::None,
@@ -707,7 +707,7 @@ fn template_class_method() {
                    index: 0,
                  },
                },
-               arguments: vec![CppFunctionArgument {
+               arguments: vec![CppMethodArgument {
                                  name: "index".to_string(),
                                  argument_type: CppType {
                                    indirection: CppTypeIndirection::None,

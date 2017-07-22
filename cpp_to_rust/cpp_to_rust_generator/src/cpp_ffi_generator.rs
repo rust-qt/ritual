@@ -3,7 +3,7 @@ use cpp_data::{CppVisibility, create_cast_method, CppTypeAllocationPlace, CppDat
 use cpp_type::{CppTypeRole, CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase,
                CppFunctionPointerType};
 use cpp_ffi_data::{CppAndFfiMethod, c_base_name, CppFfiHeaderData, QtSlotWrapper};
-use cpp_method::{CppMethod, CppMethodKind, CppFunctionArgument, CppMethodClassMembership};
+use cpp_method::{CppMethod, CppMethodKind, CppMethodArgument, CppMethodClassMembership};
 use common::errors::{Result, ChainErr, unexpected};
 use common::log;
 use common::utils::{MapIfOk, add_to_multihash};
@@ -301,7 +301,7 @@ impl<'a> CppFfiGenerator<'a> {
       let create_function = |kind: CppMethodKind,
                              name: String,
                              is_slot: bool,
-                             arguments: Vec<CppFunctionArgument>|
+                             arguments: Vec<CppMethodArgument>|
        -> CppMethod {
         CppMethod {
           name: name,
@@ -346,7 +346,7 @@ impl<'a> CppFfiGenerator<'a> {
                                    format!("~{}", class_name),
                                    false,
                                    vec![]));
-      let method_set_args = vec![CppFunctionArgument {
+      let method_set_args = vec![CppMethodArgument {
                                    name: "func".to_string(),
                                    argument_type: CppType {
                                      base: CppTypeBase::FunctionPointer(function_type.clone()),
@@ -356,7 +356,7 @@ impl<'a> CppFfiGenerator<'a> {
                                    },
                                    has_default_value: false,
                                  },
-                                 CppFunctionArgument {
+                                 CppMethodArgument {
                                    name: "data".to_string(),
                                    argument_type: void_ptr.clone(),
                                    has_default_value: false,
@@ -373,7 +373,7 @@ impl<'a> CppFfiGenerator<'a> {
                                                  .iter()
                                                  .enumerate()
                                                  .map(|(num, t)| {
-                                                        CppFunctionArgument {
+                                                        CppMethodArgument {
                                                           name: format!("arg{}", num),
                                                           argument_type: t.clone(),
                                                           has_default_value: false,

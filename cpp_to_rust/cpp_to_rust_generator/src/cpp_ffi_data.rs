@@ -53,7 +53,7 @@ impl CppFfiArgumentMeaning {
 
 /// Representation of an argument of a FFI function
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CppFfiFunctionArgument {
+pub struct CppFfiMethodArgument {
   /// Identifier
   pub name: String,
   /// Type
@@ -62,7 +62,7 @@ pub struct CppFfiFunctionArgument {
   pub meaning: CppFfiArgumentMeaning,
 }
 
-impl CppFfiFunctionArgument {
+impl CppFfiMethodArgument {
   /// Generates part of caption string for FFI method.
   /// Used to generate FFI methods with different names
   /// for overloaded functions.
@@ -105,14 +105,14 @@ impl CppFfiFunctionArgument {
 /// Information about arguments and return type of a FFI function
 /// with no final function name
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CppFfiFunctionSignature {
+pub struct CppFfiMethodSignature {
   /// List of arguments
-  pub arguments: Vec<CppFfiFunctionArgument>,
+  pub arguments: Vec<CppFfiMethodArgument>,
   /// Return type
   pub return_type: CppFfiType,
 }
 
-impl CppFfiFunctionSignature {
+impl CppFfiMethodSignature {
   /// Returns true if this signature has const this_ptr argument,
   /// indicating that original C++ method has const attribute.
   /// Returns false if there is no this argument or it's not const.
@@ -196,7 +196,7 @@ pub struct CppMethodWithFfiSignature {
   /// the return type of the method
   pub allocation_place: ReturnValueAllocationPlace,
   /// FFI method signature
-  pub c_signature: CppFfiFunctionSignature,
+  pub c_signature: CppFfiMethodSignature,
 }
 
 /// Final result of converting a C++ method
@@ -209,7 +209,7 @@ pub struct CppAndFfiMethod {
   /// the return type of the method
   pub allocation_place: ReturnValueAllocationPlace,
   /// FFI method signature
-  pub c_signature: CppFfiFunctionSignature,
+  pub c_signature: CppFfiMethodSignature,
   /// Final name of FFI method
   pub c_name: String,
 }

@@ -73,7 +73,7 @@ fn argument_types_equal2() {
   let method2 = empty_regular_method();
   method1
     .arguments
-    .push(CppFunctionArgument {
+    .push(CppMethodArgument {
             argument_type: CppType {
               indirection: CppTypeIndirection::None,
               is_const: false,
@@ -93,7 +93,7 @@ fn argument_types_equal3() {
   let mut method2 = empty_regular_method();
   method1
     .arguments
-    .push(CppFunctionArgument {
+    .push(CppMethodArgument {
             argument_type: CppType {
               indirection: CppTypeIndirection::None,
               is_const: false,
@@ -105,7 +105,7 @@ fn argument_types_equal3() {
           });
   method2
     .arguments
-    .push(CppFunctionArgument {
+    .push(CppMethodArgument {
             argument_type: CppType {
               indirection: CppTypeIndirection::None,
               is_const: false,
@@ -125,7 +125,7 @@ fn argument_types_equal4() {
   let mut method2 = empty_regular_method();
   method1
     .arguments
-    .push(CppFunctionArgument {
+    .push(CppMethodArgument {
             argument_type: CppType {
               indirection: CppTypeIndirection::None,
               is_const: false,
@@ -137,7 +137,7 @@ fn argument_types_equal4() {
           });
   method2
     .arguments
-    .push(CppFunctionArgument {
+    .push(CppMethodArgument {
             argument_type: CppType {
               indirection: CppTypeIndirection::None,
               is_const: false,
@@ -157,7 +157,7 @@ fn argument_types_equal5() {
   let mut method2 = empty_regular_method();
   method1
     .arguments
-    .push(CppFunctionArgument {
+    .push(CppMethodArgument {
             argument_type: CppType {
               indirection: CppTypeIndirection::None,
               is_const: false,
@@ -169,7 +169,7 @@ fn argument_types_equal5() {
           });
   method2
     .arguments
-    .push(CppFunctionArgument {
+    .push(CppMethodArgument {
             argument_type: CppType {
               indirection: CppTypeIndirection::None,
               is_const: false,
@@ -189,7 +189,7 @@ fn argument_types_equal6() {
   let mut method2 = empty_regular_method();
   method1
     .arguments
-    .push(CppFunctionArgument {
+    .push(CppMethodArgument {
             argument_type: CppType {
               indirection: CppTypeIndirection::None,
               is_const: false,
@@ -201,7 +201,7 @@ fn argument_types_equal6() {
           });
   method2
     .arguments
-    .push(CppFunctionArgument {
+    .push(CppMethodArgument {
             argument_type: CppType {
               indirection: CppTypeIndirection::Ptr,
               is_const: false,
@@ -218,7 +218,7 @@ fn argument_types_equal6() {
 #[test]
 fn argument_types_equal7() {
   let mut method1 = empty_regular_method();
-  let int = CppFunctionArgument {
+  let int = CppMethodArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
@@ -278,7 +278,7 @@ fn c_signature_simple_func() {
   };
   method1
     .arguments
-    .push(CppFunctionArgument {
+    .push(CppMethodArgument {
             argument_type: CppType {
               indirection: CppTypeIndirection::None,
               is_const: false,
@@ -314,7 +314,7 @@ fn c_signature_method_with_this() {
   };
   method1
     .arguments
-    .push(CppFunctionArgument {
+    .push(CppMethodArgument {
             argument_type: CppType {
               indirection: CppTypeIndirection::None,
               is_const: false,
@@ -378,7 +378,7 @@ fn c_signature_static_method() {
   };
   method1
     .arguments
-    .push(CppFunctionArgument {
+    .push(CppMethodArgument {
             argument_type: CppType {
               indirection: CppTypeIndirection::None,
               is_const: false,
@@ -412,7 +412,7 @@ fn c_signature_constructor() {
                                   });
   method1
     .arguments
-    .push(CppFunctionArgument {
+    .push(CppMethodArgument {
             argument_type: CppType {
               indirection: CppTypeIndirection::Ref,
               is_const: true,
@@ -563,7 +563,7 @@ fn c_signature_method_returning_class() {
   };
   method1
     .arguments
-    .push(CppFunctionArgument {
+    .push(CppMethodArgument {
             argument_type: CppType {
               indirection: CppTypeIndirection::None,
               is_const: false,
@@ -725,7 +725,7 @@ fn short_text1() {
       is_const2: false,
       base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
-    arguments: vec![CppFunctionArgument {
+    arguments: vec![CppMethodArgument {
                       argument_type: CppType {
                         indirection: CppTypeIndirection::None,
                         is_const: false,
@@ -735,7 +735,7 @@ fn short_text1() {
                       name: "arg1".to_string(),
                       has_default_value: false,
                     },
-                    CppFunctionArgument {
+                    CppMethodArgument {
                       argument_type: CppType {
                         indirection: CppTypeIndirection::None,
                         is_const: false,

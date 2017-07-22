@@ -19,7 +19,7 @@ fn argument_meaning() {
 
 #[test]
 fn argument_int() {
-  let arg = CppFfiFunctionArgument {
+  let arg = CppFfiMethodArgument {
     name: "arg1".to_string(),
     argument_type: CppFfiType {
       original_type: CppType {
@@ -61,7 +61,7 @@ fn argument_int() {
 
 #[test]
 fn argument_int_ptr() {
-  let arg = CppFfiFunctionArgument {
+  let arg = CppFfiMethodArgument {
     name: "arg1".to_string(),
     argument_type: CppFfiType {
       original_type: CppType {
@@ -130,7 +130,7 @@ fn argument_func() {
     }),
   };
 
-  let arg = CppFfiFunctionArgument {
+  let arg = CppFfiMethodArgument {
     name: "arg1".to_string(),
     argument_type: CppFfiType {
       original_type: type1.clone(),
@@ -162,8 +162,8 @@ fn argument_func() {
 
 #[test]
 fn signature_two_numbers() {
-  let sig = CppFfiFunctionSignature {
-    arguments: vec![CppFfiFunctionArgument {
+  let sig = CppFfiMethodSignature {
+    arguments: vec![CppFfiMethodArgument {
                       name: "arg1".to_string(),
                       argument_type: CppFfiType {
                         original_type: CppType {
@@ -182,7 +182,7 @@ fn signature_two_numbers() {
                       },
                       meaning: CppFfiArgumentMeaning::Argument(0),
                     },
-                    CppFfiFunctionArgument {
+                    CppFfiMethodArgument {
                       name: "arg2".to_string(),
                       argument_type: CppFfiType {
                         original_type: CppType {
@@ -242,8 +242,8 @@ fn signature_two_numbers() {
 
 #[test]
 fn signature_class_method() {
-  let sig = CppFfiFunctionSignature {
-    arguments: vec![CppFfiFunctionArgument {
+  let sig = CppFfiMethodSignature {
+    arguments: vec![CppFfiMethodArgument {
                       name: "this_ptr".to_string(),
                       argument_type: CppFfiType {
                         original_type: CppType {
@@ -268,7 +268,7 @@ fn signature_class_method() {
                       },
                       meaning: CppFfiArgumentMeaning::This,
                     },
-                    CppFfiFunctionArgument {
+                    CppFfiMethodArgument {
                       name: "arg1".to_string(),
                       argument_type: CppFfiType {
                         original_type: CppType {
@@ -314,8 +314,8 @@ fn signature_class_method() {
 
 #[test]
 fn signature_class_method_const() {
-  let sig = CppFfiFunctionSignature {
-    arguments: vec![CppFfiFunctionArgument {
+  let sig = CppFfiMethodSignature {
+    arguments: vec![CppFfiMethodArgument {
                       name: "this_ptr".to_string(),
                       argument_type: CppFfiType {
                         original_type: CppType {
@@ -340,7 +340,7 @@ fn signature_class_method_const() {
                       },
                       meaning: CppFfiArgumentMeaning::This,
                     },
-                    CppFfiFunctionArgument {
+                    CppFfiMethodArgument {
                       name: "arg1".to_string(),
                       argument_type: CppFfiType {
                         original_type: CppType {
