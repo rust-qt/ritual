@@ -530,7 +530,7 @@ impl Config {
   /// `::errors::fancy_unwrap` to check the result and display
   /// additional error information.
   pub fn exec(self) -> Result<()> {
-    ::launcher::run(self)
+    ::launcher::exec_one(self)
   }
 
   /// Returns value set by `Config::set_cache_usage`.
@@ -649,4 +649,4 @@ impl Config {
   }
 }
 
-pub use launcher::{is_completed, completed_marker_path};
+pub use launcher::{is_completed, completed_marker_path, exec};

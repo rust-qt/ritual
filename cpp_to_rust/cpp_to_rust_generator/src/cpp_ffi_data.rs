@@ -2,7 +2,6 @@ use caption_strategy::{ArgumentCaptionStrategy, MethodCaptionStrategy, TypeCapti
 use cpp_method::{CppMethod, ReturnValueAllocationPlace, CppMethodArgument};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppFunctionPointerType};
-use cpp_data::CppDataWithDeps;
 use common::errors::Result;
 use common::utils::MapIfOk;
 
@@ -56,7 +55,6 @@ impl CppCast {
     }
 
   }
-
 }
 
 /// Information about real nature of a C++ FFI method.
@@ -392,12 +390,4 @@ pub struct CppFfiHeaderData {
   pub methods: Vec<CppAndFfiMethod>,
   /// Generated Qt slot wrappers
   pub qt_slot_wrappers: Vec<QtSlotWrapper>,
-}
-
-/// Information about the generated C++ wrapper library
-pub struct CppAndFfiData {
-  /// Processed C++ data
-  pub cpp_data: CppDataWithDeps,
-  /// Generated headers
-  pub cpp_ffi_headers: Vec<CppFfiHeaderData>,
 }

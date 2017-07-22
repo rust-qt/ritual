@@ -848,7 +848,10 @@ impl<'a> CppFfiGenerator<'a> {
         is_const: false,
         is_const2: false,
       };
-      methods.push(create_cast_method(CppCast::Static { is_unsafe: false, is_direct: true, },
+      methods.push(create_cast_method(CppCast::Static {
+                                        is_unsafe: false,
+                                        is_direct: true,
+                                      },
                                       &cast_from,
                                       &cast_to,
                                       include_file_name));

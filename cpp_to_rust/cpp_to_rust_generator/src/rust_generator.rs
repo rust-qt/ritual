@@ -1,9 +1,9 @@
 //! Generates Rust public API and FFI functions
 
 use caption_strategy::TypeCaptionStrategy;
-use cpp_data::{CppTypeKind, CppEnumValue, CppTypeAllocationPlace};
+use cpp_data::{CppTypeKind, CppEnumValue, CppTypeAllocationPlace, CppDataWithDeps};
 use cpp_ffi_data::{CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiType, CppIndirectionChange,
-                   CppAndFfiData, CppFfiMethodKind, CppCast};
+                   CppFfiMethodKind, CppCast, CppFfiHeaderData};
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
@@ -215,17 +215,13 @@ fn prepare_enum_values(values: &[CppEnumValue]) -> Vec<RustEnumValue> {
 }
 
 /// Generator of the Rust public API of the crate.
-pub struct RustGenerator {
+pub struct RustGenerator<'a> {
   /// Data collected on previous step of the generator workflow
-  input_data: CppAndFfiData,
-  /// Configuration of this generator
-  config: RustGeneratorConfig,
+  input_data: RustGeneratorInputData<'a>,
 
   top_module_names: HashMap<String, RustName>,
   /// Type wrappers created for this crate
   processed_types: Vec<RustProcessedTypeInfo>,
-  /// Type wrappers found in all dependencies
-  dependency_types: Vec<RustProcessedTypeInfo>,
 }
 
 /// Results of adapting API for Rust wrapper.
@@ -239,126 +235,129 @@ pub struct RustGeneratorOutput {
   pub processed_types: Vec<RustProcessedTypeInfo>,
 }
 
-/// Config for `rust_generator` module.
-pub struct RustGeneratorConfig {
+// TODO: implement removal of arbitrary prefixes (#25)
+
+/// Information required by Rust generator
+pub struct RustGeneratorInputData<'a> {
+  /// Processed C++ data
+  pub cpp_data: &'a CppDataWithDeps,
+  /// Generated headers
+  pub cpp_ffi_headers: Vec<CppFfiHeaderData>,
+  /// Type wrappers found in all dependencies
+  pub dependency_types: Vec<RustProcessedTypeInfo>,
   /// Name of generated crate
   pub crate_name: String,
   /// Flag instructing to remove leading "Q" and "Qt"
   /// from identifiers.
   pub remove_qt_prefix: bool,
 }
-// TODO: implement removal of arbitrary prefixes (#25)
 
-/// Execute processing
-#[cfg_attr(feature="clippy", allow(extend_from_slice))]
-#[cfg_attr(feature="clippy", allow(block_in_if_condition_stmt))]
-pub fn run(input_data: CppAndFfiData,
-           dependency_rust_types: Vec<RustProcessedTypeInfo>,
-           config: RustGeneratorConfig)
-           -> Result<RustGeneratorOutput> {
-  let mut generator = RustGenerator {
-    top_module_names: HashMap::new(),
-    processed_types: Vec::new(),
-    dependency_types: dependency_rust_types,
-    input_data: input_data,
-    config: config,
-  };
-  generator.top_module_names = generator.calc_top_module_names()?;
+impl<'a> RustGeneratorInputData<'a> {
+  /// Execute processing
+  #[cfg_attr(feature="clippy", allow(extend_from_slice))]
+  #[cfg_attr(feature="clippy", allow(block_in_if_condition_stmt))]
+  pub fn run(self) -> Result<RustGeneratorOutput> {
+    let mut generator = RustGenerator {
+      top_module_names: HashMap::new(),
+      processed_types: Vec::new(),
+      input_data: self,
+    };
+    generator.top_module_names = generator.calc_top_module_names()?;
 
-  generator.processed_types = generator.calc_processed_types()?;
-  let mut modules = Vec::new();
-  {
-    let mut cpp_methods: Vec<&CppAndFfiMethod> = Vec::new();
-    for header in &generator.input_data.cpp_ffi_headers {
-      cpp_methods.extend(header.methods.iter());
-    }
-    let mut module_names_set = HashSet::new();
-    for item in &generator.processed_types {
-      if !module_names_set.contains(&item.rust_name.parts[1]) {
-        module_names_set.insert(item.rust_name.parts[1].clone());
+    generator.processed_types = generator.calc_processed_types()?;
+    let mut modules = Vec::new();
+    {
+      let mut cpp_methods: Vec<&CppAndFfiMethod> = Vec::new();
+      for header in &generator.input_data.cpp_ffi_headers {
+        cpp_methods.extend(header.methods.iter());
       }
-    }
-    cpp_methods = cpp_methods
-      .into_iter()
-      .filter(|method| {
-        if let Some(ref info) = method.cpp_method.class_membership {
-          if !generator
-                .processed_types
-                .iter()
-                .any(|t| {
-                       t.cpp_name == info.class_type.name &&
-                       t.cpp_template_arguments == info.class_type.template_arguments
-                     }) {
-            log::llog(log::DebugRustSkips,
-                      || "Warning: method is skipped because class type is not available in Rust:");
-            log::llog(log::DebugRustSkips, || format!("{}\n", method.short_text()));
-            return false;
+      let mut module_names_set = HashSet::new();
+      for item in &generator.processed_types {
+        if !module_names_set.contains(&item.rust_name.parts[1]) {
+          module_names_set.insert(item.rust_name.parts[1].clone());
+        }
+      }
+      cpp_methods = cpp_methods
+        .into_iter()
+        .filter(|method| {
+          if let Some(ref info) = method.cpp_method.class_membership {
+            if !generator
+                  .processed_types
+                  .iter()
+                  .any(|t| {
+                         t.cpp_name == info.class_type.name &&
+                         t.cpp_template_arguments == info.class_type.template_arguments
+                       }) {
+              log::llog(log::DebugRustSkips,
+                        || "Warning: method is skipped because class type is not available in Rust:");
+              log::llog(log::DebugRustSkips, || format!("{}\n", method.short_text()));
+              return false;
+            }
+          }
+          true
+        })
+        .collect();
+      for method in cpp_methods.clone() {
+        if method.cpp_method.class_membership.is_none() {
+          let rust_name = generator.free_function_rust_name(&method.cpp_method)?;
+          if !module_names_set.contains(&rust_name.parts[1]) {
+            module_names_set.insert(rust_name.parts[1].clone());
           }
         }
-        true
-      })
-      .collect();
-    for method in cpp_methods.clone() {
-      if method.cpp_method.class_membership.is_none() {
-        let rust_name = generator.free_function_rust_name(&method.cpp_method)?;
-        if !module_names_set.contains(&rust_name.parts[1]) {
-          module_names_set.insert(rust_name.parts[1].clone());
-        }
       }
-    }
 
-    let mut module_names: Vec<_> = module_names_set.into_iter().collect();
-    module_names.sort();
-    let module_count = module_names.len();
-    for (i, module_name) in module_names.into_iter().enumerate() {
-      log::status(format!("({}/{}) Generating module: {}",
-                          i + 1,
-                          module_count,
-                          module_name));
-      let full_module_name = RustName::new(vec![generator.config.crate_name.clone(), module_name])?;
-      let (module, tmp_cpp_methods) = generator
-        .generate_module(cpp_methods, &full_module_name)?;
-      cpp_methods = tmp_cpp_methods;
-      if let Some(module) = module {
-        modules.push(module);
-      }
-    }
-    if !cpp_methods.is_empty() {
-      log::error("unprocessed cpp methods left:");
-      for method in cpp_methods {
-        log::error(format!("  {}", method.cpp_method.short_text()));
-        if let Some(ref info) = method.cpp_method.class_membership {
-          let rust_name = generator
-            .calculate_rust_name(&info.class_type.name,
-                                 &method.cpp_method.include_file,
-                                 false,
-                                 None)?;
-          log::error(format!("  -> {}", rust_name.full_name(None)));
-        } else {
-          let rust_name = generator.free_function_rust_name(&method.cpp_method)?;
-          log::error(format!("  -> {}", rust_name.full_name(None)));
+      let mut module_names: Vec<_> = module_names_set.into_iter().collect();
+      module_names.sort();
+      let module_count = module_names.len();
+      for (i, module_name) in module_names.into_iter().enumerate() {
+        log::status(format!("({}/{}) Generating module: {}",
+                            i + 1,
+                            module_count,
+                            module_name));
+        let full_module_name = RustName::new(vec![generator.input_data.crate_name.clone(), module_name])?;
+        let (module, tmp_cpp_methods) = generator
+          .generate_module(cpp_methods, &full_module_name)?;
+        cpp_methods = tmp_cpp_methods;
+        if let Some(module) = module {
+          modules.push(module);
         }
       }
-      return Err(unexpected("unprocessed cpp methods left").into());
+      if !cpp_methods.is_empty() {
+        log::error("unprocessed cpp methods left:");
+        for method in cpp_methods {
+          log::error(format!("  {}", method.cpp_method.short_text()));
+          if let Some(ref info) = method.cpp_method.class_membership {
+            let rust_name = generator
+              .calculate_rust_name(&info.class_type.name,
+                                   &method.cpp_method.include_file,
+                                   false,
+                                   None)?;
+            log::error(format!("  -> {}", rust_name.full_name(None)));
+          } else {
+            let rust_name = generator.free_function_rust_name(&method.cpp_method)?;
+            log::error(format!("  -> {}", rust_name.full_name(None)));
+          }
+        }
+        return Err(unexpected("unprocessed cpp methods left").into());
+      }
     }
-  }
-  let mut any_not_declared = false;
-  for type1 in &generator.processed_types {
-    if !type1.is_declared_in(&modules) {
-      log::error(format!("type is not processed: {:?}", type1));
-      any_not_declared = true;
+    let mut any_not_declared = false;
+    for type1 in &generator.processed_types {
+      if !type1.is_declared_in(&modules) {
+        log::error(format!("type is not processed: {:?}", type1));
+        any_not_declared = true;
+      }
     }
+    if any_not_declared {
+      return Err(unexpected("unprocessed cpp types left").into());
+    }
+    Ok(RustGeneratorOutput {
+         ffi_functions: generator.generate_ffi_functions(),
+         modules: modules,
+         processed_types: generator.processed_types,
+       })
   }
-  if any_not_declared {
-    return Err(unexpected("unprocessed cpp types left").into());
-  }
-  Ok(RustGeneratorOutput {
-       ffi_functions: generator.generate_ffi_functions(),
-       modules: modules,
-       processed_types: generator.processed_types,
-     })
 }
-
 
 /// Output data of `RustGenerator::generate_type` function.
 struct GenerateTypeResult {
@@ -642,15 +641,15 @@ fn ffi_type(processed_types: &[RustProcessedTypeInfo],
 }
 
 
-impl RustGenerator {
+impl<'aa> RustGenerator<'aa> {
   fn calc_top_module_names(&self) -> Result<HashMap<String, RustName>> {
     let mut result = HashMap::new();
     {
       let mut check_header = |header: &str| -> Result<()> {
         if !result.contains_key(header) {
           let mut parts = Vec::new();
-          parts.push(self.config.crate_name.clone());
-          parts.push(include_file_to_module_name(header, self.config.remove_qt_prefix));
+          parts.push(self.input_data.crate_name.clone());
+          parts.push(include_file_to_module_name(header, self.input_data.remove_qt_prefix));
           result.insert(header.to_string(), RustName::new(parts)?);
         }
         Ok(())
@@ -765,7 +764,7 @@ impl RustGenerator {
                                    .iter()
                                    .map_if_ok(|arg| -> Result<_> {
                 Ok(complete_type(&self.processed_types,
-                                 &self.dependency_types,
+                                 &self.input_data.dependency_types,
                                  &arg
                                     .argument_type
                                     .to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
@@ -867,7 +866,7 @@ impl RustGenerator {
     for (arg_index, arg) in method.c_signature.arguments.iter().enumerate() {
       if arg.meaning != CppFfiArgumentMeaning::ReturnValue {
         let arg_type = complete_type(&self.processed_types,
-                                     &self.dependency_types,
+                                     &self.input_data.dependency_types,
                                      &arg.argument_type,
                                      &arg.meaning,
                                      false,
@@ -894,7 +893,7 @@ impl RustGenerator {
       // FFI return type must be void
       assert!(method.c_signature.return_type == CppFfiType::void());
       (complete_type(&self.processed_types,
-                     &self.dependency_types,
+                     &self.input_data.dependency_types,
                      &arg.argument_type,
                      &arg.meaning,
                      false,
@@ -904,7 +903,7 @@ impl RustGenerator {
       // none of the arguments has return value meaning,
       // so FFI return value must be used
       let return_type = complete_type(&self.processed_types,
-                                      &self.dependency_types,
+                                      &self.input_data.dependency_types,
                                       &method.c_signature.return_type,
                                       &CppFfiArgumentMeaning::ReturnValue,
                                       false,
@@ -1042,7 +1041,7 @@ impl RustGenerator {
         } else {
           vec!["cpp_utils".to_string(), "StaticCast".to_string()]
         }
-      },
+      }
       CppCast::Dynamic => vec!["cpp_utils".to_string(), "DynamicCast".to_string()],
       CppCast::QObject => {
         vec!["qt_core".to_string(),
@@ -1088,8 +1087,7 @@ impl RustGenerator {
         .ptr_to_ref(*final_is_const)?;
       final_method.arguments.arguments[0].name = "self".to_string();
 
-      if !cpp_cast.is_unsafe_static_cast() &&
-          cpp_cast.is_direct_static_cast() {
+      if !cpp_cast.is_unsafe_static_cast() && cpp_cast.is_direct_static_cast() {
 
         let mut deref_method = final_method.clone();
         deref_method.name = RustName::new(vec![if *final_is_const {
@@ -1213,10 +1211,10 @@ impl RustGenerator {
         }
 
         let cpp_method_key = method.arguments.cpp_method.cpp_method.clone();
-//        if let Some(v) = cpp_method_key.arguments_before_omitting {
-//          cpp_method_key.arguments = v;
-//          cpp_method_key.arguments_before_omitting = None;
-//        }
+        //        if let Some(v) = cpp_method_key.arguments_before_omitting {
+        //          cpp_method_key.arguments = v;
+        //          cpp_method_key.arguments_before_omitting = None;
+        //        }
         add_to_multihash(&mut grouped_by_cpp_method,
                          cpp_method_key,
                          method.arguments.clone());
@@ -1238,7 +1236,7 @@ impl RustGenerator {
                                         Ok(doc_formatter::rust_method_variant(args,
                                                     method_name.last_name()?,
                                                     first_method.self_arg_kind()?,
-                                                    &self.config.crate_name))
+                                                    &self.input_data.crate_name))
                                       })?,
                        });
       }
@@ -1637,7 +1635,7 @@ impl RustGenerator {
     let mut args = Vec::new();
     for arg in &data.c_signature.arguments {
       let rust_type = ffi_type(&self.processed_types,
-                               &self.dependency_types,
+                               &self.input_data.dependency_types,
                                &arg.argument_type.ffi_type)?;
       args.push(RustFFIArgument {
                   name: sanitize_rust_identifier(&arg.name),
@@ -1646,7 +1644,7 @@ impl RustGenerator {
     }
     Ok(RustFFIFunction {
          return_type: ffi_type(&self.processed_types,
-                               &self.dependency_types,
+                               &self.input_data.dependency_types,
                                &data.c_signature.return_type.ffi_type)?,
          name: data.c_name.clone(),
          arguments: args,
@@ -1782,7 +1780,7 @@ impl RustGenerator {
         if let Some(ref args) = item.cpp_template_arguments {
           for x in args {
             let rust_type = complete_type(result,
-                                          &self.dependency_types,
+                                          &self.input_data.dependency_types,
                                           &x.to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
                                           &CppFfiArgumentMeaning::Argument(0),
                                           true,
@@ -1912,7 +1910,7 @@ impl RustGenerator {
           .iter()
           .map_if_ok(|x| -> Result<_> {
             let rust_type = complete_type(&result,
-                                          &self.dependency_types,
+                                          &self.input_data.dependency_types,
                                           x,
                                           &CppFfiArgumentMeaning::Argument(0),
                                           false,
@@ -1943,7 +1941,7 @@ impl RustGenerator {
                                    .iter()
                                    .map_if_ok(|t| -> Result<_> {
               let mut t = complete_type(&result,
-                                        &self.dependency_types,
+                                        &self.input_data.dependency_types,
                                         t,
                                         &CppFfiArgumentMeaning::Argument(0),
                                         false,
@@ -1986,7 +1984,7 @@ impl RustGenerator {
                                         } else {
                                           Case::Class
                                         },
-                                        self.config.remove_qt_prefix)
+                                        self.input_data.remove_qt_prefix)
     };
 
     let module_name =
@@ -2004,7 +2002,7 @@ impl RustGenerator {
     for part in split_parts {
       parts.push(remove_qt_prefix_and_convert_case(&part.to_string(),
                                                    Case::Snake,
-                                                   self.config.remove_qt_prefix));
+                                                   self.input_data.remove_qt_prefix));
     }
 
     if parts.len() > 2 && parts[1] == parts[2] {
@@ -2051,12 +2049,10 @@ fn calculate_rust_name_test_part(name: &'static str,
   let mut generator = RustGenerator {
     top_module_names: HashMap::new(),
     processed_types: Vec::new(),
-    dependency_types: Vec::new(),
-    input_data: CppAndFfiData {
+    input_data: RustGeneratorInputData {
       cpp_ffi_headers: vec![header],
-      cpp_data: Default::default(),
-    },
-    config: RustGeneratorConfig {
+      cpp_data: &Default::default(),
+      dependency_types: Vec::new(),
       crate_name: "qt_core".to_string(),
       remove_qt_prefix: true,
     },

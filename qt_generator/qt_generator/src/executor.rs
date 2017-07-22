@@ -3,7 +3,7 @@
 use cpp_to_rust_generator::common::errors::Result;
 use cpp_to_rust_generator::common::{log, toml};
 use cpp_to_rust_generator::common::file_utils::{PathBufWithAdded, repo_crate_local_path};
-use cpp_to_rust_generator::config::{Config, CacheUsage, DebugLoggingConfig};
+use cpp_to_rust_generator::config::{Config, CacheUsage, DebugLoggingConfig, exec};
 use cpp_to_rust_generator::cpp_data::CppVisibility;
 use cpp_to_rust_generator::common::cpp_build_config::{CppBuildConfigData, CppLibraryType};
 use cpp_to_rust_generator::common::target;
@@ -55,6 +55,7 @@ pub fn exec_all(libs: Vec<String>,
   } else {
     libs
   };
+  let mut configs = Vec::new();
   for sublib_name in final_libs {
     let lib_cache_dir = cache_dir.with_added(format!("qt_{}", sublib_name));
     let lib_crate_templates_path = crate_templates_path.with_added(&sublib_name);
@@ -73,30 +74,31 @@ pub fn exec_all(libs: Vec<String>,
       }
       dependency_paths.push(path);
     }
-    exec(&sublib_name,
-         lib_cache_dir,
-         lib_output_dir,
-         lib_crate_templates_path,
-         dependency_paths,
-         &config)?;
+    if is_completed(&lib_cache_dir) && config.cache_usage.can_skip_all() {
+      log::status("No processing! cpp_to_rust uses previous results.");
+      log::status("Run with -C0 to force full processing.");
+      continue;
+    }
+    configs.push(make_config(&sublib_name,
+                lib_cache_dir,
+                lib_output_dir,
+                lib_crate_templates_path,
+                dependency_paths,
+                &config)?);
   }
+  exec(configs.into_iter())?;
   Ok(())
 }
 
 /// Executes the generator for a single Qt module with given configuration.
-fn exec(sublib_name: &str,
-        cache_dir: PathBuf,
-        output_dir: PathBuf,
-        crate_templates_path: PathBuf,
-        dependency_paths: Vec<PathBuf>,
-        exec_config: &ExecConfig)
-        -> Result<()> {
-  if is_completed(&cache_dir) && exec_config.cache_usage.can_skip_all() {
-    log::status("No processing! cpp_to_rust uses previous results.");
-    log::status("Run with -C0 to force full processing.");
-    return Ok(());
-  }
-  log::status(format!("Processing library: {}", sublib_name));
+fn make_config(sublib_name: &str,
+               cache_dir: PathBuf,
+               output_dir: PathBuf,
+               crate_templates_path: PathBuf,
+               dependency_paths: Vec<PathBuf>,
+               exec_config: &ExecConfig)
+               -> Result<Config> {
+  log::status(format!("Preparing generator config for library: {}", sublib_name));
   let crate_name = format!("qt_{}", sublib_name);
   let mut crate_properties = CrateProperties::new(crate_name.clone(),
                                                   versions::QT_OUTPUT_CRATES_VERSION);
@@ -243,8 +245,7 @@ fn exec(sublib_name: &str,
   }
 
   config.set_dependency_cache_paths(dependency_paths);
-  config.exec()?;
-  Ok(())
+  Ok(config)
 }
 
 /// Adds documentation from `data` to `cpp_methods`.

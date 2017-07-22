@@ -1,10 +1,8 @@
 //! Types for handling information about C++ methods.
 
 
-use cpp_data::{CppVisibility, CppOriginLocation,
-               TemplateArgumentsDeclaration, CppBaseSpecifier};
-use cpp_ffi_data::{CppFfiType, CppFfiMethodSignature,
-                   CppFfiMethodArgument, CppFfiArgumentMeaning};
+use cpp_data::{CppVisibility, CppOriginLocation, TemplateArgumentsDeclaration, CppBaseSpecifier};
+use cpp_ffi_data::{CppFfiType, CppFfiMethodSignature, CppFfiMethodArgument, CppFfiArgumentMeaning};
 use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase, CppTypeClassBase};
 use common::errors::{Result, unexpected};
 use common::string_utils::JoinWithSeparator;
