@@ -34,6 +34,12 @@ pub fn run_and_return(sublib_name: &str) -> Result<()> {
   config
     .cpp_build_paths_mut()
     .add_include_path(&installation_data.lib_include_path);
+  for dep in lib_dependencies(sublib_name)? {
+    let dep_data = get_installation_data(dep)?;
+    config
+      .cpp_build_paths_mut()
+      .add_include_path(&dep_data.lib_include_path);
+  }
   let mut cpp_build_config_data = CppBuildConfigData::new();
   if installation_data.is_framework {
     config

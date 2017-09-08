@@ -130,6 +130,10 @@ fn exec(sublib_name: &str,
   let installation_data = get_installation_data(sublib_name)?;
   config.add_include_path(&installation_data.root_include_path);
   config.add_include_path(&installation_data.lib_include_path);
+  for dep in lib_dependencies(&sublib_name)? {
+    let dep_data = get_installation_data(dep)?;
+    config.add_include_path(&dep_data.lib_include_path);
+  }
   config.add_target_include_path(&installation_data.lib_include_path);
   config.set_cache_usage(exec_config.cache_usage.clone());
   config.set_write_dependencies_local_paths(exec_config.write_dependencies_local_paths);
