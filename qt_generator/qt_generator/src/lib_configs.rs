@@ -401,6 +401,5 @@ pub fn logic_3d(config: &mut Config) -> Result<()> {
 /// Qt3DExtras specific configuration.
 pub fn extras_3d(config: &mut Config) -> Result<()> {
   config.add_cpp_filtered_namespace("Qt3DExtras");
-  config.add_cpp_parser_blocked_names(vec!["Qt3DWindow"]);
   Ok(())
 }
