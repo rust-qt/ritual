@@ -116,10 +116,20 @@ pub fn lib_dependencies(sublib_name: &str) -> Result<&'static [&'static str]> {
   const GUI: &'static [&'static str] = &["core"];
   const WIDGETS: &'static [&'static str] = &["core", "gui"];
   const UI_TOOLS: &'static [&'static str] = &["core", "gui", "widgets"];
+  const CORE3D: &'static [&'static str] = &["core", "gui"];
+  const RENDER3D: &'static [&'static str] = &["core", "gui", "3d_core"];
+  const INPUT3D: &'static [&'static str] = &["core", "gui", "3d_core"];
+  const LOGIC3D: &'static [&'static str] = &["core", "gui", "3d_core"];
+  const EXTRAS3D: &'static [&'static str] = &["core", "gui", "3d_core", "3d_render", "3d_input", "3d_logic"];
   Ok(match sublib_name {
        "core" => CORE,
        "gui" => GUI,
        "widgets" => WIDGETS,
+       "3d_core" => CORE3D,
+       "3d_render" => RENDER3D,
+       "3d_input" => INPUT3D,
+       "3d_logic" => LOGIC3D,
+       "3d_extras" => EXTRAS3D,
        "ui_tools" => UI_TOOLS,
        _ => return Err(format!("Unknown lib name: {}", sublib_name).into()),
      })

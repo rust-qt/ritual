@@ -51,6 +51,11 @@ pub fn exec_all(libs: Vec<String>,
     vec!["core".to_string(),
          "gui".to_string(),
          "widgets".to_string(),
+         "3d_core".to_string(),
+         "3d_render".to_string(),
+         "3d_input".to_string(),
+         "3d_logic".to_string(),
+         "3d_extras".to_string(),
          "ui_tools".to_string()]
   } else {
     libs
@@ -242,6 +247,11 @@ fn exec(sublib_name: &str,
     "core" => lib_configs::core(&mut config)?,
     "gui" => lib_configs::gui(&mut config)?,
     "widgets" => lib_configs::widgets(&mut config)?,
+    "3d_core" => lib_configs::core_3d(&mut config)?,
+    "3d_render" => lib_configs::render_3d(&mut config)?,
+    "3d_input" => lib_configs::input_3d(&mut config)?,
+    "3d_logic" => lib_configs::logic_3d(&mut config)?,
+    "3d_extras" => lib_configs::extras_3d(&mut config)?,
     "ui_tools" => {}
     _ => return Err(format!("Unknown lib name: {}", sublib_name).into()),
   }
