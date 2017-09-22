@@ -83,7 +83,7 @@ fn operator_rust_name(operator: &CppOperator) -> Result<String> {
 fn remove_qt_prefix_and_convert_case(s: &str, case: Case, remove_qt_prefix: bool) -> String {
   let mut parts: Vec<_> = WordIterator::new(s).collect();
   if remove_qt_prefix && parts.len() > 1 {
-    if parts[0] == "Q" || parts[0] == "q" || parts[0] == "Qt" {
+    if (parts[0] == "Q" || parts[0] == "q" || parts[0] == "Qt") && !parts[1].starts_with(|c: char| c.is_digit(10)) {
       parts.remove(0);
     }
   }
@@ -2019,6 +2019,14 @@ fn remove_qt_prefix_and_convert_case_test() {
              "DirIterator");
   assert_eq!(remove_qt_prefix_and_convert_case(&"QDirIterator".to_string(), Case::Snake, true),
              "dir_iterator");
+  assert_eq!(remove_qt_prefix_and_convert_case(&"Qt3DWindow".to_string(), Case::Class, false),
+             "Qt3DWindow");
+  assert_eq!(remove_qt_prefix_and_convert_case(&"Qt3DWindow".to_string(), Case::Snake, false),
+             "qt_3d_window");
+  assert_eq!(remove_qt_prefix_and_convert_case(&"Qt3DWindow".to_string(), Case::Class, true),
+             "Qt3DWindow");
+  assert_eq!(remove_qt_prefix_and_convert_case(&"Qt3DWindow".to_string(), Case::Snake, true),
+             "qt_3d_window");
 }
 
 #[cfg(test)]
