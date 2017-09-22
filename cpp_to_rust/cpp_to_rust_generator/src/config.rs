@@ -245,6 +245,7 @@ pub struct Config {
   cpp_parser_blocked_names: Vec<String>,
   cpp_ffi_generator_filters: Vec<CppFfiGeneratorFilter>,
   cpp_data_filters: Vec<CppDataFilter>,
+  cpp_filtered_namespaces: Vec<String>,
   cpp_build_config: CppBuildConfig, // TODO: add CppBuildPaths when needed
   write_dependencies_local_paths: bool,
   type_allocation_places: HashMap<String, CppTypeAllocationPlace>,
@@ -278,6 +279,7 @@ impl Config {
       cpp_parser_blocked_names: Default::default(),
       cpp_ffi_generator_filters: Default::default(),
       cpp_data_filters: Default::default(),
+      cpp_filtered_namespaces: Default::default(),
       cpp_build_config: Default::default(),
       type_allocation_places: Default::default(),
       write_dependencies_local_paths: true,
@@ -455,6 +457,22 @@ impl Config {
     self.cpp_data_filters.push(CppDataFilter(Box::new(f)));
   }
 
+  /// Adds a namespace to filter out before rust code generation.
+  pub fn add_cpp_filtered_namespace<N: Into<String>>(&mut self, namespace: N) {
+    self.cpp_filtered_namespaces.push(namespace.into());
+  }
+
+  /// Adds multiple namespaces to filter out before rust code generation.
+  pub fn add_cpp_filtered_namespaces<Item, Iter>(&mut self, namespaces: Iter)
+    where Item: Into<String>,
+          Iter: IntoIterator<Item = Item>
+  {
+    for namespace in namespaces {
+      self.cpp_filtered_namespaces.push(namespace.into());
+    }
+  }
+
+
   /// Overrides automatic selection of type allocation place for `type_name` and uses `place`
   /// instead. See `CppTypeAllocationPlace` for more information.
   pub fn set_type_allocation_place<S: Into<String>>(&mut self,
@@ -608,6 +626,11 @@ impl Config {
   /// Returns values added by `Config::add_cpp_data_filter`.
   pub fn cpp_data_filters(&self) -> Vec<&Box<CppDataFilterFn>> {
     self.cpp_data_filters.iter().map(|x| &x.0).collect()
+  }
+
+  /// Returns values added by `Config::add_cpp_filtered_namespace`.
+  pub fn cpp_filtered_namespaces(&self) -> &Vec<String> {
+    &self.cpp_filtered_namespaces
   }
 
   /// Returns current `CppBuildConfig` value.

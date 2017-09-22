@@ -339,6 +339,7 @@ pub fn run(config: Config) -> Result<()> {
                                         crate_name: config.crate_properties().name().clone(),
                                         // TODO: more universal prefix removal (#25)
                                         remove_qt_prefix: remove_qt_prefix,
+                                        filtered_namespaces: config.cpp_filtered_namespaces().clone(),
                                       })
       .chain_err(|| "Rust data generator failed")?;
   log::status(format!("Generating Rust crate code ({})",

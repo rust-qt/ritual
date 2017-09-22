@@ -246,6 +246,8 @@ pub struct RustGeneratorConfig {
   /// Flag instructing to remove leading "Q" and "Qt"
   /// from identifiers.
   pub remove_qt_prefix: bool,
+  /// List of namespaces to filter out during code generation
+  pub filtered_namespaces: Vec<String>,
 }
 // TODO: implement removal of arbitrary prefixes (#25)
 
@@ -1979,7 +1981,11 @@ impl RustGenerator {
     //    parts.push(config.crate_name.clone());
     //    parts.push(include_file_to_module_name(include_file, config.remove_qt_prefix));
     for part in split_parts {
-      parts.push(remove_qt_prefix_and_convert_case(&part.to_string(),
+      let part = part.to_string();
+      if self.config.filtered_namespaces.contains(&part) {
+        continue;
+      }
+      parts.push(remove_qt_prefix_and_convert_case(&part,
                                                    Case::Snake,
                                                    self.config.remove_qt_prefix));
     }
@@ -2036,6 +2042,7 @@ fn calculate_rust_name_test_part(name: &'static str,
     config: RustGeneratorConfig {
       crate_name: "qt_core".to_string(),
       remove_qt_prefix: true,
+      filtered_namespaces: Vec::new(),
     },
   };
   generator.top_module_names = generator.calc_top_module_names().unwrap();
