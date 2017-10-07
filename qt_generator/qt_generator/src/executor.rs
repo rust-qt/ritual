@@ -51,12 +51,12 @@ pub fn exec_all(libs: Vec<String>,
     vec!["core".to_string(),
          "gui".to_string(),
          "widgets".to_string(),
+         "ui_tools".to_string(),
          "3d_core".to_string(),
          "3d_render".to_string(),
          "3d_input".to_string(),
          "3d_logic".to_string(),
-         "3d_extras".to_string(),
-         "ui_tools".to_string()]
+         "3d_extras".to_string()]
   } else {
     libs
   };
