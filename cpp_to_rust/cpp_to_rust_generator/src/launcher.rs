@@ -380,6 +380,7 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
           crate_name: config.crate_properties().name().clone(),
           // TODO: more universal prefix removal (#25)
           remove_qt_prefix: remove_qt_prefix,
+          filtered_namespaces: config.cpp_filtered_namespaces().clone(),
         }
         .run()
         .chain_err(|| "Rust data generator failed")?;

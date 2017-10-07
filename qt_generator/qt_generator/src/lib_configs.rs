@@ -340,3 +340,62 @@ pub fn widgets(config: &mut Config) -> Result<()> {
   });
   Ok(())
 }
+
+/// Qt3DCore specific configuration.
+pub fn core_3d(config: &mut Config) -> Result<()> {
+  config.add_cpp_filtered_namespace("Qt3DCore");
+  exclude_qvector_eq_based_methods(config, &["Qt3DCore::QNodeIdTypePair"]);
+  Ok(())
+}
+
+/// Qt3DRender specific configuration.
+pub fn render_3d(config: &mut Config) -> Result<()> {
+  config.add_cpp_filtered_namespace("Qt3DRender");
+  config.add_cpp_parser_blocked_names(vec!["Qt3DRender::QTexture1D",
+                                           "Qt3DRender::QTexture1DArray",
+                                           "Qt3DRender::QTexture2D",
+                                           "Qt3DRender::QTexture2DArray",
+                                           "Qt3DRender::QTexture3D",
+                                           "Qt3DRender::QTextureCubeMap",
+                                           "Qt3DRender::QTextureCubeMapArray",
+                                           "Qt3DRender::QTexture2DMultisample",
+                                           "Qt3DRender::QTexture2DMultisampleArray",
+                                           "Qt3DRender::QTextureRectangle",
+                                           "Qt3DRender::QTextureBuffer",
+                                           "Qt3DRender::QRenderCapture",
+                                           "Qt3DRender::QRenderCaptureReply"]);
+  config.add_cpp_ffi_generator_filter(|method| {
+    if let Some(ref info) = method.class_membership {
+      match info.class_type.to_cpp_pseudo_code().as_ref() {
+        "Qt3DRender::QSpotLight" => {
+          match method.name.as_ref() {
+            "attenuation" => return Ok(false),
+            _ => {}
+          }
+        }
+        _ => {}
+      }
+    }
+    Ok(true)
+  });
+  Ok(())
+}
+
+/// Qt3DInput specific configuration.
+pub fn input_3d(config: &mut Config) -> Result<()> {
+  config.add_cpp_filtered_namespace("Qt3DInput");
+  config.add_cpp_parser_blocked_names(vec!["Qt3DInput::QWheelEvent"]);
+  Ok(())
+}
+
+/// Qt3DLogic specific configuration.
+pub fn logic_3d(config: &mut Config) -> Result<()> {
+  config.add_cpp_filtered_namespace("Qt3DLogic");
+  Ok(())
+}
+
+/// Qt3DExtras specific configuration.
+pub fn extras_3d(config: &mut Config) -> Result<()> {
+  config.add_cpp_filtered_namespace("Qt3DExtras");
+  Ok(())
+}

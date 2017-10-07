@@ -83,7 +83,8 @@ fn operator_rust_name(operator: &CppOperator) -> Result<String> {
 fn remove_qt_prefix_and_convert_case(s: &str, case: Case, remove_qt_prefix: bool) -> String {
   let mut parts: Vec<_> = WordIterator::new(s).collect();
   if remove_qt_prefix && parts.len() > 1 {
-    if parts[0] == "Q" || parts[0] == "q" || parts[0] == "Qt" {
+    if (parts[0] == "Q" || parts[0] == "q" || parts[0] == "Qt") &&
+       !parts[1].starts_with(|c: char| c.is_digit(10)) {
       parts.remove(0);
     }
   }
@@ -250,6 +251,8 @@ pub struct RustGeneratorInputData<'a> {
   /// Flag instructing to remove leading "Q" and "Qt"
   /// from identifiers.
   pub remove_qt_prefix: bool,
+  /// List of namespaces to filter out during code generation
+  pub filtered_namespaces: Vec<String>,
 }
 
 impl<'a> RustGeneratorInputData<'a> {
@@ -2008,7 +2011,11 @@ impl<'aa> RustGenerator<'aa> {
     //    parts.push(config.crate_name.clone());
     //    parts.push(include_file_to_module_name(include_file, config.remove_qt_prefix));
     for part in split_parts {
-      parts.push(remove_qt_prefix_and_convert_case(&part.to_string(),
+      let part = part.to_string();
+      if self.input_data.filtered_namespaces.contains(&part) {
+        continue;
+      }
+      parts.push(remove_qt_prefix_and_convert_case(&part,
                                                    Case::Snake,
                                                    self.input_data.remove_qt_prefix));
     }
@@ -2042,6 +2049,14 @@ fn remove_qt_prefix_and_convert_case_test() {
              "DirIterator");
   assert_eq!(remove_qt_prefix_and_convert_case(&"QDirIterator".to_string(), Case::Snake, true),
              "dir_iterator");
+  assert_eq!(remove_qt_prefix_and_convert_case(&"Qt3DWindow".to_string(), Case::Class, false),
+             "Qt3DWindow");
+  assert_eq!(remove_qt_prefix_and_convert_case(&"Qt3DWindow".to_string(), Case::Snake, false),
+             "qt_3d_window");
+  assert_eq!(remove_qt_prefix_and_convert_case(&"Qt3DWindow".to_string(), Case::Class, true),
+             "Qt3DWindow");
+  assert_eq!(remove_qt_prefix_and_convert_case(&"Qt3DWindow".to_string(), Case::Snake, true),
+             "qt_3d_window");
 }
 
 #[cfg(test)]
@@ -2063,6 +2078,7 @@ fn calculate_rust_name_test_part(name: &'static str,
       dependency_types: Vec::new(),
       crate_name: "qt_core".to_string(),
       remove_qt_prefix: true,
+      filtered_namespaces: Vec::new(),
     },
   };
   generator.top_module_names = generator.calc_top_module_names().unwrap();
