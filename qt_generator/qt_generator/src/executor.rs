@@ -60,7 +60,7 @@ pub fn exec_all(libs: Vec<String>,
   } else {
     libs
   };
-  let mut configs = Vec::new();
+  let mut configs: Vec<Config> = Vec::new();
   for sublib_name in final_libs {
     let lib_cache_dir = cache_dir.with_added(format!("qt_{}", sublib_name));
     let lib_crate_templates_path = crate_templates_path.with_added(&sublib_name);
@@ -69,7 +69,7 @@ pub fn exec_all(libs: Vec<String>,
     let mut dependency_paths = Vec::new();
     for dep in lib_dependencies(&sublib_name)? {
       let path = cache_dir.with_added(format!("qt_{}", dep));
-      if !is_completed(&path) {
+      if !configs.iter().any(|c| c.cache_dir_path() == &path) && !is_completed(&path) {
         return Err(format!("\"{}\" depends on \"{}\" but processing \
           in \"{}\" directory is not completed.",
                            sublib_name,
