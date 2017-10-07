@@ -12,7 +12,7 @@ use common::string_utils::JoinWithSeparator;
 use common::log;
 
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clang::*;
 use clang;
@@ -212,8 +212,17 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(config: &CppParserConfig,
     args.push(str.to_string());
   }
   if let Ok(path) = ::std::env::var("CLANG_SYSTEM_INCLUDE_PATH") {
+    if !Path::new(&path).exists() {
+      log::error(format!("Warning: CLANG_SYSTEM_INCLUDE_PATH environment variable is set to \"{}\" \
+                          but this path does not exist.",
+                         path));
+      log::error("This may result in parse errors related to system header includes.");
+    }
     args.push("-isystem".to_string());
     args.push(path);
+  } else {
+    log::error("Warning: CLANG_SYSTEM_INCLUDE_PATH environment variable is not set.");
+    log::error("This may result in parse errors related to system header includes.");
   }
   for dir in &config.framework_paths {
     let str = path_to_str(dir)?;
