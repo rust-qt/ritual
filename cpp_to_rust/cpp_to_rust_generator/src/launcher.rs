@@ -117,8 +117,8 @@ fn check_all_paths(config: &Config) -> Result<()> {
 /// from the cache directory if it's available and permitted by `config.cache_usage()`.
 /// Otherwise, performs necessary steps to parse and process C++ data.
 fn load_or_create_cpp_data<'a>(config: &Config,
-                           dependencies_cpp_data: Vec<&'a CppData>)
-                           -> Result<CppDataWithDeps<'a>> {
+                               dependencies_cpp_data: Vec<&'a CppData>)
+                               -> Result<CppDataWithDeps<'a>> {
   let parser_cpp_data_file_path = config.cache_dir_path().with_added("parser_cpp_data.bin");
 
   let loaded_parser_cpp_data = if config.cache_usage().can_use_raw_cpp_data() &&
@@ -315,7 +315,9 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
       dependencies.push(data);
     }
     {
-      let cpp_data = load_or_create_cpp_data(&config, dependencies.iter().map(|dep| &dep.cpp_data).collect())?;
+      let cpp_data =
+        load_or_create_cpp_data(&config,
+                                dependencies.iter().map(|dep| &dep.cpp_data).collect())?;
       let output_path_existed = config.output_dir_path().with_added("src").exists();
 
       let c_lib_path = config.output_dir_path().with_added("c_lib");
@@ -371,7 +373,10 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
       let rust_data = rust_generator::RustGeneratorInputData {
           cpp_data: &cpp_data,
           cpp_ffi_headers: cpp_ffi_headers,
-          dependency_types: dependencies.iter().map(|dep| &dep.rust_export_info.rust_types as &[_]).collect(),
+          dependency_types: dependencies
+            .iter()
+            .map(|dep| &dep.rust_export_info.rust_types as &[_])
+            .collect(),
           crate_name: config.crate_properties().name().clone(),
           // TODO: more universal prefix removal (#25)
           remove_qt_prefix: remove_qt_prefix,

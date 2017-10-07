@@ -17,9 +17,9 @@ struct CppPostProcessor<'a> {
 
 /// Derives `ProcessedCppData` from `ParserCppData`.
 pub fn cpp_post_process<'a>(parser_data: ParserCppData,
-                        dependencies: Vec<&'a CppData>,
-                        allocation_place_overrides: &HashMap<String, CppTypeAllocationPlace>)
-                        -> Result<CppDataWithDeps<'a>> {
+                            dependencies: Vec<&'a CppData>,
+                            allocation_place_overrides: &HashMap<String, CppTypeAllocationPlace>)
+                            -> Result<CppDataWithDeps<'a>> {
   let processor = CppPostProcessor {
     parser_data: parser_data,
     dependencies: dependencies,
@@ -137,7 +137,9 @@ impl<'a> CppPostProcessor<'a> {
   #[cfg_attr(feature="clippy", allow(block_in_if_condition_stmt))]
   fn find_template_instantiations(&self) -> Vec<CppTemplateInstantiations> {
 
-    fn check_type(type1: &CppType, deps: &[&CppData], result: &mut Vec<CppTemplateInstantiations>) {
+    fn check_type(type1: &CppType,
+                  deps: &[&CppData],
+                  result: &mut Vec<CppTemplateInstantiations>) {
       if let CppTypeBase::Class(CppTypeClassBase {
                                   ref name,
                                   ref template_arguments,
