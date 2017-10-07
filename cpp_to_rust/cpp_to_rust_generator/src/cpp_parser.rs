@@ -630,7 +630,7 @@ impl<'a> CppParser<'a> {
           return Err(format!("failed to get enum declaration: {:?}", type1).into());
         }
       }
-      TypeKind::Record => {
+      TypeKind::Elaborated | TypeKind::Record => {
         if let Some(declaration) = type1.get_declaration() {
           if declaration
                .get_accessibility()

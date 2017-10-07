@@ -97,7 +97,13 @@ impl DocData {
                          docs_path.display())
                      .into());
     }
-    let doc_file_path = docs_path.with_added(format!("qt{}.qch", qt_sub_lib_name));
+    let doc_file_name = if qt_sub_lib_name.starts_with("3d_") {
+      "3d".to_string()
+    } else {
+      qt_sub_lib_name.replace("_", "")
+    };
+
+    let doc_file_path = docs_path.with_added(format!("qt{}.qch", doc_file_name));
     if !doc_file_path.exists() {
       return Err(format!("Documentation file does not exist: {}",
                          doc_file_path.display())

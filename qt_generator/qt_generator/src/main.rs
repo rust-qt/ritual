@@ -80,7 +80,7 @@ fn main() {
     const OUTPUT_DIR_HELP: &'static str = "Directory for generated crates";
     const LIBS_HELP: &'static str = "Libraries (Qt modules) to process. Specify \"all\" to process all\
                                      supported modules or specify one or multiple of the following: \
-                                     core, gui, widgets, ui_tools, all.";
+                                     core, gui, widgets, ui_tools, 3d_core, 3d_render, 3d_input, 3d_logic, 3d_extras, all.";
     const CACHE_USAGE_HELP: &'static str = "Cache usage for repeated execution";
     const CACHE_USAGE_LONG_HELP: &'static str = "Cache usage for repeated execution:\n\
                                                  0 - no cache usage (default),\n\

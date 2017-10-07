@@ -6,4 +6,6 @@ out
 Cargo.lock
 *.swp
 .cargo
+*.orig
+
 

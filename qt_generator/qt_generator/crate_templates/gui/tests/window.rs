@@ -3,7 +3,6 @@ extern crate qt_gui;
 use qt_gui::gui_application::GuiApplication;
 use qt_gui::window::Window;
 use qt_gui::qt_core::point::Point;
-use qt_gui::cpp_utils::*;
 
 #[test]
 fn window1() {

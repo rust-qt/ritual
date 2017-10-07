@@ -51,11 +51,16 @@ pub fn exec_all(libs: Vec<String>,
     vec!["core".to_string(),
          "gui".to_string(),
          "widgets".to_string(),
-         "ui_tools".to_string()]
+         "ui_tools".to_string(),
+         "3d_core".to_string(),
+         "3d_render".to_string(),
+         "3d_input".to_string(),
+         "3d_logic".to_string(),
+         "3d_extras".to_string()]
   } else {
     libs
   };
-  let mut configs = Vec::new();
+  let mut configs: Vec<Config> = Vec::new();
   for sublib_name in final_libs {
     let lib_cache_dir = cache_dir.with_added(format!("qt_{}", sublib_name));
     let lib_crate_templates_path = crate_templates_path.with_added(&sublib_name);
@@ -64,7 +69,7 @@ pub fn exec_all(libs: Vec<String>,
     let mut dependency_paths = Vec::new();
     for dep in lib_dependencies(&sublib_name)? {
       let path = cache_dir.with_added(format!("qt_{}", dep));
-      if !is_completed(&path) {
+      if !configs.iter().any(|c| c.cache_dir_path() == &path) && !is_completed(&path) {
         return Err(format!("\"{}\" depends on \"{}\" but processing \
           in \"{}\" directory is not completed.",
                            sublib_name,
@@ -132,6 +137,10 @@ fn make_config(sublib_name: &str,
   let installation_data = get_installation_data(sublib_name)?;
   config.add_include_path(&installation_data.root_include_path);
   config.add_include_path(&installation_data.lib_include_path);
+  for dep in lib_dependencies(&sublib_name)? {
+    let dep_data = get_installation_data(dep)?;
+    config.add_include_path(&dep_data.lib_include_path);
+  }
   config.add_target_include_path(&installation_data.lib_include_path);
   config.set_cache_usage(exec_config.cache_usage.clone());
   config.set_write_dependencies_local_paths(exec_config.write_dependencies_local_paths);
@@ -240,6 +249,11 @@ fn make_config(sublib_name: &str,
     "core" => lib_configs::core(&mut config)?,
     "gui" => lib_configs::gui(&mut config)?,
     "widgets" => lib_configs::widgets(&mut config)?,
+    "3d_core" => lib_configs::core_3d(&mut config)?,
+    "3d_render" => lib_configs::render_3d(&mut config)?,
+    "3d_input" => lib_configs::input_3d(&mut config)?,
+    "3d_logic" => lib_configs::logic_3d(&mut config)?,
+    "3d_extras" => lib_configs::extras_3d(&mut config)?,
     "ui_tools" => {}
     _ => return Err(format!("Unknown lib name: {}", sublib_name).into()),
   }
