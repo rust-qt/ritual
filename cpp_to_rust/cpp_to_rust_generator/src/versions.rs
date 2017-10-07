@@ -8,7 +8,7 @@
 
 
 /// Version of `cpp_to_rust_build_tools` crate.
-pub const BUILD_TOOLS_VERSION: &'static str = "0.2.1";
+pub const BUILD_TOOLS_VERSION: &'static str = "0.2.3";
 
 /// Version of `cpp_utils` crate.
 pub const CPP_UTILS_VERSION: &'static str = "0.2.0";
