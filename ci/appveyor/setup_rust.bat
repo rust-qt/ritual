@@ -4,8 +4,7 @@ set PATH=%USERPROFILE%\.cargo\bin;%PATH%
 
 rustup show || goto :install_rust
 echo "Rustup is already installed."
-rustup self update || goto :error
-rustup update stable || goto :error
+rustup update || goto :error
 
 :rust_ok
 rustup toolchain list || goto :error
