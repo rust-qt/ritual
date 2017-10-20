@@ -9,6 +9,4 @@ cache:
 - 'qt_generator\qt_build_tools\target'
 - 'qt_generator\qt_generator\target'
 - 'qt_generator\qt_generator_common\target'
-- '%USERPROFILE%\.cargo'
-- '%USERPROFILE%\.multirust'
 
