@@ -189,20 +189,29 @@ impl CppBuildPaths {
   /// Adds `path` to a lib directory.
   /// It's supplied to the linker via `-L` option or environment variables.
   pub fn add_lib_path<P: Into<PathBuf>>(&mut self, path: P) {
-    self.lib_paths.push(path.into());
+    let path = path.into();
+    if !self.lib_paths.contains(&path) {
+      self.lib_paths.push(path);
+    }
   }
 
   /// Adds `path` to a framework directory (OS X specific).
   /// It's supplied to the linker via `-F` option or environment variables.
   pub fn add_framework_path<P: Into<PathBuf>>(&mut self, path: P) {
-    self.framework_paths.push(path.into());
+    let path = path.into();
+    if !self.framework_paths.contains(&path) {
+      self.framework_paths.push(path);
+    }
   }
 
   /// Adds `path` to an include directory.
   /// It's supplied to the C++ parser
   /// and the C++ compiler via `-I` option.
   pub fn add_include_path<P: Into<PathBuf>>(&mut self, path: P) {
-    self.include_paths.push(path.into());
+    let path = path.into();
+    if !self.include_paths.contains(&path) {
+      self.include_paths.push(path);
+    }
   }
 
   /// If `CPP_TO_RUST_LIB_PATHS`, `CPP_TO_RUST_FRAMEWORK_PATHS` or

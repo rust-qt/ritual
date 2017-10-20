@@ -363,7 +363,8 @@ pub fn render_3d(config: &mut Config) -> Result<()> {
                                            "Qt3DRender::QTextureRectangle",
                                            "Qt3DRender::QTextureBuffer",
                                            "Qt3DRender::QRenderCapture",
-                                           "Qt3DRender::QRenderCaptureReply"]);
+                                           "Qt3DRender::QRenderCaptureReply",
+                                           "Qt3DRender::QSortCriterion"]);
   config.add_cpp_ffi_generator_filter(|method| {
     if let Some(ref info) = method.class_membership {
       match info.class_type.to_cpp_pseudo_code().as_ref() {
@@ -373,7 +374,27 @@ pub fn render_3d(config: &mut Config) -> Result<()> {
             _ => {}
           }
         }
+
+        "Qt3DRender::QGraphicsApiFilter" => {
+          match method.name.as_ref() {
+            "operator==" | "operator!=" => return Ok(false),
+            _ => {}
+          }
+        }
+
         _ => {}
+      }
+    }
+    if method.short_text().contains("QGraphicsApiFilter") {
+      println!("TEST {:?}", method);
+    }
+    if method.name == "Qt3DRender::operator==" || method.name == "Qt3DRender::operator!=" {
+      if method.arguments.len() == 2 {
+        if let CppTypeBase::Class(ref base) = method.arguments[0].argument_type.base {
+          if &base.name == "Qt3DRender::QGraphicsApiFilter" {
+            return Ok(false);
+          }
+        }
       }
     }
     Ok(true)
