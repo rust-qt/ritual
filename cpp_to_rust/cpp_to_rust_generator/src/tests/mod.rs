@@ -6,8 +6,9 @@ mod cpp_parser;
 mod full_run;
 
 use std::path::{Path, PathBuf};
-use common::file_utils::{create_dir_all, PathBufWithAdded};
+use common::file_utils::{create_dir_all, PathBufWithAdded, canonicalize};
 
+#[derive(Debug)]
 pub enum TempTestDir {
   System(::tempdir::TempDir),
   Custom(PathBuf),
@@ -16,7 +17,7 @@ pub enum TempTestDir {
 impl TempTestDir {
   pub fn new(name: &str) -> TempTestDir {
     if let Ok(value) = ::std::env::var("CPP_TO_RUST_TEMP_TEST_DIR") {
-      let path = PathBuf::from(value).with_added(name);
+      let path = canonicalize(PathBuf::from(value)).unwrap().with_added(name);
       create_dir_all(&path).unwrap();
       TempTestDir::Custom(path)
     } else {

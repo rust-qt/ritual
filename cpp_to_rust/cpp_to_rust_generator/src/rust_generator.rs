@@ -1369,7 +1369,7 @@ impl<'aa> RustGenerator<'aa> {
                         -> Result<Vec<(Option<String>, Vec<RustSingleMethod>)>> {
     let mut buckets: Vec<Vec<RustSingleMethod>> = Vec::new();
     for method in methods {
-      if let Some(mut b) = buckets
+      if let Some(b) = buckets
            .iter_mut()
            .find(|b| {
                    b.iter()
