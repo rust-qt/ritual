@@ -55,7 +55,7 @@ impl Error {
           if let Some(path) = symbol.filename() {
             let path_is_good = |x: std::path::Component| if let Some(x) = x.as_os_str().to_str() {
               x == "libstd" || x == "libpanic_unwind" || x == "libcore" || x == "errors.rs" ||
-              x.starts_with("backtrace") || x.starts_with("error-chain")
+                x.starts_with("backtrace") || x.starts_with("error-chain")
             } else {
               false
             };
@@ -101,8 +101,9 @@ pub fn unexpected<S: Into<String>>(text: S) -> ErrorKind {
 
 impl<T> ChainErr<T> for Option<T> {
   fn chain_err<F, EK>(self, callback: F) -> Result<T>
-    where F: FnOnce() -> EK,
-          EK: Into<ErrorKind>
+  where
+    F: FnOnce() -> EK,
+    EK: Into<ErrorKind>,
   {
     match self {
       Some(x) => Ok(x),

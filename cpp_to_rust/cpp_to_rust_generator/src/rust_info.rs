@@ -399,11 +399,13 @@ impl RustMethodCaptionStrategy {
   /// (more preferred strategies go first).
   pub fn all() -> &'static [RustMethodCaptionStrategy] {
     use self::RustMethodCaptionStrategy::*;
-    const LIST: &'static [RustMethodCaptionStrategy] = &[SelfOnly,
-                                                         UnsafeOnly,
-                                                         SelfAndArgTypes,
-                                                         SelfAndArgNames,
-                                                         SelfAndIndex];
+    const LIST: &'static [RustMethodCaptionStrategy] = &[
+      SelfOnly,
+      UnsafeOnly,
+      SelfAndArgTypes,
+      SelfAndArgNames,
+      SelfAndIndex,
+    ];
     return LIST;
   }
 }
@@ -414,20 +416,17 @@ impl RustProcessedTypeInfo {
   /// Returns true if this type was properly declared within any of the modules.
   pub fn is_declared_in(&self, modules: &[RustModule]) -> bool {
     for module in modules {
-      if module
-           .types
-           .iter()
-           .any(|t| match t.kind {
-                  RustTypeDeclarationKind::CppTypeWrapper {
-                    ref cpp_type_name,
-                    ref cpp_template_arguments,
-                    ..
-                  } => {
-                    cpp_type_name == &self.cpp_name &&
-                    cpp_template_arguments == &self.cpp_template_arguments
-                  }
-                  _ => false,
-                }) {
+      if module.types.iter().any(|t| match t.kind {
+        RustTypeDeclarationKind::CppTypeWrapper {
+          ref cpp_type_name,
+          ref cpp_template_arguments,
+          ..
+        } => {
+          cpp_type_name == &self.cpp_name && cpp_template_arguments == &self.cpp_template_arguments
+        }
+        _ => false,
+      })
+      {
         return true;
       }
       if self.is_declared_in(&module.submodules) {

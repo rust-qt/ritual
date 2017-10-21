@@ -25,9 +25,11 @@ pub fn exe_suffix() -> &'static str {
 
 /// Creates and empty collection at `hash[key]` if there isn't one already.
 /// Adds `value` to `hash[key]` collection.
-pub fn add_to_multihash<K: Eq + Hash + Clone, T, V: Default + Extend<T>>(hash: &mut HashMap<K, V>,
-                                                                         key: K,
-                                                                         value: T) {
+pub fn add_to_multihash<K: Eq + Hash + Clone, T, V: Default + Extend<T>>(
+  hash: &mut HashMap<K, V>,
+  key: K,
+  value: T,
+) {
   use std::collections::hash_map::Entry;
   match hash.entry(key) {
     Entry::Occupied(mut entry) => entry.get_mut().extend(std::iter::once(value)),
@@ -44,13 +46,15 @@ pub fn add_to_multihash<K: Eq + Hash + Clone, T, V: Default + Extend<T>>(hash: &
 /// Runs a command and checks that it was successful
 pub fn run_command(command: &mut Command) -> Result<()> {
   log::status(format!("Executing command: {:?}", command));
-  let status = command
-    .status()
-    .chain_err(|| format!("failed to run command: {:?}", command))?;
+  let status = command.status().chain_err(|| {
+    format!("failed to run command: {:?}", command)
+  })?;
   if status.success() {
     Ok(())
   } else {
-    Err(format!("command failed with {}: {:?}", status, command).into())
+    Err(
+      format!("command failed with {}: {:?}", status, command).into(),
+    )
   }
 }
 
@@ -59,23 +63,25 @@ pub fn get_command_output(command: &mut Command) -> Result<String> {
   log::status(format!("Executing command: {:?}", command));
   command.stdout(std::process::Stdio::piped());
   command.stderr(std::process::Stdio::piped());
-  let output = command
-    .output()
-    .chain_err(|| format!("failed to run command: {:?}", command))?;
+  let output = command.output().chain_err(|| {
+    format!("failed to run command: {:?}", command)
+  })?;
   if output.status.success() {
     String::from_utf8(output.stdout).chain_err(|| "comand output is not valid unicode")
   } else {
     use std::io::Write;
     let mut stderr = std::io::stderr();
     writeln!(stderr, "Stdout:")?;
-    stderr
-      .write_all(&output.stdout)
-      .chain_err(|| "output failed")?;
+    stderr.write_all(&output.stdout).chain_err(
+      || "output failed",
+    )?;
     writeln!(stderr, "Stderr:")?;
-    stderr
-      .write_all(&output.stderr)
-      .chain_err(|| "output failed")?;
-    Err(format!("command failed with {}: {:?}", output.status, command).into())
+    stderr.write_all(&output.stderr).chain_err(
+      || "output failed",
+    )?;
+    Err(
+      format!("command failed with {}: {:?}", output.status, command).into(),
+    )
   }
 }
 
@@ -84,15 +90,17 @@ pub trait MapIfOk<A> {
   /// Call closure `f` on each element of the collection and return
   /// `Vec` of values returned by the closure. If closure returns `Err`
   /// at some iteration, return that `Err` instead.
-  fn map_if_ok<B, E, F: Fn(A) -> std::result::Result<B, E>>(self,
-                                                            f: F)
-                                                            -> std::result::Result<Vec<B>, E>;
+  fn map_if_ok<B, E, F: Fn(A) -> std::result::Result<B, E>>(
+    self,
+    f: F,
+  ) -> std::result::Result<Vec<B>, E>;
 }
 
 impl<A, T: IntoIterator<Item = A>> MapIfOk<A> for T {
-  fn map_if_ok<B, E, F: Fn(A) -> std::result::Result<B, E>>(self,
-                                                            f: F)
-                                                            -> std::result::Result<Vec<B>, E> {
+  fn map_if_ok<B, E, F: Fn(A) -> std::result::Result<B, E>>(
+    self,
+    f: F,
+  ) -> std::result::Result<Vec<B>, E> {
     let mut r = Vec::new();
     for item in self {
       r.push(f(item)?);
@@ -104,10 +112,11 @@ impl<A, T: IntoIterator<Item = A>> MapIfOk<A> for T {
 /// Reads environment variable `env_var_name`, adds `new_paths`
 /// to acquired list of paths and returns the list formatted as path list
 /// (without applying it).
-#[cfg_attr(feature="clippy", allow(or_fun_call))]
-pub fn add_env_path_item(env_var_name: &str,
-                         mut new_paths: Vec<PathBuf>)
-                         -> Result<std::ffi::OsString> {
+#[cfg_attr(feature = "clippy", allow(or_fun_call))]
+pub fn add_env_path_item(
+  env_var_name: &str,
+  mut new_paths: Vec<PathBuf>,
+) -> Result<std::ffi::OsString> {
   use std::env;
   for path in env::split_paths(&env::var(env_var_name).unwrap_or(String::new())) {
     if new_paths.iter().find(|&x| x == &path).is_none() {

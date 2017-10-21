@@ -30,33 +30,38 @@ pub struct ExecConfig {
 }
 
 /// Executes generator for `libs` with given configuration.
-pub fn exec_all(libs: Vec<String>,
-                cache_dir: PathBuf,
-                output_dir: PathBuf,
-                config: ExecConfig)
-                -> Result<()> {
+pub fn exec_all(
+  libs: Vec<String>,
+  cache_dir: PathBuf,
+  output_dir: PathBuf,
+  config: ExecConfig,
+) -> Result<()> {
   if config.quiet_mode {
     let mut logger = log::default_logger();
 
-    logger.set_category_settings(log::Status,
-                                 log::LoggerSettings {
-                                   file_path: None,
-                                   write_to_stderr: false,
-                                 });
+    logger.set_category_settings(
+      log::Status,
+      log::LoggerSettings {
+        file_path: None,
+        write_to_stderr: false,
+      },
+    );
   }
 
   let crate_templates_path =
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_added("crate_templates");
   let final_libs = if libs.iter().any(|x| x == "all") {
-    vec!["core".to_string(),
-         "gui".to_string(),
-         "widgets".to_string(),
-         "ui_tools".to_string(),
-         "3d_core".to_string(),
-         "3d_render".to_string(),
-         "3d_input".to_string(),
-         "3d_logic".to_string(),
-         "3d_extras".to_string()]
+    vec![
+      "core".to_string(),
+      "gui".to_string(),
+      "widgets".to_string(),
+      "ui_tools".to_string(),
+      "3d_core".to_string(),
+      "3d_render".to_string(),
+      "3d_input".to_string(),
+      "3d_logic".to_string(),
+      "3d_extras".to_string(),
+    ]
   } else {
     libs
   };
@@ -70,12 +75,15 @@ pub fn exec_all(libs: Vec<String>,
     for dep in lib_dependencies(&sublib_name)? {
       let path = cache_dir.with_added(format!("qt_{}", dep));
       if !configs.iter().any(|c| c.cache_dir_path() == &path) && !is_completed(&path) {
-        return Err(format!("\"{}\" depends on \"{}\" but processing \
+        return Err(
+          format!(
+            "\"{}\" depends on \"{}\" but processing \
           in \"{}\" directory is not completed.",
-                           sublib_name,
-                           dep,
-                           path.display())
-                       .into());
+            sublib_name,
+            dep,
+            path.display()
+          ).into(),
+        );
       }
       dependency_paths.push(path);
     }
@@ -84,43 +92,60 @@ pub fn exec_all(libs: Vec<String>,
       log::status("Run with -C0 to force full processing.");
       continue;
     }
-    configs.push(make_config(&sublib_name,
-                             lib_cache_dir,
-                             lib_output_dir,
-                             lib_crate_templates_path,
-                             dependency_paths,
-                             &config)?);
+    configs.push(make_config(
+      &sublib_name,
+      lib_cache_dir,
+      lib_output_dir,
+      lib_crate_templates_path,
+      dependency_paths,
+      &config,
+    )?);
   }
   exec(configs.into_iter())?;
   Ok(())
 }
 
 /// Executes the generator for a single Qt module with given configuration.
-fn make_config(sublib_name: &str,
-               cache_dir: PathBuf,
-               output_dir: PathBuf,
-               crate_templates_path: PathBuf,
-               dependency_paths: Vec<PathBuf>,
-               exec_config: &ExecConfig)
-               -> Result<Config> {
-  log::status(format!("Preparing generator config for library: {}", sublib_name));
+fn make_config(
+  sublib_name: &str,
+  cache_dir: PathBuf,
+  output_dir: PathBuf,
+  crate_templates_path: PathBuf,
+  dependency_paths: Vec<PathBuf>,
+  exec_config: &ExecConfig,
+) -> Result<Config> {
+  log::status(format!(
+    "Preparing generator config for library: {}",
+    sublib_name
+  ));
   let crate_name = format!("qt_{}", sublib_name);
-  let mut crate_properties = CrateProperties::new(crate_name.clone(),
-                                                  versions::QT_OUTPUT_CRATES_VERSION);
+  let mut crate_properties =
+    CrateProperties::new(crate_name.clone(), versions::QT_OUTPUT_CRATES_VERSION);
   let mut custom_fields = toml::Table::new();
   let mut package_data = toml::Table::new();
-  package_data.insert("authors".to_string(),
-                      toml::Value::Array(vec![toml::Value::String("Pavel Strakhov <ri@idzaaus.org>"
-                                                                    .to_string())]));
-  let description = format!("Bindings for {} C++ library (generated automatically with cpp_to_rust project)",
-                            lib_folder_name(sublib_name));
+  package_data.insert(
+    "authors".to_string(),
+    toml::Value::Array(vec![
+      toml::Value::String(
+        "Pavel Strakhov <ri@idzaaus.org>".to_string()
+      ),
+    ]),
+  );
+  let description = format!(
+    "Bindings for {} C++ library (generated automatically with cpp_to_rust project)",
+    lib_folder_name(sublib_name)
+  );
   package_data.insert("description".to_string(), toml::Value::String(description));
   let doc_url = format!("https://rust-qt.github.io/rustdoc/qt/{}", &crate_name);
   package_data.insert("documentation".to_string(), toml::Value::String(doc_url));
-  package_data.insert("repository".to_string(),
-                      toml::Value::String("https://github.com/rust-qt/cpp_to_rust".to_string()));
-  package_data.insert("license".to_string(),
-                      toml::Value::String("MIT".to_string()));
+  package_data.insert(
+    "repository".to_string(),
+    toml::Value::String("https://github.com/rust-qt/cpp_to_rust".to_string()),
+  );
+  package_data.insert(
+    "license".to_string(),
+    toml::Value::String("MIT".to_string()),
+  );
 
   custom_fields.insert("package".to_string(), toml::Value::Table(package_data));
   crate_properties.set_custom_fields(custom_fields);
@@ -130,9 +155,11 @@ fn make_config(sublib_name: &str,
   } else {
     None
   };
-  crate_properties.add_build_dependency("qt_build_tools",
-                                        versions::QT_BUILD_TOOLS_VERSION,
-                                        qt_build_tools_path);
+  crate_properties.add_build_dependency(
+    "qt_build_tools",
+    versions::QT_BUILD_TOOLS_VERSION,
+    qt_build_tools_path,
+  );
   let mut config = Config::new(&output_dir, &cache_dir, crate_properties);
   let installation_data = get_installation_data(sublib_name)?;
   config.add_include_path(&installation_data.root_include_path);
@@ -149,39 +176,54 @@ fn make_config(sublib_name: &str,
   config.set_debug_logging_config(exec_config.debug_logging_config.clone());
   config.set_cpp_lib_version(installation_data.qt_version.as_str());
   if exec_config.write_dependencies_local_paths {
-    log::status("Output Cargo.toml file will contain local paths of used dependencies \
-               (use --no-local-paths to disable).");
+    log::status(
+      "Output Cargo.toml file will contain local paths of used dependencies \
+               (use --no-local-paths to disable).",
+    );
   } else {
-    log::status("Local paths will not be written to the output crate. Make sure all dependencies \
-               are published before trying to compile the crate.");
+    log::status(
+      "Local paths will not be written to the output crate. Make sure all dependencies \
+               are published before trying to compile the crate.",
+    );
   }
   // TODO: does parsing work on MacOS without adding "-F"?
 
   config.add_include_directive(&lib_folder_name(sublib_name));
   let lib_include_path = installation_data.lib_include_path.clone();
-  config.add_cpp_data_filter(move |cpp_data| fix_header_names(cpp_data, &lib_include_path));
+  config.add_cpp_data_filter(move |cpp_data| {
+    fix_header_names(cpp_data, &lib_include_path)
+  });
   config.add_cpp_parser_arguments(vec!["-fPIC", "-fcxx-exceptions"]);
   {
     let mut data = CppBuildConfigData::new();
     data.add_compiler_flag("-std=gnu++11");
-    config
-      .cpp_build_config_mut()
-      .add(target::Condition::Env(target::Env::Msvc).negate(), data);
+    config.cpp_build_config_mut().add(
+      target::Condition::Env(
+        target::Env::Msvc,
+      ).negate(),
+      data,
+    );
   }
   {
     let mut data = CppBuildConfigData::new();
     data.add_compiler_flag("-fPIC");
     // msvc and mingw don't need this
-    config
-      .cpp_build_config_mut()
-      .add(target::Condition::OS(target::OS::Windows).negate(), data);
+    config.cpp_build_config_mut().add(
+      target::Condition::OS(
+        target::OS::Windows,
+      ).negate(),
+      data,
+    );
   }
   {
     let mut data = CppBuildConfigData::new();
     data.set_library_type(CppLibraryType::Shared);
-    config
-      .cpp_build_config_mut()
-      .add(target::Condition::Env(target::Env::Msvc), data);
+    config.cpp_build_config_mut().add(
+      target::Condition::Env(
+        target::Env::Msvc,
+      ),
+      data,
+    );
   }
 
   if target::current_env() == target::Env::Msvc {
@@ -220,17 +262,20 @@ fn make_config(sublib_name: &str,
                   } else {
                     let type_name = &type1.name;
                     log::llog(log::DebugQtDoc, || {
-                      format!("Not found doc for enum variant: {}::{}",
-                              type_name,
-                              &value.name)
+                      format!(
+                        "Not found doc for enum variant: {}::{}",
+                        type_name,
+                        &value.name
+                      )
                     });
                   }
                 }
               }
             }
             Err(err) => {
-              log::llog(log::DebugQtDoc,
-                        || format!("Not found doc for type: {}: {}", type1.name, err));
+              log::llog(log::DebugQtDoc, || {
+                format!("Not found doc for type: {}: {}", type1.name, err)
+              });
             }
           }
         }
@@ -271,20 +316,25 @@ fn find_methods_docs(cpp_methods: &mut [CppMethod], data: &mut DocParser) -> Res
       }
     }
     if let Some(ref declaration_code) = cpp_method.declaration_code {
-      match data.doc_for_method(&cpp_method.doc_id(),
-                                declaration_code,
-                                &cpp_method.short_text()) {
+      match data.doc_for_method(
+        &cpp_method.doc_id(),
+        declaration_code,
+        &cpp_method.short_text(),
+      ) {
         Ok(doc) => cpp_method.doc = Some(doc),
         Err(msg) => {
           if cpp_method.class_membership.is_some() &&
-             (&cpp_method.name == "tr" || &cpp_method.name == "trUtf8" ||
-              &cpp_method.name == "metaObject") {
+            (&cpp_method.name == "tr" || &cpp_method.name == "trUtf8" ||
+               &cpp_method.name == "metaObject")
+          {
             // no error message
           } else {
             log::llog(log::DebugQtDoc, || {
-              format!("Failed to get documentation for method: {}: {}",
-                      &cpp_method.short_text(),
-                      msg)
+              format!(
+                "Failed to get documentation for method: {}: {}",
+                &cpp_method.short_text(),
+                msg
+              )
             });
           }
         }

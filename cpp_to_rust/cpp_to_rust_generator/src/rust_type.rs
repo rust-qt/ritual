@@ -132,10 +132,9 @@ impl RustName {
 
   /// Returns last component of the name.
   pub fn last_name(&self) -> Result<&String> {
-    self
-      .parts
-      .last()
-      .chain_err(|| unexpected("RustName can't be empty"))
+    self.parts.last().chain_err(
+      || unexpected("RustName can't be empty"),
+    )
   }
 
   /// Returns formatted name for using within `current_crate`.
@@ -175,72 +174,71 @@ impl RustType {
   #[allow(dead_code)]
   pub fn caption(&self, context: &RustName) -> Result<String> {
     Ok(match *self {
-         RustType::EmptyTuple => "empty".to_string(),
-         RustType::Common {
-           ref base,
-           ref generic_arguments,
-           ref is_const,
-           ref is_const2,
-           ref indirection,
-         } => {
+      RustType::EmptyTuple => "empty".to_string(),
+      RustType::Common {
+        ref base,
+        ref generic_arguments,
+        ref is_const,
+        ref is_const2,
+        ref indirection,
+      } => {
 
-      let mut name = if base.parts.len() == 1 {
-        base.parts[0].to_snake_case()
-      } else {
-        let mut remaining_context: &[String] = &context.parts;
-        let mut parts: &[String] = &base.parts;
-        if &parts[0] == "libc" {
-          parts = &parts[1..];
-        };
-        let mut good_parts = Vec::new();
-        for part in parts {
-          if !remaining_context.is_empty() && part == &remaining_context[0] {
-            remaining_context = &remaining_context[1..];
-          } else {
-            remaining_context = &[];
-            let snake_part = part.to_snake_case();
-            if good_parts.last() != Some(&snake_part) {
-              good_parts.push(snake_part);
+        let mut name = if base.parts.len() == 1 {
+          base.parts[0].to_snake_case()
+        } else {
+          let mut remaining_context: &[String] = &context.parts;
+          let mut parts: &[String] = &base.parts;
+          if &parts[0] == "libc" {
+            parts = &parts[1..];
+          };
+          let mut good_parts = Vec::new();
+          for part in parts {
+            if !remaining_context.is_empty() && part == &remaining_context[0] {
+              remaining_context = &remaining_context[1..];
             } else {
+              remaining_context = &[];
+              let snake_part = part.to_snake_case();
+              if good_parts.last() != Some(&snake_part) {
+                good_parts.push(snake_part);
+              } else {
+              }
             }
           }
+          if good_parts.is_empty() {
+            base.last_name()?.clone()
+          } else {
+            good_parts.join("_")
+          }
+        };
+        if let Some(ref args) = *generic_arguments {
+          name = format!(
+            "{}_{}",
+            name,
+            args.iter().map_if_ok(|x| x.caption(context))?.join("_")
+          );
         }
-        if good_parts.is_empty() {
-          base.last_name()?.clone()
-        } else {
-          good_parts.join("_")
+        let mut_text = if *is_const { "" } else { "_mut" };
+        match *indirection {
+          RustTypeIndirection::None => {}
+          RustTypeIndirection::Ref { .. } => {
+            name = format!("{}{}_ref", name, mut_text);
+          }
+          RustTypeIndirection::Ptr => {
+            name = format!("{}{}_ptr", name, mut_text);
+          }
+          RustTypeIndirection::PtrPtr => {
+            let mut_text2 = if *is_const2 { "" } else { "_mut" };
+            name = format!("{}{}_ptr{}_ptr", name, mut_text, mut_text2);
+          }
+          RustTypeIndirection::PtrRef { .. } => {
+            let mut_text2 = if *is_const2 { "" } else { "_mut" };
+            name = format!("{}{}_ptr{}_ref", name, mut_text, mut_text2);
+          }
         }
-      };
-      if let Some(ref args) = *generic_arguments {
-        name = format!("{}_{}",
-                       name,
-                       args
-                         .iter()
-                         .map_if_ok(|x| x.caption(context))?
-                         .join("_"));
+        name
       }
-      let mut_text = if *is_const { "" } else { "_mut" };
-      match *indirection {
-        RustTypeIndirection::None => {}
-        RustTypeIndirection::Ref { .. } => {
-          name = format!("{}{}_ref", name, mut_text);
-        }
-        RustTypeIndirection::Ptr => {
-          name = format!("{}{}_ptr", name, mut_text);
-        }
-        RustTypeIndirection::PtrPtr => {
-          let mut_text2 = if *is_const2 { "" } else { "_mut" };
-          name = format!("{}{}_ptr{}_ptr", name, mut_text, mut_text2);
-        }
-        RustTypeIndirection::PtrRef { .. } => {
-          let mut_text2 = if *is_const2 { "" } else { "_mut" };
-          name = format!("{}{}_ptr{}_ref", name, mut_text, mut_text2);
-        }
-      }
-      name
-    }
-         RustType::FunctionPointer { .. } => "fn".to_string(),
-       })
+      RustType::FunctionPointer { .. } => "fn".to_string(),
+    })
   }
 
   /// Returns true if this type is a reference.
@@ -289,11 +287,12 @@ impl RustType {
   /// Returns true if indirection that is applied last has const qualifier.
   pub fn last_is_const(&self) -> Result<bool> {
     if let RustType::Common {
-             ref is_const,
-             ref is_const2,
-             ref indirection,
-             ..
-           } = *self {
+      ref is_const,
+      ref is_const2,
+      ref indirection,
+      ..
+    } = *self
+    {
       match *indirection {
         RustTypeIndirection::PtrPtr { .. } |
         RustTypeIndirection::PtrRef { .. } => Ok(*is_const2),
@@ -367,10 +366,11 @@ impl CompleteType {
   pub fn ptr_to_ref(&self, is_const1: bool) -> Result<CompleteType> {
     let mut r = self.clone();
     if let RustType::Common {
-             ref mut is_const,
-             ref mut indirection,
-             ..
-           } = r.rust_api_type {
+      ref mut is_const,
+      ref mut indirection,
+      ..
+    } = r.rust_api_type
+    {
       if *indirection != RustTypeIndirection::Ptr {
         return Err("not a pointer type".into());
       }
@@ -391,10 +391,11 @@ impl CompleteType {
   pub fn ptr_to_value(&self) -> Result<CompleteType> {
     let mut r = self.clone();
     if let RustType::Common {
-             ref mut is_const,
-             ref mut indirection,
-             ..
-           } = r.rust_api_type {
+      ref mut is_const,
+      ref mut indirection,
+      ..
+    } = r.rust_api_type
+    {
       if *indirection != RustTypeIndirection::Ptr {
         return Err("not a pointer type".into());
       }

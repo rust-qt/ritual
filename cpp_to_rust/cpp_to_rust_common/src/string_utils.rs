@@ -9,9 +9,10 @@ pub trait JoinWithSeparator<S> {
 }
 
 impl<S, S2, X> JoinWithSeparator<S2> for X
-  where S: AsRef<str>,
-        S2: AsRef<str>,
-        X: Iterator<Item = S>
+where
+  S: AsRef<str>,
+  S2: AsRef<str>,
+  X: Iterator<Item = S>,
 {
   type Output = String;
   fn join(self, separator: S2) -> String {
@@ -90,13 +91,14 @@ pub trait CaseOperations {
 
 fn iterator_to_class_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {
   it.map(|x| if char_at(x.as_ref(), 0).is_digit(10) {
-           x.as_ref().to_uppercase()
-         } else {
-           format!("{}{}",
-                   x.as_ref()[0..1].to_uppercase(),
-                   x.as_ref()[1..].to_lowercase())
-         })
-    .join("")
+    x.as_ref().to_uppercase()
+  } else {
+    format!(
+      "{}{}",
+      x.as_ref()[0..1].to_uppercase(),
+      x.as_ref()[1..].to_lowercase()
+    )
+  }).join("")
 }
 
 fn ends_with_digit<S: AsRef<str>>(s: S) -> bool {
@@ -137,7 +139,7 @@ fn iterator_to_upper_case_words<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> 
   it.map(|x| x.as_ref().to_uppercase()).join("_")
 }
 
-#[cfg_attr(feature="clippy", allow(needless_range_loop))]
+#[cfg_attr(feature = "clippy", allow(needless_range_loop))]
 fn replace_all_sub_vecs(parts: &mut Vec<String>, needle: Vec<&str>) {
   let mut any_found = true;
   while any_found {

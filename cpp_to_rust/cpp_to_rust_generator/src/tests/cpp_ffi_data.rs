@@ -38,24 +38,40 @@ fn argument_int() {
     },
     meaning: CppFfiArgumentMeaning::Argument(0),
   };
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::NameOnly).unwrap(),
-             "arg1");
-  assert_eq!(arg
-               .caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))
-               .unwrap(),
-             "int");
-  assert_eq!(arg
-               .caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))
-               .unwrap(),
-             "int");
-  assert_eq!(arg
-               .caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))
-               .unwrap(),
-             "int_arg1");
-  assert_eq!(arg
-               .caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))
-               .unwrap(),
-             "int_arg1");
+  assert_eq!(
+    arg.caption(ArgumentCaptionStrategy::NameOnly).unwrap(),
+    "arg1"
+  );
+  assert_eq!(
+    arg
+      .caption(ArgumentCaptionStrategy::TypeOnly(
+        TypeCaptionStrategy::Short,
+      ))
+      .unwrap(),
+    "int"
+  );
+  assert_eq!(
+    arg
+      .caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))
+      .unwrap(),
+    "int"
+  );
+  assert_eq!(
+    arg
+      .caption(ArgumentCaptionStrategy::TypeAndName(
+        TypeCaptionStrategy::Short,
+      ))
+      .unwrap(),
+    "int_arg1"
+  );
+  assert_eq!(
+    arg
+      .caption(ArgumentCaptionStrategy::TypeAndName(
+        TypeCaptionStrategy::Full,
+      ))
+      .unwrap(),
+    "int_arg1"
+  );
   assert_eq!(arg.to_cpp_code().unwrap(), "int arg1");
 }
 
@@ -80,24 +96,40 @@ fn argument_int_ptr() {
     },
     meaning: CppFfiArgumentMeaning::Argument(0),
   };
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::NameOnly).unwrap(),
-             "arg1");
-  assert_eq!(arg
-               .caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))
-               .unwrap(),
-             "int");
-  assert_eq!(arg
-               .caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))
-               .unwrap(),
-             "int_ptr");
-  assert_eq!(arg
-               .caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))
-               .unwrap(),
-             "int_arg1");
-  assert_eq!(arg
-               .caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))
-               .unwrap(),
-             "int_ptr_arg1");
+  assert_eq!(
+    arg.caption(ArgumentCaptionStrategy::NameOnly).unwrap(),
+    "arg1"
+  );
+  assert_eq!(
+    arg
+      .caption(ArgumentCaptionStrategy::TypeOnly(
+        TypeCaptionStrategy::Short,
+      ))
+      .unwrap(),
+    "int"
+  );
+  assert_eq!(
+    arg
+      .caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))
+      .unwrap(),
+    "int_ptr"
+  );
+  assert_eq!(
+    arg
+      .caption(ArgumentCaptionStrategy::TypeAndName(
+        TypeCaptionStrategy::Short,
+      ))
+      .unwrap(),
+    "int_arg1"
+  );
+  assert_eq!(
+    arg
+      .caption(ArgumentCaptionStrategy::TypeAndName(
+        TypeCaptionStrategy::Full,
+      ))
+      .unwrap(),
+    "int_ptr_arg1"
+  );
   assert_eq!(arg.to_cpp_code().unwrap(), "int* arg1");
 }
 
@@ -115,18 +147,20 @@ fn argument_func() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
       }),
-      arguments: vec![CppType {
-                        indirection: CppTypeIndirection::None,
-                        is_const: false,
-                        is_const2: false,
-                        base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-                      },
-                      CppType {
-                        indirection: CppTypeIndirection::Ptr,
-                        is_const: false,
-                        is_const2: false,
-                        base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
-                      }],
+      arguments: vec![
+        CppType {
+          indirection: CppTypeIndirection::None,
+          is_const: false,
+          is_const2: false,
+          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+        },
+        CppType {
+          indirection: CppTypeIndirection::Ptr,
+          is_const: false,
+          is_const2: false,
+          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
+        },
+      ],
     }),
   };
 
@@ -139,101 +173,172 @@ fn argument_func() {
     },
     meaning: CppFfiArgumentMeaning::Argument(0),
   };
-  assert_eq!(arg.caption(ArgumentCaptionStrategy::NameOnly).unwrap(),
-             "arg1");
-  assert_eq!(arg
-               .caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))
-               .unwrap(),
-             "func");
-  assert_eq!(arg
-               .caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))
-               .unwrap(),
-             "int_func_int_bool_ptr");
-  assert_eq!(arg
-               .caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))
-               .unwrap(),
-             "func_arg1");
-  assert_eq!(arg
-               .caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))
-               .unwrap(),
-             "int_func_int_bool_ptr_arg1");
+  assert_eq!(
+    arg.caption(ArgumentCaptionStrategy::NameOnly).unwrap(),
+    "arg1"
+  );
+  assert_eq!(
+    arg
+      .caption(ArgumentCaptionStrategy::TypeOnly(
+        TypeCaptionStrategy::Short,
+      ))
+      .unwrap(),
+    "func"
+  );
+  assert_eq!(
+    arg
+      .caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))
+      .unwrap(),
+    "int_func_int_bool_ptr"
+  );
+  assert_eq!(
+    arg
+      .caption(ArgumentCaptionStrategy::TypeAndName(
+        TypeCaptionStrategy::Short,
+      ))
+      .unwrap(),
+    "func_arg1"
+  );
+  assert_eq!(
+    arg
+      .caption(ArgumentCaptionStrategy::TypeAndName(
+        TypeCaptionStrategy::Full,
+      ))
+      .unwrap(),
+    "int_func_int_bool_ptr_arg1"
+  );
   assert_eq!(arg.to_cpp_code().unwrap(), "int (*arg1)(int, bool*)");
 }
 
 #[test]
 fn signature_two_numbers() {
   let sig = CppFfiMethodSignature {
-    arguments: vec![CppFfiMethodArgument {
-                      name: "arg1".to_string(),
-                      argument_type: CppFfiType {
-                        original_type: CppType {
-                          indirection: CppTypeIndirection::None,
-                          is_const: false,
-                          is_const2: false,
-                          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-                        },
-                        ffi_type: CppType {
-                          indirection: CppTypeIndirection::None,
-                          is_const: false,
-                          is_const2: false,
-                          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-                        },
-                        conversion: CppIndirectionChange::NoChange,
-                      },
-                      meaning: CppFfiArgumentMeaning::Argument(0),
-                    },
-                    CppFfiMethodArgument {
-                      name: "arg2".to_string(),
-                      argument_type: CppFfiType {
-                        original_type: CppType {
-                          indirection: CppTypeIndirection::None,
-                          is_const: false,
-                          is_const2: false,
-                          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
-                        },
-                        ffi_type: CppType {
-                          indirection: CppTypeIndirection::None,
-                          is_const: false,
-                          is_const2: false,
-                          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
-                        },
-                        conversion: CppIndirectionChange::NoChange,
-                      },
-                      meaning: CppFfiArgumentMeaning::Argument(0),
-                    }],
+    arguments: vec![
+      CppFfiMethodArgument {
+        name: "arg1".to_string(),
+        argument_type: CppFfiType {
+          original_type: CppType {
+            indirection: CppTypeIndirection::None,
+            is_const: false,
+            is_const2: false,
+            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+          },
+          ffi_type: CppType {
+            indirection: CppTypeIndirection::None,
+            is_const: false,
+            is_const2: false,
+            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+          },
+          conversion: CppIndirectionChange::NoChange,
+        },
+        meaning: CppFfiArgumentMeaning::Argument(0),
+      },
+      CppFfiMethodArgument {
+        name: "arg2".to_string(),
+        argument_type: CppFfiType {
+          original_type: CppType {
+            indirection: CppTypeIndirection::None,
+            is_const: false,
+            is_const2: false,
+            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+          },
+          ffi_type: CppType {
+            indirection: CppTypeIndirection::None,
+            is_const: false,
+            is_const2: false,
+            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+          },
+          conversion: CppIndirectionChange::NoChange,
+        },
+        meaning: CppFfiArgumentMeaning::Argument(0),
+      },
+    ],
     return_type: CppFfiType::void(),
   };
 
-  assert_eq!(sig
-               .arguments_caption(ArgumentCaptionStrategy::NameOnly)
-               .unwrap(),
-             "arg1_arg2");
-  assert_eq!(sig
-               .arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))
-               .unwrap(),
-             "int_double");
-  assert_eq!(sig
-               .arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))
-               .unwrap(),
-             "int_double");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short)).unwrap(),
-             "int_arg1_double_arg2");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))
-               .unwrap(),
-             "int_arg1_double_arg2");
+  assert_eq!(
+    sig
+      .arguments_caption(ArgumentCaptionStrategy::NameOnly)
+      .unwrap(),
+    "arg1_arg2"
+  );
+  assert_eq!(
+    sig
+      .arguments_caption(ArgumentCaptionStrategy::TypeOnly(
+        TypeCaptionStrategy::Short,
+      ))
+      .unwrap(),
+    "int_double"
+  );
+  assert_eq!(
+    sig
+      .arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))
+      .unwrap(),
+    "int_double"
+  );
+  assert_eq!(
+    sig
+      .arguments_caption(ArgumentCaptionStrategy::TypeAndName(
+        TypeCaptionStrategy::Short,
+      ))
+      .unwrap(),
+    "int_arg1_double_arg2"
+  );
+  assert_eq!(
+    sig
+      .arguments_caption(ArgumentCaptionStrategy::TypeAndName(
+        TypeCaptionStrategy::Full,
+      ))
+      .unwrap(),
+    "int_arg1_double_arg2"
+  );
 
-  assert_eq!(sig
-               .caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::NameOnly))
-               .unwrap(),
-             "arg1_arg2");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))).unwrap(),
-             "int_double");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))).unwrap(),
-             "int_double");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))).unwrap(),
-             "int_arg1_double_arg2");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))).unwrap(),
-             "int_arg1_double_arg2");
+  assert_eq!(
+    sig
+      .caption(MethodCaptionStrategy::ArgumentsOnly(
+        ArgumentCaptionStrategy::NameOnly,
+      ))
+      .unwrap(),
+    "arg1_arg2"
+  );
+  assert_eq!(
+    sig
+      .caption(MethodCaptionStrategy::ArgumentsOnly(
+        ArgumentCaptionStrategy::TypeOnly(
+          TypeCaptionStrategy::Short,
+        ),
+      ))
+      .unwrap(),
+    "int_double"
+  );
+  assert_eq!(
+    sig
+      .caption(MethodCaptionStrategy::ArgumentsOnly(
+        ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full),
+      ))
+      .unwrap(),
+    "int_double"
+  );
+  assert_eq!(
+    sig
+      .caption(MethodCaptionStrategy::ArgumentsOnly(
+        ArgumentCaptionStrategy::TypeAndName(
+          TypeCaptionStrategy::Short,
+        ),
+      ))
+      .unwrap(),
+    "int_arg1_double_arg2"
+  );
+  assert_eq!(
+    sig
+      .caption(MethodCaptionStrategy::ArgumentsOnly(
+        ArgumentCaptionStrategy::TypeAndName(
+          TypeCaptionStrategy::Full,
+        ),
+      ))
+      .unwrap(),
+    "int_arg1_double_arg2"
+  );
 
   assert_eq!(sig.caption(MethodCaptionStrategy::ConstOnly).unwrap(), "");
 
@@ -243,69 +348,90 @@ fn signature_two_numbers() {
 #[test]
 fn signature_class_method() {
   let sig = CppFfiMethodSignature {
-    arguments: vec![CppFfiMethodArgument {
-                      name: "this_ptr".to_string(),
-                      argument_type: CppFfiType {
-                        original_type: CppType {
-                          indirection: CppTypeIndirection::Ptr,
-                          is_const: false,
-                          is_const2: false,
-                          base: CppTypeBase::Class(CppTypeClassBase {
-                                                     name: "Class1".to_string(),
-                                                     template_arguments: None,
-                                                   }),
-                        },
-                        ffi_type: CppType {
-                          indirection: CppTypeIndirection::Ptr,
-                          is_const: false,
-                          is_const2: false,
-                          base: CppTypeBase::Class(CppTypeClassBase {
-                                                     name: "Class1".to_string(),
-                                                     template_arguments: None,
-                                                   }),
-                        },
-                        conversion: CppIndirectionChange::NoChange,
-                      },
-                      meaning: CppFfiArgumentMeaning::This,
-                    },
-                    CppFfiMethodArgument {
-                      name: "arg1".to_string(),
-                      argument_type: CppFfiType {
-                        original_type: CppType {
-                          indirection: CppTypeIndirection::None,
-                          is_const: false,
-                          is_const2: false,
-                          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
-                        },
-                        ffi_type: CppType {
-                          indirection: CppTypeIndirection::None,
-                          is_const: false,
-                          is_const2: false,
-                          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
-                        },
-                        conversion: CppIndirectionChange::NoChange,
-                      },
-                      meaning: CppFfiArgumentMeaning::Argument(0),
-                    }],
+    arguments: vec![
+      CppFfiMethodArgument {
+        name: "this_ptr".to_string(),
+        argument_type: CppFfiType {
+          original_type: CppType {
+            indirection: CppTypeIndirection::Ptr,
+            is_const: false,
+            is_const2: false,
+            base: CppTypeBase::Class(CppTypeClassBase {
+              name: "Class1".to_string(),
+              template_arguments: None,
+            }),
+          },
+          ffi_type: CppType {
+            indirection: CppTypeIndirection::Ptr,
+            is_const: false,
+            is_const2: false,
+            base: CppTypeBase::Class(CppTypeClassBase {
+              name: "Class1".to_string(),
+              template_arguments: None,
+            }),
+          },
+          conversion: CppIndirectionChange::NoChange,
+        },
+        meaning: CppFfiArgumentMeaning::This,
+      },
+      CppFfiMethodArgument {
+        name: "arg1".to_string(),
+        argument_type: CppFfiType {
+          original_type: CppType {
+            indirection: CppTypeIndirection::None,
+            is_const: false,
+            is_const2: false,
+            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+          },
+          ffi_type: CppType {
+            indirection: CppTypeIndirection::None,
+            is_const: false,
+            is_const2: false,
+            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+          },
+          conversion: CppIndirectionChange::NoChange,
+        },
+        meaning: CppFfiArgumentMeaning::Argument(0),
+      },
+    ],
     return_type: CppFfiType::void(),
   };
-  assert_eq!(sig
-               .arguments_caption(ArgumentCaptionStrategy::NameOnly)
-               .unwrap(),
-             "arg1");
-  assert_eq!(sig
-               .arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))
-               .unwrap(),
-             "double");
-  assert_eq!(sig
-               .arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))
-               .unwrap(),
-             "double");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short)).unwrap(),
-             "double_arg1");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))
-               .unwrap(),
-             "double_arg1");
+  assert_eq!(
+    sig
+      .arguments_caption(ArgumentCaptionStrategy::NameOnly)
+      .unwrap(),
+    "arg1"
+  );
+  assert_eq!(
+    sig
+      .arguments_caption(ArgumentCaptionStrategy::TypeOnly(
+        TypeCaptionStrategy::Short,
+      ))
+      .unwrap(),
+    "double"
+  );
+  assert_eq!(
+    sig
+      .arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))
+      .unwrap(),
+    "double"
+  );
+  assert_eq!(
+    sig
+      .arguments_caption(ArgumentCaptionStrategy::TypeAndName(
+        TypeCaptionStrategy::Short,
+      ))
+      .unwrap(),
+    "double_arg1"
+  );
+  assert_eq!(
+    sig
+      .arguments_caption(ArgumentCaptionStrategy::TypeAndName(
+        TypeCaptionStrategy::Full,
+      ))
+      .unwrap(),
+    "double_arg1"
+  );
 
   assert_eq!(sig.caption(MethodCaptionStrategy::ConstOnly).unwrap(), "");
 
@@ -315,97 +441,190 @@ fn signature_class_method() {
 #[test]
 fn signature_class_method_const() {
   let sig = CppFfiMethodSignature {
-    arguments: vec![CppFfiMethodArgument {
-                      name: "this_ptr".to_string(),
-                      argument_type: CppFfiType {
-                        original_type: CppType {
-                          indirection: CppTypeIndirection::Ptr,
-                          is_const: true,
-                          is_const2: false,
-                          base: CppTypeBase::Class(CppTypeClassBase {
-                                                     name: "Class1".to_string(),
-                                                     template_arguments: None,
-                                                   }),
-                        },
-                        ffi_type: CppType {
-                          indirection: CppTypeIndirection::Ptr,
-                          is_const: true,
-                          is_const2: false,
-                          base: CppTypeBase::Class(CppTypeClassBase {
-                                                     name: "Class1".to_string(),
-                                                     template_arguments: None,
-                                                   }),
-                        },
-                        conversion: CppIndirectionChange::NoChange,
-                      },
-                      meaning: CppFfiArgumentMeaning::This,
-                    },
-                    CppFfiMethodArgument {
-                      name: "arg1".to_string(),
-                      argument_type: CppFfiType {
-                        original_type: CppType {
-                          indirection: CppTypeIndirection::None,
-                          is_const: false,
-                          is_const2: false,
-                          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
-                        },
-                        ffi_type: CppType {
-                          indirection: CppTypeIndirection::None,
-                          is_const: false,
-                          is_const2: false,
-                          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
-                        },
-                        conversion: CppIndirectionChange::NoChange,
-                      },
-                      meaning: CppFfiArgumentMeaning::Argument(0),
-                    }],
+    arguments: vec![
+      CppFfiMethodArgument {
+        name: "this_ptr".to_string(),
+        argument_type: CppFfiType {
+          original_type: CppType {
+            indirection: CppTypeIndirection::Ptr,
+            is_const: true,
+            is_const2: false,
+            base: CppTypeBase::Class(CppTypeClassBase {
+              name: "Class1".to_string(),
+              template_arguments: None,
+            }),
+          },
+          ffi_type: CppType {
+            indirection: CppTypeIndirection::Ptr,
+            is_const: true,
+            is_const2: false,
+            base: CppTypeBase::Class(CppTypeClassBase {
+              name: "Class1".to_string(),
+              template_arguments: None,
+            }),
+          },
+          conversion: CppIndirectionChange::NoChange,
+        },
+        meaning: CppFfiArgumentMeaning::This,
+      },
+      CppFfiMethodArgument {
+        name: "arg1".to_string(),
+        argument_type: CppFfiType {
+          original_type: CppType {
+            indirection: CppTypeIndirection::None,
+            is_const: false,
+            is_const2: false,
+            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+          },
+          ffi_type: CppType {
+            indirection: CppTypeIndirection::None,
+            is_const: false,
+            is_const2: false,
+            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+          },
+          conversion: CppIndirectionChange::NoChange,
+        },
+        meaning: CppFfiArgumentMeaning::Argument(0),
+      },
+    ],
     return_type: CppFfiType::void(),
   };
 
-  assert_eq!(sig
-               .arguments_caption(ArgumentCaptionStrategy::NameOnly)
-               .unwrap(),
-             "arg1");
-  assert_eq!(sig
-               .arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))
-               .unwrap(),
-             "double");
-  assert_eq!(sig
-               .arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))
-               .unwrap(),
-             "double");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short)).unwrap(),
-             "double_arg1");
-  assert_eq!(sig.arguments_caption(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))
-               .unwrap(),
-             "double_arg1");
+  assert_eq!(
+    sig
+      .arguments_caption(ArgumentCaptionStrategy::NameOnly)
+      .unwrap(),
+    "arg1"
+  );
+  assert_eq!(
+    sig
+      .arguments_caption(ArgumentCaptionStrategy::TypeOnly(
+        TypeCaptionStrategy::Short,
+      ))
+      .unwrap(),
+    "double"
+  );
+  assert_eq!(
+    sig
+      .arguments_caption(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))
+      .unwrap(),
+    "double"
+  );
+  assert_eq!(
+    sig
+      .arguments_caption(ArgumentCaptionStrategy::TypeAndName(
+        TypeCaptionStrategy::Short,
+      ))
+      .unwrap(),
+    "double_arg1"
+  );
+  assert_eq!(
+    sig
+      .arguments_caption(ArgumentCaptionStrategy::TypeAndName(
+        TypeCaptionStrategy::Full,
+      ))
+      .unwrap(),
+    "double_arg1"
+  );
 
-  assert_eq!(sig.caption(MethodCaptionStrategy::ConstOnly).unwrap(),
-             "const");
+  assert_eq!(
+    sig.caption(MethodCaptionStrategy::ConstOnly).unwrap(),
+    "const"
+  );
 
-  assert_eq!(sig
-               .caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::NameOnly))
-               .unwrap(),
-             "arg1");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))).unwrap(),
-             "double");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))).unwrap(),
-             "double");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))).unwrap(),
-             "double_arg1");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ArgumentsOnly(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))).unwrap(),
-             "double_arg1");
+  assert_eq!(
+    sig
+      .caption(MethodCaptionStrategy::ArgumentsOnly(
+        ArgumentCaptionStrategy::NameOnly,
+      ))
+      .unwrap(),
+    "arg1"
+  );
+  assert_eq!(
+    sig
+      .caption(MethodCaptionStrategy::ArgumentsOnly(
+        ArgumentCaptionStrategy::TypeOnly(
+          TypeCaptionStrategy::Short,
+        ),
+      ))
+      .unwrap(),
+    "double"
+  );
+  assert_eq!(
+    sig
+      .caption(MethodCaptionStrategy::ArgumentsOnly(
+        ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full),
+      ))
+      .unwrap(),
+    "double"
+  );
+  assert_eq!(
+    sig
+      .caption(MethodCaptionStrategy::ArgumentsOnly(
+        ArgumentCaptionStrategy::TypeAndName(
+          TypeCaptionStrategy::Short,
+        ),
+      ))
+      .unwrap(),
+    "double_arg1"
+  );
+  assert_eq!(
+    sig
+      .caption(MethodCaptionStrategy::ArgumentsOnly(
+        ArgumentCaptionStrategy::TypeAndName(
+          TypeCaptionStrategy::Full,
+        ),
+      ))
+      .unwrap(),
+    "double_arg1"
+  );
 
-  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::NameOnly)).unwrap(),
-             "const_arg1");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short))).unwrap(),
-             "const_double");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full))).unwrap(),
-             "const_double");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short))).unwrap(),
-             "const_double_arg1");
-  assert_eq!(sig.caption(MethodCaptionStrategy::ConstAndArguments(ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full))).unwrap(),
-             "const_double_arg1");
+  assert_eq!(
+    sig
+      .caption(MethodCaptionStrategy::ConstAndArguments(
+        ArgumentCaptionStrategy::NameOnly,
+      ))
+      .unwrap(),
+    "const_arg1"
+  );
+  assert_eq!(
+    sig
+      .caption(MethodCaptionStrategy::ConstAndArguments(
+        ArgumentCaptionStrategy::TypeOnly(
+          TypeCaptionStrategy::Short,
+        ),
+      ))
+      .unwrap(),
+    "const_double"
+  );
+  assert_eq!(
+    sig
+      .caption(MethodCaptionStrategy::ConstAndArguments(
+        ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full),
+      ))
+      .unwrap(),
+    "const_double"
+  );
+  assert_eq!(
+    sig
+      .caption(MethodCaptionStrategy::ConstAndArguments(
+        ArgumentCaptionStrategy::TypeAndName(
+          TypeCaptionStrategy::Short,
+        ),
+      ))
+      .unwrap(),
+    "const_double_arg1"
+  );
+  assert_eq!(
+    sig
+      .caption(MethodCaptionStrategy::ConstAndArguments(
+        ArgumentCaptionStrategy::TypeAndName(
+          TypeCaptionStrategy::Full,
+        ),
+      ))
+      .unwrap(),
+    "const_double_arg1"
+  );
 
   assert!(sig.has_const_this());
 }
@@ -426,15 +645,22 @@ fn c_base_name_free_func() {
   let mut method = empty_regular_method();
   method.name = "func1".to_string();
   let include_file = "QRect".to_string();
-  assert_eq!(c_base_name(&method,
-                         &ReturnValueAllocationPlace::NotApplicable,
-                         &include_file)
-                 .unwrap(),
-             "QRect_G_func1");
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
-             "QRect_G_func1_to_output");
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
-             "QRect_G_func1_as_ptr");
+  assert_eq!(
+    c_base_name(
+      &method,
+      &ReturnValueAllocationPlace::NotApplicable,
+      &include_file,
+    ).unwrap(),
+    "QRect_G_func1"
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+    "QRect_G_func1_to_output"
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+    "QRect_G_func1_as_ptr"
+  );
 }
 
 #[test]
@@ -442,15 +668,22 @@ fn c_base_name_free_func_in_namespace() {
   let mut method = empty_regular_method();
   method.name = "ns::func1".to_string();
   let include_file = "QRect".to_string();
-  assert_eq!(c_base_name(&method,
-                         &ReturnValueAllocationPlace::NotApplicable,
-                         &include_file)
-                 .unwrap(),
-             "QRect_G_ns_func1");
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
-             "QRect_G_ns_func1_to_output");
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
-             "QRect_G_ns_func1_as_ptr");
+  assert_eq!(
+    c_base_name(
+      &method,
+      &ReturnValueAllocationPlace::NotApplicable,
+      &include_file,
+    ).unwrap(),
+    "QRect_G_ns_func1"
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+    "QRect_G_ns_func1_to_output"
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+    "QRect_G_ns_func1_as_ptr"
+  );
 }
 
 #[test]
@@ -459,15 +692,22 @@ fn c_base_name_class_method() {
   method.name = "func1".to_string();
   method.class_membership = Some(empty_membership("MyClass"));
   let include_file = "QRect".to_string();
-  assert_eq!(c_base_name(&method,
-                         &ReturnValueAllocationPlace::NotApplicable,
-                         &include_file)
-                 .unwrap(),
-             "MyClass_func1");
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
-             "MyClass_func1_to_output");
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
-             "MyClass_func1_as_ptr");
+  assert_eq!(
+    c_base_name(
+      &method,
+      &ReturnValueAllocationPlace::NotApplicable,
+      &include_file,
+    ).unwrap(),
+    "MyClass_func1"
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+    "MyClass_func1_to_output"
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+    "MyClass_func1_as_ptr"
+  );
 }
 
 #[test]
@@ -476,15 +716,22 @@ fn c_base_name_class_method_in_namespace() {
   method.name = "func1".to_string();
   method.class_membership = Some(empty_membership("ns1::MyClass"));
   let include_file = "QRect".to_string();
-  assert_eq!(c_base_name(&method,
-                         &ReturnValueAllocationPlace::NotApplicable,
-                         &include_file)
-                 .unwrap(),
-             "ns1_MyClass_func1");
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
-             "ns1_MyClass_func1_to_output");
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
-             "ns1_MyClass_func1_as_ptr");
+  assert_eq!(
+    c_base_name(
+      &method,
+      &ReturnValueAllocationPlace::NotApplicable,
+      &include_file,
+    ).unwrap(),
+    "ns1_MyClass_func1"
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+    "ns1_MyClass_func1_to_output"
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+    "ns1_MyClass_func1_as_ptr"
+  );
 }
 
 #[test]
@@ -492,19 +739,26 @@ fn c_base_name_constructor() {
   let mut method = empty_regular_method();
   method.name = "QRect".to_string();
   method.class_membership = Some({
-                                   let mut info = empty_membership("QRect");
-                                   info.kind = CppMethodKind::Constructor;
-                                   info
-                                 });
+    let mut info = empty_membership("QRect");
+    info.kind = CppMethodKind::Constructor;
+    info
+  });
   let include_file = "QtCore".to_string();
-  assert!(c_base_name(&method,
-                      &ReturnValueAllocationPlace::NotApplicable,
-                      &include_file)
-              .is_err());
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
-             "QRect_constructor");
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
-             "QRect_new");
+  assert!(
+    c_base_name(
+      &method,
+      &ReturnValueAllocationPlace::NotApplicable,
+      &include_file,
+    ).is_err()
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+    "QRect_constructor"
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+    "QRect_new"
+  );
 }
 
 #[test]
@@ -512,19 +766,26 @@ fn c_base_name_destructor() {
   let mut method = empty_regular_method();
   method.name = "QRect".to_string();
   method.class_membership = Some({
-                                   let mut info = empty_membership("QRect");
-                                   info.kind = CppMethodKind::Destructor;
-                                   info
-                                 });
+    let mut info = empty_membership("QRect");
+    info.kind = CppMethodKind::Destructor;
+    info
+  });
   let include_file = "QtCore".to_string();
-  assert!(c_base_name(&method,
-                      &ReturnValueAllocationPlace::NotApplicable,
-                      &include_file)
-              .is_err());
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
-             "QRect_destructor");
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
-             "QRect_delete");
+  assert!(
+    c_base_name(
+      &method,
+      &ReturnValueAllocationPlace::NotApplicable,
+      &include_file,
+    ).is_err()
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+    "QRect_destructor"
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+    "QRect_delete"
+  );
 }
 
 #[test]
@@ -534,15 +795,22 @@ fn c_base_name_class_method_operator() {
   method.class_membership = Some(empty_membership("MyClass"));
   method.operator = Some(CppOperator::GreaterThan);
   let include_file = "QRect".to_string();
-  assert_eq!(c_base_name(&method,
-                         &ReturnValueAllocationPlace::NotApplicable,
-                         &include_file)
-                 .unwrap(),
-             "MyClass_operator_gt");
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
-             "MyClass_operator_gt_to_output");
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
-             "MyClass_operator_gt_as_ptr");
+  assert_eq!(
+    c_base_name(
+      &method,
+      &ReturnValueAllocationPlace::NotApplicable,
+      &include_file,
+    ).unwrap(),
+    "MyClass_operator_gt"
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+    "MyClass_operator_gt_to_output"
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+    "MyClass_operator_gt_as_ptr"
+  );
 }
 
 #[test]
@@ -551,15 +819,22 @@ fn c_base_name_free_func_operator() {
   method.name = "operator>".to_string();
   method.operator = Some(CppOperator::GreaterThan);
   let include_file = "QRect".to_string();
-  assert_eq!(c_base_name(&method,
-                         &ReturnValueAllocationPlace::NotApplicable,
-                         &include_file)
-                 .unwrap(),
-             "QRect_G_operator_gt");
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
-             "QRect_G_operator_gt_to_output");
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
-             "QRect_G_operator_gt_as_ptr");
+  assert_eq!(
+    c_base_name(
+      &method,
+      &ReturnValueAllocationPlace::NotApplicable,
+      &include_file,
+    ).unwrap(),
+    "QRect_G_operator_gt"
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+    "QRect_G_operator_gt_to_output"
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+    "QRect_G_operator_gt_as_ptr"
+  );
 }
 
 #[test]
@@ -567,24 +842,30 @@ fn c_base_name_conversion_operator() {
   let mut method = empty_regular_method();
   method.name = "operator const QPoint&".to_string();
   method.class_membership = Some(empty_membership("MyClass"));
-  method.operator =
-    Some(CppOperator::Conversion(CppType {
-                                   is_const: true,
-                                   is_const2: false,
-                                   base: CppTypeBase::Class(CppTypeClassBase {
-                                                              name: "QPoint".to_string(),
-                                                              template_arguments: None,
-                                                            }),
-                                   indirection: CppTypeIndirection::Ref,
-                                 }));
+  method.operator = Some(CppOperator::Conversion(CppType {
+    is_const: true,
+    is_const2: false,
+    base: CppTypeBase::Class(CppTypeClassBase {
+      name: "QPoint".to_string(),
+      template_arguments: None,
+    }),
+    indirection: CppTypeIndirection::Ref,
+  }));
   let include_file = "QRect".to_string();
-  assert_eq!(c_base_name(&method,
-                         &ReturnValueAllocationPlace::NotApplicable,
-                         &include_file)
-                 .unwrap(),
-             "MyClass_convert_to_const_QPoint_ref");
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
-             "MyClass_convert_to_const_QPoint_ref_to_output");
-  assert_eq!(c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
-             "MyClass_convert_to_const_QPoint_ref_as_ptr");
+  assert_eq!(
+    c_base_name(
+      &method,
+      &ReturnValueAllocationPlace::NotApplicable,
+      &include_file,
+    ).unwrap(),
+    "MyClass_convert_to_const_QPoint_ref"
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
+    "MyClass_convert_to_const_QPoint_ref_to_output"
+  );
+  assert_eq!(
+    c_base_name(&method, &ReturnValueAllocationPlace::Heap, &include_file).unwrap(),
+    "MyClass_convert_to_const_QPoint_ref_as_ptr"
+  );
 }

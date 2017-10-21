@@ -41,7 +41,7 @@ impl<'a> Form<'a> {
 
 fn main() {
   Application::create_and_exit(|_| {
-                                 let _form = Form::new();
-                                 Application::exec()
-                               })
+    let _form = Form::new();
+    Application::exec()
+  })
 }

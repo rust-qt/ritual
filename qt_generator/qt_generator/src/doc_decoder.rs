@@ -80,22 +80,23 @@ impl DocData {
 
   /// Searches for an index item by lambda condition.
   pub fn find_index_item<F: Fn(&DocIndexItem) -> bool>(&mut self, f: F) -> Option<DocIndexItem> {
-    self
-      .index
-      .iter_mut()
-      .find(|item| f(item))
-      .and_then(|mut item| {
-                  item.accessed = true;
-                  Some(item.clone())
-                })
+    self.index.iter_mut().find(|item| f(item)).and_then(
+      |mut item| {
+        item.accessed = true;
+        Some(item.clone())
+      },
+    )
   }
 
   /// Parses Qt documentation of module `qt_sub_lib_name` located at `docs_path`.
   pub fn new(qt_sub_lib_name: &str, docs_path: &Path) -> Result<DocData> {
     if !docs_path.exists() {
-      return Err(format!("Documentation directory does not exist: {}",
-                         docs_path.display())
-                     .into());
+      return Err(
+        format!(
+          "Documentation directory does not exist: {}",
+          docs_path.display()
+        ).into(),
+      );
     }
     let doc_file_name = if qt_sub_lib_name.starts_with("3d_") {
       "3d".to_string()
@@ -105,13 +106,19 @@ impl DocData {
 
     let doc_file_path = docs_path.with_added(format!("qt{}.qch", doc_file_name));
     if !doc_file_path.exists() {
-      return Err(format!("Documentation file does not exist: {}",
-                         doc_file_path.display())
-                     .into());
+      return Err(
+        format!(
+          "Documentation file does not exist: {}",
+          doc_file_path.display()
+        ).into(),
+      );
     }
-    log::status(format!("Adding Qt documentation from {}", doc_file_path.display()));
-    let connection = rusqlite::Connection::open_with_flags(&doc_file_path,
-                                                           rusqlite::SQLITE_OPEN_READ_ONLY)
+    log::status(format!(
+      "Adding Qt documentation from {}",
+      doc_file_path.display()
+    ));
+    let connection =
+      rusqlite::Connection::open_with_flags(&doc_file_path, rusqlite::SQLITE_OPEN_READ_ONLY)
         .convert_err()?;
 
     let mut index_data = Vec::new();
@@ -126,16 +133,16 @@ impl DocData {
         let file_id: i32 = index_row.get_checked(1).convert_err()?;
         let anchor: Option<String> = index_row.get_checked(2).convert_err()?;
         index_data.push(DocIndexItem {
-                          name: name,
-                          document_id: file_id,
-                          anchor: anchor,
-                          accessed: false,
-                        });
+          name: name,
+          document_id: file_id,
+          anchor: anchor,
+          accessed: false,
+        });
       }
     }
     Ok(DocData {
-         index: index_data,
-         connection: connection,
-       })
+      index: index_data,
+      connection: connection,
+    })
   }
 }

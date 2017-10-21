@@ -69,10 +69,10 @@ impl DocParser {
       let document = self.doc_data.document(doc_id)?;
       let item_docs = all_item_docs(&document, &self.base_url)?;
       entry.insert(FileData {
-                     document: document,
-                     item_docs: item_docs,
-                     file_name: self.doc_data.file_name(doc_id)?,
-                   });
+        document: document,
+        item_docs: item_docs,
+        file_name: self.doc_data.file_name(doc_id)?,
+      });
     }
     Ok(&self.file_data[&doc_id])
   }
@@ -85,18 +85,18 @@ impl DocParser {
   /// the C++ parser, and the other one is constructed based on
   /// the parsed signature data. Declarations are used to distinguish between
   /// multiple methods with the same name.
-  pub fn doc_for_method(&mut self,
-                        name: &str,
-                        declaration1: &str,
-                        declaration2: &str)
-                        -> Result<CppMethodDoc> {
+  pub fn doc_for_method(
+    &mut self,
+    name: &str,
+    declaration1: &str,
+    declaration2: &str,
+  ) -> Result<CppMethodDoc> {
     let mut name_parts: Vec<_> = name.split("::").collect();
     let anchor_override = if name_parts.len() >= 2 &&
-                             name_parts[name_parts.len() - 1] == name_parts[name_parts.len() - 2] {
+      name_parts[name_parts.len() - 1] == name_parts[name_parts.len() - 2]
+    {
       // constructors are not in the index
-      let last_part = name_parts
-        .pop()
-        .chain_err(|| "name_parts can't be empty")?;
+      let last_part = name_parts.pop().chain_err(|| "name_parts can't be empty")?;
       Some(last_part.to_string())
     } else {
       None
@@ -109,17 +109,15 @@ impl DocParser {
     let index_item = self
       .doc_data
       .find_index_item(|item| {
-                         &item.name == &corrected_name &&
-                         (item.anchor.is_some() || anchor_override.is_some())
-                       })
+        &item.name == &corrected_name && (item.anchor.is_some() || anchor_override.is_some())
+      })
       .chain_err(|| format!("No documentation entry for {}", corrected_name))?;
     let anchor = match anchor_override {
       Some(x) => x,
       None => {
-        index_item
-          .anchor
-          .clone()
-          .chain_err(|| unexpected("anchor is expected here!"))?
+        index_item.anchor.clone().chain_err(|| {
+          unexpected("anchor is expected here!")
+        })?
       }
     };
     let anchor_prefix = format!("{}-", anchor);
@@ -129,7 +127,9 @@ impl DocParser {
     let candidates: Vec<_> = file_data
       .item_docs
       .iter()
-      .filter(|x| &x.anchor == &anchor || x.anchor.starts_with(&anchor_prefix))
+      .filter(|x| {
+        &x.anchor == &anchor || x.anchor.starts_with(&anchor_prefix)
+      })
       .collect();
     if candidates.is_empty() {
       return Err(format!("No matching anchors found for {}", name).into());
@@ -145,9 +145,10 @@ impl DocParser {
     for declaration in &[declaration1, declaration2] {
       let mut declaration_no_scope = declaration.to_string();
       if let Some((ref prefix1, ref prefix2)) = scope_prefix {
-        declaration_no_scope = declaration_no_scope
-          .replace(prefix1, "")
-          .replace(prefix2, "");
+        declaration_no_scope = declaration_no_scope.replace(prefix1, "").replace(
+          prefix2,
+          "",
+        );
       }
       let mut query_imprint = declaration_no_scope
         .replace("Q_REQUIRED_RESULT", "")
@@ -166,21 +167,22 @@ impl DocParser {
           let mut item_declaration_imprint =
             item_declaration.replace("virtual ", "").replace(" ", "");
           if let Some((ref prefix1, ref prefix2)) = scope_prefix {
-            item_declaration_imprint = item_declaration_imprint
-              .replace(prefix1, "")
-              .replace(prefix2, "");
+            item_declaration_imprint = item_declaration_imprint.replace(prefix1, "").replace(
+              prefix2,
+              "",
+            );
           }
           if &item_declaration_imprint == &query_imprint {
             if item.html.find(|c| c != '\n').is_none() {
               return Err("found empty documentation".into());
             }
             return Ok(CppMethodDoc {
-                        html: item.html.clone(),
-                        anchor: item.anchor.clone(),
-                        mismatched_declaration: None,
-                        url: format!("{}#{}", file_url, item.anchor),
-                        cross_references: item.cross_references.clone(),
-                      });
+              html: item.html.clone(),
+              anchor: item.anchor.clone(),
+              mismatched_declaration: None,
+              url: format!("{}#{}", file_url, item.anchor),
+              cross_references: item.cross_references.clone(),
+            });
           }
         }
       }
@@ -188,55 +190,61 @@ impl DocParser {
         for item_declaration in &item.declarations {
           let mut item_declaration_imprint = item_declaration.clone();
           if let Some((ref prefix1, ref prefix2)) = scope_prefix {
-            item_declaration_imprint = item_declaration_imprint
-              .replace(prefix1, "")
-              .replace(prefix2, "");
+            item_declaration_imprint = item_declaration_imprint.replace(prefix1, "").replace(
+              prefix2,
+              "",
+            );
           }
           if are_argument_types_equal(&declaration_no_scope, &item_declaration_imprint) {
             if item.html.find(|c| c != '\n').is_none() {
               return Err("found empty documentation".into());
             }
             return Ok(CppMethodDoc {
-                        html: item.html.clone(),
-                        anchor: item.anchor.clone(),
-                        mismatched_declaration: None,
-                        url: format!("{}#{}", file_url, item.anchor),
-                        cross_references: item.cross_references.clone(),
-                      });
+              html: item.html.clone(),
+              anchor: item.anchor.clone(),
+              mismatched_declaration: None,
+              url: format!("{}#{}", file_url, item.anchor),
+              cross_references: item.cross_references.clone(),
+            });
           }
         }
       }
     }
     if candidates.len() == 1 {
       log::llog(log::DebugQtDocDeclarations, || {
-        format!("\
+        format!(
+          "\
           Declaration mismatch ignored because there is only one \
                  method.\nDeclaration 1: {}\nDeclaration 2: {}\nDoc declaration: {:?}\n",
-                declaration1,
-                declaration2,
-                candidates[0].declarations)
+          declaration1,
+          declaration2,
+          candidates[0].declarations
+        )
       });
 
       if candidates[0].html.is_empty() {
         return Err("found empty documentation".into());
       }
       return Ok(CppMethodDoc {
-                  html: candidates[0].html.clone(),
-                  anchor: candidates[0].anchor.clone(),
-                  url: format!("{}#{}", file_url, candidates[0].anchor),
-                  mismatched_declaration: Some(candidates[0].declarations[0].clone()),
-                  cross_references: candidates[0].cross_references.clone(),
-                });
+        html: candidates[0].html.clone(),
+        anchor: candidates[0].anchor.clone(),
+        url: format!("{}#{}", file_url, candidates[0].anchor),
+        mismatched_declaration: Some(candidates[0].declarations[0].clone()),
+        cross_references: candidates[0].cross_references.clone(),
+      });
     }
     log::llog(log::DebugQtDocDeclarations, || {
-      format!("Declaration mismatch!\nDeclaration 1: {}\nDeclaration 2: {}",
-              declaration1,
-              declaration2)
+      format!(
+        "Declaration mismatch!\nDeclaration 1: {}\nDeclaration 2: {}",
+        declaration1,
+        declaration2
+      )
     });
     log::llog(log::DebugQtDocDeclarations, || "Candidates:");
     for item in &candidates {
-      log::llog(log::DebugQtDocDeclarations,
-                || format!("  {:?}", item.declarations));
+      log::llog(log::DebugQtDocDeclarations, || {
+        format!("  {:?}", item.declarations)
+      });
     }
     log::llog(log::DebugQtDocDeclarations, || "");
     Err("Declaration mismatch".into())
@@ -258,19 +266,21 @@ impl DocParser {
           .chain_err(|| format!("no such anchor: {}", anchor))?;
         (result.clone(), file_data.file_name.clone())
       };
-      return Ok((CppTypeDoc {
-                   html: result.html,
-                   url: format!("{}{}#{}", self.base_url, file_name, anchor),
-                   cross_references: result.cross_references,
-                 },
-                 result.enum_variants));
+      return Ok((
+        CppTypeDoc {
+          html: result.html,
+          url: format!("{}{}#{}", self.base_url, file_name, anchor),
+          cross_references: result.cross_references,
+        },
+        result.enum_variants,
+      ));
     }
     let mut result = String::new();
     let mut url = self.base_url.clone();
     {
-      let file_data = self
-        .file_data(index_item.document_id)
-        .chain_err(|| "failed to get document")?;
+      let file_data = self.file_data(index_item.document_id).chain_err(
+        || "failed to get document",
+      )?;
       url.push_str(&file_data.file_name);
       let doc = &file_data.document;
       use html_parser::predicate::{And, Name, Class};
@@ -293,23 +303,27 @@ impl DocParser {
       }
     }
     let (html, cross_references) = process_html(&result, &self.base_url)?;
-    Ok((CppTypeDoc {
-          html: html,
-          url: url,
-          cross_references: cross_references.into_iter().collect(),
-        },
-        Vec::new()))
+    Ok((
+      CppTypeDoc {
+        html: html,
+        url: url,
+        cross_references: cross_references.into_iter().collect(),
+      },
+      Vec::new(),
+    ))
   }
 
   /// Marks an enum variant `full_name` as used in the `DocData` index,
   /// so that it won't be listed in unused documentation entries.
   pub fn mark_enum_variant_used(&mut self, full_name: &str) {
     if self
-         .doc_data
-         .find_index_item(|item| &item.name == &full_name)
-         .is_none() {
-      log::llog(log::DebugQtDoc,
-                || format!("mark_enum_variant_used failed for {}", full_name));
+      .doc_data
+      .find_index_item(|item| &item.name == &full_name)
+      .is_none()
+    {
+      log::llog(log::DebugQtDoc, || {
+        format!("mark_enum_variant_used failed for {}", full_name)
+      });
 
     }
   }
@@ -342,11 +356,7 @@ fn arguments_from_declaration(declaration: &str) -> Option<Vec<&str>> {
     Some(start_index) => {
       match declaration.rfind(')') {
         None => None,
-        Some(end_index) => {
-          Some(declaration[start_index + 1..end_index]
-                 .split(',')
-                 .collect())
-        }
+        Some(end_index) => Some(declaration[start_index + 1..end_index].split(',').collect()),
       }
     }
   }
@@ -398,34 +408,40 @@ fn are_argument_types_equal(declaration1: &str, declaration2: &str) -> bool {
 
 #[test]
 fn qt_doc_parser_test() {
-  assert!(are_argument_types_equal(&"Q_CORE_EXPORT int qstricmp(const char *, const char *)"
-                                      .to_string(),
-                                   &"int qstricmp(const char * str1, const char * str2)"
-                                      .to_string()));
+  assert!(are_argument_types_equal(
+    &"Q_CORE_EXPORT int qstricmp(const char *, const char *)"
+      .to_string(),
+    &"int qstricmp(const char * str1, const char * str2)"
+      .to_string(),
+  ));
 
-  assert!(are_argument_types_equal(&"static void exit ( int retcode = 0 )".to_string(),
-                                   &"static void exit(int returnCode = 0)".to_string()));
+  assert!(are_argument_types_equal(
+    &"static void exit ( int retcode = 0 )".to_string(),
+    &"static void exit(int returnCode = 0)".to_string(),
+  ));
 
-  assert!(are_argument_types_equal(&"static QMetaObject :: Connection connect ( const QObject * \
+  assert!(are_argument_types_equal(
+    &"static QMetaObject :: Connection connect ( const QObject * \
                                     sender , const char * signal , const QObject * receiver , \
                                     const char * member , Qt :: ConnectionType = Qt :: \
                                     AutoConnection )"
-                                        .to_string(),
-                                   &"static QMetaObject::Connection connect(const QObject * \
+      .to_string(),
+    &"static QMetaObject::Connection connect(const QObject * \
                                     sender, const char * signal, const QObject * receiver, \
                                     const char * method, Qt::ConnectionType type = \
                                     Qt::AutoConnection)"
-                                        .to_string()));
+      .to_string(),
+  ));
 }
 
 /// Returns a copy of `html` with all relative link URLs replaced with absolute URLs.
 /// Also returns the set of absolute URLs.
 fn process_html(html: &str, base_url: &str) -> Result<(String, HashSet<String>)> {
-  let bad_subfolder_regex = Regex::new(r"^\.\./qt[^/]+/")
-    .chain_err(|| "invalid regex")?;
+  let bad_subfolder_regex = Regex::new(r"^\.\./qt[^/]+/").chain_err(|| "invalid regex")?;
 
-  let link_regex = Regex::new("(href|src)=\"([^\"]*)\"")
-    .chain_err(|| "invalid regex")?;
+  let link_regex = Regex::new("(href|src)=\"([^\"]*)\"").chain_err(
+    || "invalid regex",
+  )?;
   let mut cross_references = HashSet::new();
   let html = link_regex.replace_all(html.trim(), |captures: &::regex::Captures| {
     let mut link = bad_subfolder_regex.replace(&captures[2], "");
@@ -462,16 +478,20 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
       .replace("[signal]", "")
       .replace("[slot]", "");
     if main_declaration.find("[pure virtual]").is_some() {
-      main_declaration = format!("virtual {} = 0",
-                                 main_declaration.replace("[pure virtual]", ""));
+      main_declaration = format!(
+        "virtual {} = 0",
+        main_declaration.replace("[pure virtual]", "")
+      );
     }
     let mut declarations = vec![main_declaration];
     let mut result = String::new();
     let mut node = if let Some(r) = h3.next() {
       r
     } else {
-      log::llog(log::DebugGeneral,
-                || "Failed to find element next to h3_node");
+      log::llog(
+        log::DebugGeneral,
+        || "Failed to find element next to h3_node",
+      );
       continue;
     };
     let mut enum_variants = Vec::new();
@@ -495,9 +515,9 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
               let (html, cross_references) = process_html(&tds[2].inner_html(), base_url).unwrap();
               all_cross_references.extend(cross_references.into_iter());
               enum_variants.push(DocForEnumVariant {
-                                   name: name.to_string(),
-                                   html: html,
-                                 });
+                name: name.to_string(),
+                html: html,
+              });
             }
           };
         let value_list_r = node.find(value_list_condition.clone());
@@ -522,12 +542,12 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
     let (html, cross_references) = process_html(&result, base_url)?;
     all_cross_references.extend(cross_references.into_iter());
     results.push(ItemDoc {
-                   declarations: declarations,
-                   html: html,
-                   anchor: anchor_text,
-                   enum_variants: enum_variants,
-                   cross_references: all_cross_references.into_iter().collect(),
-                 });
+      declarations: declarations,
+      html: html,
+      anchor: anchor_text,
+      enum_variants: enum_variants,
+      cross_references: all_cross_references.into_iter().collect(),
+    });
   }
   Ok(results)
 }

@@ -54,7 +54,10 @@ pub fn get_installation_data(sublib_name: &str) -> Result<InstallationData> {
   log::status("Detecting Qt directories");
 
   let root_include_path = run_qmake_query("QT_INSTALL_HEADERS")?;
-  log::status(format!("QT_INSTALL_HEADERS = \"{}\"", root_include_path.display()));
+  log::status(format!(
+    "QT_INSTALL_HEADERS = \"{}\"",
+    root_include_path.display()
+  ));
   let lib_path = run_qmake_query("QT_INSTALL_LIBS")?;
   log::status(format!("QT_INSTALL_LIBS = \"{}\"", lib_path.display()));
   let docs_path = run_qmake_query("QT_INSTALL_DOCS")?;
@@ -63,29 +66,32 @@ pub fn get_installation_data(sublib_name: &str) -> Result<InstallationData> {
   let dir = root_include_path.with_added(&folder_name);
   if dir.exists() {
     Ok(InstallationData {
-         root_include_path: root_include_path,
-         lib_path: lib_path,
-         docs_path: docs_path,
-         lib_include_path: dir,
-         is_framework: false,
-         qt_version: qt_version,
-       })
+      root_include_path: root_include_path,
+      lib_path: lib_path,
+      docs_path: docs_path,
+      lib_include_path: dir,
+      is_framework: false,
+      qt_version: qt_version,
+    })
   } else {
     let dir2 = lib_path.with_added(format!("{}.framework/Headers", folder_name));
     if dir2.exists() {
       Ok(InstallationData {
-           root_include_path: root_include_path,
-           lib_path: lib_path,
-           docs_path: docs_path,
-           lib_include_path: dir2,
-           is_framework: true,
-           qt_version: qt_version,
-         })
+        root_include_path: root_include_path,
+        lib_path: lib_path,
+        docs_path: docs_path,
+        lib_include_path: dir2,
+        is_framework: true,
+        qt_version: qt_version,
+      })
     } else {
-      Err(format!("extra header dir not found (tried: {}, {})",
-                  dir.display(),
-                  dir2.display())
-              .into())
+      Err(
+        format!(
+          "extra header dir not found (tried: {}, {})",
+          dir.display(),
+          dir2.display()
+        ).into(),
+      )
     }
   }
 }
@@ -120,22 +126,24 @@ pub fn lib_dependencies(sublib_name: &str) -> Result<&'static [&'static str]> {
   const RENDER3D: &'static [&'static str] = &["core", "gui", "3d_core"];
   const INPUT3D: &'static [&'static str] = &["core", "gui", "3d_core"];
   const LOGIC3D: &'static [&'static str] = &["core", "gui", "3d_core"];
-  const EXTRAS3D: &'static [&'static str] = &["core",
-                                              "gui",
-                                              "3d_core",
-                                              "3d_render",
-                                              "3d_input",
-                                              "3d_logic"];
+  const EXTRAS3D: &'static [&'static str] = &[
+    "core",
+    "gui",
+    "3d_core",
+    "3d_render",
+    "3d_input",
+    "3d_logic",
+  ];
   Ok(match sublib_name {
-       "core" => CORE,
-       "gui" => GUI,
-       "widgets" => WIDGETS,
-       "3d_core" => CORE3D,
-       "3d_render" => RENDER3D,
-       "3d_input" => INPUT3D,
-       "3d_logic" => LOGIC3D,
-       "3d_extras" => EXTRAS3D,
-       "ui_tools" => UI_TOOLS,
-       _ => return Err(format!("Unknown lib name: {}", sublib_name).into()),
-     })
+    "core" => CORE,
+    "gui" => GUI,
+    "widgets" => WIDGETS,
+    "3d_core" => CORE3D,
+    "3d_render" => RENDER3D,
+    "3d_input" => INPUT3D,
+    "3d_logic" => LOGIC3D,
+    "3d_extras" => EXTRAS3D,
+    "ui_tools" => UI_TOOLS,
+    _ => return Err(format!("Unknown lib name: {}", sublib_name).into()),
+  })
 }

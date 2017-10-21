@@ -19,30 +19,32 @@ pub fn run_and_return(sublib_name: &str) -> Result<()> {
 
   let mut config = Config::new()?;
   {
-    let original_qt_version = config
-      .original_cpp_lib_version()
-      .chain_err(|| "cpp_lib_version is expected in Config")?;
+    let original_qt_version = config.original_cpp_lib_version().chain_err(
+      || "cpp_lib_version is expected in Config",
+    )?;
 
     if original_qt_version != installation_data.qt_version {
-      println!("cargo:warning=This crate was generated for Qt {}, but Qt {} is currently in use.",
-               original_qt_version,
-               installation_data.qt_version);
+      println!(
+        "cargo:warning=This crate was generated for Qt {}, but Qt {} is currently in use.",
+        original_qt_version,
+        installation_data.qt_version
+      );
     }
   }
 
   let mut cpp_build_config_data = CppBuildConfigData::new();
   {
     let mut apply_installation_data = |name: &str, data: &InstallationData| {
-      config
-        .cpp_build_paths_mut()
-        .add_include_path(&data.root_include_path);
-      config
-        .cpp_build_paths_mut()
-        .add_include_path(&data.lib_include_path);
+      config.cpp_build_paths_mut().add_include_path(
+        &data.root_include_path,
+      );
+      config.cpp_build_paths_mut().add_include_path(
+        &data.lib_include_path,
+      );
       if data.is_framework {
-        config
-          .cpp_build_paths_mut()
-          .add_framework_path(&data.lib_path);
+        config.cpp_build_paths_mut().add_framework_path(
+          &data.lib_path,
+        );
         cpp_build_config_data.add_linked_framework(framework_name(name));
       } else {
         config.cpp_build_paths_mut().add_lib_path(&data.lib_path);
@@ -59,9 +61,10 @@ pub fn run_and_return(sublib_name: &str) -> Result<()> {
 
   }
 
-  config
-    .cpp_build_config_mut()
-    .add(target::Condition::True, cpp_build_config_data);
+  config.cpp_build_config_mut().add(
+    target::Condition::True,
+    cpp_build_config_data,
+  );
   config.run_and_return()
 }
 

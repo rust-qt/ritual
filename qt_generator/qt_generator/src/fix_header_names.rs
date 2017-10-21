@@ -19,10 +19,10 @@ impl HeaderNameMap {
   fn real_to_fancy(&self, real_header: &str, class_name: Option<&str>) -> String {
     if let Some(class_name) = class_name {
       if let Some(fancy_headers) = self.map_real_to_all_fancy.get(real_header) {
-        if let Some(x) =
-          fancy_headers
-            .iter()
-            .find(|&x| x == class_name || class_name.starts_with(&format!("{}::", x))) {
+        if let Some(x) = fancy_headers.iter().find(|&x| {
+          x == class_name || class_name.starts_with(&format!("{}::", x))
+        })
+        {
           return x.clone();
         }
       }
@@ -43,9 +43,9 @@ impl HeaderNameMap {
       if !header_path.is_file() {
         continue;
       }
-      let metadata =
-        ::std::fs::metadata(&header_path)
-          .chain_err(|| format!("failed to get metadata for {}", header_path.display()))?;
+      let metadata = ::std::fs::metadata(&header_path).chain_err(|| {
+        format!("failed to get metadata for {}", header_path.display())
+      })?;
       if metadata.len() < 100 {
         let file_content = file_to_string(&header_path)?;
         if let Some(matches) = re.captures(file_content.trim()) {
@@ -77,19 +77,21 @@ impl HeaderNameMap {
           }
         }
         if !ok {
-          log::llog(log::DebugQtHeaderNames,
-                    || format!("{} -> {:?} (detect failed)", real_header, fancy_headers));
+          log::llog(log::DebugQtHeaderNames, || {
+            format!("{} -> {:?} (detect failed)", real_header, fancy_headers)
+          });
         }
         result
       };
-      log::llog(log::DebugQtHeaderNames,
-                || format!("{} -> {}", real_header, fancy_header));
+      log::llog(log::DebugQtHeaderNames, || {
+        format!("{} -> {}", real_header, fancy_header)
+      });
       map_real_to_fancy.insert(real_header.clone(), fancy_header);
     }
     Ok(HeaderNameMap {
-         map_real_to_all_fancy: map_real_to_all_fancy,
-         map_real_to_fancy: map_real_to_fancy,
-       })
+      map_real_to_all_fancy: map_real_to_all_fancy,
+      map_real_to_fancy: map_real_to_fancy,
+    })
   }
 }
 
@@ -110,14 +112,17 @@ pub fn fix_header_names(data: &mut ParserCppData, headers_dir: &PathBuf) -> Resu
 fn test_qt_fix_header_names() {
   use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
   let map = HeaderNameMap::new(&PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                                  .with_added("test_assets")
-                                  .with_added("qt_headers"))
-      .unwrap();
+    .with_added("test_assets")
+    .with_added("qt_headers")).unwrap();
   assert_eq!(map.real_to_fancy("qfile.h", None), "QFile");
   assert_eq!(map.real_to_fancy("qfile.h", Some("QFile")), "QFile");
   assert_eq!(map.real_to_fancy("qnotmap.h", None), "qnotmap.h");
-  assert_eq!(map.real_to_fancy("qfactoryinterface.h", None),
-             "QFactoryInterface");
-  assert_eq!(map.real_to_fancy("qfactoryinterface.h", Some("^_^")),
-             "QFactoryInterface");
+  assert_eq!(
+    map.real_to_fancy("qfactoryinterface.h", None),
+    "QFactoryInterface"
+  );
+  assert_eq!(
+    map.real_to_fancy("qfactoryinterface.h", Some("^_^")),
+    "QFactoryInterface"
+  );
 }

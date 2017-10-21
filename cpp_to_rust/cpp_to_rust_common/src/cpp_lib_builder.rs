@@ -26,17 +26,21 @@ impl CMakeVar {
   }
   /// Creates a new variable containing a list of values.
   pub fn new_list<I, S, L>(name: S, values: L) -> Result<CMakeVar>
-    where S: Into<String>,
-          I: AsRef<str>,
-          L: IntoIterator<Item = I>
+  where
+    S: Into<String>,
+    I: AsRef<str>,
+    L: IntoIterator<Item = I>,
   {
     let value = values
       .into_iter()
       .map_if_ok(|s| -> Result<_> {
         if s.as_ref().contains(';') {
-          Err(format!("can't pass value to cmake because ';' symbol is reserved: {}",
-                      s.as_ref())
-                  .into())
+          Err(
+            format!(
+              "can't pass value to cmake because ';' symbol is reserved: {}",
+              s.as_ref()
+            ).into(),
+          )
         } else {
           Ok(s)
         }
@@ -48,14 +52,17 @@ impl CMakeVar {
 
   /// Creates a new variable containing a list of paths.
   pub fn new_path_list<I, S, L>(name: S, paths: L) -> Result<CMakeVar>
-    where S: Into<String>,
-          I: AsRef<Path>,
-          L: IntoIterator<Item = I>
+  where
+    S: Into<String>,
+    I: AsRef<Path>,
+    L: IntoIterator<Item = I>,
   {
-    CMakeVar::new_list(name,
-                       paths
-                         .into_iter()
-                         .map_if_ok(|x| path_to_str(x.as_ref()).map(|x| x.to_string()))?)
+    CMakeVar::new_list(
+      name,
+      paths.into_iter().map_if_ok(|x| {
+        path_to_str(x.as_ref()).map(|x| x.to_string())
+      })?,
+    )
   }
 }
 
@@ -92,9 +99,9 @@ impl CppLibBuilder {
       create_dir_all(&self.build_dir)?;
     }
     let mut cmake_command = Command::new("cmake");
-    cmake_command
-      .arg(self.cmake_source_dir)
-      .current_dir(&self.build_dir);
+    cmake_command.arg(self.cmake_source_dir).current_dir(
+      &self.build_dir,
+    );
     let actual_build_type = if target::current_env() == target::Env::Msvc {
       // Rust always links to release version of MSVC runtime, so
       // link will fail if C library is built in debug mode
@@ -114,12 +121,17 @@ impl CppLibBuilder {
       }
     }
     let mut actual_cmake_vars = self.cmake_vars.clone();
-    actual_cmake_vars.push(CMakeVar::new("CMAKE_BUILD_TYPE",
-                                         match actual_build_type {
-                                           BuildType::Release => "Release",
-                                           BuildType::Debug => "Debug",
-                                         }));
-    actual_cmake_vars.push(CMakeVar::new("CMAKE_INSTALL_PREFIX", path_to_str(&self.install_dir)?));
+    actual_cmake_vars.push(CMakeVar::new(
+      "CMAKE_BUILD_TYPE",
+      match actual_build_type {
+        BuildType::Release => "Release",
+        BuildType::Debug => "Debug",
+      },
+    ));
+    actual_cmake_vars.push(CMakeVar::new(
+      "CMAKE_INSTALL_PREFIX",
+      path_to_str(&self.install_dir)?,
+    ));
 
     for var in actual_cmake_vars {
       cmake_command.arg(format!("-D{}={}", var.name, var.value));

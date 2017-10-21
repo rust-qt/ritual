@@ -28,11 +28,13 @@ impl ArgumentCaptionStrategy {
   /// Returns list of all available strategies
   /// (sorted from high to low priority)
   pub fn all() -> Vec<Self> {
-    vec![ArgumentCaptionStrategy::NameOnly,
-         ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short),
-         ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short),
-         ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full),
-         ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full)]
+    vec![
+      ArgumentCaptionStrategy::NameOnly,
+      ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short),
+      ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short),
+      ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Full),
+      ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full),
+    ]
   }
 }
 

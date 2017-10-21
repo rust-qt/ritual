@@ -91,31 +91,31 @@ impl CrateProperties {
 
   /// Adds an extra non-`cpp_to_rust`-based dependency with
   /// `name`, `version` and optionally `local_path`.
-  pub fn add_dependency<S1: Into<String>, S2: Into<String>>(&mut self,
-                                                            name: S1,
-                                                            version: S2,
-                                                            local_path: Option<PathBuf>) {
-    self
-      .dependencies
-      .push(CrateDependency {
-              name: name.into(),
-              version: version.into(),
-              local_path: local_path,
-            });
+  pub fn add_dependency<S1: Into<String>, S2: Into<String>>(
+    &mut self,
+    name: S1,
+    version: S2,
+    local_path: Option<PathBuf>,
+  ) {
+    self.dependencies.push(CrateDependency {
+      name: name.into(),
+      version: version.into(),
+      local_path: local_path,
+    });
   }
   /// Adds an extra build dependency with
   /// `name`, `version` and optionally `local_path`.
-  pub fn add_build_dependency<S1: Into<String>, S2: Into<String>>(&mut self,
-                                                                  name: S1,
-                                                                  version: S2,
-                                                                  local_path: Option<PathBuf>) {
-    self
-      .build_dependencies
-      .push(CrateDependency {
-              name: name.into(),
-              version: version.into(),
-              local_path: local_path,
-            });
+  pub fn add_build_dependency<S1: Into<String>, S2: Into<String>>(
+    &mut self,
+    name: S1,
+    version: S2,
+    local_path: Option<PathBuf>,
+  ) {
+    self.build_dependencies.push(CrateDependency {
+      name: name.into(),
+      version: version.into(),
+      local_path: local_path,
+    });
   }
   /// Removes default dependencies from output `Cargo.toml`. Default
   /// dependencies are `libc`, `cpp_utils` and crates added using
@@ -261,10 +261,11 @@ impl Config {
   /// `output_dir_path` will contain the generated crate.
   /// `cache_dir_path` will be used for cache, temporary files and
   /// inter-library information files.
-  pub fn new<P1: Into<PathBuf>, P2: Into<PathBuf>>(output_dir_path: P1,
-                                                   cache_dir_path: P2,
-                                                   crate_properties: CrateProperties)
-                                                   -> Config {
+  pub fn new<P1: Into<PathBuf>, P2: Into<PathBuf>>(
+    output_dir_path: P1,
+    cache_dir_path: P2,
+    crate_properties: CrateProperties,
+  ) -> Config {
     Config {
       crate_properties: crate_properties,
       output_dir_path: output_dir_path.into(),
@@ -358,8 +359,9 @@ impl Config {
 
   /// Adds multiple blocked names. See `Config::add_cpp_parser_blocked_name`.
   pub fn add_cpp_parser_blocked_names<Item, Iter>(&mut self, items: Iter)
-    where Item: Into<String>,
-          Iter: IntoIterator<Item = Item>
+  where
+    Item: Into<String>,
+    Iter: IntoIterator<Item = Item>,
   {
     for item in items {
       self.cpp_parser_blocked_names.push(item.into());
@@ -378,8 +380,9 @@ impl Config {
   /// Adds multiple command line arguments for clang C++ parser.
   /// See `Config::add_cpp_parser_argument`.
   pub fn add_cpp_parser_arguments<Item, Iter>(&mut self, items: Iter)
-    where Item: Into<String>,
-          Iter: IntoIterator<Item = Item>
+  where
+    Item: Into<String>,
+    Iter: IntoIterator<Item = Item>,
   {
     for item in items {
       self.cpp_parser_arguments.push(item.into());
@@ -441,18 +444,20 @@ impl Config {
   /// - `Ok(false)` blocks the method. Remaining filter functions are not run
   /// on this method.
   pub fn add_cpp_ffi_generator_filter<F>(&mut self, f: F)
-    where F: Fn(&CppMethod) -> Result<bool> + 'static
+  where
+    F: Fn(&CppMethod) -> Result<bool> + 'static,
   {
-    self
-      .cpp_ffi_generator_filters
-      .push(CppFfiGeneratorFilter(Box::new(f)));
+    self.cpp_ffi_generator_filters.push(CppFfiGeneratorFilter(
+      Box::new(f),
+    ));
   }
 
   /// Adds a custom function that visits `&mut CppData` and can perform any changes
   /// in the output of the C++ parser. Filters are executed in the same order they
   /// were added. If the function returns `Err`, the processing is terminated.
   pub fn add_cpp_data_filter<F>(&mut self, f: F)
-    where F: Fn(&mut ParserCppData) -> Result<()> + 'static
+  where
+    F: Fn(&mut ParserCppData) -> Result<()> + 'static,
   {
     self.cpp_data_filters.push(CppDataFilter(Box::new(f)));
   }
@@ -464,8 +469,9 @@ impl Config {
 
   /// Adds multiple namespaces to filter out before rust code generation.
   pub fn add_cpp_filtered_namespaces<Item, Iter>(&mut self, namespaces: Iter)
-    where Item: Into<String>,
-          Iter: IntoIterator<Item = Item>
+  where
+    Item: Into<String>,
+    Iter: IntoIterator<Item = Item>,
   {
     for namespace in namespaces {
       self.cpp_filtered_namespaces.push(namespace.into());
@@ -475,23 +481,22 @@ impl Config {
 
   /// Overrides automatic selection of type allocation place for `type_name` and uses `place`
   /// instead. See `CppTypeAllocationPlace` for more information.
-  pub fn set_type_allocation_place<S: Into<String>>(&mut self,
-                                                    place: CppTypeAllocationPlace,
-                                                    type_name: S) {
-    self
-      .type_allocation_places
-      .insert(type_name.into(), place);
+  pub fn set_type_allocation_place<S: Into<String>>(
+    &mut self,
+    place: CppTypeAllocationPlace,
+    type_name: S,
+  ) {
+    self.type_allocation_places.insert(type_name.into(), place);
   }
   /// Overrides automatic selection of type allocation place for `types` and uses `place`
   /// instead. See also `Config::set_type_allocation_place`.
   pub fn set_types_allocation_place<SI, S>(&mut self, place: CppTypeAllocationPlace, types: SI)
-    where SI: IntoIterator<Item = S>,
-          S: Into<String>
+  where
+    SI: IntoIterator<Item = S>,
+    S: Into<String>,
   {
     for t in types {
-      self
-        .type_allocation_places
-        .insert(t.into(), place.clone());
+      self.type_allocation_places.insert(t.into(), place.clone());
     }
   }
 

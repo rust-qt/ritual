@@ -30,13 +30,15 @@ pub struct Config {
 }
 
 fn manifest_dir() -> Result<PathBuf> {
-  let dir = std::env::var("CARGO_MANIFEST_DIR")
-    .chain_err(|| "CARGO_MANIFEST_DIR env var is missing")?;
+  let dir = std::env::var("CARGO_MANIFEST_DIR").chain_err(
+    || "CARGO_MANIFEST_DIR env var is missing",
+  )?;
   Ok(PathBuf::from(dir))
 }
 fn out_dir() -> Result<PathBuf> {
-  let dir = std::env::var("OUT_DIR")
-    .chain_err(|| "OUT_DIR env var is missing")?;
+  let dir = std::env::var("OUT_DIR").chain_err(
+    || "OUT_DIR env var is missing",
+  )?;
   Ok(PathBuf::from(dir))
 }
 
@@ -52,20 +54,18 @@ impl Config {
   /// and call `config.run()` to apply them.
   pub fn new() -> Result<Config> {
     Ok(Config {
-         build_script_data: build_script_data()?,
-         cpp_build_paths: CppBuildPaths::default(),
-       })
+      build_script_data: build_script_data()?,
+      cpp_build_paths: CppBuildPaths::default(),
+    })
   }
 
   /// Returns version of the native C++ library used for generating this crate.
   /// This is the value set with `Config::set_cpp_lib_version` during generation,
   /// or `None` if the version was not set.
   pub fn original_cpp_lib_version(&self) -> Option<&str> {
-    self
-      .build_script_data
-      .cpp_lib_version
-      .as_ref()
-      .map(|x| x.as_str())
+    self.build_script_data.cpp_lib_version.as_ref().map(|x| {
+      x.as_str()
+    })
   }
 
   /// Returns current `CppBuildConfig` data.
@@ -96,68 +96,91 @@ impl Config {
   /// Same as `run()`, but result of the operation is returned to the caller.
   pub fn run_and_return(mut self) -> Result<()> {
     self.cpp_build_paths.apply_env();
-    let cpp_build_config_data = self
-      .build_script_data
-      .cpp_build_config
-      .eval(&current_target())?;
+    let cpp_build_config_data = self.build_script_data.cpp_build_config.eval(
+      &current_target(),
+    )?;
     let mut cmake_vars = Vec::new();
-    cmake_vars.push(CMakeVar::new("C2R_LIBRARY_TYPE",
-                                  match cpp_build_config_data.library_type() {
-                                    Some(CppLibraryType::Shared) => "SHARED",
-                                    Some(CppLibraryType::Static) |
-                                    None => "STATIC",
-                                  }));
-    cmake_vars.push(CMakeVar::new_path_list("C2R_INCLUDE_PATHS",
-                                            self.cpp_build_paths.include_paths())?);
-    cmake_vars.push(CMakeVar::new_path_list("C2R_LIB_PATHS", self.cpp_build_paths.lib_paths())?);
-    cmake_vars.push(CMakeVar::new_path_list("C2R_FRAMEWORK_PATHS",
-                                            self.cpp_build_paths.framework_paths())?);
-    cmake_vars.push(CMakeVar::new_list("C2R_LINKED_LIBS", cpp_build_config_data.linked_libs())?);
-    cmake_vars.push(CMakeVar::new_list("C2R_LINKED_FRAMEWORKS",
-                                       cpp_build_config_data.linked_frameworks())?);
-    cmake_vars.push(CMakeVar::new("C2R_COMPILER_FLAGS",
-                                  cpp_build_config_data.compiler_flags().join(" ")));
+    cmake_vars.push(CMakeVar::new(
+      "C2R_LIBRARY_TYPE",
+      match cpp_build_config_data.library_type() {
+        Some(CppLibraryType::Shared) => "SHARED",
+        Some(CppLibraryType::Static) |
+        None => "STATIC",
+      },
+    ));
+    cmake_vars.push(CMakeVar::new_path_list(
+      "C2R_INCLUDE_PATHS",
+      self.cpp_build_paths.include_paths(),
+    )?);
+    cmake_vars.push(CMakeVar::new_path_list(
+      "C2R_LIB_PATHS",
+      self.cpp_build_paths.lib_paths(),
+    )?);
+    cmake_vars.push(CMakeVar::new_path_list(
+      "C2R_FRAMEWORK_PATHS",
+      self.cpp_build_paths.framework_paths(),
+    )?);
+    cmake_vars.push(CMakeVar::new_list(
+      "C2R_LINKED_LIBS",
+      cpp_build_config_data.linked_libs(),
+    )?);
+    cmake_vars.push(CMakeVar::new_list(
+      "C2R_LINKED_FRAMEWORKS",
+      cpp_build_config_data.linked_frameworks(),
+    )?);
+    cmake_vars.push(CMakeVar::new(
+      "C2R_COMPILER_FLAGS",
+      cpp_build_config_data.compiler_flags().join(" "),
+    ));
     let out_dir = out_dir()?;
     let c_lib_install_dir = out_dir.with_added("c_lib_install");
     let manifest_dir = manifest_dir()?;
-    let profile = std::env::var("PROFILE")
-      .chain_err(|| "PROFILE env var is missing")?;
+    let profile = std::env::var("PROFILE").chain_err(
+      || "PROFILE env var is missing",
+    )?;
     log::status("Building C++ wrapper library");
     CppLibBuilder {
-        cmake_source_dir: manifest_dir.with_added("c_lib"),
-        build_dir: out_dir.with_added("c_lib_build"),
-        install_dir: c_lib_install_dir.clone(),
-        num_jobs: std::env::var("NUM_JOBS")
-          .ok()
-          .and_then(|x| x.parse().ok()),
-        cmake_vars: cmake_vars,
-        build_type: match profile.as_str() {
-          "debug" => BuildType::Debug,
-          "release" => BuildType::Release,
-          _ => return Err(format!("unknown value of PROFILE env var: {}", profile).into()),
-        },
-      }
-      .run()?;
+      cmake_source_dir: manifest_dir.with_added("c_lib"),
+      build_dir: out_dir.with_added("c_lib_build"),
+      install_dir: c_lib_install_dir.clone(),
+      num_jobs: std::env::var("NUM_JOBS").ok().and_then(|x| x.parse().ok()),
+      cmake_vars: cmake_vars,
+      build_type: match profile.as_str() {
+        "debug" => BuildType::Debug,
+        "release" => BuildType::Release,
+        _ => {
+          return Err(
+            format!("unknown value of PROFILE env var: {}", profile).into(),
+          )
+        }
+      },
+    }.run()?;
     {
       log::status("Generating ffi.rs file");
       let mut ffi_file = create_file(out_dir.with_added("ffi.rs"))?;
       if cpp_build_config_data.library_type() == Some(CppLibraryType::Shared) {
-        ffi_file
-          .write(format!("#[link(name = \"{}\")]\n",
-                         &self.build_script_data.cpp_wrapper_lib_name))?;
+        ffi_file.write(format!(
+          "#[link(name = \"{}\")]\n",
+          &self.build_script_data.cpp_wrapper_lib_name
+        ))?;
       } else {
-        ffi_file
-          .write(format!("#[link(name = \"{}\", kind = \"static\")]\n",
-                         &self.build_script_data.cpp_wrapper_lib_name))?;
+        ffi_file.write(format!(
+          "#[link(name = \"{}\", kind = \"static\")]\n",
+          &self.build_script_data.cpp_wrapper_lib_name
+        ))?;
       }
-      ffi_file
-        .write(file_to_string(manifest_dir.with_added("src").with_added("ffi.in.rs"))?)?;
+      ffi_file.write(file_to_string(
+        manifest_dir.with_added("src").with_added(
+          "ffi.in.rs",
+        ),
+      )?)?;
     }
     {
       log::status("Requesting type sizes");
-      let mut command = Command::new(c_lib_install_dir
-                                       .with_added("lib")
-                                       .with_added(format!("type_sizes{}", exe_suffix())));
+      let mut command = Command::new(c_lib_install_dir.with_added("lib").with_added(format!(
+        "type_sizes{}",
+        exe_suffix()
+      )));
       let mut file = create_file(out_dir.with_added("type_sizes.rs"))?;
       file.write(get_command_output(&mut command)?)?;
     }
@@ -178,8 +201,10 @@ impl Config {
     for path in self.cpp_build_paths.framework_paths() {
       println!("cargo:rustc-link-search=framework={}", path_to_str(path)?);
     }
-    println!("cargo:rustc-link-search=native={}",
-             path_to_str(&c_lib_install_dir.with_added("lib"))?);
+    println!(
+      "cargo:rustc-link-search=native={}",
+      path_to_str(&c_lib_install_dir.with_added("lib"))?
+    );
     log::status("cpp_to_rust build script finished.");
     Ok(())
   }

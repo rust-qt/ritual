@@ -232,14 +232,15 @@ pub struct CppData {
 
 impl CppData {
   /// Returns an iterator over all explicitly declared methods and implicit destructors.
-  pub fn methods_and_implicit_destructors
-    (&self)
-     -> ::std::iter::Chain<::std::slice::Iter<CppMethod>, ::std::slice::Iter<CppMethod>> {
-    self
-      .parser
-      .methods
-      .iter()
-      .chain(self.processed.implicit_destructors.iter())
+  pub fn methods_and_implicit_destructors(
+    &self,
+  ) -> ::std::iter::Chain<::std::slice::Iter<CppMethod>, ::std::slice::Iter<CppMethod>> {
+    self.parser.methods.iter().chain(
+      self
+        .processed
+        .implicit_destructors
+        .iter(),
+    )
   }
 }
 
@@ -274,9 +275,9 @@ impl CppTypeData {
       return Err("not a class".into());
     }
     Ok(CppTypeClassBase {
-         name: self.name.clone(),
-         template_arguments: self.default_template_arguments(),
-       })
+      name: self.name.clone(),
+      template_arguments: self.default_template_arguments(),
+    })
   }
 
   /// Creates template parameters expected for this type.
@@ -296,22 +297,24 @@ impl CppTypeData {
         match *template_arguments {
           None => None,
           Some(ref arguments) => {
-            Some(arguments
-                   .names
-                   .iter()
-                   .enumerate()
-                   .map(|(num, _)| {
-              CppType {
-                is_const: false,
-                is_const2: false,
-                indirection: CppTypeIndirection::None,
-                base: CppTypeBase::TemplateParameter {
-                  nested_level: arguments.nested_level,
-                  index: num,
-                },
-              }
-            })
-                   .collect())
+            Some(
+              arguments
+                .names
+                .iter()
+                .enumerate()
+                .map(|(num, _)| {
+                  CppType {
+                    is_const: false,
+                    is_const2: false,
+                    indirection: CppTypeIndirection::None,
+                    base: CppTypeBase::TemplateParameter {
+                      nested_level: arguments.nested_level,
+                      index: num,
+                    },
+                  }
+                })
+                .collect(),
+            )
           }
         }
       }
@@ -341,10 +344,11 @@ impl ParserCppData {
   pub fn is_template_class(&self, name: &str) -> bool {
     if let Some(type_info) = self.types.iter().find(|t| &t.name == name) {
       if let CppTypeKind::Class {
-               ref template_arguments,
-               ref bases,
-               ..
-             } = type_info.kind {
+        ref template_arguments,
+        ref bases,
+        ..
+      } = type_info.kind
+      {
         if template_arguments.is_some() {
           return true;
         }
@@ -352,7 +356,8 @@ impl ParserCppData {
           if let CppTypeBase::Class(CppTypeClassBase {
                                       ref name,
                                       ref template_arguments,
-                                    }) = base.base_type.base {
+                                    }) = base.base_type.base
+          {
             if template_arguments.is_some() {
               return true;
             }
@@ -363,8 +368,9 @@ impl ParserCppData {
         }
       }
     } else {
-      log::llog(log::DebugGeneral,
-                || format!("Unknown type assumed to be non-template: {}", name));
+      log::llog(log::DebugGeneral, || {
+        format!("Unknown type assumed to be non-template: {}", name)
+      });
     }
     false
   }
@@ -397,7 +403,8 @@ impl ParserCppData {
     let mut files = HashSet::new();
     for type1 in &self.types {
       if self.inherits(&type1.name, "QObject", dependencies) &&
-         !files.contains(&type1.origin_location.include_file_path) {
+        !files.contains(&type1.origin_location.include_file_path)
+      {
         files.insert(type1.origin_location.include_file_path.clone());
       }
     }
@@ -428,8 +435,9 @@ impl ParserCppData {
       let file = open_file(&file_path)?;
       let reader = BufReader::new(file.into_file());
       for (line_num, line) in reader.lines().enumerate() {
-        let line = line
-          .chain_err(|| format!("failed while reading lines from {}", &file_path))?;
+        let line = line.chain_err(|| {
+          format!("failed while reading lines from {}", &file_path)
+        })?;
         let section_type = if re_signals.is_match(&line) {
           Some(SectionType::Signals)
         } else if re_slots.is_match(&line) {
@@ -441,9 +449,9 @@ impl ParserCppData {
         };
         if let Some(section_type) = section_type {
           file_sections.push(Section {
-                               line: line_num,
-                               section_type: section_type,
-                             });
+            line: line_num,
+            section_type: section_type,
+          });
         }
       }
       // println!("sections: {:?}", file_sections);
@@ -473,12 +481,16 @@ impl ParserCppData {
                   if log::is_on(log::DebugSignals) {
                     match section.section_type {
                       SectionType::Signals => {
-                        log::log(log::DebugSignals,
-                                 format!("Found signal: {}", method.short_text()));
+                        log::log(
+                          log::DebugSignals,
+                          format!("Found signal: {}", method.short_text()),
+                        );
                       }
                       SectionType::Slots => {
-                        log::log(log::DebugSignals,
-                                 format!("Found slot: {}", method.short_text()));
+                        log::log(
+                          log::DebugSignals,
+                          format!("Found slot: {}", method.short_text()),
+                        );
                       }
                       SectionType::Other => {}
                     }
@@ -535,24 +547,23 @@ impl<'a> CppDataWithDeps<'a> {
     if let CppTypeBase::Class(CppTypeClassBase {
                                 ref name,
                                 ref template_arguments,
-                              }) = type1.base {
+                              }) = type1.base
+    {
       if let Some(ref template_arguments) = *template_arguments {
         let is_valid = |cpp_data: &CppData| {
-          cpp_data
-            .processed
-            .template_instantiations
-            .iter()
-            .any(|inst| {
-                   &inst.class_name == name &&
-                   inst
-                     .instantiations
-                     .iter()
-                     .any(|x| &x.template_arguments == template_arguments)
-                 })
+          cpp_data.processed.template_instantiations.iter().any(
+            |inst| {
+              &inst.class_name == name &&
+                inst.instantiations.iter().any(|x| {
+                  &x.template_arguments == template_arguments
+                })
+            },
+          )
         };
         if !once(&self.current)
-              .chain(self.dependencies.iter().map(|x| *x))
-              .any(is_valid) {
+          .chain(self.dependencies.iter().map(|x| *x))
+          .any(is_valid)
+        {
           return Err(format!("type not available: {:?}", type1).into());
         }
         for arg in template_arguments {
@@ -570,11 +581,10 @@ impl<'a> CppDataWithDeps<'a> {
 
   /// Returns selected type allocation place for type `class_name`.
   pub fn type_allocation_place(&self, class_name: &str) -> Result<CppTypeAllocationPlace> {
-    if let Some(r) = self
-         .current
-         .processed
-         .type_allocation_places
-         .get(class_name) {
+    if let Some(r) = self.current.processed.type_allocation_places.get(
+      class_name,
+    )
+    {
       return Ok(r.clone());
     }
     for dep in &self.dependencies {
@@ -582,12 +592,15 @@ impl<'a> CppDataWithDeps<'a> {
         return Ok(r.clone());
       }
     }
-    Err(format!("no type allocation place information for {}", class_name).into())
+    Err(
+      format!("no type allocation place information for {}", class_name).into(),
+    )
   }
 
   /// Search for a `CppTypeData` object in this `CppData` and all dependencies.
   pub fn find_type_info<F>(&self, f: F) -> Option<&CppTypeData>
-    where F: Fn(&&CppTypeData) -> bool
+  where
+    F: Fn(&&CppTypeData) -> bool,
   {
     once(&self.current.parser.types)
       .chain(self.dependencies.iter().map(|d| &d.parser.types))
@@ -895,12 +908,14 @@ impl<'a> CppDataWithDeps<'a> {
 
   /// Checks if specified class has any virtual methods (own or inherited).
   pub fn has_virtual_methods(&self, class_name: &str) -> bool {
-    for method in self
-          .current
-          .parser
-          .methods
-          .iter()
-          .chain(self.current.processed.inherited_methods.iter()) {
+    for method in self.current.parser.methods.iter().chain(
+      self
+        .current
+        .processed
+        .inherited_methods
+        .iter(),
+    )
+    {
       if let Some(ref info) = method.class_membership {
         if &info.class_type.name == class_name && info.is_virtual {
           return true;
@@ -912,12 +927,14 @@ impl<'a> CppDataWithDeps<'a> {
 
   /// Checks if specified class has any virtual methods (own or inherited).
   pub fn has_pure_virtual_methods(&self, class_name: &str) -> bool {
-    for method in self
-          .current
-          .parser
-          .methods
-          .iter()
-          .chain(self.current.processed.inherited_methods.iter()) {
+    for method in self.current.parser.methods.iter().chain(
+      self
+        .current
+        .processed
+        .inherited_methods
+        .iter(),
+    )
+    {
       if let Some(ref info) = method.class_membership {
         if &info.class_type.name == class_name && info.is_pure_virtual {
           return true;
@@ -963,10 +980,11 @@ impl<'a> CppDataWithDeps<'a> {
       }
     }
     for instantiations in &self.current.processed.template_instantiations {
-      let type_info =
-        self
-          .find_type_info(|x| &x.name == &instantiations.class_name)
-          .chain_err(|| format!("type info not found for {}", &instantiations.class_name))?;
+      let type_info = self
+        .find_type_info(|x| &x.name == &instantiations.class_name)
+        .chain_err(|| {
+          format!("type info not found for {}", &instantiations.class_name)
+        })?;
       if !result.contains(&type_info.include_file) {
         result.insert(type_info.include_file.clone());
       }

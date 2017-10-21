@@ -50,7 +50,9 @@ fn load_dependency(path: &PathBuf) -> Result<DependencyInfo> {
   log::status(format!("Loading files from {}", path.display()));
   let parser_cpp_data_path = path.with_added("parser_cpp_data.bin");
   if !parser_cpp_data_path.exists() {
-    return Err(format!("file not found: {}", parser_cpp_data_path.display()).into());
+    return Err(
+      format!("file not found: {}", parser_cpp_data_path.display()).into(),
+    );
   }
   let parser_cpp_data = load_bincode(&parser_cpp_data_path)?;
 
@@ -58,7 +60,9 @@ fn load_dependency(path: &PathBuf) -> Result<DependencyInfo> {
 
   let processed_cpp_data_path = path.with_added("processed_cpp_data.bin");
   if !processed_cpp_data_path.exists() {
-    return Err(format!("file not found: {}", processed_cpp_data_path.display()).into());
+    return Err(
+      format!("file not found: {}", processed_cpp_data_path.display()).into(),
+    );
   }
   let processed_cpp_data = load_bincode(&processed_cpp_data_path)?;
   let cpp_data = CppData {
@@ -67,14 +71,16 @@ fn load_dependency(path: &PathBuf) -> Result<DependencyInfo> {
   };
   let rust_export_info_path = path.with_added("rust_export_info.bin");
   if !rust_export_info_path.exists() {
-    return Err(format!("file not found: {}", rust_export_info_path.display()).into());
+    return Err(
+      format!("file not found: {}", rust_export_info_path.display()).into(),
+    );
   }
   let rust_export_info = load_bincode(&rust_export_info_path)?;
   Ok(DependencyInfo {
-       rust_export_info: rust_export_info,
-       cpp_data: cpp_data,
-       cache_path: path.clone(),
-     })
+    rust_export_info: rust_export_info,
+    cpp_data: cpp_data,
+    cache_path: path.clone(),
+  })
 }
 
 /// Creates output and cache directories if they don't exist.
@@ -82,15 +88,22 @@ fn load_dependency(path: &PathBuf) -> Result<DependencyInfo> {
 fn check_all_paths(config: &Config) -> Result<()> {
   let check_dir = |path: &PathBuf| -> Result<()> {
     if !path.is_absolute() {
-      return Err(format!("Only absolute paths allowed. Relative path: {}",
-                         path.display())
-                     .into());
+      return Err(
+        format!(
+          "Only absolute paths allowed. Relative path: {}",
+          path.display()
+        ).into(),
+      );
     }
     if !path.exists() {
-      return Err(format!("Directory doesn't exist: {}", path.display()).into());
+      return Err(
+        format!("Directory doesn't exist: {}", path.display()).into(),
+      );
     }
     if !path.is_dir() {
-      return Err(format!("Path is not a directory: {}", path.display()).into());
+      return Err(
+        format!("Path is not a directory: {}", path.display()).into(),
+      );
     }
     Ok(())
   };
@@ -116,17 +129,21 @@ fn check_all_paths(config: &Config) -> Result<()> {
 /// Loads C++ data saved during a previous run of the generator
 /// from the cache directory if it's available and permitted by `config.cache_usage()`.
 /// Otherwise, performs necessary steps to parse and process C++ data.
-fn load_or_create_cpp_data<'a>(config: &Config,
-                               dependencies_cpp_data: Vec<&'a CppData>)
-                               -> Result<CppDataWithDeps<'a>> {
+fn load_or_create_cpp_data<'a>(
+  config: &Config,
+  dependencies_cpp_data: Vec<&'a CppData>,
+) -> Result<CppDataWithDeps<'a>> {
   let parser_cpp_data_file_path = config.cache_dir_path().with_added("parser_cpp_data.bin");
 
   let loaded_parser_cpp_data = if config.cache_usage().can_use_raw_cpp_data() &&
-                                  parser_cpp_data_file_path.as_path().is_file() {
+    parser_cpp_data_file_path.as_path().is_file()
+  {
     match load_bincode(&parser_cpp_data_file_path) {
       Ok(r) => {
-        log::status(format!("C++ parser data is loaded from file: {}",
-                            parser_cpp_data_file_path.display()));
+        log::status(format!(
+          "C++ parser data is loaded from file: {}",
+          parser_cpp_data_file_path.display()
+        ));
         Some(r)
       }
       Err(err) => {
@@ -153,35 +170,40 @@ fn load_or_create_cpp_data<'a>(config: &Config,
     };
     let mut parser_cpp_data: ParserCppData = cpp_parser::run(parser_config, &dependencies_cpp_data)
       .chain_err(|| "C++ parser failed")?;
-    parser_cpp_data
-      .detect_signals_and_slots(&dependencies_cpp_data)?;
+    parser_cpp_data.detect_signals_and_slots(
+      &dependencies_cpp_data,
+    )?;
     // TODO: rename `cpp_data_filters` to `parser_cpp_data_filters`
     if config.has_cpp_data_filters() {
       log::status("Running custom filters for C++ parser data");
       for filter in config.cpp_data_filters() {
-        filter(&mut parser_cpp_data)
-          .chain_err(|| "cpp_data_filter failed")?;
+        filter(&mut parser_cpp_data).chain_err(
+          || "cpp_data_filter failed",
+        )?;
       }
     }
     if config.write_cache() {
       log::status("Saving C++ parser data");
       save_bincode(&parser_cpp_data_file_path, &parser_cpp_data)?;
-      log::status(format!("C++ parser data is saved to file: {}",
-                          parser_cpp_data_file_path.display()));
+      log::status(format!(
+        "C++ parser data is saved to file: {}",
+        parser_cpp_data_file_path.display()
+      ));
     }
     parser_cpp_data
   };
 
-  let processed_cpp_data_file_path = config
-    .cache_dir_path()
-    .with_added("processed_cpp_data.bin");
+  let processed_cpp_data_file_path = config.cache_dir_path().with_added("processed_cpp_data.bin");
 
   let loaded_processed_cpp_data = if config.cache_usage().can_use_cpp_data() &&
-                                     processed_cpp_data_file_path.as_path().is_file() {
+    processed_cpp_data_file_path.as_path().is_file()
+  {
     match load_bincode(&processed_cpp_data_file_path) {
       Ok(r) => {
-        log::status(format!("C++ processed data is loaded from file: {}",
-                            processed_cpp_data_file_path.display()));
+        log::status(format!(
+          "C++ processed data is loaded from file: {}",
+          processed_cpp_data_file_path.display()
+        ));
         Some(r)
       }
       Err(err) => {
@@ -203,14 +225,18 @@ fn load_or_create_cpp_data<'a>(config: &Config,
     }
   } else {
     log::status("Post-processing parse result");
-    let r = cpp_post_process(parser_cpp_data,
-                             dependencies_cpp_data,
-                             config.type_allocation_places())?;
+    let r = cpp_post_process(
+      parser_cpp_data,
+      dependencies_cpp_data,
+      config.type_allocation_places(),
+    )?;
     if config.write_cache() {
       log::status("Saving processed C++ data");
       save_bincode(&processed_cpp_data_file_path, &r.current.processed)?;
-      log::status(format!("Processed C++ data is saved to file: {}",
-                          processed_cpp_data_file_path.display()));
+      log::status(format!(
+        "Processed C++ data is saved to file: {}",
+        processed_cpp_data_file_path.display()
+      ));
     }
     r
   };
@@ -230,48 +256,57 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
     if config.cache_usage().can_skip_all() && is_completed(config.cache_dir_path()) {
       continue;
     }
-    log::status(format!("Generating crate: {}", config.crate_properties().name()));
+    log::status(format!(
+      "Generating crate: {}",
+      config.crate_properties().name()
+    ));
     check_all_paths(&config)?;
     {
       let mut logger = log::default_logger();
       logger.set_default_settings(log::LoggerSettings {
-                                    file_path: None,
-                                    write_to_stderr: false,
-                                  });
+        file_path: None,
+        write_to_stderr: false,
+      });
       let mut category_settings = HashMap::new();
-      let mut debug_categories = vec![log::DebugGeneral,
-                                      log::DebugMoveFiles,
-                                      log::DebugTemplateInstantiation,
-                                      log::DebugInheritance,
-                                      log::DebugParserSkips,
-                                      log::DebugParser,
-                                      log::DebugFfiSkips,
-                                      log::DebugSignals,
-                                      log::DebugAllocationPlace,
-                                      log::DebugRustSkips,
-                                      log::DebugQtDoc,
-                                      log::DebugQtHeaderNames];
+      let mut debug_categories = vec![
+        log::DebugGeneral,
+        log::DebugMoveFiles,
+        log::DebugTemplateInstantiation,
+        log::DebugInheritance,
+        log::DebugParserSkips,
+        log::DebugParser,
+        log::DebugFfiSkips,
+        log::DebugSignals,
+        log::DebugAllocationPlace,
+        log::DebugRustSkips,
+        log::DebugQtDoc,
+        log::DebugQtHeaderNames,
+      ];
       for category in &[log::Status, log::Error] {
         if config.quiet_mode() {
           debug_categories.push(*category);
         } else {
-          category_settings.insert(*category,
-                                   log::LoggerSettings {
-                                     file_path: None,
-                                     write_to_stderr: true,
-                                   });
+          category_settings.insert(
+            *category,
+            log::LoggerSettings {
+              file_path: None,
+              write_to_stderr: true,
+            },
+          );
         }
       }
-      let debug_logging_config = if config.debug_logging_config() == &DebugLoggingConfig::Print &&
-                                    config.quiet_mode() {
-        DebugLoggingConfig::SaveToFile
-      } else {
-        config.debug_logging_config().clone()
-      };
+      let debug_logging_config =
+        if config.debug_logging_config() == &DebugLoggingConfig::Print && config.quiet_mode() {
+          DebugLoggingConfig::SaveToFile
+        } else {
+          config.debug_logging_config().clone()
+        };
       if debug_logging_config == DebugLoggingConfig::SaveToFile {
         let logs_dir = config.cache_dir_path().with_added("log");
-        logger.log(log::Status,
-                   format!("Debug log will be saved to {}", logs_dir.display()));
+        logger.log(
+          log::Status,
+          format!("Debug log will be saved to {}", logs_dir.display()),
+        );
         if logs_dir.exists() {
           remove_dir_all(&logs_dir)?;
         }
@@ -279,19 +314,23 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
         for category in debug_categories {
           let name = format!("{:?}", category).to_snake_case();
           let path = logs_dir.with_added(format!("{}.log", name));
-          category_settings.insert(category,
-                                   log::LoggerSettings {
-                                     file_path: Some(path),
-                                     write_to_stderr: false,
-                                   });
+          category_settings.insert(
+            category,
+            log::LoggerSettings {
+              file_path: Some(path),
+              write_to_stderr: false,
+            },
+          );
         }
       } else if debug_logging_config == DebugLoggingConfig::Print {
         for category in debug_categories {
-          category_settings.insert(category,
-                                   log::LoggerSettings {
-                                     file_path: None,
-                                     write_to_stderr: true,
-                                   });
+          category_settings.insert(
+            category,
+            log::LoggerSettings {
+              file_path: None,
+              write_to_stderr: true,
+            },
+          );
         }
       }
       logger.set_all_category_settings(category_settings);
@@ -309,15 +348,17 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
       let data = if let Some(data) = dependency_cache.remove(&cache_path) {
         data
       } else {
-        load_dependency(&cache_path)
-          .chain_err(|| "failed to load dependency")?
+        load_dependency(&cache_path).chain_err(
+          || "failed to load dependency",
+        )?
       };
       dependencies.push(data);
     }
     {
-      let cpp_data =
-        load_or_create_cpp_data(&config,
-                                dependencies.iter().map(|dep| &dep.cpp_data).collect())?;
+      let cpp_data = load_or_create_cpp_data(
+        &config,
+        dependencies.iter().map(|dep| &dep.cpp_data).collect(),
+      )?;
       let output_path_existed = config.output_dir_path().with_added("src").exists();
 
       let c_lib_path = config.output_dir_path().with_added("c_lib");
@@ -335,23 +376,29 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
         c_lib_path.clone()
       };
       create_dir_all(&c_lib_tmp_path)?;
-      log::status(format!("Generating C++ wrapper library ({})", cpp_ffi_lib_name));
+      log::status(format!(
+        "Generating C++ wrapper library ({})",
+        cpp_ffi_lib_name
+      ));
 
-      let cpp_ffi_headers = cpp_ffi_generator::run(&cpp_data,
-                                                   cpp_ffi_lib_name.clone(),
-                                                   config.cpp_ffi_generator_filters())
-          .chain_err(|| "FFI generator failed")?;
+      let cpp_ffi_headers = cpp_ffi_generator::run(
+        &cpp_data,
+        cpp_ffi_lib_name.clone(),
+        config.cpp_ffi_generator_filters(),
+      ).chain_err(|| "FFI generator failed")?;
 
       log::status(format!("Generating C++ wrapper code"));
       let code_gen = CppCodeGenerator::new(cpp_ffi_lib_name.clone(), c_lib_tmp_path.clone());
-      code_gen
-        .generate_template_files(config.include_directives())?;
+      code_gen.generate_template_files(
+        config.include_directives(),
+      )?;
       code_gen.generate_files(&cpp_ffi_headers)?;
 
       let crate_new_path = if output_path_existed {
-        let path = config
-          .cache_dir_path()
-          .with_added(format!("{}.new", &config.crate_properties().name()));
+        let path = config.cache_dir_path().with_added(format!(
+          "{}.new",
+          &config.crate_properties().name()
+        ));
         if path.as_path().exists() {
           remove_dir_all(&path)?;
         }
@@ -371,21 +418,22 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
       };
       log::status("Preparing Rust functions");
       let rust_data = rust_generator::RustGeneratorInputData {
-          cpp_data: &cpp_data,
-          cpp_ffi_headers: cpp_ffi_headers,
-          dependency_types: dependencies
-            .iter()
-            .map(|dep| &dep.rust_export_info.rust_types as &[_])
-            .collect(),
-          crate_name: config.crate_properties().name().clone(),
-          // TODO: more universal prefix removal (#25)
-          remove_qt_prefix: remove_qt_prefix,
-          filtered_namespaces: config.cpp_filtered_namespaces().clone(),
-        }
-        .run()
+        cpp_data: &cpp_data,
+        cpp_ffi_headers: cpp_ffi_headers,
+        dependency_types: dependencies
+          .iter()
+          .map(|dep| &dep.rust_export_info.rust_types as &[_])
+          .collect(),
+        crate_name: config.crate_properties().name().clone(),
+        // TODO: more universal prefix removal (#25)
+        remove_qt_prefix: remove_qt_prefix,
+        filtered_namespaces: config.cpp_filtered_namespaces().clone(),
+      }.run()
         .chain_err(|| "Rust data generator failed")?;
-      log::status(format!("Generating Rust crate code ({})",
-                          &config.crate_properties().name()));
+      log::status(format!(
+        "Generating Rust crate code ({})",
+        &config.crate_properties().name()
+      ));
       rust_code_generator::run(rust_config, &rust_data)
         .chain_err(|| "Rust code generator failed")?;
       let mut cpp_type_size_requests = Vec::new();
@@ -393,23 +441,21 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
         if let RustTypeWrapperKind::Struct { ref size_const_name, .. } = type1.kind {
           if let Some(ref size_const_name) = *size_const_name {
             cpp_type_size_requests.push(CppTypeSizeRequest {
-                                          cpp_code: CppTypeClassBase {
-                                              name: type1.cpp_name.clone(),
-                                              template_arguments: type1
-                                                .cpp_template_arguments
-                                                .clone(),
-                                            }
-                                            .to_cpp_code()?,
-                                          size_const_name: size_const_name.clone(),
-                                        });
+              cpp_code: CppTypeClassBase {
+                name: type1.cpp_name.clone(),
+                template_arguments: type1.cpp_template_arguments.clone(),
+              }.to_cpp_code()?,
+              size_const_name: size_const_name.clone(),
+            });
           }
         }
       }
       {
         let mut file = create_file(c_lib_tmp_path.with_added("type_sizes.cpp"))?;
-        file
-          .write(generate_cpp_type_size_requester(&cpp_type_size_requests,
-                                                  config.include_directives())?)?;
+        file.write(generate_cpp_type_size_requester(
+          &cpp_type_size_requests,
+          config.include_directives(),
+        )?)?;
       }
       if c_lib_path_existed {
         move_files(&c_lib_tmp_path, &c_lib_path)?;
@@ -421,13 +467,13 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
         output_path: path_to_str(config.output_dir_path())?.to_string(),
       };
       if config.write_cache() {
-        let rust_export_path = config
-          .cache_dir_path()
-          .with_added("rust_export_info.bin");
+        let rust_export_path = config.cache_dir_path().with_added("rust_export_info.bin");
         log::status("Saving Rust export info");
         save_bincode(&rust_export_path, &rust_export_info)?;
-        log::status(format!("Rust export info is saved to file: {}",
-                            rust_export_path.display()));
+        log::status(format!(
+          "Rust export info is saved to file: {}",
+          rust_export_path.display()
+        ));
       }
 
       if output_path_existed {
@@ -435,28 +481,34 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
         // but keep existing unknown top level files and folders, such as "target" or ".cargo"
         for item in read_dir(&crate_new_path)? {
           let item = item?;
-          move_files(&crate_new_path.with_added(item.file_name()),
-                     &config.output_dir_path().with_added(item.file_name()))?;
+          move_files(
+            &crate_new_path.with_added(item.file_name()),
+            &config.output_dir_path().with_added(item.file_name()),
+          )?;
         }
         remove_dir(&crate_new_path)?;
       }
-      save_json(config
-                  .output_dir_path()
-                  .with_added("build_script_data.json"),
-                &BuildScriptData {
-                   cpp_build_config: config.cpp_build_config().clone(),
-                   cpp_wrapper_lib_name: cpp_ffi_lib_name,
-                   cpp_lib_version: config.cpp_lib_version().map(|s| s.to_string()),
-                 })?;
+      save_json(
+        config.output_dir_path().with_added(
+          "build_script_data.json",
+        ),
+        &BuildScriptData {
+          cpp_build_config: config.cpp_build_config().clone(),
+          cpp_wrapper_lib_name: cpp_ffi_lib_name,
+          cpp_lib_version: config.cpp_lib_version().map(|s| s.to_string()),
+        },
+      )?;
       if config.write_cache() {
         create_file(completed_marker_path(config.cache_dir_path()))?;
       }
-      dependency_cache.insert(config.cache_dir_path().clone(),
-                              DependencyInfo {
-                                cpp_data: cpp_data.current,
-                                rust_export_info: rust_export_info,
-                                cache_path: config.cache_dir_path().clone(),
-                              });
+      dependency_cache.insert(
+        config.cache_dir_path().clone(),
+        DependencyInfo {
+          cpp_data: cpp_data.current,
+          rust_export_info: rust_export_info,
+          cache_path: config.cache_dir_path().clone(),
+        },
+      );
     }
     for dep in dependencies {
       dependency_cache.insert(dep.cache_path.clone(), dep);

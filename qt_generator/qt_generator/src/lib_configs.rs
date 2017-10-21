@@ -7,20 +7,17 @@ use cpp_to_rust_generator::cpp_type::{CppType, CppTypeBase, CppBuiltInNumericTyp
 
 /// Helper method to blacklist all methods of `QList<T>` template instantiation that
 /// don't work if `T` doesn't have `operator==`. `types` is list of such `T` types.
-fn exclude_qlist_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(config: &mut Config,
-                                                                            types: I) {
-  let types: Vec<String> = types
-    .into_iter()
-    .map(|x| x.as_ref().to_string())
-    .collect();
+fn exclude_qlist_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(
+  config: &mut Config,
+  types: I,
+) {
+  let types: Vec<String> = types.into_iter().map(|x| x.as_ref().to_string()).collect();
   config.add_cpp_ffi_generator_filter(move |method| {
     if let Some(ref info) = method.class_membership {
       if info.class_type.name == "QList" {
-        let args = info
-          .class_type
-          .template_arguments
-          .as_ref()
-          .chain_err(|| "failed to get QList args")?;
+        let args = info.class_type.template_arguments.as_ref().chain_err(
+          || "failed to get QList args",
+        )?;
         let arg = args.get(0).chain_err(|| "failed to get QList arg")?;
         let arg_text = arg.to_cpp_pseudo_code();
         if types.iter().any(|x| x == &arg_text) {
@@ -44,20 +41,17 @@ fn exclude_qlist_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(conf
 
 /// Helper method to blacklist all methods of `QVector<T>` template instantiation that
 /// don't work if `T` doesn't have `operator==`. `types` is list of such `T` types.
-fn exclude_qvector_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(config: &mut Config,
-                                                                              types: I) {
-  let types: Vec<String> = types
-    .into_iter()
-    .map(|x| x.as_ref().to_string())
-    .collect();
+fn exclude_qvector_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(
+  config: &mut Config,
+  types: I,
+) {
+  let types: Vec<String> = types.into_iter().map(|x| x.as_ref().to_string()).collect();
   config.add_cpp_ffi_generator_filter(move |method| {
     if let Some(ref info) = method.class_membership {
       if info.class_type.name == "QVector" {
-        let args = info
-          .class_type
-          .template_arguments
-          .as_ref()
-          .chain_err(|| "failed to get QVector args")?;
+        let args = info.class_type.template_arguments.as_ref().chain_err(
+          || "failed to get QVector args",
+        )?;
         let arg = args.get(0).chain_err(|| "failed to get QVector arg")?;
         let arg_text = arg.to_cpp_pseudo_code();
         if types.iter().any(|x| x == &arg_text) {
@@ -137,41 +131,49 @@ pub fn core(config: &mut Config) -> Result<()> {
   config.add_cpp_parser_blocked_names(core_cpp_parser_blocked_names());
 
   // TODO: the following items should be conditionally available on Windows;
-  config.add_cpp_parser_blocked_names(vec!["QWinEventNotifier",
-                                           "QProcess::CreateProcessArguments",
-                                           "QProcess::nativeArguments",
-                                           "QProcess::setNativeArguments",
-                                           "QProcess::createProcessArgumentsModifier",
-                                           "QProcess::setCreateProcessArgumentsModifier",
-                                           "QAbstractEventDispatcher::registerEventNotifier",
-                                           "QAbstractEventDispatcher::unregisterEventNotifier"]);
+  config.add_cpp_parser_blocked_names(vec![
+    "QWinEventNotifier",
+    "QProcess::CreateProcessArguments",
+    "QProcess::nativeArguments",
+    "QProcess::setNativeArguments",
+    "QProcess::createProcessArgumentsModifier",
+    "QProcess::setCreateProcessArgumentsModifier",
+    "QAbstractEventDispatcher::registerEventNotifier",
+    "QAbstractEventDispatcher::unregisterEventNotifier",
+  ]);
 
   // QProcess::pid returns different types on different platforms,
   // but this method is obsolete anyway
   config.add_cpp_parser_blocked_names(vec!["QProcess::pid"]);
 
   exclude_qvector_eq_based_methods(config, &["QStaticPlugin", "QTimeZone::OffsetData"]);
-  exclude_qlist_eq_based_methods(config,
-                                 &["QAbstractEventDispatcher::TimerInfo", "QCommandLineOption"]);
+  exclude_qlist_eq_based_methods(
+    config,
+    &["QAbstractEventDispatcher::TimerInfo", "QCommandLineOption"],
+  );
 
-  config.set_types_allocation_place(CppTypeAllocationPlace::Stack,
-                                    vec!["QAssociativeIterable",
-                                         "QByteArray",
-                                         "QChar",
-                                         "QItemSelection",
-                                         "QJsonArray",
-                                         "QJsonObject",
-                                         "QJsonParseError",
-                                         "QJsonValue",
-                                         "QJsonValueRef",
-                                         "QList",
-                                         "QLoggingCategory",
-                                         "QMultiHash",
-                                         "QPointF",
-                                         "QRegularExpressionMatch",
-                                         "QResource",
-                                         "QSequentialIterable",
-                                         "QString"]);
+  config.set_types_allocation_place(
+    CppTypeAllocationPlace::Stack,
+    vec![
+      "QAssociativeIterable",
+      "QByteArray",
+      "QChar",
+      "QItemSelection",
+      "QJsonArray",
+      "QJsonObject",
+      "QJsonParseError",
+      "QJsonValue",
+      "QJsonValueRef",
+      "QList",
+      "QLoggingCategory",
+      "QMultiHash",
+      "QPointF",
+      "QRegularExpressionMatch",
+      "QResource",
+      "QSequentialIterable",
+      "QString",
+    ],
+  );
 
   config.add_cpp_ffi_generator_filter(|method| {
     if let Some(ref info) = method.class_membership {
@@ -233,8 +235,9 @@ pub fn core(config: &mut Config) -> Result<()> {
       base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::LongDouble),
     };
     if &method.name == "qHash" && method.class_membership.is_none() &&
-       (method.arguments.len() == 1 || method.arguments.len() == 2) &&
-       &method.arguments[0].argument_type == &long_double {
+      (method.arguments.len() == 1 || method.arguments.len() == 2) &&
+      &method.arguments[0].argument_type == &long_double
+    {
       return Ok(false); // produces error on MacOS
     }
     Ok(true)
@@ -244,28 +247,38 @@ pub fn core(config: &mut Config) -> Result<()> {
 
 /// QtGui specific configuration.
 pub fn gui(config: &mut Config) -> Result<()> {
-  config.add_cpp_parser_blocked_names(vec!["QAbstractOpenGLFunctionsPrivate",
-                                           "QOpenGLFunctionsPrivate",
-                                           "QOpenGLExtraFunctionsPrivate",
-                                           "QKeySequence::isDetached",
-                                           "QBrushData",
-                                           "QAccessible::ActivationObserver",
-                                           "QAccessibleImageInterface",
-                                           "QAccessibleBridge",
-                                           "QAccessibleBridgePlugin",
-                                           "QAccessibleApplication",
-                                           "QOpenGLVersionStatus",
-                                           "QOpenGLVersionFunctionsBackend",
-                                           "QOpenGLVersionFunctionsStorage",
-                                           "QOpenGLTexture::TextureFormatClass",
-                                           "QTextFrameLayoutData"]);
-  exclude_qvector_eq_based_methods(config,
-                                   &["QTextLayout::FormatRange",
-                                     "QAbstractTextDocumentLayout::Selection"]);
-  exclude_qlist_eq_based_methods(config,
-                                 &["QInputMethodEvent::Attribute",
-                                   "QTextLayout::FormatRange",
-                                   "QTouchEvent::TouchPoint"]);
+  config.add_cpp_parser_blocked_names(vec![
+    "QAbstractOpenGLFunctionsPrivate",
+    "QOpenGLFunctionsPrivate",
+    "QOpenGLExtraFunctionsPrivate",
+    "QKeySequence::isDetached",
+    "QBrushData",
+    "QAccessible::ActivationObserver",
+    "QAccessibleImageInterface",
+    "QAccessibleBridge",
+    "QAccessibleBridgePlugin",
+    "QAccessibleApplication",
+    "QOpenGLVersionStatus",
+    "QOpenGLVersionFunctionsBackend",
+    "QOpenGLVersionFunctionsStorage",
+    "QOpenGLTexture::TextureFormatClass",
+    "QTextFrameLayoutData",
+  ]);
+  exclude_qvector_eq_based_methods(
+    config,
+    &[
+      "QTextLayout::FormatRange",
+      "QAbstractTextDocumentLayout::Selection",
+    ],
+  );
+  exclude_qlist_eq_based_methods(
+    config,
+    &[
+      "QInputMethodEvent::Attribute",
+      "QTextLayout::FormatRange",
+      "QTouchEvent::TouchPoint",
+    ],
+  );
   config.add_cpp_ffi_generator_filter(|method| {
     if let Some(ref info) = method.class_membership {
       match info.class_type.to_cpp_pseudo_code().as_ref() {
@@ -295,16 +308,13 @@ pub fn gui(config: &mut Config) -> Result<()> {
         _ => {}
       }
       if info.class_type.name.starts_with("QOpenGLFunctions_") &&
-         (info.class_type.name.ends_with("_CoreBackend") |
-          info
-            .class_type
-            .name
-            .ends_with("_CoreBackend::Functions") |
-          info.class_type.name.ends_with("_DeprecatedBackend") |
-          info
-            .class_type
-            .name
-            .ends_with("_DeprecatedBackend::Functions")) {
+        (info.class_type.name.ends_with("_CoreBackend") |
+           info.class_type.name.ends_with("_CoreBackend::Functions") |
+           info.class_type.name.ends_with("_DeprecatedBackend") |
+           info.class_type.name.ends_with(
+            "_DeprecatedBackend::Functions",
+          ))
+      {
         return Ok(false);
       }
     }
@@ -321,8 +331,10 @@ pub fn widgets(config: &mut Config) -> Result<()> {
   // TODO: Mac specific:
   config.add_cpp_parser_blocked_names(vec!["QMacCocoaViewContainer", "QMacNativeWidget"]);
 
-  exclude_qlist_eq_based_methods(config,
-                                 &["QTableWidgetSelectionRange", "QTextEdit::ExtraSelection"]);
+  exclude_qlist_eq_based_methods(
+    config,
+    &["QTableWidgetSelectionRange", "QTextEdit::ExtraSelection"],
+  );
   config.add_cpp_ffi_generator_filter(|method| {
     if let Some(ref info) = method.class_membership {
       match info.class_type.to_cpp_pseudo_code().as_ref() {
@@ -351,20 +363,22 @@ pub fn core_3d(config: &mut Config) -> Result<()> {
 /// Qt3DRender specific configuration.
 pub fn render_3d(config: &mut Config) -> Result<()> {
   config.add_cpp_filtered_namespace("Qt3DRender");
-  config.add_cpp_parser_blocked_names(vec!["Qt3DRender::QTexture1D",
-                                           "Qt3DRender::QTexture1DArray",
-                                           "Qt3DRender::QTexture2D",
-                                           "Qt3DRender::QTexture2DArray",
-                                           "Qt3DRender::QTexture3D",
-                                           "Qt3DRender::QTextureCubeMap",
-                                           "Qt3DRender::QTextureCubeMapArray",
-                                           "Qt3DRender::QTexture2DMultisample",
-                                           "Qt3DRender::QTexture2DMultisampleArray",
-                                           "Qt3DRender::QTextureRectangle",
-                                           "Qt3DRender::QTextureBuffer",
-                                           "Qt3DRender::QRenderCapture",
-                                           "Qt3DRender::QRenderCaptureReply",
-                                           "Qt3DRender::QSortCriterion"]);
+  config.add_cpp_parser_blocked_names(vec![
+    "Qt3DRender::QTexture1D",
+    "Qt3DRender::QTexture1DArray",
+    "Qt3DRender::QTexture2D",
+    "Qt3DRender::QTexture2DArray",
+    "Qt3DRender::QTexture3D",
+    "Qt3DRender::QTextureCubeMap",
+    "Qt3DRender::QTextureCubeMapArray",
+    "Qt3DRender::QTexture2DMultisample",
+    "Qt3DRender::QTexture2DMultisampleArray",
+    "Qt3DRender::QTextureRectangle",
+    "Qt3DRender::QTextureBuffer",
+    "Qt3DRender::QRenderCapture",
+    "Qt3DRender::QRenderCaptureReply",
+    "Qt3DRender::QSortCriterion",
+  ]);
   config.add_cpp_ffi_generator_filter(|method| {
     if let Some(ref info) = method.class_membership {
       match info.class_type.to_cpp_pseudo_code().as_ref() {
