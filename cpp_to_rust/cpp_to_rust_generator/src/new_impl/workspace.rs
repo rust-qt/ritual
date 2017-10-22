@@ -2,11 +2,21 @@ use new_impl::database::Database;
 use common::errors::Result;
 use common::file_utils::PathBufWithAdded;
 use common::file_utils::{save_json, load_json};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
+#[derive(Debug, Default)]
+#[derive(Serialize, Deserialize)]
+pub struct WorkspaceConfig {}
+
+#[derive(Debug)]
 pub struct Workspace {
   path: PathBuf,
+  config: WorkspaceConfig,
   databases: Vec<Database>,
+}
+
+fn config_path(path: &Path) -> PathBuf {
+  path.with_added("config.json")
 }
 
 impl Workspace {
@@ -14,8 +24,14 @@ impl Workspace {
     if !path.is_dir() {
       return Err(format!("No such directory: {}", path.display()).into());
     }
+    let config_path = config_path(&path);
     Ok(Workspace {
       path,
+      config: if config_path.exists() {
+        load_json(config_path)?
+      } else {
+        WorkspaceConfig::default()
+      },
       databases: Vec::new(),
     })
   }
@@ -59,5 +75,9 @@ impl Workspace {
     save_json(self.database_path(data.crate_name()), &data)?;
     self.databases.push(data);
     Ok(())
+  }
+
+  fn save_config(&self) -> Result<()> {
+    save_json(config_path(&self.path), &self.config)
   }
 }

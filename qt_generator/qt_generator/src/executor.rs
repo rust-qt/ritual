@@ -29,6 +29,20 @@ pub struct ExecConfig {
   pub quiet_mode: bool,
 }
 
+pub fn all_sublib_names() -> &'static [&'static str] {
+  &[
+    "core",
+    "gui",
+    "widgets",
+    "ui_tools",
+    "3d_core",
+    "3d_render",
+    "3d_input",
+    "3d_logic",
+    "3d_extras",
+  ]
+}
+
 /// Executes generator for `libs` with given configuration.
 pub fn exec_all(
   libs: Vec<String>,
@@ -51,17 +65,7 @@ pub fn exec_all(
   let crate_templates_path =
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_added("crate_templates");
   let final_libs = if libs.iter().any(|x| x == "all") {
-    vec![
-      "core".to_string(),
-      "gui".to_string(),
-      "widgets".to_string(),
-      "ui_tools".to_string(),
-      "3d_core".to_string(),
-      "3d_render".to_string(),
-      "3d_input".to_string(),
-      "3d_logic".to_string(),
-      "3d_extras".to_string(),
-    ]
+    all_sublib_names().iter().map(|s| s.to_string()).collect()
   } else {
     libs
   };

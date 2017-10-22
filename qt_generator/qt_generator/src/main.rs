@@ -24,6 +24,8 @@ mod fix_header_names;
 mod lib_configs;
 mod versions;
 
+mod new_impl;
+
 /// Interprets command line options and runs the generator.
 fn run(matches: clap::ArgMatches) -> Result<()> {
   let libs: Vec<_> = matches
@@ -73,6 +75,11 @@ fn run(matches: clap::ArgMatches) -> Result<()> {
   )
 }
 
+fn main() {
+  new_impl::new_main()
+}
+
+/*
 fn main() {
   let result = {
     use clap::{Arg, App};
@@ -177,3 +184,4 @@ fn main() {
     std::process::exit(1);
   }
 }
+*/
