@@ -1,9 +1,71 @@
 use cpp_to_rust_generator::common::string_utils::JoinWithSeparator;
-use cpp_to_rust_generator::common::errors::Result;
+use cpp_to_rust_generator::common::errors::{Result, ChainErr};
+use cpp_to_rust_generator::common::log;
+use cpp_to_rust_generator::common::file_utils::{canonicalize, PathBufWithAdded};
+use cpp_to_rust_generator::new_impl::workspace::Workspace;
+use std::path::{Path, PathBuf};
+use qt_generator_common::{all_sublib_names, lib_dependencies};
+use lib_configs::make_config;
 
 fn run(matches: ::clap::ArgMatches) -> Result<()> {
-  unimplemented!()
+  let workspace_path = canonicalize(&PathBuf::from(matches.value_of("workspace").chain_err(
+    || "clap arg missing",
+  )?))?;
 
+  log::status(format!("Workspace: {}", workspace_path.display()));
+  let mut workspace = Workspace::new(workspace_path)?;
+  workspace.set_disable_logging(matches.is_present("disable-logging"));
+  let mut was_any_action = false;
+
+  if matches.is_present("process") {
+    let libs: Vec<_> = matches
+      .values_of("process")
+      .chain_err(|| "clap arg missing")?
+      .map(|s| s.to_lowercase())
+      .collect();
+
+    let final_libs = if libs.iter().any(|x| x == "all") {
+      all_sublib_names().iter().map(|s| s.to_string()).collect()
+    } else {
+      libs
+    };
+    let crate_templates_path =
+      PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_added("crate_templates");
+    for sublib_name in final_libs {
+      let lib_crate_templates_path = crate_templates_path.with_added(&sublib_name);
+
+      let config = make_config(&sublib_name, lib_crate_templates_path)?;
+      was_any_action = true;
+      workspace.process_crate(&config);
+    }
+  }
+
+  if matches.is_present("generate") {
+
+    /*
+      if exec_config.write_dependencies_local_paths {
+        log::status(
+          "Output Cargo.toml file will contain local paths of used dependencies \
+                   (use --no-local-paths to disable).",
+        );
+      } else {
+        log::status(
+          "Local paths will not be written to the output crate. Make sure all dependencies \
+                   are published before trying to compile the crate.",
+        );
+      }
+
+    */
+  }
+
+  //...
+
+  workspace.save_data()?;
+  if was_any_action {
+    log::status("qt_generator finished");
+  } else {
+    log::error("No action requested. Run \"qt_generator --help\".");
+  }
 }
 
 
@@ -17,11 +79,14 @@ pub fn new_main() {
     const WORKSPACE_DIR_HELP: &'static str = "Directory for output and temporary files";
     const DISABLE_LOGGING_HELP: &'static str = "Disable creating log files";
     const GENERATE_HELP: &'static str = "Generate new crates";
+    const CLEAR_ALL_HELP: &'static str = "Clear all data in the workspace.";
+    const CLEAR_CURRENT_HELP: &'static str = "\
+      Clear data corresponding to the current platform in the workspace.";
 
     let libs_help = format!(
       "Process libraries (Qt modules). Specify \"all\" \
       to process all supported modules or specify one or multiple of the following: {}.",
-      ::executor::all_sublib_names().join(", ")
+      all_sublib_names.join(", ")
     );
 
     run(
@@ -58,6 +123,12 @@ pub fn new_main() {
             .long("disable-logging")
             .help(DISABLE_LOGGING_HELP),
         )
+        .arg(Arg::with_name("clear-current").long("clear-current").help(
+          CLEAR_CURRENT_HELP,
+        ))
+        .arg(Arg::with_name("clear-all").long("clear-all").help(
+          CLEAR_ALL_HELP,
+        ))
         .get_matches(),
     )
   };

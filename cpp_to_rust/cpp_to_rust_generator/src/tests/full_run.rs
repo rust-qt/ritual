@@ -2,7 +2,7 @@ use common::file_utils::{PathBufWithAdded, create_dir};
 use common::utils::{run_command, add_env_path_item};
 use common::cpp_lib_builder::{CppLibBuilder, BuildType};
 use common::errors::fancy_unwrap;
-use config::{Config, CrateProperties, CacheUsage};
+use config::{Config, CrateProperties};
 use common::cpp_build_config::CppBuildConfigData;
 use common::target;
 use std::process::Command;
@@ -98,7 +98,6 @@ fn full_run() {
     config.add_cpp_parser_argument("-std=gnu++11");
   }
   config.set_crate_template_path(&crate_template_path);
-  config.set_cache_usage(CacheUsage::None);
   fancy_unwrap(config.exec());
   assert!(crate_dir.exists());
 

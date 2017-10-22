@@ -14,7 +14,6 @@ extern crate qt_generator_common;
 
 use cpp_to_rust_generator::common::errors::{Result, ChainErr};
 use cpp_to_rust_generator::common::file_utils::{create_dir_all, canonicalize};
-use cpp_to_rust_generator::config::{CacheUsage, DebugLoggingConfig};
 use std::path::PathBuf;
 
 mod executor;
@@ -25,55 +24,6 @@ mod lib_configs;
 mod versions;
 
 mod new_impl;
-
-/// Interprets command line options and runs the generator.
-fn run(matches: clap::ArgMatches) -> Result<()> {
-  let libs: Vec<_> = matches
-    .values_of("libs")
-    .chain_err(|| "clap arg missing")?
-    .map(|s| s.to_lowercase())
-    .collect();
-  let output_dir = PathBuf::from(matches.value_of("output-dir").chain_err(
-    || "clap arg missing",
-  )?);
-  if !output_dir.exists() {
-    create_dir_all(&output_dir)?;
-  }
-  let cache_dir = PathBuf::from(matches.value_of("cache-dir").chain_err(
-    || "clap arg missing",
-  )?);
-  if !cache_dir.exists() {
-    create_dir_all(&cache_dir)?;
-  }
-  let config = executor::ExecConfig {
-    write_dependencies_local_paths: !matches.is_present("no-local-paths"),
-    cache_usage: match matches.value_of("cache-usage").chain_err(
-      || "mising value of cache-usage",
-    )? {
-      "0" => CacheUsage::None,
-      "1" => CacheUsage::RawCppDataOnly,
-      "2" => CacheUsage::CppDataOnly,
-      "3" => CacheUsage::Full,
-      _ => return Err("Invalid value of 'cache-usage' argument".into()),
-    },
-    write_cache: !matches.is_present("dont-write-cache"),
-    quiet_mode: matches.is_present("quiet"),
-    debug_logging_config: match matches.value_of("debug-logging").chain_err(
-      || "mising value of debug-logging",
-    )? {
-      "print" => DebugLoggingConfig::Print,
-      "save" => DebugLoggingConfig::SaveToFile,
-      "disable" => DebugLoggingConfig::Disable,
-      _ => return Err("Invalid value of 'debug-logging' argument".into()),
-    },
-  };
-  executor::exec_all(
-    libs,
-    canonicalize(&cache_dir)?,
-    canonicalize(&output_dir)?,
-    config,
-  )
-}
 
 fn main() {
   new_impl::new_main()

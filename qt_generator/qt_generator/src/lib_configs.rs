@@ -5,6 +5,24 @@ use cpp_to_rust_generator::config::{Config, CppTypeAllocationPlace};
 use cpp_to_rust_generator::cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType,
                                       CppTypeIndirection};
 
+
+use cpp_to_rust_generator::common::{log, toml};
+use cpp_to_rust_generator::common::file_utils::{PathBufWithAdded, repo_crate_local_path};
+use cpp_to_rust_generator::cpp_data::CppVisibility;
+use cpp_to_rust_generator::common::cpp_build_config::{CppBuildConfigData, CppLibraryType};
+use cpp_to_rust_generator::common::target;
+use qt_generator_common::{get_installation_data, lib_folder_name, lib_dependencies};
+use std::path::PathBuf;
+use versions;
+
+use doc_parser::DocParser;
+use fix_header_names::fix_header_names;
+use cpp_to_rust_generator::cpp_method::CppMethod;
+use cpp_to_rust_generator::cpp_data::CppTypeKind;
+use cpp_to_rust_generator::config::CrateProperties;
+use doc_decoder::DocData;
+use lib_configs;
+
 /// Helper method to blacklist all methods of `QList<T>` template instantiation that
 /// don't work if `T` doesn't have `operator==`. `types` is list of such `T` types.
 fn exclude_qlist_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(
@@ -432,5 +450,224 @@ pub fn logic_3d(config: &mut Config) -> Result<()> {
 /// Qt3DExtras specific configuration.
 pub fn extras_3d(config: &mut Config) -> Result<()> {
   config.add_cpp_filtered_namespace("Qt3DExtras");
+  Ok(())
+}
+
+
+
+
+/// Executes the generator for a single Qt module with given configuration.
+pub fn make_config(sublib_name: &str, crate_templates_path: PathBuf) -> Result<Config> {
+  log::status(format!(
+    "Preparing generator config for library: {}",
+    sublib_name
+  ));
+  let crate_name = format!("qt_{}", sublib_name);
+  let mut crate_properties =
+    CrateProperties::new(crate_name.clone(), versions::QT_OUTPUT_CRATES_VERSION);
+  let mut custom_fields = toml::Table::new();
+  let mut package_data = toml::Table::new();
+  package_data.insert(
+    "authors".to_string(),
+    toml::Value::Array(vec![
+      toml::Value::String(
+        "Pavel Strakhov <ri@idzaaus.org>".to_string()
+      ),
+    ]),
+  );
+  let description = format!(
+    "Bindings for {} C++ library (generated automatically with cpp_to_rust project)",
+    lib_folder_name(sublib_name)
+  );
+  package_data.insert("description".to_string(), toml::Value::String(description));
+  let doc_url = format!("https://rust-qt.github.io/rustdoc/qt/{}", &crate_name);
+  package_data.insert("documentation".to_string(), toml::Value::String(doc_url));
+  package_data.insert(
+    "repository".to_string(),
+    toml::Value::String("https://github.com/rust-qt/cpp_to_rust".to_string()),
+  );
+  package_data.insert(
+    "license".to_string(),
+    toml::Value::String("MIT".to_string()),
+  );
+
+  custom_fields.insert("package".to_string(), toml::Value::Table(package_data));
+  crate_properties.set_custom_fields(custom_fields);
+  crate_properties.remove_default_build_dependencies();
+  crate_properties.add_build_dependency(
+    "qt_build_tools",
+    versions::QT_BUILD_TOOLS_VERSION,
+    Some(repo_crate_local_path("qt_generator/qt_build_tools")?),
+  );
+  let mut config = Config::new(crate_properties);
+  let installation_data = get_installation_data(sublib_name)?;
+  config.add_include_path(&installation_data.root_include_path);
+  config.add_include_path(&installation_data.lib_include_path);
+  for dep in lib_dependencies(&sublib_name)? {
+    let dep_data = get_installation_data(dep)?;
+    config.add_include_path(&dep_data.lib_include_path);
+  }
+  config.add_target_include_path(&installation_data.lib_include_path);
+  config.set_cpp_lib_version(installation_data.qt_version.as_str());
+  // TODO: does parsing work on MacOS without adding "-F"?
+
+  config.add_include_directive(&lib_folder_name(sublib_name));
+  let lib_include_path = installation_data.lib_include_path.clone();
+  config.add_cpp_data_filter(move |cpp_data| {
+    fix_header_names(cpp_data, &lib_include_path)
+  });
+  config.add_cpp_parser_arguments(vec!["-fPIC", "-fcxx-exceptions"]);
+  {
+    let mut data = CppBuildConfigData::new();
+    data.add_compiler_flag("-std=gnu++11");
+    config.cpp_build_config_mut().add(
+      target::Condition::Env(
+        target::Env::Msvc,
+      ).negate(),
+      data,
+    );
+  }
+  {
+    let mut data = CppBuildConfigData::new();
+    data.add_compiler_flag("-fPIC");
+    // msvc and mingw don't need this
+    config.cpp_build_config_mut().add(
+      target::Condition::OS(
+        target::OS::Windows,
+      ).negate(),
+      data,
+    );
+  }
+  {
+    let mut data = CppBuildConfigData::new();
+    data.set_library_type(CppLibraryType::Shared);
+    config.cpp_build_config_mut().add(
+      target::Condition::Env(
+        target::Env::Msvc,
+      ),
+      data,
+    );
+  }
+
+  if target::current_env() == target::Env::Msvc {
+    config.add_cpp_parser_argument("-std=c++14");
+  } else {
+    config.add_cpp_parser_argument("-std=gnu++11");
+  }
+  config.add_cpp_parser_blocked_name("qt_check_for_QGADGET_macro");
+  let sublib_name_clone = sublib_name.to_string();
+  let docs_path = installation_data.docs_path.clone();
+
+  config.add_cpp_data_filter(move |cpp_data| {
+    match DocData::new(&sublib_name_clone, &docs_path) {
+      Ok(doc_data) => {
+        let mut parser = DocParser::new(doc_data);
+        find_methods_docs(&mut cpp_data.methods, &mut parser)?;
+        for type1 in &mut cpp_data.types {
+          match parser.doc_for_type(&type1.name) {
+            Ok(doc) => {
+              // log::debug(format!("Found doc for type: {}", type1.name));
+              type1.doc = Some(doc.0);
+              if let CppTypeKind::Enum { ref mut values } = type1.kind {
+                let enum_namespace = if let Some(index) = type1.name.rfind("::") {
+                  type1.name[0..index + 2].to_string()
+                } else {
+                  String::new()
+                };
+                for value in values {
+                  if let Some(r) = doc.1.iter().find(|x| x.name == value.name) {
+                    value.doc = Some(r.html.clone());
+
+                    // let full_name = format!("{}::{}", enum_namespace, &value.name);
+                    // println!("full name: {}", full_name);
+                    parser.mark_enum_variant_used(&format!("{}{}", enum_namespace, &value.name));
+
+                  } else {
+                    let type_name = &type1.name;
+                    log::llog(log::DebugQtDoc, || {
+                      format!(
+                        "Not found doc for enum variant: {}::{}",
+                        type_name,
+                        &value.name
+                      )
+                    });
+                  }
+                }
+              }
+            }
+            Err(err) => {
+              log::llog(log::DebugQtDoc, || {
+                format!("Not found doc for type: {}: {}", type1.name, err)
+              });
+            }
+          }
+        }
+        parser.report_unused_anchors();
+      }
+      Err(err) => {
+        log::error(format!("Failed to get Qt documentation: {}", err));
+        err.discard_expected();
+      }
+    }
+    Ok(())
+  });
+
+  config.set_crate_template_path(crate_templates_path);
+  match sublib_name {
+    "core" => lib_configs::core(&mut config)?,
+    "gui" => lib_configs::gui(&mut config)?,
+    "widgets" => lib_configs::widgets(&mut config)?,
+    "3d_core" => lib_configs::core_3d(&mut config)?,
+    "3d_render" => lib_configs::render_3d(&mut config)?,
+    "3d_input" => lib_configs::input_3d(&mut config)?,
+    "3d_logic" => lib_configs::logic_3d(&mut config)?,
+    "3d_extras" => lib_configs::extras_3d(&mut config)?,
+    "ui_tools" => {}
+    _ => return Err(format!("Unknown lib name: {}", sublib_name).into()),
+  }
+
+  config.set_dependent_cpp_crates(
+    lib_dependencies(sublib_name)?
+      .iter()
+      .map(|s| s.to_string())
+      .collect(),
+  );
+  Ok(config)
+}
+
+/// Adds documentation from `data` to `cpp_methods`.
+fn find_methods_docs(cpp_methods: &mut [CppMethod], data: &mut DocParser) -> Result<()> {
+  for cpp_method in cpp_methods {
+    if let Some(ref info) = cpp_method.class_membership {
+      if info.visibility == CppVisibility::Private {
+        continue;
+      }
+    }
+    if let Some(ref declaration_code) = cpp_method.declaration_code {
+      match data.doc_for_method(
+        &cpp_method.doc_id(),
+        declaration_code,
+        &cpp_method.short_text(),
+      ) {
+        Ok(doc) => cpp_method.doc = Some(doc),
+        Err(msg) => {
+          if cpp_method.class_membership.is_some() &&
+            (&cpp_method.name == "tr" || &cpp_method.name == "trUtf8" ||
+               &cpp_method.name == "metaObject")
+          {
+            // no error message
+          } else {
+            log::llog(log::DebugQtDoc, || {
+              format!(
+                "Failed to get documentation for method: {}: {}",
+                &cpp_method.short_text(),
+                msg
+              )
+            });
+          }
+        }
+      }
+    }
+  }
   Ok(())
 }

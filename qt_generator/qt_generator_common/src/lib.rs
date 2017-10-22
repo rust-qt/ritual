@@ -116,6 +116,21 @@ pub fn framework_name(sublib_name: &str) -> String {
   format!("Qt{}", sublib_name_capitalized)
 }
 
+pub fn all_sublib_names() -> &'static [&'static str] {
+  &[
+    "core",
+    "gui",
+    "widgets",
+    "ui_tools",
+    "3d_core",
+    "3d_render",
+    "3d_input",
+    "3d_logic",
+    "3d_extras",
+  ]
+}
+
+
 /// Returns list of modules this module depends on.
 pub fn lib_dependencies(sublib_name: &str) -> Result<&'static [&'static str]> {
   const CORE: &'static [&'static str] = &[];

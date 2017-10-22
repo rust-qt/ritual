@@ -119,7 +119,7 @@ impl CrateProperties {
   }
   /// Removes default dependencies from output `Cargo.toml`. Default
   /// dependencies are `libc`, `cpp_utils` and crates added using
-  /// `Config::set_dependency_cache_paths`.
+  /// `Config::set_dependent_cpp_crates`.
   pub fn remove_default_dependencies(&mut self) {
     self.remove_default_dependencies = true;
   }
@@ -166,64 +166,6 @@ impl CrateProperties {
   }
 }
 
-/// Value of this enum determines how `cpp_to_rust` uses
-/// data from the cache directory accumulated in a previous processing
-/// of the same library.
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum CacheUsage {
-  /// The most aggressive caching. The generator will use all cached
-  /// data and may even completely skip processing if it was completed before.
-  Full,
-  /// The generator will use raw or processed C++ data if possible.
-  CppDataOnly,
-  /// The generator will use raw C++ data if possible.
-  RawCppDataOnly,
-  /// No cached data will be used.
-  None,
-}
-
-impl CacheUsage {
-  /// Returns true if raw C++ data file can be used in this mode.
-  pub fn can_use_raw_cpp_data(&self) -> bool {
-    self != &CacheUsage::None
-  }
-  /// Returns true if processed C++ data file can be used in this mode.
-  pub fn can_use_cpp_data(&self) -> bool {
-    match *self {
-      CacheUsage::Full | CacheUsage::CppDataOnly => true,
-      _ => false,
-    }
-  }
-  /// Returns true if this mode allows to skip processing completely.
-  pub fn can_skip_all(&self) -> bool {
-    self == &CacheUsage::Full
-  }
-}
-
-impl Default for CacheUsage {
-  fn default() -> CacheUsage {
-    CacheUsage::None
-  }
-}
-
-/// Value of this enum determines how extra logging information
-/// will be used.
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum DebugLoggingConfig {
-  /// Output debug logs to stderr (noisy).
-  Print,
-  /// Save debug logs to `log` subdirectory of the cache directory.
-  SaveToFile,
-  /// Disable debug logs.
-  Disable,
-}
-
-impl Default for DebugLoggingConfig {
-  fn default() -> DebugLoggingConfig {
-    DebugLoggingConfig::Disable
-  }
-}
-
 /// The starting point of `cpp_to_rust` API.
 /// Create a `Config` object, set its properties,
 /// add custom functions if necessary, and start
@@ -231,16 +173,15 @@ impl Default for DebugLoggingConfig {
 #[derive(Debug)]
 pub struct Config {
   // see setters documentation for information about these properties
-  cache_usage: CacheUsage,
   crate_properties: CrateProperties,
-  output_dir_path: PathBuf,
-  cache_dir_path: PathBuf,
   crate_template_path: Option<PathBuf>,
-  dependency_cache_paths: Vec<PathBuf>,
+  dependent_cpp_crates: Vec<String>,
+  include_directives: Vec<PathBuf>,
+  target_include_paths: Vec<PathBuf>,
+
   include_paths: Vec<PathBuf>,
   framework_paths: Vec<PathBuf>,
-  target_include_paths: Vec<PathBuf>,
-  include_directives: Vec<PathBuf>,
+
   cpp_parser_arguments: Vec<String>,
   cpp_parser_blocked_names: Vec<String>,
   cpp_ffi_generator_filters: Vec<CppFfiGeneratorFilter>,
@@ -249,7 +190,6 @@ pub struct Config {
   cpp_build_config: CppBuildConfig, // TODO: add CppBuildPaths when needed
   write_dependencies_local_paths: bool,
   type_allocation_places: HashMap<String, CppTypeAllocationPlace>,
-  debug_logging_config: DebugLoggingConfig,
   quiet_mode: bool,
   write_cache: bool,
   cpp_lib_version: Option<String>,
@@ -258,20 +198,11 @@ pub struct Config {
 impl Config {
   /// Creates a `Config`.
   /// `crate_properties` are used in Cargo.toml of the generated crate.
-  /// `output_dir_path` will contain the generated crate.
-  /// `cache_dir_path` will be used for cache, temporary files and
-  /// inter-library information files.
-  pub fn new<P1: Into<PathBuf>, P2: Into<PathBuf>>(
-    output_dir_path: P1,
-    cache_dir_path: P2,
-    crate_properties: CrateProperties,
-  ) -> Config {
+  pub fn new(crate_properties: CrateProperties) -> Config {
     Config {
       crate_properties: crate_properties,
-      output_dir_path: output_dir_path.into(),
-      cache_dir_path: cache_dir_path.into(),
       crate_template_path: Default::default(),
-      dependency_cache_paths: Default::default(),
+      dependent_cpp_crates: Default::default(),
       include_paths: Default::default(),
       framework_paths: Default::default(),
       target_include_paths: Default::default(),
@@ -284,33 +215,10 @@ impl Config {
       cpp_build_config: Default::default(),
       type_allocation_places: Default::default(),
       write_dependencies_local_paths: true,
-      cache_usage: CacheUsage::default(),
-      debug_logging_config: DebugLoggingConfig::default(),
       quiet_mode: false,
       write_cache: true,
       cpp_lib_version: None,
     }
-  }
-
-  /// Returns true if a completion marker exists in the cache directory,
-  /// indicating that processing of the library in this cache directory
-  /// was completed before. Note that the marker is not created if
-  /// `write_cache` was set to false. The marker will only be used if
-  /// cache usage is set to `CacheUsage::Full`.
-  pub fn is_completed(&self) -> bool {
-    ::launcher::is_completed(&self.cache_dir_path)
-  }
-  /// Returns path to the completion marker file
-  /// indicating that processing of the library in this cache directory
-  /// was completed before. Note that the marker is not created if
-  /// `write_cache` was set to false. The marker will only be used if
-  /// cache usage is set to `CacheUsage::Full`.
-  pub fn completed_marker_path(&self) -> PathBuf {
-    ::launcher::completed_marker_path(&self.cache_dir_path)
-  }
-  /// Defines how cached data is used in repeated runs of the generator.
-  pub fn set_cache_usage(&mut self, value: CacheUsage) {
-    self.cache_usage = value;
   }
 
   /// Sets the directory containing additional files for the crate.
@@ -336,11 +244,11 @@ impl Config {
     self.crate_template_path = Some(path.into());
   }
 
-  /// Sets list of paths to cache directories of processed dependencies.
+  /// Sets list of names of crates created with `cpp_to_rust`.
   /// The generator will integrate API of the current library with its
   /// dependencies and re-use their types.
-  pub fn set_dependency_cache_paths(&mut self, paths: Vec<PathBuf>) {
-    self.dependency_cache_paths = paths;
+  pub fn set_dependent_cpp_crates(&mut self, paths: Vec<String>) {
+    self.dependent_cpp_crates = paths;
   }
 
   /// Adds a C++ identifier that should be skipped
@@ -500,11 +408,6 @@ impl Config {
     }
   }
 
-  /// Changes how debug logs are handled. See `DebugLoggingConfig` for more information.
-  pub fn set_debug_logging_config(&mut self, config: DebugLoggingConfig) {
-    self.debug_logging_config = config;
-  }
-
   /// Sets quiet mode. In quiet mode status messages and debug logs are
   /// redirected to `log` subdirectory of the cache directory. Only error messages
   /// are always written to stderr. Quiet mode is disabled by default.
@@ -544,36 +447,9 @@ impl Config {
     self.cpp_lib_version.as_ref().map(|x| x.as_str())
   }
 
-  /// Starts execution of the generator.
-  /// This function will print the necessary build script output to stdout.
-  /// It also displays some debugging output that can be made visible by
-  /// running cargo commands with `-vv` option.
-  ///
-  /// The result of this function must be checked. You can use
-  /// `::errors::fancy_unwrap` to check the result and display
-  /// additional error information.
-  pub fn exec(self) -> Result<()> {
-    ::launcher::exec_one(self)
-  }
-
-  /// Returns value set by `Config::set_cache_usage`.
-  pub fn cache_usage(&self) -> &CacheUsage {
-    &self.cache_usage
-  }
-
   /// Returns crate properties passed to `Config::new`.
   pub fn crate_properties(&self) -> &CrateProperties {
     &self.crate_properties
-  }
-
-  /// Returns path to the output directory passed to `Config::new`.
-  pub fn output_dir_path(&self) -> &PathBuf {
-    &self.output_dir_path
-  }
-
-  /// Returns path to the cache directory passed to `Config::new`.
-  pub fn cache_dir_path(&self) -> &PathBuf {
-    &self.cache_dir_path
   }
 
   /// Returns value set by `Config::set_crate_template_path`.
@@ -581,9 +457,9 @@ impl Config {
     self.crate_template_path.as_ref()
   }
 
-  /// Returns value set by `Config::set_dependency_cache_paths`.
-  pub fn dependency_cache_paths(&self) -> &[PathBuf] {
-    &self.dependency_cache_paths
+  /// Returns value set by `Config::set_dependent_cpp_crates`.
+  pub fn dependent_cpp_crates(&self) -> &[String] {
+    &self.dependent_cpp_crates
   }
 
   /// Returns names added with `Config::add_cpp_parser_blocked_name`
@@ -663,10 +539,7 @@ impl Config {
   pub fn write_dependencies_local_paths(&self) -> bool {
     self.write_dependencies_local_paths
   }
-  /// Returns value set by `Config::set_debug_logging_config`.
-  pub fn debug_logging_config(&self) -> &DebugLoggingConfig {
-    &self.debug_logging_config
-  }
+
   /// Returns value set by `Config::set_quiet_mode`.
   pub fn quiet_mode(&self) -> bool {
     self.quiet_mode
@@ -676,5 +549,3 @@ impl Config {
     self.write_cache
   }
 }
-
-pub use launcher::{is_completed, completed_marker_path, exec};

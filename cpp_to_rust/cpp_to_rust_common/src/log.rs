@@ -125,7 +125,7 @@ impl Logger {
           });
         self.files.insert(category, file);
       }
-      let mut file = self.files.get_mut(&category).unwrap();
+      let file = self.files.get_mut(&category).unwrap();
       file.write(text.borrow().as_bytes()).unwrap();
       file.write(b"\n").unwrap();
     }

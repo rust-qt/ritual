@@ -39,7 +39,7 @@ pub mod cpp_method;
 pub mod cpp_type;
 mod cpp_operator;
 mod doc_formatter;
-mod launcher;
+//mod launcher;
 mod rust_generator;
 mod rust_code_generator;
 mod rust_info;
@@ -50,5 +50,4 @@ mod versions;
 #[cfg(test)]
 mod tests;
 
-
-mod new_impl;
+pub mod new_impl;
