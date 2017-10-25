@@ -7,11 +7,11 @@ use cpp_to_rust_generator::cpp_type::{CppType, CppTypeBase, CppBuiltInNumericTyp
 
 
 use cpp_to_rust_generator::common::{log, toml};
-use cpp_to_rust_generator::common::file_utils::{PathBufWithAdded, repo_crate_local_path};
+use cpp_to_rust_generator::common::file_utils::repo_crate_local_path;
 use cpp_to_rust_generator::cpp_data::CppVisibility;
-use cpp_to_rust_generator::common::cpp_build_config::{CppBuildConfigData, CppLibraryType};
 use cpp_to_rust_generator::common::target;
-use qt_generator_common::{get_installation_data, lib_folder_name, lib_dependencies};
+use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
+use qt_generator_common::{lib_folder_name, crate_name, lib_dependencies, get_full_build_config};
 use std::path::PathBuf;
 use versions;
 
@@ -457,14 +457,14 @@ pub fn extras_3d(config: &mut Config) -> Result<()> {
 
 
 /// Executes the generator for a single Qt module with given configuration.
-pub fn make_config(sublib_name: &str, crate_templates_path: PathBuf) -> Result<Config> {
+pub fn make_config(sublib_name: &str) -> Result<Config> {
   log::status(format!(
     "Preparing generator config for library: {}",
     sublib_name
   ));
-  let crate_name = format!("qt_{}", sublib_name);
+  let this_crate_name = crate_name(sublib_name);
   let mut crate_properties =
-    CrateProperties::new(crate_name.clone(), versions::QT_OUTPUT_CRATES_VERSION);
+    CrateProperties::new(this_crate_name.clone(), versions::QT_OUTPUT_CRATES_VERSION);
   let mut custom_fields = toml::Table::new();
   let mut package_data = toml::Table::new();
   package_data.insert(
@@ -480,7 +480,7 @@ pub fn make_config(sublib_name: &str, crate_templates_path: PathBuf) -> Result<C
     lib_folder_name(sublib_name)
   );
   package_data.insert("description".to_string(), toml::Value::String(description));
-  let doc_url = format!("https://rust-qt.github.io/rustdoc/qt/{}", &crate_name);
+  let doc_url = format!("https://rust-qt.github.io/rustdoc/qt/{}", &this_crate_name);
   package_data.insert("documentation".to_string(), toml::Value::String(doc_url));
   package_data.insert(
     "repository".to_string(),
@@ -500,54 +500,21 @@ pub fn make_config(sublib_name: &str, crate_templates_path: PathBuf) -> Result<C
     Some(repo_crate_local_path("qt_generator/qt_build_tools")?),
   );
   let mut config = Config::new(crate_properties);
-  let installation_data = get_installation_data(sublib_name)?;
-  config.add_include_path(&installation_data.root_include_path);
-  config.add_include_path(&installation_data.lib_include_path);
-  for dep in lib_dependencies(&sublib_name)? {
-    let dep_data = get_installation_data(dep)?;
-    config.add_include_path(&dep_data.lib_include_path);
-  }
-  config.add_target_include_path(&installation_data.lib_include_path);
-  config.set_cpp_lib_version(installation_data.qt_version.as_str());
+  let qt_config = get_full_build_config(sublib_name)?;
+  config.set_cpp_build_config(qt_config.cpp_build_config);
+  config.set_cpp_build_paths(qt_config.cpp_build_paths);
+
+  config.add_target_include_path(&qt_config.installation_data.lib_include_path);
+  config.set_cpp_lib_version(qt_config.installation_data.qt_version.as_str());
   // TODO: does parsing work on MacOS without adding "-F"?
 
   config.add_include_directive(&lib_folder_name(sublib_name));
-  let lib_include_path = installation_data.lib_include_path.clone();
+  let lib_include_path = qt_config.installation_data.lib_include_path.clone();
   config.add_cpp_data_filter(move |cpp_data| {
     fix_header_names(cpp_data, &lib_include_path)
   });
+  // TODO: allow to override parser flags
   config.add_cpp_parser_arguments(vec!["-fPIC", "-fcxx-exceptions"]);
-  {
-    let mut data = CppBuildConfigData::new();
-    data.add_compiler_flag("-std=gnu++11");
-    config.cpp_build_config_mut().add(
-      target::Condition::Env(
-        target::Env::Msvc,
-      ).negate(),
-      data,
-    );
-  }
-  {
-    let mut data = CppBuildConfigData::new();
-    data.add_compiler_flag("-fPIC");
-    // msvc and mingw don't need this
-    config.cpp_build_config_mut().add(
-      target::Condition::OS(
-        target::OS::Windows,
-      ).negate(),
-      data,
-    );
-  }
-  {
-    let mut data = CppBuildConfigData::new();
-    data.set_library_type(CppLibraryType::Shared);
-    config.cpp_build_config_mut().add(
-      target::Condition::Env(
-        target::Env::Msvc,
-      ),
-      data,
-    );
-  }
 
   if target::current_env() == target::Env::Msvc {
     config.add_cpp_parser_argument("-std=c++14");
@@ -556,7 +523,7 @@ pub fn make_config(sublib_name: &str, crate_templates_path: PathBuf) -> Result<C
   }
   config.add_cpp_parser_blocked_name("qt_check_for_QGADGET_macro");
   let sublib_name_clone = sublib_name.to_string();
-  let docs_path = installation_data.docs_path.clone();
+  let docs_path = qt_config.installation_data.docs_path.clone();
 
   config.add_cpp_data_filter(move |cpp_data| {
     match DocData::new(&sublib_name_clone, &docs_path) {
@@ -612,7 +579,11 @@ pub fn make_config(sublib_name: &str, crate_templates_path: PathBuf) -> Result<C
     Ok(())
   });
 
-  config.set_crate_template_path(crate_templates_path);
+  config.set_crate_template_path(
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+      .with_added("crate_templates")
+      .with_added(&sublib_name),
+  );
   match sublib_name {
     "core" => lib_configs::core(&mut config)?,
     "gui" => lib_configs::gui(&mut config)?,
@@ -629,7 +600,7 @@ pub fn make_config(sublib_name: &str, crate_templates_path: PathBuf) -> Result<C
   config.set_dependent_cpp_crates(
     lib_dependencies(sublib_name)?
       .iter()
-      .map(|s| s.to_string())
+      .map(|s| crate_name(s))
       .collect(),
   );
   Ok(config)

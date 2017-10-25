@@ -11,11 +11,11 @@ use cpp_to_rust_build_tools::common::errors::{fancy_unwrap, Result, ChainErr};
 use cpp_to_rust_build_tools::common::target;
 use cpp_to_rust_build_tools::common::cpp_build_config::CppBuildConfigData;
 use qt_generator_common::{InstallationData, get_installation_data, real_lib_name, framework_name,
-                          lib_dependencies};
+                          lib_dependencies, get_full_build_config};
 
 /// Runs the build script.
 pub fn run_and_return(sublib_name: &str) -> Result<()> {
-  let installation_data = get_installation_data(sublib_name)?;
+  let qt_config = get_full_build_config()?;
 
   let mut config = Config::new()?;
   {
@@ -23,7 +23,7 @@ pub fn run_and_return(sublib_name: &str) -> Result<()> {
       || "cpp_lib_version is expected in Config",
     )?;
 
-    if original_qt_version != installation_data.qt_version {
+    if original_qt_version != qt_config.installation_data.qt_version {
       println!(
         "cargo:warning=This crate was generated for Qt {}, but Qt {} is currently in use.",
         original_qt_version,
@@ -31,40 +31,8 @@ pub fn run_and_return(sublib_name: &str) -> Result<()> {
       );
     }
   }
-
-  let mut cpp_build_config_data = CppBuildConfigData::new();
-  {
-    let mut apply_installation_data = |name: &str, data: &InstallationData| {
-      config.cpp_build_paths_mut().add_include_path(
-        &data.root_include_path,
-      );
-      config.cpp_build_paths_mut().add_include_path(
-        &data.lib_include_path,
-      );
-      if data.is_framework {
-        config.cpp_build_paths_mut().add_framework_path(
-          &data.lib_path,
-        );
-        cpp_build_config_data.add_linked_framework(framework_name(name));
-      } else {
-        config.cpp_build_paths_mut().add_lib_path(&data.lib_path);
-        cpp_build_config_data.add_linked_lib(real_lib_name(name));
-      }
-    };
-
-
-    apply_installation_data(sublib_name, &installation_data);
-    for dep in lib_dependencies(sublib_name)? {
-      let dep_data = get_installation_data(dep)?;
-      apply_installation_data(dep, &dep_data);
-    }
-
-  }
-
-  config.cpp_build_config_mut().add(
-    target::Condition::True,
-    cpp_build_config_data,
-  );
+  config.set_cpp_build_config(qt_config.cpp_build_config);
+  config.set_cpp_build_paths(qt_config.cpp_build_paths);
   config.run_and_return()
 }
 

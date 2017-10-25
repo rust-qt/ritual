@@ -14,7 +14,9 @@ use cpp_to_rust_common::file_utils::PathBufWithAdded;
 use cpp_to_rust_common::string_utils::CaseOperations;
 use cpp_to_rust_common::errors::Result;
 use cpp_to_rust_common::log;
-
+use cpp_to_rust_common::target;
+use cpp_to_rust_common::cpp_build_config::{CppBuildPaths, CppBuildConfig, CppBuildConfigData,
+                                           CppLibraryType};
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -96,11 +98,71 @@ pub fn get_installation_data(sublib_name: &str) -> Result<InstallationData> {
   }
 }
 
+pub struct FullBuildConfig {
+  pub installation_data: InstallationData,
+  pub cpp_build_config: CppBuildConfig,
+  pub cpp_build_paths: CppBuildPaths,
+}
+
+pub fn get_full_build_config(sublib_name: &str) -> Result<FullBuildConfig> {
+  let installation_data = get_installation_data(sublib_name)?;
+  let mut cpp_build_paths = CppBuildPaths::new();
+  let mut cpp_build_config_data = CppBuildConfigData::new();
+  {
+    let mut apply_installation_data = |name: &str, data: &InstallationData| {
+      cpp_build_paths.add_include_path(&data.root_include_path);
+      cpp_build_paths.add_include_path(&data.lib_include_path);
+      if data.is_framework {
+        cpp_build_paths.add_framework_path(&data.lib_path);
+        cpp_build_config_data.add_linked_framework(framework_name(name));
+      } else {
+        cpp_build_paths.add_lib_path(&data.lib_path);
+        cpp_build_config_data.add_linked_lib(real_lib_name(name));
+      }
+    };
+
+    apply_installation_data(sublib_name, &installation_data);
+    for dep in lib_dependencies(sublib_name)? {
+      let dep_data = get_installation_data(dep)?;
+      apply_installation_data(dep, &dep_data);
+    }
+
+  }
+  let mut cpp_build_config = CppBuildConfig::new();
+  cpp_build_config.add(target::Condition::True, cpp_build_config_data);
+  {
+    let mut data = CppBuildConfigData::new();
+    data.add_compiler_flag("-std=gnu++11");
+    cpp_build_config.add(target::Condition::Env(target::Env::Msvc).negate(), data);
+  }
+  {
+    let mut data = CppBuildConfigData::new();
+    data.add_compiler_flag("-fPIC");
+    // msvc and mingw don't need this
+    cpp_build_config.add(target::Condition::OS(target::OS::Windows).negate(), data);
+  }
+  {
+    let mut data = CppBuildConfigData::new();
+    data.set_library_type(CppLibraryType::Shared);
+    cpp_build_config.add(target::Condition::Env(target::Env::Msvc), data);
+  }
+  Ok(FullBuildConfig {
+    installation_data,
+    cpp_build_config,
+    cpp_build_paths,
+  })
+}
+
 /// Returns library name of the specified module as
 /// should be passed to the linker, e.g. `"Qt5Core"`.
 pub fn real_lib_name(sublib_name: &str) -> String {
   let sublib_name_capitalized = sublib_name.to_class_case();
   format!("Qt5{}", sublib_name_capitalized)
+}
+
+/// Returns crate name of the specified module.
+pub fn crate_name(sublib_name: &str) -> String {
+  format!("qt_{}", sublib_name)
 }
 
 /// Returns name of the module's include directory, e.g. `"QtCore"`.

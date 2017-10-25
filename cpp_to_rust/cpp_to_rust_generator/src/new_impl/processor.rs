@@ -7,7 +7,7 @@ use common::file_utils::PathBufWithAdded;
 use cpp_parser;
 use common::errors::{Result, ChainErr};
 use std::path::PathBuf;
-use cpp_post_processor::cpp_post_process;
+//use cpp_post_processor::cpp_post_process;
 
 /// Creates output and cache directories if they don't exist.
 /// Returns `Err` if any path in `config` is invalid or relative.
@@ -37,7 +37,13 @@ fn check_all_paths(config: &Config) -> Result<()> {
   if let Some(path) = config.crate_template_path() {
     check_dir(path)?;
   }
-  for path in config.include_paths() {
+  for path in config.cpp_build_paths().include_paths() {
+    check_dir(path)?;
+  }
+  for path in config.cpp_build_paths().lib_paths() {
+    check_dir(path)?;
+  }
+  for path in config.cpp_build_paths().framework_paths() {
     check_dir(path)?;
   }
   for path in config.target_include_paths() {
@@ -70,8 +76,8 @@ pub fn process(workspace: &mut Workspace, config: &Config) -> Result<()> {
 
   log::status("Running C++ parser");
   let parser_config = cpp_parser::CppParserConfig {
-    include_paths: Vec::from(config.include_paths()),
-    framework_paths: Vec::from(config.framework_paths()),
+    include_paths: Vec::from(config.cpp_build_paths().include_paths()),
+    framework_paths: Vec::from(config.cpp_build_paths().framework_paths()),
     include_directives: Vec::from(config.include_directives()),
     target_include_paths: Vec::from(config.target_include_paths()),
     tmp_cpp_path: workspace.tmp_path()?.with_added("1.cpp"),

@@ -12,9 +12,9 @@ extern crate select as html_parser;
 extern crate regex;
 extern crate qt_generator_common;
 
-use cpp_to_rust_generator::common::errors::{Result, ChainErr};
-use cpp_to_rust_generator::common::file_utils::{create_dir_all, canonicalize};
-use std::path::PathBuf;
+//use cpp_to_rust_generator::common::errors::{Result, ChainErr};
+//use cpp_to_rust_generator::common::file_utils::{create_dir_all, canonicalize};
+//use std::path::PathBuf;
 
 mod executor;
 mod doc_decoder;

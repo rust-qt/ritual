@@ -80,12 +80,10 @@ impl DocData {
 
   /// Searches for an index item by lambda condition.
   pub fn find_index_item<F: Fn(&DocIndexItem) -> bool>(&mut self, f: F) -> Option<DocIndexItem> {
-    self.index.iter_mut().find(|item| f(item)).and_then(
-      |mut item| {
-        item.accessed = true;
-        Some(item.clone())
-      },
-    )
+    self.index.iter_mut().find(|item| f(item)).and_then(|item| {
+      item.accessed = true;
+      Some(item.clone())
+    })
   }
 
   /// Parses Qt documentation of module `qt_sub_lib_name` located at `docs_path`.

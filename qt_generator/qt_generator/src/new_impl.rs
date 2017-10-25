@@ -1,10 +1,9 @@
-use cpp_to_rust_generator::common::string_utils::JoinWithSeparator;
 use cpp_to_rust_generator::common::errors::{Result, ChainErr};
 use cpp_to_rust_generator::common::log;
-use cpp_to_rust_generator::common::file_utils::{canonicalize, PathBufWithAdded};
+use cpp_to_rust_generator::common::file_utils::canonicalize;
 use cpp_to_rust_generator::new_impl::workspace::Workspace;
-use std::path::{Path, PathBuf};
-use qt_generator_common::{all_sublib_names, lib_dependencies};
+use std::path::PathBuf;
+use qt_generator_common::all_sublib_names;
 use lib_configs::make_config;
 
 fn run(matches: ::clap::ArgMatches) -> Result<()> {
@@ -14,7 +13,9 @@ fn run(matches: ::clap::ArgMatches) -> Result<()> {
 
   log::status(format!("Workspace: {}", workspace_path.display()));
   let mut workspace = Workspace::new(workspace_path)?;
-  workspace.set_disable_logging(matches.is_present("disable-logging"));
+  workspace.set_disable_logging(
+    matches.is_present("disable-logging"),
+  )?;
   let mut was_any_action = false;
 
   if matches.is_present("process") {
@@ -29,14 +30,10 @@ fn run(matches: ::clap::ArgMatches) -> Result<()> {
     } else {
       libs
     };
-    let crate_templates_path =
-      PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_added("crate_templates");
     for sublib_name in final_libs {
-      let lib_crate_templates_path = crate_templates_path.with_added(&sublib_name);
-
-      let config = make_config(&sublib_name, lib_crate_templates_path)?;
+      let config = make_config(&sublib_name)?;
       was_any_action = true;
-      workspace.process_crate(&config);
+      workspace.process_crate(&config)?;
     }
   }
 
@@ -66,6 +63,7 @@ fn run(matches: ::clap::ArgMatches) -> Result<()> {
   } else {
     log::error("No action requested. Run \"qt_generator --help\".");
   }
+  Ok(())
 }
 
 
@@ -86,7 +84,7 @@ pub fn new_main() {
     let libs_help = format!(
       "Process libraries (Qt modules). Specify \"all\" \
       to process all supported modules or specify one or multiple of the following: {}.",
-      all_sublib_names.join(", ")
+      all_sublib_names().join(", ")
     );
 
     run(

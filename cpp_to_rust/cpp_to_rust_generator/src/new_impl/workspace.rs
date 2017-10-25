@@ -12,6 +12,7 @@ use std::collections::HashMap;
 #[derive(Serialize, Deserialize)]
 pub struct WorkspaceConfig {
   disable_logging: bool,
+  write_dependencies_local_paths: bool,
 }
 
 #[derive(Debug)]

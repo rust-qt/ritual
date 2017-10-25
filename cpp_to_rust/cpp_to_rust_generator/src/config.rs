@@ -5,7 +5,7 @@ use common::errors::Result;
 use cpp_method::CppMethod;
 use cpp_data::ParserCppData;
 pub use cpp_data::CppTypeAllocationPlace;
-use common::cpp_build_config::CppBuildConfig;
+use common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
 use std::collections::HashMap;
 use common;
 
@@ -174,25 +174,22 @@ impl CrateProperties {
 pub struct Config {
   // see setters documentation for information about these properties
   crate_properties: CrateProperties,
+  cpp_lib_version: Option<String>,
   crate_template_path: Option<PathBuf>,
   dependent_cpp_crates: Vec<String>,
   include_directives: Vec<PathBuf>,
   target_include_paths: Vec<PathBuf>,
-
-  include_paths: Vec<PathBuf>,
-  framework_paths: Vec<PathBuf>,
-
+  cpp_build_config: CppBuildConfig,
+  cpp_build_paths: CppBuildPaths,
   cpp_parser_arguments: Vec<String>,
   cpp_parser_blocked_names: Vec<String>,
+
+  // TODO: maybe change filters API
   cpp_ffi_generator_filters: Vec<CppFfiGeneratorFilter>,
   cpp_data_filters: Vec<CppDataFilter>,
   cpp_filtered_namespaces: Vec<String>,
-  cpp_build_config: CppBuildConfig, // TODO: add CppBuildPaths when needed
-  write_dependencies_local_paths: bool,
+
   type_allocation_places: HashMap<String, CppTypeAllocationPlace>,
-  quiet_mode: bool,
-  write_cache: bool,
-  cpp_lib_version: Option<String>,
 }
 
 impl Config {
@@ -203,8 +200,7 @@ impl Config {
       crate_properties: crate_properties,
       crate_template_path: Default::default(),
       dependent_cpp_crates: Default::default(),
-      include_paths: Default::default(),
-      framework_paths: Default::default(),
+      cpp_build_paths: Default::default(),
       target_include_paths: Default::default(),
       include_directives: Default::default(),
       cpp_parser_arguments: Default::default(),
@@ -214,9 +210,6 @@ impl Config {
       cpp_filtered_namespaces: Default::default(),
       cpp_build_config: Default::default(),
       type_allocation_places: Default::default(),
-      write_dependencies_local_paths: true,
-      quiet_mode: false,
-      write_cache: true,
       cpp_lib_version: None,
     }
   }
@@ -297,27 +290,12 @@ impl Config {
     }
   }
 
-
-  /// Adds path to an include directory.
-  /// It's supplied to the C++ parser via `-I` option.
-  ///
-  /// Note that this value is not used when building the wrapper library.
-  /// Use `Config::cpp_build_config_mut` or a similar method to
-  /// configure building the wrapper library.
-  pub fn add_include_path<P: Into<PathBuf>>(&mut self, path: P) {
-    self.include_paths.push(path.into());
+  /// Sets `CppBuildPaths` value for this config. These paths
+  /// are used for testing C++ methods while processing the library,
+  /// but they are not used when building the generated crate.
+  pub fn set_cpp_build_paths(&mut self, paths: CppBuildPaths) {
+    self.cpp_build_paths = paths;
   }
-
-  /// Adds path to a framework directory (OS X specific).
-  /// It's supplied to the C++ parser via `-F` option.
-  ///
-  /// Note that this value is not used when building the wrapper library.
-  /// Use `Config::cpp_build_config_mut` or a similar method to
-  /// configure building the wrapper library.
-  pub fn add_framework_path<P: Into<PathBuf>>(&mut self, path: P) {
-    self.framework_paths.push(path.into());
-  }
-
 
   /// Adds path to an include directory or an include file
   /// of the target library.
@@ -408,25 +386,6 @@ impl Config {
     }
   }
 
-  /// Sets quiet mode. In quiet mode status messages and debug logs are
-  /// redirected to `log` subdirectory of the cache directory. Only error messages
-  /// are always written to stderr. Quiet mode is disabled by default.
-  pub fn set_quiet_mode(&mut self, quiet_mode: bool) {
-    self.quiet_mode = quiet_mode;
-  }
-
-  /// Sets writing to cache mode. If enabled, result of processing is saved to
-  /// extra files in cache directory. The main use of these files are loading
-  /// dependency data. They are also used for speeding up repeated runs of the generator
-  /// on the same library.
-  ///
-  /// Writing to cache is enabled by default. If the library is not intended to be used as
-  /// a dependency when running the generator on another library, it's safe to disable
-  /// writing to cache in order to speed up the generator.
-  pub fn set_write_cache(&mut self, write_cache: bool) {
-    self.write_cache = write_cache;
-  }
-
   /// Sets `CppBuildConfig` value that will be passed to the build script
   /// of the generated crate.
   pub fn set_cpp_build_config(&mut self, cpp_build_config: CppBuildConfig) {
@@ -475,14 +434,9 @@ impl Config {
   }
 
 
-  /// Returns values added by `Config::add_include_path`.
-  pub fn include_paths(&self) -> &[PathBuf] {
-    &self.include_paths
-  }
-
-  /// Returns values added by `Config::add_framework_path`.
-  pub fn framework_paths(&self) -> &[PathBuf] {
-    &self.framework_paths
+  /// Returns values added by `Config::set_cpp_build_paths`.
+  pub fn cpp_build_paths(&self) -> &CppBuildPaths {
+    &self.cpp_build_paths
   }
 
   /// Returns values added by `Config::add_target_include_path`.
@@ -526,26 +480,5 @@ impl Config {
   /// Keys of the hash map are names of C++ types.
   pub fn type_allocation_places(&self) -> &HashMap<String, CppTypeAllocationPlace> {
     &self.type_allocation_places
-  }
-
-  /// If `value` is `true`, the generated `Cargo.toml` will specify
-  /// both versions and local paths of all dependencies. If `value` is `false`,
-  /// only version will be specified, so publishing all dependencies would be
-  /// required to build the crate.
-  pub fn set_write_dependencies_local_paths(&mut self, value: bool) {
-    self.write_dependencies_local_paths = value;
-  }
-  /// Returns value set by `Config::set_write_dependencies_local_paths`.
-  pub fn write_dependencies_local_paths(&self) -> bool {
-    self.write_dependencies_local_paths
-  }
-
-  /// Returns value set by `Config::set_quiet_mode`.
-  pub fn quiet_mode(&self) -> bool {
-    self.quiet_mode
-  }
-  /// Returns value set by `Config::set_write_cache`.
-  pub fn write_cache(&self) -> bool {
-    self.write_cache
   }
 }
