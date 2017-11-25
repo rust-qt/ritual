@@ -34,7 +34,7 @@ And add corresponding `extern crate` directives to the crate root (`main.rs` or 
 extern crate qt_widgets;
 ```
 
-Each crate re-exports its depenencies, so, for example, you can access `qt_core` as `qt_widgets::qt_core` without adding an explicit dependency.
+Each crate re-exports its dependencies, so, for example, you can access `qt_core` as `qt_widgets::qt_core` without adding an explicit dependency.
 
 [Online documentation](https://rust-qt.github.io/rustdoc/qt/qt_core) of published Qt crates (you may also run `cargo doc --open` to generate documentation for your crate's dependencies).
 
