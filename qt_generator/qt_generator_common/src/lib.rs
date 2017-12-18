@@ -61,7 +61,17 @@ pub fn get_installation_data(sublib_name: &str) -> Result<InstallationData> {
   log::status(format!("QT_INSTALL_DOCS = \"{}\"", docs_path.display()));
   let folder_name = lib_folder_name(sublib_name);
   let dir = root_include_path.with_added(&folder_name);
-  if dir.exists() {
+  let dir2 = lib_path.with_added(format!("{}.framework/Headers", folder_name));
+  if dir2.exists() {
+    Ok(InstallationData {
+         root_include_path: root_include_path,
+         lib_path: lib_path,
+         docs_path: docs_path,
+         lib_include_path: dir2,
+         is_framework: true,
+         qt_version: qt_version,
+       })
+  } else if dir.exists() {
     Ok(InstallationData {
          root_include_path: root_include_path,
          lib_path: lib_path,
@@ -71,22 +81,10 @@ pub fn get_installation_data(sublib_name: &str) -> Result<InstallationData> {
          qt_version: qt_version,
        })
   } else {
-    let dir2 = lib_path.with_added(format!("{}.framework/Headers", folder_name));
-    if dir2.exists() {
-      Ok(InstallationData {
-           root_include_path: root_include_path,
-           lib_path: lib_path,
-           docs_path: docs_path,
-           lib_include_path: dir2,
-           is_framework: true,
-           qt_version: qt_version,
-         })
-    } else {
-      Err(format!("extra header dir not found (tried: {}, {})",
-                  dir.display(),
-                  dir2.display())
-              .into())
-    }
+    Err(format!("extra header dir not found (tried: {}, {})",
+                dir.display(),
+                dir2.display())
+            .into())
   }
 }
 
