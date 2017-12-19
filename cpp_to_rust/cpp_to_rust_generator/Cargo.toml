@@ -26,3 +26,4 @@ clippy = {version = "0.0", optional = true} # linter
 
 cpp_to_rust_common = { version = "0.2.3", path = "../../cpp_to_rust/cpp_to_rust_common" }
 
+lazy_static = "1.0" # regex caching
