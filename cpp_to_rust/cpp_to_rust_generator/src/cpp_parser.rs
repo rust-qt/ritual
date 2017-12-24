@@ -314,7 +314,9 @@ impl<'a> CppParser<'a> {
                           context_class: Option<Entity>,
                           context_method: Option<Entity>)
                           -> Result<CppType> {
-    let template_class_regex = Regex::new(r"^([\w:]+)<(.+)>$")?;
+    lazy_static! {
+      static ref TEMPLATE_CLASS_REGEX: Regex  = Regex::new(r"^([\w:]+)<(.+)>$").unwrap();
+    }
     let (is_const, name) = if let Some(type1) = type1 {
       let is_const = type1.is_const_qualified();
       let mut name = type1.get_display_name();
@@ -336,7 +338,7 @@ impl<'a> CppParser<'a> {
                                get_full_name(declaration).unwrap_or("?".into()))
                            .into());
           }
-          if let Some(matches) = template_class_regex.captures(name.as_ref()) {
+          if let Some(matches) = TEMPLATE_CLASS_REGEX.captures(name.as_ref()) {
             let mut arg_types = Vec::new();
             if let Some(items) = matches.at(2) {
               for arg in items.split(',') {
@@ -503,7 +505,7 @@ impl<'a> CppParser<'a> {
       return Ok(result_type);
     }
 
-    if let Some(matches) = template_class_regex.captures(remaining_name) {
+    if let Some(matches) = TEMPLATE_CLASS_REGEX.captures(remaining_name) {
       if matches.len() < 3 {
         return Err("invalid matches len in regexp".into());
       }
@@ -1018,8 +1020,10 @@ impl<'a> CppParser<'a> {
       .get_name()
       .chain_err(|| "failed to get function name")?;
     if name.contains('<') {
-      let regex = Regex::new(r"^([\w~]+)<[^<>]+>$")?;
-      if let Some(matches) = regex.captures(name.clone().as_ref()) {
+      lazy_static! {
+        static ref REGEX: Regex = Regex::new(r"^([\w~]+)<[^<>]+>$").unwrap();
+      }
+      if let Some(matches) = REGEX.captures(name.clone().as_ref()) {
         log::llog(log::DebugParser,
                   || format!("Fixing malformed method name: {}", name));
         name = matches
