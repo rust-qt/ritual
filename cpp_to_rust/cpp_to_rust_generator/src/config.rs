@@ -189,6 +189,8 @@ pub struct Config {
   cpp_data_filters: Vec<CppDataFilter>,
   cpp_filtered_namespaces: Vec<String>,
 
+  prefixes_to_remove: Vec<String>,
+  
   type_allocation_places: HashMap<String, CppTypeAllocationPlace>,
 }
 
@@ -209,6 +211,7 @@ impl Config {
       cpp_data_filters: Default::default(),
       cpp_filtered_namespaces: Default::default(),
       cpp_build_config: Default::default(),
+      prefixes_to_remove: Default::default(),
       type_allocation_places: Default::default(),
       cpp_lib_version: None,
     }
@@ -364,6 +367,20 @@ impl Config {
     }
   }
 
+  /// Adds a prefix to remove from C++ datatype and method names
+  pub fn add_prefix_to_remove<N: Into<String>>(&mut self, prefix: N) {
+    self.prefixes_to_remove.push(prefix.into());
+  }
+
+  /// Adds multiple prefixes to remove from C++ datatype and method names
+  pub fn add_prefixes_to_remove<Item, Iter>(&mut self, prefixes: Iter)
+    where Item: Into<String>,
+          Iter: IntoIterator<Item = Item>
+  {
+    for prefix in prefixes {
+      self.add_prefix_to_remove(prefix.into());
+    }
+  }
 
   /// Overrides automatic selection of type allocation place for `type_name` and uses `place`
   /// instead. See `CppTypeAllocationPlace` for more information.
@@ -476,6 +493,12 @@ impl Config {
   pub fn cpp_build_config(&self) -> &CppBuildConfig {
     &self.cpp_build_config
   }
+
+  /// Returns current `prefixes_to_remove` value
+  pub fn prefixes_to_remove(&self) -> &Vec<String> {
+    &self.prefixes_to_remove
+  }
+
   /// Returns values added by `Config::set_type_allocation_place`.
   /// Keys of the hash map are names of C++ types.
   pub fn type_allocation_places(&self) -> &HashMap<String, CppTypeAllocationPlace> {

@@ -68,7 +68,6 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
   let mut dependency_cache = HashMap::new();
   for config in configs {
 
-
     {
       let cpp_data = load_or_create_cpp_data(
         &config,
@@ -133,17 +132,17 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
       };
       log::status("Preparing Rust functions");
       let rust_data = rust_generator::RustGeneratorInputData {
-        cpp_data: &cpp_data,
-        cpp_ffi_headers: cpp_ffi_headers,
-        dependency_types: dependencies
-          .iter()
-          .map(|dep| &dep.rust_export_info.rust_types as &[_])
-          .collect(),
-        crate_name: config.crate_properties().name().clone(),
-        // TODO: more universal prefix removal (#25)
-        remove_qt_prefix: remove_qt_prefix,
-        filtered_namespaces: config.cpp_filtered_namespaces().clone(),
-      }.run()
+          cpp_data: &cpp_data,
+          cpp_ffi_headers: cpp_ffi_headers,
+          dependency_types: dependencies
+            .iter()
+            .map(|dep| &dep.rust_export_info.rust_types as &[_])
+            .collect(),
+          crate_name: config.crate_properties().name().clone(),
+          prefixes_to_remove: config.prefixes_to_remove().clone(),
+          filtered_namespaces: config.cpp_filtered_namespaces().clone(),
+        }
+        .run()
         .chain_err(|| "Rust data generator failed")?;
       log::status(format!(
         "Generating Rust crate code ({})",
