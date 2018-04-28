@@ -131,6 +131,9 @@ pub enum CppTypeBase {
     /// Index of the parameter. In `QHash<K, V>` `"K"` has `index = 0`
     /// and `"V"` has `index = 1`.
     index: usize,
+
+    /// Declared name of this template parameter
+    name: String,
   },
   /// Function pointer type
   FunctionPointer(CppFunctionPointerType),
@@ -463,8 +466,9 @@ impl CppTypeBase {
       CppTypeBase::TemplateParameter {
         ref nested_level,
         ref index,
+        ref name,
       } => {
-        return format!("T{}_{}", nested_level, index);
+        return name.to_string(); // format!("T{}_{}", nested_level, index);
       }
       CppTypeBase::Class(ref base) => return base.to_cpp_pseudo_code(),
       CppTypeBase::FunctionPointer(..) => {
@@ -710,6 +714,7 @@ impl CppType {
     if let CppTypeBase::TemplateParameter {
       nested_level,
       index,
+      ..
     } = self.base
     {
       if nested_level == nested_level1 {

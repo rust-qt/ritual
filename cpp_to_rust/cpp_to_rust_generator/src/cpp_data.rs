@@ -20,8 +20,10 @@ pub struct CppEnumValue {
   pub name: String,
   /// Corresponding value
   pub value: i64,
-  /// C++ documentation for this item in HTML
-  pub doc: Option<String>,
+  // /// C++ documentation for this item in HTML
+  //pub doc: Option<String>,
+  /// Full type name of the enum this item belongs to
+  pub enum_name: String,
 }
 
 /// Member field of a C++ class declaration
@@ -35,6 +37,9 @@ pub struct CppClassField {
   pub visibility: CppVisibility,
   /// Size of type in bytes
   pub size: Option<usize>,
+
+  /// Name and template arguments of the class type that owns this field
+  pub class_type: CppTypeClassBase,
 }
 
 /// A "using" directive inside a class definition,
@@ -63,18 +68,13 @@ pub struct CppBaseSpecifier {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum CppTypeKind {
   /// Enum declaration
-  Enum {
-    /// List of items
-    values: Vec<CppEnumValue>,
-  },
+  Enum,
   /// Class declaration
   Class {
     /// List of class types this class is derived from
     bases: Vec<CppBaseSpecifier>,
-    /// List of class fields
-    fields: Vec<CppClassField>,
     /// Information about template arguments of this type.
-    template_arguments: Option<TemplateArgumentsDeclaration>,
+    template_arguments: Option<Vec<CppType>>,
     /// List of using directives, like "using BaseClass::method1;"
     using_directives: Vec<CppClassUsingDirective>,
   },
@@ -233,59 +233,6 @@ impl CppTypeData {
     match self.kind {
       CppTypeKind::Class { .. } => true,
       _ => false,
-    }
-  }
-
-  /// Creates CppTypeBase object representing type
-  /// of an object of this type. See
-  /// default_template_arguments() documentation
-  /// for details about handling template parameters.
-  pub fn default_class_type(&self) -> Result<CppTypeClassBase> {
-    if !self.is_class() {
-      return Err("not a class".into());
-    }
-    Ok(CppTypeClassBase {
-      name: self.name.clone(),
-      template_arguments: self.default_template_arguments(),
-    })
-  }
-
-  /// Creates template parameters expected for this type.
-  /// For example, QHash<QString, int> will have 2 default
-  /// template parameters with indexes 0 and 1. This function
-  /// is helpful for determining type of "this" pointer.
-  /// Result of this function may differ from actual template
-  /// parameters, for example:
-  /// - if a class is inside another template class,
-  /// nested level should be 1 instead of 0;
-  /// - if QList<V> type is used inside QHash<K, V> type,
-  /// QList's template parameter will have index = 1
-  /// instead of 0.
-  pub fn default_template_arguments(&self) -> Option<Vec<CppType>> {
-    match self.kind {
-      CppTypeKind::Class {
-        ref template_arguments,
-        ..
-      } => match *template_arguments {
-        None => None,
-        Some(ref arguments) => Some(
-          arguments
-            .names
-            .iter()
-            .enumerate()
-            .map(|(num, _)| CppType {
-              is_const: false,
-              is_const2: false,
-              indirection: CppTypeIndirection::None,
-              base: CppTypeBase::TemplateParameter {
-                nested_level: arguments.nested_level,
-                index: num,
-              },
-            })
-            .collect(),
-        ),
-      },
-      _ => None,
     }
   }
 

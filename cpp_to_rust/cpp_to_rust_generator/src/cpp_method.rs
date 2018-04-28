@@ -125,13 +125,13 @@ pub struct CppMethod {
   /// None if this is not a template method.
   /// If the method belongs to a template class,
   /// the class's template arguments are not included here.
-  pub template_arguments: Option<TemplateArgumentsDeclaration>,
+  pub template_arguments: Option<Vec<CppType>>,
   /// For an instantiated template method, this field contains the types
   /// used for instantiation. For example, `T QObject::findChild<T>()` would have
   /// no `template_arguments_values` because it's not instantiated, and
   /// `QWidget* QObject::findChild<QWidget*>()` would have `QWidget*` type in
   /// `template_arguments_values`.
-  pub template_arguments_values: Option<Vec<CppType>>,
+  //pub template_arguments_values: Option<Vec<CppType>>,
   /// C++ code of the method's declaration.
   /// None if the method was not explicitly declared.
   pub declaration_code: Option<String>,
@@ -345,9 +345,13 @@ impl CppMethod {
     s = format!("{} {}", s, self.return_type.to_cpp_pseudo_code());
     s = format!("{} {}", s, self.full_name());
     if let Some(ref args) = self.template_arguments {
-      s = format!("{}<{}>", s, args.names.iter().join(", "));
+      s = format!(
+        "{}<{}>",
+        s,
+        args.iter().map(|x| x.to_cpp_pseudo_code()).join(", ")
+      );
     }
-    if let Some(ref args) = self.template_arguments_values {
+    if let Some(ref args) = self.template_arguments {
       s = format!(
         "{}<{}>",
         s,

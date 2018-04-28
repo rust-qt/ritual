@@ -5,6 +5,8 @@ use cpp_method::CppMethod;
 use cpp_method::CppMethodDoc;
 use cpp_data::CppTypeDoc;
 use cpp_data::CppOriginLocation;
+use cpp_data::CppEnumValue;
+use cpp_data::CppClassField;
 
 //use common::errors::Result;
 
@@ -44,13 +46,15 @@ pub struct DataEnvWithInfo {
 pub enum CppItemData {
   Type(CppTypeData),
   Method(CppMethod),
-  ClassField(CppField),
+  EnumValue(CppEnumValue),
+  ClassField(CppClassField),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CppItemDoc {
   Type(CppTypeDoc),
   Method(CppMethodDoc),
+  EnumValue(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

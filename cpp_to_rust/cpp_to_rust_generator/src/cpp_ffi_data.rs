@@ -326,7 +326,7 @@ pub fn c_base_name(
   } else {
     add_place_note(cpp_method.name.replace("::", "_"))
   };
-  let template_args_text = match cpp_method.template_arguments_values {
+  let template_args_text = match cpp_method.template_arguments {
     Some(ref args) => format!(
       "_{}",
       args
