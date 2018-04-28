@@ -14,7 +14,7 @@ struct CppPostProcessor<'a> {
   parser_data: ParserCppData,
   dependencies: Vec<&'a CppData>,
 }
-
+/*
 /// Derives `ProcessedCppData` from `ParserCppData`.
 pub fn cpp_post_process<'a>(
   parser_data: ParserCppData,
@@ -47,7 +47,7 @@ pub fn cpp_post_process<'a>(
     dependencies: processor.dependencies,
   })
 }
-
+*/
 impl<'a> CppPostProcessor<'a> {
   /// Checks if specified class has virtual destructor (own or inherited).
   pub fn has_virtual_destructor(&self, class_name: &str, inherited_methods: &[CppMethod]) -> bool {
@@ -81,7 +81,7 @@ impl<'a> CppPostProcessor<'a> {
     }
     false
   }
-
+  /*
   /// Adds destructors for every class that does not have explicitly
   /// defined destructor, allowing to create wrappings for
   /// destructors implicitly available in C++.
@@ -129,7 +129,7 @@ impl<'a> CppPostProcessor<'a> {
     }
     Ok(methods)
   }
-
+*/
   /// Searches for template instantiations in this library's API,
   /// excluding results that were already processed in dependencies.
   #[cfg_attr(feature = "clippy", allow(block_in_if_condition_stmt))]

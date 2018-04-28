@@ -121,13 +121,6 @@ pub struct CppMethod {
   //  pub arguments_before_omitting: Option<Vec<CppMethodArgument>>,
   /// Whether the argument list is terminated with "..."
   pub allows_variadic_arguments: bool,
-  /// File name of the include file where the method is defined
-  /// (without full path)
-  pub include_file: String,
-  /// Exact location of declaration of the method.
-  /// Can be None if the method is generated automatically
-  /// and doesn't have corresponding C++ declaration.
-  pub origin_location: Option<CppOriginLocation>,
   /// Names of the method's template arguments.
   /// None if this is not a template method.
   /// If the method belongs to a template class,

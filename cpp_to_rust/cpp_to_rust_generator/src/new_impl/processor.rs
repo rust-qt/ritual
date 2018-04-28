@@ -57,6 +57,11 @@ pub fn process(workspace: &mut Workspace, config: &Config) -> Result<()> {
   // TODO: allow to remove any prefix through `Config` (#25)
   let remove_qt_prefix = config.crate_properties().name().starts_with("qt_");
 
+  log::status("Loading current crate data");
+  let mut current_database = workspace
+    .load_crate(config.crate_properties().name())
+    .chain_err(|| "failed to load current crate data")?;
+
   if !config.dependent_cpp_crates().is_empty() {
     log::status("Loading dependencies");
   }
@@ -78,11 +83,13 @@ pub fn process(workspace: &mut Workspace, config: &Config) -> Result<()> {
     tmp_cpp_path: workspace.tmp_path()?.with_added("1.cpp"),
     name_blacklist: Vec::from(config.cpp_parser_blocked_names()),
     clang_arguments: Vec::from(config.cpp_parser_arguments()),
+    cpp_library_version: config.cpp_lib_version().map(|s| s.to_string()),
   };
 
-  /*
-  let mut parser_cpp_data = cpp_parser::run(parser_config, &dependent_cpp_crates)
+  cpp_parser::run(parser_config, &mut current_database, &dependent_cpp_crates)
     .chain_err(|| "C++ parser failed")?;
+
+  /*
   parser_cpp_data.detect_signals_and_slots(
     &dependent_cpp_crates,
   )?;
@@ -107,5 +114,11 @@ pub fn process(workspace: &mut Workspace, config: &Config) -> Result<()> {
 
   */
 
-  unimplemented!()
+  for database in dependent_cpp_crates {
+    workspace.put_crate(database, true);
+  }
+  workspace.put_crate(current_database, false);
+  log::status("Saving data");
+  workspace.save_data()?;
+  Ok(())
 }

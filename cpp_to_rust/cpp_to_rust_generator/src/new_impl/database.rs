@@ -1,39 +1,64 @@
-use new_impl::cpp_type::CppType;
-use new_impl::cpp_method::CppMethod;
 use common::target::Target;
 use common::log;
+use cpp_data::CppTypeData;
+use cpp_method::CppMethod;
+use cpp_method::CppMethodDoc;
+use cpp_data::CppTypeDoc;
+use cpp_data::CppOriginLocation;
 
 //use common::errors::Result;
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CppField; // TODO: fill
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DataSource {
-  Parser,
-  Checker,
+  CppParser,
+  CppChecker,
+  DocParser,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DataEnv {
-  target: Target,
-  data_source: DataSource,
-  cpp_library_version: Option<String>,
+  pub target: Target,
+  pub data_source: DataSource,
+  pub cpp_library_version: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DataEnvResult {
-  env: DataEnv,
-  error: Option<String>,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DataEnvInfo {
+  pub error: Option<String>,
+  /// File name of the include file (without full path)
+  pub include_file: Option<String>,
+  /// Exact location of the declaration
+  pub origin_location: Option<CppOriginLocation>,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DataEnvWithInfo {
+  pub env: DataEnv,
+  pub info: DataEnvInfo,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CppItemData {
-  Type(CppType),
+  Type(CppTypeData),
   Method(CppMethod),
+  ClassField(CppField),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CppItemDoc {
+  Type(CppTypeDoc),
+  Method(CppMethodDoc),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseItem {
-  environments: Vec<DataEnvResult>,
-  cpp_data: CppItemData,
+  pub environments: Vec<DataEnvWithInfo>,
+  pub cpp_data: CppItemData,
+  /// C++ documentation data for this type
+  pub doc: Option<CppItemDoc>,
   // TODO: add cpp_ffi and rust data
 }
 
@@ -52,45 +77,50 @@ impl Database {
     }
   }
 
+  pub fn items(&self) -> &[DatabaseItem] {
+    &self.items
+  }
+
   pub fn crate_name(&self) -> &str {
     &self.crate_name
   }
 
-  pub fn add_cpp_data(&mut self, env: DataEnv, data: CppItemData, error: Option<String>) {
+  pub fn add_cpp_data(&mut self, env: DataEnv, data: CppItemData, info: DataEnvInfo) {
     if let Some(r) = self.items.iter_mut().find(|item| item.cpp_data == data) {
       if let Some(env1) = r.environments.iter_mut().find(|env2| env2.env == env) {
-        if env1.error != error {
+        if env1.info != info {
           log::llog(log::LoggerCategory::DebugGeneral, || {
             format!(
               "cpp env result changed for existing data!\n\
-               env: {:?}\ndata: {:?}\nnew error: {:?}\nold error: {:?}\n",
-              env, data, error, env1.error
+               env: {:?}\ndata: {:?}\nnew info: {:?}\nold info: {:?}\n",
+              env, data, info, env1.info
             )
           });
-          env1.error = error;
+          env1.info = info;
         }
         return;
       }
       log::llog(log::LoggerCategory::DebugGeneral, || {
         format!(
           "cpp new env for existing data!\n\
-           env: {:?}\ndata: {:?}\nerror: {:?}\n",
-          env, data, error
+           env: {:?}\ndata: {:?}\ninfo: {:?}\n",
+          env, data, info
         )
       });
-      r.environments.push(DataEnvResult { env, error });
+      r.environments.push(DataEnvWithInfo { env, info });
       return;
     }
     log::llog(log::LoggerCategory::DebugGeneral, || {
       format!(
         "cpp new data!\n\
-         env: {:?}\ndata: {:?}\nerror: {:?}\n",
-        env, data, error
+         env: {:?}\ndata: {:?}\ninfo: {:?}\n",
+        env, data, info
       )
     });
     self.items.push(DatabaseItem {
-      environments: vec![DataEnvResult { env, error }],
+      environments: vec![DataEnvWithInfo { env, info }],
       cpp_data: data,
+      doc: None,
     });
   }
 }

@@ -117,14 +117,8 @@ pub struct CppTypeData {
   /// Identifier, including namespaces and nested classes
   /// (separated with "::", like in C++)
   pub name: String,
-  /// File name of the include file (without full path)
-  pub include_file: String,
-  /// Exact location of the declaration
-  pub origin_location: CppOriginLocation,
   /// Type information
   pub kind: CppTypeKind,
-  /// C++ documentation data for this type
-  pub doc: Option<CppTypeDoc>,
 }
 
 /// Information about template arguments of a C++ class type
@@ -369,6 +363,7 @@ impl ParserCppData {
     false
   }
 
+  /*
   /// Parses include files to detect which methods are signals or slots.
   pub fn detect_signals_and_slots(&mut self, dependencies: &[&CppData]) -> Result<()> {
     let mut files = HashSet::new();
@@ -484,6 +479,7 @@ impl ParserCppData {
     }
     Ok(())
   }
+*/
 
   /// Checks if specified class has explicitly declared protected or private destructor.
   pub fn has_non_public_destructor(&self, class_type: &CppTypeClassBase) -> bool {
@@ -908,7 +904,7 @@ impl<'a> CppDataWithDeps<'a> {
       .chain(self.dependencies.iter().map(|x| &x.parser.types))
       .collect()
   }
-
+  /*
   /// Returns all include files found within this `CppData`
   /// (excluding dependencies).
   pub fn all_include_files(&self) -> Result<HashSet<String>> {
@@ -932,5 +928,5 @@ impl<'a> CppDataWithDeps<'a> {
       }
     }
     Ok(result)
-  }
+  } */
 }

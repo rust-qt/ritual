@@ -10,14 +10,20 @@ use common::errors::{unexpected, ChainErr, Result};
 use common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
 use common::string_utils::JoinWithSeparator;
 use common::log;
+use new_impl::database::{CppItemData, Database};
 
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-
+use common::target::current_target;
 use clang::*;
 use clang;
 
 use regex::Regex;
+use std::iter::once;
+use new_impl::database::DataEnvInfo;
+use new_impl::database::DataEnv;
+use new_impl::database::DataSource;
+use new_impl::database::DatabaseItem;
 
 fn convert_type_kind(kind: TypeKind) -> CppBuiltInNumericType {
   match kind {
@@ -50,10 +56,12 @@ fn convert_type_kind(kind: TypeKind) -> CppBuiltInNumericType {
 struct CppParser<'a> {
   /// Configuration of the parser
   config: CppParserConfig,
-  /// C++ types found by the parser
-  types: Vec<CppTypeData>,
-  /// Processed C++ data of the dependencies
-  dependencies_data: &'a [&'a CppData],
+  /// Processed data of the dependencies
+  dependencies_data: &'a [Database],
+  /// Database of current crate for output
+  current_database: &'a mut Database,
+
+  env: DataEnv,
 }
 
 /// Print representation of `entity` and its children to the log.
@@ -161,6 +169,8 @@ pub struct CppParserConfig {
   /// List of names that should be excluded from the processing.
   /// See `Config::add_cpp_parser_blocked_name` for more details.
   pub name_blacklist: Vec<String>,
+
+  pub cpp_library_version: Option<String>,
 }
 
 #[cfg(test)]
@@ -186,10 +196,10 @@ fn init_clang() -> Result<Clang> {
 /// If successful, calls `f` and passes the topmost entity (the translation unit)
 /// as its argument. Returns output value of `f` or an error.
 #[cfg_attr(feature = "clippy", allow(block_in_if_condition_stmt))]
-fn run_clang<R, F: Fn(Entity) -> Result<R>>(
+fn run_clang<R, F: FnMut(Entity) -> Result<R>>(
   config: &CppParserConfig,
   cpp_code: Option<String>,
-  f: F,
+  mut f: F,
 ) -> Result<R> {
   let clang = init_clang()?;
   let index = Index::new(&clang, false, false);
@@ -267,44 +277,66 @@ fn run_clang<R, F: Fn(Entity) -> Result<R>>(
 }
 
 /// Runs the parser on specified data.
-pub fn run(config: CppParserConfig, dependencies_data: &[&CppData]) -> Result<ParserCppData> {
+pub fn run(
+  config: CppParserConfig,
+  current_database: &mut Database,
+  dependencies_data: &[Database],
+) -> Result<()> {
   log::status(get_version());
   log::status("Initializing clang...");
-  let (mut parser, methods) = run_clang(&config, None, |translation_unit| {
-    let mut parser = CppParser {
-      types: Vec::new(),
-      config: config.clone(),
-      dependencies_data: dependencies_data,
-    };
+  //let (mut parser, methods) =
+  let mut parser = CppParser {
+    env: DataEnv {
+      target: current_target(),
+      data_source: DataSource::CppParser,
+      cpp_library_version: config.cpp_library_version.clone(),
+    },
+    config: config.clone(),
+    current_database,
+    dependencies_data,
+  };
+  run_clang(&config, None, |translation_unit| {
     log::status("Parsing types");
     parser.parse_types(translation_unit);
     log::status("Parsing methods");
-    let methods = parser.parse_methods(translation_unit);
-    Ok((parser, methods))
+    //let methods =
+    parser.parse_methods(translation_unit);
+    //Ok((parser, methods))
+    Ok(())
   })?;
-  log::status("Checking data integrity");
-  let (good_methods, good_types) = parser.check_integrity(methods);
-  parser.types = good_types;
-  log::status("Searching for template instantiations");
-  Ok(ParserCppData {
-    types: parser.types,
-    methods: good_methods,
-  })
+  Ok(())
+
+  //  log::status("Checking data integrity");
+  //  let (good_methods, good_types) = parser.check_integrity(methods);
+  //  parser.types = good_types;
+  //  log::status("Searching for template instantiations");
+  //  Ok(ParserCppData {
+  //    types: parser.types,
+  //    methods: good_methods,
+  //  })
 }
 
 impl<'a> CppParser<'a> {
   /// Search for a C++ type information in the types found by the parser
   /// and in types of the dependencies.
   fn find_type<F: Fn(&CppTypeData) -> bool>(&self, f: F) -> Option<&CppTypeData> {
-    if let Some(r) = self.types.iter().find(|x| f(x)) {
-      return Some(r);
-    }
-    for data in self.dependencies_data {
-      if let Some(r) = data.parser.types.iter().find(|&x| f(x)) {
-        return Some(r);
+    let databases = once(self.current_database as &_).chain(self.dependencies_data.iter());
+    for database in databases {
+      for item in database.items() {
+        if let CppItemData::Type(ref info) = item.cpp_data {
+          if f(info) {
+            return Some(info);
+          }
+        }
       }
     }
-    None
+    return None;
+  }
+
+  fn save_info(&mut self, data: CppItemData, info: DataEnvInfo) {
+    self
+      .current_database
+      .add_cpp_data(self.env.clone(), data, info);
   }
 
   /// Attempts to parse an unexposed type, i.e. a type the used `clang` API
@@ -918,7 +950,7 @@ impl<'a> CppParser<'a> {
 
   /// Parses a function `entity`.
   #[cfg_attr(feature = "clippy", allow(cyclomatic_complexity))]
-  fn parse_function(&self, entity: Entity) -> Result<CppMethod> {
+  fn parse_function(&self, entity: Entity) -> Result<(CppMethod, DataEnvInfo)> {
     let (class_name, class_entity) = match entity.get_semantic_parent() {
       Some(p) => match p.get_kind() {
         EntityKind::ClassDecl | EntityKind::ClassTemplate | EntityKind::StructDecl => {
@@ -1173,54 +1205,59 @@ impl<'a> CppParser<'a> {
       }
       Some(token_strings.join(" "))
     };
-    Ok(CppMethod {
-      name: name_with_namespace,
-      operator: method_operator,
-      class_membership: match class_name {
-        Some(class_name) => {
-          Some(CppMethodClassMembership {
-            kind: match entity.get_kind() {
-              EntityKind::Constructor => CppMethodKind::Constructor,
-              EntityKind::Destructor => CppMethodKind::Destructor,
-              _ => CppMethodKind::Regular,
-            },
-            is_virtual: entity.is_virtual_method(),
-            is_pure_virtual: entity.is_pure_virtual_method(),
-            is_const: entity.is_const_method(),
-            is_static: entity.is_static_method(),
-            visibility: match entity.get_accessibility().unwrap_or(Accessibility::Public) {
-              Accessibility::Public => CppVisibility::Public,
-              Accessibility::Protected => CppVisibility::Protected,
-              Accessibility::Private => CppVisibility::Private,
-            },
-            // not all signals are detected here! see CppData::detect_signals_and_slots
-            is_signal: is_signal,
-            is_slot: false,
-            class_type: match self.find_type(|x| &x.name == &class_name) {
-              Some(info) => info.default_class_type()?,
-              None => return Err(format!("Unknown class type: {}", class_name).into()),
-            },
-          })
-        }
-        None => None,
+    Ok((
+      CppMethod {
+        name: name_with_namespace,
+        operator: method_operator,
+        class_membership: match class_name {
+          Some(class_name) => {
+            Some(CppMethodClassMembership {
+              kind: match entity.get_kind() {
+                EntityKind::Constructor => CppMethodKind::Constructor,
+                EntityKind::Destructor => CppMethodKind::Destructor,
+                _ => CppMethodKind::Regular,
+              },
+              is_virtual: entity.is_virtual_method(),
+              is_pure_virtual: entity.is_pure_virtual_method(),
+              is_const: entity.is_const_method(),
+              is_static: entity.is_static_method(),
+              visibility: match entity.get_accessibility().unwrap_or(Accessibility::Public) {
+                Accessibility::Public => CppVisibility::Public,
+                Accessibility::Protected => CppVisibility::Protected,
+                Accessibility::Private => CppVisibility::Private,
+              },
+              // not all signals are detected here! see CppData::detect_signals_and_slots
+              is_signal: is_signal,
+              is_slot: false,
+              class_type: match self.find_type(|x| &x.name == &class_name) {
+                Some(info) => info.default_class_type()?,
+                None => return Err(format!("Unknown class type: {}", class_name).into()),
+              },
+            })
+          }
+          None => None,
+        },
+        arguments: arguments,
+        allows_variadic_arguments: allows_variadic_arguments,
+        return_type: return_type_parsed,
+        template_arguments: template_arguments,
+        template_arguments_values: None,
+        declaration_code: declaration_code,
+        doc: None,
+        inheritance_chain: Vec::new(),
+        //is_fake_inherited_method: false,
+        is_ffi_whitelisted: false,
       },
-      arguments: arguments,
-      allows_variadic_arguments: allows_variadic_arguments,
-      return_type: return_type_parsed,
-      include_file: self.entity_include_file(entity)?,
-      origin_location: Some(get_origin_location(entity)?),
-      template_arguments: template_arguments,
-      template_arguments_values: None,
-      declaration_code: declaration_code,
-      doc: None,
-      inheritance_chain: Vec::new(),
-      //is_fake_inherited_method: false,
-      is_ffi_whitelisted: false,
-    })
+      DataEnvInfo {
+        include_file: Some(self.entity_include_file(entity)?),
+        origin_location: Some(get_origin_location(entity)?),
+        error: None,
+      },
+    ))
   }
 
   /// Parses an enum `entity`.
-  fn parse_enum(&self, entity: Entity) -> Result<CppTypeData> {
+  fn parse_enum(&self, entity: Entity) -> Result<(CppTypeData, DataEnvInfo)> {
     let include_file = self.entity_include_file(entity).chain_err(|| {
       format!(
         "Origin of type is unknown: {}; entity: {:?}",
@@ -1243,13 +1280,17 @@ impl<'a> CppParser<'a> {
         });
       }
     }
-    Ok(CppTypeData {
-      name: get_full_name(entity)?,
-      include_file: include_file,
-      origin_location: get_origin_location(entity)?,
-      kind: CppTypeKind::Enum { values: values },
-      doc: None,
-    })
+    Ok((
+      CppTypeData {
+        name: get_full_name(entity)?,
+        kind: CppTypeKind::Enum { values: values },
+      },
+      DataEnvInfo {
+        include_file: Some(include_file),
+        origin_location: Some(get_origin_location(entity)?),
+        error: None,
+      },
+    ))
   }
 
   /// Parses a class field `entity`.
@@ -1281,7 +1322,7 @@ impl<'a> CppParser<'a> {
   }
 
   /// Parses a class or a struct `entity`.
-  fn parse_class(&self, entity: Entity) -> Result<CppTypeData> {
+  fn parse_class(&self, entity: Entity) -> Result<(CppTypeData, DataEnvInfo)> {
     let include_file = self.entity_include_file(entity).chain_err(|| {
       format!(
         "Origin of type is unknown: {}; entity: {:?}",
@@ -1369,18 +1410,22 @@ impl<'a> CppParser<'a> {
         return Err("Types nested into template types are not supported".into());
       }
     }
-    Ok(CppTypeData {
-      name: full_name,
-      include_file: include_file,
-      origin_location: get_origin_location(entity).unwrap(),
-      kind: CppTypeKind::Class {
-        bases: bases,
-        fields: fields,
-        using_directives: using_directives,
-        template_arguments: template_arguments,
+    Ok((
+      CppTypeData {
+        name: full_name,
+        kind: CppTypeKind::Class {
+          bases: bases,
+          fields: fields,
+          using_directives: using_directives,
+          template_arguments: template_arguments,
+        },
       },
-      doc: None,
-    })
+      DataEnvInfo {
+        error: None,
+        include_file: Some(include_file),
+        origin_location: Some(get_origin_location(entity).unwrap()),
+      },
+    ))
   }
 
   /// Determines file path of the include file this `entity` is located in.
@@ -1449,7 +1494,7 @@ impl<'a> CppParser<'a> {
         }
         if entity.get_name().is_some() && entity.is_definition() {
           match self.parse_enum(entity) {
-            Ok(r) => {
+            Ok((r, info)) => {
               if let Some(info) = self.find_type(|x| x.name == r.name).cloned() {
                 log::llog(log::DebugParser, || {
                   format!(
@@ -1458,7 +1503,7 @@ impl<'a> CppParser<'a> {
                   )
                 });
               } else {
-                self.types.push(r);
+                self.save_info(CppItemData::Type(r), info);
               }
             }
             Err(error) => {
@@ -1484,7 +1529,7 @@ impl<'a> CppParser<'a> {
         entity.get_template().is_none(); // not a template specialization
         if ok {
           match self.parse_class(entity) {
-            Ok(r) => {
+            Ok((r, info)) => {
               if let Some(info) = self.find_type(|x| x.name == r.name).cloned() {
                 log::llog(log::DebugParser, || {
                   format!(
@@ -1493,7 +1538,7 @@ impl<'a> CppParser<'a> {
                   )
                 });
               } else {
-                self.types.push(r);
+                self.save_info(CppItemData::Type(r), info);
               }
             }
             Err(msg) => {
@@ -1525,10 +1570,9 @@ impl<'a> CppParser<'a> {
   }
 
   /// Parses methods in translation unit `entity`.
-  fn parse_methods(&self, entity: Entity) -> Vec<CppMethod> {
-    let mut methods = Vec::new();
+  fn parse_methods(&mut self, entity: Entity) {
     if !self.should_process_entity(entity) {
-      return methods;
+      return;
     }
     match entity.get_kind() {
       EntityKind::FunctionDecl
@@ -1539,8 +1583,8 @@ impl<'a> CppParser<'a> {
       | EntityKind::FunctionTemplate => {
         if entity.get_canonical_entity() == entity {
           match self.parse_function(entity) {
-            Ok(r) => {
-              methods.push(r);
+            Ok((r, info)) => {
+              self.save_info(CppItemData::Method(r), info);
             }
             Err(msg) => {
               log::llog(log::DebugParserSkips, || {
@@ -1574,7 +1618,7 @@ impl<'a> CppParser<'a> {
                   log::llog(log::DebugParserSkips, || {
                     format!("skipping template partial specialization: {}", name)
                   });
-                  return methods;
+                  return;
                 }
               }
             }
@@ -1590,12 +1634,10 @@ impl<'a> CppParser<'a> {
       | EntityKind::ClassDecl
       | EntityKind::UnexposedDecl
       | EntityKind::ClassTemplate => for c in entity.get_children() {
-        methods.append(&mut self.parse_methods(c));
+        self.parse_methods(c);
       },
       _ => {}
     }
-
-    methods
   }
 
   /// Returns `Err` if `type1` or any of its components refer to
@@ -1645,6 +1687,7 @@ impl<'a> CppParser<'a> {
     Ok(())
   }
 
+  /*
   /// Returns types and methods that don't refer to any unknown types.
   fn check_integrity(&self, methods: Vec<CppMethod>) -> (Vec<CppMethod>, Vec<CppTypeData>) {
     let good_methods = methods
@@ -1712,5 +1755,5 @@ impl<'a> CppParser<'a> {
       good_types.push(good_type);
     }
     (good_methods, good_types)
-  }
+  } */
 }

@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use versions;
 
 use doc_parser::DocParser;
-use fix_header_names::fix_header_names;
+//use fix_header_names::fix_header_names;
 use cpp_to_rust_generator::cpp_method::CppMethod;
 use cpp_to_rust_generator::cpp_data::CppTypeKind;
 use cpp_to_rust_generator::config::CrateProperties;
@@ -496,7 +496,8 @@ pub fn make_config(sublib_name: &str) -> Result<Config> {
 
   config.add_include_directive(&lib_folder_name(sublib_name));
   let lib_include_path = qt_config.installation_data.lib_include_path.clone();
-  config.add_cpp_data_filter(move |cpp_data| fix_header_names(cpp_data, &lib_include_path));
+  // TODO: reimplement this
+  //config.add_cpp_data_filter(move |cpp_data| fix_header_names(cpp_data, &lib_include_path));
   // TODO: allow to override parser flags
   config.add_cpp_parser_arguments(vec!["-fPIC", "-fcxx-exceptions"]);
 
@@ -509,6 +510,8 @@ pub fn make_config(sublib_name: &str) -> Result<Config> {
   let sublib_name_clone = sublib_name.to_string();
   let docs_path = qt_config.installation_data.docs_path.clone();
 
+  // TODO: reimplement this
+/*
   config.add_cpp_data_filter(move |cpp_data| {
     match DocData::new(&sublib_name_clone, &docs_path) {
       Ok(doc_data) => {
@@ -559,7 +562,7 @@ pub fn make_config(sublib_name: &str) -> Result<Config> {
       }
     }
     Ok(())
-  });
+  });*/
 
   config.set_crate_template_path(
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

@@ -93,7 +93,7 @@ impl HeaderNameMap {
     })
   }
 }
-
+/*
 /// Replaces names of header files in `data` with Qt's shortcut headers.
 pub fn fix_header_names(data: &mut ParserCppData, headers_dir: &PathBuf) -> Result<()> {
   let map = HeaderNameMap::new(headers_dir)?;
@@ -106,6 +106,7 @@ pub fn fix_header_names(data: &mut ParserCppData, headers_dir: &PathBuf) -> Resu
   }
   Ok(())
 }
+*/
 
 #[test]
 fn test_qt_fix_header_names() {
