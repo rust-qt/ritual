@@ -1354,7 +1354,7 @@ impl<'a> CppParser<'a> {
       )
     })?;
     let full_name = get_full_name(entity)?;
-    let mut bases = Vec::new();
+    /*
     let using_directives = entity
       .get_children()
       .into_iter()
@@ -1380,7 +1380,7 @@ impl<'a> CppParser<'a> {
           method_name: child.get_name().expect("method_name failed"),
         })
       })
-      .collect();
+      .collect(); */
     let template_arguments = get_template_arguments(entity);
     if entity.get_kind() == EntityKind::ClassTemplate {
       if template_arguments.is_none() {
@@ -1405,6 +1405,7 @@ impl<'a> CppParser<'a> {
       name: full_name.clone(),
       template_arguments: template_arguments.clone(),
     };
+    let mut current_base_index = 0;
     for child in entity.get_children() {
       if child.get_kind() == EntityKind::FieldDecl {
         if let Err(err) = self.parse_class_field(child, class_type_for_field.clone()) {
@@ -1419,15 +1420,39 @@ impl<'a> CppParser<'a> {
           Ok(r) => r,
           Err(msg) => return Err(format!("Can't parse base class type: {}", msg).into()),
         };
-        bases.push(CppBaseSpecifier {
-          base_type: base_type,
-          is_virtual: child.is_virtual_base(),
-          visibility: match child.get_accessibility().unwrap_or(Accessibility::Public) {
-            Accessibility::Public => CppVisibility::Public,
-            Accessibility::Protected => CppVisibility::Protected,
-            Accessibility::Private => CppVisibility::Private,
-          },
-        });
+        if base_type.indirection != CppTypeIndirection::None || base_type.is_const
+          || base_type.is_const2
+        {
+          return Err(
+            format!(
+              "Invalid indirection or constness in base type: {:?}",
+              base_type
+            ).into(),
+          );
+        }
+        if let CppTypeBase::Class(ref base_type) = base_type.base {
+          self.save_info(
+            CppItemData::ClassBase(CppBaseSpecifier {
+              base_type: base_type.clone(),
+              is_virtual: child.is_virtual_base(),
+              visibility: match child.get_accessibility().unwrap_or(Accessibility::Public) {
+                Accessibility::Public => CppVisibility::Public,
+                Accessibility::Protected => CppVisibility::Protected,
+                Accessibility::Private => CppVisibility::Private,
+              },
+              base_index: current_base_index,
+              derived_class_type: class_type_for_field.clone(),
+            }),
+            DataEnvInfo {
+              error: None,
+              include_file: Some(include_file.clone()),
+              origin_location: Some(get_origin_location(entity).unwrap()),
+            },
+          );
+          current_base_index += 1;
+        } else {
+          return Err(format!("base type is not a class: {:?}", base_type).into());
+        }
       }
       if child.get_kind() == EntityKind::NonTypeTemplateParameter {
         return Err("Non-type template parameter is not supported".into());
@@ -1437,8 +1462,6 @@ impl<'a> CppParser<'a> {
       CppItemData::Type(CppTypeData {
         name: full_name,
         kind: CppTypeKind::Class {
-          bases: bases,
-          using_directives: using_directives,
           template_arguments: template_arguments,
         },
       }),

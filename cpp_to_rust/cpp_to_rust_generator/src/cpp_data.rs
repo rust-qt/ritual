@@ -57,11 +57,17 @@ pub struct CppClassUsingDirective {
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppBaseSpecifier {
   /// Base class type (can include template arguments)
-  pub base_type: CppType,
+  pub base_type: CppTypeClassBase,
+  /// Index of this base (for classes that have multiple base classes)
+  pub base_index: usize,
   /// True if this base is virtual
   pub is_virtual: bool,
   /// Base visibility (public, protected or private)
   pub visibility: CppVisibility,
+
+  /// Name and template arguments of the class type that
+  /// inherits this base class
+  pub derived_class_type: CppTypeClassBase,
 }
 
 /// Information about a C++ type declaration
@@ -71,12 +77,10 @@ pub enum CppTypeKind {
   Enum,
   /// Class declaration
   Class {
-    /// List of class types this class is derived from
-    bases: Vec<CppBaseSpecifier>,
     /// Information about template arguments of this type.
     template_arguments: Option<Vec<CppType>>,
-    /// List of using directives, like "using BaseClass::method1;"
-    using_directives: Vec<CppClassUsingDirective>,
+    // /// List of using directives, like "using BaseClass::method1;"
+    //using_directives: Vec<CppClassUsingDirective>,
   },
 }
 
@@ -235,7 +239,7 @@ impl CppTypeData {
       _ => false,
     }
   }
-
+  /*
   /// Checks if the type was directly derived from specified type.
   #[allow(dead_code)]
   pub fn inherits_directly(&self, class_name: &str) -> bool {
@@ -249,9 +253,9 @@ impl CppTypeData {
       }
     }
     false
-  }
+  }*/
 }
-
+/*
 impl ParserCppData {
   /// Checks if specified class is a template class.
   #[allow(dead_code)]
@@ -310,7 +314,7 @@ impl ParserCppData {
     false
   }
 
-  /*
+
   /// Parses include files to detect which methods are signals or slots.
   pub fn detect_signals_and_slots(&mut self, dependencies: &[&CppData]) -> Result<()> {
     let mut files = HashSet::new();
@@ -426,7 +430,7 @@ impl ParserCppData {
     }
     Ok(())
   }
-*/
+
 
   /// Checks if specified class has explicitly declared protected or private destructor.
   pub fn has_non_public_destructor(&self, class_type: &CppTypeClassBase) -> bool {
@@ -440,7 +444,7 @@ impl ParserCppData {
     false
   }
 }
-
+*/
 impl TemplateArgumentsDeclaration {
   /// Returns count of the template arguments.
   #[allow(dead_code)]
@@ -774,7 +778,7 @@ impl<'a> CppDataWithDeps<'a> {
       }
     }
     Ok(())
-  } */
+  }
 
   /// Checks if `class_name` types inherits `base_name` type directly or indirectly.
   pub fn inherits(&self, class_name: &str, base_name: &str) -> bool {
@@ -832,7 +836,7 @@ impl<'a> CppDataWithDeps<'a> {
     }
     false
   }
-
+*/
   //
   //  /// Returns true if C++ type `name` is polymorphic, i.e. has
   ///// at least one virtual function.

@@ -7,6 +7,7 @@ use cpp_data::CppTypeDoc;
 use cpp_data::CppOriginLocation;
 use cpp_data::CppEnumValue;
 use cpp_data::CppClassField;
+use cpp_data::CppBaseSpecifier;
 
 //use common::errors::Result;
 
@@ -27,6 +28,7 @@ pub struct DataEnv {
   pub cpp_library_version: Option<String>,
 }
 
+// TODO: attach this data to DataSource enum instead?
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DataEnvInfo {
   pub error: Option<String>,
@@ -48,6 +50,7 @@ pub enum CppItemData {
   Method(CppMethod),
   EnumValue(CppEnumValue),
   ClassField(CppClassField),
+  ClassBase(CppBaseSpecifier),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
