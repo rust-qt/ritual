@@ -156,7 +156,9 @@ fn argument_types_equal5() {
       indirection: CppTypeIndirection::None,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::Enum { name: "Enum1".to_string() },
+      base: CppTypeBase::Enum {
+        name: "Enum1".to_string(),
+      },
     },
     name: "arg1".to_string(),
     has_default_value: false,
@@ -259,7 +261,9 @@ fn c_signature_simple_func() {
       indirection: CppTypeIndirection::None,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::Enum { name: "Enum1".to_string() },
+      base: CppTypeBase::Enum {
+        name: "Enum1".to_string(),
+      },
     },
     name: "arg1".to_string(),
     has_default_value: false,
@@ -373,7 +377,9 @@ fn c_signature_static_method() {
       indirection: CppTypeIndirection::None,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::Enum { name: "Enum1".to_string() },
+      base: CppTypeBase::Enum {
+        name: "Enum1".to_string(),
+      },
     },
     name: "arg1".to_string(),
     has_default_value: false,
@@ -395,7 +401,6 @@ fn c_signature_static_method() {
   assert_eq!(r.return_type.ffi_type, method1.return_type);
 }
 
-
 #[test]
 fn c_signature_constructor() {
   let mut method1 = empty_regular_method();
@@ -409,7 +414,9 @@ fn c_signature_constructor() {
       indirection: CppTypeIndirection::Ref,
       is_const: true,
       is_const2: false,
-      base: CppTypeBase::Enum { name: "Enum1".to_string() },
+      base: CppTypeBase::Enum {
+        name: "Enum1".to_string(),
+      },
     },
     name: "arg1".to_string(),
     has_default_value: true,
@@ -431,7 +438,9 @@ fn c_signature_constructor() {
       indirection: CppTypeIndirection::Ptr,
       is_const: true,
       is_const2: false,
-      base: CppTypeBase::Enum { name: "Enum1".to_string() },
+      base: CppTypeBase::Enum {
+        name: "Enum1".to_string(),
+      },
     }
   );
   assert_eq!(
@@ -478,7 +487,9 @@ fn c_signature_constructor() {
       indirection: CppTypeIndirection::Ptr,
       is_const: true,
       is_const2: false,
-      base: CppTypeBase::Enum { name: "Enum1".to_string() },
+      base: CppTypeBase::Enum {
+        name: "Enum1".to_string(),
+      },
     }
   );
   assert_eq!(

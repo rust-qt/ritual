@@ -4,7 +4,7 @@
 mod tests {
   use std::rc::Rc;
   use std::cell::RefCell;
-  use {CppDeletable, Deleter, CppBox};
+  use {CppBox, CppDeletable, Deleter};
 
   struct Struct1 {
     value: Rc<RefCell<i32>>,
@@ -23,7 +23,9 @@ mod tests {
   #[test]
   fn test_drop_calls_deleter() {
     let value1 = Rc::new(RefCell::new(10));
-    let mut object1 = Struct1 { value: value1.clone() };
+    let mut object1 = Struct1 {
+      value: value1.clone(),
+    };
     assert!(value1.borrow().clone() == 10);
     unsafe {
       CppBox::new(&mut object1 as *mut _);
@@ -119,7 +121,6 @@ impl<T: CppDeletable> CppBox<T> {
     }
   }
 }
-
 
 impl<T: CppDeletable> AsRef<T> for CppBox<T> {
   fn as_ref(&self) -> &T {
@@ -270,7 +271,6 @@ pub unsafe fn unsafe_static_cast_mut<R, T: UnsafeStaticCast<R>>(ptr: *mut T) -> 
     .map(|x| x.static_cast_mut() as *mut R)
     .unwrap_or(std::ptr::null_mut())
 }
-
 
 /// Provides access to C++ `dynamic_cast` conversion.
 ///

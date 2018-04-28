@@ -1,6 +1,6 @@
-use common::file_utils::{PathBufWithAdded, create_dir};
-use common::utils::{run_command, add_env_path_item};
-use common::cpp_lib_builder::{CppLibBuilder, BuildType};
+use common::file_utils::{create_dir, PathBufWithAdded};
+use common::utils::{add_env_path_item, run_command};
+use common::cpp_lib_builder::{BuildType, CppLibBuilder};
 use common::errors::fancy_unwrap;
 use config::{Config, CrateProperties};
 use common::cpp_build_config::CppBuildConfigData;
@@ -76,21 +76,17 @@ fn full_run() {
   {
     let mut data = CppBuildConfigData::new();
     data.add_linked_lib("ctrt1");
-    config.cpp_build_config_mut().add(
-      target::Condition::True,
-      data,
-    );
+    config
+      .cpp_build_config_mut()
+      .add(target::Condition::True, data);
   }
   {
     let mut data = CppBuildConfigData::new();
     data.add_compiler_flag("-fPIC");
     data.add_compiler_flag("-std=gnu++11");
-    config.cpp_build_config_mut().add(
-      target::Condition::Env(
-        target::Env::Msvc,
-      ).negate(),
-      data,
-    );
+    config
+      .cpp_build_config_mut()
+      .add(target::Condition::Env(target::Env::Msvc).negate(), data);
   }
   if target::current_env() == target::Env::Msvc {
     config.add_cpp_parser_argument("-std=c++14");

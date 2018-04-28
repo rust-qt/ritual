@@ -2,8 +2,8 @@
 //! Qt's shortcut header names.
 
 use cpp_to_rust_generator::cpp_data::ParserCppData;
-use cpp_to_rust_generator::common::errors::{Result, ChainErr};
-use cpp_to_rust_generator::common::file_utils::{read_dir, file_to_string, os_str_to_str};
+use cpp_to_rust_generator::common::errors::{ChainErr, Result};
+use cpp_to_rust_generator::common::file_utils::{file_to_string, os_str_to_str, read_dir};
 use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::common::utils::add_to_multihash;
 
@@ -19,9 +19,9 @@ impl HeaderNameMap {
   fn real_to_fancy(&self, real_header: &str, class_name: Option<&str>) -> String {
     if let Some(class_name) = class_name {
       if let Some(fancy_headers) = self.map_real_to_all_fancy.get(real_header) {
-        if let Some(x) = fancy_headers.iter().find(|&x| {
-          x == class_name || class_name.starts_with(&format!("{}::", x))
-        })
+        if let Some(x) = fancy_headers
+          .iter()
+          .find(|&x| x == class_name || class_name.starts_with(&format!("{}::", x)))
         {
           return x.clone();
         }
@@ -43,9 +43,8 @@ impl HeaderNameMap {
       if !header_path.is_file() {
         continue;
       }
-      let metadata = ::std::fs::metadata(&header_path).chain_err(|| {
-        format!("failed to get metadata for {}", header_path.display())
-      })?;
+      let metadata = ::std::fs::metadata(&header_path)
+        .chain_err(|| format!("failed to get metadata for {}", header_path.display()))?;
       if metadata.len() < 100 {
         let file_content = file_to_string(&header_path)?;
         if let Some(matches) = re.captures(file_content.trim()) {
@@ -113,7 +112,8 @@ fn test_qt_fix_header_names() {
   use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
   let map = HeaderNameMap::new(&PathBuf::from(env!("CARGO_MANIFEST_DIR"))
     .with_added("test_assets")
-    .with_added("qt_headers")).unwrap();
+    .with_added("qt_headers"))
+    .unwrap();
   assert_eq!(map.real_to_fancy("qfile.h", None), "QFile");
   assert_eq!(map.real_to_fancy("qfile.h", Some("QFile")), "QFile");
   assert_eq!(map.real_to_fancy("qnotmap.h", None), "qnotmap.h");

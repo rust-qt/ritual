@@ -1,18 +1,16 @@
 //! Types for handling information about C++ methods.
 
-
-use cpp_data::{CppVisibility, CppOriginLocation, TemplateArgumentsDeclaration, CppBaseSpecifier};
-use cpp_ffi_data::{CppFfiType, CppFfiMethodSignature, CppFfiMethodArgument, CppFfiArgumentMeaning};
-use cpp_type::{CppType, CppTypeIndirection, CppTypeRole, CppTypeBase, CppTypeClassBase};
-use common::errors::{Result, unexpected};
+use cpp_data::{CppBaseSpecifier, CppOriginLocation, CppVisibility, TemplateArgumentsDeclaration};
+use cpp_ffi_data::{CppFfiArgumentMeaning, CppFfiMethodArgument, CppFfiMethodSignature, CppFfiType};
+use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection, CppTypeRole};
+use common::errors::{unexpected, Result};
 use common::string_utils::JoinWithSeparator;
 use common::utils::MapIfOk;
 
 pub use cpp_operator::{CppOperator, CppOperatorInfo};
 
 /// Information about an argument of a C++ method
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppMethodArgument {
   /// Identifier. If the argument doesn't have a name
   /// (which is allowed in C++), this field contains
@@ -26,8 +24,7 @@ pub struct CppMethodArgument {
 }
 
 /// Enumerator indicating special cases of C++ methods.
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub enum CppMethodKind {
   /// Just a class method
   Regular,
@@ -36,8 +33,6 @@ pub enum CppMethodKind {
   /// Destructor
   Destructor,
 }
-
-
 
 /// Information about an automatically generated method
 //#[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -59,8 +54,7 @@ pub enum CppMethodKind {
 //  pub field_name: String,
 //}
 /// Information about a C++ class member method
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppMethodClassMembership {
   /// Type of the class where this method belong. This is used to construct
   /// type of "this" pointer and return type of constructors.
@@ -82,15 +76,13 @@ pub struct CppMethodClassMembership {
   pub is_signal: bool,
   /// True if the method is a Qt slot
   pub is_slot: bool,
-
   // / If this method is a generated field accessor, this field contains
   // / information about it. Field accessors do not have real C++ methods corresponding to them.
   //pub fake: Option<FakeCppMethod>,
 }
 
 /// C++ documentation for a method
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppMethodDoc {
   /// HTML anchor of this documentation entry
   /// (used to detect duplicates)
@@ -108,8 +100,7 @@ pub struct CppMethodDoc {
 }
 
 /// Information about a C++ method
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppMethod {
   /// Identifier. For class methods, this field includes
   /// only the method's own name. For free functions,
@@ -163,10 +154,6 @@ pub struct CppMethod {
   /// If true, FFI generator skips some checks
   pub is_ffi_whitelisted: bool,
 }
-
-
-
-
 
 /// Chosen type allocation place for the method
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -254,9 +241,9 @@ impl CppMethod {
       }
     }
     for (index, arg) in self.arguments.iter().enumerate() {
-      let c_type = arg.argument_type.to_cpp_ffi_type(
-        CppTypeRole::NotReturnType,
-      )?;
+      let c_type = arg
+        .argument_type
+        .to_cpp_ffi_type(CppTypeRole::NotReturnType)?;
       r.arguments.push(CppFfiMethodArgument {
         name: arg.name.clone(),
         argument_type: c_type,
@@ -290,7 +277,7 @@ impl CppMethod {
           return Err(
             unexpected(
               "NotApplicable encountered but return value needs \
-                                 allocation_place variants",
+               allocation_place variants",
             ).into(),
           );
         }
@@ -300,7 +287,6 @@ impl CppMethod {
     }
     Ok(r)
   }
-
 
   /// Returns fully qualified C++ name of this method,
   /// i.e. including namespaces and class name (if any).
@@ -381,18 +367,16 @@ impl CppMethod {
       self
         .arguments
         .iter()
-        .map(|arg| {
-          format!(
-            "{} {}{}",
-            arg.argument_type.to_cpp_pseudo_code(),
-            arg.name,
-            if arg.has_default_value {
-              " = ?".to_string()
-            } else {
-              String::new()
-            }
-          )
-        })
+        .map(|arg| format!(
+          "{} {}{}",
+          arg.argument_type.to_cpp_pseudo_code(),
+          arg.name,
+          if arg.has_default_value {
+            " = ?".to_string()
+          } else {
+            String::new()
+          }
+        ))
         .join(", ")
     );
     if let Some(ref info) = self.class_membership {
@@ -486,8 +470,6 @@ impl CppMethod {
         .join(",")
     ))
   }
-
-
 
   #[allow(dead_code)]
   /// Returns true if this method is an operator.

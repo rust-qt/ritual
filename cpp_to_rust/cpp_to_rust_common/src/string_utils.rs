@@ -88,16 +88,17 @@ pub trait CaseOperations {
   fn to_upper_case_words(self) -> String;
 }
 
-
 fn iterator_to_class_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {
-  it.map(|x| if char_at(x.as_ref(), 0).is_digit(10) {
-    x.as_ref().to_uppercase()
-  } else {
-    format!(
-      "{}{}",
-      x.as_ref()[0..1].to_uppercase(),
-      x.as_ref()[1..].to_lowercase()
-    )
+  it.map(|x| {
+    if char_at(x.as_ref(), 0).is_digit(10) {
+      x.as_ref().to_uppercase()
+    } else {
+      format!(
+        "{}{}",
+        x.as_ref()[0..1].to_uppercase(),
+        x.as_ref()[1..].to_lowercase()
+      )
+    }
   }).join("")
 }
 

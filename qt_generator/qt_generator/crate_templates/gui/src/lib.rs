@@ -23,6 +23,4 @@
 //! as the application object, and if you use `qt_gui` but not `qt_widgets`, you should use
 //! `qt_gui::gui_application::GuiApplication`.
 
-
-
 include_generated!();

@@ -8,5 +8,4 @@ fn class1_constructor1() {
   assert_eq!(v.field1(), 1);
   v.set_field1(3);
   assert_eq!(v.field1(), 3);
-
 }

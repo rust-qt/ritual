@@ -1,22 +1,20 @@
 //! Types for handling information about C++ library APIs.
 
-
 use cpp_method::{CppMethod, CppMethodKind};
 pub use cpp_operator::CppOperator;
-use cpp_type::{CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
-use common::errors::{Result, ChainErr};
+use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
+use common::errors::{ChainErr, Result};
 use common::file_utils::open_file;
 use common::log;
 
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 use std::iter::once;
 use std::io::{BufRead, BufReader};
 
 use regex::Regex;
 
 /// One item of a C++ enum declaration
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct CppEnumValue {
   /// Identifier
   pub name: String,
@@ -27,8 +25,7 @@ pub struct CppEnumValue {
 }
 
 /// Member field of a C++ class declaration
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppClassField {
   /// Identifier
   pub name: String,
@@ -43,8 +40,7 @@ pub struct CppClassField {
 /// A "using" directive inside a class definition,
 /// indicating that the class should inherite a
 /// certain method of a base class.
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppClassUsingDirective {
   /// Name of the base class
   pub class_name: String,
@@ -53,8 +49,7 @@ pub struct CppClassUsingDirective {
 }
 
 /// Item of base class list in a class declaration
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppBaseSpecifier {
   /// Base class type (can include template arguments)
   pub base_type: CppType,
@@ -64,10 +59,8 @@ pub struct CppBaseSpecifier {
   pub visibility: CppVisibility,
 }
 
-
 /// Information about a C++ type declaration
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum CppTypeKind {
   /// Enum declaration
   Enum {
@@ -88,8 +81,7 @@ pub enum CppTypeKind {
 }
 
 /// Location of a C++ type's definition in header files.
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppOriginLocation {
   // Full path to the include file
   pub include_file_path: String,
@@ -101,8 +93,7 @@ pub struct CppOriginLocation {
 
 /// Visibility of a C++ entity. Defaults to `Public`
 /// for entities that can't have visibility (like free functions)
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub enum CppVisibility {
   Public,
   Protected,
@@ -110,8 +101,7 @@ pub enum CppVisibility {
 }
 
 /// C++ documentation for a type
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct CppTypeDoc {
   /// HTML content
   pub html: String,
@@ -122,8 +112,7 @@ pub struct CppTypeDoc {
 }
 
 /// Information about a C++ type declaration
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct CppTypeData {
   /// Identifier, including namespaces and nested classes
   /// (separated with "::", like in C++)
@@ -139,8 +128,7 @@ pub struct CppTypeData {
 }
 
 /// Information about template arguments of a C++ class type
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct TemplateArgumentsDeclaration {
   /// Indicates how many template types this type is nested into.
   ///
@@ -162,8 +150,7 @@ pub struct TemplateArgumentsDeclaration {
 
 /// Information about a C++ template class
 /// instantiation.
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Default, Serialize, Deserialize)]
 pub struct CppTemplateInstantiation {
   /// List of template arguments used in this instantiation
   pub template_arguments: Vec<CppType>,
@@ -171,8 +158,7 @@ pub struct CppTemplateInstantiation {
 
 /// List of template instantiations of
 /// a template class.
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Default, Serialize, Deserialize)]
 pub struct CppTemplateInstantiations {
   /// Template class name
   pub class_name: String,
@@ -186,8 +172,7 @@ pub struct CppTemplateInstantiations {
 /// This value can be overriden using `Config::set_type_allocation_place`.
 ///
 /// See `cpp_to_rust_generator`'s `README.md` for detailed description.
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum CppTypeAllocationPlace {
   /// Values are stored on C++ heap and used as `CppBox<T>`.
   Heap,
@@ -196,8 +181,7 @@ pub enum CppTypeAllocationPlace {
 }
 
 /// C++ parser output
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Default, Serialize, Deserialize)]
 pub struct ParserCppData {
   /// List of found type declarations
   pub types: Vec<CppTypeData>,
@@ -205,8 +189,7 @@ pub struct ParserCppData {
   pub methods: Vec<CppMethod>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Default, Serialize, Deserialize)]
 pub struct ProcessedCppData {
   /// Automatically generated methods
   pub implicit_destructors: Vec<CppMethod>,
@@ -235,12 +218,11 @@ impl CppData {
   pub fn methods_and_implicit_destructors(
     &self,
   ) -> ::std::iter::Chain<::std::slice::Iter<CppMethod>, ::std::slice::Iter<CppMethod>> {
-    self.parser.methods.iter().chain(
-      self
-        .processed
-        .implicit_destructors
-        .iter(),
-    )
+    self
+      .parser
+      .methods
+      .iter()
+      .chain(self.processed.implicit_destructors.iter())
   }
 }
 
@@ -250,12 +232,6 @@ pub struct CppDataWithDeps<'a> {
   /// Data of dependencies
   pub dependencies: Vec<&'a CppData>,
 }
-
-
-
-
-
-
 
 impl CppTypeData {
   /// Checks if the type is a class type.
@@ -293,31 +269,28 @@ impl CppTypeData {
   /// instead of 0.
   pub fn default_template_arguments(&self) -> Option<Vec<CppType>> {
     match self.kind {
-      CppTypeKind::Class { ref template_arguments, .. } => {
-        match *template_arguments {
-          None => None,
-          Some(ref arguments) => {
-            Some(
-              arguments
-                .names
-                .iter()
-                .enumerate()
-                .map(|(num, _)| {
-                  CppType {
-                    is_const: false,
-                    is_const2: false,
-                    indirection: CppTypeIndirection::None,
-                    base: CppTypeBase::TemplateParameter {
-                      nested_level: arguments.nested_level,
-                      index: num,
-                    },
-                  }
-                })
-                .collect(),
-            )
-          }
-        }
-      }
+      CppTypeKind::Class {
+        ref template_arguments,
+        ..
+      } => match *template_arguments {
+        None => None,
+        Some(ref arguments) => Some(
+          arguments
+            .names
+            .iter()
+            .enumerate()
+            .map(|(num, _)| CppType {
+              is_const: false,
+              is_const2: false,
+              indirection: CppTypeIndirection::None,
+              base: CppTypeBase::TemplateParameter {
+                nested_level: arguments.nested_level,
+                index: num,
+              },
+            })
+            .collect(),
+        ),
+      },
       _ => None,
     }
   }
@@ -354,9 +327,9 @@ impl ParserCppData {
         }
         for base in bases {
           if let CppTypeBase::Class(CppTypeClassBase {
-                                      ref name,
-                                      ref template_arguments,
-                                    }) = base.base_type.base
+            ref name,
+            ref template_arguments,
+          }) = base.base_type.base
           {
             if template_arguments.is_some() {
               return true;
@@ -396,14 +369,12 @@ impl ParserCppData {
     false
   }
 
-
-
   /// Parses include files to detect which methods are signals or slots.
   pub fn detect_signals_and_slots(&mut self, dependencies: &[&CppData]) -> Result<()> {
     let mut files = HashSet::new();
     for type1 in &self.types {
-      if self.inherits(&type1.name, "QObject", dependencies) &&
-        !files.contains(&type1.origin_location.include_file_path)
+      if self.inherits(&type1.name, "QObject", dependencies)
+        && !files.contains(&type1.origin_location.include_file_path)
       {
         files.insert(type1.origin_location.include_file_path.clone());
       }
@@ -435,9 +406,7 @@ impl ParserCppData {
       let file = open_file(&file_path)?;
       let reader = BufReader::new(file.into_file());
       for (line_num, line) in reader.lines().enumerate() {
-        let line = line.chain_err(|| {
-          format!("failed while reading lines from {}", &file_path)
-        })?;
+        let line = line.chain_err(|| format!("failed while reading lines from {}", &file_path))?;
         let section_type = if re_signals.is_match(&line) {
           Some(SectionType::Signals)
         } else if re_slots.is_match(&line) {
@@ -510,7 +479,6 @@ impl ParserCppData {
               SectionType::Other => {}
             }
           }
-
         }
       }
     }
@@ -538,27 +506,27 @@ impl TemplateArgumentsDeclaration {
   }
 }
 
-
-
-
 impl<'a> CppDataWithDeps<'a> {
   /// Returns true if `type1` is a known template instantiation.
   pub fn check_template_type(&self, type1: &CppType) -> Result<()> {
     if let CppTypeBase::Class(CppTypeClassBase {
-                                ref name,
-                                ref template_arguments,
-                              }) = type1.base
+      ref name,
+      ref template_arguments,
+    }) = type1.base
     {
       if let Some(ref template_arguments) = *template_arguments {
         let is_valid = |cpp_data: &CppData| {
-          cpp_data.processed.template_instantiations.iter().any(
-            |inst| {
-              &inst.class_name == name &&
-                inst.instantiations.iter().any(|x| {
-                  &x.template_arguments == template_arguments
-                })
-            },
-          )
+          cpp_data
+            .processed
+            .template_instantiations
+            .iter()
+            .any(|inst| {
+              &inst.class_name == name
+                && inst
+                  .instantiations
+                  .iter()
+                  .any(|x| &x.template_arguments == template_arguments)
+            })
         };
         if !once(&self.current)
           .chain(self.dependencies.iter().map(|x| *x))
@@ -574,16 +542,13 @@ impl<'a> CppDataWithDeps<'a> {
     Ok(())
   }
 
-
-
-
-
-
   /// Returns selected type allocation place for type `class_name`.
   pub fn type_allocation_place(&self, class_name: &str) -> Result<CppTypeAllocationPlace> {
-    if let Some(r) = self.current.processed.type_allocation_places.get(
-      class_name,
-    )
+    if let Some(r) = self
+      .current
+      .processed
+      .type_allocation_places
+      .get(class_name)
     {
       return Ok(r.clone());
     }
@@ -592,9 +557,7 @@ impl<'a> CppDataWithDeps<'a> {
         return Ok(r.clone());
       }
     }
-    Err(
-      format!("no type allocation place information for {}", class_name).into(),
-    )
+    Err(format!("no type allocation place information for {}", class_name).into())
   }
 
   /// Search for a `CppTypeData` object in this `CppData` and all dependencies.
@@ -607,12 +570,6 @@ impl<'a> CppDataWithDeps<'a> {
       .flat_map(|x| x)
       .find(f)
   }
-
-
-
-
-
-
 
   /*
   /// Helper function that performs a portion of add_inherited_methods implementation.
@@ -876,8 +833,6 @@ impl<'a> CppDataWithDeps<'a> {
     Ok(())
   } */
 
-
-
   /// Checks if `class_name` types inherits `base_name` type directly or indirectly.
   pub fn inherits(&self, class_name: &str, base_name: &str) -> bool {
     for types in self.all_types() {
@@ -899,22 +854,14 @@ impl<'a> CppDataWithDeps<'a> {
     false
   }
 
-
-
-
-
-
-
-
   /// Checks if specified class has any virtual methods (own or inherited).
   pub fn has_virtual_methods(&self, class_name: &str) -> bool {
-    for method in self.current.parser.methods.iter().chain(
-      self
-        .current
-        .processed
-        .inherited_methods
-        .iter(),
-    )
+    for method in self
+      .current
+      .parser
+      .methods
+      .iter()
+      .chain(self.current.processed.inherited_methods.iter())
     {
       if let Some(ref info) = method.class_membership {
         if &info.class_type.name == class_name && info.is_virtual {
@@ -927,13 +874,12 @@ impl<'a> CppDataWithDeps<'a> {
 
   /// Checks if specified class has any virtual methods (own or inherited).
   pub fn has_pure_virtual_methods(&self, class_name: &str) -> bool {
-    for method in self.current.parser.methods.iter().chain(
-      self
-        .current
-        .processed
-        .inherited_methods
-        .iter(),
-    )
+    for method in self
+      .current
+      .parser
+      .methods
+      .iter()
+      .chain(self.current.processed.inherited_methods.iter())
     {
       if let Some(ref info) = method.class_membership {
         if &info.class_type.name == class_name && info.is_pure_virtual {
@@ -943,7 +889,6 @@ impl<'a> CppDataWithDeps<'a> {
     }
     false
   }
-
 
   //
   //  /// Returns true if C++ type `name` is polymorphic, i.e. has
@@ -957,7 +902,6 @@ impl<'a> CppDataWithDeps<'a> {
   //          false
   //        })
   //  }
-
 
   pub fn all_types(&self) -> Vec<&Vec<CppTypeData>> {
     once(&self.current.parser.types)
@@ -982,9 +926,7 @@ impl<'a> CppDataWithDeps<'a> {
     for instantiations in &self.current.processed.template_instantiations {
       let type_info = self
         .find_type_info(|x| &x.name == &instantiations.class_name)
-        .chain_err(|| {
-          format!("type info not found for {}", &instantiations.class_name)
-        })?;
+        .chain_err(|| format!("type info not found for {}", &instantiations.class_name))?;
       if !result.contains(&type_info.include_file) {
         result.insert(type_info.include_file.clone());
       }

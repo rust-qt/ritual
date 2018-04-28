@@ -1,9 +1,8 @@
-#![cfg_attr(feature="clippy", allow(redundant_closure))]
+#![cfg_attr(feature = "clippy", allow(redundant_closure))]
 
 //! Error handling types based on `error_chain` crate.
 
 use std;
-
 
 error_chain! {
   foreign_links {
@@ -53,11 +52,13 @@ impl Error {
       for frame in backtrace.frames() {
         for symbol in frame.symbols() {
           if let Some(path) = symbol.filename() {
-            let path_is_good = |x: std::path::Component| if let Some(x) = x.as_os_str().to_str() {
-              x == "libstd" || x == "libpanic_unwind" || x == "libcore" || x == "errors.rs" ||
-                x.starts_with("backtrace") || x.starts_with("error-chain")
-            } else {
-              false
+            let path_is_good = |x: std::path::Component| {
+              if let Some(x) = x.as_os_str().to_str() {
+                x == "libstd" || x == "libpanic_unwind" || x == "libcore" || x == "errors.rs"
+                  || x.starts_with("backtrace") || x.starts_with("error-chain")
+              } else {
+                false
+              }
             };
             if path.components().any(path_is_good) {
               continue;

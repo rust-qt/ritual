@@ -1,4 +1,4 @@
-use cpp_to_rust_generator::common::errors::{Result, ChainErr};
+use cpp_to_rust_generator::common::errors::{ChainErr, Result};
 use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::common::file_utils::canonicalize;
 use cpp_to_rust_generator::new_impl::workspace::Workspace;
@@ -7,15 +7,13 @@ use qt_generator_common::all_sublib_names;
 use lib_configs::make_config;
 
 fn run(matches: ::clap::ArgMatches) -> Result<()> {
-  let workspace_path = canonicalize(&PathBuf::from(matches.value_of("workspace").chain_err(
-    || "clap arg missing",
-  )?))?;
+  let workspace_path = canonicalize(&PathBuf::from(matches
+    .value_of("workspace")
+    .chain_err(|| "clap arg missing")?))?;
 
   log::status(format!("Workspace: {}", workspace_path.display()));
   let mut workspace = Workspace::new(workspace_path)?;
-  workspace.set_disable_logging(
-    matches.is_present("disable-logging"),
-  )?;
+  workspace.set_disable_logging(matches.is_present("disable-logging"))?;
   let mut was_any_action = false;
 
   if matches.is_present("process") {
@@ -66,24 +64,25 @@ fn run(matches: ::clap::ArgMatches) -> Result<()> {
   Ok(())
 }
 
-
 pub fn new_main() {
   let result = {
-    use clap::{Arg, App};
+    use clap::{App, Arg};
     const ABOUT: &'static str = "Generates rust_qt crates using cpp_to_rust";
-    const AFTER_HELP: &'static str = "\
-      Example:\n    qt_generator -w /path/to/workspace -p all -g\n\n\
-      See https://github.com/rust-qt/cpp_to_rust for more details.";
+    const AFTER_HELP: &'static str =
+      "\
+       Example:\n    qt_generator -w /path/to/workspace -p all -g\n\n\
+       See https://github.com/rust-qt/cpp_to_rust for more details.";
     const WORKSPACE_DIR_HELP: &'static str = "Directory for output and temporary files";
     const DISABLE_LOGGING_HELP: &'static str = "Disable creating log files";
     const GENERATE_HELP: &'static str = "Generate new crates";
     const CLEAR_ALL_HELP: &'static str = "Clear all data in the workspace.";
-    const CLEAR_CURRENT_HELP: &'static str = "\
-      Clear data corresponding to the current platform in the workspace.";
+    const CLEAR_CURRENT_HELP: &'static str =
+      "\
+       Clear data corresponding to the current platform in the workspace.";
 
     let libs_help = format!(
       "Process libraries (Qt modules). Specify \"all\" \
-      to process all supported modules or specify one or multiple of the following: {}.",
+       to process all supported modules or specify one or multiple of the following: {}.",
       all_sublib_names().join(", ")
     );
 
@@ -121,12 +120,16 @@ pub fn new_main() {
             .long("disable-logging")
             .help(DISABLE_LOGGING_HELP),
         )
-        .arg(Arg::with_name("clear-current").long("clear-current").help(
-          CLEAR_CURRENT_HELP,
-        ))
-        .arg(Arg::with_name("clear-all").long("clear-all").help(
-          CLEAR_ALL_HELP,
-        ))
+        .arg(
+          Arg::with_name("clear-current")
+            .long("clear-current")
+            .help(CLEAR_CURRENT_HELP),
+        )
+        .arg(
+          Arg::with_name("clear-all")
+            .long("clear-all")
+            .help(CLEAR_ALL_HELP),
+        )
         .get_matches(),
     )
   };

@@ -1,7 +1,7 @@
 use cpp_ffi_data::*;
 use cpp_type::*;
 use caption_strategy::*;
-use tests::cpp_method::{empty_regular_method, empty_membership};
+use tests::cpp_method::{empty_membership, empty_regular_method};
 use cpp_method::{CppMethodKind, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
 
@@ -304,9 +304,7 @@ fn signature_two_numbers() {
   assert_eq!(
     sig
       .caption(MethodCaptionStrategy::ArgumentsOnly(
-        ArgumentCaptionStrategy::TypeOnly(
-          TypeCaptionStrategy::Short,
-        ),
+        ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short,),
       ))
       .unwrap(),
     "int_double"
@@ -322,9 +320,7 @@ fn signature_two_numbers() {
   assert_eq!(
     sig
       .caption(MethodCaptionStrategy::ArgumentsOnly(
-        ArgumentCaptionStrategy::TypeAndName(
-          TypeCaptionStrategy::Short,
-        ),
+        ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short,),
       ))
       .unwrap(),
     "int_arg1_double_arg2"
@@ -332,9 +328,7 @@ fn signature_two_numbers() {
   assert_eq!(
     sig
       .caption(MethodCaptionStrategy::ArgumentsOnly(
-        ArgumentCaptionStrategy::TypeAndName(
-          TypeCaptionStrategy::Full,
-        ),
+        ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full,),
       ))
       .unwrap(),
     "int_arg1_double_arg2"
@@ -543,9 +537,7 @@ fn signature_class_method_const() {
   assert_eq!(
     sig
       .caption(MethodCaptionStrategy::ArgumentsOnly(
-        ArgumentCaptionStrategy::TypeOnly(
-          TypeCaptionStrategy::Short,
-        ),
+        ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short,),
       ))
       .unwrap(),
     "double"
@@ -561,9 +553,7 @@ fn signature_class_method_const() {
   assert_eq!(
     sig
       .caption(MethodCaptionStrategy::ArgumentsOnly(
-        ArgumentCaptionStrategy::TypeAndName(
-          TypeCaptionStrategy::Short,
-        ),
+        ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short,),
       ))
       .unwrap(),
     "double_arg1"
@@ -571,9 +561,7 @@ fn signature_class_method_const() {
   assert_eq!(
     sig
       .caption(MethodCaptionStrategy::ArgumentsOnly(
-        ArgumentCaptionStrategy::TypeAndName(
-          TypeCaptionStrategy::Full,
-        ),
+        ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full,),
       ))
       .unwrap(),
     "double_arg1"
@@ -590,9 +578,7 @@ fn signature_class_method_const() {
   assert_eq!(
     sig
       .caption(MethodCaptionStrategy::ConstAndArguments(
-        ArgumentCaptionStrategy::TypeOnly(
-          TypeCaptionStrategy::Short,
-        ),
+        ArgumentCaptionStrategy::TypeOnly(TypeCaptionStrategy::Short,),
       ))
       .unwrap(),
     "const_double"
@@ -608,9 +594,7 @@ fn signature_class_method_const() {
   assert_eq!(
     sig
       .caption(MethodCaptionStrategy::ConstAndArguments(
-        ArgumentCaptionStrategy::TypeAndName(
-          TypeCaptionStrategy::Short,
-        ),
+        ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Short,),
       ))
       .unwrap(),
     "const_double_arg1"
@@ -618,9 +602,7 @@ fn signature_class_method_const() {
   assert_eq!(
     sig
       .caption(MethodCaptionStrategy::ConstAndArguments(
-        ArgumentCaptionStrategy::TypeAndName(
-          TypeCaptionStrategy::Full,
-        ),
+        ArgumentCaptionStrategy::TypeAndName(TypeCaptionStrategy::Full,),
       ))
       .unwrap(),
     "const_double_arg1"
@@ -628,9 +610,6 @@ fn signature_class_method_const() {
 
   assert!(sig.has_const_this());
 }
-
-
-
 
 #[test]
 fn cpp_ffi_type_void() {

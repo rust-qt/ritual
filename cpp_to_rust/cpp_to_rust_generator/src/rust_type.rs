@@ -1,4 +1,4 @@
-use common::errors::{Result, unexpected, ChainErr};
+use common::errors::{unexpected, ChainErr, Result};
 use common::string_utils::CaseOperations;
 use common::utils::MapIfOk;
 use cpp_type::CppType;
@@ -11,8 +11,7 @@ use cpp_ffi_data::CppIndirectionChange;
 /// and intermediate names are module names.
 /// Built-in types are represented
 /// by a single vector item, like `vec!["i32"]`.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct RustName {
   /// Parts of the name
   pub parts: Vec<String>,
@@ -20,8 +19,7 @@ pub struct RustName {
 
 /// Conversion from public Rust API type to
 /// the corresponding FFI type
-#[derive(Debug, Clone, Eq, PartialEq)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub enum RustToCTypeConversion {
   /// Types are the same
@@ -40,8 +38,7 @@ pub enum RustToCTypeConversion {
 
 /// Information about a completely processed type
 /// including its variations at each processing step.
-#[derive(Debug, Clone, Eq, PartialEq)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CompleteType {
   /// Original C++ type used in the C++ library's API
   pub cpp_type: CppType,
@@ -59,8 +56,7 @@ pub struct CompleteType {
 }
 
 /// Indirection of a Rust type
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum RustTypeIndirection {
   /// No indirection
   None,
@@ -75,8 +71,7 @@ pub enum RustTypeIndirection {
 }
 
 /// A Rust type
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum RustType {
   /// Empty tuple `()`, used as the replacement of C++'s `void` type.
   EmptyTuple,
@@ -109,7 +104,6 @@ pub enum RustType {
   },
 }
 
-
 impl RustName {
   /// Creates new `RustName` consisting of `parts`.
   pub fn new(parts: Vec<String>) -> Result<RustName> {
@@ -132,9 +126,10 @@ impl RustName {
 
   /// Returns last component of the name.
   pub fn last_name(&self) -> Result<&String> {
-    self.parts.last().chain_err(
-      || unexpected("RustName can't be empty"),
-    )
+    self
+      .parts
+      .last()
+      .chain_err(|| unexpected("RustName can't be empty"))
   }
 
   /// Returns formatted name for using within `current_crate`.
@@ -182,7 +177,6 @@ impl RustType {
         ref is_const2,
         ref indirection,
       } => {
-
         let mut name = if base.parts.len() == 1 {
           base.parts[0].to_snake_case()
         } else {
@@ -245,25 +239,27 @@ impl RustType {
   #[allow(dead_code)]
   pub fn is_ref(&self) -> bool {
     match *self {
-      RustType::Common { ref indirection, .. } => {
-        match *indirection {
-          RustTypeIndirection::Ref { .. } |
-          RustTypeIndirection::PtrRef { .. } => true,
-          _ => false,
-        }
-      }
-      RustType::EmptyTuple |
-      RustType::FunctionPointer { .. } => false,
+      RustType::Common {
+        ref indirection, ..
+      } => match *indirection {
+        RustTypeIndirection::Ref { .. } | RustTypeIndirection::PtrRef { .. } => true,
+        _ => false,
+      },
+      RustType::EmptyTuple | RustType::FunctionPointer { .. } => false,
     }
   }
 
   /// Returns a copy of this type with `new_lifetime` added, if possible.
   pub fn with_lifetime(&self, new_lifetime: String) -> RustType {
     let mut r = self.clone();
-    if let RustType::Common { ref mut indirection, .. } = r {
+    if let RustType::Common {
+      ref mut indirection,
+      ..
+    } = r
+    {
       match *indirection {
-        RustTypeIndirection::Ref { ref mut lifetime } |
-        RustTypeIndirection::PtrRef { ref mut lifetime } => *lifetime = Some(new_lifetime),
+        RustTypeIndirection::Ref { ref mut lifetime }
+        | RustTypeIndirection::PtrRef { ref mut lifetime } => *lifetime = Some(new_lifetime),
         _ => {}
       }
     }
@@ -274,13 +270,13 @@ impl RustType {
   /// or `None` if there isn't any lifetime in this type.
   pub fn lifetime(&self) -> Option<&String> {
     match *self {
-      RustType::Common { ref indirection, .. } => {
-        match *indirection {
-          RustTypeIndirection::Ref { ref lifetime } |
-          RustTypeIndirection::PtrRef { ref lifetime } => lifetime.as_ref(),
-          _ => None,
-        }
-      }
+      RustType::Common {
+        ref indirection, ..
+      } => match *indirection {
+        RustTypeIndirection::Ref { ref lifetime }
+        | RustTypeIndirection::PtrRef { ref lifetime } => lifetime.as_ref(),
+        _ => None,
+      },
       _ => None,
     }
   }
@@ -294,8 +290,7 @@ impl RustType {
     } = *self
     {
       match *indirection {
-        RustTypeIndirection::PtrPtr { .. } |
-        RustTypeIndirection::PtrRef { .. } => Ok(*is_const2),
+        RustTypeIndirection::PtrPtr { .. } | RustTypeIndirection::PtrRef { .. } => Ok(*is_const2),
         _ => Ok(*is_const),
       }
     } else {
@@ -314,7 +309,9 @@ impl RustType {
   /// Sets value of `is_const` for a common type.
   pub fn set_const(&mut self, value: bool) -> Result<()> {
     match *self {
-      RustType::Common { ref mut is_const, .. } => {
+      RustType::Common {
+        ref mut is_const, ..
+      } => {
         *is_const = value;
         Ok(())
       }
@@ -334,11 +331,10 @@ impl RustType {
         ..
       } => {
         match *indirection {
-          RustTypeIndirection::None |
-          RustTypeIndirection::Ref { .. } => {}
-          RustTypeIndirection::Ptr |
-          RustTypeIndirection::PtrPtr |
-          RustTypeIndirection::PtrRef { .. } => {
+          RustTypeIndirection::None | RustTypeIndirection::Ref { .. } => {}
+          RustTypeIndirection::Ptr
+          | RustTypeIndirection::PtrPtr
+          | RustTypeIndirection::PtrRef { .. } => {
             return true;
           }
         }

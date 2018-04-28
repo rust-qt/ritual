@@ -1,15 +1,14 @@
 use new_impl::database::Database;
 use common::errors::Result;
 use common::file_utils::PathBufWithAdded;
-use common::file_utils::{save_json, load_json, remove_dir_all, create_dir_all, create_dir};
+use common::file_utils::{create_dir, create_dir_all, load_json, remove_dir_all, save_json};
 use common::string_utils::CaseOperations;
 use common::log;
 use config::Config;
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 
-#[derive(Debug, Default)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct WorkspaceConfig {
   disable_logging: bool,
   write_dependencies_local_paths: bool,
@@ -21,6 +20,11 @@ struct EditedDatabase {
   saved: bool,
 }
 
+/// Provides access to data stored in the user's project directory.
+/// The directory contains a subdirectory for each crate the user wants
+/// to process. When running any operations, the data is read from and
+/// saved to the workspace files. Global workspace configuration
+/// can also be set through the `Workspace` object.
 #[derive(Debug)]
 pub struct Workspace {
   path: PathBuf,
@@ -33,11 +37,10 @@ fn config_path(path: &Path) -> PathBuf {
 }
 
 fn database_path(workspace_path: &Path, crate_name: &str) -> PathBuf {
-  workspace_path.with_added(crate_name).with_added(
-    "database.json",
-  )
+  workspace_path
+    .with_added(crate_name)
+    .with_added("database.json")
 }
-
 
 impl Workspace {
   pub fn new(path: PathBuf) -> Result<Workspace> {
@@ -81,7 +84,6 @@ impl Workspace {
       .position(|d| d.database.crate_name() == crate_name)
       .and_then(|i| Some(self.databases.swap_remove(i).database))
   }
-
 
   pub fn load_crate(&mut self, crate_name: &str) -> Result<Database> {
     if let Some(r) = self.take_loaded_crate(crate_name) {

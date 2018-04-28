@@ -3,14 +3,13 @@
 //! See [README](https://github.com/rust-qt/cpp_to_rust/tree/master/qt_generator/qt_generator)
 //! for more information.
 
-
 extern crate clap;
-extern crate cpp_to_rust_generator;
-extern crate rusqlite;
 extern crate compress;
-extern crate select as html_parser;
-extern crate regex;
+extern crate cpp_to_rust_generator;
 extern crate qt_generator_common;
+extern crate regex;
+extern crate rusqlite;
+extern crate select as html_parser;
 
 //use cpp_to_rust_generator::common::errors::{Result, ChainErr};
 //use cpp_to_rust_generator::common::file_utils::{create_dir_all, canonicalize};

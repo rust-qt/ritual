@@ -120,9 +120,7 @@ impl Logger {
           .create(true)
           .append(true)
           .open(path)
-          .unwrap_or_else(|err| {
-            panic!("failed to open log file '{}': {}", path.display(), err)
-          });
+          .unwrap_or_else(|err| panic!("failed to open log file '{}': {}", path.display(), err));
         self.files.insert(category, file);
       }
       let file = self.files.get_mut(&category).unwrap();

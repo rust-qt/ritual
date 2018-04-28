@@ -1,10 +1,10 @@
-use cpp_data::{CppDataWithDeps, CppData, ParserCppData, ProcessedCppData, CppTypeAllocationPlace,
-               CppTypeKind, CppVisibility, CppTemplateInstantiations, CppTemplateInstantiation,
-               CppTypeData, CppBaseSpecifier};
-use cpp_method::{CppMethod, CppMethodKind, CppMethodClassMembership};
-use cpp_type::{CppType, CppTypeClassBase, CppTypeBase, CppTypeIndirection};
+use cpp_data::{CppBaseSpecifier, CppData, CppDataWithDeps, CppTemplateInstantiation,
+               CppTemplateInstantiations, CppTypeAllocationPlace, CppTypeData, CppTypeKind,
+               CppVisibility, ParserCppData, ProcessedCppData};
+use cpp_method::{CppMethod, CppMethodClassMembership, CppMethodKind};
+use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
 use common::log;
-use common::errors::{Result, unexpected};
+use common::errors::{unexpected, Result};
 
 use std::collections::{HashMap, HashSet};
 use std::iter::once;
@@ -28,10 +28,8 @@ pub fn cpp_post_process<'a>(
 
   let inherited_methods = processor.detect_inherited_methods2()?;
   let implicit_destructors = processor.ensure_explicit_destructors(&inherited_methods)?;
-  let type_allocation_places = processor.choose_allocation_places(
-    allocation_place_overrides,
-    &inherited_methods,
-  )?;
+  let type_allocation_places =
+    processor.choose_allocation_places(allocation_place_overrides, &inherited_methods)?;
 
   let result = ProcessedCppData {
     implicit_destructors: implicit_destructors,
@@ -50,14 +48,14 @@ pub fn cpp_post_process<'a>(
   })
 }
 
-
-
 impl<'a> CppPostProcessor<'a> {
   /// Checks if specified class has virtual destructor (own or inherited).
   pub fn has_virtual_destructor(&self, class_name: &str, inherited_methods: &[CppMethod]) -> bool {
-    for method in self.parser_data.methods.iter().chain(
-      inherited_methods.iter(),
-    )
+    for method in self
+      .parser_data
+      .methods
+      .iter()
+      .chain(inherited_methods.iter())
     {
       if let Some(ref info) = method.class_membership {
         if info.kind == CppMethodKind::Destructor && &info.class_type.name == class_name {
@@ -69,9 +67,11 @@ impl<'a> CppPostProcessor<'a> {
   }
   /// Checks if specified class has any virtual methods (own or inherited).
   pub fn has_virtual_methods(&self, class_name: &str, inherited_methods: &[CppMethod]) -> bool {
-    for method in self.parser_data.methods.iter().chain(
-      inherited_methods.iter(),
-    )
+    for method in self
+      .parser_data
+      .methods
+      .iter()
+      .chain(inherited_methods.iter())
     {
       if let Some(ref info) = method.class_membership {
         if &info.class_type.name == class_name && info.is_virtual {
@@ -82,7 +82,6 @@ impl<'a> CppPostProcessor<'a> {
     false
   }
 
-
   /// Adds destructors for every class that does not have explicitly
   /// defined destructor, allowing to create wrappings for
   /// destructors implicitly available in C++.
@@ -91,9 +90,11 @@ impl<'a> CppPostProcessor<'a> {
     for type1 in &self.parser_data.types {
       if let CppTypeKind::Class { .. } = type1.kind {
         let class_name = &type1.name;
-        let found_destructor = self.parser_data.methods.iter().any(|m| {
-          m.is_destructor() && m.class_name() == Some(class_name)
-        });
+        let found_destructor = self
+          .parser_data
+          .methods
+          .iter()
+          .any(|m| m.is_destructor() && m.class_name() == Some(class_name));
         if !found_destructor {
           let is_virtual = self.has_virtual_destructor(class_name, inherited_methods);
           methods.push(CppMethod {
@@ -133,33 +134,30 @@ impl<'a> CppPostProcessor<'a> {
   /// excluding results that were already processed in dependencies.
   #[cfg_attr(feature = "clippy", allow(block_in_if_condition_stmt))]
   fn find_template_instantiations(&self) -> Vec<CppTemplateInstantiations> {
-
     fn check_type(type1: &CppType, deps: &[&CppData], result: &mut Vec<CppTemplateInstantiations>) {
       if let CppTypeBase::Class(CppTypeClassBase {
-                                  ref name,
-                                  ref template_arguments,
-                                }) = type1.base
+        ref name,
+        ref template_arguments,
+      }) = type1.base
       {
         if let Some(ref template_arguments) = *template_arguments {
-          if !template_arguments.iter().any(|x| {
-            x.base.is_or_contains_template_parameter()
-          })
+          if !template_arguments
+            .iter()
+            .any(|x| x.base.is_or_contains_template_parameter())
           {
             if !deps.iter().any(|data| {
               data.processed.template_instantiations.iter().any(|i| {
-                &i.class_name == name &&
-                  i.instantiations.iter().any(|x| {
-                    &x.template_arguments == template_arguments
-                  })
+                &i.class_name == name
+                  && i.instantiations
+                    .iter()
+                    .any(|x| &x.template_arguments == template_arguments)
               })
-            })
-            {
+            }) {
               if !result.iter().any(|x| &x.class_name == name) {
                 log::llog(log::DebugParser, || {
                   format!(
                     "Found template instantiation: {}<{:?}>",
-                    name,
-                    template_arguments
+                    name, template_arguments
                   )
                 });
                 result.push(CppTemplateInstantiations {
@@ -171,18 +169,19 @@ impl<'a> CppPostProcessor<'a> {
                   ],
                 });
               } else {
-                let item = result.iter_mut().find(|x| &x.class_name == name).expect(
-                  "previously found",
-                );
-                if !item.instantiations.iter().any(|x| {
-                  &x.template_arguments == template_arguments
-                })
+                let item = result
+                  .iter_mut()
+                  .find(|x| &x.class_name == name)
+                  .expect("previously found");
+                if !item
+                  .instantiations
+                  .iter()
+                  .any(|x| &x.template_arguments == template_arguments)
                 {
                   log::llog(log::DebugParser, || {
                     format!(
                       "Found template instantiation: {}<{:?}>",
-                      name,
-                      template_arguments
+                      name, template_arguments
                     )
                   });
                   item.instantiations.push(CppTemplateInstantiation {
@@ -223,16 +222,17 @@ impl<'a> CppPostProcessor<'a> {
     result
   }
 
-
   fn detect_inherited_methods2(&self) -> Result<Vec<CppMethod>> {
     let mut remaining_classes: Vec<&CppTypeData> = self
       .parser_data
       .types
       .iter()
-      .filter(|t| if let CppTypeKind::Class { ref bases, .. } = t.kind {
-        !bases.is_empty()
-      } else {
-        false
+      .filter(|t| {
+        if let CppTypeKind::Class { ref bases, .. } = t.kind {
+          !bases.is_empty()
+        } else {
+          false
+        }
       })
       .collect();
     let mut ordered_classes = Vec::new();
@@ -241,10 +241,9 @@ impl<'a> CppPostProcessor<'a> {
       let mut remaining_classes2 = Vec::new();
       for class in &remaining_classes {
         if let CppTypeKind::Class { ref bases, .. } = class.kind {
-          if bases.iter().any(
-            |base| if base.visibility != CppVisibility::Private &&
-              base.base_type.indirection ==
-                CppTypeIndirection::None
+          if bases.iter().any(|base| {
+            if base.visibility != CppVisibility::Private
+              && base.base_type.indirection == CppTypeIndirection::None
             {
               if let CppTypeBase::Class(ref base_info) = base.base_type.base {
                 remaining_classes.iter().any(|c| c.name == base_info.name)
@@ -253,9 +252,8 @@ impl<'a> CppPostProcessor<'a> {
               }
             } else {
               false
-            },
-          )
-          {
+            }
+          }) {
             remaining_classes2.push(*class);
           } else {
             ordered_classes.push(*class);
@@ -267,9 +265,7 @@ impl<'a> CppPostProcessor<'a> {
       }
       remaining_classes = remaining_classes2;
       if !any_added {
-        return Err(
-          "Cyclic dependency detected while detecting inherited methods".into(),
-        );
+        return Err("Cyclic dependency detected while detecting inherited methods".into());
       }
     }
 
@@ -292,20 +288,21 @@ impl<'a> CppPostProcessor<'a> {
       let bases_with_methods: Vec<(&CppBaseSpecifier, Vec<&CppMethod>)> = bases
         .iter()
         .filter(|base| {
-          base.visibility != CppVisibility::Private &&
-            base.base_type.indirection == CppTypeIndirection::None
+          base.visibility != CppVisibility::Private
+            && base.base_type.indirection == CppTypeIndirection::None
         })
         .map(|base| {
           let methods = if let CppTypeBase::Class(ref base_class_base) = base.base_type.base {
-
             once(&self.parser_data)
               .chain(self.dependencies.iter().map(|d| &d.parser))
               .map(|p| &p.methods)
               .flat_map(|m| m)
-              .filter(|m| if let Some(ref info) = m.class_membership {
-                &info.class_type == base_class_base
-              } else {
-                false
+              .filter(|m| {
+                if let Some(ref info) = m.class_membership {
+                  &info.class_type == base_class_base
+                } else {
+                  false
+                }
               })
               .collect()
           } else {
@@ -319,10 +316,14 @@ impl<'a> CppPostProcessor<'a> {
       for &(ref base, ref methods) in &bases_with_methods {
         if let CppTypeBase::Class(ref base_class_base) = base.base_type.base {
           for method in methods {
-            if let CppTypeKind::Class { ref using_directives, .. } = class.kind {
-              let use_method = if using_directives.iter().any(|dir| {
-                dir.class_name == base_class_base.name && dir.method_name == method.name
-              })
+            if let CppTypeKind::Class {
+              ref using_directives,
+              ..
+            } = class.kind
+            {
+              let use_method = if using_directives
+                .iter()
+                .any(|dir| dir.class_name == base_class_base.name && dir.method_name == method.name)
               {
                 true // excplicitly inherited with a using directive
               } else if own_methods.iter().any(|m| m.name == method.name) {
@@ -330,8 +331,7 @@ impl<'a> CppPostProcessor<'a> {
                 false
               } else if bases_with_methods.iter().any(|&(ref base2, ref methods2)| {
                 base != base2 && methods2.iter().any(|m| m.name == method.name)
-              })
-              {
+              }) {
                 // not inherited because method with the same name exists in one of
                 // the other bases
                 false
@@ -364,22 +364,17 @@ impl<'a> CppPostProcessor<'a> {
                 });
                 result.push(new_method);
               }
-
             } else {
               unreachable!()
             }
-
           }
         } else {
           unreachable!()
         }
-
       }
-
     }
     Ok(result)
   }
-
 
   fn detect_signal_argument_types(&self) -> Result<Vec<Vec<CppType>>> {
     let mut all_types = HashSet::new();
@@ -391,13 +386,12 @@ impl<'a> CppPostProcessor<'a> {
             .iter()
             .map(|x| x.argument_type.clone())
             .collect();
-          if !all_types.contains(&types) &&
-            !self.dependencies.iter().any(|d| {
-              d.processed.signal_argument_types.iter().any(
-                |t| t == &types,
-              )
-            })
-          {
+          if !all_types.contains(&types) && !self.dependencies.iter().any(|d| {
+            d.processed
+              .signal_argument_types
+              .iter()
+              .any(|t| t == &types)
+          }) {
             all_types.insert(types);
           }
         }
@@ -408,13 +402,13 @@ impl<'a> CppPostProcessor<'a> {
     for t in &all_types {
       let mut types = t.clone();
       while let Some(_) = types.pop() {
-        if !types_with_omitted_args.contains(&types) && !all_types.contains(&types) &&
-          !self.dependencies.iter().any(|d| {
-            d.processed.signal_argument_types.iter().any(
-              |t| t == &types,
-            )
-          })
-        {
+        if !types_with_omitted_args.contains(&types) && !all_types.contains(&types)
+          && !self.dependencies.iter().any(|d| {
+            d.processed
+              .signal_argument_types
+              .iter()
+              .any(|t| t == &types)
+          }) {
           types_with_omitted_args.insert(types.clone());
         }
       }
@@ -432,8 +426,6 @@ impl<'a> CppPostProcessor<'a> {
     }
     Ok(all_types.into_iter().collect())
   }
-
-
 
   /// Detects the preferred type allocation place for each type based on
   /// API of all known methods. Keys of `overrides` are C++ type names.
@@ -455,9 +447,9 @@ impl<'a> CppPostProcessor<'a> {
     };
     fn check_type(cpp_type: &CppType, data: &mut HashMap<String, TypeStats>) {
       if let CppTypeBase::Class(CppTypeClassBase {
-                                  ref name,
-                                  ref template_arguments,
-                                }) = cpp_type.base
+        ref name,
+        ref template_arguments,
+      }) = cpp_type.base
       {
         if !data.contains_key(name) {
           data.insert(name.clone(), TypeStats::default());
@@ -501,10 +493,7 @@ impl<'a> CppPostProcessor<'a> {
             log::DebugAllocationPlace,
             format!(
               "{}\t{}\t{}\t{}",
-              name,
-              stats.has_virtual_methods,
-              stats.pointers_count,
-              stats.not_pointers_count
+              name, stats.has_virtual_methods, stats.pointers_count, stats.not_pointers_count
             ),
           );
         }
@@ -533,13 +522,12 @@ impl<'a> CppPostProcessor<'a> {
             log::llog(log::DebugAllocationPlace, || {
               format!(
                 "  Not enough data (pointers={}, not pointers={})",
-                stats.pointers_count,
-                stats.not_pointers_count
+                stats.pointers_count, stats.not_pointers_count
               )
             });
-          } else if stats.not_pointers_count as f32 /
-                   (stats.pointers_count + stats.not_pointers_count) as f32 >
-                   min_not_pointers_percent
+          } else if stats.not_pointers_count as f32
+            / (stats.pointers_count + stats.not_pointers_count) as f32
+            > min_not_pointers_percent
           {
             log::llog(log::DebugAllocationPlace, || {
               format!("Can't determine type allocation place for '{}':", name)
@@ -547,8 +535,7 @@ impl<'a> CppPostProcessor<'a> {
             log::llog(log::DebugAllocationPlace, || {
               format!(
                 "  Many not pointers (pointers={}, not pointers={})",
-                stats.pointers_count,
-                stats.not_pointers_count
+                stats.pointers_count, stats.not_pointers_count
               )
             });
           }

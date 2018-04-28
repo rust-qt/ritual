@@ -55,8 +55,7 @@ impl<'a> Form<'a> {
           MessageBox::information((
             widget1,
             &String::from_std_str("My title"),
-            &String::from_std_str("Text: \"%1\". Congratulations!")
-              .arg0(&text),
+            &String::from_std_str("Text: \"%1\". Congratulations!").arg0(&text),
           ));
         }
       }),
@@ -64,13 +63,14 @@ impl<'a> Form<'a> {
         uref(button1).set_enabled(!uref(line_edit1).text().is_empty());
       }),
     };
-    uref(button).signals().clicked().connect(
-      &form.button_clicked,
-    );
-    uref(line_edit).signals().text_edited().connect(
-      &form
-        .line_edit_edited,
-    );
+    uref(button)
+      .signals()
+      .clicked()
+      .connect(&form.button_clicked);
+    uref(line_edit)
+      .signals()
+      .text_edited()
+      .connect(&form.line_edit_edited);
     form
   }
 }

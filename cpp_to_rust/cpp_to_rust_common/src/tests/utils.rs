@@ -62,7 +62,6 @@ fn word_iterator3() {
   assert_eq!(split_to_words("QThreadPool"), vec!["Q", "Thread", "Pool"]);
 }
 
-
 #[test]
 fn case_operations() {
   use string_utils::CaseOperations;
@@ -128,5 +127,4 @@ fn case_operations() {
   assert_eq!(v3.to_snake_case(), "count0");
   let v4 = vec!["count", "1"];
   assert_eq!(v4.to_snake_case(), "count1");
-
 }

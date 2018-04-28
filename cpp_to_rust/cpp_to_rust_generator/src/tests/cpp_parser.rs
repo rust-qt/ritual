@@ -400,8 +400,7 @@ fn free_func_operator_sub() {
   for code in &[
     "class C1 {}; \n C1 operator-(C1 a, C1 b);",
     "class C1 {}; \n C1 operator -(C1 a, C1 b);",
-  ]
-  {
+  ] {
     let data = run_parser(code);
     assert!(data.types.len() == 1);
     assert!(data.methods.len() == 1);
@@ -825,7 +824,6 @@ fn template_class_template_method() {
       },
     }
   );
-
 }
 
 #[test]
@@ -948,97 +946,7 @@ fn template_instantiation() {
              .instantiations
              .get(0)
              .unwrap()
-             .template_arguments == &vec![int]);*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}
+             .template_arguments == &vec![int]);*/}
 
 #[test]
 fn derived_class_simple() {
@@ -1204,7 +1112,11 @@ fn class_with_use() {
   );
   assert!(data.types.len() == 3);
   assert_eq!(data.types[2].name, "C");
-  if let CppTypeKind::Class { ref using_directives, .. } = data.types[2].kind {
+  if let CppTypeKind::Class {
+    ref using_directives,
+    ..
+  } = data.types[2].kind
+  {
     assert_eq!(
       using_directives,
       &vec![
@@ -1392,9 +1304,7 @@ fn fixed_size_integers() {
       }),
     }
   );
-
 }
-
 
 #[test]
 fn template_class_with_base() {

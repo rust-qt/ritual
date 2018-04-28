@@ -6,7 +6,6 @@
 //! because the build tools crate is not even a part of the generator build.
 //! Make sure to update versions here when the actual version of the dependency changes.
 
-
 /// Version of `cpp_to_rust_build_tools` crate.
 pub const BUILD_TOOLS_VERSION: &'static str = "0.2.3";
 

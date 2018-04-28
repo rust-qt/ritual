@@ -333,9 +333,9 @@ impl Config {
   where
     F: Fn(&CppMethod) -> Result<bool> + 'static,
   {
-    self.cpp_ffi_generator_filters.push(CppFfiGeneratorFilter(
-      Box::new(f),
-    ));
+    self
+      .cpp_ffi_generator_filters
+      .push(CppFfiGeneratorFilter(Box::new(f)));
   }
 
   /// Adds a custom function that visits `&mut CppData` and can perform any changes
@@ -363,7 +363,6 @@ impl Config {
       self.cpp_filtered_namespaces.push(namespace.into());
     }
   }
-
 
   /// Overrides automatic selection of type allocation place for `type_name` and uses `place`
   /// instead. See `CppTypeAllocationPlace` for more information.
@@ -432,7 +431,6 @@ impl Config {
   pub fn cpp_parser_arguments(&self) -> &[String] {
     &self.cpp_parser_arguments
   }
-
 
   /// Returns values added by `Config::set_cpp_build_paths`.
   pub fn cpp_build_paths(&self) -> &CppBuildPaths {

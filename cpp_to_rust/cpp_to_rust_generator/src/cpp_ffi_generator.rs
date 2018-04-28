@@ -1,17 +1,17 @@
-use caption_strategy::{TypeCaptionStrategy, MethodCaptionStrategy};
-use cpp_data::{CppVisibility, CppTypeAllocationPlace, CppDataWithDeps, CppTypeKind,
-               CppTemplateInstantiation, CppOperator};
-use cpp_type::{CppTypeRole, CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase,
-               CppFunctionPointerType};
-use cpp_ffi_data::{CppAndFfiMethod, c_base_name, CppFfiHeaderData, QtSlotWrapper,
-                   CppFfiMethodKind, CppFieldAccessorType, CppMethodWithFfiSignature, CppCast};
-use cpp_method::{CppMethod, CppMethodKind, CppMethodArgument, CppMethodClassMembership,
+use caption_strategy::{MethodCaptionStrategy, TypeCaptionStrategy};
+use cpp_data::{CppDataWithDeps, CppOperator, CppTemplateInstantiation, CppTypeAllocationPlace,
+               CppTypeKind, CppVisibility};
+use cpp_type::{CppFunctionPointerType, CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection,
+               CppTypeRole};
+use cpp_ffi_data::{c_base_name, CppAndFfiMethod, CppCast, CppFfiHeaderData, CppFfiMethodKind,
+                   CppFieldAccessorType, CppMethodWithFfiSignature, QtSlotWrapper};
+use cpp_method::{CppMethod, CppMethodArgument, CppMethodClassMembership, CppMethodKind,
                  ReturnValueAllocationPlace};
-use common::errors::{Result, ChainErr, unexpected};
+use common::errors::{unexpected, ChainErr, Result};
 use common::log;
-use common::utils::{MapIfOk, add_to_multihash};
+use common::utils::{add_to_multihash, MapIfOk};
 use config::CppFfiGeneratorFilterFn;
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 use std::iter::once;
 
 /// This object generates the C++ wrapper library
@@ -82,11 +82,9 @@ pub fn run(
         .cpp_data
         .current
         .methods_and_implicit_destructors()
-        .map(|m| {
-          CppMethodRefWithKind {
-            method: m,
-            kind: CppFfiMethodKind::Real,
-          }
+        .map(|m| CppMethodRefWithKind {
+          method: m,
+          kind: CppFfiMethodKind::Real,
         })
         .chain(extra_methods.iter().map(|i| i.as_ref()))
         .filter(|x| &x.method.include_file == include_file),
@@ -141,21 +139,18 @@ fn apply_instantiations_to_method(
       new_method.arguments.push(CppMethodArgument {
         name: arg.name.clone(),
         has_default_value: arg.has_default_value,
-        argument_type: arg.argument_type.instantiate(
-          nested_level,
-          &ins.template_arguments,
-        )?,
+        argument_type: arg
+          .argument_type
+          .instantiate(nested_level, &ins.template_arguments)?,
       });
     }
-    new_method.return_type = method.return_type.instantiate(
-      nested_level,
-      &ins.template_arguments,
-    )?;
+    new_method.return_type = method
+      .return_type
+      .instantiate(nested_level, &ins.template_arguments)?;
     if let Some(ref mut info) = new_method.class_membership {
-      info.class_type = info.class_type.instantiate_class(
-        nested_level,
-        &ins.template_arguments,
-      )?;
+      info.class_type = info
+        .class_type
+        .instantiate_class(nested_level, &ins.template_arguments)?;
     }
     let mut conversion_type = None;
     if let Some(ref mut operator) = new_method.operator {
@@ -165,9 +160,10 @@ fn apply_instantiations_to_method(
         conversion_type = Some(r);
       }
     }
-    if new_method.all_involved_types().iter().any(|t| {
-      t.base.is_or_contains_template_parameter()
-    })
+    if new_method
+      .all_involved_types()
+      .iter()
+      .any(|t| t.base.is_or_contains_template_parameter())
     {
       return Err(
         format!(
@@ -198,26 +194,25 @@ fn instantiate_templates(data: &CppDataWithDeps) -> Result<Vec<CppMethodWithKind
     for method in cpp_data.methods_and_implicit_destructors() {
       for type1 in method.all_involved_types() {
         if let CppTypeBase::Class(CppTypeClassBase {
-                                    ref name,
-                                    ref template_arguments,
-                                  }) = type1.base
+          ref name,
+          ref template_arguments,
+        }) = type1.base
         {
           if let Some(ref template_arguments) = *template_arguments {
             assert!(!template_arguments.is_empty());
-            if template_arguments.iter().all(
-              |x| x.base.is_template_parameter(),
-            )
+            if template_arguments
+              .iter()
+              .all(|x| x.base.is_template_parameter())
             {
-              if let Some(template_instantiations) =
-                data.current.processed.template_instantiations.iter().find(
-                  |x| {
-                    &x.class_name == name
-                  },
-                )
+              if let Some(template_instantiations) = data
+                .current
+                .processed
+                .template_instantiations
+                .iter()
+                .find(|x| &x.class_name == name)
               {
-                let nested_level = if let CppTypeBase::TemplateParameter {
-                  nested_level, ..
-                } = template_arguments[0].base
+                let nested_level = if let CppTypeBase::TemplateParameter { nested_level, .. } =
+                  template_arguments[0].base
                 {
                   nested_level
                 } else {
@@ -262,12 +257,9 @@ fn instantiate_templates(data: &CppDataWithDeps) -> Result<Vec<CppMethodWithKind
                     }
                     break;
                   }
-                  Err(msg) => {
-                    log::llog(
-                      log::DebugTemplateInstantiation,
-                      || format!("failed: {}", msg),
-                    )
-                  }
+                  Err(msg) => log::llog(log::DebugTemplateInstantiation, || {
+                    format!("failed: {}", msg)
+                  }),
                 }
                 break;
               }
@@ -279,8 +271,6 @@ fn instantiate_templates(data: &CppDataWithDeps) -> Result<Vec<CppMethodWithKind
   }
   Ok(new_methods)
 }
-
-
 
 /// Adds fictional getter and setter methods for each known public field of each class.
 fn generate_field_accessors(cpp_data: &CppDataWithDeps) -> Result<Vec<CppMethodWithKind>> {
@@ -301,10 +291,8 @@ fn generate_field_accessors(cpp_data: &CppDataWithDeps) -> Result<Vec<CppMethodW
                   is_virtual: false,
                   is_pure_virtual: false,
                   is_const: match accessor_type {
-                    CppFieldAccessorType::CopyGetter |
-                    CppFieldAccessorType::ConstRefGetter => true,
-                    CppFieldAccessorType::MutRefGetter |
-                    CppFieldAccessorType::Setter => false,
+                    CppFieldAccessorType::CopyGetter | CppFieldAccessorType::ConstRefGetter => true,
+                    CppFieldAccessorType::MutRefGetter | CppFieldAccessorType::Setter => false,
                   },
                   is_static: false,
                   visibility: CppVisibility::Public,
@@ -332,10 +320,9 @@ fn generate_field_accessors(cpp_data: &CppDataWithDeps) -> Result<Vec<CppMethodW
             })
           };
         if field.visibility == CppVisibility::Public {
-          if field.field_type.indirection == CppTypeIndirection::None &&
-            field.field_type.base.is_class()
+          if field.field_type.indirection == CppTypeIndirection::None
+            && field.field_type.base.is_class()
           {
-
             let mut type2_const = field.field_type.clone();
             type2_const.is_const = true;
             type2_const.indirection = CppTypeIndirection::Ref;
@@ -416,8 +403,6 @@ fn create_cast_method(
     kind: CppFfiMethodKind::Cast(cast),
   }
 }
-
-
 
 /// Performs a portion of `generate_casts` operation.
 /// Adds casts between `target_type` and `base_type` and calls
@@ -513,7 +498,6 @@ fn generate_casts(cpp_data: &CppDataWithDeps) -> Result<Vec<CppMethodWithKind>> 
   Ok(new_methods)
 }
 
-
 /// Generates the FFI function signature for this method.
 fn method_to_ffi_signature<'a>(
   method: CppMethodRefWithKind<'a>,
@@ -533,9 +517,11 @@ fn method_to_ffi_signature<'a>(
   };
 
   let place = if method.method.is_constructor() || method.method.is_destructor() {
-    let info = method.method.class_membership.as_ref().expect(
-      "class info expected here",
-    );
+    let info = method
+      .method
+      .class_membership
+      .as_ref()
+      .expect("class info expected here");
     get_place(&info.class_type.name)?
   } else if method.method.return_type.needs_allocation_place_variants() {
     if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = method.method.return_type.base {
@@ -556,8 +542,6 @@ fn method_to_ffi_signature<'a>(
   })
 }
 
-
-
 impl<'a> CppFfiGenerator<'a> {
   /// Returns false if the method is excluded from processing
   /// for some reason
@@ -567,9 +551,7 @@ impl<'a> CppFfiGenerator<'a> {
     //    }
     let class_name = method.class_name().unwrap_or(&String::new()).clone();
     for filter in &self.filters {
-      let allowed = filter(method).chain_err(
-        || "cpp_ffi_generator_filter failed",
-      )?;
+      let allowed = filter(method).chain_err(|| "cpp_ffi_generator_filter failed")?;
       if !allowed {
         log::llog(log::DebugFfiSkips, || {
           format!("Skipping blacklisted method: \n{}\n", method.short_text())
@@ -581,8 +563,8 @@ impl<'a> CppFfiGenerator<'a> {
       return Ok(false);
     }
     if let Some(ref membership) = method.class_membership {
-      if membership.kind == CppMethodKind::Constructor &&
-        self.cpp_data.has_pure_virtual_methods(&class_name)
+      if membership.kind == CppMethodKind::Constructor
+        && self.cpp_data.has_pure_virtual_methods(&class_name)
       {
         log::llog(log::DebugFfiSkips, || {
           format!("Skipping constructor of abstract class {}", class_name)
@@ -607,9 +589,10 @@ impl<'a> CppFfiGenerator<'a> {
       // TODO: QObject::findChild and QObject::findChildren should be allowed
       return Ok(false);
     }
-    if method.all_involved_types().iter().any(|x| {
-      x.base.is_or_contains_template_parameter()
-    })
+    if method
+      .all_involved_types()
+      .iter()
+      .any(|x| x.base.is_or_contains_template_parameter())
     {
       return Ok(false);
     }
@@ -636,8 +619,7 @@ impl<'a> CppFfiGenerator<'a> {
       let mut process_one = |method: CppMethodRefWithKind| match method_to_ffi_signature(
         method.clone(),
         &self.cpp_data,
-        type_allocation_places_override
-          .clone(),
+        type_allocation_places_override.clone(),
       ) {
         Err(msg) => {
           log::llog(log::DebugFfiSkips, || {
@@ -648,31 +630,28 @@ impl<'a> CppFfiGenerator<'a> {
             )
           });
         }
-        Ok(result) => {
-          match c_base_name(
-            &result.cpp_method,
-            &result.allocation_place,
-            include_file_base_name,
-          ) {
-            Err(msg) => {
-              log::llog(log::DebugFfiSkips, || {
-                format!(
-                  "Unable to produce C function for method:\n{}\nError:{}\n",
-                  method.method.short_text(),
-                  msg
-                )
-              });
-            }
-            Ok(name) => {
-
-              add_to_multihash(
-                &mut hash_name_to_methods,
-                format!("{}_{}", &self.cpp_ffi_lib_name, name),
-                result,
-              );
-            }
+        Ok(result) => match c_base_name(
+          &result.cpp_method,
+          &result.allocation_place,
+          include_file_base_name,
+        ) {
+          Err(msg) => {
+            log::llog(log::DebugFfiSkips, || {
+              format!(
+                "Unable to produce C function for method:\n{}\nError:{}\n",
+                method.method.short_text(),
+                msg
+              )
+            });
           }
-        }
+          Ok(name) => {
+            add_to_multihash(
+              &mut hash_name_to_methods,
+              format!("{}_{}", &self.cpp_ffi_lib_name, name),
+              result,
+            );
+          }
+        },
       };
 
       for method in methods {
@@ -697,22 +676,8 @@ impl<'a> CppFfiGenerator<'a> {
             }
           }
         }
-
-
-
-
-
-
-
-
-
       }
-
-
-
     }
-
-
 
     let mut processed_methods = Vec::new();
     for (key, mut values) in hash_name_to_methods {
@@ -749,9 +714,7 @@ impl<'a> CppFfiGenerator<'a> {
         }
       } else {
         log::error(format!("values dump: {:?}\n", values));
-        log::error(
-          "All type caption strategies have failed! Involved functions:",
-        );
+        log::error("All type caption strategies have failed! Involved functions:");
         for value in values {
           log::error(format!("  {}", value.cpp_method.short_text()));
         }
@@ -778,9 +741,7 @@ impl<'a> CppFfiGenerator<'a> {
     let mut qt_slot_wrappers = Vec::new();
     let mut methods = Vec::new();
     for types in &self.cpp_data.current.processed.signal_argument_types {
-      let ffi_types = types.map_if_ok(
-        |t| t.to_cpp_ffi_type(CppTypeRole::NotReturnType),
-      )?;
+      let ffi_types = types.map_if_ok(|t| t.to_cpp_ffi_type(CppTypeRole::NotReturnType))?;
       let args_captions = types.map_if_ok(|t| t.caption(TypeCaptionStrategy::Full))?;
       let args_caption = if args_captions.is_empty() {
         "no_args".to_string()
@@ -836,7 +797,7 @@ impl<'a> CppFfiGenerator<'a> {
             doc: None,
             inheritance_chain: Vec::new(),
             is_ffi_whitelisted: false,
-          //is_fake_inherited_method: false,
+            //is_fake_inherited_method: false,
           },
           kind: CppFfiMethodKind::Real,
         }
@@ -884,12 +845,10 @@ impl<'a> CppFfiGenerator<'a> {
         types
           .iter()
           .enumerate()
-          .map(|(num, t)| {
-            CppMethodArgument {
-              name: format!("arg{}", num),
-              argument_type: t.clone(),
-              has_default_value: false,
-            }
+          .map(|(num, t)| CppMethodArgument {
+            name: format!("arg{}", num),
+            argument_type: t.clone(),
+            has_default_value: false,
           })
           .collect(),
       );

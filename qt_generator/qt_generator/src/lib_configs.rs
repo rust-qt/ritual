@@ -1,17 +1,16 @@
 //! Generator configurations specific for each Qt module.
 
-use cpp_to_rust_generator::common::errors::{Result, ChainErr};
+use cpp_to_rust_generator::common::errors::{ChainErr, Result};
 use cpp_to_rust_generator::config::{Config, CppTypeAllocationPlace};
-use cpp_to_rust_generator::cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType,
+use cpp_to_rust_generator::cpp_type::{CppBuiltInNumericType, CppType, CppTypeBase,
                                       CppTypeIndirection};
-
 
 use cpp_to_rust_generator::common::{log, toml};
 use cpp_to_rust_generator::common::file_utils::repo_crate_local_path;
 use cpp_to_rust_generator::cpp_data::CppVisibility;
 use cpp_to_rust_generator::common::target;
 use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
-use qt_generator_common::{lib_folder_name, crate_name, lib_dependencies, get_full_build_config};
+use qt_generator_common::{crate_name, get_full_build_config, lib_dependencies, lib_folder_name};
 use std::path::PathBuf;
 use versions;
 
@@ -33,16 +32,19 @@ fn exclude_qlist_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(
   config.add_cpp_ffi_generator_filter(move |method| {
     if let Some(ref info) = method.class_membership {
       if info.class_type.name == "QList" {
-        let args = info.class_type.template_arguments.as_ref().chain_err(
-          || "failed to get QList args",
-        )?;
+        let args = info
+          .class_type
+          .template_arguments
+          .as_ref()
+          .chain_err(|| "failed to get QList args")?;
         let arg = args.get(0).chain_err(|| "failed to get QList arg")?;
         let arg_text = arg.to_cpp_pseudo_code();
         if types.iter().any(|x| x == &arg_text) {
           match method.name.as_ref() {
-            "operator==" | "operator!=" | "indexOf" | "lastIndexOf" | "contains" |
-            "startsWith" | "endsWith" | "removeOne" | "removeAll" | "value" | "toVector" |
-            "toSet" => return Ok(false),
+            "operator==" | "operator!=" | "indexOf" | "lastIndexOf" | "contains" | "startsWith"
+            | "endsWith" | "removeOne" | "removeAll" | "value" | "toVector" | "toSet" => {
+              return Ok(false)
+            }
             "count" => {
               if method.arguments.len() == 1 {
                 return Ok(false);
@@ -67,15 +69,17 @@ fn exclude_qvector_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(
   config.add_cpp_ffi_generator_filter(move |method| {
     if let Some(ref info) = method.class_membership {
       if info.class_type.name == "QVector" {
-        let args = info.class_type.template_arguments.as_ref().chain_err(
-          || "failed to get QVector args",
-        )?;
+        let args = info
+          .class_type
+          .template_arguments
+          .as_ref()
+          .chain_err(|| "failed to get QVector args")?;
         let arg = args.get(0).chain_err(|| "failed to get QVector arg")?;
         let arg_text = arg.to_cpp_pseudo_code();
         if types.iter().any(|x| x == &arg_text) {
           match method.name.as_ref() {
-            "operator==" | "operator!=" | "indexOf" | "lastIndexOf" | "contains" |
-            "startsWith" | "endsWith" | "removeOne" | "removeAll" | "toList" => return Ok(false),
+            "operator==" | "operator!=" | "indexOf" | "lastIndexOf" | "contains" | "startsWith"
+            | "endsWith" | "removeOne" | "removeAll" | "toList" => return Ok(false),
             "count" => {
               if method.arguments.len() == 1 {
                 return Ok(false);
@@ -198,19 +202,16 @@ pub fn core(config: &mut Config) -> Result<()> {
       if info.class_type.to_cpp_pseudo_code() == "QFuture<void>" {
         // template partial specialization removes these methods
         match method.name.as_ref() {
-          "operator void" |
-          "isResultReadyAt" |
-          "result" |
-          "resultAt" |
-          "results" => return Ok(false),
+          "operator void" | "isResultReadyAt" | "result" | "resultAt" | "results" => {
+            return Ok(false)
+          }
           _ => {}
         }
       }
       if info.class_type.to_cpp_pseudo_code() == "QFutureIterator<void>" {
         // template partial specialization removes these methods
         match method.name.as_ref() {
-          "QFutureIterator" |
-          "operator=" => return Ok(false),
+          "QFutureIterator" | "operator=" => return Ok(false),
           _ => {}
         }
       }
@@ -228,8 +229,7 @@ pub fn core(config: &mut Config) -> Result<()> {
       }
       if info.class_type.name == "QMetaType" {
         match method.name.as_ref() {
-          "registerConverterFunction" |
-          "unregisterConverterFunction" => {
+          "registerConverterFunction" | "unregisterConverterFunction" => {
             // only public on msvc for some technical reason
             return Ok(false);
           }
@@ -252,9 +252,9 @@ pub fn core(config: &mut Config) -> Result<()> {
       is_const2: false,
       base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::LongDouble),
     };
-    if &method.name == "qHash" && method.class_membership.is_none() &&
-      (method.arguments.len() == 1 || method.arguments.len() == 2) &&
-      &method.arguments[0].argument_type == &long_double
+    if &method.name == "qHash" && method.class_membership.is_none()
+      && (method.arguments.len() == 1 || method.arguments.len() == 2)
+      && &method.arguments[0].argument_type == &long_double
     {
       return Ok(false); // produces error on MacOS
     }
@@ -300,38 +300,34 @@ pub fn gui(config: &mut Config) -> Result<()> {
   config.add_cpp_ffi_generator_filter(|method| {
     if let Some(ref info) = method.class_membership {
       match info.class_type.to_cpp_pseudo_code().as_ref() {
-        "QQueue<QInputMethodEvent::Attribute>" |
-        "QQueue<QTextLayout::FormatRange>" |
-        "QQueue<QTouchEvent::TouchPoint>" => {
-          match method.name.as_ref() {
-            "operator==" | "operator!=" => return Ok(false),
-            _ => {}
-          }
-        }
-        "QStack<QInputMethodEvent::Attribute>" |
-        "QStack<QTextLayout::FormatRange>" => {
+        "QQueue<QInputMethodEvent::Attribute>"
+        | "QQueue<QTextLayout::FormatRange>"
+        | "QQueue<QTouchEvent::TouchPoint>" => match method.name.as_ref() {
+          "operator==" | "operator!=" => return Ok(false),
+          _ => {}
+        },
+        "QStack<QInputMethodEvent::Attribute>" | "QStack<QTextLayout::FormatRange>" => {
           match method.name.as_ref() {
             "operator==" | "operator!=" | "fromList" => return Ok(false),
             _ => {}
           }
         }
-        "QOpenGLVersionFunctionsStorage" => {
-          match method.name.as_ref() {
-            "QOpenGLVersionFunctionsStorage" |
-            "~QOpenGLVersionFunctionsStorage" |
-            "backend" => return Ok(false),
-            _ => {}
+        "QOpenGLVersionFunctionsStorage" => match method.name.as_ref() {
+          "QOpenGLVersionFunctionsStorage" | "~QOpenGLVersionFunctionsStorage" | "backend" => {
+            return Ok(false)
           }
-        }
+          _ => {}
+        },
         _ => {}
       }
-      if info.class_type.name.starts_with("QOpenGLFunctions_") &&
-        (info.class_type.name.ends_with("_CoreBackend") |
-           info.class_type.name.ends_with("_CoreBackend::Functions") |
-           info.class_type.name.ends_with("_DeprecatedBackend") |
-           info.class_type.name.ends_with(
-            "_DeprecatedBackend::Functions",
-          ))
+      if info.class_type.name.starts_with("QOpenGLFunctions_")
+        && (info.class_type.name.ends_with("_CoreBackend")
+          | info.class_type.name.ends_with("_CoreBackend::Functions")
+          | info.class_type.name.ends_with("_DeprecatedBackend")
+          | info
+            .class_type
+            .name
+            .ends_with("_DeprecatedBackend::Functions"))
       {
         return Ok(false);
       }
@@ -356,8 +352,7 @@ pub fn widgets(config: &mut Config) -> Result<()> {
   config.add_cpp_ffi_generator_filter(|method| {
     if let Some(ref info) = method.class_membership {
       match info.class_type.to_cpp_pseudo_code().as_ref() {
-        "QQueue<QTableWidgetSelectionRange>" |
-        "QQueue<QTextEdit::ExtraSelection>" => {
+        "QQueue<QTableWidgetSelectionRange>" | "QQueue<QTextEdit::ExtraSelection>" => {
           match method.name.as_ref() {
             "operator==" | "operator!=" => return Ok(false),
             _ => {}
@@ -400,19 +395,15 @@ pub fn render_3d(config: &mut Config) -> Result<()> {
   config.add_cpp_ffi_generator_filter(|method| {
     if let Some(ref info) = method.class_membership {
       match info.class_type.to_cpp_pseudo_code().as_ref() {
-        "Qt3DRender::QSpotLight" => {
-          match method.name.as_ref() {
-            "attenuation" => return Ok(false),
-            _ => {}
-          }
-        }
+        "Qt3DRender::QSpotLight" => match method.name.as_ref() {
+          "attenuation" => return Ok(false),
+          _ => {}
+        },
 
-        "Qt3DRender::QGraphicsApiFilter" => {
-          match method.name.as_ref() {
-            "operator==" | "operator!=" => return Ok(false),
-            _ => {}
-          }
-        }
+        "Qt3DRender::QGraphicsApiFilter" => match method.name.as_ref() {
+          "operator==" | "operator!=" => return Ok(false),
+          _ => {}
+        },
 
         _ => {}
       }
@@ -453,9 +444,6 @@ pub fn extras_3d(config: &mut Config) -> Result<()> {
   Ok(())
 }
 
-
-
-
 /// Executes the generator for a single Qt module with given configuration.
 pub fn make_config(sublib_name: &str) -> Result<Config> {
   log::status(format!(
@@ -470,9 +458,7 @@ pub fn make_config(sublib_name: &str) -> Result<Config> {
   package_data.insert(
     "authors".to_string(),
     toml::Value::Array(vec![
-      toml::Value::String(
-        "Pavel Strakhov <ri@idzaaus.org>".to_string()
-      ),
+      toml::Value::String("Pavel Strakhov <ri@idzaaus.org>".to_string()),
     ]),
   );
   let description = format!(
@@ -510,9 +496,7 @@ pub fn make_config(sublib_name: &str) -> Result<Config> {
 
   config.add_include_directive(&lib_folder_name(sublib_name));
   let lib_include_path = qt_config.installation_data.lib_include_path.clone();
-  config.add_cpp_data_filter(move |cpp_data| {
-    fix_header_names(cpp_data, &lib_include_path)
-  });
+  config.add_cpp_data_filter(move |cpp_data| fix_header_names(cpp_data, &lib_include_path));
   // TODO: allow to override parser flags
   config.add_cpp_parser_arguments(vec!["-fPIC", "-fcxx-exceptions"]);
 
@@ -548,14 +532,12 @@ pub fn make_config(sublib_name: &str) -> Result<Config> {
                     // let full_name = format!("{}::{}", enum_namespace, &value.name);
                     // println!("full name: {}", full_name);
                     parser.mark_enum_variant_used(&format!("{}{}", enum_namespace, &value.name));
-
                   } else {
                     let type_name = &type1.name;
                     log::llog(log::DebugQtDoc, || {
                       format!(
                         "Not found doc for enum variant: {}::{}",
-                        type_name,
-                        &value.name
+                        type_name, &value.name
                       )
                     });
                   }
@@ -622,9 +604,9 @@ fn find_methods_docs(cpp_methods: &mut [CppMethod], data: &mut DocParser) -> Res
       ) {
         Ok(doc) => cpp_method.doc = Some(doc),
         Err(msg) => {
-          if cpp_method.class_membership.is_some() &&
-            (&cpp_method.name == "tr" || &cpp_method.name == "trUtf8" ||
-               &cpp_method.name == "metaObject")
+          if cpp_method.class_membership.is_some()
+            && (&cpp_method.name == "tr" || &cpp_method.name == "trUtf8"
+              || &cpp_method.name == "metaObject")
           {
             // no error message
           } else {

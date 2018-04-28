@@ -6,19 +6,19 @@
 //! See [README](https://github.com/rust-qt/cpp_to_rust)
 //! for more information.
 //!
+extern crate backtrace;
+extern crate bincode;
 #[macro_use]
 extern crate error_chain;
-extern crate backtrace;
-extern crate regex;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde;
-extern crate serde_json;
-extern crate bincode;
-extern crate term_painter;
-extern crate num_cpus;
 #[macro_use]
 extern crate lazy_static;
+extern crate num_cpus;
+extern crate regex;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
+extern crate term_painter;
 pub extern crate toml;
 
 pub mod log;
@@ -34,8 +34,7 @@ pub mod target;
 
 /// This type contains data serialized by the generator and placed to the
 /// generated crate's directory. The build script reads and uses this value.
-#[derive(Debug, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildScriptData {
   /// Information required to build the C++ wrapper library
   pub cpp_build_config: cpp_build_config::CppBuildConfig,

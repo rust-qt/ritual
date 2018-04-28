@@ -1,6 +1,5 @@
-
 mod database;
 pub mod workspace;
-mod final_type;
-mod final_method;
+mod cpp_type;
+mod cpp_method;
 mod processor;

@@ -21,22 +21,19 @@ use errors::Result;
 /// can modify this config during build script execution using
 /// `cpp_to_rust_build_tools::Config::set_cpp_build_config` or
 /// `cpp_build_config_mut`.
-#[derive(Default, Debug, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct CppBuildConfig {
   items: Vec<CppBuildConfigItem>,
 }
 
-#[derive(Debug, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct CppBuildConfigItem {
   condition: ::target::Condition,
   data: CppBuildConfigData,
 }
 
 /// Type of a C++ library (shared or static).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CppLibraryType {
   Shared,
   Static,
@@ -45,8 +42,7 @@ pub enum CppLibraryType {
 /// Platform-specific information
 /// required to build the C++ wrapper library.
 /// This type contains one configuration item of `CppBuildConfig`.
-#[derive(Debug, Clone, Default)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CppBuildConfigData {
   linked_libs: Vec<String>,
   linked_frameworks: Vec<String>,
@@ -114,12 +110,12 @@ impl CppBuildConfigData {
 
   fn add_from(&mut self, other: &CppBuildConfigData) -> Result<()> {
     self.linked_libs.append(&mut other.linked_libs.clone());
-    self.linked_frameworks.append(
-      &mut other.linked_frameworks.clone(),
-    );
-    self.compiler_flags.append(
-      &mut other.compiler_flags.clone(),
-    );
+    self
+      .linked_frameworks
+      .append(&mut other.linked_frameworks.clone());
+    self
+      .compiler_flags
+      .append(&mut other.compiler_flags.clone());
     if self.library_type.is_some() {
       if other.library_type.is_some() && other.library_type != self.library_type {
         return Err("conflicting library types specified".into());

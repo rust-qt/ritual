@@ -38,9 +38,9 @@ fn models_and_casts() {
   let abstract_model: &mut AbstractItemModel = string_list_model.static_cast_mut();
   assert_eq!(abstract_model.row_count(()), 2);
   {
-    let string_list_model_back: &mut StringListModel = abstract_model.dynamic_cast_mut().expect(
-      "dynamic_cast should be successful",
-    );
+    let string_list_model_back: &mut StringListModel = abstract_model
+      .dynamic_cast_mut()
+      .expect("dynamic_cast should be successful");
     assert_eq!(string_list_model_back.row_count(()), 2);
   }
 

@@ -1,6 +1,6 @@
-use cpp_type::{CppType, CppTypeRole, CppTypeIndirection, CppTypeBase, CppBuiltInNumericType,
-               CppSpecificNumericTypeKind, CppTypeClassBase, CppSpecificNumericType,
-               CppFunctionPointerType};
+use cpp_type::{CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
+               CppSpecificNumericTypeKind, CppType, CppTypeBase, CppTypeClassBase,
+               CppTypeIndirection, CppTypeRole};
 use caption_strategy::TypeCaptionStrategy;
 use cpp_ffi_data::CppIndirectionChange;
 
@@ -218,7 +218,9 @@ fn enum1() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::Enum { name: "Qt::CaseSensitivity".to_string() },
+    base: CppTypeBase::Enum {
+      name: "Qt::CaseSensitivity".to_string(),
+    },
   };
   assert_eq!(type1.is_void(), false);
   assert_eq!(type1.base.is_void(), false);
@@ -243,7 +245,6 @@ fn enum1() {
   assert_type_to_ffi_unchanged(&type1);
   assert!(!type1.needs_allocation_place_variants());
 }
-
 
 #[test]
 fn class_value() {

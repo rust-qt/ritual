@@ -6,7 +6,7 @@ mod cpp_parser;
 mod full_run;
 
 use std::path::{Path, PathBuf};
-use common::file_utils::{create_dir_all, PathBufWithAdded, canonicalize};
+use common::file_utils::{canonicalize, create_dir_all, PathBufWithAdded};
 
 #[derive(Debug)]
 pub enum TempTestDir {

@@ -1,13 +1,12 @@
 use caption_strategy::{ArgumentCaptionStrategy, MethodCaptionStrategy, TypeCaptionStrategy};
-use cpp_method::{CppMethod, ReturnValueAllocationPlace, CppMethodArgument};
+use cpp_method::{CppMethod, CppMethodArgument, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
-use cpp_type::{CppType, CppTypeBase, CppFunctionPointerType};
+use cpp_type::{CppFunctionPointerType, CppType, CppTypeBase};
 use common::errors::Result;
 use common::utils::MapIfOk;
 
 /// Variation of a field accessor method
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub enum CppFieldAccessorType {
   /// Returns copy of the field
   CopyGetter,
@@ -53,7 +52,6 @@ impl CppCast {
       CppCast::Static { ref is_direct, .. } => *is_direct,
       _ => false,
     }
-
   }
 }
 
@@ -82,8 +80,7 @@ pub enum CppFfiMethodKind {
 
 /// Relation between original C++ method's argument value
 /// and corresponding FFI function's argument value
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum CppIndirectionChange {
   /// Argument types are identical
   NoChange,
@@ -146,13 +143,11 @@ impl CppFfiMethodArgument {
       ArgumentCaptionStrategy::TypeOnly(type_strategy) => {
         self.argument_type.original_type.caption(type_strategy)?
       }
-      ArgumentCaptionStrategy::TypeAndName(type_strategy) => {
-        format!(
-          "{}_{}",
-          self.argument_type.original_type.caption(type_strategy)?,
-          self.name
-        )
-      }
+      ArgumentCaptionStrategy::TypeAndName(type_strategy) => format!(
+        "{}_{}",
+        self.argument_type.original_type.caption(type_strategy)?,
+        self.name
+      ),
     })
   }
 
@@ -186,9 +181,10 @@ impl CppFfiMethodSignature {
   /// indicating that original C++ method has const attribute.
   /// Returns false if there is no this argument or it's not const.
   pub fn has_const_this(&self) -> bool {
-    self.arguments.iter().any(|arg| {
-      arg.meaning == CppFfiArgumentMeaning::This && arg.argument_type.ffi_type.is_const
-    })
+    self
+      .arguments
+      .iter()
+      .any(|arg| arg.meaning == CppFfiArgumentMeaning::This && arg.argument_type.ffi_type.is_const)
   }
 
   /// Generates arguments caption string for FFI method.
@@ -321,27 +317,23 @@ pub fn c_base_name(
     }
   } else if let Some(ref operator) = cpp_method.operator {
     add_place_note(match *operator {
-      CppOperator::Conversion(ref cpp_type) => {
-        format!(
-          "convert_to_{}",
-          cpp_type.caption(TypeCaptionStrategy::Full)?
-        )
-      }
+      CppOperator::Conversion(ref cpp_type) => format!(
+        "convert_to_{}",
+        cpp_type.caption(TypeCaptionStrategy::Full)?
+      ),
       _ => format!("operator_{}", operator.c_name()?),
     })
   } else {
     add_place_note(cpp_method.name.replace("::", "_"))
   };
   let template_args_text = match cpp_method.template_arguments_values {
-    Some(ref args) => {
-      format!(
-        "_{}",
-        args
-          .iter()
-          .map_if_ok(|x| x.caption(TypeCaptionStrategy::Full))?
-          .join("_")
-      )
-    }
+    Some(ref args) => format!(
+      "_{}",
+      args
+        .iter()
+        .map_if_ok(|x| x.caption(TypeCaptionStrategy::Full))?
+        .join("_")
+    ),
     None => String::new(),
   };
   Ok(scope_prefix + &method_name + &template_args_text)

@@ -3,14 +3,13 @@
 use cpp_ffi_data::CppAndFfiMethod;
 use cpp_type::CppType;
 use cpp_data::CppData;
-use rust_type::{RustName, CompleteType, RustType};
+use rust_type::{CompleteType, RustName, RustType};
 use cpp_method::CppMethodDoc;
 use cpp_data::CppTypeDoc;
 use std::path::PathBuf;
 
 /// One variant of a Rust enum
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustEnumValue {
   /// Identifier
   pub name: String,
@@ -23,10 +22,8 @@ pub struct RustEnumValue {
   pub is_dummy: bool,
 }
 
-
 /// C++ documentation data for a enum variant
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct CppEnumValueDocItem {
   /// C++ name of the variant
   pub variant_name: String,
@@ -35,8 +32,7 @@ pub struct CppEnumValueDocItem {
 }
 
 /// Information about a Qt slot wrapper on Rust side
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustQtSlotWrapper {
   /// Argument types of the slot
   pub arguments: Vec<CompleteType>,
@@ -49,8 +45,7 @@ pub struct RustQtSlotWrapper {
 }
 
 /// Information about a Rust type wrapper
-#[derive(Debug, PartialEq, Eq, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum RustTypeWrapperKind {
   /// Enum wrapper
   Enum {
@@ -79,8 +74,7 @@ pub enum RustTypeWrapperKind {
 }
 
 /// Exported information about a Rust wrapper type
-#[derive(Debug, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustProcessedTypeInfo {
   /// Full name of corresponding C++ type (class or enum).
   pub cpp_name: String,
@@ -96,15 +90,12 @@ pub struct RustProcessedTypeInfo {
   pub is_public: bool,
 }
 
-
-
 /// Exported information about generated crate
 /// for future use of it as a dependency. This information
 /// is saved to the cache directory but not to the
 /// output crate directory, so the crate's build script
 /// cannot access it (as opposed to `BuildScriptData`).
-#[derive(Debug, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustExportInfo {
   /// Name of the crate
   pub crate_name: String,
@@ -131,7 +122,6 @@ pub struct RustMethodDocItem {
   /// C++ code containing declaration of the corresponding C++ method.
   pub cpp_fn: String,
 }
-
 
 /// Location of a Rust method.
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -410,7 +400,6 @@ impl RustMethodCaptionStrategy {
   }
 }
 
-
 impl RustProcessedTypeInfo {
   /// Implements sanity check of the data.
   /// Returns true if this type was properly declared within any of the modules.
@@ -425,8 +414,7 @@ impl RustProcessedTypeInfo {
           cpp_type_name == &self.cpp_name && cpp_template_arguments == &self.cpp_template_arguments
         }
         _ => false,
-      })
-      {
+      }) {
         return true;
       }
       if self.is_declared_in(&module.submodules) {

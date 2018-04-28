@@ -15,7 +15,7 @@ use cpp_to_rust_common::string_utils::CaseOperations;
 use cpp_to_rust_common::errors::Result;
 use cpp_to_rust_common::log;
 use cpp_to_rust_common::target;
-use cpp_to_rust_common::cpp_build_config::{CppBuildPaths, CppBuildConfig, CppBuildConfigData,
+use cpp_to_rust_common::cpp_build_config::{CppBuildConfig, CppBuildConfigData, CppBuildPaths,
                                            CppLibraryType};
 use std::path::PathBuf;
 use std::process::Command;
@@ -25,7 +25,6 @@ fn run_qmake_string_query(property: &str) -> Result<String> {
   let result = get_command_output(Command::new("qmake").arg("-query").arg(property))?;
   Ok(result.trim().to_string())
 }
-
 
 /// Makes a query to `qmake` and interprets its output as a path.
 fn run_qmake_query(property: &str) -> Result<PathBuf> {
@@ -126,7 +125,6 @@ pub fn get_full_build_config(sublib_name: &str) -> Result<FullBuildConfig> {
       let dep_data = get_installation_data(dep)?;
       apply_installation_data(dep, &dep_data);
     }
-
   }
   let mut cpp_build_config = CppBuildConfig::new();
   cpp_build_config.add(target::Condition::True, cpp_build_config_data);
@@ -191,7 +189,6 @@ pub fn all_sublib_names() -> &'static [&'static str] {
     "3d_extras",
   ]
 }
-
 
 /// Returns list of modules this module depends on.
 pub fn lib_dependencies(sublib_name: &str) -> Result<&'static [&'static str]> {

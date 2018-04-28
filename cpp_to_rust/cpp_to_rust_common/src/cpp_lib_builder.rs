@@ -59,9 +59,9 @@ impl CMakeVar {
   {
     CMakeVar::new_list(
       name,
-      paths.into_iter().map_if_ok(|x| {
-        path_to_str(x.as_ref()).map(|x| x.to_string())
-      })?,
+      paths
+        .into_iter()
+        .map_if_ok(|x| path_to_str(x.as_ref()).map(|x| x.to_string()))?,
     )
   }
 }
@@ -99,9 +99,9 @@ impl CppLibBuilder {
       create_dir_all(&self.build_dir)?;
     }
     let mut cmake_command = Command::new("cmake");
-    cmake_command.arg(self.cmake_source_dir).current_dir(
-      &self.build_dir,
-    );
+    cmake_command
+      .arg(self.cmake_source_dir)
+      .current_dir(&self.build_dir);
     let actual_build_type = if target::current_env() == target::Env::Msvc {
       // Rust always links to release version of MSVC runtime, so
       // link will fail if C library is built in debug mode

@@ -8,15 +8,14 @@
 //! See [README](https://github.com/rust-qt/cpp_to_rust)
 //! for more information.
 
-
 pub extern crate cpp_to_rust_common as common;
 use common::errors::{fancy_unwrap, ChainErr, Result};
 use common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
 use common::BuildScriptData;
-use common::file_utils::{PathBufWithAdded, load_json, create_file, file_to_string, path_to_str};
-use common::cpp_lib_builder::{CppLibBuilder, CMakeVar, BuildType};
+use common::file_utils::{create_file, file_to_string, load_json, path_to_str, PathBufWithAdded};
+use common::cpp_lib_builder::{BuildType, CMakeVar, CppLibBuilder};
 use common::target::current_target;
-use common::utils::{get_command_output, exe_suffix};
+use common::utils::{exe_suffix, get_command_output};
 use common::log;
 
 use std::path::PathBuf;
@@ -30,15 +29,12 @@ pub struct Config {
 }
 
 fn manifest_dir() -> Result<PathBuf> {
-  let dir = std::env::var("CARGO_MANIFEST_DIR").chain_err(
-    || "CARGO_MANIFEST_DIR env var is missing",
-  )?;
+  let dir =
+    std::env::var("CARGO_MANIFEST_DIR").chain_err(|| "CARGO_MANIFEST_DIR env var is missing")?;
   Ok(PathBuf::from(dir))
 }
 fn out_dir() -> Result<PathBuf> {
-  let dir = std::env::var("OUT_DIR").chain_err(
-    || "OUT_DIR env var is missing",
-  )?;
+  let dir = std::env::var("OUT_DIR").chain_err(|| "OUT_DIR env var is missing")?;
   Ok(PathBuf::from(dir))
 }
 
@@ -63,9 +59,11 @@ impl Config {
   /// This is the value set with `Config::set_cpp_lib_version` during generation,
   /// or `None` if the version was not set.
   pub fn original_cpp_lib_version(&self) -> Option<&str> {
-    self.build_script_data.cpp_lib_version.as_ref().map(|x| {
-      x.as_str()
-    })
+    self
+      .build_script_data
+      .cpp_lib_version
+      .as_ref()
+      .map(|x| x.as_str())
   }
 
   /// Returns current `CppBuildConfig` data.
@@ -96,16 +94,16 @@ impl Config {
   /// Same as `run()`, but result of the operation is returned to the caller.
   pub fn run_and_return(mut self) -> Result<()> {
     self.cpp_build_paths.apply_env();
-    let cpp_build_config_data = self.build_script_data.cpp_build_config.eval(
-      &current_target(),
-    )?;
+    let cpp_build_config_data = self
+      .build_script_data
+      .cpp_build_config
+      .eval(&current_target())?;
     let mut cmake_vars = Vec::new();
     cmake_vars.push(CMakeVar::new(
       "C2R_LIBRARY_TYPE",
       match cpp_build_config_data.library_type() {
         Some(CppLibraryType::Shared) => "SHARED",
-        Some(CppLibraryType::Static) |
-        None => "STATIC",
+        Some(CppLibraryType::Static) | None => "STATIC",
       },
     ));
     cmake_vars.push(CMakeVar::new_path_list(
@@ -135,9 +133,7 @@ impl Config {
     let out_dir = out_dir()?;
     let c_lib_install_dir = out_dir.with_added("c_lib_install");
     let manifest_dir = manifest_dir()?;
-    let profile = std::env::var("PROFILE").chain_err(
-      || "PROFILE env var is missing",
-    )?;
+    let profile = std::env::var("PROFILE").chain_err(|| "PROFILE env var is missing")?;
     log::status("Building C++ wrapper library");
     CppLibBuilder {
       cmake_source_dir: manifest_dir.with_added("c_lib"),
@@ -148,11 +144,7 @@ impl Config {
       build_type: match profile.as_str() {
         "debug" => BuildType::Debug,
         "release" => BuildType::Release,
-        _ => {
-          return Err(
-            format!("unknown value of PROFILE env var: {}", profile).into(),
-          )
-        }
+        _ => return Err(format!("unknown value of PROFILE env var: {}", profile).into()),
       },
     }.run()?;
     {
@@ -170,17 +162,16 @@ impl Config {
         ))?;
       }
       ffi_file.write(file_to_string(
-        manifest_dir.with_added("src").with_added(
-          "ffi.in.rs",
-        ),
+        manifest_dir.with_added("src").with_added("ffi.in.rs"),
       )?)?;
     }
     {
       log::status("Requesting type sizes");
-      let mut command = Command::new(c_lib_install_dir.with_added("lib").with_added(format!(
-        "type_sizes{}",
-        exe_suffix()
-      )));
+      let mut command = Command::new(
+        c_lib_install_dir
+          .with_added("lib")
+          .with_added(format!("type_sizes{}", exe_suffix())),
+      );
       let mut file = create_file(out_dir.with_added("type_sizes.rs"))?;
       file.write(get_command_output(&mut command)?)?;
     }
@@ -224,7 +215,6 @@ impl Config {
     std::process::exit(0)
   }
 }
-
 
 /// Same as `run()`, but result of the operation is returned to the caller.
 pub fn run_and_return() -> Result<()> {

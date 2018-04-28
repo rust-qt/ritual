@@ -1,11 +1,10 @@
-
 use new_impl::workspace::Workspace;
 use config::Config;
 use common::log;
 use common::utils::MapIfOk;
 use common::file_utils::PathBufWithAdded;
 use cpp_parser;
-use common::errors::{Result, ChainErr};
+use common::errors::{ChainErr, Result};
 use std::path::PathBuf;
 //use cpp_post_processor::cpp_post_process;
 
@@ -22,14 +21,10 @@ fn check_all_paths(config: &Config) -> Result<()> {
       );
     }
     if !path.exists() {
-      return Err(
-        format!("Directory doesn't exist: {}", path.display()).into(),
-      );
+      return Err(format!("Directory doesn't exist: {}", path.display()).into());
     }
     if !path.is_dir() {
-      return Err(
-        format!("Path is not a directory: {}", path.display()).into(),
-      );
+      return Err(format!("Path is not a directory: {}", path.display()).into());
     }
     Ok(())
   };
@@ -53,7 +48,6 @@ fn check_all_paths(config: &Config) -> Result<()> {
 }
 
 pub fn process(workspace: &mut Workspace, config: &Config) -> Result<()> {
-
   log::status(format!(
     "Processing crate: {}",
     config.crate_properties().name()
@@ -66,13 +60,14 @@ pub fn process(workspace: &mut Workspace, config: &Config) -> Result<()> {
   if !config.dependent_cpp_crates().is_empty() {
     log::status("Loading dependencies");
   }
-  let dependent_cpp_crates = config.dependent_cpp_crates().iter().map_if_ok(
-    |name| -> Result<_> {
-      workspace.load_crate(name).chain_err(
-        || "failed to load dependency",
-      )
-    },
-  )?;
+  let dependent_cpp_crates = config
+    .dependent_cpp_crates()
+    .iter()
+    .map_if_ok(|name| -> Result<_> {
+      workspace
+        .load_crate(name)
+        .chain_err(|| "failed to load dependency")
+    })?;
 
   log::status("Running C++ parser");
   let parser_config = cpp_parser::CppParserConfig {

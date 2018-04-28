@@ -4,8 +4,7 @@ use common::errors::Result;
 use cpp_type::CppType;
 
 /// Available types of C++ operators
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub enum CppOperator {
   /// (type) a
   Conversion(CppType),
@@ -108,7 +107,6 @@ pub enum CppOperator {
   DeleteArray,
 }
 
-
 /// Constraints applied to a C++ operator method
 /// of a certain kind
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -141,13 +139,11 @@ impl CppOperator {
     }
 
     match *self {
-      Conversion(..) => {
-        CppOperatorInfo {
-          function_name_suffix: None,
-          arguments_count: 1,
-          allows_variadic_arguments: false,
-        }
-      }
+      Conversion(..) => CppOperatorInfo {
+        function_name_suffix: None,
+        arguments_count: 1,
+        allows_variadic_arguments: false,
+      },
       Assignment => oi("=", 2),
       Addition => oi("+", 2),
       Subtraction => oi("-", 2),
@@ -190,13 +186,11 @@ impl CppOperator {
       AddressOf => oi("&", 1),
       StructureDereference => oi("->", 1),
       PointerToMember => oi("->*", 2),
-      FunctionCall => {
-        CppOperatorInfo {
-          function_name_suffix: Some("()"),
-          arguments_count: 0,
-          allows_variadic_arguments: true,
-        }
-      }
+      FunctionCall => CppOperatorInfo {
+        function_name_suffix: Some("()"),
+        arguments_count: 0,
+        allows_variadic_arguments: true,
+      },
       Comma => oi(",", 2),
       New => oi("new", 2),
       NewArray => oi("new[]", 2),
@@ -211,9 +205,7 @@ impl CppOperator {
     use self::CppOperator::*;
     Ok(match *self {
       Conversion(..) => {
-        return Err(
-          "CppOperator::c_name: conversion operators are not supported".into(),
-        )
+        return Err("CppOperator::c_name: conversion operators are not supported".into())
       }
       Assignment => "assign",
       Addition => "add",

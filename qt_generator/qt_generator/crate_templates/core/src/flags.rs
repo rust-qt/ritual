@@ -1,7 +1,6 @@
 use std;
 use libc::c_int;
 
-
 /// Rust alternative to Qt's `QFlags` types.
 ///
 /// `Flags<E>` is an OR-combination of integer values of the enum type `E`.
@@ -36,8 +35,6 @@ impl<E: FlaggableEnum> Flags<E> {
     self.value == 0
   }
 }
-
-
 
 impl<E: FlaggableEnum, T: EnumOrFlags<E>> std::ops::BitOr<T> for Flags<E> {
   type Output = Flags<E>;

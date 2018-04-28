@@ -4,7 +4,7 @@
 use doc_decoder::DocData;
 use std::collections::{hash_map, HashMap, HashSet};
 use cpp_to_rust_generator::common::log;
-use cpp_to_rust_generator::common::errors::{Result, ChainErr, unexpected};
+use cpp_to_rust_generator::common::errors::{unexpected, ChainErr, Result};
 use cpp_to_rust_generator::cpp_method::CppMethodDoc;
 use cpp_to_rust_generator::cpp_data::CppTypeDoc;
 use html_parser::node::Node;
@@ -92,8 +92,8 @@ impl DocParser {
     declaration2: &str,
   ) -> Result<CppMethodDoc> {
     let mut name_parts: Vec<_> = name.split("::").collect();
-    let anchor_override = if name_parts.len() >= 2 &&
-      name_parts[name_parts.len() - 1] == name_parts[name_parts.len() - 2]
+    let anchor_override = if name_parts.len() >= 2
+      && name_parts[name_parts.len() - 1] == name_parts[name_parts.len() - 2]
     {
       // constructors are not in the index
       let last_part = name_parts.pop().chain_err(|| "name_parts can't be empty")?;
@@ -114,11 +114,10 @@ impl DocParser {
       .chain_err(|| format!("No documentation entry for {}", corrected_name))?;
     let anchor = match anchor_override {
       Some(x) => x,
-      None => {
-        index_item.anchor.clone().chain_err(|| {
-          unexpected("anchor is expected here!")
-        })?
-      }
+      None => index_item
+        .anchor
+        .clone()
+        .chain_err(|| unexpected("anchor is expected here!"))?,
     };
     let anchor_prefix = format!("{}-", anchor);
     let base_url = self.base_url.clone();
@@ -127,9 +126,7 @@ impl DocParser {
     let candidates: Vec<_> = file_data
       .item_docs
       .iter()
-      .filter(|x| {
-        &x.anchor == &anchor || x.anchor.starts_with(&anchor_prefix)
-      })
+      .filter(|x| &x.anchor == &anchor || x.anchor.starts_with(&anchor_prefix))
       .collect();
     if candidates.is_empty() {
       return Err(format!("No matching anchors found for {}", name).into());
@@ -138,17 +135,15 @@ impl DocParser {
       Some(index) => {
         let prefix = &name[0..index];
         Some((format!("{} ::", prefix), format!("{}::", prefix)))
-
       }
       None => None,
     };
     for declaration in &[declaration1, declaration2] {
       let mut declaration_no_scope = declaration.to_string();
       if let Some((ref prefix1, ref prefix2)) = scope_prefix {
-        declaration_no_scope = declaration_no_scope.replace(prefix1, "").replace(
-          prefix2,
-          "",
-        );
+        declaration_no_scope = declaration_no_scope
+          .replace(prefix1, "")
+          .replace(prefix2, "");
       }
       let mut query_imprint = declaration_no_scope
         .replace("Q_REQUIRED_RESULT", "")
@@ -167,10 +162,9 @@ impl DocParser {
           let mut item_declaration_imprint =
             item_declaration.replace("virtual ", "").replace(" ", "");
           if let Some((ref prefix1, ref prefix2)) = scope_prefix {
-            item_declaration_imprint = item_declaration_imprint.replace(prefix1, "").replace(
-              prefix2,
-              "",
-            );
+            item_declaration_imprint = item_declaration_imprint
+              .replace(prefix1, "")
+              .replace(prefix2, "");
           }
           if &item_declaration_imprint == &query_imprint {
             if item.html.find(|c| c != '\n').is_none() {
@@ -190,10 +184,9 @@ impl DocParser {
         for item_declaration in &item.declarations {
           let mut item_declaration_imprint = item_declaration.clone();
           if let Some((ref prefix1, ref prefix2)) = scope_prefix {
-            item_declaration_imprint = item_declaration_imprint.replace(prefix1, "").replace(
-              prefix2,
-              "",
-            );
+            item_declaration_imprint = item_declaration_imprint
+              .replace(prefix1, "")
+              .replace(prefix2, "");
           }
           if are_argument_types_equal(&declaration_no_scope, &item_declaration_imprint) {
             if item.html.find(|c| c != '\n').is_none() {
@@ -214,11 +207,9 @@ impl DocParser {
       log::llog(log::DebugQtDocDeclarations, || {
         format!(
           "\
-          Declaration mismatch ignored because there is only one \
-                 method.\nDeclaration 1: {}\nDeclaration 2: {}\nDoc declaration: {:?}\n",
-          declaration1,
-          declaration2,
-          candidates[0].declarations
+           Declaration mismatch ignored because there is only one \
+           method.\nDeclaration 1: {}\nDeclaration 2: {}\nDoc declaration: {:?}\n",
+          declaration1, declaration2, candidates[0].declarations
         )
       });
 
@@ -236,8 +227,7 @@ impl DocParser {
     log::llog(log::DebugQtDocDeclarations, || {
       format!(
         "Declaration mismatch!\nDeclaration 1: {}\nDeclaration 2: {}",
-        declaration1,
-        declaration2
+        declaration1, declaration2
       )
     });
     log::llog(log::DebugQtDocDeclarations, || "Candidates:");
@@ -278,12 +268,12 @@ impl DocParser {
     let mut result = String::new();
     let mut url = self.base_url.clone();
     {
-      let file_data = self.file_data(index_item.document_id).chain_err(
-        || "failed to get document",
-      )?;
+      let file_data = self
+        .file_data(index_item.document_id)
+        .chain_err(|| "failed to get document")?;
       url.push_str(&file_data.file_name);
       let doc = &file_data.document;
-      use html_parser::predicate::{And, Name, Class};
+      use html_parser::predicate::{And, Class, Name};
       let div_r = doc.find(And(Name("div"), Class("descr")));
       let div = div_r.iter().next().chain_err(|| "no div.descr")?;
       let h2_r = div.find(Name("h2"));
@@ -324,7 +314,6 @@ impl DocParser {
       log::llog(log::DebugQtDoc, || {
         format!("mark_enum_variant_used failed for {}", full_name)
       });
-
     }
   }
 
@@ -353,12 +342,10 @@ impl DocParser {
 fn arguments_from_declaration(declaration: &str) -> Option<Vec<&str>> {
   match declaration.find('(') {
     None => None,
-    Some(start_index) => {
-      match declaration.rfind(')') {
-        None => None,
-        Some(end_index) => Some(declaration[start_index + 1..end_index].split(',').collect()),
-      }
-    }
+    Some(start_index) => match declaration.rfind(')') {
+      None => None,
+      Some(end_index) => Some(declaration[start_index + 1..end_index].split(',').collect()),
+    },
   }
 }
 
@@ -405,14 +392,11 @@ fn are_argument_types_equal(declaration1: &str, declaration2: &str) -> bool {
   true
 }
 
-
 #[test]
 fn qt_doc_parser_test() {
   assert!(are_argument_types_equal(
-    &"Q_CORE_EXPORT int qstricmp(const char *, const char *)"
-      .to_string(),
-    &"int qstricmp(const char * str1, const char * str2)"
-      .to_string(),
+    &"Q_CORE_EXPORT int qstricmp(const char *, const char *)".to_string(),
+    &"int qstricmp(const char * str1, const char * str2)".to_string(),
   ));
 
   assert!(are_argument_types_equal(
@@ -422,14 +406,14 @@ fn qt_doc_parser_test() {
 
   assert!(are_argument_types_equal(
     &"static QMetaObject :: Connection connect ( const QObject * \
-                                    sender , const char * signal , const QObject * receiver , \
-                                    const char * member , Qt :: ConnectionType = Qt :: \
-                                    AutoConnection )"
+      sender , const char * signal , const QObject * receiver , \
+      const char * member , Qt :: ConnectionType = Qt :: \
+      AutoConnection )"
       .to_string(),
     &"static QMetaObject::Connection connect(const QObject * \
-                                    sender, const char * signal, const QObject * receiver, \
-                                    const char * method, Qt::ConnectionType type = \
-                                    Qt::AutoConnection)"
+      sender, const char * signal, const QObject * receiver, \
+      const char * method, Qt::ConnectionType type = \
+      Qt::AutoConnection)"
       .to_string(),
   ));
 }
@@ -439,9 +423,7 @@ fn qt_doc_parser_test() {
 fn process_html(html: &str, base_url: &str) -> Result<(String, HashSet<String>)> {
   let bad_subfolder_regex = Regex::new(r"^\.\./qt[^/]+/").chain_err(|| "invalid regex")?;
 
-  let link_regex = Regex::new("(href|src)=\"([^\"]*)\"").chain_err(
-    || "invalid regex",
-  )?;
+  let link_regex = Regex::new("(href|src)=\"([^\"]*)\"").chain_err(|| "invalid regex")?;
   let mut cross_references = HashSet::new();
   let html = link_regex.replace_all(html.trim(), |captures: &::regex::Captures| {
     let mut link = bad_subfolder_regex.replace(&captures[2], "");
@@ -457,7 +439,7 @@ fn process_html(html: &str, base_url: &str) -> Result<(String, HashSet<String>)>
 /// Parses document to a list of `ItemDoc`s.
 fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
   let mut results = Vec::new();
-  use html_parser::predicate::{And, Or, Attr, Name, Class};
+  use html_parser::predicate::{And, Attr, Class, Name, Or};
   let h3s = doc.find(And(Name("h3"), Or(Class("fn"), Class("flags"))));
   for h3 in h3s.iter() {
     let anchor = h3.find(And(Name("a"), Attr("name", ())));
@@ -488,10 +470,9 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
     let mut node = if let Some(r) = h3.next() {
       r
     } else {
-      log::llog(
-        log::DebugGeneral,
-        || "Failed to find element next to h3_node",
-      );
+      log::llog(log::DebugGeneral, || {
+        "Failed to find element next to h3_node"
+      });
       continue;
     };
     let mut enum_variants = Vec::new();
@@ -502,8 +483,8 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
       }
       if node.as_comment().is_none() {
         let value_list_condition = And(Name("table"), Class("valuelist"));
-        let mut parse_enum_variants =
-          |value_list: Node| for tr in value_list.find(Name("tr")).iter() {
+        let mut parse_enum_variants = |value_list: Node| {
+          for tr in value_list.find(Name("tr")).iter() {
             let td_r = tr.find(Name("td"));
             let tds: Vec<_> = td_r.iter().collect();
             if tds.len() == 3 {
@@ -519,7 +500,8 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
                 html: html,
               });
             }
-          };
+          }
+        };
         let value_list_r = node.find(value_list_condition.clone());
         if node.is(value_list_condition) {
           parse_enum_variants(node);
