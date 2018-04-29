@@ -8,6 +8,9 @@ use cpp_data::CppOriginLocation;
 use cpp_data::CppEnumValue;
 use cpp_data::CppClassField;
 use cpp_data::CppBaseSpecifier;
+use new_impl::html_logger::HtmlLogger;
+use std::path::Path;
+use common::errors::{ChainErr, Result};
 
 //use common::errors::Result;
 
@@ -131,6 +134,18 @@ impl Database {
       cpp_data: data,
       doc: None,
     });
+  }
+
+  pub fn print_as_html(&self, path: &Path) -> Result<()> {
+    let mut logger = HtmlLogger::new(
+      path,
+      &format!("Database for crate \"{}\"", &self.crate_name),
+    )?;
+    logger.add_header(&["Item", "Environments"]);
+    //...
+    unimplemented!();
+
+    Ok(())
   }
   /*
   pub fn mark_missing_cpp_data(&mut self, env: DataEnv) {

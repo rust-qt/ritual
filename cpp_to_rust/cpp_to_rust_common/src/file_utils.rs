@@ -177,6 +177,10 @@ impl FileWrapper {
       .chain_err(|| format!("Failed to write to file: {:?}", self.path))
   }
 
+  pub fn path(&self) -> &Path {
+    &self.path
+  }
+
   /// Returns underlying `std::fs::File`
   pub fn into_file(self) -> fs::File {
     self.file
