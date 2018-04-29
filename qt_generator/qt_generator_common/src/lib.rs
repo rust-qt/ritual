@@ -1,8 +1,5 @@
 //! Common utilities for the generator and the build script for Qt crates.
 //!
-//! Qt modules are identified within this crate using snake case names without
-//! a prefix, e.g. `core` for QtCore and `ui_tools` for QtUiTools.
-//! `sublib_name` argument should be in this form.
 //!
 //! See [README](https://github.com/rust-qt/cpp_to_rust)
 //! for more information.
@@ -49,7 +46,7 @@ pub struct InstallationData {
 }
 
 /// Detects properties of current Qt installation using `qmake` command line utility.
-pub fn get_installation_data(sublib_name: &str) -> Result<InstallationData> {
+pub fn get_installation_data(crate_name: &str) -> Result<InstallationData> {
   let qt_version = run_qmake_string_query("QT_VERSION")?;
   log::status(format!("QT_VERSION = \"{}\"", qt_version));
   log::status("Detecting Qt directories");
@@ -63,7 +60,7 @@ pub fn get_installation_data(sublib_name: &str) -> Result<InstallationData> {
   log::status(format!("QT_INSTALL_LIBS = \"{}\"", lib_path.display()));
   let docs_path = run_qmake_query("QT_INSTALL_DOCS")?;
   log::status(format!("QT_INSTALL_DOCS = \"{}\"", docs_path.display()));
-  let folder_name = lib_folder_name(sublib_name);
+  let folder_name = lib_folder_name(crate_name);
   let dir = root_include_path.with_added(&folder_name);
   if dir.exists() {
     Ok(InstallationData {
@@ -103,8 +100,8 @@ pub struct FullBuildConfig {
   pub cpp_build_paths: CppBuildPaths,
 }
 
-pub fn get_full_build_config(sublib_name: &str) -> Result<FullBuildConfig> {
-  let installation_data = get_installation_data(sublib_name)?;
+pub fn get_full_build_config(crate_name: &str) -> Result<FullBuildConfig> {
+  let installation_data = get_installation_data(crate_name)?;
   let mut cpp_build_paths = CppBuildPaths::new();
   let mut cpp_build_config_data = CppBuildConfigData::new();
   {
@@ -120,8 +117,8 @@ pub fn get_full_build_config(sublib_name: &str) -> Result<FullBuildConfig> {
       }
     };
 
-    apply_installation_data(sublib_name, &installation_data);
-    for dep in lib_dependencies(sublib_name)? {
+    apply_installation_data(crate_name, &installation_data);
+    for dep in lib_dependencies(crate_name)? {
       let dep_data = get_installation_data(dep)?;
       apply_installation_data(dep, &dep_data);
     }
@@ -153,71 +150,69 @@ pub fn get_full_build_config(sublib_name: &str) -> Result<FullBuildConfig> {
 
 /// Returns library name of the specified module as
 /// should be passed to the linker, e.g. `"Qt5Core"`.
-pub fn real_lib_name(sublib_name: &str) -> String {
+pub fn real_lib_name(crate_name: &str) -> String {
+  let sublib_name = crate_name.replace("qt_", "");
   let sublib_name_capitalized = sublib_name.to_class_case();
   format!("Qt5{}", sublib_name_capitalized)
 }
 
-/// Returns crate name of the specified module.
-pub fn crate_name(sublib_name: &str) -> String {
-  format!("qt_{}", sublib_name)
-}
-
 /// Returns name of the module's include directory, e.g. `"QtCore"`.
-pub fn lib_folder_name(sublib_name: &str) -> String {
+pub fn lib_folder_name(crate_name: &str) -> String {
+  let sublib_name = crate_name.replace("qt_", "");
   let sublib_name_capitalized = sublib_name.to_class_case();
   format!("Qt{}", sublib_name_capitalized)
 }
 
 /// Returns MacOS framework name of the specified module as
 /// should be passed to the linker, e.g. `"QtCore"`.
-pub fn framework_name(sublib_name: &str) -> String {
+pub fn framework_name(crate_name: &str) -> String {
+  let sublib_name = crate_name.replace("qt_", "");
   let sublib_name_capitalized = sublib_name.to_class_case();
   format!("Qt{}", sublib_name_capitalized)
 }
 
-pub fn all_sublib_names() -> &'static [&'static str] {
+pub fn all_crate_names() -> &'static [&'static str] {
   &[
-    "core",
-    "gui",
-    "widgets",
-    "ui_tools",
-    "3d_core",
-    "3d_render",
-    "3d_input",
-    "3d_logic",
-    "3d_extras",
+    "qt_core",
+    "qt_gui",
+    "qt_widgets",
+    "qt_ui_tools",
+    "qt_3d_core",
+    "qt_3d_render",
+    "qt_3d_input",
+    "qt_3d_logic",
+    "qt_3d_extras",
   ]
 }
 
 /// Returns list of modules this module depends on.
-pub fn lib_dependencies(sublib_name: &str) -> Result<&'static [&'static str]> {
+pub fn lib_dependencies(crate_name: &str) -> Result<&'static [&'static str]> {
   const CORE: &'static [&'static str] = &[];
-  const GUI: &'static [&'static str] = &["core"];
-  const WIDGETS: &'static [&'static str] = &["core", "gui"];
-  const UI_TOOLS: &'static [&'static str] = &["core", "gui", "widgets"];
-  const CORE3D: &'static [&'static str] = &["core", "gui"];
-  const RENDER3D: &'static [&'static str] = &["core", "gui", "3d_core"];
-  const INPUT3D: &'static [&'static str] = &["core", "gui", "3d_core"];
-  const LOGIC3D: &'static [&'static str] = &["core", "gui", "3d_core"];
+  const GUI: &'static [&'static str] = &["qt_core"];
+  const WIDGETS: &'static [&'static str] = &["qt_core", "qt_gui"];
+  const UI_TOOLS: &'static [&'static str] = &["qt_core", "qt_gui", "qt_widgets"];
+  const CORE3D: &'static [&'static str] = &["qt_core", "qt_gui"];
+  const RENDER3D: &'static [&'static str] = &["qt_core", "qt_gui", "qt_3d_core"];
+  const INPUT3D: &'static [&'static str] = &["qt_core", "qt_gui", "qt_3d_core"];
+  const LOGIC3D: &'static [&'static str] = &["qt_core", "qt_gui", "qt_3d_core"];
   const EXTRAS3D: &'static [&'static str] = &[
-    "core",
-    "gui",
-    "3d_core",
-    "3d_render",
-    "3d_input",
-    "3d_logic",
+    "qt_core",
+    "qt_gui",
+    "qt_3d_core",
+    "qt_3d_render",
+    "qt_3d_input",
+    "qt_3d_logic",
   ];
-  Ok(match sublib_name {
-    "core" => CORE,
-    "gui" => GUI,
-    "widgets" => WIDGETS,
-    "3d_core" => CORE3D,
-    "3d_render" => RENDER3D,
-    "3d_input" => INPUT3D,
-    "3d_logic" => LOGIC3D,
-    "3d_extras" => EXTRAS3D,
-    "ui_tools" => UI_TOOLS,
-    _ => return Err(format!("Unknown lib name: {}", sublib_name).into()),
+  Ok(match crate_name {
+    "qt_core" => CORE,
+    "qt_gui" => GUI,
+    "qt_widgets" => WIDGETS,
+    "qt_3d_core" => CORE3D,
+    "qt_3d_render" => RENDER3D,
+    "qt_3d_input" => INPUT3D,
+    "qt_3d_logic" => LOGIC3D,
+    "qt_3d_extras" => EXTRAS3D,
+    "qt_ui_tools" => UI_TOOLS,
+    _ => return Err(format!("Unknown crate name: {}", crate_name).into()),
   })
 }

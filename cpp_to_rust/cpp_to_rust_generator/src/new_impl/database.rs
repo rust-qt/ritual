@@ -18,7 +18,6 @@ pub struct CppField; // TODO: fill
 pub enum DataSource {
   CppParser,
   CppChecker,
-  DocParser,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -29,8 +28,9 @@ pub struct DataEnv {
 }
 
 // TODO: attach this data to DataSource enum instead?
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DataEnvInfo {
+  pub is_success: bool,
   pub error: Option<String>,
   /// File name of the include file (without full path)
   pub include_file: Option<String>,
@@ -72,8 +72,9 @@ pub struct DatabaseItem {
 /// Represents all collected data related to a crate.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Database {
-  crate_name: String,
-  items: Vec<DatabaseItem>,
+  pub crate_name: String,
+  pub items: Vec<DatabaseItem>,
+  pub environments: Vec<DataEnv>,
 }
 
 impl Database {
@@ -81,6 +82,7 @@ impl Database {
     Database {
       crate_name: crate_name.to_owned(),
       items: Vec::new(),
+      environments: Vec::new(),
     }
   }
 
@@ -130,4 +132,19 @@ impl Database {
       doc: None,
     });
   }
+  /*
+  pub fn mark_missing_cpp_data(&mut self, env: DataEnv) {
+    let info = DataEnvInfo {
+      is_success: false,
+      ..DataEnvInfo::default()
+    };
+    for item in &mut self.items {
+      if !item.environments.iter().any(|env2| env2.env == env) {
+        item.environments.push(DataEnvWithInfo {
+          env: env.clone(),
+          info: info.clone(),
+        });
+      }
+    }
+  }*/
 }

@@ -14,7 +14,7 @@ use qt_generator_common::{framework_name, get_full_build_config, get_installatio
                           lib_dependencies, real_lib_name, InstallationData};
 
 /// Runs the build script.
-pub fn run_and_return(sublib_name: &str) -> Result<()> {
+pub fn run_and_return(crate_name: &str) -> Result<()> {
   let qt_config = get_full_build_config()?;
 
   let mut config = Config::new()?;
@@ -36,7 +36,7 @@ pub fn run_and_return(sublib_name: &str) -> Result<()> {
 }
 
 /// Runs the build script and exits the process with an appropriate exit code.
-pub fn run(sublib_name: &str) -> ! {
-  fancy_unwrap(run_and_return(sublib_name));
+pub fn run(crate_name: &str) -> ! {
+  fancy_unwrap(run_and_return(crate_name));
   std::process::exit(0)
 }

@@ -136,16 +136,16 @@ pub struct CppMethod {
   /// None if the method was not explicitly declared.
   pub declaration_code: Option<String>,
   // TODO: fill inheritance_chain for explicitly redeclared methods (#23)
-  /// List of base classes this method was inferited from.
-  /// The first item is the most base class.
-  pub inheritance_chain: Vec<CppBaseSpecifier>,
+  // /// List of base classes this method was inferited from.
+  // /// The first item is the most base class.
+  //pub inheritance_chain: Vec<CppBaseSpecifier>,
   // If true, this method was not declared in headers but
   // added in the generator's preprocessing step.
   //pub is_fake_inherited_method: bool,
-  /// C++ documentation data for this method
-  pub doc: Option<CppMethodDoc>,
-  /// If true, FFI generator skips some checks
-  pub is_ffi_whitelisted: bool,
+  // /// C++ documentation data for this method
+  //pub doc: Option<CppMethodDoc>,
+  // /// If true, FFI generator skips some checks
+  //pub is_ffi_whitelisted: bool,
 }
 
 /// Chosen type allocation place for the method
@@ -383,7 +383,7 @@ impl CppMethod {
     }
     s.trim().to_string()
   }
-
+  /*
   /// Returns debugging output for `inheritance_chain` content.
   pub fn inheritance_chain_text(&self) -> String {
     self
@@ -402,7 +402,7 @@ impl CppMethod {
         text
       })
       .join(" -> ")
-  }
+  }*/
 
   /// Returns name of the class this method belongs to, if any.
   pub fn class_name(&self) -> Option<&String> {

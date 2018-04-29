@@ -317,6 +317,7 @@ pub fn run(
     //Ok((parser, methods))
     Ok(())
   })?;
+  parser.current_database.environments.push(parser.env);
   Ok(())
 
   //  log::status("Checking data integrity");
@@ -1240,12 +1241,9 @@ impl<'a> CppParser<'a> {
         return_type: return_type_parsed,
         template_arguments: template_arguments,
         declaration_code: declaration_code,
-        doc: None,
-        inheritance_chain: Vec::new(),
-        //is_fake_inherited_method: false,
-        is_ffi_whitelisted: false,
       },
       DataEnvInfo {
+        is_success: true,
         include_file: Some(self.entity_include_file(entity)?),
         origin_location: Some(get_origin_location(entity)?),
         error: None,
@@ -1269,6 +1267,7 @@ impl<'a> CppParser<'a> {
         kind: CppTypeKind::Enum,
       }),
       DataEnvInfo {
+        is_success: true,
         include_file: Some(include_file.clone()),
         origin_location: Some(get_origin_location(entity)?),
         error: None,
@@ -1289,6 +1288,7 @@ impl<'a> CppParser<'a> {
             enum_name: enum_name.clone(),
           }),
           DataEnvInfo {
+            is_success: true,
             include_file: Some(include_file.clone()),
             origin_location: Some(get_origin_location(child)?),
             error: None,
@@ -1335,6 +1335,7 @@ impl<'a> CppParser<'a> {
         },
       }),
       DataEnvInfo {
+        is_success: true,
         include_file: Some(include_file),
         origin_location: Some(get_origin_location(entity)?),
         error: None,
@@ -1444,6 +1445,7 @@ impl<'a> CppParser<'a> {
               derived_class_type: class_type_for_field.clone(),
             }),
             DataEnvInfo {
+              is_success: true,
               error: None,
               include_file: Some(include_file.clone()),
               origin_location: Some(get_origin_location(entity).unwrap()),
@@ -1466,6 +1468,7 @@ impl<'a> CppParser<'a> {
         },
       }),
       DataEnvInfo {
+        is_success: true,
         error: None,
         include_file: Some(include_file),
         origin_location: Some(get_origin_location(entity).unwrap()),

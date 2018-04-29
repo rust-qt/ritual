@@ -177,10 +177,6 @@ impl Workspace {
     Ok(())
   }
 
-  pub fn process_crate(&mut self, config: &Config) -> Result<()> {
-    ::new_impl::processor::process(self, config)
-  }
-
   pub fn save_data(&mut self) -> Result<()> {
     for database in &mut self.databases {
       if !database.saved {

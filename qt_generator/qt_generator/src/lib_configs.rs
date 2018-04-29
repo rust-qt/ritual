@@ -10,7 +10,7 @@ use cpp_to_rust_generator::common::file_utils::repo_crate_local_path;
 use cpp_to_rust_generator::cpp_data::CppVisibility;
 use cpp_to_rust_generator::common::target;
 use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
-use qt_generator_common::{crate_name, get_full_build_config, lib_dependencies, lib_folder_name};
+use qt_generator_common::{get_full_build_config, lib_dependencies, lib_folder_name};
 use std::path::PathBuf;
 use versions;
 
@@ -445,14 +445,13 @@ pub fn extras_3d(config: &mut Config) -> Result<()> {
 }
 
 /// Executes the generator for a single Qt module with given configuration.
-pub fn make_config(sublib_name: &str) -> Result<Config> {
+pub fn make_config(crate_name: &str) -> Result<Config> {
   log::status(format!(
-    "Preparing generator config for library: {}",
-    sublib_name
+    "Preparing generator config for crate: {}",
+    crate_name
   ));
-  let this_crate_name = crate_name(sublib_name);
   let mut crate_properties =
-    CrateProperties::new(this_crate_name.clone(), versions::QT_OUTPUT_CRATES_VERSION);
+    CrateProperties::new(crate_name.clone(), versions::QT_OUTPUT_CRATES_VERSION);
   let mut custom_fields = toml::Table::new();
   let mut package_data = toml::Table::new();
   package_data.insert(
@@ -463,10 +462,10 @@ pub fn make_config(sublib_name: &str) -> Result<Config> {
   );
   let description = format!(
     "Bindings for {} C++ library (generated automatically with cpp_to_rust project)",
-    lib_folder_name(sublib_name)
+    lib_folder_name(crate_name)
   );
   package_data.insert("description".to_string(), toml::Value::String(description));
-  let doc_url = format!("https://rust-qt.github.io/rustdoc/qt/{}", &this_crate_name);
+  let doc_url = format!("https://rust-qt.github.io/rustdoc/qt/{}", &crate_name);
   package_data.insert("documentation".to_string(), toml::Value::String(doc_url));
   package_data.insert(
     "repository".to_string(),
@@ -486,7 +485,7 @@ pub fn make_config(sublib_name: &str) -> Result<Config> {
     Some(repo_crate_local_path("qt_generator/qt_build_tools")?),
   );
   let mut config = Config::new(crate_properties);
-  let qt_config = get_full_build_config(sublib_name)?;
+  let qt_config = get_full_build_config(crate_name)?;
   config.set_cpp_build_config(qt_config.cpp_build_config);
   config.set_cpp_build_paths(qt_config.cpp_build_paths);
 
@@ -494,7 +493,7 @@ pub fn make_config(sublib_name: &str) -> Result<Config> {
   config.set_cpp_lib_version(qt_config.installation_data.qt_version.as_str());
   // TODO: does parsing work on MacOS without adding "-F"?
 
-  config.add_include_directive(&lib_folder_name(sublib_name));
+  config.add_include_directive(&lib_folder_name(crate_name));
   let lib_include_path = qt_config.installation_data.lib_include_path.clone();
   // TODO: reimplement this
   //config.add_cpp_data_filter(move |cpp_data| fix_header_names(cpp_data, &lib_include_path));
@@ -507,7 +506,7 @@ pub fn make_config(sublib_name: &str) -> Result<Config> {
     config.add_cpp_parser_argument("-std=gnu++11");
   }
   config.add_cpp_parser_blocked_name("qt_check_for_QGADGET_macro");
-  let sublib_name_clone = sublib_name.to_string();
+  let crate_name_clone = crate_name.to_string();
   let docs_path = qt_config.installation_data.docs_path.clone();
 
   // TODO: reimplement this
@@ -567,30 +566,30 @@ pub fn make_config(sublib_name: &str) -> Result<Config> {
   config.set_crate_template_path(
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
       .with_added("crate_templates")
-      .with_added(&sublib_name),
+      .with_added(&crate_name),
   );
-  match sublib_name {
-    "core" => lib_configs::core(&mut config)?,
-    "gui" => lib_configs::gui(&mut config)?,
-    "widgets" => lib_configs::widgets(&mut config)?,
-    "3d_core" => lib_configs::core_3d(&mut config)?,
-    "3d_render" => lib_configs::render_3d(&mut config)?,
-    "3d_input" => lib_configs::input_3d(&mut config)?,
-    "3d_logic" => lib_configs::logic_3d(&mut config)?,
-    "3d_extras" => lib_configs::extras_3d(&mut config)?,
-    "ui_tools" => {}
-    _ => return Err(format!("Unknown lib name: {}", sublib_name).into()),
+  match crate_name {
+    "qt_core" => lib_configs::core(&mut config)?,
+    "qt_gui" => lib_configs::gui(&mut config)?,
+    "qt_widgets" => lib_configs::widgets(&mut config)?,
+    "qt_3d_core" => lib_configs::core_3d(&mut config)?,
+    "qt_3d_render" => lib_configs::render_3d(&mut config)?,
+    "qt_3d_input" => lib_configs::input_3d(&mut config)?,
+    "qt_3d_logic" => lib_configs::logic_3d(&mut config)?,
+    "qt_3d_extras" => lib_configs::extras_3d(&mut config)?,
+    "qt_ui_tools" => {}
+    _ => return Err(format!("Unknown crate name: {}", crate_name).into()),
   }
 
   config.set_dependent_cpp_crates(
-    lib_dependencies(sublib_name)?
+    lib_dependencies(crate_name)?
       .iter()
-      .map(|s| crate_name(s))
+      .map(|s| s.to_string())
       .collect(),
   );
   Ok(config)
 }
-
+/*
 /// Adds documentation from `data` to `cpp_methods`.
 fn find_methods_docs(cpp_methods: &mut [CppMethod], data: &mut DocParser) -> Result<()> {
   for cpp_method in cpp_methods {
@@ -627,3 +626,4 @@ fn find_methods_docs(cpp_methods: &mut [CppMethod], data: &mut DocParser) -> Res
   }
   Ok(())
 }
+*/

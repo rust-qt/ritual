@@ -47,7 +47,7 @@ fn check_all_paths(config: &Config) -> Result<()> {
   Ok(())
 }
 
-pub fn process(workspace: &mut Workspace, config: &Config) -> Result<()> {
+pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]) -> Result<()> {
   log::status(format!(
     "Processing crate: {}",
     config.crate_properties().name()
@@ -74,20 +74,47 @@ pub fn process(workspace: &mut Workspace, config: &Config) -> Result<()> {
         .chain_err(|| "failed to load dependency")
     })?;
 
-  log::status("Running C++ parser");
-  let parser_config = cpp_parser::CppParserConfig {
-    include_paths: Vec::from(config.cpp_build_paths().include_paths()),
-    framework_paths: Vec::from(config.cpp_build_paths().framework_paths()),
-    include_directives: Vec::from(config.include_directives()),
-    target_include_paths: Vec::from(config.target_include_paths()),
-    tmp_cpp_path: workspace.tmp_path()?.with_added("1.cpp"),
-    name_blacklist: Vec::from(config.cpp_parser_blocked_names()),
-    clang_arguments: Vec::from(config.cpp_parser_arguments()),
-    cpp_library_version: config.cpp_lib_version().map(|s| s.to_string()),
-  };
+  for operation in operations {
+    match operation.as_str() {
+      "run_cpp_parser" => {
+        log::status("Running C++ parser");
+        let parser_config = cpp_parser::CppParserConfig {
+          include_paths: Vec::from(config.cpp_build_paths().include_paths()),
+          framework_paths: Vec::from(config.cpp_build_paths().framework_paths()),
+          include_directives: Vec::from(config.include_directives()),
+          target_include_paths: Vec::from(config.target_include_paths()),
+          tmp_cpp_path: workspace.tmp_path()?.with_added("1.cpp"),
+          name_blacklist: Vec::from(config.cpp_parser_blocked_names()),
+          clang_arguments: Vec::from(config.cpp_parser_arguments()),
+          cpp_library_version: config.cpp_lib_version().map(|s| s.to_string()),
+        };
 
-  cpp_parser::run(parser_config, &mut current_database, &dependent_cpp_crates)
-    .chain_err(|| "C++ parser failed")?;
+        cpp_parser::run(parser_config, &mut current_database, &dependent_cpp_crates)
+          .chain_err(|| "C++ parser failed")?;
+      }
+      //...
+      "print_database" => unimplemented!(),
+      "generate_crate" => {
+        unimplemented!()
+
+        /*
+if exec_config.write_dependencies_local_paths {
+log::status(
+ "Output Cargo.toml file will contain local paths of used dependencies \
+          (use --no-local-paths to disable).",
+);
+} else {
+log::status(
+ "Local paths will not be written to the output crate. Make sure all dependencies \
+          are published before trying to compile the crate.",
+);
+}
+
+*/
+      }
+      _ => return Err(format!("unknown operation: {}", operation).into()),
+    }
+  }
 
   /*
   parser_cpp_data.detect_signals_and_slots(
