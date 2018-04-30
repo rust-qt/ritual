@@ -1284,7 +1284,7 @@ impl<'a> CppParser<'a> {
             name: child
               .get_name()
               .chain_err(|| "failed to get name of enum variant")?,
-            value: val.0,
+            value: val.1,
             enum_name: enum_name.clone(),
           }),
           DataEnvInfo {
@@ -1321,10 +1321,10 @@ impl<'a> CppParser<'a> {
       })?;
     self.save_info(
       CppItemData::ClassField(CppClassField {
-        size: match field_clang_type.get_sizeof() {
-          Ok(size) => Some(size),
-          Err(_) => None,
-        },
+        //        size: match field_clang_type.get_sizeof() {
+        //          Ok(size) => Some(size),
+        //          Err(_) => None,
+        //        },
         name: field_name,
         field_type: field_type,
         class_type: class_type,
@@ -1390,13 +1390,13 @@ impl<'a> CppParser<'a> {
     } else if template_arguments.is_some() {
       return Err(unexpected("unexpected template arguments").into());
     }
-    let size = match entity.get_type() {
-      Some(type1) => type1.get_sizeof().ok(),
-      None => None,
-    };
-    if template_arguments.is_none() && size.is_none() {
-      return Err("Failed to request size, but the class is not a template class".into());
-    }
+    //    let size = match entity.get_type() {
+    //      Some(type1) => type1.get_sizeof().ok(),
+    //      None => None,
+    //    };
+    //    if template_arguments.is_none() && size.is_none() {
+    //      return Err("Failed to request size, but the class is not a template class".into());
+    //    }
     if let Some(parent) = entity.get_semantic_parent() {
       if get_template_arguments(parent).is_some() {
         return Err("Types nested into template types are not supported".into());
@@ -1434,7 +1434,7 @@ impl<'a> CppParser<'a> {
         if let CppTypeBase::Class(ref base_type) = base_type.base {
           self.save_info(
             CppItemData::ClassBase(CppBaseSpecifier {
-              base_type: base_type.clone(),
+              base_class_type: base_type.clone(),
               is_virtual: child.is_virtual_base(),
               visibility: match child.get_accessibility().unwrap_or(Accessibility::Public) {
                 Accessibility::Public => CppVisibility::Public,

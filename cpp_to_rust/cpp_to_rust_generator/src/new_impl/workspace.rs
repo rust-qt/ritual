@@ -84,6 +84,16 @@ impl Workspace {
       .position(|d| d.database.crate_name() == crate_name)
       .and_then(|i| Some(self.databases.swap_remove(i).database))
   }
+  /*
+  pub fn crate_exists(&self, crate_name: &str) -> bool {
+    database_path(&self.path, crate_name).exists()
+  }
+
+  pub fn create_crate(&mut self, crate_name: &str) -> Result<()> {
+    create_dir(self.path.with_added(crate_name))?;
+    save_json(database_path(&self.path, data.crate_name()), &Database::empty(crate_name))?;
+    Ok(())
+  }*/
 
   pub fn load_crate(&mut self, crate_name: &str) -> Result<Database> {
     if let Some(r) = self.take_loaded_crate(crate_name) {
@@ -100,6 +110,10 @@ impl Workspace {
     if path.exists() {
       load_json(path)
     } else {
+      let dir_path = self.path.with_added(crate_name);
+      if !dir_path.exists() {
+        create_dir(dir_path)?;
+      }
       Ok(Database::empty(crate_name))
     }
   }
@@ -178,19 +192,23 @@ impl Workspace {
   }
 
   pub fn save_data(&mut self) -> Result<()> {
+    //log::status("test1: save data start!");
     for database in &mut self.databases {
       if !database.saved {
+        //log::status("test1: save data - saving crate");
         let data = &database.database;
         save_json(database_path(&self.path, data.crate_name()), &data)?;
         database.saved = true;
       }
     }
+    //log::status("test1: save data success!");
     Ok(())
   }
 }
 
 impl Drop for Workspace {
   fn drop(&mut self) {
+    //log::status("test1: Workspace drop!");
     if let Err(err) = self.save_data() {
       err.display_report();
       ::std::process::exit(1);

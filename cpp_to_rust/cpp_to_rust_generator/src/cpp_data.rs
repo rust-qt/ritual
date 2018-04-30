@@ -19,7 +19,7 @@ pub struct CppEnumValue {
   /// Identifier
   pub name: String,
   /// Corresponding value
-  pub value: i64,
+  pub value: u64,
   // /// C++ documentation for this item in HTML
   //pub doc: Option<String>,
   /// Full type name of the enum this item belongs to
@@ -35,9 +35,8 @@ pub struct CppClassField {
   pub field_type: CppType,
   /// Visibility
   pub visibility: CppVisibility,
-  /// Size of type in bytes
-  pub size: Option<usize>,
-
+  //  /// Size of type in bytes
+  //  pub size: Option<usize>,
   /// Name and template arguments of the class type that owns this field
   pub class_type: CppTypeClassBase,
 }
@@ -57,7 +56,7 @@ pub struct CppClassUsingDirective {
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppBaseSpecifier {
   /// Base class type (can include template arguments)
-  pub base_type: CppTypeClassBase,
+  pub base_class_type: CppTypeClassBase,
   /// Index of this base (for classes that have multiple base classes)
   pub base_index: usize,
   /// True if this base is virtual

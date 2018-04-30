@@ -96,6 +96,7 @@ pub fn new_main() {
             .help(&crates_help)
             .takes_value(true)
             .multiple(true)
+            .required(true)
             .use_delimiter(false),
         )
         .arg(
@@ -106,22 +107,13 @@ pub fn new_main() {
             .help(&OPERATIONS_HELP)
             .takes_value(true)
             .multiple(true)
+            .required(true)
             .use_delimiter(false),
         )
         .arg(
           Arg::with_name("disable-logging")
             .long("disable-logging")
             .help(DISABLE_LOGGING_HELP),
-        )
-        .arg(
-          Arg::with_name("clear")
-            .long("clear")
-            .help(CLEAR_CURRENT_HELP),
-        )
-        .arg(
-          Arg::with_name("clear-all")
-            .long("clear-all")
-            .help(CLEAR_ALL_HELP),
         )
         .get_matches(),
     )

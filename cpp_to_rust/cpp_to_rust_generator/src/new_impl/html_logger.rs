@@ -7,6 +7,13 @@ pub struct HtmlLogger {
   file: FileWrapper,
 }
 
+pub fn escape_html(text: &str) -> String {
+  text
+    .replace("&", "&amp;")
+    .replace("<", "&lt;")
+    .replace(">", "&gt;")
+}
+
 impl HtmlLogger {
   pub fn new<P: AsRef<Path>>(path: P, title: &str) -> Result<HtmlLogger> {
     let mut file = create_file(path)?;

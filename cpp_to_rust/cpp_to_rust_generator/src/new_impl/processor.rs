@@ -59,7 +59,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
 
   log::status("Loading current crate data");
   let mut current_database = workspace
-    .load_crate(config.crate_properties().name())
+    .load_or_create_crate(config.crate_properties().name())
     .chain_err(|| "failed to load current crate data")?;
 
   if !config.dependent_cpp_crates().is_empty() {
@@ -74,10 +74,13 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
         .chain_err(|| "failed to load dependency")
     })?;
 
+  let mut current_database_saved = true;
+
   for operation in operations {
     match operation.as_str() {
       "run_cpp_parser" => {
         log::status("Running C++ parser");
+        current_database_saved = false;
         let parser_config = cpp_parser::CppParserConfig {
           include_paths: Vec::from(config.cpp_build_paths().include_paths()),
           framework_paths: Vec::from(config.cpp_build_paths().framework_paths()),
@@ -93,7 +96,14 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
           .chain_err(|| "C++ parser failed")?;
       }
       //...
-      "print_database" => unimplemented!(),
+      "print_database" => {
+        let path = workspace
+          .path()
+          .with_added("log")
+          .with_added(format!("database_{}.html", current_database.crate_name));
+        log::status(format!("Printing database to {}", path.display()));
+        current_database.print_as_html(&path)?;
+      }
       "generate_crate" => {
         unimplemented!()
 
@@ -112,6 +122,7 @@ log::status(
 
 */
       }
+      "clear" => unimplemented!(),
       _ => return Err(format!("unknown operation: {}", operation).into()),
     }
   }
@@ -144,7 +155,7 @@ log::status(
   for database in dependent_cpp_crates {
     workspace.put_crate(database, true);
   }
-  workspace.put_crate(current_database, false);
+  workspace.put_crate(current_database, current_database_saved);
   log::status("Saving data");
   workspace.save_data()?;
   Ok(())

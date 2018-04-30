@@ -11,7 +11,12 @@ use cpp_data::CppBaseSpecifier;
 use new_impl::html_logger::HtmlLogger;
 use std::path::Path;
 use common::errors::{ChainErr, Result};
-
+use std::fmt::Display;
+use std::fmt::Formatter;
+use cpp_data::CppTypeKind;
+use common::string_utils::JoinWithSeparator;
+use cpp_data::CppVisibility;
+use new_impl::html_logger::escape_html;
 //use common::errors::Result;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -54,6 +59,75 @@ pub enum CppItemData {
   EnumValue(CppEnumValue),
   ClassField(CppClassField),
   ClassBase(CppBaseSpecifier),
+}
+
+impl Display for CppItemData {
+  fn fmt(&self, f: &mut Formatter) -> ::std::result::Result<(), ::std::fmt::Error> {
+    let s = match *self {
+      CppItemData::Type(ref type1) => match type1.kind {
+        CppTypeKind::Enum => format!("enum {}", type1.name),
+        CppTypeKind::Class {
+          ref template_arguments,
+        } => format!(
+          "class {}{}",
+          type1.name,
+          if let Some(ref args) = *template_arguments {
+            format!(
+              "<{}>",
+              args.iter().map(|arg| arg.to_cpp_pseudo_code()).join(", ")
+            )
+          } else {
+            String::new()
+          }
+        ),
+      },
+      CppItemData::Method(ref method) => method.short_text(),
+      CppItemData::EnumValue(ref value) => format!(
+        "enum {} {{ {} = {}, ... }}",
+        value.enum_name, value.name, value.value
+      ),
+      CppItemData::ClassField(ref field) => {
+        let visibility_text = match field.visibility {
+          CppVisibility::Public => "",
+          CppVisibility::Protected => "protected ",
+          CppVisibility::Private => "private ",
+        };
+        format!(
+          "class {} {{ {}{} {}; ... }}",
+          field.class_type.to_cpp_pseudo_code(),
+          visibility_text,
+          field.field_type.to_cpp_pseudo_code(),
+          field.name
+        )
+      }
+      CppItemData::ClassBase(ref class_base) => {
+        let virtual_text = if class_base.is_virtual {
+          "virtual "
+        } else {
+          ""
+        };
+        let visibility_text = match class_base.visibility {
+          CppVisibility::Public => "public",
+          CppVisibility::Protected => "protected",
+          CppVisibility::Private => "private",
+        };
+        let index_text = if class_base.base_index > 0 {
+          format!(" (index: {}", class_base.base_index)
+        } else {
+          String::new()
+        };
+        format!(
+          "class {} : {}{} {}{}",
+          class_base.derived_class_type.to_cpp_pseudo_code(),
+          virtual_text,
+          visibility_text,
+          class_base.base_class_type.to_cpp_pseudo_code(),
+          index_text
+        )
+      }
+    };
+    f.write_str(&s)
+  }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -142,9 +216,9 @@ impl Database {
       &format!("Database for crate \"{}\"", &self.crate_name),
     )?;
     logger.add_header(&["Item", "Environments"]);
-    //...
-    unimplemented!();
-
+    for item in &self.items {
+      logger.add(&[&escape_html(&item.cpp_data.to_string()), "..."], "");
+    }
     Ok(())
   }
   /*
