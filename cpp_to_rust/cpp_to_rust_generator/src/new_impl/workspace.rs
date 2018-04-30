@@ -73,6 +73,14 @@ impl Workspace {
     Ok(path)
   }
 
+  pub fn log_path(&self) -> Result<PathBuf> {
+    let path = self.path.with_added("log");
+    if !path.exists() {
+      create_dir(&path)?;
+    }
+    Ok(path)
+  }
+
   pub fn import_published_crate(&mut self, crate_name: &str) -> Result<()> {
     unimplemented!()
   }
@@ -166,7 +174,7 @@ impl Workspace {
       );
     }
     if !self.config.disable_logging {
-      let logs_dir = self.path.with_added("log");
+      let logs_dir = self.log_path()?;
       logger.log(
         log::Status,
         format!("Debug log will be saved to {}", logs_dir.display()),

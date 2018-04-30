@@ -1,6 +1,7 @@
 
 td, th {
   text-align: left;
+  vertical-align: top;
 }
 
 tr:nth-child(even) {

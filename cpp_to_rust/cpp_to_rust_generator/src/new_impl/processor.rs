@@ -87,6 +87,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
           include_directives: Vec::from(config.include_directives()),
           target_include_paths: Vec::from(config.target_include_paths()),
           tmp_cpp_path: workspace.tmp_path()?.with_added("1.cpp"),
+          html_log_path: workspace.log_path()?.with_added("cpp_parser_log.html"),
           name_blacklist: Vec::from(config.cpp_parser_blocked_names()),
           clang_arguments: Vec::from(config.cpp_parser_arguments()),
           cpp_library_version: config.cpp_lib_version().map(|s| s.to_string()),
@@ -98,10 +99,9 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
       //...
       "print_database" => {
         let path = workspace
-          .path()
-          .with_added("log")
+          .log_path()?
           .with_added(format!("database_{}.html", current_database.crate_name));
-        log::status(format!("Printing database to {}", path.display()));
+        log::status("Printing database");
         current_database.print_as_html(&path)?;
       }
       "generate_crate" => {

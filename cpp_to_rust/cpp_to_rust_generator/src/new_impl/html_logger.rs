@@ -2,6 +2,8 @@ use common::file_utils::{create_file, FileWrapper};
 use common::errors::{ChainErr, Result};
 use std::path::Path;
 use common::file_utils::PathBufWithAdded;
+use common::log;
+use std::fmt::Display;
 
 pub struct HtmlLogger {
   file: FileWrapper,
@@ -32,7 +34,7 @@ impl HtmlLogger {
     self.file.write("</tr>")?;
     Ok(())
   }
-  pub fn add(&mut self, texts: &[&str], classes: &str) -> Result<()> {
+  pub fn add<S: Display>(&mut self, texts: &[S], classes: &str) -> Result<()> {
     self.file.write(format!("<tr class='{}'>", classes))?;
     for text in texts {
       self.file.write(format!("<td>{}</td>", text))?;
@@ -58,6 +60,7 @@ impl HtmlLogger {
     if !script_path.exists() {
       create_file(script_path)?.write(include_str!("../../templates/html_logger/script.js"))?;
     }
+    log::status(format!("Log saved as {}", self.file.path().display()));
     Ok(())
   }
 }

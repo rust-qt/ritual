@@ -61,6 +61,9 @@ pub struct DataEnvInfo {
   pub include_file: Option<String>,
   /// Exact location of the declaration
   pub origin_location: Option<CppOriginLocation>,
+  /// Set to true before a repeated check is performed in the same
+  /// environment
+  pub is_invalidated: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -147,6 +150,19 @@ impl Display for CppItemData {
   }
 }
 
+pub enum DatabaseUpdateResultType {
+  ItemAdded,
+  EnvAdded,
+  EnvUpdated,
+  Unchanged,
+}
+
+pub struct DatabaseUpdateResult {
+  pub result_type: DatabaseUpdateResultType,
+  pub old_data: Vec<DataEnvWithInfo>,
+  pub new_data: Vec<DataEnvWithInfo>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CppItemDoc {
   Type(CppTypeDoc),
@@ -188,30 +204,59 @@ impl Database {
     &self.crate_name
   }
 
-  pub fn add_cpp_data(&mut self, env: DataEnv, data: CppItemData, info: DataEnvInfo) {
-    if let Some(r) = self.items.iter_mut().find(|item| item.cpp_data == data) {
-      if let Some(env1) = r.environments.iter_mut().find(|env2| env2.env == env) {
-        if env1.info != info {
-          log::llog(log::LoggerCategory::DebugGeneral, || {
-            format!(
-              "cpp env result changed for existing data!\n\
-               env: {:?}\ndata: {:?}\nnew info: {:?}\nold info: {:?}\n",
-              env, data, info, env1.info
-            )
-          });
-          env1.info = info;
+  pub fn invalidate_env(&mut self, env: &DataEnv) {
+    for item in &mut self.items {
+      for env1 in &mut item.environments {
+        if &env1.env == env {
+          env1.info.is_invalidated = true;
         }
-        return;
       }
-      log::llog(log::LoggerCategory::DebugGeneral, || {
-        format!(
-          "cpp new env for existing data!\n\
-           env: {:?}\ndata: {:?}\ninfo: {:?}\n",
-          env, data, info
-        )
-      });
-      r.environments.push(DataEnvWithInfo { env, info });
-      return;
+    }
+  }
+
+  pub fn add_cpp_data(
+    &mut self,
+    env: DataEnv,
+    data: CppItemData,
+    info: DataEnvInfo,
+  ) -> DatabaseUpdateResult {
+    if let Some(item) = self.items.iter_mut().find(|item| item.cpp_data == data) {
+      let mut result = DatabaseUpdateResult {
+        result_type: DatabaseUpdateResultType::Unchanged,
+        old_data: item.environments.clone(),
+        new_data: Vec::new(),
+      };
+      let mut ok = false;
+      if let Some(env1) = item.environments.iter_mut().find(|env2| env2.env == env) {
+        env1.info.is_invalidated = false; // suppress false change detection
+        if env1.info != info {
+          //          log::llog(log::LoggerCategory::DebugGeneral, || {
+          //            format!(
+          //              "cpp env result changed for existing data!\n\
+          //               env: {:?}\ndata: {:?}\nnew info: {:?}\nold info: {:?}\n",
+          //              env, data, info, env1.info
+          //            )
+          //          });
+          env1.info = info.clone();
+          result.result_type = DatabaseUpdateResultType::EnvUpdated;
+        } else {
+          // result unchanged
+        }
+        ok = true;
+      }
+      if !ok {
+        //        log::llog(log::LoggerCategory::DebugGeneral, || {
+        //          format!(
+        //            "cpp new env for existing data!\n\
+        //           env: {:?}\ndata: {:?}\ninfo: {:?}\n",
+        //            env, data, info
+        //          )
+        //        });
+        item.environments.push(DataEnvWithInfo { env, info });
+        result.result_type = DatabaseUpdateResultType::EnvAdded;
+      }
+      result.new_data = item.environments.clone();
+      return result;
     }
     log::llog(log::LoggerCategory::DebugGeneral, || {
       format!(
@@ -220,11 +265,18 @@ impl Database {
         env, data, info
       )
     });
-    self.items.push(DatabaseItem {
+    let item = DatabaseItem {
       environments: vec![DataEnvWithInfo { env, info }],
       cpp_data: data,
       doc: None,
-    });
+    };
+    let result = DatabaseUpdateResult {
+      result_type: DatabaseUpdateResultType::ItemAdded,
+      old_data: Vec::new(),
+      new_data: item.environments.clone(),
+    };
+    self.items.push(item);
+    result
   }
 
   pub fn print_as_html(&self, path: &Path) -> Result<()> {
@@ -247,7 +299,7 @@ impl Database {
         );
       }
 
-      logger.add(&[escape_html(&item_text).as_str(), env_text.as_str()], "");
+      logger.add(&[escape_html(&item_text), env_text], "");
     }
     Ok(())
   }
