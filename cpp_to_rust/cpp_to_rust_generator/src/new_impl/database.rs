@@ -35,6 +35,23 @@ pub struct DataEnv {
   pub cpp_library_version: Option<String>,
 }
 
+impl DataEnv {
+  pub fn short_text(&self) -> String {
+    format!(
+      "{}/{:?}-{:?}-{:?}-{:?}",
+      self
+        .cpp_library_version
+        .as_ref()
+        .map(|s| s.as_str())
+        .unwrap_or("None"),
+      self.target.arch,
+      self.target.os,
+      self.target.family,
+      self.target.env
+    )
+  }
+}
+
 // TODO: attach this data to DataSource enum instead?
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DataEnvInfo {
@@ -217,7 +234,20 @@ impl Database {
     )?;
     logger.add_header(&["Item", "Environments"]);
     for item in &self.items {
-      logger.add(&[&escape_html(&item.cpp_data.to_string()), "..."], "");
+      let item_text = item.cpp_data.to_string();
+      let mut env_text = String::new();
+      if !item.environments.is_empty() {
+        env_text += &format!(
+          "C++ parser: {}",
+          item
+            .environments
+            .iter()
+            .map(|env| env.env.short_text())
+            .join(", ")
+        );
+      }
+
+      logger.add(&[escape_html(&item_text).as_str(), env_text.as_str()], "");
     }
     Ok(())
   }
