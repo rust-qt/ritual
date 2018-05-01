@@ -464,12 +464,7 @@ impl<'a> CppParser<'a> {
               indirection: CppTypeIndirection::None,
             });
           } else {
-            return Err(
-              format!(
-                "Unexposed type has a declaration but is too complex: {}",
-                name
-              ).into(),
-            );
+            return Err(format!("Can't parse declaration of an unexposed type: {}", name).into());
           }
         }
       }
@@ -628,12 +623,7 @@ impl<'a> CppParser<'a> {
         return Ok(result_type);
       }
     } else {
-      return Err(
-        format!(
-          "Unexposed type has a declaration but is too complex: {}",
-          name
-        ).into(),
-      );
+      return Err(format!("Can't parse declaration of an unexposed type: {}", name).into());
     }
 
     Err(format!("Unrecognized unexposed type: {}", name).into())

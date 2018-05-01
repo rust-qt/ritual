@@ -22,6 +22,7 @@ use cpp_to_rust_generator::config::CrateProperties;
 use doc_decoder::DocData;
 use lib_configs;
 
+/*
 /// Helper method to blacklist all methods of `QList<T>` template instantiation that
 /// don't work if `T` doesn't have `operator==`. `types` is list of such `T` types.
 fn exclude_qlist_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(
@@ -146,14 +147,15 @@ fn core_cpp_parser_blocked_names() -> Vec<&'static str> {
     "QFutureInterfaceBase", "QFutureInterface", "QFutureWatcherBase", "QFutureWatcher"
   ]
 }
-
+*/
 /// QtCore specific configuration.
 pub fn core(config: &mut Config) -> Result<()> {
   // TODO: replace QVariant::Type with QMetaType::Type?
-  config.add_cpp_parser_blocked_names(core_cpp_parser_blocked_names());
+  //config.add_cpp_parser_blocked_names(core_cpp_parser_blocked_names());
+  //config.add_cpp_parser_blocked_names(vec!["QtMetaTypePrivate", "QtPrivate"]);
 
   // TODO: the following items should be conditionally available on Windows;
-  config.add_cpp_parser_blocked_names(vec![
+  /*config.add_cpp_parser_blocked_names(vec![
     "QWinEventNotifier",
     "QProcess::CreateProcessArguments",
     "QProcess::nativeArguments",
@@ -162,12 +164,12 @@ pub fn core(config: &mut Config) -> Result<()> {
     "QProcess::setCreateProcessArgumentsModifier",
     "QAbstractEventDispatcher::registerEventNotifier",
     "QAbstractEventDispatcher::unregisterEventNotifier",
-  ]);
+  ]);*/
 
   // QProcess::pid returns different types on different platforms,
   // but this method is obsolete anyway
   config.add_cpp_parser_blocked_names(vec!["QProcess::pid"]);
-
+  /*
   exclude_qvector_eq_based_methods(config, &["QStaticPlugin", "QTimeZone::OffsetData"]);
   exclude_qlist_eq_based_methods(
     config,
@@ -259,12 +261,13 @@ pub fn core(config: &mut Config) -> Result<()> {
       return Ok(false); // produces error on MacOS
     }
     Ok(true)
-  });
+  });*/
   Ok(())
 }
 
 /// QtGui specific configuration.
 pub fn gui(config: &mut Config) -> Result<()> {
+  /*
   config.add_cpp_parser_blocked_names(vec![
     "QAbstractOpenGLFunctionsPrivate",
     "QOpenGLFunctionsPrivate",
@@ -334,12 +337,13 @@ pub fn gui(config: &mut Config) -> Result<()> {
     }
     Ok(true)
   });
-
+*/
   Ok(())
 }
 
 /// QtWidgets specific configuration.
 pub fn widgets(config: &mut Config) -> Result<()> {
+  /*
   config.add_cpp_parser_blocked_names(vec!["QWidgetData", "QWidgetItemV2"]);
 
   // TODO: Mac specific:
@@ -362,20 +366,21 @@ pub fn widgets(config: &mut Config) -> Result<()> {
       }
     }
     Ok(true)
-  });
+  });*/
   Ok(())
 }
 
 /// Qt3DCore specific configuration.
 pub fn core_3d(config: &mut Config) -> Result<()> {
   config.add_cpp_filtered_namespace("Qt3DCore");
-  exclude_qvector_eq_based_methods(config, &["Qt3DCore::QNodeIdTypePair"]);
+  //exclude_qvector_eq_based_methods(config, &["Qt3DCore::QNodeIdTypePair"]);
   Ok(())
 }
 
 /// Qt3DRender specific configuration.
 pub fn render_3d(config: &mut Config) -> Result<()> {
   config.add_cpp_filtered_namespace("Qt3DRender");
+  /*
   config.add_cpp_parser_blocked_names(vec![
     "Qt3DRender::QTexture1D",
     "Qt3DRender::QTexture1DArray",
@@ -421,14 +426,14 @@ pub fn render_3d(config: &mut Config) -> Result<()> {
       }
     }
     Ok(true)
-  });
+  });*/
   Ok(())
 }
 
 /// Qt3DInput specific configuration.
 pub fn input_3d(config: &mut Config) -> Result<()> {
   config.add_cpp_filtered_namespace("Qt3DInput");
-  config.add_cpp_parser_blocked_names(vec!["Qt3DInput::QWheelEvent"]);
+  //config.add_cpp_parser_blocked_names(vec!["Qt3DInput::QWheelEvent"]);
   Ok(())
 }
 
