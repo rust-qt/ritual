@@ -7,6 +7,11 @@ use cpp_parser;
 use common::errors::{ChainErr, Result};
 use std::path::PathBuf;
 use new_impl::cpp_checker;
+use new_impl::database::Database;
+use new_impl::html_logger::HtmlLogger;
+use new_impl::database::DataEnv;
+use new_impl::database::DataSource;
+use common::target::current_target;
 //use cpp_post_processor::cpp_post_process;
 
 /// Creates output and cache directories if they don't exist.
@@ -48,6 +53,15 @@ fn check_all_paths(config: &Config) -> Result<()> {
   Ok(())
 }
 
+pub struct ProcessorData<'a> {
+  pub workspace: &'a mut Workspace,
+  pub config: &'a Config,
+  pub current_database: &'a mut Database,
+  pub dep_databases: &'a [Database],
+  pub html_logger: HtmlLogger,
+  pub env: DataEnv,
+}
+
 pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]) -> Result<()> {
   log::status(format!(
     "Processing crate: {}",
@@ -82,26 +96,31 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
       "run_cpp_parser" => {
         log::status("Running C++ parser");
         current_database_saved = false;
-        let parser_config = cpp_parser::CppParserConfig {
-          include_paths: Vec::from(config.cpp_build_paths().include_paths()),
-          framework_paths: Vec::from(config.cpp_build_paths().framework_paths()),
-          include_directives: Vec::from(config.include_directives()),
-          target_include_paths: Vec::from(config.target_include_paths()),
-          tmp_cpp_path: workspace.tmp_path()?.with_added("1.cpp"),
-          html_log_path: workspace.log_path()?.with_added("cpp_parser_log.html"),
-          name_blacklist: Vec::from(config.cpp_parser_blocked_names()),
-          clang_arguments: Vec::from(config.cpp_parser_arguments()),
-          cpp_library_version: config.cpp_lib_version().map(|s| s.to_string()),
+        let html_logger = HtmlLogger::new(
+          workspace.log_path()?.with_added("cpp_parser_log.html"),
+          "C++ parser log",
+        )?;
+
+        let data = ProcessorData {
+          workspace,
+          html_logger,
+          env: DataEnv {
+            target: current_target(),
+            data_source: DataSource::CppParser,
+            cpp_library_version: config.cpp_lib_version().map(|s| s.to_string()),
+          },
+          current_database: &mut current_database,
+          dep_databases: &dependent_cpp_crates,
+          config,
         };
 
-        cpp_parser::run(parser_config, &mut current_database, &dependent_cpp_crates)
-          .chain_err(|| "C++ parser failed")?;
+        cpp_parser::run(data).chain_err(|| "C++ parser failed")?;
       }
       "run_cpp_checker" => {
         log::status("Running C++ checker");
         // TODO: enable this!
         //current_database_saved = false;
-        cpp_checker::run(workspace, config)?;
+        cpp_checker::run(workspace, &mut current_database, config)?;
       }
       //...
       "print_database" => {
