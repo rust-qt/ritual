@@ -9,6 +9,9 @@ use std::process::Command;
 use std::path::{Path, PathBuf};
 use log;
 use target;
+use cpp_build_config::CppLibraryType;
+use cpp_build_config::CppBuildPaths;
+use cpp_build_config::CppBuildConfigData;
 
 /// A CMake variable with a name and a value.
 #[derive(Debug, Clone)]
@@ -82,7 +85,7 @@ pub struct CppLibBuilder {
   /// Path to the build directory (may not exist before building)
   pub build_dir: PathBuf,
   /// Path to the install directory (may not exist before building)
-  pub install_dir: PathBuf,
+  pub install_dir: Option<PathBuf>,
   /// Number of threads used to build the library. If `None` is supplied,
   /// number of threads will be detected automatically.
   pub num_jobs: Option<usize>,
@@ -128,10 +131,12 @@ impl CppLibBuilder {
         BuildType::Debug => "Debug",
       },
     ));
-    actual_cmake_vars.push(CMakeVar::new(
-      "CMAKE_INSTALL_PREFIX",
-      path_to_str(&self.install_dir)?,
-    ));
+    if let Some(ref install_dir) = self.install_dir {
+      actual_cmake_vars.push(CMakeVar::new(
+        "CMAKE_INSTALL_PREFIX",
+        path_to_str(install_dir)?,
+      ));
+    }
 
     for var in actual_cmake_vars {
       cmake_command.arg(format!("-D{}={}", var.name, var.value));
@@ -168,10 +173,54 @@ impl CppLibBuilder {
     if target::current_env() != target::Env::Msvc {
       make_args.push(format!("-j{}", num_jobs));
     }
-    make_args.push("install".to_string());
+    if self.install_dir.is_some() {
+      make_args.push("install".to_string());
+    }
     let mut make_command = Command::new(make_command_name);
     make_command.args(&make_args).current_dir(self.build_dir);
     run_command(&mut make_command)?;
     Ok(())
   }
+}
+
+pub fn c2r_cmake_vars(
+  cpp_build_config_data: &CppBuildConfigData,
+  cpp_build_paths: &CppBuildPaths,
+  library_type: Option<&CppLibraryType>,
+) -> Result<Vec<CMakeVar>> {
+  let mut cmake_vars = Vec::new();
+  if let Some(library_type) = library_type {
+    cmake_vars.push(CMakeVar::new(
+      "C2R_LIBRARY_TYPE",
+      match *library_type {
+        CppLibraryType::Shared => "SHARED",
+        CppLibraryType::Static => "STATIC",
+      },
+    ));
+  }
+  cmake_vars.push(CMakeVar::new_path_list(
+    "C2R_INCLUDE_PATHS",
+    cpp_build_paths.include_paths(),
+  )?);
+  cmake_vars.push(CMakeVar::new_path_list(
+    "C2R_LIB_PATHS",
+    cpp_build_paths.lib_paths(),
+  )?);
+  cmake_vars.push(CMakeVar::new_path_list(
+    "C2R_FRAMEWORK_PATHS",
+    cpp_build_paths.framework_paths(),
+  )?);
+  cmake_vars.push(CMakeVar::new_list(
+    "C2R_LINKED_LIBS",
+    cpp_build_config_data.linked_libs(),
+  )?);
+  cmake_vars.push(CMakeVar::new_list(
+    "C2R_LINKED_FRAMEWORKS",
+    cpp_build_config_data.linked_frameworks(),
+  )?);
+  cmake_vars.push(CMakeVar::new(
+    "C2R_COMPILER_FLAGS",
+    cpp_build_config_data.compiler_flags().join(" "),
+  ));
+  Ok(cmake_vars)
 }

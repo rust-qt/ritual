@@ -6,6 +6,7 @@ use common::file_utils::PathBufWithAdded;
 use cpp_parser;
 use common::errors::{ChainErr, Result};
 use std::path::PathBuf;
+use new_impl::cpp_checker;
 //use cpp_post_processor::cpp_post_process;
 
 /// Creates output and cache directories if they don't exist.
@@ -95,6 +96,12 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
 
         cpp_parser::run(parser_config, &mut current_database, &dependent_cpp_crates)
           .chain_err(|| "C++ parser failed")?;
+      }
+      "run_cpp_checker" => {
+        log::status("Running C++ checker");
+        // TODO: enable this!
+        //current_database_saved = false;
+        cpp_checker::run(workspace, config)?;
       }
       //...
       "print_database" => {

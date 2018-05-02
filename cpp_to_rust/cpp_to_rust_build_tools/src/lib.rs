@@ -98,38 +98,7 @@ impl Config {
       .build_script_data
       .cpp_build_config
       .eval(&current_target())?;
-    let mut cmake_vars = Vec::new();
-    cmake_vars.push(CMakeVar::new(
-      "C2R_LIBRARY_TYPE",
-      match cpp_build_config_data.library_type() {
-        Some(CppLibraryType::Shared) => "SHARED",
-        Some(CppLibraryType::Static) | None => "STATIC",
-      },
-    ));
-    cmake_vars.push(CMakeVar::new_path_list(
-      "C2R_INCLUDE_PATHS",
-      self.cpp_build_paths.include_paths(),
-    )?);
-    cmake_vars.push(CMakeVar::new_path_list(
-      "C2R_LIB_PATHS",
-      self.cpp_build_paths.lib_paths(),
-    )?);
-    cmake_vars.push(CMakeVar::new_path_list(
-      "C2R_FRAMEWORK_PATHS",
-      self.cpp_build_paths.framework_paths(),
-    )?);
-    cmake_vars.push(CMakeVar::new_list(
-      "C2R_LINKED_LIBS",
-      cpp_build_config_data.linked_libs(),
-    )?);
-    cmake_vars.push(CMakeVar::new_list(
-      "C2R_LINKED_FRAMEWORKS",
-      cpp_build_config_data.linked_frameworks(),
-    )?);
-    cmake_vars.push(CMakeVar::new(
-      "C2R_COMPILER_FLAGS",
-      cpp_build_config_data.compiler_flags().join(" "),
-    ));
+
     let out_dir = out_dir()?;
     let c_lib_install_dir = out_dir.with_added("c_lib_install");
     let manifest_dir = manifest_dir()?;
@@ -140,7 +109,11 @@ impl Config {
       build_dir: out_dir.with_added("c_lib_build"),
       install_dir: c_lib_install_dir.clone(),
       num_jobs: std::env::var("NUM_JOBS").ok().and_then(|x| x.parse().ok()),
-      cmake_vars: cmake_vars,
+      cmake_vars: c2r_cmake_vars(
+        &cpp_build_config_data,
+        &self.cpp_build_paths,
+        Some(cpp_build_config_data.library_type()),
+      ),
       build_type: match profile.as_str() {
         "debug" => BuildType::Debug,
         "release" => BuildType::Release,
