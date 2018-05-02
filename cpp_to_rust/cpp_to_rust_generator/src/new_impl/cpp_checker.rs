@@ -30,6 +30,7 @@ impl<'a> CppChecker<'a> {
       CheckContext::Main,
       true,
     )?;
+    self.builder.skip_cmake = true;
     self.check_preliminary_test(
       "correct assertion",
       "assert(2 + 2 == 4);",
@@ -124,6 +125,7 @@ pub fn run(workspace: &mut Workspace, config: &Config) -> Result<()> {
       None,
     )?,
     capture_output: true,
+    skip_cmake: false,
   };
 
   let mut checker = CppChecker {

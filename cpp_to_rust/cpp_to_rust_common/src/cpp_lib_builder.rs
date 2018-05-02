@@ -97,6 +97,8 @@ pub struct CppLibBuilder {
   pub cmake_vars: Vec<CMakeVar>,
 
   pub capture_output: bool,
+
+  pub skip_cmake: bool,
 }
 
 pub enum CppLibBuilderOutput {
@@ -110,53 +112,55 @@ impl CppLibBuilder {
     if !self.build_dir.exists() {
       create_dir_all(&self.build_dir)?;
     }
-    let mut cmake_command = Command::new("cmake");
-    cmake_command
-      .arg(&self.cmake_source_dir)
-      .current_dir(&self.build_dir);
-    let actual_build_type = if target::current_env() == target::Env::Msvc {
-      // Rust always links to release version of MSVC runtime, so
-      // link will fail if C library is built in debug mode
-      BuildType::Release
-    } else {
-      self.build_type.clone()
-    };
-    if target::current_os() == target::OS::Windows {
-      match target::current_env() {
-        target::Env::Msvc => {
-          cmake_command.arg("-G").arg("NMake Makefiles");
+    if !self.skip_cmake {
+      let mut cmake_command = Command::new("cmake");
+      cmake_command
+        .arg(&self.cmake_source_dir)
+        .current_dir(&self.build_dir);
+      let actual_build_type = if target::current_env() == target::Env::Msvc {
+        // Rust always links to release version of MSVC runtime, so
+        // link will fail if C library is built in debug mode
+        BuildType::Release
+      } else {
+        self.build_type.clone()
+      };
+      if target::current_os() == target::OS::Windows {
+        match target::current_env() {
+          target::Env::Msvc => {
+            cmake_command.arg("-G").arg("NMake Makefiles");
+          }
+          target::Env::Gnu => {
+            cmake_command.arg("-G").arg("MinGW Makefiles");
+          }
+          _ => {}
         }
-        target::Env::Gnu => {
-          cmake_command.arg("-G").arg("MinGW Makefiles");
-        }
-        _ => {}
       }
-    }
-    let mut actual_cmake_vars = self.cmake_vars.clone();
-    actual_cmake_vars.push(CMakeVar::new(
-      "CMAKE_BUILD_TYPE",
-      match actual_build_type {
-        BuildType::Release => "Release",
-        BuildType::Debug => "Debug",
-      },
-    ));
-    if let Some(ref install_dir) = self.install_dir {
+      let mut actual_cmake_vars = self.cmake_vars.clone();
       actual_cmake_vars.push(CMakeVar::new(
-        "CMAKE_INSTALL_PREFIX",
-        path_to_str(install_dir)?,
+        "CMAKE_BUILD_TYPE",
+        match actual_build_type {
+          BuildType::Release => "Release",
+          BuildType::Debug => "Debug",
+        },
       ));
-    }
-
-    for var in actual_cmake_vars {
-      cmake_command.arg(format!("-D{}={}", var.name, var.value));
-    }
-    if self.capture_output {
-      let output = run_command_and_capture_output(&mut cmake_command)?;
-      if !output.is_success() {
-        return Ok(CppLibBuilderOutput::Fail(output));
+      if let Some(ref install_dir) = self.install_dir {
+        actual_cmake_vars.push(CMakeVar::new(
+          "CMAKE_INSTALL_PREFIX",
+          path_to_str(install_dir)?,
+        ));
       }
-    } else {
-      run_command(&mut cmake_command)?;
+
+      for var in actual_cmake_vars {
+        cmake_command.arg(format!("-D{}={}", var.name, var.value));
+      }
+      if self.capture_output {
+        let output = run_command_and_capture_output(&mut cmake_command)?;
+        if !output.is_success() {
+          return Ok(CppLibBuilderOutput::Fail(output));
+        }
+      } else {
+        run_command(&mut cmake_command)?;
+      }
     }
 
     let mut make_command_name = if target::current_os() == target::OS::Windows {
