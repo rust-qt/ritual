@@ -12,6 +12,8 @@ use target;
 use cpp_build_config::CppLibraryType;
 use cpp_build_config::CppBuildPaths;
 use cpp_build_config::CppBuildConfigData;
+use utils::CommandOutput;
+use utils::run_command_and_capture_output;
 
 /// A CMake variable with a name and a value.
 #[derive(Debug, Clone)]
@@ -93,24 +95,31 @@ pub struct CppLibBuilder {
   pub build_type: BuildType,
   /// Additional variables passed to CMake
   pub cmake_vars: Vec<CMakeVar>,
+
+  pub capture_output: bool,
+}
+
+pub enum CppLibBuilderOutput {
+  Success,
+  Fail(CommandOutput),
 }
 
 impl CppLibBuilder {
   /// Builds the library.
-  pub fn run(self) -> Result<()> {
+  pub fn run(&self) -> Result<CppLibBuilderOutput> {
     if !self.build_dir.exists() {
       create_dir_all(&self.build_dir)?;
     }
     let mut cmake_command = Command::new("cmake");
     cmake_command
-      .arg(self.cmake_source_dir)
+      .arg(&self.cmake_source_dir)
       .current_dir(&self.build_dir);
     let actual_build_type = if target::current_env() == target::Env::Msvc {
       // Rust always links to release version of MSVC runtime, so
       // link will fail if C library is built in debug mode
       BuildType::Release
     } else {
-      self.build_type
+      self.build_type.clone()
     };
     if target::current_os() == target::OS::Windows {
       match target::current_env() {
@@ -141,7 +150,14 @@ impl CppLibBuilder {
     for var in actual_cmake_vars {
       cmake_command.arg(format!("-D{}={}", var.name, var.value));
     }
-    run_command(&mut cmake_command)?;
+    if self.capture_output {
+      let output = run_command_and_capture_output(&mut cmake_command)?;
+      if !output.is_success() {
+        return Ok(CppLibBuilderOutput::Fail(output));
+      }
+    } else {
+      run_command(&mut cmake_command)?;
+    }
 
     let mut make_command_name = if target::current_os() == target::OS::Windows {
       match target::current_env() {
@@ -177,9 +193,16 @@ impl CppLibBuilder {
       make_args.push("install".to_string());
     }
     let mut make_command = Command::new(make_command_name);
-    make_command.args(&make_args).current_dir(self.build_dir);
-    run_command(&mut make_command)?;
-    Ok(())
+    make_command.args(&make_args).current_dir(&self.build_dir);
+    if self.capture_output {
+      let output = run_command_and_capture_output(&mut make_command)?;
+      if !output.is_success() {
+        return Ok(CppLibBuilderOutput::Fail(output));
+      }
+    } else {
+      run_command(&mut make_command)?;
+    }
+    Ok(CppLibBuilderOutput::Success)
   }
 }
 

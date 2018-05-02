@@ -54,6 +54,35 @@ pub fn run_command(command: &mut Command) -> Result<()> {
   }
 }
 
+#[derive(Debug)]
+pub struct CommandOutput {
+  pub status: ::std::process::ExitStatus,
+  pub stdout: String,
+  pub stderr: String,
+}
+
+impl CommandOutput {
+  pub fn is_success(&self) -> bool {
+    self.status.success()
+  }
+}
+
+/// Runs a command and returns its output regardless of
+/// whether it was successful
+pub fn run_command_and_capture_output(command: &mut Command) -> Result<CommandOutput> {
+  log::status(format!("Executing command: {:?}", command));
+  command.stdout(std::process::Stdio::piped());
+  command.stderr(std::process::Stdio::piped());
+  let output = command
+    .output()
+    .chain_err(|| format!("failed to run command: {:?}", command))?;
+  Ok(CommandOutput {
+    stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+    stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+    status: output.status,
+  })
+}
+
 /// Runs a command and returns its stdout if it was successful
 pub fn get_command_output(command: &mut Command) -> Result<String> {
   log::status(format!("Executing command: {:?}", command));

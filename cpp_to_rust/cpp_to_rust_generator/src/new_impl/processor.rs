@@ -162,8 +162,10 @@ log::status(
   for database in dependent_cpp_crates {
     workspace.put_crate(database, true);
   }
+  if !current_database_saved {
+    log::status("Saving data");
+  }
   workspace.put_crate(current_database, current_database_saved);
-  log::status("Saving data");
   workspace.save_data()?;
   Ok(())
 }

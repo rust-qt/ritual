@@ -22,5 +22,6 @@ void call_destructor(T* x) {{
 }}
 
 #include <iostream>
+#include <cassert>
 
 #endif // UTILS_H
