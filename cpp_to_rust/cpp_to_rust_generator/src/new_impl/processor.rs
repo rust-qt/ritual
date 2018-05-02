@@ -93,11 +93,12 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
 
   for operation in operations {
     match operation.as_str() {
-      "run_cpp_parser" => {
-        log::status("Running C++ parser");
+      "run_cpp_parser" | "run_cpp_checker" => {
         current_database_saved = false;
         let html_logger = HtmlLogger::new(
-          workspace.log_path()?.with_added("cpp_parser_log.html"),
+          workspace
+            .log_path()?
+            .with_added(format!("{}_log.html", operation)),
           "C++ parser log",
         )?;
 
@@ -106,23 +107,38 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
           html_logger,
           env: DataEnv {
             target: current_target(),
-            data_source: DataSource::CppParser,
+            data_source: match operation.as_str() {
+              "run_cpp_parser" => DataSource::CppParser,
+              "run_cpp_checker" => DataSource::CppChecker,
+              _ => unreachable!(),
+            },
             cpp_library_version: config.cpp_lib_version().map(|s| s.to_string()),
           },
           current_database: &mut current_database,
           dep_databases: &dependent_cpp_crates,
           config,
         };
-
-        cpp_parser::run(data).chain_err(|| "C++ parser failed")?;
+        if !data
+          .current_database
+          .environments
+          .iter()
+          .any(|e| e == &data.env)
+        {
+          data.current_database.environments.push(data.env.clone());
+        }
+        data.current_database.invalidate_env(&data.env);
+        match operation.as_str() {
+          "run_cpp_parser" => {
+            log::status("Running C++ parser");
+            cpp_parser::run(data).chain_err(|| "C++ parser failed")?;
+          }
+          "run_cpp_checker" => {
+            log::status("Running C++ checker");
+            cpp_checker::run(data)?;
+          }
+          _ => unreachable!(),
+        }
       }
-      "run_cpp_checker" => {
-        log::status("Running C++ checker");
-        // TODO: enable this!
-        //current_database_saved = false;
-        cpp_checker::run(workspace, &mut current_database, config)?;
-      }
-      //...
       "print_database" => {
         let path = workspace
           .log_path()?

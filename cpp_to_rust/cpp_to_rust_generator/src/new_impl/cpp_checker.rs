@@ -16,6 +16,7 @@ use new_impl::database::DataEnv;
 use new_impl::database::DataSource;
 use new_impl::html_logger::HtmlLogger;
 use new_impl::database::Database;
+use new_impl::processor::ProcessorData;
 
 fn snippet_for_item(item: &CppItemData) -> Result<Snippet> {
   match *item {
@@ -45,12 +46,9 @@ fn snippet_for_item(item: &CppItemData) -> Result<Snippet> {
 }
 
 struct CppChecker<'a> {
-  database: &'a mut Database,
-  config: &'a Config,
+  data: ProcessorData<'a>,
   main_cpp_path: PathBuf,
   builder: CppLibBuilder,
-  data_env: DataEnv,
-  html_logger: HtmlLogger,
 }
 
 enum SnippetContext {
@@ -79,9 +77,7 @@ impl Snippet {
 
 impl<'a> CppChecker<'a> {
   fn run(&mut self) -> Result<()> {
-    self.database.environments.push(self.data_env.clone());
-    self.database.invalidate_env(&self.data_env);
-    self.html_logger.add_header(&["Item", "Status"])?;
+    self.data.html_logger.add_header(&["Item", "Status"])?;
     self.check_preliminary_test(
       "hello world",
       &Snippet::new_in_main("std::cout << \"Hello world\\n\";"),
@@ -158,8 +154,8 @@ impl<'a> CppChecker<'a> {
   }
 }
 
-pub fn run(workspace: &mut Workspace, database: &mut Database, config: &Config) -> Result<()> {
-  let root_path = workspace.tmp_path()?.with_added("cpp_checker");
+pub fn run(data: ProcessorData) -> Result<()> {
+  let root_path = data.workspace.tmp_path()?.with_added("cpp_checker");
   if root_path.exists() {
     remove_dir_all(&root_path)?;
   }
@@ -169,7 +165,8 @@ pub fn run(workspace: &mut Workspace, database: &mut Database, config: &Config) 
     .write(include_str!("../../templates/cpp_checker/CMakeLists.txt"))?;
   create_file(src_path.with_added("utils.h"))?.write(format!(
     include_str!("../../templates/cpp_checker/utils.h"),
-    include_directives_code = config
+    include_directives_code = data
+      .config
       .include_directives()
       .map_if_ok(|d| -> Result<_> { Ok(format!("#include \"{}\"", path_to_str(d)?)) })?
       .join("\n")
@@ -182,29 +179,18 @@ pub fn run(workspace: &mut Workspace, database: &mut Database, config: &Config) 
     num_jobs: None,
     build_type: BuildType::Debug,
     cmake_vars: c2r_cmake_vars(
-      &config.cpp_build_config().eval(&current_target())?,
-      config.cpp_build_paths(),
+      &data.config.cpp_build_config().eval(&current_target())?,
+      data.config.cpp_build_paths(),
       None,
     )?,
     capture_output: true,
     skip_cmake: false,
   };
 
-  let html_logger = HtmlLogger::new(
-    workspace.log_path()?.with_added("cpp_checker_log.html"),
-    "C++ checker log",
-  )?;
   let mut checker = CppChecker {
-    database,
-    config,
+    data,
     builder,
     main_cpp_path: src_path.with_added("main.cpp"),
-    data_env: DataEnv {
-      target: current_target(),
-      data_source: DataSource::CppChecker,
-      cpp_library_version: config.cpp_lib_version().map(|s| s.to_string()),
-    },
-    html_logger,
   };
 
   checker.run()?;

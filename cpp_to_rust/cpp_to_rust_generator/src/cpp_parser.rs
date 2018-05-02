@@ -282,15 +282,6 @@ pub fn run(data: ProcessorData) -> Result<()> {
   log::status("Initializing clang...");
   //let (mut parser, methods) =
   let mut parser = CppParser { data };
-  parser
-    .data
-    .current_database
-    .environments
-    .push(parser.data.env.clone());
-  parser
-    .data
-    .current_database
-    .invalidate_env(&parser.data.env);
   parser.data.html_logger.add_header(&["Item", "Status"])?;
   run_clang(
     &parser.data.config,
