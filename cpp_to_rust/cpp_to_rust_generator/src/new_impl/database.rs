@@ -38,12 +38,16 @@ pub struct DataEnv {
 impl DataEnv {
   pub fn short_text(&self) -> String {
     format!(
-      "{}/{:?}-{:?}-{:?}-{:?}",
+      "{}/{}/{:?}-{:?}-{:?}-{:?}",
       self
         .cpp_library_version
         .as_ref()
         .map(|s| s.as_str())
         .unwrap_or("None"),
+      match self.data_source {
+        DataSource::CppParser => "cpp_parser",
+        DataSource::CppChecker => "cpp_checker",
+      },
       self.target.arch,
       self.target.os,
       self.target.family,
@@ -64,6 +68,23 @@ pub struct DataEnvInfo {
   /// Set to true before a repeated check is performed in the same
   /// environment
   pub is_invalidated: bool,
+}
+
+impl DataEnvInfo {
+  pub fn to_html_log(&self) -> String {
+    let mut s = if self.is_success {
+      "<span class='ok'>OK</span>".to_string()
+    } else {
+      "<span class='ok'>Error</span>".to_string()
+    };
+    if let Some(ref err) = self.error {
+      s += &format!(" ({})", err);
+    }
+    if self.is_invalidated {
+      s += " <span class='invalidated'>(invalidated)</span>";
+    }
+    s
+  }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -158,8 +179,9 @@ pub enum DatabaseUpdateResultType {
 }
 
 pub struct DatabaseUpdateResult {
+  pub item: String,
   pub result_type: DatabaseUpdateResultType,
-  pub old_data: Vec<DataEnvWithInfo>,
+  pub old_data: Option<DataEnvInfo>,
   pub new_data: Vec<DataEnvWithInfo>,
 }
 
@@ -177,6 +199,38 @@ pub struct DatabaseItem {
   /// C++ documentation data for this type
   pub doc: Option<CppItemDoc>,
   // TODO: add cpp_ffi and rust data
+}
+
+impl DatabaseItem {
+  pub fn add_cpp_data(&mut self, env: &DataEnv, info: DataEnvInfo) -> DatabaseUpdateResult {
+    let mut result = DatabaseUpdateResult {
+      item: self.cpp_data.to_string(),
+      result_type: DatabaseUpdateResultType::Unchanged,
+      old_data: None,
+      new_data: Vec::new(),
+    };
+    let mut ok = false;
+    if let Some(env1) = self.environments.iter_mut().find(|env2| &env2.env == env) {
+      env1.info.is_invalidated = false; // suppress false change detection
+      if env1.info != info {
+        result.result_type = DatabaseUpdateResultType::EnvUpdated;
+        result.old_data = Some(env1.info.clone());
+        env1.info = info.clone();
+      } else {
+        // result unchanged
+      }
+      ok = true;
+    }
+    if !ok {
+      self.environments.push(DataEnvWithInfo {
+        env: env.clone(),
+        info,
+      });
+      result.result_type = DatabaseUpdateResultType::EnvAdded;
+    }
+    result.new_data = self.environments.clone();
+    return result;
+  }
 }
 
 /// Represents all collected data related to a crate.
@@ -216,63 +270,27 @@ impl Database {
 
   pub fn add_cpp_data(
     &mut self,
-    env: DataEnv,
-    data: CppItemData,
+    env: &DataEnv,
+    data: &CppItemData,
     info: DataEnvInfo,
   ) -> DatabaseUpdateResult {
-    if let Some(item) = self.items.iter_mut().find(|item| item.cpp_data == data) {
-      let mut result = DatabaseUpdateResult {
-        result_type: DatabaseUpdateResultType::Unchanged,
-        old_data: item.environments.clone(),
-        new_data: Vec::new(),
-      };
-      let mut ok = false;
-      if let Some(env1) = item.environments.iter_mut().find(|env2| env2.env == env) {
-        env1.info.is_invalidated = false; // suppress false change detection
-        if env1.info != info {
-          //          log::llog(log::LoggerCategory::DebugGeneral, || {
-          //            format!(
-          //              "cpp env result changed for existing data!\n\
-          //               env: {:?}\ndata: {:?}\nnew info: {:?}\nold info: {:?}\n",
-          //              env, data, info, env1.info
-          //            )
-          //          });
-          env1.info = info.clone();
-          result.result_type = DatabaseUpdateResultType::EnvUpdated;
-        } else {
-          // result unchanged
-        }
-        ok = true;
-      }
-      if !ok {
-        //        log::llog(log::LoggerCategory::DebugGeneral, || {
-        //          format!(
-        //            "cpp new env for existing data!\n\
-        //           env: {:?}\ndata: {:?}\ninfo: {:?}\n",
-        //            env, data, info
-        //          )
-        //        });
-        item.environments.push(DataEnvWithInfo { env, info });
-        result.result_type = DatabaseUpdateResultType::EnvAdded;
-      }
-      result.new_data = item.environments.clone();
-      return result;
+    if let Some(item) = self.items.iter_mut().find(|item| &item.cpp_data == data) {
+      return item.add_cpp_data(env, info);
     }
-    log::llog(log::LoggerCategory::DebugGeneral, || {
-      format!(
-        "cpp new data!\n\
-         env: {:?}\ndata: {:?}\ninfo: {:?}\n",
-        env, data, info
-      )
-    });
     let item = DatabaseItem {
-      environments: vec![DataEnvWithInfo { env, info }],
-      cpp_data: data,
+      environments: vec![
+        DataEnvWithInfo {
+          env: env.clone(),
+          info,
+        },
+      ],
+      cpp_data: data.clone(),
       doc: None,
     };
     let result = DatabaseUpdateResult {
+      item: data.to_string(),
       result_type: DatabaseUpdateResultType::ItemAdded,
-      old_data: Vec::new(),
+      old_data: None,
       new_data: item.environments.clone(),
     };
     self.items.push(item);
@@ -284,22 +302,19 @@ impl Database {
       path,
       &format!("Database for crate \"{}\"", &self.crate_name),
     )?;
-    logger.add_header(&["Item", "Environments"]);
+    logger.add_header(&["Item", "Environments"])?;
+
     for item in &self.items {
       let item_text = item.cpp_data.to_string();
-      let mut env_text = String::new();
-      if !item.environments.is_empty() {
-        env_text += &format!(
-          "C++ parser: {}",
-          item
-            .environments
-            .iter()
-            .map(|env| env.env.short_text())
-            .join(", ")
-        );
-      }
-
-      logger.add(&[escape_html(&item_text), env_text], "");
+      let item_texts = item.environments.iter().map(|item| {
+        format!(
+          "<li>{}: {}</li>",
+          item.env.short_text(),
+          item.info.to_html_log()
+        )
+      });
+      let env_text = format!("<ul>{}</ul>", item_texts.join(""));
+      logger.add(&[escape_html(&item_text), env_text], "")?;
     }
     Ok(())
   }

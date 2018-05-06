@@ -4,6 +4,9 @@ use std::path::Path;
 use common::file_utils::PathBufWithAdded;
 use common::log;
 use std::fmt::Display;
+use new_impl::database::DatabaseUpdateResult;
+use new_impl::database::DatabaseUpdateResultType;
+use common::string_utils::JoinWithSeparator;
 
 pub struct HtmlLogger {
   file: FileWrapper,
@@ -41,6 +44,40 @@ impl HtmlLogger {
     }
     self.file.write("</tr>")?;
     Ok(())
+  }
+
+  pub fn log_database_update_result(&mut self, result: &DatabaseUpdateResult) {
+    let log_class = match result.result_type {
+      DatabaseUpdateResultType::ItemAdded => "database_item_added",
+      DatabaseUpdateResultType::EnvAdded => "database_env_added",
+      DatabaseUpdateResultType::EnvUpdated => "database_env_updated",
+      DatabaseUpdateResultType::Unchanged => "database_unchanged",
+    };
+    let mut text = match result.result_type {
+      DatabaseUpdateResultType::ItemAdded => "New item".to_string(),
+      DatabaseUpdateResultType::EnvAdded => "New env for existing item".to_string(),
+      DatabaseUpdateResultType::EnvUpdated => format!(
+        "Env data changed! Old data: {}",
+        result
+          .old_data
+          .as_ref()
+          .map(|r| r.to_html_log())
+          .unwrap_or("None".to_string())
+      ),
+      DatabaseUpdateResultType::Unchanged => "Unchanged".to_string(),
+    };
+
+    let item_texts = result.new_data.iter().map(|item| {
+      format!(
+        "<li>{}: {}</li>",
+        item.env.short_text(),
+        item.info.to_html_log()
+      )
+    });
+    text += &format!("<ul>{}</ul>", item_texts.join(""));
+    self
+      .add(&[&escape_html(&result.item), &text], log_class)
+      .unwrap();
   }
 
   fn finalize(&mut self) -> Result<()> {

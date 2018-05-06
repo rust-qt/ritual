@@ -12,6 +12,10 @@ use new_impl::html_logger::HtmlLogger;
 use new_impl::database::DataEnv;
 use new_impl::database::DataSource;
 use common::target::current_target;
+use new_impl::database::CppItemData;
+use new_impl::database::DataEnvInfo;
+use new_impl::database::DatabaseUpdateResultType;
+use new_impl::database::DatabaseUpdateResult;
 //use cpp_post_processor::cpp_post_process;
 
 /// Creates output and cache directories if they don't exist.
@@ -62,6 +66,14 @@ pub struct ProcessorData<'a> {
   pub env: DataEnv,
 }
 
+impl<'a> ProcessorData<'a> {
+  pub fn add_cpp_data(&mut self, data: &CppItemData, info: DataEnvInfo) {
+    let data_text = data.to_string();
+    let result = self.current_database.add_cpp_data(&self.env, data, info);
+    self.html_logger.log_database_update_result(&result);
+  }
+}
+
 pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]) -> Result<()> {
   log::status(format!(
     "Processing crate: {}",
@@ -89,12 +101,9 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
         .chain_err(|| "failed to load dependency")
     })?;
 
-  let mut current_database_saved = true;
-
   for operation in operations {
     match operation.as_str() {
       "run_cpp_parser" | "run_cpp_checker" => {
-        current_database_saved = false;
         let html_logger = HtmlLogger::new(
           workspace
             .log_path()?
@@ -197,6 +206,7 @@ log::status(
   for database in dependent_cpp_crates {
     workspace.put_crate(database, true);
   }
+  let current_database_saved = !operations.iter().any(|op| op != "print_database");
   if !current_database_saved {
     log::status("Saving data");
   }

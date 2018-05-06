@@ -17,6 +17,36 @@ use new_impl::database::DataSource;
 use new_impl::html_logger::HtmlLogger;
 use new_impl::database::Database;
 use new_impl::processor::ProcessorData;
+use new_impl::database::DataEnvInfo;
+use std::path::Path;
+
+fn check_snippet(
+  main_cpp_path: &Path,
+  builder: &CppLibBuilder,
+  snippet: &Snippet,
+) -> Result<CppLibBuilderOutput> {
+  {
+    let mut file = create_file(main_cpp_path)?;
+    file.write("#include \"utils.h\"\n\n")?;
+    match snippet.context {
+      SnippetContext::Main => {
+        file.write(format!("int main() {{\n{}\n}}\n", snippet.code))?;
+      }
+      SnippetContext::Global => {
+        file.write(format!("{}\n\nint main() {{}}\n", snippet.code))?;
+      }
+    }
+  }
+  builder.run()
+}
+
+fn check_one_item(main_cpp_path: &Path, builder: &CppLibBuilder, item: &CppItemData) -> Result<()> {
+  let snippet = snippet_for_item(item).map_err(|e| format!("can't generate snippet: {}", e))?;
+  match check_snippet(main_cpp_path, builder, &snippet)? {
+    CppLibBuilderOutput::Success => Ok(()),
+    CppLibBuilderOutput::Fail(output) => Err(format!("build failed: {}", output.stderr).into()),
+  }
+}
 
 fn snippet_for_item(item: &CppItemData) -> Result<Snippet> {
   match *item {
@@ -33,7 +63,7 @@ fn snippet_for_item(item: &CppItemData) -> Result<Snippet> {
           template_arguments: template_arguments.clone(),
         }.to_cpp_code()?;
         Ok(Snippet::new_in_main(format!(
-          "assert(std::is_class<{}>::value);",
+          "assert(std::is_class<{0}>::value);\nassert(sizeof({0}) > 0);",
           type_code
         )))
       }
@@ -78,6 +108,36 @@ impl Snippet {
 impl<'a> CppChecker<'a> {
   fn run(&mut self) -> Result<()> {
     self.data.html_logger.add_header(&["Item", "Status"])?;
+    self.run_tests()?;
+
+    let total_count = self.data.current_database.items.len();
+    for (index, item) in self.data.current_database.items.iter_mut().enumerate() {
+      log::status(format!("Checking item {} / {}", index + 1, total_count));
+      let result = check_one_item(&self.main_cpp_path, &self.builder, &item.cpp_data);
+      let data = match result {
+        Ok(_) => DataEnvInfo {
+          is_success: true,
+          error: None,
+          include_file: None,
+          origin_location: None,
+          is_invalidated: false,
+        },
+        Err(err) => DataEnvInfo {
+          is_success: false,
+          error: Some(err.to_string()),
+          include_file: None,
+          origin_location: None,
+          is_invalidated: false,
+        },
+      };
+      let r = item.add_cpp_data(&self.data.env, data);
+      self.data.html_logger.log_database_update_result(&r);
+    }
+
+    Ok(())
+  }
+
+  fn run_tests(&mut self) -> Result<()> {
     self.check_preliminary_test(
       "hello world",
       &Snippet::new_in_main("std::cout << \"Hello world\\n\";"),
@@ -98,7 +158,9 @@ impl<'a> CppChecker<'a> {
          assert(std::is_class<C1>::value); \n\
          assert(!std::is_class<E1>::value); \n\
          assert(!std::is_enum<C1>::value); \n\
-         assert(std::is_enum<E1>::value); \n\
+         assert(std::is_enum<E1>::value); \
+         assert(sizeof(C1) > 0);\
+         assert(sizeof(E1) > 0);\n\
          ",
       ),
       true,
@@ -116,7 +178,6 @@ impl<'a> CppChecker<'a> {
       false,
     )?;
     self.check_preliminary_test("status code 1", &Snippet::new_in_main("return 1;"), false)?;
-
     Ok(())
   }
 
@@ -138,19 +199,7 @@ impl<'a> CppChecker<'a> {
   }
 
   fn check_snippet(&self, snippet: &Snippet) -> Result<CppLibBuilderOutput> {
-    {
-      let mut file = create_file(&self.main_cpp_path)?;
-      file.write("#include \"utils.h\"\n\n")?;
-      match snippet.context {
-        SnippetContext::Main => {
-          file.write(format!("int main() {{\n{}\n}}\n", snippet.code))?;
-        }
-        SnippetContext::Global => {
-          file.write(format!("{}\n\nint main() {{}}\n", snippet.code))?;
-        }
-      }
-    }
-    self.builder.run()
+    check_snippet(&self.main_cpp_path, &self.builder, snippet)
   }
 }
 
@@ -176,7 +225,7 @@ pub fn run(data: ProcessorData) -> Result<()> {
     cmake_source_dir: src_path.clone(),
     build_dir: root_path.with_added("build"),
     install_dir: None,
-    num_jobs: None,
+    num_jobs: Some(1),
     build_type: BuildType::Debug,
     cmake_vars: c2r_cmake_vars(
       &data.config.cpp_build_config().eval(&current_target())?,

@@ -326,32 +326,6 @@ impl<'a> CppParser<'a> {
     return None;
   }
 
-  fn save_info(&mut self, data: CppItemData, info: DataEnvInfo) {
-    let data_text = data.to_string();
-    let result = self
-      .data
-      .current_database
-      .add_cpp_data(self.data.env.clone(), data, info);
-
-    let log_class = match result.result_type {
-      DatabaseUpdateResultType::ItemAdded => "database_item_added",
-      DatabaseUpdateResultType::EnvAdded => "database_env_added",
-      DatabaseUpdateResultType::EnvUpdated => "database_env_updated",
-      DatabaseUpdateResultType::Unchanged => "database_unchanged",
-    };
-    let mut text = match result.result_type {
-      DatabaseUpdateResultType::ItemAdded => "New item",
-      DatabaseUpdateResultType::EnvAdded => "Current environment added for this item",
-      DatabaseUpdateResultType::EnvUpdated => "Data changed for this environment!",
-      DatabaseUpdateResultType::Unchanged => "Unchanged",
-    };
-    self
-      .data
-      .html_logger
-      .add(&[data_text.as_str(), text], log_class)
-      .unwrap();
-  }
-
   /// Attempts to parse an unexposed type, i.e. a type the used `clang` API
   /// is not able to describe. Either `type1` or `string` must be specified,
   /// and both may be specified at the same time.
@@ -1251,8 +1225,8 @@ impl<'a> CppParser<'a> {
       )
     })?;
     let enum_name = get_full_name(entity)?;
-    self.save_info(
-      CppItemData::Type(CppTypeData {
+    self.data.add_cpp_data(
+      &CppItemData::Type(CppTypeData {
         name: enum_name.clone(),
         kind: CppTypeKind::Enum,
       }),
@@ -1270,8 +1244,8 @@ impl<'a> CppParser<'a> {
           .get_enum_constant_value()
           .chain_err(|| "failed to get value of enum variant")?;
 
-        self.save_info(
-          CppItemData::EnumValue(CppEnumValue {
+        self.data.add_cpp_data(
+          &CppItemData::EnumValue(CppEnumValue {
             name: child
               .get_name()
               .chain_err(|| "failed to get name of enum variant")?,
@@ -1311,8 +1285,8 @@ impl<'a> CppParser<'a> {
           field_name
         )
       })?;
-    self.save_info(
-      CppItemData::ClassField(CppClassField {
+    self.data.add_cpp_data(
+      &CppItemData::ClassField(CppClassField {
         //        size: match field_clang_type.get_sizeof() {
         //          Ok(size) => Some(size),
         //          Err(_) => None,
@@ -1443,8 +1417,8 @@ impl<'a> CppParser<'a> {
           );
         }
         if let CppTypeBase::Class(ref base_type) = base_type.base {
-          self.save_info(
-            CppItemData::ClassBase(CppBaseSpecifier {
+          self.data.add_cpp_data(
+            &CppItemData::ClassBase(CppBaseSpecifier {
               base_class_type: base_type.clone(),
               is_virtual: child.is_virtual_base(),
               visibility: match child.get_accessibility().unwrap_or(Accessibility::Public) {
@@ -1472,8 +1446,8 @@ impl<'a> CppParser<'a> {
         return Err("Non-type template parameter is not supported".into());
       }
     }
-    self.save_info(
-      CppItemData::Type(CppTypeData {
+    self.data.add_cpp_data(
+      &CppItemData::Type(CppTypeData {
         name: full_name,
         kind: CppTypeKind::Class {
           template_arguments: template_arguments,
@@ -1630,7 +1604,7 @@ impl<'a> CppParser<'a> {
         if entity.get_canonical_entity() == entity {
           match self.parse_function(entity) {
             Ok((r, info)) => {
-              self.save_info(CppItemData::Method(r), info);
+              self.data.add_cpp_data(&CppItemData::Method(r), info);
             }
             Err(error) => {
               self.data.html_logger.add(
@@ -1639,7 +1613,7 @@ impl<'a> CppParser<'a> {
                   format!("failed to parse class: {}", error),
                 ],
                 "cpp_parser_error",
-              );
+              )?;
               error.discard_expected();
             }
           }

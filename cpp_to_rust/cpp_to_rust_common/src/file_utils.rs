@@ -196,13 +196,26 @@ pub fn load_json<P: AsRef<Path>, T: ::serde::Deserialize>(path: P) -> Result<T> 
 
 /// Serialize `value` into JSON file `path`.
 pub fn save_json<P: AsRef<Path>, T: ::serde::Serialize>(path: P, value: &T) -> Result<()> {
-  let file = create_file(path.as_ref())?;
-  ::serde_json::to_writer(&mut file.into_file(), value).chain_err(|| {
-    format!(
-      "failed to serialize to JSON file: {}",
-      path.as_ref().display()
-    )
-  })
+  let tmp_path = {
+    let mut buf = path.as_ref().to_path_buf();
+    let tmp_file_name = format!("{}.new", os_str_to_str(&buf.file_name().unwrap())?);
+    buf.set_file_name(tmp_file_name);
+    buf
+  };
+  {
+    let file = create_file(&tmp_path)?;
+    ::serde_json::to_writer(&mut file.into_file(), value).chain_err(|| {
+      format!(
+        "failed to serialize to JSON file: {}",
+        path.as_ref().display()
+      )
+    })?;
+  }
+  if path.as_ref().exists() {
+    remove_file(path.as_ref())?;
+  }
+  rename_file(&tmp_path, path.as_ref())?;
+  Ok(())
 }
 
 /// Deserialize value from binary file `path`.
