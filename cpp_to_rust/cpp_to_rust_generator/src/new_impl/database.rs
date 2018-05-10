@@ -13,10 +13,10 @@ use std::path::Path;
 use common::errors::{ChainErr, Result};
 use std::fmt::Display;
 use std::fmt::Formatter;
-use cpp_data::CppTypeKind;
 use common::string_utils::JoinWithSeparator;
 use cpp_data::CppVisibility;
 use new_impl::html_logger::escape_html;
+use cpp_ffi_data::CppFfiMethod;
 //use common::errors::Result;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -105,22 +105,9 @@ pub enum CppItemData {
 impl Display for CppItemData {
   fn fmt(&self, f: &mut Formatter) -> ::std::result::Result<(), ::std::fmt::Error> {
     let s = match *self {
-      CppItemData::Type(ref type1) => match type1.kind {
-        CppTypeKind::Enum => format!("enum {}", type1.name),
-        CppTypeKind::Class {
-          ref template_arguments,
-        } => format!(
-          "class {}{}",
-          type1.name,
-          if let Some(ref args) = *template_arguments {
-            format!(
-              "<{}>",
-              args.iter().map(|arg| arg.to_cpp_pseudo_code()).join(", ")
-            )
-          } else {
-            String::new()
-          }
-        ),
+      CppItemData::Type(ref type1) => match *type1 {
+        CppTypeData::Enum { ref name } => format!("enum {}", name),
+        CppTypeData::Class { ref type_base } => format!("class {}", type_base.to_cpp_pseudo_code()),
       },
       CppItemData::Method(ref method) => method.short_text(),
       CppItemData::EnumValue(ref value) => format!(
@@ -198,7 +185,10 @@ pub struct DatabaseItem {
   pub cpp_data: CppItemData,
   /// C++ documentation data for this type
   pub doc: Option<CppItemDoc>,
-  // TODO: add cpp_ffi and rust data
+
+  pub cpp_ffi_methods: Vec<CppFfiMethod>,
+  // TODO: add rust data
+  pub is_stack_allocated_type: bool,
 }
 
 impl DatabaseItem {
@@ -286,6 +276,8 @@ impl Database {
       ],
       cpp_data: data.clone(),
       doc: None,
+      cpp_ffi_methods: Vec::new(),
+      is_stack_allocated_type: false,
     };
     let result = DatabaseUpdateResult {
       item: data.to_string(),

@@ -10,7 +10,6 @@ use std::path::PathBuf;
 use std::fmt::Display;
 use common::log;
 use new_impl::database::CppItemData;
-use cpp_data::CppTypeKind;
 use cpp_type::CppTypeClassBase;
 use new_impl::database::DataEnv;
 use new_impl::database::DataSource;
@@ -19,6 +18,8 @@ use new_impl::database::Database;
 use new_impl::processor::ProcessorData;
 use new_impl::database::DataEnvInfo;
 use std::path::Path;
+use new_impl::processor::ProcessorItem;
+use cpp_data::CppTypeData;
 
 fn check_snippet(
   main_cpp_path: &Path,
@@ -50,18 +51,13 @@ fn check_one_item(main_cpp_path: &Path, builder: &CppLibBuilder, item: &CppItemD
 
 fn snippet_for_item(item: &CppItemData) -> Result<Snippet> {
   match *item {
-    CppItemData::Type(ref type1) => match type1.kind {
-      CppTypeKind::Enum => Ok(Snippet::new_in_main(format!(
+    CppItemData::Type(ref type1) => match *type1 {
+      CppTypeData::Enum { ref name } => Ok(Snippet::new_in_main(format!(
         "assert(std::is_enum<{}>::value);",
-        type1.name
+        name
       ))),
-      CppTypeKind::Class {
-        ref template_arguments,
-      } => {
-        let type_code = CppTypeClassBase {
-          name: type1.name.clone(),
-          template_arguments: template_arguments.clone(),
-        }.to_cpp_code()?;
+      CppTypeData::Class { ref type_base } => {
+        let type_code = type_base.to_cpp_code()?;
         Ok(Snippet::new_in_main(format!(
           "assert(std::is_class<{0}>::value);\nassert(sizeof({0}) > 0);",
           type_code
@@ -203,7 +199,7 @@ impl<'a> CppChecker<'a> {
   }
 }
 
-pub fn run(data: ProcessorData) -> Result<()> {
+fn run(data: ProcessorData) -> Result<()> {
   let root_path = data.workspace.tmp_path()?.with_added("cpp_checker");
   if root_path.exists() {
     remove_dir_all(&root_path)?;
@@ -245,4 +241,13 @@ pub fn run(data: ProcessorData) -> Result<()> {
   checker.run()?;
 
   Ok(())
+}
+
+pub fn cpp_checker() -> ProcessorItem {
+  ProcessorItem {
+    name: "cpp_checker".to_string(),
+    is_main: true,
+    run_after: vec!["cpp_parser".to_string(), "cpp_ffi_generator".to_string()],
+    function: run,
+  }
 }

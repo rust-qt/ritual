@@ -1,5 +1,5 @@
 use cpp_data::{CppBaseSpecifier, CppClassField, CppClassUsingDirective, CppData, CppEnumValue,
-               CppOriginLocation, CppTypeData, CppTypeKind, CppVisibility, ParserCppData,
+               CppOriginLocation, CppTypeData, CppVisibility, ParserCppData,
                TemplateArgumentsDeclaration};
 use cpp_method::{CppMethod, CppMethodArgument, CppMethodClassMembership, CppMethodKind};
 use cpp_operator::CppOperator;
@@ -29,6 +29,7 @@ use new_impl::html_logger::HtmlLogger;
 use new_impl::database::DatabaseUpdateResultType;
 use config::Config;
 use new_impl::processor::ProcessorData;
+use new_impl::processor::ProcessorItem;
 
 fn entity_log_representation(entity: Entity) -> String {
   format!(
@@ -277,7 +278,7 @@ fn run_clang<R, F: FnMut(Entity) -> Result<R>>(
 }
 
 /// Runs the parser on specified data.
-pub fn run(data: ProcessorData) -> Result<()> {
+fn run(data: ProcessorData) -> Result<()> {
   log::status(get_version());
   log::status("Initializing clang...");
   //let (mut parser, methods) =
@@ -307,6 +308,15 @@ pub fn run(data: ProcessorData) -> Result<()> {
   //    types: parser.types,
   //    methods: good_methods,
   //  })
+}
+
+pub fn cpp_parser() -> ProcessorItem {
+  ProcessorItem {
+    name: "cpp_parser".to_string(),
+    is_main: true,
+    run_after: Vec::new(),
+    function: run,
+  }
 }
 
 impl<'a> CppParser<'a> {
@@ -506,14 +516,14 @@ impl<'a> CppParser<'a> {
         });
       }
     }
-    if let Some(type_data) = self.find_type(|x| &x.name == remaining_name) {
-      match type_data.kind {
-        CppTypeKind::Enum { .. } => {
+    if let Some(type_data) = self.find_type(|x| x.name() == remaining_name) {
+      match *type_data {
+        CppTypeData::Enum { .. } => {
           result_type.base = CppTypeBase::Enum {
             name: remaining_name.to_string(),
           }
         }
-        CppTypeKind::Class { .. } => {
+        CppTypeData::Class { .. } => {
           result_type.base = CppTypeBase::Class(CppTypeClassBase {
             name: remaining_name.to_string(),
             template_arguments: None,
@@ -529,7 +539,7 @@ impl<'a> CppParser<'a> {
       }
       let class_name = &matches[1];
       if self
-        .find_type(|x| &x.name == class_name && x.is_class())
+        .find_type(|x| x.name() == class_name && x.is_class())
         .is_some()
       {
         let mut arg_types = Vec::new();
@@ -1226,9 +1236,8 @@ impl<'a> CppParser<'a> {
     })?;
     let enum_name = get_full_name(entity)?;
     self.data.add_cpp_data(
-      &CppItemData::Type(CppTypeData {
+      &CppItemData::Type(CppTypeData::Enum {
         name: enum_name.clone(),
-        kind: CppTypeKind::Enum,
       }),
       DataEnvInfo {
         is_success: true,
@@ -1447,9 +1456,9 @@ impl<'a> CppParser<'a> {
       }
     }
     self.data.add_cpp_data(
-      &CppItemData::Type(CppTypeData {
-        name: full_name,
-        kind: CppTypeKind::Class {
+      &CppItemData::Type(CppTypeData::Class {
+        type_base: CppTypeClassBase {
+          name: full_name,
           template_arguments: template_arguments,
         },
       }),
@@ -1675,7 +1684,7 @@ impl<'a> CppParser<'a> {
       | CppTypeBase::PointerSizedInteger { .. }
       | CppTypeBase::TemplateParameter { .. } => {}
       CppTypeBase::Enum { ref name } => {
-        if self.find_type(|x| &x.name == name).is_none() {
+        if self.find_type(|x| x.name() == name).is_none() {
           return Err(format!("unknown type: {}", name).into());
         }
       }
@@ -1683,7 +1692,7 @@ impl<'a> CppParser<'a> {
         ref name,
         ref template_arguments,
       }) => {
-        if self.find_type(|x| &x.name == name).is_none() {
+        if self.find_type(|x| x.name() == name).is_none() {
           return Err(format!("unknown type: {}", name).into());
         }
         if let Some(ref args) = *template_arguments {

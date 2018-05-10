@@ -1,7 +1,7 @@
 //! Types for handling information about C++ methods.
 
 use cpp_data::{CppBaseSpecifier, CppOriginLocation, CppVisibility, TemplateArgumentsDeclaration};
-use cpp_ffi_data::{CppFfiArgumentMeaning, CppFfiMethodArgument, CppFfiMethodSignature, CppFfiType};
+use cpp_ffi_data::{CppFfiArgumentMeaning, CppFfiMethod, CppFfiMethodArgument, CppFfiType};
 use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection, CppTypeRole};
 use common::errors::{unexpected, Result};
 use common::string_utils::JoinWithSeparator;
@@ -149,7 +149,7 @@ pub struct CppMethod {
 }
 
 /// Chosen type allocation place for the method
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub enum ReturnValueAllocationPlace {
   /// The method returns a class object by value (or is a constructor), and
   /// it's translated to "output" FFI argument and placement new
@@ -208,16 +208,19 @@ impl CppMethod {
   /// - converts all types to FFI types;
   /// - adds "this" argument explicitly if present;
   /// - adds "output" argument for return value if `allocation_place` is `Stack`.
-  pub fn c_signature(
+  pub fn to_ffi_method(
     &self,
-    allocation_place: ReturnValueAllocationPlace,
-  ) -> Result<CppFfiMethodSignature> {
+    stack_allocated_types: &[CppTypeClassBase],
+    name: &str,
+  ) -> Result<CppFfiMethod> {
     if self.allows_variadic_arguments {
       return Err("Variable arguments are not supported".into());
     }
-    let mut r = CppFfiMethodSignature {
+    let mut r = CppFfiMethod {
       arguments: Vec::new(),
       return_type: CppFfiType::void(),
+      name: name.to_string(),
+      allocation_place: ReturnValueAllocationPlace::NotApplicable,
     };
     if let Some(ref info) = self.class_membership {
       if !info.is_static && info.kind != CppMethodKind::Constructor {
@@ -255,25 +258,22 @@ impl CppMethod {
     };
     let c_type = real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
     if real_return_type.needs_allocation_place_variants() {
-      match allocation_place {
-        ReturnValueAllocationPlace::Stack => {
+      if let CppTypeBase::Class(ref base) = real_return_type.base {
+        if stack_allocated_types.iter().any(|t| t == base) {
           r.arguments.push(CppFfiMethodArgument {
             name: "output".to_string(),
             argument_type: c_type,
             meaning: CppFfiArgumentMeaning::ReturnValue,
           });
-        }
-        ReturnValueAllocationPlace::Heap => {
+          r.allocation_place = ReturnValueAllocationPlace::Stack;
+        } else {
           r.return_type = c_type;
+          r.allocation_place = ReturnValueAllocationPlace::Heap;
         }
-        ReturnValueAllocationPlace::NotApplicable => {
-          return Err(
-            unexpected(
-              "NotApplicable encountered but return value needs \
-               allocation_place variants",
-            ).into(),
-          );
-        }
+      } else {
+        return Err(
+          unexpected("return value needs allocation_place variants but is not a class type").into(),
+        );
       }
     } else {
       r.return_type = c_type;

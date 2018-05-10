@@ -3,11 +3,11 @@ use config::Config;
 use common::log;
 use common::utils::MapIfOk;
 use common::file_utils::PathBufWithAdded;
-use cpp_parser;
+use cpp_parser::cpp_parser;
 use common::errors::{ChainErr, Result};
 use std::path::PathBuf;
-use new_impl::cpp_checker;
-use new_impl::database::Database;
+use new_impl::cpp_checker::cpp_checker;
+use new_impl::database::{Database, DatabaseItem};
 use new_impl::html_logger::HtmlLogger;
 use new_impl::database::DataEnv;
 use new_impl::database::DataSource;
@@ -16,6 +16,8 @@ use new_impl::database::CppItemData;
 use new_impl::database::DataEnvInfo;
 use new_impl::database::DatabaseUpdateResultType;
 use new_impl::database::DatabaseUpdateResult;
+use std::iter::once;
+use cpp_ffi_generator::cpp_ffi_generator;
 //use cpp_post_processor::cpp_post_process;
 
 /// Creates output and cache directories if they don't exist.
@@ -72,6 +74,25 @@ impl<'a> ProcessorData<'a> {
     let result = self.current_database.add_cpp_data(&self.env, data, info);
     self.html_logger.log_database_update_result(&result);
   }
+
+  pub fn all_databases(&self) -> Vec<&Database> {
+    once(&self.current_database as &_)
+      .chain(self.dep_databases.iter())
+      .collect()
+  }
+  pub fn all_items(&self) -> Vec<&DatabaseItem> {
+    once(&self.current_database as &_)
+      .chain(self.dep_databases.iter())
+      .flat_map(|d| d.items.iter())
+      .collect()
+  }
+}
+
+pub struct ProcessorItem {
+  pub name: String,
+  pub is_main: bool,
+  pub run_after: Vec<String>,
+  pub function: fn(data: ProcessorData) -> Result<()>,
 }
 
 pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]) -> Result<()> {
@@ -80,6 +101,16 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
     config.crate_properties().name()
   ));
   check_all_paths(&config)?;
+
+  let processor_items = vec![
+    cpp_parser(),
+    // TODO: instantiate_templates
+    // TODO: generate_field_accessors
+    // TODO: generate_casts
+    cpp_ffi_generator(),
+    // TODO: generate_slot_wrappers
+    cpp_checker(),
+  ];
 
   // TODO: allow to remove any prefix through `Config` (#25)
   let remove_qt_prefix = config.crate_properties().name().starts_with("qt_");
@@ -102,79 +133,73 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
     })?;
 
   for operation in operations {
-    match operation.as_str() {
-      "run_cpp_parser" | "run_cpp_checker" => {
-        let html_logger = HtmlLogger::new(
-          workspace
-            .log_path()?
-            .with_added(format!("{}_log.html", operation)),
-          "C++ parser log",
-        )?;
+    if let Some(item) = processor_items.iter().find(|item| &item.name == operation) {
+      log::status(format!("Running processor item: {}", &item.name));
 
-        let data = ProcessorData {
-          workspace,
-          html_logger,
-          env: DataEnv {
-            target: current_target(),
-            data_source: match operation.as_str() {
-              "run_cpp_parser" => DataSource::CppParser,
-              "run_cpp_checker" => DataSource::CppChecker,
-              _ => unreachable!(),
-            },
-            cpp_library_version: config.cpp_lib_version().map(|s| s.to_string()),
-          },
-          current_database: &mut current_database,
-          dep_databases: &dependent_cpp_crates,
-          config,
-        };
-        if !data
-          .current_database
-          .environments
-          .iter()
-          .any(|e| e == &data.env)
-        {
-          data.current_database.environments.push(data.env.clone());
-        }
-        data.current_database.invalidate_env(&data.env);
-        match operation.as_str() {
-          "run_cpp_parser" => {
-            log::status("Running C++ parser");
-            cpp_parser::run(data).chain_err(|| "C++ parser failed")?;
-          }
-          "run_cpp_checker" => {
-            log::status("Running C++ checker");
-            cpp_checker::run(data)?;
-          }
-          _ => unreachable!(),
-        }
-      }
-      "print_database" => {
-        let path = workspace
+      let html_logger = HtmlLogger::new(
+        workspace
           .log_path()?
-          .with_added(format!("database_{}.html", current_database.crate_name));
-        log::status("Printing database");
-        current_database.print_as_html(&path)?;
-      }
-      "generate_crate" => {
-        unimplemented!()
+          .with_added(format!("{}_log.html", operation)),
+        "C++ parser log",
+      )?;
 
-        /*
-if exec_config.write_dependencies_local_paths {
-log::status(
- "Output Cargo.toml file will contain local paths of used dependencies \
-          (use --no-local-paths to disable).",
-);
-} else {
-log::status(
- "Local paths will not be written to the output crate. Make sure all dependencies \
-          are published before trying to compile the crate.",
-);
-}
-
-*/
+      let data = ProcessorData {
+        workspace,
+        html_logger,
+        env: DataEnv {
+          target: current_target(),
+          data_source: match operation.as_str() {
+            "cpp_parser" => DataSource::CppParser,
+            "cpp_checker" => DataSource::CppChecker,
+            _ => unreachable!(),
+          },
+          cpp_library_version: config.cpp_lib_version().map(|s| s.to_string()),
+        },
+        current_database: &mut current_database,
+        dep_databases: &dependent_cpp_crates,
+        config,
+      };
+      if !data
+        .current_database
+        .environments
+        .iter()
+        .any(|e| e == &data.env)
+      {
+        data.current_database.environments.push(data.env.clone());
       }
-      "clear" => unimplemented!(),
-      _ => return Err(format!("unknown operation: {}", operation).into()),
+      data.current_database.invalidate_env(&data.env);
+      (item.function)(data)?;
+    } else {
+      // TODO: all other operations are also processor items
+      match operation.as_str() {
+        "print_database" => {
+          let path = workspace
+            .log_path()?
+            .with_added(format!("database_{}.html", current_database.crate_name));
+          log::status("Printing database");
+          current_database.print_as_html(&path)?;
+        }
+        "generate_crate" => {
+          unimplemented!()
+
+          /*
+  if exec_config.write_dependencies_local_paths {
+  log::status(
+   "Output Cargo.toml file will contain local paths of used dependencies \
+            (use --no-local-paths to disable).",
+  );
+  } else {
+  log::status(
+   "Local paths will not be written to the output crate. Make sure all dependencies \
+            are published before trying to compile the crate.",
+  );
+  }
+
+  */
+        }
+        "clear" => unimplemented!(),
+        _ => return Err(format!("unknown operation: {}", operation).into()),
+      }
     }
   }
 

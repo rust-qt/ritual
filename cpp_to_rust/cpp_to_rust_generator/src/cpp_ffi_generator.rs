@@ -1,10 +1,10 @@
 use caption_strategy::{MethodCaptionStrategy, TypeCaptionStrategy};
 use cpp_data::{CppDataWithDeps, CppOperator, CppTemplateInstantiation, CppTypeAllocationPlace,
-               CppTypeKind, CppVisibility};
+               CppVisibility};
 use cpp_type::{CppFunctionPointerType, CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection,
                CppTypeRole};
-use cpp_ffi_data::{c_base_name, CppAndFfiMethod, CppCast, CppFfiHeaderData, CppFfiMethodKind,
-                   CppFieldAccessorType, CppMethodWithFfiSignature, QtSlotWrapper};
+use cpp_ffi_data::{c_base_name, CppCast, CppFfiMethod, CppFfiMethodKind, CppFieldAccessorType,
+                   QtSlotWrapper};
 use cpp_method::{CppMethod, CppMethodArgument, CppMethodClassMembership, CppMethodKind,
                  ReturnValueAllocationPlace};
 use common::errors::{unexpected, ChainErr, Result};
@@ -13,15 +13,19 @@ use common::utils::{add_to_multihash, MapIfOk};
 use config::CppFfiGeneratorFilterFn;
 use std::collections::{HashMap, HashSet};
 use std::iter::once;
+use new_impl::database::CppItemData;
+use new_impl::processor::ProcessorData;
+use new_impl::processor::ProcessorItem;
+use cpp_data::CppClassField;
+use cpp_data::CppBaseSpecifier;
+use cpp_data::CppTypeData;
 
 /// This object generates the C++ wrapper library
 struct CppFfiGenerator<'a> {
   /// Input C++ data
-  cpp_data: &'a CppDataWithDeps<'a>,
+  data: ProcessorData<'a>,
   /// Name of the wrapper library
   cpp_ffi_lib_name: String,
-  /// FFI filters passed to `Config`
-  filters: Vec<&'a Box<CppFfiGeneratorFilterFn>>,
 }
 
 #[derive(Debug, Clone)]
@@ -45,69 +49,29 @@ impl CppMethodWithKind {
 }
 
 /// Runs the FFI generator
-pub fn run(
-  cpp_data: &CppDataWithDeps,
-  cpp_ffi_lib_name: String,
-  filters: Vec<&Box<CppFfiGeneratorFilterFn>>,
-) -> Result<Vec<CppFfiHeaderData>> {
-  let generator = CppFfiGenerator {
-    cpp_data: cpp_data,
-    cpp_ffi_lib_name: cpp_ffi_lib_name,
-    filters: filters,
+pub fn run(data: ProcessorData) -> Result<()> {
+  let cpp_ffi_lib_name = format!("{}_ffi", &data.config.crate_properties().name());
+  let mut generator = CppFfiGenerator {
+    data: data,
+    cpp_ffi_lib_name,
   };
 
-  let mut c_headers = Vec::new();
-  let mut include_name_list: Vec<_> = generator
-    .cpp_data
-    .all_include_files()?
-    .into_iter()
-    .collect();
-  include_name_list.sort();
+  //  let mut extra_methods = Vec::new();
+  //  extra_methods.append(&mut instantiate_templates(&generator.cpp_data)?);
+  //  extra_methods.append(&mut generate_field_accessors(&generator.cpp_data)?);
+  //  extra_methods.append(&mut generate_casts(&generator.cpp_data)?);
 
-  let mut extra_methods = Vec::new();
-  extra_methods.append(&mut instantiate_templates(&generator.cpp_data)?);
-  extra_methods.append(&mut generate_field_accessors(&generator.cpp_data)?);
-  extra_methods.append(&mut generate_casts(&generator.cpp_data)?);
+  generator.process_methods()?;
+  Ok(())
+}
 
-  for include_file in &include_name_list {
-    let mut include_file_base_name = include_file.clone();
-
-    if let Some(index) = include_file_base_name.find('.') {
-      include_file_base_name = include_file_base_name[0..index].to_string();
-    }
-    let methods = generator.process_methods(
-      &include_file_base_name,
-      None,
-      generator
-        .cpp_data
-        .current
-        .methods_and_implicit_destructors()
-        .map(|m| CppMethodRefWithKind {
-          method: m,
-          kind: CppFfiMethodKind::Real,
-        })
-        .chain(extra_methods.iter().map(|i| i.as_ref()))
-        .filter(|x| &x.method.include_file == include_file),
-    )?;
-    if methods.is_empty() {
-      log::llog(log::DebugFfiSkips, || {
-        format!("Skipping empty include file {}", include_file)
-      });
-    } else {
-      c_headers.push(CppFfiHeaderData {
-        include_file_base_name: include_file_base_name,
-        methods: methods,
-        qt_slot_wrappers: Vec::new(),
-      });
-    }
+pub fn cpp_ffi_generator() -> ProcessorItem {
+  ProcessorItem {
+    name: "cpp_ffi_generator".to_string(),
+    is_main: true,
+    run_after: Vec::new(),
+    function: run,
   }
-  if let Some(header) = generator.generate_slot_wrappers()? {
-    c_headers.push(header);
-  }
-  if c_headers.is_empty() {
-    return Err("No FFI headers generated".into());
-  }
-  Ok(c_headers)
 }
 
 /// Tries to apply each of `template_instantiations` to `method`.
@@ -116,7 +80,7 @@ pub fn run(
 /// with the method.
 fn apply_instantiations_to_method(
   method: &CppMethod,
-  nested_level: usize,
+  nested_level1: usize,
   template_instantiations: &[CppTemplateInstantiation],
 ) -> Result<Vec<CppMethod>> {
   let mut new_methods = Vec::new();
@@ -126,12 +90,22 @@ fn apply_instantiations_to_method(
     });
     let mut new_method = method.clone();
     if let Some(ref args) = method.template_arguments {
-      if args.nested_level == nested_level {
-        if args.count() != ins.template_arguments.len() {
+      if args.iter().enumerate().all(|(index1, arg)| {
+        if let CppTypeBase::TemplateParameter {
+          nested_level,
+          index,
+          ..
+        } = arg.base
+        {
+          nested_level1 == nested_level && index1 == index
+        } else {
+          false
+        }
+      }) {
+        if args.len() != ins.template_arguments.len() {
           return Err("template arguments count mismatch".into());
         }
-        new_method.template_arguments = None;
-        new_method.template_arguments_values = Some(ins.template_arguments.clone());
+        new_method.template_arguments = Some(ins.template_arguments.clone());
       }
     }
     new_method.arguments.clear();
@@ -141,21 +115,21 @@ fn apply_instantiations_to_method(
         has_default_value: arg.has_default_value,
         argument_type: arg
           .argument_type
-          .instantiate(nested_level, &ins.template_arguments)?,
+          .instantiate(nested_level1, &ins.template_arguments)?,
       });
     }
     new_method.return_type = method
       .return_type
-      .instantiate(nested_level, &ins.template_arguments)?;
+      .instantiate(nested_level1, &ins.template_arguments)?;
     if let Some(ref mut info) = new_method.class_membership {
       info.class_type = info
         .class_type
-        .instantiate_class(nested_level, &ins.template_arguments)?;
+        .instantiate_class(nested_level1, &ins.template_arguments)?;
     }
     let mut conversion_type = None;
     if let Some(ref mut operator) = new_method.operator {
       if let CppOperator::Conversion(ref mut cpp_type) = *operator {
-        let r = cpp_type.instantiate(nested_level, &ins.template_arguments)?;
+        let r = cpp_type.instantiate(nested_level1, &ins.template_arguments)?;
         *cpp_type = r.clone();
         conversion_type = Some(r);
       }
@@ -273,97 +247,83 @@ fn instantiate_templates(data: &CppDataWithDeps) -> Result<Vec<CppMethodWithKind
 }
 
 /// Adds fictional getter and setter methods for each known public field of each class.
-fn generate_field_accessors(cpp_data: &CppDataWithDeps) -> Result<Vec<CppMethodWithKind>> {
+fn generate_field_accessors(field: &CppClassField) -> Result<Vec<CppMethodWithKind>> {
   // TODO: fix doc generator for field accessors
-  log::status("Adding field accessors");
+  //log::status("Adding field accessors");
   let mut new_methods = Vec::new();
-  for type_info in &cpp_data.current.parser.types {
-    if let CppTypeKind::Class { ref fields, .. } = type_info.kind {
-      for field in fields {
-        let create_method =
-          |name, accessor_type, return_type, arguments| -> Result<CppMethodWithKind> {
-            Ok(CppMethodWithKind {
-              method: CppMethod {
-                name: name,
-                class_membership: Some(CppMethodClassMembership {
-                  class_type: type_info.default_class_type()?,
-                  kind: CppMethodKind::Regular,
-                  is_virtual: false,
-                  is_pure_virtual: false,
-                  is_const: match accessor_type {
-                    CppFieldAccessorType::CopyGetter | CppFieldAccessorType::ConstRefGetter => true,
-                    CppFieldAccessorType::MutRefGetter | CppFieldAccessorType::Setter => false,
-                  },
-                  is_static: false,
-                  visibility: CppVisibility::Public,
-                  is_signal: false,
-                  is_slot: false,
-                }),
-                operator: None,
-                return_type: return_type,
-                arguments: arguments,
-                allows_variadic_arguments: false,
-                include_file: type_info.include_file.clone(),
-                origin_location: None,
-                template_arguments: None,
-                template_arguments_values: None,
-                declaration_code: None,
-                doc: None,
-                inheritance_chain: Vec::new(),
-                //is_fake_inherited_method: false,
-                is_ffi_whitelisted: false,
-              },
-              kind: CppFfiMethodKind::FieldAccessor {
-                accessor_type: accessor_type,
-                field_name: field.name.clone(),
-              },
-            })
-          };
-        if field.visibility == CppVisibility::Public {
-          if field.field_type.indirection == CppTypeIndirection::None
-            && field.field_type.base.is_class()
-          {
-            let mut type2_const = field.field_type.clone();
-            type2_const.is_const = true;
-            type2_const.indirection = CppTypeIndirection::Ref;
-            let mut type2_mut = field.field_type.clone();
-            type2_mut.is_const = false;
-            type2_mut.indirection = CppTypeIndirection::Ref;
-            new_methods.push(create_method(
-              field.name.clone(),
-              CppFieldAccessorType::ConstRefGetter,
-              type2_const,
-              Vec::new(),
-            )?);
-            new_methods.push(create_method(
-              format!("{}_mut", field.name),
-              CppFieldAccessorType::MutRefGetter,
-              type2_mut,
-              Vec::new(),
-            )?);
-          } else {
-            new_methods.push(create_method(
-              field.name.clone(),
-              CppFieldAccessorType::CopyGetter,
-              field.field_type.clone(),
-              Vec::new(),
-            )?);
-          }
-          let arg = CppMethodArgument {
-            argument_type: field.field_type.clone(),
-            name: "value".to_string(),
-            has_default_value: false,
-          };
-          new_methods.push(create_method(
-            format!("set_{}", field.name),
-            CppFieldAccessorType::Setter,
-            CppType::void(),
-            vec![arg],
-          )?);
-        }
-      }
+  let create_method = |name, accessor_type, return_type, arguments| -> Result<CppMethodWithKind> {
+    // TODO: generate CppFfiMethod, don't generate CppMethod
+    Ok(CppMethodWithKind {
+      method: CppMethod {
+        name: name,
+        class_membership: Some(CppMethodClassMembership {
+          class_type: field.class_type.clone(),
+          kind: CppMethodKind::Regular,
+          is_virtual: false,
+          is_pure_virtual: false,
+          is_const: match accessor_type {
+            CppFieldAccessorType::CopyGetter | CppFieldAccessorType::ConstRefGetter => true,
+            CppFieldAccessorType::MutRefGetter | CppFieldAccessorType::Setter => false,
+          },
+          is_static: false,
+          visibility: CppVisibility::Public,
+          is_signal: false,
+          is_slot: false,
+        }),
+        operator: None,
+        return_type: return_type,
+        arguments: arguments,
+        allows_variadic_arguments: false,
+        template_arguments: None,
+        declaration_code: None,
+      },
+      kind: CppFfiMethodKind::FieldAccessor {
+        accessor_type: accessor_type,
+      },
+    })
+  };
+  if field.visibility == CppVisibility::Public {
+    if field.field_type.indirection == CppTypeIndirection::None && field.field_type.base.is_class()
+    {
+      let mut type2_const = field.field_type.clone();
+      type2_const.is_const = true;
+      type2_const.indirection = CppTypeIndirection::Ref;
+      let mut type2_mut = field.field_type.clone();
+      type2_mut.is_const = false;
+      type2_mut.indirection = CppTypeIndirection::Ref;
+      new_methods.push(create_method(
+        field.name.clone(),
+        CppFieldAccessorType::ConstRefGetter,
+        type2_const,
+        Vec::new(),
+      )?);
+      new_methods.push(create_method(
+        format!("{}_mut", field.name),
+        CppFieldAccessorType::MutRefGetter,
+        type2_mut,
+        Vec::new(),
+      )?);
+    } else {
+      new_methods.push(create_method(
+        field.name.clone(),
+        CppFieldAccessorType::CopyGetter,
+        field.field_type.clone(),
+        Vec::new(),
+      )?);
     }
+    let arg = CppMethodArgument {
+      argument_type: field.field_type.clone(),
+      name: "value".to_string(),
+      has_default_value: false,
+    };
+    new_methods.push(create_method(
+      format!("set_{}", field.name),
+      CppFieldAccessorType::Setter,
+      CppType::void(),
+      vec![arg],
+    )?);
   }
+
   Ok(new_methods)
 }
 
@@ -371,12 +331,7 @@ fn generate_field_accessors(cpp_data: &CppDataWithDeps) -> Result<Vec<CppMethodW
 /// `static_cast` or `dynamic_cast` from type `from` to type `to`.
 /// See `CppMethod`'s documentation for more information
 /// about `is_unsafe_static_cast` and `is_direct_static_cast`.
-fn create_cast_method(
-  cast: CppCast,
-  from: &CppType,
-  to: &CppType,
-  include_file: &str,
-) -> CppMethodWithKind {
+fn create_cast_method(cast: CppCast, from: &CppType, to: &CppType) -> CppMethodWithKind {
   CppMethodWithKind {
     method: CppMethod {
       name: cast.cpp_method_name().to_string(),
@@ -391,14 +346,8 @@ fn create_cast_method(
         },
       ],
       allows_variadic_arguments: false,
-      include_file: include_file.to_string(),
-      origin_location: None,
-      template_arguments: None,
-      template_arguments_values: Some(vec![to.clone()]),
+      template_arguments: Some(vec![to.clone()]),
       declaration_code: None,
-      doc: None,
-      inheritance_chain: Vec::new(),
-      is_ffi_whitelisted: true,
     },
     kind: CppFfiMethodKind::Cast(cast),
   }
@@ -409,14 +358,11 @@ fn create_cast_method(
 /// `generate_casts_one` recursively to add casts between `target_type`
 /// and base types of `base_type`.
 fn generate_casts_one(
-  cpp_data: &CppDataWithDeps,
+  processor_data: &ProcessorData,
   target_type: &CppTypeClassBase,
-  base_type: &CppType,
-  is_direct: bool,
+  base_type: &CppTypeClassBase,
+  direct_base_index: Option<usize>,
 ) -> Result<Vec<CppMethodWithKind>> {
-  let type_info = cpp_data
-    .find_type_info(|x| x.name == target_type.name)
-    .chain_err(|| "type info not found")?;
   let target_ptr_type = CppType {
     base: CppTypeBase::Class(target_type.clone()),
     indirection: CppTypeIndirection::Ptr,
@@ -424,7 +370,7 @@ fn generate_casts_one(
     is_const2: false,
   };
   let base_ptr_type = CppType {
-    base: base_type.base.clone(),
+    base: CppTypeBase::Class(base_type.clone()),
     indirection: CppTypeIndirection::Ptr,
     is_const: false,
     is_const2: false,
@@ -433,77 +379,62 @@ fn generate_casts_one(
   new_methods.push(create_cast_method(
     CppCast::Static {
       is_unsafe: true,
-      is_direct: is_direct,
+      direct_base_index: direct_base_index,
     },
     &base_ptr_type,
     &target_ptr_type,
-    &type_info.include_file,
   ));
   new_methods.push(create_cast_method(
     CppCast::Static {
       is_unsafe: false,
-      is_direct: is_direct,
+      direct_base_index: direct_base_index,
     },
     &target_ptr_type,
     &base_ptr_type,
-    &type_info.include_file,
   ));
-  if let CppTypeBase::Class(ref base) = base_type.base {
-    if cpp_data.has_virtual_methods(&base.name) {
-      new_methods.push(create_cast_method(
-        CppCast::Dynamic,
-        &base_ptr_type,
-        &target_ptr_type,
-        &type_info.include_file,
-      ));
-    }
-  }
+  new_methods.push(create_cast_method(
+    CppCast::Dynamic,
+    &base_ptr_type,
+    &target_ptr_type,
+  ));
 
-  if let CppTypeBase::Class(ref base) = base_type.base {
-    if let Some(type_info) = cpp_data.find_type_info(|x| x.name == base.name) {
-      if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
-        for base in bases {
+  for database in processor_data.all_databases() {
+    for item in &database.items {
+      if let CppItemData::ClassBase(ref base) = item.cpp_data {
+        if &base.derived_class_type == base_type {
           new_methods.append(&mut generate_casts_one(
-            cpp_data,
+            processor_data,
             target_type,
-            &base.base_type,
-            false,
+            &base.base_class_type,
+            None,
           )?);
         }
       }
     }
   }
+
   Ok(new_methods)
 }
 
 /// Adds `static_cast` and `dynamic_cast` functions for all appropriate pairs of types
 /// in this `CppData`.
-fn generate_casts(cpp_data: &CppDataWithDeps) -> Result<Vec<CppMethodWithKind>> {
-  log::status("Adding cast functions");
-  let mut new_methods = Vec::new();
-  for type_info in &cpp_data.current.parser.types {
-    if let CppTypeKind::Class { ref bases, .. } = type_info.kind {
-      let t = type_info.default_class_type()?;
-      let single_base = bases.len() == 1;
-      for base in bases {
-        new_methods.append(&mut generate_casts_one(
-          cpp_data,
-          &t,
-          &base.base_type,
-          single_base,
-        )?);
-      }
-    }
-  }
-  Ok(new_methods)
+fn generate_casts(base: &CppBaseSpecifier, data: &ProcessorData) -> Result<Vec<CppMethodWithKind>> {
+  //log::status("Adding cast functions");
+  Ok(generate_casts_one(
+    data,
+    &base.derived_class_type,
+    &base.base_class_type,
+    Some(base.base_index),
+  )?)
 }
 
+/*
 /// Generates the FFI function signature for this method.
 fn method_to_ffi_signature<'a>(
   method: CppMethodRefWithKind<'a>,
   cpp_data: &CppDataWithDeps,
   type_allocation_places_override: Option<CppTypeAllocationPlace>,
-) -> Result<CppMethodWithFfiSignature> {
+) -> Result<CppFfiMethod> {
   let get_place = |name| -> Result<ReturnValueAllocationPlace> {
     let v = if let Some(ref x) = type_allocation_places_override {
       x.clone()
@@ -534,13 +465,12 @@ fn method_to_ffi_signature<'a>(
   };
 
   let c_signature = method.method.c_signature(place.clone())?;
-  Ok(CppMethodWithFfiSignature {
-    cpp_method: method.method.clone(),
+  Ok(CppFfiMethod {
     kind: method.kind,
     allocation_place: place,
     c_signature: c_signature,
   })
-}
+}*/
 
 impl<'a> CppFfiGenerator<'a> {
   /// Returns false if the method is excluded from processing
@@ -550,27 +480,19 @@ impl<'a> CppFfiGenerator<'a> {
     //      return Ok(false);
     //    }
     let class_name = method.class_name().unwrap_or(&String::new()).clone();
-    for filter in &self.filters {
-      let allowed = filter(method).chain_err(|| "cpp_ffi_generator_filter failed")?;
-      if !allowed {
-        log::llog(log::DebugFfiSkips, || {
-          format!("Skipping blacklisted method: \n{}\n", method.short_text())
-        });
-        return Ok(false);
-      }
-    }
+    //    for filter in &self.filters {
+    //      let allowed = filter(method).chain_err(|| "cpp_ffi_generator_filter failed")?;
+    //      if !allowed {
+    //        log::llog(log::DebugFfiSkips, || {
+    //          format!("Skipping blacklisted method: \n{}\n", method.short_text())
+    //        });
+    //        return Ok(false);
+    //      }
+    //    }
     if class_name == "QFlags" {
       return Ok(false);
     }
     if let Some(ref membership) = method.class_membership {
-      if membership.kind == CppMethodKind::Constructor
-        && self.cpp_data.has_pure_virtual_methods(&class_name)
-      {
-        log::llog(log::DebugFfiSkips, || {
-          format!("Skipping constructor of abstract class {}", class_name)
-        });
-        return Ok(false);
-      }
       if membership.visibility == CppVisibility::Private {
         return Ok(false);
       }
@@ -584,11 +506,11 @@ impl<'a> CppFfiGenerator<'a> {
     if method.template_arguments.is_some() {
       return Ok(false);
     }
-    if method.template_arguments_values.is_some() && !method.is_ffi_whitelisted {
-      // TODO: re-enable after template test compilation (#24) is implemented
-      // TODO: QObject::findChild and QObject::findChildren should be allowed
-      return Ok(false);
-    }
+    //if method.template_arguments_values.is_some() && !method.is_ffi_whitelisted {
+    // TODO: re-enable after template test compilation (#24) is implemented
+    // TODO: QObject::findChild and QObject::findChildren should be allowed
+    //return Ok(false);
+    //}
     if method
       .all_involved_types()
       .iter()
@@ -601,19 +523,43 @@ impl<'a> CppFfiGenerator<'a> {
 
   /// Generates FFI wrappers for all specified methods,
   /// resolving all name conflicts using additional method captions.
-  fn process_methods<'b, I>(
-    &self,
-    include_file_base_name: &str,
-    type_allocation_places_override: Option<CppTypeAllocationPlace>,
-    methods: I,
-  ) -> Result<Vec<CppAndFfiMethod>>
-  where
-    I: Iterator<Item = CppMethodRefWithKind<'b>>,
-  {
-    log::status(format!(
-      "Generating C++ FFI methods for header: {}",
-      include_file_base_name
-    ));
+  fn process_methods(&mut self) -> Result<()> {
+    let stack_allocated_types: Vec<_> = self
+      .data
+      .all_items()
+      .iter()
+      .filter_map(|item| {
+        if let CppItemData::Type(ref type_data) = item.cpp_data {
+          if let CppTypeData::Class { ref type_base } = *type_data {
+            if item.is_stack_allocated_type {
+              return Some(type_base.clone());
+            }
+          }
+        }
+        None
+      })
+      .collect();
+
+    for (index, item) in &mut self.data.current_database.items.iter_mut().enumerate() {
+      if item.cpp_ffi_methods.len() > 0 {
+        continue;
+      }
+      if let CppItemData::Method(ref method) = item.cpp_data {
+        let name = format!("{}_fn{}", self.cpp_ffi_lib_name, index);
+        match method.to_ffi_method(&stack_allocated_types, &name) {
+          Err(msg) => {
+            // TODO: new logs?
+          }
+          Ok(r) => {
+            item.cpp_ffi_methods.push(r);
+          }
+        }
+      }
+    }
+
+    Ok(())
+
+    /*
     let mut hash_name_to_methods: HashMap<String, Vec<_>> = HashMap::new();
     {
       let mut process_one = |method: CppMethodRefWithKind| match method_to_ffi_signature(
@@ -682,7 +628,7 @@ impl<'a> CppFfiGenerator<'a> {
     let mut processed_methods = Vec::new();
     for (key, mut values) in hash_name_to_methods {
       if values.len() == 1 {
-        processed_methods.push(CppAndFfiMethod::new(values.remove(0), key.clone()));
+        processed_methods.push(CppFfiMethod::new(values.remove(0), key.clone()));
         continue;
       }
       let mut found_strategy = None;
@@ -722,9 +668,12 @@ impl<'a> CppFfiGenerator<'a> {
       }
     }
     processed_methods.sort_by(|a, b| a.c_name.cmp(&b.c_name));
-    Ok(processed_methods)
+    Ok(processed_methods)*/
   }
 
+  // TODO: slot wrappers
+
+  /*
   /// Generates slot wrappers for all encountered argument types
   /// (excluding types already handled in the dependencies).
   fn generate_slot_wrappers(&'a self) -> Result<Option<CppFfiHeaderData>> {
@@ -897,5 +846,25 @@ impl<'a> CppFfiGenerator<'a> {
       )?,
       qt_slot_wrappers: qt_slot_wrappers,
     }))
-  }
+  }*/
 }
+
+// TODO: generate methods with omitted arguments
+//for method in methods {
+//if let Some(last_arg) = method.method.arguments.last() {
+//if last_arg.has_default_value {
+//let mut method_copy = method.method.clone();
+//while let Some(arg) = method_copy.arguments.pop() {
+//if !arg.has_default_value {
+//break;
+//}
+//process_one(CppMethodRefWithKind {
+//method: &method_copy,
+//kind: CppFfiMethodKind::RealWithOmittedArguments {
+//arguments_before_omitting: Some(method.method.arguments.clone()),
+//},
+//});
+//}
+//}
+//}
+//}

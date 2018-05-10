@@ -28,7 +28,7 @@ extern crate serde;
 
 pub extern crate cpp_to_rust_common as common;
 
-//mod cpp_ffi_generator;
+pub mod cpp_ffi_generator;
 //mod cpp_code_generator;
 mod caption_strategy;
 pub mod config;

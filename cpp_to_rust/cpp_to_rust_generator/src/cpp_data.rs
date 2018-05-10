@@ -69,20 +69,6 @@ pub struct CppBaseSpecifier {
   pub derived_class_type: CppTypeClassBase,
 }
 
-/// Information about a C++ type declaration
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum CppTypeKind {
-  /// Enum declaration
-  Enum,
-  /// Class declaration
-  Class {
-    /// Information about template arguments of this type.
-    template_arguments: Option<Vec<CppType>>,
-    // /// List of using directives, like "using BaseClass::method1;"
-    //using_directives: Vec<CppClassUsingDirective>,
-  },
-}
-
 /// Location of a C++ type's definition in header files.
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppOriginLocation {
@@ -116,12 +102,25 @@ pub struct CppTypeDoc {
 
 /// Information about a C++ type declaration
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct CppTypeData {
-  /// Identifier, including namespaces and nested classes
-  /// (separated with "::", like in C++)
-  pub name: String,
-  /// Type information
-  pub kind: CppTypeKind,
+pub enum CppTypeData {
+  Enum {
+    /// Identifier, including namespaces and nested classes
+    /// (separated with "::", like in C++)
+    name: String,
+  },
+  Class {
+    /// Information about name and template arguments of this type.
+    type_base: CppTypeClassBase,
+  },
+}
+
+impl CppTypeData {
+  pub fn name(&self) -> &str {
+    match *self {
+      CppTypeData::Enum { ref name } => name,
+      CppTypeData::Class { ref type_base } => &type_base.name,
+    }
+  }
 }
 
 /// Information about template arguments of a C++ class type
@@ -233,8 +232,8 @@ pub struct CppDataWithDeps<'a> {
 impl CppTypeData {
   /// Checks if the type is a class type.
   pub fn is_class(&self) -> bool {
-    match self.kind {
-      CppTypeKind::Class { .. } => true,
+    match self {
+      &CppTypeData::Class { .. } => true,
       _ => false,
     }
   }

@@ -23,9 +23,11 @@ pub enum CppCast {
   Static {
     /// If true, this is an unsafe (from base to derived) `static_cast` wrapper.
     is_unsafe: bool,
-    /// If true, this is a wrapper of `static_cast` between a class and its
-    /// direct base.
-    is_direct: bool,
+
+    /// If Some, this is a wrapper of `static_cast` between a class and its
+    /// direct base. Contains index of the base (e.g. 0 for the first base; always
+    /// 0 if the class only has one base).
+    direct_base_index: Option<usize>,
   },
   Dynamic,
   #[allow(unused)]
@@ -47,9 +49,12 @@ impl CppCast {
       _ => false,
     }
   }
-  pub fn is_direct_static_cast(&self) -> bool {
+  pub fn is_first_direct_static_cast(&self) -> bool {
     match *self {
-      CppCast::Static { ref is_direct, .. } => *is_direct,
+      CppCast::Static {
+        ref direct_base_index,
+        ..
+      } => direct_base_index == &Some(0),
       _ => false,
     }
   }
@@ -60,18 +65,19 @@ impl CppCast {
 pub enum CppFfiMethodKind {
   /// This is a real C++ method.
   Real,
-  RealWithOmittedArguments {
-    /// If Some, the method is derived from another method by omitting arguments,
-    /// and this field contains all arguments of the original method.
-    arguments_before_omitting: Option<Vec<CppMethodArgument>>,
-  },
+  RealWithOmittedArguments,
+  //{
+  //    /// If Some, the method is derived from another method by omitting arguments,
+  //    /// and this field contains all arguments of the original method.
+  //    arguments_before_omitting: Option<Vec<CppMethodArgument>>,
+  //  },
   /// This is a field accessor, i.e. a non-existing getter or setter
   /// method for a public field.
   FieldAccessor {
     /// Type of the accessor
     accessor_type: CppFieldAccessorType,
-    /// Name of the C++ field
-    field_name: String,
+    // /// Name of the C++ field
+    // field_name: String,
   },
   /// This is an instance of `static_cast`, `dynamic_cast` or
   /// `qobject_cast` function call.
@@ -97,7 +103,7 @@ pub enum CppIndirectionChange {
 
 /// Information that indicates how an FFI function argument
 /// should be interpreted
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum CppFfiArgumentMeaning {
   /// This argument contains value for "this" pointer
   /// used to call C++ class member functions
@@ -123,7 +129,7 @@ impl CppFfiArgumentMeaning {
 }
 
 /// Representation of an argument of a FFI function
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct CppFfiMethodArgument {
   /// Identifier
   pub name: String,
@@ -168,15 +174,21 @@ impl CppFfiMethodArgument {
 
 /// Information about arguments and return type of a FFI function
 /// with no final function name
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CppFfiMethodSignature {
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct CppFfiMethod {
   /// List of arguments
   pub arguments: Vec<CppFfiMethodArgument>,
   /// Return type
   pub return_type: CppFfiType,
+
+  /// Allocation place method used for converting
+  /// the return type of the method
+  pub allocation_place: ReturnValueAllocationPlace,
+  /// Final name of FFI method
+  pub name: String,
 }
 
-impl CppFfiMethodSignature {
+impl CppFfiMethod {
   /// Returns true if this signature has const this_ptr argument,
   /// indicating that original C++ method has const attribute.
   /// Returns false if there is no this argument or it's not const.
@@ -229,7 +241,7 @@ impl CppFfiMethodSignature {
 
 /// FFI function type with attached information about
 /// corresponding original C++ type and their relation
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct CppFfiType {
   /// Original C++ type
   pub original_type: CppType,
@@ -250,37 +262,37 @@ impl CppFfiType {
   }
 }
 
-/// C++ method with arguments and return type
-/// processed for FFI but no FFI function name
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CppMethodWithFfiSignature {
-  /// Original C++ method
-  pub cpp_method: CppMethod,
-  /// For fake C++ methods, this field describes how they were generated
-  pub kind: CppFfiMethodKind,
-  /// Allocation place method used for converting
-  /// the return type of the method
-  pub allocation_place: ReturnValueAllocationPlace,
-  /// FFI method signature
-  pub c_signature: CppFfiMethodSignature,
-}
+// /// C++ method with arguments and return type
+// /// processed for FFI but no FFI function name
+//#[derive(Debug, PartialEq, Eq, Clone)]
+//pub struct CppMethodWithFfiSignature {
+//  /// Original C++ method
+//  pub cpp_method: CppMethod,
+//  /// For fake C++ methods, this field describes how they were generated
+//  pub kind: CppFfiMethodKind,
+//  /// Allocation place method used for converting
+//  /// the return type of the method
+//  pub allocation_place: ReturnValueAllocationPlace,
+//  /// FFI method signature
+//  pub c_signature: CppFfiMethodSignature,
+//}
 
-/// Final result of converting a C++ method
-/// to a FFI method
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct CppAndFfiMethod {
-  /// Original C++ method
-  pub cpp_method: CppMethod,
-  /// For fake C++ methods, this field describes how they were generated
-  pub kind: CppFfiMethodKind,
-  /// Allocation place method used for converting
-  /// the return type of the method
-  pub allocation_place: ReturnValueAllocationPlace,
-  /// FFI method signature
-  pub c_signature: CppFfiMethodSignature,
-  /// Final name of FFI method
-  pub c_name: String,
-}
+///// Final result of converting a C++ method
+///// to a FFI method
+//#[derive(Debug, PartialEq, Eq, Clone)]
+//pub struct CppAndFfiMethod {
+//  /// Original C++ method
+//  //pub cpp_method: CppMethod,
+//  /// For fake C++ methods, this field describes how they were generated
+//  pub kind: CppFfiMethodKind,
+//  /// Allocation place method used for converting
+//  /// the return type of the method
+//  pub allocation_place: ReturnValueAllocationPlace,
+//  /// FFI method signature
+//  pub c_signature: CppFfiMethodSignature,
+//  /// Final name of FFI method
+//  pub c_name: String,
+//}
 
 /// Generates initial FFI method name without any captions
 pub fn c_base_name(
@@ -339,24 +351,6 @@ pub fn c_base_name(
   Ok(scope_prefix + &method_name + &template_args_text)
 }
 
-impl CppAndFfiMethod {
-  /// Adds FFI method name to a CppMethodWithFfiSignature object.
-  pub fn new(data: CppMethodWithFfiSignature, c_name: String) -> CppAndFfiMethod {
-    CppAndFfiMethod {
-      cpp_method: data.cpp_method,
-      kind: data.kind,
-      allocation_place: data.allocation_place,
-      c_signature: data.c_signature,
-      c_name: c_name,
-    }
-  }
-
-  /// Convenience function to call `CppMethod::short_text`.
-  pub fn short_text(&self) -> String {
-    self.cpp_method.short_text()
-  }
-}
-
 /// Information about a Qt slot wrapper with
 /// certain slot arguments
 #[derive(Debug, Clone)]
@@ -370,15 +364,4 @@ pub struct QtSlotWrapper {
   /// String identifier passed to `QObject::connect` function to
   /// specify the object's slot.
   pub receiver_id: String,
-}
-
-/// Information about a header of the generated C++ wrapper library
-#[derive(Debug, Clone)]
-pub struct CppFfiHeaderData {
-  /// Name of the original include file without extension
-  pub include_file_base_name: String,
-  /// Processed methods
-  pub methods: Vec<CppAndFfiMethod>,
-  /// Generated Qt slot wrappers
-  pub qt_slot_wrappers: Vec<QtSlotWrapper>,
 }

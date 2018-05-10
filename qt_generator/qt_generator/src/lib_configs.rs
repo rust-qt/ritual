@@ -17,7 +17,6 @@ use versions;
 use doc_parser::DocParser;
 //use fix_header_names::fix_header_names;
 use cpp_to_rust_generator::cpp_method::CppMethod;
-use cpp_to_rust_generator::cpp_data::CppTypeKind;
 use cpp_to_rust_generator::config::CrateProperties;
 use doc_decoder::DocData;
 use lib_configs;

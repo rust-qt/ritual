@@ -1,6 +1,6 @@
 //! Types holding information about generates Rust API.
 
-use cpp_ffi_data::CppAndFfiMethod;
+use cpp_ffi_data::CppFfiMethod;
 use cpp_type::CppType;
 use cpp_data::CppData;
 use rust_type::{CompleteType, RustName, RustType};
@@ -155,7 +155,7 @@ pub struct RustMethodArgumentsVariant {
   /// `self` argument), and they are not listed in this field.
   pub arguments: Vec<RustMethodArgument>,
   /// C++ method corresponding to this variant.
-  pub cpp_method: CppAndFfiMethod,
+  pub cpp_ffi_method: CppFfiMethod,
   /// Index of the FFI function argument used for acquiring the return value,
   /// if any. `None` if the return value is passed normally (as the return value
   /// of the FFI function).
