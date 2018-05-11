@@ -9,14 +9,14 @@
 //! for more information.
 
 pub extern crate cpp_to_rust_common as common;
-use common::errors::{fancy_unwrap, ChainErr, Result};
-use common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
 use common::BuildScriptData;
-use common::file_utils::{create_file, file_to_string, load_json, path_to_str, PathBufWithAdded};
+use common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
 use common::cpp_lib_builder::{BuildType, CMakeVar, CppLibBuilder};
+use common::errors::{fancy_unwrap, ChainErr, Result};
+use common::file_utils::{create_file, file_to_string, load_json, path_to_str, PathBufWithAdded};
+use common::log;
 use common::target::current_target;
 use common::utils::{exe_suffix, get_command_output};
-use common::log;
 
 use std::path::PathBuf;
 use std::process::Command;

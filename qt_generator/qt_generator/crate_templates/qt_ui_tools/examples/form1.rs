@@ -1,16 +1,16 @@
 extern crate qt_ui_tools;
 
-use qt_ui_tools::ui_loader::UiLoader;
-use qt_ui_tools::qt_widgets::widget::Widget;
 use qt_ui_tools::qt_core::file::File;
 use qt_ui_tools::qt_core::flags::Flags;
 use qt_ui_tools::qt_core::io_device::OpenModeFlag;
+use qt_ui_tools::qt_widgets::widget::Widget;
+use qt_ui_tools::ui_loader::UiLoader;
 
 use qt_ui_tools::cpp_utils::{static_cast_mut, CppBox};
 use qt_ui_tools::qt_widgets::application::Application;
 
-use qt_ui_tools::qt_core::string::String;
 use qt_ui_tools::qt_core::slots::SlotNoArgs;
+use qt_ui_tools::qt_core::string::String;
 
 struct Form<'a> {
   _widget: CppBox<Widget>,

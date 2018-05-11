@@ -1,9 +1,11 @@
 use caption_strategy::{ArgumentCaptionStrategy, MethodCaptionStrategy, TypeCaptionStrategy};
+use common::errors::Result;
+use common::utils::MapIfOk;
+use cpp_data::CppClassField;
 use cpp_method::{CppMethod, CppMethodArgument, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
 use cpp_type::{CppFunctionPointerType, CppType, CppTypeBase};
-use common::errors::Result;
-use common::utils::MapIfOk;
+use new_impl::database::CppCheckerInfoList;
 
 /// Variation of a field accessor method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
@@ -18,7 +20,7 @@ pub enum CppFieldAccessorType {
   Setter,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum CppCast {
   Static {
     /// If true, this is an unsafe (from base to derived) `static_cast` wrapper.
@@ -61,11 +63,16 @@ impl CppCast {
 }
 
 /// Information about real nature of a C++ FFI method.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum CppFfiMethodKind {
   /// This is a real C++ method.
-  Real,
-  RealWithOmittedArguments,
+  Method {
+    cpp_method: CppMethod,
+    omitted_arguments: Option<usize>,
+    /// If Some, this is an instance of `static_cast`, `dynamic_cast` or
+    /// `qobject_cast` function call.
+    cast_data: Option<CppCast>,
+  },
   //{
   //    /// If Some, the method is derived from another method by omitting arguments,
   //    /// and this field contains all arguments of the original method.
@@ -77,11 +84,8 @@ pub enum CppFfiMethodKind {
     /// Type of the accessor
     accessor_type: CppFieldAccessorType,
     // /// Name of the C++ field
-    // field_name: String,
+    field: CppClassField,
   },
-  /// This is an instance of `static_cast`, `dynamic_cast` or
-  /// `qobject_cast` function call.
-  Cast(CppCast),
 }
 
 /// Relation between original C++ method's argument value
@@ -184,8 +188,13 @@ pub struct CppFfiMethod {
   /// Allocation place method used for converting
   /// the return type of the method
   pub allocation_place: ReturnValueAllocationPlace,
+
   /// Final name of FFI method
   pub name: String,
+
+  pub kind: CppFfiMethodKind,
+
+  pub checks: CppCheckerInfoList,
 }
 
 impl CppFfiMethod {
@@ -199,43 +208,29 @@ impl CppFfiMethod {
       .any(|arg| arg.meaning == CppFfiArgumentMeaning::This && arg.argument_type.ffi_type.is_const)
   }
 
-  /// Generates arguments caption string for FFI method.
-  /// Used to generate FFI methods with different names
-  /// for overloaded functions.
-  pub fn arguments_caption(&self, strategy: ArgumentCaptionStrategy) -> Result<String> {
-    let r = self
-      .arguments
-      .iter()
-      .filter(|x| x.meaning.is_argument())
-      .map_if_ok(|arg| arg.caption(strategy.clone()))?;
-    Ok(if r.is_empty() {
-      "no_args".to_string()
-    } else {
-      r.join("_")
-    })
-  }
-
-  /// Generates a caption for this method using specified strategy
-  /// to avoid name conflict.
-  pub fn caption(&self, strategy: MethodCaptionStrategy) -> Result<String> {
-    Ok(match strategy {
-      MethodCaptionStrategy::ArgumentsOnly(s) => self.arguments_caption(s)?,
-      MethodCaptionStrategy::ConstOnly => {
-        if self.has_const_this() {
-          "const".to_string()
+  pub fn short_text(&self) -> String {
+    match self.kind {
+      CppFfiMethodKind::Method {
+        ref cpp_method,
+        ref omitted_arguments,
+        ..
+      } => {
+        let omitted_args_text = if let Some(args) = omitted_arguments {
+          format!(" (omitted arguments: {}", args)
         } else {
-          "".to_string()
-        }
-      }
-      MethodCaptionStrategy::ConstAndArguments(s) => {
-        let r = if self.has_const_this() {
-          "const_".to_string()
-        } else {
-          "".to_string()
+          String::new()
         };
-        r + &self.arguments_caption(s)?
+        format!(
+          "FFI method call{}: {}",
+          omitted_args_text,
+          cpp_method.short_text()
+        )
       }
-    })
+      CppFfiMethodKind::FieldAccessor {
+        ref field,
+        ref accessor_type,
+      } => format!("FFI field {:?}: {}", accessor_type, field.short_text()),
+    }
   }
 }
 

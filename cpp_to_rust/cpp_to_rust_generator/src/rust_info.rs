@@ -1,11 +1,11 @@
 //! Types holding information about generates Rust API.
 
-use cpp_ffi_data::CppFfiMethod;
-use cpp_type::CppType;
 use cpp_data::CppData;
-use rust_type::{CompleteType, RustName, RustType};
-use cpp_method::CppMethodDoc;
 use cpp_data::CppTypeDoc;
+use cpp_ffi_data::CppFfiMethod;
+use cpp_method::CppMethodDoc;
+use cpp_type::CppType;
+use rust_type::{CompleteType, RustName, RustType};
 use std::path::PathBuf;
 
 /// One variant of a Rust enum

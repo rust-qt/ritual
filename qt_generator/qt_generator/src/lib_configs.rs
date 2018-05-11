@@ -5,19 +5,19 @@ use cpp_to_rust_generator::config::{Config, CppTypeAllocationPlace};
 use cpp_to_rust_generator::cpp_type::{CppBuiltInNumericType, CppType, CppTypeBase,
                                       CppTypeIndirection};
 
-use cpp_to_rust_generator::common::{log, toml};
-use cpp_to_rust_generator::common::file_utils::repo_crate_local_path;
-use cpp_to_rust_generator::cpp_data::CppVisibility;
-use cpp_to_rust_generator::common::target;
 use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
+use cpp_to_rust_generator::common::file_utils::repo_crate_local_path;
+use cpp_to_rust_generator::common::target;
+use cpp_to_rust_generator::common::{log, toml};
+use cpp_to_rust_generator::cpp_data::CppVisibility;
 use qt_generator_common::{get_full_build_config, lib_dependencies, lib_folder_name};
 use std::path::PathBuf;
 use versions;
 
 use doc_parser::DocParser;
 //use fix_header_names::fix_header_names;
-use cpp_to_rust_generator::cpp_method::CppMethod;
 use cpp_to_rust_generator::config::CrateProperties;
+use cpp_to_rust_generator::cpp_method::CppMethod;
 use doc_decoder::DocData;
 use lib_configs;
 

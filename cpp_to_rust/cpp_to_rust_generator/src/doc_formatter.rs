@@ -1,16 +1,16 @@
 //! Generates markdown code for documentation comments
 //! of the output Rust crate.
 
+use common::errors::{unexpected, Result};
+use common::log;
+use common::string_utils::JoinWithSeparator;
+use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
 use rust_code_generator::rust_type_to_code;
-use rust_type::RustType;
 use rust_info::{RustEnumValue, RustMethod, RustMethodArguments, RustMethodArgumentsVariant,
                 RustMethodDocItem, RustMethodScope, RustMethodSelfArgKind,
                 RustQtReceiverDeclaration, RustQtReceiverType, RustTypeDeclaration,
                 RustTypeDeclarationKind, RustTypeWrapperKind};
-use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
-use common::string_utils::JoinWithSeparator;
-use common::log;
-use common::errors::{unexpected, Result};
+use rust_type::RustType;
 
 /// Generates pseudo-code illustrating argument types for one variant of
 /// a Rust method with emulated overloading.

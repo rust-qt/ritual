@@ -15,9 +15,9 @@ extern crate select as html_parser;
 //use cpp_to_rust_generator::common::file_utils::{create_dir_all, canonicalize};
 //use std::path::PathBuf;
 
-mod executor;
 mod doc_decoder;
 mod doc_parser;
+mod executor;
 mod fix_header_names;
 mod lib_configs;
 mod versions;

@@ -21,8 +21,8 @@ extern crate serde_json;
 extern crate term_painter;
 pub extern crate toml;
 
-pub mod log;
 pub mod errors;
+pub mod log;
 
 pub mod file_utils;
 pub mod string_utils;

@@ -1,11 +1,11 @@
 extern crate tempdir;
 
-use cpp_parser;
+use common::file_utils::{create_dir, create_file, PathBufWithAdded};
 use cpp_data::*;
 use cpp_method::*;
-use cpp_type::*;
 use cpp_operator::CppOperator;
-use common::file_utils::{create_dir, create_file, PathBufWithAdded};
+use cpp_parser;
+use cpp_type::*;
 
 use std::path::PathBuf;
 

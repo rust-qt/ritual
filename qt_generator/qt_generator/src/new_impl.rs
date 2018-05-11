@@ -1,10 +1,10 @@
 use cpp_to_rust_generator::common::errors::{ChainErr, Result};
-use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::common::file_utils::canonicalize;
+use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::new_impl::workspace::Workspace;
-use std::path::PathBuf;
-use qt_generator_common::all_crate_names;
 use lib_configs::make_config;
+use qt_generator_common::all_crate_names;
+use std::path::PathBuf;
 
 fn run(matches: ::clap::ArgMatches) -> Result<()> {
   let workspace_path = canonicalize(&PathBuf::from(matches

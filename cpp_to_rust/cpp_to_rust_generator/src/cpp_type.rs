@@ -1,10 +1,10 @@
 //! Types for handling information about C++ types.
 
 use caption_strategy::TypeCaptionStrategy;
-use cpp_ffi_data::{CppFfiType, CppIndirectionChange};
 use common::errors::{unexpected, ChainErr, Error, Result};
 use common::string_utils::JoinWithSeparator;
 use common::utils::MapIfOk;
+use cpp_ffi_data::{CppFfiType, CppIndirectionChange};
 
 /// C++ type variants based on indirection
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]

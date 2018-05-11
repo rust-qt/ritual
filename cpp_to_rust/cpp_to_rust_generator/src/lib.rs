@@ -36,15 +36,15 @@ pub mod cpp_data;
 //mod cpp_post_processor;
 mod cpp_ffi_data;
 pub mod cpp_method;
-pub mod cpp_type;
 mod cpp_operator;
+pub mod cpp_type;
 //mod doc_formatter;
 //mod launcher;
 //mod rust_generator;
 //mod rust_code_generator;
+mod cpp_parser;
 mod rust_info;
 mod rust_type;
-mod cpp_parser;
 mod versions;
 
 #[cfg(test)]

@@ -1,11 +1,11 @@
 //! Various utilities for working with files
 
-use log;
 use errors::{ChainErr, Result};
+use log;
 
-use std::path::{Path, PathBuf};
 use std::fs;
 use std::io::Read;
+use std::path::{Path, PathBuf};
 use toml;
 
 /// Move file or directory `src` to `dst` recursively,

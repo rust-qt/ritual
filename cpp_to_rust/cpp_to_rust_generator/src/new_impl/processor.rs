@@ -1,23 +1,18 @@
-use new_impl::workspace::Workspace;
-use config::Config;
-use common::log;
-use common::utils::MapIfOk;
-use common::file_utils::PathBufWithAdded;
-use cpp_parser::cpp_parser;
 use common::errors::{ChainErr, Result};
-use std::path::PathBuf;
+use common::file_utils::PathBufWithAdded;
+use common::log;
+use common::target::current_target;
+use common::utils::MapIfOk;
+use config::Config;
+use cpp_ffi_generator::cpp_ffi_generator;
+use cpp_parser::cpp_parser;
 use new_impl::cpp_checker::cpp_checker;
+use new_impl::database::CppItemData;
 use new_impl::database::{Database, DatabaseItem};
 use new_impl::html_logger::HtmlLogger;
-use new_impl::database::DataEnv;
-use new_impl::database::DataSource;
-use common::target::current_target;
-use new_impl::database::CppItemData;
-use new_impl::database::DataEnvInfo;
-use new_impl::database::DatabaseUpdateResultType;
-use new_impl::database::DatabaseUpdateResult;
+use new_impl::workspace::Workspace;
 use std::iter::once;
-use cpp_ffi_generator::cpp_ffi_generator;
+use std::path::PathBuf;
 //use cpp_post_processor::cpp_post_process;
 
 /// Creates output and cache directories if they don't exist.
@@ -65,16 +60,9 @@ pub struct ProcessorData<'a> {
   pub current_database: &'a mut Database,
   pub dep_databases: &'a [Database],
   pub html_logger: HtmlLogger,
-  pub env: DataEnv,
 }
 
 impl<'a> ProcessorData<'a> {
-  pub fn add_cpp_data(&mut self, data: &CppItemData, info: DataEnvInfo) {
-    let data_text = data.to_string();
-    let result = self.current_database.add_cpp_data(&self.env, data, info);
-    self.html_logger.log_database_update_result(&result);
-  }
-
   pub fn all_databases(&self) -> Vec<&Database> {
     once(&self.current_database as &_)
       .chain(self.dep_databases.iter())
@@ -146,28 +134,10 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
       let data = ProcessorData {
         workspace,
         html_logger,
-        env: DataEnv {
-          target: current_target(),
-          data_source: match operation.as_str() {
-            "cpp_parser" => DataSource::CppParser,
-            "cpp_checker" => DataSource::CppChecker,
-            _ => unreachable!(),
-          },
-          cpp_library_version: config.cpp_lib_version().map(|s| s.to_string()),
-        },
         current_database: &mut current_database,
         dep_databases: &dependent_cpp_crates,
         config,
       };
-      if !data
-        .current_database
-        .environments
-        .iter()
-        .any(|e| e == &data.env)
-      {
-        data.current_database.environments.push(data.env.clone());
-      }
-      data.current_database.invalidate_env(&data.env);
       (item.function)(data)?;
     } else {
       // TODO: all other operations are also processor items

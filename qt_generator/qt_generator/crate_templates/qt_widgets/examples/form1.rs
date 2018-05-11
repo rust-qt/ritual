@@ -1,15 +1,15 @@
 extern crate qt_widgets;
-use qt_widgets::cpp_utils::{CppBox, StaticCast};
 use qt_widgets::application::Application;
+use qt_widgets::cpp_utils::{CppBox, StaticCast};
 use qt_widgets::qt_core::connection::Signal;
 
-use qt_widgets::widget::Widget;
-use qt_widgets::push_button::PushButton;
 use qt_widgets::line_edit::LineEdit;
-use qt_widgets::v_box_layout::VBoxLayout;
-use qt_widgets::qt_core::string::String;
-use qt_widgets::qt_core::slots::SlotNoArgs;
 use qt_widgets::message_box::MessageBox;
+use qt_widgets::push_button::PushButton;
+use qt_widgets::qt_core::slots::SlotNoArgs;
+use qt_widgets::qt_core::string::String;
+use qt_widgets::v_box_layout::VBoxLayout;
+use qt_widgets::widget::Widget;
 
 struct Form<'a> {
   _widget: CppBox<Widget>,

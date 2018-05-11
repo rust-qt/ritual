@@ -1,13 +1,13 @@
 //! Logger implementation
 
-use std::fs::File;
-use std::io::Write;
-use std::fs::OpenOptions;
-use std::path::PathBuf;
-use std::collections::HashMap;
-use std::sync::{Mutex, MutexGuard};
-use std::borrow::Borrow;
 use std;
+use std::borrow::Borrow;
+use std::collections::HashMap;
+use std::fs::File;
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::path::PathBuf;
+use std::sync::{Mutex, MutexGuard};
 
 /// Logger category. Logger can be configured to save
 /// messages of each category to a separate file.
@@ -146,7 +146,6 @@ impl Logger {
 
 lazy_static! {
   pub static ref DEFAULT_LOGGER: Mutex<Logger> = Mutex::new(Logger::new());
-
 }
 
 /// Returns global instance of `Logger`.

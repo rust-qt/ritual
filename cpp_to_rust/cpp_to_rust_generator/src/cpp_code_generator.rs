@@ -1,15 +1,15 @@
-use cpp_ffi_data::{CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiHeaderData, CppFfiMethodKind,
-                   CppFfiType, CppFieldAccessorType, CppIndirectionChange, QtSlotWrapper};
-use cpp_method::ReturnValueAllocationPlace;
-use cpp_type::{CppType, CppTypeBase, CppTypeIndirection};
 use common::errors::{unexpected, ChainErr, Result};
 use common::file_utils::{create_dir_all, create_file, path_to_str, PathBufWithAdded};
 use common::string_utils::JoinWithSeparator;
 use common::utils::MapIfOk;
 use common::utils::get_command_output;
+use cpp_ffi_data::{CppAndFfiMethod, CppFfiArgumentMeaning, CppFfiHeaderData, CppFfiMethodKind,
+                   CppFfiType, CppFieldAccessorType, CppIndirectionChange, QtSlotWrapper};
+use cpp_method::ReturnValueAllocationPlace;
+use cpp_type::{CppType, CppTypeBase, CppTypeIndirection};
 
-use std::path::PathBuf;
 use std::iter::once;
+use std::path::PathBuf;
 use std::process::Command;
 
 /// Generates C++ code for the C wrapper library.

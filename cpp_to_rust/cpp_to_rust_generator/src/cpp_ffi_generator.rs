@@ -1,24 +1,25 @@
 use caption_strategy::{MethodCaptionStrategy, TypeCaptionStrategy};
-use cpp_data::{CppDataWithDeps, CppOperator, CppTemplateInstantiation, CppTypeAllocationPlace,
-               CppVisibility};
-use cpp_type::{CppFunctionPointerType, CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection,
-               CppTypeRole};
-use cpp_ffi_data::{c_base_name, CppCast, CppFfiMethod, CppFfiMethodKind, CppFieldAccessorType,
-                   QtSlotWrapper};
-use cpp_method::{CppMethod, CppMethodArgument, CppMethodClassMembership, CppMethodKind,
-                 ReturnValueAllocationPlace};
 use common::errors::{unexpected, ChainErr, Result};
 use common::log;
 use common::utils::{add_to_multihash, MapIfOk};
 use config::CppFfiGeneratorFilterFn;
-use std::collections::{HashMap, HashSet};
-use std::iter::once;
+use cpp_data::CppBaseSpecifier;
+use cpp_data::CppClassField;
+use cpp_data::CppTypeData;
+use cpp_data::CppTypeDataKind;
+use cpp_data::{CppDataWithDeps, CppOperator, CppTemplateInstantiation, CppTypeAllocationPlace,
+               CppVisibility};
+use cpp_ffi_data::{c_base_name, CppCast, CppFfiMethod, CppFfiMethodKind, CppFieldAccessorType,
+                   QtSlotWrapper};
+use cpp_method::{CppMethod, CppMethodArgument, CppMethodClassMembership, CppMethodKind,
+                 ReturnValueAllocationPlace};
+use cpp_type::{CppFunctionPointerType, CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection,
+               CppTypeRole};
 use new_impl::database::CppItemData;
 use new_impl::processor::ProcessorData;
 use new_impl::processor::ProcessorItem;
-use cpp_data::CppClassField;
-use cpp_data::CppBaseSpecifier;
-use cpp_data::CppTypeData;
+use std::collections::{HashMap, HashSet};
+use std::iter::once;
 
 /// This object generates the C++ wrapper library
 struct CppFfiGenerator<'a> {
@@ -224,8 +225,12 @@ fn instantiate_templates(data: &CppDataWithDeps) -> Result<Vec<CppMethodWithKind
                       }
                       if ok {
                         new_methods.push(CppMethodWithKind {
-                          method: method,
-                          kind: CppFfiMethodKind::Real,
+                          method: method.clone(),
+                          kind: CppFfiMethodKind::Method {
+                            cpp_method: method,
+                            omitted_arguments: None,
+                            cast_data: None,
+                          },
                         });
                       }
                     }
@@ -276,9 +281,11 @@ fn generate_field_accessors(field: &CppClassField) -> Result<Vec<CppMethodWithKi
         allows_variadic_arguments: false,
         template_arguments: None,
         declaration_code: None,
+        doc: None,
       },
       kind: CppFfiMethodKind::FieldAccessor {
         accessor_type: accessor_type,
+        field: field.clone(),
       },
     })
   };
@@ -332,24 +339,30 @@ fn generate_field_accessors(field: &CppClassField) -> Result<Vec<CppMethodWithKi
 /// See `CppMethod`'s documentation for more information
 /// about `is_unsafe_static_cast` and `is_direct_static_cast`.
 fn create_cast_method(cast: CppCast, from: &CppType, to: &CppType) -> CppMethodWithKind {
+  let method = CppMethod {
+    name: cast.cpp_method_name().to_string(),
+    class_membership: None,
+    operator: None,
+    return_type: to.clone(),
+    arguments: vec![
+      CppMethodArgument {
+        name: "ptr".to_string(),
+        argument_type: from.clone(),
+        has_default_value: false,
+      },
+    ],
+    allows_variadic_arguments: false,
+    template_arguments: Some(vec![to.clone()]),
+    declaration_code: None,
+    doc: None,
+  };
   CppMethodWithKind {
-    method: CppMethod {
-      name: cast.cpp_method_name().to_string(),
-      class_membership: None,
-      operator: None,
-      return_type: to.clone(),
-      arguments: vec![
-        CppMethodArgument {
-          name: "ptr".to_string(),
-          argument_type: from.clone(),
-          has_default_value: false,
-        },
-      ],
-      allows_variadic_arguments: false,
-      template_arguments: Some(vec![to.clone()]),
-      declaration_code: None,
+    method: method.clone(),
+    kind: CppFfiMethodKind::Method {
+      cast_data: Some(cast),
+      omitted_arguments: None,
+      cpp_method: method,
     },
-    kind: CppFfiMethodKind::Cast(cast),
   }
 }
 
@@ -530,8 +543,8 @@ impl<'a> CppFfiGenerator<'a> {
       .iter()
       .filter_map(|item| {
         if let CppItemData::Type(ref type_data) = item.cpp_data {
-          if let CppTypeData::Class { ref type_base } = *type_data {
-            if item.is_stack_allocated_type {
+          if let CppTypeDataKind::Class { ref type_base } = type_data.kind {
+            if type_data.is_stack_allocated_type {
               return Some(type_base.clone());
             }
           }

@@ -1,8 +1,8 @@
-use cpp_method::*;
 use cpp_data::CppVisibility;
-use cpp_type::*;
 use cpp_ffi_data::CppFfiArgumentMeaning;
 use cpp_ffi_data::CppIndirectionChange;
+use cpp_method::*;
+use cpp_type::*;
 
 #[test]
 fn cpp_method_kind() {

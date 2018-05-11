@@ -1,5 +1,5 @@
-use std;
 use libc::c_int;
+use std;
 
 /// Rust alternative to Qt's `QFlags` types.
 ///

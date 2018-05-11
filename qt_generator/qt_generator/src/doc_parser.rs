@@ -1,15 +1,15 @@
 //! HTML parsing and some workarounds
 //! for reading Qt documentation.
 
-use doc_decoder::DocData;
-use std::collections::{hash_map, HashMap, HashSet};
-use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::common::errors::{unexpected, ChainErr, Result};
-use cpp_to_rust_generator::cpp_method::CppMethodDoc;
+use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::cpp_data::CppTypeDoc;
-use html_parser::node::Node;
+use cpp_to_rust_generator::cpp_method::CppMethodDoc;
+use doc_decoder::DocData;
 use html_parser::document::Document;
+use html_parser::node::Node;
 use regex::Regex;
+use std::collections::{hash_map, HashMap, HashSet};
 
 /// Documentation data for an enum variant.
 #[derive(Debug, Clone)]

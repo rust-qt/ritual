@@ -1,15 +1,15 @@
 //! Types for handling information about C++ library APIs.
 
-use cpp_method::{CppMethod, CppMethodKind};
-pub use cpp_operator::CppOperator;
-use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
 use common::errors::{ChainErr, Result};
 use common::file_utils::open_file;
 use common::log;
+use cpp_method::{CppMethod, CppMethodKind};
+pub use cpp_operator::CppOperator;
+use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
 
 use std::collections::{HashMap, HashSet};
-use std::iter::once;
 use std::io::{BufRead, BufReader};
+use std::iter::once;
 
 use regex::Regex;
 
@@ -20,10 +20,16 @@ pub struct CppEnumValue {
   pub name: String,
   /// Corresponding value
   pub value: u64,
-  // /// C++ documentation for this item in HTML
-  //pub doc: Option<String>,
+  /// C++ documentation for this item in HTML
+  pub doc: Option<String>,
   /// Full type name of the enum this item belongs to
   pub enum_name: String,
+}
+
+impl CppEnumValue {
+  pub fn is_same(&self, other: &CppEnumValue) -> bool {
+    self.name == other.name && self.enum_name == other.enum_name && self.value == other.value
+  }
 }
 
 /// Member field of a C++ class declaration
@@ -39,6 +45,27 @@ pub struct CppClassField {
   //  pub size: Option<usize>,
   /// Name and template arguments of the class type that owns this field
   pub class_type: CppTypeClassBase,
+}
+
+impl CppClassField {
+  pub fn is_same(&self, other: &CppClassField) -> bool {
+    self == other
+  }
+
+  pub fn short_text(&self) -> String {
+    let visibility_text = match self.visibility {
+      CppVisibility::Public => "",
+      CppVisibility::Protected => "protected ",
+      CppVisibility::Private => "private ",
+    };
+    format!(
+      "class {} {{ {}{} {}; ... }}",
+      self.class_type.to_cpp_pseudo_code(),
+      visibility_text,
+      self.field_type.to_cpp_pseudo_code(),
+      self.name
+    )
+  }
 }
 
 /// A "using" directive inside a class definition,
@@ -67,6 +94,12 @@ pub struct CppBaseSpecifier {
   /// Name and template arguments of the class type that
   /// inherits this base class
   pub derived_class_type: CppTypeClassBase,
+}
+
+impl CppBaseSpecifier {
+  pub fn is_same(&self, other: &CppBaseSpecifier) -> bool {
+    self == other
+  }
 }
 
 /// Location of a C++ type's definition in header files.
@@ -102,24 +135,29 @@ pub struct CppTypeDoc {
 
 /// Information about a C++ type declaration
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum CppTypeData {
-  Enum {
-    /// Identifier, including namespaces and nested classes
-    /// (separated with "::", like in C++)
-    name: String,
-  },
+pub enum CppTypeDataKind {
+  Enum,
   Class {
     /// Information about name and template arguments of this type.
     type_base: CppTypeClassBase,
   },
 }
 
+/// Information about a C++ type declaration
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct CppTypeData {
+  /// Identifier, including namespaces and nested classes
+  /// (separated with "::", like in C++)
+  pub name: String,
+  pub kind: CppTypeDataKind,
+  /// C++ documentation for the type
+  pub doc: Option<CppTypeDoc>,
+  pub is_stack_allocated_type: bool,
+}
+
 impl CppTypeData {
-  pub fn name(&self) -> &str {
-    match *self {
-      CppTypeData::Enum { ref name } => name,
-      CppTypeData::Class { ref type_base } => &type_base.name,
-    }
+  pub fn is_same(&self, other: &CppTypeData) -> bool {
+    self.name == other.name && self.kind == other.kind
   }
 }
 
@@ -229,11 +267,11 @@ pub struct CppDataWithDeps<'a> {
   pub dependencies: Vec<&'a CppData>,
 }
 
-impl CppTypeData {
+impl CppTypeDataKind {
   /// Checks if the type is a class type.
   pub fn is_class(&self) -> bool {
     match self {
-      &CppTypeData::Class { .. } => true,
+      &CppTypeDataKind::Class { .. } => true,
       _ => false,
     }
   }

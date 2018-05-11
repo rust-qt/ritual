@@ -1,13 +1,14 @@
 //! Types for handling information about C++ methods.
 
-use cpp_data::{CppBaseSpecifier, CppOriginLocation, CppVisibility, TemplateArgumentsDeclaration};
-use cpp_ffi_data::{CppFfiArgumentMeaning, CppFfiMethod, CppFfiMethodArgument, CppFfiType};
-use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection, CppTypeRole};
 use common::errors::{unexpected, Result};
 use common::string_utils::JoinWithSeparator;
 use common::utils::MapIfOk;
-
+use cpp_data::{CppBaseSpecifier, CppOriginLocation, CppVisibility, TemplateArgumentsDeclaration};
+use cpp_ffi_data::CppFfiMethodKind;
+use cpp_ffi_data::{CppFfiArgumentMeaning, CppFfiMethod, CppFfiMethodArgument, CppFfiType};
 pub use cpp_operator::{CppOperator, CppOperatorInfo};
+use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection, CppTypeRole};
+use new_impl::database::CppCheckerInfoList;
 
 /// Information about an argument of a C++ method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
@@ -142,8 +143,8 @@ pub struct CppMethod {
   // If true, this method was not declared in headers but
   // added in the generator's preprocessing step.
   //pub is_fake_inherited_method: bool,
-  // /// C++ documentation data for this method
-  //pub doc: Option<CppMethodDoc>,
+  /// C++ documentation data for this method
+  pub doc: Option<CppMethodDoc>,
   // /// If true, FFI generator skips some checks
   //pub is_ffi_whitelisted: bool,
 }
@@ -204,6 +205,12 @@ impl CppMethod {
     true
   }
 
+  pub fn is_same(&self, other: &CppMethod) -> bool {
+    self.name == other.name && self.class_membership == other.class_membership
+      && self.operator == other.operator && self.return_type == other.return_type
+      && self.argument_types_equal(other) && self.template_arguments == other.template_arguments
+  }
+
   /// Creates FFI method signature for this method:
   /// - converts all types to FFI types;
   /// - adds "this" argument explicitly if present;
@@ -221,6 +228,12 @@ impl CppMethod {
       return_type: CppFfiType::void(),
       name: name.to_string(),
       allocation_place: ReturnValueAllocationPlace::NotApplicable,
+      checks: CppCheckerInfoList::default(),
+      kind: CppFfiMethodKind::Method {
+        cpp_method: self.clone(),
+        omitted_arguments: None,
+        cast_data: None,
+      },
     };
     if let Some(ref info) = self.class_membership {
       if !info.is_static && info.kind != CppMethodKind::Constructor {

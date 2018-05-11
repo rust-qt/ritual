@@ -1,25 +1,25 @@
-use common::errors::{ChainErr, Result};
-use config::Config;
-use new_impl::workspace::Workspace;
-use common::file_utils::{create_dir_all, create_file, path_to_str, remove_dir_all};
-use common::file_utils::PathBufWithAdded;
-use common::utils::MapIfOk;
 use common::cpp_lib_builder::{BuildType, CppLibBuilder, CppLibBuilderOutput, c2r_cmake_vars};
-use common::target::current_target;
-use std::path::PathBuf;
-use std::fmt::Display;
+use common::errors::{ChainErr, Result};
+use common::file_utils::PathBufWithAdded;
+use common::file_utils::{create_dir_all, create_file, path_to_str, remove_dir_all};
 use common::log;
-use new_impl::database::CppItemData;
-use cpp_type::CppTypeClassBase;
-use new_impl::database::DataEnv;
-use new_impl::database::DataSource;
-use new_impl::html_logger::HtmlLogger;
-use new_impl::database::Database;
-use new_impl::processor::ProcessorData;
-use new_impl::database::DataEnvInfo;
-use std::path::Path;
-use new_impl::processor::ProcessorItem;
+use common::target::current_target;
+use common::utils::MapIfOk;
+use config::Config;
 use cpp_data::CppTypeData;
+use cpp_ffi_data::CppFfiMethod;
+use cpp_type::CppTypeClassBase;
+use new_impl::database::CppCheckerAddResult;
+use new_impl::database::CppCheckerInfo;
+use new_impl::database::CppItemData;
+use new_impl::database::{CppCheckerEnv, Database};
+use new_impl::html_logger::HtmlLogger;
+use new_impl::processor::ProcessorData;
+use new_impl::processor::ProcessorItem;
+use new_impl::workspace::Workspace;
+use std::fmt::Display;
+use std::path::Path;
+use std::path::PathBuf;
 
 fn check_snippet(
   main_cpp_path: &Path,
@@ -41,38 +41,13 @@ fn check_snippet(
   builder.run()
 }
 
-fn check_one_item(main_cpp_path: &Path, builder: &CppLibBuilder, item: &CppItemData) -> Result<()> {
-  let snippet = snippet_for_item(item).map_err(|e| format!("can't generate snippet: {}", e))?;
-  match check_snippet(main_cpp_path, builder, &snippet)? {
-    CppLibBuilderOutput::Success => Ok(()),
-    CppLibBuilderOutput::Fail(output) => Err(format!("build failed: {}", output.stderr).into()),
-  }
-}
-
-fn snippet_for_item(item: &CppItemData) -> Result<Snippet> {
-  match *item {
-    CppItemData::Type(ref type1) => match *type1 {
-      CppTypeData::Enum { ref name } => Ok(Snippet::new_in_main(format!(
-        "assert(std::is_enum<{}>::value);",
-        name
-      ))),
-      CppTypeData::Class { ref type_base } => {
-        let type_code = type_base.to_cpp_code()?;
-        Ok(Snippet::new_in_main(format!(
-          "assert(std::is_class<{0}>::value);\nassert(sizeof({0}) > 0);",
-          type_code
-        )))
-      }
-    },
-    CppItemData::Method(ref method) => Err("snippet not implemented yet".into()),
-    CppItemData::EnumValue(ref enum_value) => Err("snippet not implemented yet".into()),
-    CppItemData::ClassField(ref field) => Err("snippet not implemented yet".into()),
-    CppItemData::ClassBase(ref data) => Err("snippet not implemented yet".into()),
-  }
+fn snippet_for_method(method: &CppFfiMethod) -> Result<Snippet> {
+  unimplemented!()
 }
 
 struct CppChecker<'a> {
   data: ProcessorData<'a>,
+  env: CppCheckerEnv,
   main_cpp_path: PathBuf,
   builder: CppLibBuilder,
 }
@@ -103,31 +78,53 @@ impl Snippet {
 
 impl<'a> CppChecker<'a> {
   fn run(&mut self) -> Result<()> {
+    if !self
+      .data
+      .current_database
+      .environments
+      .iter()
+      .any(|e| e == &self.env)
+    {
+      self
+        .data
+        .current_database
+        .environments
+        .push(self.env.clone());
+    }
+
     self.data.html_logger.add_header(&["Item", "Status"])?;
     self.run_tests()?;
 
     let total_count = self.data.current_database.items.len();
     for (index, item) in self.data.current_database.items.iter_mut().enumerate() {
-      log::status(format!("Checking item {} / {}", index + 1, total_count));
-      let result = check_one_item(&self.main_cpp_path, &self.builder, &item.cpp_data);
-      let data = match result {
-        Ok(_) => DataEnvInfo {
-          is_success: true,
-          error: None,
-          include_file: None,
-          origin_location: None,
-          is_invalidated: false,
-        },
-        Err(err) => DataEnvInfo {
-          is_success: false,
-          error: Some(err.to_string()),
-          include_file: None,
-          origin_location: None,
-          is_invalidated: false,
-        },
-      };
-      let r = item.add_cpp_data(&self.data.env, data);
-      self.data.html_logger.log_database_update_result(&r);
+      for ffi_method in &mut item.cpp_ffi_methods {
+        if let Ok(snippet) = snippet_for_method(ffi_method) {
+          log::status(format!("Checking item {} / {}", index + 1, total_count));
+
+          let error_data = match check_snippet(&self.main_cpp_path, &self.builder, &snippet)? {
+            CppLibBuilderOutput::Success => None, // no error
+            CppLibBuilderOutput::Fail(output) => Some(format!("build failed: {}", output.stderr)),
+          };
+          let error_data_text = CppCheckerInfo::error_to_log(&error_data);
+          let r = ffi_method.checks.add(&self.env, error_data);
+          let change_text = match r {
+            CppCheckerAddResult::Added => "Added".to_string(),
+            CppCheckerAddResult::Unchanged => "Unchanged".to_string(),
+            CppCheckerAddResult::Changed { ref old } => format!(
+              "Changed! Old data for the same env: {}",
+              CppCheckerInfo::error_to_log(old)
+            ),
+          };
+
+          self.data.html_logger.add(
+            &[
+              ffi_method.short_text(),
+              format!("{}<br>{}", error_data_text, change_text),
+            ],
+            "cpp_checker_update",
+          )?;
+        }
+      }
     }
 
     Ok(())
@@ -232,10 +229,15 @@ fn run(data: ProcessorData) -> Result<()> {
     skip_cmake: false,
   };
 
+  let env = CppCheckerEnv {
+    target: current_target(),
+    cpp_library_version: data.config.cpp_lib_version().map(|s| s.to_string()),
+  };
   let mut checker = CppChecker {
     data,
     builder,
     main_cpp_path: src_path.with_added("main.cpp"),
+    env,
   };
 
   checker.run()?;

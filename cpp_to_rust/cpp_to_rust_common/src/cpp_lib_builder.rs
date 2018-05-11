@@ -1,18 +1,18 @@
 //! Implements building a CMake-based C++ library.
 
+use cpp_build_config::CppBuildConfigData;
+use cpp_build_config::CppBuildPaths;
+use cpp_build_config::CppLibraryType;
 use errors::Result;
 use file_utils::{create_dir_all, path_to_str};
-use utils::run_command;
-use utils::MapIfOk;
-use string_utils::JoinWithSeparator;
-use std::process::Command;
-use std::path::{Path, PathBuf};
 use log;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use string_utils::JoinWithSeparator;
 use target;
-use cpp_build_config::CppLibraryType;
-use cpp_build_config::CppBuildPaths;
-use cpp_build_config::CppBuildConfigData;
 use utils::CommandOutput;
+use utils::MapIfOk;
+use utils::run_command;
 use utils::run_command_and_capture_output;
 
 /// A CMake variable with a name and a value.

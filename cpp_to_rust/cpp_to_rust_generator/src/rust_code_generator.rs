@@ -5,15 +5,15 @@ use common::file_utils::{copy_file, copy_recursively, create_dir_all, create_fil
                          os_str_to_str, path_to_str, read_dir, repo_crate_local_path, save_toml,
                          PathBufWithAdded};
 use common::log;
+use common::string_utils::{CaseOperations, JoinWithSeparator};
+use common::utils::MapIfOk;
+use doc_formatter;
 use rust_generator::RustGeneratorOutput;
 use rust_info::{DependencyInfo, RustFFIFunction, RustMethod, RustMethodArgument,
                 RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope, RustModule,
                 RustQtReceiverType, RustTypeDeclarationKind, RustTypeWrapperKind, TraitImpl,
                 TraitImplExtra};
 use rust_type::{CompleteType, RustName, RustToCTypeConversion, RustType, RustTypeIndirection};
-use common::string_utils::{CaseOperations, JoinWithSeparator};
-use common::utils::MapIfOk;
-use doc_formatter;
 use std::path::{Path, PathBuf};
 
 use common::toml;
@@ -974,25 +974,26 @@ impl<'a> RustCodeGenerator<'a> {
                 name = type1.name.last_name()?,
                 variants = values
                   .iter()
-                  .map(|item| format!(
-                    "{}  {} = {}",
-                    format_doc(&doc_formatter::enum_value_doc(&item)),
-                    item.name,
-                    item.value
-                  ))
+                  .map(|item| {
+                    format!(
+                      "{}  {} = {}",
+                      format_doc(&doc_formatter::enum_value_doc(&item)),
+                      item.name,
+                      item.value
+                    )
+                  })
                   .join(", \n")
               );
               if *is_flaggable {
-                r = r
-                  + &format!(
-                    include_str!("../templates/crate/impl_flaggable.rs.in"),
-                    name = type1.name.last_name()?,
-                    trait_type = RustName::new(vec![
-                      "qt_core".to_string(),
-                      "flags".to_string(),
-                      "FlaggableEnum".to_string(),
-                    ])?.full_name(Some(&self.config.crate_properties.name()))
-                  );
+                r = r + &format!(
+                  include_str!("../templates/crate/impl_flaggable.rs.in"),
+                  name = type1.name.last_name()?,
+                  trait_type = RustName::new(vec![
+                    "qt_core".to_string(),
+                    "flags".to_string(),
+                    "FlaggableEnum".to_string(),
+                  ])?.full_name(Some(&self.config.crate_properties.name()))
+                );
               }
               r
             }
@@ -1036,7 +1037,7 @@ impl<'a> RustCodeGenerator<'a> {
                   include_str!("../templates/crate/extern_slot_impl_receiver.rs.in"),
                   type_name = type1
                     .name
-                    .full_name(Some(&self.config.crate_properties.name(),)),
+                    .full_name(Some(&self.config.crate_properties.name())),
                   args_tuple = args_tuple,
                   receiver_id = slot_wrapper.receiver_id,
                   connections_mod = connections_mod,
@@ -1357,7 +1358,7 @@ impl<'a> {connections_mod}::Receiver for {type_name}<'a> {{
                 include_str!("../templates/crate/closure_slot_wrapper.rs.in"),
                 type_name = type1
                   .name
-                  .full_name(Some(&self.config.crate_properties.name(),)),
+                  .full_name(Some(&self.config.crate_properties.name())),
                 pub_type_name = slot_wrapper.public_type_name,
                 callback_name = slot_wrapper.callback_name,
                 args = args,

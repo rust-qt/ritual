@@ -1,14 +1,14 @@
+use common::errors::{unexpected, Result};
+use common::log;
 use cpp_data::{CppBaseSpecifier, CppData, CppDataWithDeps, CppTemplateInstantiation,
                CppTemplateInstantiations, CppTypeAllocationPlace, CppTypeData, CppTypeKind,
                CppVisibility, ParserCppData, ProcessedCppData};
 use cpp_method::{CppMethod, CppMethodClassMembership, CppMethodKind};
 use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
-use common::log;
-use common::errors::{unexpected, Result};
 
+use common::string_utils::JoinWithSeparator;
 use std::collections::{HashMap, HashSet};
 use std::iter::once;
-use common::string_utils::JoinWithSeparator;
 
 struct CppPostProcessor<'a> {
   parser_data: ParserCppData,

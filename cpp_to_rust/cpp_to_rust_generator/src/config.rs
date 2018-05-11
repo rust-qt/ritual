@@ -1,13 +1,13 @@
 //! Interface for configuring and running the generator.
 
-use std::path::PathBuf;
-use common::errors::Result;
-use cpp_method::CppMethod;
-use cpp_data::ParserCppData;
-pub use cpp_data::CppTypeAllocationPlace;
-use common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
-use std::collections::HashMap;
 use common;
+use common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
+use common::errors::Result;
+pub use cpp_data::CppTypeAllocationPlace;
+use cpp_data::ParserCppData;
+use cpp_method::CppMethod;
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 /// Function type used in `Config::add_cpp_ffi_generator_filter`.
 pub type CppFfiGeneratorFilterFn = Fn(&CppMethod) -> Result<bool>;

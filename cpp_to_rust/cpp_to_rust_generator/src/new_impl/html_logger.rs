@@ -1,12 +1,10 @@
-use common::file_utils::{create_file, FileWrapper};
 use common::errors::{ChainErr, Result};
-use std::path::Path;
 use common::file_utils::PathBufWithAdded;
+use common::file_utils::{create_file, FileWrapper};
 use common::log;
-use std::fmt::Display;
-use new_impl::database::DatabaseUpdateResult;
-use new_impl::database::DatabaseUpdateResultType;
 use common::string_utils::JoinWithSeparator;
+use std::fmt::Display;
+use std::path::Path;
 
 pub struct HtmlLogger {
   file: FileWrapper,
@@ -46,6 +44,7 @@ impl HtmlLogger {
     Ok(())
   }
 
+  /*
   pub fn log_database_update_result(&mut self, result: &DatabaseUpdateResult) {
     let log_class = match result.result_type {
       DatabaseUpdateResultType::ItemAdded => "database_item_added",
@@ -78,7 +77,7 @@ impl HtmlLogger {
     self
       .add(&[&escape_html(&result.item), &text], log_class)
       .unwrap();
-  }
+  }*/
 
   fn finalize(&mut self) -> Result<()> {
     self

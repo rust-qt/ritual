@@ -6,8 +6,8 @@ use log;
 use std;
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::process::Command;
 use std::path::PathBuf;
+use std::process::Command;
 
 #[cfg(windows)]
 /// Returns proper executable file suffix on current platform.

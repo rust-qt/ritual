@@ -1,3 +1,7 @@
+use common::errors::{unexpected, ChainErr, Result};
+use common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
+use common::log;
+use common::string_utils::JoinWithSeparator;
 use cpp_data::{CppBaseSpecifier, CppClassField, CppClassUsingDirective, CppData, CppEnumValue,
                CppOriginLocation, CppTypeData, CppVisibility, ParserCppData,
                TemplateArgumentsDeclaration};
@@ -6,30 +10,23 @@ use cpp_operator::CppOperator;
 use cpp_type::{CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
                CppSpecificNumericTypeKind, CppType, CppTypeBase, CppTypeClassBase,
                CppTypeIndirection};
-use common::errors::{unexpected, ChainErr, Result};
-use common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
-use common::string_utils::JoinWithSeparator;
-use common::log;
 use new_impl::database::{CppItemData, Database};
 
+use clang;
+use clang::*;
+use common::file_utils::PathBufWithAdded;
+use common::target::current_target;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use common::target::current_target;
-use clang::*;
-use clang;
-use common::file_utils::PathBufWithAdded;
 
-use regex::Regex;
-use std::iter::once;
-use new_impl::database::DataEnvInfo;
-use new_impl::database::DataEnv;
-use new_impl::database::DataSource;
-use new_impl::database::DatabaseItem;
-use new_impl::html_logger::HtmlLogger;
-use new_impl::database::DatabaseUpdateResultType;
 use config::Config;
+use cpp_data::CppTypeDataKind;
+use new_impl::database::{DatabaseItem, DatabaseItemSource};
+use new_impl::html_logger::HtmlLogger;
 use new_impl::processor::ProcessorData;
 use new_impl::processor::ProcessorItem;
+use regex::Regex;
+use std::iter::once;
 
 fn entity_log_representation(entity: Entity) -> String {
   format!(
@@ -290,7 +287,7 @@ fn run(data: ProcessorData) -> Result<()> {
     None,
     |translation_unit| {
       log::status("Parsing types");
-      parser.parse_types(translation_unit);
+      parser.parse_types(translation_unit)?;
       log::status("Parsing methods");
       //let methods =
       parser.parse_methods(translation_unit)?;
@@ -516,14 +513,14 @@ impl<'a> CppParser<'a> {
         });
       }
     }
-    if let Some(type_data) = self.find_type(|x| x.name() == remaining_name) {
-      match *type_data {
-        CppTypeData::Enum { .. } => {
+    if let Some(type_data) = self.find_type(|x| &x.name == remaining_name) {
+      match type_data.kind {
+        CppTypeDataKind::Enum { .. } => {
           result_type.base = CppTypeBase::Enum {
             name: remaining_name.to_string(),
           }
         }
-        CppTypeData::Class { .. } => {
+        CppTypeDataKind::Class { .. } => {
           result_type.base = CppTypeBase::Class(CppTypeClassBase {
             name: remaining_name.to_string(),
             template_arguments: None,
@@ -539,7 +536,7 @@ impl<'a> CppParser<'a> {
       }
       let class_name = &matches[1];
       if self
-        .find_type(|x| x.name() == class_name && x.is_class())
+        .find_type(|x| &x.name == class_name && x.kind.is_class())
         .is_some()
       {
         let mut arg_types = Vec::new();
@@ -922,7 +919,7 @@ impl<'a> CppParser<'a> {
 
   /// Parses a function `entity`.
   #[cfg_attr(feature = "clippy", allow(cyclomatic_complexity))]
-  fn parse_function(&self, entity: Entity) -> Result<(CppMethod, DataEnvInfo)> {
+  fn parse_function(&self, entity: Entity) -> Result<(CppMethod, DatabaseItemSource)> {
     let (class_name, class_entity) = match entity.get_semantic_parent() {
       Some(p) => match p.get_kind() {
         EntityKind::ClassDecl | EntityKind::ClassTemplate | EntityKind::StructDecl => {
@@ -1214,13 +1211,11 @@ impl<'a> CppParser<'a> {
         return_type: return_type_parsed,
         template_arguments: template_arguments,
         declaration_code: declaration_code,
+        doc: None,
       },
-      DataEnvInfo {
-        is_success: true,
+      DatabaseItemSource::CppParser {
         include_file: Some(self.entity_include_file(entity)?),
         origin_location: Some(get_origin_location(entity)?),
-        error: None,
-        is_invalidated: false,
       },
     ))
   }
@@ -1235,17 +1230,17 @@ impl<'a> CppParser<'a> {
       )
     })?;
     let enum_name = get_full_name(entity)?;
-    self.data.add_cpp_data(
-      &CppItemData::Type(CppTypeData::Enum {
-        name: enum_name.clone(),
-      }),
-      DataEnvInfo {
-        is_success: true,
+    self.data.current_database.add_cpp_data(
+      DatabaseItemSource::CppParser {
         include_file: Some(include_file.clone()),
         origin_location: Some(get_origin_location(entity)?),
-        error: None,
-        is_invalidated: false,
       },
+      CppItemData::Type(CppTypeData {
+        kind: CppTypeDataKind::Enum,
+        name: enum_name.clone(),
+        doc: None,
+        is_stack_allocated_type: false,
+      }),
     );
     for child in entity.get_children() {
       if child.get_kind() == EntityKind::EnumConstantDecl {
@@ -1253,21 +1248,19 @@ impl<'a> CppParser<'a> {
           .get_enum_constant_value()
           .chain_err(|| "failed to get value of enum variant")?;
 
-        self.data.add_cpp_data(
-          &CppItemData::EnumValue(CppEnumValue {
+        self.data.current_database.add_cpp_data(
+          DatabaseItemSource::CppParser {
+            include_file: Some(include_file.clone()),
+            origin_location: Some(get_origin_location(child)?),
+          },
+          CppItemData::EnumValue(CppEnumValue {
             name: child
               .get_name()
               .chain_err(|| "failed to get name of enum variant")?,
             value: val.1,
             enum_name: enum_name.clone(),
+            doc: None,
           }),
-          DataEnvInfo {
-            is_success: true,
-            include_file: Some(include_file.clone()),
-            origin_location: Some(get_origin_location(child)?),
-            error: None,
-            is_invalidated: false,
-          },
         );
       }
     }
@@ -1294,8 +1287,12 @@ impl<'a> CppParser<'a> {
           field_name
         )
       })?;
-    self.data.add_cpp_data(
-      &CppItemData::ClassField(CppClassField {
+    self.data.current_database.add_cpp_data(
+      DatabaseItemSource::CppParser {
+        include_file: Some(include_file),
+        origin_location: Some(get_origin_location(entity)?),
+      },
+      CppItemData::ClassField(CppClassField {
         //        size: match field_clang_type.get_sizeof() {
         //          Ok(size) => Some(size),
         //          Err(_) => None,
@@ -1309,13 +1306,6 @@ impl<'a> CppParser<'a> {
           Accessibility::Private => CppVisibility::Private,
         },
       }),
-      DataEnvInfo {
-        is_success: true,
-        include_file: Some(include_file),
-        origin_location: Some(get_origin_location(entity)?),
-        error: None,
-        is_invalidated: false,
-      },
     );
 
     Ok(())
@@ -1406,7 +1396,7 @@ impl<'a> CppParser<'a> {
               format!("failed to parse class field: {}", err),
             ],
             "cpp_parser_error",
-          );
+          )?;
           err.discard_expected();
         }
       }
@@ -1426,8 +1416,12 @@ impl<'a> CppParser<'a> {
           );
         }
         if let CppTypeBase::Class(ref base_type) = base_type.base {
-          self.data.add_cpp_data(
-            &CppItemData::ClassBase(CppBaseSpecifier {
+          self.data.current_database.add_cpp_data(
+            DatabaseItemSource::CppParser {
+              include_file: Some(include_file.clone()),
+              origin_location: Some(get_origin_location(entity).unwrap()),
+            },
+            CppItemData::ClassBase(CppBaseSpecifier {
               base_class_type: base_type.clone(),
               is_virtual: child.is_virtual_base(),
               visibility: match child.get_accessibility().unwrap_or(Accessibility::Public) {
@@ -1438,13 +1432,6 @@ impl<'a> CppParser<'a> {
               base_index: current_base_index,
               derived_class_type: class_type_for_field.clone(),
             }),
-            DataEnvInfo {
-              is_success: true,
-              error: None,
-              include_file: Some(include_file.clone()),
-              origin_location: Some(get_origin_location(entity).unwrap()),
-              is_invalidated: false,
-            },
           );
           current_base_index += 1;
         } else {
@@ -1455,20 +1442,22 @@ impl<'a> CppParser<'a> {
         return Err("Non-type template parameter is not supported".into());
       }
     }
-    self.data.add_cpp_data(
-      &CppItemData::Type(CppTypeData::Class {
-        type_base: CppTypeClassBase {
-          name: full_name,
-          template_arguments: template_arguments,
-        },
-      }),
-      DataEnvInfo {
-        is_success: true,
-        error: None,
+    self.data.current_database.add_cpp_data(
+      DatabaseItemSource::CppParser {
         include_file: Some(include_file),
         origin_location: Some(get_origin_location(entity).unwrap()),
-        is_invalidated: false,
       },
+      CppItemData::Type(CppTypeData {
+        kind: CppTypeDataKind::Class {
+          type_base: CppTypeClassBase {
+            name: full_name.clone(),
+            template_arguments: template_arguments,
+          },
+        },
+        name: full_name,
+        doc: None,
+        is_stack_allocated_type: false,
+      }),
     );
     Ok(())
   }
@@ -1541,14 +1530,14 @@ impl<'a> CppParser<'a> {
 
   /// Parses type declarations in translation unit `entity`
   /// and saves them to `self`.
-  fn parse_types(&mut self, entity: Entity) {
+  fn parse_types(&mut self, entity: Entity) -> Result<()> {
     if !self.should_process_entity(entity) {
-      return;
+      return Ok(());
     }
     match entity.get_kind() {
       EntityKind::EnumDecl => {
         if entity.get_accessibility() == Some(Accessibility::Private) {
-          return; // skipping private stuff
+          return Ok(()); // skipping private stuff
         }
         if entity.get_name().is_some() && entity.is_definition() {
           if let Err(error) = self.parse_enum(entity) {
@@ -1558,14 +1547,14 @@ impl<'a> CppParser<'a> {
                 format!("failed to parse enum: {}", error),
               ],
               "cpp_parser_error",
-            );
+            )?;
             error.discard_expected();
           }
         }
       }
       EntityKind::ClassDecl | EntityKind::ClassTemplate | EntityKind::StructDecl => {
         if entity.get_accessibility() == Some(Accessibility::Private) {
-          return; // skipping private stuff
+          return Ok(()); // skipping private stuff
         }
         let ok = entity.get_name().is_some() && // not an anonymous struct
         entity.is_definition() && // not a forward declaration
@@ -1578,7 +1567,7 @@ impl<'a> CppParser<'a> {
                 format!("failed to parse class: {}", error),
               ],
               "cpp_parser_error",
-            );
+            )?;
             error.discard_expected();
           }
         }
@@ -1592,10 +1581,11 @@ impl<'a> CppParser<'a> {
       | EntityKind::ClassDecl
       | EntityKind::UnexposedDecl
       | EntityKind::ClassTemplate => for c in entity.get_children() {
-        self.parse_types(c);
+        self.parse_types(c)?;
       },
       _ => {}
     }
+    Ok(())
   }
 
   /// Parses methods in translation unit `entity`.
@@ -1613,7 +1603,10 @@ impl<'a> CppParser<'a> {
         if entity.get_canonical_entity() == entity {
           match self.parse_function(entity) {
             Ok((r, info)) => {
-              self.data.add_cpp_data(&CppItemData::Method(r), info);
+              self
+                .data
+                .current_database
+                .add_cpp_data(info, CppItemData::Method(r));
             }
             Err(error) => {
               self.data.html_logger.add(
@@ -1684,7 +1677,7 @@ impl<'a> CppParser<'a> {
       | CppTypeBase::PointerSizedInteger { .. }
       | CppTypeBase::TemplateParameter { .. } => {}
       CppTypeBase::Enum { ref name } => {
-        if self.find_type(|x| x.name() == name).is_none() {
+        if self.find_type(|x| &x.name == name).is_none() {
           return Err(format!("unknown type: {}", name).into());
         }
       }
@@ -1692,7 +1685,7 @@ impl<'a> CppParser<'a> {
         ref name,
         ref template_arguments,
       }) => {
-        if self.find_type(|x| x.name() == name).is_none() {
+        if self.find_type(|x| &x.name == name).is_none() {
           return Err(format!("unknown type: {}", name).into());
         }
         if let Some(ref args) = *template_arguments {

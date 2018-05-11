@@ -1,8 +1,8 @@
 use common::errors::{unexpected, ChainErr, Result};
 use common::string_utils::CaseOperations;
 use common::utils::MapIfOk;
-use cpp_type::CppType;
 use cpp_ffi_data::CppIndirectionChange;
+use cpp_type::CppType;
 
 /// Rust identifier. Represented by
 /// a vector of name parts. For a regular name,

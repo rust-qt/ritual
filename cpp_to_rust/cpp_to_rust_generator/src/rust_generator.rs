@@ -1,6 +1,11 @@
 //! Generates Rust public API and FFI functions
 
 use caption_strategy::TypeCaptionStrategy;
+use common::errors::{unexpected, ChainErr, Result};
+use common::log;
+use common::string_utils::JoinWithSeparator;
+use common::string_utils::{CaseOperations, WordIterator};
+use common::utils::{add_to_multihash, MapIfOk};
 use cpp_data::{CppDataWithDeps, CppEnumValue, CppTypeAllocationPlace, CppTypeKind};
 use cpp_ffi_data::{CppAndFfiMethod, CppCast, CppFfiArgumentMeaning, CppFfiHeaderData,
                    CppFfiMethodKind, CppFfiType, CppIndirectionChange};
@@ -9,8 +14,7 @@ use cpp_operator::CppOperator;
 use cpp_type::{CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
                CppSpecificNumericTypeKind, CppType, CppTypeBase, CppTypeClassBase,
                CppTypeIndirection, CppTypeRole};
-use common::errors::{unexpected, ChainErr, Result};
-use common::log;
+use doc_formatter;
 use rust_info::{RustEnumValue, RustFFIArgument, RustFFIFunction, RustMethod, RustMethodArgument,
                 RustMethodArguments, RustMethodArgumentsVariant, RustMethodCaptionStrategy,
                 RustMethodDocItem, RustMethodScope, RustMethodSelfArgKind, RustModule,
@@ -18,10 +22,6 @@ use rust_info::{RustEnumValue, RustFFIArgument, RustFFIFunction, RustMethod, Rus
                 RustQtSlotWrapper, RustTypeDeclaration, RustTypeDeclarationKind,
                 RustTypeWrapperKind, TraitAssociatedType, TraitImpl, TraitImplExtra};
 use rust_type::{CompleteType, RustName, RustToCTypeConversion, RustType, RustTypeIndirection};
-use common::string_utils::{CaseOperations, WordIterator};
-use common::utils::{add_to_multihash, MapIfOk};
-use common::string_utils::JoinWithSeparator;
-use doc_formatter;
 use std::collections::{hash_map, HashMap, HashSet};
 
 /// Intermediate data of a single C++ method converted to
