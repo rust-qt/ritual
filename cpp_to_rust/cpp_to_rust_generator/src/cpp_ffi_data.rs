@@ -1,9 +1,6 @@
-use caption_strategy::{ArgumentCaptionStrategy, MethodCaptionStrategy, TypeCaptionStrategy};
 use common::errors::Result;
-use common::utils::MapIfOk;
 use cpp_data::CppClassField;
-use cpp_method::{CppMethod, CppMethodArgument, ReturnValueAllocationPlace};
-use cpp_operator::CppOperator;
+use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_type::{CppFunctionPointerType, CppType, CppTypeBase};
 use new_impl::database::CppCheckerInfoList;
 
@@ -144,23 +141,6 @@ pub struct CppFfiMethodArgument {
 }
 
 impl CppFfiMethodArgument {
-  /// Generates part of caption string for FFI method.
-  /// Used to generate FFI methods with different names
-  /// for overloaded functions.
-  pub fn caption(&self, strategy: ArgumentCaptionStrategy) -> Result<String> {
-    Ok(match strategy {
-      ArgumentCaptionStrategy::NameOnly => self.name.clone(),
-      ArgumentCaptionStrategy::TypeOnly(type_strategy) => {
-        self.argument_type.original_type.caption(type_strategy)?
-      }
-      ArgumentCaptionStrategy::TypeAndName(type_strategy) => format!(
-        "{}_{}",
-        self.argument_type.original_type.caption(type_strategy)?,
-        self.name
-      ),
-    })
-  }
-
   /// Generates C++ code for the part of FFI function signature
   /// corresponding to this argument
   pub fn to_cpp_code(&self) -> Result<String> {
@@ -288,63 +268,6 @@ impl CppFfiType {
 //  /// Final name of FFI method
 //  pub c_name: String,
 //}
-
-/// Generates initial FFI method name without any captions
-pub fn c_base_name(
-  cpp_method: &CppMethod,
-  allocation_place: &ReturnValueAllocationPlace,
-  include_file: &str,
-) -> Result<String> {
-  let scope_prefix = match cpp_method.class_membership {
-    Some(ref info) => format!("{}_", info.class_type.caption()?),
-    None => format!("{}_G_", include_file),
-  };
-
-  let add_place_note = |name| match *allocation_place {
-    ReturnValueAllocationPlace::Stack => format!("{}_to_output", name),
-    ReturnValueAllocationPlace::Heap => format!("{}_as_ptr", name),
-    ReturnValueAllocationPlace::NotApplicable => name,
-  };
-
-  let method_name = if cpp_method.is_constructor() {
-    match *allocation_place {
-      ReturnValueAllocationPlace::Stack => "constructor".to_string(),
-      ReturnValueAllocationPlace::Heap => "new".to_string(),
-      ReturnValueAllocationPlace::NotApplicable => {
-        return Err("NotApplicable in constructor".into());
-      }
-    }
-  } else if cpp_method.is_destructor() {
-    match *allocation_place {
-      ReturnValueAllocationPlace::Stack => "destructor".to_string(),
-      ReturnValueAllocationPlace::Heap => "delete".to_string(),
-      ReturnValueAllocationPlace::NotApplicable => {
-        return Err("NotApplicable in destructor".into());
-      }
-    }
-  } else if let Some(ref operator) = cpp_method.operator {
-    add_place_note(match *operator {
-      CppOperator::Conversion(ref cpp_type) => format!(
-        "convert_to_{}",
-        cpp_type.caption(TypeCaptionStrategy::Full)?
-      ),
-      _ => format!("operator_{}", operator.c_name()?),
-    })
-  } else {
-    add_place_note(cpp_method.name.replace("::", "_"))
-  };
-  let template_args_text = match cpp_method.template_arguments {
-    Some(ref args) => format!(
-      "_{}",
-      args
-        .iter()
-        .map_if_ok(|x| x.caption(TypeCaptionStrategy::Full))?
-        .join("_")
-    ),
-    None => String::new(),
-  };
-  Ok(scope_prefix + &method_name + &template_args_text)
-}
 
 /// Information about a Qt slot wrapper with
 /// certain slot arguments

@@ -5,7 +5,6 @@ use cpp_to_rust_generator::common::errors::{ChainErr, Result};
 use cpp_to_rust_generator::common::file_utils::{file_to_string, os_str_to_str, read_dir};
 use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::common::utils::add_to_multihash;
-use cpp_to_rust_generator::cpp_data::ParserCppData;
 
 use std::collections::HashMap;
 use std::path::PathBuf;

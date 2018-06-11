@@ -1,13 +1,13 @@
 use common::errors::{ChainErr, Result};
 use common::file_utils::PathBufWithAdded;
 use common::log;
-use common::target::current_target;
+
 use common::utils::MapIfOk;
 use config::Config;
 use cpp_ffi_generator::cpp_ffi_generator;
 use cpp_parser::cpp_parser;
 use new_impl::cpp_checker::cpp_checker;
-use new_impl::database::CppItemData;
+
 use new_impl::database::{Database, DatabaseItem};
 use new_impl::html_logger::HtmlLogger;
 use new_impl::workspace::Workspace;
@@ -101,6 +101,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
   ];
 
   // TODO: allow to remove any prefix through `Config` (#25)
+  #[allow(unused_variables)]
   let remove_qt_prefix = config.crate_properties().name().starts_with("qt_");
 
   log::status("Loading current crate data");

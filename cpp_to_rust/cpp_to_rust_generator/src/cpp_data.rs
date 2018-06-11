@@ -1,17 +1,12 @@
 //! Types for handling information about C++ library APIs.
 
-use common::errors::{ChainErr, Result};
-use common::file_utils::open_file;
-use common::log;
-use cpp_method::{CppMethod, CppMethodKind};
+use common::errors::Result;
+use cpp_method::CppMethod;
 pub use cpp_operator::CppOperator;
-use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
+use cpp_type::{CppType, CppTypeBase, CppTypeClassBase};
 
-use std::collections::{HashMap, HashSet};
-use std::io::{BufRead, BufReader};
+use std::collections::HashMap;
 use std::iter::once;
-
-use regex::Regex;
 
 /// One item of a C++ enum declaration
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]

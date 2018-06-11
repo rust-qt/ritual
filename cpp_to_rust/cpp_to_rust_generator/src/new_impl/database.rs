@@ -1,5 +1,5 @@
-use common::errors::{ChainErr, Result};
-use common::log;
+use common::errors::Result;
+
 use common::string_utils::JoinWithSeparator;
 use common::target::Target;
 use cpp_data::CppBaseSpecifier;
@@ -8,11 +8,11 @@ use cpp_data::CppEnumValue;
 use cpp_data::CppOriginLocation;
 use cpp_data::CppTypeData;
 use cpp_data::CppTypeDataKind;
-use cpp_data::CppTypeDoc;
+
 use cpp_data::CppVisibility;
 use cpp_ffi_data::CppFfiMethod;
 use cpp_method::CppMethod;
-use cpp_method::CppMethodDoc;
+
 use new_impl::html_logger::HtmlLogger;
 use new_impl::html_logger::escape_html;
 use std::fmt::Display;

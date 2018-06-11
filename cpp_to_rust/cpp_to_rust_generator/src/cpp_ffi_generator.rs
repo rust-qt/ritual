@@ -1,25 +1,14 @@
-use caption_strategy::{MethodCaptionStrategy, TypeCaptionStrategy};
-use common::errors::{unexpected, ChainErr, Result};
-use common::log;
-use common::utils::{add_to_multihash, MapIfOk};
-use config::CppFfiGeneratorFilterFn;
+use common::errors::{unexpected, Result};
 use cpp_data::CppBaseSpecifier;
 use cpp_data::CppClassField;
-use cpp_data::CppTypeData;
 use cpp_data::CppTypeDataKind;
-use cpp_data::{CppDataWithDeps, CppOperator, CppTemplateInstantiation, CppTypeAllocationPlace,
-               CppVisibility};
-use cpp_ffi_data::{c_base_name, CppCast, CppFfiMethod, CppFfiMethodKind, CppFieldAccessorType,
-                   QtSlotWrapper};
-use cpp_method::{CppMethod, CppMethodArgument, CppMethodClassMembership, CppMethodKind,
-                 ReturnValueAllocationPlace};
-use cpp_type::{CppFunctionPointerType, CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection,
-               CppTypeRole};
+use cpp_data::CppVisibility;
+use cpp_ffi_data::{CppCast, CppFfiMethod, CppFfiMethodKind, CppFieldAccessorType};
+use cpp_method::{CppMethod, CppMethodArgument, CppMethodClassMembership, CppMethodKind};
+use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
 use new_impl::database::CppItemData;
 use new_impl::processor::ProcessorData;
 use new_impl::processor::ProcessorItem;
-use std::collections::{HashMap, HashSet};
-use std::iter::once;
 
 /// This object generates the C++ wrapper library
 struct CppFfiGenerator<'a> {
@@ -27,26 +16,6 @@ struct CppFfiGenerator<'a> {
   data: ProcessorData<'a>,
   /// Name of the wrapper library
   cpp_ffi_lib_name: String,
-}
-
-#[derive(Debug, Clone)]
-struct CppMethodRefWithKind<'a> {
-  method: &'a CppMethod,
-  kind: CppFfiMethodKind,
-}
-
-struct CppMethodWithKind {
-  method: CppMethod,
-  kind: CppFfiMethodKind,
-}
-
-impl CppMethodWithKind {
-  fn as_ref<'a>(&'a self) -> CppMethodRefWithKind<'a> {
-    CppMethodRefWithKind {
-      method: &self.method,
-      kind: self.kind.clone(),
-    }
-  }
 }
 
 /// Runs the FFI generator
@@ -74,6 +43,9 @@ pub fn cpp_ffi_generator() -> ProcessorItem {
     function: run,
   }
 }
+
+// TODO: instantiate_templates
+/*
 
 /// Tries to apply each of `template_instantiations` to `method`.
 /// Only types at the specified `nested_level` are replaced.
@@ -250,95 +222,18 @@ fn instantiate_templates(data: &CppDataWithDeps) -> Result<Vec<CppMethodWithKind
   }
   Ok(new_methods)
 }
-
-/// Adds fictional getter and setter methods for each known public field of each class.
-fn generate_field_accessors(field: &CppClassField) -> Result<Vec<CppMethodWithKind>> {
-  // TODO: fix doc generator for field accessors
-  //log::status("Adding field accessors");
-  let mut new_methods = Vec::new();
-  let create_method = |name, accessor_type, return_type, arguments| -> Result<CppMethodWithKind> {
-    // TODO: generate CppFfiMethod, don't generate CppMethod
-    Ok(CppMethodWithKind {
-      method: CppMethod {
-        name: name,
-        class_membership: Some(CppMethodClassMembership {
-          class_type: field.class_type.clone(),
-          kind: CppMethodKind::Regular,
-          is_virtual: false,
-          is_pure_virtual: false,
-          is_const: match accessor_type {
-            CppFieldAccessorType::CopyGetter | CppFieldAccessorType::ConstRefGetter => true,
-            CppFieldAccessorType::MutRefGetter | CppFieldAccessorType::Setter => false,
-          },
-          is_static: false,
-          visibility: CppVisibility::Public,
-          is_signal: false,
-          is_slot: false,
-        }),
-        operator: None,
-        return_type: return_type,
-        arguments: arguments,
-        allows_variadic_arguments: false,
-        template_arguments: None,
-        declaration_code: None,
-        doc: None,
-      },
-      kind: CppFfiMethodKind::FieldAccessor {
-        accessor_type: accessor_type,
-        field: field.clone(),
-      },
-    })
-  };
-  if field.visibility == CppVisibility::Public {
-    if field.field_type.indirection == CppTypeIndirection::None && field.field_type.base.is_class()
-    {
-      let mut type2_const = field.field_type.clone();
-      type2_const.is_const = true;
-      type2_const.indirection = CppTypeIndirection::Ref;
-      let mut type2_mut = field.field_type.clone();
-      type2_mut.is_const = false;
-      type2_mut.indirection = CppTypeIndirection::Ref;
-      new_methods.push(create_method(
-        field.name.clone(),
-        CppFieldAccessorType::ConstRefGetter,
-        type2_const,
-        Vec::new(),
-      )?);
-      new_methods.push(create_method(
-        format!("{}_mut", field.name),
-        CppFieldAccessorType::MutRefGetter,
-        type2_mut,
-        Vec::new(),
-      )?);
-    } else {
-      new_methods.push(create_method(
-        field.name.clone(),
-        CppFieldAccessorType::CopyGetter,
-        field.field_type.clone(),
-        Vec::new(),
-      )?);
-    }
-    let arg = CppMethodArgument {
-      argument_type: field.field_type.clone(),
-      name: "value".to_string(),
-      has_default_value: false,
-    };
-    new_methods.push(create_method(
-      format!("set_{}", field.name),
-      CppFieldAccessorType::Setter,
-      CppType::void(),
-      vec![arg],
-    )?);
-  }
-
-  Ok(new_methods)
-}
+*/
 
 /// Convenience function to create `CppMethod` object for
 /// `static_cast` or `dynamic_cast` from type `from` to type `to`.
 /// See `CppMethod`'s documentation for more information
 /// about `is_unsafe_static_cast` and `is_direct_static_cast`.
-fn create_cast_method(cast: CppCast, from: &CppType, to: &CppType) -> CppMethodWithKind {
+fn create_cast_method(
+  cast: CppCast,
+  from: &CppType,
+  to: &CppType,
+  name: &str,
+) -> Result<CppFfiMethod> {
   let method = CppMethod {
     name: cast.cpp_method_name().to_string(),
     class_membership: None,
@@ -356,14 +251,19 @@ fn create_cast_method(cast: CppCast, from: &CppType, to: &CppType) -> CppMethodW
     declaration_code: None,
     doc: None,
   };
-  CppMethodWithKind {
-    method: method.clone(),
-    kind: CppFfiMethodKind::Method {
-      cast_data: Some(cast),
-      omitted_arguments: None,
-      cpp_method: method,
-    },
+  // no need for stack_allocated_types since all cast methods operate on pointers
+  let mut r = method.to_ffi_method(&[], name)?;
+  if let CppFfiMethodKind::Method {
+    ref mut cast_data, ..
+  } = r.kind
+  {
+    *cast_data = Some(cast);
+  } else {
+    return Err(
+      unexpected("to_ffi_method must return a value with CppFfiMethodKind::Method").into(),
+    );
   }
+  Ok(r)
 }
 
 /// Performs a portion of `generate_casts` operation.
@@ -371,11 +271,12 @@ fn create_cast_method(cast: CppCast, from: &CppType, to: &CppType) -> CppMethodW
 /// `generate_casts_one` recursively to add casts between `target_type`
 /// and base types of `base_type`.
 fn generate_casts_one(
-  processor_data: &ProcessorData,
+  data: &[CppBaseSpecifier],
   target_type: &CppTypeClassBase,
   base_type: &CppTypeClassBase,
   direct_base_index: Option<usize>,
-) -> Result<Vec<CppMethodWithKind>> {
+  name_prefix: &str,
+) -> Result<Vec<CppFfiMethod>> {
   let target_ptr_type = CppType {
     base: CppTypeBase::Class(target_type.clone()),
     indirection: CppTypeIndirection::Ptr,
@@ -396,7 +297,8 @@ fn generate_casts_one(
     },
     &base_ptr_type,
     &target_ptr_type,
-  ));
+    &format!("{}_cast1", name_prefix),
+  )?);
   new_methods.push(create_cast_method(
     CppCast::Static {
       is_unsafe: false,
@@ -404,25 +306,24 @@ fn generate_casts_one(
     },
     &target_ptr_type,
     &base_ptr_type,
-  ));
+    &format!("{}_cast2", name_prefix),
+  )?);
   new_methods.push(create_cast_method(
     CppCast::Dynamic,
     &base_ptr_type,
     &target_ptr_type,
-  ));
+    &format!("{}_cast3", name_prefix),
+  )?);
 
-  for database in processor_data.all_databases() {
-    for item in &database.items {
-      if let CppItemData::ClassBase(ref base) = item.cpp_data {
-        if &base.derived_class_type == base_type {
-          new_methods.append(&mut generate_casts_one(
-            processor_data,
-            target_type,
-            &base.base_class_type,
-            None,
-          )?);
-        }
-      }
+  for base in data {
+    if &base.derived_class_type == base_type {
+      new_methods.append(&mut generate_casts_one(
+        data,
+        target_type,
+        &base.base_class_type,
+        None,
+        &format!("{}_base{}", name_prefix, base.base_index),
+      )?);
     }
   }
 
@@ -431,14 +332,19 @@ fn generate_casts_one(
 
 /// Adds `static_cast` and `dynamic_cast` functions for all appropriate pairs of types
 /// in this `CppData`.
-fn generate_casts(base: &CppBaseSpecifier, data: &ProcessorData) -> Result<Vec<CppMethodWithKind>> {
+fn generate_casts(
+  base: &CppBaseSpecifier,
+  data: &[CppBaseSpecifier],
+  name_prefix: &str,
+) -> Result<Vec<CppFfiMethod>> {
   //log::status("Adding cast functions");
-  Ok(generate_casts_one(
+  generate_casts_one(
     data,
     &base.derived_class_type,
     &base.base_class_type,
     Some(base.base_index),
-  )?)
+    name_prefix,
+  )
 }
 
 /*
@@ -484,6 +390,99 @@ fn method_to_ffi_signature<'a>(
     c_signature: c_signature,
   })
 }*/
+
+/// Adds fictional getter and setter methods for each known public field of each class.
+fn generate_field_accessors(
+  field: &CppClassField,
+  stack_allocated_types: &[CppTypeClassBase],
+  name_prefix: &str,
+) -> Result<Vec<CppFfiMethod>> {
+  // TODO: fix doc generator for field accessors
+  //log::status("Adding field accessors");
+  let mut new_methods = Vec::new();
+  let create_method = |name, accessor_type, return_type, arguments| -> Result<CppFfiMethod> {
+    let fake_method = CppMethod {
+      name: name,
+      class_membership: Some(CppMethodClassMembership {
+        class_type: field.class_type.clone(),
+        kind: CppMethodKind::Regular,
+        is_virtual: false,
+        is_pure_virtual: false,
+        is_const: match accessor_type {
+          CppFieldAccessorType::CopyGetter | CppFieldAccessorType::ConstRefGetter => true,
+          CppFieldAccessorType::MutRefGetter | CppFieldAccessorType::Setter => false,
+        },
+        is_static: false,
+        visibility: CppVisibility::Public,
+        is_signal: false,
+        is_slot: false,
+      }),
+      operator: None,
+      return_type: return_type,
+      arguments: arguments,
+      allows_variadic_arguments: false,
+      template_arguments: None,
+      declaration_code: None,
+      doc: None,
+    };
+    let mut ffi_method = fake_method.to_ffi_method(
+      stack_allocated_types,
+      &format!(
+        "{}_{}",
+        name_prefix,
+        format!("{:?}", accessor_type).to_lowercase()
+      ),
+    )?;
+    ffi_method.kind = CppFfiMethodKind::FieldAccessor {
+      accessor_type: accessor_type,
+      field: field.clone(),
+    };
+    Ok(ffi_method)
+  };
+  if field.visibility == CppVisibility::Public {
+    if field.field_type.indirection == CppTypeIndirection::None && field.field_type.base.is_class()
+    {
+      let mut type2_const = field.field_type.clone();
+      type2_const.is_const = true;
+      type2_const.indirection = CppTypeIndirection::Ref;
+      let mut type2_mut = field.field_type.clone();
+      type2_mut.is_const = false;
+      type2_mut.indirection = CppTypeIndirection::Ref;
+      new_methods.push(create_method(
+        field.name.clone(),
+        CppFieldAccessorType::ConstRefGetter,
+        type2_const,
+        Vec::new(),
+      )?);
+      new_methods.push(create_method(
+        format!("{}_mut", field.name),
+        CppFieldAccessorType::MutRefGetter,
+        type2_mut,
+        Vec::new(),
+      )?);
+    } else {
+      new_methods.push(create_method(
+        field.name.clone(),
+        CppFieldAccessorType::CopyGetter,
+        field.field_type.clone(),
+        Vec::new(),
+      )?);
+    }
+    let arg = CppMethodArgument {
+      argument_type: field.field_type.clone(),
+      name: "value".to_string(),
+      has_default_value: false,
+    };
+    new_methods.push(create_method(
+      format!("set_{}", field.name),
+      CppFieldAccessorType::Setter,
+      CppType::void(),
+      vec![arg],
+    )?);
+  }
+
+  Ok(new_methods)
+}
 
 impl<'a> CppFfiGenerator<'a> {
   /// Returns false if the method is excluded from processing
@@ -553,19 +552,47 @@ impl<'a> CppFfiGenerator<'a> {
       })
       .collect();
 
+    let all_class_bases: Vec<_> = self
+      .data
+      .all_items()
+      .iter()
+      .filter_map(|item| {
+        if let CppItemData::ClassBase(ref base) = item.cpp_data {
+          Some(base.clone())
+        } else {
+          None
+        }
+      })
+      .collect();
+
     for (index, item) in &mut self.data.current_database.items.iter_mut().enumerate() {
       if item.cpp_ffi_methods.len() > 0 {
         continue;
       }
-      if let CppItemData::Method(ref method) = item.cpp_data {
-        let name = format!("{}_fn{}", self.cpp_ffi_lib_name, index);
-        match method.to_ffi_method(&stack_allocated_types, &name) {
-          Err(msg) => {
-            // TODO: new logs?
-          }
-          Ok(r) => {
-            item.cpp_ffi_methods.push(r);
-          }
+      let name = format!("{}_item{}", self.cpp_ffi_lib_name, index);
+      let result = match item.cpp_data {
+        CppItemData::Type(_) | CppItemData::EnumValue(_) => {
+          Ok(Vec::new())
+          // no FFI methods for these items
+        }
+        CppItemData::Method(ref method) => method
+          .to_ffi_method(&stack_allocated_types, &name)
+          .map(|r| vec![r]),
+        CppItemData::ClassField(ref field) => {
+          generate_field_accessors(field, &stack_allocated_types, &name)
+        }
+        CppItemData::ClassBase(ref base) => generate_casts(base, &all_class_bases, &name),
+      };
+
+      match result {
+        Err(msg) => {
+          self
+            .data
+            .html_logger
+            .add(&[item.cpp_data.to_string(), msg.to_string()], "error")?;
+        }
+        Ok(r) => {
+          item.cpp_ffi_methods = r;
         }
       }
     }

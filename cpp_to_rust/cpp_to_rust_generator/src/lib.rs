@@ -30,7 +30,6 @@ pub extern crate cpp_to_rust_common as common;
 
 pub mod cpp_ffi_generator;
 //mod cpp_code_generator;
-mod caption_strategy;
 pub mod config;
 pub mod cpp_data;
 //mod cpp_post_processor;
@@ -43,8 +42,8 @@ pub mod cpp_type;
 //mod rust_generator;
 //mod rust_code_generator;
 mod cpp_parser;
-mod rust_info;
-mod rust_type;
+//mod rust_info;
+//mod rust_type;
 mod versions;
 
 #[cfg(test)]

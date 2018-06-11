@@ -3,7 +3,7 @@
 use common::errors::{unexpected, Result};
 use common::string_utils::JoinWithSeparator;
 use common::utils::MapIfOk;
-use cpp_data::{CppBaseSpecifier, CppOriginLocation, CppVisibility, TemplateArgumentsDeclaration};
+use cpp_data::CppVisibility;
 use cpp_ffi_data::CppFfiMethodKind;
 use cpp_ffi_data::{CppFfiArgumentMeaning, CppFfiMethod, CppFfiMethodArgument, CppFfiType};
 pub use cpp_operator::{CppOperator, CppOperatorInfo};

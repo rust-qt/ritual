@@ -3,7 +3,7 @@ use common::file_utils::PathBufWithAdded;
 use common::file_utils::{create_dir, create_dir_all, load_json, remove_dir_all, save_json};
 use common::log;
 use common::string_utils::CaseOperations;
-use config::Config;
+
 use new_impl::database::Database;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -81,6 +81,7 @@ impl Workspace {
     Ok(path)
   }
 
+  #[allow(unused_variables)]
   pub fn import_published_crate(&mut self, crate_name: &str) -> Result<()> {
     unimplemented!()
   }
@@ -150,7 +151,7 @@ impl Workspace {
       write_to_stderr: false,
     });
     let mut category_settings = HashMap::new();
-    let mut debug_categories = vec![
+    let debug_categories = vec![
       log::DebugGeneral,
       log::DebugMoveFiles,
       log::DebugTemplateInstantiation,

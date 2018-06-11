@@ -2,27 +2,26 @@ use common::errors::{unexpected, ChainErr, Result};
 use common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
 use common::log;
 use common::string_utils::JoinWithSeparator;
-use cpp_data::{CppBaseSpecifier, CppClassField, CppClassUsingDirective, CppData, CppEnumValue,
-               CppOriginLocation, CppTypeData, CppVisibility, ParserCppData,
-               TemplateArgumentsDeclaration};
+use cpp_data::{CppBaseSpecifier, CppClassField, CppEnumValue, CppOriginLocation, CppTypeData,
+               CppVisibility};
 use cpp_method::{CppMethod, CppMethodArgument, CppMethodClassMembership, CppMethodKind};
 use cpp_operator::CppOperator;
 use cpp_type::{CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
                CppSpecificNumericTypeKind, CppType, CppTypeBase, CppTypeClassBase,
                CppTypeIndirection};
-use new_impl::database::{CppItemData, Database};
+use new_impl::database::CppItemData;
 
 use clang;
 use clang::*;
 use common::file_utils::PathBufWithAdded;
-use common::target::current_target;
+
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 use config::Config;
 use cpp_data::CppTypeDataKind;
-use new_impl::database::{DatabaseItem, DatabaseItemSource};
-use new_impl::html_logger::HtmlLogger;
+use new_impl::database::DatabaseItemSource;
+
 use new_impl::processor::ProcessorData;
 use new_impl::processor::ProcessorItem;
 use regex::Regex;
@@ -1663,53 +1662,6 @@ impl<'a> CppParser<'a> {
         self.parse_methods(c)?;
       },
       _ => {}
-    }
-    Ok(())
-  }
-
-  /// Returns `Err` if `type1` or any of its components refer to
-  /// an unknown type.
-  fn check_type_integrity(&self, type1: &CppType) -> Result<()> {
-    match type1.base {
-      CppTypeBase::Void
-      | CppTypeBase::BuiltInNumeric(..)
-      | CppTypeBase::SpecificNumeric { .. }
-      | CppTypeBase::PointerSizedInteger { .. }
-      | CppTypeBase::TemplateParameter { .. } => {}
-      CppTypeBase::Enum { ref name } => {
-        if self.find_type(|x| &x.name == name).is_none() {
-          return Err(format!("unknown type: {}", name).into());
-        }
-      }
-      CppTypeBase::Class(CppTypeClassBase {
-        ref name,
-        ref template_arguments,
-      }) => {
-        if self.find_type(|x| &x.name == name).is_none() {
-          return Err(format!("unknown type: {}", name).into());
-        }
-        if let Some(ref args) = *template_arguments {
-          for arg in args {
-            if let Err(msg) = self.check_type_integrity(arg) {
-              return Err(msg);
-            }
-          }
-        }
-      }
-      CppTypeBase::FunctionPointer(CppFunctionPointerType {
-        ref return_type,
-        ref arguments,
-        ..
-      }) => {
-        if let Err(msg) = self.check_type_integrity(return_type) {
-          return Err(msg);
-        }
-        for arg in arguments {
-          if let Err(msg) = self.check_type_integrity(arg) {
-            return Err(msg);
-          }
-        }
-      }
     }
     Ok(())
   }

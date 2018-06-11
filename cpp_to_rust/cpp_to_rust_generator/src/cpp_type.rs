@@ -1,9 +1,7 @@
 //! Types for handling information about C++ types.
 
-use caption_strategy::TypeCaptionStrategy;
 use common::errors::{unexpected, ChainErr, Error, Result};
 use common::string_utils::JoinWithSeparator;
-use common::utils::MapIfOk;
 use cpp_ffi_data::{CppFfiType, CppIndirectionChange};
 
 /// C++ type variants based on indirection
@@ -278,23 +276,6 @@ impl CppTypeClassBase {
     }
   }
 
-  /// Returns string representation of this type for the purpose
-  /// of function name generation.
-  pub fn caption(&self) -> Result<String> {
-    let name_caption = self.name.replace("::", "_");
-    Ok(match self.template_arguments {
-      Some(ref args) => format!(
-        "{}_{}",
-        name_caption,
-        args
-          .iter()
-          .map_if_ok(|arg| arg.caption(TypeCaptionStrategy::Full))?
-          .join("_")
-      ),
-      None => name_caption,
-    })
-  }
-
   /// Attempts to replace template types at `nested_level1`
   /// within this type with `template_arguments1`.
   pub fn instantiate_class(
@@ -428,46 +409,11 @@ impl CppTypeBase {
     }
   }
 
-  /// Generates alphanumeric representation of self
-  /// used to generate FFI function names
-  pub fn caption(&self, strategy: TypeCaptionStrategy) -> Result<String> {
-    Ok(match *self {
-      CppTypeBase::Void => "void".to_string(),
-      CppTypeBase::BuiltInNumeric(ref t) => t.to_cpp_code().to_string().replace(" ", "_"),
-      CppTypeBase::SpecificNumeric(CppSpecificNumericType { ref name, .. })
-      | CppTypeBase::PointerSizedInteger { ref name, .. } => name.clone(),
-      CppTypeBase::Enum { ref name } => name.replace("::", "_"),
-      CppTypeBase::Class(ref data) => data.caption()?,
-      CppTypeBase::TemplateParameter { .. } => {
-        return Err("template parameters are not allowed to have captions".into());
-      }
-      CppTypeBase::FunctionPointer(CppFunctionPointerType {
-        ref return_type,
-        ref arguments,
-        ..
-      }) => match strategy {
-        TypeCaptionStrategy::Short => "func".to_string(),
-        TypeCaptionStrategy::Full => format!(
-          "{}_func_{}",
-          return_type.caption(strategy.clone())?,
-          arguments
-            .iter()
-            .map_if_ok(|x| x.caption(strategy.clone()))?
-            .join("_")
-        ),
-      },
-    })
-  }
-
   /// Generates string representation of this type
   /// for debugging output.
   pub fn to_cpp_pseudo_code(&self) -> String {
     match *self {
-      CppTypeBase::TemplateParameter {
-        ref nested_level,
-        ref index,
-        ref name,
-      } => {
+      CppTypeBase::TemplateParameter { ref name, .. } => {
         return name.to_string(); // format!("T{}_{}", nested_level, index);
       }
       CppTypeBase::Class(ref base) => return base.to_cpp_pseudo_code(),
@@ -660,35 +606,6 @@ impl CppType {
       ffi_type: result,
       conversion: conversion,
       original_type: self.clone(),
-    })
-  }
-
-  /// Generates alphanumeric representation of self
-  /// used to generate FFI function names
-  pub fn caption(&self, strategy: TypeCaptionStrategy) -> Result<String> {
-    Ok(match strategy {
-      TypeCaptionStrategy::Short => self.base.caption(strategy.clone())?,
-      TypeCaptionStrategy::Full => {
-        let mut r = self.base.caption(strategy.clone())?;
-        match self.indirection {
-          CppTypeIndirection::None => {}
-          CppTypeIndirection::Ptr => r = format!("{}_ptr", r),
-          CppTypeIndirection::Ref => r = format!("{}_ref", r),
-          CppTypeIndirection::PtrRef => r = format!("{}_ptr_ref", r),
-          CppTypeIndirection::PtrPtr => {
-            if self.is_const2 {
-              r = format!("{}_ptr_const_ptr", r);
-            } else {
-              r = format!("{}_ptr_ptr", r);
-            }
-          }
-          CppTypeIndirection::RValueRef => r = format!("{}_rvalue_ref", r),
-        }
-        if self.is_const {
-          r = format!("const_{}", r);
-        }
-        r
-      }
     })
   }
 

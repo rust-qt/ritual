@@ -1,23 +1,21 @@
 use common::cpp_lib_builder::{BuildType, CppLibBuilder, CppLibBuilderOutput, c2r_cmake_vars};
-use common::errors::{ChainErr, Result};
+use common::errors::Result;
 use common::file_utils::PathBufWithAdded;
 use common::file_utils::{create_dir_all, create_file, path_to_str, remove_dir_all};
 use common::log;
 use common::target::current_target;
 use common::utils::MapIfOk;
-use config::Config;
-use cpp_data::CppTypeData;
+
 use cpp_ffi_data::CppFfiMethod;
-use cpp_type::CppTypeClassBase;
+
 use new_impl::database::CppCheckerAddResult;
 use new_impl::database::CppCheckerInfo;
-use new_impl::database::CppItemData;
-use new_impl::database::{CppCheckerEnv, Database};
-use new_impl::html_logger::HtmlLogger;
+
+use new_impl::database::CppCheckerEnv;
+
 use new_impl::processor::ProcessorData;
 use new_impl::processor::ProcessorItem;
-use new_impl::workspace::Workspace;
-use std::fmt::Display;
+
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -41,6 +39,7 @@ fn check_snippet(
   builder.run()
 }
 
+#[allow(unused_variables)]
 fn snippet_for_method(method: &CppFfiMethod) -> Result<Snippet> {
   unimplemented!()
 }

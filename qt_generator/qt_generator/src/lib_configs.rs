@@ -1,24 +1,17 @@
 //! Generator configurations specific for each Qt module.
 
-use cpp_to_rust_generator::common::errors::{ChainErr, Result};
-use cpp_to_rust_generator::config::{Config, CppTypeAllocationPlace};
-use cpp_to_rust_generator::cpp_type::{CppBuiltInNumericType, CppType, CppTypeBase,
-                                      CppTypeIndirection};
-
+use cpp_to_rust_generator::common::errors::Result;
 use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
 use cpp_to_rust_generator::common::file_utils::repo_crate_local_path;
 use cpp_to_rust_generator::common::target;
 use cpp_to_rust_generator::common::{log, toml};
-use cpp_to_rust_generator::cpp_data::CppVisibility;
+use cpp_to_rust_generator::config::Config;
 use qt_generator_common::{get_full_build_config, lib_dependencies, lib_folder_name};
 use std::path::PathBuf;
 use versions;
 
-use doc_parser::DocParser;
 //use fix_header_names::fix_header_names;
 use cpp_to_rust_generator::config::CrateProperties;
-use cpp_to_rust_generator::cpp_method::CppMethod;
-use doc_decoder::DocData;
 use lib_configs;
 
 /*
@@ -498,7 +491,7 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
   // TODO: does parsing work on MacOS without adding "-F"?
 
   config.add_include_directive(&lib_folder_name(crate_name));
-  let lib_include_path = qt_config.installation_data.lib_include_path.clone();
+  //let lib_include_path = qt_config.installation_data.lib_include_path.clone();
   // TODO: reimplement this
   //config.add_cpp_data_filter(move |cpp_data| fix_header_names(cpp_data, &lib_include_path));
   // TODO: allow to override parser flags
@@ -510,8 +503,8 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
     config.add_cpp_parser_argument("-std=gnu++11");
   }
   config.add_cpp_parser_blocked_name("qt_check_for_QGADGET_macro");
-  let crate_name_clone = crate_name.to_string();
-  let docs_path = qt_config.installation_data.docs_path.clone();
+  //let crate_name_clone = crate_name.to_string();
+  //let docs_path = qt_config.installation_data.docs_path.clone();
 
   // TODO: reimplement this
 /*
