@@ -17,7 +17,6 @@ extern crate select as html_parser;
 
 mod doc_decoder;
 mod doc_parser;
-mod executor;
 mod fix_header_names;
 mod lib_configs;
 mod versions;

@@ -8,6 +8,7 @@ use cpp_ffi_generator::cpp_ffi_generator;
 use cpp_parser::cpp_parser;
 use new_impl::cpp_checker::cpp_checker;
 
+use common::string_utils::JoinWithSeparator;
 use new_impl::database::{Database, DatabaseItem};
 use new_impl::html_logger::HtmlLogger;
 use new_impl::workspace::Workspace;
@@ -76,11 +77,56 @@ impl<'a> ProcessorData<'a> {
   }
 }
 
+pub struct ProcessorMainCycleItem {
+  pub item_name: String,
+  pub run_after: Vec<String>,
+}
+
+pub type ProcessorItemFn = fn(data: ProcessorData) -> Result<()>;
+
 pub struct ProcessorItem {
   pub name: String,
-  pub is_main: bool,
-  pub run_after: Vec<String>,
-  pub function: fn(data: ProcessorData) -> Result<()>,
+  pub main_cycle_items: Vec<ProcessorMainCycleItem>,
+  pub function: ProcessorItemFn,
+}
+
+impl ProcessorItem {
+  pub fn new_custom<S: Into<String>>(name: S, function: ProcessorItemFn) -> ProcessorItem {
+    ProcessorItem {
+      name: name.into(),
+      function,
+      main_cycle_items: Vec::new(),
+    }
+  }
+  pub fn new<S: Into<String>>(
+    name: S,
+    run_after: Vec<String>,
+    function: ProcessorItemFn,
+  ) -> ProcessorItem {
+    let name = name.into();
+    ProcessorItem {
+      name: name.clone(),
+      function,
+      main_cycle_items: vec![
+        ProcessorMainCycleItem {
+          item_name: name,
+          run_after,
+        },
+      ],
+    }
+  }
+}
+
+fn print_database_item() -> ProcessorItem {
+  ProcessorItem::new_custom("print_database", |data| {
+    let path = data.workspace.log_path()?.with_added(format!(
+      "database_{}.html",
+      data.current_database.crate_name
+    ));
+    log::status("Printing database");
+    data.current_database.print_as_html(&path)?;
+    Ok(())
+  })
 }
 
 pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]) -> Result<()> {
@@ -98,6 +144,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
     cpp_ffi_generator(),
     // TODO: generate_slot_wrappers
     cpp_checker(),
+    print_database_item(),
   ];
 
   // TODO: allow to remove any prefix through `Config` (#25)
@@ -141,38 +188,28 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
       };
       (item.function)(data)?;
     } else {
-      // TODO: all other operations are also processor items
-      match operation.as_str() {
-        "print_database" => {
-          let path = workspace
-            .log_path()?
-            .with_added(format!("database_{}.html", current_database.crate_name));
-          log::status("Printing database");
-          current_database.print_as_html(&path)?;
-        }
-        "generate_crate" => {
-          unimplemented!()
-
-          /*
-  if exec_config.write_dependencies_local_paths {
-  log::status(
-   "Output Cargo.toml file will contain local paths of used dependencies \
-            (use --no-local-paths to disable).",
-  );
-  } else {
-  log::status(
-   "Local paths will not be written to the output crate. Make sure all dependencies \
-            are published before trying to compile the crate.",
-  );
-  }
-
-  */
-        }
-        "clear" => unimplemented!(),
-        _ => return Err(format!("unknown operation: {}", operation).into()),
-      }
+      println!(
+        "Unknown operation: {}. Supported operations: {}",
+        operation,
+        processor_items.iter().map(|item| &item.name).join(", ")
+      );
     }
   }
+
+  /*
+if exec_config.write_dependencies_local_paths {
+log::status(
+"Output Cargo.toml file will contain local paths of used dependencies \
+  (use --no-local-paths to disable).",
+);
+} else {
+log::status(
+"Local paths will not be written to the output crate. Make sure all dependencies \
+  are published before trying to compile the crate.",
+);
+}
+
+*/
 
   /*
   parser_cpp_data.detect_signals_and_slots(

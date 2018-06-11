@@ -36,12 +36,7 @@ pub fn run(data: ProcessorData) -> Result<()> {
 }
 
 pub fn cpp_ffi_generator() -> ProcessorItem {
-  ProcessorItem {
-    name: "cpp_ffi_generator".to_string(),
-    is_main: true,
-    run_after: Vec::new(),
-    function: run,
-  }
+  ProcessorItem::new("cpp_ffi_generator", Vec::new(), run)
 }
 
 // TODO: instantiate_templates
@@ -567,6 +562,10 @@ impl<'a> CppFfiGenerator<'a> {
 
     for (index, item) in &mut self.data.current_database.items.iter_mut().enumerate() {
       if item.cpp_ffi_methods.len() > 0 {
+        self.data.html_logger.add(
+          &[item.cpp_data.to_string(), "already processed".to_string()],
+          "already_processed",
+        )?;
         continue;
       }
       let name = format!("{}_item{}", self.cpp_ffi_lib_name, index);
@@ -593,6 +592,13 @@ impl<'a> CppFfiGenerator<'a> {
         }
         Ok(r) => {
           item.cpp_ffi_methods = r;
+          self.data.html_logger.add(
+            &[
+              item.cpp_data.to_string(),
+              format!("added methods: {}", item.cpp_ffi_methods.len()),
+            ],
+            "success",
+          )?;
         }
       }
     }

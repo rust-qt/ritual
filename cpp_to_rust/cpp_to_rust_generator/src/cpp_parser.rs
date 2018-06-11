@@ -307,12 +307,7 @@ fn run(data: ProcessorData) -> Result<()> {
 }
 
 pub fn cpp_parser() -> ProcessorItem {
-  ProcessorItem {
-    name: "cpp_parser".to_string(),
-    is_main: true,
-    run_after: Vec::new(),
-    function: run,
-  }
+  ProcessorItem::new("cpp_parser", Vec::new(), run)
 }
 
 impl<'a> CppParser<'a> {

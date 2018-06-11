@@ -245,10 +245,9 @@ fn run(data: ProcessorData) -> Result<()> {
 }
 
 pub fn cpp_checker() -> ProcessorItem {
-  ProcessorItem {
-    name: "cpp_checker".to_string(),
-    is_main: true,
-    run_after: vec!["cpp_parser".to_string(), "cpp_ffi_generator".to_string()],
-    function: run,
-  }
+  ProcessorItem::new(
+    "cpp_checker",
+    vec!["cpp_parser".to_string(), "cpp_ffi_generator".to_string()],
+    run,
+  )
 }
