@@ -3,8 +3,13 @@ use cpp_data::CppBaseSpecifier;
 use cpp_data::CppClassField;
 use cpp_data::CppTypeDataKind;
 use cpp_data::CppVisibility;
+use cpp_ffi_data::CppFfiArgumentMeaning;
+use cpp_ffi_data::CppFfiMethodArgument;
+use cpp_ffi_data::CppFfiType;
 use cpp_ffi_data::{CppCast, CppFfiMethod, CppFfiMethodKind, CppFieldAccessorType};
+use cpp_method::ReturnValueAllocationPlace;
 use cpp_method::{CppMethod, CppMethodArgument, CppMethodClassMembership, CppMethodKind};
+use cpp_type::CppTypeRole;
 use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
 use new_impl::database::CppItemData;
 use new_impl::processor::ProcessorData;
@@ -247,7 +252,7 @@ fn create_cast_method(
     doc: None,
   };
   // no need for stack_allocated_types since all cast methods operate on pointers
-  let mut r = method.to_ffi_method(&[], name)?;
+  let mut r = to_ffi_method(&method, &[], name)?;
   if let CppFfiMethodKind::Method {
     ref mut cast_data, ..
   } = r.kind
@@ -386,6 +391,89 @@ fn method_to_ffi_signature<'a>(
   })
 }*/
 
+/// Creates FFI method signature for this method:
+/// - converts all types to FFI types;
+/// - adds "this" argument explicitly if present;
+/// - adds "output" argument for return value if `allocation_place` is `Stack`.
+pub fn to_ffi_method(
+  method: &CppMethod,
+  stack_allocated_types: &[CppTypeClassBase],
+  name: &str,
+) -> Result<CppFfiMethod> {
+  if method.allows_variadic_arguments {
+    return Err("Variable arguments are not supported".into());
+  }
+  let mut r = CppFfiMethod {
+    arguments: Vec::new(),
+    return_type: CppFfiType::void(),
+    name: name.to_string(),
+    allocation_place: ReturnValueAllocationPlace::NotApplicable,
+    checks: Default::default(),
+    kind: CppFfiMethodKind::Method {
+      cpp_method: method.clone(),
+      omitted_arguments: None,
+      cast_data: None,
+    },
+  };
+  if let Some(ref info) = method.class_membership {
+    if !info.is_static && info.kind != CppMethodKind::Constructor {
+      r.arguments.push(CppFfiMethodArgument {
+        name: "this_ptr".to_string(),
+        argument_type: CppType {
+          base: CppTypeBase::Class(info.class_type.clone()),
+          is_const: info.is_const,
+          is_const2: false,
+          indirection: CppTypeIndirection::Ptr,
+        }.to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
+        meaning: CppFfiArgumentMeaning::This,
+      });
+    }
+  }
+  for (index, arg) in method.arguments.iter().enumerate() {
+    let c_type = arg
+      .argument_type
+      .to_cpp_ffi_type(CppTypeRole::NotReturnType)?;
+    r.arguments.push(CppFfiMethodArgument {
+      name: arg.name.clone(),
+      argument_type: c_type,
+      meaning: CppFfiArgumentMeaning::Argument(index as i8),
+    });
+  }
+  let real_return_type = if let Some(info) = method.class_info_if_constructor() {
+    CppType {
+      is_const: false,
+      is_const2: false,
+      indirection: CppTypeIndirection::None,
+      base: CppTypeBase::Class(info.class_type.clone()),
+    }
+  } else {
+    method.return_type.clone()
+  };
+  let c_type = real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
+  if real_return_type.needs_allocation_place_variants() {
+    if let CppTypeBase::Class(ref base) = real_return_type.base {
+      if stack_allocated_types.iter().any(|t| t == base) {
+        r.arguments.push(CppFfiMethodArgument {
+          name: "output".to_string(),
+          argument_type: c_type,
+          meaning: CppFfiArgumentMeaning::ReturnValue,
+        });
+        r.allocation_place = ReturnValueAllocationPlace::Stack;
+      } else {
+        r.return_type = c_type;
+        r.allocation_place = ReturnValueAllocationPlace::Heap;
+      }
+    } else {
+      return Err(
+        unexpected("return value needs allocation_place variants but is not a class type").into(),
+      );
+    }
+  } else {
+    r.return_type = c_type;
+  }
+  Ok(r)
+}
+
 /// Adds fictional getter and setter methods for each known public field of each class.
 fn generate_field_accessors(
   field: &CppClassField,
@@ -420,7 +508,8 @@ fn generate_field_accessors(
       declaration_code: None,
       doc: None,
     };
-    let mut ffi_method = fake_method.to_ffi_method(
+    let mut ffi_method = to_ffi_method(
+      &fake_method,
       stack_allocated_types,
       &format!(
         "{}_{}",
@@ -479,25 +568,12 @@ fn generate_field_accessors(
   Ok(new_methods)
 }
 
-impl<'a> CppFfiGenerator<'a> {
-  /// Returns false if the method is excluded from processing
-  /// for some reason
-  fn should_process_method(&self, method: &CppMethod) -> Result<bool> {
-    //    if method.is_fake_inherited_method {
-    //      return Ok(false);
-    //    }
-    let class_name = method.class_name().unwrap_or(&String::new()).clone();
-    //    for filter in &self.filters {
-    //      let allowed = filter(method).chain_err(|| "cpp_ffi_generator_filter failed")?;
-    //      if !allowed {
-    //        log::llog(log::DebugFfiSkips, || {
-    //          format!("Skipping blacklisted method: \n{}\n", method.short_text())
-    //        });
-    //        return Ok(false);
-    //      }
-    //    }
-    if class_name == "QFlags" {
-      return Ok(false);
+fn should_process_item(item: &CppItemData) -> Result<bool> {
+  if let CppItemData::Method(ref method) = *item {
+    if let Some(class_name) = method.class_name() {
+      if class_name == "QFlags" {
+        return Ok(false);
+      }
     }
     if let Some(ref membership) = method.class_membership {
       if membership.visibility == CppVisibility::Private {
@@ -513,20 +589,26 @@ impl<'a> CppFfiGenerator<'a> {
     if method.template_arguments.is_some() {
       return Ok(false);
     }
-    //if method.template_arguments_values.is_some() && !method.is_ffi_whitelisted {
-    // TODO: re-enable after template test compilation (#24) is implemented
-    // TODO: QObject::findChild and QObject::findChildren should be allowed
-    //return Ok(false);
-    //}
-    if method
-      .all_involved_types()
-      .iter()
-      .any(|x| x.base.is_or_contains_template_parameter())
-    {
-      return Ok(false);
-    }
-    Ok(true)
   }
+  if item
+    .all_involved_types()
+    .iter()
+    .any(|x| x.base.is_or_contains_template_parameter())
+  {
+    return Ok(false);
+  }
+  Ok(true)
+
+  //if method.template_arguments_values.is_some() && !method.is_ffi_whitelisted {
+  // TODO: re-enable after template test compilation (#24) is implemented
+  // TODO: QObject::findChild and QObject::findChildren should be allowed
+  //return Ok(false);
+  //}
+}
+
+impl<'a> CppFfiGenerator<'a> {
+  /// Returns false if the method is excluded from processing
+  /// for some reason
 
   /// Generates FFI wrappers for all specified methods,
   /// resolving all name conflicts using additional method captions.
@@ -561,22 +643,30 @@ impl<'a> CppFfiGenerator<'a> {
       .collect();
 
     for (index, item) in &mut self.data.current_database.items.iter_mut().enumerate() {
-      if item.cpp_ffi_methods.len() > 0 {
+      if item.cpp_ffi_methods.is_some() {
         self.data.html_logger.add(
           &[item.cpp_data.to_string(), "already processed".to_string()],
           "already_processed",
         )?;
         continue;
       }
+      if !should_process_item(&item.cpp_data)? {
+        self.data.html_logger.add(
+          &[item.cpp_data.to_string(), "skipped".to_string()],
+          "skipped",
+        )?;
+        continue;
+      }
+
       let name = format!("{}_item{}", self.cpp_ffi_lib_name, index);
       let result = match item.cpp_data {
         CppItemData::Type(_) | CppItemData::EnumValue(_) => {
           Ok(Vec::new())
           // no FFI methods for these items
         }
-        CppItemData::Method(ref method) => method
-          .to_ffi_method(&stack_allocated_types, &name)
-          .map(|r| vec![r]),
+        CppItemData::Method(ref method) => {
+          to_ffi_method(method, &stack_allocated_types, &name).map(|r| vec![r])
+        }
         CppItemData::ClassField(ref field) => {
           generate_field_accessors(field, &stack_allocated_types, &name)
         }
@@ -585,24 +675,28 @@ impl<'a> CppFfiGenerator<'a> {
 
       match result {
         Err(msg) => {
+          item.cpp_ffi_methods = Some(Vec::new());
           self
             .data
             .html_logger
             .add(&[item.cpp_data.to_string(), msg.to_string()], "error")?;
         }
         Ok(r) => {
-          item.cpp_ffi_methods = r;
           self.data.html_logger.add(
             &[
               item.cpp_data.to_string(),
-              format!("added methods: {}", item.cpp_ffi_methods.len()),
+              match r.len() {
+                0 => "no methods".to_string(),
+                1 => format!("added method: {:?}", r[0]),
+                _ => format!("added methods ({}): {:?}", r.len(), r),
+              },
             ],
             "success",
           )?;
+          item.cpp_ffi_methods = Some(r);
         }
       }
     }
-
     Ok(())
 
     /*

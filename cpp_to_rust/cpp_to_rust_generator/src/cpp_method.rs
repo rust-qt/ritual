@@ -1,6 +1,6 @@
 //! Types for handling information about C++ methods.
 
-use common::errors::{unexpected, Result};
+use common::errors::Result;
 use common::string_utils::JoinWithSeparator;
 use common::utils::MapIfOk;
 use cpp_data::CppVisibility;
@@ -209,89 +209,6 @@ impl CppMethod {
     self.name == other.name && self.class_membership == other.class_membership
       && self.operator == other.operator && self.return_type == other.return_type
       && self.argument_types_equal(other) && self.template_arguments == other.template_arguments
-  }
-
-  /// Creates FFI method signature for this method:
-  /// - converts all types to FFI types;
-  /// - adds "this" argument explicitly if present;
-  /// - adds "output" argument for return value if `allocation_place` is `Stack`.
-  pub fn to_ffi_method(
-    &self,
-    stack_allocated_types: &[CppTypeClassBase],
-    name: &str,
-  ) -> Result<CppFfiMethod> {
-    if self.allows_variadic_arguments {
-      return Err("Variable arguments are not supported".into());
-    }
-    let mut r = CppFfiMethod {
-      arguments: Vec::new(),
-      return_type: CppFfiType::void(),
-      name: name.to_string(),
-      allocation_place: ReturnValueAllocationPlace::NotApplicable,
-      checks: CppCheckerInfoList::default(),
-      kind: CppFfiMethodKind::Method {
-        cpp_method: self.clone(),
-        omitted_arguments: None,
-        cast_data: None,
-      },
-    };
-    if let Some(ref info) = self.class_membership {
-      if !info.is_static && info.kind != CppMethodKind::Constructor {
-        r.arguments.push(CppFfiMethodArgument {
-          name: "this_ptr".to_string(),
-          argument_type: CppType {
-            base: CppTypeBase::Class(info.class_type.clone()),
-            is_const: info.is_const,
-            is_const2: false,
-            indirection: CppTypeIndirection::Ptr,
-          }.to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
-          meaning: CppFfiArgumentMeaning::This,
-        });
-      }
-    }
-    for (index, arg) in self.arguments.iter().enumerate() {
-      let c_type = arg
-        .argument_type
-        .to_cpp_ffi_type(CppTypeRole::NotReturnType)?;
-      r.arguments.push(CppFfiMethodArgument {
-        name: arg.name.clone(),
-        argument_type: c_type,
-        meaning: CppFfiArgumentMeaning::Argument(index as i8),
-      });
-    }
-    let real_return_type = if let Some(info) = self.class_info_if_constructor() {
-      CppType {
-        is_const: false,
-        is_const2: false,
-        indirection: CppTypeIndirection::None,
-        base: CppTypeBase::Class(info.class_type.clone()),
-      }
-    } else {
-      self.return_type.clone()
-    };
-    let c_type = real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
-    if real_return_type.needs_allocation_place_variants() {
-      if let CppTypeBase::Class(ref base) = real_return_type.base {
-        if stack_allocated_types.iter().any(|t| t == base) {
-          r.arguments.push(CppFfiMethodArgument {
-            name: "output".to_string(),
-            argument_type: c_type,
-            meaning: CppFfiArgumentMeaning::ReturnValue,
-          });
-          r.allocation_place = ReturnValueAllocationPlace::Stack;
-        } else {
-          r.return_type = c_type;
-          r.allocation_place = ReturnValueAllocationPlace::Heap;
-        }
-      } else {
-        return Err(
-          unexpected("return value needs allocation_place variants but is not a class type").into(),
-        );
-      }
-    } else {
-      r.return_type = c_type;
-    }
-    Ok(r)
   }
 
   /// Returns fully qualified C++ name of this method,

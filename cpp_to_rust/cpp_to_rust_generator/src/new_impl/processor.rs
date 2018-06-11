@@ -117,16 +117,58 @@ impl ProcessorItem {
   }
 }
 
-fn print_database_item() -> ProcessorItem {
-  ProcessorItem::new_custom("print_database", |data| {
-    let path = data.workspace.log_path()?.with_added(format!(
-      "database_{}.html",
-      data.current_database.crate_name
-    ));
-    log::status("Printing database");
-    data.current_database.print_as_html(&path)?;
-    Ok(())
-  })
+mod items {
+  use common::string_utils::JoinWithSeparator;
+  use new_impl::database::CppCheckerInfo;
+  use new_impl::html_logger::escape_html;
+  use new_impl::processor::ProcessorItem;
+
+  pub fn print_database() -> ProcessorItem {
+    ProcessorItem::new_custom("print_database", |mut data| {
+      data.html_logger.add_header(&["Item", "Environments"])?;
+
+      for item in &data.current_database.items {
+        data.html_logger.add(
+          &[
+            escape_html(&item.cpp_data.to_string()),
+            format!("{:?}", item.source),
+          ],
+          "database_item",
+        )?;
+        if let Some(ref cpp_ffi_methods) = item.cpp_ffi_methods {
+          for ffi_method in cpp_ffi_methods {
+            let item_text = ffi_method.short_text();
+            let item_texts = ffi_method.checks.items.iter().map(|item| {
+              format!(
+                "<li>{}: {}</li>",
+                item.env.short_text(),
+                CppCheckerInfo::error_to_log(&item.error)
+              )
+            });
+            let env_text = format!("<ul>{}</ul>", item_texts.join(""));
+            data
+              .html_logger
+              .add(&[escape_html(&item_text), env_text], "ffi_method")?;
+          }
+        }
+      }
+      Ok(())
+    })
+  }
+  pub fn clear() -> ProcessorItem {
+    ProcessorItem::new_custom("clear", |data| {
+      data.current_database.clear();
+      Ok(())
+    })
+  }
+  pub fn clear_cpp_ffi() -> ProcessorItem {
+    ProcessorItem::new_custom("clear_cpp_ffi", |data| {
+      for item in &mut data.current_database.items {
+        item.cpp_ffi_methods = None;
+      }
+      Ok(())
+    })
+  }
 }
 
 pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]) -> Result<()> {
@@ -144,7 +186,9 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
     cpp_ffi_generator(),
     // TODO: generate_slot_wrappers
     cpp_checker(),
-    print_database_item(),
+    items::print_database(),
+    items::clear_cpp_ffi(),
+    items::clear(),
   ];
 
   // TODO: allow to remove any prefix through `Config` (#25)
@@ -176,7 +220,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
         workspace
           .log_path()?
           .with_added(format!("{}_log.html", operation)),
-        "C++ parser log",
+        &format!("{} log", operation),
       )?;
 
       let data = ProcessorData {

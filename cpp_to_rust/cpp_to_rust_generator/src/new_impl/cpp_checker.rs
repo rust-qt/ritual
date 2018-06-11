@@ -96,32 +96,34 @@ impl<'a> CppChecker<'a> {
 
     let total_count = self.data.current_database.items.len();
     for (index, item) in self.data.current_database.items.iter_mut().enumerate() {
-      for ffi_method in &mut item.cpp_ffi_methods {
-        if let Ok(snippet) = snippet_for_method(ffi_method) {
-          log::status(format!("Checking item {} / {}", index + 1, total_count));
+      if let Some(ref mut cpp_ffi_methods) = item.cpp_ffi_methods {
+        for ffi_method in cpp_ffi_methods {
+          if let Ok(snippet) = snippet_for_method(ffi_method) {
+            log::status(format!("Checking item {} / {}", index + 1, total_count));
 
-          let error_data = match check_snippet(&self.main_cpp_path, &self.builder, &snippet)? {
-            CppLibBuilderOutput::Success => None, // no error
-            CppLibBuilderOutput::Fail(output) => Some(format!("build failed: {}", output.stderr)),
-          };
-          let error_data_text = CppCheckerInfo::error_to_log(&error_data);
-          let r = ffi_method.checks.add(&self.env, error_data);
-          let change_text = match r {
-            CppCheckerAddResult::Added => "Added".to_string(),
-            CppCheckerAddResult::Unchanged => "Unchanged".to_string(),
-            CppCheckerAddResult::Changed { ref old } => format!(
-              "Changed! Old data for the same env: {}",
-              CppCheckerInfo::error_to_log(old)
-            ),
-          };
+            let error_data = match check_snippet(&self.main_cpp_path, &self.builder, &snippet)? {
+              CppLibBuilderOutput::Success => None, // no error
+              CppLibBuilderOutput::Fail(output) => Some(format!("build failed: {}", output.stderr)),
+            };
+            let error_data_text = CppCheckerInfo::error_to_log(&error_data);
+            let r = ffi_method.checks.add(&self.env, error_data);
+            let change_text = match r {
+              CppCheckerAddResult::Added => "Added".to_string(),
+              CppCheckerAddResult::Unchanged => "Unchanged".to_string(),
+              CppCheckerAddResult::Changed { ref old } => format!(
+                "Changed! Old data for the same env: {}",
+                CppCheckerInfo::error_to_log(old)
+              ),
+            };
 
-          self.data.html_logger.add(
-            &[
-              ffi_method.short_text(),
-              format!("{}<br>{}", error_data_text, change_text),
-            ],
-            "cpp_checker_update",
-          )?;
+            self.data.html_logger.add(
+              &[
+                ffi_method.short_text(),
+                format!("{}<br>{}", error_data_text, change_text),
+              ],
+              "cpp_checker_update",
+            )?;
+          }
         }
       }
     }

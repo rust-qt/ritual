@@ -1,6 +1,3 @@
-use common::errors::Result;
-
-use common::string_utils::JoinWithSeparator;
 use common::target::Target;
 use cpp_data::CppBaseSpecifier;
 use cpp_data::CppClassField;
@@ -13,15 +10,15 @@ use cpp_data::CppVisibility;
 use cpp_ffi_data::CppFfiMethod;
 use cpp_method::CppMethod;
 
-use new_impl::html_logger::HtmlLogger;
-use new_impl::html_logger::escape_html;
+use cpp_type::CppType;
+use cpp_type::CppTypeBase;
+use cpp_type::CppTypeIndirection;
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::path::Path;
 //use common::errors::Result;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CppField; // TODO: fill
+pub struct CppField; // TODO: fill??
 
 //#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 //pub enum DataSource {
@@ -141,6 +138,56 @@ impl CppItemData {
       _ => false,
     }
   }
+
+  pub fn all_involved_types(&self) -> Vec<CppType> {
+    match *self {
+      CppItemData::Type(ref t) => match t.kind {
+        CppTypeDataKind::Enum => vec![
+          CppType {
+            indirection: CppTypeIndirection::None,
+            is_const: false,
+            is_const2: false,
+            base: CppTypeBase::Enum {
+              name: t.name.to_string(),
+            },
+          },
+        ],
+        CppTypeDataKind::Class { ref type_base } => vec![
+          CppType {
+            indirection: CppTypeIndirection::None,
+            is_const: false,
+            is_const2: false,
+            base: CppTypeBase::Class(type_base.clone()),
+          },
+        ],
+      },
+      CppItemData::EnumValue(_) => Vec::new(),
+      CppItemData::Method(ref method) => method.all_involved_types(),
+      CppItemData::ClassField(ref field) => {
+        let class_type = CppType {
+          indirection: CppTypeIndirection::None,
+          is_const: false,
+          is_const2: false,
+          base: CppTypeBase::Class(field.class_type.clone()),
+        };
+        vec![class_type, field.field_type.clone()]
+      }
+      CppItemData::ClassBase(ref base) => vec![
+        CppType {
+          indirection: CppTypeIndirection::None,
+          is_const: false,
+          is_const2: false,
+          base: CppTypeBase::Class(base.base_class_type.clone()),
+        },
+        CppType {
+          indirection: CppTypeIndirection::None,
+          is_const: false,
+          is_const2: false,
+          base: CppTypeBase::Class(base.derived_class_type.clone()),
+        },
+      ],
+    }
+  }
 }
 
 impl Display for CppItemData {
@@ -192,7 +239,7 @@ impl Display for CppItemData {
 pub struct DatabaseItem {
   pub cpp_data: CppItemData,
   pub source: DatabaseItemSource,
-  pub cpp_ffi_methods: Vec<CppFfiMethod>,
+  pub cpp_ffi_methods: Option<Vec<CppFfiMethod>>,
   // TODO: add rust data
 }
 
@@ -217,6 +264,11 @@ impl Database {
     &self.items
   }
 
+  pub fn clear(&mut self) {
+    self.items.clear();
+    self.environments.clear();
+  }
+
   pub fn crate_name(&self) -> &str {
     &self.crate_name
   }
@@ -236,42 +288,11 @@ impl Database {
     self.items.push(DatabaseItem {
       cpp_data: data,
       source: source,
-      cpp_ffi_methods: Vec::new(),
+      cpp_ffi_methods: None,
     });
     true
   }
 
-  pub fn print_as_html(&self, path: &Path) -> Result<()> {
-    let mut logger = HtmlLogger::new(
-      path,
-      &format!("Database for crate \"{}\"", &self.crate_name),
-    )?;
-    logger.add_header(&["Item", "Environments"])?;
-
-    for item in &self.items {
-      logger.add(
-        &[
-          escape_html(&item.cpp_data.to_string()),
-          format!("{:?}", item.source),
-        ],
-        "database_item",
-      )?;
-
-      for ffi_method in &item.cpp_ffi_methods {
-        let item_text = ffi_method.short_text();
-        let item_texts = ffi_method.checks.items.iter().map(|item| {
-          format!(
-            "<li>{}: {}</li>",
-            item.env.short_text(),
-            CppCheckerInfo::error_to_log(&item.error)
-          )
-        });
-        let env_text = format!("<ul>{}</ul>", item_texts.join(""));
-        logger.add(&[escape_html(&item_text), env_text], "ffi_method")?;
-      }
-    }
-    Ok(())
-  }
   /*
   pub fn mark_missing_cpp_data(&mut self, env: DataEnv) {
     let info = DataEnvInfo {
