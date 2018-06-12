@@ -85,6 +85,23 @@ pub enum CppFfiMethodKind {
   },
 }
 
+impl CppFfiMethodKind {
+  pub fn cpp_method(&self) -> Option<&CppMethod> {
+    if let CppFfiMethodKind::Method { ref cpp_method, .. } = *self {
+      Some(cpp_method)
+    } else {
+      None
+    }
+  }
+  pub fn cpp_field(&self) -> Option<&CppClassField> {
+    if let CppFfiMethodKind::FieldAccessor { ref field, .. } = *self {
+      Some(field)
+    } else {
+      None
+    }
+  }
+}
+
 /// Relation between original C++ method's argument value
 /// and corresponding FFI function's argument value
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -282,4 +299,9 @@ pub struct QtSlotWrapper {
   /// String identifier passed to `QObject::connect` function to
   /// specify the object's slot.
   pub receiver_id: String,
+}
+
+pub struct CppFfiFileData {
+  pub methods: Vec<CppFfiMethod>,
+  pub qt_slot_wrappers: Vec<QtSlotWrapper>,
 }

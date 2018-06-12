@@ -1299,6 +1299,9 @@ impl<'a> CppParser<'a> {
           Accessibility::Protected => CppVisibility::Protected,
           Accessibility::Private => CppVisibility::Private,
         },
+        // TODO: determine `is_const` and `is_static` (switch to a newer clang?)
+        is_const: false,
+        is_static: false,
       }),
     );
 

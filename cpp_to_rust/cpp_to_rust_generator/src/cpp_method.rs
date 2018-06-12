@@ -4,11 +4,8 @@ use common::errors::Result;
 use common::string_utils::JoinWithSeparator;
 use common::utils::MapIfOk;
 use cpp_data::CppVisibility;
-use cpp_ffi_data::CppFfiMethodKind;
-use cpp_ffi_data::{CppFfiArgumentMeaning, CppFfiMethod, CppFfiMethodArgument, CppFfiType};
 pub use cpp_operator::{CppOperator, CppOperatorInfo};
-use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection, CppTypeRole};
-use new_impl::database::CppCheckerInfoList;
+use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
 
 /// Information about an argument of a C++ method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
@@ -35,25 +32,6 @@ pub enum CppMethodKind {
   Destructor,
 }
 
-/// Information about an automatically generated method
-//#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-//#[derive(Serialize, Deserialize)]
-//pub enum FakeCppMethod {
-//  /// Method for accessing a public field of a class
-//  FieldAccessor {
-//    accessor_type: CppFieldAccessorType,
-//    field_name: String,
-//  },
-//}
-/// for accessing a public field of a class
-//#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-//#[derive(Serialize, Deserialize)]
-//pub struct CppFieldAccessor {
-//  /// Type of the accessor
-//  pub accessor_type: CppFieldAccessorType,
-//  /// Name of the C++ field
-//  pub field_name: String,
-//}
 /// Information about a C++ class member method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppMethodClassMembership {
@@ -77,9 +55,6 @@ pub struct CppMethodClassMembership {
   pub is_signal: bool,
   /// True if the method is a Qt slot
   pub is_slot: bool,
-  // / If this method is a generated field accessor, this field contains
-  // / information about it. Field accessors do not have real C++ methods corresponding to them.
-  //pub fake: Option<FakeCppMethod>,
 }
 
 /// C++ documentation for a method

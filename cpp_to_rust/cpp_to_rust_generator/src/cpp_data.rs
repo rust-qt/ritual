@@ -40,6 +40,9 @@ pub struct CppClassField {
   //  pub size: Option<usize>,
   /// Name and template arguments of the class type that owns this field
   pub class_type: CppTypeClassBase,
+
+  pub is_const: bool,
+  pub is_static: bool,
 }
 
 impl CppClassField {
