@@ -1,8 +1,9 @@
 use common::errors::{unexpected, Result};
 use common::log;
-use cpp_data::{CppBaseSpecifier, CppData, CppDataWithDeps, CppTemplateInstantiation,
-               CppTemplateInstantiations, CppTypeAllocationPlace, CppTypeData, CppTypeKind,
-               CppVisibility, ParserCppData, ProcessedCppData};
+use cpp_data::{
+  CppBaseSpecifier, CppData, CppDataWithDeps, CppTemplateInstantiation, CppTemplateInstantiations,
+  CppTypeAllocationPlace, CppTypeData, CppTypeKind, CppVisibility, ParserCppData, ProcessedCppData,
+};
 use cpp_method::{CppMethod, CppMethodClassMembership, CppMethodKind};
 use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
 
@@ -162,11 +163,9 @@ impl<'a> CppPostProcessor<'a> {
                 });
                 result.push(CppTemplateInstantiations {
                   class_name: name.clone(),
-                  instantiations: vec![
-                    CppTemplateInstantiation {
-                      template_arguments: template_arguments.clone(),
-                    },
-                  ],
+                  instantiations: vec![CppTemplateInstantiation {
+                    template_arguments: template_arguments.clone(),
+                  }],
                 });
               } else {
                 let item = result

@@ -6,10 +6,11 @@ use common::log;
 use common::string_utils::JoinWithSeparator;
 use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
 use rust_code_generator::rust_type_to_code;
-use rust_info::{RustEnumValue, RustMethod, RustMethodArguments, RustMethodArgumentsVariant,
-                RustMethodDocItem, RustMethodScope, RustMethodSelfArgKind,
-                RustQtReceiverDeclaration, RustQtReceiverType, RustTypeDeclaration,
-                RustTypeDeclarationKind, RustTypeWrapperKind};
+use rust_info::{
+  RustEnumValue, RustMethod, RustMethodArguments, RustMethodArgumentsVariant, RustMethodDocItem,
+  RustMethodScope, RustMethodSelfArgKind, RustQtReceiverDeclaration, RustQtReceiverType,
+  RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind,
+};
 use rust_type::RustType;
 
 /// Generates pseudo-code illustrating argument types for one variant of

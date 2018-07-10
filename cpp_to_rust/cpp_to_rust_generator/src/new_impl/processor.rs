@@ -107,12 +107,10 @@ impl ProcessorItem {
     ProcessorItem {
       name: name.clone(),
       function,
-      main_cycle_items: vec![
-        ProcessorMainCycleItem {
-          item_name: name,
-          run_after,
-        },
-      ],
+      main_cycle_items: vec![ProcessorMainCycleItem {
+        item_name: name,
+        run_after,
+      }],
     }
   }
 }

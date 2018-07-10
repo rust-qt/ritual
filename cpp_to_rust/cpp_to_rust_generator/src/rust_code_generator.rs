@@ -1,18 +1,20 @@
 //! Types and functions used for Rust code generation.
 
 use common::errors::{unexpected, ChainErr, Result};
-use common::file_utils::{copy_file, copy_recursively, create_dir_all, create_file, file_to_string,
-                         os_str_to_str, path_to_str, read_dir, repo_crate_local_path, save_toml,
-                         PathBufWithAdded};
+use common::file_utils::{
+  copy_file, copy_recursively, create_dir_all, create_file, file_to_string, os_str_to_str,
+  path_to_str, read_dir, repo_crate_local_path, save_toml, PathBufWithAdded,
+};
 use common::log;
 use common::string_utils::{CaseOperations, JoinWithSeparator};
 use common::utils::MapIfOk;
 use doc_formatter;
 use rust_generator::RustGeneratorOutput;
-use rust_info::{DependencyInfo, RustFFIFunction, RustMethod, RustMethodArgument,
-                RustMethodArguments, RustMethodArgumentsVariant, RustMethodScope, RustModule,
-                RustQtReceiverType, RustTypeDeclarationKind, RustTypeWrapperKind, TraitImpl,
-                TraitImplExtra};
+use rust_info::{
+  DependencyInfo, RustFFIFunction, RustMethod, RustMethodArgument, RustMethodArguments,
+  RustMethodArgumentsVariant, RustMethodScope, RustModule, RustQtReceiverType,
+  RustTypeDeclarationKind, RustTypeWrapperKind, TraitImpl, TraitImplExtra,
+};
 use rust_type::{CompleteType, RustName, RustToCTypeConversion, RustType, RustTypeIndirection};
 use std::path::{Path, PathBuf};
 

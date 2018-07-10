@@ -181,9 +181,12 @@ impl CppMethod {
   }
 
   pub fn is_same(&self, other: &CppMethod) -> bool {
-    self.name == other.name && self.class_membership == other.class_membership
-      && self.operator == other.operator && self.return_type == other.return_type
-      && self.argument_types_equal(other) && self.template_arguments == other.template_arguments
+    self.name == other.name
+      && self.class_membership == other.class_membership
+      && self.operator == other.operator
+      && self.return_type == other.return_type
+      && self.argument_types_equal(other)
+      && self.template_arguments == other.template_arguments
   }
 
   /// Returns fully qualified C++ name of this method,
@@ -249,13 +252,6 @@ impl CppMethod {
     }
     s = format!("{} {}", s, self.return_type.to_cpp_pseudo_code());
     s = format!("{} {}", s, self.full_name());
-    if let Some(ref args) = self.template_arguments {
-      s = format!(
-        "{}<{}>",
-        s,
-        args.iter().map(|x| x.to_cpp_pseudo_code()).join(", ")
-      );
-    }
     if let Some(ref args) = self.template_arguments {
       s = format!(
         "{}<{}>",

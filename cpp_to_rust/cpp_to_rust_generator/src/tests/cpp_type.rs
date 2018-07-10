@@ -1,8 +1,10 @@
 use caption_strategy::TypeCaptionStrategy;
 use cpp_ffi_data::CppIndirectionChange;
-use cpp_type::{CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
-               CppSpecificNumericTypeKind, CppType, CppTypeBase, CppTypeClassBase,
-               CppTypeIndirection, CppTypeRole};
+use cpp_type::{
+  CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
+  CppSpecificNumericTypeKind, CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection,
+  CppTypeRole,
+};
 
 fn assert_type_to_ffi_unchanged(t: &CppType) {
   for role in &[CppTypeRole::NotReturnType, CppTypeRole::ReturnType] {
@@ -454,17 +456,15 @@ fn class_mut_ptr() {
 
 #[test]
 fn class_with_template_args() {
-  let args = Some(vec![
-    CppType {
-      indirection: CppTypeIndirection::None,
-      is_const: false,
-      is_const2: false,
-      base: CppTypeBase::Class(CppTypeClassBase {
-        name: "QString".to_string(),
-        template_arguments: None,
-      }),
-    },
-  ]);
+  let args = Some(vec![CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    is_const2: false,
+    base: CppTypeBase::Class(CppTypeClassBase {
+      name: "QString".to_string(),
+      template_arguments: None,
+    }),
+  }]);
   let type1 = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
@@ -564,17 +564,15 @@ fn nested_template_cpp_code() {
           is_const2: false,
           base: CppTypeBase::Class(CppTypeClassBase {
             name: "QList".to_string(),
-            template_arguments: Some(vec![
-              CppType {
-                indirection: CppTypeIndirection::None,
-                is_const: false,
-                is_const2: false,
-                base: CppTypeBase::Class(CppTypeClassBase {
-                  name: "QString".to_string(),
-                  template_arguments: None,
-                }),
-              },
-            ]),
+            template_arguments: Some(vec![CppType {
+              indirection: CppTypeIndirection::None,
+              is_const: false,
+              is_const2: false,
+              base: CppTypeBase::Class(CppTypeClassBase {
+                name: "QString".to_string(),
+                template_arguments: None,
+              }),
+            }]),
           }),
         },
       ]),
@@ -588,17 +586,15 @@ fn nested_template_cpp_code() {
 
 #[test]
 fn qflags() {
-  let args = Some(vec![
-    CppType {
-      indirection: CppTypeIndirection::None,
-      is_const: false,
-      is_const2: false,
-      base: CppTypeBase::Class(CppTypeClassBase {
-        name: "Qt::AlignmentFlag".to_string(),
-        template_arguments: None,
-      }),
-    },
-  ]);
+  let args = Some(vec![CppType {
+    indirection: CppTypeIndirection::None,
+    is_const: false,
+    is_const2: false,
+    base: CppTypeBase::Class(CppTypeClassBase {
+      name: "Qt::AlignmentFlag".to_string(),
+      template_arguments: None,
+    }),
+  }]);
   let type1 = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,

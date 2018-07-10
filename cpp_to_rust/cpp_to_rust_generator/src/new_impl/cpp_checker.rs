@@ -1,4 +1,4 @@
-use common::cpp_lib_builder::{BuildType, CppLibBuilder, CppLibBuilderOutput, c2r_cmake_vars};
+use common::cpp_lib_builder::{c2r_cmake_vars, BuildType, CppLibBuilder, CppLibBuilderOutput};
 use common::errors::Result;
 use common::file_utils::PathBufWithAdded;
 use common::file_utils::{create_dir_all, create_file, path_to_str, remove_dir_all};
@@ -16,6 +16,8 @@ use new_impl::database::CppCheckerEnv;
 use new_impl::processor::ProcessorData;
 use new_impl::processor::ProcessorItem;
 
+use cpp_code_generator;
+use new_impl::html_logger::escape_html;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -41,7 +43,9 @@ fn check_snippet(
 
 #[allow(unused_variables)]
 fn snippet_for_method(method: &CppFfiMethod) -> Result<Snippet> {
-  unimplemented!()
+  Ok(Snippet::new_global(
+    cpp_code_generator::function_implementation(method)?,
+  ))
 }
 
 struct CppChecker<'a> {
@@ -118,7 +122,11 @@ impl<'a> CppChecker<'a> {
 
             self.data.html_logger.add(
               &[
-                ffi_method.short_text(),
+                format!(
+                  "{}<br><pre>{}</pre>",
+                  escape_html(&ffi_method.short_text()),
+                  escape_html(&snippet.code)
+                ),
                 format!("{}<br>{}", error_data_text, change_text),
               ],
               "cpp_checker_update",

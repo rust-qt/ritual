@@ -57,7 +57,7 @@ impl CppClassField {
       CppVisibility::Private => "private ",
     };
     format!(
-      "class {} {{ {}{} {}; ... }}",
+      "class {} {{ {}{} {}; }}",
       self.class_type.to_cpp_pseudo_code(),
       visibility_text,
       self.field_type.to_cpp_pseudo_code(),

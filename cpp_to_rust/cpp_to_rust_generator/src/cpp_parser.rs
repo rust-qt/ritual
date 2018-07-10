@@ -2,13 +2,15 @@ use common::errors::{unexpected, ChainErr, Result};
 use common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
 use common::log;
 use common::string_utils::JoinWithSeparator;
-use cpp_data::{CppBaseSpecifier, CppClassField, CppEnumValue, CppOriginLocation, CppTypeData,
-               CppVisibility};
+use cpp_data::{
+  CppBaseSpecifier, CppClassField, CppEnumValue, CppOriginLocation, CppTypeData, CppVisibility,
+};
 use cpp_method::{CppMethod, CppMethodArgument, CppMethodClassMembership, CppMethodKind};
 use cpp_operator::CppOperator;
-use cpp_type::{CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
-               CppSpecificNumericTypeKind, CppType, CppTypeBase, CppTypeClassBase,
-               CppTypeIndirection};
+use cpp_type::{
+  CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
+  CppSpecificNumericTypeKind, CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection,
+};
 use new_impl::database::CppItemData;
 
 use clang;
@@ -1402,7 +1404,8 @@ impl<'a> CppParser<'a> {
           Ok(r) => r,
           Err(msg) => return Err(format!("Can't parse base class type: {}", msg).into()),
         };
-        if base_type.indirection != CppTypeIndirection::None || base_type.is_const
+        if base_type.indirection != CppTypeIndirection::None
+          || base_type.is_const
           || base_type.is_const2
         {
           return Err(

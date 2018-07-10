@@ -6,8 +6,9 @@
 
 extern crate cpp_to_rust_common;
 
-use cpp_to_rust_common::cpp_build_config::{CppBuildConfig, CppBuildConfigData, CppBuildPaths,
-                                           CppLibraryType};
+use cpp_to_rust_common::cpp_build_config::{
+  CppBuildConfig, CppBuildConfigData, CppBuildPaths, CppLibraryType,
+};
 use cpp_to_rust_common::errors::Result;
 use cpp_to_rust_common::file_utils::PathBufWithAdded;
 use cpp_to_rust_common::log;

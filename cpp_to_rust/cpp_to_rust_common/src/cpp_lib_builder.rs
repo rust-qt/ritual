@@ -10,10 +10,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use string_utils::JoinWithSeparator;
 use target;
-use utils::CommandOutput;
-use utils::MapIfOk;
 use utils::run_command;
 use utils::run_command_and_capture_output;
+use utils::CommandOutput;
+use utils::MapIfOk;
 
 /// A CMake variable with a name and a value.
 #[derive(Debug, Clone)]

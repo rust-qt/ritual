@@ -728,7 +728,8 @@ impl CppType {
     if self == other_type {
       return true;
     }
-    if self.indirection != other_type.indirection || self.is_const != other_type.is_const
+    if self.indirection != other_type.indirection
+      || self.is_const != other_type.is_const
       || self.is_const2 != other_type.is_const2
     {
       return false;
@@ -768,7 +769,8 @@ impl CppType {
         } else if data1.is_unsigned_integer() {
           return data.is_unsigned_integer() || data.is_integer_with_undefined_signedness();
         } else if data1.is_integer_with_undefined_signedness() {
-          return data.is_signed_integer() || data.is_unsigned_integer()
+          return data.is_signed_integer()
+            || data.is_unsigned_integer()
             || data.is_integer_with_undefined_signedness();
         } else {
           return false;

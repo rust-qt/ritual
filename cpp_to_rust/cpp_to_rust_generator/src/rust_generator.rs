@@ -7,20 +7,25 @@ use common::string_utils::JoinWithSeparator;
 use common::string_utils::{CaseOperations, WordIterator};
 use common::utils::{add_to_multihash, MapIfOk};
 use cpp_data::{CppDataWithDeps, CppEnumValue, CppTypeAllocationPlace, CppTypeKind};
-use cpp_ffi_data::{CppAndFfiMethod, CppCast, CppFfiArgumentMeaning, CppFfiHeaderData,
-                   CppFfiMethodKind, CppFfiType, CppIndirectionChange};
+use cpp_ffi_data::{
+  CppAndFfiMethod, CppCast, CppFfiArgumentMeaning, CppFfiHeaderData, CppFfiMethodKind, CppFfiType,
+  CppIndirectionChange,
+};
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
-use cpp_type::{CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
-               CppSpecificNumericTypeKind, CppType, CppTypeBase, CppTypeClassBase,
-               CppTypeIndirection, CppTypeRole};
+use cpp_type::{
+  CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
+  CppSpecificNumericTypeKind, CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection,
+  CppTypeRole,
+};
 use doc_formatter;
-use rust_info::{RustEnumValue, RustFFIArgument, RustFFIFunction, RustMethod, RustMethodArgument,
-                RustMethodArguments, RustMethodArgumentsVariant, RustMethodCaptionStrategy,
-                RustMethodDocItem, RustMethodScope, RustMethodSelfArgKind, RustModule,
-                RustProcessedTypeInfo, RustQtReceiverDeclaration, RustQtReceiverType,
-                RustQtSlotWrapper, RustTypeDeclaration, RustTypeDeclarationKind,
-                RustTypeWrapperKind, TraitAssociatedType, TraitImpl, TraitImplExtra};
+use rust_info::{
+  RustEnumValue, RustFFIArgument, RustFFIFunction, RustMethod, RustMethodArgument,
+  RustMethodArguments, RustMethodArgumentsVariant, RustMethodCaptionStrategy, RustMethodDocItem,
+  RustMethodScope, RustMethodSelfArgKind, RustModule, RustProcessedTypeInfo,
+  RustQtReceiverDeclaration, RustQtReceiverType, RustQtSlotWrapper, RustTypeDeclaration,
+  RustTypeDeclarationKind, RustTypeWrapperKind, TraitAssociatedType, TraitImpl, TraitImplExtra,
+};
 use rust_type::{CompleteType, RustName, RustToCTypeConversion, RustType, RustTypeIndirection};
 use std::collections::{hash_map, HashMap, HashSet};
 
@@ -516,15 +521,13 @@ fn complete_type(
         "flags".to_string(),
         "Flags".to_string(),
       ])?,
-      generic_arguments: Some(vec![
-        RustType::Common {
-          base: enum_type,
-          generic_arguments: None,
-          indirection: RustTypeIndirection::None,
-          is_const: false,
-          is_const2: false,
-        },
-      ]),
+      generic_arguments: Some(vec![RustType::Common {
+        base: enum_type,
+        generic_arguments: None,
+        indirection: RustTypeIndirection::None,
+        is_const: false,
+        is_const2: false,
+      }]),
       indirection: RustTypeIndirection::None,
       is_const: false,
       is_const2: false,
@@ -1149,12 +1152,10 @@ impl<'aa> RustGenerator<'aa> {
         ])?;
         let deref_trait_name = if *final_is_const { "Deref" } else { "DerefMut" }.to_string();
         let associated_types = if *final_is_const {
-          vec![
-            TraitAssociatedType {
-              name: "Target".to_string(),
-              value: to_type.ptr_to_value()?.rust_api_type,
-            },
-          ]
+          vec![TraitAssociatedType {
+            name: "Target".to_string(),
+            value: to_type.ptr_to_value()?.rust_api_type,
+          }]
         } else {
           Vec::new()
         };
@@ -1479,7 +1480,8 @@ impl<'aa> RustGenerator<'aa> {
       }
       match self.generate_rust_single_method(method, scope, false) {
         Ok(rust_method) => {
-          if (&method.cpp_method.name == "static_cast" || &method.cpp_method.name == "dynamic_cast"
+          if (&method.cpp_method.name == "static_cast"
+            || &method.cpp_method.name == "dynamic_cast"
             || &method.cpp_method.name == "qobject_cast")
             && method.cpp_method.class_membership.is_none()
           {
@@ -2412,7 +2414,8 @@ impl RustSingleMethod {
             .argument_type
             .cpp_type
             .can_be_the_same_as(&arg2.argument_type.cpp_type)
-            && !(arg1.name == "allocation_place_marker" && arg2.name == "allocation_place_marker"
+            && !(arg1.name == "allocation_place_marker"
+              && arg2.name == "allocation_place_marker"
               && arg1 != arg2)
         }) {
         return Ok(false);

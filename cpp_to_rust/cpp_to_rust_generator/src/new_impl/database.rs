@@ -13,6 +13,7 @@ use cpp_method::CppMethod;
 use cpp_type::CppType;
 use cpp_type::CppTypeBase;
 use cpp_type::CppTypeIndirection;
+use new_impl::html_logger::escape_html;
 use std::fmt::Display;
 use std::fmt::Formatter;
 //use common::errors::Result;
@@ -80,8 +81,11 @@ pub struct CppCheckerInfo {
 impl CppCheckerInfo {
   pub fn error_to_log(error: &Option<String>) -> String {
     match error {
-      None => "<span class='ok'>OK</span>".to_string(),
-      Some(error) => format!("<span class='ok'>Error</span> ({})", error),
+      None => "<div class='ok'>OK</div>".to_string(),
+      Some(error) => format!(
+        "<div class='error'>Error<br><pre>{}</pre></div>",
+        escape_html(error)
+      ),
     }
   }
 }
@@ -142,24 +146,20 @@ impl CppItemData {
   pub fn all_involved_types(&self) -> Vec<CppType> {
     match *self {
       CppItemData::Type(ref t) => match t.kind {
-        CppTypeDataKind::Enum => vec![
-          CppType {
-            indirection: CppTypeIndirection::None,
-            is_const: false,
-            is_const2: false,
-            base: CppTypeBase::Enum {
-              name: t.name.to_string(),
-            },
+        CppTypeDataKind::Enum => vec![CppType {
+          indirection: CppTypeIndirection::None,
+          is_const: false,
+          is_const2: false,
+          base: CppTypeBase::Enum {
+            name: t.name.to_string(),
           },
-        ],
-        CppTypeDataKind::Class { ref type_base } => vec![
-          CppType {
-            indirection: CppTypeIndirection::None,
-            is_const: false,
-            is_const2: false,
-            base: CppTypeBase::Class(type_base.clone()),
-          },
-        ],
+        }],
+        CppTypeDataKind::Class { ref type_base } => vec![CppType {
+          indirection: CppTypeIndirection::None,
+          is_const: false,
+          is_const2: false,
+          base: CppTypeBase::Class(type_base.clone()),
+        }],
       },
       CppItemData::EnumValue(_) => Vec::new(),
       CppItemData::Method(ref method) => method.all_involved_types(),

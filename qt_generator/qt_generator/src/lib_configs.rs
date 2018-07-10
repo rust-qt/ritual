@@ -1,8 +1,8 @@
 //! Generator configurations specific for each Qt module.
 
 use cpp_to_rust_generator::common::errors::Result;
-use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
 use cpp_to_rust_generator::common::file_utils::repo_crate_local_path;
+use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
 use cpp_to_rust_generator::common::target;
 use cpp_to_rust_generator::common::{log, toml};
 use cpp_to_rust_generator::config::Config;
@@ -453,9 +453,9 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
   let mut package_data = toml::Table::new();
   package_data.insert(
     "authors".to_string(),
-    toml::Value::Array(vec![
-      toml::Value::String("Pavel Strakhov <ri@idzaaus.org>".to_string()),
-    ]),
+    toml::Value::Array(vec![toml::Value::String(
+      "Pavel Strakhov <ri@idzaaus.org>".to_string(),
+    )]),
   );
   let description = format!(
     "Bindings for {} C++ library (generated automatically with cpp_to_rust project)",

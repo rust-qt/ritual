@@ -54,8 +54,12 @@ impl Error {
           if let Some(path) = symbol.filename() {
             let path_is_good = |x: std::path::Component| {
               if let Some(x) = x.as_os_str().to_str() {
-                x == "libstd" || x == "libpanic_unwind" || x == "libcore" || x == "errors.rs"
-                  || x.starts_with("backtrace") || x.starts_with("error-chain")
+                x == "libstd"
+                  || x == "libpanic_unwind"
+                  || x == "libcore"
+                  || x == "errors.rs"
+                  || x.starts_with("backtrace")
+                  || x.starts_with("error-chain")
               } else {
                 false
               }

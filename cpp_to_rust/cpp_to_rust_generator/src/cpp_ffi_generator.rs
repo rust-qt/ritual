@@ -239,13 +239,11 @@ fn create_cast_method(
     class_membership: None,
     operator: None,
     return_type: to.clone(),
-    arguments: vec![
-      CppMethodArgument {
-        name: "ptr".to_string(),
-        argument_type: from.clone(),
-        has_default_value: false,
-      },
-    ],
+    arguments: vec![CppMethodArgument {
+      name: "ptr".to_string(),
+      argument_type: from.clone(),
+      has_default_value: false,
+    }],
     allows_variadic_arguments: false,
     template_arguments: Some(vec![to.clone()]),
     declaration_code: None,

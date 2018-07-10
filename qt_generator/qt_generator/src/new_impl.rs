@@ -64,10 +64,6 @@ pub fn new_main() {
     const WORKSPACE_DIR_HELP: &'static str = "Directory for output and temporary files";
     const OPERATIONS_HELP: &'static str = "Operations to perform";
     const DISABLE_LOGGING_HELP: &'static str = "Disable creating log files";
-    const CLEAR_ALL_HELP: &'static str = "Clear all data in the workspace.";
-    const CLEAR_CURRENT_HELP: &'static str =
-      "\
-       Clear data corresponding to the current platform in the workspace.";
 
     let crates_help = format!(
       "Process libraries (Qt modules). Specify \"all\" \

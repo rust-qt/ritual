@@ -64,18 +64,16 @@ fn simple_func() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
-      arguments: vec![
-        CppMethodArgument {
-          name: "x".to_string(),
-          argument_type: CppType {
-            indirection: CppTypeIndirection::None,
-            is_const: false,
-            is_const2: false,
-            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-          },
-          has_default_value: false,
+      arguments: vec![CppMethodArgument {
+        name: "x".to_string(),
+        argument_type: CppType {
+          indirection: CppTypeIndirection::None,
+          is_const: false,
+          is_const2: false,
+          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
         },
-      ],
+        has_default_value: false,
+      }],
       doc: None,
       inheritance_chain: Vec::new(),
       allows_variadic_arguments: false,
@@ -106,18 +104,16 @@ fn simple_func_with_default_value() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
       },
-      arguments: vec![
-        CppMethodArgument {
-          name: "x".to_string(),
-          argument_type: CppType {
-            indirection: CppTypeIndirection::None,
-            is_const: false,
-            is_const2: false,
-            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-          },
-          has_default_value: true,
+      arguments: vec![CppMethodArgument {
+        name: "x".to_string(),
+        argument_type: CppType {
+          indirection: CppTypeIndirection::None,
+          is_const: false,
+          is_const2: false,
+          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
         },
-      ],
+        has_default_value: true,
+      }],
       doc: None,
       inheritance_chain: Vec::new(),
       allows_variadic_arguments: false,
@@ -191,21 +187,19 @@ fn functions_with_class_arg() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
       },
-      arguments: vec![
-        CppMethodArgument {
-          name: "x".to_string(),
-          argument_type: CppType {
-            indirection: CppTypeIndirection::None,
-            is_const: false,
-            is_const2: false,
-            base: CppTypeBase::Class(CppTypeClassBase {
-              name: "Magic".to_string(),
-              template_arguments: None,
-            }),
-          },
-          has_default_value: false,
+      arguments: vec![CppMethodArgument {
+        name: "x".to_string(),
+        argument_type: CppType {
+          indirection: CppTypeIndirection::None,
+          is_const: false,
+          is_const2: false,
+          base: CppTypeBase::Class(CppTypeClassBase {
+            name: "Magic".to_string(),
+            template_arguments: None,
+          }),
         },
-      ],
+        has_default_value: false,
+      }],
       doc: None,
       inheritance_chain: Vec::new(),
       allows_variadic_arguments: false,
@@ -229,21 +223,19 @@ fn functions_with_class_arg() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
       },
-      arguments: vec![
-        CppMethodArgument {
-          name: "x".to_string(),
-          argument_type: CppType {
-            indirection: CppTypeIndirection::Ptr,
-            is_const: false,
-            is_const2: false,
-            base: CppTypeBase::Class(CppTypeClassBase {
-              name: "Magic".to_string(),
-              template_arguments: None,
-            }),
-          },
-          has_default_value: false,
+      arguments: vec![CppMethodArgument {
+        name: "x".to_string(),
+        argument_type: CppType {
+          indirection: CppTypeIndirection::Ptr,
+          is_const: false,
+          is_const2: false,
+          base: CppTypeBase::Class(CppTypeClassBase {
+            name: "Magic".to_string(),
+            template_arguments: None,
+          }),
         },
-      ],
+        has_default_value: false,
+      }],
       doc: None,
       inheritance_chain: Vec::new(),
       allows_variadic_arguments: false,
@@ -267,21 +259,19 @@ fn functions_with_class_arg() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
       },
-      arguments: vec![
-        CppMethodArgument {
-          name: "arg1".to_string(),
-          argument_type: CppType {
-            indirection: CppTypeIndirection::Ref,
-            is_const: true,
-            is_const2: false,
-            base: CppTypeBase::Class(CppTypeClassBase {
-              name: "Magic".to_string(),
-              template_arguments: None,
-            }),
-          },
-          has_default_value: false,
+      arguments: vec![CppMethodArgument {
+        name: "arg1".to_string(),
+        argument_type: CppType {
+          indirection: CppTypeIndirection::Ref,
+          is_const: true,
+          is_const2: false,
+          base: CppTypeBase::Class(CppTypeClassBase {
+            name: "Magic".to_string(),
+            template_arguments: None,
+          }),
         },
-      ],
+        has_default_value: false,
+      }],
       doc: None,
       inheritance_chain: Vec::new(),
       allows_variadic_arguments: false,
@@ -319,18 +309,16 @@ fn variadic_func() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
-      arguments: vec![
-        CppMethodArgument {
-          name: "format".to_string(),
-          argument_type: CppType {
-            indirection: CppTypeIndirection::Ptr,
-            is_const: true,
-            is_const2: false,
-            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Char),
-          },
-          has_default_value: false,
+      arguments: vec![CppMethodArgument {
+        name: "format".to_string(),
+        argument_type: CppType {
+          indirection: CppTypeIndirection::Ptr,
+          is_const: true,
+          is_const2: false,
+          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Char),
         },
-      ],
+        has_default_value: false,
+      }],
       doc: None,
       inheritance_chain: Vec::new(),
       allows_variadic_arguments: true,
@@ -364,21 +352,19 @@ fn free_template_func() {
           index: 0,
         },
       },
-      arguments: vec![
-        CppMethodArgument {
-          name: "value".to_string(),
-          argument_type: CppType {
-            indirection: CppTypeIndirection::None,
-            is_const: false,
-            is_const2: false,
-            base: CppTypeBase::TemplateParameter {
-              nested_level: 0,
-              index: 0,
-            },
+      arguments: vec![CppMethodArgument {
+        name: "value".to_string(),
+        argument_type: CppType {
+          indirection: CppTypeIndirection::None,
+          is_const: false,
+          is_const2: false,
+          base: CppTypeBase::TemplateParameter {
+            nested_level: 0,
+            index: 0,
           },
-          has_default_value: false,
         },
-      ],
+        has_default_value: false,
+      }],
       doc: None,
       inheritance_chain: Vec::new(),
       allows_variadic_arguments: false,
@@ -512,18 +498,16 @@ fn simple_class_method() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
-      arguments: vec![
-        CppMethodArgument {
-          name: "x".to_string(),
-          argument_type: CppType {
-            indirection: CppTypeIndirection::None,
-            is_const: false,
-            is_const2: false,
-            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-          },
-          has_default_value: false,
+      arguments: vec![CppMethodArgument {
+        name: "x".to_string(),
+        argument_type: CppType {
+          indirection: CppTypeIndirection::None,
+          is_const: false,
+          is_const2: false,
+          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
         },
-      ],
+        has_default_value: false,
+      }],
       doc: None,
       inheritance_chain: Vec::new(),
       allows_variadic_arguments: false,
@@ -720,17 +704,15 @@ fn template_class_method() {
       class_membership: Some(CppMethodClassMembership {
         class_type: CppTypeClassBase {
           name: "MyVector".to_string(),
-          template_arguments: Some(vec![
-            CppType {
-              indirection: CppTypeIndirection::None,
-              is_const: false,
-              is_const2: false,
-              base: CppTypeBase::TemplateParameter {
-                nested_level: 0,
-                index: 0,
-              },
+          template_arguments: Some(vec![CppType {
+            indirection: CppTypeIndirection::None,
+            is_const: false,
+            is_const2: false,
+            base: CppTypeBase::TemplateParameter {
+              nested_level: 0,
+              index: 0,
             },
-          ]),
+          }]),
         },
         kind: CppMethodKind::Regular,
         is_virtual: false,
@@ -751,18 +733,16 @@ fn template_class_method() {
           index: 0,
         },
       },
-      arguments: vec![
-        CppMethodArgument {
-          name: "index".to_string(),
-          argument_type: CppType {
-            indirection: CppTypeIndirection::None,
-            is_const: false,
-            is_const2: false,
-            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
-          },
-          has_default_value: false,
+      arguments: vec![CppMethodArgument {
+        name: "index".to_string(),
+        argument_type: CppType {
+          indirection: CppTypeIndirection::None,
+          is_const: false,
+          is_const2: false,
+          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
         },
-      ],
+        has_default_value: false,
+      }],
       doc: None,
       inheritance_chain: Vec::new(),
       allows_variadic_arguments: false,
@@ -962,21 +942,19 @@ fn derived_class_simple() {
   if let CppTypeKind::Class { ref bases, .. } = data.types[1].kind {
     assert_eq!(
       bases,
-      &vec![
-        CppBaseSpecifier {
-          base_type: CppType {
-            indirection: CppTypeIndirection::None,
-            is_const: false,
-            is_const2: false,
-            base: CppTypeBase::Class(CppTypeClassBase {
-              name: "Base".to_string(),
-              template_arguments: None,
-            }),
-          },
-          is_virtual: false,
-          visibility: CppVisibility::Public,
+      &vec![CppBaseSpecifier {
+        base_type: CppType {
+          indirection: CppTypeIndirection::None,
+          is_const: false,
+          is_const2: false,
+          base: CppTypeBase::Class(CppTypeClassBase {
+            name: "Base".to_string(),
+            template_arguments: None,
+          }),
         },
-      ]
+        is_virtual: false,
+        visibility: CppVisibility::Public,
+      }]
     );
   } else {
     panic!("invalid type kind");
@@ -997,21 +975,19 @@ fn derived_class_simple_private() {
   if let CppTypeKind::Class { ref bases, .. } = data.types[1].kind {
     assert_eq!(
       bases,
-      &vec![
-        CppBaseSpecifier {
-          base_type: CppType {
-            indirection: CppTypeIndirection::None,
-            is_const: false,
-            is_const2: false,
-            base: CppTypeBase::Class(CppTypeClassBase {
-              name: "Base".to_string(),
-              template_arguments: None,
-            }),
-          },
-          is_virtual: false,
-          visibility: CppVisibility::Private,
+      &vec![CppBaseSpecifier {
+        base_type: CppType {
+          indirection: CppTypeIndirection::None,
+          is_const: false,
+          is_const2: false,
+          base: CppTypeBase::Class(CppTypeClassBase {
+            name: "Base".to_string(),
+            template_arguments: None,
+          }),
         },
-      ]
+        is_virtual: false,
+        visibility: CppVisibility::Private,
+      }]
     );
   } else {
     panic!("invalid type kind");
@@ -1032,21 +1008,19 @@ fn derived_class_simple_virtual() {
   if let CppTypeKind::Class { ref bases, .. } = data.types[1].kind {
     assert_eq!(
       bases,
-      &vec![
-        CppBaseSpecifier {
-          base_type: CppType {
-            indirection: CppTypeIndirection::None,
-            is_const: false,
-            is_const2: false,
-            base: CppTypeBase::Class(CppTypeClassBase {
-              name: "Base".to_string(),
-              template_arguments: None,
-            }),
-          },
-          is_virtual: true,
-          visibility: CppVisibility::Public,
+      &vec![CppBaseSpecifier {
+        base_type: CppType {
+          indirection: CppTypeIndirection::None,
+          is_const: false,
+          is_const2: false,
+          base: CppTypeBase::Class(CppTypeClassBase {
+            name: "Base".to_string(),
+            template_arguments: None,
+          }),
         },
-      ]
+        is_virtual: true,
+        visibility: CppVisibility::Public,
+      }]
     );
   } else {
     panic!("invalid type kind");
@@ -1119,12 +1093,10 @@ fn class_with_use() {
   {
     assert_eq!(
       using_directives,
-      &vec![
-        CppClassUsingDirective {
-          class_name: "B".to_string(),
-          method_name: "m1".to_string(),
-        },
-      ]
+      &vec![CppClassUsingDirective {
+        class_name: "B".to_string(),
+        method_name: "m1".to_string(),
+      }]
     );
   } else {
     panic!("invalid type kind");
