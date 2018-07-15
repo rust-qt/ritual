@@ -204,6 +204,7 @@ pub fn lib_dependencies(crate_name: &str) -> Result<&'static [&'static str]> {
     "qt_3d_input",
     "qt_3d_logic",
   ];
+  const MOQT_CORE: &'static [&'static str] = &[];
   Ok(match crate_name {
     "qt_core" => CORE,
     "qt_gui" => GUI,
@@ -214,6 +215,7 @@ pub fn lib_dependencies(crate_name: &str) -> Result<&'static [&'static str]> {
     "qt_3d_logic" => LOGIC3D,
     "qt_3d_extras" => EXTRAS3D,
     "qt_ui_tools" => UI_TOOLS,
+    "moqt_core" => MOQT_CORE,
     _ => return Err(format!("Unknown crate name: {}", crate_name).into()),
   })
 }

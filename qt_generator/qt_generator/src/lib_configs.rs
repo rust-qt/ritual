@@ -1,6 +1,7 @@
 //! Generator configurations specific for each Qt module.
 
-use cpp_to_rust_generator::common::errors::Result;
+use cpp_to_rust_generator::common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
+use cpp_to_rust_generator::common::errors::{ChainErr, Result};
 use cpp_to_rust_generator::common::file_utils::repo_crate_local_path;
 use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
 use cpp_to_rust_generator::common::target;
@@ -13,6 +14,7 @@ use versions;
 //use fix_header_names::fix_header_names;
 use cpp_to_rust_generator::config::CrateProperties;
 use lib_configs;
+use std::path::Path;
 
 /*
 /// Helper method to blacklist all methods of `QList<T>` template instantiation that
@@ -482,29 +484,82 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
     Some(repo_crate_local_path("qt_generator/qt_build_tools")?),
   );
   let mut config = Config::new(crate_properties);
-  let qt_config = get_full_build_config(crate_name)?;
-  config.set_cpp_build_config(qt_config.cpp_build_config);
-  config.set_cpp_build_paths(qt_config.cpp_build_paths);
+  if crate_name.starts_with("moqt_") {
+    let moqt_path =
+      PathBuf::from(::std::env::var("MOQT_PATH").chain_err(|| "MOQT_PATH env var is missing")?);
 
-  config.add_target_include_path(&qt_config.installation_data.lib_include_path);
-  config.set_cpp_lib_version(qt_config.installation_data.qt_version.as_str());
-  // TODO: does parsing work on MacOS without adding "-F"?
+    config.add_include_directive(format!("{}.h", crate_name));
+    let moqt_sublib_path = moqt_path.with_added(crate_name);
+    if !moqt_sublib_path.exists() {
+      return Err(format!("Path does not exist: {}", moqt_sublib_path.display()).into());
+    }
+    let include_path = moqt_sublib_path.with_added("include");
+    if !include_path.exists() {
+      return Err(format!("Path does not exist: {}", include_path.display()).into());
+    }
+    let lib_path = moqt_sublib_path.with_added("lib");
+    if !lib_path.exists() {
+      return Err(format!("Path does not exist: {}", lib_path.display()).into());
+    }
+    {
+      let mut paths = CppBuildPaths::new();
+      paths.add_include_path(&include_path);
+      paths.add_lib_path(&lib_path);
+      config.set_cpp_build_paths(paths);
+    }
+    config.add_target_include_path(&include_path);
 
-  config.add_include_directive(&lib_folder_name(crate_name));
-  //let lib_include_path = qt_config.installation_data.lib_include_path.clone();
-  // TODO: reimplement this
-  //config.add_cpp_data_filter(move |cpp_data| fix_header_names(cpp_data, &lib_include_path));
-  // TODO: allow to override parser flags
-  config.add_cpp_parser_arguments(vec!["-fPIC", "-fcxx-exceptions"]);
-
-  if target::current_env() == target::Env::Msvc {
-    config.add_cpp_parser_argument("-std=c++14");
+    {
+      let mut data = CppBuildConfigData::new();
+      data.add_linked_lib(crate_name.replace("_", ""));
+      config
+        .cpp_build_config_mut()
+        .add(target::Condition::True, data);
+    }
+    {
+      let mut data = CppBuildConfigData::new();
+      data.add_compiler_flag("-fPIC");
+      data.add_compiler_flag("-std=gnu++11");
+      config
+        .cpp_build_config_mut()
+        .add(target::Condition::Env(target::Env::Msvc).negate(), data);
+    }
+    if target::current_env() == target::Env::Msvc {
+      config.add_cpp_parser_argument("-std=c++14");
+    } else {
+      config.add_cpp_parser_argument("-std=gnu++11");
+    }
+  //    let cpp_config_data = CppBuildConfigData {
+  //      linked_libs: vec![crate_name.to_string()],
+  //      linked_frameworks: Vec::new(),
+  //
+  //    }
+  //...
   } else {
-    config.add_cpp_parser_argument("-std=gnu++11");
+    let qt_config = get_full_build_config(crate_name)?;
+    config.set_cpp_build_config(qt_config.cpp_build_config);
+    config.set_cpp_build_paths(qt_config.cpp_build_paths);
+
+    config.add_target_include_path(&qt_config.installation_data.lib_include_path);
+    config.set_cpp_lib_version(qt_config.installation_data.qt_version.as_str());
+    // TODO: does parsing work on MacOS without adding "-F"?
+
+    config.add_include_directive(&lib_folder_name(crate_name));
+    //let lib_include_path = qt_config.installation_data.lib_include_path.clone();
+    // TODO: reimplement this
+    //config.add_cpp_data_filter(move |cpp_data| fix_header_names(cpp_data, &lib_include_path));
+    // TODO: allow to override parser flags
+    config.add_cpp_parser_arguments(vec!["-fPIC", "-fcxx-exceptions"]);
+
+    if target::current_env() == target::Env::Msvc {
+      config.add_cpp_parser_argument("-std=c++14");
+    } else {
+      config.add_cpp_parser_argument("-std=gnu++11");
+    }
+    config.add_cpp_parser_blocked_name("qt_check_for_QGADGET_macro");
+    //let crate_name_clone = crate_name.to_string();
+    //let docs_path = qt_config.installation_data.docs_path.clone();
   }
-  config.add_cpp_parser_blocked_name("qt_check_for_QGADGET_macro");
-  //let crate_name_clone = crate_name.to_string();
-  //let docs_path = qt_config.installation_data.docs_path.clone();
 
   // TODO: reimplement this
 /*
@@ -575,6 +630,7 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
     "qt_3d_logic" => lib_configs::logic_3d(&mut config)?,
     "qt_3d_extras" => lib_configs::extras_3d(&mut config)?,
     "qt_ui_tools" => {}
+    "moqt_core" => {}
     _ => return Err(format!("Unknown crate name: {}", crate_name).into()),
   }
 

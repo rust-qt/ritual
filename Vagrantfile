@@ -19,8 +19,8 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "linux" do |linux|
     linux.vm.box = "ubuntu/bionic64"
-    linux.vm.provision "install_dependencies", type: "shell", path: "vagrant/linux_bootstrap.sh", privileged: false
-    linux.vm.provision "moqt", type: "shell", path: "vagrant/linux_moqt.sh", privileged: false
+    linux.vm.provision "install_dependencies", type: "shell", path: "vagrant/linux/install_dependencies.sh", privileged: false
+    linux.vm.provision "moqt", type: "shell", path: "vagrant/linux/moqt.sh", privileged: false
 
     if local_settings["moqt_workspace_path"]
       linux.vm.synced_folder local_settings["moqt_workspace_path"], "/home/vagrant/moqt_workspace"

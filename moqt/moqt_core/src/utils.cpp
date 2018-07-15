@@ -1,6 +1,6 @@
 #include "moqt_core_utils.h"
 
-int ctrt1_abs(int x) {
+int moqt_abs(int x) {
   if (x >= 0) {
     return x;
   } else {
@@ -8,6 +8,6 @@ int ctrt1_abs(int x) {
   }
 }
 
-const char* ctrt1_version() {
+const char* moqt_core_version() {
   return "0.0.1";
 }
