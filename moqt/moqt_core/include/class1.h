@@ -1,12 +1,12 @@
-#include "ctrt1/exports.h"
+#include "moqt_core_exports.h"
 #include <cstdint>
 
-class CTRT1_EXPORT Class1_F {
+class MOQT_CORE_EXPORT Class1_F {
 public:
   Class1_F() {}
 };
 
-class CTRT1_EXPORT Class1 {
+class MOQT_CORE_EXPORT Class1 {
 public:
   Class1(int x);
   int x();

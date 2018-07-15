@@ -7,5 +7,6 @@ Cargo.lock
 *.swp
 .cargo
 *.orig
-
-
+.vagrant
+vagrant/local_settings.yml
+*.log
