@@ -105,7 +105,7 @@ impl CppFfiMethodKind {
 /// Relation between original C++ method's argument value
 /// and corresponding FFI function's argument value
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum CppIndirectionChange {
+pub enum CppTypeConversionToFfi {
   /// Argument types are identical
   NoChange,
   /// C++ argument is a class value (like QPoint)
@@ -241,7 +241,7 @@ pub struct CppFfiType {
   /// FFI function type
   pub ffi_type: CppType,
   /// Relation
-  pub conversion: CppIndirectionChange,
+  pub conversion: CppTypeConversionToFfi,
 }
 
 impl CppFfiType {
@@ -250,42 +250,10 @@ impl CppFfiType {
     CppFfiType {
       original_type: CppType::void(),
       ffi_type: CppType::void(),
-      conversion: CppIndirectionChange::NoChange,
+      conversion: CppTypeConversionToFfi::NoChange,
     }
   }
 }
-
-// /// C++ method with arguments and return type
-// /// processed for FFI but no FFI function name
-//#[derive(Debug, PartialEq, Eq, Clone)]
-//pub struct CppMethodWithFfiSignature {
-//  /// Original C++ method
-//  pub cpp_method: CppMethod,
-//  /// For fake C++ methods, this field describes how they were generated
-//  pub kind: CppFfiMethodKind,
-//  /// Allocation place method used for converting
-//  /// the return type of the method
-//  pub allocation_place: ReturnValueAllocationPlace,
-//  /// FFI method signature
-//  pub c_signature: CppFfiMethodSignature,
-//}
-
-///// Final result of converting a C++ method
-///// to a FFI method
-//#[derive(Debug, PartialEq, Eq, Clone)]
-//pub struct CppAndFfiMethod {
-//  /// Original C++ method
-//  //pub cpp_method: CppMethod,
-//  /// For fake C++ methods, this field describes how they were generated
-//  pub kind: CppFfiMethodKind,
-//  /// Allocation place method used for converting
-//  /// the return type of the method
-//  pub allocation_place: ReturnValueAllocationPlace,
-//  /// FFI method signature
-//  pub c_signature: CppFfiMethodSignature,
-//  /// Final name of FFI method
-//  pub c_name: String,
-//}
 
 /// Information about a Qt slot wrapper with
 /// certain slot arguments

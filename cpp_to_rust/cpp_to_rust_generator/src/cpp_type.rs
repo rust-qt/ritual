@@ -2,7 +2,7 @@
 
 use common::errors::{unexpected, ChainErr, Error, Result};
 use common::string_utils::JoinWithSeparator;
-use cpp_ffi_data::{CppFfiType, CppIndirectionChange};
+use cpp_ffi_data::{CppFfiType, CppTypeConversionToFfi};
 
 /// C++ type variants based on indirection
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
@@ -552,25 +552,25 @@ impl CppType {
         }
         return Ok(CppFfiType {
           ffi_type: self.clone(),
-          conversion: CppIndirectionChange::NoChange,
+          conversion: CppTypeConversionToFfi::NoChange,
           original_type: self.clone(),
         });
       }
       _ => {}
     }
     let mut result = self.clone();
-    let mut conversion = CppIndirectionChange::NoChange;
+    let mut conversion = CppTypeConversionToFfi::NoChange;
     match self.indirection {
       CppTypeIndirection::None | CppTypeIndirection::Ptr | CppTypeIndirection::PtrPtr => {
         // no change needed
       }
       CppTypeIndirection::Ref => {
         result.indirection = CppTypeIndirection::Ptr;
-        conversion = CppIndirectionChange::ReferenceToPointer;
+        conversion = CppTypeConversionToFfi::ReferenceToPointer;
       }
       CppTypeIndirection::PtrRef => {
         result.indirection = CppTypeIndirection::PtrPtr;
-        conversion = CppIndirectionChange::ReferenceToPointer;
+        conversion = CppTypeConversionToFfi::ReferenceToPointer;
       }
       CppTypeIndirection::RValueRef => {
         return Err(Error::from("rvalue references are not supported")).chain_err(&err);
@@ -587,7 +587,7 @@ impl CppType {
             self
           ))).chain_err(&err);
         }
-        conversion = CppIndirectionChange::QFlagsToUInt;
+        conversion = CppTypeConversionToFfi::QFlagsToUInt;
         result.base = CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::UInt);
         result.is_const = false;
         result.indirection = CppTypeIndirection::None;
@@ -595,7 +595,7 @@ impl CppType {
         // structs can't be passed by value
         if self.indirection == CppTypeIndirection::None {
           result.indirection = CppTypeIndirection::Ptr;
-          conversion = CppIndirectionChange::ValueToPointer;
+          conversion = CppTypeConversionToFfi::ValueToPointer;
 
           // "const Rect" return type should not be translated to const pointer
           result.is_const = role != CppTypeRole::ReturnType;

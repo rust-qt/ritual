@@ -191,8 +191,6 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
   let standard_processing_steps = vec![
     cpp_parser(),
     // TODO: instantiate_templates
-    // TODO: generate_field_accessors
-    // TODO: generate_casts
     cpp_ffi_generator(),
     // TODO: generate_slot_wrappers
     cpp_checker(),

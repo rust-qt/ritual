@@ -30,12 +30,6 @@ pub fn run(data: ProcessorData) -> Result<()> {
     data: data,
     cpp_ffi_lib_name,
   };
-
-  //  let mut extra_methods = Vec::new();
-  //  extra_methods.append(&mut instantiate_templates(&generator.cpp_data)?);
-  //  extra_methods.append(&mut generate_field_accessors(&generator.cpp_data)?);
-  //  extra_methods.append(&mut generate_casts(&generator.cpp_data)?);
-
   generator.process_methods()?;
   Ok(())
 }
@@ -163,6 +157,40 @@ fn generate_casts(
     Some(base.base_index),
     name_prefix,
   )
+}
+
+pub fn generate_ffi_methods_for_method(
+  method: &CppMethod,
+  stack_allocated_types: &[CppTypeClassBase],
+  name: &str,
+) -> Result<Vec<CppFfiMethod>> {
+  let mut methods = Vec::new();
+  // TODO: don't use name here at all, generate names for all methods elsewhere
+  methods.push(to_ffi_method(method, stack_allocated_types, name)?);
+
+  if let Some(last_arg) = method.arguments.last() {
+    if last_arg.has_default_value {
+      let mut method_copy = method.clone();
+      while let Some(arg) = method_copy.arguments.pop() {
+        if !arg.has_default_value {
+          break;
+        }
+        let mut processed_method = to_ffi_method(&method_copy, stack_allocated_types, name)?;
+        if let CppFfiMethodKind::Method {
+          ref mut omitted_arguments,
+          ..
+        } = processed_method.kind
+        {
+          *omitted_arguments = Some(method.arguments.len() - method_copy.arguments.len());
+        } else {
+          return Err(unexpected("expected method kind here").into());
+        }
+        methods.push(processed_method);
+      }
+    }
+  }
+
+  Ok(methods)
 }
 
 /// Creates FFI method signature for this method:
@@ -438,7 +466,7 @@ impl<'a> CppFfiGenerator<'a> {
           // no FFI methods for these items
         }
         CppItemData::Method(ref method) => {
-          to_ffi_method(method, &stack_allocated_types, &name).map(|r| vec![r])
+          generate_ffi_methods_for_method(method, &stack_allocated_types, &name)
         }
         CppItemData::ClassField(ref field) => {
           generate_field_accessors(field, &stack_allocated_types, &name)
@@ -473,117 +501,6 @@ impl<'a> CppFfiGenerator<'a> {
       }
     }
     Ok(())
-
-    /*
-    let mut hash_name_to_methods: HashMap<String, Vec<_>> = HashMap::new();
-    {
-      let mut process_one = |method: CppMethodRefWithKind| match method_to_ffi_signature(
-        method.clone(),
-        &self.cpp_data,
-        type_allocation_places_override.clone(),
-      ) {
-        Err(msg) => {
-          log::llog(log::DebugFfiSkips, || {
-            format!(
-              "Unable to produce C function for method:\n{}\nError:{}\n",
-              method.method.short_text(),
-              msg
-            )
-          });
-        }
-        Ok(result) => match c_base_name(
-          &result.cpp_method,
-          &result.allocation_place,
-          include_file_base_name,
-        ) {
-          Err(msg) => {
-            log::llog(log::DebugFfiSkips, || {
-              format!(
-                "Unable to produce C function for method:\n{}\nError:{}\n",
-                method.method.short_text(),
-                msg
-              )
-            });
-          }
-          Ok(name) => {
-            add_to_multihash(
-              &mut hash_name_to_methods,
-              format!("{}_{}", &self.cpp_ffi_lib_name, name),
-              result,
-            );
-          }
-        },
-      };
-
-      for method in methods {
-        if !self.should_process_method(&method.method)? {
-          continue;
-        }
-        process_one(method.clone());
-        // generate methods with omitted arguments
-        if let Some(last_arg) = method.method.arguments.last() {
-          if last_arg.has_default_value {
-            let mut method_copy = method.method.clone();
-            while let Some(arg) = method_copy.arguments.pop() {
-              if !arg.has_default_value {
-                break;
-              }
-              process_one(CppMethodRefWithKind {
-                method: &method_copy,
-                kind: CppFfiMethodKind::RealWithOmittedArguments {
-                  arguments_before_omitting: Some(method.method.arguments.clone()),
-                },
-              });
-            }
-          }
-        }
-      }
-    }
-
-    let mut processed_methods = Vec::new();
-    for (key, mut values) in hash_name_to_methods {
-      if values.len() == 1 {
-        processed_methods.push(CppFfiMethod::new(values.remove(0), key.clone()));
-        continue;
-      }
-      let mut found_strategy = None;
-      for strategy in MethodCaptionStrategy::all() {
-        let mut type_captions = HashSet::new();
-        let mut ok = true;
-        for value in &values {
-          let caption = value.c_signature.caption(strategy.clone())?;
-          if type_captions.contains(&caption) {
-            ok = false;
-            break;
-          }
-          type_captions.insert(caption);
-        }
-        if ok {
-          found_strategy = Some(strategy);
-          break;
-        }
-      }
-      if let Some(strategy) = found_strategy {
-        for x in values {
-          let caption = x.c_signature.caption(strategy.clone())?;
-          let final_name = if caption.is_empty() {
-            key.clone()
-          } else {
-            format!("{}_{}", key, caption)
-          };
-          processed_methods.push(CppAndFfiMethod::new(x, final_name));
-        }
-      } else {
-        log::error(format!("values dump: {:?}\n", values));
-        log::error("All type caption strategies have failed! Involved functions:");
-        for value in values {
-          log::error(format!("  {}", value.cpp_method.short_text()));
-        }
-        return Err(unexpected("all type caption strategies have failed").into());
-      }
-    }
-    processed_methods.sort_by(|a, b| a.c_name.cmp(&b.c_name));
-    Ok(processed_methods)*/
   }
 
   // TODO: slot wrappers
@@ -763,23 +680,3 @@ impl<'a> CppFfiGenerator<'a> {
     }))
   }*/
 }
-
-// TODO: generate methods with omitted arguments
-//for method in methods {
-//if let Some(last_arg) = method.method.arguments.last() {
-//if last_arg.has_default_value {
-//let mut method_copy = method.method.clone();
-//while let Some(arg) = method_copy.arguments.pop() {
-//if !arg.has_default_value {
-//break;
-//}
-//process_one(CppMethodRefWithKind {
-//method: &method_copy,
-//kind: CppFfiMethodKind::RealWithOmittedArguments {
-//arguments_before_omitting: Some(method.method.arguments.clone()),
-//},
-//});
-//}
-//}
-//}
-//}

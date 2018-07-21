@@ -4,8 +4,8 @@ use common::string_utils::JoinWithSeparator;
 use common::utils::get_command_output;
 use common::utils::MapIfOk;
 use cpp_ffi_data::{
-  CppFfiArgumentMeaning, CppFfiMethodKind, CppFfiType, CppFieldAccessorType, CppIndirectionChange,
-  QtSlotWrapper,
+  CppFfiArgumentMeaning, CppFfiMethodKind, CppFfiType, CppFieldAccessorType,
+  CppTypeConversionToFfi, QtSlotWrapper,
 };
 use cpp_method::ReturnValueAllocationPlace;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection};
@@ -71,14 +71,14 @@ fn qt_slot_wrapper(wrapper: &QtSlotWrapper) -> Result<String> {
 /// converts it to type `type1.ffi_type`
 fn convert_type_to_ffi(type1: &CppFfiType, expression: String) -> Result<String> {
   Ok(match type1.conversion {
-    CppIndirectionChange::NoChange => expression,
-    CppIndirectionChange::ValueToPointer => format!(
+    CppTypeConversionToFfi::NoChange => expression,
+    CppTypeConversionToFfi::ValueToPointer => format!(
       "new {}({})",
       type1.original_type.base.to_cpp_code(None)?,
       expression
     ),
-    CppIndirectionChange::ReferenceToPointer => format!("&{}", expression),
-    CppIndirectionChange::QFlagsToUInt => format!("uint({})", expression),
+    CppTypeConversionToFfi::ReferenceToPointer => format!("&{}", expression),
+    CppTypeConversionToFfi::QFlagsToUInt => format!("uint({})", expression),
   })
 }
 
@@ -87,8 +87,8 @@ fn convert_type_to_ffi(type1: &CppFfiType, expression: String) -> Result<String>
 fn convert_return_type(method: &CppFfiMethod, expression: String) -> Result<String> {
   let mut result = expression;
   match method.return_type.conversion {
-    CppIndirectionChange::NoChange => {}
-    CppIndirectionChange::ValueToPointer => {
+    CppTypeConversionToFfi::NoChange => {}
+    CppTypeConversionToFfi::ValueToPointer => {
       match method.allocation_place {
         ReturnValueAllocationPlace::Stack => {
           return Err(unexpected("stack allocated wrappers are expected to return void").into());
@@ -115,10 +115,10 @@ fn convert_return_type(method: &CppFfiMethod, expression: String) -> Result<Stri
         }
       }
     }
-    CppIndirectionChange::ReferenceToPointer => {
+    CppTypeConversionToFfi::ReferenceToPointer => {
       result = format!("&{}", result);
     }
-    CppIndirectionChange::QFlagsToUInt => {
+    CppTypeConversionToFfi::QFlagsToUInt => {
       result = format!("uint({})", result);
     }
   }
@@ -155,11 +155,11 @@ fn arguments_values(method: &CppFfiMethod) -> Result<String> {
     .map_if_ok(|argument| -> Result<_> {
       let mut result = argument.name.clone();
       match argument.argument_type.conversion {
-        CppIndirectionChange::ValueToPointer | CppIndirectionChange::ReferenceToPointer => {
+        CppTypeConversionToFfi::ValueToPointer | CppTypeConversionToFfi::ReferenceToPointer => {
           result = format!("*{}", result)
         }
-        CppIndirectionChange::NoChange => {}
-        CppIndirectionChange::QFlagsToUInt => {
+        CppTypeConversionToFfi::NoChange => {}
+        CppTypeConversionToFfi::QFlagsToUInt => {
           let type_text = if argument.argument_type.original_type.indirection
             == CppTypeIndirection::Ref
             && argument.argument_type.original_type.is_const

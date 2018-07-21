@@ -34,7 +34,7 @@ fn argument_int() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
-      conversion: CppIndirectionChange::NoChange,
+      conversion: CppTypeConversionToFfi::NoChange,
     },
     meaning: CppFfiArgumentMeaning::Argument(0),
   };
@@ -92,7 +92,7 @@ fn argument_int_ptr() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
-      conversion: CppIndirectionChange::NoChange,
+      conversion: CppTypeConversionToFfi::NoChange,
     },
     meaning: CppFfiArgumentMeaning::Argument(0),
   };
@@ -169,7 +169,7 @@ fn argument_func() {
     argument_type: CppFfiType {
       original_type: type1.clone(),
       ffi_type: type1.clone(),
-      conversion: CppIndirectionChange::NoChange,
+      conversion: CppTypeConversionToFfi::NoChange,
     },
     meaning: CppFfiArgumentMeaning::Argument(0),
   };
@@ -229,7 +229,7 @@ fn signature_two_numbers() {
             is_const2: false,
             base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
           },
-          conversion: CppIndirectionChange::NoChange,
+          conversion: CppTypeConversionToFfi::NoChange,
         },
         meaning: CppFfiArgumentMeaning::Argument(0),
       },
@@ -248,7 +248,7 @@ fn signature_two_numbers() {
             is_const2: false,
             base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
           },
-          conversion: CppIndirectionChange::NoChange,
+          conversion: CppTypeConversionToFfi::NoChange,
         },
         meaning: CppFfiArgumentMeaning::Argument(0),
       },
@@ -364,7 +364,7 @@ fn signature_class_method() {
               template_arguments: None,
             }),
           },
-          conversion: CppIndirectionChange::NoChange,
+          conversion: CppTypeConversionToFfi::NoChange,
         },
         meaning: CppFfiArgumentMeaning::This,
       },
@@ -383,7 +383,7 @@ fn signature_class_method() {
             is_const2: false,
             base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
           },
-          conversion: CppIndirectionChange::NoChange,
+          conversion: CppTypeConversionToFfi::NoChange,
         },
         meaning: CppFfiArgumentMeaning::Argument(0),
       },
@@ -457,7 +457,7 @@ fn signature_class_method_const() {
               template_arguments: None,
             }),
           },
-          conversion: CppIndirectionChange::NoChange,
+          conversion: CppTypeConversionToFfi::NoChange,
         },
         meaning: CppFfiArgumentMeaning::This,
       },
@@ -476,7 +476,7 @@ fn signature_class_method_const() {
             is_const2: false,
             base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
           },
-          conversion: CppIndirectionChange::NoChange,
+          conversion: CppTypeConversionToFfi::NoChange,
         },
         meaning: CppFfiArgumentMeaning::Argument(0),
       },
@@ -616,7 +616,7 @@ fn cpp_ffi_type_void() {
   let t = CppFfiType::void();
   assert!(t.original_type.is_void());
   assert!(t.ffi_type.is_void());
-  assert_eq!(t.conversion, CppIndirectionChange::NoChange);
+  assert_eq!(t.conversion, CppTypeConversionToFfi::NoChange);
 }
 
 #[test]

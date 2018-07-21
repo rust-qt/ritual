@@ -1,5 +1,5 @@
 use caption_strategy::TypeCaptionStrategy;
-use cpp_ffi_data::CppIndirectionChange;
+use cpp_ffi_data::CppTypeConversionToFfi;
 use cpp_type::{
   CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
   CppSpecificNumericTypeKind, CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection,
@@ -11,7 +11,7 @@ fn assert_type_to_ffi_unchanged(t: &CppType) {
     let ffi1 = t.to_cpp_ffi_type(role.clone()).unwrap();
     assert_eq!(&ffi1.original_type, t);
     assert_eq!(&ffi1.ffi_type, t);
-    assert_eq!(ffi1.conversion, CppIndirectionChange::NoChange);
+    assert_eq!(ffi1.conversion, CppTypeConversionToFfi::NoChange);
   }
 }
 
@@ -294,7 +294,7 @@ fn class_value() {
   );
   assert_eq!(
     ffi_return_type.conversion,
-    CppIndirectionChange::ValueToPointer
+    CppTypeConversionToFfi::ValueToPointer
   );
 
   let ffi_arg = type1.to_cpp_ffi_type(CppTypeRole::NotReturnType).unwrap();
@@ -315,7 +315,7 @@ fn class_value() {
     &ffi_arg.ffi_type.to_cpp_code(None).unwrap(),
     "const QPoint*"
   );
-  assert_eq!(ffi_arg.conversion, CppIndirectionChange::ValueToPointer);
+  assert_eq!(ffi_arg.conversion, CppTypeConversionToFfi::ValueToPointer);
   assert!(type1.needs_allocation_place_variants());
 }
 
@@ -364,7 +364,7 @@ fn class_const_ref() {
       }
     );
     assert_eq!(&ffi1.ffi_type.to_cpp_code(None).unwrap(), "const QRectF*");
-    assert_eq!(ffi1.conversion, CppIndirectionChange::ReferenceToPointer);
+    assert_eq!(ffi1.conversion, CppTypeConversionToFfi::ReferenceToPointer);
   }
   assert!(!type1.needs_allocation_place_variants());
 }
@@ -414,7 +414,7 @@ fn class_mut_ref() {
       }
     );
     assert_eq!(&ffi1.ffi_type.to_cpp_code(None).unwrap(), "QRectF*");
-    assert_eq!(ffi1.conversion, CppIndirectionChange::ReferenceToPointer);
+    assert_eq!(ffi1.conversion, CppTypeConversionToFfi::ReferenceToPointer);
   }
   assert!(!type1.needs_allocation_place_variants());
 }
@@ -515,7 +515,7 @@ fn class_with_template_args() {
   );
   assert_eq!(
     ffi_return_type.conversion,
-    CppIndirectionChange::ValueToPointer
+    CppTypeConversionToFfi::ValueToPointer
   );
 
   let ffi_arg = type1.to_cpp_ffi_type(CppTypeRole::NotReturnType).unwrap();
@@ -536,7 +536,7 @@ fn class_with_template_args() {
     &ffi_arg.ffi_type.to_cpp_code(None).unwrap(),
     "const QVector< QString >*"
   );
-  assert_eq!(ffi_arg.conversion, CppIndirectionChange::ValueToPointer);
+  assert_eq!(ffi_arg.conversion, CppTypeConversionToFfi::ValueToPointer);
   assert!(type1.needs_allocation_place_variants());
 }
 
@@ -647,7 +647,7 @@ fn qflags() {
       &ffi_type.ffi_type.to_cpp_code(None).unwrap(),
       "unsigned int"
     );
-    assert_eq!(ffi_type.conversion, CppIndirectionChange::QFlagsToUInt);
+    assert_eq!(ffi_type.conversion, CppTypeConversionToFfi::QFlagsToUInt);
   }
   assert!(!type1.needs_allocation_place_variants());
 }

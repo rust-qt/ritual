@@ -41,7 +41,68 @@ use std::collections::{hash_map, HashMap, HashSet};
     }
     false
   }
-}*/
+}
+
+impl<'a> CppDataWithDeps<'a> {
+
+
+  /// Returns selected type allocation place for type `class_name`.
+  pub fn type_allocation_place(&self, class_name: &str) -> Result<CppTypeAllocationPlace> {
+    if let Some(r) = self
+      .current
+      .processed
+      .type_allocation_places
+      .get(class_name)
+    {
+      return Ok(r.clone());
+    }
+    for dep in &self.dependencies {
+      if let Some(r) = dep.processed.type_allocation_places.get(class_name) {
+        return Ok(r.clone());
+      }
+    }
+    Err(format!("no type allocation place information for {}", class_name).into())
+  }
+
+  /// Search for a `CppTypeData` object in this `CppData` and all dependencies.
+  pub fn find_type_info<F>(&self, f: F) -> Option<&CppTypeData>
+  where
+    F: Fn(&&CppTypeData) -> bool,
+  {
+    once(&self.current.parser.types)
+      .chain(self.dependencies.iter().map(|d| &d.parser.types))
+      .flat_map(|x| x)
+      .find(f)
+  }
+
+    /// Returns all include files found within this `CppData`
+  /// (excluding dependencies).
+  pub fn all_include_files(&self) -> Result<HashSet<String>> {
+    let mut result = HashSet::new();
+    for method in &self.current.parser.methods {
+      if !result.contains(&method.include_file) {
+        result.insert(method.include_file.clone());
+      }
+    }
+    for tp in &self.current.parser.types {
+      if !result.contains(&tp.include_file) {
+        result.insert(tp.include_file.clone());
+      }
+    }
+    for instantiations in &self.current.processed.template_instantiations {
+      let type_info = self
+        .find_type_info(|x| &x.name == &instantiations.class_name)
+        .chain_err(|| format!("type info not found for {}", &instantiations.class_name))?;
+      if !result.contains(&type_info.include_file) {
+        result.insert(type_info.include_file.clone());
+      }
+    }
+    Ok(result)
+  }
+
+}
+
+*/
 
 /// Intermediate data of a single C++ method converted to
 /// a Rust method before any overloading is applied.
