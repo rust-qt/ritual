@@ -98,6 +98,7 @@ impl HeaderNameMap {
 
 /// Replaces names of header files in `data` with Qt's shortcut headers.
 pub fn fix_header_names(data: &mut [DatabaseItem], headers_dir: &PathBuf) -> Result<()> {
+  // TODO: only run on new database items?
   let map = HeaderNameMap::new(headers_dir)?;
   for item in data {
     let class_name = match item.cpp_data {
@@ -111,9 +112,8 @@ pub fn fix_header_names(data: &mut [DatabaseItem], headers_dir: &PathBuf) -> Res
       ..
     } = item.source
     {
-      if let Some(old_include_file) = include_file.take() {
-        *include_file = Some(map.real_to_fancy(&old_include_file, class_name));
-      }
+      let new_include_file = map.real_to_fancy(include_file, class_name);
+      *include_file = new_include_file;
     }
   }
   Ok(())

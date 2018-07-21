@@ -11,6 +11,7 @@ use cpp_ffi_data::CppFfiMethod;
 use cpp_method::CppMethod;
 
 use common::string_utils::JoinWithSeparator;
+use cpp_data::CppTemplateInstantiation;
 use cpp_ffi_data::QtSlotWrapper;
 use cpp_type::CppType;
 use cpp_type::CppTypeBase;
@@ -46,9 +47,9 @@ impl CppCheckerEnv {
 pub enum DatabaseItemSource {
   CppParser {
     /// File name of the include file (without full path)
-    include_file: Option<String>,
+    include_file: String,
     /// Exact location of the declaration
-    origin_location: Option<CppOriginLocation>,
+    origin_location: CppOriginLocation,
   },
   Destructor,
   TemplateInstantiation,
@@ -121,6 +122,7 @@ pub enum CppItemData {
   Method(CppMethod),
   ClassField(CppClassField),
   ClassBase(CppBaseSpecifier),
+  TemplateInstantiation(CppTemplateInstantiation),
   QtSignalArguments(Vec<CppType>),
 }
 
@@ -131,7 +133,11 @@ impl CppItemData {
       (&CppItemData::EnumValue(ref v), &CppItemData::EnumValue(ref v2)) => v.is_same(v2),
       (&CppItemData::Method(ref v), &CppItemData::Method(ref v2)) => v.is_same(v2),
       (&CppItemData::ClassField(ref v), &CppItemData::ClassField(ref v2)) => v.is_same(v2),
-      (&CppItemData::ClassBase(ref v), &CppItemData::ClassBase(ref v2)) => v.is_same(v2),
+      (&CppItemData::ClassBase(ref v), &CppItemData::ClassBase(ref v2)) => v == v2,
+      (&CppItemData::TemplateInstantiation(ref v), &CppItemData::TemplateInstantiation(ref v2)) => {
+        v == v2
+      }
+      (&CppItemData::QtSignalArguments(ref v), &CppItemData::QtSignalArguments(ref v2)) => v == v2,
       _ => false,
     }
   }
@@ -180,6 +186,7 @@ impl CppItemData {
         },
       ],
       CppItemData::QtSignalArguments(ref args) => args.clone(),
+      CppItemData::TemplateInstantiation(ref data) => data.template_arguments.clone(),
     }
   }
 }
@@ -227,6 +234,15 @@ impl Display for CppItemData {
       CppItemData::QtSignalArguments(ref args) => format!(
         "Qt signal args ({})",
         args.iter().map(|arg| arg.to_cpp_pseudo_code()).join(", ")
+      ),
+      CppItemData::TemplateInstantiation(ref data) => format!(
+        "template instantiation: {}<{}>",
+        data.class_name,
+        data
+          .template_arguments
+          .iter()
+          .map(|arg| arg.to_cpp_pseudo_code())
+          .join(", ")
       ),
     };
 

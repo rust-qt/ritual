@@ -585,6 +585,7 @@ fn find_methods_docs(items: &mut [DatabaseItem], data: &mut DocParser) -> Result
 }
 
 pub fn parse_docs(data: ProcessorData, qt_crate_name: &str, docs_path: &Path) -> Result<()> {
+  // TODO: only run on new database items?
   let doc_data = match DocData::new(&qt_crate_name, &docs_path) {
     Ok(doc_data) => doc_data,
     Err(err) => {

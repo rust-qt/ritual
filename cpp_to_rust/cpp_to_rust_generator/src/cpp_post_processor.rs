@@ -2,7 +2,7 @@ use common::errors::{unexpected, Result};
 use common::log;
 use cpp_data::{
   CppBaseSpecifier, CppData, CppDataWithDeps, CppTemplateInstantiation, CppTemplateInstantiations,
-  CppTypeAllocationPlace, CppTypeData, CppTypeKind, CppVisibility, ParserCppData, ProcessedCppData,
+  CppTypeAllocationPlace, CppTypeData, CppTypeKind, CppVisibility, ParserCppData,
 };
 use cpp_method::{CppMethod, CppMethodClassMembership, CppMethodKind};
 use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};

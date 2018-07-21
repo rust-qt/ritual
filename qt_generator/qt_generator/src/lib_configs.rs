@@ -13,6 +13,7 @@ use versions;
 
 use cpp_to_rust_generator::config::CrateProperties;
 use cpp_to_rust_generator::new_impl::processor::ProcessingStep;
+use detect_signals_and_slots::detect_signals_and_slots;
 use doc_parser::parse_docs;
 use fix_header_names::fix_header_names;
 use lib_configs;
@@ -557,10 +558,17 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
     config.add_cpp_parser_blocked_name("qt_check_for_QGADGET_macro");
 
     let lib_include_path = qt_config.installation_data.lib_include_path.clone();
+
     config.add_custom_processing_step(ProcessingStep::new(
       "qt_fix_header_names",
       vec!["cpp_parser".to_string()],
       move |data| fix_header_names(&mut data.current_database.items, &lib_include_path),
+    ));
+
+    config.add_custom_processing_step(ProcessingStep::new(
+      "qt_detect_signals_and_slots",
+      vec!["cpp_parser".to_string()],
+      detect_signals_and_slots,
     ));
 
     let crate_name_clone = crate_name.to_string();

@@ -670,6 +670,7 @@ impl<'a> CppFfiGenerator<'a> {
         }
         CppItemData::ClassBase(ref base) => generate_casts(base, &all_class_bases, &name),
         CppItemData::QtSignalArguments(ref signal_srguments) => unimplemented!(),
+        CppItemData::TemplateInstantiation(..) => continue,
       };
 
       match result {

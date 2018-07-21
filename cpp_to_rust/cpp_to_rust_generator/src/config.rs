@@ -2,7 +2,6 @@
 
 use common;
 use common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
-pub use cpp_data::CppTypeAllocationPlace;
 use new_impl::processor::ProcessingStep;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -163,7 +162,8 @@ pub struct Config {
 
   // TODO: revisit fields below when new rust name generator is done
   cpp_filtered_namespaces: Vec<String>,
-  type_allocation_places: HashMap<String, CppTypeAllocationPlace>,
+
+  rust_stack_allocated_types: Vec<String>,
 }
 
 impl Config {
@@ -181,7 +181,7 @@ impl Config {
       cpp_parser_blocked_names: Default::default(),
       cpp_filtered_namespaces: Default::default(),
       cpp_build_config: Default::default(),
-      type_allocation_places: Default::default(),
+      rust_stack_allocated_types: Default::default(),
       custom_processing_steps: Default::default(),
       cpp_lib_version: None,
     }
@@ -308,23 +308,8 @@ impl Config {
 
   /// Overrides automatic selection of type allocation place for `type_name` and uses `place`
   /// instead. See `CppTypeAllocationPlace` for more information.
-  pub fn set_type_allocation_place<S: Into<String>>(
-    &mut self,
-    place: CppTypeAllocationPlace,
-    type_name: S,
-  ) {
-    self.type_allocation_places.insert(type_name.into(), place);
-  }
-  /// Overrides automatic selection of type allocation place for `types` and uses `place`
-  /// instead. See also `Config::set_type_allocation_place`.
-  pub fn set_types_allocation_place<SI, S>(&mut self, place: CppTypeAllocationPlace, types: SI)
-  where
-    SI: IntoIterator<Item = S>,
-    S: Into<String>,
-  {
-    for t in types {
-      self.type_allocation_places.insert(t.into(), place.clone());
-    }
+  pub fn set_rust_stack_allocated_types(&mut self, names: Vec<String>) {
+    self.rust_stack_allocated_types = names;
   }
 
   /// Sets `CppBuildConfig` value that will be passed to the build script
@@ -402,10 +387,10 @@ impl Config {
   pub fn cpp_build_config(&self) -> &CppBuildConfig {
     &self.cpp_build_config
   }
-  /// Returns values added by `Config::set_type_allocation_place`.
+  /// Returns values added by `Config::set_rust_stack_allocated_types`.
   /// Keys of the hash map are names of C++ types.
-  pub fn type_allocation_places(&self) -> &HashMap<String, CppTypeAllocationPlace> {
-    &self.type_allocation_places
+  pub fn rust_stack_allocated_types(&self) -> &[String] {
+    &self.rust_stack_allocated_types
   }
 
   pub fn custom_processing_steps(&self) -> &[ProcessingStep] {

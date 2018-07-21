@@ -1210,8 +1210,8 @@ impl<'a> CppParser<'a> {
         doc: None,
       },
       DatabaseItemSource::CppParser {
-        include_file: Some(self.entity_include_file(entity)?),
-        origin_location: Some(get_origin_location(entity)?),
+        include_file: self.entity_include_file(entity)?,
+        origin_location: get_origin_location(entity)?,
       },
     ))
   }
@@ -1228,8 +1228,8 @@ impl<'a> CppParser<'a> {
     let enum_name = get_full_name(entity)?;
     self.data.current_database.add_cpp_data(
       DatabaseItemSource::CppParser {
-        include_file: Some(include_file.clone()),
-        origin_location: Some(get_origin_location(entity)?),
+        include_file: include_file.clone(),
+        origin_location: get_origin_location(entity)?,
       },
       CppItemData::Type(CppTypeData {
         kind: CppTypeDataKind::Enum,
@@ -1246,8 +1246,8 @@ impl<'a> CppParser<'a> {
 
         self.data.current_database.add_cpp_data(
           DatabaseItemSource::CppParser {
-            include_file: Some(include_file.clone()),
-            origin_location: Some(get_origin_location(child)?),
+            include_file: include_file.clone(),
+            origin_location: get_origin_location(child)?,
           },
           CppItemData::EnumValue(CppEnumValue {
             name: child
@@ -1285,8 +1285,8 @@ impl<'a> CppParser<'a> {
       })?;
     self.data.current_database.add_cpp_data(
       DatabaseItemSource::CppParser {
-        include_file: Some(include_file),
-        origin_location: Some(get_origin_location(entity)?),
+        include_file: include_file,
+        origin_location: get_origin_location(entity)?,
       },
       CppItemData::ClassField(CppClassField {
         //        size: match field_clang_type.get_sizeof() {
@@ -1391,8 +1391,8 @@ impl<'a> CppParser<'a> {
         if let CppTypeBase::Class(ref base_type) = base_type.base {
           self.data.current_database.add_cpp_data(
             DatabaseItemSource::CppParser {
-              include_file: Some(include_file.clone()),
-              origin_location: Some(get_origin_location(entity).unwrap()),
+              include_file: include_file.clone(),
+              origin_location: get_origin_location(entity).unwrap(),
             },
             CppItemData::ClassBase(CppBaseSpecifier {
               base_class_type: base_type.clone(),
@@ -1417,8 +1417,8 @@ impl<'a> CppParser<'a> {
     }
     self.data.current_database.add_cpp_data(
       DatabaseItemSource::CppParser {
-        include_file: Some(include_file),
-        origin_location: Some(get_origin_location(entity).unwrap()),
+        include_file: include_file,
+        origin_location: get_origin_location(entity).unwrap(),
       },
       CppItemData::Type(CppTypeData {
         kind: CppTypeDataKind::Class {
