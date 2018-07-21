@@ -10,8 +10,8 @@ use cpp_ffi_data::{
 use cpp_method::ReturnValueAllocationPlace;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection};
 
-use cpp_ffi_data::CppFfiFileData;
 use cpp_ffi_data::CppFfiMethod;
+use new_impl::database::DatabaseItem;
 use std::iter::once;
 use std::path::Path;
 use std::path::PathBuf;
@@ -371,7 +371,7 @@ pub fn generate_template_files(
 }
 
 /// Generates a source file with the specified FFI methods.
-fn generate_cpp_file(data: &CppFfiFileData, file_path: &Path) -> Result<()> {
+fn generate_cpp_file(data: &[DatabaseItem], file_path: &Path) -> Result<()> {
   //    let cpp_path = self
   //      .lib_path
   //      .with_added("src")
@@ -379,16 +379,22 @@ fn generate_cpp_file(data: &CppFfiFileData, file_path: &Path) -> Result<()> {
 
   let mut cpp_file = create_file(file_path)?;
   {
-    for wrapper in &data.qt_slot_wrappers {
-      cpp_file.write(qt_slot_wrapper(wrapper)?)?;
+    for item in data {
+      if let Some(ref wrapper) = item.qt_slot_wrapper {
+        cpp_file.write(qt_slot_wrapper(wrapper)?)?;
+      }
     }
     cpp_file.write("extern \"C\" {\n\n")?;
-    for method in &data.methods {
-      cpp_file.write(function_implementation(method)?)?;
+    for item in data {
+      if let Some(ref methods) = item.cpp_ffi_methods {
+        for method in methods {
+          cpp_file.write(function_implementation(method)?)?;
+        }
+      }
     }
     cpp_file.write("\n} // extern \"C\"\n\n")?;
   }
-  if !data.qt_slot_wrappers.is_empty() {
+  if data.iter().any(|item| item.qt_slot_wrapper.is_some()) {
     let moc_output = get_command_output(Command::new("moc").arg("-i").arg(file_path))?;
     cpp_file.write(format!(
       "// start of MOC generated code\n{}\n// end of MOC generated code\n",

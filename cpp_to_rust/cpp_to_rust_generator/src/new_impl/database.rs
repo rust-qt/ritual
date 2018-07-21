@@ -10,22 +10,14 @@ use cpp_data::CppVisibility;
 use cpp_ffi_data::CppFfiMethod;
 use cpp_method::CppMethod;
 
+use common::string_utils::JoinWithSeparator;
+use cpp_ffi_data::QtSlotWrapper;
 use cpp_type::CppType;
 use cpp_type::CppTypeBase;
 use cpp_type::CppTypeIndirection;
 use new_impl::html_logger::escape_html;
 use std::fmt::Display;
 use std::fmt::Formatter;
-//use common::errors::Result;
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CppField; // TODO: fill??
-
-//#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-//pub enum DataSource {
-//  CppParser,
-//  CppChecker,
-//}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CppCheckerEnv {
@@ -129,6 +121,7 @@ pub enum CppItemData {
   Method(CppMethod),
   ClassField(CppClassField),
   ClassBase(CppBaseSpecifier),
+  QtSignalArguments(Vec<CppType>),
 }
 
 impl CppItemData {
@@ -186,6 +179,7 @@ impl CppItemData {
           base: CppTypeBase::Class(base.derived_class_type.clone()),
         },
       ],
+      CppItemData::QtSignalArguments(ref args) => args.clone(),
     }
   }
 }
@@ -230,7 +224,12 @@ impl Display for CppItemData {
           index_text
         )
       }
+      CppItemData::QtSignalArguments(ref args) => format!(
+        "Qt signal args ({})",
+        args.iter().map(|arg| arg.to_cpp_pseudo_code()).join(", ")
+      ),
     };
+
     f.write_str(&s)
   }
 }
@@ -240,6 +239,7 @@ pub struct DatabaseItem {
   pub cpp_data: CppItemData,
   pub source: DatabaseItemSource,
   pub cpp_ffi_methods: Option<Vec<CppFfiMethod>>,
+  pub qt_slot_wrapper: Option<QtSlotWrapper>,
   // TODO: add rust data
 }
 
@@ -289,6 +289,7 @@ impl Database {
       cpp_data: data,
       source: source,
       cpp_ffi_methods: None,
+      qt_slot_wrapper: None,
     });
     true
   }

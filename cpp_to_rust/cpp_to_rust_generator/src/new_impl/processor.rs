@@ -12,6 +12,7 @@ use common::string_utils::JoinWithSeparator;
 use new_impl::database::{Database, DatabaseItem};
 use new_impl::html_logger::HtmlLogger;
 use new_impl::workspace::Workspace;
+use std::fmt;
 use std::iter::once;
 use std::path::PathBuf;
 //use cpp_post_processor::cpp_post_process;
@@ -77,36 +78,47 @@ impl<'a> ProcessorData<'a> {
   }
 }
 
+#[derive(Debug)]
 pub struct ProcessorMainCycleItem {
   pub item_name: String,
   pub run_after: Vec<String>,
 }
 
-pub type ProcessorItemFn = fn(data: ProcessorData) -> Result<()>;
-
-pub struct ProcessorItem {
+pub struct ProcessingStep {
   pub name: String,
   pub main_cycle_items: Vec<ProcessorMainCycleItem>,
-  pub function: ProcessorItemFn,
+  pub function: Box<Fn(ProcessorData) -> Result<()>>,
 }
 
-impl ProcessorItem {
-  pub fn new_custom<S: Into<String>>(name: S, function: ProcessorItemFn) -> ProcessorItem {
-    ProcessorItem {
+impl fmt::Debug for ProcessingStep {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    f.debug_struct("ProcessingStep")
+      .field("name", &self.name)
+      .field("main_cycle_items", &self.main_cycle_items)
+      .finish()
+  }
+}
+
+impl ProcessingStep {
+  pub fn new_custom<S: Into<String>, F: 'static + Fn(ProcessorData) -> Result<()>>(
+    name: S,
+    function: F,
+  ) -> ProcessingStep {
+    ProcessingStep {
       name: name.into(),
-      function,
+      function: Box::new(function),
       main_cycle_items: Vec::new(),
     }
   }
-  pub fn new<S: Into<String>>(
+  pub fn new<S: Into<String>, F: 'static + Fn(ProcessorData) -> Result<()>>(
     name: S,
     run_after: Vec<String>,
-    function: ProcessorItemFn,
-  ) -> ProcessorItem {
+    function: F,
+  ) -> ProcessingStep {
     let name = name.into();
-    ProcessorItem {
+    ProcessingStep {
       name: name.clone(),
-      function,
+      function: Box::new(function),
       main_cycle_items: vec![ProcessorMainCycleItem {
         item_name: name,
         run_after,
@@ -119,10 +131,10 @@ mod items {
   use common::string_utils::JoinWithSeparator;
   use new_impl::database::CppCheckerInfo;
   use new_impl::html_logger::escape_html;
-  use new_impl::processor::ProcessorItem;
+  use new_impl::processor::ProcessingStep;
 
-  pub fn print_database() -> ProcessorItem {
-    ProcessorItem::new_custom("print_database", |mut data| {
+  pub fn print_database() -> ProcessingStep {
+    ProcessingStep::new_custom("print_database", |mut data| {
       data.html_logger.add_header(&["Item", "Environments"])?;
 
       for item in &data.current_database.items {
@@ -153,14 +165,14 @@ mod items {
       Ok(())
     })
   }
-  pub fn clear() -> ProcessorItem {
-    ProcessorItem::new_custom("clear", |data| {
+  pub fn clear() -> ProcessingStep {
+    ProcessingStep::new_custom("clear", |data| {
       data.current_database.clear();
       Ok(())
     })
   }
-  pub fn clear_cpp_ffi() -> ProcessorItem {
-    ProcessorItem::new_custom("clear_cpp_ffi", |data| {
+  pub fn clear_cpp_ffi() -> ProcessingStep {
+    ProcessingStep::new_custom("clear_cpp_ffi", |data| {
       for item in &mut data.current_database.items {
         item.cpp_ffi_methods = None;
       }
@@ -176,7 +188,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
   ));
   check_all_paths(&config)?;
 
-  let processor_items = vec![
+  let standard_processing_steps = vec![
     cpp_parser(),
     // TODO: instantiate_templates
     // TODO: generate_field_accessors
@@ -188,6 +200,10 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
     items::clear_cpp_ffi(),
     items::clear(),
   ];
+  let all_processing_steps: Vec<_> = standard_processing_steps
+    .iter()
+    .chain(config.custom_processing_steps().iter())
+    .collect();
 
   // TODO: allow to remove any prefix through `Config` (#25)
   #[allow(unused_variables)]
@@ -211,7 +227,10 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
     })?;
 
   for operation in operations {
-    if let Some(item) = processor_items.iter().find(|item| &item.name == operation) {
+    if let Some(item) = all_processing_steps
+      .iter()
+      .find(|item| &item.name == operation)
+    {
       log::status(format!("Running processor item: {}", &item.name));
 
       let html_logger = HtmlLogger::new(
@@ -233,7 +252,10 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
       println!(
         "Unknown operation: {}. Supported operations: {}",
         operation,
-        processor_items.iter().map(|item| &item.name).join(", ")
+        all_processing_steps
+          .iter()
+          .map(|item| &item.name)
+          .join(", ")
       );
     }
   }

@@ -12,8 +12,8 @@ use cpp_method::{CppMethod, CppMethodArgument, CppMethodClassMembership, CppMeth
 use cpp_type::CppTypeRole;
 use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
 use new_impl::database::CppItemData;
+use new_impl::processor::ProcessingStep;
 use new_impl::processor::ProcessorData;
-use new_impl::processor::ProcessorItem;
 
 /// This object generates the C++ wrapper library
 struct CppFfiGenerator<'a> {
@@ -40,8 +40,8 @@ pub fn run(data: ProcessorData) -> Result<()> {
   Ok(())
 }
 
-pub fn cpp_ffi_generator() -> ProcessorItem {
-  ProcessorItem::new("cpp_ffi_generator", Vec::new(), run)
+pub fn cpp_ffi_generator() -> ProcessingStep {
+  ProcessingStep::new("cpp_ffi_generator", Vec::new(), run)
 }
 
 // TODO: instantiate_templates
@@ -669,6 +669,7 @@ impl<'a> CppFfiGenerator<'a> {
           generate_field_accessors(field, &stack_allocated_types, &name)
         }
         CppItemData::ClassBase(ref base) => generate_casts(base, &all_class_bases, &name),
+        CppItemData::QtSignalArguments(ref signal_srguments) => unimplemented!(),
       };
 
       match result {

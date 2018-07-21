@@ -288,7 +288,7 @@ impl CppFfiType {
 
 /// Information about a Qt slot wrapper with
 /// certain slot arguments
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QtSlotWrapper {
   /// Generated name of the wrapper class
   pub class_name: String,
@@ -299,9 +299,4 @@ pub struct QtSlotWrapper {
   /// String identifier passed to `QObject::connect` function to
   /// specify the object's slot.
   pub receiver_id: String,
-}
-
-pub struct CppFfiFileData {
-  pub methods: Vec<CppFfiMethod>,
-  pub qt_slot_wrappers: Vec<QtSlotWrapper>,
 }

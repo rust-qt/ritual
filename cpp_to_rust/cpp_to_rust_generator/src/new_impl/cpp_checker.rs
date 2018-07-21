@@ -13,8 +13,8 @@ use new_impl::database::CppCheckerInfo;
 
 use new_impl::database::CppCheckerEnv;
 
+use new_impl::processor::ProcessingStep;
 use new_impl::processor::ProcessorData;
-use new_impl::processor::ProcessorItem;
 
 use cpp_code_generator;
 use new_impl::html_logger::escape_html;
@@ -254,8 +254,8 @@ fn run(data: ProcessorData) -> Result<()> {
   Ok(())
 }
 
-pub fn cpp_checker() -> ProcessorItem {
-  ProcessorItem::new(
+pub fn cpp_checker() -> ProcessingStep {
+  ProcessingStep::new(
     "cpp_checker",
     vec!["cpp_parser".to_string(), "cpp_ffi_generator".to_string()],
     run,

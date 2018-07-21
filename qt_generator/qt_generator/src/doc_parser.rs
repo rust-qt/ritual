@@ -3,13 +3,20 @@
 
 use cpp_to_rust_generator::common::errors::{unexpected, ChainErr, Result};
 use cpp_to_rust_generator::common::log;
+use cpp_to_rust_generator::cpp_data::CppTypeDataKind;
 use cpp_to_rust_generator::cpp_data::CppTypeDoc;
+use cpp_to_rust_generator::cpp_data::CppVisibility;
+use cpp_to_rust_generator::cpp_method::CppMethod;
 use cpp_to_rust_generator::cpp_method::CppMethodDoc;
+use cpp_to_rust_generator::new_impl::database::CppItemData;
+use cpp_to_rust_generator::new_impl::database::DatabaseItem;
+use cpp_to_rust_generator::new_impl::processor::ProcessorData;
 use doc_decoder::DocData;
 use html_parser::document::Document;
 use html_parser::node::Node;
 use regex::Regex;
 use std::collections::{hash_map, HashMap, HashSet};
+use std::path::Path;
 
 /// Documentation data for an enum variant.
 #[derive(Debug, Clone)]
@@ -50,6 +57,11 @@ pub struct DocParser {
   doc_data: DocData,
   file_data: HashMap<i32, FileData>,
   base_url: String,
+}
+
+struct DocForType {
+  type_doc: CppTypeDoc,
+  enum_variants_doc: Vec<DocForEnumVariant>,
 }
 
 impl DocParser {
@@ -241,7 +253,7 @@ impl DocParser {
   }
 
   /// Returns documentation for C++ type `name`.
-  pub fn doc_for_type(&mut self, name: &str) -> Result<(CppTypeDoc, Vec<DocForEnumVariant>)> {
+  pub fn doc_for_type(&mut self, name: &str) -> Result<DocForType> {
     let index_item = self
       .doc_data
       .find_index_item(|item| &item.name == &name)
@@ -256,14 +268,14 @@ impl DocParser {
           .chain_err(|| format!("no such anchor: {}", anchor))?;
         (result.clone(), file_data.file_name.clone())
       };
-      return Ok((
-        CppTypeDoc {
+      return Ok(DocForType {
+        type_doc: CppTypeDoc {
           html: result.html,
           url: format!("{}{}#{}", self.base_url, file_name, anchor),
           cross_references: result.cross_references,
         },
-        result.enum_variants,
-      ));
+        enum_variants_doc: result.enum_variants,
+      });
     }
     let mut result = String::new();
     let mut url = self.base_url.clone();
@@ -293,14 +305,14 @@ impl DocParser {
       }
     }
     let (html, cross_references) = process_html(&result, &self.base_url)?;
-    Ok((
-      CppTypeDoc {
+    Ok(DocForType {
+      type_doc: CppTypeDoc {
         html: html,
         url: url,
         cross_references: cross_references.into_iter().collect(),
       },
-      Vec::new(),
-    ))
+      enum_variants_doc: Vec::new(),
+    })
   }
 
   /// Marks an enum variant `full_name` as used in the `DocData` index,
@@ -532,4 +544,104 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
     });
   }
   Ok(results)
+}
+
+/// Adds documentation from `data` to `cpp_methods`.
+fn find_methods_docs(items: &mut [DatabaseItem], data: &mut DocParser) -> Result<()> {
+  for item in items {
+    if let CppItemData::Method(ref mut cpp_method) = item.cpp_data {
+      if let Some(ref info) = cpp_method.class_membership {
+        if info.visibility == CppVisibility::Private {
+          continue;
+        }
+      }
+      if let Some(ref declaration_code) = cpp_method.declaration_code {
+        match data.doc_for_method(
+          &cpp_method.doc_id(),
+          declaration_code,
+          &cpp_method.short_text(),
+        ) {
+          Ok(doc) => cpp_method.doc = Some(doc),
+          Err(msg) => {
+            if cpp_method.class_membership.is_some()
+              && (&cpp_method.name == "tr"
+                || &cpp_method.name == "trUtf8"
+                || &cpp_method.name == "metaObject")
+            {
+              // no error message
+            } else {
+              log::llog(log::DebugQtDoc, || {
+                format!(
+                  "Failed to get documentation for method: {}: {}",
+                  &cpp_method.short_text(),
+                  msg
+                )
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+  Ok(())
+}
+
+pub fn parse_docs(data: ProcessorData, qt_crate_name: &str, docs_path: &Path) -> Result<()> {
+  let doc_data = match DocData::new(&qt_crate_name, &docs_path) {
+    Ok(doc_data) => doc_data,
+    Err(err) => {
+      log::error(format!("Failed to get Qt documentation: {}", err));
+      err.discard_expected();
+      return Ok(());
+    }
+  };
+  let mut parser = DocParser::new(doc_data);
+  find_methods_docs(&mut data.current_database.items, &mut parser)?;
+  let mut type_doc_cache = HashMap::new();
+  for item in &mut data.current_database.items {
+    let type_name = match item.cpp_data {
+      CppItemData::Type(ref data) => data.name.clone(),
+      CppItemData::EnumValue(ref data) => data.enum_name.clone(),
+      _ => continue,
+    };
+    if !type_doc_cache.contains_key(&type_name) {
+      let doc = parser.doc_for_type(&type_name);
+      if let Err(ref err) = doc {
+        log::error(format!("Failed to get Qt documentation: {}", err));
+        err.discard_expected();
+      }
+      type_doc_cache.insert(type_name.clone(), doc);
+    }
+    let doc = type_doc_cache
+      .get(&type_name)
+      .expect("type_doc_cache is guaranteed to have an entry here because we added it above");
+    if let Ok(doc) = doc {
+      match item.cpp_data {
+        CppItemData::Type(ref mut data) => {
+          data.doc = Some(doc.type_doc.clone());
+        }
+        CppItemData::EnumValue(ref mut data) => {
+          if let Some(r) = doc.enum_variants_doc.iter().find(|x| x.name == data.name) {
+            data.doc = Some(r.html.clone());
+            let enum_namespace = if let Some(index) = data.enum_name.rfind("::") {
+              data.enum_name[0..index + 2].to_string()
+            } else {
+              String::new()
+            };
+            parser.mark_enum_variant_used(&format!("{}{}", enum_namespace, &data.name));
+          } else {
+            log::llog(log::DebugQtDoc, || {
+              format!(
+                "Not found doc for enum variant: {}::{}",
+                data.enum_name, data.name
+              )
+            });
+          }
+        }
+        _ => unreachable!(),
+      };
+    }
+  }
+  parser.report_unused_anchors();
+  Ok(())
 }

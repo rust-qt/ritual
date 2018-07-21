@@ -86,8 +86,8 @@ impl DocData {
     })
   }
 
-  /// Parses Qt documentation of module `qt_sub_lib_name` located at `docs_path`.
-  pub fn new(qt_sub_lib_name: &str, docs_path: &Path) -> Result<DocData> {
+  /// Parses Qt documentation of module `qt_crate_name` located at `docs_path`.
+  pub fn new(qt_crate_name: &str, docs_path: &Path) -> Result<DocData> {
     if !docs_path.exists() {
       return Err(
         format!(
@@ -96,13 +96,13 @@ impl DocData {
         ).into(),
       );
     }
-    let doc_file_name = if qt_sub_lib_name.starts_with("3d_") {
+    let doc_file_name = if qt_crate_name.starts_with("3d_") {
       "3d".to_string()
     } else {
-      qt_sub_lib_name.replace("_", "")
+      qt_crate_name.replace("_", "")
     };
 
-    let doc_file_path = docs_path.with_added(format!("qt{}.qch", doc_file_name));
+    let doc_file_path = docs_path.with_added(format!("{}.qch", doc_file_name));
     if !doc_file_path.exists() {
       return Err(
         format!(

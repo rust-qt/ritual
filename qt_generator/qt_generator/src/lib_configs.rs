@@ -13,8 +13,9 @@ use versions;
 
 //use fix_header_names::fix_header_names;
 use cpp_to_rust_generator::config::CrateProperties;
+use cpp_to_rust_generator::new_impl::processor::ProcessingStep;
+use doc_parser::parse_docs;
 use lib_configs;
-use std::path::Path;
 
 /*
 /// Helper method to blacklist all methods of `QList<T>` template instantiation that
@@ -557,63 +558,15 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
       config.add_cpp_parser_argument("-std=gnu++11");
     }
     config.add_cpp_parser_blocked_name("qt_check_for_QGADGET_macro");
-    //let crate_name_clone = crate_name.to_string();
-    //let docs_path = qt_config.installation_data.docs_path.clone();
+
+    let crate_name_clone = crate_name.to_string();
+    let docs_path = qt_config.installation_data.docs_path.clone();
+    config.add_custom_processing_step(ProcessingStep::new(
+      "qt_doc_parser",
+      vec!["cpp_parser".to_string()],
+      move |data| parse_docs(data, &crate_name_clone, &docs_path),
+    ));
   }
-
-  // TODO: reimplement this
-/*
-  config.add_cpp_data_filter(move |cpp_data| {
-    match DocData::new(&sublib_name_clone, &docs_path) {
-      Ok(doc_data) => {
-        let mut parser = DocParser::new(doc_data);
-        find_methods_docs(&mut cpp_data.methods, &mut parser)?;
-        for type1 in &mut cpp_data.types {
-          match parser.doc_for_type(&type1.name) {
-            Ok(doc) => {
-              // log::debug(format!("Found doc for type: {}", type1.name));
-              type1.doc = Some(doc.0);
-              if let CppTypeKind::Enum { ref mut values } = type1.kind {
-                let enum_namespace = if let Some(index) = type1.name.rfind("::") {
-                  type1.name[0..index + 2].to_string()
-                } else {
-                  String::new()
-                };
-                for value in values {
-                  if let Some(r) = doc.1.iter().find(|x| x.name == value.name) {
-                    value.doc = Some(r.html.clone());
-
-                    // let full_name = format!("{}::{}", enum_namespace, &value.name);
-                    // println!("full name: {}", full_name);
-                    parser.mark_enum_variant_used(&format!("{}{}", enum_namespace, &value.name));
-                  } else {
-                    let type_name = &type1.name;
-                    log::llog(log::DebugQtDoc, || {
-                      format!(
-                        "Not found doc for enum variant: {}::{}",
-                        type_name, &value.name
-                      )
-                    });
-                  }
-                }
-              }
-            }
-            Err(err) => {
-              log::llog(log::DebugQtDoc, || {
-                format!("Not found doc for type: {}: {}", type1.name, err)
-              });
-            }
-          }
-        }
-        parser.report_unused_anchors();
-      }
-      Err(err) => {
-        log::error(format!("Failed to get Qt documentation: {}", err));
-        err.discard_expected();
-      }
-    }
-    Ok(())
-  });*/
 
   config.set_crate_template_path(
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -642,41 +595,3 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
   );
   Ok(config)
 }
-/*
-/// Adds documentation from `data` to `cpp_methods`.
-fn find_methods_docs(cpp_methods: &mut [CppMethod], data: &mut DocParser) -> Result<()> {
-  for cpp_method in cpp_methods {
-    if let Some(ref info) = cpp_method.class_membership {
-      if info.visibility == CppVisibility::Private {
-        continue;
-      }
-    }
-    if let Some(ref declaration_code) = cpp_method.declaration_code {
-      match data.doc_for_method(
-        &cpp_method.doc_id(),
-        declaration_code,
-        &cpp_method.short_text(),
-      ) {
-        Ok(doc) => cpp_method.doc = Some(doc),
-        Err(msg) => {
-          if cpp_method.class_membership.is_some()
-            && (&cpp_method.name == "tr" || &cpp_method.name == "trUtf8"
-              || &cpp_method.name == "metaObject")
-          {
-            // no error message
-          } else {
-            log::llog(log::DebugQtDoc, || {
-              format!(
-                "Failed to get documentation for method: {}: {}",
-                &cpp_method.short_text(),
-                msg
-              )
-            });
-          }
-        }
-      }
-    }
-  }
-  Ok(())
-}
-*/

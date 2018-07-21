@@ -66,17 +66,6 @@ impl CppClassField {
   }
 }
 
-/// A "using" directive inside a class definition,
-/// indicating that the class should inherite a
-/// certain method of a base class.
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
-pub struct CppClassUsingDirective {
-  /// Name of the base class
-  pub class_name: String,
-  /// Name of the method
-  pub method_name: String,
-}
-
 /// Item of base class list in a class declaration
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppBaseSpecifier {
@@ -157,27 +146,6 @@ impl CppTypeData {
   pub fn is_same(&self, other: &CppTypeData) -> bool {
     self.name == other.name && self.kind == other.kind
   }
-}
-
-/// Information about template arguments of a C++ class type
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
-pub struct TemplateArgumentsDeclaration {
-  /// Indicates how many template types this type is nested into.
-  ///
-  /// In the following example class `A`
-  /// has level 0, and class `B` has level 1.
-  ///
-  /// ```C++
-  /// template<class T>
-  /// class A {
-  ///   template<class T2>
-  ///   class B {};
-  /// };
-  /// ```
-  pub nested_level: usize,
-  /// Names of template arguments. Names themselves are
-  /// not particularly important, but their count is.
-  pub names: Vec<String>,
 }
 
 /// Information about a C++ template class
@@ -479,13 +447,6 @@ impl ParserCppData {
   }
 }
 */
-impl TemplateArgumentsDeclaration {
-  /// Returns count of the template arguments.
-  #[allow(dead_code)]
-  pub fn count(&self) -> usize {
-    self.names.len()
-  }
-}
 
 impl<'a> CppDataWithDeps<'a> {
   /// Returns true if `type1` is a known template instantiation.

@@ -24,8 +24,8 @@ use config::Config;
 use cpp_data::CppTypeDataKind;
 use new_impl::database::DatabaseItemSource;
 
+use new_impl::processor::ProcessingStep;
 use new_impl::processor::ProcessorData;
-use new_impl::processor::ProcessorItem;
 use regex::Regex;
 use std::iter::once;
 
@@ -308,8 +308,8 @@ fn run(data: ProcessorData) -> Result<()> {
   //  })
 }
 
-pub fn cpp_parser() -> ProcessorItem {
-  ProcessorItem::new("cpp_parser", Vec::new(), run)
+pub fn cpp_parser() -> ProcessingStep {
+  ProcessingStep::new("cpp_parser", Vec::new(), run)
 }
 
 impl<'a> CppParser<'a> {
@@ -1320,33 +1320,6 @@ impl<'a> CppParser<'a> {
       )
     })?;
     let full_name = get_full_name(entity)?;
-    /*
-    let using_directives = entity
-      .get_children()
-      .into_iter()
-      .filter(|c| c.get_kind() == EntityKind::UsingDeclaration)
-      .filter_map(|child| {
-        let type_ref =
-          if let Some(x) = child.get_children().into_iter().find(|c| {
-            c.get_kind() == EntityKind::TypeRef || c.get_kind() == EntityKind::TemplateRef
-          }) {
-            x
-          } else {
-            log::llog(log::DebugParser, || {
-              "Failed to parse UsingDeclaration: class type not found".to_string()
-            });
-            dump_entity(child, 0);
-            return None;
-          };
-        let type_def = type_ref
-          .get_definition()
-          .expect("TypeRef definition not found");
-        Some(CppClassUsingDirective {
-          class_name: get_full_name(type_def).expect("class_name get_full_name failed"),
-          method_name: child.get_name().expect("method_name failed"),
-        })
-      })
-      .collect(); */
     let template_arguments = get_template_arguments(entity);
     if entity.get_kind() == EntityKind::ClassTemplate {
       if entity

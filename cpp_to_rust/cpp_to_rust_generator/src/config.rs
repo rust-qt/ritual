@@ -2,34 +2,10 @@
 
 use common;
 use common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
-use common::errors::Result;
 pub use cpp_data::CppTypeAllocationPlace;
-use cpp_data::ParserCppData;
-use cpp_method::CppMethod;
+use new_impl::processor::ProcessingStep;
 use std::collections::HashMap;
 use std::path::PathBuf;
-
-/// Function type used in `Config::add_cpp_ffi_generator_filter`.
-pub type CppFfiGeneratorFilterFn = Fn(&CppMethod) -> Result<bool>;
-
-struct CppFfiGeneratorFilter(Box<Fn(&CppMethod) -> Result<bool>>);
-
-impl ::std::fmt::Debug for CppFfiGeneratorFilter {
-  fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::result::Result<(), ::std::fmt::Error> {
-    write!(f, "CppFfiGeneratorFilter")
-  }
-}
-
-/// Function type used in `Config::add_cpp_data_filter`.
-pub type CppDataFilterFn = Fn(&mut ParserCppData) -> Result<()>;
-
-struct CppDataFilter(Box<CppDataFilterFn>);
-
-impl ::std::fmt::Debug for CppDataFilter {
-  fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::result::Result<(), ::std::fmt::Error> {
-    write!(f, "CppDataFilter")
-  }
-}
 
 /// Information about an extra non-`cpp_to_rust`-based dependency.
 #[derive(Default, Debug, Clone)]
@@ -183,12 +159,10 @@ pub struct Config {
   cpp_build_paths: CppBuildPaths,
   cpp_parser_arguments: Vec<String>,
   cpp_parser_blocked_names: Vec<String>,
+  custom_processing_steps: Vec<ProcessingStep>,
 
-  // TODO: maybe change filters API
-  cpp_ffi_generator_filters: Vec<CppFfiGeneratorFilter>,
-  cpp_data_filters: Vec<CppDataFilter>,
+  // TODO: revisit fields below when new rust name generator is done
   cpp_filtered_namespaces: Vec<String>,
-
   type_allocation_places: HashMap<String, CppTypeAllocationPlace>,
 }
 
@@ -205,11 +179,10 @@ impl Config {
       include_directives: Default::default(),
       cpp_parser_arguments: Default::default(),
       cpp_parser_blocked_names: Default::default(),
-      cpp_ffi_generator_filters: Default::default(),
-      cpp_data_filters: Default::default(),
       cpp_filtered_namespaces: Default::default(),
       cpp_build_config: Default::default(),
       type_allocation_places: Default::default(),
+      custom_processing_steps: Default::default(),
       cpp_lib_version: None,
     }
   }
@@ -317,37 +290,6 @@ impl Config {
     self.include_directives.push(path.into());
   }
 
-  /// Adds a custom function that decides whether a C++ method should be
-  /// added to the C++ wrapper library. For each C++ method,
-  /// each function will be run once. Filters are executed in the same order they
-  /// were added.
-  ///
-  /// Interpetation of the function's output:
-  ///
-  /// - `Err` indicates an unexpected failure and terminates the processing.
-  /// - `Ok(true)` allows to continue processing of the method.
-  /// If all functions return `Ok(true)`, the method is accepted.
-  /// - `Ok(false)` blocks the method. Remaining filter functions are not run
-  /// on this method.
-  pub fn add_cpp_ffi_generator_filter<F>(&mut self, f: F)
-  where
-    F: Fn(&CppMethod) -> Result<bool> + 'static,
-  {
-    self
-      .cpp_ffi_generator_filters
-      .push(CppFfiGeneratorFilter(Box::new(f)));
-  }
-
-  /// Adds a custom function that visits `&mut CppData` and can perform any changes
-  /// in the output of the C++ parser. Filters are executed in the same order they
-  /// were added. If the function returns `Err`, the processing is terminated.
-  pub fn add_cpp_data_filter<F>(&mut self, f: F)
-  where
-    F: Fn(&mut ParserCppData) -> Result<()> + 'static,
-  {
-    self.cpp_data_filters.push(CppDataFilter(Box::new(f)));
-  }
-
   /// Adds a namespace to filter out before rust code generation.
   pub fn add_cpp_filtered_namespace<N: Into<String>>(&mut self, namespace: N) {
     self.cpp_filtered_namespaces.push(namespace.into());
@@ -405,6 +347,10 @@ impl Config {
     self.cpp_lib_version.as_ref().map(|x| x.as_str())
   }
 
+  pub fn add_custom_processing_step(&mut self, step: ProcessingStep) {
+    self.custom_processing_steps.push(step);
+  }
+
   /// Returns crate properties passed to `Config::new`.
   pub fn crate_properties(&self) -> &CrateProperties {
     &self.crate_properties
@@ -447,24 +393,6 @@ impl Config {
     &self.include_directives
   }
 
-  /// Returns values added by `Config::add_cpp_ffi_generator_filter`.
-  pub fn cpp_ffi_generator_filters(&self) -> Vec<&Box<CppFfiGeneratorFilterFn>> {
-    self
-      .cpp_ffi_generator_filters
-      .iter()
-      .map(|x| &x.0)
-      .collect()
-  }
-
-  pub fn has_cpp_data_filters(&self) -> bool {
-    !self.cpp_data_filters.is_empty()
-  }
-
-  /// Returns values added by `Config::add_cpp_data_filter`.
-  pub fn cpp_data_filters(&self) -> Vec<&Box<CppDataFilterFn>> {
-    self.cpp_data_filters.iter().map(|x| &x.0).collect()
-  }
-
   /// Returns values added by `Config::add_cpp_filtered_namespace`.
   pub fn cpp_filtered_namespaces(&self) -> &Vec<String> {
     &self.cpp_filtered_namespaces
@@ -478,5 +406,9 @@ impl Config {
   /// Keys of the hash map are names of C++ types.
   pub fn type_allocation_places(&self) -> &HashMap<String, CppTypeAllocationPlace> {
     &self.type_allocation_places
+  }
+
+  pub fn custom_processing_steps(&self) -> &[ProcessingStep] {
+    &self.custom_processing_steps
   }
 }
