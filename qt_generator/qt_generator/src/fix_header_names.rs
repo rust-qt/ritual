@@ -6,6 +6,9 @@ use cpp_to_rust_generator::common::file_utils::{file_to_string, os_str_to_str, r
 use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::common::utils::add_to_multihash;
 
+use cpp_to_rust_generator::new_impl::database::CppItemData;
+use cpp_to_rust_generator::new_impl::database::DatabaseItem;
+use cpp_to_rust_generator::new_impl::database::DatabaseItemSource;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -92,20 +95,29 @@ impl HeaderNameMap {
     })
   }
 }
-/*
+
 /// Replaces names of header files in `data` with Qt's shortcut headers.
-pub fn fix_header_names(data: &mut ParserCppData, headers_dir: &PathBuf) -> Result<()> {
+pub fn fix_header_names(data: &mut [DatabaseItem], headers_dir: &PathBuf) -> Result<()> {
   let map = HeaderNameMap::new(headers_dir)?;
-  for t in &mut data.types {
-    t.include_file = map.real_to_fancy(&t.include_file, Some(&t.name));
-  }
-  for m in &mut data.methods {
-    let x = map.real_to_fancy(&m.include_file, m.class_name().map(|x| x.as_ref()));
-    m.include_file = x;
+  for item in data {
+    let class_name = match item.cpp_data {
+      CppItemData::Type(ref data) => Some(data.name.as_str()),
+      CppItemData::Method(ref data) => data.class_name().map(|x| x.as_str()),
+      _ => continue,
+    };
+
+    if let DatabaseItemSource::CppParser {
+      ref mut include_file,
+      ..
+    } = item.source
+    {
+      if let Some(old_include_file) = include_file.take() {
+        *include_file = Some(map.real_to_fancy(&old_include_file, class_name));
+      }
+    }
   }
   Ok(())
 }
-*/
 
 #[test]
 fn test_qt_fix_header_names() {

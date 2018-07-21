@@ -11,10 +11,10 @@ use qt_generator_common::{get_full_build_config, lib_dependencies, lib_folder_na
 use std::path::PathBuf;
 use versions;
 
-//use fix_header_names::fix_header_names;
 use cpp_to_rust_generator::config::CrateProperties;
 use cpp_to_rust_generator::new_impl::processor::ProcessingStep;
 use doc_parser::parse_docs;
+use fix_header_names::fix_header_names;
 use lib_configs;
 
 /*
@@ -546,9 +546,6 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
     // TODO: does parsing work on MacOS without adding "-F"?
 
     config.add_include_directive(&lib_folder_name(crate_name));
-    //let lib_include_path = qt_config.installation_data.lib_include_path.clone();
-    // TODO: reimplement this
-    //config.add_cpp_data_filter(move |cpp_data| fix_header_names(cpp_data, &lib_include_path));
     // TODO: allow to override parser flags
     config.add_cpp_parser_arguments(vec!["-fPIC", "-fcxx-exceptions"]);
 
@@ -558,6 +555,13 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
       config.add_cpp_parser_argument("-std=gnu++11");
     }
     config.add_cpp_parser_blocked_name("qt_check_for_QGADGET_macro");
+
+    let lib_include_path = qt_config.installation_data.lib_include_path.clone();
+    config.add_custom_processing_step(ProcessingStep::new(
+      "qt_fix_header_names",
+      vec!["cpp_parser".to_string()],
+      move |data| fix_header_names(&mut data.current_database.items, &lib_include_path),
+    ));
 
     let crate_name_clone = crate_name.to_string();
     let docs_path = qt_config.installation_data.docs_path.clone();

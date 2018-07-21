@@ -3,10 +3,8 @@
 
 use cpp_to_rust_generator::common::errors::{unexpected, ChainErr, Result};
 use cpp_to_rust_generator::common::log;
-use cpp_to_rust_generator::cpp_data::CppTypeDataKind;
 use cpp_to_rust_generator::cpp_data::CppTypeDoc;
 use cpp_to_rust_generator::cpp_data::CppVisibility;
-use cpp_to_rust_generator::cpp_method::CppMethod;
 use cpp_to_rust_generator::cpp_method::CppMethodDoc;
 use cpp_to_rust_generator::new_impl::database::CppItemData;
 use cpp_to_rust_generator::new_impl::database::DatabaseItem;
@@ -97,7 +95,7 @@ impl DocParser {
   /// the C++ parser, and the other one is constructed based on
   /// the parsed signature data. Declarations are used to distinguish between
   /// multiple methods with the same name.
-  pub fn doc_for_method(
+  fn doc_for_method(
     &mut self,
     name: &str,
     declaration1: &str,
@@ -253,7 +251,7 @@ impl DocParser {
   }
 
   /// Returns documentation for C++ type `name`.
-  pub fn doc_for_type(&mut self, name: &str) -> Result<DocForType> {
+  fn doc_for_type(&mut self, name: &str) -> Result<DocForType> {
     let index_item = self
       .doc_data
       .find_index_item(|item| &item.name == &name)
