@@ -184,6 +184,7 @@ pub struct CppFfiMethod {
 
   /// Allocation place method used for converting
   /// the return type of the method
+  /// or used to determine implementation of the destructor
   pub allocation_place: ReturnValueAllocationPlace,
 
   /// Final name of FFI method

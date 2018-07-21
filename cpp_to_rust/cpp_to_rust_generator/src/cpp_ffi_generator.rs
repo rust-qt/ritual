@@ -165,50 +165,6 @@ fn generate_casts(
   )
 }
 
-/*
-/// Generates the FFI function signature for this method.
-fn method_to_ffi_signature<'a>(
-  method: CppMethodRefWithKind<'a>,
-  cpp_data: &CppDataWithDeps,
-  type_allocation_places_override: Option<CppTypeAllocationPlace>,
-) -> Result<CppFfiMethod> {
-  let get_place = |name| -> Result<ReturnValueAllocationPlace> {
-    let v = if let Some(ref x) = type_allocation_places_override {
-      x.clone()
-    } else {
-      cpp_data.type_allocation_place(name)?
-    };
-    Ok(match v {
-      CppTypeAllocationPlace::Heap => ReturnValueAllocationPlace::Heap,
-      CppTypeAllocationPlace::Stack => ReturnValueAllocationPlace::Stack,
-    })
-  };
-
-  let place = if method.method.is_constructor() || method.method.is_destructor() {
-    let info = method
-      .method
-      .class_membership
-      .as_ref()
-      .expect("class info expected here");
-    get_place(&info.class_type.name)?
-  } else if method.method.return_type.needs_allocation_place_variants() {
-    if let CppTypeBase::Class(CppTypeClassBase { ref name, .. }) = method.method.return_type.base {
-      get_place(name)?
-    } else {
-      return Err(unexpected("class type expected here").into());
-    }
-  } else {
-    ReturnValueAllocationPlace::NotApplicable
-  };
-
-  let c_signature = method.method.c_signature(place.clone())?;
-  Ok(CppFfiMethod {
-    kind: method.kind,
-    allocation_place: place,
-    c_signature: c_signature,
-  })
-}*/
-
 /// Creates FFI method signature for this method:
 /// - converts all types to FFI types;
 /// - adds "this" argument explicitly if present;
@@ -257,19 +213,18 @@ pub fn to_ffi_method(
       meaning: CppFfiArgumentMeaning::Argument(index as i8),
     });
   }
-  let real_return_type = if let Some(info) = method.class_info_if_constructor() {
-    CppType {
+  let type_for_place = match method.class_membership {
+    Some(ref info) if info.kind.is_constructor() || info.kind.is_destructor() => CppType {
       is_const: false,
       is_const2: false,
       indirection: CppTypeIndirection::None,
       base: CppTypeBase::Class(info.class_type.clone()),
-    }
-  } else {
-    method.return_type.clone()
+    },
+    _ => method.return_type.clone(),
   };
-  let c_type = real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
-  if real_return_type.needs_allocation_place_variants() {
-    if let CppTypeBase::Class(ref base) = real_return_type.base {
+  let c_type = type_for_place.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
+  if type_for_place.needs_allocation_place_variants() {
+    if let CppTypeBase::Class(ref base) = type_for_place.base {
       if stack_allocated_types.iter().any(|t| t == base) {
         r.arguments.push(CppFfiMethodArgument {
           name: "output".to_string(),
