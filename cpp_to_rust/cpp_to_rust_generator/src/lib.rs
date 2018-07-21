@@ -45,6 +45,7 @@ mod cpp_parser;
 //mod rust_info;
 //mod rust_type;
 //mod versions;
+mod cpp_template_instantiator;
 
 #[cfg(test)]
 mod tests;

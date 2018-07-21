@@ -3,7 +3,6 @@
 use common;
 use common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
 use new_impl::processor::ProcessingStep;
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Information about an extra non-`cpp_to_rust`-based dependency.

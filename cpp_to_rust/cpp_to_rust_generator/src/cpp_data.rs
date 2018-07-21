@@ -1,7 +1,5 @@
 //! Types for handling information about C++ library APIs.
 
-use common::errors::Result;
-use cpp_method::CppMethod;
 pub use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppTypeClassBase};
 
@@ -164,55 +162,10 @@ impl CppTypeDataKind {
   }
 }
 /*
-impl ParserCppData {
-  /// Checks if specified class has explicitly declared protected or private destructor.
-  pub fn has_non_public_destructor(&self, class_type: &CppTypeClassBase) -> bool {
-    for method in &self.methods {
-      if let Some(ref info) = method.class_membership {
-        if info.kind == CppMethodKind::Destructor && &info.class_type == class_type {
-          return info.visibility != CppVisibility::Public;
-        }
-      }
-    }
-    false
-  }
-}
+
 
 impl<'a> CppDataWithDeps<'a> {
-  /// Returns true if `type1` is a known template instantiation.
-  pub fn check_template_type(&self, type1: &CppType) -> Result<()> {
-    if let CppTypeBase::Class(CppTypeClassBase {
-      ref name,
-      ref template_arguments,
-    }) = type1.base
-    {
-      if let Some(ref template_arguments) = *template_arguments {
-        let is_valid = |cpp_data: &CppData| {
-          cpp_data
-            .processed
-            .template_instantiations
-            .iter()
-            .any(|inst| {
-              &inst.class_name == name
-                && inst
-                  .instantiations
-                  .iter()
-                  .any(|x| &x.template_arguments == template_arguments)
-            })
-        };
-        if !once(&self.current)
-          .chain(self.dependencies.iter().map(|x| *x))
-          .any(is_valid)
-        {
-          return Err(format!("type not available: {:?}", type1).into());
-        }
-        for arg in template_arguments {
-          self.check_template_type(arg)?;
-        }
-      }
-    }
-    Ok(())
-  }
+
 
   /// Returns selected type allocation place for type `class_name`.
   pub fn type_allocation_place(&self, class_name: &str) -> Result<CppTypeAllocationPlace> {

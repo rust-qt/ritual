@@ -189,6 +189,22 @@ impl CppItemData {
       CppItemData::TemplateInstantiation(ref data) => data.template_arguments.clone(),
     }
   }
+
+  pub fn as_method_ref(&self) -> Option<&CppMethod> {
+    if let CppItemData::Method(ref data) = *self {
+      Some(data)
+    } else {
+      None
+    }
+  }
+
+  pub fn as_template_instantiation_ref(&self) -> Option<&CppTemplateInstantiation> {
+    if let CppItemData::TemplateInstantiation(ref data) = *self {
+      Some(data)
+    } else {
+      None
+    }
+  }
 }
 
 impl Display for CppItemData {

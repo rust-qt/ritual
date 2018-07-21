@@ -29,6 +29,20 @@ use rust_info::{
 use rust_type::{CompleteType, RustName, RustToCTypeConversion, RustType, RustTypeIndirection};
 use std::collections::{hash_map, HashMap, HashSet};
 
+/*impl ParserCppData {
+  /// Checks if specified class has explicitly declared protected or private destructor.
+  pub fn has_non_public_destructor(&self, class_type: &CppTypeClassBase) -> bool {
+    for method in &self.methods {
+      if let Some(ref info) = method.class_membership {
+        if info.kind == CppMethodKind::Destructor && &info.class_type == class_type {
+          return info.visibility != CppVisibility::Public;
+        }
+      }
+    }
+    false
+  }
+}*/
+
 /// Intermediate data of a single C++ method converted to
 /// a Rust method before any overloading is applied.
 #[derive(Debug, PartialEq, Eq, Clone)]
