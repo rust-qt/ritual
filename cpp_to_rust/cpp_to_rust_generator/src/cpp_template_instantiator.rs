@@ -1,8 +1,6 @@
 use common::errors::Result;
 use common::log;
 use cpp_data::CppTemplateInstantiation;
-use cpp_ffi_data::CppFfiMethod;
-use cpp_ffi_data::CppFfiMethodKind;
 use cpp_method::CppMethod;
 use cpp_method::CppMethodArgument;
 use cpp_method::CppOperator;
@@ -10,7 +8,6 @@ use cpp_type::CppType;
 use cpp_type::CppTypeBase;
 use cpp_type::CppTypeClassBase;
 use new_impl::processor::ProcessorData;
-use std::iter::once;
 
 /// Returns true if `type1` is a known template instantiation.
 fn check_template_type(data: &ProcessorData, type1: &CppType) -> Result<()> {

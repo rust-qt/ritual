@@ -1,11 +1,7 @@
 //! Types for handling information about C++ library APIs.
 
 pub use cpp_operator::CppOperator;
-use cpp_type::{CppType, CppTypeBase, CppTypeClassBase};
-
-use cpp_method::CppMethodKind;
-use std::collections::HashMap;
-use std::iter::once;
+use cpp_type::{CppType, CppTypeClassBase};
 
 /// One item of a C++ enum declaration
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]

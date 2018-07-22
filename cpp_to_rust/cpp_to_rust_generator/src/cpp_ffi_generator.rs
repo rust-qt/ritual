@@ -19,22 +19,111 @@ use new_impl::processor::ProcessingStep;
 use new_impl::processor::ProcessorData;
 use std::iter::once;
 
-/// This object generates the C++ wrapper library
-struct CppFfiGenerator<'a> {
-  /// Input C++ data
-  data: ProcessorData<'a>,
-  /// Name of the wrapper library
-  cpp_ffi_lib_name: String,
+struct FfiNameProvider {
+  prefix: String,
+  next_id: u64,
+}
+
+impl FfiNameProvider {
+  fn new(prefix: String, next_id: u64) -> Self {
+    FfiNameProvider { prefix, next_id }
+  }
+  fn next_name(&mut self) -> String {
+    let id = self.next_id;
+    self.next_id += 1;
+    format!("{}{}", self.prefix, id)
+  }
 }
 
 /// Runs the FFI generator
-pub fn run(data: ProcessorData) -> Result<()> {
-  let cpp_ffi_lib_name = format!("{}_ffi", &data.config.crate_properties().name());
-  let mut generator = CppFfiGenerator {
-    data: data,
-    cpp_ffi_lib_name,
-  };
-  generator.process_methods()?;
+fn run(mut data: ProcessorData) -> Result<()> {
+  let cpp_ffi_lib_name = format!("ctr_{}_ffi", &data.config.crate_properties().name());
+  let stack_allocated_types: Vec<_> = data
+    .all_items()
+    .iter()
+    .filter_map(|item| {
+      if let CppItemData::Type(ref type_data) = item.cpp_data {
+        if let CppTypeDataKind::Class { ref type_base } = type_data.kind {
+          if type_data.is_stack_allocated_type {
+            return Some(type_base.clone());
+          }
+        }
+      }
+      None
+    })
+    .collect();
+
+  let all_class_bases: Vec<_> = data
+    .all_items()
+    .iter()
+    .filter_map(|item| {
+      if let CppItemData::ClassBase(ref base) = item.cpp_data {
+        Some(base.clone())
+      } else {
+        None
+      }
+    })
+    .collect();
+
+  // TODO: save and use next_id
+  let mut name_provider = FfiNameProvider::new(cpp_ffi_lib_name.clone(), 0);
+
+  for item in &mut data.current_database.items {
+    if item.cpp_ffi_methods.is_some() {
+      data.html_logger.add(
+        &[item.cpp_data.to_string(), "already processed".to_string()],
+        "already_processed",
+      )?;
+      continue;
+    }
+    if !should_process_item(&item.cpp_data)? {
+      data.html_logger.add(
+        &[item.cpp_data.to_string(), "skipped".to_string()],
+        "skipped",
+      )?;
+      continue;
+    }
+    let result = match item.cpp_data {
+      CppItemData::Type(_) | CppItemData::EnumValue(_) => {
+        Ok(Vec::new())
+        // no FFI methods for these items
+      }
+      CppItemData::Method(ref method) => {
+        generate_ffi_methods_for_method(method, &stack_allocated_types, &mut name_provider)
+      }
+      CppItemData::ClassField(ref field) => {
+        generate_field_accessors(field, &stack_allocated_types, &mut name_provider)
+      }
+      CppItemData::ClassBase(ref base) => {
+        generate_casts(base, &all_class_bases, &mut name_provider)
+      }
+      CppItemData::QtSignalArguments(ref signal_srguments) => unimplemented!(),
+      CppItemData::TemplateInstantiation(..) => continue,
+    };
+
+    match result {
+      Err(msg) => {
+        item.cpp_ffi_methods = Some(Vec::new());
+        data
+          .html_logger
+          .add(&[item.cpp_data.to_string(), msg.to_string()], "error")?;
+      }
+      Ok(r) => {
+        data.html_logger.add(
+          &[
+            item.cpp_data.to_string(),
+            match r.len() {
+              0 => "no methods".to_string(),
+              1 => format!("added method: {:?}", r[0]),
+              _ => format!("added methods ({}): {:?}", r.len(), r),
+            },
+          ],
+          "success",
+        )?;
+        item.cpp_ffi_methods = Some(r);
+      }
+    }
+  }
   Ok(())
 }
 
@@ -50,7 +139,7 @@ fn create_cast_method(
   cast: CppCast,
   from: &CppType,
   to: &CppType,
-  name: &str,
+  name_provider: &mut FfiNameProvider,
 ) -> Result<CppFfiMethod> {
   let method = CppMethod {
     name: cast.cpp_method_name().to_string(),
@@ -68,7 +157,7 @@ fn create_cast_method(
     doc: None,
   };
   // no need for stack_allocated_types since all cast methods operate on pointers
-  let mut r = to_ffi_method(&method, &[], name)?;
+  let mut r = to_ffi_method(&method, &[], name_provider)?;
   if let CppFfiMethodKind::Method {
     ref mut cast_data, ..
   } = r.kind
@@ -91,7 +180,7 @@ fn generate_casts_one(
   target_type: &CppTypeClassBase,
   base_type: &CppTypeClassBase,
   direct_base_index: Option<usize>,
-  name_prefix: &str,
+  name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiMethod>> {
   let target_ptr_type = CppType {
     base: CppTypeBase::Class(target_type.clone()),
@@ -113,7 +202,7 @@ fn generate_casts_one(
     },
     &base_ptr_type,
     &target_ptr_type,
-    &format!("{}_cast1", name_prefix),
+    name_provider,
   )?);
   new_methods.push(create_cast_method(
     CppCast::Static {
@@ -122,13 +211,13 @@ fn generate_casts_one(
     },
     &target_ptr_type,
     &base_ptr_type,
-    &format!("{}_cast2", name_prefix),
+    name_provider,
   )?);
   new_methods.push(create_cast_method(
     CppCast::Dynamic,
     &base_ptr_type,
     &target_ptr_type,
-    &format!("{}_cast3", name_prefix),
+    name_provider,
   )?);
 
   for base in data {
@@ -138,7 +227,7 @@ fn generate_casts_one(
         target_type,
         &base.base_class_type,
         None,
-        &format!("{}_base{}", name_prefix, base.base_index),
+        name_provider,
       )?);
     }
   }
@@ -151,7 +240,7 @@ fn generate_casts_one(
 fn generate_casts(
   base: &CppBaseSpecifier,
   data: &[CppBaseSpecifier],
-  name_prefix: &str,
+  name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiMethod>> {
   //log::status("Adding cast functions");
   generate_casts_one(
@@ -159,18 +248,18 @@ fn generate_casts(
     &base.derived_class_type,
     &base.base_class_type,
     Some(base.base_index),
-    name_prefix,
+    name_provider,
   )
 }
 
-pub fn generate_ffi_methods_for_method(
+fn generate_ffi_methods_for_method(
   method: &CppMethod,
   stack_allocated_types: &[CppTypeClassBase],
-  name: &str,
+  name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiMethod>> {
   let mut methods = Vec::new();
   // TODO: don't use name here at all, generate names for all methods elsewhere
-  methods.push(to_ffi_method(method, stack_allocated_types, name)?);
+  methods.push(to_ffi_method(method, stack_allocated_types, name_provider)?);
 
   if let Some(last_arg) = method.arguments.last() {
     if last_arg.has_default_value {
@@ -179,7 +268,8 @@ pub fn generate_ffi_methods_for_method(
         if !arg.has_default_value {
           break;
         }
-        let mut processed_method = to_ffi_method(&method_copy, stack_allocated_types, name)?;
+        let mut processed_method =
+          to_ffi_method(&method_copy, stack_allocated_types, name_provider)?;
         if let CppFfiMethodKind::Method {
           ref mut omitted_arguments,
           ..
@@ -201,10 +291,10 @@ pub fn generate_ffi_methods_for_method(
 /// - converts all types to FFI types;
 /// - adds "this" argument explicitly if present;
 /// - adds "output" argument for return value if `allocation_place` is `Stack`.
-pub fn to_ffi_method(
+fn to_ffi_method(
   method: &CppMethod,
   stack_allocated_types: &[CppTypeClassBase],
-  name: &str,
+  name_provider: &mut FfiNameProvider,
 ) -> Result<CppFfiMethod> {
   if method.allows_variadic_arguments {
     return Err("Variable arguments are not supported".into());
@@ -212,7 +302,7 @@ pub fn to_ffi_method(
   let mut r = CppFfiMethod {
     arguments: Vec::new(),
     return_type: CppFfiType::void(),
-    name: name.to_string(),
+    name: name_provider.next_name(),
     allocation_place: ReturnValueAllocationPlace::NotApplicable,
     checks: Default::default(),
     kind: CppFfiMethodKind::Method {
@@ -283,12 +373,12 @@ pub fn to_ffi_method(
 fn generate_field_accessors(
   field: &CppClassField,
   stack_allocated_types: &[CppTypeClassBase],
-  name_prefix: &str,
+  name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiMethod>> {
   // TODO: fix doc generator for field accessors
   //log::status("Adding field accessors");
   let mut new_methods = Vec::new();
-  let create_method = |name, accessor_type, return_type, arguments| -> Result<CppFfiMethod> {
+  let mut create_method = |name, accessor_type, return_type, arguments| -> Result<CppFfiMethod> {
     let fake_method = CppMethod {
       name: name,
       class_membership: Some(CppMethodClassMembership {
@@ -313,15 +403,7 @@ fn generate_field_accessors(
       declaration_code: None,
       doc: None,
     };
-    let mut ffi_method = to_ffi_method(
-      &fake_method,
-      stack_allocated_types,
-      &format!(
-        "{}_{}",
-        name_prefix,
-        format!("{:?}", accessor_type).to_lowercase()
-      ),
-    )?;
+    let mut ffi_method = to_ffi_method(&fake_method, stack_allocated_types, name_provider)?;
     ffi_method.kind = CppFfiMethodKind::FieldAccessor {
       accessor_type: accessor_type,
       field: field.clone(),
@@ -411,107 +493,11 @@ fn should_process_item(item: &CppItemData) -> Result<bool> {
   //}
 }
 
-impl<'a> CppFfiGenerator<'a> {
-  /// Returns false if the method is excluded from processing
-  /// for some reason
-
-  /// Generates FFI wrappers for all specified methods,
-  /// resolving all name conflicts using additional method captions.
-  fn process_methods(&mut self) -> Result<()> {
-    let stack_allocated_types: Vec<_> = self
-      .data
-      .all_items()
-      .iter()
-      .filter_map(|item| {
-        if let CppItemData::Type(ref type_data) = item.cpp_data {
-          if let CppTypeDataKind::Class { ref type_base } = type_data.kind {
-            if type_data.is_stack_allocated_type {
-              return Some(type_base.clone());
-            }
-          }
-        }
-        None
-      })
-      .collect();
-
-    let all_class_bases: Vec<_> = self
-      .data
-      .all_items()
-      .iter()
-      .filter_map(|item| {
-        if let CppItemData::ClassBase(ref base) = item.cpp_data {
-          Some(base.clone())
-        } else {
-          None
-        }
-      })
-      .collect();
-
-    for (index, item) in &mut self.data.current_database.items.iter_mut().enumerate() {
-      if item.cpp_ffi_methods.is_some() {
-        self.data.html_logger.add(
-          &[item.cpp_data.to_string(), "already processed".to_string()],
-          "already_processed",
-        )?;
-        continue;
-      }
-      if !should_process_item(&item.cpp_data)? {
-        self.data.html_logger.add(
-          &[item.cpp_data.to_string(), "skipped".to_string()],
-          "skipped",
-        )?;
-        continue;
-      }
-
-      let name = format!("{}_item{}", self.cpp_ffi_lib_name, index);
-      let result = match item.cpp_data {
-        CppItemData::Type(_) | CppItemData::EnumValue(_) => {
-          Ok(Vec::new())
-          // no FFI methods for these items
-        }
-        CppItemData::Method(ref method) => {
-          generate_ffi_methods_for_method(method, &stack_allocated_types, &name)
-        }
-        CppItemData::ClassField(ref field) => {
-          generate_field_accessors(field, &stack_allocated_types, &name)
-        }
-        CppItemData::ClassBase(ref base) => generate_casts(base, &all_class_bases, &name),
-        CppItemData::QtSignalArguments(ref signal_srguments) => unimplemented!(),
-        CppItemData::TemplateInstantiation(..) => continue,
-      };
-
-      match result {
-        Err(msg) => {
-          item.cpp_ffi_methods = Some(Vec::new());
-          self
-            .data
-            .html_logger
-            .add(&[item.cpp_data.to_string(), msg.to_string()], "error")?;
-        }
-        Ok(r) => {
-          self.data.html_logger.add(
-            &[
-              item.cpp_data.to_string(),
-              match r.len() {
-                0 => "no methods".to_string(),
-                1 => format!("added method: {:?}", r[0]),
-                _ => format!("added methods ({}): {:?}", r.len(), r),
-              },
-            ],
-            "success",
-          )?;
-          item.cpp_ffi_methods = Some(r);
-        }
-      }
-    }
-    Ok(())
-  }
-}
 /// Generates slot wrappers for all encountered argument types
 /// (excluding types already handled in the dependencies).
 fn generate_slot_wrapper(
   arguments: &[CppType],
-  name_suffix: &str,
+  name_provider: &mut FfiNameProvider,
 ) -> Result<(QtSlotWrapper, Vec<CppFfiMethod>)> {
   let ffi_types = arguments.map_if_ok(|t| t.to_cpp_ffi_type(CppTypeRole::NotReturnType))?;
 
@@ -524,7 +510,7 @@ fn generate_slot_wrapper(
   let func_arguments = once(void_ptr.clone())
     .chain(ffi_types.iter().map(|t| t.ffi_type.clone()))
     .collect();
-  let class_name = format!("CtrSlotWrapper{}", name_suffix);
+  let class_name = name_provider.next_name();
   let function_type = CppFunctionPointerType {
     return_type: Box::new(CppType::void()),
     arguments: func_arguments,
@@ -629,9 +615,17 @@ fn generate_slot_wrapper(
 
   let mut ffi_methods = Vec::new();
   for method in methods {
-    ffi_methods.push_vec(generate_ffi_methods_for_method(&method, &[], name_suffix)?);
+    ffi_methods.push_vec(generate_ffi_methods_for_method(
+      &method,
+      &[],
+      name_provider,
+    )?);
   }
-  ffi_methods.push_vec(generate_casts(&class_bases[0], &class_bases, name_suffix)?);
+  ffi_methods.push_vec(generate_casts(
+    &class_bases[0],
+    &class_bases,
+    name_provider,
+  )?);
   let qt_slot_wrapper = QtSlotWrapper {
     class_name: class_name.clone(),
     arguments: ffi_types,

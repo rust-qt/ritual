@@ -2,7 +2,6 @@ use cpp_to_rust_generator::common::errors::{ChainErr, Result};
 use cpp_to_rust_generator::common::file_utils::open_file;
 use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::cpp_data::CppTypeDataKind;
-use cpp_to_rust_generator::cpp_type::CppTypeClassBase;
 use cpp_to_rust_generator::new_impl::database::CppItemData;
 use cpp_to_rust_generator::new_impl::database::DatabaseItemSource;
 use cpp_to_rust_generator::new_impl::processor::ProcessorData;
