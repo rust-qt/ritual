@@ -6,7 +6,7 @@ use common::log;
 use common::target::current_target;
 use common::utils::MapIfOk;
 
-use cpp_ffi_data::CppFfiMethod;
+use cpp_ffi_data::CppFfiFunction;
 
 use new_impl::database::CppCheckerAddResult;
 use new_impl::database::CppCheckerInfo;
@@ -42,7 +42,7 @@ fn check_snippet(
 }
 
 #[allow(unused_variables)]
-fn snippet_for_method(method: &CppFfiMethod) -> Result<Snippet> {
+fn snippet_for_method(method: &CppFfiFunction) -> Result<Snippet> {
   Ok(Snippet::new_global(
     cpp_code_generator::function_implementation(method)?,
   ))

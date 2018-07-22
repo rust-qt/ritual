@@ -5,7 +5,7 @@ use cpp_to_rust_generator::common::errors::{unexpected, ChainErr, Result};
 use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::cpp_data::CppTypeDoc;
 use cpp_to_rust_generator::cpp_data::CppVisibility;
-use cpp_to_rust_generator::cpp_method::CppMethodDoc;
+use cpp_to_rust_generator::cpp_function::CppFunctionDoc;
 use cpp_to_rust_generator::new_impl::database::CppItemData;
 use cpp_to_rust_generator::new_impl::database::DatabaseItem;
 use cpp_to_rust_generator::new_impl::processor::ProcessorData;
@@ -100,7 +100,7 @@ impl DocParser {
     name: &str,
     declaration1: &str,
     declaration2: &str,
-  ) -> Result<CppMethodDoc> {
+  ) -> Result<CppFunctionDoc> {
     let mut name_parts: Vec<_> = name.split("::").collect();
     let anchor_override = if name_parts.len() >= 2
       && name_parts[name_parts.len() - 1] == name_parts[name_parts.len() - 2]
@@ -180,7 +180,7 @@ impl DocParser {
             if item.html.find(|c| c != '\n').is_none() {
               return Err("found empty documentation".into());
             }
-            return Ok(CppMethodDoc {
+            return Ok(CppFunctionDoc {
               html: item.html.clone(),
               anchor: item.anchor.clone(),
               mismatched_declaration: None,
@@ -202,7 +202,7 @@ impl DocParser {
             if item.html.find(|c| c != '\n').is_none() {
               return Err("found empty documentation".into());
             }
-            return Ok(CppMethodDoc {
+            return Ok(CppFunctionDoc {
               html: item.html.clone(),
               anchor: item.anchor.clone(),
               mismatched_declaration: None,
@@ -226,7 +226,7 @@ impl DocParser {
       if candidates[0].html.is_empty() {
         return Err("found empty documentation".into());
       }
-      return Ok(CppMethodDoc {
+      return Ok(CppFunctionDoc {
         html: candidates[0].html.clone(),
         anchor: candidates[0].anchor.clone(),
         url: format!("{}#{}", file_url, candidates[0].anchor),
@@ -548,7 +548,7 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
 fn find_methods_docs(items: &mut [DatabaseItem], data: &mut DocParser) -> Result<()> {
   for item in items {
     if let CppItemData::Method(ref mut cpp_method) = item.cpp_data {
-      if let Some(ref info) = cpp_method.class_membership {
+      if let Some(ref info) = cpp_method.member {
         if info.visibility == CppVisibility::Private {
           continue;
         }
@@ -561,7 +561,7 @@ fn find_methods_docs(items: &mut [DatabaseItem], data: &mut DocParser) -> Result
         ) {
           Ok(doc) => cpp_method.doc = Some(doc),
           Err(msg) => {
-            if cpp_method.class_membership.is_some()
+            if cpp_method.member.is_some()
               && (&cpp_method.name == "tr"
                 || &cpp_method.name == "trUtf8"
                 || &cpp_method.name == "metaObject")

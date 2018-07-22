@@ -157,7 +157,7 @@ pub fn detect_signals_and_slots(data: ProcessorData) -> Result<()> {
             }
           }
         }
-        if let Some(ref mut info) = method.class_membership {
+        if let Some(ref mut info) = method.member {
           match section_type {
             SectionType::Signals => {
               info.is_signal = true;

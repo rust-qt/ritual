@@ -1,6 +1,6 @@
 use common::errors::Result;
 use cpp_data::CppClassField;
-use cpp_method::{CppMethod, ReturnValueAllocationPlace};
+use cpp_function::{CppFunction, ReturnValueAllocationPlace};
 use cpp_type::{CppFunctionPointerType, CppType, CppTypeBase};
 use new_impl::database::CppCheckerInfoList;
 
@@ -61,20 +61,17 @@ impl CppCast {
 
 /// Information about real nature of a C++ FFI method.
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum CppFfiMethodKind {
-  /// This is a real C++ method.
-  Method {
-    cpp_method: CppMethod,
+pub enum CppFfiFunctionKind {
+  /// This is a real C++ function.
+  Function {
+    cpp_function: CppFunction,
+    /// If `Some`, the method is derived from another method by omitting arguments,
+    /// and this field contains the number of omitted arguments.
     omitted_arguments: Option<usize>,
     /// If Some, this is an instance of `static_cast`, `dynamic_cast` or
     /// `qobject_cast` function call.
-    cast_data: Option<CppCast>,
+    cast: Option<CppCast>,
   },
-  //{
-  //    /// If Some, the method is derived from another method by omitting arguments,
-  //    /// and this field contains all arguments of the original method.
-  //    arguments_before_omitting: Option<Vec<CppMethodArgument>>,
-  //  },
   /// This is a field accessor, i.e. a non-existing getter or setter
   /// method for a public field.
   FieldAccessor {
@@ -85,16 +82,19 @@ pub enum CppFfiMethodKind {
   },
 }
 
-impl CppFfiMethodKind {
-  pub fn cpp_method(&self) -> Option<&CppMethod> {
-    if let CppFfiMethodKind::Method { ref cpp_method, .. } = *self {
-      Some(cpp_method)
+impl CppFfiFunctionKind {
+  pub fn cpp_function(&self) -> Option<&CppFunction> {
+    if let CppFfiFunctionKind::Function {
+      ref cpp_function, ..
+    } = *self
+    {
+      Some(cpp_function)
     } else {
       None
     }
   }
   pub fn cpp_field(&self) -> Option<&CppClassField> {
-    if let CppFfiMethodKind::FieldAccessor { ref field, .. } = *self {
+    if let CppFfiFunctionKind::FieldAccessor { ref field, .. } = *self {
       Some(field)
     } else {
       None
@@ -148,7 +148,7 @@ impl CppFfiArgumentMeaning {
 
 /// Representation of an argument of a FFI function
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct CppFfiMethodArgument {
+pub struct CppFfiFunctionArgument {
   /// Identifier
   pub name: String,
   /// Type
@@ -157,7 +157,7 @@ pub struct CppFfiMethodArgument {
   pub meaning: CppFfiArgumentMeaning,
 }
 
-impl CppFfiMethodArgument {
+impl CppFfiFunctionArgument {
   /// Generates C++ code for the part of FFI function signature
   /// corresponding to this argument
   pub fn to_cpp_code(&self) -> Result<String> {
@@ -176,9 +176,9 @@ impl CppFfiMethodArgument {
 /// Information about arguments and return type of a FFI function
 /// with no final function name
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct CppFfiMethod {
+pub struct CppFfiFunction {
   /// List of arguments
-  pub arguments: Vec<CppFfiMethodArgument>,
+  pub arguments: Vec<CppFfiFunctionArgument>,
   /// Return type
   pub return_type: CppFfiType,
 
@@ -190,12 +190,12 @@ pub struct CppFfiMethod {
   /// Final name of FFI method
   pub name: String,
 
-  pub kind: CppFfiMethodKind,
+  pub kind: CppFfiFunctionKind,
 
   pub checks: CppCheckerInfoList,
 }
 
-impl CppFfiMethod {
+impl CppFfiFunction {
   /// Returns true if this signature has const this_ptr argument,
   /// indicating that original C++ method has const attribute.
   /// Returns false if there is no this argument or it's not const.
@@ -208,8 +208,8 @@ impl CppFfiMethod {
 
   pub fn short_text(&self) -> String {
     match self.kind {
-      CppFfiMethodKind::Method {
-        ref cpp_method,
+      CppFfiFunctionKind::Function {
+        ref cpp_function,
         ref omitted_arguments,
         ..
       } => {
@@ -219,12 +219,12 @@ impl CppFfiMethod {
           String::new()
         };
         format!(
-          "FFI method call{}: {}",
+          "FFI function call{}: {}",
           omitted_args_text,
-          cpp_method.short_text()
+          cpp_function.short_text()
         )
       }
-      CppFfiMethodKind::FieldAccessor {
+      CppFfiFunctionKind::FieldAccessor {
         ref field,
         ref accessor_type,
       } => format!("FFI field {:?}: {}", accessor_type, field.short_text()),

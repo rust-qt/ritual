@@ -1,6 +1,6 @@
 use caption_strategy::*;
 use cpp_ffi_data::*;
-use cpp_method::{CppMethodKind, ReturnValueAllocationPlace};
+use cpp_function::{CppFunctionKind, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
 use cpp_type::*;
 use tests::cpp_method::{empty_membership, empty_regular_method};
@@ -19,7 +19,7 @@ fn argument_meaning() {
 
 #[test]
 fn argument_int() {
-  let arg = CppFfiMethodArgument {
+  let arg = CppFfiFunctionArgument {
     name: "arg1".to_string(),
     argument_type: CppFfiType {
       original_type: CppType {
@@ -77,7 +77,7 @@ fn argument_int() {
 
 #[test]
 fn argument_int_ptr() {
-  let arg = CppFfiMethodArgument {
+  let arg = CppFfiFunctionArgument {
     name: "arg1".to_string(),
     argument_type: CppFfiType {
       original_type: CppType {
@@ -164,7 +164,7 @@ fn argument_func() {
     }),
   };
 
-  let arg = CppFfiMethodArgument {
+  let arg = CppFfiFunctionArgument {
     name: "arg1".to_string(),
     argument_type: CppFfiType {
       original_type: type1.clone(),
@@ -214,7 +214,7 @@ fn argument_func() {
 fn signature_two_numbers() {
   let sig = CppFfiMethodSignature {
     arguments: vec![
-      CppFfiMethodArgument {
+      CppFfiFunctionArgument {
         name: "arg1".to_string(),
         argument_type: CppFfiType {
           original_type: CppType {
@@ -233,7 +233,7 @@ fn signature_two_numbers() {
         },
         meaning: CppFfiArgumentMeaning::Argument(0),
       },
-      CppFfiMethodArgument {
+      CppFfiFunctionArgument {
         name: "arg2".to_string(),
         argument_type: CppFfiType {
           original_type: CppType {
@@ -343,7 +343,7 @@ fn signature_two_numbers() {
 fn signature_class_method() {
   let sig = CppFfiMethodSignature {
     arguments: vec![
-      CppFfiMethodArgument {
+      CppFfiFunctionArgument {
         name: "this_ptr".to_string(),
         argument_type: CppFfiType {
           original_type: CppType {
@@ -368,7 +368,7 @@ fn signature_class_method() {
         },
         meaning: CppFfiArgumentMeaning::This,
       },
-      CppFfiMethodArgument {
+      CppFfiFunctionArgument {
         name: "arg1".to_string(),
         argument_type: CppFfiType {
           original_type: CppType {
@@ -436,7 +436,7 @@ fn signature_class_method() {
 fn signature_class_method_const() {
   let sig = CppFfiMethodSignature {
     arguments: vec![
-      CppFfiMethodArgument {
+      CppFfiFunctionArgument {
         name: "this_ptr".to_string(),
         argument_type: CppFfiType {
           original_type: CppType {
@@ -461,7 +461,7 @@ fn signature_class_method_const() {
         },
         meaning: CppFfiArgumentMeaning::This,
       },
-      CppFfiMethodArgument {
+      CppFfiFunctionArgument {
         name: "arg1".to_string(),
         argument_type: CppFfiType {
           original_type: CppType {
@@ -669,7 +669,7 @@ fn c_base_name_free_func_in_namespace() {
 fn c_base_name_class_method() {
   let mut method = empty_regular_method();
   method.name = "func1".to_string();
-  method.class_membership = Some(empty_membership("MyClass"));
+  method.member = Some(empty_membership("MyClass"));
   let include_file = "QRect".to_string();
   assert_eq!(
     c_base_name(
@@ -693,7 +693,7 @@ fn c_base_name_class_method() {
 fn c_base_name_class_method_in_namespace() {
   let mut method = empty_regular_method();
   method.name = "func1".to_string();
-  method.class_membership = Some(empty_membership("ns1::MyClass"));
+  method.member = Some(empty_membership("ns1::MyClass"));
   let include_file = "QRect".to_string();
   assert_eq!(
     c_base_name(
@@ -717,9 +717,9 @@ fn c_base_name_class_method_in_namespace() {
 fn c_base_name_constructor() {
   let mut method = empty_regular_method();
   method.name = "QRect".to_string();
-  method.class_membership = Some({
+  method.member = Some({
     let mut info = empty_membership("QRect");
-    info.kind = CppMethodKind::Constructor;
+    info.kind = CppFunctionKind::Constructor;
     info
   });
   let include_file = "QtCore".to_string();
@@ -744,9 +744,9 @@ fn c_base_name_constructor() {
 fn c_base_name_destructor() {
   let mut method = empty_regular_method();
   method.name = "QRect".to_string();
-  method.class_membership = Some({
+  method.member = Some({
     let mut info = empty_membership("QRect");
-    info.kind = CppMethodKind::Destructor;
+    info.kind = CppFunctionKind::Destructor;
     info
   });
   let include_file = "QtCore".to_string();
@@ -771,7 +771,7 @@ fn c_base_name_destructor() {
 fn c_base_name_class_method_operator() {
   let mut method = empty_regular_method();
   method.name = "operator>".to_string();
-  method.class_membership = Some(empty_membership("MyClass"));
+  method.member = Some(empty_membership("MyClass"));
   method.operator = Some(CppOperator::GreaterThan);
   let include_file = "QRect".to_string();
   assert_eq!(
@@ -820,7 +820,7 @@ fn c_base_name_free_func_operator() {
 fn c_base_name_conversion_operator() {
   let mut method = empty_regular_method();
   method.name = "operator const QPoint&".to_string();
-  method.class_membership = Some(empty_membership("MyClass"));
+  method.member = Some(empty_membership("MyClass"));
   method.operator = Some(CppOperator::Conversion(CppType {
     is_const: true,
     is_const2: false,

@@ -5,7 +5,7 @@ use common::string_utils::JoinWithSeparator;
 use cpp_data::{
   CppBaseSpecifier, CppClassField, CppEnumValue, CppOriginLocation, CppTypeData, CppVisibility,
 };
-use cpp_method::{CppMethod, CppMethodArgument, CppMethodClassMembership, CppMethodKind};
+use cpp_function::{CppFunction, CppFunctionArgument, CppFunctionKind, CppFunctionMemberData};
 use cpp_operator::CppOperator;
 use cpp_type::{
   CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
@@ -915,7 +915,7 @@ impl<'a> CppParser<'a> {
 
   /// Parses a function `entity`.
   #[cfg_attr(feature = "clippy", allow(cyclomatic_complexity))]
-  fn parse_function(&self, entity: Entity) -> Result<(CppMethod, DatabaseItemSource)> {
+  fn parse_function(&self, entity: Entity) -> Result<(CppFunction, DatabaseItemSource)> {
     let (class_name, class_entity) = match entity.get_semantic_parent() {
       Some(p) => match p.get_kind() {
         EntityKind::ClassDecl | EntityKind::ClassTemplate | EntityKind::StructDecl => {
@@ -1030,7 +1030,7 @@ impl<'a> CppParser<'a> {
           break;
         }
       }
-      arguments.push(CppMethodArgument {
+      arguments.push(CppFunctionArgument {
         name: name,
         argument_type: argument_type,
         has_default_value: has_default_value,
@@ -1171,16 +1171,16 @@ impl<'a> CppParser<'a> {
       Some(token_strings.join(" "))
     };
     Ok((
-      CppMethod {
+      CppFunction {
         name: name_with_namespace,
         operator: method_operator,
-        class_membership: match class_name {
+        member: match class_name {
           Some(class_name) => {
-            Some(CppMethodClassMembership {
+            Some(CppFunctionMemberData {
               kind: match entity.get_kind() {
-                EntityKind::Constructor => CppMethodKind::Constructor,
-                EntityKind::Destructor => CppMethodKind::Destructor,
-                _ => CppMethodKind::Regular,
+                EntityKind::Constructor => CppFunctionKind::Constructor,
+                EntityKind::Destructor => CppFunctionKind::Destructor,
+                _ => CppFunctionKind::Regular,
               },
               is_virtual: entity.is_virtual_method(),
               is_pure_virtual: entity.is_pure_virtual_method(),

@@ -7,8 +7,8 @@ use cpp_data::CppTypeData;
 use cpp_data::CppTypeDataKind;
 
 use cpp_data::CppVisibility;
-use cpp_ffi_data::CppFfiMethod;
-use cpp_method::CppMethod;
+use cpp_ffi_data::CppFfiFunction;
+use cpp_function::CppFunction;
 
 use common::string_utils::JoinWithSeparator;
 use cpp_data::CppTemplateInstantiation;
@@ -119,7 +119,7 @@ impl CppCheckerInfoList {
 pub enum CppItemData {
   Type(CppTypeData),
   EnumValue(CppEnumValue),
-  Method(CppMethod),
+  Method(CppFunction),
   ClassField(CppClassField),
   ClassBase(CppBaseSpecifier),
   TemplateInstantiation(CppTemplateInstantiation),
@@ -190,7 +190,7 @@ impl CppItemData {
     }
   }
 
-  pub fn as_method_ref(&self) -> Option<&CppMethod> {
+  pub fn as_method_ref(&self) -> Option<&CppFunction> {
     if let CppItemData::Method(ref data) = *self {
       Some(data)
     } else {
@@ -270,7 +270,7 @@ impl Display for CppItemData {
 pub struct DatabaseItem {
   pub cpp_data: CppItemData,
   pub source: DatabaseItemSource,
-  pub cpp_ffi_methods: Option<Vec<CppFfiMethod>>,
+  pub cpp_ffi_methods: Option<Vec<CppFfiFunction>>,
   pub qt_slot_wrapper: Option<QtSlotWrapper>,
   // TODO: add rust data
 }

@@ -5,12 +5,12 @@ use cpp_data::CppClassField;
 use cpp_data::CppTypeDataKind;
 use cpp_data::CppVisibility;
 use cpp_ffi_data::CppFfiArgumentMeaning;
-use cpp_ffi_data::CppFfiMethodArgument;
+use cpp_ffi_data::CppFfiFunctionArgument;
 use cpp_ffi_data::CppFfiType;
 use cpp_ffi_data::QtSlotWrapper;
-use cpp_ffi_data::{CppCast, CppFfiMethod, CppFfiMethodKind, CppFieldAccessorType};
-use cpp_method::ReturnValueAllocationPlace;
-use cpp_method::{CppMethod, CppMethodArgument, CppMethodClassMembership, CppMethodKind};
+use cpp_ffi_data::{CppCast, CppFfiFunction, CppFfiFunctionKind, CppFieldAccessorType};
+use cpp_function::ReturnValueAllocationPlace;
+use cpp_function::{CppFunction, CppFunctionArgument, CppFunctionKind, CppFunctionMemberData};
 use cpp_type::CppFunctionPointerType;
 use cpp_type::CppTypeRole;
 use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
@@ -142,13 +142,13 @@ fn create_cast_method(
   from: &CppType,
   to: &CppType,
   name_provider: &mut FfiNameProvider,
-) -> Result<CppFfiMethod> {
-  let method = CppMethod {
+) -> Result<CppFfiFunction> {
+  let method = CppFunction {
     name: cast.cpp_method_name().to_string(),
-    class_membership: None,
+    member: None,
     operator: None,
     return_type: to.clone(),
-    arguments: vec![CppMethodArgument {
+    arguments: vec![CppFunctionArgument {
       name: "ptr".to_string(),
       argument_type: from.clone(),
       has_default_value: false,
@@ -160,14 +160,12 @@ fn create_cast_method(
   };
   // no need for stack_allocated_types since all cast methods operate on pointers
   let mut r = to_ffi_method(&method, &[], name_provider)?;
-  if let CppFfiMethodKind::Method {
-    ref mut cast_data, ..
-  } = r.kind
-  {
-    *cast_data = Some(cast);
+  let cast1 = cast;
+  if let CppFfiFunctionKind::Function { ref mut cast, .. } = r.kind {
+    *cast = Some(cast1);
   } else {
     return Err(
-      unexpected("to_ffi_method must return a value with CppFfiMethodKind::Method").into(),
+      unexpected("to_ffi_method must return a value with CppFfiFunctionKind::Function").into(),
     );
   }
   Ok(r)
@@ -183,7 +181,7 @@ fn generate_casts_one(
   base_type: &CppTypeClassBase,
   direct_base_index: Option<usize>,
   name_provider: &mut FfiNameProvider,
-) -> Result<Vec<CppFfiMethod>> {
+) -> Result<Vec<CppFfiFunction>> {
   let target_ptr_type = CppType {
     base: CppTypeBase::Class(target_type.clone()),
     indirection: CppTypeIndirection::Ptr,
@@ -243,7 +241,7 @@ fn generate_casts(
   base: &CppBaseSpecifier,
   data: &[CppBaseSpecifier],
   name_provider: &mut FfiNameProvider,
-) -> Result<Vec<CppFfiMethod>> {
+) -> Result<Vec<CppFfiFunction>> {
   //log::status("Adding cast functions");
   generate_casts_one(
     data,
@@ -255,10 +253,10 @@ fn generate_casts(
 }
 
 fn generate_ffi_methods_for_method(
-  method: &CppMethod,
+  method: &CppFunction,
   stack_allocated_types: &[CppTypeClassBase],
   name_provider: &mut FfiNameProvider,
-) -> Result<Vec<CppFfiMethod>> {
+) -> Result<Vec<CppFfiFunction>> {
   let mut methods = Vec::new();
   // TODO: don't use name here at all, generate names for all methods elsewhere
   methods.push(to_ffi_method(method, stack_allocated_types, name_provider)?);
@@ -272,7 +270,7 @@ fn generate_ffi_methods_for_method(
         }
         let mut processed_method =
           to_ffi_method(&method_copy, stack_allocated_types, name_provider)?;
-        if let CppFfiMethodKind::Method {
+        if let CppFfiFunctionKind::Function {
           ref mut omitted_arguments,
           ..
         } = processed_method.kind
@@ -294,28 +292,28 @@ fn generate_ffi_methods_for_method(
 /// - adds "this" argument explicitly if present;
 /// - adds "output" argument for return value if `allocation_place` is `Stack`.
 fn to_ffi_method(
-  method: &CppMethod,
+  method: &CppFunction,
   stack_allocated_types: &[CppTypeClassBase],
   name_provider: &mut FfiNameProvider,
-) -> Result<CppFfiMethod> {
+) -> Result<CppFfiFunction> {
   if method.allows_variadic_arguments {
     return Err("Variable arguments are not supported".into());
   }
-  let mut r = CppFfiMethod {
+  let mut r = CppFfiFunction {
     arguments: Vec::new(),
     return_type: CppFfiType::void(),
     name: name_provider.next_name(),
     allocation_place: ReturnValueAllocationPlace::NotApplicable,
     checks: Default::default(),
-    kind: CppFfiMethodKind::Method {
-      cpp_method: method.clone(),
+    kind: CppFfiFunctionKind::Function {
+      cpp_function: method.clone(),
       omitted_arguments: None,
-      cast_data: None,
+      cast: None,
     },
   };
-  if let Some(ref info) = method.class_membership {
-    if !info.is_static && info.kind != CppMethodKind::Constructor {
-      r.arguments.push(CppFfiMethodArgument {
+  if let Some(ref info) = method.member {
+    if !info.is_static && info.kind != CppFunctionKind::Constructor {
+      r.arguments.push(CppFfiFunctionArgument {
         name: "this_ptr".to_string(),
         argument_type: CppType {
           base: CppTypeBase::Class(info.class_type.clone()),
@@ -331,13 +329,13 @@ fn to_ffi_method(
     let c_type = arg
       .argument_type
       .to_cpp_ffi_type(CppTypeRole::NotReturnType)?;
-    r.arguments.push(CppFfiMethodArgument {
+    r.arguments.push(CppFfiFunctionArgument {
       name: arg.name.clone(),
       argument_type: c_type,
       meaning: CppFfiArgumentMeaning::Argument(index as i8),
     });
   }
-  let type_for_place = match method.class_membership {
+  let type_for_place = match method.member {
     Some(ref info) if info.kind.is_constructor() || info.kind.is_destructor() => CppType {
       is_const: false,
       is_const2: false,
@@ -350,7 +348,7 @@ fn to_ffi_method(
   if type_for_place.needs_allocation_place_variants() {
     if let CppTypeBase::Class(ref base) = type_for_place.base {
       if stack_allocated_types.iter().any(|t| t == base) {
-        r.arguments.push(CppFfiMethodArgument {
+        r.arguments.push(CppFfiFunctionArgument {
           name: "output".to_string(),
           argument_type: c_type,
           meaning: CppFfiArgumentMeaning::ReturnValue,
@@ -376,16 +374,16 @@ fn generate_field_accessors(
   field: &CppClassField,
   stack_allocated_types: &[CppTypeClassBase],
   name_provider: &mut FfiNameProvider,
-) -> Result<Vec<CppFfiMethod>> {
+) -> Result<Vec<CppFfiFunction>> {
   // TODO: fix doc generator for field accessors
   //log::status("Adding field accessors");
   let mut new_methods = Vec::new();
-  let mut create_method = |name, accessor_type, return_type, arguments| -> Result<CppFfiMethod> {
-    let fake_method = CppMethod {
+  let mut create_method = |name, accessor_type, return_type, arguments| -> Result<CppFfiFunction> {
+    let fake_method = CppFunction {
       name: name,
-      class_membership: Some(CppMethodClassMembership {
+      member: Some(CppFunctionMemberData {
         class_type: field.class_type.clone(),
-        kind: CppMethodKind::Regular,
+        kind: CppFunctionKind::Regular,
         is_virtual: false,
         is_pure_virtual: false,
         is_const: match accessor_type {
@@ -406,7 +404,7 @@ fn generate_field_accessors(
       doc: None,
     };
     let mut ffi_method = to_ffi_method(&fake_method, stack_allocated_types, name_provider)?;
-    ffi_method.kind = CppFfiMethodKind::FieldAccessor {
+    ffi_method.kind = CppFfiFunctionKind::FieldAccessor {
       accessor_type: accessor_type,
       field: field.clone(),
     };
@@ -441,7 +439,7 @@ fn generate_field_accessors(
         Vec::new(),
       )?);
     }
-    let arg = CppMethodArgument {
+    let arg = CppFunctionArgument {
       argument_type: field.field_type.clone(),
       name: "value".to_string(),
       has_default_value: false,
@@ -464,7 +462,7 @@ fn should_process_item(item: &CppItemData) -> Result<bool> {
         return Ok(false);
       }
     }
-    if let Some(ref membership) = method.class_membership {
+    if let Some(ref membership) = method.member {
       if membership.visibility == CppVisibility::Private {
         return Ok(false);
       }
@@ -500,7 +498,7 @@ fn should_process_item(item: &CppItemData) -> Result<bool> {
 fn generate_slot_wrapper(
   arguments: &[CppType],
   name_provider: &mut FfiNameProvider,
-) -> Result<(QtSlotWrapper, Vec<CppFfiMethod>)> {
+) -> Result<(QtSlotWrapper, Vec<CppFfiFunction>)> {
   let ffi_types = arguments.map_if_ok(|t| t.to_cpp_ffi_type(CppTypeRole::NotReturnType))?;
 
   let void_ptr = CppType {
@@ -518,14 +516,14 @@ fn generate_slot_wrapper(
     arguments: func_arguments,
     allows_variadic_arguments: false,
   };
-  let create_function = |kind: CppMethodKind,
+  let create_function = |kind: CppFunctionKind,
                          name: String,
                          is_slot: bool,
-                         arguments: Vec<CppMethodArgument>|
-   -> CppMethod {
-    CppMethod {
+                         arguments: Vec<CppFunctionArgument>|
+   -> CppFunction {
+    CppFunction {
       name: name,
-      class_membership: Some(CppMethodClassMembership {
+      member: Some(CppFunctionMemberData {
         class_type: CppTypeClassBase {
           name: class_name.clone(),
           template_arguments: None,
@@ -550,19 +548,19 @@ fn generate_slot_wrapper(
   };
   let mut methods = Vec::new();
   methods.push(create_function(
-    CppMethodKind::Constructor,
+    CppFunctionKind::Constructor,
     class_name.clone(),
     false,
     vec![],
   ));
   methods.push(create_function(
-    CppMethodKind::Destructor,
+    CppFunctionKind::Destructor,
     format!("~{}", class_name),
     false,
     vec![],
   ));
   let method_set_args = vec![
-    CppMethodArgument {
+    CppFunctionArgument {
       name: "func".to_string(),
       argument_type: CppType {
         base: CppTypeBase::FunctionPointer(function_type.clone()),
@@ -572,27 +570,27 @@ fn generate_slot_wrapper(
       },
       has_default_value: false,
     },
-    CppMethodArgument {
+    CppFunctionArgument {
       name: "data".to_string(),
       argument_type: void_ptr.clone(),
       has_default_value: false,
     },
   ];
   methods.push(create_function(
-    CppMethodKind::Regular,
+    CppFunctionKind::Regular,
     "set".to_string(),
     false,
     method_set_args,
   ));
 
   let method_custom_slot = create_function(
-    CppMethodKind::Regular,
+    CppFunctionKind::Regular,
     "custom_slot".to_string(),
     true,
     arguments
       .iter()
       .enumerate()
-      .map(|(num, t)| CppMethodArgument {
+      .map(|(num, t)| CppFunctionArgument {
         name: format!("arg{}", num),
         argument_type: t.clone(),
         has_default_value: false,

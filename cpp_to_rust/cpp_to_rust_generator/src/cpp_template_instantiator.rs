@@ -1,9 +1,9 @@
 use common::errors::Result;
 use common::log;
 use cpp_data::CppTemplateInstantiation;
-use cpp_method::CppMethod;
-use cpp_method::CppMethodArgument;
-use cpp_method::CppOperator;
+use cpp_function::CppFunction;
+use cpp_function::CppFunctionArgument;
+use cpp_function::CppOperator;
 use cpp_type::CppType;
 use cpp_type::CppTypeBase;
 use cpp_type::CppTypeClassBase;
@@ -40,10 +40,10 @@ fn check_template_type(data: &ProcessorData, type1: &CppType) -> Result<()> {
 /// Returns `Err` if any of `template_instantiations` is incompatible
 /// with the method.
 fn apply_instantiation_to_method(
-  method: &CppMethod,
+  method: &CppFunction,
   nested_level1: usize,
   template_instantiation: &CppTemplateInstantiation,
-) -> Result<CppMethod> {
+) -> Result<CppFunction> {
   log::llog(log::DebugTemplateInstantiation, || {
     format!("instantiation: {:?}", template_instantiation)
   });
@@ -69,7 +69,7 @@ fn apply_instantiation_to_method(
   }
   new_method.arguments.clear();
   for arg in &method.arguments {
-    new_method.arguments.push(CppMethodArgument {
+    new_method.arguments.push(CppFunctionArgument {
       name: arg.name.clone(),
       has_default_value: arg.has_default_value,
       argument_type: arg
@@ -80,7 +80,7 @@ fn apply_instantiation_to_method(
   new_method.return_type = method
     .return_type
     .instantiate(nested_level1, &template_instantiation.template_arguments)?;
-  if let Some(ref mut info) = new_method.class_membership {
+  if let Some(ref mut info) = new_method.member {
     info.class_type = info
       .class_type
       .instantiate_class(nested_level1, &template_instantiation.template_arguments)?;
@@ -117,7 +117,7 @@ fn apply_instantiation_to_method(
 
 /// Generates methods as template instantiations of
 /// methods of existing template classes and existing template methods.
-fn instantiate_templates(data: &ProcessorData) -> Result<Vec<CppMethod>> {
+fn instantiate_templates(data: &ProcessorData) -> Result<Vec<CppFunction>> {
   log::status("Instantiating templates");
   let mut new_methods = Vec::new();
   for method in data

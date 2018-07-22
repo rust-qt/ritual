@@ -1,27 +1,27 @@
 use cpp_data::CppVisibility;
 use cpp_ffi_data::CppFfiArgumentMeaning;
 use cpp_ffi_data::CppTypeConversionToFfi;
-use cpp_method::*;
+use cpp_function::*;
 use cpp_type::*;
 
 #[test]
 fn cpp_method_kind() {
-  assert!(!CppMethodKind::Constructor.is_destructor());
-  assert!(CppMethodKind::Constructor.is_constructor());
-  assert!(!CppMethodKind::Constructor.is_regular());
+  assert!(!CppFunctionKind::Constructor.is_destructor());
+  assert!(CppFunctionKind::Constructor.is_constructor());
+  assert!(!CppFunctionKind::Constructor.is_regular());
 
-  assert!(CppMethodKind::Destructor.is_destructor());
-  assert!(!CppMethodKind::Destructor.is_constructor());
-  assert!(!CppMethodKind::Destructor.is_regular());
+  assert!(CppFunctionKind::Destructor.is_destructor());
+  assert!(!CppFunctionKind::Destructor.is_constructor());
+  assert!(!CppFunctionKind::Destructor.is_regular());
 
-  assert!(!CppMethodKind::Regular.is_destructor());
-  assert!(!CppMethodKind::Regular.is_constructor());
-  assert!(CppMethodKind::Regular.is_regular());
+  assert!(!CppFunctionKind::Regular.is_destructor());
+  assert!(!CppFunctionKind::Regular.is_constructor());
+  assert!(CppFunctionKind::Regular.is_regular());
 }
 
-pub fn empty_membership(class_name: &'static str) -> CppMethodClassMembership {
-  CppMethodClassMembership {
-    kind: CppMethodKind::Regular,
+pub fn empty_membership(class_name: &'static str) -> CppFunctionMemberData {
+  CppFunctionMemberData {
+    kind: CppFunctionKind::Regular,
     is_virtual: false,
     is_pure_virtual: false,
     is_const: false,
@@ -36,10 +36,10 @@ pub fn empty_membership(class_name: &'static str) -> CppMethodClassMembership {
   }
 }
 
-pub fn empty_regular_method() -> CppMethod {
-  CppMethod {
+pub fn empty_regular_method() -> CppFunction {
+  CppFunction {
     name: String::new(),
-    class_membership: None,
+    member: None,
     return_type: CppType::void(),
     arguments: vec![],
     doc: None,
@@ -67,7 +67,7 @@ fn argument_types_equal1() {
 fn argument_types_equal2() {
   let mut method1 = empty_regular_method();
   let method2 = empty_regular_method();
-  method1.arguments.push(CppMethodArgument {
+  method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
@@ -85,7 +85,7 @@ fn argument_types_equal2() {
 fn argument_types_equal3() {
   let mut method1 = empty_regular_method();
   let mut method2 = empty_regular_method();
-  method1.arguments.push(CppMethodArgument {
+  method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
@@ -95,7 +95,7 @@ fn argument_types_equal3() {
     name: "arg1".to_string(),
     has_default_value: false,
   });
-  method2.arguments.push(CppMethodArgument {
+  method2.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
@@ -113,7 +113,7 @@ fn argument_types_equal3() {
 fn argument_types_equal4() {
   let mut method1 = empty_regular_method();
   let mut method2 = empty_regular_method();
-  method1.arguments.push(CppMethodArgument {
+  method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
@@ -123,7 +123,7 @@ fn argument_types_equal4() {
     name: "arg1".to_string(),
     has_default_value: false,
   });
-  method2.arguments.push(CppMethodArgument {
+  method2.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
@@ -141,7 +141,7 @@ fn argument_types_equal4() {
 fn argument_types_equal5() {
   let mut method1 = empty_regular_method();
   let mut method2 = empty_regular_method();
-  method1.arguments.push(CppMethodArgument {
+  method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
@@ -151,7 +151,7 @@ fn argument_types_equal5() {
     name: "arg1".to_string(),
     has_default_value: false,
   });
-  method2.arguments.push(CppMethodArgument {
+  method2.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
@@ -171,7 +171,7 @@ fn argument_types_equal5() {
 fn argument_types_equal6() {
   let mut method1 = empty_regular_method();
   let mut method2 = empty_regular_method();
-  method1.arguments.push(CppMethodArgument {
+  method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
@@ -181,7 +181,7 @@ fn argument_types_equal6() {
     name: "arg1".to_string(),
     has_default_value: false,
   });
-  method2.arguments.push(CppMethodArgument {
+  method2.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::Ptr,
       is_const: false,
@@ -198,7 +198,7 @@ fn argument_types_equal6() {
 #[test]
 fn argument_types_equal7() {
   let mut method1 = empty_regular_method();
-  let int = CppMethodArgument {
+  let int = CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
@@ -256,7 +256,7 @@ fn c_signature_simple_func() {
     is_const2: false,
     base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
   };
-  method1.arguments.push(CppMethodArgument {
+  method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
@@ -289,14 +289,14 @@ fn c_signature_simple_func() {
 #[test]
 fn c_signature_method_with_this() {
   let mut method1 = empty_regular_method();
-  method1.class_membership = Some(empty_membership("MyClass"));
+  method1.member = Some(empty_membership("MyClass"));
   method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
     base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
   };
-  method1.arguments.push(CppMethodArgument {
+  method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
@@ -322,14 +322,7 @@ fn c_signature_method_with_this() {
   assert_eq!(r.arguments[0].name, "this_ptr");
   assert_eq!(
     r.arguments[0].argument_type.ffi_type.base,
-    CppTypeBase::Class(
-      method1
-        .class_membership
-        .as_ref()
-        .unwrap()
-        .class_type
-        .clone(),
-    )
+    CppTypeBase::Class(method1.member.as_ref().unwrap().class_type.clone(),)
   );
   assert_eq!(
     r.arguments[0].argument_type.ffi_type.indirection,
@@ -361,7 +354,7 @@ fn c_signature_method_with_this() {
 #[test]
 fn c_signature_static_method() {
   let mut method1 = empty_regular_method();
-  method1.class_membership = Some({
+  method1.member = Some({
     let mut info = empty_membership("MyClass");
     info.is_static = true;
     info
@@ -372,7 +365,7 @@ fn c_signature_static_method() {
     is_const2: false,
     base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
   };
-  method1.arguments.push(CppMethodArgument {
+  method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
@@ -404,12 +397,12 @@ fn c_signature_static_method() {
 #[test]
 fn c_signature_constructor() {
   let mut method1 = empty_regular_method();
-  method1.class_membership = Some({
+  method1.member = Some({
     let mut info = empty_membership("MyClass");
-    info.kind = CppMethodKind::Constructor;
+    info.kind = CppFunctionKind::Constructor;
     info
   });
-  method1.arguments.push(CppMethodArgument {
+  method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::Ref,
       is_const: true,
@@ -521,9 +514,9 @@ fn c_signature_constructor() {
 #[test]
 fn c_signature_destructor() {
   let mut method1 = empty_regular_method();
-  method1.class_membership = Some({
+  method1.member = Some({
     let mut info = empty_membership("MyClass");
-    info.kind = CppMethodKind::Destructor;
+    info.kind = CppFunctionKind::Destructor;
     info
   });
 
@@ -539,14 +532,7 @@ fn c_signature_destructor() {
   assert_eq!(r_stack.arguments[0].name, "this_ptr");
   assert_eq!(
     &r_stack.arguments[0].argument_type.ffi_type.base,
-    &CppTypeBase::Class(
-      method1
-        .class_membership
-        .as_ref()
-        .unwrap()
-        .class_type
-        .clone(),
-    )
+    &CppTypeBase::Class(method1.member.as_ref().unwrap().class_type.clone(),)
   );
   assert_eq!(
     r_stack.arguments[0].argument_type.ffi_type.indirection,
@@ -567,14 +553,7 @@ fn c_signature_destructor() {
   assert_eq!(r_heap.arguments[0].name, "this_ptr");
   assert_eq!(
     r_heap.arguments[0].argument_type.ffi_type.base,
-    CppTypeBase::Class(
-      method1
-        .class_membership
-        .as_ref()
-        .unwrap()
-        .class_type
-        .clone(),
-    )
+    CppTypeBase::Class(method1.member.as_ref().unwrap().class_type.clone(),)
   );
   assert_eq!(
     r_heap.arguments[0].argument_type.ffi_type.indirection,
@@ -592,7 +571,7 @@ fn c_signature_destructor() {
 #[test]
 fn c_signature_method_returning_class() {
   let mut method1 = empty_regular_method();
-  method1.class_membership = Some(empty_membership("MyClass"));
+  method1.member = Some(empty_membership("MyClass"));
   method1.return_type = CppType {
     indirection: CppTypeIndirection::None,
     is_const: false,
@@ -602,7 +581,7 @@ fn c_signature_method_returning_class() {
       template_arguments: None,
     }),
   };
-  method1.arguments.push(CppMethodArgument {
+  method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
@@ -622,14 +601,7 @@ fn c_signature_method_returning_class() {
   assert_eq!(r_stack.arguments[0].name, "this_ptr");
   assert_eq!(
     &r_stack.arguments[0].argument_type.ffi_type.base,
-    &CppTypeBase::Class(
-      method1
-        .class_membership
-        .as_ref()
-        .unwrap()
-        .class_type
-        .clone(),
-    )
+    &CppTypeBase::Class(method1.member.as_ref().unwrap().class_type.clone(),)
   );
   assert_eq!(
     r_stack.arguments[0].argument_type.ffi_type.indirection,
@@ -690,14 +662,7 @@ fn c_signature_method_returning_class() {
   assert_eq!(r_heap.arguments[0].name, "this_ptr");
   assert_eq!(
     r_heap.arguments[0].argument_type.ffi_type.base,
-    CppTypeBase::Class(
-      method1
-        .class_membership
-        .as_ref()
-        .unwrap()
-        .class_type
-        .clone(),
-    )
+    CppTypeBase::Class(method1.member.as_ref().unwrap().class_type.clone(),)
   );
   assert_eq!(
     r_heap.arguments[0].argument_type.ffi_type.indirection,
@@ -756,7 +721,7 @@ fn full_name_free_function_in_namespace() {
 fn full_name_method() {
   let mut method1 = empty_regular_method();
   method1.name = "func1".to_string();
-  method1.class_membership = Some(empty_membership("MyClass"));
+  method1.member = Some(empty_membership("MyClass"));
   assert_eq!(method1.class_name(), Some(&"MyClass".to_string()));
 }
 
@@ -764,7 +729,7 @@ fn full_name_method() {
 fn full_name_static_method() {
   let mut method1 = empty_regular_method();
   method1.name = "func1".to_string();
-  method1.class_membership = Some({
+  method1.member = Some({
     let mut info = empty_membership("MyClass");
     info.is_static = true;
     info
@@ -776,16 +741,16 @@ fn full_name_static_method() {
 fn full_name_nested_class_method() {
   let mut method1 = empty_regular_method();
   method1.name = "func1".to_string();
-  method1.class_membership = Some(empty_membership("MyClass::Iterator"));
+  method1.member = Some(empty_membership("MyClass::Iterator"));
   assert_eq!(method1.class_name(), Some(&"MyClass::Iterator".to_string()));
 }
 
 #[test]
 fn short_text1() {
-  let method = CppMethod {
+  let method = CppFunction {
     name: "method1".to_string(),
-    class_membership: Some(CppMethodClassMembership {
-      kind: CppMethodKind::Regular,
+    member: Some(CppFunctionMemberData {
+      kind: CppFunctionKind::Regular,
       is_virtual: false,
       is_pure_virtual: false,
       is_const: true,
@@ -806,7 +771,7 @@ fn short_text1() {
       base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     arguments: vec![
-      CppMethodArgument {
+      CppFunctionArgument {
         argument_type: CppType {
           indirection: CppTypeIndirection::None,
           is_const: false,
@@ -816,7 +781,7 @@ fn short_text1() {
         name: "arg1".to_string(),
         has_default_value: false,
       },
-      CppMethodArgument {
+      CppFunctionArgument {
         argument_type: CppType {
           indirection: CppTypeIndirection::None,
           is_const: false,

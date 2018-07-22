@@ -34,7 +34,7 @@ pub mod cpp_data;
 pub mod cpp_ffi_generator;
 //mod cpp_post_processor;
 mod cpp_ffi_data;
-pub mod cpp_method;
+pub mod cpp_function;
 mod cpp_operator;
 pub mod cpp_type;
 //mod doc_formatter;

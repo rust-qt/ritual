@@ -4,13 +4,13 @@ use common::string_utils::JoinWithSeparator;
 use common::utils::get_command_output;
 use common::utils::MapIfOk;
 use cpp_ffi_data::{
-  CppFfiArgumentMeaning, CppFfiMethodKind, CppFfiType, CppFieldAccessorType,
+  CppFfiArgumentMeaning, CppFfiFunctionKind, CppFfiType, CppFieldAccessorType,
   CppTypeConversionToFfi, QtSlotWrapper,
 };
-use cpp_method::ReturnValueAllocationPlace;
+use cpp_function::ReturnValueAllocationPlace;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection};
 
-use cpp_ffi_data::CppFfiMethod;
+use cpp_ffi_data::CppFfiFunction;
 use new_impl::database::DatabaseItem;
 use std::iter::once;
 use std::path::Path;
@@ -19,7 +19,7 @@ use std::process::Command;
 
 /// Generates function name, return type and arguments list
 /// as it appears in both function declaration and implementation.
-fn function_signature(method: &CppFfiMethod) -> Result<String> {
+fn function_signature(method: &CppFfiFunction) -> Result<String> {
   let mut arg_texts = Vec::new();
   for arg in &method.arguments {
     arg_texts.push(arg.to_cpp_code()?);
@@ -84,7 +84,7 @@ fn convert_type_to_ffi(type1: &CppFfiType, expression: String) -> Result<String>
 
 /// Wraps `expression` returned by the original C++ method to
 /// convert it to return type of the FFI method.
-fn convert_return_type(method: &CppFfiMethod, expression: String) -> Result<String> {
+fn convert_return_type(method: &CppFfiFunction, expression: String) -> Result<String> {
   let mut result = expression;
   match method.return_type.conversion {
     CppTypeConversionToFfi::NoChange => {}
@@ -102,7 +102,7 @@ fn convert_return_type(method: &CppFfiMethod, expression: String) -> Result<Stri
           // so no conversion is necessary for constructors.
           if !method
             .kind
-            .cpp_method()
+            .cpp_function()
             .map(|m| m.is_constructor())
             .unwrap_or(false)
           {
@@ -126,7 +126,7 @@ fn convert_return_type(method: &CppFfiMethod, expression: String) -> Result<Stri
   if method.allocation_place == ReturnValueAllocationPlace::Stack
     && !method
       .kind
-      .cpp_method()
+      .cpp_function()
       .map(|m| m.is_constructor())
       .unwrap_or(false)
   {
@@ -147,7 +147,7 @@ fn convert_return_type(method: &CppFfiMethod, expression: String) -> Result<Stri
 }
 
 /// Generates code for values passed to the original C++ method.
-fn arguments_values(method: &CppFfiMethod) -> Result<String> {
+fn arguments_values(method: &CppFfiFunction) -> Result<String> {
   let r: Vec<_> = method
     .arguments
     .iter()
@@ -181,10 +181,10 @@ fn arguments_values(method: &CppFfiMethod) -> Result<String> {
 
 /// Generates code for the value returned by the FFI method.
 #[cfg_attr(feature = "clippy", allow(collapsible_if))]
-fn returned_expression(method: &CppFfiMethod) -> Result<String> {
+fn returned_expression(method: &CppFfiFunction) -> Result<String> {
   let result = if method
     .kind
-    .cpp_method()
+    .cpp_function()
     .map(|m| m.is_destructor())
     .unwrap_or(false)
   {
@@ -201,8 +201,9 @@ fn returned_expression(method: &CppFfiMethod) -> Result<String> {
     let mut is_field_accessor = false;
     let result_without_args = if let Some(info) = method
       .kind
-      .cpp_method()
-      .and_then(|m| m.class_info_if_constructor())
+      .cpp_function()
+      .filter(|m| m.is_constructor())
+      .and_then(|m| m.member())
     {
       let class_type = &info.class_type;
       match method.allocation_place {
@@ -226,8 +227,8 @@ fn returned_expression(method: &CppFfiMethod) -> Result<String> {
       // TODO: scope specifier should probably be stored in a field `cpp_full_name` of `CppFFiMethod`
       let scope_specifier = if let Some(ref class_membership) = method
         .kind
-        .cpp_method()
-        .and_then(|m| m.class_membership.as_ref())
+        .cpp_function()
+        .and_then(|m| m.member.as_ref())
         .and_then(|cm| if cm.is_static { Some(cm) } else { None })
       {
         // static method
@@ -252,7 +253,7 @@ fn returned_expression(method: &CppFfiMethod) -> Result<String> {
           "".to_string()
         }
       };
-      let template_args = if let Some(cpp_method) = method.kind.cpp_method() {
+      let template_args = if let Some(cpp_method) = method.kind.cpp_function() {
         match cpp_method.template_arguments {
           Some(ref args) => {
             let mut texts = Vec::new();
@@ -267,7 +268,7 @@ fn returned_expression(method: &CppFfiMethod) -> Result<String> {
         String::new()
       };
       match method.kind {
-        CppFfiMethodKind::FieldAccessor {
+        CppFfiFunctionKind::FieldAccessor {
           ref accessor_type,
           ref field,
         } => {
@@ -283,9 +284,9 @@ fn returned_expression(method: &CppFfiMethod) -> Result<String> {
             format!("{}{}", scope_specifier, field.name)
           }
         }
-        CppFfiMethodKind::Method { ref cpp_method, .. } => {
-          format!("{}{}{}", scope_specifier, cpp_method.name, template_args)
-        }
+        CppFfiFunctionKind::Function {
+          ref cpp_function, ..
+        } => format!("{}{}{}", scope_specifier, cpp_function.name, template_args),
       }
     };
     if is_field_accessor {
@@ -298,10 +299,10 @@ fn returned_expression(method: &CppFfiMethod) -> Result<String> {
 }
 
 /// Generates body of the FFI method implementation.
-fn source_body(method: &CppFfiMethod) -> Result<String> {
+fn source_body(method: &CppFfiFunction) -> Result<String> {
   if method
     .kind
-    .cpp_method()
+    .cpp_function()
     .map(|m| m.is_destructor())
     .unwrap_or(false) && method.allocation_place == ReturnValueAllocationPlace::Heap
   {
@@ -328,7 +329,7 @@ fn source_body(method: &CppFfiMethod) -> Result<String> {
 }
 
 /// Generates implementation of the FFI method for the source file.
-pub fn function_implementation(method: &CppFfiMethod) -> Result<String> {
+pub fn function_implementation(method: &CppFfiFunction) -> Result<String> {
   Ok(format!(
     "C2R_EXPORT {} {{\n  {}}}\n\n",
     function_signature(method)?,

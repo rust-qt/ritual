@@ -9,7 +9,7 @@ use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
 
 /// Information about an argument of a C++ method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
-pub struct CppMethodArgument {
+pub struct CppFunctionArgument {
   /// Identifier. If the argument doesn't have a name
   /// (which is allowed in C++), this field contains
   /// generated name "argX" (X is position of the argument).
@@ -23,7 +23,7 @@ pub struct CppMethodArgument {
 
 /// Enumerator indicating special cases of C++ methods.
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
-pub enum CppMethodKind {
+pub enum CppFunctionKind {
   /// Just a class method
   Regular,
   /// Constructor
@@ -34,12 +34,12 @@ pub enum CppMethodKind {
 
 /// Information about a C++ class member method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
-pub struct CppMethodClassMembership {
+pub struct CppFunctionMemberData {
   /// Type of the class where this method belong. This is used to construct
   /// type of "this" pointer and return type of constructors.
   pub class_type: CppTypeClassBase,
   /// Whether this method is a constructor, a destructor or an operator
-  pub kind: CppMethodKind,
+  pub kind: CppFunctionKind,
   /// True if this is a virtual method
   pub is_virtual: bool,
   /// True if this is a pure virtual method (requires is_virtual = true)
@@ -59,7 +59,7 @@ pub struct CppMethodClassMembership {
 
 /// C++ documentation for a method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
-pub struct CppMethodDoc {
+pub struct CppFunctionDoc {
   /// HTML anchor of this documentation entry
   /// (used to detect duplicates)
   pub anchor: String,
@@ -77,51 +77,48 @@ pub struct CppMethodDoc {
 
 /// Information about a C++ method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
-pub struct CppMethod {
+pub struct CppFunction {
   /// Identifier. For class methods, this field includes
   /// only the method's own name. For free functions,
   /// this field also includes namespaces (if any).
   pub name: String,
   /// Additional information about a class member function
   /// or None for free functions
-  pub class_membership: Option<CppMethodClassMembership>,
+  pub member: Option<CppFunctionMemberData>,
   /// If the method is a C++ operator, indicates its kind
   pub operator: Option<CppOperator>,
   /// Return type of the method.
   /// Return type is reported as void for constructors and destructors.
   pub return_type: CppType,
   /// List of the method's arguments
-  pub arguments: Vec<CppMethodArgument>,
+  pub arguments: Vec<CppFunctionArgument>,
   //  /// If Some, the method is derived from another method by omitting arguments,
   //  /// and this field contains all arguments of the original method.
   //  pub arguments_before_omitting: Option<Vec<CppMethodArgument>>,
   /// Whether the argument list is terminated with "..."
   pub allows_variadic_arguments: bool,
-  /// Names of the method's template arguments.
-  /// None if this is not a template method.
+  /// For a template method, this fields contains its template arguments
+  /// in the form of `CppTypeBase::TemplateParameter` types.
+  /// For an instantiated template method, this field contains the types
+  /// used for instantiation.
+  ///
+  /// For example, `T QObject::findChild<T>()` would have
+  /// a `TemplateParameter` type in `template_arguments`
+  /// because it's not instantiated, and
+  /// `QWidget* QObject::findChild<QWidget*>()` would have `QWidget*` type in
+  /// `template_arguments`.
+  ///
+  /// This field is `None` if this is not a template method.
   /// If the method belongs to a template class,
   /// the class's template arguments are not included here.
+  /// Instead, they are available in `member.class_type`.
   pub template_arguments: Option<Vec<CppType>>,
-  /// For an instantiated template method, this field contains the types
-  /// used for instantiation. For example, `T QObject::findChild<T>()` would have
-  /// no `template_arguments_values` because it's not instantiated, and
-  /// `QWidget* QObject::findChild<QWidget*>()` would have `QWidget*` type in
-  /// `template_arguments_values`.
   //pub template_arguments_values: Option<Vec<CppType>>,
   /// C++ code of the method's declaration.
   /// None if the method was not explicitly declared.
   pub declaration_code: Option<String>,
-  // TODO: fill inheritance_chain for explicitly redeclared methods (#23)
-  // /// List of base classes this method was inferited from.
-  // /// The first item is the most base class.
-  //pub inheritance_chain: Vec<CppBaseSpecifier>,
-  // If true, this method was not declared in headers but
-  // added in the generator's preprocessing step.
-  //pub is_fake_inherited_method: bool,
   /// C++ documentation data for this method
-  pub doc: Option<CppMethodDoc>,
-  // /// If true, FFI generator skips some checks
-  //pub is_ffi_whitelisted: bool,
+  pub doc: Option<CppFunctionDoc>,
 }
 
 /// Chosen type allocation place for the method
@@ -138,18 +135,18 @@ pub enum ReturnValueAllocationPlace {
   NotApplicable,
 }
 
-impl CppMethodKind {
+impl CppFunctionKind {
   /// Returns true if this method is a constructor
   pub fn is_constructor(&self) -> bool {
     match *self {
-      CppMethodKind::Constructor => true,
+      CppFunctionKind::Constructor => true,
       _ => false,
     }
   }
   /// Returns true if this method is a destructor
   pub fn is_destructor(&self) -> bool {
     match *self {
-      CppMethodKind::Destructor => true,
+      CppFunctionKind::Destructor => true,
       _ => false,
     }
   }
@@ -157,15 +154,15 @@ impl CppMethodKind {
   /// Returns true if this method is a regular method or a free function
   pub fn is_regular(&self) -> bool {
     match *self {
-      CppMethodKind::Regular => true,
+      CppFunctionKind::Regular => true,
       _ => false,
     }
   }
 }
 
-impl CppMethod {
+impl CppFunction {
   /// Checks if two methods have exactly the same set of input argument types
-  pub fn argument_types_equal(&self, other: &CppMethod) -> bool {
+  pub fn argument_types_equal(&self, other: &CppFunction) -> bool {
     if self.arguments.len() != other.arguments.len() {
       return false;
     }
@@ -180,9 +177,9 @@ impl CppMethod {
     true
   }
 
-  pub fn is_same(&self, other: &CppMethod) -> bool {
+  pub fn is_same(&self, other: &CppFunction) -> bool {
     self.name == other.name
-      && self.class_membership == other.class_membership
+      && self.member == other.member
       && self.operator == other.operator
       && self.return_type == other.return_type
       && self.argument_types_equal(other)
@@ -193,7 +190,7 @@ impl CppMethod {
   /// i.e. including namespaces and class name (if any).
   /// This method is not suitable for code generation.
   pub fn full_name(&self) -> String {
-    if let Some(ref info) = self.class_membership {
+    if let Some(ref info) = self.member {
       format!(
         "{}::{}",
         CppTypeBase::Class(info.class_type.clone()).to_cpp_pseudo_code(),
@@ -207,7 +204,7 @@ impl CppMethod {
   /// Returns the identifier this method would be presented with
   /// in Qt documentation.
   pub fn doc_id(&self) -> String {
-    if let Some(ref info) = self.class_membership {
+    if let Some(ref info) = self.member {
       format!("{}::{}", info.class_type.name, self.name)
     } else {
       self.name.clone()
@@ -218,7 +215,7 @@ impl CppMethod {
   /// (only for debugging output).
   pub fn short_text(&self) -> String {
     let mut s = String::new();
-    if let Some(ref info) = self.class_membership {
+    if let Some(ref info) = self.member {
       if info.is_virtual {
         if info.is_pure_virtual {
           s = format!("{} pure virtual", s);
@@ -242,9 +239,9 @@ impl CppMethod {
         s = format!("{} [slot]", s);
       }
       match info.kind {
-        CppMethodKind::Constructor => s = format!("{} [constructor]", s),
-        CppMethodKind::Destructor => s = format!("{} [destructor]", s),
-        CppMethodKind::Regular => {}
+        CppFunctionKind::Constructor => s = format!("{} [constructor]", s),
+        CppFunctionKind::Destructor => s = format!("{} [destructor]", s),
+        CppFunctionKind::Regular => {}
       }
     }
     if self.allows_variadic_arguments {
@@ -277,37 +274,17 @@ impl CppMethod {
         ))
         .join(", ")
     );
-    if let Some(ref info) = self.class_membership {
+    if let Some(ref info) = self.member {
       if info.is_const {
         s = format!("{} const", s);
       }
     }
     s.trim().to_string()
   }
-  /*
-  /// Returns debugging output for `inheritance_chain` content.
-  pub fn inheritance_chain_text(&self) -> String {
-    self
-      .inheritance_chain
-      .iter()
-      .map(|x| {
-        let mut text = x.base_type.to_cpp_pseudo_code();
-        if x.is_virtual {
-          text = format!("virtual {}", text);
-        }
-        match x.visibility {
-          CppVisibility::Protected => text = format!("protected {}", text),
-          CppVisibility::Private => text = format!("private {}", text),
-          CppVisibility::Public => {}
-        }
-        text
-      })
-      .join(" -> ")
-  }*/
 
   /// Returns name of the class this method belongs to, if any.
   pub fn class_name(&self) -> Option<&String> {
-    match self.class_membership {
+    match self.member {
       Some(ref info) => Some(&info.class_type.name),
       None => None,
     }
@@ -315,7 +292,7 @@ impl CppMethod {
 
   /// Returns true if this method is a constructor.
   pub fn is_constructor(&self) -> bool {
-    match self.class_membership {
+    match self.member {
       Some(ref info) => info.kind.is_constructor(),
       None => false,
     }
@@ -323,30 +300,16 @@ impl CppMethod {
 
   /// Returns true if this method is a destructor.
   pub fn is_destructor(&self) -> bool {
-    match self.class_membership {
+    match self.member {
       Some(ref info) => info.kind.is_destructor(),
       None => false,
-    }
-  }
-
-  /// A convenience method. Returns `class_membership` if
-  /// the method is a constructor, and `None` otherwise.
-  pub fn class_info_if_constructor(&self) -> Option<&CppMethodClassMembership> {
-    if let Some(ref info) = self.class_membership {
-      if info.kind.is_constructor() {
-        Some(info)
-      } else {
-        None
-      }
-    } else {
-      None
     }
   }
 
   /// Returns the identifier that should be used in `QObject::connect`
   /// to specify this signal or slot.
   pub fn receiver_id(&self) -> Result<String> {
-    let type_num = if let Some(ref info) = self.class_membership {
+    let type_num = if let Some(ref info) = self.member {
       if info.is_slot {
         "1"
       } else if info.is_signal {
@@ -369,6 +332,10 @@ impl CppMethod {
     ))
   }
 
+  pub fn member(&self) -> Option<&CppFunctionMemberData> {
+    self.member.as_ref()
+  }
+
   #[allow(dead_code)]
   /// Returns true if this method is an operator.
   pub fn is_operator(&self) -> bool {
@@ -379,7 +346,7 @@ impl CppMethod {
   /// including argument types, return type and type of `this` implicit parameter.
   pub fn all_involved_types(&self) -> Vec<CppType> {
     let mut result: Vec<CppType> = Vec::new();
-    if let Some(ref class_membership) = self.class_membership {
+    if let Some(ref class_membership) = self.member {
       result.push(CppType {
         base: CppTypeBase::Class(class_membership.class_type.clone()),
         is_const: class_membership.is_const,

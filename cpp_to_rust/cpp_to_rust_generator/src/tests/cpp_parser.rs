@@ -2,7 +2,7 @@ extern crate tempdir;
 
 use common::file_utils::{create_dir, create_file, PathBufWithAdded};
 use cpp_data::*;
-use cpp_method::*;
+use cpp_function::*;
 use cpp_operator::CppOperator;
 use cpp_parser;
 use cpp_type::*;
@@ -54,9 +54,9 @@ fn simple_func() {
   assert!(data.methods.len() == 1);
   assert_eq!(
     data.methods[0],
-    CppMethod {
+    CppFunction {
       name: "func1".to_string(),
-      class_membership: None,
+      member: None,
       operator: None,
       return_type: CppType {
         indirection: CppTypeIndirection::None,
@@ -64,7 +64,7 @@ fn simple_func() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
-      arguments: vec![CppMethodArgument {
+      arguments: vec![CppFunctionArgument {
         name: "x".to_string(),
         argument_type: CppType {
           indirection: CppTypeIndirection::None,
@@ -94,9 +94,9 @@ fn simple_func_with_default_value() {
   assert!(data.methods.len() == 1);
   assert_eq!(
     data.methods[0],
-    CppMethod {
+    CppFunction {
       name: "func1".to_string(),
-      class_membership: None,
+      member: None,
       operator: None,
       return_type: CppType {
         indirection: CppTypeIndirection::None,
@@ -104,7 +104,7 @@ fn simple_func_with_default_value() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
       },
-      arguments: vec![CppMethodArgument {
+      arguments: vec![CppFunctionArgument {
         name: "x".to_string(),
         argument_type: CppType {
           indirection: CppTypeIndirection::None,
@@ -177,9 +177,9 @@ fn functions_with_class_arg() {
   assert!(data.methods.len() == 3);
   assert_eq!(
     data.methods[0],
-    CppMethod {
+    CppFunction {
       name: "func1".to_string(),
-      class_membership: None,
+      member: None,
       operator: None,
       return_type: CppType {
         indirection: CppTypeIndirection::None,
@@ -187,7 +187,7 @@ fn functions_with_class_arg() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
       },
-      arguments: vec![CppMethodArgument {
+      arguments: vec![CppFunctionArgument {
         name: "x".to_string(),
         argument_type: CppType {
           indirection: CppTypeIndirection::None,
@@ -213,9 +213,9 @@ fn functions_with_class_arg() {
   );
   assert_eq!(
     data.methods[1],
-    CppMethod {
+    CppFunction {
       name: "func1".to_string(),
-      class_membership: None,
+      member: None,
       operator: None,
       return_type: CppType {
         indirection: CppTypeIndirection::None,
@@ -223,7 +223,7 @@ fn functions_with_class_arg() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
       },
-      arguments: vec![CppMethodArgument {
+      arguments: vec![CppFunctionArgument {
         name: "x".to_string(),
         argument_type: CppType {
           indirection: CppTypeIndirection::Ptr,
@@ -249,9 +249,9 @@ fn functions_with_class_arg() {
   );
   assert_eq!(
     data.methods[2],
-    CppMethod {
+    CppFunction {
       name: "func2".to_string(),
-      class_membership: None,
+      member: None,
       operator: None,
       return_type: CppType {
         indirection: CppTypeIndirection::None,
@@ -259,7 +259,7 @@ fn functions_with_class_arg() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
       },
-      arguments: vec![CppMethodArgument {
+      arguments: vec![CppFunctionArgument {
         name: "arg1".to_string(),
         argument_type: CppType {
           indirection: CppTypeIndirection::Ref,
@@ -299,9 +299,9 @@ fn variadic_func() {
   assert!(data.methods.len() == 1);
   assert_eq!(
     data.methods[0],
-    CppMethod {
+    CppFunction {
       name: "my_printf".to_string(),
-      class_membership: None,
+      member: None,
       operator: None,
       return_type: CppType {
         indirection: CppTypeIndirection::None,
@@ -309,7 +309,7 @@ fn variadic_func() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
-      arguments: vec![CppMethodArgument {
+      arguments: vec![CppFunctionArgument {
         name: "format".to_string(),
         argument_type: CppType {
           indirection: CppTypeIndirection::Ptr,
@@ -339,9 +339,9 @@ fn free_template_func() {
   assert!(data.methods.len() == 1);
   assert_eq!(
     data.methods[0],
-    CppMethod {
+    CppFunction {
       name: "abs".to_string(),
-      class_membership: None,
+      member: None,
       operator: None,
       return_type: CppType {
         indirection: CppTypeIndirection::None,
@@ -352,7 +352,7 @@ fn free_template_func() {
           index: 0,
         },
       },
-      arguments: vec![CppMethodArgument {
+      arguments: vec![CppFunctionArgument {
         name: "value".to_string(),
         argument_type: CppType {
           indirection: CppTypeIndirection::None,
@@ -392,9 +392,9 @@ fn free_func_operator_sub() {
     assert!(data.methods.len() == 1);
     assert_eq!(
       data.methods[0],
-      CppMethod {
+      CppFunction {
         name: "operator-".to_string(),
-        class_membership: None,
+        member: None,
         operator: Some(CppOperator::Subtraction),
         return_type: CppType {
           indirection: CppTypeIndirection::None,
@@ -406,7 +406,7 @@ fn free_func_operator_sub() {
           }),
         },
         arguments: vec![
-          CppMethodArgument {
+          CppFunctionArgument {
             name: "a".to_string(),
             argument_type: CppType {
               indirection: CppTypeIndirection::None,
@@ -419,7 +419,7 @@ fn free_func_operator_sub() {
             },
             has_default_value: false,
           },
-          CppMethodArgument {
+          CppFunctionArgument {
             name: "b".to_string(),
             argument_type: CppType {
               indirection: CppTypeIndirection::None,
@@ -475,14 +475,14 @@ fn simple_class_method() {
   assert!(data.methods.len() == 1);
   assert_eq!(
     data.methods[0],
-    CppMethod {
+    CppFunction {
       name: "func1".to_string(),
-      class_membership: Some(CppMethodClassMembership {
+      member: Some(CppFunctionMemberData {
         class_type: CppTypeClassBase {
           name: "MyClass".to_string(),
           template_arguments: None,
         },
-        kind: CppMethodKind::Regular,
+        kind: CppFunctionKind::Regular,
         is_virtual: false,
         is_pure_virtual: false,
         is_const: false,
@@ -498,7 +498,7 @@ fn simple_class_method() {
         is_const2: false,
         base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
-      arguments: vec![CppMethodArgument {
+      arguments: vec![CppFunctionArgument {
         name: "x".to_string(),
         argument_type: CppType {
           indirection: CppTypeIndirection::None,
@@ -699,9 +699,9 @@ fn template_class_method() {
   assert!(data.methods.len() == 1);
   assert_eq!(
     data.methods[0],
-    CppMethod {
+    CppFunction {
       name: "get".to_string(),
-      class_membership: Some(CppMethodClassMembership {
+      member: Some(CppFunctionMemberData {
         class_type: CppTypeClassBase {
           name: "MyVector".to_string(),
           template_arguments: Some(vec![CppType {
@@ -714,7 +714,7 @@ fn template_class_method() {
             },
           }]),
         },
-        kind: CppMethodKind::Regular,
+        kind: CppFunctionKind::Regular,
         is_virtual: false,
         is_pure_virtual: false,
         is_const: false,
@@ -733,7 +733,7 @@ fn template_class_method() {
           index: 0,
         },
       },
-      arguments: vec![CppMethodArgument {
+      arguments: vec![CppFunctionArgument {
         name: "index".to_string(),
         argument_type: CppType {
           indirection: CppTypeIndirection::None,
