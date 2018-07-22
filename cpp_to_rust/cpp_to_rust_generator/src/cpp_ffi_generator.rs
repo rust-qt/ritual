@@ -1,4 +1,5 @@
 use common::errors::{unexpected, Result};
+use common::utils::{MapIfOk, PushVec};
 use cpp_data::CppBaseSpecifier;
 use cpp_data::CppClassField;
 use cpp_data::CppTypeDataKind;
@@ -6,14 +7,17 @@ use cpp_data::CppVisibility;
 use cpp_ffi_data::CppFfiArgumentMeaning;
 use cpp_ffi_data::CppFfiMethodArgument;
 use cpp_ffi_data::CppFfiType;
+use cpp_ffi_data::QtSlotWrapper;
 use cpp_ffi_data::{CppCast, CppFfiMethod, CppFfiMethodKind, CppFieldAccessorType};
 use cpp_method::ReturnValueAllocationPlace;
 use cpp_method::{CppMethod, CppMethodArgument, CppMethodClassMembership, CppMethodKind};
+use cpp_type::CppFunctionPointerType;
 use cpp_type::CppTypeRole;
 use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
 use new_impl::database::CppItemData;
 use new_impl::processor::ProcessingStep;
 use new_impl::processor::ProcessorData;
+use std::iter::once;
 
 /// This object generates the C++ wrapper library
 struct CppFfiGenerator<'a> {
@@ -502,181 +506,137 @@ impl<'a> CppFfiGenerator<'a> {
     }
     Ok(())
   }
+}
+/// Generates slot wrappers for all encountered argument types
+/// (excluding types already handled in the dependencies).
+fn generate_slot_wrapper(
+  arguments: &[CppType],
+  name_suffix: &str,
+) -> Result<(QtSlotWrapper, Vec<CppFfiMethod>)> {
+  let ffi_types = arguments.map_if_ok(|t| t.to_cpp_ffi_type(CppTypeRole::NotReturnType))?;
 
-  // TODO: slot wrappers
-
-  /*
-  /// Generates slot wrappers for all encountered argument types
-  /// (excluding types already handled in the dependencies).
-  fn generate_slot_wrappers(&'a self) -> Result<Option<CppFfiHeaderData>> {
-    let include_file_name = "slots";
-    if self
-      .cpp_data
-      .current
-      .processed
-      .signal_argument_types
-      .is_empty()
-    {
-      return Ok(None);
-    }
-    let mut qt_slot_wrappers = Vec::new();
-    let mut methods = Vec::new();
-    for types in &self.cpp_data.current.processed.signal_argument_types {
-      let ffi_types = types.map_if_ok(|t| t.to_cpp_ffi_type(CppTypeRole::NotReturnType))?;
-      let args_captions = types.map_if_ok(|t| t.caption(TypeCaptionStrategy::Full))?;
-      let args_caption = if args_captions.is_empty() {
-        "no_args".to_string()
-      } else {
-        args_captions.join("_")
-      };
-      let void_ptr = CppType {
-        base: CppTypeBase::Void,
-        indirection: CppTypeIndirection::Ptr,
-        is_const: false,
-        is_const2: false,
-      };
-      let func_arguments = once(void_ptr.clone())
-        .chain(ffi_types.iter().map(|t| t.ffi_type.clone()))
-        .collect();
-      let class_name = format!("{}_SlotWrapper_{}", self.cpp_ffi_lib_name, args_caption);
-      let function_type = CppFunctionPointerType {
-        return_type: Box::new(CppType::void()),
-        arguments: func_arguments,
-        allows_variadic_arguments: false,
-      };
-      let create_function = |kind: CppMethodKind,
-                             name: String,
-                             is_slot: bool,
-                             arguments: Vec<CppMethodArgument>|
-       -> CppMethodWithKind {
-        CppMethodWithKind {
-          method: CppMethod {
-            name: name,
-            class_membership: Some(CppMethodClassMembership {
-              class_type: CppTypeClassBase {
-                name: class_name.clone(),
-                template_arguments: None,
-              },
-              is_virtual: true,
-              is_pure_virtual: false,
-              is_const: false,
-              is_static: false,
-              visibility: CppVisibility::Public,
-              is_signal: false,
-              is_slot: is_slot,
-              kind: kind,
-            }),
-            operator: None,
-            return_type: CppType::void(),
-            arguments: arguments,
-            allows_variadic_arguments: false,
-            include_file: include_file_name.to_string(),
-            origin_location: None,
-            template_arguments: None,
-            template_arguments_values: None,
-            declaration_code: None,
-            doc: None,
-            inheritance_chain: Vec::new(),
-            is_ffi_whitelisted: false,
-            //is_fake_inherited_method: false,
-          },
-          kind: CppFfiMethodKind::Real,
-        }
-      };
-      methods.push(create_function(
-        CppMethodKind::Constructor,
-        class_name.clone(),
-        false,
-        vec![],
-      ));
-      methods.push(create_function(
-        CppMethodKind::Destructor,
-        format!("~{}", class_name),
-        false,
-        vec![],
-      ));
-      let method_set_args = vec![
-        CppMethodArgument {
-          name: "func".to_string(),
-          argument_type: CppType {
-            base: CppTypeBase::FunctionPointer(function_type.clone()),
-            indirection: CppTypeIndirection::None,
-            is_const: false,
-            is_const2: false,
-          },
-          has_default_value: false,
-        },
-        CppMethodArgument {
-          name: "data".to_string(),
-          argument_type: void_ptr.clone(),
-          has_default_value: false,
-        },
-      ];
-      methods.push(create_function(
-        CppMethodKind::Regular,
-        "set".to_string(),
-        false,
-        method_set_args,
-      ));
-
-      let method_custom_slot = create_function(
-        CppMethodKind::Regular,
-        "custom_slot".to_string(),
-        true,
-        types
-          .iter()
-          .enumerate()
-          .map(|(num, t)| CppMethodArgument {
-            name: format!("arg{}", num),
-            argument_type: t.clone(),
-            has_default_value: false,
-          })
-          .collect(),
-      );
-      let receiver_id = method_custom_slot.method.receiver_id()?;
-      methods.push(method_custom_slot);
-      qt_slot_wrappers.push(QtSlotWrapper {
-        class_name: class_name.clone(),
-        arguments: ffi_types,
-        function_type: function_type.clone(),
-        receiver_id: receiver_id,
-      });
-      let cast_from = CppType {
-        base: CppTypeBase::Class(CppTypeClassBase {
+  let void_ptr = CppType {
+    base: CppTypeBase::Void,
+    indirection: CppTypeIndirection::Ptr,
+    is_const: false,
+    is_const2: false,
+  };
+  let func_arguments = once(void_ptr.clone())
+    .chain(ffi_types.iter().map(|t| t.ffi_type.clone()))
+    .collect();
+  let class_name = format!("CtrSlotWrapper{}", name_suffix);
+  let function_type = CppFunctionPointerType {
+    return_type: Box::new(CppType::void()),
+    arguments: func_arguments,
+    allows_variadic_arguments: false,
+  };
+  let create_function = |kind: CppMethodKind,
+                         name: String,
+                         is_slot: bool,
+                         arguments: Vec<CppMethodArgument>|
+   -> CppMethod {
+    CppMethod {
+      name: name,
+      class_membership: Some(CppMethodClassMembership {
+        class_type: CppTypeClassBase {
           name: class_name.clone(),
           template_arguments: None,
-        }),
-        indirection: CppTypeIndirection::Ptr,
-        is_const: false,
-        is_const2: false,
-      };
-      let cast_to = CppType {
-        base: CppTypeBase::Class(CppTypeClassBase {
-          name: "QObject".to_string(),
-          template_arguments: None,
-        }),
-        indirection: CppTypeIndirection::Ptr,
-        is_const: false,
-        is_const2: false,
-      };
-      methods.push(create_cast_method(
-        CppCast::Static {
-          is_unsafe: false,
-          is_direct: true,
         },
-        &cast_from,
-        &cast_to,
-        include_file_name,
-      ));
+        is_virtual: true,
+        is_pure_virtual: false,
+        is_const: false,
+        is_static: false,
+        visibility: CppVisibility::Public,
+        is_signal: false,
+        is_slot: is_slot,
+        kind: kind,
+      }),
+      operator: None,
+      return_type: CppType::void(),
+      arguments: arguments,
+      allows_variadic_arguments: false,
+      template_arguments: None,
+      declaration_code: None,
+      doc: None,
     }
-    Ok(Some(CppFfiHeaderData {
-      include_file_base_name: include_file_name.to_string(),
-      methods: self.process_methods(
-        include_file_name,
-        Some(CppTypeAllocationPlace::Heap),
-        methods.iter().map(|i| i.as_ref()),
-      )?,
-      qt_slot_wrappers: qt_slot_wrappers,
-    }))
-  }*/
+  };
+  let mut methods = Vec::new();
+  methods.push(create_function(
+    CppMethodKind::Constructor,
+    class_name.clone(),
+    false,
+    vec![],
+  ));
+  methods.push(create_function(
+    CppMethodKind::Destructor,
+    format!("~{}", class_name),
+    false,
+    vec![],
+  ));
+  let method_set_args = vec![
+    CppMethodArgument {
+      name: "func".to_string(),
+      argument_type: CppType {
+        base: CppTypeBase::FunctionPointer(function_type.clone()),
+        indirection: CppTypeIndirection::None,
+        is_const: false,
+        is_const2: false,
+      },
+      has_default_value: false,
+    },
+    CppMethodArgument {
+      name: "data".to_string(),
+      argument_type: void_ptr.clone(),
+      has_default_value: false,
+    },
+  ];
+  methods.push(create_function(
+    CppMethodKind::Regular,
+    "set".to_string(),
+    false,
+    method_set_args,
+  ));
+
+  let method_custom_slot = create_function(
+    CppMethodKind::Regular,
+    "custom_slot".to_string(),
+    true,
+    arguments
+      .iter()
+      .enumerate()
+      .map(|(num, t)| CppMethodArgument {
+        name: format!("arg{}", num),
+        argument_type: t.clone(),
+        has_default_value: false,
+      })
+      .collect(),
+  );
+  let receiver_id = method_custom_slot.receiver_id()?;
+  methods.push(method_custom_slot);
+  let class_bases = vec![CppBaseSpecifier {
+    derived_class_type: CppTypeClassBase {
+      name: class_name.clone(),
+      template_arguments: None,
+    },
+    base_class_type: CppTypeClassBase {
+      name: "QObject".to_string(),
+      template_arguments: None,
+    },
+    base_index: 0,
+    is_virtual: false,
+    visibility: CppVisibility::Public,
+  }];
+
+  let mut ffi_methods = Vec::new();
+  for method in methods {
+    ffi_methods.push_vec(generate_ffi_methods_for_method(&method, &[], name_suffix)?);
+  }
+  ffi_methods.push_vec(generate_casts(&class_bases[0], &class_bases, name_suffix)?);
+  let qt_slot_wrapper = QtSlotWrapper {
+    class_name: class_name.clone(),
+    arguments: ffi_types,
+    function_type: function_type.clone(),
+    receiver_id: receiver_id,
+  };
+  Ok((qt_slot_wrapper, ffi_methods))
 }

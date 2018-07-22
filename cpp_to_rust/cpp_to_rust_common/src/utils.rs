@@ -149,3 +149,13 @@ pub fn add_env_path_item(
   }
   env::join_paths(new_paths).chain_err(|| "env::join_paths failed")
 }
+
+pub trait PushVec<T> {
+  fn push_vec(&mut self, vec: Vec<T>);
+}
+
+impl<T> PushVec<T> for Vec<T> {
+  fn push_vec(&mut self, mut vec: Vec<T>) {
+    self.append(&mut vec);
+  }
+}
