@@ -281,6 +281,7 @@ pub struct Database {
   pub crate_name: String,
   pub items: Vec<DatabaseItem>,
   pub environments: Vec<CppCheckerEnv>,
+  pub next_ffi_id: u64,
 }
 
 impl Database {
@@ -289,6 +290,7 @@ impl Database {
       crate_name: crate_name.to_owned(),
       items: Vec::new(),
       environments: Vec::new(),
+      next_ffi_id: 0,
     }
   }
 
@@ -299,6 +301,7 @@ impl Database {
   pub fn clear(&mut self) {
     self.items.clear();
     self.environments.clear();
+    self.next_ffi_id = 0;
   }
 
   pub fn crate_name(&self) -> &str {

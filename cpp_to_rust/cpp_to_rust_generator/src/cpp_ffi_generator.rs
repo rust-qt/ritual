@@ -66,7 +66,8 @@ fn run(mut data: ProcessorData) -> Result<()> {
     .collect();
 
   // TODO: save and use next_id
-  let mut name_provider = FfiNameProvider::new(cpp_ffi_lib_name.clone(), 0);
+  let mut name_provider =
+    FfiNameProvider::new(cpp_ffi_lib_name.clone(), data.current_database.next_ffi_id);
 
   for item in &mut data.current_database.items {
     if item.cpp_ffi_methods.is_some() {
@@ -124,6 +125,7 @@ fn run(mut data: ProcessorData) -> Result<()> {
       }
     }
   }
+  data.current_database.next_ffi_id = name_provider.next_id;
   Ok(())
 }
 
