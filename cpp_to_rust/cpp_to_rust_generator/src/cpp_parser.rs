@@ -297,15 +297,6 @@ fn run(data: ProcessorData) -> Result<()> {
     },
   )?;
   Ok(())
-
-  //  log::status("Checking data integrity");
-  //  let (good_methods, good_types) = parser.check_integrity(methods);
-  //  parser.types = good_types;
-  //  log::status("Searching for template instantiations");
-  //  Ok(ParserCppData {
-  //    types: parser.types,
-  //    methods: good_methods,
-  //  })
 }
 
 pub fn cpp_parser() -> ProcessingStep {
@@ -1639,74 +1630,4 @@ impl<'a> CppParser<'a> {
     }
     Ok(())
   }
-
-  /*
-  /// Returns types and methods that don't refer to any unknown types.
-  fn check_integrity(&self, methods: Vec<CppMethod>) -> (Vec<CppMethod>, Vec<CppTypeData>) {
-    let good_methods = methods
-      .into_iter()
-      .filter(|method| {
-        if let Err(msg) = self.check_type_integrity(&method.return_type.clone()) {
-          log::llog(log::DebugParserSkips, || {
-            format!("Method is removed: {}: {}", method.short_text(), msg)
-          });
-          return false;
-        }
-        for arg in &method.arguments {
-          if let Err(msg) = self.check_type_integrity(&arg.argument_type) {
-            log::llog(log::DebugParserSkips, || {
-              format!("Method is removed: {}: {}", method.short_text(), msg)
-            });
-            return false;
-          }
-        }
-        true
-      })
-      .collect();
-
-    let mut good_types = Vec::new();
-    for t in &self.types {
-      let mut good_type = t.clone();
-      if let CppTypeKind::Class {
-        ref mut bases,
-        ref mut fields,
-        ..
-      } = good_type.kind
-      {
-        let mut valid_bases = Vec::new();
-        for base in bases.iter() {
-          if let Err(msg) = self.check_type_integrity(&base.base_type) {
-            log::llog(log::DebugParserSkips, || {
-              format!(
-                "Class {}: base class removed because type is not available: {:?}: {}",
-                t.name, base, msg
-              )
-            });
-          } else {
-            valid_bases.push(base.clone());
-          }
-        }
-        bases.clear();
-        bases.append(&mut valid_bases);
-
-        let mut valid_fields = Vec::new();
-        for field in fields.iter() {
-          if let Err(msg) = self.check_type_integrity(&field.field_type) {
-            log::llog(log::DebugParserSkips, || {
-              format!(
-                "Class {}: field removed because type is not available: {:?}: {}",
-                t.name, field, msg
-              )
-            });
-          } else {
-            valid_fields.push(field.clone());
-          }
-        }
-        fields.clear();
-        fields.append(&mut valid_fields);
-      }
-      good_types.push(good_type);
-    }
-    (good_methods, good_types)
-  } */
 }

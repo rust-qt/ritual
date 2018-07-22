@@ -200,8 +200,8 @@ impl CppOperator {
   }
 
   /// Returns alphanumeric identifier for this operator
-  /// used to name FFI functions.
-  pub fn c_name(&self) -> Result<&'static str> {
+  /// used to name wrapper functions.
+  pub fn ascii_name(&self) -> Result<&'static str> {
     use self::CppOperator::*;
     Ok(match *self {
       Conversion(..) => {
