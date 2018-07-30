@@ -51,7 +51,7 @@ pub enum DatabaseItemSource {
     /// Exact location of the declaration
     origin_location: CppOriginLocation,
   },
-  Destructor,
+  ImplicitDestructor,
   TemplateInstantiation,
   SignalArguments,
 }
@@ -119,7 +119,7 @@ impl CppCheckerInfoList {
 pub enum CppItemData {
   Type(CppTypeData),
   EnumValue(CppEnumValue),
-  Method(CppFunction),
+  Function(CppFunction),
   ClassField(CppClassField),
   ClassBase(CppBaseSpecifier),
   TemplateInstantiation(CppTemplateInstantiation),
@@ -131,7 +131,7 @@ impl CppItemData {
     match (self, other) {
       (&CppItemData::Type(ref v), &CppItemData::Type(ref v2)) => v.is_same(v2),
       (&CppItemData::EnumValue(ref v), &CppItemData::EnumValue(ref v2)) => v.is_same(v2),
-      (&CppItemData::Method(ref v), &CppItemData::Method(ref v2)) => v.is_same(v2),
+      (&CppItemData::Function(ref v), &CppItemData::Function(ref v2)) => v.is_same(v2),
       (&CppItemData::ClassField(ref v), &CppItemData::ClassField(ref v2)) => v.is_same(v2),
       (&CppItemData::ClassBase(ref v), &CppItemData::ClassBase(ref v2)) => v == v2,
       (&CppItemData::TemplateInstantiation(ref v), &CppItemData::TemplateInstantiation(ref v2)) => {
@@ -161,7 +161,7 @@ impl CppItemData {
         }],
       },
       CppItemData::EnumValue(_) => Vec::new(),
-      CppItemData::Method(ref method) => method.all_involved_types(),
+      CppItemData::Function(ref method) => method.all_involved_types(),
       CppItemData::ClassField(ref field) => {
         let class_type = CppType {
           indirection: CppTypeIndirection::None,
@@ -190,8 +190,15 @@ impl CppItemData {
     }
   }
 
-  pub fn as_method_ref(&self) -> Option<&CppFunction> {
-    if let CppItemData::Method(ref data) = *self {
+  pub fn as_function_ref(&self) -> Option<&CppFunction> {
+    if let CppItemData::Function(ref data) = *self {
+      Some(data)
+    } else {
+      None
+    }
+  }
+  pub fn as_type_ref(&self) -> Option<&CppTypeData> {
+    if let CppItemData::Type(ref data) = *self {
       Some(data)
     } else {
       None
@@ -216,7 +223,7 @@ impl Display for CppItemData {
           format!("class {}", type_base.to_cpp_pseudo_code())
         }
       },
-      CppItemData::Method(ref method) => method.short_text(),
+      CppItemData::Function(ref method) => method.short_text(),
       CppItemData::EnumValue(ref value) => format!(
         "enum {} {{ {} = {}, ... }}",
         value.enum_name, value.name, value.value
@@ -270,7 +277,7 @@ impl Display for CppItemData {
 pub struct DatabaseItem {
   pub cpp_data: CppItemData,
   pub source: DatabaseItemSource,
-  pub cpp_ffi_methods: Option<Vec<CppFfiFunction>>,
+  pub cpp_ffi_functions: Option<Vec<CppFfiFunction>>,
   pub qt_slot_wrapper: Option<QtSlotWrapper>,
   // TODO: add rust data
 }
@@ -323,7 +330,7 @@ impl Database {
     self.items.push(DatabaseItem {
       cpp_data: data,
       source: source,
-      cpp_ffi_methods: None,
+      cpp_ffi_functions: None,
       qt_slot_wrapper: None,
     });
     true

@@ -306,6 +306,13 @@ impl CppFunction {
     }
   }
 
+  pub fn is_virtual(&self) -> bool {
+    match self.member {
+      Some(ref info) => info.is_virtual,
+      None => false,
+    }
+  }
+
   /// Returns the identifier that should be used in `QObject::connect`
   /// to specify this signal or slot.
   pub fn receiver_id(&self) -> Result<String> {

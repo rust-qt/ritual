@@ -4,11 +4,12 @@ use common::log;
 
 use common::utils::MapIfOk;
 use config::Config;
-use cpp_ffi_generator::cpp_ffi_generator;
-use cpp_parser::cpp_parser;
-use new_impl::cpp_checker::cpp_checker;
+use cpp_ffi_generator::cpp_ffi_generator_step;
+use cpp_parser::cpp_parser_step;
+use new_impl::cpp_checker::cpp_checker_step;
 
 use common::string_utils::JoinWithSeparator;
+use cpp_explicit_destructors::add_explicit_destructors_step;
 use new_impl::database::{Database, DatabaseItem};
 use new_impl::html_logger::HtmlLogger;
 use new_impl::workspace::Workspace;
@@ -127,7 +128,7 @@ impl ProcessingStep {
   }
 }
 
-mod items {
+mod steps {
   use common::string_utils::JoinWithSeparator;
   use new_impl::database::CppCheckerInfo;
   use new_impl::html_logger::escape_html;
@@ -145,7 +146,7 @@ mod items {
           ],
           "database_item",
         )?;
-        if let Some(ref cpp_ffi_methods) = item.cpp_ffi_methods {
+        if let Some(ref cpp_ffi_methods) = item.cpp_ffi_functions {
           for ffi_method in cpp_ffi_methods {
             let item_text = ffi_method.short_text();
             let item_texts = ffi_method.checks.items.iter().map(|item| {
@@ -174,7 +175,7 @@ mod items {
   pub fn clear_cpp_ffi() -> ProcessingStep {
     ProcessingStep::new_custom("clear_cpp_ffi", |data| {
       for item in &mut data.current_database.items {
-        item.cpp_ffi_methods = None;
+        item.cpp_ffi_functions = None;
       }
       data.current_database.next_ffi_id = 0;
       Ok(())
@@ -190,14 +191,15 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
   check_all_paths(&config)?;
 
   let standard_processing_steps = vec![
-    cpp_parser(),
+    cpp_parser_step(),
+    add_explicit_destructors_step(),
     // TODO: instantiate_templates
-    cpp_ffi_generator(),
+    cpp_ffi_generator_step(),
     // TODO: generate_slot_wrappers
-    cpp_checker(),
-    items::print_database(),
-    items::clear_cpp_ffi(),
-    items::clear(),
+    cpp_checker_step(),
+    steps::print_database(),
+    steps::clear_cpp_ffi(),
+    steps::clear(),
   ];
   let all_processing_steps: Vec<_> = standard_processing_steps
     .iter()

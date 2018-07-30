@@ -70,7 +70,7 @@ fn run(mut data: ProcessorData) -> Result<()> {
     FfiNameProvider::new(cpp_ffi_lib_name.clone(), data.current_database.next_ffi_id);
 
   for item in &mut data.current_database.items {
-    if item.cpp_ffi_methods.is_some() {
+    if item.cpp_ffi_functions.is_some() {
       data.html_logger.add(
         &[item.cpp_data.to_string(), "already processed".to_string()],
         "already_processed",
@@ -89,7 +89,7 @@ fn run(mut data: ProcessorData) -> Result<()> {
         Ok(Vec::new())
         // no FFI methods for these items
       }
-      CppItemData::Method(ref method) => {
+      CppItemData::Function(ref method) => {
         generate_ffi_methods_for_method(method, &stack_allocated_types, &mut name_provider)
       }
       CppItemData::ClassField(ref field) => {
@@ -104,7 +104,7 @@ fn run(mut data: ProcessorData) -> Result<()> {
 
     match result {
       Err(msg) => {
-        item.cpp_ffi_methods = Some(Vec::new());
+        item.cpp_ffi_functions = Some(Vec::new());
         data
           .html_logger
           .add(&[item.cpp_data.to_string(), msg.to_string()], "error")?;
@@ -121,7 +121,7 @@ fn run(mut data: ProcessorData) -> Result<()> {
           ],
           "success",
         )?;
-        item.cpp_ffi_methods = Some(r);
+        item.cpp_ffi_functions = Some(r);
       }
     }
   }
@@ -129,7 +129,7 @@ fn run(mut data: ProcessorData) -> Result<()> {
   Ok(())
 }
 
-pub fn cpp_ffi_generator() -> ProcessingStep {
+pub fn cpp_ffi_generator_step() -> ProcessingStep {
   ProcessingStep::new("cpp_ffi_generator", Vec::new(), run)
 }
 
@@ -456,7 +456,7 @@ fn generate_field_accessors(
 }
 
 fn should_process_item(item: &CppItemData) -> Result<bool> {
-  if let CppItemData::Method(ref method) = *item {
+  if let CppItemData::Function(ref method) = *item {
     if let Some(class_name) = method.class_name() {
       if class_name == "QFlags" {
         return Ok(false);

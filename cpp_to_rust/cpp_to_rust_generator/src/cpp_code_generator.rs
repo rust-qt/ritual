@@ -387,7 +387,7 @@ fn generate_cpp_file(data: &[DatabaseItem], file_path: &Path) -> Result<()> {
     }
     cpp_file.write("extern \"C\" {\n\n")?;
     for item in data {
-      if let Some(ref methods) = item.cpp_ffi_methods {
+      if let Some(ref methods) = item.cpp_ffi_functions {
         for method in methods {
           cpp_file.write(function_implementation(method)?)?;
         }

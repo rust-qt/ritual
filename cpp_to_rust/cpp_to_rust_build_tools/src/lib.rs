@@ -18,6 +18,7 @@ use common::target::current_target;
 use common::utils::{exe_suffix, get_command_output};
 use common::BuildScriptData;
 
+use common::cpp_lib_builder::c2r_cmake_vars;
 use std::path::PathBuf;
 use std::process::Command;
 

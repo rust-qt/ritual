@@ -100,7 +100,7 @@ impl<'a> CppChecker<'a> {
 
     let total_count = self.data.current_database.items.len();
     for (index, item) in self.data.current_database.items.iter_mut().enumerate() {
-      if let Some(ref mut cpp_ffi_methods) = item.cpp_ffi_methods {
+      if let Some(ref mut cpp_ffi_methods) = item.cpp_ffi_functions {
         for ffi_method in cpp_ffi_methods {
           if let Ok(snippet) = snippet_for_method(ffi_method) {
             log::status(format!("Checking item {} / {}", index + 1, total_count));
@@ -254,7 +254,7 @@ fn run(data: ProcessorData) -> Result<()> {
   Ok(())
 }
 
-pub fn cpp_checker() -> ProcessingStep {
+pub fn cpp_checker_step() -> ProcessingStep {
   ProcessingStep::new(
     "cpp_checker",
     vec!["cpp_parser".to_string(), "cpp_ffi_generator".to_string()],

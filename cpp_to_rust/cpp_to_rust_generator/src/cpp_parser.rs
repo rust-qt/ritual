@@ -291,7 +291,7 @@ fn run(data: ProcessorData) -> Result<()> {
       parser.parse_types(translation_unit)?;
       log::status("Parsing methods");
       //let methods =
-      parser.parse_methods(translation_unit)?;
+      parser.parse_functions(translation_unit)?;
       //Ok((parser, methods))
       Ok(())
     },
@@ -299,7 +299,7 @@ fn run(data: ProcessorData) -> Result<()> {
   Ok(())
 }
 
-pub fn cpp_parser() -> ProcessingStep {
+pub fn cpp_parser_step() -> ProcessingStep {
   ProcessingStep::new("cpp_parser", Vec::new(), run)
 }
 
@@ -1553,7 +1553,7 @@ impl<'a> CppParser<'a> {
   }
 
   /// Parses methods in translation unit `entity`.
-  fn parse_methods(&mut self, entity: Entity) -> Result<()> {
+  fn parse_functions(&mut self, entity: Entity) -> Result<()> {
     if !self.should_process_entity(entity) {
       return Ok(());
     }
@@ -1570,7 +1570,7 @@ impl<'a> CppParser<'a> {
               self
                 .data
                 .current_database
-                .add_cpp_data(info, CppItemData::Method(r));
+                .add_cpp_data(info, CppItemData::Function(r));
             }
             Err(error) => {
               self.data.html_logger.add(
@@ -1624,7 +1624,7 @@ impl<'a> CppParser<'a> {
       | EntityKind::ClassDecl
       | EntityKind::UnexposedDecl
       | EntityKind::ClassTemplate => for c in entity.get_children() {
-        self.parse_methods(c)?;
+        self.parse_functions(c)?;
       },
       _ => {}
     }

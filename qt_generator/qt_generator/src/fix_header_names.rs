@@ -103,7 +103,7 @@ pub fn fix_header_names(data: &mut [DatabaseItem], headers_dir: &PathBuf) -> Res
   for item in data {
     let class_name = match item.cpp_data {
       CppItemData::Type(ref data) => Some(data.name.as_str()),
-      CppItemData::Method(ref data) => data.class_name().map(|x| x.as_str()),
+      CppItemData::Function(ref data) => data.class_name().map(|x| x.as_str()),
       _ => continue,
     };
 

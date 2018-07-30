@@ -123,7 +123,7 @@ fn instantiate_templates(data: &ProcessorData) -> Result<Vec<CppFunction>> {
   for method in data
     .all_items()
     .iter()
-    .filter_map(|item| item.cpp_data.as_method_ref())
+    .filter_map(|item| item.cpp_data.as_function_ref())
   {
     for type1 in method.all_involved_types() {
       if let CppTypeBase::Class(CppTypeClassBase {

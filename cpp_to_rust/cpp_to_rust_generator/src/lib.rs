@@ -3,7 +3,7 @@
 //! See [README]
 //! (https://github.com/rust-qt/cpp_to_rust/tree/master/cpp_to_rust/cpp_to_rust_generator)
 //! for more information.
-
+#![deny(unused_must_use)]
 #![cfg_attr(feature = "clippy", feature(plugin))]
 #![cfg_attr(feature = "clippy", plugin(clippy))]
 #![cfg_attr(feature = "clippy", warn(nonminimal_bool))]
@@ -45,10 +45,16 @@ mod cpp_parser;
 //mod rust_info;
 //mod rust_type;
 //mod versions;
-mod cpp_inheritance;
+
 mod cpp_template_instantiator;
 
 #[cfg(test)]
 mod tests;
 
 pub mod new_impl;
+
+mod cpp_explicit_destructors;
+mod type_allocation_places;
+
+// TODO: deal with inheritance for subclassing support
+//mod cpp_inheritance;

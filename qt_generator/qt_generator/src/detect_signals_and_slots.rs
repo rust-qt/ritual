@@ -125,7 +125,7 @@ pub fn detect_signals_and_slots(data: ProcessorData) -> Result<()> {
       ..
     } = item.source
     {
-      if let CppItemData::Method(ref mut method) = item.cpp_data {
+      if let CppItemData::Function(ref mut method) = item.cpp_data {
         let mut section_type = SectionType::Other;
         if let Some(class_name) = method.class_name() {
           if let Some(sections) = sections_per_class.get(class_name) {
