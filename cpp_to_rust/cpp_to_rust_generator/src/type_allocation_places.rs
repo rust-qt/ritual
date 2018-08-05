@@ -4,13 +4,22 @@ use cpp_type::CppType;
 use cpp_type::CppTypeBase;
 use cpp_type::CppTypeClassBase;
 use cpp_type::CppTypeIndirection;
+use new_impl::processor::ProcessingStep;
 use new_impl::processor::ProcessorData;
 use std::collections::HashMap;
+
+pub fn choose_allocation_places_step() -> ProcessingStep {
+  ProcessingStep::new(
+    "choose_allocation_places",
+    Vec::new(),
+    choose_allocation_places,
+  )
+}
 
 /// Detects the preferred type allocation place for each type based on
 /// API of all known methods. Doesn't actually change the data,
 /// only suggests stack allocated types for manual configuration.
-pub fn choose_allocation_places(mut data: ProcessorData) -> Result<()> {
+fn choose_allocation_places(mut data: ProcessorData) -> Result<()> {
   log::status("Detecting type allocation places");
 
   #[derive(Default)]

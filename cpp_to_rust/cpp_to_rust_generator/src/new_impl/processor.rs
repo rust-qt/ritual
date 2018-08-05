@@ -16,6 +16,7 @@ use new_impl::workspace::Workspace;
 use std::fmt;
 use std::iter::once;
 use std::path::PathBuf;
+use type_allocation_places::choose_allocation_places_step;
 //use cpp_post_processor::cpp_post_process;
 
 /// Creates output and cache directories if they don't exist.
@@ -193,6 +194,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
   let standard_processing_steps = vec![
     cpp_parser_step(),
     add_explicit_destructors_step(),
+    choose_allocation_places_step(),
     // TODO: instantiate_templates
     cpp_ffi_generator_step(),
     // TODO: generate_slot_wrappers

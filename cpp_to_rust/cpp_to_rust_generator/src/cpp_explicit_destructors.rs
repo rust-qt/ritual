@@ -13,7 +13,7 @@ use new_impl::processor::ProcessorData;
 pub fn add_explicit_destructors_step() -> ProcessingStep {
   ProcessingStep::new(
     "add_explicit_destructors",
-    Vec::new(),
+    vec!["cpp_parser".to_string()],
     add_explicit_destructors,
   )
 }
