@@ -7,6 +7,9 @@ use cpp_function::CppOperator;
 use cpp_type::CppType;
 use cpp_type::CppTypeBase;
 use cpp_type::CppTypeClassBase;
+use new_impl::database::CppItemData;
+use new_impl::database::DatabaseItemSource;
+use new_impl::processor::ProcessingStep;
 use new_impl::processor::ProcessorData;
 
 /// Returns true if `type1` is a known template instantiation.
@@ -191,4 +194,71 @@ fn instantiate_templates(data: &ProcessorData) -> Result<Vec<CppFunction>> {
     }
   }
   Ok(new_methods)
+}
+
+pub fn find_template_instantiations_step() -> ProcessingStep {
+  ProcessingStep::new(
+    "find_template_instantiations",
+    vec!["cpp_parser".to_string()],
+    find_template_instantiations,
+  )
+}
+
+/// Searches for template instantiations in this library's API,
+/// excluding results that were already processed in dependencies.
+#[cfg_attr(feature = "clippy", allow(block_in_if_condition_stmt))]
+fn find_template_instantiations(data: ProcessorData) -> Result<()> {
+  fn check_type(type1: &CppType, data: &ProcessorData, result: &mut Vec<CppTemplateInstantiation>) {
+    if let CppTypeBase::Class(CppTypeClassBase {
+      ref name,
+      ref template_arguments,
+    }) = type1.base
+    {
+      if let Some(ref template_arguments) = *template_arguments {
+        if !template_arguments
+          .iter()
+          .any(|x| x.base.is_or_contains_template_parameter())
+        {
+          if !data
+            .all_items()
+            .iter()
+            .filter_map(|item| item.cpp_data.as_template_instantiation_ref())
+            .any(|i| &i.class_name == name && &i.template_arguments == template_arguments)
+          {
+            if !result
+              .iter()
+              .any(|x| &x.class_name == name && &x.template_arguments == template_arguments)
+            {
+              log::llog(log::DebugParser, || {
+                format!(
+                  "Found template instantiation: {}<{:?}>",
+                  name, template_arguments
+                )
+              });
+              result.push(CppTemplateInstantiation {
+                class_name: name.clone(),
+                template_arguments: template_arguments.clone(),
+              });
+            }
+          }
+        }
+        for arg in template_arguments {
+          check_type(arg, &data, result);
+        }
+      }
+    }
+  }
+  let mut result = Vec::new();
+  for item in &data.current_database.items {
+    for type1 in item.cpp_data.all_involved_types() {
+      check_type(&type1, &data, &mut result);
+    }
+  }
+  for item in result {
+    data.current_database.add_cpp_data(
+      DatabaseItemSource::TemplateInstantiation,
+      CppItemData::TemplateInstantiation(item),
+    );
+  }
+  Ok(())
 }

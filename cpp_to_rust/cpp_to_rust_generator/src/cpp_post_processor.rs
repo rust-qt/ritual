@@ -22,10 +22,10 @@ pub fn cpp_post_process<'a>(
     dependencies: dependencies,
   };
 
-  let inherited_methods = processor.detect_inherited_methods2()?;
-  let implicit_destructors = processor.ensure_explicit_destructors(&inherited_methods)?;
-  let type_allocation_places =
-    processor.choose_allocation_places(allocation_place_overrides, &inherited_methods)?;
+  //let inherited_methods = processor.detect_inherited_methods2()?;
+  //let implicit_destructors = processor.ensure_explicit_destructors(&inherited_methods)?;
+  //let type_allocation_places =
+  //  processor.choose_allocation_places(allocation_place_overrides, &inherited_methods)?;
 
   let result = ProcessedCppData {
     implicit_destructors: implicit_destructors,
@@ -76,96 +76,6 @@ impl<'a> CppPostProcessor<'a> {
       }
     }
     false
-  }
-
-  /// Searches for template instantiations in this library's API,
-  /// excluding results that were already processed in dependencies.
-  #[cfg_attr(feature = "clippy", allow(block_in_if_condition_stmt))]
-  fn find_template_instantiations(&self) -> Vec<CppTemplateInstantiations> {
-    fn check_type(type1: &CppType, deps: &[&CppData], result: &mut Vec<CppTemplateInstantiations>) {
-      if let CppTypeBase::Class(CppTypeClassBase {
-        ref name,
-        ref template_arguments,
-      }) = type1.base
-      {
-        if let Some(ref template_arguments) = *template_arguments {
-          if !template_arguments
-            .iter()
-            .any(|x| x.base.is_or_contains_template_parameter())
-          {
-            if !deps.iter().any(|data| {
-              data.processed.template_instantiations.iter().any(|i| {
-                &i.class_name == name
-                  && i.instantiations
-                    .iter()
-                    .any(|x| &x.template_arguments == template_arguments)
-              })
-            }) {
-              if !result.iter().any(|x| &x.class_name == name) {
-                log::llog(log::DebugParser, || {
-                  format!(
-                    "Found template instantiation: {}<{:?}>",
-                    name, template_arguments
-                  )
-                });
-                result.push(CppTemplateInstantiations {
-                  class_name: name.clone(),
-                  instantiations: vec![CppTemplateInstantiation {
-                    template_arguments: template_arguments.clone(),
-                  }],
-                });
-              } else {
-                let item = result
-                  .iter_mut()
-                  .find(|x| &x.class_name == name)
-                  .expect("previously found");
-                if !item
-                  .instantiations
-                  .iter()
-                  .any(|x| &x.template_arguments == template_arguments)
-                {
-                  log::llog(log::DebugParser, || {
-                    format!(
-                      "Found template instantiation: {}<{:?}>",
-                      name, template_arguments
-                    )
-                  });
-                  item.instantiations.push(CppTemplateInstantiation {
-                    template_arguments: template_arguments.clone(),
-                  });
-                }
-              }
-            }
-          }
-          for arg in template_arguments {
-            check_type(arg, deps, result);
-          }
-        }
-      }
-    }
-    let mut result = Vec::new();
-    for m in &self.parser_data.methods {
-      check_type(&m.return_type, &self.dependencies, &mut result);
-      for arg in &m.arguments {
-        check_type(&arg.argument_type, &self.dependencies, &mut result);
-      }
-    }
-    for t in &self.parser_data.types {
-      if let CppTypeKind::Class {
-        ref bases,
-        ref fields,
-        ..
-      } = t.kind
-      {
-        for base in bases {
-          check_type(&base.base_type, &self.dependencies, &mut result);
-        }
-        for field in fields {
-          check_type(&field.field_type, &self.dependencies, &mut result);
-        }
-      }
-    }
-    result
   }
 
   fn detect_signal_argument_types(&self) -> Result<Vec<Vec<CppType>>> {
