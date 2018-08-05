@@ -21,6 +21,7 @@ mod fix_header_names;
 mod lib_configs;
 mod versions;
 
+mod detect_signal_argument_types;
 mod detect_signals_and_slots;
 mod new_impl;
 

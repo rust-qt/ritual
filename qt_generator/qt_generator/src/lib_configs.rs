@@ -13,6 +13,7 @@ use versions;
 
 use cpp_to_rust_generator::config::CrateProperties;
 use cpp_to_rust_generator::new_impl::processor::ProcessingStep;
+use detect_signal_argument_types::detect_signal_argument_types;
 use detect_signals_and_slots::detect_signals_and_slots;
 use doc_parser::parse_docs;
 use fix_header_names::fix_header_names;
@@ -569,6 +570,14 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
       "qt_detect_signals_and_slots",
       vec!["cpp_parser".to_string()],
       detect_signals_and_slots,
+    ));
+    config.add_custom_processing_step(ProcessingStep::new(
+      "detect_signal_argument_types",
+      vec![
+        "cpp_parser".to_string(),
+        "qt_detect_signals_and_slots".to_string(),
+      ],
+      detect_signal_argument_types,
     ));
 
     let crate_name_clone = crate_name.to_string();

@@ -11,6 +11,7 @@ use new_impl::cpp_checker::cpp_checker_step;
 use common::string_utils::JoinWithSeparator;
 use cpp_explicit_destructors::add_explicit_destructors_step;
 use cpp_template_instantiator::find_template_instantiations_step;
+use cpp_template_instantiator::instantiate_templates_step;
 use new_impl::database::{Database, DatabaseItem};
 use new_impl::html_logger::HtmlLogger;
 use new_impl::workspace::Workspace;
@@ -197,7 +198,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
     add_explicit_destructors_step(),
     choose_allocation_places_step(),
     find_template_instantiations_step(),
-    // TODO: instantiate_templates
+    instantiate_templates_step(),
     cpp_ffi_generator_step(),
     // TODO: generate_slot_wrappers
     cpp_checker_step(),

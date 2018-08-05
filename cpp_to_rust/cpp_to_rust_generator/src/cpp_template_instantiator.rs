@@ -118,9 +118,17 @@ fn apply_instantiation_to_method(
   }
 }
 
+pub fn instantiate_templates_step() -> ProcessingStep {
+  ProcessingStep::new(
+    "instantiate_templates",
+    vec!["find_template_instantiations".to_string()],
+    instantiate_templates,
+  )
+}
+
 /// Generates methods as template instantiations of
 /// methods of existing template classes and existing template methods.
-fn instantiate_templates(data: &ProcessorData) -> Result<Vec<CppFunction>> {
+fn instantiate_templates(data: ProcessorData) -> Result<()> {
   log::status("Instantiating templates");
   let mut new_methods = Vec::new();
   for method in data
@@ -165,7 +173,7 @@ fn instantiate_templates(data: &ProcessorData) -> Result<Vec<CppFunction>> {
                   Ok(method) => {
                     let mut ok = true;
                     for type1 in method.all_involved_types() {
-                      match check_template_type(data, &type1) {
+                      match check_template_type(&data, &type1) {
                         Ok(_) => {}
                         Err(msg) => {
                           ok = false;
@@ -193,7 +201,13 @@ fn instantiate_templates(data: &ProcessorData) -> Result<Vec<CppFunction>> {
       }
     }
   }
-  Ok(new_methods)
+  for item in new_methods {
+    data.current_database.add_cpp_data(
+      DatabaseItemSource::TemplateInstantiation,
+      CppItemData::Function(item),
+    );
+  }
+  Ok(())
 }
 
 pub fn find_template_instantiations_step() -> ProcessingStep {

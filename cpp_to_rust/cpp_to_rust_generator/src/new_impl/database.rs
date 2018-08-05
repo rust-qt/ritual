@@ -53,7 +53,7 @@ pub enum DatabaseItemSource {
   },
   ImplicitDestructor,
   TemplateInstantiation,
-  SignalArguments,
+  QtSignalArguments,
 }
 
 impl DatabaseItemSource {
@@ -207,6 +207,13 @@ impl CppItemData {
 
   pub fn as_template_instantiation_ref(&self) -> Option<&CppTemplateInstantiation> {
     if let CppItemData::TemplateInstantiation(ref data) = *self {
+      Some(data)
+    } else {
+      None
+    }
+  }
+  pub fn as_signal_arguments_ref(&self) -> Option<&[CppType]> {
+    if let CppItemData::QtSignalArguments(ref data) = *self {
       Some(data)
     } else {
       None
