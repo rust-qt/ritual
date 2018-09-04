@@ -44,7 +44,7 @@ pub struct DocIndexItem {
 
 use std::io::Read;
 
-use compress;
+use libflate;
 
 impl DocData {
   /// Returns all index items.
@@ -61,8 +61,8 @@ impl DocData {
     let file_data = file_data.convert_err()?;
     let file_data: Vec<u8> = file_data.get_checked(0).convert_err()?;
     let mut file_html = Vec::new();
-    compress::zlib::Decoder::new(&file_data[4..])
-      .read_to_end(&mut file_html)
+    libflate::zlib::Decoder::new(&file_data[4..])
+      .and_then(|mut decoder| decoder.read_to_end(&mut file_html))
       .map_err(|err| format!("zlib decoder failed: {}", err))?;
     let file_html = String::from_utf8_lossy(&file_html);
     Ok(Document::from(file_html.as_ref()))

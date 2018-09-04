@@ -7,7 +7,7 @@
 extern crate clap;
 extern crate cpp_to_rust_generator;
 extern crate rusqlite;
-extern crate compress;
+extern crate libflate;
 extern crate select as html_parser;
 extern crate regex;
 extern crate qt_generator_common;
