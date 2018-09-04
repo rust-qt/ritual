@@ -178,7 +178,7 @@ impl FileWrapper {
 }
 
 /// Deserialize value from JSON file `path`.
-pub fn load_json<P: AsRef<Path>, T: ::serde::Deserialize>(path: P) -> Result<T> {
+pub fn load_json<P: AsRef<Path>, T: ::serde::de::DeserializeOwned>(path: P) -> Result<T> {
   let file = open_file(path.as_ref())?;
   ::serde_json::from_reader(file.into_file())
     .chain_err(|| format!("failed to parse file as JSON: {}", path.as_ref().display()))
@@ -194,16 +194,16 @@ pub fn save_json<P: AsRef<Path>, T: ::serde::Serialize>(path: P, value: &T) -> R
 }
 
 /// Deserialize value from binary file `path`.
-pub fn load_bincode<P: AsRef<Path>, T: ::serde::Deserialize>(path: P) -> Result<T> {
+pub fn load_bincode<P: AsRef<Path>, T: ::serde::de::DeserializeOwned>(path: P) -> Result<T> {
   let mut file = open_file(path.as_ref())?.into_file();
-  ::bincode::deserialize_from(&mut file, ::bincode::Infinite)
+  ::bincode::deserialize_from(&mut file)
     .chain_err(|| format!("load_bincode failed: {}", path.as_ref().display()))
 }
 
 /// Serialize `value` into binary file `path`.
 pub fn save_bincode<P: AsRef<Path>, T: ::serde::Serialize>(path: P, value: &T) -> Result<()> {
   let mut file = create_file(path.as_ref())?.into_file();
-  ::bincode::serialize_into(&mut file, value, ::bincode::Infinite)
+  ::bincode::serialize_into(&mut file, value)
     .chain_err(|| format!("save_bincode failed: {}", path.as_ref().display()))
 }
 
