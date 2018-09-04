@@ -107,8 +107,8 @@ fn make_config(sublib_name: &str,
   let crate_name = format!("qt_{}", sublib_name);
   let mut crate_properties = CrateProperties::new(crate_name.clone(),
                                                   versions::QT_OUTPUT_CRATES_VERSION);
-  let mut custom_fields = toml::Table::new();
-  let mut package_data = toml::Table::new();
+  let mut custom_fields = toml::value::Table::new();
+  let mut package_data = toml::value::Table::new();
   package_data.insert("authors".to_string(),
                       toml::Value::Array(vec![toml::Value::String("Pavel Strakhov <ri@idzaaus.org>"
                                                                     .to_string())]));

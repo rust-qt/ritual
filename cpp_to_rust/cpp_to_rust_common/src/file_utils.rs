@@ -208,11 +208,9 @@ pub fn save_bincode<P: AsRef<Path>, T: ::serde::Serialize>(path: P, value: &T) -
 }
 
 /// Load data from a TOML file
-pub fn load_toml<P: AsRef<Path>>(path: P) -> Result<toml::Table> {
+pub fn load_toml<P: AsRef<Path>>(path: P) -> Result<toml::value::Table> {
   let data = file_to_string(path.as_ref())?;
-  let mut parser = toml::Parser::new(&data);
-  parser
-    .parse()
+  toml::from_str(&data)
     .chain_err(|| format!("failed to parse TOML file: {}", path.as_ref().display()))
 }
 

@@ -267,7 +267,7 @@ impl<'a> RustCodeGenerator<'a> {
     }
     let cargo_toml_data = {
       let package = toml::Value::Table({
-                                         let mut table = toml::Table::new();
+                                         let mut table = toml::value::Table::new();
                                          table.insert("name".to_string(),
                                                       toml::Value::String(self
                                                                             .config
@@ -289,7 +289,7 @@ impl<'a> RustCodeGenerator<'a> {
              toml::Value::String(version.to_string())
            } else {
              toml::Value::Table({
-                                  let mut value = toml::Table::new();
+                                  let mut value = toml::value::Table::new();
                                   value.insert("version".to_string(),
                                                toml::Value::String(version.to_string()));
                                   value.insert("path".to_string(),
@@ -302,7 +302,7 @@ impl<'a> RustCodeGenerator<'a> {
       };
       let dependencies =
         toml::Value::Table({
-                             let mut table = toml::Table::new();
+                             let mut table = toml::value::Table::new();
                              if !self
                                    .config
                                    .crate_properties
@@ -331,7 +331,7 @@ impl<'a> RustCodeGenerator<'a> {
                            });
       let build_dependencies =
         toml::Value::Table({
-                             let mut table = toml::Table::new();
+                             let mut table = toml::value::Table::new();
                              if !self
                                    .config
                                    .crate_properties
@@ -350,7 +350,7 @@ impl<'a> RustCodeGenerator<'a> {
                              }
                              table
                            });
-      let mut table = toml::Table::new();
+      let mut table = toml::value::Table::new();
       table.insert("package".to_string(), package);
       table.insert("dependencies".to_string(), dependencies);
       table.insert("build-dependencies".to_string(), build_dependencies);
