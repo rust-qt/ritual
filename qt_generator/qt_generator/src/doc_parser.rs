@@ -430,12 +430,12 @@ fn process_html(html: &str, base_url: &str) -> Result<(String, HashSet<String>)>
   let html = link_regex.replace_all(html.trim(), |captures: &::regex::Captures| {
     let mut link = bad_subfolder_regex.replace(&captures[2], "");
     if !link.contains(":") {
-      link = format!("{}{}", base_url, link);
-      cross_references.insert(link.clone());
+      link = format!("{}{}", base_url, link).into();
+      cross_references.insert(link.clone().into_owned());
     }
     format!("{}=\"{}\"", &captures[1], link)
   });
-  Ok((html, cross_references))
+  Ok((html.into(), cross_references))
 }
 
 /// Parses document to a list of `ItemDoc`s.

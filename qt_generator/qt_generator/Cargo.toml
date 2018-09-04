@@ -11,7 +11,7 @@ cpp_to_rust_generator = { version = "0.2.0", path = "../../cpp_to_rust/cpp_to_ru
 qt_generator_common = { version = "0.2.3", path = "../qt_generator_common" }
 
 clap = "2.23.1"    # command line args parsing
-regex = "0.1"
+regex = "1.0"
 rusqlite = "0.7"
 compress = "0.1.2"
 select = "0.3.0"    # html parsing
