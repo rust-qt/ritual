@@ -42,7 +42,7 @@ pub type Deleter<T> = unsafe extern "C" fn(this_ptr: *mut T);
 /// Indicates that the type can be put into a CppBox.
 ///
 /// Example of implementation:
-/// ```
+/// ```ignore
 /// impl CppDeletable for Struct1 {
 ///   fn deleter() -> Deleter<Self> {
 ///     struct1_delete
