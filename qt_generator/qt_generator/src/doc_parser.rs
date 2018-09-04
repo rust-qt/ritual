@@ -274,10 +274,10 @@ impl DocParser {
       url.push_str(&file_data.file_name);
       let doc = &file_data.document;
       use html_parser::predicate::{And, Name, Class};
-      let div_r = doc.find(And(Name("div"), Class("descr")));
-      let div = div_r.iter().next().chain_err(|| "no div.descr")?;
-      let h2_r = div.find(Name("h2"));
-      let h2 = h2_r.iter().next().chain_err(|| "no div.descr h2")?;
+      let mut div_r = doc.find(And(Name("div"), Class("descr")));
+      let div = div_r.next().chain_err(|| "no div.descr")?;
+      let mut h2_r = div.find(Name("h2"));
+      let h2 = h2_r.next().chain_err(|| "no div.descr h2")?;
       let mut node = h2.next().chain_err(|| "no next() for div.descr h2")?;
       loop {
         if node.name() == Some("h3") {
@@ -442,10 +442,9 @@ fn process_html(html: &str, base_url: &str) -> Result<(String, HashSet<String>)>
 fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
   let mut results = Vec::new();
   use html_parser::predicate::{And, Or, Attr, Name, Class};
-  let h3s = doc.find(And(Name("h3"), Or(Class("fn"), Class("flags"))));
-  for h3 in h3s.iter() {
-    let anchor = h3.find(And(Name("a"), Attr("name", ())));
-    let anchor_node = if let Some(r) = anchor.iter().next() {
+  for h3 in doc.find(And(Name("h3"), Or(Class("fn"), Class("flags")))) {
+    let mut anchor = h3.find(And(Name("a"), Attr("name", ())));
+    let anchor_node = if let Some(r) = anchor.next() {
       r
     } else {
       log::llog(log::DebugGeneral, || "Failed to get anchor_node");
@@ -483,9 +482,9 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
       if node.as_comment().is_none() {
         let value_list_condition = And(Name("table"), Class("valuelist"));
         let mut parse_enum_variants =
-          |value_list: Node| for tr in value_list.find(Name("tr")).iter() {
+          |value_list: Node| for tr in value_list.find(Name("tr")) {
             let td_r = tr.find(Name("td"));
-            let tds: Vec<_> = td_r.iter().collect();
+            let tds: Vec<_> = td_r.collect();
             if tds.len() == 3 {
               let name_orig = tds[0].text();
               let mut name = name_orig.trim();
@@ -500,14 +499,14 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
                                  });
             }
           };
-        let value_list_r = node.find(value_list_condition.clone());
+        let mut value_list_r = node.find(value_list_condition.clone());
         if node.is(value_list_condition) {
           parse_enum_variants(node);
-        } else if let Some(value_list) = value_list_r.iter().next() {
+        } else if let Some(value_list) = value_list_r.next() {
           parse_enum_variants(value_list);
         } else {
           result.push_str(node.html().as_ref());
-          for td1 in node.find(And(Name("td"), Class("memItemLeft"))).iter() {
+          for td1 in node.find(And(Name("td"), Class("memItemLeft"))) {
             let td2 = td1.next().chain_err(|| "td1.next() failed")?;
             let declaration = format!("{} {}", td1.text(), td2.text());
             declarations.push(declaration);
