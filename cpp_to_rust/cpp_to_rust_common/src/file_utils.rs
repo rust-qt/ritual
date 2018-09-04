@@ -1,7 +1,7 @@
 //! Various utilities for working with files
 
 use log;
-use errors::{Result, ChainErr};
+use errors::{Result, ResultExt};
 
 use std::path::{Path, PathBuf};
 use std::fs;

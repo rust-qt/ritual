@@ -1,6 +1,6 @@
 //! Various utilities.
 
-use errors::{Result, ChainErr};
+use errors::{Result, ResultExt};
 use log;
 
 use std;

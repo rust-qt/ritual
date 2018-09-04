@@ -7,7 +7,7 @@ use cpp_ffi_data::{CppAndFfiMethod, c_base_name, CppFfiHeaderData, QtSlotWrapper
                    CppFfiMethodKind, CppFieldAccessorType, CppMethodWithFfiSignature, CppCast};
 use cpp_method::{CppMethod, CppMethodKind, CppMethodArgument, CppMethodClassMembership,
                  ReturnValueAllocationPlace};
-use common::errors::{Result, ChainErr, unexpected};
+use common::errors::{Result, ResultExt, unexpected};
 use common::log;
 use common::utils::{MapIfOk, add_to_multihash};
 use config::CppFfiGeneratorFilterFn;

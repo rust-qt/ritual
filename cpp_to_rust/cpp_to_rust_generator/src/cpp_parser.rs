@@ -6,7 +6,7 @@ use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
                CppSpecificNumericTypeKind, CppTypeClassBase, CppSpecificNumericType,
                CppFunctionPointerType};
-use common::errors::{Result, ChainErr, unexpected};
+use common::errors::{Result, ResultExt, unexpected};
 use common::file_utils::{remove_file, open_file, create_file, path_to_str, os_str_to_str};
 use common::string_utils::JoinWithSeparator;
 use common::log;

@@ -1,6 +1,6 @@
 //! Types and functions used for Rust code generation.
 
-use common::errors::{Result, ChainErr, unexpected};
+use common::errors::{Result, ResultExt, unexpected};
 use common::file_utils::{PathBufWithAdded, copy_recursively, file_to_string, copy_file,
                          create_file, create_dir_all, read_dir, os_str_to_str, save_toml,
                          path_to_str, repo_crate_local_path};

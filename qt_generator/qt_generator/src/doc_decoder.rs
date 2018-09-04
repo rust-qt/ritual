@@ -1,6 +1,6 @@
 //! Converts Qt docs from the internal format.
 
-use cpp_to_rust_generator::common::errors::{Result, ChainErr};
+use cpp_to_rust_generator::common::errors::{Result, ResultExt};
 use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
 use cpp_to_rust_generator::common::log;
 use html_parser::document::Document;

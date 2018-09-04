@@ -7,7 +7,7 @@ extern crate cpp_to_rust_build_tools;
 extern crate qt_generator_common;
 
 use cpp_to_rust_build_tools::Config;
-use cpp_to_rust_build_tools::common::errors::{fancy_unwrap, Result, ChainErr};
+use cpp_to_rust_build_tools::common::errors::{fancy_unwrap, Result, ResultExt};
 use cpp_to_rust_build_tools::common::target;
 use cpp_to_rust_build_tools::common::cpp_build_config::CppBuildConfigData;
 use qt_generator_common::{InstallationData, get_installation_data, real_lib_name, framework_name,

@@ -2,7 +2,7 @@ use cpp_ffi_data::{QtSlotWrapper, CppIndirectionChange, CppAndFfiMethod, CppFfiA
                    CppFfiHeaderData, CppFfiType, CppFieldAccessorType, CppFfiMethodKind};
 use cpp_method::ReturnValueAllocationPlace;
 use cpp_type::{CppTypeIndirection, CppTypeBase, CppType};
-use common::errors::{Result, ChainErr, unexpected};
+use common::errors::{Result, ResultExt, unexpected};
 use common::file_utils::{PathBufWithAdded, create_dir_all, create_file, path_to_str};
 use common::string_utils::JoinWithSeparator;
 use common::utils::MapIfOk;

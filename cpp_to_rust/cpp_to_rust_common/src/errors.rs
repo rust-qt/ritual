@@ -7,19 +7,16 @@ use std;
 
 error_chain! {
   foreign_links {
-    std::io::Error, IO;
-    ::regex::Error, Regex;
+    IO(std::io::Error);
+    Regex(::regex::Error);
   }
 
   errors {
     Unexpected(msg: String) {
       display("{}", msg)
     }
-
   }
 }
-
-use backtrace::Symbol;
 
 impl Error {
   /// Returns true if this error was not deemed possible
@@ -99,17 +96,18 @@ pub fn unexpected<S: Into<String>>(text: S) -> ErrorKind {
   ErrorKind::Unexpected(text.into())
 }
 
-impl<T> ChainErr<T> for Option<T> {
-  fn chain_err<F, EK>(self, callback: F) -> Result<T>
-    where F: FnOnce() -> EK,
-          EK: Into<ErrorKind>
-  {
-    match self {
-      Some(x) => Ok(x),
-      None => Err(Error::from("None encountered")).chain_err(callback),
-    }
-  }
-}
+// impl<T> ChainedError for Option<T> {
+//   type ErrorKind = ErrorKind;
+//   fn chain_err<F, EK>(self, callback: F) -> Result<T>
+//     where F: FnOnce() -> EK,
+//           EK: Into<ErrorKind>
+//   {
+//     match self {
+//       Some(x) => Ok(x),
+//       None => Err(Error::from("None encountered")).chain_err(callback),
+//     }
+//   }
+// }
 
 /// Works like `unwrap()`, but in case of an error,
 /// outputs formatted stack trace and

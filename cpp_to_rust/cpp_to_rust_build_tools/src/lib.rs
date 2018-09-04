@@ -10,7 +10,7 @@
 
 
 pub extern crate cpp_to_rust_common as common;
-use common::errors::{fancy_unwrap, ChainErr, Result};
+use common::errors::{fancy_unwrap, ResultExt, Result};
 use common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
 use common::BuildScriptData;
 use common::file_utils::{PathBufWithAdded, load_json, create_file, file_to_string, path_to_str};

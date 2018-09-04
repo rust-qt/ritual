@@ -2,7 +2,7 @@
 
 use caption_strategy::TypeCaptionStrategy;
 use cpp_ffi_data::{CppFfiType, CppIndirectionChange};
-use common::errors::{Result, ChainErr, Error, unexpected};
+use common::errors::{Result, ResultExt, Error, unexpected};
 use common::string_utils::JoinWithSeparator;
 use common::utils::MapIfOk;
 

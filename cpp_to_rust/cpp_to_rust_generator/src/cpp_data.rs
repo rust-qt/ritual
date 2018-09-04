@@ -4,7 +4,7 @@
 use cpp_method::{CppMethod, CppMethodKind};
 pub use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppTypeIndirection, CppTypeClassBase};
-use common::errors::{Result, ChainErr};
+use common::errors::{Result, ResultExt};
 use common::file_utils::open_file;
 use common::log;
 

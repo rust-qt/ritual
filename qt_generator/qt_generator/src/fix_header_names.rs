@@ -2,7 +2,7 @@
 //! Qt's shortcut header names.
 
 use cpp_to_rust_generator::cpp_data::ParserCppData;
-use cpp_to_rust_generator::common::errors::{Result, ChainErr};
+use cpp_to_rust_generator::common::errors::{Result, ResultExt};
 use cpp_to_rust_generator::common::file_utils::{read_dir, file_to_string, os_str_to_str};
 use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::common::utils::add_to_multihash;

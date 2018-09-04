@@ -11,8 +11,8 @@ license = "MIT"
 repository = "https://github.com/rust-qt/cpp_to_rust/tree/master/cpp_to_rust/cpp_to_rust_common"
 
 [dependencies]
-error-chain = "0.5" # error handling
-backtrace = "0.2.1" # error backtrace manipulation
+error-chain = "0.11" # error handling
+backtrace = "0.3" # error backtrace manipulation
 
 regex = "1.0"
 

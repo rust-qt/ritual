@@ -1,4 +1,4 @@
-use common::errors::{Result, unexpected, ChainErr};
+use common::errors::{Result, unexpected, ResultExt};
 use common::string_utils::CaseOperations;
 use common::utils::MapIfOk;
 use cpp_type::CppType;

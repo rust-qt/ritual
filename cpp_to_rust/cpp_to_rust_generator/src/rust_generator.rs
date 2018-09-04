@@ -9,7 +9,7 @@ use cpp_operator::CppOperator;
 use cpp_type::{CppType, CppTypeBase, CppBuiltInNumericType, CppTypeIndirection,
                CppSpecificNumericTypeKind, CppSpecificNumericType, CppTypeClassBase, CppTypeRole,
                CppFunctionPointerType};
-use common::errors::{Result, ChainErr, unexpected};
+use common::errors::{Result, ResultExt, unexpected};
 use common::log;
 use rust_info::{RustTypeDeclaration, RustTypeDeclarationKind, RustTypeWrapperKind, RustModule,
                 RustMethod, RustMethodScope, RustMethodArgument, RustMethodArgumentsVariant,
