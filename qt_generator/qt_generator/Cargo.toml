@@ -12,6 +12,6 @@ qt_generator_common = { version = "0.2.3", path = "../qt_generator_common" }
 
 clap = "2.23.1"    # command line args parsing
 regex = "1.0"
-rusqlite = "0.7"
+rusqlite = "0.14"
 compress = "0.1.2"
 select = "0.4.2"    # html parsing

@@ -160,7 +160,7 @@ pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) -> Resul
   } else {
     include_str!("../templates/crate/rustfmt.toml").to_string()
   };
-  let rustfmt_config = rustfmt::config::Config::from_toml(&rustfmt_config_data);
+  let rustfmt_config = rustfmt::config::Config::from_toml(&rustfmt_config_data)?;
   let generator = RustCodeGenerator {
     config: config,
     rustfmt_config: rustfmt_config,
@@ -1250,11 +1250,13 @@ impl<'a> {connections_mod}::Receiver for {type_name}<'a> {{
 
   /// Runs `rustfmt` on a Rust file `path`.
   fn call_rustfmt(&self, path: &PathBuf) {
-    let result = ::std::panic::catch_unwind(|| {
-                                              rustfmt::format_input(rustfmt::Input::File(path.clone()),
-                            &self.rustfmt_config,
-                            Some(&mut ::std::io::stdout()))
-                                            });
+    let result = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+      rustfmt::format_input(
+        rustfmt::Input::File(path.clone()),
+        &self.rustfmt_config,
+        Some(&mut ::std::io::stdout()),
+      )
+    }));
     match result {
       Ok(rustfmt_result) => {
         if rustfmt_result.is_err() {

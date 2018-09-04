@@ -111,7 +111,7 @@ impl DocData {
     }
     log::status(format!("Adding Qt documentation from {}", doc_file_path.display()));
     let connection = rusqlite::Connection::open_with_flags(&doc_file_path,
-                                                           rusqlite::SQLITE_OPEN_READ_ONLY)
+                                                           rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
         .convert_err()?;
 
     let mut index_data = Vec::new();
