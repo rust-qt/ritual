@@ -340,8 +340,8 @@ impl<'a> CppParser<'a> {
           }
           if let Some(matches) = TEMPLATE_CLASS_REGEX.captures(name.as_ref()) {
             let mut arg_types = Vec::new();
-            if let Some(items) = matches.at(2) {
-              for arg in items.split(',') {
+            if let Some(items) = matches.get(2) {
+              for arg in items.as_str().split(',') {
                 match self.parse_unexposed_type(None,
                                                 Some(arg.trim().to_string()),
                                                 context_class,
@@ -1027,8 +1027,9 @@ impl<'a> CppParser<'a> {
         log::llog(log::DebugParser,
                   || format!("Fixing malformed method name: {}", name));
         name = matches
-          .at(1)
+          .get(1)
           .chain_err(|| "invalid matches count")?
+          .as_str()
           .to_string();
       }
     }
