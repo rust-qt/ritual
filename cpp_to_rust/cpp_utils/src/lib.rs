@@ -4,7 +4,7 @@
 mod tests {
   use std::rc::Rc;
   use std::cell::RefCell;
-  use {CppDeletable, Deleter, CppBox};
+  use super::{CppDeletable, Deleter, CppBox};
 
   struct Struct1 {
     value: Rc<RefCell<i32>>,

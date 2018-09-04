@@ -84,7 +84,7 @@ impl DocData {
       .index
       .iter_mut()
       .find(|item| f(item))
-      .and_then(|mut item| {
+      .and_then(|item| {
                   item.accessed = true;
                   Some(item.clone())
                 })
