@@ -289,7 +289,8 @@ fn generate_ffi_methods_for_method(
 /// Creates FFI method signature for this method:
 /// - converts all types to FFI types;
 /// - adds "this" argument explicitly if present;
-/// - adds "output" argument for return value if `allocation_place` is `Stack`.
+/// - adds "output" argument for return value if
+///   the return value is stack-allocated.
 pub fn to_ffi_method(
     method: &CppFunction,
     stack_allocated_types: &[CppClassType],
@@ -334,35 +335,43 @@ pub fn to_ffi_method(
             meaning: CppFfiArgumentMeaning::Argument(index as i8),
         });
     }
-    let type_for_place = match method.member {
-        Some(ref info) if info.kind.is_constructor() || info.kind.is_destructor() => {
-            CppType::Class(info.class_type.clone())
-        }
-        _ => method.return_type.clone(),
-    };
-    let c_type = type_for_place.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
-    if type_for_place.needs_allocation_place_variants() {
-        if let CppType::Class(ref base) = type_for_place {
-            if stack_allocated_types.iter().any(|t| t == base) {
-                r.arguments.push(CppFfiFunctionArgument {
-                    name: "output".to_string(),
-                    argument_type: c_type,
-                    meaning: CppFfiArgumentMeaning::ReturnValue,
-                });
-                r.allocation_place = ReturnValueAllocationPlace::Stack;
-            } else {
-                r.return_type = c_type;
-                r.allocation_place = ReturnValueAllocationPlace::Heap;
-            }
+
+    if method.is_destructor() {
+        // destructor doesn't have a return type that needs special handling,
+        // but its `allocation_place` must match `allocation_place` of the type's constructor
+        let class_type = &method.member.as_ref().unwrap().class_type;
+        r.allocation_place = if stack_allocated_types.iter().any(|t| t == class_type) {
+            ReturnValueAllocationPlace::Stack
         } else {
-            return Err(unexpected(
-                "return value needs allocation_place variants but is not a class type",
-            )
-            .into());
-        }
+            ReturnValueAllocationPlace::Heap
+        };
     } else {
-        r.return_type = c_type;
+        let real_return_type = match method.member {
+            Some(ref info) if info.kind.is_constructor() => CppType::Class(info.class_type.clone()),
+            _ => method.return_type.clone(),
+        };
+        let real_return_type_ffi = real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
+        match real_return_type {
+            // QFlags is converted to uint in FFI
+            CppType::Class(ref base) if &base.name != "QFlags" => {
+                if stack_allocated_types.iter().any(|t| t == base) {
+                    r.arguments.push(CppFfiFunctionArgument {
+                        name: "output".to_string(),
+                        argument_type: real_return_type_ffi,
+                        meaning: CppFfiArgumentMeaning::ReturnValue,
+                    });
+                    r.allocation_place = ReturnValueAllocationPlace::Stack;
+                } else {
+                    r.return_type = real_return_type_ffi;
+                    r.allocation_place = ReturnValueAllocationPlace::Heap;
+                }
+            }
+            _ => {
+                r.return_type = real_return_type_ffi;
+            }
+        }
     }
+
     Ok(r)
 }
 

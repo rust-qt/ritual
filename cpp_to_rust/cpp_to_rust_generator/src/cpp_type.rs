@@ -313,6 +313,13 @@ impl CppType {
         match *self {
             CppType::TemplateParameter { .. } => true,
             CppType::PointerLike { ref target, .. } => target.is_or_contains_template_parameter(),
+            CppType::FunctionPointer(ref type1) => {
+                type1.return_type.is_or_contains_template_parameter()
+                    || type1
+                        .arguments
+                        .iter()
+                        .any(|arg| arg.is_or_contains_template_parameter())
+            }
             CppType::Class(CppClassType {
                 ref template_arguments,
                 ..
@@ -439,13 +446,13 @@ impl CppType {
     #[cfg_attr(feature = "clippy", allow(collapsible_if))]
     pub fn to_cpp_ffi_type(&self, role: CppTypeRole) -> Result<CppFfiType> {
         let err = || format!("Can't express type to FFI: {:?}", self);
+        if self.is_or_contains_template_parameter() {
+            return Err(Error::from(
+                "template parameters cannot be expressed in FFI",
+            ))
+            .chain_err(&err);
+        }
         match self {
-            CppType::TemplateParameter { .. } => {
-                return Err(Error::from(
-                    "template parameters cannot be expressed in FFI",
-                ))
-                .chain_err(&err);
-            }
             CppType::FunctionPointer(CppFunctionPointerType {
                 ref return_type,
                 ref arguments,
@@ -461,13 +468,6 @@ impl CppType {
                 all_types.push(return_type.as_ref());
                 for arg in all_types {
                     match *arg {
-                        CppType::TemplateParameter { .. } => {
-                            return Err(Error::from(
-                                "function pointers containing template parameters are not \
-                                 supported",
-                            ))
-                            .chain_err(&err);
-                        }
                         CppType::FunctionPointer(..) => {
                             // TODO: also ban pointers to function pointers
                             return Err(Error::from(
@@ -562,17 +562,6 @@ impl CppType {
             conversion: CppTypeConversionToFfi::NoChange,
             original_type: self.clone(),
         })
-    }
-
-    /// Checks if a function with this return type would need
-    /// to have 2 wrappers with 2 different return value allocation places
-    pub fn needs_allocation_place_variants(&self) -> bool {
-        if let CppType::Class(CppClassType { ref name, .. }) = self {
-            // QFlags is converted to uint in FFI
-            name != "QFlags"
-        } else {
-            false
-        }
     }
 
     /// Attempts to replace template types at `nested_level1`

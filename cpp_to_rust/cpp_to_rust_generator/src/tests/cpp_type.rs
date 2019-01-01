@@ -22,7 +22,6 @@ fn void() {
     assert_eq!(type1.to_cpp_code(None).unwrap(), "void");
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
     assert_type_to_ffi_unchanged(&type1);
-    assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -34,7 +33,6 @@ fn void_ptr() {
     assert_eq!(type1.to_cpp_code(None).unwrap(), "void*");
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
     assert_type_to_ffi_unchanged(&type1);
-    assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -46,7 +44,6 @@ fn int() {
     assert_eq!(type1.to_cpp_code(None).unwrap(), "int");
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
     assert_type_to_ffi_unchanged(&type1);
-    assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -58,7 +55,6 @@ fn bool_ptr() {
     assert_eq!(type1.to_cpp_code(None).unwrap(), "bool*");
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
     assert_type_to_ffi_unchanged(&type1);
-    assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -73,7 +69,6 @@ fn char_ptr_ptr() {
     assert_eq!(type1.to_cpp_code(None).unwrap(), "char**");
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
     assert_type_to_ffi_unchanged(&type1);
-    assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -89,7 +84,6 @@ fn qint64() {
     assert_eq!(type1.to_cpp_code(None).unwrap(), "qint64");
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
     assert_type_to_ffi_unchanged(&type1);
-    assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -104,7 +98,6 @@ fn quintptr() {
     assert_eq!(type1.to_cpp_code(None).unwrap(), "quintptr");
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
     assert_type_to_ffi_unchanged(&type1);
-    assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -118,7 +111,6 @@ fn enum1() {
     assert_eq!(type1.to_cpp_code(None).unwrap(), "Qt::CaseSensitivity");
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
     assert_type_to_ffi_unchanged(&type1);
-    assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -171,7 +163,6 @@ fn class_value() {
         "const QPoint*"
     );
     assert_eq!(ffi_arg.conversion, CppTypeConversionToFfi::ValueToPointer);
-    assert!(type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -184,7 +175,7 @@ fn class_const_ref() {
         }),
     );
     assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), true);
+    assert_eq!(type1.is_class(), false);
     assert_eq!(type1.is_template_parameter(), false);
     assert_eq!(type1.to_cpp_code(None).unwrap(), "const QRectF&");
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
@@ -205,7 +196,6 @@ fn class_const_ref() {
         assert_eq!(&ffi1.ffi_type.to_cpp_code(None).unwrap(), "const QRectF*");
         assert_eq!(ffi1.conversion, CppTypeConversionToFfi::ReferenceToPointer);
     }
-    assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -218,7 +208,7 @@ fn class_mut_ref() {
         }),
     );
     assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), true);
+    assert_eq!(type1.is_class(), false);
     assert_eq!(type1.is_template_parameter(), false);
     assert_eq!(type1.to_cpp_code(None).unwrap(), "QRectF&");
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
@@ -239,7 +229,6 @@ fn class_mut_ref() {
         assert_eq!(&ffi1.ffi_type.to_cpp_code(None).unwrap(), "QRectF*");
         assert_eq!(ffi1.conversion, CppTypeConversionToFfi::ReferenceToPointer);
     }
-    assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -252,12 +241,11 @@ fn class_mut_ptr() {
         }),
     );
     assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), true);
+    assert_eq!(type1.is_class(), false);
     assert_eq!(type1.is_template_parameter(), false);
     assert_eq!(type1.to_cpp_code(None).unwrap(), "QObject*");
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
     assert_type_to_ffi_unchanged(&type1);
-    assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -314,7 +302,6 @@ fn class_with_template_args() {
         "const QVector< QString >*"
     );
     assert_eq!(ffi_arg.conversion, CppTypeConversionToFfi::ValueToPointer);
-    assert!(type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -373,31 +360,25 @@ fn qflags() {
         );
         assert_eq!(ffi_type.conversion, CppTypeConversionToFfi::QFlagsToUInt);
     }
-    assert!(!type1.needs_allocation_place_variants());
 }
 
-fn create_template_parameter_type() -> CppType {
-    CppType::new_pointer(
+#[test]
+fn template_parameter() {
+    let type1 = CppType::new_pointer(
         false,
         CppType::TemplateParameter {
             nested_level: 0,
             index: 0,
             name: "T".into(),
         },
-    )
-}
-
-#[test]
-fn template_parameter() {
-    let type1 = create_template_parameter_type();
+    );
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), false);
-    assert_eq!(type1.is_template_parameter(), true);
+    assert_eq!(type1.is_template_parameter(), false);
     assert!(type1.to_cpp_code(None).is_err());
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
     assert!(type1.to_cpp_ffi_type(CppTypeRole::NotReturnType).is_err());
     assert!(type1.to_cpp_ffi_type(CppTypeRole::ReturnType).is_err());
-    assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]
@@ -416,7 +397,6 @@ fn function1() {
     let name = "my_name".to_string();
     assert!(type1.to_cpp_code(None).is_err());
     assert_type_to_ffi_unchanged(&type1);
-    assert!(!type1.needs_allocation_place_variants());
 }
 
 #[test]

@@ -243,7 +243,7 @@ fn functions_with_class_arg() {
 fn func_with_unknown_type() {
     let data = run_parser("class SomeClass; \n int func1(SomeClass* x);");
     assert!(data.types.is_empty());
-    assert!(data.methods.is_empty());
+    assert_eq!(data.methods.len(), 1);
 }
 
 #[test]
@@ -526,7 +526,7 @@ fn template_class_method() {
       Iterator begin();
     };",
     );
-    assert!(data.types.len() == 1);
+    assert_eq!(data.types.len(), 1);
     assert_eq!(data.types[0].name, "MyVector");
     if let CppTypeDataKind::Class { ref type_base } = data.types[0].kind {
         assert_eq!(
@@ -542,7 +542,7 @@ fn template_class_method() {
     }
     assert!(data.bases.is_empty());
     assert!(data.fields.is_empty());
-    assert!(data.methods.len() == 1);
+    assert_eq!(data.methods.len(), 2);
     assert_eq!(
         data.methods[0],
         CppFunction {
@@ -897,15 +897,15 @@ fn complex_const_types() {
     );
     assert_eq!(
         &data.methods[6].return_type,
-        &CppType::new_pointer(false, CppType::new_pointer(true, base.clone()))
+        &CppType::new_pointer(true, CppType::new_pointer(false, base.clone()))
     );
     assert_eq!(
         &data.methods[7].return_type,
-        &CppType::new_pointer(false, CppType::new_pointer(false, base.clone()))
+        &CppType::new_pointer(true, CppType::new_pointer(true, base.clone()))
     );
     assert_eq!(
         &data.methods[8].return_type,
-        &CppType::new_pointer(false, CppType::new_pointer(true, base.clone()))
+        &CppType::new_pointer(true, CppType::new_pointer(true, base.clone()))
     );
     assert_eq!(
         &data.methods[9].return_type,

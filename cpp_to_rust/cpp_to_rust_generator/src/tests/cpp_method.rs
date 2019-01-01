@@ -264,7 +264,7 @@ fn c_signature_method_with_this() {
     assert_eq!(r.arguments[1].name, "my_arg");
     assert_eq!(
         r.arguments[1].argument_type.ffi_type,
-        CppType::new_pointer(false, method1.arguments[0].argument_type.clone())
+        CppType::new_pointer(true, method1.arguments[0].argument_type.clone())
     );
     assert_eq!(
         r.arguments[1].argument_type.conversion,
@@ -436,7 +436,6 @@ fn c_signature_destructor() {
             template_arguments: None,
         }),
     );
-    println!("OK? {:#?}", r_stack);
     assert_eq!(r_stack.arguments.len(), 1);
     assert_eq!(r_stack.arguments[0].name, "this_ptr");
     assert_eq!(
@@ -514,7 +513,7 @@ fn c_signature_method_returning_class() {
     assert_eq!(r_stack.arguments[1].name, "my_arg");
     assert_eq!(
         r_stack.arguments[1].argument_type.ffi_type,
-        CppType::new_pointer(false, method1.arguments[0].argument_type.clone())
+        CppType::new_pointer(true, method1.arguments[0].argument_type.clone())
     );
     assert_eq!(
         r_stack.arguments[1].argument_type.conversion,
@@ -566,7 +565,7 @@ fn c_signature_method_returning_class() {
     assert_eq!(r_heap.arguments[1].name, "my_arg");
     assert_eq!(
         r_heap.arguments[1].argument_type.ffi_type,
-        CppType::new_pointer(false, method1.arguments[0].argument_type.clone())
+        CppType::new_pointer(true, method1.arguments[0].argument_type.clone())
     );
     assert_eq!(
         r_heap.arguments[1].argument_type.conversion,
