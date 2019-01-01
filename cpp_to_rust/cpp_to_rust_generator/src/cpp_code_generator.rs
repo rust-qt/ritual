@@ -27,7 +27,7 @@ fn function_signature(method: &CppFfiFunction) -> Result<String> {
   }
   let name_with_args = format!("{}({})", method.name, arg_texts.join(", "));
   let return_type = &method.return_type.ffi_type;
-  let r = if let CppType::FunctionPointer(..) = return_type.base {
+  let r = if let CppType::FunctionPointer(..) = return_type {
     return_type.to_cpp_code(Some(&name_with_args))?
   } else {
     format!("{} {}", return_type.to_cpp_code(None)?, name_with_args)
@@ -72,7 +72,7 @@ fn convert_type_to_ffi(type1: &CppFfiType, expression: String) -> Result<String>
     CppTypeConversionToFfi::NoChange => expression,
     CppTypeConversionToFfi::ValueToPointer => format!(
       "new {}({})",
-      type1.original_type.base.to_cpp_code(None)?,
+      type1.original_type.to_cpp_code(None)?,
       expression
     ),
     CppTypeConversionToFfi::ReferenceToPointer => format!("&{}", expression),
@@ -106,7 +106,7 @@ fn convert_return_type(method: &CppFfiFunction, expression: String) -> Result<St
           {
             result = format!(
               "new {}({})",
-              method.return_type.original_type.base.to_cpp_code(None)?,
+              method.return_type.original_type.to_cpp_code(None)?,
               result
             );
           }
@@ -136,7 +136,7 @@ fn convert_return_type(method: &CppFfiFunction, expression: String) -> Result<St
       result = format!(
         "new({}) {}({})",
         arg.name,
-        method.return_type.original_type.base.to_cpp_code(None)?,
+        method.return_type.original_type.to_cpp_code(None)?,
         result
       );
     }

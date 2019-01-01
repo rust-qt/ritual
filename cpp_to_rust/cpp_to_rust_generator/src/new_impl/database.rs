@@ -143,45 +143,20 @@ impl CppItemData {
   pub fn all_involved_types(&self) -> Vec<CppType> {
     match *self {
       CppItemData::Type(ref t) => match t.kind {
-        CppTypeDataKind::Enum => vec![CppType {
-          indirection: CppTypeIndirection::None,
-          is_const: false,
-          is_const2: false,
-          base: CppType::Enum {
-            name: t.name.to_string(),
-          },
+        CppTypeDataKind::Enum => vec![CppType::Enum {
+          name: t.name.to_string(),
         }],
-        CppTypeDataKind::Class { ref type_base } => vec![CppType {
-          indirection: CppTypeIndirection::None,
-          is_const: false,
-          is_const2: false,
-          base: CppType::Class(type_base.clone()),
-        }],
+        CppTypeDataKind::Class { ref type_base } => vec![CppType::Class(type_base.clone())],
       },
       CppItemData::EnumValue(_) => Vec::new(),
       CppItemData::Function(ref method) => method.all_involved_types(),
       CppItemData::ClassField(ref field) => {
-        let class_type = CppType {
-          indirection: CppTypeIndirection::None,
-          is_const: false,
-          is_const2: false,
-          base: CppType::Class(field.class_type.clone()),
-        };
+        let class_type = CppType::Class(field.class_type.clone());
         vec![class_type, field.field_type.clone()]
       }
       CppItemData::ClassBase(ref base) => vec![
-        CppType {
-          indirection: CppTypeIndirection::None,
-          is_const: false,
-          is_const2: false,
-          base: CppType::Class(base.base_class_type.clone()),
-        },
-        CppType {
-          indirection: CppTypeIndirection::None,
-          is_const: false,
-          is_const2: false,
-          base: CppType::Class(base.derived_class_type.clone()),
-        },
+        CppType::Class(base.base_class_type.clone()),
+        CppType::Class(base.derived_class_type.clone()),
       ],
       CppItemData::QtSignalArguments(ref args) => args.clone(),
       CppItemData::TemplateInstantiation(ref data) => data.template_arguments.clone(),

@@ -16,7 +16,7 @@ fn assert_type_to_ffi_unchanged(t: &CppType) {
 
 #[test]
 fn void() {
-  let type1 = CppType::void();
+  let type1 = CppType::Void;
   assert_eq!(type1.is_void(), true);
   assert_eq!(type1.base.is_void(), true);
   assert_eq!(type1.base.is_class(), false);

@@ -48,7 +48,7 @@ fn add_explicit_destructors(data: ProcessorData) -> Result<()> {
               kind: CppFunctionKind::Destructor,
             }),
             operator: None,
-            return_type: CppType::void(),
+            return_type: CppType::Void,
             arguments: vec![],
             allows_variadic_arguments: false,
             template_arguments: None,

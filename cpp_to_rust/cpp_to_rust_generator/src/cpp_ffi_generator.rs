@@ -99,7 +99,7 @@ fn run(mut data: ProcessorData) -> Result<()> {
       CppItemData::ClassBase(ref base) => {
         generate_casts(base, &all_class_bases, &mut name_provider)
       }
-      CppItemData::QtSignalArguments(ref signal_srguments) => unimplemented!(),
+      CppItemData::QtSignalArguments(ref _signal_srguments) => unimplemented!(),
       CppItemData::TemplateInstantiation(..) => continue,
     };
 
@@ -342,7 +342,7 @@ fn to_ffi_method(
   };
   let c_type = type_for_place.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
   if type_for_place.needs_allocation_place_variants() {
-    if let CppType::Class(ref base) = type_for_place.base {
+    if let CppType::Class(ref base) = type_for_place {
       if stack_allocated_types.iter().any(|t| t == base) {
         r.arguments.push(CppFfiFunctionArgument {
           name: "output".to_string(),
@@ -446,7 +446,7 @@ fn generate_field_accessors(
     new_methods.push(create_method(
       format!("set_{}", field.name),
       CppFieldAccessorType::Setter,
-      CppType::void(),
+      CppType::Void,
       vec![arg],
     )?);
   }
@@ -479,7 +479,7 @@ fn should_process_item(item: &CppItemData) -> Result<bool> {
   if item
     .all_involved_types()
     .iter()
-    .any(|x| x.base.is_or_contains_template_parameter())
+    .any(|x| x.is_or_contains_template_parameter())
   {
     return Ok(false);
   }
@@ -510,7 +510,7 @@ fn generate_slot_wrapper(
     .collect();
   let class_name = name_provider.next_name();
   let function_type = CppFunctionPointerType {
-    return_type: Box::new(CppType::void()),
+    return_type: Box::new(CppType::Void),
     arguments: func_arguments,
     allows_variadic_arguments: false,
   };
@@ -536,7 +536,7 @@ fn generate_slot_wrapper(
         kind: kind,
       }),
       operator: None,
-      return_type: CppType::void(),
+      return_type: CppType::Void,
       arguments: arguments,
       allows_variadic_arguments: false,
       template_arguments: None,

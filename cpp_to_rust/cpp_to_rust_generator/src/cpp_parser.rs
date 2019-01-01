@@ -24,6 +24,7 @@ use config::Config;
 use cpp_data::CppTypeDataKind;
 use new_impl::database::DatabaseItemSource;
 
+use cpp_type::CppPointerLikeTypeKind;
 use new_impl::processor::ProcessingStep;
 use new_impl::processor::ProcessorData;
 use regex::Regex;
@@ -107,12 +108,11 @@ fn get_template_arguments(entity: Entity) -> Option<Vec<CppType>> {
   let mut nested_level = 0;
   if let Some(parent) = entity.get_semantic_parent() {
     if let Some(args) = get_template_arguments(parent) {
-      let parent_nested_level =
-        if let CppType::TemplateParameter { nested_level, .. } = args[0].base {
-          nested_level
-        } else {
-          panic!("this value should always be a template parameter")
-        };
+      let parent_nested_level = if let CppType::TemplateParameter { nested_level, .. } = args[0] {
+        nested_level
+      } else {
+        panic!("this value should always be a template parameter")
+      };
 
       nested_level = parent_nested_level + 1;
     }
@@ -430,78 +430,70 @@ impl<'a> CppParser<'a> {
         }
       }
     }
-    let mut remaining_name: &str = name.as_ref();
-    let mut result_type = CppType::Void;
-    if remaining_name.ends_with(" *") {
-      result_type.indirection = CppTypeIndirection::Ptr;
-      remaining_name = remaining_name[0..remaining_name.len() - " *".len()].trim();
-    }
-    if remaining_name.ends_with(" &") {
-      result_type.indirection = CppTypeIndirection::Ref;
-      remaining_name = remaining_name[0..remaining_name.len() - " &".len()].trim();
-    }
-    if remaining_name == "void" {
-      return Ok(result_type);
-    }
-    if let Some(x) = CppBuiltInNumericType::all()
-      .iter()
-      .find(|x| x.to_cpp_code() == remaining_name)
-    {
-      result_type.base = CppType::BuiltInNumeric(x.clone());
-      return Ok(result_type);
-    }
-    if let Some(base) = self.parse_special_typedef(remaining_name) {
-      result_type.base = base;
-      return Ok(result_type);
-    }
-    if result_type.indirection == CppTypeIndirection::Ptr
-      || result_type.indirection == CppTypeIndirection::Ref
-    {
-      if let Ok(subtype) = self.parse_unexposed_type(
+
+    if name.ends_with(" *") {
+      let remaining_name = name[0..name.len() - " *".len()].trim();
+      let subtype = self.parse_unexposed_type(
         None,
         Some(remaining_name.to_string()),
         context_class,
         context_method,
-      ) {
-        let mut new_indirection =
-          CppTypeIndirection::combine(&subtype.indirection, &result_type.indirection)
-            .map_err(|e| e.to_string())?;
-        if new_indirection == CppTypeIndirection::Ptr {
-          if let CppType::FunctionPointer(..) = subtype.base {
-            new_indirection = CppTypeIndirection::None;
-          }
-        }
-        let new_is_const2 = if new_indirection == CppTypeIndirection::PtrPtr {
-          remaining_name.trim().ends_with(" const")
-        } else {
-          false
-        };
-        return Ok(CppType {
-          base: subtype.base,
-          is_const: subtype.is_const,
-          is_const2: new_is_const2,
-          indirection: new_indirection,
+      )?;
+      if let CppType::FunctionPointer(..) = subtype {
+        return Ok(subtype);
+      } else {
+        return Ok(CppType::PointerLike {
+          kind: CppPointerLikeTypeKind::Pointer,
+          is_const,
+          target: Box::new(subtype),
         });
       }
     }
-    if let Some(type_data) = self.find_type(|x| &x.name == remaining_name) {
-      match type_data.kind {
-        CppTypeDataKind::Enum { .. } => {
-          result_type.base = CppType::Enum {
-            name: remaining_name.to_string(),
-          }
-        }
-        CppTypeDataKind::Class { .. } => {
-          result_type.base = CppType::Class(CppClassType {
-            name: remaining_name.to_string(),
-            template_arguments: None,
-          })
-        }
-      }
-      return Ok(result_type);
+
+    if name.ends_with(" &") {
+      let remaining_name = name[0..name.len() - " &".len()].trim();
+      let subtype = self.parse_unexposed_type(
+        None,
+        Some(remaining_name.to_string()),
+        context_class,
+        context_method,
+      )?;
+      return Ok(CppType::PointerLike {
+        kind: CppPointerLikeTypeKind::Reference,
+        is_const,
+        target: Box::new(subtype),
+      });
     }
 
-    if let Some(matches) = template_class_regex.captures(remaining_name) {
+    if name == "void" {
+      return Ok(CppType::Void);
+    }
+    if let Some(x) = CppBuiltInNumericType::all()
+      .iter()
+      .find(|x| x.to_cpp_code() == name)
+    {
+      return Ok(CppType::BuiltInNumeric(x.clone()));
+    }
+    if let Some(result) = self.parse_special_typedef(&name) {
+      return Ok(result);
+    }
+    if let Some(type_data) = self.find_type(|x| &x.name == &name) {
+      match type_data.kind {
+        CppTypeDataKind::Enum { .. } => {
+          return Ok(CppType::Enum {
+            name: name.to_string(),
+          });
+        }
+        CppTypeDataKind::Class { .. } => {
+          return Ok(CppType::Class(CppClassType {
+            name: name.to_string(),
+            template_arguments: None,
+          }));
+        }
+      }
+    }
+
+    if let Some(matches) = template_class_regex.captures(&name) {
       if matches.len() < 3 {
         return Err("invalid matches len in regexp".into());
       }
@@ -530,11 +522,10 @@ impl<'a> CppParser<'a> {
             }
           }
         }
-        result_type.base = CppType::Class(CppClassType {
+        return Ok(CppType::Class(CppClassType {
           name: class_name.to_string(),
           template_arguments: Some(arg_types),
-        });
-        return Ok(result_type);
+        }));
       }
     } else {
       return Err(format!("Can't parse declaration of an unexposed type: {}", name).into());
@@ -565,24 +556,16 @@ impl<'a> CppParser<'a> {
         .into(),
       );
     }
-    let is_const = type1.is_const_qualified();
     match type1.get_kind() {
       TypeKind::Typedef => {
         let parsed = self.parse_type(type1.get_canonical_type(), context_class, context_method)?;
-        if let CppType::BuiltInNumeric(..) = parsed.base {
-          if parsed.indirection == CppTypeIndirection::None {
-            let mut name = type1.get_display_name();
-            if name.starts_with("const ") {
-              name = name[6..].trim().to_string();
-            }
-            if let Some(r) = self.parse_special_typedef(&name) {
-              return Ok(CppType {
-                base: r,
-                indirection: parsed.indirection,
-                is_const: parsed.is_const,
-                is_const2: parsed.is_const2,
-              });
-            }
+        if let CppType::BuiltInNumeric(..) = parsed {
+          let mut name = type1.get_display_name();
+          if name.starts_with("const ") {
+            name = name[6..].trim().to_string();
+          }
+          if let Some(r) = self.parse_special_typedef(&name) {
+            return Ok(r);
           }
         }
         Ok(parsed)
@@ -727,30 +710,16 @@ impl<'a> CppParser<'a> {
           Some(pointee) => match self.parse_type(pointee, context_class, context_method) {
             Ok(subtype) => {
               let original_type_indirection = match type1.get_kind() {
-                TypeKind::Pointer => CppTypeIndirection::Ptr,
-                TypeKind::LValueReference => CppTypeIndirection::Ref,
-                TypeKind::RValueReference => CppTypeIndirection::RValueRef,
+                TypeKind::Pointer => CppPointerLikeTypeKind::Pointer,
+                TypeKind::LValueReference => CppPointerLikeTypeKind::Reference,
+                TypeKind::RValueReference => CppPointerLikeTypeKind::RValueReference,
                 _ => unreachable!(),
               };
 
-              let mut new_indirection =
-                CppTypeIndirection::combine(&subtype.indirection, &original_type_indirection)
-                  .map_err(|e| e.to_string())?;
-              if new_indirection == CppTypeIndirection::Ptr {
-                if let CppType::FunctionPointer(..) = subtype.base {
-                  new_indirection = CppTypeIndirection::None;
-                }
-              }
-              let new_is_const2 = if new_indirection == CppTypeIndirection::PtrPtr {
-                pointee.is_const_qualified()
-              } else {
-                false
-              };
-              Ok(CppType {
-                indirection: new_indirection,
-                base: subtype.base,
-                is_const: subtype.is_const,
-                is_const2: new_is_const2,
+              Ok(CppType::PointerLike {
+                kind: original_type_indirection,
+                is_const: pointee.is_const_qualified(),
+                target: Box::new(subtype),
               })
             }
             Err(msg) => Err(msg),
@@ -768,11 +737,11 @@ impl<'a> CppParser<'a> {
             if let CppType::Class(CppClassType {
               ref template_arguments,
               ..
-            }) = parsed_unexposed.base
+            }) = parsed_unexposed
             {
               if let Some(ref template_arguments) = *template_arguments {
                 let template_arguments_unexposed = template_arguments;
-                if template_arguments_unexposed.iter().any(|x| match x.base {
+                if template_arguments_unexposed.iter().any(|x| match x {
                   CppType::SpecificNumeric { .. } | CppType::PointerSizedInteger { .. } => true,
                   _ => false,
                 }) {
@@ -780,7 +749,7 @@ impl<'a> CppParser<'a> {
                     if let CppType::Class(CppClassType {
                       ref mut template_arguments,
                       ..
-                    }) = parsed_canonical.base
+                    }) = parsed_canonical
                     {
                       if let Some(ref mut template_arguments) = *template_arguments {
                         template_arguments.clone_from(template_arguments_unexposed);
@@ -1328,19 +1297,7 @@ impl<'a> CppParser<'a> {
           Ok(r) => r,
           Err(msg) => return Err(format!("Can't parse base class type: {}", msg).into()),
         };
-        if base_type.indirection != CppTypeIndirection::None
-          || base_type.is_const
-          || base_type.is_const2
-        {
-          return Err(
-            format!(
-              "Invalid indirection or constness in base type: {:?}",
-              base_type
-            )
-            .into(),
-          );
-        }
-        if let CppType::Class(ref base_type) = base_type.base {
+        if let CppType::Class(ref base_type) = base_type {
           self.data.current_database.add_cpp_data(
             DatabaseItemSource::CppParser {
               include_file: include_file.clone(),
@@ -1557,12 +1514,12 @@ impl<'a> CppParser<'a> {
             if let CppType::Class(CppClassType {
               ref template_arguments,
               ..
-            }) = parent_type.base
+            }) = parent_type
             {
               if let Some(ref template_arguments) = *template_arguments {
                 if template_arguments
                   .iter()
-                  .any(|x| !x.base.is_template_parameter())
+                  .any(|x| !x.is_template_parameter())
                 {
                   self.data.html_logger.add(
                     &[

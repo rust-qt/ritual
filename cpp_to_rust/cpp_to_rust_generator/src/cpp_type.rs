@@ -1,6 +1,6 @@
 //! Types for handling information about C++ types.
 
-use common::errors::{unexpected, ChainErr, Error, Result};
+use common::errors::{ChainErr, Error, Result};
 use common::string_utils::JoinWithSeparator;
 use cpp_ffi_data::{CppFfiType, CppTypeConversionToFfi};
 
@@ -237,6 +237,28 @@ impl CppClassType {
       self.name.clone()
     }
   }
+
+  /// Attempts to replace template types at `nested_level1`
+  /// within this type with `template_arguments1`.
+  pub fn instantiate(
+    &self,
+    nested_level1: usize,
+    template_arguments1: &[CppType],
+  ) -> Result<CppClassType> {
+    Ok(CppClassType {
+      name: self.name.clone(),
+      template_arguments: match self.template_arguments {
+        Some(ref template_arguments) => {
+          let mut args = Vec::new();
+          for arg in template_arguments {
+            args.push(arg.instantiate(nested_level1, template_arguments1)?);
+          }
+          Some(args)
+        }
+        None => None,
+      },
+    })
+  }
 }
 
 impl CppType {
@@ -274,6 +296,7 @@ impl CppType {
   pub fn is_or_contains_template_parameter(&self) -> bool {
     match *self {
       CppType::TemplateParameter { .. } => true,
+      CppType::PointerLike { ref target, .. } => target.is_or_contains_template_parameter(),
       CppType::Class(CppClassType {
         ref template_arguments,
         ..
@@ -281,7 +304,7 @@ impl CppType {
         if let Some(ref template_arguments) = *template_arguments {
           template_arguments
             .iter()
-            .any(|arg| arg.base.is_or_contains_template_parameter())
+            .any(|arg| arg.is_or_contains_template_parameter())
         } else {
           false
         }
@@ -334,16 +357,16 @@ impl CppType {
         ref kind,
         ref is_const,
         ref target,
-      } => format!(
+      } => Ok(format!(
         "{}{}{}",
         if *is_const { "const " } else { "" },
-        target.to_cpp_code(function_pointer_inner_text),
+        target.to_cpp_code(function_pointer_inner_text)?,
         match *kind {
           CppPointerLikeTypeKind::Pointer => "*",
           CppPointerLikeTypeKind::Reference => "&",
           CppPointerLikeTypeKind::RValueReference => "&&",
         }
-      ),
+      )),
     }
   }
 
@@ -398,7 +421,7 @@ impl CppType {
   #[cfg_attr(feature = "clippy", allow(collapsible_if))]
   pub fn to_cpp_ffi_type(&self, role: CppTypeRole) -> Result<CppFfiType> {
     let err = || format!("Can't express type to FFI: {:?}", self);
-    match self.base {
+    match self {
       CppType::TemplateParameter { .. } => {
         return Err(Error::from(
           "template parameters cannot be expressed in FFI",
@@ -485,7 +508,7 @@ impl CppType {
           CppPointerLikeTypeKind::Pointer => {}
           CppPointerLikeTypeKind::Reference => {
             if *is_const {
-              if let CppType::Class(ref type1) = *target {
+              if let CppType::Class(ref type1) = **target {
                 if type1.name == "QFlags" {
                   return Ok(CppFfiType {
                     ffi_type: CppType::BuiltInNumeric(CppBuiltInNumericType::UInt),
@@ -545,28 +568,18 @@ impl CppType {
         index,
         ..
       } => {
-        if nested_level == nested_level1 {
-          if index >= template_arguments1.len() {
+        if *nested_level == nested_level1 {
+          if *index >= template_arguments1.len() {
             return Err("not enough template arguments".into());
           }
-          Ok(template_arguments1[index].clone())
+          Ok(template_arguments1[*index].clone())
         } else {
           Ok(self.clone())
         }
       }
-      CppType::Class(ref type1) => Ok(CppType::Class(CppClassType {
-        name: self.name.clone(),
-        template_arguments: match self.template_arguments {
-          Some(ref template_arguments) => {
-            let mut args = Vec::new();
-            for arg in template_arguments {
-              args.push(arg.instantiate(nested_level1, template_arguments1)?);
-            }
-            Some(args)
-          }
-          None => None,
-        },
-      })),
+      CppType::Class(ref type1) => Ok(CppType::Class(
+        type1.instantiate(nested_level1, template_arguments1)?,
+      )),
       CppType::PointerLike {
         ref kind,
         ref is_const,
@@ -590,109 +603,24 @@ impl CppType {
   /// i.e. their size and memory layout may vary, but this function
   /// does not address this property.
   pub fn is_platform_dependent(&self) -> bool {
-    if let CppType::Class(CppClassType {
-      ref template_arguments,
-      ..
-    }) = self.base
-    {
-      if let Some(ref template_arguments) = *template_arguments {
-        for arg in template_arguments {
-          if arg.is_platform_dependent() {
-            return true;
+    match self {
+      CppType::Class(CppClassType {
+        ref template_arguments,
+        ..
+      }) => {
+        if let Some(ref template_arguments) = *template_arguments {
+          for arg in template_arguments {
+            if arg.is_platform_dependent() {
+              return true;
+            }
           }
         }
+        false
       }
+      CppType::BuiltInNumeric(ref data) => data != &CppBuiltInNumericType::Bool,
+      CppType::PointerLike { ref target, .. } => target.is_platform_dependent(),
+      _ => false,
     }
-    if let CppType::BuiltInNumeric(ref data) = self.base {
-      if data != &CppBuiltInNumericType::Bool {
-        return true;
-      }
-    }
-    false
-  }
-
-  /// Returns true if `self` and `other_type` may theoretically be
-  /// the same concrete type on some platform. For example,
-  /// `int` and `long` can be the same, but
-  /// `int` and `unsigned long` cannot.
-  pub fn can_be_the_same_as(&self, other_type: &CppType) -> bool {
-    if self == other_type {
-      return true;
-    }
-    if self.indirection != other_type.indirection
-      || self.is_const != other_type.is_const
-      || self.is_const2 != other_type.is_const2
-    {
-      return false;
-    }
-    if let CppType::Class(CppClassType {
-      ref name,
-      ref template_arguments,
-      ..
-    }) = self.base
-    {
-      if let Some(ref template_arguments) = *template_arguments {
-        let name1 = name;
-        let args1 = template_arguments;
-        if let CppType::Class(CppClassType {
-          ref name,
-          ref template_arguments,
-          ..
-        }) = other_type.base
-        {
-          if let Some(ref template_arguments) = *template_arguments {
-            return name1 == name
-              && args1.len() == template_arguments.len()
-              && args1
-                .iter()
-                .zip(template_arguments.iter())
-                .all(|(a1, a2)| a1.can_be_the_same_as(a2));
-          }
-        }
-      }
-    }
-    if let CppType::BuiltInNumeric(ref data) = self.base {
-      let data1 = data;
-      if let CppType::BuiltInNumeric(ref data) = other_type.base {
-        if data1.is_float() {
-          return data.is_float();
-        } else if data1.is_signed_integer() {
-          return data.is_signed_integer() || data.is_integer_with_undefined_signedness();
-        } else if data1.is_unsigned_integer() {
-          return data.is_unsigned_integer() || data.is_integer_with_undefined_signedness();
-        } else if data1.is_integer_with_undefined_signedness() {
-          return data.is_signed_integer()
-            || data.is_unsigned_integer()
-            || data.is_integer_with_undefined_signedness();
-        } else {
-          return false;
-        }
-      }
-      if let CppType::SpecificNumeric(CppSpecificNumericType { ref kind, .. }) = other_type.base {
-        if data1.is_float() {
-          return kind == &CppSpecificNumericTypeKind::FloatingPoint;
-        } else if data1.is_signed_integer() {
-          return kind == &CppSpecificNumericTypeKind::Integer { is_signed: true };
-        } else if data1.is_unsigned_integer() {
-          return kind == &CppSpecificNumericTypeKind::Integer { is_signed: false };
-        } else if data1.is_integer_with_undefined_signedness() {
-          if let CppSpecificNumericTypeKind::Integer { .. } = *kind {
-            return true;
-          } else {
-            return false;
-          }
-        } else {
-          return false;
-        }
-      }
-      return false;
-    }
-    if let CppType::BuiltInNumeric(..) = other_type.base {
-      if let CppType::SpecificNumeric { .. } = self.base {
-        return other_type.can_be_the_same_as(self);
-      }
-    }
-    false
   }
 }
 

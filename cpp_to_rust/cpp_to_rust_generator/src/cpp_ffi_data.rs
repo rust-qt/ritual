@@ -161,7 +161,7 @@ impl CppFfiFunctionArgument {
   /// Generates C++ code for the part of FFI function signature
   /// corresponding to this argument
   pub fn to_cpp_code(&self) -> Result<String> {
-    if let CppType::FunctionPointer(..) = self.argument_type.ffi_type.base {
+    if let CppType::FunctionPointer(..) = self.argument_type.ffi_type {
       Ok(self.argument_type.ffi_type.to_cpp_code(Some(&self.name))?)
     } else {
       Ok(format!(
@@ -200,10 +200,13 @@ impl CppFfiFunction {
   /// indicating that original C++ method has const attribute.
   /// Returns false if there is no this argument or it's not const.
   pub fn has_const_this(&self) -> bool {
-    self
-      .arguments
-      .iter()
-      .any(|arg| arg.meaning == CppFfiArgumentMeaning::This && arg.argument_type.ffi_type.is_const)
+    self.arguments.iter().any(|arg| {
+      arg.meaning == CppFfiArgumentMeaning::This
+        && match arg.argument_type.ffi_type {
+          CppType::PointerLike { is_const, .. } => is_const,
+          _ => false,
+        }
+    })
   }
 
   pub fn short_text(&self) -> String {
@@ -248,8 +251,8 @@ impl CppFfiType {
   /// Generates an object representing the void type
   pub fn void() -> Self {
     CppFfiType {
-      original_type: CppType::void(),
-      ffi_type: CppType::void(),
+      original_type: CppType::Void,
+      ffi_type: CppType::Void,
       conversion: CppTypeConversionToFfi::NoChange,
     }
   }

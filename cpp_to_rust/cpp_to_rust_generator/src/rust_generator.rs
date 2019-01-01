@@ -2482,37 +2482,6 @@ impl RustSingleMethod {
     })
   }
 
-  /// Returns true if all  requirements for overloading
-  /// `self` with `other_method` are satisfied.
-  fn can_be_overloaded_with(&self, other_method: &RustSingleMethod) -> Result<bool> {
-    if self.is_unsafe != other_method.is_unsafe {
-      return Ok(false);
-    }
-    if self.self_arg_kind()? != other_method.self_arg_kind()? {
-      return Ok(false);
-    }
-    if self.arguments.arguments.len() == other_method.arguments.arguments.len() {
-      if self
-        .arguments
-        .arguments
-        .iter()
-        .zip(other_method.arguments.arguments.iter())
-        .all(|(arg1, arg2)| {
-          arg1
-            .argument_type
-            .cpp_type
-            .can_be_the_same_as(&arg2.argument_type.cpp_type)
-            && !(arg1.name == "allocation_place_marker"
-              && arg2.name == "allocation_place_marker"
-              && arg1 != arg2)
-        })
-      {
-        return Ok(false);
-      }
-    }
-    Ok(true)
-  }
-
   /// Generates name suffix for this method using `caption_strategy`.
   /// `all_self_args` should contain all kinds of arguments found in
   /// the methods that have to be disambiguated using the name suffix.

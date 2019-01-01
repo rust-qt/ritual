@@ -40,7 +40,7 @@ pub fn empty_regular_method() -> CppFunction {
   CppFunction {
     name: String::new(),
     member: None,
-    return_type: CppType::void(),
+    return_type: CppType::Void,
     arguments: vec![],
     doc: None,
     inheritance_chain: Vec::new(),
@@ -233,7 +233,7 @@ fn argument_types_equal8() {
 #[test]
 fn c_signature_empty() {
   let mut method1 = empty_regular_method();
-  method1.return_type = CppType::void();
+  method1.return_type = CppType::Void;
 
   assert!(!method1.is_constructor());
   assert!(!method1.is_destructor());

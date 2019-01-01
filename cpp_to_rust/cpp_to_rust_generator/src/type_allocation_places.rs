@@ -1,6 +1,7 @@
 use common::errors::Result;
 use common::log;
 use cpp_type::CppClassType;
+use cpp_type::CppPointerLikeTypeKind;
 use cpp_type::CppType;
 use new_impl::processor::ProcessingStep;
 use new_impl::processor::ProcessorData;
@@ -27,27 +28,38 @@ fn choose_allocation_places(mut data: ProcessorData) -> Result<()> {
     pointers_count: usize,
     not_pointers_count: usize,
   };
-  fn check_type(cpp_type: &CppType, data: &mut HashMap<String, TypeStats>) {
-    if let CppType::Class(CppClassType {
-      ref name,
-      ref template_arguments,
-    }) = cpp_type.base
-    {
-      if !data.contains_key(name) {
-        data.insert(name.clone(), TypeStats::default());
-      }
-      match cpp_type.indirection {
-        CppTypeIndirection::None | CppTypeIndirection::Ref => {
-          data.get_mut(name).unwrap().not_pointers_count += 1
+  fn check_type(
+    cpp_type: &CppType,
+    is_behind_pointer: bool,
+    data: &mut HashMap<String, TypeStats>,
+  ) {
+    match cpp_type {
+      CppType::Class(CppClassType {
+        ref name,
+        ref template_arguments,
+      }) => {
+        if !data.contains_key(name) {
+          data.insert(name.clone(), TypeStats::default());
         }
-        CppTypeIndirection::Ptr => data.get_mut(name).unwrap().pointers_count += 1,
-        _ => {}
-      }
-      if let Some(ref args) = *template_arguments {
-        for arg in args {
-          check_type(arg, data);
+        if is_behind_pointer {
+          data.get_mut(name).unwrap().pointers_count += 1;
+        } else {
+          data.get_mut(name).unwrap().not_pointers_count += 1;
+        }
+        if let Some(ref args) = *template_arguments {
+          for arg in args {
+            check_type(arg, false, data);
+          }
         }
       }
+      CppType::PointerLike {
+        ref kind,
+        ref target,
+        ..
+      } => {
+        check_type(target, *kind == CppPointerLikeTypeKind::Pointer, data);
+      }
+      _ => {}
     }
   }
 
@@ -78,7 +90,7 @@ fn choose_allocation_places(mut data: ProcessorData) -> Result<()> {
     .filter_map(|i| i.cpp_data.as_function_ref())
   {
     for type1 in method.all_involved_types() {
-      check_type(&type1, &mut data_map);
+      check_type(&type1, false, &mut data_map);
     }
   }
   data.html_logger.add_header(&[
