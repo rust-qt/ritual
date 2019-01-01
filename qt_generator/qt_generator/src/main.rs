@@ -26,7 +26,7 @@ mod detect_signals_and_slots;
 mod new_impl;
 
 fn main() {
-  new_impl::new_main()
+    new_impl::new_main()
 }
 
 /*

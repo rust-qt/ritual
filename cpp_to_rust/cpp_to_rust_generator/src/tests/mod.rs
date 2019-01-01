@@ -10,25 +10,25 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub enum TempTestDir {
-  System(::tempdir::TempDir),
-  Custom(PathBuf),
+    System(::tempdir::TempDir),
+    Custom(PathBuf),
 }
 
 impl TempTestDir {
-  pub fn new(name: &str) -> TempTestDir {
-    if let Ok(value) = ::std::env::var("CPP_TO_RUST_TEMP_TEST_DIR") {
-      let path = canonicalize(PathBuf::from(value)).unwrap().with_added(name);
-      create_dir_all(&path).unwrap();
-      TempTestDir::Custom(path)
-    } else {
-      TempTestDir::System(::tempdir::TempDir::new(name).unwrap())
+    pub fn new(name: &str) -> TempTestDir {
+        if let Ok(value) = ::std::env::var("CPP_TO_RUST_TEMP_TEST_DIR") {
+            let path = canonicalize(PathBuf::from(value)).unwrap().with_added(name);
+            create_dir_all(&path).unwrap();
+            TempTestDir::Custom(path)
+        } else {
+            TempTestDir::System(::tempdir::TempDir::new(name).unwrap())
+        }
     }
-  }
 
-  pub fn path(&self) -> &Path {
-    match *self {
-      TempTestDir::System(ref dir) => dir.path(),
-      TempTestDir::Custom(ref path) => path,
+    pub fn path(&self) -> &Path {
+        match *self {
+            TempTestDir::System(ref dir) => dir.path(),
+            TempTestDir::Custom(ref path) => path,
+        }
     }
-  }
 }

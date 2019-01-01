@@ -36,12 +36,12 @@ pub mod target;
 /// generated crate's directory. The build script reads and uses this value.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildScriptData {
-  /// Information required to build the C++ wrapper library
-  pub cpp_build_config: cpp_build_config::CppBuildConfig,
-  /// Name of the original C++ library passed to the generator
-  pub cpp_lib_version: Option<String>,
-  /// Name of C++ wrapper library
-  pub cpp_wrapper_lib_name: String,
+    /// Information required to build the C++ wrapper library
+    pub cpp_build_config: cpp_build_config::CppBuildConfig,
+    /// Name of the original C++ library passed to the generator
+    pub cpp_lib_version: Option<String>,
+    /// Name of C++ wrapper library
+    pub cpp_wrapper_lib_name: String,
 }
 
 #[cfg(test)]

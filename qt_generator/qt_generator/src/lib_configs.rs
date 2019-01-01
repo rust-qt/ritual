@@ -147,472 +147,473 @@ fn core_cpp_parser_blocked_names() -> Vec<&'static str> {
 */
 /// QtCore specific configuration.
 pub fn core(config: &mut Config) -> Result<()> {
-  // TODO: replace QVariant::Type with QMetaType::Type?
-  //config.add_cpp_parser_blocked_names(core_cpp_parser_blocked_names());
-  //config.add_cpp_parser_blocked_names(vec!["QtMetaTypePrivate", "QtPrivate"]);
+    // TODO: replace QVariant::Type with QMetaType::Type?
+    //config.add_cpp_parser_blocked_names(core_cpp_parser_blocked_names());
+    //config.add_cpp_parser_blocked_names(vec!["QtMetaTypePrivate", "QtPrivate"]);
 
-  // TODO: the following items should be conditionally available on Windows;
-  /*config.add_cpp_parser_blocked_names(vec![
-    "QWinEventNotifier",
-    "QProcess::CreateProcessArguments",
-    "QProcess::nativeArguments",
-    "QProcess::setNativeArguments",
-    "QProcess::createProcessArgumentsModifier",
-    "QProcess::setCreateProcessArgumentsModifier",
-    "QAbstractEventDispatcher::registerEventNotifier",
-    "QAbstractEventDispatcher::unregisterEventNotifier",
-  ]);*/
+    // TODO: the following items should be conditionally available on Windows;
+    /*config.add_cpp_parser_blocked_names(vec![
+      "QWinEventNotifier",
+      "QProcess::CreateProcessArguments",
+      "QProcess::nativeArguments",
+      "QProcess::setNativeArguments",
+      "QProcess::createProcessArgumentsModifier",
+      "QProcess::setCreateProcessArgumentsModifier",
+      "QAbstractEventDispatcher::registerEventNotifier",
+      "QAbstractEventDispatcher::unregisterEventNotifier",
+    ]);*/
 
-  // QProcess::pid returns different types on different platforms,
-  // but this method is obsolete anyway
-  config.add_cpp_parser_blocked_names(vec!["QProcess::pid"]);
-  /*
-  exclude_qvector_eq_based_methods(config, &["QStaticPlugin", "QTimeZone::OffsetData"]);
-  exclude_qlist_eq_based_methods(
-    config,
-    &["QAbstractEventDispatcher::TimerInfo", "QCommandLineOption"],
-  );
+    // QProcess::pid returns different types on different platforms,
+    // but this method is obsolete anyway
+    config.add_cpp_parser_blocked_names(vec!["QProcess::pid"]);
+    /*
+    exclude_qvector_eq_based_methods(config, &["QStaticPlugin", "QTimeZone::OffsetData"]);
+    exclude_qlist_eq_based_methods(
+      config,
+      &["QAbstractEventDispatcher::TimerInfo", "QCommandLineOption"],
+    );
 
-  config.set_types_allocation_place(
-    CppTypeAllocationPlace::Stack,
-    vec![
-      "QAssociativeIterable",
-      "QByteArray",
-      "QChar",
-      "QItemSelection",
-      "QJsonArray",
-      "QJsonObject",
-      "QJsonParseError",
-      "QJsonValue",
-      "QJsonValueRef",
-      "QList",
-      "QLoggingCategory",
-      "QMultiHash",
-      "QPointF",
-      "QRegularExpressionMatch",
-      "QResource",
-      "QSequentialIterable",
-      "QString",
-    ],
-  );
+    config.set_types_allocation_place(
+      CppTypeAllocationPlace::Stack,
+      vec![
+        "QAssociativeIterable",
+        "QByteArray",
+        "QChar",
+        "QItemSelection",
+        "QJsonArray",
+        "QJsonObject",
+        "QJsonParseError",
+        "QJsonValue",
+        "QJsonValueRef",
+        "QList",
+        "QLoggingCategory",
+        "QMultiHash",
+        "QPointF",
+        "QRegularExpressionMatch",
+        "QResource",
+        "QSequentialIterable",
+        "QString",
+      ],
+    );
 
-  config.add_cpp_ffi_generator_filter(|method| {
-    if let Some(ref info) = method.class_membership {
-      if info.class_type.to_cpp_pseudo_code() == "QFuture<void>" {
-        // template partial specialization removes these methods
-        match method.name.as_ref() {
-          "operator void" | "isResultReadyAt" | "result" | "resultAt" | "results" => {
-            return Ok(false)
+    config.add_cpp_ffi_generator_filter(|method| {
+      if let Some(ref info) = method.class_membership {
+        if info.class_type.to_cpp_pseudo_code() == "QFuture<void>" {
+          // template partial specialization removes these methods
+          match method.name.as_ref() {
+            "operator void" | "isResultReadyAt" | "result" | "resultAt" | "results" => {
+              return Ok(false)
+            }
+            _ => {}
           }
-          _ => {}
         }
-      }
-      if info.class_type.to_cpp_pseudo_code() == "QFutureIterator<void>" {
-        // template partial specialization removes these methods
-        match method.name.as_ref() {
-          "QFutureIterator" | "operator=" => return Ok(false),
-          _ => {}
+        if info.class_type.to_cpp_pseudo_code() == "QFutureIterator<void>" {
+          // template partial specialization removes these methods
+          match method.name.as_ref() {
+            "QFutureIterator" | "operator=" => return Ok(false),
+            _ => {}
+          }
         }
-      }
-      if info.class_type.name == "QString" {
-        match method.name.as_ref() {
-          "toLatin1" | "toUtf8" | "toLocal8Bit" => {
-            // MacOS has non-const duplicates of these methods,
-            // and that would alter Rust names of these methods
-            if !info.is_const {
+        if info.class_type.name == "QString" {
+          match method.name.as_ref() {
+            "toLatin1" | "toUtf8" | "toLocal8Bit" => {
+              // MacOS has non-const duplicates of these methods,
+              // and that would alter Rust names of these methods
+              if !info.is_const {
+                return Ok(false);
+              }
+            }
+            _ => {}
+          }
+        }
+        if info.class_type.name == "QMetaType" {
+          match method.name.as_ref() {
+            "registerConverterFunction" | "unregisterConverterFunction" => {
+              // only public on msvc for some technical reason
               return Ok(false);
             }
+            _ => {}
           }
-          _ => {}
+        }
+        if info.class_type.name == "QVariant" {
+          match method.name.as_ref() {
+            "create" | "cmp" | "compare" | "convert" => {
+              // only public on msvc for some technical reason
+              return Ok(false);
+            }
+            _ => {}
+          }
         }
       }
-      if info.class_type.name == "QMetaType" {
-        match method.name.as_ref() {
-          "registerConverterFunction" | "unregisterConverterFunction" => {
-            // only public on msvc for some technical reason
-            return Ok(false);
-          }
-          _ => {}
-        }
+      let long_double = CppType {
+        indirection: CppTypeIndirection::None,
+        is_const: false,
+        is_const2: false,
+        base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::LongDouble),
+      };
+      if &method.name == "qHash" && method.class_membership.is_none()
+        && (method.arguments.len() == 1 || method.arguments.len() == 2)
+        && &method.arguments[0].argument_type == &long_double
+      {
+        return Ok(false); // produces error on MacOS
       }
-      if info.class_type.name == "QVariant" {
-        match method.name.as_ref() {
-          "create" | "cmp" | "compare" | "convert" => {
-            // only public on msvc for some technical reason
-            return Ok(false);
-          }
-          _ => {}
-        }
-      }
-    }
-    let long_double = CppType {
-      indirection: CppTypeIndirection::None,
-      is_const: false,
-      is_const2: false,
-      base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::LongDouble),
-    };
-    if &method.name == "qHash" && method.class_membership.is_none()
-      && (method.arguments.len() == 1 || method.arguments.len() == 2)
-      && &method.arguments[0].argument_type == &long_double
-    {
-      return Ok(false); // produces error on MacOS
-    }
-    Ok(true)
-  });*/
-  Ok(())
+      Ok(true)
+    });*/
+    Ok(())
 }
 
 /// QtGui specific configuration.
 pub fn gui(config: &mut Config) -> Result<()> {
-  /*
-    config.add_cpp_parser_blocked_names(vec![
-      "QAbstractOpenGLFunctionsPrivate",
-      "QOpenGLFunctionsPrivate",
-      "QOpenGLExtraFunctionsPrivate",
-      "QKeySequence::isDetached",
-      "QBrushData",
-      "QAccessible::ActivationObserver",
-      "QAccessibleImageInterface",
-      "QAccessibleBridge",
-      "QAccessibleBridgePlugin",
-      "QAccessibleApplication",
-      "QOpenGLVersionStatus",
-      "QOpenGLVersionFunctionsBackend",
-      "QOpenGLVersionFunctionsStorage",
-      "QOpenGLTexture::TextureFormatClass",
-      "QTextFrameLayoutData",
-    ]);
-    exclude_qvector_eq_based_methods(
-      config,
-      &[
-        "QTextLayout::FormatRange",
-        "QAbstractTextDocumentLayout::Selection",
-      ],
-    );
-    exclude_qlist_eq_based_methods(
-      config,
-      &[
-        "QInputMethodEvent::Attribute",
-        "QTextLayout::FormatRange",
-        "QTouchEvent::TouchPoint",
-      ],
-    );
-    config.add_cpp_ffi_generator_filter(|method| {
-      if let Some(ref info) = method.class_membership {
-        match info.class_type.to_cpp_pseudo_code().as_ref() {
-          "QQueue<QInputMethodEvent::Attribute>"
-          | "QQueue<QTextLayout::FormatRange>"
-          | "QQueue<QTouchEvent::TouchPoint>" => match method.name.as_ref() {
-            "operator==" | "operator!=" => return Ok(false),
-            _ => {}
-          },
-          "QStack<QInputMethodEvent::Attribute>" | "QStack<QTextLayout::FormatRange>" => {
-            match method.name.as_ref() {
-              "operator==" | "operator!=" | "fromList" => return Ok(false),
+    /*
+      config.add_cpp_parser_blocked_names(vec![
+        "QAbstractOpenGLFunctionsPrivate",
+        "QOpenGLFunctionsPrivate",
+        "QOpenGLExtraFunctionsPrivate",
+        "QKeySequence::isDetached",
+        "QBrushData",
+        "QAccessible::ActivationObserver",
+        "QAccessibleImageInterface",
+        "QAccessibleBridge",
+        "QAccessibleBridgePlugin",
+        "QAccessibleApplication",
+        "QOpenGLVersionStatus",
+        "QOpenGLVersionFunctionsBackend",
+        "QOpenGLVersionFunctionsStorage",
+        "QOpenGLTexture::TextureFormatClass",
+        "QTextFrameLayoutData",
+      ]);
+      exclude_qvector_eq_based_methods(
+        config,
+        &[
+          "QTextLayout::FormatRange",
+          "QAbstractTextDocumentLayout::Selection",
+        ],
+      );
+      exclude_qlist_eq_based_methods(
+        config,
+        &[
+          "QInputMethodEvent::Attribute",
+          "QTextLayout::FormatRange",
+          "QTouchEvent::TouchPoint",
+        ],
+      );
+      config.add_cpp_ffi_generator_filter(|method| {
+        if let Some(ref info) = method.class_membership {
+          match info.class_type.to_cpp_pseudo_code().as_ref() {
+            "QQueue<QInputMethodEvent::Attribute>"
+            | "QQueue<QTextLayout::FormatRange>"
+            | "QQueue<QTouchEvent::TouchPoint>" => match method.name.as_ref() {
+              "operator==" | "operator!=" => return Ok(false),
               _ => {}
+            },
+            "QStack<QInputMethodEvent::Attribute>" | "QStack<QTextLayout::FormatRange>" => {
+              match method.name.as_ref() {
+                "operator==" | "operator!=" | "fromList" => return Ok(false),
+                _ => {}
+              }
             }
-          }
-          "QOpenGLVersionFunctionsStorage" => match method.name.as_ref() {
-            "QOpenGLVersionFunctionsStorage" | "~QOpenGLVersionFunctionsStorage" | "backend" => {
-              return Ok(false)
-            }
+            "QOpenGLVersionFunctionsStorage" => match method.name.as_ref() {
+              "QOpenGLVersionFunctionsStorage" | "~QOpenGLVersionFunctionsStorage" | "backend" => {
+                return Ok(false)
+              }
+              _ => {}
+            },
             _ => {}
-          },
-          _ => {}
+          }
+          if info.class_type.name.starts_with("QOpenGLFunctions_")
+            && (info.class_type.name.ends_with("_CoreBackend")
+              | info.class_type.name.ends_with("_CoreBackend::Functions")
+              | info.class_type.name.ends_with("_DeprecatedBackend")
+              | info
+                .class_type
+                .name
+                .ends_with("_DeprecatedBackend::Functions"))
+          {
+            return Ok(false);
+          }
         }
-        if info.class_type.name.starts_with("QOpenGLFunctions_")
-          && (info.class_type.name.ends_with("_CoreBackend")
-            | info.class_type.name.ends_with("_CoreBackend::Functions")
-            | info.class_type.name.ends_with("_DeprecatedBackend")
-            | info
-              .class_type
-              .name
-              .ends_with("_DeprecatedBackend::Functions"))
-        {
-          return Ok(false);
-        }
-      }
-      Ok(true)
-    });
-  */
-  Ok(())
+        Ok(true)
+      });
+    */
+    Ok(())
 }
 
 /// QtWidgets specific configuration.
 pub fn widgets(config: &mut Config) -> Result<()> {
-  /*
-  config.add_cpp_parser_blocked_names(vec!["QWidgetData", "QWidgetItemV2"]);
+    /*
+    config.add_cpp_parser_blocked_names(vec!["QWidgetData", "QWidgetItemV2"]);
 
-  // TODO: Mac specific:
-  config.add_cpp_parser_blocked_names(vec!["QMacCocoaViewContainer", "QMacNativeWidget"]);
+    // TODO: Mac specific:
+    config.add_cpp_parser_blocked_names(vec!["QMacCocoaViewContainer", "QMacNativeWidget"]);
 
-  exclude_qlist_eq_based_methods(
-    config,
-    &["QTableWidgetSelectionRange", "QTextEdit::ExtraSelection"],
-  );
-  config.add_cpp_ffi_generator_filter(|method| {
-    if let Some(ref info) = method.class_membership {
-      match info.class_type.to_cpp_pseudo_code().as_ref() {
-        "QQueue<QTableWidgetSelectionRange>" | "QQueue<QTextEdit::ExtraSelection>" => {
-          match method.name.as_ref() {
-            "operator==" | "operator!=" => return Ok(false),
-            _ => {}
+    exclude_qlist_eq_based_methods(
+      config,
+      &["QTableWidgetSelectionRange", "QTextEdit::ExtraSelection"],
+    );
+    config.add_cpp_ffi_generator_filter(|method| {
+      if let Some(ref info) = method.class_membership {
+        match info.class_type.to_cpp_pseudo_code().as_ref() {
+          "QQueue<QTableWidgetSelectionRange>" | "QQueue<QTextEdit::ExtraSelection>" => {
+            match method.name.as_ref() {
+              "operator==" | "operator!=" => return Ok(false),
+              _ => {}
+            }
           }
+          _ => {}
         }
-        _ => {}
       }
-    }
-    Ok(true)
-  });*/
-  Ok(())
+      Ok(true)
+    });*/
+    Ok(())
 }
 
 /// Qt3DCore specific configuration.
 pub fn core_3d(config: &mut Config) -> Result<()> {
-  config.add_cpp_filtered_namespace("Qt3DCore");
-  //exclude_qvector_eq_based_methods(config, &["Qt3DCore::QNodeIdTypePair"]);
-  Ok(())
+    config.add_cpp_filtered_namespace("Qt3DCore");
+    //exclude_qvector_eq_based_methods(config, &["Qt3DCore::QNodeIdTypePair"]);
+    Ok(())
 }
 
 /// Qt3DRender specific configuration.
 pub fn render_3d(config: &mut Config) -> Result<()> {
-  config.add_cpp_filtered_namespace("Qt3DRender");
-  /*
-  config.add_cpp_parser_blocked_names(vec![
-    "Qt3DRender::QTexture1D",
-    "Qt3DRender::QTexture1DArray",
-    "Qt3DRender::QTexture2D",
-    "Qt3DRender::QTexture2DArray",
-    "Qt3DRender::QTexture3D",
-    "Qt3DRender::QTextureCubeMap",
-    "Qt3DRender::QTextureCubeMapArray",
-    "Qt3DRender::QTexture2DMultisample",
-    "Qt3DRender::QTexture2DMultisampleArray",
-    "Qt3DRender::QTextureRectangle",
-    "Qt3DRender::QTextureBuffer",
-    "Qt3DRender::QRenderCapture",
-    "Qt3DRender::QRenderCaptureReply",
-    "Qt3DRender::QSortCriterion",
-  ]);
-  config.add_cpp_ffi_generator_filter(|method| {
-    if let Some(ref info) = method.class_membership {
-      match info.class_type.to_cpp_pseudo_code().as_ref() {
-        "Qt3DRender::QSpotLight" => match method.name.as_ref() {
-          "attenuation" => return Ok(false),
-          _ => {}
-        },
+    config.add_cpp_filtered_namespace("Qt3DRender");
+    /*
+    config.add_cpp_parser_blocked_names(vec![
+      "Qt3DRender::QTexture1D",
+      "Qt3DRender::QTexture1DArray",
+      "Qt3DRender::QTexture2D",
+      "Qt3DRender::QTexture2DArray",
+      "Qt3DRender::QTexture3D",
+      "Qt3DRender::QTextureCubeMap",
+      "Qt3DRender::QTextureCubeMapArray",
+      "Qt3DRender::QTexture2DMultisample",
+      "Qt3DRender::QTexture2DMultisampleArray",
+      "Qt3DRender::QTextureRectangle",
+      "Qt3DRender::QTextureBuffer",
+      "Qt3DRender::QRenderCapture",
+      "Qt3DRender::QRenderCaptureReply",
+      "Qt3DRender::QSortCriterion",
+    ]);
+    config.add_cpp_ffi_generator_filter(|method| {
+      if let Some(ref info) = method.class_membership {
+        match info.class_type.to_cpp_pseudo_code().as_ref() {
+          "Qt3DRender::QSpotLight" => match method.name.as_ref() {
+            "attenuation" => return Ok(false),
+            _ => {}
+          },
 
-        "Qt3DRender::QGraphicsApiFilter" => match method.name.as_ref() {
-          "operator==" | "operator!=" => return Ok(false),
-          _ => {}
-        },
+          "Qt3DRender::QGraphicsApiFilter" => match method.name.as_ref() {
+            "operator==" | "operator!=" => return Ok(false),
+            _ => {}
+          },
 
-        _ => {}
+          _ => {}
+        }
       }
-    }
-    if method.short_text().contains("QGraphicsApiFilter") {
-      println!("TEST {:?}", method);
-    }
-    if method.name == "Qt3DRender::operator==" || method.name == "Qt3DRender::operator!=" {
-      if method.arguments.len() == 2 {
-        if let CppTypeBase::Class(ref base) = method.arguments[0].argument_type.base {
-          if &base.name == "Qt3DRender::QGraphicsApiFilter" {
-            return Ok(false);
+      if method.short_text().contains("QGraphicsApiFilter") {
+        println!("TEST {:?}", method);
+      }
+      if method.name == "Qt3DRender::operator==" || method.name == "Qt3DRender::operator!=" {
+        if method.arguments.len() == 2 {
+          if let CppTypeBase::Class(ref base) = method.arguments[0].argument_type.base {
+            if &base.name == "Qt3DRender::QGraphicsApiFilter" {
+              return Ok(false);
+            }
           }
         }
       }
-    }
-    Ok(true)
-  });*/
-  Ok(())
+      Ok(true)
+    });*/
+    Ok(())
 }
 
 /// Qt3DInput specific configuration.
 pub fn input_3d(config: &mut Config) -> Result<()> {
-  config.add_cpp_filtered_namespace("Qt3DInput");
-  //config.add_cpp_parser_blocked_names(vec!["Qt3DInput::QWheelEvent"]);
-  Ok(())
+    config.add_cpp_filtered_namespace("Qt3DInput");
+    //config.add_cpp_parser_blocked_names(vec!["Qt3DInput::QWheelEvent"]);
+    Ok(())
 }
 
 /// Qt3DLogic specific configuration.
 pub fn logic_3d(config: &mut Config) -> Result<()> {
-  config.add_cpp_filtered_namespace("Qt3DLogic");
-  Ok(())
+    config.add_cpp_filtered_namespace("Qt3DLogic");
+    Ok(())
 }
 
 /// Qt3DExtras specific configuration.
 pub fn extras_3d(config: &mut Config) -> Result<()> {
-  config.add_cpp_filtered_namespace("Qt3DExtras");
-  Ok(())
+    config.add_cpp_filtered_namespace("Qt3DExtras");
+    Ok(())
 }
 
 /// Executes the generator for a single Qt module with given configuration.
 pub fn make_config(crate_name: &str) -> Result<Config> {
-  log::status(format!(
-    "Preparing generator config for crate: {}",
-    crate_name
-  ));
-  let mut crate_properties =
-    CrateProperties::new(crate_name.clone(), versions::QT_OUTPUT_CRATES_VERSION);
-  let mut custom_fields = toml::Table::new();
-  let mut package_data = toml::Table::new();
-  package_data.insert(
-    "authors".to_string(),
-    toml::Value::Array(vec![toml::Value::String(
-      "Pavel Strakhov <ri@idzaaus.org>".to_string(),
-    )]),
-  );
-  let description = format!(
-    "Bindings for {} C++ library (generated automatically with cpp_to_rust project)",
-    lib_folder_name(crate_name)
-  );
-  package_data.insert("description".to_string(), toml::Value::String(description));
-  let doc_url = format!("https://rust-qt.github.io/rustdoc/qt/{}", &crate_name);
-  package_data.insert("documentation".to_string(), toml::Value::String(doc_url));
-  package_data.insert(
-    "repository".to_string(),
-    toml::Value::String("https://github.com/rust-qt/cpp_to_rust".to_string()),
-  );
-  package_data.insert(
-    "license".to_string(),
-    toml::Value::String("MIT".to_string()),
-  );
+    log::status(format!(
+        "Preparing generator config for crate: {}",
+        crate_name
+    ));
+    let mut crate_properties =
+        CrateProperties::new(crate_name.clone(), versions::QT_OUTPUT_CRATES_VERSION);
+    let mut custom_fields = toml::Table::new();
+    let mut package_data = toml::Table::new();
+    package_data.insert(
+        "authors".to_string(),
+        toml::Value::Array(vec![toml::Value::String(
+            "Pavel Strakhov <ri@idzaaus.org>".to_string(),
+        )]),
+    );
+    let description = format!(
+        "Bindings for {} C++ library (generated automatically with cpp_to_rust project)",
+        lib_folder_name(crate_name)
+    );
+    package_data.insert("description".to_string(), toml::Value::String(description));
+    let doc_url = format!("https://rust-qt.github.io/rustdoc/qt/{}", &crate_name);
+    package_data.insert("documentation".to_string(), toml::Value::String(doc_url));
+    package_data.insert(
+        "repository".to_string(),
+        toml::Value::String("https://github.com/rust-qt/cpp_to_rust".to_string()),
+    );
+    package_data.insert(
+        "license".to_string(),
+        toml::Value::String("MIT".to_string()),
+    );
 
-  custom_fields.insert("package".to_string(), toml::Value::Table(package_data));
-  crate_properties.set_custom_fields(custom_fields);
-  crate_properties.remove_default_build_dependencies();
-  crate_properties.add_build_dependency(
-    "qt_build_tools",
-    versions::QT_BUILD_TOOLS_VERSION,
-    Some(repo_crate_local_path("qt_generator/qt_build_tools")?),
-  );
-  let mut config = Config::new(crate_properties);
-  if crate_name.starts_with("moqt_") {
-    let moqt_path =
-      PathBuf::from(::std::env::var("MOQT_PATH").chain_err(|| "MOQT_PATH env var is missing")?);
+    custom_fields.insert("package".to_string(), toml::Value::Table(package_data));
+    crate_properties.set_custom_fields(custom_fields);
+    crate_properties.remove_default_build_dependencies();
+    crate_properties.add_build_dependency(
+        "qt_build_tools",
+        versions::QT_BUILD_TOOLS_VERSION,
+        Some(repo_crate_local_path("qt_generator/qt_build_tools")?),
+    );
+    let mut config = Config::new(crate_properties);
+    if crate_name.starts_with("moqt_") {
+        let moqt_path = PathBuf::from(
+            ::std::env::var("MOQT_PATH").chain_err(|| "MOQT_PATH env var is missing")?,
+        );
 
-    config.add_include_directive(format!("{}.h", crate_name));
-    let moqt_sublib_path = moqt_path.with_added(crate_name);
-    if !moqt_sublib_path.exists() {
-      return Err(format!("Path does not exist: {}", moqt_sublib_path.display()).into());
-    }
-    let include_path = moqt_sublib_path.with_added("include");
-    if !include_path.exists() {
-      return Err(format!("Path does not exist: {}", include_path.display()).into());
-    }
-    let lib_path = moqt_sublib_path.with_added("lib");
-    if !lib_path.exists() {
-      return Err(format!("Path does not exist: {}", lib_path.display()).into());
-    }
-    {
-      let mut paths = CppBuildPaths::new();
-      paths.add_include_path(&include_path);
-      paths.add_lib_path(&lib_path);
-      config.set_cpp_build_paths(paths);
-    }
-    config.add_target_include_path(&include_path);
+        config.add_include_directive(format!("{}.h", crate_name));
+        let moqt_sublib_path = moqt_path.with_added(crate_name);
+        if !moqt_sublib_path.exists() {
+            return Err(format!("Path does not exist: {}", moqt_sublib_path.display()).into());
+        }
+        let include_path = moqt_sublib_path.with_added("include");
+        if !include_path.exists() {
+            return Err(format!("Path does not exist: {}", include_path.display()).into());
+        }
+        let lib_path = moqt_sublib_path.with_added("lib");
+        if !lib_path.exists() {
+            return Err(format!("Path does not exist: {}", lib_path.display()).into());
+        }
+        {
+            let mut paths = CppBuildPaths::new();
+            paths.add_include_path(&include_path);
+            paths.add_lib_path(&lib_path);
+            config.set_cpp_build_paths(paths);
+        }
+        config.add_target_include_path(&include_path);
 
-    {
-      let mut data = CppBuildConfigData::new();
-      data.add_linked_lib(crate_name.replace("_", ""));
-      config
-        .cpp_build_config_mut()
-        .add(target::Condition::True, data);
-    }
-    {
-      let mut data = CppBuildConfigData::new();
-      data.add_compiler_flag("-fPIC");
-      data.add_compiler_flag("-std=gnu++11");
-      config
-        .cpp_build_config_mut()
-        .add(target::Condition::Env(target::Env::Msvc).negate(), data);
-    }
-    if target::current_env() == target::Env::Msvc {
-      config.add_cpp_parser_argument("-std=c++14");
+        {
+            let mut data = CppBuildConfigData::new();
+            data.add_linked_lib(crate_name.replace("_", ""));
+            config
+                .cpp_build_config_mut()
+                .add(target::Condition::True, data);
+        }
+        {
+            let mut data = CppBuildConfigData::new();
+            data.add_compiler_flag("-fPIC");
+            data.add_compiler_flag("-std=gnu++11");
+            config
+                .cpp_build_config_mut()
+                .add(target::Condition::Env(target::Env::Msvc).negate(), data);
+        }
+        if target::current_env() == target::Env::Msvc {
+            config.add_cpp_parser_argument("-std=c++14");
+        } else {
+            config.add_cpp_parser_argument("-std=gnu++11");
+        }
+    //    let cpp_config_data = CppBuildConfigData {
+    //      linked_libs: vec![crate_name.to_string()],
+    //      linked_frameworks: Vec::new(),
+    //
+    //    }
+    //...
     } else {
-      config.add_cpp_parser_argument("-std=gnu++11");
+        let qt_config = get_full_build_config(crate_name)?;
+        config.set_cpp_build_config(qt_config.cpp_build_config);
+        config.set_cpp_build_paths(qt_config.cpp_build_paths);
+
+        config.add_target_include_path(&qt_config.installation_data.lib_include_path);
+        config.set_cpp_lib_version(qt_config.installation_data.qt_version.as_str());
+        // TODO: does parsing work on MacOS without adding "-F"?
+
+        config.add_include_directive(&lib_folder_name(crate_name));
+        // TODO: allow to override parser flags
+        config.add_cpp_parser_arguments(vec!["-fPIC", "-fcxx-exceptions"]);
+
+        if target::current_env() == target::Env::Msvc {
+            config.add_cpp_parser_argument("-std=c++14");
+        } else {
+            config.add_cpp_parser_argument("-std=gnu++11");
+        }
+        config.add_cpp_parser_blocked_name("qt_check_for_QGADGET_macro");
+
+        let lib_include_path = qt_config.installation_data.lib_include_path.clone();
+
+        config.add_custom_processing_step(ProcessingStep::new(
+            "qt_fix_header_names",
+            vec!["cpp_parser".to_string()],
+            move |data| fix_header_names(&mut data.current_database.items, &lib_include_path),
+        ));
+
+        config.add_custom_processing_step(ProcessingStep::new(
+            "qt_detect_signals_and_slots",
+            vec!["cpp_parser".to_string()],
+            detect_signals_and_slots,
+        ));
+        config.add_custom_processing_step(ProcessingStep::new(
+            "detect_signal_argument_types",
+            vec![
+                "cpp_parser".to_string(),
+                "qt_detect_signals_and_slots".to_string(),
+            ],
+            detect_signal_argument_types,
+        ));
+
+        let crate_name_clone = crate_name.to_string();
+        let docs_path = qt_config.installation_data.docs_path.clone();
+        config.add_custom_processing_step(ProcessingStep::new(
+            "qt_doc_parser",
+            vec!["cpp_parser".to_string()],
+            move |data| parse_docs(data, &crate_name_clone, &docs_path),
+        ));
     }
-  //    let cpp_config_data = CppBuildConfigData {
-  //      linked_libs: vec![crate_name.to_string()],
-  //      linked_frameworks: Vec::new(),
-  //
-  //    }
-  //...
-  } else {
-    let qt_config = get_full_build_config(crate_name)?;
-    config.set_cpp_build_config(qt_config.cpp_build_config);
-    config.set_cpp_build_paths(qt_config.cpp_build_paths);
 
-    config.add_target_include_path(&qt_config.installation_data.lib_include_path);
-    config.set_cpp_lib_version(qt_config.installation_data.qt_version.as_str());
-    // TODO: does parsing work on MacOS without adding "-F"?
-
-    config.add_include_directive(&lib_folder_name(crate_name));
-    // TODO: allow to override parser flags
-    config.add_cpp_parser_arguments(vec!["-fPIC", "-fcxx-exceptions"]);
-
-    if target::current_env() == target::Env::Msvc {
-      config.add_cpp_parser_argument("-std=c++14");
-    } else {
-      config.add_cpp_parser_argument("-std=gnu++11");
+    config.set_crate_template_path(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .with_added("crate_templates")
+            .with_added(&crate_name),
+    );
+    match crate_name {
+        "qt_core" => lib_configs::core(&mut config)?,
+        "qt_gui" => lib_configs::gui(&mut config)?,
+        "qt_widgets" => lib_configs::widgets(&mut config)?,
+        "qt_3d_core" => lib_configs::core_3d(&mut config)?,
+        "qt_3d_render" => lib_configs::render_3d(&mut config)?,
+        "qt_3d_input" => lib_configs::input_3d(&mut config)?,
+        "qt_3d_logic" => lib_configs::logic_3d(&mut config)?,
+        "qt_3d_extras" => lib_configs::extras_3d(&mut config)?,
+        "qt_ui_tools" => {}
+        "moqt_core" => {}
+        _ => return Err(format!("Unknown crate name: {}", crate_name).into()),
     }
-    config.add_cpp_parser_blocked_name("qt_check_for_QGADGET_macro");
 
-    let lib_include_path = qt_config.installation_data.lib_include_path.clone();
-
-    config.add_custom_processing_step(ProcessingStep::new(
-      "qt_fix_header_names",
-      vec!["cpp_parser".to_string()],
-      move |data| fix_header_names(&mut data.current_database.items, &lib_include_path),
-    ));
-
-    config.add_custom_processing_step(ProcessingStep::new(
-      "qt_detect_signals_and_slots",
-      vec!["cpp_parser".to_string()],
-      detect_signals_and_slots,
-    ));
-    config.add_custom_processing_step(ProcessingStep::new(
-      "detect_signal_argument_types",
-      vec![
-        "cpp_parser".to_string(),
-        "qt_detect_signals_and_slots".to_string(),
-      ],
-      detect_signal_argument_types,
-    ));
-
-    let crate_name_clone = crate_name.to_string();
-    let docs_path = qt_config.installation_data.docs_path.clone();
-    config.add_custom_processing_step(ProcessingStep::new(
-      "qt_doc_parser",
-      vec!["cpp_parser".to_string()],
-      move |data| parse_docs(data, &crate_name_clone, &docs_path),
-    ));
-  }
-
-  config.set_crate_template_path(
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-      .with_added("crate_templates")
-      .with_added(&crate_name),
-  );
-  match crate_name {
-    "qt_core" => lib_configs::core(&mut config)?,
-    "qt_gui" => lib_configs::gui(&mut config)?,
-    "qt_widgets" => lib_configs::widgets(&mut config)?,
-    "qt_3d_core" => lib_configs::core_3d(&mut config)?,
-    "qt_3d_render" => lib_configs::render_3d(&mut config)?,
-    "qt_3d_input" => lib_configs::input_3d(&mut config)?,
-    "qt_3d_logic" => lib_configs::logic_3d(&mut config)?,
-    "qt_3d_extras" => lib_configs::extras_3d(&mut config)?,
-    "qt_ui_tools" => {}
-    "moqt_core" => {}
-    _ => return Err(format!("Unknown crate name: {}", crate_name).into()),
-  }
-
-  config.set_dependent_cpp_crates(
-    lib_dependencies(crate_name)?
-      .iter()
-      .map(|s| s.to_string())
-      .collect(),
-  );
-  Ok(config)
+    config.set_dependent_cpp_crates(
+        lib_dependencies(crate_name)?
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+    );
+    Ok(config)
 }
