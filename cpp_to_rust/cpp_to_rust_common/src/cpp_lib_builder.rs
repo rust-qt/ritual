@@ -44,7 +44,8 @@ impl CMakeVar {
             format!(
               "can't pass value to cmake because ';' symbol is reserved: {}",
               s.as_ref()
-            ).into(),
+            )
+            .into(),
           )
         } else {
           Ok(s)

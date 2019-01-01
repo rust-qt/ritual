@@ -93,7 +93,8 @@ impl DocData {
         format!(
           "Documentation directory does not exist: {}",
           docs_path.display()
-        ).into(),
+        )
+        .into(),
       );
     }
     let doc_file_name = if qt_crate_name.starts_with("3d_") {
@@ -108,7 +109,8 @@ impl DocData {
         format!(
           "Documentation file does not exist: {}",
           doc_file_path.display()
-        ).into(),
+        )
+        .into(),
       );
     }
     log::status(format!(

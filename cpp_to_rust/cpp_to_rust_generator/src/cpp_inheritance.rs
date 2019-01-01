@@ -162,7 +162,7 @@ impl<'a> CppDataWithDeps<'a> {
               }
             });
             all_new_methods.append(
-              &mut self.inherited_methods_from(&type1.name, &base_methods.collect::<Vec<_>>())?
+              &mut self.inherited_methods_from(&type1.name, &base_methods.collect::<Vec<_>>())?,
             );
           }
         }

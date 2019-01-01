@@ -14,8 +14,6 @@ use common::string_utils::JoinWithSeparator;
 use cpp_data::CppTemplateInstantiation;
 use cpp_ffi_data::QtSlotWrapper;
 use cpp_type::CppType;
-use cpp_type::CppTypeBase;
-use cpp_type::CppTypeIndirection;
 use new_impl::html_logger::escape_html;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -149,7 +147,7 @@ impl CppItemData {
           indirection: CppTypeIndirection::None,
           is_const: false,
           is_const2: false,
-          base: CppTypeBase::Enum {
+          base: CppType::Enum {
             name: t.name.to_string(),
           },
         }],
@@ -157,7 +155,7 @@ impl CppItemData {
           indirection: CppTypeIndirection::None,
           is_const: false,
           is_const2: false,
-          base: CppTypeBase::Class(type_base.clone()),
+          base: CppType::Class(type_base.clone()),
         }],
       },
       CppItemData::EnumValue(_) => Vec::new(),
@@ -167,7 +165,7 @@ impl CppItemData {
           indirection: CppTypeIndirection::None,
           is_const: false,
           is_const2: false,
-          base: CppTypeBase::Class(field.class_type.clone()),
+          base: CppType::Class(field.class_type.clone()),
         };
         vec![class_type, field.field_type.clone()]
       }
@@ -176,13 +174,13 @@ impl CppItemData {
           indirection: CppTypeIndirection::None,
           is_const: false,
           is_const2: false,
-          base: CppTypeBase::Class(base.base_class_type.clone()),
+          base: CppType::Class(base.base_class_type.clone()),
         },
         CppType {
           indirection: CppTypeIndirection::None,
           is_const: false,
           is_const2: false,
-          base: CppTypeBase::Class(base.derived_class_type.clone()),
+          base: CppType::Class(base.derived_class_type.clone()),
         },
       ],
       CppItemData::QtSignalArguments(ref args) => args.clone(),

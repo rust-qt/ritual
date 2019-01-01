@@ -120,7 +120,8 @@ impl Config {
         "release" => BuildType::Release,
         _ => return Err(format!("unknown value of PROFILE env var: {}", profile).into()),
       },
-    }.run()?;
+    }
+    .run()?;
     {
       log::status("Generating ffi.rs file");
       let mut ffi_file = create_file(out_dir.with_added("ffi.rs"))?;

@@ -35,7 +35,8 @@ fn build_cpp_lib() -> TempTestDir {
       install_dir: install_dir,
       num_jobs: None,
       cmake_vars: Vec::new(),
-    }.run(),
+    }
+    .run(),
   );
   temp_dir
 }

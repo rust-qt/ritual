@@ -26,13 +26,13 @@ fn argument_int() {
         indirection: CppTypeIndirection::None,
         is_const: false,
         is_const2: false,
-        base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+        base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
       ffi_type: CppType {
         indirection: CppTypeIndirection::None,
         is_const: false,
         is_const2: false,
-        base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+        base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
       conversion: CppTypeConversionToFfi::NoChange,
     },
@@ -84,13 +84,13 @@ fn argument_int_ptr() {
         indirection: CppTypeIndirection::Ptr,
         is_const: false,
         is_const2: false,
-        base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+        base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
       ffi_type: CppType {
         indirection: CppTypeIndirection::Ptr,
         is_const: false,
         is_const2: false,
-        base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+        base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
       },
       conversion: CppTypeConversionToFfi::NoChange,
     },
@@ -139,26 +139,26 @@ fn argument_func() {
     is_const: false,
     is_const2: false,
     indirection: CppTypeIndirection::None,
-    base: CppTypeBase::FunctionPointer(CppFunctionPointerType {
+    base: CppType::FunctionPointer(CppFunctionPointerType {
       allows_variadic_arguments: false,
       return_type: Box::new(CppType {
         indirection: CppTypeIndirection::None,
         is_const: false,
         is_const2: false,
-        base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+        base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
       }),
       arguments: vec![
         CppType {
           indirection: CppTypeIndirection::None,
           is_const: false,
           is_const2: false,
-          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+          base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
         },
         CppType {
           indirection: CppTypeIndirection::Ptr,
           is_const: false,
           is_const2: false,
-          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
+          base: CppType::BuiltInNumeric(CppBuiltInNumericType::Bool),
         },
       ],
     }),
@@ -221,13 +221,13 @@ fn signature_two_numbers() {
             indirection: CppTypeIndirection::None,
             is_const: false,
             is_const2: false,
-            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+            base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
           },
           ffi_type: CppType {
             indirection: CppTypeIndirection::None,
             is_const: false,
             is_const2: false,
-            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+            base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
           },
           conversion: CppTypeConversionToFfi::NoChange,
         },
@@ -240,13 +240,13 @@ fn signature_two_numbers() {
             indirection: CppTypeIndirection::None,
             is_const: false,
             is_const2: false,
-            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+            base: CppType::BuiltInNumeric(CppBuiltInNumericType::Double),
           },
           ffi_type: CppType {
             indirection: CppTypeIndirection::None,
             is_const: false,
             is_const2: false,
-            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+            base: CppType::BuiltInNumeric(CppBuiltInNumericType::Double),
           },
           conversion: CppTypeConversionToFfi::NoChange,
         },
@@ -350,7 +350,7 @@ fn signature_class_method() {
             indirection: CppTypeIndirection::Ptr,
             is_const: false,
             is_const2: false,
-            base: CppTypeBase::Class(CppTypeClassBase {
+            base: CppType::Class(CppClassType {
               name: "Class1".to_string(),
               template_arguments: None,
             }),
@@ -359,7 +359,7 @@ fn signature_class_method() {
             indirection: CppTypeIndirection::Ptr,
             is_const: false,
             is_const2: false,
-            base: CppTypeBase::Class(CppTypeClassBase {
+            base: CppType::Class(CppClassType {
               name: "Class1".to_string(),
               template_arguments: None,
             }),
@@ -375,13 +375,13 @@ fn signature_class_method() {
             indirection: CppTypeIndirection::None,
             is_const: false,
             is_const2: false,
-            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+            base: CppType::BuiltInNumeric(CppBuiltInNumericType::Double),
           },
           ffi_type: CppType {
             indirection: CppTypeIndirection::None,
             is_const: false,
             is_const2: false,
-            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+            base: CppType::BuiltInNumeric(CppBuiltInNumericType::Double),
           },
           conversion: CppTypeConversionToFfi::NoChange,
         },
@@ -443,7 +443,7 @@ fn signature_class_method_const() {
             indirection: CppTypeIndirection::Ptr,
             is_const: true,
             is_const2: false,
-            base: CppTypeBase::Class(CppTypeClassBase {
+            base: CppType::Class(CppClassType {
               name: "Class1".to_string(),
               template_arguments: None,
             }),
@@ -452,7 +452,7 @@ fn signature_class_method_const() {
             indirection: CppTypeIndirection::Ptr,
             is_const: true,
             is_const2: false,
-            base: CppTypeBase::Class(CppTypeClassBase {
+            base: CppType::Class(CppClassType {
               name: "Class1".to_string(),
               template_arguments: None,
             }),
@@ -468,13 +468,13 @@ fn signature_class_method_const() {
             indirection: CppTypeIndirection::None,
             is_const: false,
             is_const2: false,
-            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+            base: CppType::BuiltInNumeric(CppBuiltInNumericType::Double),
           },
           ffi_type: CppType {
             indirection: CppTypeIndirection::None,
             is_const: false,
             is_const2: false,
-            base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+            base: CppType::BuiltInNumeric(CppBuiltInNumericType::Double),
           },
           conversion: CppTypeConversionToFfi::NoChange,
         },
@@ -629,7 +629,8 @@ fn c_base_name_free_func() {
       &method,
       &ReturnValueAllocationPlace::NotApplicable,
       &include_file,
-    ).unwrap(),
+    )
+    .unwrap(),
     "QRect_G_func1"
   );
   assert_eq!(
@@ -652,7 +653,8 @@ fn c_base_name_free_func_in_namespace() {
       &method,
       &ReturnValueAllocationPlace::NotApplicable,
       &include_file,
-    ).unwrap(),
+    )
+    .unwrap(),
     "QRect_G_ns_func1"
   );
   assert_eq!(
@@ -676,7 +678,8 @@ fn c_base_name_class_method() {
       &method,
       &ReturnValueAllocationPlace::NotApplicable,
       &include_file,
-    ).unwrap(),
+    )
+    .unwrap(),
     "MyClass_func1"
   );
   assert_eq!(
@@ -700,7 +703,8 @@ fn c_base_name_class_method_in_namespace() {
       &method,
       &ReturnValueAllocationPlace::NotApplicable,
       &include_file,
-    ).unwrap(),
+    )
+    .unwrap(),
     "ns1_MyClass_func1"
   );
   assert_eq!(
@@ -723,13 +727,12 @@ fn c_base_name_constructor() {
     info
   });
   let include_file = "QtCore".to_string();
-  assert!(
-    c_base_name(
-      &method,
-      &ReturnValueAllocationPlace::NotApplicable,
-      &include_file,
-    ).is_err()
-  );
+  assert!(c_base_name(
+    &method,
+    &ReturnValueAllocationPlace::NotApplicable,
+    &include_file,
+  )
+  .is_err());
   assert_eq!(
     c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
     "QRect_constructor"
@@ -750,13 +753,12 @@ fn c_base_name_destructor() {
     info
   });
   let include_file = "QtCore".to_string();
-  assert!(
-    c_base_name(
-      &method,
-      &ReturnValueAllocationPlace::NotApplicable,
-      &include_file,
-    ).is_err()
-  );
+  assert!(c_base_name(
+    &method,
+    &ReturnValueAllocationPlace::NotApplicable,
+    &include_file,
+  )
+  .is_err());
   assert_eq!(
     c_base_name(&method, &ReturnValueAllocationPlace::Stack, &include_file).unwrap(),
     "QRect_destructor"
@@ -779,7 +781,8 @@ fn c_base_name_class_method_operator() {
       &method,
       &ReturnValueAllocationPlace::NotApplicable,
       &include_file,
-    ).unwrap(),
+    )
+    .unwrap(),
     "MyClass_operator_gt"
   );
   assert_eq!(
@@ -803,7 +806,8 @@ fn c_base_name_free_func_operator() {
       &method,
       &ReturnValueAllocationPlace::NotApplicable,
       &include_file,
-    ).unwrap(),
+    )
+    .unwrap(),
     "QRect_G_operator_gt"
   );
   assert_eq!(
@@ -824,7 +828,7 @@ fn c_base_name_conversion_operator() {
   method.operator = Some(CppOperator::Conversion(CppType {
     is_const: true,
     is_const2: false,
-    base: CppTypeBase::Class(CppTypeClassBase {
+    base: CppType::Class(CppClassType {
       name: "QPoint".to_string(),
       template_arguments: None,
     }),
@@ -836,7 +840,8 @@ fn c_base_name_conversion_operator() {
       &method,
       &ReturnValueAllocationPlace::NotApplicable,
       &include_file,
-    ).unwrap(),
+    )
+    .unwrap(),
     "MyClass_convert_to_const_QPoint_ref"
   );
   assert_eq!(

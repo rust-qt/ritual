@@ -1,7 +1,7 @@
 //! Types for handling information about C++ library APIs.
 
 pub use cpp_operator::CppOperator;
-use cpp_type::{CppType, CppTypeClassBase};
+use cpp_type::{CppClassType, CppType};
 
 /// One item of a C++ enum declaration
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -34,7 +34,7 @@ pub struct CppClassField {
   //  /// Size of type in bytes
   //  pub size: Option<usize>,
   /// Name and template arguments of the class type that owns this field
-  pub class_type: CppTypeClassBase,
+  pub class_type: CppClassType,
 
   pub is_const: bool,
   pub is_static: bool,
@@ -66,7 +66,7 @@ impl CppClassField {
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppBaseSpecifier {
   /// Base class type (can include template arguments)
-  pub base_class_type: CppTypeClassBase,
+  pub base_class_type: CppClassType,
   /// Index of this base (for classes that have multiple base classes)
   pub base_index: usize,
   /// True if this base is virtual
@@ -76,7 +76,7 @@ pub struct CppBaseSpecifier {
 
   /// Name and template arguments of the class type that
   /// inherits this base class
-  pub derived_class_type: CppTypeClassBase,
+  pub derived_class_type: CppClassType,
 }
 
 /// Location of a C++ type's definition in header files.
@@ -116,7 +116,7 @@ pub enum CppTypeDataKind {
   Enum,
   Class {
     /// Information about name and template arguments of this type.
-    type_base: CppTypeClassBase,
+    type_base: CppClassType,
   },
 }
 

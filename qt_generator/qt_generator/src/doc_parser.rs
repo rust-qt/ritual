@@ -463,7 +463,8 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
       .attr("name")
       .chain_err(|| "anchor_node doesn't have name attribute")?
       .to_string();
-    let mut main_declaration = h3.text()
+    let mut main_declaration = h3
+      .text()
       .replace("[static]", "static")
       .replace("[protected]", "protected")
       .replace("[virtual]", "virtual")

@@ -30,7 +30,8 @@ fn check_all_paths(config: &Config) -> Result<()> {
         format!(
           "Only absolute paths allowed. Relative path: {}",
           path.display()
-        ).into(),
+        )
+        .into(),
       );
     }
     if !path.exists() {
@@ -223,14 +224,15 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
   if !config.dependent_cpp_crates().is_empty() {
     log::status("Loading dependencies");
   }
-  let dependent_cpp_crates = config
-    .dependent_cpp_crates()
-    .iter()
-    .map_if_ok(|name| -> Result<_> {
-      workspace
-        .load_crate(name)
-        .chain_err(|| "failed to load dependency")
-    })?;
+  let dependent_cpp_crates =
+    config
+      .dependent_cpp_crates()
+      .iter()
+      .map_if_ok(|name| -> Result<_> {
+        workspace
+          .load_crate(name)
+          .chain_err(|| "failed to load dependency")
+      })?;
 
   for operation in operations {
     if let Some(item) = all_processing_steps
@@ -267,19 +269,19 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
   }
 
   /*
-if exec_config.write_dependencies_local_paths {
-log::status(
-"Output Cargo.toml file will contain local paths of used dependencies \
-  (use --no-local-paths to disable).",
-);
-} else {
-log::status(
-"Local paths will not be written to the output crate. Make sure all dependencies \
-  are published before trying to compile the crate.",
-);
-}
+  if exec_config.write_dependencies_local_paths {
+  log::status(
+  "Output Cargo.toml file will contain local paths of used dependencies \
+    (use --no-local-paths to disable).",
+  );
+  } else {
+  log::status(
+  "Local paths will not be written to the output crate. Make sure all dependencies \
+    are published before trying to compile the crate.",
+  );
+  }
 
-*/
+  */
 
   /*
   parser_cpp_data.detect_signals_and_slots(

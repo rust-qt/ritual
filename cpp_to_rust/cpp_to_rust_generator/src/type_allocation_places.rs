@@ -1,9 +1,7 @@
 use common::errors::Result;
 use common::log;
+use cpp_type::CppClassType;
 use cpp_type::CppType;
-use cpp_type::CppTypeBase;
-use cpp_type::CppTypeClassBase;
-use cpp_type::CppTypeIndirection;
 use new_impl::processor::ProcessingStep;
 use new_impl::processor::ProcessorData;
 use std::collections::HashMap;
@@ -30,7 +28,7 @@ fn choose_allocation_places(mut data: ProcessorData) -> Result<()> {
     not_pointers_count: usize,
   };
   fn check_type(cpp_type: &CppType, data: &mut HashMap<String, TypeStats>) {
-    if let CppTypeBase::Class(CppTypeClassBase {
+    if let CppType::Class(CppClassType {
       ref name,
       ref template_arguments,
     }) = cpp_type.base

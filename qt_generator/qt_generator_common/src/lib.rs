@@ -89,7 +89,8 @@ pub fn get_installation_data(crate_name: &str) -> Result<InstallationData> {
           "extra header dir not found (tried: {}, {})",
           dir.display(),
           dir2.display()
-        ).into(),
+        )
+        .into(),
       )
     }
   }

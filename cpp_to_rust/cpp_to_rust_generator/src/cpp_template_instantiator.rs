@@ -4,9 +4,8 @@ use cpp_data::CppTemplateInstantiation;
 use cpp_function::CppFunction;
 use cpp_function::CppFunctionArgument;
 use cpp_function::CppOperator;
+use cpp_type::CppClassType;
 use cpp_type::CppType;
-use cpp_type::CppTypeBase;
-use cpp_type::CppTypeClassBase;
 use new_impl::database::CppItemData;
 use new_impl::database::DatabaseItemSource;
 use new_impl::processor::ProcessingStep;
@@ -14,7 +13,7 @@ use new_impl::processor::ProcessorData;
 
 /// Returns true if `type1` is a known template instantiation.
 fn check_template_type(data: &ProcessorData, type1: &CppType) -> Result<()> {
-  if let CppTypeBase::Class(CppTypeClassBase {
+  if let CppType::Class(CppClassType {
     ref name,
     ref template_arguments,
   }) = type1.base
@@ -36,8 +35,6 @@ fn check_template_type(data: &ProcessorData, type1: &CppType) -> Result<()> {
   Ok(())
 }
 
-// TODO: instantiate_templates
-
 /// Tries to apply each of `template_instantiations` to `method`.
 /// Only types at the specified `nested_level` are replaced.
 /// Returns `Err` if any of `template_instantiations` is incompatible
@@ -53,7 +50,7 @@ fn apply_instantiation_to_method(
   let mut new_method = method.clone();
   if let Some(ref args) = method.template_arguments {
     if args.iter().enumerate().all(|(index1, arg)| {
-      if let CppTypeBase::TemplateParameter {
+      if let CppType::TemplateParameter {
         nested_level,
         index,
         ..
@@ -105,7 +102,8 @@ fn apply_instantiation_to_method(
       format!(
         "extra template parameters left: {}",
         new_method.short_text()
-      ).into(),
+      )
+      .into(),
     )
   } else {
     if let Some(conversion_type) = conversion_type {
@@ -137,7 +135,7 @@ fn instantiate_templates(data: ProcessorData) -> Result<()> {
     .filter_map(|item| item.cpp_data.as_function_ref())
   {
     for type1 in method.all_involved_types() {
-      if let CppTypeBase::Class(CppTypeClassBase {
+      if let CppType::Class(CppClassType {
         ref name,
         ref template_arguments,
       }) = type1.base
@@ -155,7 +153,7 @@ fn instantiate_templates(data: ProcessorData) -> Result<()> {
               .filter_map(|item| item.cpp_data.as_template_instantiation_ref())
             {
               if &template_instantiation.class_name == name {
-                let nested_level = if let CppTypeBase::TemplateParameter { nested_level, .. } =
+                let nested_level = if let CppType::TemplateParameter { nested_level, .. } =
                   template_arguments[0].base
                 {
                   nested_level
@@ -223,7 +221,7 @@ pub fn find_template_instantiations_step() -> ProcessingStep {
 #[cfg_attr(feature = "clippy", allow(block_in_if_condition_stmt))]
 fn find_template_instantiations(data: ProcessorData) -> Result<()> {
   fn check_type(type1: &CppType, data: &ProcessorData, result: &mut Vec<CppTemplateInstantiation>) {
-    if let CppTypeBase::Class(CppTypeClassBase {
+    if let CppType::Class(CppClassType {
       ref name,
       ref template_arguments,
     }) = type1.base

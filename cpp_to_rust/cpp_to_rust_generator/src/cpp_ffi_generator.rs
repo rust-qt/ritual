@@ -12,8 +12,9 @@ use cpp_ffi_data::{CppCast, CppFfiFunction, CppFfiFunctionKind, CppFieldAccessor
 use cpp_function::ReturnValueAllocationPlace;
 use cpp_function::{CppFunction, CppFunctionArgument, CppFunctionKind, CppFunctionMemberData};
 use cpp_type::CppFunctionPointerType;
+use cpp_type::CppPointerLikeTypeKind;
 use cpp_type::CppTypeRole;
-use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
+use cpp_type::{CppClassType, CppType};
 use new_impl::database::CppItemData;
 use new_impl::processor::ProcessingStep;
 use new_impl::processor::ProcessorData;
@@ -177,22 +178,20 @@ fn create_cast_method(
 /// and base types of `base_type`.
 fn generate_casts_one(
   data: &[CppBaseSpecifier],
-  target_type: &CppTypeClassBase,
-  base_type: &CppTypeClassBase,
+  target_type: &CppClassType,
+  base_type: &CppClassType,
   direct_base_index: Option<usize>,
   name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiFunction>> {
-  let target_ptr_type = CppType {
-    base: CppTypeBase::Class(target_type.clone()),
-    indirection: CppTypeIndirection::Ptr,
+  let target_ptr_type = CppType::PointerLike {
     is_const: false,
-    is_const2: false,
+    kind: CppPointerLikeTypeKind::Pointer,
+    target: Box::new(CppType::Class(target_type.clone())),
   };
-  let base_ptr_type = CppType {
-    base: CppTypeBase::Class(base_type.clone()),
-    indirection: CppTypeIndirection::Ptr,
+  let base_ptr_type = CppType::PointerLike {
     is_const: false,
-    is_const2: false,
+    kind: CppPointerLikeTypeKind::Pointer,
+    target: Box::new(CppType::Class(base_type.clone())),
   };
   let mut new_methods = Vec::new();
   new_methods.push(create_cast_method(
@@ -254,7 +253,7 @@ fn generate_casts(
 
 fn generate_ffi_methods_for_method(
   method: &CppFunction,
-  stack_allocated_types: &[CppTypeClassBase],
+  stack_allocated_types: &[CppClassType],
   name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiFunction>> {
   let mut methods = Vec::new();
@@ -293,7 +292,7 @@ fn generate_ffi_methods_for_method(
 /// - adds "output" argument for return value if `allocation_place` is `Stack`.
 fn to_ffi_method(
   method: &CppFunction,
-  stack_allocated_types: &[CppTypeClassBase],
+  stack_allocated_types: &[CppClassType],
   name_provider: &mut FfiNameProvider,
 ) -> Result<CppFfiFunction> {
   if method.allows_variadic_arguments {
@@ -315,12 +314,12 @@ fn to_ffi_method(
     if !info.is_static && info.kind != CppFunctionKind::Constructor {
       r.arguments.push(CppFfiFunctionArgument {
         name: "this_ptr".to_string(),
-        argument_type: CppType {
-          base: CppTypeBase::Class(info.class_type.clone()),
-          is_const: info.is_const,
-          is_const2: false,
-          indirection: CppTypeIndirection::Ptr,
-        }.to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
+        argument_type: CppType::PointerLike {
+          is_const: false,
+          kind: CppPointerLikeTypeKind::Pointer,
+          target: Box::new(CppType::Class(info.class_type.clone())),
+        }
+        .to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
         meaning: CppFfiArgumentMeaning::This,
       });
     }
@@ -336,17 +335,14 @@ fn to_ffi_method(
     });
   }
   let type_for_place = match method.member {
-    Some(ref info) if info.kind.is_constructor() || info.kind.is_destructor() => CppType {
-      is_const: false,
-      is_const2: false,
-      indirection: CppTypeIndirection::None,
-      base: CppTypeBase::Class(info.class_type.clone()),
-    },
+    Some(ref info) if info.kind.is_constructor() || info.kind.is_destructor() => {
+      CppType::Class(info.class_type.clone())
+    }
     _ => method.return_type.clone(),
   };
   let c_type = type_for_place.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
   if type_for_place.needs_allocation_place_variants() {
-    if let CppTypeBase::Class(ref base) = type_for_place.base {
+    if let CppType::Class(ref base) = type_for_place.base {
       if stack_allocated_types.iter().any(|t| t == base) {
         r.arguments.push(CppFfiFunctionArgument {
           name: "output".to_string(),
@@ -372,7 +368,7 @@ fn to_ffi_method(
 /// Adds fictional getter and setter methods for each known public field of each class.
 fn generate_field_accessors(
   field: &CppClassField,
-  stack_allocated_types: &[CppTypeClassBase],
+  stack_allocated_types: &[CppClassType],
   name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiFunction>> {
   // TODO: fix doc generator for field accessors
@@ -411,14 +407,17 @@ fn generate_field_accessors(
     Ok(ffi_method)
   };
   if field.visibility == CppVisibility::Public {
-    if field.field_type.indirection == CppTypeIndirection::None && field.field_type.base.is_class()
-    {
-      let mut type2_const = field.field_type.clone();
-      type2_const.is_const = true;
-      type2_const.indirection = CppTypeIndirection::Ref;
-      let mut type2_mut = field.field_type.clone();
-      type2_mut.is_const = false;
-      type2_mut.indirection = CppTypeIndirection::Ref;
+    if field.field_type.is_class() {
+      let type2_const = CppType::PointerLike {
+        is_const: true,
+        kind: CppPointerLikeTypeKind::Reference,
+        target: Box::new(field.field_type.clone()),
+      };
+      let type2_mut = CppType::PointerLike {
+        is_const: false,
+        kind: CppPointerLikeTypeKind::Reference,
+        target: Box::new(field.field_type.clone()),
+      };
       new_methods.push(create_method(
         field.name.clone(),
         CppFieldAccessorType::ConstRefGetter,
@@ -501,11 +500,10 @@ fn generate_slot_wrapper(
 ) -> Result<(QtSlotWrapper, Vec<CppFfiFunction>)> {
   let ffi_types = arguments.map_if_ok(|t| t.to_cpp_ffi_type(CppTypeRole::NotReturnType))?;
 
-  let void_ptr = CppType {
-    base: CppTypeBase::Void,
-    indirection: CppTypeIndirection::Ptr,
+  let void_ptr = CppType::PointerLike {
     is_const: false,
-    is_const2: false,
+    kind: CppPointerLikeTypeKind::Pointer,
+    target: Box::new(CppType::Void),
   };
   let func_arguments = once(void_ptr.clone())
     .chain(ffi_types.iter().map(|t| t.ffi_type.clone()))
@@ -524,7 +522,7 @@ fn generate_slot_wrapper(
     CppFunction {
       name: name,
       member: Some(CppFunctionMemberData {
-        class_type: CppTypeClassBase {
+        class_type: CppClassType {
           name: class_name.clone(),
           template_arguments: None,
         },
@@ -562,12 +560,7 @@ fn generate_slot_wrapper(
   let method_set_args = vec![
     CppFunctionArgument {
       name: "func".to_string(),
-      argument_type: CppType {
-        base: CppTypeBase::FunctionPointer(function_type.clone()),
-        indirection: CppTypeIndirection::None,
-        is_const: false,
-        is_const2: false,
-      },
+      argument_type: CppType::FunctionPointer(function_type.clone()),
       has_default_value: false,
     },
     CppFunctionArgument {
@@ -600,11 +593,11 @@ fn generate_slot_wrapper(
   let receiver_id = method_custom_slot.receiver_id()?;
   methods.push(method_custom_slot);
   let class_bases = vec![CppBaseSpecifier {
-    derived_class_type: CppTypeClassBase {
+    derived_class_type: CppClassType {
       name: class_name.clone(),
       template_arguments: None,
     },
-    base_class_type: CppTypeClassBase {
+    base_class_type: CppClassType {
       name: "QObject".to_string(),
       template_arguments: None,
     },

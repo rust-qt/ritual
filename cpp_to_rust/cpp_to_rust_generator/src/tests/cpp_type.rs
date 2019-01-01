@@ -1,9 +1,8 @@
 use caption_strategy::TypeCaptionStrategy;
 use cpp_ffi_data::CppTypeConversionToFfi;
 use cpp_type::{
-  CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
-  CppSpecificNumericTypeKind, CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection,
-  CppTypeRole,
+  CppBuiltInNumericType, CppClassType, CppFunctionPointerType, CppSpecificNumericType,
+  CppSpecificNumericTypeKind, CppType, CppTypeIndirection, CppTypeRole,
 };
 
 fn assert_type_to_ffi_unchanged(t: &CppType) {
@@ -42,7 +41,7 @@ fn void_ptr() {
     indirection: CppTypeIndirection::Ptr,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::Void,
+    base: CppType::Void,
   };
   assert_eq!(type1.is_void(), false);
   assert_eq!(type1.base.is_void(), true);
@@ -71,7 +70,7 @@ fn int() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+    base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
   };
   assert_eq!(type1.is_void(), false);
   assert_eq!(type1.base.is_void(), false);
@@ -97,7 +96,7 @@ fn bool_ptr() {
     indirection: CppTypeIndirection::Ptr,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
+    base: CppType::BuiltInNumeric(CppBuiltInNumericType::Bool),
   };
   assert_eq!(type1.is_void(), false);
   assert_eq!(type1.base.is_void(), false);
@@ -126,7 +125,7 @@ fn char_ptr_ptr() {
     indirection: CppTypeIndirection::PtrPtr,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Char),
+    base: CppType::BuiltInNumeric(CppBuiltInNumericType::Char),
   };
   assert_eq!(type1.is_void(), false);
   assert_eq!(type1.base.is_void(), false);
@@ -155,7 +154,7 @@ fn qint64() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::SpecificNumeric(CppSpecificNumericType {
+    base: CppType::SpecificNumeric(CppSpecificNumericType {
       name: "qint64".to_string(),
       bits: 64,
       kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
@@ -185,7 +184,7 @@ fn quintptr() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::PointerSizedInteger {
+    base: CppType::PointerSizedInteger {
       name: "quintptr".to_string(),
       is_signed: false,
     },
@@ -220,7 +219,7 @@ fn enum1() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::Enum {
+    base: CppType::Enum {
       name: "Qt::CaseSensitivity".to_string(),
     },
   };
@@ -254,7 +253,7 @@ fn class_value() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::Class(CppTypeClassBase {
+    base: CppType::Class(CppClassType {
       name: "QPoint".to_string(),
       template_arguments: None,
     }),
@@ -282,7 +281,7 @@ fn class_value() {
       indirection: CppTypeIndirection::Ptr,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::Class(CppTypeClassBase {
+      base: CppType::Class(CppClassType {
         name: "QPoint".to_string(),
         template_arguments: None,
       }),
@@ -305,7 +304,7 @@ fn class_value() {
       indirection: CppTypeIndirection::Ptr,
       is_const: true,
       is_const2: false,
-      base: CppTypeBase::Class(CppTypeClassBase {
+      base: CppType::Class(CppClassType {
         name: "QPoint".to_string(),
         template_arguments: None,
       }),
@@ -325,7 +324,7 @@ fn class_const_ref() {
     indirection: CppTypeIndirection::Ref,
     is_const: true,
     is_const2: false,
-    base: CppTypeBase::Class(CppTypeClassBase {
+    base: CppType::Class(CppClassType {
       name: "QRectF".to_string(),
       template_arguments: None,
     }),
@@ -357,7 +356,7 @@ fn class_const_ref() {
         indirection: CppTypeIndirection::Ptr,
         is_const: true,
         is_const2: false,
-        base: CppTypeBase::Class(CppTypeClassBase {
+        base: CppType::Class(CppClassType {
           name: "QRectF".to_string(),
           template_arguments: None,
         }),
@@ -375,7 +374,7 @@ fn class_mut_ref() {
     indirection: CppTypeIndirection::Ref,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::Class(CppTypeClassBase {
+    base: CppType::Class(CppClassType {
       name: "QRectF".to_string(),
       template_arguments: None,
     }),
@@ -407,7 +406,7 @@ fn class_mut_ref() {
         indirection: CppTypeIndirection::Ptr,
         is_const: false,
         is_const2: false,
-        base: CppTypeBase::Class(CppTypeClassBase {
+        base: CppType::Class(CppClassType {
           name: "QRectF".to_string(),
           template_arguments: None,
         }),
@@ -425,7 +424,7 @@ fn class_mut_ptr() {
     indirection: CppTypeIndirection::Ptr,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::Class(CppTypeClassBase {
+    base: CppType::Class(CppClassType {
       name: "QObject".to_string(),
       template_arguments: None,
     }),
@@ -460,7 +459,7 @@ fn class_with_template_args() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::Class(CppTypeClassBase {
+    base: CppType::Class(CppClassType {
       name: "QString".to_string(),
       template_arguments: None,
     }),
@@ -469,7 +468,7 @@ fn class_with_template_args() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::Class(CppTypeClassBase {
+    base: CppType::Class(CppClassType {
       name: "QVector".to_string(),
       template_arguments: args.clone(),
     }),
@@ -503,7 +502,7 @@ fn class_with_template_args() {
       indirection: CppTypeIndirection::Ptr,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::Class(CppTypeClassBase {
+      base: CppType::Class(CppClassType {
         name: "QVector".to_string(),
         template_arguments: args.clone(),
       }),
@@ -526,7 +525,7 @@ fn class_with_template_args() {
       indirection: CppTypeIndirection::Ptr,
       is_const: true,
       is_const2: false,
-      base: CppTypeBase::Class(CppTypeClassBase {
+      base: CppType::Class(CppClassType {
         name: "QVector".to_string(),
         template_arguments: args.clone(),
       }),
@@ -546,14 +545,14 @@ fn nested_template_cpp_code() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::Class(CppTypeClassBase {
+    base: CppType::Class(CppClassType {
       name: "QHash".to_string(),
       template_arguments: Some(vec![
         CppType {
           indirection: CppTypeIndirection::None,
           is_const: false,
           is_const2: false,
-          base: CppTypeBase::Class(CppTypeClassBase {
+          base: CppType::Class(CppClassType {
             name: "QString".to_string(),
             template_arguments: None,
           }),
@@ -562,13 +561,13 @@ fn nested_template_cpp_code() {
           indirection: CppTypeIndirection::None,
           is_const: false,
           is_const2: false,
-          base: CppTypeBase::Class(CppTypeClassBase {
+          base: CppType::Class(CppClassType {
             name: "QList".to_string(),
             template_arguments: Some(vec![CppType {
               indirection: CppTypeIndirection::None,
               is_const: false,
               is_const2: false,
-              base: CppTypeBase::Class(CppTypeClassBase {
+              base: CppType::Class(CppClassType {
                 name: "QString".to_string(),
                 template_arguments: None,
               }),
@@ -590,7 +589,7 @@ fn qflags() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::Class(CppTypeClassBase {
+    base: CppType::Class(CppClassType {
       name: "Qt::AlignmentFlag".to_string(),
       template_arguments: None,
     }),
@@ -599,7 +598,7 @@ fn qflags() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::Class(CppTypeClassBase {
+    base: CppType::Class(CppClassType {
       name: "QFlags".to_string(),
       template_arguments: args.clone(),
     }),
@@ -640,7 +639,7 @@ fn qflags() {
         indirection: CppTypeIndirection::None,
         is_const: false,
         is_const2: false,
-        base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::UInt),
+        base: CppType::BuiltInNumeric(CppBuiltInNumericType::UInt),
       }
     );
     assert_eq!(
@@ -657,7 +656,7 @@ fn create_template_parameter_type() -> CppType {
     indirection: CppTypeIndirection::Ptr,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::TemplateParameter {
+    base: CppType::TemplateParameter {
       nested_level: 0,
       index: 0,
     },
@@ -690,26 +689,26 @@ fn function1() {
     is_const: false,
     is_const2: false,
     indirection: CppTypeIndirection::None,
-    base: CppTypeBase::FunctionPointer(CppFunctionPointerType {
+    base: CppType::FunctionPointer(CppFunctionPointerType {
       allows_variadic_arguments: false,
       return_type: Box::new(CppType {
         indirection: CppTypeIndirection::None,
         is_const: false,
         is_const2: false,
-        base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+        base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
       }),
       arguments: vec![
         CppType {
           indirection: CppTypeIndirection::None,
           is_const: false,
           is_const2: false,
-          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+          base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
         },
         CppType {
           indirection: CppTypeIndirection::Ptr,
           is_const: false,
           is_const2: false,
-          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
+          base: CppType::BuiltInNumeric(CppBuiltInNumericType::Bool),
         },
       ],
     }),
@@ -752,7 +751,7 @@ fn instantiate1() {
     indirection: CppTypeIndirection::Ref,
     is_const: true,
     is_const2: false,
-    base: CppTypeBase::TemplateParameter {
+    base: CppType::TemplateParameter {
       nested_level: 0,
       index: 0,
     },
@@ -761,13 +760,10 @@ fn instantiate1() {
     indirection: CppTypeIndirection::Ptr,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool),
+    base: CppType::BuiltInNumeric(CppBuiltInNumericType::Bool),
   };
   let r = type1.instantiate(0, &[type2]).unwrap();
-  assert_eq!(
-    r.base,
-    CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Bool)
-  );
+  assert_eq!(r.base, CppType::BuiltInNumeric(CppBuiltInNumericType::Bool));
   assert_eq!(r.indirection, CppTypeIndirection::PtrRef);
   assert_eq!(r.is_const, false);
   assert_eq!(r.is_const2, true);

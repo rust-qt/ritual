@@ -8,9 +8,10 @@ use cpp_ffi_data::{
   CppTypeConversionToFfi, QtSlotWrapper,
 };
 use cpp_function::ReturnValueAllocationPlace;
-use cpp_type::{CppType, CppTypeBase, CppTypeIndirection};
+use cpp_type::CppType;
 
 use cpp_ffi_data::CppFfiFunction;
+use cpp_type::CppPointerLikeTypeKind;
 use new_impl::database::DatabaseItem;
 use std::iter::once;
 use std::path::Path;
@@ -26,7 +27,7 @@ fn function_signature(method: &CppFfiFunction) -> Result<String> {
   }
   let name_with_args = format!("{}({})", method.name, arg_texts.join(", "));
   let return_type = &method.return_type.ffi_type;
-  let r = if let CppTypeBase::FunctionPointer(..) = return_type.base {
+  let r = if let CppType::FunctionPointer(..) = return_type.base {
     return_type.to_cpp_code(Some(&name_with_args))?
   } else {
     format!("{} {}", return_type.to_cpp_code(None)?, name_with_args)
@@ -36,12 +37,7 @@ fn function_signature(method: &CppFfiFunction) -> Result<String> {
 
 /// Generates code for a Qt slot wrapper
 fn qt_slot_wrapper(wrapper: &QtSlotWrapper) -> Result<String> {
-  let func_type = CppType {
-    base: CppTypeBase::FunctionPointer(wrapper.function_type.clone()),
-    indirection: CppTypeIndirection::None,
-    is_const: false,
-    is_const2: false,
-  };
+  let func_type = CppType::FunctionPointer(wrapper.function_type.clone());
   let method_args = wrapper
     .arguments
     .iter()
@@ -51,11 +47,13 @@ fn qt_slot_wrapper(wrapper: &QtSlotWrapper) -> Result<String> {
     })?
     .join(", ");
   let func_args = once("m_data".to_string())
-    .chain(wrapper
-      .arguments
-      .iter()
-      .enumerate()
-      .map_if_ok(|(num, t)| convert_type_to_ffi(t, format!("arg{}", num)))?)
+    .chain(
+      wrapper
+        .arguments
+        .iter()
+        .enumerate()
+        .map_if_ok(|(num, t)| convert_type_to_ffi(t, format!("arg{}", num)))?,
+    )
     .join(", ");
   Ok(format!(
     include_str!("../templates/c_lib/qt_slot_wrapper.h"),
@@ -160,14 +158,17 @@ fn arguments_values(method: &CppFfiFunction) -> Result<String> {
         }
         CppTypeConversionToFfi::NoChange => {}
         CppTypeConversionToFfi::QFlagsToUInt => {
-          let type_text = if argument.argument_type.original_type.indirection
-            == CppTypeIndirection::Ref
-            && argument.argument_type.original_type.is_const
+          let type_text = if let CppType::PointerLike {
+            ref kind,
+            ref is_const,
+            ref target,
+          } = argument.argument_type.original_type
           {
-            let mut fake_type = argument.argument_type.original_type.clone();
-            fake_type.is_const = false;
-            fake_type.indirection = CppTypeIndirection::None;
-            fake_type.to_cpp_code(None)?
+            if *kind == CppPointerLikeTypeKind::Reference && *is_const {
+              target.to_cpp_code(None)?
+            } else {
+              return Err("Unsupported original type for QFlagsToUInt conversion".into());
+            }
           } else {
             argument.argument_type.original_type.to_cpp_code(None)?
           };
@@ -304,7 +305,8 @@ fn source_body(method: &CppFfiFunction) -> Result<String> {
     .kind
     .cpp_function()
     .map(|m| m.is_destructor())
-    .unwrap_or(false) && method.allocation_place == ReturnValueAllocationPlace::Heap
+    .unwrap_or(false)
+    && method.allocation_place == ReturnValueAllocationPlace::Heap
   {
     if let Some(arg) = method
       .arguments

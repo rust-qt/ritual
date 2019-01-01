@@ -122,10 +122,12 @@ pub fn fix_header_names(data: &mut [DatabaseItem], headers_dir: &PathBuf) -> Res
 #[test]
 fn test_qt_fix_header_names() {
   use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
-  let map = HeaderNameMap::new(&PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-    .with_added("test_assets")
-    .with_added("qt_headers"))
-    .unwrap();
+  let map = HeaderNameMap::new(
+    &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+      .with_added("test_assets")
+      .with_added("qt_headers"),
+  )
+  .unwrap();
   assert_eq!(map.real_to_fancy("qfile.h", None), "QFile");
   assert_eq!(map.real_to_fancy("qfile.h", Some("QFile")), "QFile");
   assert_eq!(map.real_to_fancy("qnotmap.h", None), "qnotmap.h");

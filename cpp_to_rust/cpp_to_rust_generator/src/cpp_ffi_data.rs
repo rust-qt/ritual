@@ -1,7 +1,7 @@
 use common::errors::Result;
 use cpp_data::CppClassField;
 use cpp_function::{CppFunction, ReturnValueAllocationPlace};
-use cpp_type::{CppFunctionPointerType, CppType, CppTypeBase};
+use cpp_type::{CppFunctionPointerType, CppType};
 use new_impl::database::CppCheckerInfoList;
 
 /// Variation of a field accessor method
@@ -161,7 +161,7 @@ impl CppFfiFunctionArgument {
   /// Generates C++ code for the part of FFI function signature
   /// corresponding to this argument
   pub fn to_cpp_code(&self) -> Result<String> {
-    if let CppTypeBase::FunctionPointer(..) = self.argument_type.ffi_type.base {
+    if let CppType::FunctionPointer(..) = self.argument_type.ffi_type.base {
       Ok(self.argument_type.ffi_type.to_cpp_code(Some(&self.name))?)
     } else {
       Ok(format!(

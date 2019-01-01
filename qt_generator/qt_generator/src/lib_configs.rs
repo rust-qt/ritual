@@ -265,76 +265,76 @@ pub fn core(config: &mut Config) -> Result<()> {
 /// QtGui specific configuration.
 pub fn gui(config: &mut Config) -> Result<()> {
   /*
-  config.add_cpp_parser_blocked_names(vec![
-    "QAbstractOpenGLFunctionsPrivate",
-    "QOpenGLFunctionsPrivate",
-    "QOpenGLExtraFunctionsPrivate",
-    "QKeySequence::isDetached",
-    "QBrushData",
-    "QAccessible::ActivationObserver",
-    "QAccessibleImageInterface",
-    "QAccessibleBridge",
-    "QAccessibleBridgePlugin",
-    "QAccessibleApplication",
-    "QOpenGLVersionStatus",
-    "QOpenGLVersionFunctionsBackend",
-    "QOpenGLVersionFunctionsStorage",
-    "QOpenGLTexture::TextureFormatClass",
-    "QTextFrameLayoutData",
-  ]);
-  exclude_qvector_eq_based_methods(
-    config,
-    &[
-      "QTextLayout::FormatRange",
-      "QAbstractTextDocumentLayout::Selection",
-    ],
-  );
-  exclude_qlist_eq_based_methods(
-    config,
-    &[
-      "QInputMethodEvent::Attribute",
-      "QTextLayout::FormatRange",
-      "QTouchEvent::TouchPoint",
-    ],
-  );
-  config.add_cpp_ffi_generator_filter(|method| {
-    if let Some(ref info) = method.class_membership {
-      match info.class_type.to_cpp_pseudo_code().as_ref() {
-        "QQueue<QInputMethodEvent::Attribute>"
-        | "QQueue<QTextLayout::FormatRange>"
-        | "QQueue<QTouchEvent::TouchPoint>" => match method.name.as_ref() {
-          "operator==" | "operator!=" => return Ok(false),
-          _ => {}
-        },
-        "QStack<QInputMethodEvent::Attribute>" | "QStack<QTextLayout::FormatRange>" => {
-          match method.name.as_ref() {
-            "operator==" | "operator!=" | "fromList" => return Ok(false),
+    config.add_cpp_parser_blocked_names(vec![
+      "QAbstractOpenGLFunctionsPrivate",
+      "QOpenGLFunctionsPrivate",
+      "QOpenGLExtraFunctionsPrivate",
+      "QKeySequence::isDetached",
+      "QBrushData",
+      "QAccessible::ActivationObserver",
+      "QAccessibleImageInterface",
+      "QAccessibleBridge",
+      "QAccessibleBridgePlugin",
+      "QAccessibleApplication",
+      "QOpenGLVersionStatus",
+      "QOpenGLVersionFunctionsBackend",
+      "QOpenGLVersionFunctionsStorage",
+      "QOpenGLTexture::TextureFormatClass",
+      "QTextFrameLayoutData",
+    ]);
+    exclude_qvector_eq_based_methods(
+      config,
+      &[
+        "QTextLayout::FormatRange",
+        "QAbstractTextDocumentLayout::Selection",
+      ],
+    );
+    exclude_qlist_eq_based_methods(
+      config,
+      &[
+        "QInputMethodEvent::Attribute",
+        "QTextLayout::FormatRange",
+        "QTouchEvent::TouchPoint",
+      ],
+    );
+    config.add_cpp_ffi_generator_filter(|method| {
+      if let Some(ref info) = method.class_membership {
+        match info.class_type.to_cpp_pseudo_code().as_ref() {
+          "QQueue<QInputMethodEvent::Attribute>"
+          | "QQueue<QTextLayout::FormatRange>"
+          | "QQueue<QTouchEvent::TouchPoint>" => match method.name.as_ref() {
+            "operator==" | "operator!=" => return Ok(false),
             _ => {}
+          },
+          "QStack<QInputMethodEvent::Attribute>" | "QStack<QTextLayout::FormatRange>" => {
+            match method.name.as_ref() {
+              "operator==" | "operator!=" | "fromList" => return Ok(false),
+              _ => {}
+            }
           }
-        }
-        "QOpenGLVersionFunctionsStorage" => match method.name.as_ref() {
-          "QOpenGLVersionFunctionsStorage" | "~QOpenGLVersionFunctionsStorage" | "backend" => {
-            return Ok(false)
-          }
+          "QOpenGLVersionFunctionsStorage" => match method.name.as_ref() {
+            "QOpenGLVersionFunctionsStorage" | "~QOpenGLVersionFunctionsStorage" | "backend" => {
+              return Ok(false)
+            }
+            _ => {}
+          },
           _ => {}
-        },
-        _ => {}
+        }
+        if info.class_type.name.starts_with("QOpenGLFunctions_")
+          && (info.class_type.name.ends_with("_CoreBackend")
+            | info.class_type.name.ends_with("_CoreBackend::Functions")
+            | info.class_type.name.ends_with("_DeprecatedBackend")
+            | info
+              .class_type
+              .name
+              .ends_with("_DeprecatedBackend::Functions"))
+        {
+          return Ok(false);
+        }
       }
-      if info.class_type.name.starts_with("QOpenGLFunctions_")
-        && (info.class_type.name.ends_with("_CoreBackend")
-          | info.class_type.name.ends_with("_CoreBackend::Functions")
-          | info.class_type.name.ends_with("_DeprecatedBackend")
-          | info
-            .class_type
-            .name
-            .ends_with("_DeprecatedBackend::Functions"))
-      {
-        return Ok(false);
-      }
-    }
-    Ok(true)
-  });
-*/
+      Ok(true)
+    });
+  */
   Ok(())
 }
 

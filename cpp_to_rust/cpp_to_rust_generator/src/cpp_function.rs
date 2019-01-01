@@ -5,7 +5,8 @@ use common::string_utils::JoinWithSeparator;
 use common::utils::MapIfOk;
 use cpp_data::CppVisibility;
 pub use cpp_operator::{CppOperator, CppOperatorInfo};
-use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
+use cpp_type::CppPointerLikeTypeKind;
+use cpp_type::{CppClassType, CppType};
 
 /// Information about an argument of a C++ method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
@@ -37,7 +38,7 @@ pub enum CppFunctionKind {
 pub struct CppFunctionMemberData {
   /// Type of the class where this method belong. This is used to construct
   /// type of "this" pointer and return type of constructors.
-  pub class_type: CppTypeClassBase,
+  pub class_type: CppClassType,
   /// Whether this method is a constructor, a destructor or an operator
   pub kind: CppFunctionKind,
   /// True if this is a virtual method
@@ -193,7 +194,7 @@ impl CppFunction {
     if let Some(ref info) = self.member {
       format!(
         "{}::{}",
-        CppTypeBase::Class(info.class_type.clone()).to_cpp_pseudo_code(),
+        CppType::Class(info.class_type.clone()).to_cpp_pseudo_code(),
         self.name
       )
     } else {
@@ -354,11 +355,10 @@ impl CppFunction {
   pub fn all_involved_types(&self) -> Vec<CppType> {
     let mut result: Vec<CppType> = Vec::new();
     if let Some(ref class_membership) = self.member {
-      result.push(CppType {
-        base: CppTypeBase::Class(class_membership.class_type.clone()),
+      result.push(CppType::PointerLike {
         is_const: class_membership.is_const,
-        is_const2: false,
-        indirection: CppTypeIndirection::Ptr,
+        kind: CppPointerLikeTypeKind::Pointer,
+        target: Box::new(CppType::Class(class_membership.class_type.clone())),
       });
     }
     for t in self.arguments.iter().map(|x| x.argument_type.clone()) {

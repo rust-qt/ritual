@@ -144,16 +144,18 @@ pub fn rust_type_to_code(rust_type: &RustType, crate_name: &str) -> String {
 
 /// Executes the code generator with `config` on `data`.
 pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) -> Result<()> {
-  let template_rustfmt_config_path = config.crate_template_path.as_ref().and_then(
-    |crate_template_path| {
-      let template_rustfmt_config_path = crate_template_path.with_added("rustfmt.toml");
-      if template_rustfmt_config_path.exists() {
-        Some(template_rustfmt_config_path)
-      } else {
-        None
-      }
-    },
-  );
+  let template_rustfmt_config_path =
+    config
+      .crate_template_path
+      .as_ref()
+      .and_then(|crate_template_path| {
+        let template_rustfmt_config_path = crate_template_path.with_added("rustfmt.toml");
+        if template_rustfmt_config_path.exists() {
+          Some(template_rustfmt_config_path)
+        } else {
+          None
+        }
+      });
 
   let rustfmt_config_data = if let Some(template_rustfmt_config_path) = template_rustfmt_config_path
   {
@@ -225,16 +227,19 @@ impl<'a> RustCodeGenerator<'a> {
   /// If a crate template was supplied, files from it are
   /// copied to the output location.
   pub fn generate_template(&self) -> Result<()> {
-    let template_rustfmt_config_path = self.config.crate_template_path.as_ref().and_then(
-      |crate_template_path| {
-        let template_rustfmt_config_path = crate_template_path.with_added("rustfmt.toml");
-        if template_rustfmt_config_path.exists() {
-          Some(template_rustfmt_config_path)
-        } else {
-          None
-        }
-      },
-    );
+    let template_rustfmt_config_path =
+      self
+        .config
+        .crate_template_path
+        .as_ref()
+        .and_then(|crate_template_path| {
+          let template_rustfmt_config_path = crate_template_path.with_added("rustfmt.toml");
+          if template_rustfmt_config_path.exists() {
+            Some(template_rustfmt_config_path)
+          } else {
+            None
+          }
+        });
     let output_rustfmt_config_path = self.config.output_path.with_added("rustfmt.toml");
     if let Some(ref template_rustfmt_config_path) = template_rustfmt_config_path {
       copy_file(template_rustfmt_config_path, output_rustfmt_config_path)?;
@@ -243,16 +248,19 @@ impl<'a> RustCodeGenerator<'a> {
       rustfmt_file.write(include_str!("../templates/crate/rustfmt.toml"))?;
     }
 
-    let template_build_rs_path = self.config.crate_template_path.as_ref().and_then(
-      |crate_template_path| {
-        let template_build_rs_path = crate_template_path.with_added("build.rs");
-        if template_build_rs_path.exists() {
-          Some(template_build_rs_path)
-        } else {
-          None
-        }
-      },
-    );
+    let template_build_rs_path =
+      self
+        .config
+        .crate_template_path
+        .as_ref()
+        .and_then(|crate_template_path| {
+          let template_build_rs_path = crate_template_path.with_added("build.rs");
+          if template_build_rs_path.exists() {
+            Some(template_build_rs_path)
+          } else {
+            None
+          }
+        });
     let output_build_rs_path = self.config.output_path.with_added("build.rs");
     if let Some(ref template_build_rs_path) = template_build_rs_path {
       copy_file(template_build_rs_path, output_build_rs_path)?;
@@ -732,10 +740,12 @@ impl<'a> RustCodeGenerator<'a> {
             maybe_mut_declaration,
             arg.name,
             match lifetime {
-              Some(lifetime) => self.rust_type_to_code(&arg
-                .argument_type
-                .rust_api_type
-                .with_lifetime(lifetime.clone(),)),
+              Some(lifetime) => self.rust_type_to_code(
+                &arg
+                  .argument_type
+                  .rust_api_type
+                  .with_lifetime(lifetime.clone(),)
+              ),
               None => self.rust_type_to_code(&arg.argument_type.rust_api_type),
             }
           )
@@ -882,7 +892,8 @@ impl<'a> RustCodeGenerator<'a> {
             "Automatically generated module '{}' conflicts with a mandatory \
              module",
             name
-          ).into(),
+          )
+          .into(),
         );
       }
     }
@@ -892,7 +903,8 @@ impl<'a> RustCodeGenerator<'a> {
           format!(
             "Automatically generated module '{}' conflicts with a reserved name",
             name
-          ).into(),
+          )
+          .into(),
         );
       }
     }
@@ -976,26 +988,26 @@ impl<'a> RustCodeGenerator<'a> {
                 name = type1.name.last_name()?,
                 variants = values
                   .iter()
-                  .map(|item| {
-                    format!(
-                      "{}  {} = {}",
-                      format_doc(&doc_formatter::enum_value_doc(&item)),
-                      item.name,
-                      item.value
-                    )
-                  })
+                  .map(|item| format!(
+                    "{}  {} = {}",
+                    format_doc(&doc_formatter::enum_value_doc(&item)),
+                    item.name,
+                    item.value
+                  ))
                   .join(", \n")
               );
               if *is_flaggable {
-                r = r + &format!(
-                  include_str!("../templates/crate/impl_flaggable.rs.in"),
-                  name = type1.name.last_name()?,
-                  trait_type = RustName::new(vec![
-                    "qt_core".to_string(),
-                    "flags".to_string(),
-                    "FlaggableEnum".to_string(),
-                  ])?.full_name(Some(&self.config.crate_properties.name()))
-                );
+                r = r
+                  + &format!(
+                    include_str!("../templates/crate/impl_flaggable.rs.in"),
+                    name = type1.name.last_name()?,
+                    trait_type = RustName::new(vec![
+                      "qt_core".to_string(),
+                      "flags".to_string(),
+                      "FlaggableEnum".to_string(),
+                    ])?
+                    .full_name(Some(&self.config.crate_properties.name()))
+                  );
               }
               r
             }
@@ -1034,7 +1046,8 @@ impl<'a> RustCodeGenerator<'a> {
                   "qt_core".to_string(),
                   "object".to_string(),
                   "Object".to_string(),
-                ])?.full_name(Some(&self.config.crate_properties.name()));
+                ])?
+                .full_name(Some(&self.config.crate_properties.name()));
                 r.push_str(&format!(
                   include_str!("../templates/crate/extern_slot_impl_receiver.rs.in"),
                   type_name = type1
@@ -1069,7 +1082,8 @@ impl<'a> RustCodeGenerator<'a> {
               "qt_core".to_string(),
               "object".to_string(),
               "Object".to_string(),
-            ])?.full_name(Some(&self.config.crate_properties.name()));
+            ])?
+            .full_name(Some(&self.config.crate_properties.name()));
             let mut content = Vec::new();
             let obj_name = type1
               .name
@@ -1250,9 +1264,11 @@ impl<'a> {connections_mod}::Receiver for {type_name}<'a> {{
               .iter()
               .map(|t| {
                 if let Some(ref lifetime) = final_lifetime {
-                  self.rust_type_to_code(&t.argument_type
-                    .rust_api_type
-                    .with_lifetime(lifetime.to_string()))
+                  self.rust_type_to_code(
+                    &t.argument_type
+                      .rust_api_type
+                      .with_lifetime(lifetime.to_string()),
+                  )
                 } else {
                   self.rust_type_to_code(&t.argument_type.rust_api_type)
                 }
@@ -1267,10 +1283,12 @@ impl<'a> {connections_mod}::Receiver for {type_name}<'a> {{
               }
             }
             let return_type_string = match final_lifetime {
-              Some(ref lifetime) => self.rust_type_to_code(&variant
-                .return_type
-                .rust_api_type
-                .with_lifetime(lifetime.to_string())),
+              Some(ref lifetime) => self.rust_type_to_code(
+                &variant
+                  .return_type
+                  .rust_api_type
+                  .with_lifetime(lifetime.to_string()),
+              ),
               None => self.rust_type_to_code(&variant.return_type.rust_api_type),
             };
             let return_type_decl = if common_return_type.is_some() {
@@ -1341,7 +1359,8 @@ impl<'a> {connections_mod}::Receiver for {type_name}<'a> {{
                 "qt_core".to_string(),
                 "object".to_string(),
                 "Object".to_string(),
-              ])?.full_name(Some(&self.config.crate_properties.name()));
+              ])?
+              .full_name(Some(&self.config.crate_properties.name()));
               let callback_args = slot_wrapper
                 .arguments
                 .iter()
@@ -1450,9 +1469,11 @@ impl<'a> {connections_mod}::Receiver for {type_name}<'a> {{
         file.write(code)?;
         file.write(&template[index + INCLUDE_GENERATED_MARKER.len()..])?;
       } else {
-        let name = os_str_to_str(path
-          .file_name()
-          .chain_err(|| unexpected("no file name in path"))?)?;
+        let name = os_str_to_str(
+          path
+            .file_name()
+            .chain_err(|| unexpected("no file name in path"))?,
+        )?;
         let e = format!(
           "Generated source file {} conflicts with the crate template. \
            Use \"include_generated!();\" macro in the crate template to merge files or block \

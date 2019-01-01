@@ -15,8 +15,7 @@ use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
 use cpp_type::{
   CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
-  CppSpecificNumericTypeKind, CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection,
-  CppTypeRole,
+  CppSpecificNumericTypeKind, CppType, CppTypeClassBase, CppTypeIndirection, CppTypeRole,
 };
 use doc_formatter;
 use rust_info::{
@@ -396,7 +395,8 @@ impl<'a> RustGeneratorInputData<'a> {
         ));
         let full_module_name =
           RustName::new(vec![generator.input_data.crate_name.clone(), module_name])?;
-        let (module, tmp_cpp_methods) = generator.generate_module(cpp_methods, &full_module_name)?;
+        let (module, tmp_cpp_methods) =
+          generator.generate_module(cpp_methods, &full_module_name)?;
         cpp_methods = tmp_cpp_methods;
         if let Some(module) = module {
           modules.push(module);
@@ -511,7 +511,8 @@ fn complete_type(
               unexpected(
                 "find_type_info failed in complete_type() after success in \
                  ffi_type()",
-              ).into(),
+              )
+              .into(),
             );
           }
           match *allocation_place {
@@ -680,11 +681,13 @@ fn ffi_type(
       ref bits, ref kind, ..
     }) => {
       let letter = match *kind {
-        CppSpecificNumericTypeKind::Integer { ref is_signed } => if *is_signed {
-          "i"
-        } else {
-          "u"
-        },
+        CppSpecificNumericTypeKind::Integer { ref is_signed } => {
+          if *is_signed {
+            "i"
+          } else {
+            "u"
+          }
+        }
         CppSpecificNumericTypeKind::FloatingPoint => "f",
       };
       RustName::new(vec![format!("{}{}", letter, bits)])?
@@ -740,7 +743,8 @@ fn ffi_type(
           format!(
             "invalid FFI type indirection: {:?}",
             cpp_ffi_type.indirection
-          ).into(),
+          )
+          .into(),
         )
       }
     },
@@ -852,7 +856,8 @@ impl<'aa> RustGenerator<'aa> {
                 .processed
                 .inherited_methods
                 .iter(),
-            ) {
+            )
+          {
             if let Some(ref info) = method.class_membership {
               if &info.class_type == &class_type && (info.is_signal || info.is_slot) {
                 add_to_multihash(
@@ -879,8 +884,9 @@ impl<'aa> RustGenerator<'aa> {
                           &CppFfiArgumentMeaning::Argument(0),
                           false,
                           &ReturnValueAllocationPlace::NotApplicable,
-                        )?.rust_api_type
-                          .with_lifetime("static".to_string()),
+                        )?
+                        .rust_api_type
+                        .with_lifetime("static".to_string()),
                       )
                     })?,
                   },
@@ -903,7 +909,8 @@ impl<'aa> RustGenerator<'aa> {
                     r.method_name,
                     r.arguments
                       .iter()
-                      .map(|x| x.caption(&info.rust_name,)
+                      .map(|x| x
+                        .caption(&info.rust_name,)
                         .expect("receiver argument caption failed",))
                       .join("_")
                   );
@@ -1218,13 +1225,12 @@ impl<'aa> RustGenerator<'aa> {
 
       if !cpp_cast.is_unsafe_static_cast() && cpp_cast.is_direct_static_cast() {
         let mut deref_method = final_method.clone();
-        deref_method.name = RustName::new(vec![
-          if *final_is_const {
-            "deref"
-          } else {
-            "deref_mut"
-          }.to_string(),
-        ])?;
+        deref_method.name = RustName::new(vec![if *final_is_const {
+          "deref"
+        } else {
+          "deref_mut"
+        }
+        .to_string()])?;
         let deref_trait_name = if *final_is_const { "Deref" } else { "DerefMut" }.to_string();
         let associated_types = if *final_is_const {
           vec![TraitAssociatedType {
@@ -1305,7 +1311,10 @@ impl<'aa> RustGenerator<'aa> {
       let cpp_method_name = first_method.arguments.cpp_method.cpp_method.full_name();
       let mut args_variants = Vec::new();
       let mut method_name = first_method.name.clone();
-      let mut method_last_name = method_name.parts.pop().chain_err(|| "name can't be empty")?;
+      let mut method_last_name = method_name
+        .parts
+        .pop()
+        .chain_err(|| "name can't be empty")?;
       if let Some(self_arg_kind_caption) = self_arg_kind_caption {
         method_last_name =
           vec![method_last_name.as_ref(), self_arg_kind_caption.as_ref()].to_snake_case();
@@ -1450,7 +1459,11 @@ impl<'aa> RustGenerator<'aa> {
       let mut method = filtered_methods
         .pop()
         .chain_err(|| "filtered_methods can't be empty")?;
-      let mut last_name = method.name.parts.pop().chain_err(|| "name can't be empty")?;
+      let mut last_name = method
+        .name
+        .parts
+        .pop()
+        .chain_err(|| "name can't be empty")?;
       if let Some(self_arg_kind_caption) = self_arg_kind_caption {
         last_name = vec![last_name.as_ref(), self_arg_kind_caption.as_ref()].to_snake_case();
       }
@@ -2492,7 +2505,8 @@ impl RustSingleMethod {
             && !(arg1.name == "allocation_place_marker"
               && arg2.name == "allocation_place_marker"
               && arg1 != arg2)
-        }) {
+        })
+      {
         return Ok(false);
       }
     }

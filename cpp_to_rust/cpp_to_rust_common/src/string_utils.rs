@@ -99,7 +99,8 @@ fn iterator_to_class_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String
         x.as_ref()[1..].to_lowercase()
       )
     }
-  }).join("")
+  })
+  .join("")
 }
 
 fn ends_with_digit<S: AsRef<str>>(s: S) -> bool {

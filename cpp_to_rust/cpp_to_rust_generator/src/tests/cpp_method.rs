@@ -29,7 +29,7 @@ pub fn empty_membership(class_name: &'static str) -> CppFunctionMemberData {
     visibility: CppVisibility::Public,
     is_signal: false,
     is_slot: false,
-    class_type: CppTypeClassBase {
+    class_type: CppClassType {
       name: class_name.to_string(),
       template_arguments: None,
     },
@@ -72,7 +72,7 @@ fn argument_types_equal2() {
       indirection: CppTypeIndirection::None,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+      base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "arg1".to_string(),
     has_default_value: false,
@@ -90,7 +90,7 @@ fn argument_types_equal3() {
       indirection: CppTypeIndirection::None,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+      base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "arg1".to_string(),
     has_default_value: false,
@@ -100,7 +100,7 @@ fn argument_types_equal3() {
       indirection: CppTypeIndirection::None,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+      base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "x".to_string(),
     has_default_value: false,
@@ -118,7 +118,7 @@ fn argument_types_equal4() {
       indirection: CppTypeIndirection::None,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+      base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "arg1".to_string(),
     has_default_value: false,
@@ -128,7 +128,7 @@ fn argument_types_equal4() {
       indirection: CppTypeIndirection::None,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+      base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "arg1".to_string(),
     has_default_value: true,
@@ -146,7 +146,7 @@ fn argument_types_equal5() {
       indirection: CppTypeIndirection::None,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+      base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "arg1".to_string(),
     has_default_value: false,
@@ -156,7 +156,7 @@ fn argument_types_equal5() {
       indirection: CppTypeIndirection::None,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::Enum {
+      base: CppType::Enum {
         name: "Enum1".to_string(),
       },
     },
@@ -176,7 +176,7 @@ fn argument_types_equal6() {
       indirection: CppTypeIndirection::None,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+      base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "arg1".to_string(),
     has_default_value: false,
@@ -186,7 +186,7 @@ fn argument_types_equal6() {
       indirection: CppTypeIndirection::Ptr,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+      base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "arg1".to_string(),
     has_default_value: false,
@@ -203,7 +203,7 @@ fn argument_types_equal7() {
       indirection: CppTypeIndirection::None,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+      base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     name: "arg1".to_string(),
     has_default_value: false,
@@ -224,7 +224,7 @@ fn argument_types_equal8() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+    base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
   };
   assert!(method1.argument_types_equal(&method2));
   assert!(method2.argument_types_equal(&method1));
@@ -254,14 +254,14 @@ fn c_signature_simple_func() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+    base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
   };
   method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::Enum {
+      base: CppType::Enum {
         name: "Enum1".to_string(),
       },
     },
@@ -294,14 +294,14 @@ fn c_signature_method_with_this() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+    base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
   };
   method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::Class(CppTypeClassBase {
+      base: CppType::Class(CppClassType {
         name: "MyClass2".to_string(),
         template_arguments: None,
       }),
@@ -322,7 +322,7 @@ fn c_signature_method_with_this() {
   assert_eq!(r.arguments[0].name, "this_ptr");
   assert_eq!(
     r.arguments[0].argument_type.ffi_type.base,
-    CppTypeBase::Class(method1.member.as_ref().unwrap().class_type.clone(),)
+    CppType::Class(method1.member.as_ref().unwrap().class_type.clone(),)
   );
   assert_eq!(
     r.arguments[0].argument_type.ffi_type.indirection,
@@ -363,14 +363,14 @@ fn c_signature_static_method() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+    base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
   };
   method1.arguments.push(CppFunctionArgument {
     argument_type: CppType {
       indirection: CppTypeIndirection::None,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::Enum {
+      base: CppType::Enum {
         name: "Enum1".to_string(),
       },
     },
@@ -407,7 +407,7 @@ fn c_signature_constructor() {
       indirection: CppTypeIndirection::Ref,
       is_const: true,
       is_const2: false,
-      base: CppTypeBase::Enum {
+      base: CppType::Enum {
         name: "Enum1".to_string(),
       },
     },
@@ -431,7 +431,7 @@ fn c_signature_constructor() {
       indirection: CppTypeIndirection::Ptr,
       is_const: true,
       is_const2: false,
-      base: CppTypeBase::Enum {
+      base: CppType::Enum {
         name: "Enum1".to_string(),
       },
     }
@@ -452,7 +452,7 @@ fn c_signature_constructor() {
       indirection: CppTypeIndirection::Ptr,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::Class(CppTypeClassBase {
+      base: CppType::Class(CppClassType {
         name: "MyClass".to_string(),
         template_arguments: None,
       }),
@@ -480,7 +480,7 @@ fn c_signature_constructor() {
       indirection: CppTypeIndirection::Ptr,
       is_const: true,
       is_const2: false,
-      base: CppTypeBase::Enum {
+      base: CppType::Enum {
         name: "Enum1".to_string(),
       },
     }
@@ -499,7 +499,7 @@ fn c_signature_constructor() {
       indirection: CppTypeIndirection::Ptr,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::Class(CppTypeClassBase {
+      base: CppType::Class(CppClassType {
         name: "MyClass".to_string(),
         template_arguments: None,
       }),
@@ -532,7 +532,7 @@ fn c_signature_destructor() {
   assert_eq!(r_stack.arguments[0].name, "this_ptr");
   assert_eq!(
     &r_stack.arguments[0].argument_type.ffi_type.base,
-    &CppTypeBase::Class(method1.member.as_ref().unwrap().class_type.clone(),)
+    &CppType::Class(method1.member.as_ref().unwrap().class_type.clone(),)
   );
   assert_eq!(
     r_stack.arguments[0].argument_type.ffi_type.indirection,
@@ -553,7 +553,7 @@ fn c_signature_destructor() {
   assert_eq!(r_heap.arguments[0].name, "this_ptr");
   assert_eq!(
     r_heap.arguments[0].argument_type.ffi_type.base,
-    CppTypeBase::Class(method1.member.as_ref().unwrap().class_type.clone(),)
+    CppType::Class(method1.member.as_ref().unwrap().class_type.clone(),)
   );
   assert_eq!(
     r_heap.arguments[0].argument_type.ffi_type.indirection,
@@ -576,7 +576,7 @@ fn c_signature_method_returning_class() {
     indirection: CppTypeIndirection::None,
     is_const: false,
     is_const2: false,
-    base: CppTypeBase::Class(CppTypeClassBase {
+    base: CppType::Class(CppClassType {
       name: "MyClass3".to_string(),
       template_arguments: None,
     }),
@@ -586,7 +586,7 @@ fn c_signature_method_returning_class() {
       indirection: CppTypeIndirection::None,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::Class(CppTypeClassBase {
+      base: CppType::Class(CppClassType {
         name: "MyClass2".to_string(),
         template_arguments: None,
       }),
@@ -601,7 +601,7 @@ fn c_signature_method_returning_class() {
   assert_eq!(r_stack.arguments[0].name, "this_ptr");
   assert_eq!(
     &r_stack.arguments[0].argument_type.ffi_type.base,
-    &CppTypeBase::Class(method1.member.as_ref().unwrap().class_type.clone(),)
+    &CppType::Class(method1.member.as_ref().unwrap().class_type.clone(),)
   );
   assert_eq!(
     r_stack.arguments[0].argument_type.ffi_type.indirection,
@@ -638,7 +638,7 @@ fn c_signature_method_returning_class() {
       indirection: CppTypeIndirection::Ptr,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::Class(CppTypeClassBase {
+      base: CppType::Class(CppClassType {
         name: "MyClass3".to_string(),
         template_arguments: None,
       }),
@@ -662,7 +662,7 @@ fn c_signature_method_returning_class() {
   assert_eq!(r_heap.arguments[0].name, "this_ptr");
   assert_eq!(
     r_heap.arguments[0].argument_type.ffi_type.base,
-    CppTypeBase::Class(method1.member.as_ref().unwrap().class_type.clone(),)
+    CppType::Class(method1.member.as_ref().unwrap().class_type.clone(),)
   );
   assert_eq!(
     r_heap.arguments[0].argument_type.ffi_type.indirection,
@@ -698,7 +698,7 @@ fn c_signature_method_returning_class() {
       indirection: CppTypeIndirection::Ptr,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::Class(CppTypeClassBase {
+      base: CppType::Class(CppClassType {
         name: "MyClass3".to_string(),
         template_arguments: None,
       }),
@@ -758,7 +758,7 @@ fn short_text1() {
       visibility: CppVisibility::Protected,
       is_signal: false,
       is_slot: false,
-      class_type: CppTypeClassBase {
+      class_type: CppClassType {
         name: "Class1".to_string(),
         template_arguments: None,
       },
@@ -768,7 +768,7 @@ fn short_text1() {
       indirection: CppTypeIndirection::None,
       is_const: false,
       is_const2: false,
-      base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+      base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
     },
     arguments: vec![
       CppFunctionArgument {
@@ -776,7 +776,7 @@ fn short_text1() {
           indirection: CppTypeIndirection::None,
           is_const: false,
           is_const2: false,
-          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Int),
+          base: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
         },
         name: "arg1".to_string(),
         has_default_value: false,
@@ -786,7 +786,7 @@ fn short_text1() {
           indirection: CppTypeIndirection::None,
           is_const: false,
           is_const2: false,
-          base: CppTypeBase::BuiltInNumeric(CppBuiltInNumericType::Double),
+          base: CppType::BuiltInNumeric(CppBuiltInNumericType::Double),
         },
         name: "arg2".to_string(),
         has_default_value: true,

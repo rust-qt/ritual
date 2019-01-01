@@ -7,9 +7,11 @@ use qt_generator_common::all_crate_names;
 use std::path::PathBuf;
 
 fn run(matches: ::clap::ArgMatches) -> Result<()> {
-  let workspace_path = canonicalize(&PathBuf::from(matches
-    .value_of("workspace")
-    .chain_err(|| "clap arg missing")?))?;
+  let workspace_path = canonicalize(&PathBuf::from(
+    matches
+      .value_of("workspace")
+      .chain_err(|| "clap arg missing")?,
+  ))?;
 
   log::status(format!("Workspace: {}", workspace_path.display()));
   let mut workspace = Workspace::new(workspace_path)?;

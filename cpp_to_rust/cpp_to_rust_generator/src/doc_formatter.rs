@@ -4,7 +4,7 @@
 use common::errors::{unexpected, Result};
 use common::log;
 use common::string_utils::JoinWithSeparator;
-use cpp_type::{CppType, CppTypeBase, CppTypeClassBase, CppTypeIndirection};
+use cpp_type::{CppType, CppTypeClassBase, CppTypeIndirection};
 use rust_code_generator::rust_type_to_code;
 use rust_info::{
   RustEnumValue, RustMethod, RustMethodArguments, RustMethodArgumentsVariant, RustMethodDocItem,
@@ -75,7 +75,8 @@ pub fn type_doc(type1: &RustTypeDeclaration) -> String {
         indirection: CppTypeIndirection::None,
         is_const: false,
         is_const2: false,
-      }.to_cpp_pseudo_code();
+      }
+      .to_cpp_pseudo_code();
       let mut doc = format!("C++ type: {}", wrap_inline_cpp_code(&cpp_type_code));
       if let Some(ref cpp_doc) = *cpp_doc {
         doc += &format!(
