@@ -172,6 +172,27 @@ impl CppItemData {
             None
         }
     }
+    pub fn as_field_ref(&self) -> Option<&CppClassField> {
+        if let CppItemData::ClassField(ref data) = *self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+    pub fn as_enum_value_ref(&self) -> Option<&CppEnumValue> {
+        if let CppItemData::EnumValue(ref data) = *self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+    pub fn as_base_ref(&self) -> Option<&CppBaseSpecifier> {
+        if let CppItemData::ClassBase(ref data) = *self {
+            Some(data)
+        } else {
+            None
+        }
+    }
     pub fn as_type_ref(&self) -> Option<&CppTypeData> {
         if let CppItemData::Type(ref data) = *self {
             Some(data)

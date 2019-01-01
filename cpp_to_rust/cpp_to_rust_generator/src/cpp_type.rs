@@ -262,6 +262,22 @@ impl CppClassType {
 }
 
 impl CppType {
+    pub fn new_pointer(is_const: bool, target: CppType) -> Self {
+        CppType::PointerLike {
+            kind: CppPointerLikeTypeKind::Pointer,
+            is_const,
+            target: Box::new(target),
+        }
+    }
+
+    pub fn new_reference(is_const: bool, target: CppType) -> Self {
+        CppType::PointerLike {
+            kind: CppPointerLikeTypeKind::Reference,
+            is_const,
+            target: Box::new(target),
+        }
+    }
+
     #[allow(dead_code)]
     /// Returns true if this is `void` type.
     pub fn is_void(&self) -> bool {

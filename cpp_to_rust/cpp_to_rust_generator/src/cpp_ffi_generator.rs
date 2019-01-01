@@ -20,16 +20,16 @@ use new_impl::processor::ProcessingStep;
 use new_impl::processor::ProcessorData;
 use std::iter::once;
 
-struct FfiNameProvider {
+pub struct FfiNameProvider {
     prefix: String,
     next_id: u64,
 }
 
 impl FfiNameProvider {
-    fn new(prefix: String, next_id: u64) -> Self {
+    pub fn new(prefix: String, next_id: u64) -> Self {
         FfiNameProvider { prefix, next_id }
     }
-    fn next_name(&mut self) -> String {
+    pub fn next_name(&mut self) -> String {
         let id = self.next_id;
         self.next_id += 1;
         format!("{}{}", self.prefix, id)
@@ -290,7 +290,7 @@ fn generate_ffi_methods_for_method(
 /// - converts all types to FFI types;
 /// - adds "this" argument explicitly if present;
 /// - adds "output" argument for return value if `allocation_place` is `Stack`.
-fn to_ffi_method(
+pub fn to_ffi_method(
     method: &CppFunction,
     stack_allocated_types: &[CppClassType],
     name_provider: &mut FfiNameProvider,

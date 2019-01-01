@@ -1,4 +1,4 @@
-use common::cpp_build_config::CppBuildConfigData;
+/*use common::cpp_build_config::CppBuildConfigData;
 use common::cpp_lib_builder::{BuildType, CppLibBuilder};
 use common::errors::fancy_unwrap;
 use common::file_utils::{create_dir, PathBufWithAdded};
@@ -32,7 +32,7 @@ fn build_cpp_lib() -> TempTestDir {
             cmake_source_dir: cpp_lib_source_dir,
             build_dir: build_dir,
             build_type: BuildType::Release,
-            install_dir: install_dir,
+            install_dir: Some(install_dir),
             num_jobs: None,
             cmake_vars: Vec::new(),
         }
@@ -123,3 +123,4 @@ fn full_run() {
         run_command(&mut command).unwrap();
     }
 }
+*/

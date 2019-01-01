@@ -17,7 +17,7 @@ use qt_generator_common::{
 
 /// Runs the build script.
 pub fn run_and_return(crate_name: &str) -> Result<()> {
-    let qt_config = get_full_build_config()?;
+    let qt_config = get_full_build_config(crate_name)?;
 
     let mut config = Config::new()?;
     {
@@ -28,7 +28,7 @@ pub fn run_and_return(crate_name: &str) -> Result<()> {
         if original_qt_version != qt_config.installation_data.qt_version {
             println!(
                 "cargo:warning=This crate was generated for Qt {}, but Qt {} is currently in use.",
-                original_qt_version, installation_data.qt_version
+                original_qt_version, qt_config.installation_data.qt_version
             );
         }
     }

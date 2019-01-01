@@ -107,18 +107,20 @@ impl Config {
         CppLibBuilder {
             cmake_source_dir: manifest_dir.with_added("c_lib"),
             build_dir: out_dir.with_added("c_lib_build"),
-            install_dir: c_lib_install_dir.clone(),
+            install_dir: Some(c_lib_install_dir.clone()),
             num_jobs: std::env::var("NUM_JOBS").ok().and_then(|x| x.parse().ok()),
             cmake_vars: c2r_cmake_vars(
                 &cpp_build_config_data,
                 &self.cpp_build_paths,
-                Some(cpp_build_config_data.library_type()),
-            ),
+                cpp_build_config_data.library_type().as_ref(),
+            )?,
             build_type: match profile.as_str() {
                 "debug" => BuildType::Debug,
                 "release" => BuildType::Release,
                 _ => return Err(format!("unknown value of PROFILE env var: {}", profile).into()),
             },
+            capture_output: false,
+            skip_cmake: false,
         }
         .run()?;
         {
