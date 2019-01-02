@@ -89,6 +89,7 @@ pub struct ProcessorMainCycleItem {
 
 pub struct ProcessingStep {
     pub name: String,
+    pub is_const: bool,
     pub main_cycle_items: Vec<ProcessorMainCycleItem>,
     pub function: Box<Fn(ProcessorData) -> Result<()>>,
 }
@@ -109,6 +110,7 @@ impl ProcessingStep {
     ) -> ProcessingStep {
         ProcessingStep {
             name: name.into(),
+            is_const: false,
             function: Box::new(function),
             main_cycle_items: Vec::new(),
         }
@@ -121,6 +123,7 @@ impl ProcessingStep {
         let name = name.into();
         ProcessingStep {
             name: name.clone(),
+            is_const: false,
             function: Box::new(function),
             main_cycle_items: vec![ProcessorMainCycleItem {
                 item_name: name,
@@ -137,35 +140,38 @@ mod steps {
     use processor::ProcessingStep;
 
     pub fn print_database() -> ProcessingStep {
-        ProcessingStep::new_custom("print_database", |mut data| {
-            data.html_logger.add_header(&["Item", "Environments"])?;
+        ProcessingStep {
+            is_const: true,
+            ..ProcessingStep::new_custom("print_database", |mut data| {
+                data.html_logger.add_header(&["Item", "Environments"])?;
 
-            for item in &data.current_database.items {
-                data.html_logger.add(
-                    &[
-                        escape_html(&item.cpp_data.to_string()),
-                        format!("{:?}", item.source),
-                    ],
-                    "database_item",
-                )?;
-                if let Some(ref ffi_items) = item.ffi_items {
-                    for ffi_item in ffi_items {
-                        let item_text = format!("{:?}", ffi_item.cpp_item);
-                        let item_texts = ffi_item.checks.items.iter().map(|item| {
-                            format!(
-                                "<li>{}: {}</li>",
-                                item.env.short_text(),
-                                CppCheckerInfo::error_to_log(&item.error)
-                            )
-                        });
-                        let env_text = format!("<ul>{}</ul>", item_texts.join(""));
-                        data.html_logger
-                            .add(&[escape_html(&item_text), env_text], "ffi_item")?;
+                for item in &data.current_database.items {
+                    data.html_logger.add(
+                        &[
+                            escape_html(&item.cpp_data.to_string()),
+                            format!("{:?}", item.source),
+                        ],
+                        "database_item",
+                    )?;
+                    if let Some(ref ffi_items) = item.ffi_items {
+                        for ffi_item in ffi_items {
+                            let item_text = format!("{:?}", ffi_item.cpp_item);
+                            let item_texts = ffi_item.checks.items.iter().map(|item| {
+                                format!(
+                                    "<li>{}: {}</li>",
+                                    item.env.short_text(),
+                                    CppCheckerInfo::error_to_log(&item.error)
+                                )
+                            });
+                            let env_text = format!("<ul>{}</ul>", item_texts.join(""));
+                            data.html_logger
+                                .add(&[escape_html(&item_text), env_text], "ffi_item")?;
+                        }
                     }
                 }
-            }
-            Ok(())
-        })
+                Ok(())
+            })
+        }
     }
     pub fn clear() -> ProcessingStep {
         ProcessingStep::new_custom("clear", |data| {
@@ -231,6 +237,8 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
                     .chain_err(|| "failed to load dependency")
             })?;
 
+    let mut current_database_saved = true;
+
     for operation in operations {
         if let Some(item) = all_processing_steps
             .iter()
@@ -253,6 +261,10 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
                 config,
             };
             (item.function)(data)?;
+
+            if !item.is_const {
+                current_database_saved = false;
+            }
         } else {
             println!(
                 "Unknown operation: {}. Supported operations: {}",
@@ -308,10 +320,11 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
     for database in dependent_cpp_crates {
         workspace.put_crate(database, true);
     }
-    let current_database_saved = !operations.iter().any(|op| op != "print_database");
+
     if !current_database_saved {
         log::status("Saving data");
     }
+
     workspace.put_crate(current_database, current_database_saved);
     workspace.save_data()?;
     Ok(())
