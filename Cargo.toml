@@ -4,6 +4,7 @@ members = [
   "cpp_to_rust/cpp_to_rust_common",
   "cpp_to_rust/cpp_to_rust_generator",
   "cpp_to_rust/cpp_to_rust_build_tools",
+  "cpp_to_rust/cpp_utils",
   "qt_generator/qt_generator_common",
   "qt_generator/qt_build_tools",
   "qt_generator/qt_generator"

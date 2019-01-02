@@ -7,7 +7,34 @@ use common::utils::{add_env_path_item, run_command};
 use config::{Config, CrateProperties};
 use std::path::PathBuf;
 use std::process::Command;
-use tests::TempTestDir;
+use common::file_utils::{canonicalize, create_dir_all, PathBufWithAdded};
+use std::path::{Path, PathBuf};
+
+#[derive(Debug)]
+pub enum TempTestDir {
+    System(::tempdir::TempDir),
+    Custom(PathBuf),
+}
+
+impl TempTestDir {
+    pub fn new(name: &str) -> TempTestDir {
+        if let Ok(value) = ::std::env::var("CPP_TO_RUST_TEMP_TEST_DIR") {
+            let path = canonicalize(PathBuf::from(value)).unwrap().with_added(name);
+            create_dir_all(&path).unwrap();
+            TempTestDir::Custom(path)
+        } else {
+            TempTestDir::System(::tempdir::TempDir::new(name).unwrap())
+        }
+    }
+
+    pub fn path(&self) -> &Path {
+        match *self {
+            TempTestDir::System(ref dir) => dir.path(),
+            TempTestDir::Custom(ref path) => path,
+        }
+    }
+}
+
 
 fn build_cpp_lib() -> TempTestDir {
     let cpp_lib_source_dir = {

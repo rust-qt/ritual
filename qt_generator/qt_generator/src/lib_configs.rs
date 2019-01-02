@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use versions;
 
 use cpp_to_rust_generator::config::CrateProperties;
-use cpp_to_rust_generator::new_impl::processor::ProcessingStep;
+use cpp_to_rust_generator::processor::ProcessingStep;
 use detect_signal_argument_types::detect_signal_argument_types;
 use detect_signals_and_slots::detect_signals_and_slots;
 use doc_parser::parse_docs;
@@ -263,7 +263,7 @@ pub fn core(config: &mut Config) -> Result<()> {
 }
 
 /// QtGui specific configuration.
-pub fn gui(config: &mut Config) -> Result<()> {
+pub fn gui(_config: &mut Config) -> Result<()> {
     /*
       config.add_cpp_parser_blocked_names(vec![
         "QAbstractOpenGLFunctionsPrivate",
@@ -339,7 +339,7 @@ pub fn gui(config: &mut Config) -> Result<()> {
 }
 
 /// QtWidgets specific configuration.
-pub fn widgets(config: &mut Config) -> Result<()> {
+pub fn widgets(_config: &mut Config) -> Result<()> {
     /*
     config.add_cpp_parser_blocked_names(vec!["QWidgetData", "QWidgetItemV2"]);
 

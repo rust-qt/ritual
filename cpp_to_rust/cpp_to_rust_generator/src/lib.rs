@@ -29,6 +29,7 @@ extern crate serde;
 pub extern crate cpp_to_rust_common as common;
 
 pub mod config;
+pub mod cpp_checker;
 mod cpp_code_generator;
 pub mod cpp_data;
 mod cpp_ffi_data;
@@ -36,6 +37,11 @@ pub mod cpp_ffi_generator;
 pub mod cpp_function;
 mod cpp_operator;
 pub mod cpp_type;
+pub mod database;
+pub mod html_logger;
+pub mod processor;
+pub mod workspace;
+
 //mod doc_formatter;
 //mod launcher;
 //mod rust_generator;
@@ -49,8 +55,6 @@ mod cpp_template_instantiator;
 
 #[cfg(test)]
 mod tests;
-
-pub mod new_impl;
 
 mod cpp_explicit_destructors;
 mod type_allocation_places;

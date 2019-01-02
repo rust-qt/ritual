@@ -4,21 +4,21 @@ use common::log;
 
 use common::utils::MapIfOk;
 use config::Config;
+use cpp_checker::cpp_checker_step;
 use cpp_ffi_generator::cpp_ffi_generator_step;
 use cpp_parser::cpp_parser_step;
-use new_impl::cpp_checker::cpp_checker_step;
 
 use common::string_utils::JoinWithSeparator;
 use cpp_explicit_destructors::add_explicit_destructors_step;
 use cpp_template_instantiator::find_template_instantiations_step;
 use cpp_template_instantiator::instantiate_templates_step;
-use new_impl::database::{Database, DatabaseItem};
-use new_impl::html_logger::HtmlLogger;
-use new_impl::workspace::Workspace;
+use database::{Database, DatabaseItem};
+use html_logger::HtmlLogger;
 use std::fmt;
 use std::iter::once;
 use std::path::PathBuf;
 use type_allocation_places::choose_allocation_places_step;
+use workspace::Workspace;
 //use cpp_post_processor::cpp_post_process;
 
 /// Creates output and cache directories if they don't exist.
@@ -132,9 +132,9 @@ impl ProcessingStep {
 
 mod steps {
     use common::string_utils::JoinWithSeparator;
-    use new_impl::database::CppCheckerInfo;
-    use new_impl::html_logger::escape_html;
-    use new_impl::processor::ProcessingStep;
+    use database::CppCheckerInfo;
+    use html_logger::escape_html;
+    use processor::ProcessingStep;
 
     pub fn print_database() -> ProcessingStep {
         ProcessingStep::new_custom("print_database", |mut data| {

@@ -2,7 +2,7 @@
 
 use common;
 use common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
-use new_impl::processor::ProcessingStep;
+use processor::ProcessingStep;
 use std::path::PathBuf;
 
 /// Information about an extra non-`cpp_to_rust`-based dependency.

@@ -14,7 +14,7 @@ use common::string_utils::JoinWithSeparator;
 use cpp_data::CppTemplateInstantiation;
 use cpp_ffi_data::QtSlotWrapper;
 use cpp_type::CppType;
-use new_impl::html_logger::escape_html;
+use html_logger::escape_html;
 use std::fmt::Display;
 use std::fmt::Formatter;
 

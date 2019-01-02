@@ -3,8 +3,8 @@ use common::log;
 use cpp_type::CppClassType;
 use cpp_type::CppPointerLikeTypeKind;
 use cpp_type::CppType;
-use new_impl::processor::ProcessingStep;
-use new_impl::processor::ProcessorData;
+use processor::ProcessingStep;
+use processor::ProcessorData;
 use std::collections::HashMap;
 
 pub fn choose_allocation_places_step() -> ProcessingStep {

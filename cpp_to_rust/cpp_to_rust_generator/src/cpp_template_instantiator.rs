@@ -6,10 +6,10 @@ use cpp_function::CppFunctionArgument;
 use cpp_function::CppOperator;
 use cpp_type::CppClassType;
 use cpp_type::CppType;
-use new_impl::database::CppItemData;
-use new_impl::database::DatabaseItemSource;
-use new_impl::processor::ProcessingStep;
-use new_impl::processor::ProcessorData;
+use database::CppItemData;
+use database::DatabaseItemSource;
+use processor::ProcessingStep;
+use processor::ProcessorData;
 
 /// Returns true if `type1` is a known template instantiation.
 fn check_template_type(data: &ProcessorData, type1: &CppType) -> Result<()> {

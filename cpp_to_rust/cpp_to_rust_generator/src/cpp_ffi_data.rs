@@ -2,7 +2,7 @@ use common::errors::Result;
 use cpp_data::CppClassField;
 use cpp_function::{CppFunction, ReturnValueAllocationPlace};
 use cpp_type::{CppFunctionPointerType, CppType};
-use new_impl::database::CppCheckerInfoList;
+use database::CppCheckerInfoList;
 
 /// Variation of a field accessor method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]

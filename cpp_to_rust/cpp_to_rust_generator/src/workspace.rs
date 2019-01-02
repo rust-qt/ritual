@@ -4,7 +4,7 @@ use common::file_utils::{create_dir, create_dir_all, load_json, remove_dir_all, 
 use common::log;
 use common::string_utils::CaseOperations;
 
-use new_impl::database::Database;
+use database::Database;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 

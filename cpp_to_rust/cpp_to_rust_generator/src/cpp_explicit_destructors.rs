@@ -5,10 +5,10 @@ use cpp_function::CppFunction;
 use cpp_function::CppFunctionKind;
 use cpp_function::CppFunctionMemberData;
 use cpp_type::CppType;
-use new_impl::database::CppItemData;
-use new_impl::database::DatabaseItemSource;
-use new_impl::processor::ProcessingStep;
-use new_impl::processor::ProcessorData;
+use database::CppItemData;
+use database::DatabaseItemSource;
+use processor::ProcessingStep;
+use processor::ProcessorData;
 
 pub fn add_explicit_destructors_step() -> ProcessingStep {
     ProcessingStep::new(

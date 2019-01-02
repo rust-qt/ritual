@@ -11,7 +11,7 @@ use cpp_type::{
     CppBuiltInNumericType, CppClassType, CppFunctionPointerType, CppSpecificNumericType,
     CppSpecificNumericTypeKind, CppType,
 };
-use new_impl::database::CppItemData;
+use database::CppItemData;
 
 use clang;
 use clang::*;
@@ -22,11 +22,11 @@ use std::path::{Path, PathBuf};
 
 use config::Config;
 use cpp_data::CppTypeDataKind;
-use new_impl::database::DatabaseItemSource;
+use database::DatabaseItemSource;
 
 use cpp_type::CppPointerLikeTypeKind;
-use new_impl::processor::ProcessingStep;
-use new_impl::processor::ProcessorData;
+use processor::ProcessingStep;
+use processor::ProcessorData;
 use regex::Regex;
 use std::iter::once;
 

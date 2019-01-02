@@ -15,9 +15,9 @@ use cpp_type::CppFunctionPointerType;
 use cpp_type::CppPointerLikeTypeKind;
 use cpp_type::CppTypeRole;
 use cpp_type::{CppClassType, CppType};
-use new_impl::database::CppItemData;
-use new_impl::processor::ProcessingStep;
-use new_impl::processor::ProcessorData;
+use database::CppItemData;
+use processor::ProcessingStep;
+use processor::ProcessorData;
 use std::iter::once;
 
 pub struct FfiNameProvider {
@@ -507,6 +507,7 @@ fn should_process_item(item: &CppItemData) -> Result<bool> {
 
 /// Generates slot wrappers for all encountered argument types
 /// (excluding types already handled in the dependencies).
+#[allow(dead_code)]
 fn generate_slot_wrapper(
     arguments: &[CppType],
     name_provider: &mut FfiNameProvider,

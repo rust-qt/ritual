@@ -20,7 +20,7 @@ impl HtmlLogger {
     pub fn new<P: AsRef<Path>>(path: P, title: &str) -> Result<HtmlLogger> {
         let mut file = create_file(path)?;
         file.write(format!(
-            include_str!("../../templates/html_logger/header.html"),
+            include_str!("../templates/html_logger/header.html"),
             title = title
         ))?;
         Ok(HtmlLogger { file: file })
@@ -80,7 +80,7 @@ impl HtmlLogger {
 
     fn finalize(&mut self) -> Result<()> {
         self.file
-            .write(include_str!("../../templates/html_logger/footer.html"))?;
+            .write(include_str!("../templates/html_logger/footer.html"))?;
         let parent_path = self
             .file
             .path()
@@ -88,13 +88,11 @@ impl HtmlLogger {
             .chain_err(|| "path parent failed")?;
         let style_path = parent_path.with_added("style.css");
         if !style_path.exists() {
-            create_file(style_path)?
-                .write(include_str!("../../templates/html_logger/style.css"))?;
+            create_file(style_path)?.write(include_str!("../templates/html_logger/style.css"))?;
         }
         let script_path = parent_path.with_added("script.js");
         if !script_path.exists() {
-            create_file(script_path)?
-                .write(include_str!("../../templates/html_logger/script.js"))?;
+            create_file(script_path)?.write(include_str!("../templates/html_logger/script.js"))?;
         }
         log::status(format!("Log saved as {}", self.file.path().display()));
         Ok(())

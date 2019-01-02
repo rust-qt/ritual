@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use common::errors::{unexpected, Result};
 use common::file_utils::{create_dir_all, create_file, path_to_str, PathBufWithAdded};
 use common::string_utils::JoinWithSeparator;
@@ -12,7 +14,7 @@ use cpp_type::CppType;
 
 use cpp_ffi_data::CppFfiFunction;
 use cpp_type::CppPointerLikeTypeKind;
-use new_impl::database::DatabaseItem;
+use database::DatabaseItem;
 use std::iter::once;
 use std::path::Path;
 use std::path::PathBuf;

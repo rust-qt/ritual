@@ -10,7 +10,7 @@
 
 pub extern crate cpp_to_rust_common as common;
 use common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
-use common::cpp_lib_builder::{BuildType, CMakeVar, CppLibBuilder};
+use common::cpp_lib_builder::{BuildType, CppLibBuilder};
 use common::errors::{fancy_unwrap, ChainErr, Result};
 use common::file_utils::{create_file, file_to_string, load_json, path_to_str, PathBufWithAdded};
 use common::log;

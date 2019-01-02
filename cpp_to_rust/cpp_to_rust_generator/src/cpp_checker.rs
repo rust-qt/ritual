@@ -8,16 +8,16 @@ use common::utils::MapIfOk;
 
 use cpp_ffi_data::CppFfiFunction;
 
-use new_impl::database::CppCheckerAddResult;
-use new_impl::database::CppCheckerInfo;
+use database::CppCheckerAddResult;
+use database::CppCheckerInfo;
 
-use new_impl::database::CppCheckerEnv;
+use database::CppCheckerEnv;
 
-use new_impl::processor::ProcessingStep;
-use new_impl::processor::ProcessorData;
+use processor::ProcessingStep;
+use processor::ProcessorData;
 
 use cpp_code_generator;
-use new_impl::html_logger::escape_html;
+use html_logger::escape_html;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -217,9 +217,9 @@ fn run(data: ProcessorData) -> Result<()> {
     let src_path = root_path.with_added("src");
     create_dir_all(&src_path)?;
     create_file(src_path.with_added("CMakeLists.txt"))?
-        .write(include_str!("../../templates/cpp_checker/CMakeLists.txt"))?;
+        .write(include_str!("../templates/cpp_checker/CMakeLists.txt"))?;
     create_file(src_path.with_added("utils.h"))?.write(format!(
-        include_str!("../../templates/cpp_checker/utils.h"),
+        include_str!("../templates/cpp_checker/utils.h"),
         include_directives_code = data
             .config
             .include_directives()

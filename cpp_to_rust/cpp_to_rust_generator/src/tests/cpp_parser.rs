@@ -4,15 +4,14 @@ use common::file_utils::{create_dir, create_file, PathBufWithAdded};
 use cpp_data::*;
 use cpp_function::*;
 use cpp_operator::CppOperator;
-use cpp_parser;
 use cpp_type::*;
 
-use common::cpp_build_config::{CppBuildConfig, CppBuildConfigData, CppBuildPaths, CppLibraryType};
+use common::cpp_build_config::CppBuildPaths;
 use config::Config;
 use config::CrateProperties;
 use cpp_parser::cpp_parser_step;
-use new_impl::workspace::Workspace;
-use std::path::PathBuf;
+use processor;
+use workspace::Workspace;
 
 struct ParserCppData {
     types: Vec<CppTypeData>,
@@ -44,8 +43,7 @@ fn run_parser(code: &'static str) -> ParserCppData {
     config.add_include_directive(include_name);
     config.set_cpp_build_paths(paths);
 
-    crate::new_impl::processor::process(&mut workspace, &config, &[cpp_parser_step().name])
-        .unwrap();
+    processor::process(&mut workspace, &config, &[cpp_parser_step().name]).unwrap();
 
     let database = workspace.load_or_create_crate("A").unwrap();
 

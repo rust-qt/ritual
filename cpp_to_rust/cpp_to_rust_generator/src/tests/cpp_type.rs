@@ -394,7 +394,6 @@ fn function1() {
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), false);
     assert_eq!(type1.is_template_parameter(), false);
-    let name = "my_name".to_string();
     assert!(type1.to_cpp_code(None).is_err());
     assert_type_to_ffi_unchanged(&type1);
 }

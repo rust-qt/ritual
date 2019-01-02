@@ -1,8 +1,5 @@
 use cpp_ffi_data::*;
-use cpp_function::{CppFunctionKind, ReturnValueAllocationPlace};
-use cpp_operator::CppOperator;
 use cpp_type::*;
-use tests::cpp_method::{empty_membership, empty_regular_method};
 
 #[test]
 fn argument_meaning() {

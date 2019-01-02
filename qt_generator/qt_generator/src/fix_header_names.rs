@@ -6,9 +6,9 @@ use cpp_to_rust_generator::common::file_utils::{file_to_string, os_str_to_str, r
 use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::common::utils::add_to_multihash;
 
-use cpp_to_rust_generator::new_impl::database::CppItemData;
-use cpp_to_rust_generator::new_impl::database::DatabaseItem;
-use cpp_to_rust_generator::new_impl::database::DatabaseItemSource;
+use cpp_to_rust_generator::database::CppItemData;
+use cpp_to_rust_generator::database::DatabaseItem;
+use cpp_to_rust_generator::database::DatabaseItemSource;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
