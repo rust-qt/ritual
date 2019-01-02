@@ -1,3 +1,4 @@
+use crate::cpp_data::CppName;
 use crate::cpp_ffi_data::CppTypeConversionToFfi;
 use crate::cpp_type::{
     CppBuiltInNumericType, CppClassType, CppFunctionPointerType, CppSpecificNumericType,
@@ -74,7 +75,7 @@ fn char_ptr_ptr() {
 #[test]
 fn qint64() {
     let type1 = CppType::SpecificNumeric(CppSpecificNumericType {
-        name: "qint64".to_string(),
+        name: CppName::from_one_part("qint64"),
         bits: 64,
         kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
     });
@@ -89,7 +90,7 @@ fn qint64() {
 #[test]
 fn quintptr() {
     let type1 = CppType::PointerSizedInteger {
-        name: "quintptr".to_string(),
+        name: CppName::from_one_part("quintptr"),
         is_signed: false,
     };
     assert_eq!(type1.is_void(), false);
@@ -103,7 +104,7 @@ fn quintptr() {
 #[test]
 fn enum1() {
     let type1 = CppType::Enum {
-        name: "Qt::CaseSensitivity".to_string(),
+        name: CppName::from_one_part("Qt::CaseSensitivity"),
     };
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), false);
@@ -116,7 +117,7 @@ fn enum1() {
 #[test]
 fn class_value() {
     let type1 = CppType::Class(CppClassType {
-        name: "QPoint".to_string(),
+        name: CppName::from_one_part("QPoint"),
         template_arguments: None,
     });
     assert_eq!(type1.is_void(), false);
@@ -132,7 +133,7 @@ fn class_value() {
         &CppType::new_pointer(
             false,
             CppType::Class(CppClassType {
-                name: "QPoint".to_string(),
+                name: CppName::from_one_part("QPoint"),
                 template_arguments: None,
             })
         ),
@@ -153,7 +154,7 @@ fn class_value() {
         &CppType::new_pointer(
             true,
             CppType::Class(CppClassType {
-                name: "QPoint".to_string(),
+                name: CppName::from_one_part("QPoint"),
                 template_arguments: None,
             })
         )
@@ -170,7 +171,7 @@ fn class_const_ref() {
     let type1 = CppType::new_reference(
         true,
         CppType::Class(CppClassType {
-            name: "QRectF".to_string(),
+            name: CppName::from_one_part("QRectF"),
             template_arguments: None,
         }),
     );
@@ -188,7 +189,7 @@ fn class_const_ref() {
             &CppType::new_pointer(
                 true,
                 CppType::Class(CppClassType {
-                    name: "QRectF".to_string(),
+                    name: CppName::from_one_part("QRectF"),
                     template_arguments: None,
                 })
             )
@@ -203,7 +204,7 @@ fn class_mut_ref() {
     let type1 = CppType::new_reference(
         false,
         CppType::Class(CppClassType {
-            name: "QRectF".to_string(),
+            name: CppName::from_one_part("QRectF"),
             template_arguments: None,
         }),
     );
@@ -221,7 +222,7 @@ fn class_mut_ref() {
             &CppType::new_pointer(
                 false,
                 CppType::Class(CppClassType {
-                    name: "QRectF".to_string(),
+                    name: CppName::from_one_part("QRectF"),
                     template_arguments: None,
                 })
             )
@@ -236,7 +237,7 @@ fn class_mut_ptr() {
     let type1 = CppType::new_pointer(
         false,
         CppType::Class(CppClassType {
-            name: "QObject".to_string(),
+            name: CppName::from_one_part("QObject"),
             template_arguments: None,
         }),
     );
@@ -251,11 +252,11 @@ fn class_mut_ptr() {
 #[test]
 fn class_with_template_args() {
     let args = Some(vec![CppType::Class(CppClassType {
-        name: "QString".to_string(),
+        name: CppName::from_one_part("QString"),
         template_arguments: None,
     })]);
     let type1 = CppType::Class(CppClassType {
-        name: "QVector".to_string(),
+        name: CppName::from_one_part("QVector"),
         template_arguments: args.clone(),
     });
     assert_eq!(type1.is_void(), false);
@@ -271,7 +272,7 @@ fn class_with_template_args() {
         &CppType::new_pointer(
             false,
             CppType::Class(CppClassType {
-                name: "QVector".to_string(),
+                name: CppName::from_one_part("QVector"),
                 template_arguments: args.clone(),
             })
         ),
@@ -292,7 +293,7 @@ fn class_with_template_args() {
         &CppType::new_pointer(
             true,
             CppType::Class(CppClassType {
-                name: "QVector".to_string(),
+                name: CppName::from_one_part("QVector"),
                 template_arguments: args.clone(),
             })
         )
@@ -307,16 +308,16 @@ fn class_with_template_args() {
 #[test]
 fn nested_template_cpp_code() {
     let type1 = CppType::Class(CppClassType {
-        name: "QHash".to_string(),
+        name: CppName::from_one_part("QHash"),
         template_arguments: Some(vec![
             CppType::Class(CppClassType {
-                name: "QString".to_string(),
+                name: CppName::from_one_part("QString"),
                 template_arguments: None,
             }),
             CppType::Class(CppClassType {
-                name: "QList".to_string(),
+                name: CppName::from_one_part("QList"),
                 template_arguments: Some(vec![CppType::Class(CppClassType {
-                    name: "QString".to_string(),
+                    name: CppName::from_one_part("QString"),
                     template_arguments: None,
                 })]),
             }),
@@ -331,11 +332,11 @@ fn nested_template_cpp_code() {
 #[test]
 fn qflags() {
     let args = Some(vec![CppType::Class(CppClassType {
-        name: "Qt::AlignmentFlag".to_string(),
+        name: CppName::from_one_part("Qt::AlignmentFlag"),
         template_arguments: None,
     })]);
     let type1 = CppType::Class(CppClassType {
-        name: "QFlags".to_string(),
+        name: CppName::from_one_part("QFlags"),
         template_arguments: args.clone(),
     });
     assert_eq!(type1.is_void(), false);

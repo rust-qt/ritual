@@ -28,7 +28,7 @@ fn function_signature(method: &CppFfiFunction) -> Result<String> {
     for arg in &method.arguments {
         arg_texts.push(arg.to_cpp_code()?);
     }
-    let name_with_args = format!("{}({})", method.name, arg_texts.join(", "));
+    let name_with_args = format!("{}({})", method.name.to_cpp_code(), arg_texts.join(", "));
     let return_type = &method.return_type.ffi_type;
     let r = if let CppType::FunctionPointer(..) = return_type {
         return_type.to_cpp_code(Some(&name_with_args))?

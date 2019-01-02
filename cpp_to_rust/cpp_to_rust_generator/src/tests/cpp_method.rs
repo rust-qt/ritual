@@ -1,3 +1,4 @@
+use crate::cpp_data::CppName;
 use crate::cpp_data::CppVisibility;
 use crate::cpp_ffi_data::CppFfiArgumentMeaning;
 use crate::cpp_ffi_data::CppFfiFunction;
@@ -31,7 +32,7 @@ pub fn empty_membership(class_name: &'static str) -> CppFunctionMemberData {
         is_signal: false,
         is_slot: false,
         class_type: CppClassType {
-            name: class_name.to_string(),
+            name: CppName::from_one_part(class_name),
             template_arguments: None,
         },
     }
@@ -39,7 +40,7 @@ pub fn empty_membership(class_name: &'static str) -> CppFunctionMemberData {
 
 pub fn empty_regular_method() -> CppFunction {
     CppFunction {
-        name: String::new(),
+        name: CppName::from_one_part("empty"),
         member: None,
         return_type: CppType::Void,
         arguments: vec![],
@@ -119,7 +120,7 @@ fn argument_types_equal5() {
     });
     method2.arguments.push(CppFunctionArgument {
         argument_type: CppType::Enum {
-            name: "Enum1".to_string(),
+            name: CppName::from_one_part("Enum1"),
         },
         name: "arg1".to_string(),
         has_default_value: false,
@@ -205,7 +206,7 @@ fn c_signature_simple_func() {
     method1.return_type = CppType::BuiltInNumeric(CppBuiltInNumericType::Int);
     method1.arguments.push(CppFunctionArgument {
         argument_type: CppType::Enum {
-            name: "Enum1".to_string(),
+            name: CppName::from_one_part("Enum1"),
         },
         name: "arg1".to_string(),
         has_default_value: false,
@@ -233,7 +234,7 @@ fn c_signature_method_with_this() {
     method1.return_type = CppType::BuiltInNumeric(CppBuiltInNumericType::Int);
     method1.arguments.push(CppFunctionArgument {
         argument_type: CppType::Class(CppClassType {
-            name: "MyClass2".to_string(),
+            name: CppName::from_one_part("MyClass2"),
             template_arguments: None,
         }),
         name: "my_arg".to_string(),
@@ -243,7 +244,10 @@ fn c_signature_method_with_this() {
     assert!(!method1.is_constructor());
     assert!(!method1.is_destructor());
     assert!(!method1.is_operator());
-    assert_eq!(method1.class_name(), Some(&"MyClass".to_string()));
+    assert_eq!(
+        method1.class_name(),
+        Some(&CppName::from_one_part("MyClass"))
+    );
 
     let r = to_ffi(&method1, None);
     assert!(r.arguments.len() == 2);
@@ -285,7 +289,7 @@ fn c_signature_static_method() {
     method1.return_type = CppType::BuiltInNumeric(CppBuiltInNumericType::Int);
     method1.arguments.push(CppFunctionArgument {
         argument_type: CppType::Enum {
-            name: "Enum1".to_string(),
+            name: CppName::from_one_part("Enum1"),
         },
         name: "arg1".to_string(),
         has_default_value: false,
@@ -317,7 +321,7 @@ fn c_signature_constructor() {
         argument_type: CppType::new_reference(
             true,
             CppType::Enum {
-                name: "Enum1".to_string(),
+                name: CppName::from_one_part("Enum1"),
             },
         ),
         name: "arg1".to_string(),
@@ -327,12 +331,15 @@ fn c_signature_constructor() {
     assert!(method1.is_constructor());
     assert!(!method1.is_destructor());
     assert!(!method1.is_operator());
-    assert_eq!(method1.class_name(), Some(&"MyClass".to_string()));
+    assert_eq!(
+        method1.class_name(),
+        Some(&CppName::from_one_part("MyClass"))
+    );
 
     let r_stack = to_ffi(
         &method1,
         Some(CppClassType {
-            name: "MyClass".to_string(),
+            name: CppName::from_one_part("MyClass"),
             template_arguments: None,
         }),
     );
@@ -344,7 +351,7 @@ fn c_signature_constructor() {
         CppType::new_pointer(
             true,
             CppType::Enum {
-                name: "Enum1".to_string(),
+                name: CppName::from_one_part("Enum1"),
             }
         )
     );
@@ -363,7 +370,7 @@ fn c_signature_constructor() {
         CppType::new_pointer(
             false,
             CppType::Class(CppClassType {
-                name: "MyClass".to_string(),
+                name: CppName::from_one_part("MyClass"),
                 template_arguments: None,
             })
         ),
@@ -387,7 +394,7 @@ fn c_signature_constructor() {
         CppType::new_pointer(
             true,
             CppType::Enum {
-                name: "Enum1".to_string(),
+                name: CppName::from_one_part("Enum1"),
             }
         ),
     );
@@ -404,7 +411,7 @@ fn c_signature_constructor() {
         CppType::new_pointer(
             false,
             CppType::Class(CppClassType {
-                name: "MyClass".to_string(),
+                name: CppName::from_one_part("MyClass"),
                 template_arguments: None,
             })
         ),
@@ -427,12 +434,15 @@ fn c_signature_destructor() {
     assert!(!method1.is_constructor());
     assert!(method1.is_destructor());
     assert!(!method1.is_operator());
-    assert_eq!(method1.class_name(), Some(&"MyClass".to_string()));
+    assert_eq!(
+        method1.class_name(),
+        Some(&CppName::from_one_part("MyClass"))
+    );
 
     let r_stack = to_ffi(
         &method1,
         Some(CppClassType {
-            name: "MyClass".to_string(),
+            name: CppName::from_one_part("MyClass"),
             template_arguments: None,
         }),
     );
@@ -477,12 +487,12 @@ fn c_signature_method_returning_class() {
     let mut method1 = empty_regular_method();
     method1.member = Some(empty_membership("MyClass"));
     method1.return_type = CppType::Class(CppClassType {
-        name: "MyClass3".to_string(),
+        name: CppName::from_one_part("MyClass3"),
         template_arguments: None,
     });
     method1.arguments.push(CppFunctionArgument {
         argument_type: CppType::Class(CppClassType {
-            name: "MyClass2".to_string(),
+            name: CppName::from_one_part("MyClass2"),
             template_arguments: None,
         }),
         name: "my_arg".to_string(),
@@ -491,7 +501,7 @@ fn c_signature_method_returning_class() {
     let r_stack = to_ffi(
         &method1,
         Some(CppClassType {
-            name: "MyClass3".to_string(),
+            name: CppName::from_one_part("MyClass3"),
             template_arguments: None,
         }),
     );
@@ -530,7 +540,7 @@ fn c_signature_method_returning_class() {
         CppType::new_pointer(
             false,
             CppType::Class(CppClassType {
-                name: "MyClass3".to_string(),
+                name: CppName::from_one_part("MyClass3"),
                 template_arguments: None,
             })
         ),
@@ -581,7 +591,7 @@ fn c_signature_method_returning_class() {
         CppType::new_pointer(
             false,
             CppType::Class(CppClassType {
-                name: "MyClass3".to_string(),
+                name: CppName::from_one_part("MyClass3"),
                 template_arguments: None,
             })
         ),
@@ -595,42 +605,51 @@ fn c_signature_method_returning_class() {
 #[test]
 fn full_name_free_function_in_namespace() {
     let mut method1 = empty_regular_method();
-    method1.name = "ns::func1".to_string();
+    method1.name = CppName::from_one_part("ns::func1");
     assert_eq!(method1.class_name(), None);
 }
 
 #[test]
 fn full_name_method() {
     let mut method1 = empty_regular_method();
-    method1.name = "func1".to_string();
+    method1.name = CppName::from_one_part("func1");
     method1.member = Some(empty_membership("MyClass"));
-    assert_eq!(method1.class_name(), Some(&"MyClass".to_string()));
+    assert_eq!(
+        method1.class_name(),
+        Some(&CppName::from_one_part("MyClass"))
+    );
 }
 
 #[test]
 fn full_name_static_method() {
     let mut method1 = empty_regular_method();
-    method1.name = "func1".to_string();
+    method1.name = CppName::from_one_part("func1");
     method1.member = Some({
         let mut info = empty_membership("MyClass");
         info.is_static = true;
         info
     });
-    assert_eq!(method1.class_name(), Some(&"MyClass".to_string()));
+    assert_eq!(
+        method1.class_name(),
+        Some(&CppName::from_one_part("MyClass"))
+    );
 }
 
 #[test]
 fn full_name_nested_class_method() {
     let mut method1 = empty_regular_method();
-    method1.name = "func1".to_string();
+    method1.name = CppName::from_one_part("func1");
     method1.member = Some(empty_membership("MyClass::Iterator"));
-    assert_eq!(method1.class_name(), Some(&"MyClass::Iterator".to_string()));
+    assert_eq!(
+        method1.class_name(),
+        Some(&CppName::from_one_part("MyClass::Iterator"))
+    );
 }
 
 #[test]
 fn short_text1() {
     let method = CppFunction {
-        name: "method1".to_string(),
+        name: CppName::from_one_part("method1"),
         member: Some(CppFunctionMemberData {
             kind: CppFunctionKind::Regular,
             is_virtual: false,
@@ -641,7 +660,7 @@ fn short_text1() {
             is_signal: false,
             is_slot: false,
             class_type: CppClassType {
-                name: "Class1".to_string(),
+                name: CppName::from_one_part("Class1"),
                 template_arguments: None,
             },
         }),

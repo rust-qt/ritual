@@ -87,7 +87,7 @@ fn simple_func() {
     assert_eq!(
         data.methods[0],
         CppFunction {
-            name: "func1".to_string(),
+            name: CppName::from_one_part("func1"),
             member: None,
             operator: None,
             return_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
@@ -112,7 +112,7 @@ fn simple_func_with_default_value() {
     assert_eq!(
         data.methods[0],
         CppFunction {
-            name: "func1".to_string(),
+            name: CppName::from_one_part("func1"),
             member: None,
             operator: None,
             return_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Bool),
@@ -138,7 +138,7 @@ fn functions_with_class_arg() {
   bool func2(const Magic&);",
     );
     assert_eq!(data.types.len(), 1);
-    assert_eq!(data.types[0].name, "Magic");
+    assert_eq!(data.types[0].name, CppName::from_one_part("Magic"));
 
     if let CppTypeDataKind::Class { ref type_base } = data.types[0].kind {
         assert!(type_base.template_arguments.is_none());
@@ -167,14 +167,14 @@ fn functions_with_class_arg() {
     assert_eq!(
         data.methods[0],
         CppFunction {
-            name: "func1".to_string(),
+            name: CppName::from_one_part("func1"),
             member: None,
             operator: None,
             return_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Bool),
             arguments: vec![CppFunctionArgument {
                 name: "x".to_string(),
                 argument_type: CppType::Class(CppClassType {
-                    name: "Magic".to_string(),
+                    name: CppName::from_one_part("Magic"),
                     template_arguments: None,
                 }),
                 has_default_value: false,
@@ -188,7 +188,7 @@ fn functions_with_class_arg() {
     assert_eq!(
         data.methods[1],
         CppFunction {
-            name: "func1".to_string(),
+            name: CppName::from_one_part("func1"),
             member: None,
             operator: None,
             return_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Bool),
@@ -197,7 +197,7 @@ fn functions_with_class_arg() {
                 argument_type: CppType::new_pointer(
                     false,
                     CppType::Class(CppClassType {
-                        name: "Magic".to_string(),
+                        name: CppName::from_one_part("Magic"),
                         template_arguments: None,
                     })
                 ),
@@ -212,7 +212,7 @@ fn functions_with_class_arg() {
     assert_eq!(
         data.methods[2],
         CppFunction {
-            name: "func2".to_string(),
+            name: CppName::from_one_part("func2"),
             member: None,
             operator: None,
             return_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Bool),
@@ -221,7 +221,7 @@ fn functions_with_class_arg() {
                 argument_type: CppType::new_reference(
                     true,
                     CppType::Class(CppClassType {
-                        name: "Magic".to_string(),
+                        name: CppName::from_one_part("Magic"),
                         template_arguments: None,
                     })
                 ),
@@ -250,7 +250,7 @@ fn variadic_func() {
     assert_eq!(
         data.methods[0],
         CppFunction {
-            name: "my_printf".to_string(),
+            name: CppName::from_one_part("my_printf"),
             member: None,
             operator: None,
             return_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
@@ -278,7 +278,7 @@ fn free_template_func() {
     assert_eq!(
         data.methods[0],
         CppFunction {
-            name: "abs".to_string(),
+            name: CppName::from_one_part("abs"),
             member: None,
             operator: None,
             return_type: CppType::TemplateParameter {
@@ -319,18 +319,18 @@ fn free_func_operator_sub() {
         assert_eq!(
             data.methods[0],
             CppFunction {
-                name: "operator-".to_string(),
+                name: CppName::from_one_part("operator-"),
                 member: None,
                 operator: Some(CppOperator::Subtraction),
                 return_type: CppType::Class(CppClassType {
-                    name: "C1".to_string(),
+                    name: CppName::from_one_part("C1"),
                     template_arguments: None,
                 }),
                 arguments: vec![
                     CppFunctionArgument {
                         name: "a".to_string(),
                         argument_type: CppType::Class(CppClassType {
-                            name: "C1".to_string(),
+                            name: CppName::from_one_part("C1"),
                             template_arguments: None,
                         }),
                         has_default_value: false,
@@ -338,7 +338,7 @@ fn free_func_operator_sub() {
                     CppFunctionArgument {
                         name: "b".to_string(),
                         argument_type: CppType::Class(CppClassType {
-                            name: "C1".to_string(),
+                            name: CppName::from_one_part("C1"),
                             template_arguments: None,
                         }),
                         has_default_value: false,
@@ -364,7 +364,7 @@ fn simple_class_method() {
     };",
     );
     assert!(data.types.len() == 1);
-    assert_eq!(data.types[0].name, "MyClass");
+    assert_eq!(data.types[0].name, CppName::from_one_part("MyClass"));
     if let CppTypeDataKind::Class { ref type_base } = data.types[0].kind {
         assert!(type_base.template_arguments.is_none());
     } else {
@@ -378,10 +378,10 @@ fn simple_class_method() {
     assert_eq!(
         data.methods[0],
         CppFunction {
-            name: "func1".to_string(),
+            name: CppName::from_one_part("func1"),
             member: Some(CppFunctionMemberData {
                 class_type: CppClassType {
-                    name: "MyClass".to_string(),
+                    name: CppName::from_one_part("MyClass"),
                     template_arguments: None,
                 },
                 kind: CppFunctionKind::Regular,
@@ -428,7 +428,7 @@ fn advanced_class_methods() {
     };",
     );
     assert_eq!(data.methods.len(), 8);
-    assert_eq!(data.methods[0].name, "MyClass");
+    assert_eq!(data.methods[0].name, CppName::from_one_part("MyClass"));
     assert!(data.methods[0]
         .member
         .as_ref()
@@ -438,7 +438,7 @@ fn advanced_class_methods() {
     assert_eq!(data.methods[0].arguments.len(), 3);
     assert_eq!(data.methods[0].return_type, CppType::Void);
 
-    assert_eq!(data.methods[1].name, "~MyClass");
+    assert_eq!(data.methods[1].name, CppName::from_one_part("~MyClass"));
     assert!(data.methods[1]
         .member
         .as_ref()
@@ -448,10 +448,10 @@ fn advanced_class_methods() {
     assert_eq!(data.methods[1].arguments.len(), 0);
     assert_eq!(data.methods[1].return_type, CppType::Void);
 
-    assert_eq!(data.methods[2].name, "func1");
+    assert_eq!(data.methods[2].name, CppName::from_one_part("func1"));
     assert!(data.methods[2].member.as_ref().unwrap().is_static);
 
-    assert_eq!(data.methods[3].name, "func2");
+    assert_eq!(data.methods[3].name, CppName::from_one_part("func2"));
     assert!(data.methods[3].member.as_ref().unwrap().is_virtual);
     assert!(!data.methods[3].member.as_ref().unwrap().is_pure_virtual);
     assert_eq!(
@@ -459,7 +459,7 @@ fn advanced_class_methods() {
         CppVisibility::Public
     );
 
-    assert_eq!(data.methods[4].name, "func3");
+    assert_eq!(data.methods[4].name, CppName::from_one_part("func3"));
     assert!(data.methods[4].member.as_ref().unwrap().is_virtual);
     assert!(data.methods[4].member.as_ref().unwrap().is_pure_virtual);
     assert_eq!(
@@ -467,10 +467,13 @@ fn advanced_class_methods() {
         CppVisibility::Protected
     );
 
-    assert_eq!(data.methods[5].name, "func4");
+    assert_eq!(data.methods[5].name, CppName::from_one_part("func4"));
     assert!(data.methods[5].member.as_ref().unwrap().is_const);
 
-    assert_eq!(data.methods[6].name, "operator bool");
+    assert_eq!(
+        data.methods[6].name,
+        CppName::from_one_part("operator bool")
+    );
     assert!(data.methods[6].member.as_ref().unwrap().is_const);
     assert_eq!(
         data.methods[6].operator,
@@ -483,7 +486,7 @@ fn advanced_class_methods() {
         CppType::BuiltInNumeric(CppBuiltInNumericType::Bool),
     );
 
-    assert_eq!(data.methods[7].name, "func6");
+    assert_eq!(data.methods[7].name, CppName::from_one_part("func6"));
     assert_eq!(
         data.methods[7].template_arguments,
         Some(vec![
@@ -523,7 +526,7 @@ fn template_class_method() {
     };",
     );
     assert_eq!(data.types.len(), 1);
-    assert_eq!(data.types[0].name, "MyVector");
+    assert_eq!(data.types[0].name, CppName::from_one_part("MyVector"));
     if let CppTypeDataKind::Class { ref type_base } = data.types[0].kind {
         assert_eq!(
             type_base.template_arguments,
@@ -542,10 +545,10 @@ fn template_class_method() {
     assert_eq!(
         data.methods[0],
         CppFunction {
-            name: "get".to_string(),
+            name: CppName::from_one_part("get"),
             member: Some(CppFunctionMemberData {
                 class_type: CppClassType {
-                    name: "MyVector".to_string(),
+                    name: CppName::from_one_part("MyVector"),
                     template_arguments: Some(vec![CppType::TemplateParameter {
                         nested_level: 0,
                         index: 0,
@@ -593,7 +596,7 @@ fn template_class_template_method() {
       T get_t();
     };",
     );
-    assert_eq!(data.methods[0].name, "get_f");
+    assert_eq!(data.methods[0].name, CppName::from_one_part("get_f"));
     assert_eq!(
         data.methods[0].template_arguments,
         Some(vec![CppType::TemplateParameter {
@@ -611,7 +614,7 @@ fn template_class_template_method() {
         },
     );
 
-    assert_eq!(data.methods[1].name, "get_t");
+    assert_eq!(data.methods[1].name, CppName::from_one_part("get_t"));
     assert_eq!(data.methods[1].template_arguments, None);
     assert_eq!(
         data.methods[1].return_type,
@@ -633,7 +636,7 @@ fn simple_enum() {
   };",
     );
     assert_eq!(data.types.len(), 1);
-    assert_eq!(data.types[0].name, "Enum1");
+    assert_eq!(data.types[0].name, CppName::from_one_part("Enum1"));
     assert_eq!(data.types[0].kind, CppTypeDataKind::Enum);
     assert_eq!(
         data.enum_values,
@@ -642,13 +645,13 @@ fn simple_enum() {
                 name: "Good".to_string(),
                 value: 0,
                 doc: None,
-                enum_name: "Enum1".to_string(),
+                enum_name: CppName::from_one_part("Enum1"),
             },
             CppEnumValue {
                 name: "Bad".to_string(),
                 value: 1,
                 doc: None,
-                enum_name: "Enum1".to_string(),
+                enum_name: CppName::from_one_part("Enum1"),
             },
         ]
     );
@@ -667,7 +670,7 @@ fn simple_enum2() {
   }",
     );
     assert_eq!(data.types.len(), 1);
-    assert_eq!(data.types[0].name, "ns1::Enum1");
+    assert_eq!(data.types[0].name, CppName::from_parts(&["ns1", "Enum1"]));
     assert_eq!(data.types[0].kind, CppTypeDataKind::Enum);
     assert_eq!(
         data.enum_values,
@@ -676,19 +679,19 @@ fn simple_enum2() {
                 name: "Good".to_string(),
                 value: 1,
                 doc: None,
-                enum_name: "ns1::Enum1".to_string(),
+                enum_name: CppName::from_parts(&["ns1", "Enum1"]),
             },
             CppEnumValue {
                 name: "Bad".to_string(),
                 value: 2,
                 doc: None,
-                enum_name: "ns1::Enum1".to_string(),
+                enum_name: CppName::from_parts(&["ns1", "Enum1"]),
             },
             CppEnumValue {
                 name: "Questionable".to_string(),
                 value: 3,
                 doc: None,
-                enum_name: "ns1::Enum1".to_string(),
+                enum_name: CppName::from_parts(&["ns1", "Enum1"]),
             },
         ]
     );
@@ -710,7 +713,7 @@ fn template_instantiation() {
     assert_eq!(
         data.methods[0].return_type,
         CppType::Class(CppClassType {
-            name: "Vector".to_string(),
+            name: CppName::from_one_part("Vector"),
             template_arguments: Some(vec![int.clone()]),
         }),
     );
@@ -743,17 +746,17 @@ fn template_instantiation() {
 fn derived_class_simple() {
     let data = run_parser("class Base {}; class Derived : public Base {};");
     assert!(data.types.len() == 2);
-    assert_eq!(data.types[0].name, "Base");
-    assert_eq!(data.types[1].name, "Derived");
+    assert_eq!(data.types[0].name, CppName::from_one_part("Base"));
+    assert_eq!(data.types[1].name, CppName::from_one_part("Derived"));
     assert_eq!(
         data.bases,
         vec![CppBaseSpecifier {
             base_class_type: CppClassType {
-                name: "Base".to_string(),
+                name: CppName::from_one_part("Base"),
                 template_arguments: None,
             },
             derived_class_type: CppClassType {
-                name: "Derived".to_string(),
+                name: CppName::from_one_part("Derived"),
                 template_arguments: None,
             },
             is_virtual: false,
@@ -767,17 +770,17 @@ fn derived_class_simple() {
 fn derived_class_simple_private() {
     let data = run_parser("class Base {}; class Derived : Base {};");
     assert!(data.types.len() == 2);
-    assert_eq!(data.types[0].name, "Base");
-    assert_eq!(data.types[1].name, "Derived");
+    assert_eq!(data.types[0].name, CppName::from_one_part("Base"));
+    assert_eq!(data.types[1].name, CppName::from_one_part("Derived"));
     assert_eq!(
         data.bases,
         vec![CppBaseSpecifier {
             base_class_type: CppClassType {
-                name: "Base".to_string(),
+                name: CppName::from_one_part("Base"),
                 template_arguments: None,
             },
             derived_class_type: CppClassType {
-                name: "Derived".to_string(),
+                name: CppName::from_one_part("Derived"),
                 template_arguments: None,
             },
             is_virtual: false,
@@ -791,17 +794,17 @@ fn derived_class_simple_private() {
 fn derived_class_simple_virtual() {
     let data = run_parser("class Base {}; class Derived : public virtual Base {};");
     assert!(data.types.len() == 2);
-    assert_eq!(data.types[0].name, "Base");
-    assert_eq!(data.types[1].name, "Derived");
+    assert_eq!(data.types[0].name, CppName::from_one_part("Base"));
+    assert_eq!(data.types[1].name, CppName::from_one_part("Derived"));
     assert_eq!(
         data.bases,
         vec![CppBaseSpecifier {
             base_class_type: CppClassType {
-                name: "Base".to_string(),
+                name: CppName::from_one_part("Base"),
                 template_arguments: None,
             },
             derived_class_type: CppClassType {
-                name: "Derived".to_string(),
+                name: CppName::from_one_part("Derived"),
                 template_arguments: None,
             },
             is_virtual: true,
@@ -819,19 +822,19 @@ fn derived_class_multiple() {
     class Derived : public Base2, public Base1 {};",
     );
     assert!(data.types.len() == 3);
-    assert_eq!(data.types[0].name, "Base1");
-    assert_eq!(data.types[1].name, "Base2");
-    assert_eq!(data.types[2].name, "Derived");
+    assert_eq!(data.types[0].name, CppName::from_one_part("Base1"));
+    assert_eq!(data.types[1].name, CppName::from_one_part("Base2"));
+    assert_eq!(data.types[2].name, CppName::from_one_part("Derived"));
     assert_eq!(
         data.bases,
         vec![
             CppBaseSpecifier {
                 base_class_type: CppClassType {
-                    name: "Base2".to_string(),
+                    name: CppName::from_one_part("Base2"),
                     template_arguments: None,
                 },
                 derived_class_type: CppClassType {
-                    name: "Derived".to_string(),
+                    name: CppName::from_one_part("Derived"),
                     template_arguments: None,
                 },
                 is_virtual: false,
@@ -840,11 +843,11 @@ fn derived_class_multiple() {
             },
             CppBaseSpecifier {
                 base_class_type: CppClassType {
-                    name: "Base1".to_string(),
+                    name: CppName::from_one_part("Base1"),
                     template_arguments: None,
                 },
                 derived_class_type: CppClassType {
-                    name: "Derived".to_string(),
+                    name: CppName::from_one_part("Derived"),
                     template_arguments: None,
                 },
                 is_virtual: false,
@@ -917,7 +920,7 @@ fn anon_enum() {
   };",
     );
     assert!(data.types.len() == 1);
-    assert_eq!(data.types[0].name, "X");
+    assert_eq!(data.types[0].name, CppName::from_one_part("X"));
     assert!(data.fields.is_empty());
 }
 
@@ -942,19 +945,19 @@ fn fixed_size_integers() {
   ",
     );
     assert_eq!(data.methods.len(), 2);
-    assert_eq!(&data.methods[0].name, "f1");
+    assert_eq!(&data.methods[0].name, &CppName::from_one_part("f1"));
     let type1 = CppType::SpecificNumeric(CppSpecificNumericType {
-        name: "GLuint64".to_string(),
+        name: CppName::from_one_part("GLuint64"),
         bits: 64,
         kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
     });
     assert_eq!(&data.methods[0].return_type, &type1);
 
-    assert_eq!(&data.methods[1].name, "f2");
+    assert_eq!(&data.methods[1].name, &CppName::from_one_part("f2"));
     assert_eq!(
         &data.methods[1].return_type,
         &CppType::Class(CppClassType {
-            name: "QVector".to_string(),
+            name: CppName::from_one_part("QVector"),
             template_arguments: Some(vec![type1.clone()]),
         }),
     );
@@ -972,7 +975,7 @@ fn template_class_with_base() {
   ",
     );
     assert!(data.types.len() == 2);
-    assert_eq!(data.types[0].name, "C1");
+    assert_eq!(data.types[0].name, CppName::from_one_part("C1"));
     if let CppTypeDataKind::Class { ref type_base } = data.types[0].kind {
         assert_eq!(
             &type_base.template_arguments,
@@ -986,7 +989,7 @@ fn template_class_with_base() {
         panic!("invalid type kind");
     }
 
-    assert_eq!(data.types[1].name, "C2");
+    assert_eq!(data.types[1].name, CppName::from_one_part("C2"));
     if let CppTypeDataKind::Class { ref type_base } = data.types[1].kind {
         assert_eq!(
             &type_base.template_arguments,

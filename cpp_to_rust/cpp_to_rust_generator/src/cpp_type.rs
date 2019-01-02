@@ -2,6 +2,7 @@
 
 use crate::common::errors::{ChainErr, Error, Result};
 use crate::common::string_utils::JoinWithSeparator;
+use crate::cpp_data::CppName;
 use crate::cpp_ffi_data::{CppFfiType, CppTypeConversionToFfi};
 use serde_derive::{Deserialize, Serialize};
 
@@ -52,7 +53,7 @@ pub enum CppSpecificNumericTypeKind {
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppClassType {
     /// Name, including namespaces and nested classes
-    pub name: String,
+    pub name: CppName,
     /// For template classes, C++ types used as template
     /// arguments in this type,
     /// like [QString, int] in QHash<QString, int>
@@ -76,7 +77,7 @@ pub struct CppFunctionPointerType {
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct CppSpecificNumericType {
     /// Type identifier (most likely a typedef name)
-    pub name: String,
+    pub name: CppName,
     /// Size of type in bits
     pub bits: usize,
     /// Information about the type (float or integer,
@@ -98,11 +99,11 @@ pub enum CppType {
     SpecificNumeric(CppSpecificNumericType),
     /// Pointer sized integer, like qintptr
     /// (may be translated to Rust's isize)
-    PointerSizedInteger { name: String, is_signed: bool },
+    PointerSizedInteger { name: CppName, is_signed: bool },
     /// Enum type
     Enum {
         /// Name, including namespaces and nested classes
-        name: String,
+        name: CppName,
     },
     /// Class type
     Class(CppClassType),
@@ -219,7 +220,7 @@ impl CppClassType {
                 }
                 Ok(format!("{}< {} >", self.name, arg_texts.join(", ")))
             }
-            None => Ok(self.name.clone()),
+            None => Ok(self.name.to_cpp_code()),
         }
     }
 
@@ -235,7 +236,7 @@ impl CppClassType {
                     .join(", ")
             )
         } else {
-            self.name.clone()
+            self.name.to_cpp_code()
         }
     }
 
@@ -347,7 +348,7 @@ impl CppType {
             CppType::BuiltInNumeric(ref t) => Ok(t.to_cpp_code().to_string()),
             CppType::Enum { ref name }
             | CppType::SpecificNumeric(CppSpecificNumericType { ref name, .. })
-            | CppType::PointerSizedInteger { ref name, .. } => Ok(name.clone()),
+            | CppType::PointerSizedInteger { ref name, .. } => Ok(name.to_cpp_code()),
             //      CppTypeBase::SpecificNumeric { ref name, .. } => Ok(name.clone()),
             //      CppTypeBase::PointerSizedInteger { ref name, .. } => Ok(name.clone()),
             CppType::Class(ref info) => info.to_cpp_code(),
@@ -500,7 +501,7 @@ impl CppType {
                 });
             }
             CppType::Class(ref type1) => {
-                if type1.name == "QFlags" {
+                if type1.name == CppName::from_one_part("QFlags") {
                     return Ok(CppFfiType {
                         ffi_type: CppType::BuiltInNumeric(CppBuiltInNumericType::UInt),
                         conversion: CppTypeConversionToFfi::QFlagsToUInt,
@@ -528,7 +529,7 @@ impl CppType {
                     CppPointerLikeTypeKind::Reference => {
                         if *is_const {
                             if let CppType::Class(ref type1) = **target {
-                                if type1.name == "QFlags" {
+                                if type1.name == CppName::from_one_part("QFlags") {
                                     return Ok(CppFfiType {
                                         ffi_type: CppType::BuiltInNumeric(
                                             CppBuiltInNumericType::UInt,

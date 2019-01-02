@@ -103,8 +103,8 @@ pub fn fix_header_names(data: &mut [DatabaseItem], headers_dir: &PathBuf) -> Res
     let map = HeaderNameMap::new(headers_dir)?;
     for item in data {
         let class_name = match item.cpp_data {
-            CppItemData::Type(ref data) => Some(data.name.as_str()),
-            CppItemData::Function(ref data) => data.class_name().map(|x| x.as_str()),
+            CppItemData::Type(ref data) => Some(data.name.to_string()),
+            CppItemData::Function(ref data) => data.class_name().map(|x| x.to_string()),
             _ => continue,
         };
 
@@ -113,7 +113,8 @@ pub fn fix_header_names(data: &mut [DatabaseItem], headers_dir: &PathBuf) -> Res
             ..
         } = item.source
         {
-            let new_include_file = map.real_to_fancy(include_file, class_name);
+            let new_include_file =
+                map.real_to_fancy(include_file, class_name.as_ref().map(|s| s.as_str()));
             *include_file = new_include_file;
         }
     }

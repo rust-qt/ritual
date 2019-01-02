@@ -26,6 +26,7 @@ use crate::config::Config;
 use crate::cpp_data::CppTypeDataKind;
 use crate::database::DatabaseItemSource;
 
+use crate::cpp_data::CppName;
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
@@ -35,7 +36,9 @@ use std::iter::once;
 fn entity_log_representation(entity: Entity) -> String {
     format!(
         "{}; {:?}",
-        get_full_name(entity).unwrap_or("?".into()),
+        get_full_name(entity)
+            .map(|name| name.to_string())
+            .unwrap_or("?".into()),
         entity
     )
 }
@@ -139,9 +142,10 @@ fn get_template_arguments(entity: Entity) -> Option<Vec<CppType>> {
 }
 
 /// Returns fully qualified name of `entity`.
-fn get_full_name(entity: Entity) -> Result<String> {
+fn get_full_name(entity: Entity) -> Result<CppName> {
     let mut current_entity = entity;
-    if let Some(mut s) = entity.get_name() {
+    if let Some(name) = entity.get_name() {
+        let mut parts = vec![name];
         while let Some(p) = current_entity.get_semantic_parent() {
             match p.get_kind() {
                 EntityKind::ClassDecl
@@ -151,7 +155,9 @@ fn get_full_name(entity: Entity) -> Result<String> {
                 | EntityKind::EnumDecl
                 | EntityKind::ClassTemplatePartialSpecialization => {
                     match p.get_name() {
-                        Some(p_name) => s = format!("{}::{}", p_name, s),
+                        Some(p_name) => {
+                            parts.insert(0, p_name);
+                        }
                         None => return Err("Anonymous nested type".into()),
                     }
                     current_entity = p;
@@ -162,7 +168,7 @@ fn get_full_name(entity: Entity) -> Result<String> {
                 _ => break,
             }
         }
-        Ok(s)
+        Ok(CppName { parts })
     } else {
         Err("Anonymous type".into())
     }
@@ -287,9 +293,7 @@ fn run(data: ProcessorData) -> Result<()> {
             log::status("Parsing types");
             parser.parse_types(translation_unit)?;
             log::status("Parsing methods");
-            //let methods =
             parser.parse_functions(translation_unit)?;
-            //Ok((parser, methods))
             Ok(())
         },
     )?;
@@ -298,6 +302,12 @@ fn run(data: ProcessorData) -> Result<()> {
 
 pub fn cpp_parser_step() -> ProcessingStep {
     ProcessingStep::new("cpp_parser", Vec::new(), run)
+}
+
+fn parse_cpp_name(name: &str) -> CppName {
+    CppName {
+        parts: name.split("::").map(String::from).collect(),
+    }
 }
 
 impl<'a> CppParser<'a> {
@@ -355,7 +365,9 @@ impl<'a> CppParser<'a> {
                     {
                         return Err(format!(
                             "Type uses private class ({})",
-                            get_full_name(declaration).unwrap_or("?".into())
+                            get_full_name(declaration)
+                                .map(|name| name.to_string())
+                                .unwrap_or("?".into())
                         )
                         .into());
                     }
@@ -481,16 +493,16 @@ impl<'a> CppParser<'a> {
         if let Some(result) = self.parse_special_typedef(&name) {
             return Ok(result);
         }
-        if let Some(type_data) = self.find_type(|x| &x.name == &name) {
+        if let Some(type_data) = self.find_type(|x| &x.name.to_cpp_code() == &name) {
             match type_data.kind {
                 CppTypeDataKind::Enum { .. } => {
                     return Ok(CppType::Enum {
-                        name: name.to_string(),
+                        name: parse_cpp_name(&name),
                     });
                 }
                 CppTypeDataKind::Class { .. } => {
                     return Ok(CppType::Class(CppClassType {
-                        name: name.to_string(),
+                        name: parse_cpp_name(&name),
                         template_arguments: None,
                     }));
                 }
@@ -501,9 +513,9 @@ impl<'a> CppParser<'a> {
             if matches.len() < 3 {
                 return Err("invalid matches len in regexp".into());
             }
-            let class_name = &matches[1];
+            let class_name = parse_cpp_name(&matches[1]);
             if self
-                .find_type(|x| &x.name == class_name && x.kind.is_class())
+                .find_type(|x| x.name == class_name && x.kind.is_class())
                 .is_some()
             {
                 let mut arg_types = Vec::new();
@@ -525,7 +537,7 @@ impl<'a> CppParser<'a> {
                     }
                 }
                 return Ok(CppType::Class(CppClassType {
-                    name: class_name.to_string(),
+                    name: class_name,
                     template_arguments: Some(arg_types),
                 }));
             }
@@ -613,7 +625,9 @@ impl<'a> CppParser<'a> {
                     {
                         return Err(format!(
                             "Type uses private class ({})",
-                            get_full_name(declaration).unwrap_or("unnamed".to_string())
+                            get_full_name(declaration)
+                                .map(|name| name.to_string())
+                                .unwrap_or("unnamed".to_string())
                         )
                         .into());
                     }
@@ -782,68 +796,68 @@ impl<'a> CppParser<'a> {
         match name {
             "qint8" | "int8_t" | "GLbyte" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    name: name.to_string(),
+                    name: CppName::from_one_part(name),
                     bits: 8,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
                 }))
             }
             "quint8" | "uint8_t" | "GLubyte" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    name: name.to_string(),
+                    name: CppName::from_one_part(name),
                     bits: 8,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
                 }))
             }
             "qint16" | "int16_t" | "GLshort" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    name: name.to_string(),
+                    name: CppName::from_one_part(name),
                     bits: 16,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
                 }))
             }
             "quint16" | "uint16_t" | "GLushort" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    name: name.to_string(),
+                    name: CppName::from_one_part(name),
                     bits: 16,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
                 }))
             }
             "qint32" | "int32_t" | "GLint" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    name: name.to_string(),
+                    name: CppName::from_one_part(name),
                     bits: 32,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
                 }))
             }
             "quint32" | "uint32_t" | "GLuint" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    name: name.to_string(),
+                    name: CppName::from_one_part(name),
                     bits: 32,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
                 }))
             }
             "qint64" | "int64_t" | "qlonglong" | "GLint64" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    name: name.to_string(),
+                    name: CppName::from_one_part(name),
                     bits: 64,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
                 }))
             }
             "quint64" | "uint64_t" | "qulonglong" | "GLuint64" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    name: name.to_string(),
+                    name: CppName::from_one_part(name),
                     bits: 64,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
                 }))
             }
             "qintptr" | "qptrdiff" | "QList::difference_type" => {
                 Some(CppType::PointerSizedInteger {
-                    name: name.to_string(),
+                    name: CppName::from_one_part(name),
                     is_signed: true,
                 })
             }
             "quintptr" => Some(CppType::PointerSizedInteger {
-                name: name.to_string(),
+                name: CppName::from_one_part(name),
                 is_signed: false,
             }),
             _ => None,
@@ -987,17 +1001,17 @@ impl<'a> CppParser<'a> {
                     .to_string();
             }
         }
-        let mut name_with_namespace = name.clone();
-        if let Some(parent) = entity.get_semantic_parent() {
-            if parent.get_kind() == EntityKind::Namespace {
-                name_with_namespace = format!(
-                    "{}::{}",
-                    get_full_name(parent)
-                        .chain_err(|| "failed to get full name of parent entity")?,
-                    name
-                );
+
+        let name_with_namespace = match entity.get_semantic_parent() {
+            Some(parent) if parent.get_kind() == EntityKind::Namespace => {
+                let mut new_name = get_full_name(parent)
+                    .chain_err(|| "failed to get full name of parent entity")?;
+                new_name.parts.push(name.clone());
+                new_name
             }
-        }
+            _ => CppName::from_one_part(name.clone()),
+        };
+
         let allows_variadic_arguments = entity.is_variadic();
         let has_this_argument = class_name.is_some() && !entity.is_static_method();
         let real_arguments_count = arguments.len() + if has_this_argument { 1 } else { 0 };
@@ -1141,7 +1155,7 @@ impl<'a> CppParser<'a> {
                             is_signal: is_signal,
                             is_slot: false,
                             class_type: CppClassType {
-                                name: class_name.to_string(),
+                                name: class_name,
                                 template_arguments: get_template_arguments(class_entity.unwrap()),
                             },
                         })
@@ -1167,7 +1181,9 @@ impl<'a> CppParser<'a> {
         let include_file = self.entity_include_file(entity).chain_err(|| {
             format!(
                 "Origin of type is unknown: {}; entity: {:?}",
-                get_full_name(entity).unwrap_or("?".into()),
+                get_full_name(entity)
+                    .map(|name| name.to_string())
+                    .unwrap_or("?".into()),
                 entity
             )
         })?;
@@ -1214,7 +1230,10 @@ impl<'a> CppParser<'a> {
         let include_file = self.entity_include_file(entity).chain_err(|| {
             format!(
                 "Origin of class field is unknown: {}; entity: {:?}",
-                get_full_name(entity).unwrap_or("?".into()),
+                // TODO: add function for this
+                get_full_name(entity)
+                    .map(|name| name.to_string())
+                    .unwrap_or("?".into()),
                 entity
             )
         })?;
@@ -1261,7 +1280,9 @@ impl<'a> CppParser<'a> {
         let include_file = self.entity_include_file(entity).chain_err(|| {
             format!(
                 "Origin of type is unknown: {}; entity: {:?}",
-                get_full_name(entity).unwrap_or("?".into()),
+                get_full_name(entity)
+                    .map(|name| name.to_string())
+                    .unwrap_or("?".into()),
                 entity
             )
         })?;
@@ -1399,9 +1420,6 @@ impl<'a> CppParser<'a> {
     /// Returns false if this `entity` was blacklisted in some way.
     fn should_process_entity(&self, entity: Entity) -> bool {
         if let Ok(full_name) = get_full_name(entity) {
-            if full_name == "AllFields" {
-                return true; //our special class
-            }
             if let Ok(file_path) = self.entity_include_path(entity) {
                 let file_path_buf = PathBuf::from(&file_path);
                 if !self.data.config.target_include_paths().is_empty()
@@ -1421,17 +1439,6 @@ impl<'a> CppParser<'a> {
                 .cpp_parser_blocked_names()
                 .iter()
                 .any(|x| x == &full_name)
-            {
-                return false;
-            }
-        }
-        if let Some(name) = entity.get_name() {
-            if self
-                .data
-                .config
-                .cpp_parser_blocked_names()
-                .iter()
-                .any(|x| x == &name)
             {
                 return false;
             }

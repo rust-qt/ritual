@@ -17,6 +17,7 @@ use crate::doc_parser::parse_docs;
 use crate::fix_header_names::fix_header_names;
 use crate::lib_configs;
 use cpp_to_rust_generator::config::CrateProperties;
+use cpp_to_rust_generator::cpp_data::CppName;
 use cpp_to_rust_generator::processor::ProcessingStep;
 
 /*
@@ -165,7 +166,7 @@ pub fn core(config: &mut Config) -> Result<()> {
 
     // QProcess::pid returns different types on different platforms,
     // but this method is obsolete anyway
-    config.add_cpp_parser_blocked_names(vec!["QProcess::pid"]);
+    config.add_cpp_parser_blocked_names(vec![CppName::from_parts(&["QProcess", "pid"])]);
     /*
     exclude_qvector_eq_based_methods(config, &["QStaticPlugin", "QTimeZone::OffsetData"]);
     exclude_qlist_eq_based_methods(
@@ -369,14 +370,14 @@ pub fn widgets(_config: &mut Config) -> Result<()> {
 
 /// Qt3DCore specific configuration.
 pub fn core_3d(config: &mut Config) -> Result<()> {
-    config.add_cpp_filtered_namespace("Qt3DCore");
+    config.add_cpp_filtered_namespace(CppName::from_one_part("Qt3DCore"));
     //exclude_qvector_eq_based_methods(config, &["Qt3DCore::QNodeIdTypePair"]);
     Ok(())
 }
 
 /// Qt3DRender specific configuration.
 pub fn render_3d(config: &mut Config) -> Result<()> {
-    config.add_cpp_filtered_namespace("Qt3DRender");
+    config.add_cpp_filtered_namespace(CppName::from_one_part("Qt3DRender"));
     /*
     config.add_cpp_parser_blocked_names(vec![
       "Qt3DRender::QTexture1D",
@@ -429,20 +430,20 @@ pub fn render_3d(config: &mut Config) -> Result<()> {
 
 /// Qt3DInput specific configuration.
 pub fn input_3d(config: &mut Config) -> Result<()> {
-    config.add_cpp_filtered_namespace("Qt3DInput");
+    config.add_cpp_filtered_namespace(CppName::from_one_part("Qt3DInput"));
     //config.add_cpp_parser_blocked_names(vec!["Qt3DInput::QWheelEvent"]);
     Ok(())
 }
 
 /// Qt3DLogic specific configuration.
 pub fn logic_3d(config: &mut Config) -> Result<()> {
-    config.add_cpp_filtered_namespace("Qt3DLogic");
+    config.add_cpp_filtered_namespace(CppName::from_one_part("Qt3DLogic"));
     Ok(())
 }
 
 /// Qt3DExtras specific configuration.
 pub fn extras_3d(config: &mut Config) -> Result<()> {
-    config.add_cpp_filtered_namespace("Qt3DExtras");
+    config.add_cpp_filtered_namespace(CppName::from_one_part("Qt3DExtras"));
     Ok(())
 }
 
@@ -557,7 +558,7 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
         } else {
             config.add_cpp_parser_argument("-std=gnu++11");
         }
-        config.add_cpp_parser_blocked_name("qt_check_for_QGADGET_macro");
+        //config.add_cpp_parser_blocked_name(CppName::from_one_part("qt_check_for_QGADGET_macro"));
 
         let lib_include_path = qt_config.installation_data.lib_include_path.clone();
 

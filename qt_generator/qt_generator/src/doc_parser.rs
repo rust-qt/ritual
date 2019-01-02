@@ -4,6 +4,7 @@
 use crate::doc_decoder::DocData;
 use cpp_to_rust_generator::common::errors::{unexpected, ChainErr, Result};
 use cpp_to_rust_generator::common::log;
+use cpp_to_rust_generator::cpp_data::CppName;
 use cpp_to_rust_generator::cpp_data::CppTypeDoc;
 use cpp_to_rust_generator::cpp_data::CppVisibility;
 use cpp_to_rust_generator::cpp_function::CppFunctionDoc;
@@ -252,7 +253,8 @@ impl DocParser {
     }
 
     /// Returns documentation for C++ type `name`.
-    fn doc_for_type(&mut self, name: &str) -> Result<DocForType> {
+    fn doc_for_type(&mut self, name: &CppName) -> Result<DocForType> {
+        let name = name.to_string();
         let index_item = self
             .doc_data
             .find_index_item(|item| &item.name == &name)
@@ -570,9 +572,9 @@ fn find_methods_docs(items: &mut [DatabaseItem], data: &mut DocParser) -> Result
                     Ok(doc) => cpp_method.doc = Some(doc),
                     Err(msg) => {
                         if cpp_method.member.is_some()
-                            && (&cpp_method.name == "tr"
-                                || &cpp_method.name == "trUtf8"
-                                || &cpp_method.name == "metaObject")
+                            && (&cpp_method.name == &CppName::from_one_part("tr")
+                                || &cpp_method.name == &CppName::from_one_part("trUtf8")
+                                || &cpp_method.name == &CppName::from_one_part("metaObject"))
                         {
                             // no error message
                         } else {
@@ -630,12 +632,7 @@ pub fn parse_docs(data: ProcessorData, qt_crate_name: &str, docs_path: &Path) ->
                 CppItemData::EnumValue(ref mut data) => {
                     if let Some(r) = doc.enum_variants_doc.iter().find(|x| x.name == data.name) {
                         data.doc = Some(r.html.clone());
-                        let enum_namespace = if let Some(index) = data.enum_name.rfind("::") {
-                            data.enum_name[0..index + 2].to_string()
-                        } else {
-                            String::new()
-                        };
-                        parser.mark_enum_variant_used(&format!("{}{}", enum_namespace, &data.name));
+                        parser.mark_enum_variant_used(&data.full_name().to_string());
                     } else {
                         log::llog(log::DebugQtDoc, || {
                             format!(

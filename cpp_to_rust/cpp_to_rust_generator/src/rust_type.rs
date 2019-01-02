@@ -1,8 +1,9 @@
-use common::errors::{unexpected, ChainErr, Result};
-use common::string_utils::CaseOperations;
-use common::utils::MapIfOk;
-use cpp_ffi_data::CppIndirectionChange;
-use cpp_type::CppType;
+//use common::errors::{unexpected, ChainErr, Result};
+//use common::string_utils::CaseOperations;
+//use common::utils::MapIfOk;
+//use cpp_ffi_data::CppIndirectionChange;
+//use cpp_type::CppType;
+use serde_derive::{Deserialize, Serialize};
 
 /// Rust identifier. Represented by
 /// a vector of name parts. For a regular name,
@@ -13,10 +14,11 @@ use cpp_type::CppType;
 /// by a single vector item, like `vec!["i32"]`.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct RustName {
-  /// Parts of the name
-  pub parts: Vec<String>,
+    /// Parts of the name
+    pub parts: Vec<String>,
 }
 
+/*
 /// Conversion from public Rust API type to
 /// the corresponding FFI type
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -407,3 +409,4 @@ impl CompleteType {
     Ok(r)
   }
 }
+*/

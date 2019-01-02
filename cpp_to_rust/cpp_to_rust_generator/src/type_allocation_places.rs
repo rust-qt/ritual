@@ -1,5 +1,6 @@
 use crate::common::errors::Result;
 use crate::common::log;
+use crate::cpp_data::CppName;
 use crate::cpp_type::CppClassType;
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
@@ -31,7 +32,7 @@ fn choose_allocation_places(mut data: ProcessorData) -> Result<()> {
     fn check_type(
         cpp_type: &CppType,
         is_behind_pointer: bool,
-        data: &mut HashMap<String, TypeStats>,
+        data: &mut HashMap<CppName, TypeStats>,
     ) {
         match cpp_type {
             CppType::Class(CppClassType {
@@ -103,7 +104,7 @@ fn choose_allocation_places(mut data: ProcessorData) -> Result<()> {
     for (name, stats) in &data_map {
         data.html_logger.add(
             &[
-                name.clone(),
+                name.to_string(),
                 format!("{}", stats.has_virtual_methods),
                 format!("{}", stats.pointers_count),
                 format!("{}", stats.not_pointers_count),
@@ -140,8 +141,8 @@ fn choose_allocation_places(mut data: ProcessorData) -> Result<()> {
                 if stats.pointers_count + stats.not_pointers_count < min_safe_data_count {
                     data.html_logger.add(
                         &[
-                            name.as_str(),
-                            "Can't determine type allocation place: not enough data",
+                            name.to_string(),
+                            "Can't determine type allocation place: not enough data".to_string(),
                         ],
                         "type_allocation_places_error",
                     )?;
@@ -151,8 +152,8 @@ fn choose_allocation_places(mut data: ProcessorData) -> Result<()> {
                 {
                     data.html_logger.add(
                         &[
-                            name.as_str(),
-                            "Can't determine type allocation place: many non-pointers",
+                            name.to_string(),
+                            "Can't determine type allocation place: many non-pointers".to_string(),
                         ],
                         "type_allocation_places_error",
                     )?;
@@ -162,8 +163,8 @@ fn choose_allocation_places(mut data: ProcessorData) -> Result<()> {
         } else {
             data.html_logger.add(
                 &[
-                    name.as_str(),
-                    "Can't determine type allocation place: no stats",
+                    name.to_string(),
+                    "Can't determine type allocation place: no stats".to_string(),
                 ],
                 "type_allocation_places_error",
             )?;

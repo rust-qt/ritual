@@ -3,6 +3,7 @@
 use crate::common::errors::Result;
 use crate::common::string_utils::JoinWithSeparator;
 use crate::common::utils::MapIfOk;
+use crate::cpp_data::CppName;
 use crate::cpp_data::CppVisibility;
 pub use crate::cpp_operator::{CppOperator, CppOperatorInfo};
 use crate::cpp_type::CppPointerLikeTypeKind;
@@ -83,7 +84,7 @@ pub struct CppFunction {
     /// Identifier. For class methods, this field includes
     /// only the method's own name. For free functions,
     /// this field also includes namespaces (if any).
-    pub name: String,
+    pub name: CppName,
     /// Additional information about a class member function
     /// or None for free functions
     pub member: Option<CppFunctionMemberData>,
@@ -199,7 +200,7 @@ impl CppFunction {
                 self.name
             )
         } else {
-            self.name.clone()
+            self.name.to_string()
         }
     }
 
@@ -209,7 +210,7 @@ impl CppFunction {
         if let Some(ref info) = self.member {
             format!("{}::{}", info.class_type.name, self.name)
         } else {
-            self.name.clone()
+            self.name.to_string()
         }
     }
 
@@ -284,7 +285,7 @@ impl CppFunction {
     }
 
     /// Returns name of the class this method belongs to, if any.
-    pub fn class_name(&self) -> Option<&String> {
+    pub fn class_name(&self) -> Option<&CppName> {
         match self.member {
             Some(ref info) => Some(&info.class_type.name),
             None => None,

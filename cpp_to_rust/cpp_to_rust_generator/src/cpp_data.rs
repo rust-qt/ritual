@@ -2,7 +2,9 @@
 
 pub use crate::cpp_operator::CppOperator;
 use crate::cpp_type::{CppClassType, CppType};
+use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
+use std::fmt;
 
 /// One item of a C++ enum declaration
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -14,12 +16,19 @@ pub struct CppEnumValue {
     /// C++ documentation for this item in HTML
     pub doc: Option<String>,
     /// Full type name of the enum this item belongs to
-    pub enum_name: String,
+    pub enum_name: CppName,
 }
 
 impl CppEnumValue {
     pub fn is_same(&self, other: &CppEnumValue) -> bool {
         self.name == other.name && self.enum_name == other.enum_name && self.value == other.value
+    }
+
+    pub fn full_name(&self) -> CppName {
+        let mut name = self.enum_name.clone();
+        name.parts.pop().expect("enum_name can't be empty");
+        name.parts.push(self.name.clone());
+        name
     }
 }
 
@@ -111,6 +120,39 @@ pub struct CppTypeDoc {
     pub cross_references: Vec<String>,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
+pub struct CppName {
+    /// Parts of the name
+    pub parts: Vec<String>,
+}
+
+impl CppName {
+    pub fn from_one_part(part: impl ToString) -> Self {
+        Self {
+            parts: vec![part.to_string()],
+        }
+    }
+
+    pub fn from_parts(parts: &[&str]) -> Self {
+        Self {
+            parts: parts.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    pub fn to_cpp_code(&self) -> String {
+        self.parts.join("::")
+    }
+}
+
+impl fmt::Display for CppName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        for item in self.parts.iter().map(|s| s.as_str()).intersperse("::") {
+            write!(f, "{}", item)?;
+        }
+        Ok(())
+    }
+}
+
 /// Information about a C++ type declaration
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum CppTypeDataKind {
@@ -126,7 +168,7 @@ pub enum CppTypeDataKind {
 pub struct CppTypeData {
     /// Identifier, including namespaces and nested classes
     /// (separated with "::", like in C++)
-    pub name: String,
+    pub name: CppName,
     pub kind: CppTypeDataKind,
     /// C++ documentation for the type
     pub doc: Option<CppTypeDoc>,
@@ -141,10 +183,10 @@ impl CppTypeData {
 
 /// Information about a C++ template class
 /// instantiation.
-#[derive(Debug, PartialEq, Eq, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct CppTemplateInstantiation {
     /// Template class name
-    pub class_name: String,
+    pub class_name: CppName,
     /// List of template arguments used in this instantiation
     pub template_arguments: Vec<CppType>,
 }

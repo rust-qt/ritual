@@ -1,4 +1,5 @@
 use crate::common::errors::Result;
+use crate::cpp_data::CppName;
 use crate::cpp_data::CppTypeDataKind;
 use crate::cpp_data::CppVisibility;
 use crate::cpp_function::CppFunction;
@@ -35,7 +36,7 @@ fn add_explicit_destructors(data: ProcessorData) -> Result<()> {
                     .any(|m| m.is_destructor() && m.class_name() == Some(class_name));
                 if !found_destructor {
                     methods.push(CppFunction {
-                        name: format!("~{}", class_name),
+                        name: CppName::from_one_part(format!("~{}", class_name)),
                         member: Some(CppFunctionMemberData {
                             class_type: type_base.clone(),
                             is_virtual: false, // the destructor can actually be virtual but we don't care about it here

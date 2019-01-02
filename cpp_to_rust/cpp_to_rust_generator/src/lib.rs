@@ -38,7 +38,7 @@ pub mod workspace;
 //mod rust_code_generator;
 mod cpp_parser;
 //mod rust_info;
-//mod rust_type;
+mod rust_type;
 //mod versions;
 
 mod cpp_template_instantiator;

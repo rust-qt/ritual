@@ -14,6 +14,7 @@ use crate::cpp_data::CppTemplateInstantiation;
 use crate::cpp_ffi_data::CppFfiItem;
 use crate::cpp_type::CppType;
 use crate::html_logger::escape_html;
+use crate::rust_type::RustName;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -114,6 +115,7 @@ impl CppCheckerInfoList {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CppItemData {
+    Namespace(String),
     Type(CppTypeData),
     EnumValue(CppEnumValue),
     Function(CppFunction),
@@ -146,11 +148,11 @@ impl CppItemData {
         match *self {
             CppItemData::Type(ref t) => match t.kind {
                 CppTypeDataKind::Enum => vec![CppType::Enum {
-                    name: t.name.to_string(),
+                    name: t.name.clone(),
                 }],
                 CppTypeDataKind::Class { ref type_base } => vec![CppType::Class(type_base.clone())],
             },
-            CppItemData::EnumValue(_) => Vec::new(),
+            CppItemData::EnumValue(_) | CppItemData::Namespace(_) => Vec::new(),
             CppItemData::Function(ref method) => method.all_involved_types(),
             CppItemData::ClassField(ref field) => {
                 let class_type = CppType::Class(field.class_type.clone());
@@ -215,13 +217,18 @@ impl CppItemData {
             None
         }
     }
+
+    pub fn path(&self) -> Option<String> {
+        unimplemented!()
+    }
 }
 
 impl Display for CppItemData {
     fn fmt(&self, f: &mut Formatter) -> ::std::result::Result<(), ::std::fmt::Error> {
         let s = match *self {
+            CppItemData::Namespace(ref path) => format!("namespace {}", path),
             CppItemData::Type(ref type1) => match type1.kind {
-                CppTypeDataKind::Enum => format!("enum {}", type1.name),
+                CppTypeDataKind::Enum => format!("enum {}", type1.name.to_cpp_code()),
                 CppTypeDataKind::Class { ref type_base } => {
                     format!("class {}", type_base.to_cpp_pseudo_code())
                 }
@@ -279,7 +286,7 @@ impl Display for CppItemData {
 pub struct FfiItem {
     pub cpp_item: CppFfiItem,
     pub checks: CppCheckerInfoList,
-    pub rust_item: Option<()>,
+    pub another_rust_item: Option<()>,
 }
 
 impl FfiItem {
@@ -287,17 +294,25 @@ impl FfiItem {
         FfiItem {
             cpp_item,
             checks: CppCheckerInfoList::default(),
-            rust_item: None,
+            another_rust_item: None,
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RustItem {
+    pub path: RustName,
+    pub naming_strategy: (),
+    pub sclass_nested_path: Option<RustName>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseItem {
     pub cpp_data: CppItemData,
+
     pub source: DatabaseItemSource,
     pub ffi_items: Option<Vec<FfiItem>>,
-    // TODO: add rust data
+    pub rust_item: Option<RustItem>,
 }
 
 /// Represents all collected data related to a crate.
@@ -349,6 +364,7 @@ impl Database {
             cpp_data: data,
             source: source,
             ffi_items: None,
+            rust_item: None,
         });
         true
     }
