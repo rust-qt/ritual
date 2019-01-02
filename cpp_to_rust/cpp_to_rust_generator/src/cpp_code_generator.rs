@@ -13,6 +13,7 @@ use cpp_function::ReturnValueAllocationPlace;
 use cpp_type::CppType;
 
 use cpp_ffi_data::CppFfiFunction;
+use cpp_ffi_data::CppFfiItem;
 use cpp_type::CppPointerLikeTypeKind;
 use database::DatabaseItem;
 use std::iter::once;
@@ -390,23 +391,25 @@ fn generate_cpp_file(data: &[DatabaseItem], file_path: &Path) -> Result<()> {
     //      .with_added(format!("{}_{}.cpp", &self.lib_name, data.name));
 
     let mut cpp_file = create_file(file_path)?;
-    {
-        for item in data {
-            if let Some(ref wrapper) = item.qt_slot_wrapper {
-                cpp_file.write(qt_slot_wrapper(wrapper)?)?;
-            }
-        }
-        cpp_file.write("extern \"C\" {\n\n")?;
-        for item in data {
-            if let Some(ref methods) = item.cpp_ffi_functions {
-                for method in methods {
-                    cpp_file.write(function_implementation(method)?)?;
+    let mut any_slot_wrappers = false;
+    for item in data {
+        if let Some(ref ffi_items) = &item.ffi_items {
+            for ffi_item in ffi_items {
+                match ffi_item.cpp_item {
+                    CppFfiItem::Function(ref function) => {
+                        cpp_file.write("extern \"C\" {\n\n")?;
+                        cpp_file.write(function_implementation(function)?)?;
+                        cpp_file.write("\n} // extern \"C\"\n\n")?;
+                    }
+                    CppFfiItem::QtSlotWrapper(ref wrapper) => {
+                        any_slot_wrappers = true;
+                        cpp_file.write(qt_slot_wrapper(wrapper)?)?;
+                    }
                 }
             }
         }
-        cpp_file.write("\n} // extern \"C\"\n\n")?;
     }
-    if data.iter().any(|item| item.qt_slot_wrapper.is_some()) {
+    if any_slot_wrappers {
         let moc_output = get_command_output(Command::new("moc").arg("-i").arg(file_path))?;
         cpp_file.write(format!(
             "// start of MOC generated code\n{}\n// end of MOC generated code\n",

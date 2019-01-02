@@ -1,11 +1,12 @@
 use common::errors::{unexpected, Result};
-use common::utils::{MapIfOk, PushVec};
+use common::utils::MapIfOk;
 use cpp_data::CppBaseSpecifier;
 use cpp_data::CppClassField;
 use cpp_data::CppTypeDataKind;
 use cpp_data::CppVisibility;
 use cpp_ffi_data::CppFfiArgumentMeaning;
 use cpp_ffi_data::CppFfiFunctionArgument;
+use cpp_ffi_data::CppFfiItem;
 use cpp_ffi_data::CppFfiType;
 use cpp_ffi_data::QtSlotWrapper;
 use cpp_ffi_data::{CppCast, CppFfiFunction, CppFfiFunctionKind, CppFieldAccessorType};
@@ -16,6 +17,7 @@ use cpp_type::CppPointerLikeTypeKind;
 use cpp_type::CppTypeRole;
 use cpp_type::{CppClassType, CppType};
 use database::CppItemData;
+use database::FfiItem;
 use processor::ProcessingStep;
 use processor::ProcessorData;
 use std::iter::once;
@@ -71,7 +73,7 @@ fn run(mut data: ProcessorData) -> Result<()> {
         FfiNameProvider::new(cpp_ffi_lib_name.clone(), data.current_database.next_ffi_id);
 
     for item in &mut data.current_database.items {
-        if item.cpp_ffi_functions.is_some() {
+        if item.ffi_items.is_some() {
             data.html_logger.add(
                 &[item.cpp_data.to_string(), "already processed".to_string()],
                 "already_processed",
@@ -92,20 +94,25 @@ fn run(mut data: ProcessorData) -> Result<()> {
             }
             CppItemData::Function(ref method) => {
                 generate_ffi_methods_for_method(method, &stack_allocated_types, &mut name_provider)
+                    .map(|v| v.into_iter().map(Into::into).collect())
             }
             CppItemData::ClassField(ref field) => {
                 generate_field_accessors(field, &stack_allocated_types, &mut name_provider)
+                    .map(|v| v.into_iter().map(Into::into).collect())
             }
             CppItemData::ClassBase(ref base) => {
                 generate_casts(base, &all_class_bases, &mut name_provider)
+                    .map(|v| v.into_iter().map(Into::into).collect())
             }
-            CppItemData::QtSignalArguments(ref _signal_srguments) => unimplemented!(),
+            CppItemData::QtSignalArguments(ref signal_arguments) => {
+                generate_slot_wrapper(signal_arguments, &mut name_provider)
+            }
             CppItemData::TemplateInstantiation(..) => continue,
         };
 
         match result {
             Err(msg) => {
-                item.cpp_ffi_functions = Some(Vec::new());
+                item.ffi_items = Some(Vec::new());
                 data.html_logger
                     .add(&[item.cpp_data.to_string(), msg.to_string()], "error")?;
             }
@@ -121,7 +128,7 @@ fn run(mut data: ProcessorData) -> Result<()> {
                     ],
                     "success",
                 )?;
-                item.cpp_ffi_functions = Some(r);
+                item.ffi_items = Some(r.into_iter().map(FfiItem::new).collect());
             }
         }
     }
@@ -304,7 +311,6 @@ pub fn to_ffi_method(
         return_type: CppFfiType::void(),
         name: name_provider.next_name(),
         allocation_place: ReturnValueAllocationPlace::NotApplicable,
-        checks: Default::default(),
         kind: CppFfiFunctionKind::Function {
             cpp_function: method.clone(),
             omitted_arguments: None,
@@ -511,7 +517,7 @@ fn should_process_item(item: &CppItemData) -> Result<bool> {
 fn generate_slot_wrapper(
     arguments: &[CppType],
     name_provider: &mut FfiNameProvider,
-) -> Result<(QtSlotWrapper, Vec<CppFfiFunction>)> {
+) -> Result<Vec<CppFfiItem>> {
     let ffi_types = arguments.map_if_ok(|t| t.to_cpp_ffi_type(CppTypeRole::NotReturnType))?;
 
     let void_ptr = CppType::PointerLike {
@@ -620,24 +626,25 @@ fn generate_slot_wrapper(
         visibility: CppVisibility::Public,
     }];
 
-    let mut ffi_methods = Vec::new();
-    for method in methods {
-        ffi_methods.push_vec(generate_ffi_methods_for_method(
-            &method,
-            &[],
-            name_provider,
-        )?);
-    }
-    ffi_methods.push_vec(generate_casts(
-        &class_bases[0],
-        &class_bases,
-        name_provider,
-    )?);
     let qt_slot_wrapper = QtSlotWrapper {
         class_name: class_name.clone(),
         arguments: ffi_types,
         function_type: function_type.clone(),
-        receiver_id: receiver_id,
+        receiver_id,
     };
-    Ok((qt_slot_wrapper, ffi_methods))
+
+    let mut items = vec![qt_slot_wrapper.into()];
+    for method in methods {
+        items.extend(
+            generate_ffi_methods_for_method(&method, &[], name_provider)?
+                .into_iter()
+                .map(Into::into),
+        );
+    }
+    items.extend(
+        generate_casts(&class_bases[0], &class_bases, name_provider)?
+            .into_iter()
+            .map(Into::into),
+    );
+    Ok(items)
 }

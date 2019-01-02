@@ -7,12 +7,11 @@ use cpp_data::CppTypeData;
 use cpp_data::CppTypeDataKind;
 
 use cpp_data::CppVisibility;
-use cpp_ffi_data::CppFfiFunction;
 use cpp_function::CppFunction;
 
 use common::string_utils::JoinWithSeparator;
 use cpp_data::CppTemplateInstantiation;
-use cpp_ffi_data::QtSlotWrapper;
+use cpp_ffi_data::CppFfiItem;
 use cpp_type::CppType;
 use html_logger::escape_html;
 use std::fmt::Display;
@@ -276,11 +275,27 @@ impl Display for CppItemData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FfiItem {
+    pub cpp_item: CppFfiItem,
+    pub checks: CppCheckerInfoList,
+    pub rust_item: Option<()>,
+}
+
+impl FfiItem {
+    pub fn new(cpp_item: CppFfiItem) -> Self {
+        FfiItem {
+            cpp_item,
+            checks: CppCheckerInfoList::default(),
+            rust_item: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseItem {
     pub cpp_data: CppItemData,
     pub source: DatabaseItemSource,
-    pub cpp_ffi_functions: Option<Vec<CppFfiFunction>>,
-    pub qt_slot_wrapper: Option<QtSlotWrapper>,
+    pub ffi_items: Option<Vec<FfiItem>>,
     // TODO: add rust data
 }
 
@@ -332,8 +347,7 @@ impl Database {
         self.items.push(DatabaseItem {
             cpp_data: data,
             source: source,
-            cpp_ffi_functions: None,
-            qt_slot_wrapper: None,
+            ffi_items: None,
         });
         true
     }

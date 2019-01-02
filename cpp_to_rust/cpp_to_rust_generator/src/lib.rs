@@ -17,6 +17,7 @@
 // #![warn(print_stdout)]
 
 extern crate clang;
+extern crate derive_more;
 extern crate regex;
 extern crate rustfmt;
 extern crate tempdir;

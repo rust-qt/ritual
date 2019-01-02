@@ -6,8 +6,6 @@ use common::log;
 use common::target::current_target;
 use common::utils::MapIfOk;
 
-use cpp_ffi_data::CppFfiFunction;
-
 use database::CppCheckerAddResult;
 use database::CppCheckerInfo;
 
@@ -17,6 +15,7 @@ use processor::ProcessingStep;
 use processor::ProcessorData;
 
 use cpp_code_generator;
+use cpp_ffi_data::CppFfiItem;
 use html_logger::escape_html;
 use std::path::Path;
 use std::path::PathBuf;
@@ -42,10 +41,13 @@ fn check_snippet(
 }
 
 #[allow(unused_variables)]
-fn snippet_for_method(method: &CppFfiFunction) -> Result<Snippet> {
-    Ok(Snippet::new_global(
-        cpp_code_generator::function_implementation(method)?,
-    ))
+fn snippet_for_item(item: &CppFfiItem) -> Result<Snippet> {
+    match *item {
+        CppFfiItem::Function(ref function) => Ok(Snippet::new_global(
+            cpp_code_generator::function_implementation(function)?,
+        )),
+        CppFfiItem::QtSlotWrapper(_) => Err("qt slot wrappers are not supported yet".into()),
+    }
 }
 
 struct CppChecker<'a> {
@@ -99,9 +101,9 @@ impl<'a> CppChecker<'a> {
 
         let total_count = self.data.current_database.items.len();
         for (index, item) in self.data.current_database.items.iter_mut().enumerate() {
-            if let Some(ref mut cpp_ffi_methods) = item.cpp_ffi_functions {
-                for ffi_method in cpp_ffi_methods {
-                    if let Ok(snippet) = snippet_for_method(ffi_method) {
+            if let Some(ref mut ffi_items) = item.ffi_items {
+                for ffi_item in ffi_items {
+                    if let Ok(snippet) = snippet_for_item(&ffi_item.cpp_item) {
                         log::status(format!("Checking item {} / {}", index + 1, total_count));
 
                         let error_data =
@@ -112,7 +114,7 @@ impl<'a> CppChecker<'a> {
                                 }
                             };
                         let error_data_text = CppCheckerInfo::error_to_log(&error_data);
-                        let r = ffi_method.checks.add(&self.env, error_data);
+                        let r = ffi_item.checks.add(&self.env, error_data);
                         let change_text = match r {
                             CppCheckerAddResult::Added => "Added".to_string(),
                             CppCheckerAddResult::Unchanged => "Unchanged".to_string(),
@@ -126,7 +128,7 @@ impl<'a> CppChecker<'a> {
                             &[
                                 format!(
                                     "{}<br><pre>{}</pre>",
-                                    escape_html(&ffi_method.short_text()),
+                                    escape_html(&format!("{:?}", ffi_item)),
                                     escape_html(&snippet.code)
                                 ),
                                 format!("{}<br>{}", error_data_text, change_text),

@@ -148,10 +148,10 @@ mod steps {
                     ],
                     "database_item",
                 )?;
-                if let Some(ref cpp_ffi_methods) = item.cpp_ffi_functions {
-                    for ffi_method in cpp_ffi_methods {
-                        let item_text = ffi_method.short_text();
-                        let item_texts = ffi_method.checks.items.iter().map(|item| {
+                if let Some(ref ffi_items) = item.ffi_items {
+                    for ffi_item in ffi_items {
+                        let item_text = format!("{:?}", ffi_item.cpp_item);
+                        let item_texts = ffi_item.checks.items.iter().map(|item| {
                             format!(
                                 "<li>{}: {}</li>",
                                 item.env.short_text(),
@@ -160,7 +160,7 @@ mod steps {
                         });
                         let env_text = format!("<ul>{}</ul>", item_texts.join(""));
                         data.html_logger
-                            .add(&[escape_html(&item_text), env_text], "ffi_method")?;
+                            .add(&[escape_html(&item_text), env_text], "ffi_item")?;
                     }
                 }
             }
@@ -173,10 +173,10 @@ mod steps {
             Ok(())
         })
     }
-    pub fn clear_cpp_ffi() -> ProcessingStep {
-        ProcessingStep::new_custom("clear_cpp_ffi", |data| {
+    pub fn clear_ffi() -> ProcessingStep {
+        ProcessingStep::new_custom("clear_ffi", |data| {
             for item in &mut data.current_database.items {
-                item.cpp_ffi_functions = None;
+                item.ffi_items = None;
             }
             data.current_database.next_ffi_id = 0;
             Ok(())
@@ -201,7 +201,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
         // TODO: generate_slot_wrappers
         cpp_checker_step(),
         steps::print_database(),
-        steps::clear_cpp_ffi(),
+        steps::clear_ffi(),
         steps::clear(),
     ];
     let all_processing_steps: Vec<_> = standard_processing_steps

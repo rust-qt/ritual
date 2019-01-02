@@ -2,7 +2,7 @@ use common::errors::Result;
 use cpp_data::CppClassField;
 use cpp_function::{CppFunction, ReturnValueAllocationPlace};
 use cpp_type::{CppFunctionPointerType, CppType};
-use database::CppCheckerInfoList;
+use derive_more::From;
 
 /// Variation of a field accessor method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
@@ -191,8 +191,6 @@ pub struct CppFfiFunction {
     pub name: String,
 
     pub kind: CppFfiFunctionKind,
-
-    pub checks: CppCheckerInfoList,
 }
 
 impl CppFfiFunction {
@@ -231,6 +229,21 @@ impl CppFfiFunction {
                 ref field,
                 ref accessor_type,
             } => format!("FFI field {:?}: {}", accessor_type, field.short_text()),
+        }
+    }
+}
+
+#[derive(From, Debug, Clone, Serialize, Deserialize)]
+pub enum CppFfiItem {
+    Function(CppFfiFunction),
+    QtSlotWrapper(QtSlotWrapper),
+}
+
+impl CppFfiItem {
+    pub fn is_qt_slot_wrapper(&self) -> bool {
+        match *self {
+            CppFfiItem::QtSlotWrapper(_) => true,
+            _ => false,
         }
     }
 }
