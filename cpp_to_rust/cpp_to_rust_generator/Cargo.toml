@@ -10,20 +10,18 @@ exclude = ["test_assets/**/*"]
 
 [dependencies]
 
-regex = "0.1"
+regex = "1.1.0"
 
-serde = "0.9"       # serialization
-serde_derive = "0.9"
+serde = "1.0.84"       # serialization
+serde_derive = "1.0.84"
 
-clang = "0.16"    # C++ parsing
+clang = "0.20.0"    # C++ parsing
 
-select = "0.3.0"    # html parsing
+select = "0.4.2"    # html parsing
 
-tempdir = "0.3.5"   # temporary directory creation
+tempdir = "0.3.7"   # temporary directory creation
 
-rustfmt = "0.6"     # Rust code formatting
-
-clippy = {version = "0.0", optional = true} # linter
+rustfmt = "0.10.0"  # Rust code formatting
 
 cpp_to_rust_common = { version = "0.2.3", path = "../../cpp_to_rust/cpp_to_rust_common" }
 derive_more = "0.13.0"

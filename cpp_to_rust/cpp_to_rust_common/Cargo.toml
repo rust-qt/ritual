@@ -12,22 +12,20 @@ license = "MIT"
 repository = "https://github.com/rust-qt/cpp_to_rust/tree/master/cpp_to_rust/cpp_to_rust_common"
 
 [dependencies]
-error-chain = "0.5" # error handling
-backtrace = "0.2.1" # error backtrace manipulation
+error-chain = "0.5"  # error handling
+backtrace = "0.2.3" # error backtrace manipulation
 
-regex = "0.1"
+regex = "1.1.0"
 
-serde = "0.9"       # serialization
-serde_derive = "0.9"
-serde_json = "0.9"
-bincode = "0.7.0"
+serde = "1.0.84"       # serialization
+serde_derive = "1.0.84"
+serde_json = "1.0.34"
+bincode = "1.0.1"
 
-term-painter = "0.2.3"   # colored output
+term-painter = "0.2.4"   # colored output
 
-num_cpus = "1.0.0"  # detect preferred task count
+num_cpus = "1.9.0"  # detect preferred task count
 
-toml = "0.2" # toml generation and parsing
-lazy_static = "0.2"
+toml = "0.4.10" # toml generation and parsing
+lazy_static = "1.2.0"
 
-[build-dependencies]
-serde_codegen = "0.9"

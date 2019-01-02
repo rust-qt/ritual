@@ -38,7 +38,7 @@ pub struct CrateProperties {
     /// Version of the crate (must be in compliance with cargo requirements)
     version: String,
     /// Extra properties to be merged with auto generated content of `Cargo.toml`
-    custom_fields: crate::common::toml::Table,
+    custom_fields: crate::common::toml::value::Table,
     /// Extra dependencies for output `Cargo.toml`
     dependencies: Vec<CrateDependency>,
     /// Extra build dependencies for output `Cargo.toml`
@@ -105,7 +105,7 @@ impl CrateProperties {
 
     /// Sets custom fields for output `Cargo.toml`. These fields will
     /// be added to auto-generated fields (or replace them in case of a name conflict).
-    pub fn set_custom_fields(&mut self, value: common::toml::Table) {
+    pub fn set_custom_fields(&mut self, value: common::toml::value::Table) {
         self.custom_fields = value;
     }
 
@@ -135,7 +135,7 @@ impl CrateProperties {
         self.remove_default_build_dependencies
     }
 
-    pub fn custom_fields(&self) -> &common::toml::Table {
+    pub fn custom_fields(&self) -> &common::toml::value::Table {
         &self.custom_fields
     }
 }

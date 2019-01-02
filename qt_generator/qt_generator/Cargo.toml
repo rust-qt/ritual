@@ -11,8 +11,8 @@ repository = "https://github.com/rust-qt/cpp_to_rust/tree/master/qt_generator/qt
 cpp_to_rust_generator = { version = "0.2.0", path = "../../cpp_to_rust/cpp_to_rust_generator" }
 qt_generator_common = { version = "0.2.3", path = "../qt_generator_common" }
 
-clap = "2.23.1"    # command line args parsing
-regex = "0.1"
-rusqlite = "0.7"
+clap = "2.32.0"    # command line args parsing
+regex = "1.1.0"
+rusqlite = "0.16.0"
 compress = "0.1.2"
-select = "0.3.0"    # html parsing
+select = "0.4.2"   # html parsing

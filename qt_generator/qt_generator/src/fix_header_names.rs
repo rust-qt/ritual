@@ -51,8 +51,9 @@ impl HeaderNameMap {
                 let file_content = file_to_string(&header_path)?;
                 if let Some(matches) = re.captures(file_content.trim()) {
                     let real_header = matches
-                        .at(1)
+                        .get(1)
                         .chain_err(|| "invalid regexp matches")?
+                        .as_str()
                         .to_string();
                     let fancy_header = os_str_to_str(&header.file_name())?.to_string();
                     add_to_multihash(&mut map_real_to_all_fancy, real_header, fancy_header);

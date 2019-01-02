@@ -113,16 +113,18 @@ impl DocData {
             "Adding Qt documentation from {}",
             doc_file_path.display()
         ));
-        let connection =
-            rusqlite::Connection::open_with_flags(&doc_file_path, rusqlite::SQLITE_OPEN_READ_ONLY)
-                .convert_err()?;
+        let connection = rusqlite::Connection::open_with_flags(
+            &doc_file_path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .convert_err()?;
 
         let mut index_data = Vec::new();
         {
             let index_query = "select IndexTable.Identifier, IndexTable.FileId, IndexTable.Anchor \
                                from IndexTable";
             let mut index = connection.prepare(index_query).convert_err()?;
-            let mut index_rows = index.query(&[]).convert_err()?;
+            let mut index_rows = index.query(rusqlite::NO_PARAMS).convert_err()?;
             while let Some(index_row) = index_rows.next() {
                 let index_row = index_row.convert_err()?;
                 let name: String = index_row.get_checked(0).convert_err()?;
