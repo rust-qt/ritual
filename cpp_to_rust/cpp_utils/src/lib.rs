@@ -45,6 +45,14 @@ pub type Deleter<T> = unsafe extern "C" fn(this_ptr: *mut T);
 ///
 /// Example of implementation:
 /// ```
+/// use cpp_utils::{CppDeletable, Deleter};
+///
+/// struct Struct1;
+///
+/// unsafe extern "C" fn struct1_delete(this_ptr: *mut Struct1) {
+///     unimplemented!()
+/// }
+///
 /// impl CppDeletable for Struct1 {
 ///   fn deleter() -> Deleter<Self> {
 ///     struct1_delete
