@@ -162,7 +162,7 @@ pub struct Config {
     // TODO: revisit fields below when new rust name generator is done
     cpp_filtered_namespaces: Vec<String>,
 
-    rust_stack_allocated_types: Vec<String>,
+    movable_types: Vec<String>,
 }
 
 impl Config {
@@ -180,7 +180,7 @@ impl Config {
             cpp_parser_blocked_names: Default::default(),
             cpp_filtered_namespaces: Default::default(),
             cpp_build_config: Default::default(),
-            rust_stack_allocated_types: Default::default(),
+            movable_types: Default::default(),
             custom_processing_steps: Default::default(),
             cpp_lib_version: None,
         }
@@ -307,8 +307,8 @@ impl Config {
 
     /// Overrides automatic selection of type allocation place for `type_name` and uses `place`
     /// instead. See `CppTypeAllocationPlace` for more information.
-    pub fn set_rust_stack_allocated_types(&mut self, names: Vec<String>) {
-        self.rust_stack_allocated_types = names;
+    pub fn set_movable_types(&mut self, names: Vec<String>) {
+        self.movable_types = names;
     }
 
     /// Sets `CppBuildConfig` value that will be passed to the build script
@@ -386,10 +386,10 @@ impl Config {
     pub fn cpp_build_config(&self) -> &CppBuildConfig {
         &self.cpp_build_config
     }
-    /// Returns values added by `Config::set_rust_stack_allocated_types`.
+    /// Returns values added by `Config::set_movable_types`.
     /// Keys of the hash map are names of C++ types.
-    pub fn rust_stack_allocated_types(&self) -> &[String] {
-        &self.rust_stack_allocated_types
+    pub fn movable_types(&self) -> &[String] {
+        &self.movable_types
     }
 
     pub fn custom_processing_steps(&self) -> &[ProcessingStep] {

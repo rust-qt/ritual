@@ -175,10 +175,10 @@ fn argument_types_equal8() {
 }
 
 fn to_ffi(function: &CppFunction, force_stack: Option<CppClassType>) -> CppFfiFunction {
-    let stack_allocated_types: Vec<_> = force_stack.into_iter().collect();
+    let movable_types: Vec<_> = force_stack.into_iter().collect();
     crate::cpp_ffi_generator::to_ffi_method(
         function,
-        &stack_allocated_types,
+        &movable_types,
         &mut crate::cpp_ffi_generator::FfiNameProvider::new(String::new(), 0),
     )
     .unwrap()

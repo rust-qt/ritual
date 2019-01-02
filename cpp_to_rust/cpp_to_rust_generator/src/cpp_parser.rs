@@ -1178,7 +1178,7 @@ impl<'a> CppParser<'a> {
                 kind: CppTypeDataKind::Enum,
                 name: enum_name.clone(),
                 doc: None,
-                is_stack_allocated_type: false,
+                is_movable: false,
             }),
         );
         for child in entity.get_children() {
@@ -1364,7 +1364,7 @@ impl<'a> CppParser<'a> {
                 },
                 name: full_name,
                 doc: None,
-                is_stack_allocated_type: false,
+                is_movable: false,
             }),
         );
         Ok(())

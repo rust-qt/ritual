@@ -112,8 +112,8 @@ fn choose_allocation_places(mut data: ProcessorData) -> Result<()> {
         )?;
     }
 
-    let mut stack_allocated = Vec::new();
-    let mut heap_allocated = Vec::new();
+    let mut movable_types = Vec::new();
+    let mut immovable_types = Vec::new();
 
     for type1 in data
         .current_database
@@ -126,15 +126,10 @@ fn choose_allocation_places(mut data: ProcessorData) -> Result<()> {
         }
         let name = &type1.name;
         // TODO: add `heap_allocated_types` to `Config` just for suppressing the output of this function
-        if data
-            .config
-            .rust_stack_allocated_types()
-            .iter()
-            .any(|n| n == name)
-        {
+        if data.config.movable_types().iter().any(|n| n == name) {
             continue;
         }
-        let suggest_stack_allocated = if let Some(ref stats) = data_map.get(name) {
+        let suggest_movable_types = if let Some(ref stats) = data_map.get(name) {
             if stats.has_virtual_methods {
                 false
             } else if stats.pointers_count == 0 {
@@ -175,24 +170,24 @@ fn choose_allocation_places(mut data: ProcessorData) -> Result<()> {
             false
         };
 
-        if suggest_stack_allocated {
-            stack_allocated.push(name.clone());
+        if suggest_movable_types {
+            movable_types.push(name.clone());
         } else {
-            heap_allocated.push(name.clone());
+            immovable_types.push(name.clone());
         }
     }
 
     data.html_logger.add(
         &[
             "Heap allocation is suggested for types:".to_string(),
-            format!("{:?}", heap_allocated),
+            format!("{:?}", immovable_types),
         ],
         "type_allocation_places_result",
     )?;
     data.html_logger.add(
         &[
             "Stack allocation is suggested for types:".to_string(),
-            format!("{:?}", stack_allocated),
+            format!("{:?}", movable_types),
         ],
         "type_allocation_places_result",
     )?;

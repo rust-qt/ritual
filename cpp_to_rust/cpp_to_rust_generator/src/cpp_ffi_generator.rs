@@ -41,13 +41,13 @@ impl FfiNameProvider {
 /// Runs the FFI generator
 fn run(mut data: ProcessorData) -> Result<()> {
     let cpp_ffi_lib_name = format!("ctr_{}_ffi", &data.config.crate_properties().name());
-    let stack_allocated_types: Vec<_> = data
+    let movable_types: Vec<_> = data
         .all_items()
         .iter()
         .filter_map(|item| {
             if let CppItemData::Type(ref type_data) = item.cpp_data {
                 if let CppTypeDataKind::Class { ref type_base } = type_data.kind {
-                    if type_data.is_stack_allocated_type {
+                    if type_data.is_movable {
                         return Some(type_base.clone());
                     }
                 }
@@ -93,11 +93,11 @@ fn run(mut data: ProcessorData) -> Result<()> {
                 // no FFI methods for these items
             }
             CppItemData::Function(ref method) => {
-                generate_ffi_methods_for_method(method, &stack_allocated_types, &mut name_provider)
+                generate_ffi_methods_for_method(method, &movable_types, &mut name_provider)
                     .map(|v| v.into_iter().map(Into::into).collect())
             }
             CppItemData::ClassField(ref field) => {
-                generate_field_accessors(field, &stack_allocated_types, &mut name_provider)
+                generate_field_accessors(field, &movable_types, &mut name_provider)
                     .map(|v| v.into_iter().map(Into::into).collect())
             }
             CppItemData::ClassBase(ref base) => {
@@ -165,7 +165,7 @@ fn create_cast_method(
         declaration_code: None,
         doc: None,
     };
-    // no need for stack_allocated_types since all cast methods operate on pointers
+    // no need for movable_types since all cast methods operate on pointers
     let mut r = to_ffi_method(&method, &[], name_provider)?;
     let cast1 = cast;
     if let CppFfiFunctionKind::Function { ref mut cast, .. } = r.kind {
@@ -260,12 +260,12 @@ fn generate_casts(
 
 fn generate_ffi_methods_for_method(
     method: &CppFunction,
-    stack_allocated_types: &[CppClassType],
+    movable_types: &[CppClassType],
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiFunction>> {
     let mut methods = Vec::new();
     // TODO: don't use name here at all, generate names for all methods elsewhere
-    methods.push(to_ffi_method(method, stack_allocated_types, name_provider)?);
+    methods.push(to_ffi_method(method, movable_types, name_provider)?);
 
     if let Some(last_arg) = method.arguments.last() {
         if last_arg.has_default_value {
@@ -275,7 +275,7 @@ fn generate_ffi_methods_for_method(
                     break;
                 }
                 let mut processed_method =
-                    to_ffi_method(&method_copy, stack_allocated_types, name_provider)?;
+                    to_ffi_method(&method_copy, movable_types, name_provider)?;
                 if let CppFfiFunctionKind::Function {
                     ref mut omitted_arguments,
                     ..
@@ -300,7 +300,7 @@ fn generate_ffi_methods_for_method(
 ///   the return value is stack-allocated.
 pub fn to_ffi_method(
     method: &CppFunction,
-    stack_allocated_types: &[CppClassType],
+    movable_types: &[CppClassType],
     name_provider: &mut FfiNameProvider,
 ) -> Result<CppFfiFunction> {
     if method.allows_variadic_arguments {
@@ -346,7 +346,7 @@ pub fn to_ffi_method(
         // destructor doesn't have a return type that needs special handling,
         // but its `allocation_place` must match `allocation_place` of the type's constructor
         let class_type = &method.member.as_ref().unwrap().class_type;
-        r.allocation_place = if stack_allocated_types.iter().any(|t| t == class_type) {
+        r.allocation_place = if movable_types.iter().any(|t| t == class_type) {
             ReturnValueAllocationPlace::Stack
         } else {
             ReturnValueAllocationPlace::Heap
@@ -360,7 +360,7 @@ pub fn to_ffi_method(
         match real_return_type {
             // QFlags is converted to uint in FFI
             CppType::Class(ref base) if &base.name != "QFlags" => {
-                if stack_allocated_types.iter().any(|t| t == base) {
+                if movable_types.iter().any(|t| t == base) {
                     r.arguments.push(CppFfiFunctionArgument {
                         name: "output".to_string(),
                         argument_type: real_return_type_ffi,
@@ -384,7 +384,7 @@ pub fn to_ffi_method(
 /// Adds fictional getter and setter methods for each known public field of each class.
 fn generate_field_accessors(
     field: &CppClassField,
-    stack_allocated_types: &[CppClassType],
+    movable_types: &[CppClassType],
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiFunction>> {
     // TODO: fix doc generator for field accessors
@@ -418,7 +418,7 @@ fn generate_field_accessors(
                 declaration_code: None,
                 doc: None,
             };
-            let mut ffi_method = to_ffi_method(&fake_method, stack_allocated_types, name_provider)?;
+            let mut ffi_method = to_ffi_method(&fake_method, movable_types, name_provider)?;
             ffi_method.kind = CppFfiFunctionKind::FieldAccessor {
                 accessor_type: accessor_type,
                 field: field.clone(),

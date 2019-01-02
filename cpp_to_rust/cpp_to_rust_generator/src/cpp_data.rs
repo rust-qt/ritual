@@ -129,7 +129,7 @@ pub struct CppTypeData {
     pub kind: CppTypeDataKind,
     /// C++ documentation for the type
     pub doc: Option<CppTypeDoc>,
-    pub is_stack_allocated_type: bool,
+    pub is_movable: bool,
 }
 
 impl CppTypeData {
