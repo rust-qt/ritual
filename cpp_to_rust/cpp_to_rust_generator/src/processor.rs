@@ -14,6 +14,7 @@ use cpp_template_instantiator::find_template_instantiations_step;
 use cpp_template_instantiator::instantiate_templates_step;
 use database::{Database, DatabaseItem};
 use html_logger::HtmlLogger;
+use std::cmp::Ordering;
 use std::fmt;
 use std::iter::once;
 use std::path::PathBuf;
@@ -83,7 +84,6 @@ impl<'a> ProcessorData<'a> {
 
 #[derive(Debug)]
 pub struct ProcessorMainCycleItem {
-    pub item_name: String,
     pub run_after: Vec<String>,
 }
 
@@ -122,13 +122,10 @@ impl ProcessingStep {
     ) -> ProcessingStep {
         let name = name.into();
         ProcessingStep {
-            name: name.clone(),
+            name,
             is_const: false,
             function: Box::new(function),
-            main_cycle_items: vec![ProcessorMainCycleItem {
-                item_name: name,
-                run_after,
-            }],
+            main_cycle_items: vec![ProcessorMainCycleItem { run_after }],
         }
     }
 }
@@ -190,7 +187,35 @@ mod steps {
     }
 }
 
-pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]) -> Result<()> {
+#[derive(Debug)]
+struct MainItemRef<'a> {
+    step: &'a ProcessingStep,
+    run_after: &'a [String],
+}
+
+impl PartialEq for MainItemRef<'_> {
+    fn eq(&self, other: &MainItemRef) -> bool {
+        self.step.name == other.step.name
+    }
+}
+
+impl PartialOrd for MainItemRef<'_> {
+    fn partial_cmp(&self, other: &MainItemRef) -> Option<Ordering> {
+        if self.run_after.contains(&other.step.name) {
+            Some(Ordering::Greater)
+        } else {
+            Some(Ordering::Less)
+        }
+    }
+}
+impl Eq for MainItemRef<'_> {}
+impl Ord for MainItemRef<'_> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]) -> Result<()> {
     log::status(format!(
         "Processing crate: {}",
         config.crate_properties().name()
@@ -239,18 +264,44 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
 
     let mut current_database_saved = true;
 
-    for operation in operations {
-        if let Some(item) = all_processing_steps
+    for step_name in step_names {
+        let steps = if step_name == "main" {
+            let mut steps = Vec::new();
+            for step in &all_processing_steps {
+                for item in &step.main_cycle_items {
+                    steps.push(MainItemRef {
+                        step,
+                        run_after: &item.run_after,
+                    });
+                }
+            }
+            steps.sort();
+            steps.into_iter().map(|v| v.step).collect()
+        } else if let Some(item) = all_processing_steps
             .iter()
-            .find(|item| &item.name == operation)
+            .find(|item| &item.name == step_name)
         {
-            log::status(format!("Running processor item: {}", &item.name));
+            vec![*item]
+        } else {
+            println!(
+                "Unknown operation: {}. Supported operations: main, {}.",
+                step_name,
+                all_processing_steps
+                    .iter()
+                    .map(|item| &item.name)
+                    .join(", ")
+            );
+            break;
+        };
+
+        for step in steps {
+            log::status(format!("Running processor item: {}", &step.name));
 
             let html_logger = HtmlLogger::new(
                 workspace
                     .log_path()?
-                    .with_added(format!("{}_log.html", operation)),
-                &format!("{} log", operation),
+                    .with_added(format!("{}_log.html", step.name)),
+                &format!("{} log", step.name),
             )?;
 
             let data = ProcessorData {
@@ -260,20 +311,11 @@ pub fn process(workspace: &mut Workspace, config: &Config, operations: &[String]
                 dep_databases: &dependent_cpp_crates,
                 config,
             };
-            (item.function)(data)?;
+            (step.function)(data)?;
 
-            if !item.is_const {
+            if !step.is_const {
                 current_database_saved = false;
             }
-        } else {
-            println!(
-                "Unknown operation: {}. Supported operations: {}",
-                operation,
-                all_processing_steps
-                    .iter()
-                    .map(|item| &item.name)
-                    .join(", ")
-            );
         }
     }
 
