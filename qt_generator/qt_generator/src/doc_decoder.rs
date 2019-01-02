@@ -3,8 +3,8 @@
 use cpp_to_rust_generator::common::errors::{ChainErr, Result};
 use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
 use cpp_to_rust_generator::common::log;
-use html_parser::document::Document;
 use rusqlite;
+use select::document::Document;
 
 use std::path::Path;
 

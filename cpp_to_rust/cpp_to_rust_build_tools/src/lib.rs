@@ -8,17 +8,19 @@
 //! See [README](https://github.com/rust-qt/cpp_to_rust)
 //! for more information.
 
-pub extern crate cpp_to_rust_common as common;
-use common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
-use common::cpp_lib_builder::{BuildType, CppLibBuilder};
-use common::errors::{fancy_unwrap, ChainErr, Result};
-use common::file_utils::{create_file, file_to_string, load_json, path_to_str, PathBufWithAdded};
-use common::log;
-use common::target::current_target;
-use common::utils::{exe_suffix, get_command_output};
-use common::BuildScriptData;
+use crate::common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
+use crate::common::cpp_lib_builder::{BuildType, CppLibBuilder};
+use crate::common::errors::{fancy_unwrap, ChainErr, Result};
+use crate::common::file_utils::{
+    create_file, file_to_string, load_json, path_to_str, PathBufWithAdded,
+};
+use crate::common::log;
+use crate::common::target::current_target;
+use crate::common::utils::{exe_suffix, get_command_output};
+use crate::common::BuildScriptData;
+pub use cpp_to_rust_common as common;
 
-use common::cpp_lib_builder::c2r_cmake_vars;
+use crate::common::cpp_lib_builder::c2r_cmake_vars;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -155,7 +157,7 @@ impl Config {
         for name in cpp_build_config_data.linked_libs() {
             println!("cargo:rustc-link-lib={}", name);
         }
-        if ::common::target::current_env() != ::common::target::Env::Msvc {
+        if crate::common::target::current_env() != crate::common::target::Env::Msvc {
             // TODO: make it configurable
             println!("cargo:rustc-link-lib=stdc++");
         }

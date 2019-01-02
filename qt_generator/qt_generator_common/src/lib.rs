@@ -4,8 +4,6 @@
 //! See [README](https://github.com/rust-qt/cpp_to_rust)
 //! for more information.
 
-extern crate cpp_to_rust_common;
-
 use cpp_to_rust_common::cpp_build_config::{
     CppBuildConfig, CppBuildConfigData, CppBuildPaths, CppLibraryType,
 };

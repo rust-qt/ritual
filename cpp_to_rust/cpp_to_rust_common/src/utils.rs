@@ -1,7 +1,7 @@
 //! Various utilities.
 
-use errors::{ChainErr, Result};
-use log;
+use crate::errors::{ChainErr, Result};
+use crate::log;
 
 use std;
 use std::collections::HashMap;

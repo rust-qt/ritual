@@ -1,5 +1,6 @@
 //! Logger implementation
 
+use lazy_static::*;
 use std;
 use std::borrow::Borrow;
 use std::collections::HashMap;

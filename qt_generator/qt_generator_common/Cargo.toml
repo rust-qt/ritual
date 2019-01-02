@@ -1,5 +1,6 @@
 [package]
 name = "qt_generator_common"
+edition = "2018"
 
 # when changing version of this crate, change corresponding dependency version in
 # qt_build_tools and qt_generator

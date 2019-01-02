@@ -1,9 +1,9 @@
-use cpp_data::CppVisibility;
-use cpp_ffi_data::CppFfiArgumentMeaning;
-use cpp_ffi_data::CppFfiFunction;
-use cpp_ffi_data::CppTypeConversionToFfi;
-use cpp_function::*;
-use cpp_type::*;
+use crate::cpp_data::CppVisibility;
+use crate::cpp_ffi_data::CppFfiArgumentMeaning;
+use crate::cpp_ffi_data::CppFfiFunction;
+use crate::cpp_ffi_data::CppTypeConversionToFfi;
+use crate::cpp_function::*;
+use crate::cpp_type::*;
 
 #[test]
 fn cpp_method_kind() {

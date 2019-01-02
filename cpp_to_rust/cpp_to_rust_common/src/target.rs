@@ -1,5 +1,7 @@
 //! Types for expressing properties of different target platforms and platform-based conditions
 
+use serde_derive::{Deserialize, Serialize};
+
 /// CPU architecture, as reported by `target_arch`.
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -259,7 +261,7 @@ impl Condition {
     /// Evaluate the condition for `target`. Returns true if
     /// `target` matches the condition.
     pub fn eval(&self, target: &Target) -> bool {
-        use target::Condition::*;
+        use crate::target::Condition::*;
         match *self {
             Arch(ref arch) => &target.arch == arch,
             OS(ref os) => &target.os == os,

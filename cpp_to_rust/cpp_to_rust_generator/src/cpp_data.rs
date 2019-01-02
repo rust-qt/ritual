@@ -1,7 +1,8 @@
 //! Types for handling information about C++ library APIs.
 
-pub use cpp_operator::CppOperator;
-use cpp_type::{CppClassType, CppType};
+pub use crate::cpp_operator::CppOperator;
+use crate::cpp_type::{CppClassType, CppType};
+use serde_derive::{Deserialize, Serialize};
 
 /// One item of a C++ enum declaration
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]

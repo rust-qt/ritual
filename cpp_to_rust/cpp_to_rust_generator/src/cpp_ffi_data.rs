@@ -1,8 +1,9 @@
-use common::errors::Result;
-use cpp_data::CppClassField;
-use cpp_function::{CppFunction, ReturnValueAllocationPlace};
-use cpp_type::{CppFunctionPointerType, CppType};
+use crate::common::errors::Result;
+use crate::cpp_data::CppClassField;
+use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
+use crate::cpp_type::{CppFunctionPointerType, CppType};
 use derive_more::From;
+use serde_derive::{Deserialize, Serialize};
 
 /// Variation of a field accessor method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]

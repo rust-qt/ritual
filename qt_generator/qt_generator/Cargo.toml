@@ -1,5 +1,6 @@
 [package]
 name = "qt_generator"
+edition = "2018"
 version = "0.2.0"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 license = "MIT"

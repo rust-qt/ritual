@@ -1,7 +1,7 @@
 //! Various utilities for working with files
 
-use errors::{ChainErr, Result};
-use log;
+use crate::errors::{ChainErr, Result};
+use crate::log;
 
 use std::fs;
 use std::io::Read;

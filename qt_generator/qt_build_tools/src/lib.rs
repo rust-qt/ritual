@@ -3,9 +3,6 @@
 //! See [README](https://github.com/rust-qt/cpp_to_rust)
 //! for more information.
 
-extern crate cpp_to_rust_build_tools;
-extern crate qt_generator_common;
-
 use cpp_to_rust_build_tools::common::errors::{fancy_unwrap, ChainErr, Result};
 use cpp_to_rust_build_tools::Config;
 use qt_generator_common::get_full_build_config;

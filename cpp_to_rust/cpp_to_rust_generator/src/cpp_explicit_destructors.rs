@@ -1,14 +1,14 @@
-use common::errors::Result;
-use cpp_data::CppTypeDataKind;
-use cpp_data::CppVisibility;
-use cpp_function::CppFunction;
-use cpp_function::CppFunctionKind;
-use cpp_function::CppFunctionMemberData;
-use cpp_type::CppType;
-use database::CppItemData;
-use database::DatabaseItemSource;
-use processor::ProcessingStep;
-use processor::ProcessorData;
+use crate::common::errors::Result;
+use crate::cpp_data::CppTypeDataKind;
+use crate::cpp_data::CppVisibility;
+use crate::cpp_function::CppFunction;
+use crate::cpp_function::CppFunctionKind;
+use crate::cpp_function::CppFunctionMemberData;
+use crate::cpp_type::CppType;
+use crate::database::CppItemData;
+use crate::database::DatabaseItemSource;
+use crate::processor::ProcessingStep;
+use crate::processor::ProcessorData;
 
 pub fn add_explicit_destructors_step() -> ProcessingStep {
     ProcessingStep::new(

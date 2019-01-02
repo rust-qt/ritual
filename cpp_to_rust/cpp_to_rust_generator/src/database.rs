@@ -1,19 +1,20 @@
-use common::target::Target;
-use cpp_data::CppBaseSpecifier;
-use cpp_data::CppClassField;
-use cpp_data::CppEnumValue;
-use cpp_data::CppOriginLocation;
-use cpp_data::CppTypeData;
-use cpp_data::CppTypeDataKind;
+use crate::common::target::Target;
+use crate::cpp_data::CppBaseSpecifier;
+use crate::cpp_data::CppClassField;
+use crate::cpp_data::CppEnumValue;
+use crate::cpp_data::CppOriginLocation;
+use crate::cpp_data::CppTypeData;
+use crate::cpp_data::CppTypeDataKind;
 
-use cpp_data::CppVisibility;
-use cpp_function::CppFunction;
+use crate::cpp_data::CppVisibility;
+use crate::cpp_function::CppFunction;
 
-use common::string_utils::JoinWithSeparator;
-use cpp_data::CppTemplateInstantiation;
-use cpp_ffi_data::CppFfiItem;
-use cpp_type::CppType;
-use html_logger::escape_html;
+use crate::common::string_utils::JoinWithSeparator;
+use crate::cpp_data::CppTemplateInstantiation;
+use crate::cpp_ffi_data::CppFfiItem;
+use crate::cpp_type::CppType;
+use crate::html_logger::escape_html;
+use serde_derive::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::fmt::Formatter;
 

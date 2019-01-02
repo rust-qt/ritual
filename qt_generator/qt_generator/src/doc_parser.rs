@@ -1,6 +1,7 @@
 //! HTML parsing and some workarounds
 //! for reading Qt documentation.
 
+use crate::doc_decoder::DocData;
 use cpp_to_rust_generator::common::errors::{unexpected, ChainErr, Result};
 use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::cpp_data::CppTypeDoc;
@@ -9,10 +10,9 @@ use cpp_to_rust_generator::cpp_function::CppFunctionDoc;
 use cpp_to_rust_generator::database::CppItemData;
 use cpp_to_rust_generator::database::DatabaseItem;
 use cpp_to_rust_generator::processor::ProcessorData;
-use doc_decoder::DocData;
-use html_parser::document::Document;
-use html_parser::node::Node;
 use regex::Regex;
+use select::document::Document;
+use select::node::Node;
 use std::collections::{hash_map, HashMap, HashSet};
 use std::path::Path;
 
@@ -284,7 +284,7 @@ impl DocParser {
                 .chain_err(|| "failed to get document")?;
             url.push_str(&file_data.file_name);
             let doc = &file_data.document;
-            use html_parser::predicate::{And, Class, Name};
+            use select::predicate::{And, Class, Name};
             let div_r = doc.find(And(Name("div"), Class("descr")));
             let div = div_r.iter().next().chain_err(|| "no div.descr")?;
             let h2_r = div.find(Name("h2"));
@@ -451,7 +451,7 @@ fn process_html(html: &str, base_url: &str) -> Result<(String, HashSet<String>)>
 /// Parses document to a list of `ItemDoc`s.
 fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
     let mut results = Vec::new();
-    use html_parser::predicate::{And, Attr, Class, Name, Or};
+    use select::predicate::{And, Attr, Class, Name, Or};
     let h3s = doc.find(And(Name("h3"), Or(Class("fn"), Class("flags"))));
     for h3 in h3s.iter() {
         let anchor = h3.find(And(Name("a"), Attr("name", ())));

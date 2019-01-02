@@ -1,5 +1,6 @@
 [package]
 name = "cpp_to_rust_build_tools"
+edition = "2018"
 
 # Don't forget to update `cpp_to_rust/cpp_to_rust_generator/src/versions.rs`
 # and dependency version in qt_build_tools

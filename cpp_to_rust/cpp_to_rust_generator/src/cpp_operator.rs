@@ -1,7 +1,8 @@
 //! Types for describing C++ operators
 
-use common::errors::Result;
-use cpp_type::CppType;
+use crate::common::errors::Result;
+use crate::cpp_type::CppType;
+use serde_derive::{Deserialize, Serialize};
 
 /// Available types of C++ operators
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]

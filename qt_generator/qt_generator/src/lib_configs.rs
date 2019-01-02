@@ -1,5 +1,6 @@
 //! Generator configurations specific for each Qt module.
 
+use crate::versions;
 use cpp_to_rust_generator::common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
 use cpp_to_rust_generator::common::errors::{ChainErr, Result};
 use cpp_to_rust_generator::common::file_utils::repo_crate_local_path;
@@ -9,15 +10,14 @@ use cpp_to_rust_generator::common::{log, toml};
 use cpp_to_rust_generator::config::Config;
 use qt_generator_common::{get_full_build_config, lib_dependencies, lib_folder_name};
 use std::path::PathBuf;
-use versions;
 
+use crate::detect_signal_argument_types::detect_signal_argument_types;
+use crate::detect_signals_and_slots::detect_signals_and_slots;
+use crate::doc_parser::parse_docs;
+use crate::fix_header_names::fix_header_names;
+use crate::lib_configs;
 use cpp_to_rust_generator::config::CrateProperties;
 use cpp_to_rust_generator::processor::ProcessingStep;
-use detect_signal_argument_types::detect_signal_argument_types;
-use detect_signals_and_slots::detect_signals_and_slots;
-use doc_parser::parse_docs;
-use fix_header_names::fix_header_names;
-use lib_configs;
 
 /*
 /// Helper method to blacklist all methods of `QList<T>` template instantiation that

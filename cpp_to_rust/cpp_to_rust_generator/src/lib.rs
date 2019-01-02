@@ -16,18 +16,7 @@
 // #![warn(result_unwrap_used)]
 // #![warn(print_stdout)]
 
-extern crate clang;
-extern crate derive_more;
-extern crate regex;
-extern crate rustfmt;
-extern crate tempdir;
-
-#[macro_use]
-extern crate serde_derive;
-
-extern crate serde;
-
-pub extern crate cpp_to_rust_common as common;
+pub use cpp_to_rust_common as common;
 
 pub mod config;
 pub mod cpp_checker;

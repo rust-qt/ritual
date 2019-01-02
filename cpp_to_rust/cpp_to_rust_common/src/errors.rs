@@ -2,6 +2,8 @@
 
 //! Error handling types based on `error_chain` crate.
 
+use error_chain::{error_chain, quick_error};
+
 use std;
 
 error_chain! {
@@ -44,7 +46,7 @@ impl Error {
     /// Outputs formatted stack trace and
     /// chained error messages to the `Error` logging channel.
     pub fn display_report(&self) {
-        use log;
+        use crate::log;
         if let Some(backtrace) = self.backtrace() {
             log::error(format!("{:?}", backtrace));
             log::error("");

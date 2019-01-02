@@ -1,25 +1,25 @@
-use common::errors::{ChainErr, Result};
-use common::file_utils::PathBufWithAdded;
-use common::log;
+use crate::common::errors::{ChainErr, Result};
+use crate::common::file_utils::PathBufWithAdded;
+use crate::common::log;
 
-use common::utils::MapIfOk;
-use config::Config;
-use cpp_checker::cpp_checker_step;
-use cpp_ffi_generator::cpp_ffi_generator_step;
-use cpp_parser::cpp_parser_step;
+use crate::common::utils::MapIfOk;
+use crate::config::Config;
+use crate::cpp_checker::cpp_checker_step;
+use crate::cpp_ffi_generator::cpp_ffi_generator_step;
+use crate::cpp_parser::cpp_parser_step;
 
-use common::string_utils::JoinWithSeparator;
-use cpp_explicit_destructors::add_explicit_destructors_step;
-use cpp_template_instantiator::find_template_instantiations_step;
-use cpp_template_instantiator::instantiate_templates_step;
-use database::{Database, DatabaseItem};
-use html_logger::HtmlLogger;
+use crate::common::string_utils::JoinWithSeparator;
+use crate::cpp_explicit_destructors::add_explicit_destructors_step;
+use crate::cpp_template_instantiator::find_template_instantiations_step;
+use crate::cpp_template_instantiator::instantiate_templates_step;
+use crate::database::{Database, DatabaseItem};
+use crate::html_logger::HtmlLogger;
+use crate::type_allocation_places::choose_allocation_places_step;
+use crate::workspace::Workspace;
 use std::cmp::Ordering;
 use std::fmt;
 use std::iter::once;
 use std::path::PathBuf;
-use type_allocation_places::choose_allocation_places_step;
-use workspace::Workspace;
 //use cpp_post_processor::cpp_post_process;
 
 /// Creates output and cache directories if they don't exist.
@@ -131,10 +131,10 @@ impl ProcessingStep {
 }
 
 mod steps {
-    use common::string_utils::JoinWithSeparator;
-    use database::CppCheckerInfo;
-    use html_logger::escape_html;
-    use processor::ProcessingStep;
+    use crate::common::string_utils::JoinWithSeparator;
+    use crate::database::CppCheckerInfo;
+    use crate::html_logger::escape_html;
+    use crate::processor::ProcessingStep;
 
     pub fn print_database() -> ProcessingStep {
         ProcessingStep {

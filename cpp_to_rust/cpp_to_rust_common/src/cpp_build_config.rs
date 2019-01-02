@@ -1,6 +1,8 @@
 //! Types for configuring build script behavior.
 
-use errors::Result;
+use crate::errors::Result;
+use crate::target::{Condition, Target};
+use serde_derive::{Deserialize, Serialize};
 
 /// Information required to build the C++ wrapper library
 /// on every supported platform. it contains list of linked
@@ -28,7 +30,7 @@ pub struct CppBuildConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct CppBuildConfigItem {
-    condition: ::target::Condition,
+    condition: Condition,
     data: CppBuildConfigData,
 }
 
@@ -131,7 +133,7 @@ impl CppBuildConfig {
         CppBuildConfig::default()
     }
     /// Add `data` with `condition`.
-    pub fn add(&mut self, condition: ::target::Condition, data: CppBuildConfigData) {
+    pub fn add(&mut self, condition: Condition, data: CppBuildConfigData) {
         self.items.push(CppBuildConfigItem {
             condition: condition,
             data: data,
@@ -139,7 +141,7 @@ impl CppBuildConfig {
     }
     /// Select all conditions that are true on `target`, combine all corresponding
     /// configuration items and return the result.
-    pub fn eval(&self, target: &::target::Target) -> Result<CppBuildConfigData> {
+    pub fn eval(&self, target: &Target) -> Result<CppBuildConfigData> {
         let mut data = CppBuildConfigData::default();
         for item in &self.items {
             if item.condition.eval(target) {

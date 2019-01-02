@@ -5,21 +5,8 @@
 //!
 //! See [README](https://github.com/rust-qt/cpp_to_rust)
 //! for more information.
-//!
-extern crate backtrace;
-extern crate bincode;
-#[macro_use]
-extern crate error_chain;
-#[macro_use]
-extern crate lazy_static;
-extern crate num_cpus;
-extern crate regex;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde_json;
-extern crate term_painter;
-pub extern crate toml;
+
+use serde_derive::{Deserialize, Serialize};
 
 pub mod errors;
 pub mod log;
@@ -31,6 +18,7 @@ pub mod utils;
 pub mod cpp_build_config;
 pub mod cpp_lib_builder;
 pub mod target;
+pub use toml;
 
 /// This type contains data serialized by the generator and placed to the
 /// generated crate's directory. The build script reads and uses this value.

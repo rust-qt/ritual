@@ -1,5 +1,5 @@
-use cpp_ffi_data::CppTypeConversionToFfi;
-use cpp_type::{
+use crate::cpp_ffi_data::CppTypeConversionToFfi;
+use crate::cpp_type::{
     CppBuiltInNumericType, CppClassType, CppFunctionPointerType, CppSpecificNumericType,
     CppSpecificNumericTypeKind, CppType, CppTypeRole,
 };

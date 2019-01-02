@@ -1,10 +1,10 @@
-use common::errors::Result;
-use common::log;
-use cpp_type::CppClassType;
-use cpp_type::CppPointerLikeTypeKind;
-use cpp_type::CppType;
-use processor::ProcessingStep;
-use processor::ProcessorData;
+use crate::common::errors::Result;
+use crate::common::log;
+use crate::cpp_type::CppClassType;
+use crate::cpp_type::CppPointerLikeTypeKind;
+use crate::cpp_type::CppType;
+use crate::processor::ProcessingStep;
+use crate::processor::ProcessorData;
 use std::collections::HashMap;
 
 pub fn choose_allocation_places_step() -> ProcessingStep {

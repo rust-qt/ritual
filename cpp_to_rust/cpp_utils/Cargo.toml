@@ -1,5 +1,6 @@
 [package]
 name = "cpp_utils"
+edition = "2018"
 
 # Don't forget to update `cpp_to_rust/cpp_to_rust_generator/src/versions.rs`
 # when changing this version.

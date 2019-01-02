@@ -1,25 +1,27 @@
-use common::errors::{unexpected, Result};
-use common::utils::MapIfOk;
-use cpp_data::CppBaseSpecifier;
-use cpp_data::CppClassField;
-use cpp_data::CppTypeDataKind;
-use cpp_data::CppVisibility;
-use cpp_ffi_data::CppFfiArgumentMeaning;
-use cpp_ffi_data::CppFfiFunctionArgument;
-use cpp_ffi_data::CppFfiItem;
-use cpp_ffi_data::CppFfiType;
-use cpp_ffi_data::QtSlotWrapper;
-use cpp_ffi_data::{CppCast, CppFfiFunction, CppFfiFunctionKind, CppFieldAccessorType};
-use cpp_function::ReturnValueAllocationPlace;
-use cpp_function::{CppFunction, CppFunctionArgument, CppFunctionKind, CppFunctionMemberData};
-use cpp_type::CppFunctionPointerType;
-use cpp_type::CppPointerLikeTypeKind;
-use cpp_type::CppTypeRole;
-use cpp_type::{CppClassType, CppType};
-use database::CppItemData;
-use database::FfiItem;
-use processor::ProcessingStep;
-use processor::ProcessorData;
+use crate::common::errors::{unexpected, Result};
+use crate::common::utils::MapIfOk;
+use crate::cpp_data::CppBaseSpecifier;
+use crate::cpp_data::CppClassField;
+use crate::cpp_data::CppTypeDataKind;
+use crate::cpp_data::CppVisibility;
+use crate::cpp_ffi_data::CppFfiArgumentMeaning;
+use crate::cpp_ffi_data::CppFfiFunctionArgument;
+use crate::cpp_ffi_data::CppFfiItem;
+use crate::cpp_ffi_data::CppFfiType;
+use crate::cpp_ffi_data::QtSlotWrapper;
+use crate::cpp_ffi_data::{CppCast, CppFfiFunction, CppFfiFunctionKind, CppFieldAccessorType};
+use crate::cpp_function::ReturnValueAllocationPlace;
+use crate::cpp_function::{
+    CppFunction, CppFunctionArgument, CppFunctionKind, CppFunctionMemberData,
+};
+use crate::cpp_type::CppFunctionPointerType;
+use crate::cpp_type::CppPointerLikeTypeKind;
+use crate::cpp_type::CppTypeRole;
+use crate::cpp_type::{CppClassType, CppType};
+use crate::database::CppItemData;
+use crate::database::FfiItem;
+use crate::processor::ProcessingStep;
+use crate::processor::ProcessorData;
 use std::iter::once;
 
 pub struct FfiNameProvider {

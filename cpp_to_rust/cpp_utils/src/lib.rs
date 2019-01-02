@@ -2,9 +2,9 @@
 
 #[cfg(test)]
 mod tests {
+    use crate::{CppBox, CppDeletable, Deleter};
     use std::cell::RefCell;
     use std::rc::Rc;
-    use {CppBox, CppDeletable, Deleter};
 
     struct Struct1 {
         value: Rc<RefCell<i32>>,

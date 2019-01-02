@@ -1,32 +1,34 @@
-use common::errors::{unexpected, ChainErr, Result};
-use common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
-use common::log;
-use common::string_utils::JoinWithSeparator;
-use cpp_data::{
+use crate::common::errors::{unexpected, ChainErr, Result};
+use crate::common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
+use crate::common::log;
+use crate::common::string_utils::JoinWithSeparator;
+use crate::cpp_data::{
     CppBaseSpecifier, CppClassField, CppEnumValue, CppOriginLocation, CppTypeData, CppVisibility,
 };
-use cpp_function::{CppFunction, CppFunctionArgument, CppFunctionKind, CppFunctionMemberData};
-use cpp_operator::CppOperator;
-use cpp_type::{
+use crate::cpp_function::{
+    CppFunction, CppFunctionArgument, CppFunctionKind, CppFunctionMemberData,
+};
+use crate::cpp_operator::CppOperator;
+use crate::cpp_type::{
     CppBuiltInNumericType, CppClassType, CppFunctionPointerType, CppSpecificNumericType,
     CppSpecificNumericTypeKind, CppType,
 };
-use database::CppItemData;
+use crate::database::CppItemData;
 
+use crate::common::file_utils::PathBufWithAdded;
 use clang;
 use clang::*;
-use common::file_utils::PathBufWithAdded;
 
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
-use config::Config;
-use cpp_data::CppTypeDataKind;
-use database::DatabaseItemSource;
+use crate::config::Config;
+use crate::cpp_data::CppTypeDataKind;
+use crate::database::DatabaseItemSource;
 
-use cpp_type::CppPointerLikeTypeKind;
-use processor::ProcessingStep;
-use processor::ProcessorData;
+use crate::cpp_type::CppPointerLikeTypeKind;
+use crate::processor::ProcessingStep;
+use crate::processor::ProcessorData;
 use regex::Regex;
 use std::iter::once;
 

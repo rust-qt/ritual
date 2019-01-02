@@ -1,8 +1,9 @@
 //! Types for handling information about C++ types.
 
-use common::errors::{ChainErr, Error, Result};
-use common::string_utils::JoinWithSeparator;
-use cpp_ffi_data::{CppFfiType, CppTypeConversionToFfi};
+use crate::common::errors::{ChainErr, Error, Result};
+use crate::common::string_utils::JoinWithSeparator;
+use crate::cpp_ffi_data::{CppFfiType, CppTypeConversionToFfi};
+use serde_derive::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub enum CppPointerLikeTypeKind {

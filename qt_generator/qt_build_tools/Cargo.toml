@@ -1,5 +1,6 @@
 [package]
 name = "qt_build_tools"
+edition = "2018"
 
 # when changing this version, update `qt_generator/qt_generator/src/versions.rs`
 version = "0.2.4"

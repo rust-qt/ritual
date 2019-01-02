@@ -1,17 +1,15 @@
-extern crate tempdir;
+use crate::common::file_utils::{create_dir, create_file, PathBufWithAdded};
+use crate::cpp_data::*;
+use crate::cpp_function::*;
+use crate::cpp_operator::CppOperator;
+use crate::cpp_type::*;
 
-use common::file_utils::{create_dir, create_file, PathBufWithAdded};
-use cpp_data::*;
-use cpp_function::*;
-use cpp_operator::CppOperator;
-use cpp_type::*;
-
-use common::cpp_build_config::CppBuildPaths;
-use config::Config;
-use config::CrateProperties;
-use cpp_parser::cpp_parser_step;
-use processor;
-use workspace::Workspace;
+use crate::common::cpp_build_config::CppBuildPaths;
+use crate::config::Config;
+use crate::config::CrateProperties;
+use crate::cpp_parser::cpp_parser_step;
+use crate::processor;
+use crate::workspace::Workspace;
 
 struct ParserCppData {
     types: Vec<CppTypeData>,

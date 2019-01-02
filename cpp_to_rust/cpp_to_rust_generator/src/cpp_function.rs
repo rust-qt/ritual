@@ -1,12 +1,13 @@
 //! Types for handling information about C++ methods.
 
-use common::errors::Result;
-use common::string_utils::JoinWithSeparator;
-use common::utils::MapIfOk;
-use cpp_data::CppVisibility;
-pub use cpp_operator::{CppOperator, CppOperatorInfo};
-use cpp_type::CppPointerLikeTypeKind;
-use cpp_type::{CppClassType, CppType};
+use crate::common::errors::Result;
+use crate::common::string_utils::JoinWithSeparator;
+use crate::common::utils::MapIfOk;
+use crate::cpp_data::CppVisibility;
+pub use crate::cpp_operator::{CppOperator, CppOperatorInfo};
+use crate::cpp_type::CppPointerLikeTypeKind;
+use crate::cpp_type::{CppClassType, CppType};
+use serde_derive::{Deserialize, Serialize};
 
 /// Information about an argument of a C++ method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]

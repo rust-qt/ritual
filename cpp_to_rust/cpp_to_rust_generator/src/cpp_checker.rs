@@ -1,22 +1,24 @@
-use common::cpp_lib_builder::{c2r_cmake_vars, BuildType, CppLibBuilder, CppLibBuilderOutput};
-use common::errors::Result;
-use common::file_utils::PathBufWithAdded;
-use common::file_utils::{create_dir_all, create_file, path_to_str, remove_dir_all};
-use common::log;
-use common::target::current_target;
-use common::utils::MapIfOk;
+use crate::common::cpp_lib_builder::{
+    c2r_cmake_vars, BuildType, CppLibBuilder, CppLibBuilderOutput,
+};
+use crate::common::errors::Result;
+use crate::common::file_utils::PathBufWithAdded;
+use crate::common::file_utils::{create_dir_all, create_file, path_to_str, remove_dir_all};
+use crate::common::log;
+use crate::common::target::current_target;
+use crate::common::utils::MapIfOk;
 
-use database::CppCheckerAddResult;
-use database::CppCheckerInfo;
+use crate::database::CppCheckerAddResult;
+use crate::database::CppCheckerInfo;
 
-use database::CppCheckerEnv;
+use crate::database::CppCheckerEnv;
 
-use processor::ProcessingStep;
-use processor::ProcessorData;
+use crate::processor::ProcessingStep;
+use crate::processor::ProcessorData;
 
-use cpp_code_generator;
-use cpp_ffi_data::CppFfiItem;
-use html_logger::escape_html;
+use crate::cpp_code_generator;
+use crate::cpp_ffi_data::CppFfiItem;
+use crate::html_logger::escape_html;
 use std::path::Path;
 use std::path::PathBuf;
 

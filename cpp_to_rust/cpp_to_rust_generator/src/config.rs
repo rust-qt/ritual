@@ -1,8 +1,8 @@
 //! Interface for configuring and running the generator.
 
-use common;
-use common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
-use processor::ProcessingStep;
+use crate::common;
+use crate::common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
+use crate::processor::ProcessingStep;
 use std::path::PathBuf;
 
 /// Information about an extra non-`cpp_to_rust`-based dependency.
@@ -38,7 +38,7 @@ pub struct CrateProperties {
     /// Version of the crate (must be in compliance with cargo requirements)
     version: String,
     /// Extra properties to be merged with auto generated content of `Cargo.toml`
-    custom_fields: common::toml::Table,
+    custom_fields: crate::common::toml::Table,
     /// Extra dependencies for output `Cargo.toml`
     dependencies: Vec<CrateDependency>,
     /// Extra build dependencies for output `Cargo.toml`

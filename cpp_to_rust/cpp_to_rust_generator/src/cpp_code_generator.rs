@@ -1,21 +1,21 @@
 #![allow(dead_code)]
 
-use common::errors::{unexpected, Result};
-use common::file_utils::{create_dir_all, create_file, path_to_str, PathBufWithAdded};
-use common::string_utils::JoinWithSeparator;
-use common::utils::get_command_output;
-use common::utils::MapIfOk;
-use cpp_ffi_data::{
+use crate::common::errors::{unexpected, Result};
+use crate::common::file_utils::{create_dir_all, create_file, path_to_str, PathBufWithAdded};
+use crate::common::string_utils::JoinWithSeparator;
+use crate::common::utils::get_command_output;
+use crate::common::utils::MapIfOk;
+use crate::cpp_ffi_data::{
     CppFfiArgumentMeaning, CppFfiFunctionKind, CppFfiType, CppFieldAccessorType,
     CppTypeConversionToFfi, QtSlotWrapper,
 };
-use cpp_function::ReturnValueAllocationPlace;
-use cpp_type::CppType;
+use crate::cpp_function::ReturnValueAllocationPlace;
+use crate::cpp_type::CppType;
 
-use cpp_ffi_data::CppFfiFunction;
-use cpp_ffi_data::CppFfiItem;
-use cpp_type::CppPointerLikeTypeKind;
-use database::DatabaseItem;
+use crate::cpp_ffi_data::CppFfiFunction;
+use crate::cpp_ffi_data::CppFfiItem;
+use crate::cpp_type::CppPointerLikeTypeKind;
+use crate::database::DatabaseItem;
 use std::iter::once;
 use std::path::Path;
 use std::path::PathBuf;

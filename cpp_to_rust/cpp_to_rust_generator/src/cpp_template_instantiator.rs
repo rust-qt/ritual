@@ -1,15 +1,15 @@
-use common::errors::Result;
-use common::log;
-use cpp_data::CppTemplateInstantiation;
-use cpp_function::CppFunction;
-use cpp_function::CppFunctionArgument;
-use cpp_function::CppOperator;
-use cpp_type::CppClassType;
-use cpp_type::CppType;
-use database::CppItemData;
-use database::DatabaseItemSource;
-use processor::ProcessingStep;
-use processor::ProcessorData;
+use crate::common::errors::Result;
+use crate::common::log;
+use crate::cpp_data::CppTemplateInstantiation;
+use crate::cpp_function::CppFunction;
+use crate::cpp_function::CppFunctionArgument;
+use crate::cpp_function::CppOperator;
+use crate::cpp_type::CppClassType;
+use crate::cpp_type::CppType;
+use crate::database::CppItemData;
+use crate::database::DatabaseItemSource;
+use crate::processor::ProcessingStep;
+use crate::processor::ProcessorData;
 
 /// Returns true if `type1` is a known template instantiation.
 fn check_template_type(data: &ProcessorData, type1: &CppType) -> Result<()> {

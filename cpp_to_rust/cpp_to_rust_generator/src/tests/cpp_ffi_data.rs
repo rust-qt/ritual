@@ -1,5 +1,5 @@
-use cpp_ffi_data::*;
-use cpp_type::*;
+use crate::cpp_ffi_data::*;
+use crate::cpp_type::*;
 
 #[test]
 fn argument_meaning() {
