@@ -199,4 +199,10 @@ impl CppTypeDataKind {
             _ => false,
         }
     }
+    pub fn is_enum(&self) -> bool {
+        match self {
+            &CppTypeDataKind::Enum { .. } => true,
+            _ => false,
+        }
+    }
 }

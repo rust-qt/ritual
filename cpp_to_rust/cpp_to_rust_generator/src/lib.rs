@@ -32,6 +32,8 @@ pub mod html_logger;
 pub mod processor;
 pub mod workspace;
 
+mod rust_name_resolver;
+
 //mod doc_formatter;
 //mod launcher;
 //mod rust_generator;

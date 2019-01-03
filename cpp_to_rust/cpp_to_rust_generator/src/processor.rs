@@ -14,6 +14,7 @@ use crate::cpp_template_instantiator::find_template_instantiations_step;
 use crate::cpp_template_instantiator::instantiate_templates_step;
 use crate::database::{Database, DatabaseItem};
 use crate::html_logger::HtmlLogger;
+use crate::rust_name_resolver::rust_name_resolver_step;
 use crate::type_allocation_places::choose_allocation_places_step;
 use crate::workspace::Workspace;
 use std::cmp::Ordering;
@@ -230,6 +231,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
         cpp_ffi_generator_step(),
         // TODO: generate_slot_wrappers
         cpp_checker_step(),
+        rust_name_resolver_step(),
         steps::print_database(),
         steps::clear_ffi(),
         steps::clear(),

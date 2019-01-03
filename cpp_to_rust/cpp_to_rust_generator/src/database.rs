@@ -154,8 +154,11 @@ impl CppItemData {
                 }],
                 CppTypeDataKind::Class { ref type_base } => vec![CppType::Class(type_base.clone())],
             },
-            CppItemData::EnumValue(_) | CppItemData::Namespace(_) => Vec::new(),
-            CppItemData::Function(ref method) => method.all_involved_types(),
+            CppItemData::EnumValue(ref enum_value) => vec![CppType::Enum {
+                name: enum_value.enum_name.clone(),
+            }],
+            CppItemData::Namespace(_) => Vec::new(),
+            CppItemData::Function(ref function) => function.all_involved_types(),
             CppItemData::ClassField(ref field) => {
                 let class_type = CppType::Class(field.class_type.clone());
                 vec![class_type, field.field_type.clone()]
@@ -227,9 +230,9 @@ impl CppItemData {
         }
     }
 
-    pub fn path(&self) -> Option<String> {
+    /*pub fn path(&self) -> Option<String> {
         unimplemented!()
-    }
+    }*/
 }
 
 impl Display for CppItemData {

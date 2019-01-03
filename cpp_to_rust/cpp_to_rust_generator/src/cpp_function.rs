@@ -370,6 +370,10 @@ impl CppFunction {
                 result.push(cpp_type.clone());
             }
         }
+
+        if let Some(ref template_arguments) = self.template_arguments {
+            result.extend(template_arguments.clone());
+        }
         result
     }
 }
