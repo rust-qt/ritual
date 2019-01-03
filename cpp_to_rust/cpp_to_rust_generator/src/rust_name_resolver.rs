@@ -3,7 +3,7 @@ use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 //use cpp_to_rust_common::log;
 use crate::common::errors::{bail, Result};
-use crate::cpp_type::CppClassType;
+use crate::cpp_data::CppTypeDataKind;
 use crate::cpp_type::CppType;
 use crate::database::CppItemData;
 use crate::database::DatabaseItem;
@@ -11,21 +11,24 @@ use cpp_to_rust_common::log;
 
 fn check_type(all_items: &[&DatabaseItem], cpp_type: &CppType) -> Result<()> {
     match cpp_type {
-        CppType::Class(CppClassType {
-            ref name,
-            ref template_arguments,
-        }) => {
+        CppType::Class(class_type) => {
+            let kind = CppTypeDataKind::Class {
+                class_type: class_type.clone(),
+            };
             if !all_items
                 .iter()
                 .filter_map(|item| item.cpp_data.as_type_ref())
-                .any(|t| &t.name == name && t.kind.is_class())
+                .any(|t| t.name == class_type.name && t.kind == kind)
             {
-                bail!("class not found: {}", name);
+                bail!("class not found: {}", class_type.to_cpp_pseudo_code());
             }
 
-            if let Some(ref args) = *template_arguments {
-                for arg in args {
-                    check_type(all_items, arg)?;
+            if let Some(ref template_arguments) = class_type.template_arguments {
+                if template_arguments
+                    .iter()
+                    .any(|arg| arg.is_or_contains_template_parameter())
+                {
+                    bail!("template parameters are not supported");
                 }
             }
         }
@@ -47,6 +50,9 @@ fn check_type(all_items: &[&DatabaseItem], cpp_type: &CppType) -> Result<()> {
             for arg in &t.arguments {
                 check_type(all_items, arg)?;
             }
+        }
+        CppType::TemplateParameter { .. } => {
+            bail!("template parameters are not supported");
         }
         _ => {}
     }
@@ -134,7 +140,7 @@ fn it_should_check_functions() {
         cpp_data: CppItemData::Type(CppTypeData {
             name: CppName::from_one_part("C1"),
             kind: CppTypeDataKind::Class {
-                type_base: CppClassType {
+                class_type: CppClassType {
                     name: CppName::from_one_part("C1"),
                     template_arguments: None,
                 },
