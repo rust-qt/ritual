@@ -1,7 +1,7 @@
 //! Function for replacing plain boring names of the header files with
 //! Qt's shortcut header names.
 
-use cpp_to_rust_generator::common::errors::{ChainErr, Result};
+use cpp_to_rust_generator::common::errors::{err_msg, Result, ResultExt};
 use cpp_to_rust_generator::common::file_utils::{file_to_string, os_str_to_str, read_dir};
 use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::common::utils::add_to_multihash;
@@ -45,14 +45,15 @@ impl HeaderNameMap {
             if !header_path.is_file() {
                 continue;
             }
-            let metadata = ::std::fs::metadata(&header_path)
-                .chain_err(|| format!("failed to get metadata for {}", header_path.display()))?;
+            let metadata = ::std::fs::metadata(&header_path).with_context(|_| {
+                format!("failed to get metadata for {}", header_path.display())
+            })?;
             if metadata.len() < 100 {
                 let file_content = file_to_string(&header_path)?;
                 if let Some(matches) = re.captures(file_content.trim()) {
                     let real_header = matches
                         .get(1)
-                        .chain_err(|| "invalid regexp matches")?
+                        .ok_or_else(|| err_msg("invalid regexp matches"))?
                         .as_str()
                         .to_string();
                     let fancy_header = os_str_to_str(&header.file_name())?.to_string();

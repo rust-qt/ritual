@@ -1,6 +1,6 @@
 //! Types and functions used for Rust code generation.
 
-use common::errors::{unexpected, ChainErr, Result};
+use common::errors::{unexpected, ResultExt, Result};
 use common::file_utils::{
   copy_file, copy_recursively, create_dir_all, create_file, file_to_string, os_str_to_str,
   path_to_str, read_dir, repo_crate_local_path, save_toml, PathBufWithAdded,
@@ -473,7 +473,7 @@ impl<'a> RustCodeGenerator<'a> {
             {
               let args = generic_arguments
                 .as_ref()
-                .chain_err(|| "Option with no generic_arguments")?;
+                .with_context(|| "Option with no generic_arguments")?;
               if args.len() != 1 {
                 return Err("Option with invalid args count".into());
               }
@@ -637,10 +637,10 @@ impl<'a> RustCodeGenerator<'a> {
           {
             let generic_arguments = generic_arguments
               .as_ref()
-              .chain_err(|| "CppBox must have generic_arguments")?;
+              .with_context(|| "CppBox must have generic_arguments")?;
             let arg = generic_arguments
               .get(0)
-              .chain_err(|| "CppBox must have non-empty generic_arguments")?;
+              .with_context(|| "CppBox must have non-empty generic_arguments")?;
             self.rust_type_to_code(arg)
           } else {
             return Err(unexpected("CppBox type expected").into());
@@ -662,7 +662,7 @@ impl<'a> RustCodeGenerator<'a> {
     }
     let final_args = final_args
       .into_iter()
-      .map_if_ok(|x| x.chain_err(|| "ffi argument is missing"))?;
+      .map_if_ok(|x| x.with_context(|| "ffi argument is missing"))?;
 
     result.push(format!(
       "{unsafe_start}::ffi::{}({}){maybe_semicolon}{unsafe_end}",
@@ -1472,7 +1472,7 @@ impl<'a> {connections_mod}::Receiver for {type_name}<'a> {{
         let name = os_str_to_str(
           path
             .file_name()
-            .chain_err(|| unexpected("no file name in path"))?,
+            .with_context(|| unexpected("no file name in path"))?,
         )?;
         let e = format!(
           "Generated source file {} conflicts with the crate template. \

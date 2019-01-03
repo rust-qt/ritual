@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::common::errors::{unexpected, Result};
+use crate::common::errors::{bail, should_panic_on_unexpected, unexpected, Result};
 use crate::common::file_utils::{create_dir_all, create_file, path_to_str, PathBufWithAdded};
 use crate::common::string_utils::JoinWithSeparator;
 use crate::common::utils::get_command_output;
@@ -92,12 +92,10 @@ fn convert_return_type(method: &CppFfiFunction, expression: String) -> Result<St
         CppTypeConversionToFfi::ValueToPointer => {
             match method.allocation_place {
                 ReturnValueAllocationPlace::Stack => {
-                    return Err(
-                        unexpected("stack allocated wrappers are expected to return void").into(),
-                    );
+                    unexpected!("stack allocated wrappers are expected to return void");
                 }
                 ReturnValueAllocationPlace::NotApplicable => {
-                    return Err(unexpected("ValueToPointer conflicts with NotApplicable").into());
+                    unexpected!("ValueToPointer conflicts with NotApplicable");
                 }
                 ReturnValueAllocationPlace::Heap => {
                     // constructors are said to return values in parse result,
@@ -171,9 +169,7 @@ fn arguments_values(method: &CppFfiFunction) -> Result<String> {
                         if *kind == CppPointerLikeTypeKind::Reference && *is_const {
                             target.to_cpp_code(None)?
                         } else {
-                            return Err(
-                                "Unsupported original type for QFlagsToUInt conversion".into()
-                            );
+                            bail!("Unsupported original type for QFlagsToUInt conversion");
                         }
                     } else {
                         argument.argument_type.original_type.to_cpp_code(None)?
@@ -202,7 +198,7 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
         {
             format!("c2r_call_destructor({})", arg.name)
         } else {
-            return Err(unexpected("no this arg in destructor").into());
+            unexpected!("no this arg in destructor");
         }
     } else {
         let mut is_field_accessor = false;
@@ -222,16 +218,12 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
                     {
                         format!("new({}) {}", arg.name, class_type.to_cpp_code()?)
                     } else {
-                        return Err(unexpected(format!(
-                            "return value argument not found\n{:?}",
-                            method
-                        ))
-                        .into());
+                        unexpected!("return value argument not found\n{:?}", method);
                     }
                 }
                 ReturnValueAllocationPlace::Heap => format!("new {}", class_type.to_cpp_code()?),
                 ReturnValueAllocationPlace::NotApplicable => {
-                    return Err(unexpected("NotApplicable in constructor").into());
+                    unexpected!("NotApplicable in constructor");
                 }
             }
         } else {

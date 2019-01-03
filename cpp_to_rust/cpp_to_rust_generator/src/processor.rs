@@ -1,4 +1,4 @@
-use crate::common::errors::{ChainErr, Result};
+use crate::common::errors::{bail, Result, ResultExt};
 use crate::common::file_utils::PathBufWithAdded;
 use crate::common::log;
 
@@ -27,17 +27,16 @@ use std::path::PathBuf;
 fn check_all_paths(config: &Config) -> Result<()> {
     let check_dir = |path: &PathBuf| -> Result<()> {
         if !path.is_absolute() {
-            return Err(format!(
+            bail!(
                 "Only absolute paths allowed. Relative path: {}",
                 path.display()
-            )
-            .into());
+            );
         }
         if !path.exists() {
-            return Err(format!("Directory doesn't exist: {}", path.display()).into());
+            bail!("Directory doesn't exist: {}", path.display());
         }
         if !path.is_dir() {
-            return Err(format!("Path is not a directory: {}", path.display()).into());
+            bail!("Path is not a directory: {}", path.display());
         }
         Ok(())
     };
@@ -247,20 +246,16 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
     log::status("Loading current crate data");
     let mut current_database = workspace
         .load_or_create_crate(config.crate_properties().name())
-        .chain_err(|| "failed to load current crate data")?;
+        .with_context(|_| "failed to load current crate data")?;
 
     if !config.dependent_cpp_crates().is_empty() {
         log::status("Loading dependencies");
     }
-    let dependent_cpp_crates =
-        config
-            .dependent_cpp_crates()
-            .iter()
-            .map_if_ok(|name| -> Result<_> {
-                workspace
-                    .load_crate(name)
-                    .chain_err(|| "failed to load dependency")
-            })?;
+    let dependent_cpp_crates = config.dependent_cpp_crates().iter().map_if_ok(|name| {
+        workspace
+            .load_crate(name)
+            .with_context(|_| "failed to load dependency")
+    })?;
 
     let mut current_database_saved = true;
 
@@ -342,7 +337,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
     if config.has_cpp_data_filters() {
       log::status("Running custom filters for C++ parser data");
       for filter in config.cpp_data_filters() {
-        filter(&mut parser_cpp_data).chain_err(
+        filter(&mut parser_cpp_data).with_context(
           || "cpp_data_filter failed",
         )?;
       }

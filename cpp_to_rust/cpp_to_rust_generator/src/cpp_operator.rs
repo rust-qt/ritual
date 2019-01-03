@@ -1,6 +1,6 @@
 //! Types for describing C++ operators
 
-use crate::common::errors::Result;
+use crate::common::errors::{bail, Result};
 use crate::cpp_type::CppType;
 use serde_derive::{Deserialize, Serialize};
 
@@ -206,7 +206,7 @@ impl CppOperator {
         use self::CppOperator::*;
         Ok(match *self {
             Conversion(..) => {
-                return Err("CppOperator::c_name: conversion operators are not supported".into())
+                bail!("CppOperator::c_name: conversion operators are not supported");
             }
             Assignment => "assign",
             Addition => "add",

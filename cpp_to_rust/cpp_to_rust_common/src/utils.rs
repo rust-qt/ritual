@@ -1,6 +1,6 @@
 //! Various utilities.
 
-use crate::errors::{ChainErr, Result};
+use crate::errors::{bail, Result, ResultExt};
 use crate::log;
 
 use std;
@@ -46,11 +46,11 @@ pub fn run_command(command: &mut Command) -> Result<()> {
     log::status(format!("Executing command: {:?}", command));
     let status = command
         .status()
-        .chain_err(|| format!("failed to run command: {:?}", command))?;
+        .with_context(|_| format!("failed to run command: {:?}", command))?;
     if status.success() {
         Ok(())
     } else {
-        Err(format!("command failed with {}: {:?}", status, command).into())
+        bail!("command failed with {}: {:?}", status, command);
     }
 }
 
@@ -75,7 +75,7 @@ pub fn run_command_and_capture_output(command: &mut Command) -> Result<CommandOu
     command.stderr(std::process::Stdio::piped());
     let output = command
         .output()
-        .chain_err(|| format!("failed to run command: {:?}", command))?;
+        .with_context(|_| format!("failed to run command: {:?}", command))?;
     Ok(CommandOutput {
         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
         stderr: String::from_utf8_lossy(&output.stderr).to_string(),
@@ -90,21 +90,22 @@ pub fn get_command_output(command: &mut Command) -> Result<String> {
     command.stderr(std::process::Stdio::piped());
     let output = command
         .output()
-        .chain_err(|| format!("failed to run command: {:?}", command))?;
+        .with_context(|_| format!("failed to run command: {:?}", command))?;
     if output.status.success() {
-        String::from_utf8(output.stdout).chain_err(|| "comand output is not valid unicode")
+        Ok(String::from_utf8(output.stdout)
+            .with_context(|_| "comand output is not valid unicode")?)
     } else {
         use std::io::Write;
         let mut stderr = std::io::stderr();
         writeln!(stderr, "Stdout:")?;
         stderr
             .write_all(&output.stdout)
-            .chain_err(|| "output failed")?;
+            .with_context(|_| "output failed")?;
         writeln!(stderr, "Stderr:")?;
         stderr
             .write_all(&output.stderr)
-            .chain_err(|| "output failed")?;
-        Err(format!("command failed with {}: {:?}", output.status, command).into())
+            .with_context(|_| "output failed")?;
+        bail!("command failed with {}: {:?}", output.status, command);
     }
 }
 
@@ -147,7 +148,7 @@ pub fn add_env_path_item(
             new_paths.push(path.into());
         }
     }
-    env::join_paths(new_paths).chain_err(|| "env::join_paths failed")
+    Ok(env::join_paths(new_paths).with_context(|_| "env::join_paths failed")?)
 }
 
 pub trait PushVec<T> {

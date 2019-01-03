@@ -1,4 +1,4 @@
-use crate::common::errors::{unexpected, Result};
+use crate::common::errors::{bail, should_panic_on_unexpected, unexpected, Result};
 use crate::common::utils::MapIfOk;
 use crate::cpp_data::CppBaseSpecifier;
 use crate::cpp_data::CppClassField;
@@ -174,10 +174,7 @@ fn create_cast_method(
     if let CppFfiFunctionKind::Function { ref mut cast, .. } = r.kind {
         *cast = Some(cast1);
     } else {
-        return Err(unexpected(
-            "to_ffi_method must return a value with CppFfiFunctionKind::Function",
-        )
-        .into());
+        unexpected!("to_ffi_method must return a value with CppFfiFunctionKind::Function",);
     }
     Ok(r)
 }
@@ -286,7 +283,7 @@ fn generate_ffi_methods_for_method(
                 {
                     *omitted_arguments = Some(method.arguments.len() - method_copy.arguments.len());
                 } else {
-                    return Err(unexpected("expected method kind here").into());
+                    unexpected!("expected method kind here");
                 }
                 methods.push(processed_method);
             }
@@ -307,7 +304,7 @@ pub fn to_ffi_method(
     name_provider: &mut FfiNameProvider,
 ) -> Result<CppFfiFunction> {
     if method.allows_variadic_arguments {
-        return Err("Variable arguments are not supported".into());
+        bail!("Variable arguments are not supported");
     }
     let mut r = CppFfiFunction {
         arguments: Vec::new(),

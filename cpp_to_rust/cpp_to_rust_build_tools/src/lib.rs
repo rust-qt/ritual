@@ -10,7 +10,7 @@
 
 use crate::common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
 use crate::common::cpp_lib_builder::{BuildType, CppLibBuilder};
-use crate::common::errors::{fancy_unwrap, ChainErr, Result};
+use crate::common::errors::{bail, FancyUnwrap, Result, ResultExt};
 use crate::common::file_utils::{
     create_file, file_to_string, load_json, path_to_str, PathBufWithAdded,
 };
@@ -33,11 +33,11 @@ pub struct Config {
 
 fn manifest_dir() -> Result<PathBuf> {
     let dir = std::env::var("CARGO_MANIFEST_DIR")
-        .chain_err(|| "CARGO_MANIFEST_DIR env var is missing")?;
+        .with_context(|_| "CARGO_MANIFEST_DIR env var is missing")?;
     Ok(PathBuf::from(dir))
 }
 fn out_dir() -> Result<PathBuf> {
-    let dir = std::env::var("OUT_DIR").chain_err(|| "OUT_DIR env var is missing")?;
+    let dir = std::env::var("OUT_DIR").with_context(|_| "OUT_DIR env var is missing")?;
     Ok(PathBuf::from(dir))
 }
 
@@ -104,7 +104,7 @@ impl Config {
         let out_dir = out_dir()?;
         let c_lib_install_dir = out_dir.with_added("c_lib_install");
         let manifest_dir = manifest_dir()?;
-        let profile = std::env::var("PROFILE").chain_err(|| "PROFILE env var is missing")?;
+        let profile = std::env::var("PROFILE").with_context(|_| "PROFILE env var is missing")?;
         log::status("Building C++ wrapper library");
         CppLibBuilder {
             cmake_source_dir: manifest_dir.with_added("c_lib"),
@@ -119,7 +119,7 @@ impl Config {
             build_type: match profile.as_str() {
                 "debug" => BuildType::Debug,
                 "release" => BuildType::Release,
-                _ => return Err(format!("unknown value of PROFILE env var: {}", profile).into()),
+                _ => bail!("unknown value of PROFILE env var: {}", profile),
             },
             capture_output: false,
             skip_cmake: false,
@@ -189,7 +189,7 @@ impl Config {
     /// This function ends the process with the appropriate error code and never
     /// returns to the caller.
     pub fn run(self) -> ! {
-        fancy_unwrap(self.run_and_return());
+        self.run_and_return().fancy_unwrap();
         std::process::exit(0)
     }
 }
@@ -202,6 +202,6 @@ pub fn run_and_return() -> Result<()> {
 /// Runs the build script with default configuration.
 /// See `Config::run` for more information.
 pub fn run() -> ! {
-    let config = fancy_unwrap(Config::new());
+    let config = Config::new().fancy_unwrap();
     config.run()
 }

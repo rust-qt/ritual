@@ -1,7 +1,7 @@
 use crate::common::cpp_lib_builder::{
     c2r_cmake_vars, BuildType, CppLibBuilder, CppLibBuilderOutput,
 };
-use crate::common::errors::Result;
+use crate::common::errors::{bail, Result};
 use crate::common::file_utils::PathBufWithAdded;
 use crate::common::file_utils::{create_dir_all, create_file, path_to_str, remove_dir_all};
 use crate::common::log;
@@ -48,7 +48,7 @@ fn snippet_for_item(item: &CppFfiItem) -> Result<Snippet> {
         CppFfiItem::Function(ref function) => Ok(Snippet::new_global(
             cpp_code_generator::function_implementation(function)?,
         )),
-        CppFfiItem::QtSlotWrapper(_) => Err("qt slot wrappers are not supported yet".into()),
+        CppFfiItem::QtSlotWrapper(_) => bail!("qt slot wrappers are not supported yet"),
     }
 }
 
@@ -194,14 +194,12 @@ impl<'a> CppChecker<'a> {
         match self.check_snippet(snippet)? {
             CppLibBuilderOutput::Success => {
                 if !expected {
-                    return Err(format!("Nevative test ({}) succeeded", name).into());
+                    bail!("Nevative test ({}) succeeded", name);
                 }
             }
             CppLibBuilderOutput::Fail(output) => {
                 if expected {
-                    return Err(
-                        format!("Positive test ({}) failed: {}", name, output.stderr).into(),
-                    );
+                    bail!("Positive test ({}) failed: {}", name, output.stderr);
                 }
             }
         }

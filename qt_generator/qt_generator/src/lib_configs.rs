@@ -2,7 +2,7 @@
 
 use crate::versions;
 use cpp_to_rust_generator::common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
-use cpp_to_rust_generator::common::errors::{ChainErr, Result};
+use cpp_to_rust_generator::common::errors::{bail, Result, ResultExt};
 use cpp_to_rust_generator::common::file_utils::repo_crate_local_path;
 use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
 use cpp_to_rust_generator::common::target;
@@ -35,8 +35,8 @@ fn exclude_qlist_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(
           .class_type
           .template_arguments
           .as_ref()
-          .chain_err(|| "failed to get QList args")?;
-        let arg = args.get(0).chain_err(|| "failed to get QList arg")?;
+          .with_context(|| "failed to get QList args")?;
+        let arg = args.get(0).with_context(|| "failed to get QList arg")?;
         let arg_text = arg.to_cpp_pseudo_code();
         if types.iter().any(|x| x == &arg_text) {
           match method.name.as_ref() {
@@ -72,8 +72,8 @@ fn exclude_qvector_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(
           .class_type
           .template_arguments
           .as_ref()
-          .chain_err(|| "failed to get QVector args")?;
-        let arg = args.get(0).chain_err(|| "failed to get QVector arg")?;
+          .with_context(|| "failed to get QVector args")?;
+        let arg = args.get(0).with_context(|| "failed to get QVector arg")?;
         let arg_text = arg.to_cpp_pseudo_code();
         if types.iter().any(|x| x == &arg_text) {
           match method.name.as_ref() {
@@ -490,21 +490,21 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
     let mut config = Config::new(crate_properties);
     if crate_name.starts_with("moqt_") {
         let moqt_path = PathBuf::from(
-            ::std::env::var("MOQT_PATH").chain_err(|| "MOQT_PATH env var is missing")?,
+            ::std::env::var("MOQT_PATH").with_context(|_| "MOQT_PATH env var is missing")?,
         );
 
         config.add_include_directive(format!("{}.h", crate_name));
         let moqt_sublib_path = moqt_path.with_added(crate_name);
         if !moqt_sublib_path.exists() {
-            return Err(format!("Path does not exist: {}", moqt_sublib_path.display()).into());
+            bail!("Path does not exist: {}", moqt_sublib_path.display());
         }
         let include_path = moqt_sublib_path.with_added("include");
         if !include_path.exists() {
-            return Err(format!("Path does not exist: {}", include_path.display()).into());
+            bail!("Path does not exist: {}", include_path.display());
         }
         let lib_path = moqt_sublib_path.with_added("lib");
         if !lib_path.exists() {
-            return Err(format!("Path does not exist: {}", lib_path.display()).into());
+            bail!("Path does not exist: {}", lib_path.display());
         }
         {
             let mut paths = CppBuildPaths::new();
@@ -607,7 +607,7 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
         "qt_3d_extras" => lib_configs::extras_3d(&mut config)?,
         "qt_ui_tools" => {}
         "moqt_core" => {}
-        _ => return Err(format!("Unknown crate name: {}", crate_name).into()),
+        _ => bail!("Unknown crate name: {}", crate_name),
     }
 
     config.set_dependent_cpp_crates(

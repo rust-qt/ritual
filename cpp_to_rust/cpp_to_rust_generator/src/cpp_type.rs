@@ -1,6 +1,6 @@
 //! Types for handling information about C++ types.
 
-use crate::common::errors::{ChainErr, Error, Result};
+use crate::common::errors::{bail, Result, ResultExt};
 use crate::common::string_utils::JoinWithSeparator;
 use crate::cpp_data::CppName;
 use crate::cpp_ffi_data::{CppFfiType, CppTypeConversionToFfi};
@@ -341,7 +341,7 @@ impl CppType {
     /// Returns C++ code representing this type.
     pub fn to_cpp_code(&self, function_pointer_inner_text: Option<&str>) -> Result<String> {
         if !self.is_function_pointer() && function_pointer_inner_text.is_some() {
-            return Err("unexpected function_pointer_inner_text".into());
+            bail!("unexpected function_pointer_inner_text");
         }
         match *self {
             CppType::Void => Ok("void".to_string()),
@@ -353,7 +353,7 @@ impl CppType {
             //      CppTypeBase::PointerSizedInteger { ref name, .. } => Ok(name.clone()),
             CppType::Class(ref info) => info.to_cpp_code(),
             CppType::TemplateParameter { .. } => {
-                Err("template parameters are not allowed in C++ code generator".into())
+                bail!("template parameters are not allowed in C++ code generator");
             }
             CppType::FunctionPointer(CppFunctionPointerType {
                 ref return_type,
@@ -361,9 +361,7 @@ impl CppType {
                 ref allows_variadic_arguments,
             }) => {
                 if *allows_variadic_arguments {
-                    return Err(
-                        "function pointers with variadic arguments are not supported".into(),
-                    );
+                    bail!("function pointers with variadic arguments are not supported");
                 }
                 let mut arg_texts = Vec::new();
                 for arg in arguments {
@@ -377,7 +375,7 @@ impl CppType {
                         arg_texts.join(", ")
                     ))
                 } else {
-                    return Err("function_pointer_inner_text argument is missing".into());
+                    bail!("function_pointer_inner_text argument is missing");
                 }
             }
             CppType::PointerLike {
@@ -447,123 +445,113 @@ impl CppType {
     /// (e.g. references and passing objects by value).
     #[cfg_attr(feature = "clippy", allow(collapsible_if))]
     pub fn to_cpp_ffi_type(&self, role: CppTypeRole) -> Result<CppFfiType> {
-        let err = || format!("Can't express type to FFI: {:?}", self);
-        if self.is_or_contains_template_parameter() {
-            return Err(Error::from(
-                "template parameters cannot be expressed in FFI",
-            ))
-            .chain_err(&err);
-        }
-        match self {
-            CppType::FunctionPointer(CppFunctionPointerType {
-                ref return_type,
-                ref arguments,
-                ref allows_variadic_arguments,
-            }) => {
-                if *allows_variadic_arguments {
-                    return Err(Error::from(
-                        "function pointers with variadic arguments are not supported",
-                    ))
-                    .chain_err(&err);
-                }
-                let mut all_types: Vec<&CppType> = arguments.iter().collect();
-                all_types.push(return_type.as_ref());
-                for arg in all_types {
-                    match *arg {
-                        CppType::FunctionPointer(..) => {
-                            // TODO: also ban pointers to function pointers
-                            return Err(Error::from(
-                                "function pointers containing nested function pointers are \
-                                 not supported",
-                            ))
-                            .chain_err(&err);
-                        }
-                        CppType::Class(..) => {
-                            return Err(Error::from(
-                                "Function pointers containing classes by value are not \
-                                 supported",
-                            ))
-                            .chain_err(&err);
-                        }
-                        _ => {}
-                    }
-                    if arg.contains_reference() {
-                        return Err(Error::from(
-                            "Function pointers containing references are not supported",
-                        ))
-                        .chain_err(&err);
-                    }
-                }
-                return Ok(CppFfiType {
-                    ffi_type: self.clone(),
-                    conversion: CppTypeConversionToFfi::NoChange,
-                    original_type: self.clone(),
-                });
+        let inner = || -> Result<CppFfiType> {
+            if self.is_or_contains_template_parameter() {
+                bail!("template parameters cannot be expressed in FFI");
             }
-            CppType::Class(ref type1) => {
-                if type1.name == CppName::from_one_part("QFlags") {
-                    return Ok(CppFfiType {
-                        ffi_type: CppType::BuiltInNumeric(CppBuiltInNumericType::UInt),
-                        conversion: CppTypeConversionToFfi::QFlagsToUInt,
-                        original_type: self.clone(),
-                    });
-                } else {
-                    return Ok(CppFfiType {
-                        ffi_type: CppType::PointerLike {
-                            is_const: role != CppTypeRole::ReturnType,
-                            kind: CppPointerLikeTypeKind::Pointer,
-                            target: Box::new(self.clone()),
-                        },
-                        conversion: CppTypeConversionToFfi::ValueToPointer,
-                        original_type: self.clone(),
-                    });
-                }
-            }
-            CppType::PointerLike {
-                ref kind,
-                ref is_const,
-                ref target,
-            } => {
-                match *kind {
-                    CppPointerLikeTypeKind::Pointer => {}
-                    CppPointerLikeTypeKind::Reference => {
-                        if *is_const {
-                            if let CppType::Class(ref type1) = **target {
-                                if type1.name == CppName::from_one_part("QFlags") {
-                                    return Ok(CppFfiType {
-                                        ffi_type: CppType::BuiltInNumeric(
-                                            CppBuiltInNumericType::UInt,
-                                        ),
-                                        // TODO: use a separate conversion type (QFlagsConstRefToUInt)?
-                                        conversion: CppTypeConversionToFfi::QFlagsToUInt,
-                                        original_type: self.clone(),
-                                    });
-                                }
+            match self {
+                CppType::FunctionPointer(CppFunctionPointerType {
+                    ref return_type,
+                    ref arguments,
+                    ref allows_variadic_arguments,
+                }) => {
+                    if *allows_variadic_arguments {
+                        bail!("function pointers with variadic arguments are not supported");
+                    }
+                    let mut all_types: Vec<&CppType> = arguments.iter().collect();
+                    all_types.push(return_type.as_ref());
+                    for arg in all_types {
+                        match *arg {
+                            CppType::FunctionPointer(..) => {
+                                // TODO: also ban pointers to function pointers
+                                bail!(
+                                    "function pointers containing nested function pointers are \
+                                     not supported"
+                                );
                             }
+                            CppType::Class(..) => {
+                                bail!(
+                                    "Function pointers containing classes by value are not \
+                                     supported"
+                                );
+                            }
+                            _ => {}
                         }
+                        if arg.contains_reference() {
+                            bail!("Function pointers containing references are not supported");
+                        }
+                    }
+                    return Ok(CppFfiType {
+                        ffi_type: self.clone(),
+                        conversion: CppTypeConversionToFfi::NoChange,
+                        original_type: self.clone(),
+                    });
+                }
+                CppType::Class(ref type1) => {
+                    if type1.name == CppName::from_one_part("QFlags") {
+                        return Ok(CppFfiType {
+                            ffi_type: CppType::BuiltInNumeric(CppBuiltInNumericType::UInt),
+                            conversion: CppTypeConversionToFfi::QFlagsToUInt,
+                            original_type: self.clone(),
+                        });
+                    } else {
                         return Ok(CppFfiType {
                             ffi_type: CppType::PointerLike {
-                                is_const: *is_const,
+                                is_const: role != CppTypeRole::ReturnType,
                                 kind: CppPointerLikeTypeKind::Pointer,
-                                target: target.clone(),
+                                target: Box::new(self.clone()),
                             },
-                            conversion: CppTypeConversionToFfi::ReferenceToPointer,
+                            conversion: CppTypeConversionToFfi::ValueToPointer,
                             original_type: self.clone(),
                         });
                     }
-                    CppPointerLikeTypeKind::RValueReference => {
-                        return Err(Error::from("rvalue references are not supported"))
-                            .chain_err(&err);
+                }
+                CppType::PointerLike {
+                    ref kind,
+                    ref is_const,
+                    ref target,
+                } => {
+                    match *kind {
+                        CppPointerLikeTypeKind::Pointer => {}
+                        CppPointerLikeTypeKind::Reference => {
+                            if *is_const {
+                                if let CppType::Class(ref type1) = **target {
+                                    if type1.name == CppName::from_one_part("QFlags") {
+                                        return Ok(CppFfiType {
+                                            ffi_type: CppType::BuiltInNumeric(
+                                                CppBuiltInNumericType::UInt,
+                                            ),
+                                            // TODO: use a separate conversion type (QFlagsConstRefToUInt)?
+                                            conversion: CppTypeConversionToFfi::QFlagsToUInt,
+                                            original_type: self.clone(),
+                                        });
+                                    }
+                                }
+                            }
+                            return Ok(CppFfiType {
+                                ffi_type: CppType::PointerLike {
+                                    is_const: *is_const,
+                                    kind: CppPointerLikeTypeKind::Pointer,
+                                    target: target.clone(),
+                                },
+                                conversion: CppTypeConversionToFfi::ReferenceToPointer,
+                                original_type: self.clone(),
+                            });
+                        }
+                        CppPointerLikeTypeKind::RValueReference => {
+                            bail!("rvalue references are not supported");
+                        }
                     }
                 }
+                _ => {}
             }
-            _ => {}
-        }
-        Ok(CppFfiType {
-            ffi_type: self.clone(),
-            conversion: CppTypeConversionToFfi::NoChange,
-            original_type: self.clone(),
-        })
+            Ok(CppFfiType {
+                ffi_type: self.clone(),
+                conversion: CppTypeConversionToFfi::NoChange,
+                original_type: self.clone(),
+            })
+        };
+        Ok(inner().with_context(|_| format!("Can't express type to FFI: {:?}", self))?)
     }
 
     /// Attempts to replace template types at `nested_level1`
@@ -582,7 +570,7 @@ impl CppType {
             } => {
                 if *nested_level == nested_level1 {
                     if *index >= template_arguments1.len() {
-                        return Err("not enough template arguments".into());
+                        bail!("not enough template arguments");
                     }
                     Ok(template_arguments1[*index].clone())
                 } else {

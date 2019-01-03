@@ -1,4 +1,4 @@
-use crate::common::errors::Result;
+use crate::common::errors::{bail, FancyUnwrap, Result};
 use crate::common::file_utils::PathBufWithAdded;
 use crate::common::file_utils::{create_dir, create_dir_all, load_json, remove_dir_all, save_json};
 use crate::common::log;
@@ -46,7 +46,7 @@ fn database_path(workspace_path: &Path, crate_name: &str) -> PathBuf {
 impl Workspace {
     pub fn new(path: PathBuf) -> Result<Workspace> {
         if !path.is_dir() {
-            return Err(format!("No such directory: {}", path.display()).into());
+            bail!("No such directory: {}", path.display());
         }
         let config_path = config_path(&path);
         let w = Workspace {
@@ -218,9 +218,6 @@ impl Workspace {
 impl Drop for Workspace {
     fn drop(&mut self) {
         //log::status("test1: Workspace drop!");
-        if let Err(err) = self.save_data() {
-            err.display_report();
-            ::std::process::exit(1);
-        }
+        self.save_data().fancy_unwrap();
     }
 }

@@ -3,7 +3,7 @@
 //! See [README](https://github.com/rust-qt/cpp_to_rust)
 //! for more information.
 
-use cpp_to_rust_build_tools::common::errors::{fancy_unwrap, ChainErr, Result};
+use cpp_to_rust_build_tools::common::errors::{err_msg, FancyUnwrap, Result};
 use cpp_to_rust_build_tools::Config;
 use qt_generator_common::get_full_build_config;
 
@@ -15,7 +15,7 @@ pub fn run_and_return(crate_name: &str) -> Result<()> {
     {
         let original_qt_version = config
             .original_cpp_lib_version()
-            .chain_err(|| "cpp_lib_version is expected in Config")?;
+            .ok_or_else(|| err_msg("cpp_lib_version is expected in Config"))?;
 
         if original_qt_version != qt_config.installation_data.qt_version {
             println!(
@@ -31,6 +31,6 @@ pub fn run_and_return(crate_name: &str) -> Result<()> {
 
 /// Runs the build script and exits the process with an appropriate exit code.
 pub fn run(crate_name: &str) -> ! {
-    fancy_unwrap(run_and_return(crate_name));
-    std::process::exit(0)
+    run_and_return(crate_name).fancy_unwrap();
+    std::process::exit(0);
 }

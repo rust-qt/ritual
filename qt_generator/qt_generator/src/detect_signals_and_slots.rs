@@ -1,4 +1,4 @@
-use cpp_to_rust_generator::common::errors::{ChainErr, Result};
+use cpp_to_rust_generator::common::errors::{Result, ResultExt};
 use cpp_to_rust_generator::common::file_utils::open_file;
 use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::cpp_data::CppName;
@@ -83,7 +83,7 @@ pub fn detect_signals_and_slots(data: ProcessorData) -> Result<()> {
         let reader = BufReader::new(file.into_file());
         for (line_num, line) in reader.lines().enumerate() {
             let line =
-                line.chain_err(|| format!("failed while reading lines from {}", &file_path))?;
+                line.with_context(|_| format!("failed while reading lines from {}", &file_path))?;
             let section_type = if re_signals.is_match(&line) {
                 Some(SectionType::Signals)
             } else if re_slots.is_match(&line) {

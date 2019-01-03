@@ -1,23 +1,12 @@
 //! Converts Qt docs from the internal format.
 
-use cpp_to_rust_generator::common::errors::{ChainErr, Result};
+use cpp_to_rust_generator::common::errors::{bail, err_msg, Result, ResultExt};
 use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
 use cpp_to_rust_generator::common::log;
 use rusqlite;
 use select::document::Document;
 
 use std::path::Path;
-
-/// Convenience trait for converting `rusqlite` errors to `cpp_to_rust_common` errors.
-trait ConvertError<T> {
-    fn convert_err(self) -> Result<T>;
-}
-
-impl<T> ConvertError<T> for ::std::result::Result<T, rusqlite::Error> {
-    fn convert_err(self) -> Result<T> {
-        self.map_err(|err| format!("sqlite error: {}", err).into())
-    }
-}
 
 /// Decoded documentation data.
 #[derive(Debug)]
@@ -55,15 +44,15 @@ impl DocData {
     /// Returns parsed HTML document by id.
     pub fn document(&self, id: i32) -> Result<Document> {
         let file_data_query = "select Data from FileDataTable where Id==?";
-        let mut file_data_query = self.connection.prepare(file_data_query).convert_err()?;
-        let mut file_data = file_data_query.query(&[&id]).convert_err()?;
-        let file_data = file_data.next().chain_err(|| "invalid file id")?;
-        let file_data = file_data.convert_err()?;
-        let file_data: Vec<u8> = file_data.get_checked(0).convert_err()?;
+        let mut file_data_query = self.connection.prepare(file_data_query)?;
+        let mut file_data = file_data_query.query(&[&id])?;
+        let file_data = file_data.next().ok_or_else(|| err_msg("invalid file id"))?;
+        let file_data = file_data?;
+        let file_data: Vec<u8> = file_data.get_checked(0)?;
         let mut file_html = Vec::new();
         compress::zlib::Decoder::new(&file_data[4..])
             .read_to_end(&mut file_html)
-            .map_err(|err| format!("zlib decoder failed: {}", err))?;
+            .with_context(|_| "zlib decoder failed")?;
         let file_html = String::from_utf8_lossy(&file_html);
         Ok(Document::from(file_html.as_ref()))
     }
@@ -71,11 +60,11 @@ impl DocData {
     /// Returns virtual file name of the document by id.
     pub fn file_name(&self, id: i32) -> Result<String> {
         let query = "select Name from FileNameTable where FileId==?";
-        let mut query = self.connection.prepare(query).convert_err()?;
-        let mut result = query.query(&[&id]).convert_err()?;
-        let row = result.next().chain_err(|| "invalid file id")?;
-        let row = row.convert_err()?;
-        row.get_checked(0).convert_err()
+        let mut query = self.connection.prepare(query)?;
+        let mut result = query.query(&[&id])?;
+        let row = result.next().ok_or_else(|| err_msg("invalid file id"))?;
+        let row = row?;
+        Ok(row.get_checked(0)?)
     }
 
     /// Searches for an index item by lambda condition.
@@ -89,11 +78,10 @@ impl DocData {
     /// Parses Qt documentation of module `qt_crate_name` located at `docs_path`.
     pub fn new(qt_crate_name: &str, docs_path: &Path) -> Result<DocData> {
         if !docs_path.exists() {
-            return Err(format!(
+            bail!(
                 "Documentation directory does not exist: {}",
                 docs_path.display()
-            )
-            .into());
+            );
         }
         let doc_file_name = if qt_crate_name.starts_with("3d_") {
             "3d".to_string()
@@ -103,11 +91,10 @@ impl DocData {
 
         let doc_file_path = docs_path.with_added(format!("{}.qch", doc_file_name));
         if !doc_file_path.exists() {
-            return Err(format!(
+            bail!(
                 "Documentation file does not exist: {}",
                 doc_file_path.display()
-            )
-            .into());
+            );
         }
         log::status(format!(
             "Adding Qt documentation from {}",
@@ -116,20 +103,19 @@ impl DocData {
         let connection = rusqlite::Connection::open_with_flags(
             &doc_file_path,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-        )
-        .convert_err()?;
+        )?;
 
         let mut index_data = Vec::new();
         {
             let index_query = "select IndexTable.Identifier, IndexTable.FileId, IndexTable.Anchor \
                                from IndexTable";
-            let mut index = connection.prepare(index_query).convert_err()?;
-            let mut index_rows = index.query(rusqlite::NO_PARAMS).convert_err()?;
+            let mut index = connection.prepare(index_query)?;
+            let mut index_rows = index.query(rusqlite::NO_PARAMS)?;
             while let Some(index_row) = index_rows.next() {
-                let index_row = index_row.convert_err()?;
-                let name: String = index_row.get_checked(0).convert_err()?;
-                let file_id: i32 = index_row.get_checked(1).convert_err()?;
-                let anchor: Option<String> = index_row.get_checked(2).convert_err()?;
+                let index_row = index_row?;
+                let name: String = index_row.get_checked(0)?;
+                let file_id: i32 = index_row.get_checked(1)?;
+                let anchor: Option<String> = index_row.get_checked(2)?;
                 index_data.push(DocIndexItem {
                     name: name,
                     document_id: file_id,

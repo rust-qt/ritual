@@ -1,6 +1,6 @@
 //! Types for configuring build script behavior.
 
-use crate::errors::Result;
+use crate::errors::{bail, Result};
 use crate::target::{Condition, Target};
 use serde_derive::{Deserialize, Serialize};
 
@@ -118,7 +118,7 @@ impl CppBuildConfigData {
             .append(&mut other.compiler_flags.clone());
         if self.library_type.is_some() {
             if other.library_type.is_some() && other.library_type != self.library_type {
-                return Err("conflicting library types specified".into());
+                bail!("conflicting library types specified");
             }
         } else {
             self.library_type = other.library_type;

@@ -1,7 +1,7 @@
 //! Generates Rust public API and FFI functions
 
 use caption_strategy::TypeCaptionStrategy;
-use common::errors::{unexpected, ChainErr, Result};
+use common::errors::{unexpected, ResultExt, Result};
 use common::log;
 use common::string_utils::JoinWithSeparator;
 use common::string_utils::{CaseOperations, WordIterator};
@@ -91,7 +91,7 @@ impl<'a> CppDataWithDeps<'a> {
     for instantiations in &self.current.processed.template_instantiations {
       let type_info = self
         .find_type_info(|x| &x.name == &instantiations.class_name)
-        .chain_err(|| format!("type info not found for {}", &instantiations.class_name))?;
+        .with_context(|| format!("type info not found for {}", &instantiations.class_name))?;
       if !result.contains(&type_info.include_file) {
         result.insert(type_info.include_file.clone());
       }
@@ -576,7 +576,7 @@ fn complete_type(
     {
       let args = template_arguments
         .as_ref()
-        .chain_err(|| "QFlags type must have template arguments")?;
+        .with_context(|| "QFlags type must have template arguments")?;
       if args.len() != 1 {
         return Err("QFlags type must have exactly 1 template argument".into());
       }
@@ -1314,7 +1314,7 @@ impl<'aa> RustGenerator<'aa> {
       let mut method_last_name = method_name
         .parts
         .pop()
-        .chain_err(|| "name can't be empty")?;
+        .with_context(|| "name can't be empty")?;
       if let Some(self_arg_kind_caption) = self_arg_kind_caption {
         method_last_name =
           vec![method_last_name.as_ref(), self_arg_kind_caption.as_ref()].to_snake_case();
@@ -1458,12 +1458,12 @@ impl<'aa> RustGenerator<'aa> {
     } else {
       let mut method = filtered_methods
         .pop()
-        .chain_err(|| "filtered_methods can't be empty")?;
+        .with_context(|| "filtered_methods can't be empty")?;
       let mut last_name = method
         .name
         .parts
         .pop()
-        .chain_err(|| "name can't be empty")?;
+        .with_context(|| "name can't be empty")?;
       if let Some(self_arg_kind_caption) = self_arg_kind_caption {
         last_name = vec![last_name.as_ref(), self_arg_kind_caption.as_ref()].to_snake_case();
       }
@@ -1898,7 +1898,7 @@ impl<'aa> RustGenerator<'aa> {
     let template_final_name =
       |result: &Vec<RustProcessedTypeInfo>, item: &RustProcessedTypeInfo| -> Result<RustName> {
         let mut name = item.rust_name.clone();
-        let last_name = name.parts.pop().chain_err(|| "name.parts can't be empty")?;
+        let last_name = name.parts.pop().with_context(|| "name.parts can't be empty")?;
         let mut arg_captions = Vec::new();
         if let Some(ref args) = item.cpp_template_arguments {
           for x in args {
@@ -1930,7 +1930,7 @@ impl<'aa> RustGenerator<'aa> {
         .input_data
         .cpp_data
         .find_type_info(|x| &x.name == &template_instantiations.class_name)
-        .chain_err(|| {
+        .with_context(|| {
           format!(
             "type info not found for {}",
             &template_instantiations.class_name
@@ -2104,7 +2104,7 @@ impl<'aa> RustGenerator<'aa> {
     let mut split_parts: Vec<_> = name.split("::").collect();
     let original_last_part = split_parts
       .pop()
-      .chain_err(|| "split_parts can't be empty")?
+      .with_context(|| "split_parts can't be empty")?
       .to_string();
     let last_part = if let Some(operator) = operator {
       operator_rust_name(operator)?
@@ -2123,7 +2123,7 @@ impl<'aa> RustGenerator<'aa> {
     let module_name = self
       .top_module_names
       .get(include_file)
-      .chain_err(|| format!("no top level module generated for header: {}", include_file))?;
+      .with_context(|| format!("no top level module generated for header: {}", include_file))?;
 
     let mut parts = module_name.parts.clone();
     if include_file == "slots" {

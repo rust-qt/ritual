@@ -1,4 +1,4 @@
-//use common::errors::{unexpected, ChainErr, Result};
+//use common::errors::{unexpected, ResultExt, Result};
 //use common::string_utils::CaseOperations;
 //use common::utils::MapIfOk;
 //use cpp_ffi_data::CppIndirectionChange;
@@ -131,7 +131,7 @@ impl RustName {
     self
       .parts
       .last()
-      .chain_err(|| unexpected("RustName can't be empty"))
+      .with_context(|| unexpected("RustName can't be empty"))
   }
 
   /// Returns formatted name for using within `current_crate`.

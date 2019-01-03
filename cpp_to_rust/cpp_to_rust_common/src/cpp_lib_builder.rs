@@ -3,7 +3,7 @@
 use crate::cpp_build_config::CppBuildConfigData;
 use crate::cpp_build_config::CppBuildPaths;
 use crate::cpp_build_config::CppLibraryType;
-use crate::errors::Result;
+use crate::errors::{err_msg, Result};
 use crate::file_utils::{create_dir_all, path_to_str};
 use crate::log;
 use crate::string_utils::JoinWithSeparator;
@@ -40,11 +40,10 @@ impl CMakeVar {
             .into_iter()
             .map_if_ok(|s| -> Result<_> {
                 if s.as_ref().contains(';') {
-                    Err(format!(
+                    Err(err_msg(format!(
                         "can't pass value to cmake because ';' symbol is reserved: {}",
                         s.as_ref()
-                    )
-                    .into())
+                    )))
                 } else {
                     Ok(s)
                 }

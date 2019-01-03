@@ -1,130 +1,77 @@
 #![cfg_attr(feature = "clippy", allow(redundant_closure))]
 
-//! Error handling types based on `error_chain` crate.
+//! Error handling types based on `failure` crate.
 
-use error_chain::{error_chain, quick_error};
+use std::io::{stderr, Write};
 
-use std;
+pub type Result<T> = std::result::Result<T, failure::Error>;
+pub use crate::unexpected;
+pub use failure::{bail, err_msg, ResultExt};
+use std::env;
 
-error_chain! {
-  foreign_links {
-    std::io::Error, IO;
-    ::regex::Error, Regex;
-  }
-
-  errors {
-    Unexpected(msg: String) {
-      display("{}", msg)
-    }
-
-  }
+pub trait FancyUnwrap {
+    type Output;
+    fn fancy_unwrap(self) -> Self::Output;
 }
 
-use backtrace::Symbol;
-
-impl Error {
-    /// Returns true if this error was not deemed possible
-    /// during development.
-    pub fn is_unexpected(&self) -> bool {
-        if let ErrorKind::Unexpected(..) = *self.kind() {
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Panics if the error is unexpected.
-    /// Does nothing otherwise.
-    pub fn discard_expected(&self) {
-        if self.is_unexpected() {
-            self.display_report();
-            // TODO: don't panic on this in production
-            panic!("unexpected error");
-        }
-    }
-
-    /// Outputs formatted stack trace and
-    /// chained error messages to the `Error` logging channel.
-    pub fn display_report(&self) {
-        use crate::log;
-        if let Some(backtrace) = self.backtrace() {
-            log::error(format!("{:?}", backtrace));
-            log::error("");
-            let mut next_frame_num = 0;
-            for frame in backtrace.frames() {
-                for symbol in frame.symbols() {
-                    if let Some(path) = symbol.filename() {
-                        let path_is_good = |x: std::path::Component| {
-                            if let Some(x) = x.as_os_str().to_str() {
-                                x == "libstd"
-                                    || x == "libpanic_unwind"
-                                    || x == "libcore"
-                                    || x == "errors.rs"
-                                    || x.starts_with("backtrace")
-                                    || x.starts_with("error-chain")
-                            } else {
-                                false
-                            }
-                        };
-                        if path.components().any(path_is_good) {
-                            continue;
+impl<T> FancyUnwrap for Result<T> {
+    type Output = T;
+    fn fancy_unwrap(self) -> T {
+        match self {
+            Ok(value) => value,
+            Err(err) => {
+                let mut stderr = stderr();
+                writeln!(stderr, "\nError:").unwrap();
+                for cause in err.iter_chain() {
+                    writeln!(stderr, "   {}", cause).unwrap();
+                }
+                let backtrace = err.backtrace().to_string();
+                if !backtrace.is_empty() {
+                    if env::var("RUST_BACKTRACE").as_ref().map(|v| v.as_str()) == Ok("full") {
+                        writeln!(stderr, "{}", backtrace).unwrap();
+                    } else {
+                        writeln!(stderr, "Short backtrace:").unwrap();
+                        let mut lines: Vec<_> = backtrace.split("\n").collect();
+                        if let Some(position) = lines
+                            .iter()
+                            .position(|line| line.contains("std::rt::lang_start::"))
+                        {
+                            lines.truncate(position);
                         }
-                        let name = if let Some(name) = symbol.name() {
-                            name.to_string()
-                        } else {
-                            "<no name>".to_string()
-                        };
-                        if next_frame_num == 0 {
-                            log::error("Best of stack backtrace:");
+                        if let Some(position) = lines
+                            .iter()
+                            .position(|line| line.contains("failure::backtrace::Backtrace::new::"))
+                        {
+                            lines.drain(0..position + 2);
                         }
-                        log::error(format!("{:>w$}: {}", next_frame_num, name, w = 4));
-                        let line = if let Some(n) = symbol.lineno() {
-                            n.to_string()
-                        } else {
-                            "<no lineno>".to_string()
-                        };
-                        log::error(format!("      at {}:{}", path.display(), line));
-                        log::error("");
-                        next_frame_num += 1;
+                        writeln!(stderr, "{}", lines.join("\n")).unwrap();
                     }
                 }
-            }
-            if next_frame_num > 0 {
-                log::error("");
+                std::process::exit(1);
             }
         }
-        log::error("Error:");
-        let items: Vec<_> = self.iter().collect();
-        for (i, err) in items.iter().rev().enumerate() {
-            log::error(format!("{:>w$}: {}", i, err, w = 4));
+    }
+}
+
+// TODO: replace with a proper mechanism
+pub fn should_panic_on_unexpected() -> bool {
+    true
+}
+
+#[macro_export]
+macro_rules! unexpected {
+    ($e:expr) => {
+        if should_panic_on_unexpected() {
+            panic!($e);
+        } else {
+            bail!($e);
         }
-    }
-}
-
-/// Constructs an unexpected error
-pub fn unexpected<S: Into<String>>(text: S) -> ErrorKind {
-    ErrorKind::Unexpected(text.into())
-}
-
-impl<T> ChainErr<T> for Option<T> {
-    fn chain_err<F, EK>(self, callback: F) -> Result<T>
-    where
-        F: FnOnce() -> EK,
-        EK: Into<ErrorKind>,
-    {
-        match self {
-            Some(x) => Ok(x),
-            None => Err(Error::from("None encountered")).chain_err(callback),
+    };
+    ($fmt:expr, $($arg:tt)*) => {
+        if should_panic_on_unexpected() {
+            panic!($fmt, $($arg)*);
+        } else {
+            bail!($fmt, $($arg)*);
         }
-    }
-}
-
-/// Works like `unwrap()`, but in case of an error,
-/// outputs formatted stack trace and
-/// chained error messages to the `Error` logging channel.
-pub fn fancy_unwrap<T>(value: Result<T>) -> T {
-    if let Err(ref err) = value {
-        err.display_report();
-    }
-    value.unwrap()
+    };
 }

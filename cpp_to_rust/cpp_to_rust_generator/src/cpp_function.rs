@@ -1,6 +1,6 @@
 //! Types for handling information about C++ methods.
 
-use crate::common::errors::Result;
+use crate::common::errors::{bail, Result};
 use crate::common::string_utils::JoinWithSeparator;
 use crate::common::utils::MapIfOk;
 use crate::cpp_data::CppName;
@@ -324,10 +324,10 @@ impl CppFunction {
             } else if info.is_signal {
                 "2"
             } else {
-                return Err("not a signal or slot".into());
+                bail!("not a signal or slot");
             }
         } else {
-            return Err("not a class method".into());
+            bail!("not a class method");
         };
         Ok(format!(
             "{}{}({})",

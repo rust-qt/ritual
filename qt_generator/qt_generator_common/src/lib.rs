@@ -7,7 +7,7 @@
 use cpp_to_rust_common::cpp_build_config::{
     CppBuildConfig, CppBuildConfigData, CppBuildPaths, CppLibraryType,
 };
-use cpp_to_rust_common::errors::Result;
+use cpp_to_rust_common::errors::{bail, Result};
 use cpp_to_rust_common::file_utils::PathBufWithAdded;
 use cpp_to_rust_common::log;
 use cpp_to_rust_common::string_utils::CaseOperations;
@@ -82,12 +82,11 @@ pub fn get_installation_data(crate_name: &str) -> Result<InstallationData> {
                 qt_version: qt_version,
             })
         } else {
-            Err(format!(
+            bail!(
                 "extra header dir not found (tried: {}, {})",
                 dir.display(),
                 dir2.display()
-            )
-            .into())
+            );
         }
     }
 }
@@ -213,6 +212,6 @@ pub fn lib_dependencies(crate_name: &str) -> Result<&'static [&'static str]> {
         "qt_3d_extras" => EXTRAS3D,
         "qt_ui_tools" => UI_TOOLS,
         "moqt_core" => MOQT_CORE,
-        _ => return Err(format!("Unknown crate name: {}", crate_name).into()),
+        _ => bail!("Unknown crate name: {}", crate_name),
     })
 }

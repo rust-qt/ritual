@@ -2,7 +2,9 @@
 //! for reading Qt documentation.
 
 use crate::doc_decoder::DocData;
-use cpp_to_rust_generator::common::errors::{unexpected, ChainErr, Result};
+use cpp_to_rust_generator::common::errors::{
+    bail, err_msg, should_panic_on_unexpected, unexpected, Result, ResultExt,
+};
 use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::cpp_data::CppName;
 use cpp_to_rust_generator::cpp_data::CppTypeDoc;
@@ -107,7 +109,9 @@ impl DocParser {
             && name_parts[name_parts.len() - 1] == name_parts[name_parts.len() - 2]
         {
             // constructors are not in the index
-            let last_part = name_parts.pop().chain_err(|| "name_parts can't be empty")?;
+            let last_part = name_parts
+                .pop()
+                .ok_or_else(|| err_msg("name_parts can't be empty"))?;
             Some(last_part.to_string())
         } else {
             None
@@ -123,13 +127,13 @@ impl DocParser {
                 &item.name == &corrected_name
                     && (item.anchor.is_some() || anchor_override.is_some())
             })
-            .chain_err(|| format!("No documentation entry for {}", corrected_name))?;
+            .ok_or_else(|| err_msg(format!("No documentation entry for {}", corrected_name)))?;
         let anchor = match anchor_override {
             Some(x) => x,
-            None => index_item
-                .anchor
-                .clone()
-                .chain_err(|| unexpected("anchor is expected here!"))?,
+            None => match index_item.anchor {
+                Some(ref anchor) => anchor.clone(),
+                None => unexpected!("anchor is expected here!"),
+            },
         };
         let anchor_prefix = format!("{}-", anchor);
         let base_url = self.base_url.clone();
@@ -141,7 +145,7 @@ impl DocParser {
             .filter(|x| &x.anchor == &anchor || x.anchor.starts_with(&anchor_prefix))
             .collect();
         if candidates.is_empty() {
-            return Err(format!("No matching anchors found for {}", name).into());
+            bail!("No matching anchors found for {}", name);
         }
         let scope_prefix = match name.find("::") {
             Some(index) => {
@@ -180,7 +184,7 @@ impl DocParser {
                     }
                     if &item_declaration_imprint == &query_imprint {
                         if item.html.find(|c| c != '\n').is_none() {
-                            return Err("found empty documentation".into());
+                            bail!("found empty documentation");
                         }
                         return Ok(CppFunctionDoc {
                             html: item.html.clone(),
@@ -202,7 +206,7 @@ impl DocParser {
                     }
                     if are_argument_types_equal(&declaration_no_scope, &item_declaration_imprint) {
                         if item.html.find(|c| c != '\n').is_none() {
-                            return Err("found empty documentation".into());
+                            bail!("found empty documentation");
                         }
                         return Ok(CppFunctionDoc {
                             html: item.html.clone(),
@@ -226,7 +230,7 @@ impl DocParser {
             });
 
             if candidates[0].html.is_empty() {
-                return Err("found empty documentation".into());
+                bail!("found empty documentation");
             }
             return Ok(CppFunctionDoc {
                 html: candidates[0].html.clone(),
@@ -249,7 +253,7 @@ impl DocParser {
             });
         }
         log::llog(log::DebugQtDocDeclarations, || "");
-        Err("Declaration mismatch".into())
+        bail!("Declaration mismatch");
     }
 
     /// Returns documentation for C++ type `name`.
@@ -258,7 +262,7 @@ impl DocParser {
         let index_item = self
             .doc_data
             .find_index_item(|item| &item.name == &name)
-            .chain_err(|| format!("No documentation entry for {}", name))?;
+            .ok_or_else(|| err_msg(format!("No documentation entry for {}", name)))?;
         if let Some(ref anchor) = index_item.anchor {
             let (result, file_name) = {
                 let file_data = self.file_data(index_item.document_id)?;
@@ -266,7 +270,7 @@ impl DocParser {
                     .item_docs
                     .iter()
                     .find(|x| &x.anchor == anchor)
-                    .chain_err(|| format!("no such anchor: {}", anchor))?;
+                    .ok_or_else(|| err_msg(format!("no such anchor: {}", anchor)))?;
                 (result.clone(), file_data.file_name.clone())
             };
             return Ok(DocForType {
@@ -283,17 +287,19 @@ impl DocParser {
         {
             let file_data = self
                 .file_data(index_item.document_id)
-                .chain_err(|| "failed to get document")?;
+                .with_context(|_| "failed to get document")?;
             url.push_str(&file_data.file_name);
             let doc = &file_data.document;
 
             use select::predicate::{And, Class, Name};
 
             let mut div_r = doc.find(And(Name("div"), Class("descr")));
-            let div = div_r.next().chain_err(|| "no div.descr")?;
+            let div = div_r.next().ok_or_else(|| err_msg("no div.descr"))?;
             let mut h2_r = div.find(Name("h2"));
-            let h2 = h2_r.next().chain_err(|| "no div.descr h2")?;
-            let mut node = h2.next().chain_err(|| "no next() for div.descr h2")?;
+            let h2 = h2_r.next().ok_or_else(|| err_msg("no div.descr h2"))?;
+            let mut node = h2
+                .next()
+                .ok_or_else(|| err_msg("no next() for div.descr h2"))?;
             loop {
                 if node.name() == Some("h3") {
                     break; // end of method
@@ -437,9 +443,9 @@ fn qt_doc_parser_test() {
 /// Returns a copy of `html` with all relative link URLs replaced with absolute URLs.
 /// Also returns the set of absolute URLs.
 fn process_html(html: &str, base_url: &str) -> Result<(String, HashSet<String>)> {
-    let bad_subfolder_regex = Regex::new(r"^\.\./qt[^/]+/").chain_err(|| "invalid regex")?;
+    let bad_subfolder_regex = Regex::new(r"^\.\./qt[^/]+/").with_context(|_| "invalid regex")?;
 
-    let link_regex = Regex::new("(href|src)=\"([^\"]*)\"").chain_err(|| "invalid regex")?;
+    let link_regex = Regex::new("(href|src)=\"([^\"]*)\"").with_context(|_| "invalid regex")?;
     let mut cross_references = HashSet::new();
     let html = link_regex
         .replace_all(html.trim(), |captures: &::regex::Captures| {
@@ -469,7 +475,7 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
         };
         let anchor_text = anchor_node
             .attr("name")
-            .chain_err(|| "anchor_node doesn't have name attribute")?
+            .ok_or_else(|| err_msg("anchor_node doesn't have name attribute"))?
             .to_string();
         let mut main_declaration = h3
             .text()
@@ -530,7 +536,7 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
                 } else {
                     result.push_str(node.html().as_ref());
                     for td1 in node.find(And(Name("td"), Class("memItemLeft"))) {
-                        let td2 = td1.next().chain_err(|| "td1.next() failed")?;
+                        let td2 = td1.next().ok_or_else(|| err_msg("td1.next() failed"))?;
                         let declaration = format!("{} {}", td1.text(), td2.text());
                         declarations.push(declaration);
                     }
@@ -600,7 +606,6 @@ pub fn parse_docs(data: ProcessorData, qt_crate_name: &str, docs_path: &Path) ->
         Ok(doc_data) => doc_data,
         Err(err) => {
             log::error(format!("Failed to get Qt documentation: {}", err));
-            err.discard_expected();
             return Ok(());
         }
     };
@@ -617,7 +622,6 @@ pub fn parse_docs(data: ProcessorData, qt_crate_name: &str, docs_path: &Path) ->
             let doc = parser.doc_for_type(&type_name);
             if let Err(ref err) = doc {
                 log::error(format!("Failed to get Qt documentation: {}", err));
-                err.discard_expected();
             }
             type_doc_cache.insert(type_name.clone(), doc);
         }

@@ -1,4 +1,4 @@
-use crate::common::errors::Result;
+use crate::common::errors::{bail, Result};
 use crate::common::log;
 use crate::cpp_data::CppName;
 use crate::cpp_data::CppTemplateInstantiation;
@@ -28,7 +28,7 @@ fn check_template_type(data: &ProcessorData, type1: &CppType) -> Result<()> {
                     &inst.class_name == name && &inst.template_arguments == template_arguments
                 })
             {
-                return Err(format!("type not available: {:?}", type1).into());
+                bail!("type not available: {:?}", type1);
             }
             for arg in template_arguments {
                 check_template_type(data, arg)?;
@@ -65,7 +65,7 @@ fn apply_instantiation_to_method(
             }
         }) {
             if args.len() != template_instantiation.template_arguments.len() {
-                return Err("template arguments count mismatch".into());
+                bail!("template arguments count mismatch");
             }
             new_method.template_arguments = Some(template_instantiation.template_arguments.clone());
         }
@@ -102,11 +102,10 @@ fn apply_instantiation_to_method(
         .iter()
         .any(|t| t.is_or_contains_template_parameter())
     {
-        Err(format!(
+        bail!(
             "extra template parameters left: {}",
             new_method.short_text()
-        )
-        .into())
+        );
     } else {
         if let Some(conversion_type) = conversion_type {
             new_method.name =
@@ -165,7 +164,7 @@ fn instantiate_templates(data: ProcessorData) -> Result<()> {
                                 {
                                     nested_level
                                 } else {
-                                    return Err("only template parameters can be here".into());
+                                    bail!("only template parameters can be here");
                                 };
                             log::llog(log::DebugTemplateInstantiation, || "");
                             log::llog(log::DebugTemplateInstantiation, || {

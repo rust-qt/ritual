@@ -1,4 +1,4 @@
-use crate::common::errors::{ChainErr, Result};
+use crate::common::errors::{err_msg, Result};
 use crate::common::file_utils::PathBufWithAdded;
 use crate::common::file_utils::{create_file, FileWrapper};
 use crate::common::log;
@@ -85,7 +85,7 @@ impl HtmlLogger {
             .file
             .path()
             .parent()
-            .chain_err(|| "path parent failed")?;
+            .ok_or_else(|| err_msg("path parent failed"))?;
         let style_path = parent_path.with_added("style.css");
         if !style_path.exists() {
             create_file(style_path)?.write(include_str!("../templates/html_logger/style.css"))?;

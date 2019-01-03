@@ -8,7 +8,7 @@ use cpp_data::{CppData, CppDataWithDeps, ParserCppData};
 use cpp_ffi_generator;
 use cpp_parser;
 use cpp_post_processor::cpp_post_process;
-use common::errors::{Result, ChainErr};
+use common::errors::{Result, ResultExt};
 use common::string_utils::CaseOperations;
 use common::file_utils::{PathBufWithAdded, move_files, create_dir_all, save_json, load_bincode,
                          save_bincode, canonicalize, remove_dir_all, remove_dir, read_dir,
@@ -100,7 +100,7 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
         &cpp_data,
         cpp_ffi_lib_name.clone(),
         config.cpp_ffi_generator_filters(),
-      ).chain_err(|| "FFI generator failed")?;
+      ).with_context(|| "FFI generator failed")?;
 
       log::status(format!("Generating C++ wrapper code"));
       let code_gen = CppCodeGenerator::new(cpp_ffi_lib_name.clone(), c_lib_tmp_path.clone());
@@ -144,13 +144,13 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
         remove_qt_prefix: remove_qt_prefix,
         filtered_namespaces: config.cpp_filtered_namespaces().clone(),
       }.run()
-        .chain_err(|| "Rust data generator failed")?;
+        .with_context(|| "Rust data generator failed")?;
       log::status(format!(
         "Generating Rust crate code ({})",
         &config.crate_properties().name()
       ));
       rust_code_generator::run(rust_config, &rust_data)
-        .chain_err(|| "Rust code generator failed")?;
+        .with_context(|| "Rust code generator failed")?;
       let mut cpp_type_size_requests = Vec::new();
       for type1 in &rust_data.processed_types {
         if let RustTypeWrapperKind::Struct { ref size_const_name, .. } = type1.kind {
