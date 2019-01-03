@@ -17,6 +17,7 @@ struct ParserCppData {
     fields: Vec<CppClassField>,
     methods: Vec<CppFunction>,
     enum_values: Vec<CppEnumValue>,
+    namespaces: Vec<CppName>,
 }
 
 fn run_parser(code: &'static str) -> ParserCppData {
@@ -74,6 +75,12 @@ fn run_parser(code: &'static str) -> ParserCppData {
             .items
             .iter()
             .filter_map(|item| item.cpp_data.as_function_ref())
+            .cloned()
+            .collect(),
+        namespaces: database
+            .items
+            .iter()
+            .filter_map(|item| item.cpp_data.as_namespace_ref())
             .cloned()
             .collect(),
     }
@@ -581,6 +588,7 @@ fn template_class_method() {
             declaration_code: Some("T get ( int index )".to_string()),
         }
     );
+    assert!(data.namespaces.is_empty());
 }
 
 #[test]
@@ -695,6 +703,7 @@ fn simple_enum2() {
             },
         ]
     );
+    assert_eq!(data.namespaces, vec![CppName::from_one_part("ns1")]);
 }
 
 #[test]
@@ -1004,4 +1013,50 @@ fn template_class_with_base() {
     }
     assert_eq!(data.bases.len(), 1);
     assert!(data.fields.is_empty());
+}
+
+#[test]
+fn namespaces() {
+    let data = run_parser(
+        "
+            namespace a {
+                class X {};
+                namespace b {
+                    class Y {};
+                }
+                namespace c {
+                    void z() {}
+                }
+            }
+            namespace a {
+                class Z {};
+            }
+            namespace a::b::c {
+                void x() {}
+            }
+        ",
+    );
+    assert_eq!(data.namespaces.len(), 4);
+    assert!(data.namespaces.contains(&CppName::from_parts(&["a"])));
+    assert!(data.namespaces.contains(&CppName::from_parts(&["a", "b"])));
+    assert!(data
+        .namespaces
+        .contains(&CppName::from_parts(&["a", "b", "c"])));
+    assert!(data.namespaces.contains(&CppName::from_parts(&["a", "c"])));
+}
+
+#[test]
+fn empty_namespace() {
+    let data = run_parser(
+        "
+            namespace a {
+                namespace b {
+                    class Y {};
+                }
+            }
+        ",
+    );
+    assert_eq!(data.namespaces.len(), 2);
+    assert!(data.namespaces.contains(&CppName::from_parts(&["a"])));
+    assert!(data.namespaces.contains(&CppName::from_parts(&["a", "b"])));
 }

@@ -33,6 +33,7 @@ use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use regex::Regex;
+use std::collections::HashSet;
 use std::iter::once;
 
 fn entity_log_representation(entity: Entity) -> String {
@@ -279,6 +280,39 @@ fn run_clang<R, F: FnMut(Entity) -> Result<R>>(
     result
 }
 
+fn add_namespaces(data: ProcessorData) -> Result<()> {
+    let mut namespaces = HashSet::new();
+    for item in &data.current_database.items {
+        let name = match item.cpp_data {
+            CppItemData::Type(ref t) => &t.name,
+            CppItemData::Function(ref f) => &f.name,
+            _ => continue,
+        };
+        if name.parts.len() == 1 {
+            continue;
+        }
+        let mut namespace_name = name.clone();
+        namespace_name.parts.pop().expect("name is empty");
+        namespaces.insert(namespace_name.clone());
+        while let Some(_) = namespace_name.parts.pop() {
+            if !namespace_name.parts.is_empty() {
+                namespaces.insert(namespace_name.clone());
+            }
+        }
+    }
+    for item in &data.current_database.items {
+        if let CppItemData::Type(ref t) = item.cpp_data {
+            namespaces.remove(&t.name);
+        }
+    }
+    for name in namespaces {
+        let item = CppItemData::Namespace(name);
+        data.current_database
+            .add_cpp_data(DatabaseItemSource::NamespaceInfering, item);
+    }
+    Ok(())
+}
+
 /// Runs the parser on specified data.
 fn run(data: ProcessorData) -> Result<()> {
     log::status(get_version());
@@ -298,6 +332,7 @@ fn run(data: ProcessorData) -> Result<()> {
             Ok(())
         },
     )?;
+    add_namespaces(parser.data)?;
     Ok(())
 }
 

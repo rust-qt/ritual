@@ -10,6 +10,7 @@ use crate::cpp_data::CppVisibility;
 use crate::cpp_function::CppFunction;
 
 use crate::common::string_utils::JoinWithSeparator;
+use crate::cpp_data::CppName;
 use crate::cpp_data::CppTemplateInstantiation;
 use crate::cpp_ffi_data::CppFfiItem;
 use crate::cpp_type::CppType;
@@ -51,6 +52,7 @@ pub enum DatabaseItemSource {
     },
     ImplicitDestructor,
     TemplateInstantiation,
+    NamespaceInfering,
     QtSignalArguments,
 }
 
@@ -115,7 +117,7 @@ impl CppCheckerInfoList {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CppItemData {
-    Namespace(String),
+    Namespace(CppName),
     Type(CppTypeData),
     EnumValue(CppEnumValue),
     Function(CppFunction),
@@ -167,6 +169,13 @@ impl CppItemData {
         }
     }
 
+    pub fn as_namespace_ref(&self) -> Option<&CppName> {
+        if let CppItemData::Namespace(ref data) = *self {
+            Some(data)
+        } else {
+            None
+        }
+    }
     pub fn as_function_ref(&self) -> Option<&CppFunction> {
         if let CppItemData::Function(ref data) = *self {
             Some(data)
