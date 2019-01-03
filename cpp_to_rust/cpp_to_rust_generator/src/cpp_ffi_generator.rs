@@ -42,7 +42,7 @@ impl FfiNameProvider {
 }
 
 /// Runs the FFI generator
-fn run(mut data: ProcessorData) -> Result<()> {
+fn run(mut data: &mut ProcessorData) -> Result<()> {
     let cpp_ffi_lib_name = format!("ctr_{}_ffi", &data.config.crate_properties().name());
     let movable_types: Vec<_> = data
         .all_items()
@@ -204,7 +204,7 @@ fn generate_casts_one(
     new_methods.push(create_cast_method(
         CppCast::Static {
             is_unsafe: true,
-            direct_base_index: direct_base_index,
+            direct_base_index,
         },
         &base_ptr_type,
         &target_ptr_type,
@@ -213,7 +213,7 @@ fn generate_casts_one(
     new_methods.push(create_cast_method(
         CppCast::Static {
             is_unsafe: false,
-            direct_base_index: direct_base_index,
+            direct_base_index,
         },
         &target_ptr_type,
         &base_ptr_type,
@@ -359,7 +359,7 @@ pub fn to_ffi_method(
         let real_return_type_ffi = real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
         match real_return_type {
             // QFlags is converted to uint in FFI
-            CppType::Class(ref base) if &base.name != &CppName::from_one_part("QFlags") => {
+            CppType::Class(ref base) if base.name != CppName::from_one_part("QFlags") => {
                 if movable_types.iter().any(|t| t == base) {
                     r.arguments.push(CppFfiFunctionArgument {
                         name: "output".to_string(),
@@ -393,7 +393,7 @@ fn generate_field_accessors(
     let mut create_method =
         |name, accessor_type, return_type, arguments| -> Result<CppFfiFunction> {
             let fake_method = CppFunction {
-                name: name,
+                name,
                 member: Some(CppFunctionMemberData {
                     class_type: field.class_type.clone(),
                     kind: CppFunctionKind::Regular,
@@ -411,8 +411,8 @@ fn generate_field_accessors(
                     is_slot: false,
                 }),
                 operator: None,
-                return_type: return_type,
-                arguments: arguments,
+                return_type,
+                arguments,
                 allows_variadic_arguments: false,
                 template_arguments: None,
                 declaration_code: None,
@@ -420,7 +420,7 @@ fn generate_field_accessors(
             };
             let mut ffi_method = to_ffi_method(&fake_method, movable_types, name_provider)?;
             ffi_method.kind = CppFfiFunctionKind::FieldAccessor {
-                accessor_type: accessor_type,
+                accessor_type,
                 field: field.clone(),
             };
             Ok(ffi_method)
@@ -438,7 +438,7 @@ fn generate_field_accessors(
                 target: Box::new(field.field_type.clone()),
             };
             new_methods.push(create_method(
-                CppName::from_one_part(&field.name),
+                CppName::from_one_part(field.name.clone()),
                 CppFieldAccessorType::ConstRefGetter,
                 type2_const,
                 Vec::new(),
@@ -451,7 +451,7 @@ fn generate_field_accessors(
             )?);
         } else {
             new_methods.push(create_method(
-                CppName::from_one_part(&field.name),
+                CppName::from_one_part(field.name.clone()),
                 CppFieldAccessorType::CopyGetter,
                 field.field_type.clone(),
                 Vec::new(),
@@ -540,7 +540,7 @@ fn generate_slot_wrapper(
                            arguments: Vec<CppFunctionArgument>|
      -> CppFunction {
         CppFunction {
-            name: name,
+            name,
             member: Some(CppFunctionMemberData {
                 class_type: CppClassType {
                     name: class_name.clone(),
@@ -552,12 +552,12 @@ fn generate_slot_wrapper(
                 is_static: false,
                 visibility: CppVisibility::Public,
                 is_signal: false,
-                is_slot: is_slot,
-                kind: kind,
+                is_slot,
+                kind,
             }),
             operator: None,
             return_type: CppType::Void,
-            arguments: arguments,
+            arguments,
             allows_variadic_arguments: false,
             template_arguments: None,
             declaration_code: None,

@@ -415,7 +415,7 @@ fn simple_class_method() {
     );
 }
 
-#[cfg_attr(feature = "clippy", allow(cyclomatic_complexity))]
+#[allow(clippy::cyclomatic_complexity)]
 #[test]
 fn advanced_class_methods() {
     let data = run_parser(

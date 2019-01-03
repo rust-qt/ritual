@@ -20,14 +20,14 @@ fn check_template_type(data: &ProcessorData, type1: &CppType) -> Result<()> {
     }) = type1
     {
         if let Some(ref template_arguments) = *template_arguments {
-            if !data
+            let is_available = data
                 .all_items()
                 .iter()
                 .filter_map(|i| i.cpp_data.as_template_instantiation_ref())
                 .any(|inst| {
                     &inst.class_name == name && &inst.template_arguments == template_arguments
-                })
-            {
+                });
+            if !is_available {
                 bail!("type not available: {:?}", type1);
             }
             for arg in template_arguments {
@@ -52,7 +52,7 @@ fn apply_instantiation_to_method(
     });
     let mut new_method = method.clone();
     if let Some(ref args) = method.template_arguments {
-        if args.iter().enumerate().all(|(index1, arg)| {
+        let matches = args.iter().enumerate().all(|(index1, arg)| {
             if let CppType::TemplateParameter {
                 nested_level,
                 index,
@@ -63,7 +63,8 @@ fn apply_instantiation_to_method(
             } else {
                 false
             }
-        }) {
+        });
+        if matches {
             if args.len() != template_instantiation.template_arguments.len() {
                 bail!("template arguments count mismatch");
             }
@@ -128,7 +129,7 @@ pub fn instantiate_templates_step() -> ProcessingStep {
 
 /// Generates methods as template instantiations of
 /// methods of existing template classes and existing template methods.
-fn instantiate_templates(data: ProcessorData) -> Result<()> {
+fn instantiate_templates(data: &mut ProcessorData) -> Result<()> {
     log::status("Instantiating templates");
     let mut new_methods = Vec::new();
     for method in data
@@ -235,8 +236,8 @@ pub fn find_template_instantiations_step() -> ProcessingStep {
 
 /// Searches for template instantiations in this library's API,
 /// excluding results that were already processed in dependencies.
-#[cfg_attr(feature = "clippy", allow(block_in_if_condition_stmt))]
-fn find_template_instantiations(data: ProcessorData) -> Result<()> {
+#[allow(clippy::block_in_if_condition_stmt)]
+fn find_template_instantiations(data: &mut ProcessorData) -> Result<()> {
     fn check_type(
         type1: &CppType,
         data: &ProcessorData,
@@ -252,17 +253,18 @@ fn find_template_instantiations(data: ProcessorData) -> Result<()> {
                         .iter()
                         .any(|x| x.is_or_contains_template_parameter())
                     {
-                        if !data
+                        let is_in_database = data
                             .all_items()
                             .iter()
                             .filter_map(|item| item.cpp_data.as_template_instantiation_ref())
                             .any(|i| {
                                 &i.class_name == name && &i.template_arguments == template_arguments
-                            })
-                        {
-                            if !result.iter().any(|x| {
+                            });
+                        if !is_in_database {
+                            let is_in_result = result.iter().any(|x| {
                                 &x.class_name == name && &x.template_arguments == template_arguments
-                            }) {
+                            });
+                            if !is_in_result {
                                 log::llog(log::DebugParser, || {
                                     format!(
                                         "Found template instantiation: {}<{:?}>",

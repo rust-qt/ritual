@@ -22,7 +22,7 @@ pub fn add_explicit_destructors_step() -> ProcessingStep {
 /// Adds destructors for every class that does not have explicitly
 /// defined destructor, allowing to create wrappings for
 /// destructors implicitly available in C++.
-fn add_explicit_destructors(data: ProcessorData) -> Result<()> {
+fn add_explicit_destructors(data: &mut ProcessorData) -> Result<()> {
     let mut methods = Vec::new();
     for type1 in &data.current_database.items {
         if let CppItemData::Type(ref type1) = type1.cpp_data {

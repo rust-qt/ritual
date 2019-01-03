@@ -75,7 +75,7 @@ impl CrateProperties {
         self.dependencies.push(CrateDependency {
             name: name.into(),
             version: version.into(),
-            local_path: local_path,
+            local_path,
         });
     }
     /// Adds an extra build dependency with
@@ -89,7 +89,7 @@ impl CrateProperties {
         self.build_dependencies.push(CrateDependency {
             name: name.into(),
             version: version.into(),
-            local_path: local_path,
+            local_path,
         });
     }
     /// Removes default dependencies from output `Cargo.toml`. Default
@@ -171,7 +171,7 @@ impl Config {
     /// `crate_properties` are used in Cargo.toml of the generated crate.
     pub fn new(crate_properties: CrateProperties) -> Config {
         Config {
-            crate_properties: crate_properties,
+            crate_properties,
             crate_template_path: Default::default(),
             dependent_cpp_crates: Default::default(),
             cpp_build_paths: Default::default(),

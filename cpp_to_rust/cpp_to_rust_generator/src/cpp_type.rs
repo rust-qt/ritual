@@ -5,6 +5,8 @@ use crate::common::string_utils::JoinWithSeparator;
 use crate::cpp_data::CppName;
 use crate::cpp_ffi_data::{CppFfiType, CppTypeConversionToFfi};
 use serde_derive::{Deserialize, Serialize};
+use std::hash::Hash;
+use std::hash::Hasher;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub enum CppPointerLikeTypeKind {
@@ -74,7 +76,7 @@ pub struct CppFunctionPointerType {
 /// Information about a numeric C++ type that is
 /// guaranteed to be the same on all platforms,
 /// e.g. `uint32_t`.
-#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CppSpecificNumericType {
     /// Type identifier (most likely a typedef name)
     pub name: CppName,
@@ -201,11 +203,10 @@ impl CppBuiltInNumericType {
     /// Returns all supported types.
     pub fn all() -> &'static [CppBuiltInNumericType] {
         use self::CppBuiltInNumericType::*;
-        static LIST: &'static [CppBuiltInNumericType] = &[
+        &[
             Bool, Char, SChar, UChar, WChar, Char16, Char32, Short, UShort, Int, UInt, Long, ULong,
             LongLong, ULongLong, Int128, UInt128, Float, Double, LongDouble,
-        ];
-        return LIST;
+        ]
     }
 }
 
@@ -415,7 +416,7 @@ impl CppType {
 }
 
 /// Context of usage for a C++ type
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CppTypeRole {
     /// This type is used as a function's return type
     ReturnType,
@@ -443,7 +444,7 @@ impl CppType {
     /// Converts this C++ type to its adaptation for FFI interface,
     /// removing all features not supported by C ABI
     /// (e.g. references and passing objects by value).
-    #[cfg_attr(feature = "clippy", allow(collapsible_if))]
+    #[allow(clippy::collapsible_if)]
     pub fn to_cpp_ffi_type(&self, role: CppTypeRole) -> Result<CppFfiType> {
         let inner = || -> Result<CppFfiType> {
             if self.is_or_contains_template_parameter() {
@@ -556,7 +557,7 @@ impl CppType {
 
     /// Attempts to replace template types at `nested_level1`
     /// within this type with `template_arguments1`.
-    #[cfg_attr(feature = "clippy", allow(if_not_else))]
+    #[allow(clippy::if_not_else)]
     pub fn instantiate(
         &self,
         nested_level1: usize,
@@ -631,3 +632,9 @@ impl PartialEq for CppSpecificNumericType {
     }
 }
 impl Eq for CppSpecificNumericType {}
+impl Hash for CppSpecificNumericType {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.bits.hash(state);
+        self.kind.hash(state);
+    }
+}

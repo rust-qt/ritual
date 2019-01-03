@@ -134,10 +134,7 @@ impl CppBuildConfig {
     }
     /// Add `data` with `condition`.
     pub fn add(&mut self, condition: Condition, data: CppBuildConfigData) {
-        self.items.push(CppBuildConfigItem {
-            condition: condition,
-            data: data,
-        });
+        self.items.push(CppBuildConfigItem { condition, data });
     }
     /// Select all conditions that are true on `target`, combine all corresponding
     /// configuration items and return the result.

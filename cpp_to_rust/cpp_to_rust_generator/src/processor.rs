@@ -65,7 +65,7 @@ pub struct ProcessorData<'a> {
     pub config: &'a Config,
     pub current_database: &'a mut Database,
     pub dep_databases: &'a [Database],
-    pub html_logger: HtmlLogger,
+    pub html_logger: &'a mut HtmlLogger,
 }
 
 impl<'a> ProcessorData<'a> {
@@ -91,7 +91,7 @@ pub struct ProcessingStep {
     pub name: String,
     pub is_const: bool,
     pub main_cycle_items: Vec<ProcessorMainCycleItem>,
-    pub function: Box<Fn(ProcessorData) -> Result<()>>,
+    pub function: Box<Fn(&mut ProcessorData) -> Result<()>>,
 }
 
 impl fmt::Debug for ProcessingStep {
@@ -104,7 +104,7 @@ impl fmt::Debug for ProcessingStep {
 }
 
 impl ProcessingStep {
-    pub fn new_custom<S: Into<String>, F: 'static + Fn(ProcessorData) -> Result<()>>(
+    pub fn new_custom<S: Into<String>, F: 'static + Fn(&mut ProcessorData) -> Result<()>>(
         name: S,
         function: F,
     ) -> ProcessingStep {
@@ -115,7 +115,7 @@ impl ProcessingStep {
             main_cycle_items: Vec::new(),
         }
     }
-    pub fn new<S: Into<String>, F: 'static + Fn(ProcessorData) -> Result<()>>(
+    pub fn new<S: Into<String>, F: 'static + Fn(&mut ProcessorData) -> Result<()>>(
         name: S,
         run_after: Vec<String>,
         function: F,
@@ -139,7 +139,7 @@ mod steps {
     pub fn print_database() -> ProcessingStep {
         ProcessingStep {
             is_const: true,
-            ..ProcessingStep::new_custom("print_database", |mut data| {
+            ..ProcessingStep::new_custom("print_database", |data| {
                 data.html_logger.add_header(&["Item", "Environments"])?;
 
                 for item in &data.current_database.items {
@@ -294,21 +294,21 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
         for step in steps {
             log::status(format!("Running processor item: {}", &step.name));
 
-            let html_logger = HtmlLogger::new(
+            let mut html_logger = HtmlLogger::new(
                 workspace
                     .log_path()?
                     .with_added(format!("{}_log.html", step.name)),
                 &format!("{} log", step.name),
             )?;
 
-            let data = ProcessorData {
+            let mut data = ProcessorData {
                 workspace,
-                html_logger,
+                html_logger: &mut html_logger,
                 current_database: &mut current_database,
                 dep_databases: &dependent_cpp_crates,
                 config,
             };
-            (step.function)(data)?;
+            (step.function)(&mut data)?;
 
             if !step.is_const {
                 current_database_saved = false;

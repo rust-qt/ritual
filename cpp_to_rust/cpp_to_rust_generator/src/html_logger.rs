@@ -17,13 +17,14 @@ pub fn escape_html(text: &str) -> String {
 }
 
 impl HtmlLogger {
+    #[allow(clippy::new_ret_no_self)]
     pub fn new<P: AsRef<Path>>(path: P, title: &str) -> Result<HtmlLogger> {
         let mut file = create_file(path)?;
         file.write(format!(
             include_str!("../templates/html_logger/header.html"),
             title = title
         ))?;
-        Ok(HtmlLogger { file: file })
+        Ok(HtmlLogger { file })
     }
 
     pub fn add_header(&mut self, titles: &[&str]) -> Result<()> {

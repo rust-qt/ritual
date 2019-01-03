@@ -183,7 +183,7 @@ fn arguments_values(method: &CppFfiFunction) -> Result<String> {
 }
 
 /// Generates code for the value returned by the FFI method.
-#[cfg_attr(feature = "clippy", allow(collapsible_if))]
+#[allow(clippy::collapsible_if)]
 fn returned_expression(method: &CppFfiFunction) -> Result<String> {
     let result = if method
         .kind

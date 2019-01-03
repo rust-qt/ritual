@@ -61,7 +61,7 @@ fn is_cpp_item_resolvable(all_items: &[&DatabaseItem], item: &CppItemData) -> Re
 }
 
 /// Runs the parser on specified data.
-fn run(data: ProcessorData) -> Result<()> {
+fn run(data: &mut ProcessorData) -> Result<()> {
     let all_items = data.all_items();
     for item in &data.current_database.items {
         if item.rust_item.is_some() {

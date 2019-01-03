@@ -52,8 +52,8 @@ fn snippet_for_item(item: &CppFfiItem) -> Result<Snippet> {
     }
 }
 
-struct CppChecker<'a> {
-    data: ProcessorData<'a>,
+struct CppChecker<'b, 'a: 'b> {
+    data: &'b mut ProcessorData<'a>,
     env: CppCheckerEnv,
     main_cpp_path: PathBuf,
     builder: CppLibBuilder,
@@ -83,7 +83,7 @@ impl Snippet {
     }
 }
 
-impl<'a> CppChecker<'a> {
+impl CppChecker<'_, '_> {
     fn run(&mut self) -> Result<()> {
         if !self
             .data
@@ -211,7 +211,7 @@ impl<'a> CppChecker<'a> {
     }
 }
 
-fn run(data: ProcessorData) -> Result<()> {
+fn run(data: &mut ProcessorData) -> Result<()> {
     let root_path = data.workspace.tmp_path()?.with_added("cpp_checker");
     if root_path.exists() {
         remove_dir_all(&root_path)?;

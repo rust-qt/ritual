@@ -44,6 +44,7 @@ fn database_path(workspace_path: &Path, crate_name: &str) -> PathBuf {
 }
 
 impl Workspace {
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(path: PathBuf) -> Result<Workspace> {
         if !path.is_dir() {
             bail!("No such directory: {}", path.display());

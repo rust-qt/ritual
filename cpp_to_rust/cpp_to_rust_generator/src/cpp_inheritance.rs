@@ -134,7 +134,7 @@ impl<'a> CppDataWithDeps<'a> {
   /// A method will not be added if there is a method with the same
   /// name in the derived class. Constructors, destructors and assignment
   /// operators are also not added. This reflects C++'s method inheritance rules.
-  #[cfg_attr(feature = "clippy", allow(block_in_if_condition_stmt))]
+  #[allow(clippy::block_in_if_condition_stmt)]
   pub fn add_inherited_methods(&mut self) -> Result<()> {
     log::status("Adding inherited methods");
     let mut all_new_methods = Vec::new();

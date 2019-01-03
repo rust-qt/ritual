@@ -19,7 +19,7 @@ pub fn choose_allocation_places_step() -> ProcessingStep {
 /// Detects the preferred type allocation place for each type based on
 /// API of all known methods. Doesn't actually change the data,
 /// only suggests stack allocated types for manual configuration.
-fn choose_allocation_places(mut data: ProcessorData) -> Result<()> {
+fn choose_allocation_places(data: &mut ProcessorData) -> Result<()> {
     log::status("Detecting type allocation places");
 
     #[derive(Default)]

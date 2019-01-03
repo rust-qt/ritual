@@ -35,6 +35,7 @@ impl HeaderNameMap {
         real_header.to_string()
     }
 
+    #[allow(clippy::new_ret_no_self)]
     fn new(headers_dir: &PathBuf) -> Result<HeaderNameMap> {
         let re = ::regex::Regex::new(r#"^#include "([a-zA-Z0-9._]+)"$"#)?;
         let mut map_real_to_all_fancy: HashMap<_, Vec<_>> = HashMap::new();
@@ -92,8 +93,8 @@ impl HeaderNameMap {
             map_real_to_fancy.insert(real_header.clone(), fancy_header);
         }
         Ok(HeaderNameMap {
-            map_real_to_all_fancy: map_real_to_all_fancy,
-            map_real_to_fancy: map_real_to_fancy,
+            map_real_to_all_fancy,
+            map_real_to_fancy,
         })
     }
 }

@@ -859,7 +859,7 @@ impl<'a> RustCodeGenerator<'a> {
   }
 
   /// Generates `lib.rs` file.
-  #[cfg_attr(feature = "clippy", allow(collapsible_if))]
+  #[allow(clippy::collapsible_if)]
   pub fn generate_lib_file(&self, modules: &[RustModule]) -> Result<()> {
     let mut code = String::new();
 
@@ -962,7 +962,7 @@ impl<'a> RustCodeGenerator<'a> {
 
   /// Generates code for a module of the output crate.
   /// This may be a top level or nested module.
-  #[cfg_attr(feature = "clippy", allow(single_match_else))]
+  #[allow(clippy::single_match_else)]
   fn generate_module_code(&self, data: &RustModule) -> Result<String> {
     let mut results = Vec::new();
     for type1 in &data.types {

@@ -127,9 +127,9 @@ pub struct CppName {
 }
 
 impl CppName {
-    pub fn from_one_part(part: impl ToString) -> Self {
+    pub fn from_one_part(part: impl Into<String>) -> Self {
         Self {
-            parts: vec![part.to_string()],
+            parts: vec![part.into()],
         }
     }
 
@@ -195,13 +195,13 @@ impl CppTypeDataKind {
     /// Checks if the type is a class type.
     pub fn is_class(&self) -> bool {
         match self {
-            &CppTypeDataKind::Class { .. } => true,
+            CppTypeDataKind::Class { .. } => true,
             _ => false,
         }
     }
     pub fn is_enum(&self) -> bool {
         match self {
-            &CppTypeDataKind::Enum { .. } => true,
+            CppTypeDataKind::Enum { .. } => true,
             _ => false,
         }
     }

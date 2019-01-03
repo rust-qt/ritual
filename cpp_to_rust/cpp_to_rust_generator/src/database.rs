@@ -116,6 +116,7 @@ impl CppCheckerInfoList {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum CppItemData {
     Namespace(CppName),
     Type(CppTypeData),
@@ -374,7 +375,7 @@ impl Database {
         }
         self.items.push(DatabaseItem {
             cpp_data: data,
-            source: source,
+            source,
             ffi_items: None,
             rust_item: None,
         });

@@ -63,23 +63,23 @@ pub fn get_installation_data(crate_name: &str) -> Result<InstallationData> {
     let dir = root_include_path.with_added(&folder_name);
     if dir.exists() {
         Ok(InstallationData {
-            root_include_path: root_include_path,
-            lib_path: lib_path,
-            docs_path: docs_path,
+            root_include_path,
+            lib_path,
+            docs_path,
             lib_include_path: dir,
             is_framework: false,
-            qt_version: qt_version,
+            qt_version,
         })
     } else {
         let dir2 = lib_path.with_added(format!("{}.framework/Headers", folder_name));
         if dir2.exists() {
             Ok(InstallationData {
-                root_include_path: root_include_path,
-                lib_path: lib_path,
-                docs_path: docs_path,
+                root_include_path,
+                lib_path,
+                docs_path,
                 lib_include_path: dir2,
                 is_framework: true,
-                qt_version: qt_version,
+                qt_version,
             })
         } else {
             bail!(
@@ -184,15 +184,15 @@ pub fn all_crate_names() -> &'static [&'static str] {
 
 /// Returns list of modules this module depends on.
 pub fn lib_dependencies(crate_name: &str) -> Result<&'static [&'static str]> {
-    const CORE: &'static [&'static str] = &[];
-    const GUI: &'static [&'static str] = &["qt_core"];
-    const WIDGETS: &'static [&'static str] = &["qt_core", "qt_gui"];
-    const UI_TOOLS: &'static [&'static str] = &["qt_core", "qt_gui", "qt_widgets"];
-    const CORE3D: &'static [&'static str] = &["qt_core", "qt_gui"];
-    const RENDER3D: &'static [&'static str] = &["qt_core", "qt_gui", "qt_3d_core"];
-    const INPUT3D: &'static [&'static str] = &["qt_core", "qt_gui", "qt_3d_core"];
-    const LOGIC3D: &'static [&'static str] = &["qt_core", "qt_gui", "qt_3d_core"];
-    const EXTRAS3D: &'static [&'static str] = &[
+    const CORE: &[&str] = &[];
+    const GUI: &[&str] = &["qt_core"];
+    const WIDGETS: &[&str] = &["qt_core", "qt_gui"];
+    const UI_TOOLS: &[&str] = &["qt_core", "qt_gui", "qt_widgets"];
+    const CORE3D: &[&str] = &["qt_core", "qt_gui"];
+    const RENDER3D: &[&str] = &["qt_core", "qt_gui", "qt_3d_core"];
+    const INPUT3D: &[&str] = &["qt_core", "qt_gui", "qt_3d_core"];
+    const LOGIC3D: &[&str] = &["qt_core", "qt_gui", "qt_3d_core"];
+    const EXTRAS3D: &[&str] = &[
         "qt_core",
         "qt_gui",
         "qt_3d_core",
@@ -200,7 +200,7 @@ pub fn lib_dependencies(crate_name: &str) -> Result<&'static [&'static str]> {
         "qt_3d_input",
         "qt_3d_logic",
     ];
-    const MOQT_CORE: &'static [&'static str] = &[];
+    const MOQT_CORE: &[&str] = &[];
     Ok(match crate_name {
         "qt_core" => CORE,
         "qt_gui" => GUI,

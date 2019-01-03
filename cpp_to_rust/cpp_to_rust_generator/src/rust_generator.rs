@@ -154,7 +154,7 @@ fn operator_rust_name(operator: &CppOperator) -> Result<String> {
 /// If `remove_qt_prefix` is true, removes "Q" or "Qt"
 /// if it is first word of the string and not the only one word.
 /// Also converts case of the words.
-#[cfg_attr(feature = "clippy", allow(collapsible_if))]
+#[allow(clippy::collapsible_if)]
 fn remove_qt_prefix_and_convert_case(s: &str, case: Case, remove_qt_prefix: bool) -> String {
   let mut parts: Vec<_> = WordIterator::new(s).collect();
   if remove_qt_prefix && parts.len() > 1 {
@@ -333,8 +333,8 @@ pub struct RustGeneratorInputData<'a> {
 
 impl<'a> RustGeneratorInputData<'a> {
   /// Execute processing
-  #[cfg_attr(feature = "clippy", allow(extend_from_slice))]
-  #[cfg_attr(feature = "clippy", allow(block_in_if_condition_stmt))]
+  #[allow(clippy::extend_from_slice)]
+  #[allow(clippy::block_in_if_condition_stmt)]
   pub fn run(self) -> Result<RustGeneratorOutput> {
     let mut generator = RustGenerator {
       top_module_names: HashMap::new(),
@@ -1543,7 +1543,7 @@ impl<'aa> RustGenerator<'aa> {
   /// Generates methods, trait implementations and overloading types
   /// for all specified methods. All methods must either be in the same
   /// `RustMethodScope::Impl` scope or be free functions in the same module.
-  #[cfg_attr(feature = "clippy", allow(for_kv_map))]
+  #[allow(clippy::for_kv_map)]
   fn process_all_sibling_functions<'b, I>(
     &self,
     methods: I,

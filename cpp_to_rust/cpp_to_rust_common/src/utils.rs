@@ -5,6 +5,7 @@ use crate::log;
 
 use std;
 use std::collections::HashMap;
+use std::hash::BuildHasher;
 use std::hash::Hash;
 use std::path::PathBuf;
 use std::process::Command;
@@ -20,16 +21,17 @@ pub fn exe_suffix() -> &'static str {
 /// Returns proper executable file suffix on current platform.
 /// Returns `".exe"` on Windows and `""` on other platforms.
 pub fn exe_suffix() -> &'static str {
-    return "";
+    ""
 }
 
 /// Creates and empty collection at `hash[key]` if there isn't one already.
 /// Adds `value` to `hash[key]` collection.
-pub fn add_to_multihash<K: Eq + Hash + Clone, T, V: Default + Extend<T>>(
-    hash: &mut HashMap<K, V>,
-    key: K,
-    value: T,
-) {
+pub fn add_to_multihash<K, T, V, S>(hash: &mut HashMap<K, V, S>, key: K, value: T)
+where
+    K: Eq + Hash + Clone,
+    V: Default + Extend<T>,
+    S: BuildHasher,
+{
     use std::collections::hash_map::Entry;
     match hash.entry(key) {
         Entry::Occupied(mut entry) => entry.get_mut().extend(std::iter::once(value)),
@@ -137,7 +139,7 @@ impl<A, T: IntoIterator<Item = A>> MapIfOk<A> for T {
 /// Reads environment variable `env_var_name`, adds `new_paths`
 /// to acquired list of paths and returns the list formatted as path list
 /// (without applying it).
-#[cfg_attr(feature = "clippy", allow(or_fun_call))]
+#[allow(clippy::or_fun_call)]
 pub fn add_env_path_item(
     env_var_name: &str,
     mut new_paths: Vec<PathBuf>,
@@ -145,7 +147,7 @@ pub fn add_env_path_item(
     use std::env;
     for path in env::split_paths(&env::var(env_var_name).unwrap_or(String::new())) {
         if new_paths.iter().find(|&x| x == &path).is_none() {
-            new_paths.push(path.into());
+            new_paths.push(path);
         }
     }
     Ok(env::join_paths(new_paths).with_context(|_| "env::join_paths failed")?)

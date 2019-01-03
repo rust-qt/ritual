@@ -34,7 +34,8 @@ pub fn inherits(
 }
 
 /// Parses include files to detect which methods are signals or slots.
-pub fn detect_signals_and_slots(data: ProcessorData) -> Result<()> {
+#[allow(clippy::cyclomatic_complexity)]
+pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
     // TODO: only run if it's a new class or it has some new methods; don't change existing old methods
     let mut files = HashSet::new();
 
@@ -138,7 +139,7 @@ pub fn detect_signals_and_slots(data: ProcessorData) -> Result<()> {
                         let matching_sections: Vec<_> = sections
                             .clone()
                             .into_iter()
-                            .filter(|x| x.line + 1 <= origin_location.line as usize)
+                            .filter(|x| x.line < origin_location.line as usize)
                             .collect();
                         if !matching_sections.is_empty() {
                             let section = matching_sections[matching_sections.len() - 1];

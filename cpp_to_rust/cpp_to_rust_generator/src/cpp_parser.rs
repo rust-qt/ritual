@@ -37,13 +37,7 @@ use std::collections::HashSet;
 use std::iter::once;
 
 fn entity_log_representation(entity: Entity) -> String {
-    format!(
-        "{}; {:?}",
-        get_full_name(entity)
-            .map(|name| name.to_string())
-            .unwrap_or("?".into()),
-        entity
-    )
+    format!("{}; {:?}", get_full_name_display(entity), entity)
 }
 
 fn convert_type_kind(kind: TypeKind) -> CppBuiltInNumericType {
@@ -74,8 +68,8 @@ fn convert_type_kind(kind: TypeKind) -> CppBuiltInNumericType {
 
 /// Implementation of the C++ parser that extracts information
 /// about the C++ library's API from its headers.
-struct CppParser<'a> {
-    data: ProcessorData<'a>,
+struct CppParser<'b, 'a: 'b> {
+    data: &'b mut ProcessorData<'a>,
 }
 
 /// Print representation of `entity` and its children to the log.
@@ -83,11 +77,7 @@ struct CppParser<'a> {
 #[allow(dead_code)]
 fn dump_entity(entity: Entity, level: usize) {
     log::llog(log::DebugParser, || {
-        format!(
-            "{}{:?}",
-            (0..level).into_iter().map(|_| ". ").join(""),
-            entity
-        )
+        format!("{}{:?}", (0..level).map(|_| ". ").join(""), entity)
     });
     if level <= 5 {
         for child in entity.get_children() {
@@ -134,7 +124,7 @@ fn get_template_arguments(entity: Entity) -> Option<Vec<CppType>> {
         .map(|(i, c)| CppType::TemplateParameter {
             name: c.get_name().unwrap_or_else(|| format!("Type{}", i + 1)),
             index: i,
-            nested_level: nested_level,
+            nested_level,
         })
         .collect();
     if args.is_empty() {
@@ -177,6 +167,13 @@ fn get_full_name(entity: Entity) -> Result<CppName> {
     }
 }
 
+fn get_full_name_display(entity: Entity) -> String {
+    match get_full_name(entity) {
+        Ok(name) => name.to_string(),
+        Err(_) => "[unnamed]".into(),
+    }
+}
+
 #[cfg(test)]
 fn init_clang() -> Result<Clang> {
     use std;
@@ -199,7 +196,7 @@ fn init_clang() -> Result<Clang> {
 /// If `cpp_code` is specified, it's written to the C++ file before parsing it.
 /// If successful, calls `f` and passes the topmost entity (the translation unit)
 /// as its argument. Returns output value of `f` or an error.
-#[cfg_attr(feature = "clippy", allow(block_in_if_condition_stmt))]
+#[allow(clippy::block_in_if_condition_stmt)]
 fn run_clang<R, F: FnMut(Entity) -> Result<R>>(
     config: &Config,
     tmp_path: &Path,
@@ -280,7 +277,7 @@ fn run_clang<R, F: FnMut(Entity) -> Result<R>>(
     result
 }
 
-fn add_namespaces(data: ProcessorData) -> Result<()> {
+fn add_namespaces(data: &mut ProcessorData) -> Result<()> {
     let mut namespaces = HashSet::new();
     for item in &data.current_database.items {
         let name = match item.cpp_data {
@@ -314,7 +311,7 @@ fn add_namespaces(data: ProcessorData) -> Result<()> {
 }
 
 /// Runs the parser on specified data.
-fn run(data: ProcessorData) -> Result<()> {
+fn run(data: &mut ProcessorData) -> Result<()> {
     log::status(get_version());
     log::status("Initializing clang...");
     //let (mut parser, methods) =
@@ -346,7 +343,7 @@ fn parse_cpp_name(name: &str) -> CppName {
     }
 }
 
-impl<'a> CppParser<'a> {
+impl CppParser<'_, '_> {
     /// Search for a C++ type information in the types found by the parser
     /// and in types of the dependencies.
     fn find_type<F: Fn(&CppTypeData) -> bool>(&self, f: F) -> Option<&CppTypeData> {
@@ -361,7 +358,7 @@ impl<'a> CppParser<'a> {
                 }
             }
         }
-        return None;
+        None
     }
 
     /// Attempts to parse an unexposed type, i.e. a type the used `clang` API
@@ -369,6 +366,7 @@ impl<'a> CppParser<'a> {
     /// and both may be specified at the same time.
     /// Surrounding class and/or
     /// method may be specified in `context_class` and `context_method`.
+    #[allow(clippy::cyclomatic_complexity)]
     fn parse_unexposed_type(
         &self,
         type1: Option<Type>,
@@ -399,9 +397,7 @@ impl<'a> CppParser<'a> {
                     {
                         bail!(
                             "Type uses private class ({})",
-                            get_full_name(declaration)
-                                .map(|name| name.to_string())
-                                .unwrap_or("?".into())
+                            get_full_name_display(declaration)
                         );
                     }
                     if let Some(matches) = template_class_regex.captures(name.as_ref()) {
@@ -519,7 +515,7 @@ impl<'a> CppParser<'a> {
         if let Some(result) = self.parse_special_typedef(&name) {
             return Ok(result);
         }
-        if let Some(type_data) = self.find_type(|x| &x.name.to_cpp_code() == &name) {
+        if let Some(type_data) = self.find_type(|x| x.name.to_cpp_code() == name) {
             match type_data.kind {
                 CppTypeDataKind::Enum { .. } => {
                     return Ok(CppType::Enum {
@@ -650,9 +646,7 @@ impl<'a> CppParser<'a> {
                     {
                         bail!(
                             "Type uses private class ({})",
-                            get_full_name(declaration)
-                                .map(|name| name.to_string())
-                                .unwrap_or("unnamed".to_string())
+                            get_full_name_display(declaration)
                         );
                     }
                     let declaration_name = get_full_name(declaration)?;
@@ -690,7 +684,7 @@ impl<'a> CppParser<'a> {
 
                     Ok(CppType::Class(CppClassType {
                         name: declaration_name,
-                        template_arguments: template_arguments,
+                        template_arguments,
                     }))
                 } else {
                     bail!("failed to get class declaration: {:?}", type1);
@@ -735,8 +729,8 @@ impl<'a> CppParser<'a> {
                     );
                 };
                 Ok(CppType::FunctionPointer(CppFunctionPointerType {
-                    return_type: return_type,
-                    arguments: arguments,
+                    return_type,
+                    arguments,
                     allows_variadic_arguments: type1.is_variadic(),
                 }))
             }
@@ -768,7 +762,9 @@ impl<'a> CppParser<'a> {
             }
             TypeKind::Unexposed => {
                 let canonical = type1.get_canonical_type();
-                if canonical.get_kind() != TypeKind::Unexposed {
+                if canonical.get_kind() == TypeKind::Unexposed {
+                    self.parse_unexposed_type(Some(type1), None, context_class, context_method)
+                } else {
                     let mut parsed_canonical =
                         self.parse_type(canonical, context_class, context_method);
                     if let Ok(parsed_unexposed) =
@@ -805,8 +801,6 @@ impl<'a> CppParser<'a> {
                         }
                     }
                     parsed_canonical
-                } else {
-                    self.parse_unexposed_type(Some(type1), None, context_class, context_method)
                 }
             }
             _ => bail!("Unsupported kind of type: {:?}", type1.get_kind()),
@@ -887,7 +881,7 @@ impl<'a> CppParser<'a> {
     }
 
     /// Parses a function `entity`.
-    #[cfg_attr(feature = "clippy", allow(cyclomatic_complexity))]
+    #[allow(clippy::cyclomatic_complexity)]
     fn parse_function(&self, entity: Entity) -> Result<(CppFunction, DatabaseItemSource)> {
         let (class_name, class_entity) = match entity.get_semantic_parent() {
             Some(p) => match p.get_kind() {
@@ -1000,9 +994,9 @@ impl<'a> CppParser<'a> {
                 }
             }
             arguments.push(CppFunctionArgument {
-                name: name,
-                argument_type: argument_type,
-                has_default_value: has_default_value,
+                name,
+                argument_type,
+                has_default_value,
             });
         }
         let mut name = entity
@@ -1169,7 +1163,7 @@ impl<'a> CppParser<'a> {
                                 Accessibility::Private => CppVisibility::Private,
                             },
                             // not all signals are detected here! see CppData::detect_signals_and_slots
-                            is_signal: is_signal,
+                            is_signal,
                             is_slot: false,
                             class_type: CppClassType {
                                 name: class_name,
@@ -1179,11 +1173,11 @@ impl<'a> CppParser<'a> {
                     }
                     None => None,
                 },
-                arguments: arguments,
-                allows_variadic_arguments: allows_variadic_arguments,
+                arguments,
+                allows_variadic_arguments,
                 return_type: return_type_parsed,
-                template_arguments: template_arguments,
-                declaration_code: declaration_code,
+                template_arguments,
+                declaration_code,
                 doc: None,
             },
             DatabaseItemSource::CppParser {
@@ -1198,9 +1192,7 @@ impl<'a> CppParser<'a> {
         let include_file = self.entity_include_file(entity).with_context(|_| {
             format!(
                 "Origin of type is unknown: {}; entity: {:?}",
-                get_full_name(entity)
-                    .map(|name| name.to_string())
-                    .unwrap_or("?".into()),
+                get_full_name_display(entity),
                 entity
             )
         })?;
@@ -1248,9 +1240,7 @@ impl<'a> CppParser<'a> {
             format!(
                 "Origin of class field is unknown: {}; entity: {:?}",
                 // TODO: add function for this
-                get_full_name(entity)
-                    .map(|name| name.to_string())
-                    .unwrap_or("?".into()),
+                get_full_name_display(entity),
                 entity
             )
         })?;
@@ -1271,7 +1261,7 @@ impl<'a> CppParser<'a> {
             })?;
         self.data.current_database.add_cpp_data(
             DatabaseItemSource::CppParser {
-                include_file: include_file,
+                include_file,
                 origin_location: get_origin_location(entity)?,
             },
             CppItemData::ClassField(CppClassField {
@@ -1280,8 +1270,8 @@ impl<'a> CppParser<'a> {
                 //          Err(_) => None,
                 //        },
                 name: field_name,
-                field_type: field_type,
-                class_type: class_type,
+                field_type,
+                class_type,
                 visibility: match entity.get_accessibility().unwrap_or(Accessibility::Public) {
                     Accessibility::Public => CppVisibility::Public,
                     Accessibility::Protected => CppVisibility::Protected,
@@ -1301,9 +1291,7 @@ impl<'a> CppParser<'a> {
         let include_file = self.entity_include_file(entity).with_context(|_| {
             format!(
                 "Origin of type is unknown: {}; entity: {:?}",
-                get_full_name(entity)
-                    .map(|name| name.to_string())
-                    .unwrap_or("?".into()),
+                get_full_name_display(entity),
                 entity
             )
         })?;
@@ -1393,14 +1381,14 @@ impl<'a> CppParser<'a> {
         }
         self.data.current_database.add_cpp_data(
             DatabaseItemSource::CppParser {
-                include_file: include_file,
+                include_file,
                 origin_location: get_origin_location(entity).unwrap(),
             },
             CppItemData::Type(CppTypeData {
                 kind: CppTypeDataKind::Class {
                     type_base: CppClassType {
                         name: full_name.clone(),
-                        template_arguments: template_arguments,
+                        template_arguments,
                     },
                 },
                 name: full_name,
@@ -1575,7 +1563,7 @@ impl<'a> CppParser<'a> {
                                     self.data.html_logger.add(
                                         &[
                                             entity_log_representation(entity),
-                                            format!("skipping template partial specialization"),
+                                            "skipping template partial specialization".into(),
                                         ],
                                         "cpp_parser_skip",
                                     )?;

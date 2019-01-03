@@ -76,6 +76,7 @@ impl DocData {
     }
 
     /// Parses Qt documentation of module `qt_crate_name` located at `docs_path`.
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(qt_crate_name: &str, docs_path: &Path) -> Result<DocData> {
         if !docs_path.exists() {
             bail!(
@@ -117,16 +118,16 @@ impl DocData {
                 let file_id: i32 = index_row.get_checked(1)?;
                 let anchor: Option<String> = index_row.get_checked(2)?;
                 index_data.push(DocIndexItem {
-                    name: name,
+                    name,
                     document_id: file_id,
-                    anchor: anchor,
+                    anchor,
                     accessed: false,
                 });
             }
         }
         Ok(DocData {
             index: index_data,
-            connection: connection,
+            connection,
         })
     }
 }

@@ -82,8 +82,8 @@ impl DocParser {
             let document = self.doc_data.document(doc_id)?;
             let item_docs = all_item_docs(&document, &self.base_url)?;
             entry.insert(FileData {
-                document: document,
-                item_docs: item_docs,
+                document,
+                item_docs,
                 file_name: self.doc_data.file_name(doc_id)?,
             });
         }
@@ -124,8 +124,7 @@ impl DocParser {
         let index_item = self
             .doc_data
             .find_index_item(|item| {
-                &item.name == &corrected_name
-                    && (item.anchor.is_some() || anchor_override.is_some())
+                item.name == corrected_name && (item.anchor.is_some() || anchor_override.is_some())
             })
             .ok_or_else(|| err_msg(format!("No documentation entry for {}", corrected_name)))?;
         let anchor = match anchor_override {
@@ -142,7 +141,7 @@ impl DocParser {
         let candidates: Vec<_> = file_data
             .item_docs
             .iter()
-            .filter(|x| &x.anchor == &anchor || x.anchor.starts_with(&anchor_prefix))
+            .filter(|x| x.anchor == anchor || x.anchor.starts_with(&anchor_prefix))
             .collect();
         if candidates.is_empty() {
             bail!("No matching anchors found for {}", name);
@@ -182,7 +181,7 @@ impl DocParser {
                             .replace(prefix1, "")
                             .replace(prefix2, "");
                     }
-                    if &item_declaration_imprint == &query_imprint {
+                    if item_declaration_imprint == query_imprint {
                         if item.html.find(|c| c != '\n').is_none() {
                             bail!("found empty documentation");
                         }
@@ -261,7 +260,7 @@ impl DocParser {
         let name = name.to_string();
         let index_item = self
             .doc_data
-            .find_index_item(|item| &item.name == &name)
+            .find_index_item(|item| item.name == name)
             .ok_or_else(|| err_msg(format!("No documentation entry for {}", name)))?;
         if let Some(ref anchor) = index_item.anchor {
             let (result, file_name) = {
@@ -316,8 +315,8 @@ impl DocParser {
         let (html, cross_references) = process_html(&result, &self.base_url)?;
         Ok(DocForType {
             type_doc: CppTypeDoc {
-                html: html,
-                url: url,
+                html,
+                url,
                 cross_references: cross_references.into_iter().collect(),
             },
             enum_variants_doc: Vec::new(),
@@ -329,7 +328,7 @@ impl DocParser {
     pub fn mark_enum_variant_used(&mut self, full_name: &str) {
         if self
             .doc_data
-            .find_index_item(|item| &item.name == &full_name)
+            .find_index_item(|item| item.name == full_name)
             .is_none()
         {
             log::llog(log::DebugQtDoc, || {
@@ -394,15 +393,15 @@ fn are_argument_types_equal(declaration1: &str, declaration2: &str) -> bool {
 
     fn arg_to_type(arg: &str) -> &str {
         match arg.rfind(|c: char| !c.is_alphanumeric() && c != '_') {
-            Some(index) => arg[0..index + 1].trim(),
+            Some(index) => arg[0..=index].trim(),
             None => arg,
         }
     }
     for i in 0..args1.len() {
         let arg1 = arg_prepare(args1[i]);
         let arg2 = arg_prepare(args2[i]);
-        let arg1_maybe_type = arg_to_type(arg1.as_ref());
-        let arg2_maybe_type = arg_to_type(arg2.as_ref());
+        let arg1_maybe_type = arg_to_type(arg1);
+        let arg2_maybe_type = arg_to_type(arg2);
         let a1_orig = arg1.replace(" ", "");
         let a1_type = arg1_maybe_type.replace(" ", "");
         let a2_orig = arg2.replace(" ", "");
@@ -450,7 +449,7 @@ fn process_html(html: &str, base_url: &str) -> Result<(String, HashSet<String>)>
     let html = link_regex
         .replace_all(html.trim(), |captures: &::regex::Captures| {
             let mut link = bad_subfolder_regex.replace(&captures[2], "").to_string();
-            if !link.contains(":") {
+            if !link.contains(':') {
                 link = format!("{}{}", base_url, link);
                 cross_references.insert(link.clone());
             }
@@ -523,12 +522,12 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
                             all_cross_references.extend(cross_references.into_iter());
                             enum_variants.push(DocForEnumVariant {
                                 name: name.to_string(),
-                                html: html,
+                                html,
                             });
                         }
                     }
                 };
-                let mut value_list_r = node.find(value_list_condition.clone());
+                let mut value_list_r = node.find(value_list_condition);
                 if node.is(value_list_condition) {
                     parse_enum_variants(node);
                 } else if let Some(value_list) = value_list_r.next() {
@@ -550,10 +549,10 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
         let (html, cross_references) = process_html(&result, base_url)?;
         all_cross_references.extend(cross_references.into_iter());
         results.push(ItemDoc {
-            declarations: declarations,
-            html: html,
+            declarations,
+            html,
             anchor: anchor_text,
-            enum_variants: enum_variants,
+            enum_variants,
             cross_references: all_cross_references.into_iter().collect(),
         });
     }
@@ -578,9 +577,9 @@ fn find_methods_docs(items: &mut [DatabaseItem], data: &mut DocParser) -> Result
                     Ok(doc) => cpp_method.doc = Some(doc),
                     Err(msg) => {
                         if cpp_method.member.is_some()
-                            && (&cpp_method.name == &CppName::from_one_part("tr")
-                                || &cpp_method.name == &CppName::from_one_part("trUtf8")
-                                || &cpp_method.name == &CppName::from_one_part("metaObject"))
+                            && (cpp_method.name == CppName::from_one_part("tr")
+                                || cpp_method.name == CppName::from_one_part("trUtf8")
+                                || cpp_method.name == CppName::from_one_part("metaObject"))
                         {
                             // no error message
                         } else {
@@ -600,7 +599,7 @@ fn find_methods_docs(items: &mut [DatabaseItem], data: &mut DocParser) -> Result
     Ok(())
 }
 
-pub fn parse_docs(data: ProcessorData, qt_crate_name: &str, docs_path: &Path) -> Result<()> {
+pub fn parse_docs(data: &mut ProcessorData, qt_crate_name: &str, docs_path: &Path) -> Result<()> {
     // TODO: only run on new database items?
     let doc_data = match DocData::new(&qt_crate_name, &docs_path) {
         Ok(doc_data) => doc_data,

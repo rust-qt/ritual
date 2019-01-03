@@ -453,8 +453,7 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
         "Preparing generator config for crate: {}",
         crate_name
     ));
-    let mut crate_properties =
-        CrateProperties::new(crate_name.clone(), versions::QT_OUTPUT_CRATES_VERSION);
+    let mut crate_properties = CrateProperties::new(crate_name, versions::QT_OUTPUT_CRATES_VERSION);
     let mut custom_fields = toml::value::Table::new();
     let mut package_data = toml::value::Table::new();
     package_data.insert(

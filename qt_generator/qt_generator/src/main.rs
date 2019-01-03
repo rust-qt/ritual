@@ -3,6 +3,8 @@
 //! See [README](https://github.com/rust-qt/cpp_to_rust/tree/master/qt_generator/qt_generator)
 //! for more information.
 
+#![allow(clippy::collapsible_if)]
+
 use crate::lib_configs::make_config;
 use cpp_to_rust_generator::common::errors::{err_msg, FancyUnwrap, Result};
 use cpp_to_rust_generator::common::file_utils::canonicalize;
@@ -20,7 +22,7 @@ mod fix_header_names;
 mod lib_configs;
 mod versions;
 
-fn run(matches: ::clap::ArgMatches) -> Result<()> {
+fn run(matches: &clap::ArgMatches) -> Result<()> {
     let workspace_path = canonicalize(&PathBuf::from(
         matches
             .value_of("workspace")
@@ -38,7 +40,7 @@ fn run(matches: ::clap::ArgMatches) -> Result<()> {
         .collect();
 
     let final_crates = if crates.iter().any(|x| *x == "all") {
-        all_crate_names().iter().map(|x| *x).collect()
+        all_crate_names().to_vec()
     } else {
         crates
     };
@@ -71,14 +73,13 @@ fn run(matches: ::clap::ArgMatches) -> Result<()> {
 
 pub fn main() {
     use clap::{App, Arg};
-    const ABOUT: &'static str = "Generates rust_qt crates using cpp_to_rust";
-    const AFTER_HELP: &'static str =
-        "\
-         Example:\n    qt_generator -w /path/to/workspace -p all -g\n\n\
-         See https://github.com/rust-qt/cpp_to_rust for more details.";
-    const WORKSPACE_DIR_HELP: &'static str = "Directory for output and temporary files";
-    const OPERATIONS_HELP: &'static str = "Operations to perform";
-    const DISABLE_LOGGING_HELP: &'static str = "Disable creating log files";
+    const ABOUT: &str = "Generates rust_qt crates using cpp_to_rust";
+    const AFTER_HELP: &str = "\
+                              Example:\n    qt_generator -w /path/to/workspace -p all -g\n\n\
+                              See https://github.com/rust-qt/cpp_to_rust for more details.";
+    const WORKSPACE_DIR_HELP: &str = "Directory for output and temporary files";
+    const OPERATIONS_HELP: &str = "Operations to perform";
+    const DISABLE_LOGGING_HELP: &str = "Disable creating log files";
 
     let crates_help = format!(
         "Process libraries (Qt modules). Specify \"all\" \
@@ -127,5 +128,5 @@ pub fn main() {
         )
         .get_matches();
 
-    run(args).fancy_unwrap();
+    run(&args).fancy_unwrap();
 }

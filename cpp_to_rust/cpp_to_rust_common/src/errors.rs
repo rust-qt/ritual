@@ -1,5 +1,3 @@
-#![cfg_attr(feature = "clippy", allow(redundant_closure))]
-
 //! Error handling types based on `failure` crate.
 
 use std::io::{stderr, Write};
@@ -31,7 +29,7 @@ impl<T> FancyUnwrap for Result<T> {
                         writeln!(stderr, "{}", backtrace).unwrap();
                     } else {
                         writeln!(stderr, "Short backtrace:").unwrap();
-                        let mut lines: Vec<_> = backtrace.split("\n").collect();
+                        let mut lines: Vec<_> = backtrace.split('\n').collect();
                         if let Some(position) = lines
                             .iter()
                             .position(|line| line.contains("std::rt::lang_start::"))

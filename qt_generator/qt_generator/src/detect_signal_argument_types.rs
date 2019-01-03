@@ -6,7 +6,7 @@ use cpp_to_rust_generator::database::DatabaseItemSource;
 use cpp_to_rust_generator::processor::ProcessorData;
 use std::collections::HashSet;
 
-pub fn detect_signal_argument_types(data: ProcessorData) -> Result<()> {
+pub fn detect_signal_argument_types(data: &mut ProcessorData) -> Result<()> {
     let mut all_types = HashSet::new();
     for method in data
         .current_database

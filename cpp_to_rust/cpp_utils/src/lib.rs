@@ -124,7 +124,7 @@ impl<T: CppDeletable> CppBox<T> {
     /// using `as_ref`, `as_mut`, `deref` or `deref_mut` will result in a panic.
     pub unsafe fn new(ptr: *mut T) -> CppBox<T> {
         CppBox {
-            ptr: ptr,
+            ptr,
             deleter: CppDeletable::deleter(),
         }
     }
@@ -216,6 +216,7 @@ pub trait StaticCast<T> {
 
 /// Converts type of a const pointer using `StaticCast` implementation of the type.
 /// If `ptr` is null, this function does nothing and returns null pointer.
+#[allow(clippy::not_unsafe_ptr_arg_deref)] // TODO: redesign casts API
 pub fn static_cast<R, T: StaticCast<R>>(ptr: *const T) -> *const R {
     unsafe { ptr.as_ref() }
         .map(|x| x.static_cast() as *const R)
@@ -224,6 +225,7 @@ pub fn static_cast<R, T: StaticCast<R>>(ptr: *const T) -> *const R {
 
 /// Converts type of a mutable pointer using `StaticCast` implementation of the type.
 /// If `ptr` is null, this function does nothing and returns null pointer.
+#[allow(clippy::not_unsafe_ptr_arg_deref)] // TODO: redesign casts API
 pub fn static_cast_mut<R, T: StaticCast<R>>(ptr: *mut T) -> *mut R {
     unsafe { ptr.as_mut() }
         .map(|x| x.static_cast_mut() as *mut R)

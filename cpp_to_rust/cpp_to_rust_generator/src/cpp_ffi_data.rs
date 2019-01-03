@@ -63,6 +63,7 @@ impl CppCast {
 
 /// Information about real nature of a C++ FFI method.
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum CppFfiFunctionKind {
     /// This is a real C++ function.
     Function {
@@ -236,6 +237,7 @@ impl CppFfiFunction {
 }
 
 #[derive(From, Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum CppFfiItem {
     Function(CppFfiFunction),
     QtSlotWrapper(QtSlotWrapper),
