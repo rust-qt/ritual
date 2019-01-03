@@ -46,8 +46,8 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
         } = item.source
         {
             if let CppItemData::Type(ref type1) = item.cpp_data {
-                if let CppTypeDataKind::Class { ref type_base } = type1.kind {
-                    if inherits(&data, &type_base.name, &CppName::from_one_part("QObject")) {
+                if let CppTypeDataKind::Class { ref class_type } = type1.kind {
+                    if inherits(&data, &class_type.name, &CppName::from_one_part("QObject")) {
                         if !files.contains(&origin_location.include_file_path) {
                             files.insert(origin_location.include_file_path.clone());
                         }

@@ -1386,7 +1386,7 @@ impl CppParser<'_, '_> {
             },
             CppItemData::Type(CppTypeData {
                 kind: CppTypeDataKind::Class {
-                    type_base: CppClassType {
+                    class_type: CppClassType {
                         name: full_name.clone(),
                         template_arguments,
                     },

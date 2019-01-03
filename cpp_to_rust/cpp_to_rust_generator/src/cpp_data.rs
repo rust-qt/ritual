@@ -159,7 +159,7 @@ pub enum CppTypeDataKind {
     Enum,
     Class {
         /// Information about name and template arguments of this type.
-        type_base: CppClassType,
+        class_type: CppClassType,
     },
 }
 
@@ -199,6 +199,7 @@ impl CppTypeDataKind {
             _ => false,
         }
     }
+
     pub fn is_enum(&self) -> bool {
         match self {
             CppTypeDataKind::Enum { .. } => true,

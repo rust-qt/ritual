@@ -26,7 +26,7 @@ fn add_explicit_destructors(data: &mut ProcessorData) -> Result<()> {
     let mut methods = Vec::new();
     for type1 in &data.current_database.items {
         if let CppItemData::Type(ref type1) = type1.cpp_data {
-            if let CppTypeDataKind::Class { ref type_base } = type1.kind {
+            if let CppTypeDataKind::Class { ref class_type } = type1.kind {
                 let class_name = &type1.name;
                 let found_destructor = data
                     .current_database
@@ -38,7 +38,7 @@ fn add_explicit_destructors(data: &mut ProcessorData) -> Result<()> {
                     methods.push(CppFunction {
                         name: CppName::from_one_part(format!("~{}", class_name)),
                         member: Some(CppFunctionMemberData {
-                            class_type: type_base.clone(),
+                            class_type: class_type.clone(),
                             is_virtual: false, // the destructor can actually be virtual but we don't care about it here
                             is_pure_virtual: false,
                             is_const: false,
