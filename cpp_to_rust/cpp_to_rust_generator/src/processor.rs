@@ -12,6 +12,7 @@ use crate::common::string_utils::JoinWithSeparator;
 use crate::cpp_explicit_destructors::add_explicit_destructors_step;
 use crate::cpp_template_instantiator::find_template_instantiations_step;
 use crate::cpp_template_instantiator::instantiate_templates_step;
+use crate::crate_writer::crate_writer_step;
 use crate::database::{Database, DatabaseItem};
 use crate::html_logger::HtmlLogger;
 use crate::rust_name_resolver::rust_name_resolver_step;
@@ -215,6 +216,7 @@ impl Ord for MainItemRef<'_> {
     }
 }
 
+#[allow(clippy::useless_let_if_seq)]
 pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]) -> Result<()> {
     log::status(format!(
         "Processing crate: {}",
@@ -232,6 +234,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
         // TODO: generate_slot_wrappers
         cpp_checker_step(),
         rust_name_resolver_step(),
+        crate_writer_step(),
         steps::print_database(),
         steps::clear_ffi(),
         steps::clear(),
@@ -260,6 +263,11 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
     })?;
 
     let mut current_database_saved = true;
+
+    if &current_database.crate_version != config.crate_properties().version() {
+        current_database.crate_version = config.crate_properties().version().to_string();
+        current_database_saved = false;
+    }
 
     for step_name in step_names {
         let steps = if step_name == "main" {

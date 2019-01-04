@@ -32,6 +32,11 @@ fn run(matches: &clap::ArgMatches) -> Result<()> {
     log::status(format!("Workspace: {}", workspace_path.display()));
     let mut workspace = Workspace::new(workspace_path)?;
     workspace.set_disable_logging(matches.is_present("disable-logging"))?;
+
+    if let Some(value) = matches.value_of("local-paths") {
+        workspace.set_write_dependencies_local_paths(value == "1")?;
+    }
+
     let mut was_any_action = false;
 
     let crates: Vec<_> = matches
@@ -125,6 +130,11 @@ pub fn main() {
             Arg::with_name("disable-logging")
                 .long("disable-logging")
                 .help(DISABLE_LOGGING_HELP),
+        )
+        .arg(
+            Arg::with_name("local-paths")
+                .long("local-paths")
+                .takes_value(true),
         )
         .get_matches();
 

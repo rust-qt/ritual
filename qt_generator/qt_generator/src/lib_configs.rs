@@ -1,6 +1,7 @@
 //! Generator configurations specific for each Qt module.
 
 use crate::versions;
+use cpp_to_rust_generator::common::cpp_build_config::CppLibraryType;
 use cpp_to_rust_generator::common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
 use cpp_to_rust_generator::common::errors::{bail, Result, ResultExt};
 use cpp_to_rust_generator::common::file_utils::repo_crate_local_path;
@@ -480,14 +481,8 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
 
     custom_fields.insert("package".to_string(), toml::Value::Table(package_data));
     crate_properties.set_custom_fields(custom_fields);
-    crate_properties.remove_default_build_dependencies();
-    crate_properties.add_build_dependency(
-        "qt_build_tools",
-        versions::QT_BUILD_TOOLS_VERSION,
-        Some(repo_crate_local_path("qt_generator/qt_build_tools")?),
-    );
-    let mut config = Config::new(crate_properties);
-    if crate_name.starts_with("moqt_") {
+    let mut config = if crate_name.starts_with("moqt_") {
+        let mut config = Config::new(crate_properties);
         let moqt_path = PathBuf::from(
             ::std::env::var("MOQT_PATH").with_context(|_| "MOQT_PATH env var is missing")?,
         );
@@ -516,6 +511,7 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
         {
             let mut data = CppBuildConfigData::new();
             data.add_linked_lib(crate_name.replace("_", ""));
+            data.set_library_type(CppLibraryType::Shared);
             config
                 .cpp_build_config_mut()
                 .add(target::Condition::True, data);
@@ -533,13 +529,23 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
         } else {
             config.add_cpp_parser_argument("-std=gnu++11");
         }
-    //    let cpp_config_data = CppBuildConfigData {
-    //      linked_libs: vec![crate_name.to_string()],
-    //      linked_frameworks: Vec::new(),
-    //
-    //    }
-    //...
+        //    let cpp_config_data = CppBuildConfigData {
+        //      linked_libs: vec![crate_name.to_string()],
+        //      linked_frameworks: Vec::new(),
+        //
+        //    }
+        //...
+        config
     } else {
+        crate_properties.remove_default_build_dependencies();
+        crate_properties.add_build_dependency(
+            "qt_build_tools",
+            versions::QT_BUILD_TOOLS_VERSION,
+            Some(repo_crate_local_path("qt_generator/qt_build_tools")?),
+        );
+
+        let mut config = Config::new(crate_properties);
+
         let qt_config = get_full_build_config(crate_name)?;
         config.set_cpp_build_config(qt_config.cpp_build_config);
         config.set_cpp_build_paths(qt_config.cpp_build_paths);
@@ -588,7 +594,9 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
             vec!["cpp_parser".to_string()],
             move |data| parse_docs(data, &crate_name_clone, &docs_path),
         ));
-    }
+
+        config
+    };
 
     config.set_crate_template_path(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))

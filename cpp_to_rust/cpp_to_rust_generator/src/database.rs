@@ -334,15 +334,17 @@ pub struct DatabaseItem {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Database {
     pub crate_name: String,
+    pub crate_version: String,
     pub items: Vec<DatabaseItem>,
     pub environments: Vec<CppCheckerEnv>,
     pub next_ffi_id: u64,
 }
 
 impl Database {
-    pub fn empty(crate_name: &str) -> Database {
+    pub fn empty(crate_name: impl Into<String>) -> Database {
         Database {
-            crate_name: crate_name.to_owned(),
+            crate_name: crate_name.into(),
+            crate_version: "0.0.0".into(),
             items: Vec::new(),
             environments: Vec::new(),
             next_ffi_id: 0,

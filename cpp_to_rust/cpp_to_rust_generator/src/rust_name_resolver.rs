@@ -3,6 +3,7 @@ use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 //use cpp_to_rust_common::log;
 use crate::common::errors::{bail, Result};
+use crate::cpp_checker::cpp_checker_step;
 use crate::cpp_data::CppTypeDataKind;
 use crate::cpp_type::CppType;
 use crate::database::CppItemData;
@@ -74,7 +75,9 @@ fn run(data: &mut ProcessorData) -> Result<()> {
             continue;
         }
         match is_cpp_item_resolvable(&all_items, &item.cpp_data) {
-            Ok(_) => unimplemented!(),
+            Ok(_) => {
+                //unimplemented!()
+            }
             Err(err) => {
                 log::error(format!("skipping item: {}: {}", &item.cpp_data, err));
             }
@@ -86,7 +89,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
 
 pub fn rust_name_resolver_step() -> ProcessingStep {
     // TODO: set dependencies
-    ProcessingStep::new("rust_name_resolver", Vec::new(), run)
+    ProcessingStep::new("rust_name_resolver", vec![cpp_checker_step().name], run)
 }
 
 #[test]

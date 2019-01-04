@@ -22,6 +22,7 @@ pub mod html_logger;
 pub mod processor;
 pub mod workspace;
 
+mod crate_writer;
 mod rust_name_resolver;
 
 //mod doc_formatter;
@@ -31,7 +32,7 @@ mod rust_name_resolver;
 mod cpp_parser;
 //mod rust_info;
 mod rust_type;
-//mod versions;
+mod versions;
 
 mod cpp_template_instantiator;
 

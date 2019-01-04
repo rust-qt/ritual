@@ -60,7 +60,9 @@ pub fn move_files(src: &PathBuf, dst: &PathBuf) -> Result<()> {
 pub fn copy_recursively(src: &PathBuf, dst: &PathBuf) -> Result<()> {
     let inner = || -> Result<()> {
         if src.as_path().is_dir() {
-            create_dir(&dst)?;
+            if !dst.is_dir() {
+                create_dir(&dst)?;
+            }
             for item in read_dir(src)? {
                 let item = item?;
                 let from = item.path().to_path_buf();

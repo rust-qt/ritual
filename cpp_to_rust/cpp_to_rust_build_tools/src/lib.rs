@@ -21,6 +21,7 @@ use crate::common::BuildScriptData;
 pub use cpp_to_rust_common as common;
 
 use crate::common::cpp_lib_builder::c2r_cmake_vars;
+use cpp_to_rust_common::errors::err_msg;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -107,6 +108,11 @@ impl Config {
         let manifest_dir = manifest_dir()?;
         let profile = std::env::var("PROFILE").with_context(|_| "PROFILE env var is missing")?;
         log::status("Building C++ wrapper library");
+
+        let library_type = cpp_build_config_data
+            .library_type()
+            .ok_or_else(|| err_msg("library type (shared or static) is not set"))?;
+
         CppLibBuilder {
             cmake_source_dir: manifest_dir.with_added("c_lib"),
             build_dir: out_dir.with_added("c_lib_build"),
@@ -115,7 +121,7 @@ impl Config {
             cmake_vars: c2r_cmake_vars(
                 &cpp_build_config_data,
                 &self.cpp_build_paths,
-                cpp_build_config_data.library_type().as_ref(),
+                Some(&library_type),
             )?,
             build_type: match profile.as_str() {
                 "debug" => BuildType::Debug,
@@ -146,11 +152,8 @@ impl Config {
         }
         {
             log::status("Requesting type sizes");
-            let mut command = Command::new(
-                c_lib_install_dir
-                    .with_added("lib")
-                    .with_added(format!("type_sizes{}", exe_suffix())),
-            );
+            let mut command =
+                Command::new(c_lib_install_dir.with_added(format!("type_sizes{}", exe_suffix())));
             let mut file = create_file(out_dir.with_added("type_sizes.rs"))?;
             file.write(get_command_output(&mut command)?)?;
         }
@@ -173,7 +176,7 @@ impl Config {
         }
         println!(
             "cargo:rustc-link-search=native={}",
-            path_to_str(&c_lib_install_dir.with_added("lib"))?
+            path_to_str(&c_lib_install_dir)?
         );
         log::status("cpp_to_rust build script finished.");
         Ok(())

@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::common::errors::{bail, should_panic_on_unexpected, unexpected, Result};
-use crate::common::file_utils::{create_dir_all, create_file, path_to_str, PathBufWithAdded};
+use crate::common::file_utils::{create_file, path_to_str};
 use crate::common::string_utils::JoinWithSeparator;
 use crate::common::utils::get_command_output;
 use crate::common::utils::MapIfOk;
@@ -341,54 +341,27 @@ pub fn function_implementation(method: &CppFfiFunction) -> Result<String> {
     ))
 }
 
-/// Generates main files and directories of the library.
-pub fn generate_template_files(
-    lib_name: &str,
-    lib_path: &Path,
-    include_directives: &[PathBuf],
-) -> Result<()> {
-    let name_upper = lib_name.to_uppercase();
-    let cmakelists_path = lib_path.with_added("CMakeLists.txt");
-    let mut cmakelists_file = create_file(&cmakelists_path)?;
-
-    cmakelists_file.write(format!(
-        include_str!("../templates/c_lib/CMakeLists.txt"),
-        lib_name_lowercase = lib_name,
-        lib_name_uppercase = name_upper
-    ))?;
-    let src_dir = lib_path.with_added("src");
-    create_dir_all(&src_dir)?;
-
-    let include_dir = lib_path.with_added("include");
-    create_dir_all(&include_dir)?;
-
-    let include_directives_code = include_directives
-        .map_if_ok(|d| -> Result<_> { Ok(format!("#include \"{}\"", path_to_str(d)?)) })?
-        .join("\n");
-
-    let global_file_path = include_dir.with_added(format!("{}_global.h", lib_name));
-    let mut global_file = create_file(&global_file_path)?;
-    global_file.write(format!(
-        include_str!("../templates/c_lib/global.h"),
-        include_directives_code = include_directives_code
-    ))?;
-    Ok(())
-}
-
 /// Generates a source file with the specified FFI methods.
-fn generate_cpp_file(data: &[DatabaseItem], file_path: &Path) -> Result<()> {
+pub fn generate_cpp_file(
+    data: &[DatabaseItem],
+    file_path: &Path,
+    global_header_name: &str,
+) -> Result<()> {
     //    let cpp_path = self
     //      .lib_path
     //      .with_added("src")
     //      .with_added(format!("{}_{}.cpp", &self.lib_name, data.name));
 
     let mut cpp_file = create_file(file_path)?;
+    cpp_file.write(format!("#include \"{}\"\n", global_header_name))?;
+
     let mut any_slot_wrappers = false;
     for item in data {
         if let Some(ref ffi_items) = &item.ffi_items {
             for ffi_item in ffi_items {
                 match ffi_item.cpp_item {
                     CppFfiItem::Function(ref function) => {
+                        // TODO: write less extern C
                         cpp_file.write("extern \"C\" {\n\n")?;
                         cpp_file.write(function_implementation(function)?)?;
                         cpp_file.write("\n} // extern \"C\"\n\n")?;

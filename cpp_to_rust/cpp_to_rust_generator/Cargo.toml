@@ -18,7 +18,7 @@ serde_derive = "1.0.84"
 clang = "0.20.0"    # C++ parsing
 select = "0.4.2"    # html parsing
 tempdir = "0.3.7"   # temporary directory creation
-rustfmt = "0.10.0"  # Rust code formatting
 derive_more = "0.13.0"
 itertools = "0.8.0"
+pathdiff = "0.1.0"
 

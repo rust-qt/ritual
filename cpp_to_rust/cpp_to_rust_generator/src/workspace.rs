@@ -11,8 +11,8 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct WorkspaceConfig {
-    disable_logging: bool,
-    write_dependencies_local_paths: bool,
+    pub disable_logging: bool,
+    pub write_dependencies_local_paths: bool,
 }
 
 #[derive(Debug)]
@@ -75,8 +75,20 @@ impl Workspace {
         Ok(path)
     }
 
+    pub fn config(&self) -> &WorkspaceConfig {
+        &self.config
+    }
+
     pub fn log_path(&self) -> Result<PathBuf> {
         let path = self.path.with_added("log");
+        if !path.exists() {
+            create_dir(&path)?;
+        }
+        Ok(path)
+    }
+
+    pub fn crate_path(&self, crate_name: &str) -> Result<PathBuf> {
+        let path = self.path.with_added(crate_name);
         if !path.exists() {
             create_dir(&path)?;
         }
@@ -120,10 +132,8 @@ impl Workspace {
         if path.exists() {
             load_json(path)
         } else {
-            let dir_path = self.path.with_added(crate_name);
-            if !dir_path.exists() {
-                create_dir(dir_path)?;
-            }
+            // make sure crate dir exists
+            let _ = self.crate_path(crate_name)?;
             Ok(Database::empty(crate_name))
         }
     }
@@ -138,6 +148,14 @@ impl Workspace {
         }
         self.config.disable_logging = value;
         self.apply_logger_settings()?;
+        self.save_config()
+    }
+
+    pub fn set_write_dependencies_local_paths(&mut self, value: bool) -> Result<()> {
+        if self.config.write_dependencies_local_paths == value {
+            return Ok(());
+        }
+        self.config.write_dependencies_local_paths = value;
         self.save_config()
     }
 

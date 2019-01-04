@@ -7,10 +7,10 @@
 //! Make sure to update versions here when the actual version of the dependency changes.
 
 /// Version of `cpp_to_rust_build_tools` crate.
-pub const BUILD_TOOLS_VERSION: &'static str = "0.2.3";
+pub const BUILD_TOOLS_VERSION: &str = "0.2.3";
 
 /// Version of `cpp_utils` crate.
-pub const CPP_UTILS_VERSION: &'static str = "0.2.0";
+pub const CPP_UTILS_VERSION: &str = "0.2.0";
 
 /// Version of `libc` crate.
-pub const LIBC_VERSION: &'static str = "0.2";
+pub const LIBC_VERSION: &str = "0.2";
