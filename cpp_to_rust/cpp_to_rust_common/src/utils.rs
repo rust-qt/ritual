@@ -5,6 +5,7 @@ use crate::log;
 
 use std;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::hash::BuildHasher;
 use std::hash::Hash;
 use std::path::PathBuf;
@@ -160,5 +161,16 @@ pub trait PushVec<T> {
 impl<T> PushVec<T> for Vec<T> {
     fn push_vec(&mut self, mut vec: Vec<T>) {
         self.append(&mut vec);
+    }
+}
+
+pub trait DebugPrint {
+    fn debug_print(self, text: &str) -> Self;
+}
+
+impl<T: Debug> DebugPrint for T {
+    fn debug_print(self, text: &str) -> Self {
+        println!("DebugPrint {} {:?}", text, self);
+        self
     }
 }

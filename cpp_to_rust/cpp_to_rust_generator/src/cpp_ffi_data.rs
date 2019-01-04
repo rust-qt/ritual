@@ -1,6 +1,6 @@
 use crate::common::errors::Result;
 use crate::cpp_data::CppClassField;
-use crate::cpp_data::CppName;
+use crate::cpp_data::CppPath;
 use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
 use crate::cpp_type::{CppFunctionPointerType, CppType};
 use derive_more::From;
@@ -191,7 +191,7 @@ pub struct CppFfiFunction {
     pub allocation_place: ReturnValueAllocationPlace,
 
     /// Final name of FFI method
-    pub name: CppName,
+    pub name: CppPath,
 
     pub kind: CppFfiFunctionKind,
 }
@@ -280,7 +280,7 @@ impl CppFfiType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QtSlotWrapper {
     /// Generated name of the wrapper class
-    pub class_name: CppName,
+    pub class_name: CppPath,
     /// Arguments of the slot.
     pub arguments: Vec<CppFfiType>,
     /// The function pointer type accepted by this wrapper

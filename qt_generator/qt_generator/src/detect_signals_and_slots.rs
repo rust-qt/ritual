@@ -1,7 +1,7 @@
 use cpp_to_rust_generator::common::errors::{Result, ResultExt};
 use cpp_to_rust_generator::common::file_utils::open_file;
 use cpp_to_rust_generator::common::log;
-use cpp_to_rust_generator::cpp_data::CppName;
+use cpp_to_rust_generator::cpp_data::CppPath;
 use cpp_to_rust_generator::cpp_data::CppTypeDataKind;
 use cpp_to_rust_generator::database::CppItemData;
 use cpp_to_rust_generator::database::DatabaseItemSource;
@@ -15,8 +15,8 @@ use std::io::BufReader;
 /// Checks if `class_name` types inherits `base_name` type directly or indirectly.
 pub fn inherits(
     data: &ProcessorData,
-    derived_class_name: &CppName,
-    base_class_name: &CppName,
+    derived_class_name: &CppPath,
+    base_class_name: &CppPath,
 ) -> bool {
     for item in data.all_items() {
         if let CppItemData::ClassBase(ref base_data) = item.cpp_data {
@@ -47,7 +47,11 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
         {
             if let CppItemData::Type(ref type1) = item.cpp_data {
                 if let CppTypeDataKind::Class { ref class_type } = type1.kind {
-                    if inherits(&data, &class_type.name, &CppName::from_one_part("QObject")) {
+                    if inherits(
+                        &data,
+                        &class_type.name,
+                        &CppPath::from_str_unchecked("QObject"),
+                    ) {
                         if !files.contains(&origin_location.include_file_path) {
                             files.insert(origin_location.include_file_path.clone());
                         }

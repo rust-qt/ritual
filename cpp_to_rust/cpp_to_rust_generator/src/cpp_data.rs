@@ -2,9 +2,12 @@
 
 pub use crate::cpp_operator::CppOperator;
 use crate::cpp_type::{CppClassType, CppType};
+use cpp_to_rust_common::errors::{bail, Error, Result};
+use cpp_to_rust_common::utils::MapIfOk;
 use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 
 /// One item of a C++ enum declaration
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -16,7 +19,7 @@ pub struct CppEnumValue {
     /// C++ documentation for this item in HTML
     pub doc: Option<String>,
     /// Full type name of the enum this item belongs to
-    pub enum_name: CppName,
+    pub enum_name: CppPath,
 }
 
 impl CppEnumValue {
@@ -24,10 +27,10 @@ impl CppEnumValue {
         self.name == other.name && self.enum_name == other.enum_name && self.value == other.value
     }
 
-    pub fn full_name(&self) -> CppName {
+    pub fn full_name(&self) -> CppPath {
         let mut name = self.enum_name.clone();
-        name.parts.pop().expect("enum_name can't be empty");
-        name.parts.push(self.name.clone());
+        name.items.pop().expect("enum_name can't be empty");
+        name.items.push(CppPathItem::from_str_unchecked(&self.name));
         name
     }
 }
@@ -121,34 +124,135 @@ pub struct CppTypeDoc {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
-pub struct CppName {
-    /// Parts of the name
-    pub parts: Vec<String>,
+pub struct CppPathItem {
+    pub name: String,
+    pub template_arguments: Option<Vec<CppType>>,
 }
 
-impl CppName {
-    pub fn from_one_part(part: impl Into<String>) -> Self {
-        Self {
-            parts: vec![part.into()],
-        }
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
+pub struct CppPath {
+    /// Parts of the path
+    pub items: Vec<CppPathItem>,
+}
+
+impl CppPath {
+    pub fn from_str_unchecked(path: &str) -> CppPath {
+        CppPath::from_str(path).unwrap()
     }
 
-    pub fn from_parts(parts: &[&str]) -> Self {
-        Self {
-            parts: parts.iter().map(|s| s.to_string()).collect(),
-        }
+    pub fn from_item(item: CppPathItem) -> CppPath {
+        CppPath { items: vec![item] }
     }
 
-    pub fn to_cpp_code(&self) -> String {
-        self.parts.join("::")
+    pub fn from_items(items: Vec<CppPathItem>) -> CppPath {
+        CppPath { items }
+    }
+
+    pub fn to_cpp_code(&self) -> Result<String> {
+        Ok(self
+            .items
+            .iter()
+            .map_if_ok(|item| item.to_cpp_code())?
+            .join("::"))
+    }
+
+    pub fn to_cpp_pseudo_code(&self) -> String {
+        self.items
+            .iter()
+            .map(|item| item.to_cpp_pseudo_code())
+            .join("::")
+    }
+
+    pub fn with_added(&self, item: CppPathItem) -> CppPath {
+        let mut result = self.clone();
+        result.items.push(item);
+        result
+    }
+
+    pub fn last(&self) -> &CppPathItem {
+        self.items.last().expect("empty CppPath encountered")
     }
 }
 
-impl fmt::Display for CppName {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        for item in self.parts.iter().map(|s| s.as_str()).intersperse("::") {
-            write!(f, "{}", item)?;
+impl FromStr for CppPath {
+    type Err = Error;
+
+    fn from_str(path: &str) -> Result<Self> {
+        if path.contains('<') || path.contains('>') {
+            bail!("attempted to add template arguments to CppPath");
         }
+        if path.is_empty() {
+            bail!("attempted to construct an empty CppPath");
+        }
+        let items = path
+            .split("::")
+            .map(|item| CppPathItem {
+                name: item.into(),
+                template_arguments: None,
+            })
+            .collect();
+        Ok(CppPath { items })
+    }
+}
+
+impl CppPathItem {
+    pub fn to_cpp_code(&self) -> Result<String> {
+        let args = match self.template_arguments {
+            None => "".to_string(),
+            Some(ref args) => format!(
+                "< {} >",
+                args.map_if_ok(|arg| arg.to_cpp_code(None))?.join(", ")
+            ),
+        };
+        Ok(format!("{}{}", self.name, args))
+    }
+
+    pub fn to_cpp_pseudo_code(&self) -> String {
+        let args = match self.template_arguments {
+            None => "".to_string(),
+            Some(ref args) => format!(
+                "<{}>",
+                args.iter().map(|arg| arg.to_cpp_pseudo_code()).join(", ")
+            ),
+        };
+        format!("{}{}", self.name, args)
+    }
+
+    pub fn from_str_unchecked(name: &str) -> CppPathItem {
+        // TODO: Result?
+        assert!(
+            !name.contains('<'),
+            "attempted to construct CppPathItem containing template arguments"
+        );
+        assert!(
+            !name.contains('>'),
+            "attempted to construct CppPathItem containing template arguments"
+        );
+        assert!(!name.is_empty(), "attempted to construct empty CppPathItem");
+        CppPathItem {
+            name: name.into(),
+            template_arguments: None,
+        }
+    }
+}
+
+impl fmt::Display for CppPathItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
+        write!(f, "{}", self.name)?;
+        if let Some(ref args) = self.template_arguments {
+            write!(
+                f,
+                "<{}>",
+                args.iter().map(|arg| arg.to_cpp_pseudo_code()).join(", ")
+            )?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for CppPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
+        write!(f, "{}", self.to_cpp_pseudo_code())?;
         Ok(())
     }
 }
@@ -168,7 +272,7 @@ pub enum CppTypeDataKind {
 pub struct CppTypeData {
     /// Identifier, including namespaces and nested classes
     /// (separated with "::", like in C++)
-    pub name: CppName,
+    pub name: CppPath,
     pub kind: CppTypeDataKind,
     /// C++ documentation for the type
     pub doc: Option<CppTypeDoc>,
@@ -186,7 +290,7 @@ impl CppTypeData {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct CppTemplateInstantiation {
     /// Template class name
-    pub class_name: CppName,
+    pub class_name: CppPath,
     /// List of template arguments used in this instantiation
     pub template_arguments: Vec<CppType>,
 }

@@ -2,7 +2,7 @@
 
 use crate::common;
 use crate::common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
-use crate::cpp_data::CppName;
+use crate::cpp_data::CppPath;
 use crate::processor::ProcessingStep;
 use std::path::PathBuf;
 
@@ -157,13 +157,13 @@ pub struct Config {
     cpp_build_config: CppBuildConfig,
     cpp_build_paths: CppBuildPaths,
     cpp_parser_arguments: Vec<String>,
-    cpp_parser_blocked_names: Vec<CppName>,
+    cpp_parser_blocked_names: Vec<CppPath>,
     custom_processing_steps: Vec<ProcessingStep>,
 
     // TODO: revisit fields below when new rust name generator is done
-    cpp_filtered_namespaces: Vec<CppName>,
+    cpp_filtered_namespaces: Vec<CppPath>,
 
-    movable_types: Vec<CppName>,
+    movable_types: Vec<CppPath>,
 }
 
 impl Config {
@@ -227,14 +227,14 @@ impl Config {
     /// will also be skipped.
     /// All class methods with names matching the blocked name
     /// will be skipped, regardless of class name.
-    pub fn add_cpp_parser_blocked_name(&mut self, name: CppName) {
+    pub fn add_cpp_parser_blocked_name(&mut self, name: CppPath) {
         self.cpp_parser_blocked_names.push(name);
     }
 
     /// Adds multiple blocked names. See `Config::add_cpp_parser_blocked_name`.
     pub fn add_cpp_parser_blocked_names<Iter>(&mut self, items: Iter)
     where
-        Iter: IntoIterator<Item = CppName>,
+        Iter: IntoIterator<Item = CppPath>,
     {
         for item in items {
             self.cpp_parser_blocked_names.push(item);
@@ -290,12 +290,12 @@ impl Config {
     }
 
     /// Adds a namespace to filter out before rust code generation.
-    pub fn add_cpp_filtered_namespace(&mut self, namespace: CppName) {
+    pub fn add_cpp_filtered_namespace(&mut self, namespace: CppPath) {
         self.cpp_filtered_namespaces.push(namespace);
     }
 
     /// Adds multiple namespaces to filter out before rust code generation.
-    pub fn add_cpp_filtered_namespaces(&mut self, namespaces: impl IntoIterator<Item = CppName>) {
+    pub fn add_cpp_filtered_namespaces(&mut self, namespaces: impl IntoIterator<Item = CppPath>) {
         for namespace in namespaces {
             self.cpp_filtered_namespaces.push(namespace);
         }
@@ -303,7 +303,7 @@ impl Config {
 
     /// Overrides automatic selection of type allocation place for `type_name` and uses `place`
     /// instead. See `CppTypeAllocationPlace` for more information.
-    pub fn set_movable_types(&mut self, names: Vec<CppName>) {
+    pub fn set_movable_types(&mut self, names: Vec<CppPath>) {
         self.movable_types = names;
     }
 
@@ -348,7 +348,7 @@ impl Config {
 
     /// Returns names added with `Config::add_cpp_parser_blocked_name`
     /// and similar methods.
-    pub fn cpp_parser_blocked_names(&self) -> &[CppName] {
+    pub fn cpp_parser_blocked_names(&self) -> &[CppPath] {
         &self.cpp_parser_blocked_names
     }
 
@@ -374,7 +374,7 @@ impl Config {
     }
 
     /// Returns values added by `Config::add_cpp_filtered_namespace`.
-    pub fn cpp_filtered_namespaces(&self) -> &[CppName] {
+    pub fn cpp_filtered_namespaces(&self) -> &[CppPath] {
         &self.cpp_filtered_namespaces
     }
 
@@ -384,7 +384,7 @@ impl Config {
     }
     /// Returns values added by `Config::set_movable_types`.
     /// Keys of the hash map are names of C++ types.
-    pub fn movable_types(&self) -> &[CppName] {
+    pub fn movable_types(&self) -> &[CppPath] {
         &self.movable_types
     }
 

@@ -6,7 +6,7 @@ use cpp_to_rust_generator::common::errors::{
     bail, err_msg, should_panic_on_unexpected, unexpected, Result, ResultExt,
 };
 use cpp_to_rust_generator::common::log;
-use cpp_to_rust_generator::cpp_data::CppName;
+use cpp_to_rust_generator::cpp_data::CppPath;
 use cpp_to_rust_generator::cpp_data::CppTypeDoc;
 use cpp_to_rust_generator::cpp_data::CppVisibility;
 use cpp_to_rust_generator::cpp_function::CppFunctionDoc;
@@ -256,7 +256,7 @@ impl DocParser {
     }
 
     /// Returns documentation for C++ type `name`.
-    fn doc_for_type(&mut self, name: &CppName) -> Result<DocForType> {
+    fn doc_for_type(&mut self, name: &CppPath) -> Result<DocForType> {
         let name = name.to_string();
         let index_item = self
             .doc_data
@@ -577,9 +577,9 @@ fn find_methods_docs(items: &mut [DatabaseItem], data: &mut DocParser) -> Result
                     Ok(doc) => cpp_method.doc = Some(doc),
                     Err(msg) => {
                         if cpp_method.member.is_some()
-                            && (cpp_method.name == CppName::from_one_part("tr")
-                                || cpp_method.name == CppName::from_one_part("trUtf8")
-                                || cpp_method.name == CppName::from_one_part("metaObject"))
+                            && (cpp_method.name == CppPath::from_str_unchecked("tr")
+                                || cpp_method.name == CppPath::from_str_unchecked("trUtf8")
+                                || cpp_method.name == CppPath::from_str_unchecked("metaObject"))
                         {
                             // no error message
                         } else {

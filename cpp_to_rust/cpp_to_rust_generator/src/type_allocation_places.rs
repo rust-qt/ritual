@@ -1,6 +1,6 @@
 use crate::common::errors::Result;
 use crate::common::log;
-use crate::cpp_data::CppName;
+use crate::cpp_data::CppPath;
 use crate::cpp_type::CppClassType;
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
@@ -32,7 +32,7 @@ fn choose_allocation_places(data: &mut ProcessorData) -> Result<()> {
     fn check_type(
         cpp_type: &CppType,
         is_behind_pointer: bool,
-        data: &mut HashMap<CppName, TypeStats>,
+        data: &mut HashMap<CppPath, TypeStats>,
     ) {
         match cpp_type {
             CppType::Class(CppClassType {

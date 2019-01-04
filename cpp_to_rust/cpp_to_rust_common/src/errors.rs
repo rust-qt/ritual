@@ -4,7 +4,7 @@ use std::io::{stderr, Write};
 
 pub type Result<T> = std::result::Result<T, failure::Error>;
 pub use crate::unexpected;
-pub use failure::{bail, err_msg, ResultExt};
+pub use failure::{bail, err_msg, Error, ResultExt};
 use std::env;
 
 pub trait FancyUnwrap {

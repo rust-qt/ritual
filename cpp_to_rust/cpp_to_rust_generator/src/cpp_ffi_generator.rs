@@ -2,7 +2,8 @@ use crate::common::errors::{bail, should_panic_on_unexpected, unexpected, Result
 use crate::common::utils::MapIfOk;
 use crate::cpp_data::CppBaseSpecifier;
 use crate::cpp_data::CppClassField;
-use crate::cpp_data::CppName;
+use crate::cpp_data::CppPath;
+use crate::cpp_data::CppPathItem;
 use crate::cpp_data::CppTypeDataKind;
 use crate::cpp_data::CppVisibility;
 use crate::cpp_ffi_data::CppFfiArgumentMeaning;
@@ -34,10 +35,11 @@ impl FfiNameProvider {
     pub fn new(prefix: String, next_id: u64) -> Self {
         FfiNameProvider { prefix, next_id }
     }
-    pub fn next_name(&mut self) -> CppName {
+    pub fn next_path(&mut self) -> CppPath {
         let id = self.next_id;
         self.next_id += 1;
-        CppName::from_one_part(format!("{}{}", self.prefix, id))
+        let item = CppPathItem::from_str_unchecked(&format!("{}{}", self.prefix, id));
+        CppPath::from_item(item)
     }
 }
 
@@ -154,7 +156,10 @@ fn create_cast_method(
     name_provider: &mut FfiNameProvider,
 ) -> Result<CppFfiFunction> {
     let method = CppFunction {
-        name: CppName::from_one_part(cast.cpp_method_name()),
+        name: CppPath::from_item(CppPathItem {
+            name: cast.cpp_method_name().into(),
+            template_arguments: Some(vec![to.clone()]),
+        }),
         member: None,
         operator: None,
         return_type: to.clone(),
@@ -309,7 +314,7 @@ pub fn to_ffi_method(
     let mut r = CppFfiFunction {
         arguments: Vec::new(),
         return_type: CppFfiType::void(),
-        name: name_provider.next_name(),
+        name: name_provider.next_path(),
         allocation_place: ReturnValueAllocationPlace::NotApplicable,
         kind: CppFfiFunctionKind::Function {
             cpp_function: method.clone(),
@@ -359,7 +364,7 @@ pub fn to_ffi_method(
         let real_return_type_ffi = real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
         match real_return_type {
             // QFlags is converted to uint in FFI
-            CppType::Class(ref base) if base.name != CppName::from_one_part("QFlags") => {
+            CppType::Class(ref base) if base.name != CppPath::from_str_unchecked("QFlags") => {
                 if movable_types.iter().any(|t| t == base) {
                     r.arguments.push(CppFfiFunctionArgument {
                         name: "output".to_string(),
@@ -425,6 +430,8 @@ fn generate_field_accessors(
             };
             Ok(ffi_method)
         };
+    let class_path = field.class_type.name.clone(); // TODO: template arguments should be here
+
     if field.visibility == CppVisibility::Public {
         if field.field_type.is_class() {
             let type2_const = CppType::PointerLike {
@@ -438,20 +445,23 @@ fn generate_field_accessors(
                 target: Box::new(field.field_type.clone()),
             };
             new_methods.push(create_method(
-                CppName::from_one_part(field.name.clone()),
+                class_path.with_added(CppPathItem::from_str_unchecked(&field.name)),
                 CppFieldAccessorType::ConstRefGetter,
                 type2_const,
                 Vec::new(),
             )?);
             new_methods.push(create_method(
-                CppName::from_one_part(format!("{}_mut", field.name)),
+                class_path.with_added(CppPathItem::from_str_unchecked(&format!(
+                    "{}_mut",
+                    field.name
+                ))),
                 CppFieldAccessorType::MutRefGetter,
                 type2_mut,
                 Vec::new(),
             )?);
         } else {
             new_methods.push(create_method(
-                CppName::from_one_part(field.name.clone()),
+                class_path.with_added(CppPathItem::from_str_unchecked(&field.name)),
                 CppFieldAccessorType::CopyGetter,
                 field.field_type.clone(),
                 Vec::new(),
@@ -463,7 +473,10 @@ fn generate_field_accessors(
             has_default_value: false,
         };
         new_methods.push(create_method(
-            CppName::from_one_part(format!("set_{}", field.name)),
+            class_path.with_added(CppPathItem::from_str_unchecked(&format!(
+                "set_{}",
+                field.name
+            ))),
             CppFieldAccessorType::Setter,
             CppType::Void,
             vec![arg],
@@ -476,7 +489,7 @@ fn generate_field_accessors(
 fn should_process_item(item: &CppItemData) -> Result<bool> {
     if let CppItemData::Function(ref method) = *item {
         if let Some(class_name) = method.class_name() {
-            if class_name == &CppName::from_one_part("QFlags") {
+            if class_name == &CppPath::from_str_unchecked("QFlags") {
                 return Ok(false);
             }
         }
@@ -528,14 +541,14 @@ fn generate_slot_wrapper(
     let func_arguments = once(void_ptr.clone())
         .chain(ffi_types.iter().map(|t| t.ffi_type.clone()))
         .collect();
-    let class_name = name_provider.next_name();
+    let class_path = name_provider.next_path();
     let function_type = CppFunctionPointerType {
         return_type: Box::new(CppType::Void),
         arguments: func_arguments,
         allows_variadic_arguments: false,
     };
     let create_function = |kind: CppFunctionKind,
-                           name: CppName,
+                           name: CppPath,
                            is_slot: bool,
                            arguments: Vec<CppFunctionArgument>|
      -> CppFunction {
@@ -543,7 +556,7 @@ fn generate_slot_wrapper(
             name,
             member: Some(CppFunctionMemberData {
                 class_type: CppClassType {
-                    name: class_name.clone(),
+                    name: class_path.clone(),
                     template_arguments: None,
                 },
                 is_virtual: true,
@@ -567,13 +580,16 @@ fn generate_slot_wrapper(
     let mut methods = Vec::new();
     methods.push(create_function(
         CppFunctionKind::Constructor,
-        class_name.clone(),
+        class_path.with_added(CppPathItem::from_str_unchecked(&class_path.last().name)),
         false,
         vec![],
     ));
     methods.push(create_function(
         CppFunctionKind::Destructor,
-        CppName::from_one_part(format!("~{}", class_name)),
+        class_path.with_added(CppPathItem::from_str_unchecked(&format!(
+            "~{}",
+            class_path.last().name
+        ))),
         false,
         vec![],
     ));
@@ -591,14 +607,14 @@ fn generate_slot_wrapper(
     ];
     methods.push(create_function(
         CppFunctionKind::Regular,
-        CppName::from_one_part("set"),
+        class_path.with_added(CppPathItem::from_str_unchecked("set")),
         false,
         method_set_args,
     ));
 
     let method_custom_slot = create_function(
         CppFunctionKind::Regular,
-        CppName::from_one_part("custom_slot"),
+        class_path.with_added(CppPathItem::from_str_unchecked("custom_slot")),
         true,
         arguments
             .iter()
@@ -614,11 +630,11 @@ fn generate_slot_wrapper(
     methods.push(method_custom_slot);
     let class_bases = vec![CppBaseSpecifier {
         derived_class_type: CppClassType {
-            name: class_name.clone(),
+            name: class_path.clone(),
             template_arguments: None,
         },
         base_class_type: CppClassType {
-            name: CppName::from_one_part("QObject"),
+            name: CppPath::from_str_unchecked("QObject"),
             template_arguments: None,
         },
         base_index: 0,
@@ -627,7 +643,7 @@ fn generate_slot_wrapper(
     }];
 
     let qt_slot_wrapper = QtSlotWrapper {
-        class_name: class_name.clone(),
+        class_name: class_path.clone(),
         arguments: ffi_types,
         function_type: function_type.clone(),
         receiver_id,

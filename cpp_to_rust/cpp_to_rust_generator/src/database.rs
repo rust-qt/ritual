@@ -10,7 +10,7 @@ use crate::cpp_data::CppVisibility;
 use crate::cpp_function::CppFunction;
 
 use crate::common::string_utils::JoinWithSeparator;
-use crate::cpp_data::CppName;
+use crate::cpp_data::CppPath;
 use crate::cpp_data::CppTemplateInstantiation;
 use crate::cpp_ffi_data::CppFfiItem;
 use crate::cpp_type::CppType;
@@ -118,7 +118,7 @@ impl CppCheckerInfoList {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum CppItemData {
-    Namespace(CppName),
+    Namespace(CppPath),
     Type(CppTypeData),
     EnumValue(CppEnumValue),
     Function(CppFunction),
@@ -175,7 +175,7 @@ impl CppItemData {
         }
     }
 
-    pub fn as_namespace_ref(&self) -> Option<&CppName> {
+    pub fn as_namespace_ref(&self) -> Option<&CppPath> {
         if let CppItemData::Namespace(ref data) = *self {
             Some(data)
         } else {
@@ -243,7 +243,7 @@ impl Display for CppItemData {
         let s = match *self {
             CppItemData::Namespace(ref path) => format!("namespace {}", path),
             CppItemData::Type(ref type1) => match type1.kind {
-                CppTypeDataKind::Enum => format!("enum {}", type1.name.to_cpp_code()),
+                CppTypeDataKind::Enum => format!("enum {}", type1.name.to_cpp_pseudo_code()),
                 CppTypeDataKind::Class { ref class_type } => {
                     format!("class {}", class_type.to_cpp_pseudo_code())
                 }

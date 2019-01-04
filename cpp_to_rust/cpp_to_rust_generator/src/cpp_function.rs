@@ -3,7 +3,7 @@
 use crate::common::errors::{bail, Result};
 use crate::common::string_utils::JoinWithSeparator;
 use crate::common::utils::MapIfOk;
-use crate::cpp_data::CppName;
+use crate::cpp_data::CppPath;
 use crate::cpp_data::CppVisibility;
 pub use crate::cpp_operator::{CppOperator, CppOperatorInfo};
 use crate::cpp_type::CppPointerLikeTypeKind;
@@ -84,7 +84,7 @@ pub struct CppFunction {
     /// Identifier. For class methods, this field includes
     /// only the method's own name. For free functions,
     /// this field also includes namespaces (if any).
-    pub name: CppName,
+    pub name: CppPath,
     /// Additional information about a class member function
     /// or None for free functions
     pub member: Option<CppFunctionMemberData>,
@@ -115,7 +115,7 @@ pub struct CppFunction {
     /// If the method belongs to a template class,
     /// the class's template arguments are not included here.
     /// Instead, they are available in `member.class_type`.
-    pub template_arguments: Option<Vec<CppType>>,
+    pub template_arguments: Option<Vec<CppType>>, // TODO: move inside `name`
     //pub template_arguments_values: Option<Vec<CppType>>,
     /// C++ code of the method's declaration.
     /// None if the method was not explicitly declared.
@@ -193,15 +193,8 @@ impl CppFunction {
     /// i.e. including namespaces and class name (if any).
     /// This method is not suitable for code generation.
     pub fn full_name(&self) -> String {
-        if let Some(ref info) = self.member {
-            format!(
-                "{}::{}",
-                CppType::Class(info.class_type.clone()).to_cpp_pseudo_code(),
-                self.name
-            )
-        } else {
-            self.name.to_string()
-        }
+        // TODO: remove this
+        self.name.to_cpp_pseudo_code()
     }
 
     /// Returns the identifier this method would be presented with
@@ -285,7 +278,7 @@ impl CppFunction {
     }
 
     /// Returns name of the class this method belongs to, if any.
-    pub fn class_name(&self) -> Option<&CppName> {
+    pub fn class_name(&self) -> Option<&CppPath> {
         match self.member {
             Some(ref info) => Some(&info.class_type.name),
             None => None,

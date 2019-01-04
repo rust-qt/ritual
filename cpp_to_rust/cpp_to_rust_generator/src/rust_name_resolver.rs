@@ -75,9 +75,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
             continue;
         }
         match is_cpp_item_resolvable(&all_items, &item.cpp_data) {
-            Ok(_) => {
-                //unimplemented!()
-            }
+            Ok(_) => unimplemented!(),
             Err(err) => {
                 log::error(format!("skipping item: {}: {}", &item.cpp_data, err));
             }
@@ -94,15 +92,16 @@ pub fn rust_name_resolver_step() -> ProcessingStep {
 
 #[test]
 fn it_should_check_functions() {
-    use crate::cpp_data::CppName;
+    use crate::cpp_data::CppPath;
     use crate::cpp_data::CppTypeData;
     use crate::cpp_data::CppTypeDataKind;
     use crate::cpp_function::CppFunction;
     use crate::cpp_function::CppFunctionArgument;
+    use crate::cpp_type::CppClassType;
     use crate::database::DatabaseItemSource;
 
     let func = CppFunction {
-        name: CppName::from_one_part("foo"),
+        name: CppPath::from_str_unchecked("foo"),
         member: None,
         operator: None,
         return_type: CppType::Void,
@@ -124,7 +123,7 @@ fn it_should_check_functions() {
             arguments: vec![CppFunctionArgument {
                 name: "a".to_string(),
                 argument_type: CppType::Class(CppClassType {
-                    name: CppName::from_one_part("C1"),
+                    name: CppPath::from_str_unchecked("C1"),
                     template_arguments: None,
                 }),
                 has_default_value: false,
@@ -141,10 +140,10 @@ fn it_should_check_functions() {
 
     let class_item = DatabaseItem {
         cpp_data: CppItemData::Type(CppTypeData {
-            name: CppName::from_one_part("C1"),
+            name: CppPath::from_str_unchecked("C1"),
             kind: CppTypeDataKind::Class {
                 class_type: CppClassType {
-                    name: CppName::from_one_part("C1"),
+                    name: CppPath::from_str_unchecked("C1"),
                     template_arguments: None,
                 },
             },

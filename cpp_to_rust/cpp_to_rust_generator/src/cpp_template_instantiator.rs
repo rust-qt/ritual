@@ -1,6 +1,6 @@
 use crate::common::errors::{bail, Result};
 use crate::common::log;
-use crate::cpp_data::CppName;
+use crate::cpp_data::CppPathItem;
 use crate::cpp_data::CppTemplateInstantiation;
 use crate::cpp_function::CppFunction;
 use crate::cpp_function::CppFunctionArgument;
@@ -109,8 +109,14 @@ fn apply_instantiation_to_method(
         );
     } else {
         if let Some(conversion_type) = conversion_type {
-            new_method.name =
-                CppName::from_one_part(format!("operator {}", conversion_type.to_cpp_code(None)?));
+            new_method.name.items.pop().expect("CppPath can't be empty");
+            new_method
+                .name
+                .items
+                .push(CppPathItem::from_str_unchecked(&format!(
+                    "operator {}",
+                    conversion_type.to_cpp_code(None)?
+                )));
         }
         log::llog(log::DebugTemplateInstantiation, || {
             format!("success: {}", new_method.short_text())
