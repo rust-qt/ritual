@@ -62,8 +62,8 @@ fn apply_instantiation_to_method(
         .return_type
         .instantiate(nested_level1, &template_instantiation.template_arguments)?;
 
-    new_method.name = new_method
-        .name
+    new_method.path = new_method
+        .path
         .instantiate(nested_level1, &template_instantiation.template_arguments)?;
     let mut conversion_type = None;
     if let Some(ref mut operator) = new_method.operator {
@@ -85,9 +85,9 @@ fn apply_instantiation_to_method(
         );
     } else {
         if let Some(conversion_type) = conversion_type {
-            new_method.name.items.pop().expect("CppPath can't be empty");
+            new_method.path.items.pop().expect("CppPath can't be empty");
             new_method
-                .name
+                .path
                 .items
                 .push(CppPathItem::from_str_unchecked(&format!(
                     "operator {}",

@@ -577,9 +577,9 @@ fn find_methods_docs(items: &mut [DatabaseItem], data: &mut DocParser) -> Result
                     Ok(doc) => cpp_method.doc = Some(doc),
                     Err(msg) => {
                         if cpp_method.member.is_some()
-                            && (cpp_method.name == CppPath::from_str_unchecked("tr")
-                                || cpp_method.name == CppPath::from_str_unchecked("trUtf8")
-                                || cpp_method.name == CppPath::from_str_unchecked("metaObject"))
+                            && (cpp_method.path == CppPath::from_str_unchecked("tr")
+                                || cpp_method.path == CppPath::from_str_unchecked("trUtf8")
+                                || cpp_method.path == CppPath::from_str_unchecked("metaObject"))
                         {
                             // no error message
                         } else {
@@ -613,8 +613,8 @@ pub fn parse_docs(data: &mut ProcessorData, qt_crate_name: &str, docs_path: &Pat
     let mut type_doc_cache = HashMap::new();
     for item in &mut data.current_database.items {
         let type_name = match item.cpp_data {
-            CppItemData::Type(ref data) => data.name.clone(),
-            CppItemData::EnumValue(ref data) => data.enum_name.clone(),
+            CppItemData::Type(ref data) => data.path.clone(),
+            CppItemData::EnumValue(ref data) => data.enum_path.clone(),
             _ => continue,
         };
         if !type_doc_cache.contains_key(&type_name) {
@@ -640,7 +640,7 @@ pub fn parse_docs(data: &mut ProcessorData, qt_crate_name: &str, docs_path: &Pat
                         log::llog(log::DebugQtDoc, || {
                             format!(
                                 "Not found doc for enum variant: {}::{}",
-                                data.enum_name, data.name
+                                data.enum_path, data.name
                             )
                         });
                     }

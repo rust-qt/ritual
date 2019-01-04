@@ -46,7 +46,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
         {
             if let CppItemData::Type(ref type1) = item.cpp_data {
                 if type1.kind.is_class() {
-                    if inherits(&data, &type1.name, &CppPath::from_str_unchecked("QObject")) {
+                    if inherits(&data, &type1.path, &CppPath::from_str_unchecked("QObject")) {
                         if !files.contains(&origin_location.include_file_path) {
                             files.insert(origin_location.include_file_path.clone());
                         }
@@ -119,7 +119,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
                         .iter()
                         .filter(|x| x.line + 1 >= origin_location.line as usize)
                         .collect();
-                    sections_per_class.insert(type1.name.clone(), sections_for_class);
+                    sections_per_class.insert(type1.path.clone(), sections_for_class);
                 }
             }
         }

@@ -283,8 +283,8 @@ fn add_namespaces(data: &mut ProcessorData) -> Result<()> {
     let mut namespaces = HashSet::new();
     for item in &data.current_database.items {
         let name = match item.cpp_data {
-            CppItemData::Type(ref t) => &t.name,
-            CppItemData::Function(ref f) => &f.name,
+            CppItemData::Type(ref t) => &t.path,
+            CppItemData::Function(ref f) => &f.path,
             _ => continue,
         };
         if name.items.len() == 1 {
@@ -301,7 +301,7 @@ fn add_namespaces(data: &mut ProcessorData) -> Result<()> {
     }
     for item in &data.current_database.items {
         if let CppItemData::Type(ref t) = item.cpp_data {
-            namespaces.remove(&t.name);
+            namespaces.remove(&t.path);
         }
     }
     for name in namespaces {
@@ -512,11 +512,11 @@ impl CppParser<'_, '_> {
         if let Some(result) = self.parse_special_typedef(&name) {
             return Ok(result);
         }
-        if let Some(type_data) = self.find_type(|x| x.name.to_string() == name) {
+        if let Some(type_data) = self.find_type(|x| x.path.to_string() == name) {
             match type_data.kind {
                 CppTypeDataKind::Enum { .. } => {
                     return Ok(CppType::Enum {
-                        name: CppPath::from_str(&name)?,
+                        path: CppPath::from_str(&name)?,
                     });
                 }
                 CppTypeDataKind::Class { .. } => {
@@ -531,7 +531,7 @@ impl CppParser<'_, '_> {
             }
             let mut class_name = CppPath::from_str(&matches[1])?;
             if self
-                .find_type(|x| x.name == class_name && x.kind.is_class())
+                .find_type(|x| x.path == class_name && x.kind.is_class())
                 .is_some()
             {
                 let mut arg_types = Vec::new();
@@ -630,7 +630,7 @@ impl CppParser<'_, '_> {
             TypeKind::Enum => {
                 if let Some(declaration) = type1.get_declaration() {
                     Ok(CppType::Enum {
-                        name: get_full_name(declaration)?,
+                        path: get_full_name(declaration)?,
                     })
                 } else {
                     bail!("failed to get enum declaration: {:?}", type1);
@@ -810,68 +810,68 @@ impl CppParser<'_, '_> {
         match name {
             "qint8" | "int8_t" | "GLbyte" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    name: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_str_unchecked(name),
                     bits: 8,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
                 }))
             }
             "quint8" | "uint8_t" | "GLubyte" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    name: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_str_unchecked(name),
                     bits: 8,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
                 }))
             }
             "qint16" | "int16_t" | "GLshort" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    name: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_str_unchecked(name),
                     bits: 16,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
                 }))
             }
             "quint16" | "uint16_t" | "GLushort" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    name: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_str_unchecked(name),
                     bits: 16,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
                 }))
             }
             "qint32" | "int32_t" | "GLint" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    name: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_str_unchecked(name),
                     bits: 32,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
                 }))
             }
             "quint32" | "uint32_t" | "GLuint" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    name: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_str_unchecked(name),
                     bits: 32,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
                 }))
             }
             "qint64" | "int64_t" | "qlonglong" | "GLint64" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    name: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_str_unchecked(name),
                     bits: 64,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
                 }))
             }
             "quint64" | "uint64_t" | "qulonglong" | "GLuint64" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    name: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_str_unchecked(name),
                     bits: 64,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
                 }))
             }
             "qintptr" | "qptrdiff" | "QList::difference_type" => {
                 Some(CppType::PointerSizedInteger {
-                    name: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_str_unchecked(name),
                     is_signed: true,
                 })
             }
             "quintptr" => Some(CppType::PointerSizedInteger {
-                name: CppPath::from_str_unchecked(name),
+                path: CppPath::from_str_unchecked(name),
                 is_signed: false,
             }),
             _ => None,
@@ -1136,7 +1136,7 @@ impl CppParser<'_, '_> {
         };
         Ok((
             CppFunction {
-                name: name_with_namespace,
+                path: name_with_namespace,
                 operator: method_operator,
                 member: if class_name.is_some() {
                     Some(CppFunctionMemberData {
@@ -1194,7 +1194,7 @@ impl CppParser<'_, '_> {
             },
             CppItemData::Type(CppTypeData {
                 kind: CppTypeDataKind::Enum,
-                name: enum_name.clone(),
+                path: enum_name.clone(),
                 doc: None,
                 is_movable: false,
             }),
@@ -1215,7 +1215,7 @@ impl CppParser<'_, '_> {
                             .get_name()
                             .ok_or_else(|| err_msg("failed to get name of enum variant"))?,
                         value: val.1,
-                        enum_name: enum_name.clone(),
+                        enum_path: enum_name.clone(),
                         doc: None,
                     }),
                 );
@@ -1372,7 +1372,7 @@ impl CppParser<'_, '_> {
             },
             CppItemData::Type(CppTypeData {
                 kind: CppTypeDataKind::Class,
-                name: full_name,
+                path: full_name,
                 doc: None,
                 is_movable: false,
             }),

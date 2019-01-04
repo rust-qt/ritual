@@ -15,7 +15,7 @@ fn check_type(all_items: &[&DatabaseItem], cpp_type: &CppType) -> Result<()> {
             if !all_items
                 .iter()
                 .filter_map(|item| item.cpp_data.as_type_ref())
-                .any(|t| &t.name == path && t.kind.is_class())
+                .any(|t| &t.path == path && t.kind.is_class())
             {
                 bail!("class not found: {}", path.to_cpp_pseudo_code());
             }
@@ -30,13 +30,13 @@ fn check_type(all_items: &[&DatabaseItem], cpp_type: &CppType) -> Result<()> {
                 }
             }
         }
-        CppType::Enum { name } => {
+        CppType::Enum { path } => {
             if !all_items
                 .iter()
                 .filter_map(|item| item.cpp_data.as_type_ref())
-                .any(|t| &t.name == name && t.kind.is_enum())
+                .any(|t| &t.path == path && t.kind.is_enum())
             {
-                bail!("enum not found: {}", name);
+                bail!("enum not found: {}", path);
             }
         }
         CppType::PointerLike { ref target, .. } => {
@@ -97,7 +97,7 @@ fn it_should_check_functions() {
     use crate::database::DatabaseItemSource;
 
     let func = CppFunction {
-        name: CppPath::from_str_unchecked("foo"),
+        path: CppPath::from_str_unchecked("foo"),
         member: None,
         operator: None,
         return_type: CppType::Void,
@@ -132,7 +132,7 @@ fn it_should_check_functions() {
 
     let class_item = DatabaseItem {
         cpp_data: CppItemData::Type(CppTypeData {
-            name: CppPath::from_str_unchecked("C1"),
+            path: CppPath::from_str_unchecked("C1"),
             kind: CppTypeDataKind::Class,
             doc: None,
             is_movable: false,

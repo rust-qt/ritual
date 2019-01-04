@@ -36,7 +36,7 @@ pub fn empty_membership() -> CppFunctionMemberData {
 
 pub fn empty_regular_method() -> CppFunction {
     CppFunction {
-        name: CppPath::from_str_unchecked("empty"),
+        path: CppPath::from_str_unchecked("empty"),
         member: None,
         return_type: CppType::Void,
         arguments: vec![],
@@ -115,7 +115,7 @@ fn argument_types_equal5() {
     });
     method2.arguments.push(CppFunctionArgument {
         argument_type: CppType::Enum {
-            name: CppPath::from_str_unchecked("Enum1"),
+            path: CppPath::from_str_unchecked("Enum1"),
         },
         name: "arg1".to_string(),
         has_default_value: false,
@@ -201,7 +201,7 @@ fn c_signature_simple_func() {
     method1.return_type = CppType::BuiltInNumeric(CppBuiltInNumericType::Int);
     method1.arguments.push(CppFunctionArgument {
         argument_type: CppType::Enum {
-            name: CppPath::from_str_unchecked("Enum1"),
+            path: CppPath::from_str_unchecked("Enum1"),
         },
         name: "arg1".to_string(),
         has_default_value: false,
@@ -225,7 +225,7 @@ fn c_signature_simple_func() {
 #[test]
 fn c_signature_method_with_this() {
     let mut method1 = empty_regular_method();
-    method1.name = CppPath::from_str_unchecked("MyClass::empty");
+    method1.path = CppPath::from_str_unchecked("MyClass::empty");
     method1.member = Some(empty_membership());
     method1.return_type = CppType::BuiltInNumeric(CppBuiltInNumericType::Int);
     method1.arguments.push(CppFunctionArgument {
@@ -271,7 +271,7 @@ fn c_signature_method_with_this() {
 #[test]
 fn c_signature_static_method() {
     let mut method1 = empty_regular_method();
-    method1.name = CppPath::from_str_unchecked("MyClass::empty");
+    method1.path = CppPath::from_str_unchecked("MyClass::empty");
     method1.member = Some({
         let mut info = empty_membership();
         info.is_static = true;
@@ -280,7 +280,7 @@ fn c_signature_static_method() {
     method1.return_type = CppType::BuiltInNumeric(CppBuiltInNumericType::Int);
     method1.arguments.push(CppFunctionArgument {
         argument_type: CppType::Enum {
-            name: CppPath::from_str_unchecked("Enum1"),
+            path: CppPath::from_str_unchecked("Enum1"),
         },
         name: "arg1".to_string(),
         has_default_value: false,
@@ -303,7 +303,7 @@ fn c_signature_static_method() {
 #[test]
 fn c_signature_constructor() {
     let mut method1 = empty_regular_method();
-    method1.name = CppPath::from_str_unchecked("MyClass::empty");
+    method1.path = CppPath::from_str_unchecked("MyClass::empty");
     method1.member = Some({
         let mut info = empty_membership();
         info.kind = CppFunctionKind::Constructor;
@@ -313,7 +313,7 @@ fn c_signature_constructor() {
         argument_type: CppType::new_reference(
             true,
             CppType::Enum {
-                name: CppPath::from_str_unchecked("Enum1"),
+                path: CppPath::from_str_unchecked("Enum1"),
             },
         ),
         name: "arg1".to_string(),
@@ -337,7 +337,7 @@ fn c_signature_constructor() {
         CppType::new_pointer(
             true,
             CppType::Enum {
-                name: CppPath::from_str_unchecked("Enum1"),
+                path: CppPath::from_str_unchecked("Enum1"),
             }
         )
     );
@@ -377,7 +377,7 @@ fn c_signature_constructor() {
         CppType::new_pointer(
             true,
             CppType::Enum {
-                name: CppPath::from_str_unchecked("Enum1"),
+                path: CppPath::from_str_unchecked("Enum1"),
             }
         ),
     );
@@ -405,7 +405,7 @@ fn c_signature_constructor() {
 #[test]
 fn c_signature_destructor() {
     let mut method1 = empty_regular_method();
-    method1.name = CppPath::from_str_unchecked("MyClass::empty");
+    method1.path = CppPath::from_str_unchecked("MyClass::empty");
     method1.member = Some({
         let mut info = empty_membership();
         info.kind = CppFunctionKind::Destructor;
@@ -455,7 +455,7 @@ fn c_signature_destructor() {
 #[allow(clippy::cyclomatic_complexity)]
 fn c_signature_method_returning_class() {
     let mut method1 = empty_regular_method();
-    method1.name = CppPath::from_str_unchecked("MyClass::empty");
+    method1.path = CppPath::from_str_unchecked("MyClass::empty");
     method1.member = Some(empty_membership());
     method1.return_type = CppType::Class(CppPath::from_str_unchecked("MyClass3"));
     method1.arguments.push(CppFunctionArgument {
@@ -552,14 +552,14 @@ fn c_signature_method_returning_class() {
 #[test]
 fn full_name_free_function_in_namespace() {
     let mut method1 = empty_regular_method();
-    method1.name = CppPath::from_str_unchecked("ns::func1");
+    method1.path = CppPath::from_str_unchecked("ns::func1");
     assert_eq!(method1.class_type(), None);
 }
 
 #[test]
 fn full_name_method() {
     let mut method1 = empty_regular_method();
-    method1.name = CppPath::from_str_unchecked("MyClass::func1");
+    method1.path = CppPath::from_str_unchecked("MyClass::func1");
     method1.member = Some(empty_membership());
     assert_eq!(
         method1.class_type(),
@@ -570,7 +570,7 @@ fn full_name_method() {
 #[test]
 fn full_name_static_method() {
     let mut method1 = empty_regular_method();
-    method1.name = CppPath::from_str_unchecked("MyClass::func1");
+    method1.path = CppPath::from_str_unchecked("MyClass::func1");
     method1.member = Some({
         let mut info = empty_membership();
         info.is_static = true;
@@ -585,7 +585,7 @@ fn full_name_static_method() {
 #[test]
 fn full_name_nested_class_method() {
     let mut method1 = empty_regular_method();
-    method1.name = CppPath::from_str_unchecked("MyClass::Iterator::func1");
+    method1.path = CppPath::from_str_unchecked("MyClass::Iterator::func1");
     method1.member = Some(empty_membership());
     assert_eq!(
         method1.class_type(),
@@ -596,7 +596,7 @@ fn full_name_nested_class_method() {
 #[test]
 fn short_text1() {
     let method = CppFunction {
-        name: CppPath::from_str_unchecked("Class1::method1"),
+        path: CppPath::from_str_unchecked("Class1::method1"),
         member: Some(CppFunctionMemberData {
             kind: CppFunctionKind::Regular,
             is_virtual: false,

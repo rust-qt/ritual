@@ -72,12 +72,12 @@ fn choose_allocation_places(data: &mut ProcessorData) -> Result<()> {
             .items
             .iter()
             .filter_map(|i| i.cpp_data.as_function_ref())
-            .any(|m| m.class_type().as_ref() == Some(&type1.name) && m.is_virtual())
+            .any(|m| m.class_type().as_ref() == Some(&type1.path) && m.is_virtual())
         {
-            if !data_map.contains_key(&type1.name) {
-                data_map.insert(type1.name.clone(), TypeStats::default());
+            if !data_map.contains_key(&type1.path) {
+                data_map.insert(type1.path.clone(), TypeStats::default());
             }
-            data_map.get_mut(&type1.name).unwrap().has_virtual_methods = true;
+            data_map.get_mut(&type1.path).unwrap().has_virtual_methods = true;
         }
     }
     for method in data
@@ -121,7 +121,7 @@ fn choose_allocation_places(data: &mut ProcessorData) -> Result<()> {
         if !type1.kind.is_class() {
             continue;
         }
-        let name = &type1.name;
+        let name = &type1.path;
         // TODO: add `heap_allocated_types` to `Config` just for suppressing the output of this function
         if data.config.movable_types().iter().any(|n| n == name) {
             continue;

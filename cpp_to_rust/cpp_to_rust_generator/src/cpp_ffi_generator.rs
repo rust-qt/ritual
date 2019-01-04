@@ -53,7 +53,7 @@ fn run(mut data: &mut ProcessorData) -> Result<()> {
         .filter_map(|item| {
             if let CppItemData::Type(ref type_data) = item.cpp_data {
                 if type_data.kind == CppTypeDataKind::Class && type_data.is_movable {
-                    return Some(type_data.name.clone());
+                    return Some(type_data.path.clone());
                 }
             }
             None
@@ -155,7 +155,7 @@ fn create_cast_method(
     name_provider: &mut FfiNameProvider,
 ) -> Result<CppFfiFunction> {
     let method = CppFunction {
-        name: CppPath::from_item(CppPathItem {
+        path: CppPath::from_item(CppPathItem {
             name: cast.cpp_method_name().into(),
             template_arguments: Some(vec![to.clone()]),
         }),
@@ -312,7 +312,7 @@ pub fn to_ffi_method(
     let mut r = CppFfiFunction {
         arguments: Vec::new(),
         return_type: CppFfiType::void(),
-        name: name_provider.next_path(),
+        path: name_provider.next_path(),
         allocation_place: ReturnValueAllocationPlace::NotApplicable,
         kind: CppFfiFunctionKind::Function {
             cpp_function: method.clone(),
@@ -398,7 +398,7 @@ fn generate_field_accessors(
     let mut create_method =
         |name, accessor_type, return_type, arguments| -> Result<CppFfiFunction> {
             let fake_method = CppFunction {
-                name,
+                path: name,
                 member: Some(CppFunctionMemberData {
                     kind: CppFunctionKind::Regular,
                     is_virtual: false,
@@ -502,7 +502,7 @@ fn should_process_item(item: &CppItemData) -> Result<bool> {
                 return Ok(false);
             }
         }
-        if method.name.last().template_arguments.is_some() {
+        if method.path.last().template_arguments.is_some() {
             return Ok(false);
         }
     }
@@ -546,12 +546,12 @@ fn generate_slot_wrapper(
         allows_variadic_arguments: false,
     };
     let create_function = |kind: CppFunctionKind,
-                           name: CppPath,
+                           path: CppPath,
                            is_slot: bool,
                            arguments: Vec<CppFunctionArgument>|
      -> CppFunction {
         CppFunction {
-            name,
+            path,
             member: Some(CppFunctionMemberData {
                 is_virtual: true,
                 is_pure_virtual: false,
@@ -630,7 +630,7 @@ fn generate_slot_wrapper(
     }];
 
     let qt_slot_wrapper = QtSlotWrapper {
-        class_name: class_path.clone(),
+        class_path: class_path.clone(),
         arguments: ffi_types,
         function_type: function_type.clone(),
         receiver_id,

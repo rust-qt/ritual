@@ -191,7 +191,7 @@ pub struct CppFfiFunction {
     pub allocation_place: ReturnValueAllocationPlace,
 
     /// Final name of FFI method
-    pub name: CppPath,
+    pub path: CppPath,
 
     pub kind: CppFfiFunctionKind,
 }
@@ -280,7 +280,7 @@ impl CppFfiType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QtSlotWrapper {
     /// Generated name of the wrapper class
-    pub class_name: CppPath,
+    pub class_path: CppPath,
     /// Arguments of the slot.
     pub arguments: Vec<CppFfiType>,
     /// The function pointer type accepted by this wrapper

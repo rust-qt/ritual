@@ -227,8 +227,8 @@ impl Config {
     /// will also be skipped.
     /// All class methods with names matching the blocked name
     /// will be skipped, regardless of class name.
-    pub fn add_cpp_parser_blocked_name(&mut self, name: CppPath) {
-        self.cpp_parser_blocked_names.push(name);
+    pub fn add_cpp_parser_blocked_name(&mut self, path: CppPath) {
+        self.cpp_parser_blocked_names.push(path);
     }
 
     /// Adds multiple blocked names. See `Config::add_cpp_parser_blocked_name`.

@@ -76,7 +76,7 @@ fn char_ptr_ptr() {
 #[test]
 fn qint64() {
     let type1 = CppType::SpecificNumeric(CppSpecificNumericType {
-        name: CppPath::from_str_unchecked("qint64"),
+        path: CppPath::from_str_unchecked("qint64"),
         bits: 64,
         kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
     });
@@ -91,7 +91,7 @@ fn qint64() {
 #[test]
 fn quintptr() {
     let type1 = CppType::PointerSizedInteger {
-        name: CppPath::from_str_unchecked("quintptr"),
+        path: CppPath::from_str_unchecked("quintptr"),
         is_signed: false,
     };
     assert_eq!(type1.is_void(), false);
@@ -105,7 +105,7 @@ fn quintptr() {
 #[test]
 fn enum1() {
     let type1 = CppType::Enum {
-        name: CppPath::from_str_unchecked("Qt::CaseSensitivity"),
+        path: CppPath::from_str_unchecked("Qt::CaseSensitivity"),
     };
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), false);

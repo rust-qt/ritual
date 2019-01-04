@@ -151,12 +151,12 @@ impl CppItemData {
         match *self {
             CppItemData::Type(ref t) => match t.kind {
                 CppTypeDataKind::Enum => vec![CppType::Enum {
-                    name: t.name.clone(),
+                    path: t.path.clone(),
                 }],
-                CppTypeDataKind::Class => vec![CppType::Class(t.name.clone())],
+                CppTypeDataKind::Class => vec![CppType::Class(t.path.clone())],
             },
             CppItemData::EnumValue(ref enum_value) => vec![CppType::Enum {
-                name: enum_value.enum_name.clone(),
+                path: enum_value.enum_path.clone(),
             }],
             CppItemData::Namespace(_) => Vec::new(),
             CppItemData::Function(ref function) => function.all_involved_types(),
@@ -241,13 +241,13 @@ impl Display for CppItemData {
         let s = match *self {
             CppItemData::Namespace(ref path) => format!("namespace {}", path),
             CppItemData::Type(ref type1) => match type1.kind {
-                CppTypeDataKind::Enum => format!("enum {}", type1.name.to_cpp_pseudo_code()),
-                CppTypeDataKind::Class => format!("class {}", type1.name.to_cpp_pseudo_code()),
+                CppTypeDataKind::Enum => format!("enum {}", type1.path.to_cpp_pseudo_code()),
+                CppTypeDataKind::Class => format!("class {}", type1.path.to_cpp_pseudo_code()),
             },
             CppItemData::Function(ref method) => method.short_text(),
             CppItemData::EnumValue(ref value) => format!(
                 "enum {} {{ {} = {}, ... }}",
-                value.enum_name, value.name, value.value
+                value.enum_path, value.name, value.value
             ),
             CppItemData::ClassField(ref field) => field.short_text(),
             CppItemData::ClassBase(ref class_base) => {

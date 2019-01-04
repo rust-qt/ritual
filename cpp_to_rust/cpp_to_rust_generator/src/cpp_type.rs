@@ -67,7 +67,7 @@ pub struct CppFunctionPointerType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CppSpecificNumericType {
     /// Type identifier (most likely a typedef name)
-    pub name: CppPath,
+    pub path: CppPath,
     /// Size of type in bits
     pub bits: usize,
     /// Information about the type (float or integer,
@@ -89,11 +89,11 @@ pub enum CppType {
     SpecificNumeric(CppSpecificNumericType),
     /// Pointer sized integer, like qintptr
     /// (may be translated to Rust's isize)
-    PointerSizedInteger { name: CppPath, is_signed: bool },
+    PointerSizedInteger { path: CppPath, is_signed: bool },
     /// Enum type
     Enum {
         /// Name, including namespaces and nested classes
-        name: CppPath,
+        path: CppPath,
     },
     /// Class type
     Class(CppPath),
@@ -298,12 +298,12 @@ impl CppType {
         match *self {
             CppType::Void => Ok("void".to_string()),
             CppType::BuiltInNumeric(ref t) => Ok(t.to_cpp_code().to_string()),
-            CppType::Enum { ref name }
-            | CppType::SpecificNumeric(CppSpecificNumericType { ref name, .. })
-            | CppType::PointerSizedInteger { ref name, .. } => name.to_cpp_code(),
+            CppType::Enum { ref path }
+            | CppType::SpecificNumeric(CppSpecificNumericType { ref path, .. })
+            | CppType::PointerSizedInteger { ref path, .. } => path.to_cpp_code(),
             //      CppTypeBase::SpecificNumeric { ref name, .. } => Ok(name.clone()),
             //      CppTypeBase::PointerSizedInteger { ref name, .. } => Ok(name.clone()),
-            CppType::Class(ref info) => info.to_cpp_code(),
+            CppType::Class(ref path) => path.to_cpp_code(),
             CppType::TemplateParameter { .. } => {
                 bail!("template parameters are not allowed in C++ code generator");
             }

@@ -98,7 +98,7 @@ pub struct CppFunction {
     /// If the method belongs to a template class,
     /// the class's template arguments are not included here.
     /// Instead, they are available in `member.class_type`.
-    pub name: CppPath,
+    pub path: CppPath,
     /// Additional information about a class member function
     /// or None for free functions
     pub member: Option<CppFunctionMemberData>,
@@ -179,7 +179,7 @@ impl CppFunction {
     }
 
     pub fn is_same(&self, other: &CppFunction) -> bool {
-        self.name == other.name
+        self.path == other.path
             && self.member == other.member
             && self.operator == other.operator
             && self.return_type == other.return_type
@@ -188,7 +188,7 @@ impl CppFunction {
 
     pub fn class_type(&self) -> Option<CppPath> {
         if self.member.is_some() {
-            let mut path = self.name.clone();
+            let mut path = self.path.clone();
             path.items.pop().expect("CppPath can't be empty");
             if path.items.is_empty() {
                 panic!("CppFunction is a class member but its path is not nested.");
@@ -202,7 +202,7 @@ impl CppFunction {
     /// Returns the identifier this method would be presented with
     /// in Qt documentation.
     pub fn doc_id(&self) -> String {
-        self.name.to_string() // TODO: remove all template args?
+        self.path.to_string() // TODO: remove all template args?
     }
 
     /// Returns short text representing values in this method
@@ -242,7 +242,7 @@ impl CppFunction {
             s = format!("{} [var args]", s);
         }
         s = format!("{} {}", s, self.return_type.to_cpp_pseudo_code());
-        s = format!("{} {}", s, self.name);
+        s = format!("{} {}", s, self.path);
         s = format!(
             "{}({})",
             s,
@@ -316,7 +316,7 @@ impl CppFunction {
         Ok(format!(
             "{}{}({})",
             type_num,
-            self.name,
+            self.path,
             self.arguments
                 .iter()
                 .map_if_ok(|arg| arg.argument_type.to_cpp_code(None))?
@@ -355,7 +355,7 @@ impl CppFunction {
             }
         }
 
-        if let Some(ref template_arguments) = self.name.last().template_arguments {
+        if let Some(ref template_arguments) = self.path.last().template_arguments {
             result.extend(template_arguments.clone());
         }
         result

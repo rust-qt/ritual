@@ -26,7 +26,7 @@ fn add_explicit_destructors(data: &mut ProcessorData) -> Result<()> {
     for type1 in &data.current_database.items {
         if let CppItemData::Type(ref type1) = type1.cpp_data {
             if type1.kind.is_class() {
-                let class_name = &type1.name;
+                let class_name = &type1.path;
                 let found_destructor = data
                     .current_database
                     .items
@@ -35,8 +35,8 @@ fn add_explicit_destructors(data: &mut ProcessorData) -> Result<()> {
                     .any(|m| m.is_destructor() && m.class_type().as_ref() == Some(class_name));
                 if !found_destructor {
                     methods.push(CppFunction {
-                        name: type1
-                            .name
+                        path: type1
+                            .path
                             .with_added(CppPathItem::from_str_unchecked(&format!(
                                 "~{}",
                                 class_name

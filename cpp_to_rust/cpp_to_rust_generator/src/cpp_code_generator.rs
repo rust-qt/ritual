@@ -28,7 +28,7 @@ fn function_signature(method: &CppFfiFunction) -> Result<String> {
     for arg in &method.arguments {
         arg_texts.push(arg.to_cpp_code()?);
     }
-    let name_with_args = format!("{}({})", method.name.to_cpp_code()?, arg_texts.join(", "));
+    let name_with_args = format!("{}({})", method.path.to_cpp_code()?, arg_texts.join(", "));
     let return_type = &method.return_type.ffi_type;
     let r = if let CppType::FunctionPointer(..) = return_type {
         return_type.to_cpp_code(Some(&name_with_args))?
@@ -60,7 +60,7 @@ fn qt_slot_wrapper(wrapper: &QtSlotWrapper) -> Result<String> {
         .join(", ");
     Ok(format!(
         include_str!("../templates/c_lib/qt_slot_wrapper.h"),
-        class_name = &wrapper.class_name,
+        class_name = &wrapper.class_path,
         func_arg = func_type.to_cpp_code(Some("func"))?,
         func_field = func_type.to_cpp_code(Some("m_func"))?,
         method_args = method_args,
@@ -251,7 +251,7 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
                     }
                 };
                 let template_args = if let Some(cpp_method) = method.kind.cpp_function() {
-                    match cpp_method.name.last().template_arguments {
+                    match cpp_method.path.last().template_arguments {
                         Some(ref args) => {
                             let mut texts = Vec::new();
                             for arg in args {
@@ -283,7 +283,7 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
                     }
                     CppFfiFunctionKind::Function {
                         ref cpp_function, ..
-                    } => format!("{}{}{}", scope_specifier, cpp_function.name, template_args),
+                    } => format!("{}{}{}", scope_specifier, cpp_function.path, template_args),
                 }
             };
         if is_field_accessor {

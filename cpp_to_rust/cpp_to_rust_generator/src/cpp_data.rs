@@ -19,16 +19,16 @@ pub struct CppEnumValue {
     /// C++ documentation for this item in HTML
     pub doc: Option<String>,
     /// Full type name of the enum this item belongs to
-    pub enum_name: CppPath,
+    pub enum_path: CppPath,
 }
 
 impl CppEnumValue {
     pub fn is_same(&self, other: &CppEnumValue) -> bool {
-        self.name == other.name && self.enum_name == other.enum_name && self.value == other.value
+        self.name == other.name && self.enum_path == other.enum_path && self.value == other.value
     }
 
     pub fn full_name(&self) -> CppPath {
-        let mut name = self.enum_name.clone();
+        let mut name = self.enum_path.clone();
         name.items.pop().expect("enum_name can't be empty");
         name.items.push(CppPathItem::from_str_unchecked(&self.name));
         name
@@ -273,7 +273,7 @@ pub enum CppTypeDataKind {
 pub struct CppTypeData {
     /// Identifier, including namespaces and nested classes
     /// (separated with "::", like in C++)
-    pub name: CppPath,
+    pub path: CppPath,
     pub kind: CppTypeDataKind,
     /// C++ documentation for the type
     pub doc: Option<CppTypeDoc>,
@@ -282,7 +282,7 @@ pub struct CppTypeData {
 
 impl CppTypeData {
     pub fn is_same(&self, other: &CppTypeData) -> bool {
-        self.name == other.name && self.kind == other.kind
+        self.path == other.path && self.kind == other.kind
     }
 }
 
