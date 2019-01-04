@@ -1,6 +1,5 @@
 use crate::common::errors::Result;
 use crate::cpp_data::CppPathItem;
-use crate::cpp_data::CppTypeDataKind;
 use crate::cpp_data::CppVisibility;
 use crate::cpp_function::CppFunction;
 use crate::cpp_function::CppFunctionKind;
@@ -26,21 +25,23 @@ fn add_explicit_destructors(data: &mut ProcessorData) -> Result<()> {
     let mut methods = Vec::new();
     for type1 in &data.current_database.items {
         if let CppItemData::Type(ref type1) = type1.cpp_data {
-            if let CppTypeDataKind::Class { ref class_type } = type1.kind {
+            if type1.kind.is_class() {
                 let class_name = &type1.name;
                 let found_destructor = data
                     .current_database
                     .items
                     .iter()
                     .filter_map(|item| item.cpp_data.as_function_ref())
-                    .any(|m| m.is_destructor() && m.class_name() == Some(class_name));
+                    .any(|m| m.is_destructor() && m.class_type().as_ref() == Some(class_name));
                 if !found_destructor {
                     methods.push(CppFunction {
-                        name: class_type.name.with_added(CppPathItem::from_str_unchecked(
-                            &format!("~{}", class_name),
-                        )),
+                        name: type1
+                            .name
+                            .with_added(CppPathItem::from_str_unchecked(&format!(
+                                "~{}",
+                                class_name
+                            ))),
                         member: Some(CppFunctionMemberData {
-                            class_type: class_type.clone(),
                             is_virtual: false, // the destructor can actually be virtual but we don't care about it here
                             is_pure_virtual: false,
                             is_const: false,
@@ -54,7 +55,6 @@ fn add_explicit_destructors(data: &mut ProcessorData) -> Result<()> {
                         return_type: CppType::Void,
                         arguments: vec![],
                         allows_variadic_arguments: false,
-                        template_arguments: None,
                         declaration_code: None,
                         doc: None,
                     });

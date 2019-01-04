@@ -153,9 +153,7 @@ impl CppItemData {
                 CppTypeDataKind::Enum => vec![CppType::Enum {
                     name: t.name.clone(),
                 }],
-                CppTypeDataKind::Class { ref class_type } => {
-                    vec![CppType::Class(class_type.clone())]
-                }
+                CppTypeDataKind::Class => vec![CppType::Class(t.name.clone())],
             },
             CppItemData::EnumValue(ref enum_value) => vec![CppType::Enum {
                 name: enum_value.enum_name.clone(),
@@ -244,9 +242,7 @@ impl Display for CppItemData {
             CppItemData::Namespace(ref path) => format!("namespace {}", path),
             CppItemData::Type(ref type1) => match type1.kind {
                 CppTypeDataKind::Enum => format!("enum {}", type1.name.to_cpp_pseudo_code()),
-                CppTypeDataKind::Class { ref class_type } => {
-                    format!("class {}", class_type.to_cpp_pseudo_code())
-                }
+                CppTypeDataKind::Class => format!("class {}", type1.name.to_cpp_pseudo_code()),
             },
             CppItemData::Function(ref method) => method.short_text(),
             CppItemData::EnumValue(ref value) => format!(

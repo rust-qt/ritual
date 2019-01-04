@@ -7,7 +7,7 @@ use crate::cpp_data::CppPath;
 use crate::cpp_data::CppVisibility;
 pub use crate::cpp_operator::{CppOperator, CppOperatorInfo};
 use crate::cpp_type::CppPointerLikeTypeKind;
-use crate::cpp_type::{CppClassType, CppType};
+use crate::cpp_type::CppType;
 use serde_derive::{Deserialize, Serialize};
 
 /// Information about an argument of a C++ method
@@ -38,9 +38,6 @@ pub enum CppFunctionKind {
 /// Information about a C++ class member method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppFunctionMemberData {
-    /// Type of the class where this method belong. This is used to construct
-    /// type of "this" pointer and return type of constructors.
-    pub class_type: CppClassType,
     /// Whether this method is a constructor, a destructor or an operator
     pub kind: CppFunctionKind,
     /// True if this is a virtual method
@@ -84,6 +81,23 @@ pub struct CppFunction {
     /// Identifier. For class methods, this field includes
     /// only the method's own name. For free functions,
     /// this field also includes namespaces (if any).
+    ///
+    /// Last part of the path contains the template parameters of the function itself.
+    /// For a template method, this fields contains its template arguments
+    /// in the form of `CppTypeBase::TemplateParameter` types.
+    /// For an instantiated template method, this field contains the types
+    /// used for instantiation.
+    ///
+    /// For example, `T QObject::findChild<T>()` would have
+    /// a `TemplateParameter` type in `template_arguments`
+    /// because it's not instantiated, and
+    /// `QWidget* QObject::findChild<QWidget*>()` would have `QWidget*` type in
+    /// `template_arguments`.
+    ///
+    /// This field is `None` if this is not a template method.
+    /// If the method belongs to a template class,
+    /// the class's template arguments are not included here.
+    /// Instead, they are available in `member.class_type`.
     pub name: CppPath,
     /// Additional information about a class member function
     /// or None for free functions
@@ -100,22 +114,6 @@ pub struct CppFunction {
     //  pub arguments_before_omitting: Option<Vec<CppMethodArgument>>,
     /// Whether the argument list is terminated with "..."
     pub allows_variadic_arguments: bool,
-    /// For a template method, this fields contains its template arguments
-    /// in the form of `CppTypeBase::TemplateParameter` types.
-    /// For an instantiated template method, this field contains the types
-    /// used for instantiation.
-    ///
-    /// For example, `T QObject::findChild<T>()` would have
-    /// a `TemplateParameter` type in `template_arguments`
-    /// because it's not instantiated, and
-    /// `QWidget* QObject::findChild<QWidget*>()` would have `QWidget*` type in
-    /// `template_arguments`.
-    ///
-    /// This field is `None` if this is not a template method.
-    /// If the method belongs to a template class,
-    /// the class's template arguments are not included here.
-    /// Instead, they are available in `member.class_type`.
-    pub template_arguments: Option<Vec<CppType>>, // TODO: move inside `name`
     //pub template_arguments_values: Option<Vec<CppType>>,
     /// C++ code of the method's declaration.
     /// None if the method was not explicitly declared.
@@ -186,25 +184,25 @@ impl CppFunction {
             && self.operator == other.operator
             && self.return_type == other.return_type
             && self.argument_types_equal(other)
-            && self.template_arguments == other.template_arguments
     }
 
-    /// Returns fully qualified C++ name of this method,
-    /// i.e. including namespaces and class name (if any).
-    /// This method is not suitable for code generation.
-    pub fn full_name(&self) -> String {
-        // TODO: remove this
-        self.name.to_cpp_pseudo_code()
+    pub fn class_type(&self) -> Option<CppPath> {
+        if self.member.is_some() {
+            let mut path = self.name.clone();
+            path.items.pop().expect("CppPath can't be empty");
+            if path.items.is_empty() {
+                panic!("CppFunction is a class member but its path is not nested.");
+            }
+            Some(path)
+        } else {
+            None
+        }
     }
 
     /// Returns the identifier this method would be presented with
     /// in Qt documentation.
     pub fn doc_id(&self) -> String {
-        if let Some(ref info) = self.member {
-            format!("{}::{}", info.class_type.name, self.name)
-        } else {
-            self.name.to_string()
-        }
+        self.name.to_string() // TODO: remove all template args?
     }
 
     /// Returns short text representing values in this method
@@ -244,14 +242,7 @@ impl CppFunction {
             s = format!("{} [var args]", s);
         }
         s = format!("{} {}", s, self.return_type.to_cpp_pseudo_code());
-        s = format!("{} {}", s, self.full_name());
-        if let Some(ref args) = self.template_arguments {
-            s = format!(
-                "{}<{}>",
-                s,
-                args.iter().map(|x| x.to_cpp_pseudo_code()).join(", ")
-            );
-        }
+        s = format!("{} {}", s, self.name);
         s = format!(
             "{}({})",
             s,
@@ -277,14 +268,6 @@ impl CppFunction {
         s.trim().to_string()
     }
 
-    /// Returns name of the class this method belongs to, if any.
-    pub fn class_name(&self) -> Option<&CppPath> {
-        match self.member {
-            Some(ref info) => Some(&info.class_type.name),
-            None => None,
-        }
-    }
-
     /// Returns true if this method is a constructor.
     pub fn is_constructor(&self) -> bool {
         match self.member {
@@ -297,6 +280,14 @@ impl CppFunction {
     pub fn is_destructor(&self) -> bool {
         match self.member {
             Some(ref info) => info.kind.is_destructor(),
+            None => false,
+        }
+    }
+
+    /// Returns true if this method is static.
+    pub fn is_static_member(&self) -> bool {
+        match self.member {
+            Some(ref info) => info.is_static,
             None => false,
         }
     }
@@ -351,7 +342,7 @@ impl CppFunction {
             result.push(CppType::PointerLike {
                 is_const: class_membership.is_const,
                 kind: CppPointerLikeTypeKind::Pointer,
-                target: Box::new(CppType::Class(class_membership.class_type.clone())),
+                target: Box::new(CppType::Class(self.class_type().unwrap())),
             });
         }
         for t in self.arguments.iter().map(|x| x.argument_type.clone()) {
@@ -364,7 +355,7 @@ impl CppFunction {
             }
         }
 
-        if let Some(ref template_arguments) = self.template_arguments {
+        if let Some(ref template_arguments) = self.name.last().template_arguments {
             result.extend(template_arguments.clone());
         }
         result

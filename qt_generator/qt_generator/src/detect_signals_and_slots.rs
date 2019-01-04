@@ -2,7 +2,6 @@ use cpp_to_rust_generator::common::errors::{Result, ResultExt};
 use cpp_to_rust_generator::common::file_utils::open_file;
 use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::cpp_data::CppPath;
-use cpp_to_rust_generator::cpp_data::CppTypeDataKind;
 use cpp_to_rust_generator::database::CppItemData;
 use cpp_to_rust_generator::database::DatabaseItemSource;
 use cpp_to_rust_generator::processor::ProcessorData;
@@ -20,11 +19,11 @@ pub fn inherits(
 ) -> bool {
     for item in data.all_items() {
         if let CppItemData::ClassBase(ref base_data) = item.cpp_data {
-            if &base_data.derived_class_type.name == derived_class_name {
-                if &base_data.base_class_type.name == base_class_name {
+            if &base_data.derived_class_type == derived_class_name {
+                if &base_data.base_class_type == base_class_name {
                     return true;
                 }
-                if inherits(data, &base_data.base_class_type.name, base_class_name) {
+                if inherits(data, &base_data.base_class_type, base_class_name) {
                     return true;
                 }
             }
@@ -46,12 +45,8 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
         } = item.source
         {
             if let CppItemData::Type(ref type1) = item.cpp_data {
-                if let CppTypeDataKind::Class { ref class_type } = type1.kind {
-                    if inherits(
-                        &data,
-                        &class_type.name,
-                        &CppPath::from_str_unchecked("QObject"),
-                    ) {
+                if type1.kind.is_class() {
+                    if inherits(&data, &type1.name, &CppPath::from_str_unchecked("QObject")) {
                         if !files.contains(&origin_location.include_file_path) {
                             files.insert(origin_location.include_file_path.clone());
                         }
@@ -138,8 +133,8 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
         {
             if let CppItemData::Function(ref mut method) = item.cpp_data {
                 let mut section_type = SectionType::Other;
-                if let Some(class_name) = method.class_name() {
-                    if let Some(sections) = sections_per_class.get(class_name) {
+                if let Some(class_name) = method.class_type() {
+                    if let Some(sections) = sections_per_class.get(&class_name) {
                         let matching_sections: Vec<_> = sections
                             .clone()
                             .into_iter()

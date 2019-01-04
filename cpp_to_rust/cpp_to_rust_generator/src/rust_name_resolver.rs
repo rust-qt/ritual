@@ -4,7 +4,6 @@ use crate::processor::ProcessorData;
 //use cpp_to_rust_common::log;
 use crate::common::errors::{bail, Result};
 use crate::cpp_checker::cpp_checker_step;
-use crate::cpp_data::CppTypeDataKind;
 use crate::cpp_type::CppType;
 use crate::database::CppItemData;
 use crate::database::DatabaseItem;
@@ -12,19 +11,17 @@ use cpp_to_rust_common::log;
 
 fn check_type(all_items: &[&DatabaseItem], cpp_type: &CppType) -> Result<()> {
     match cpp_type {
-        CppType::Class(class_type) => {
-            let kind = CppTypeDataKind::Class {
-                class_type: class_type.clone(),
-            };
+        CppType::Class(ref path) => {
             if !all_items
                 .iter()
                 .filter_map(|item| item.cpp_data.as_type_ref())
-                .any(|t| t.name == class_type.name && t.kind == kind)
+                .any(|t| &t.name == path && t.kind.is_class())
             {
-                bail!("class not found: {}", class_type.to_cpp_pseudo_code());
+                bail!("class not found: {}", path.to_cpp_pseudo_code());
             }
 
-            if let Some(ref template_arguments) = class_type.template_arguments {
+            // TODO: maybe delete?
+            if let Some(ref template_arguments) = path.last().template_arguments {
                 if template_arguments
                     .iter()
                     .any(|arg| arg.is_or_contains_template_parameter())
@@ -97,7 +94,6 @@ fn it_should_check_functions() {
     use crate::cpp_data::CppTypeDataKind;
     use crate::cpp_function::CppFunction;
     use crate::cpp_function::CppFunctionArgument;
-    use crate::cpp_type::CppClassType;
     use crate::database::DatabaseItemSource;
 
     let func = CppFunction {
@@ -107,7 +103,6 @@ fn it_should_check_functions() {
         return_type: CppType::Void,
         arguments: vec![],
         allows_variadic_arguments: false,
-        template_arguments: None,
         declaration_code: None,
         doc: None,
     };
@@ -122,10 +117,7 @@ fn it_should_check_functions() {
         cpp_data: CppItemData::Function(CppFunction {
             arguments: vec![CppFunctionArgument {
                 name: "a".to_string(),
-                argument_type: CppType::Class(CppClassType {
-                    name: CppPath::from_str_unchecked("C1"),
-                    template_arguments: None,
-                }),
+                argument_type: CppType::Class(CppPath::from_str_unchecked("C1")),
                 has_default_value: false,
             }],
             ..func
@@ -141,12 +133,7 @@ fn it_should_check_functions() {
     let class_item = DatabaseItem {
         cpp_data: CppItemData::Type(CppTypeData {
             name: CppPath::from_str_unchecked("C1"),
-            kind: CppTypeDataKind::Class {
-                class_type: CppClassType {
-                    name: CppPath::from_str_unchecked("C1"),
-                    template_arguments: None,
-                },
-            },
+            kind: CppTypeDataKind::Class,
             doc: None,
             is_movable: false,
         }),

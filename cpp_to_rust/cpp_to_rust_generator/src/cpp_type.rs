@@ -1,7 +1,6 @@
 //! Types for handling information about C++ types.
 
 use crate::common::errors::{bail, Result, ResultExt};
-use crate::common::string_utils::JoinWithSeparator;
 use crate::cpp_data::CppPath;
 use crate::cpp_ffi_data::{CppFfiType, CppTypeConversionToFfi};
 use serde_derive::{Deserialize, Serialize};
@@ -51,17 +50,6 @@ pub enum CppSpecificNumericTypeKind {
     FloatingPoint,
 }
 
-/// Information about base C++ class type
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
-pub struct CppClassType {
-    /// Name, including namespaces and nested classes
-    pub name: CppPath,
-    /// For template classes, C++ types used as template
-    /// arguments in this type,
-    /// like [QString, int] in QHash<QString, int>
-    pub template_arguments: Option<Vec<CppType>>,
-}
-
 /// Information about a C++ function pointer type
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppFunctionPointerType {
@@ -108,7 +96,7 @@ pub enum CppType {
         name: CppPath,
     },
     /// Class type
-    Class(CppClassType),
+    Class(CppPath),
     /// Template parameter, like `"T"` anywhere inside
     /// `QVector<T>` declaration
     TemplateParameter {
@@ -210,58 +198,23 @@ impl CppBuiltInNumericType {
     }
 }
 
-impl CppClassType {
-    /// Returns C++ code representing this type.
-    pub fn to_cpp_code(&self) -> Result<String> {
-        self.name.to_cpp_code()
-        /*match self.template_arguments {
-            Some(ref args) => {
-                let mut arg_texts = Vec::new();
-                for arg in args {
-                    arg_texts.push(arg.to_cpp_code(None)?);
-                }
-                Ok(format!("{}< {} >", self.name, arg_texts.join(", ")))
-            }
-            None => self.name.to_cpp_code(),
-        }*/
-    }
-
-    /// Returns string representation of this type for debugging output.
-    pub fn to_cpp_pseudo_code(&self) -> String {
-        if let Some(ref template_arguments) = self.template_arguments {
-            format!(
-                "{}<{}>",
-                self.name,
-                template_arguments
-                    .iter()
-                    .map(|x| x.to_cpp_pseudo_code())
-                    .join(", ")
-            )
-        } else {
-            self.name.to_cpp_pseudo_code()
-        }
-    }
-
+impl CppPath {
     /// Attempts to replace template types at `nested_level1`
     /// within this type with `template_arguments1`.
     pub fn instantiate(
         &self,
         nested_level1: usize,
         template_arguments1: &[CppType],
-    ) -> Result<CppClassType> {
-        Ok(CppClassType {
-            name: self.name.clone(),
-            template_arguments: match self.template_arguments {
-                Some(ref template_arguments) => {
-                    let mut args = Vec::new();
-                    for arg in template_arguments {
-                        args.push(arg.instantiate(nested_level1, template_arguments1)?);
-                    }
-                    Some(args)
+    ) -> Result<CppPath> {
+        let mut new_path = self.clone();
+        for path_item in &mut new_path.items {
+            if let Some(ref mut template_arguments) = path_item.template_arguments {
+                for arg in template_arguments {
+                    *arg = arg.instantiate(nested_level1, template_arguments1)?;
                 }
-                None => None,
-            },
-        })
+            }
+        }
+        Ok(new_path)
     }
 }
 
@@ -324,18 +277,15 @@ impl CppType {
                         .iter()
                         .any(|arg| arg.is_or_contains_template_parameter())
             }
-            CppType::Class(CppClassType {
-                ref template_arguments,
-                ..
-            }) => {
-                if let Some(ref template_arguments) = *template_arguments {
+            CppType::Class(ref path) => path.items.iter().any(|item| {
+                if let Some(ref template_arguments) = item.template_arguments {
                     template_arguments
                         .iter()
                         .any(|arg| arg.is_or_contains_template_parameter())
                 } else {
                     false
                 }
-            }
+            }),
             _ => false,
         }
     }
@@ -425,7 +375,7 @@ pub enum CppTypeRole {
     NotReturnType,
 }
 
-fn is_qflags(path: &CppPath) -> bool {
+pub fn is_qflags(path: &CppPath) -> bool {
     path.items.len() == 1 && &path.items[0].name == "QFlags"
 }
 
@@ -493,8 +443,8 @@ impl CppType {
                         original_type: self.clone(),
                     });
                 }
-                CppType::Class(ref type1) => {
-                    if is_qflags(&type1.name) {
+                CppType::Class(ref path) => {
+                    if is_qflags(&path) {
                         return Ok(CppFfiType {
                             ffi_type: CppType::BuiltInNumeric(CppBuiltInNumericType::UInt),
                             conversion: CppTypeConversionToFfi::QFlagsToUInt,
@@ -521,8 +471,8 @@ impl CppType {
                         CppPointerLikeTypeKind::Pointer => {}
                         CppPointerLikeTypeKind::Reference => {
                             if *is_const {
-                                if let CppType::Class(ref type1) = **target {
-                                    if is_qflags(&type1.name) {
+                                if let CppType::Class(ref path) = **target {
+                                    if is_qflags(path) {
                                         return Ok(CppFfiType {
                                             ffi_type: CppType::BuiltInNumeric(
                                                 CppBuiltInNumericType::UInt,
@@ -596,36 +546,6 @@ impl CppType {
                 target: Box::new(target.instantiate(nested_level1, template_arguments1)?),
             }),
             _ => Ok(self.clone()),
-        }
-    }
-
-    /// Returns true if this type is platform dependent.
-    /// Built-in numeric types that can have different size and/or
-    /// signedness on different platforms are considered platform dependent.
-    /// Any types that refer to a platform dependent type are also
-    /// platform dependent.
-    ///
-    /// Note that most types are platform dependent in "binary" sense,
-    /// i.e. their size and memory layout may vary, but this function
-    /// does not address this property.
-    pub fn is_platform_dependent(&self) -> bool {
-        match self {
-            CppType::Class(CppClassType {
-                ref template_arguments,
-                ..
-            }) => {
-                if let Some(ref template_arguments) = *template_arguments {
-                    for arg in template_arguments {
-                        if arg.is_platform_dependent() {
-                            return true;
-                        }
-                    }
-                }
-                false
-            }
-            CppType::BuiltInNumeric(ref data) => data != &CppBuiltInNumericType::Bool,
-            CppType::PointerLike { ref target, .. } => target.is_platform_dependent(),
-            _ => false,
         }
     }
 }

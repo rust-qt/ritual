@@ -16,10 +16,11 @@ use crate::cpp_function::ReturnValueAllocationPlace;
 use crate::cpp_function::{
     CppFunction, CppFunctionArgument, CppFunctionKind, CppFunctionMemberData,
 };
+use crate::cpp_type::is_qflags;
 use crate::cpp_type::CppFunctionPointerType;
 use crate::cpp_type::CppPointerLikeTypeKind;
+use crate::cpp_type::CppType;
 use crate::cpp_type::CppTypeRole;
-use crate::cpp_type::{CppClassType, CppType};
 use crate::database::CppItemData;
 use crate::database::FfiItem;
 use crate::processor::ProcessingStep;
@@ -51,10 +52,8 @@ fn run(mut data: &mut ProcessorData) -> Result<()> {
         .iter()
         .filter_map(|item| {
             if let CppItemData::Type(ref type_data) = item.cpp_data {
-                if let CppTypeDataKind::Class { ref class_type } = type_data.kind {
-                    if type_data.is_movable {
-                        return Some(class_type.clone());
-                    }
+                if type_data.kind == CppTypeDataKind::Class && type_data.is_movable {
+                    return Some(type_data.name.clone());
                 }
             }
             None
@@ -169,7 +168,6 @@ fn create_cast_method(
             has_default_value: false,
         }],
         allows_variadic_arguments: false,
-        template_arguments: Some(vec![to.clone()]),
         declaration_code: None,
         doc: None,
     };
@@ -190,8 +188,8 @@ fn create_cast_method(
 /// and base types of `base_type`.
 fn generate_casts_one(
     data: &[CppBaseSpecifier],
-    target_type: &CppClassType,
-    base_type: &CppClassType,
+    target_type: &CppPath,
+    base_type: &CppPath,
     direct_base_index: Option<usize>,
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiFunction>> {
@@ -265,7 +263,7 @@ fn generate_casts(
 
 fn generate_ffi_methods_for_method(
     method: &CppFunction,
-    movable_types: &[CppClassType],
+    movable_types: &[CppPath],
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiFunction>> {
     let mut methods = Vec::new();
@@ -305,7 +303,7 @@ fn generate_ffi_methods_for_method(
 ///   the return value is stack-allocated.
 pub fn to_ffi_method(
     method: &CppFunction,
-    movable_types: &[CppClassType],
+    movable_types: &[CppPath],
     name_provider: &mut FfiNameProvider,
 ) -> Result<CppFfiFunction> {
     if method.allows_variadic_arguments {
@@ -329,7 +327,7 @@ pub fn to_ffi_method(
                 argument_type: CppType::PointerLike {
                     is_const: false,
                     kind: CppPointerLikeTypeKind::Pointer,
-                    target: Box::new(CppType::Class(info.class_type.clone())),
+                    target: Box::new(CppType::Class(method.class_type().unwrap())),
                 }
                 .to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
                 meaning: CppFfiArgumentMeaning::This,
@@ -350,7 +348,7 @@ pub fn to_ffi_method(
     if method.is_destructor() {
         // destructor doesn't have a return type that needs special handling,
         // but its `allocation_place` must match `allocation_place` of the type's constructor
-        let class_type = &method.member.as_ref().unwrap().class_type;
+        let class_type = &method.class_type().unwrap();
         r.allocation_place = if movable_types.iter().any(|t| t == class_type) {
             ReturnValueAllocationPlace::Stack
         } else {
@@ -358,14 +356,16 @@ pub fn to_ffi_method(
         };
     } else {
         let real_return_type = match method.member {
-            Some(ref info) if info.kind.is_constructor() => CppType::Class(info.class_type.clone()),
+            Some(ref info) if info.kind.is_constructor() => {
+                CppType::Class(method.class_type().unwrap())
+            }
             _ => method.return_type.clone(),
         };
         let real_return_type_ffi = real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
         match real_return_type {
             // QFlags is converted to uint in FFI
-            CppType::Class(ref base) if base.name != CppPath::from_str_unchecked("QFlags") => {
-                if movable_types.iter().any(|t| t == base) {
+            CppType::Class(ref path) if !is_qflags(path) => {
+                if movable_types.iter().any(|t| t == path) {
                     r.arguments.push(CppFfiFunctionArgument {
                         name: "output".to_string(),
                         argument_type: real_return_type_ffi,
@@ -389,7 +389,7 @@ pub fn to_ffi_method(
 /// Adds fictional getter and setter methods for each known public field of each class.
 fn generate_field_accessors(
     field: &CppClassField,
-    movable_types: &[CppClassType],
+    movable_types: &[CppPath],
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiFunction>> {
     // TODO: fix doc generator for field accessors
@@ -400,7 +400,6 @@ fn generate_field_accessors(
             let fake_method = CppFunction {
                 name,
                 member: Some(CppFunctionMemberData {
-                    class_type: field.class_type.clone(),
                     kind: CppFunctionKind::Regular,
                     is_virtual: false,
                     is_pure_virtual: false,
@@ -419,7 +418,6 @@ fn generate_field_accessors(
                 return_type,
                 arguments,
                 allows_variadic_arguments: false,
-                template_arguments: None,
                 declaration_code: None,
                 doc: None,
             };
@@ -430,7 +428,7 @@ fn generate_field_accessors(
             };
             Ok(ffi_method)
         };
-    let class_path = field.class_type.name.clone(); // TODO: template arguments should be here
+    let class_path = field.class_type.clone();
 
     if field.visibility == CppVisibility::Public {
         if field.field_type.is_class() {
@@ -488,8 +486,8 @@ fn generate_field_accessors(
 
 fn should_process_item(item: &CppItemData) -> Result<bool> {
     if let CppItemData::Function(ref method) = *item {
-        if let Some(class_name) = method.class_name() {
-            if class_name == &CppPath::from_str_unchecked("QFlags") {
+        if let Some(class_name) = method.class_type() {
+            if is_qflags(&class_name) {
                 return Ok(false);
             }
         }
@@ -504,7 +502,7 @@ fn should_process_item(item: &CppItemData) -> Result<bool> {
                 return Ok(false);
             }
         }
-        if method.template_arguments.is_some() {
+        if method.name.last().template_arguments.is_some() {
             return Ok(false);
         }
     }
@@ -555,10 +553,6 @@ fn generate_slot_wrapper(
         CppFunction {
             name,
             member: Some(CppFunctionMemberData {
-                class_type: CppClassType {
-                    name: class_path.clone(),
-                    template_arguments: None,
-                },
                 is_virtual: true,
                 is_pure_virtual: false,
                 is_const: false,
@@ -572,7 +566,6 @@ fn generate_slot_wrapper(
             return_type: CppType::Void,
             arguments,
             allows_variadic_arguments: false,
-            template_arguments: None,
             declaration_code: None,
             doc: None,
         }
@@ -629,14 +622,8 @@ fn generate_slot_wrapper(
     let receiver_id = method_custom_slot.receiver_id()?;
     methods.push(method_custom_slot);
     let class_bases = vec![CppBaseSpecifier {
-        derived_class_type: CppClassType {
-            name: class_path.clone(),
-            template_arguments: None,
-        },
-        base_class_type: CppClassType {
-            name: CppPath::from_str_unchecked("QObject"),
-            template_arguments: None,
-        },
+        derived_class_type: class_path.clone(),
+        base_class_type: CppPath::from_str_unchecked("QObject"),
         base_index: 0,
         is_virtual: false,
         visibility: CppVisibility::Public,

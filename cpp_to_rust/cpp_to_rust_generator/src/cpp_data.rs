@@ -1,7 +1,7 @@
 //! Types for handling information about C++ library APIs.
 
 pub use crate::cpp_operator::CppOperator;
-use crate::cpp_type::{CppClassType, CppType};
+use crate::cpp_type::CppType;
 use cpp_to_rust_common::errors::{bail, Error, Result};
 use cpp_to_rust_common::utils::MapIfOk;
 use itertools::Itertools;
@@ -39,7 +39,7 @@ impl CppEnumValue {
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppClassField {
     /// Identifier
-    pub name: String,
+    pub name: String, // TODO: merge with `class_type`
     /// Field type
     pub field_type: CppType,
     /// Visibility
@@ -47,7 +47,7 @@ pub struct CppClassField {
     //  /// Size of type in bytes
     //  pub size: Option<usize>,
     /// Name and template arguments of the class type that owns this field
-    pub class_type: CppClassType,
+    pub class_type: CppPath,
 
     pub is_const: bool,
     pub is_static: bool,
@@ -79,7 +79,7 @@ impl CppClassField {
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppBaseSpecifier {
     /// Base class type (can include template arguments)
-    pub base_class_type: CppClassType,
+    pub base_class_type: CppPath,
     /// Index of this base (for classes that have multiple base classes)
     pub base_index: usize,
     /// True if this base is virtual
@@ -89,7 +89,7 @@ pub struct CppBaseSpecifier {
 
     /// Name and template arguments of the class type that
     /// inherits this base class
-    pub derived_class_type: CppClassType,
+    pub derived_class_type: CppPath,
 }
 
 /// Location of a C++ type's definition in header files.
@@ -171,6 +171,10 @@ impl CppPath {
 
     pub fn last(&self) -> &CppPathItem {
         self.items.last().expect("empty CppPath encountered")
+    }
+
+    pub fn last_mut(&mut self) -> &mut CppPathItem {
+        self.items.last_mut().expect("empty CppPath encountered")
     }
 }
 
@@ -261,10 +265,7 @@ impl fmt::Display for CppPath {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum CppTypeDataKind {
     Enum,
-    Class {
-        /// Information about name and template arguments of this type.
-        class_type: CppClassType,
-    },
+    Class,
 }
 
 /// Information about a C++ type declaration
@@ -292,7 +293,7 @@ pub struct CppTemplateInstantiation {
     /// Template class name
     pub class_name: CppPath,
     /// List of template arguments used in this instantiation
-    pub template_arguments: Vec<CppType>,
+    pub template_arguments: Vec<CppType>, // TODO: refactor using new CppPath?
 }
 
 impl CppTypeDataKind {

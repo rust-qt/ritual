@@ -11,7 +11,7 @@ mod tests {
     }
 
     unsafe extern "C" fn struct1_delete(this_ptr: *mut Struct1) {
-        (*this_ptr).value.borrow_mut().clone_from(&mut 42);
+        (*this_ptr).value.borrow_mut().clone_from(&42);
     }
 
     impl CppDeletable for Struct1 {
@@ -26,11 +26,11 @@ mod tests {
         let mut object1 = Struct1 {
             value: value1.clone(),
         };
-        assert!(value1.borrow().clone() == 10);
+        assert!(*value1.borrow() == 10);
         unsafe {
             CppBox::new(&mut object1 as *mut _);
         }
-        assert!(value1.borrow().clone() == 42);
+        assert!(*value1.borrow() == 42);
     }
 }
 

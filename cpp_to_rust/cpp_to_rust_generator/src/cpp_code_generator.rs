@@ -202,96 +202,90 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
         }
     } else {
         let mut is_field_accessor = false;
-        let result_without_args = if let Some(info) = method
-            .kind
-            .cpp_function()
-            .filter(|m| m.is_constructor())
-            .and_then(|m| m.member())
-        {
-            let class_type = &info.class_type;
-            match method.allocation_place {
-                ReturnValueAllocationPlace::Stack => {
+
+        let result_without_args =
+            if let Some(cpp_function) = method.kind.cpp_function().filter(|m| m.is_constructor()) {
+                match method.allocation_place {
+                    ReturnValueAllocationPlace::Stack => {
+                        if let Some(arg) = method
+                            .arguments
+                            .iter()
+                            .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue)
+                        {
+                            format!(
+                                "new({}) {}",
+                                arg.name,
+                                cpp_function.class_type().unwrap().to_cpp_code()?
+                            )
+                        } else {
+                            unexpected!("return value argument not found\n{:?}", method);
+                        }
+                    }
+                    ReturnValueAllocationPlace::Heap => {
+                        format!("new {}", cpp_function.class_type().unwrap().to_cpp_code()?)
+                    }
+                    ReturnValueAllocationPlace::NotApplicable => {
+                        unexpected!("NotApplicable in constructor");
+                    }
+                }
+            } else {
+                // TODO: scope specifier should probably be stored in a field `cpp_full_name` of `CppFFiMethod`
+                let scope_specifier = if let Some(ref cpp_function) =
+                    method.kind.cpp_function().filter(|m| m.is_static_member())
+                {
+                    // static method
+                    format!("{}::", cpp_function.class_type().unwrap().to_cpp_code()?)
+                } else if let Some(ref field) = method.kind.cpp_field().filter(|f| f.is_static) {
+                    // static field
+                    format!("{}::", field.class_type.to_cpp_code()?)
+                } else {
+                    // regular member method/field or a free function
                     if let Some(arg) = method
                         .arguments
                         .iter()
-                        .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue)
+                        .find(|x| x.meaning == CppFfiArgumentMeaning::This)
                     {
-                        format!("new({}) {}", arg.name, class_type.to_cpp_code()?)
+                        format!("{}->", arg.name)
                     } else {
-                        unexpected!("return value argument not found\n{:?}", method);
+                        "".to_string()
                     }
-                }
-                ReturnValueAllocationPlace::Heap => format!("new {}", class_type.to_cpp_code()?),
-                ReturnValueAllocationPlace::NotApplicable => {
-                    unexpected!("NotApplicable in constructor");
-                }
-            }
-        } else {
-            // TODO: scope specifier should probably be stored in a field `cpp_full_name` of `CppFFiMethod`
-            let scope_specifier = if let Some(ref class_membership) = method
-                .kind
-                .cpp_function()
-                .and_then(|m| m.member.as_ref())
-                .and_then(|cm| if cm.is_static { Some(cm) } else { None })
-            {
-                // static method
-                format!("{}::", class_membership.class_type.to_cpp_code()?)
-            } else if let Some(ref field) =
-                method
-                    .kind
-                    .cpp_field()
-                    .and_then(|f| if f.is_static { Some(f) } else { None })
-            {
-                // static field
-                format!("{}::", field.class_type.to_cpp_code()?)
-            } else {
-                // regular member method/field or a free function
-                if let Some(arg) = method
-                    .arguments
-                    .iter()
-                    .find(|x| x.meaning == CppFfiArgumentMeaning::This)
-                {
-                    format!("{}->", arg.name)
-                } else {
-                    "".to_string()
-                }
-            };
-            let template_args = if let Some(cpp_method) = method.kind.cpp_function() {
-                match cpp_method.template_arguments {
-                    Some(ref args) => {
-                        let mut texts = Vec::new();
-                        for arg in args {
-                            texts.push(arg.to_cpp_code(None)?);
+                };
+                let template_args = if let Some(cpp_method) = method.kind.cpp_function() {
+                    match cpp_method.name.last().template_arguments {
+                        Some(ref args) => {
+                            let mut texts = Vec::new();
+                            for arg in args {
+                                texts.push(arg.to_cpp_code(None)?);
+                            }
+                            format!("<{}>", texts.join(", "))
                         }
-                        format!("<{}>", texts.join(", "))
+                        None => String::new(),
                     }
-                    None => String::new(),
+                } else {
+                    String::new()
+                };
+                match method.kind {
+                    CppFfiFunctionKind::FieldAccessor {
+                        ref accessor_type,
+                        ref field,
+                    } => {
+                        is_field_accessor = true;
+                        if accessor_type == &CppFieldAccessorType::Setter {
+                            format!(
+                                "{}{} = {}",
+                                scope_specifier,
+                                field.name,
+                                arguments_values(method)?
+                            )
+                        } else {
+                            format!("{}{}", scope_specifier, field.name)
+                        }
+                    }
+                    CppFfiFunctionKind::Function {
+                        ref cpp_function, ..
+                    } => format!("{}{}{}", scope_specifier, cpp_function.name, template_args),
                 }
-            } else {
-                String::new()
             };
-            match method.kind {
-                CppFfiFunctionKind::FieldAccessor {
-                    ref accessor_type,
-                    ref field,
-                } => {
-                    is_field_accessor = true;
-                    if accessor_type == &CppFieldAccessorType::Setter {
-                        format!(
-                            "{}{} = {}",
-                            scope_specifier,
-                            field.name,
-                            arguments_values(method)?
-                        )
-                    } else {
-                        format!("{}{}", scope_specifier, field.name)
-                    }
-                }
-                CppFfiFunctionKind::Function {
-                    ref cpp_function, ..
-                } => format!("{}{}{}", scope_specifier, cpp_function.name, template_args),
-            }
-        };
         if is_field_accessor {
             result_without_args
         } else {

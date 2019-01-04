@@ -12,7 +12,7 @@ use crate::cpp_function::{
 };
 use crate::cpp_operator::CppOperator;
 use crate::cpp_type::{
-    CppBuiltInNumericType, CppClassType, CppFunctionPointerType, CppSpecificNumericType,
+    CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
     CppSpecificNumericTypeKind, CppType,
 };
 use crate::database::CppItemData;
@@ -418,12 +418,9 @@ impl CppParser<'_, '_> {
                         }
                         let mut name = get_full_name(declaration)?;
                         let mut last_item = name.items.pop().expect("CppPath can't be empty");
-                        last_item.template_arguments = Some(arg_types.clone());
+                        last_item.template_arguments = Some(arg_types);
                         name.items.push(last_item);
-                        return Ok(CppType::Class(CppClassType {
-                            name,
-                            template_arguments: Some(arg_types),
-                        }));
+                        return Ok(CppType::Class(name));
                     } else {
                         bail!("Can't parse declaration of an unexposed type: {}", name);
                     }
@@ -523,10 +520,7 @@ impl CppParser<'_, '_> {
                     });
                 }
                 CppTypeDataKind::Class { .. } => {
-                    return Ok(CppType::Class(CppClassType {
-                        name: CppPath::from_str(&name)?,
-                        template_arguments: None,
-                    }));
+                    return Ok(CppType::Class(CppPath::from_str(&name)?));
                 }
             }
         }
@@ -559,13 +553,10 @@ impl CppParser<'_, '_> {
                     }
                 }
                 let mut last_part = class_name.items.pop().expect("CppPath can't be empty");
-                last_part.template_arguments = Some(arg_types.clone());
+                last_part.template_arguments = Some(arg_types);
                 println!("pushing1 {:?}", last_part);
                 class_name.items.push(last_part);
-                return Ok(CppType::Class(CppClassType {
-                    name: class_name,
-                    template_arguments: Some(arg_types),
-                }));
+                return Ok(CppType::Class(class_name));
             }
         } else {
             bail!("Can't parse declaration of an unexposed type: {}", name);
@@ -693,14 +684,11 @@ impl CppParser<'_, '_> {
                         .items
                         .pop()
                         .expect("CppPath can't be empty");
-                    last_part.template_arguments = template_arguments.clone();
+                    last_part.template_arguments = template_arguments;
                     println!("pushing2 {:?}", last_part);
                     declaration_name.items.push(last_part);
 
-                    Ok(CppType::Class(CppClassType {
-                        name: declaration_name,
-                        template_arguments,
-                    }))
+                    Ok(CppType::Class(declaration_name))
                 } else {
                     bail!("failed to get class declaration: {:?}", type1);
                 }
@@ -786,38 +774,24 @@ impl CppParser<'_, '_> {
                     if let Ok(parsed_unexposed) =
                         self.parse_unexposed_type(Some(type1), None, context_class, context_method)
                     {
-                        if let CppType::Class(CppClassType {
-                            ref template_arguments,
-                            ..
-                        }) = parsed_unexposed
-                        {
-                            if let Some(ref template_arguments) = *template_arguments {
-                                let template_arguments_unexposed = template_arguments;
+                        if let CppType::Class(path) = parsed_unexposed {
+                            if let Some(ref template_arguments_unexposed) =
+                                path.last().template_arguments
+                            {
                                 if template_arguments_unexposed.iter().any(|x| match x {
                                     CppType::SpecificNumeric { .. }
                                     | CppType::PointerSizedInteger { .. } => true,
                                     _ => false,
                                 }) {
                                     if let Ok(ref mut parsed_canonical) = parsed_canonical {
-                                        if let CppType::Class(CppClassType {
-                                            ref mut template_arguments,
-                                            ref mut name,
-                                        }) = parsed_canonical
-                                        {
-                                            if let Some(ref mut template_arguments) =
-                                                *template_arguments
-                                            {
-                                                *template_arguments =
-                                                    template_arguments_unexposed.clone();
-
-                                                let mut last_item = name
-                                                    .items
-                                                    .pop()
-                                                    .expect("CppPath can't be empty");
+                                        if let CppType::Class(ref mut path) = parsed_canonical {
+                                            let mut last_item =
+                                                path.items.pop().expect("CppPath can't be empty");
+                                            if last_item.template_arguments.is_some() {
                                                 last_item.template_arguments =
                                                     Some(template_arguments_unexposed.clone());
-                                                name.items.push(last_item);
                                             }
+                                            path.items.push(last_item);
                                         }
                                     }
                                 }
@@ -959,19 +933,7 @@ impl CppParser<'_, '_> {
         } else {
             bail!("failed to get function arguments: {:?}", entity);
         };
-        let template_arguments = match entity.get_kind() {
-            EntityKind::FunctionTemplate => {
-                if entity
-                    .get_children()
-                    .into_iter()
-                    .any(|c| c.get_kind() == EntityKind::NonTypeTemplateParameter)
-                {
-                    bail!("Non-type template parameter is not supported");
-                }
-                get_template_arguments(entity)
-            }
-            _ => None,
-        };
+
         let mut is_signal = false;
         for (argument_number, argument_entity) in argument_entities.into_iter().enumerate() {
             let name = argument_entity
@@ -1023,6 +985,9 @@ impl CppParser<'_, '_> {
                 has_default_value,
             });
         }
+
+        let mut name_with_namespace = get_full_name(entity)?;
+
         let mut name = entity
             .get_name()
             .ok_or_else(|| err_msg("failed to get function name"))?;
@@ -1040,7 +1005,22 @@ impl CppParser<'_, '_> {
             }
         }
 
-        let name_with_namespace = get_full_name(entity)?;
+        let template_arguments = match entity.get_kind() {
+            EntityKind::FunctionTemplate => {
+                if entity
+                    .get_children()
+                    .into_iter()
+                    .any(|c| c.get_kind() == EntityKind::NonTypeTemplateParameter)
+                {
+                    bail!("Non-type template parameter is not supported");
+                }
+                get_template_arguments(entity)
+            }
+            _ => None,
+        };
+
+        name_with_namespace.last_mut().name = name.clone();
+        name_with_namespace.last_mut().template_arguments = template_arguments;
 
         let allows_variadic_arguments = entity.is_variadic();
         let has_this_argument = class_name.is_some() && !entity.is_static_method();
@@ -1158,41 +1138,35 @@ impl CppParser<'_, '_> {
             CppFunction {
                 name: name_with_namespace,
                 operator: method_operator,
-                member: match class_name {
-                    Some(class_name) => {
-                        Some(CppFunctionMemberData {
-                            kind: match entity.get_kind() {
-                                EntityKind::Constructor => CppFunctionKind::Constructor,
-                                EntityKind::Destructor => CppFunctionKind::Destructor,
-                                _ => CppFunctionKind::Regular,
-                            },
-                            is_virtual: entity.is_virtual_method(),
-                            is_pure_virtual: entity.is_pure_virtual_method(),
-                            is_const: entity.is_const_method(),
-                            is_static: entity.is_static_method(),
-                            visibility: match entity
-                                .get_accessibility()
-                                .unwrap_or(Accessibility::Public)
-                            {
-                                Accessibility::Public => CppVisibility::Public,
-                                Accessibility::Protected => CppVisibility::Protected,
-                                Accessibility::Private => CppVisibility::Private,
-                            },
-                            // not all signals are detected here! see CppData::detect_signals_and_slots
-                            is_signal,
-                            is_slot: false,
-                            class_type: CppClassType {
-                                name: class_name,
-                                template_arguments: get_template_arguments(class_entity.unwrap()),
-                            },
-                        })
-                    }
-                    None => None,
+                member: if class_name.is_some() {
+                    Some(CppFunctionMemberData {
+                        kind: match entity.get_kind() {
+                            EntityKind::Constructor => CppFunctionKind::Constructor,
+                            EntityKind::Destructor => CppFunctionKind::Destructor,
+                            _ => CppFunctionKind::Regular,
+                        },
+                        is_virtual: entity.is_virtual_method(),
+                        is_pure_virtual: entity.is_pure_virtual_method(),
+                        is_const: entity.is_const_method(),
+                        is_static: entity.is_static_method(),
+                        visibility: match entity
+                            .get_accessibility()
+                            .unwrap_or(Accessibility::Public)
+                        {
+                            Accessibility::Public => CppVisibility::Public,
+                            Accessibility::Protected => CppVisibility::Protected,
+                            Accessibility::Private => CppVisibility::Private,
+                        },
+                        // not all signals are detected here! see CppData::detect_signals_and_slots
+                        is_signal,
+                        is_slot: false,
+                    })
+                } else {
+                    None
                 },
                 arguments,
                 allows_variadic_arguments,
                 return_type: return_type_parsed,
-                template_arguments,
                 declaration_code,
                 doc: None,
             },
@@ -1251,7 +1225,7 @@ impl CppParser<'_, '_> {
     }
 
     /// Parses a class field `entity`.
-    fn parse_class_field(&mut self, entity: Entity, class_type: CppClassType) -> Result<()> {
+    fn parse_class_field(&mut self, entity: Entity, class_type: CppPath) -> Result<()> {
         let include_file = self.entity_include_file(entity).with_context(|_| {
             format!(
                 "Origin of class field is unknown: {}; entity: {:?}",
@@ -1344,14 +1318,10 @@ impl CppParser<'_, '_> {
                 bail!("Types nested into template types are not supported");
             }
         }
-        let class_type_for_field = CppClassType {
-            name: full_name.clone(),
-            template_arguments: template_arguments.clone(),
-        };
         let mut current_base_index = 0;
         for child in entity.get_children() {
             if child.get_kind() == EntityKind::FieldDecl {
-                if let Err(err) = self.parse_class_field(child, class_type_for_field.clone()) {
+                if let Err(err) = self.parse_class_field(child, full_name.clone()) {
                     self.data.html_logger.add(
                         &[
                             entity_log_representation(child),
@@ -1383,7 +1353,7 @@ impl CppParser<'_, '_> {
                                 Accessibility::Private => CppVisibility::Private,
                             },
                             base_index: current_base_index,
-                            derived_class_type: class_type_for_field.clone(),
+                            derived_class_type: full_name.clone(),
                         }),
                     );
                     current_base_index += 1;
@@ -1401,12 +1371,7 @@ impl CppParser<'_, '_> {
                 origin_location: get_origin_location(entity).unwrap(),
             },
             CppItemData::Type(CppTypeData {
-                kind: CppTypeDataKind::Class {
-                    class_type: CppClassType {
-                        name: full_name.clone(),
-                        template_arguments,
-                    },
-                },
+                kind: CppTypeDataKind::Class,
                 name: full_name,
                 doc: None,
                 is_movable: false,
@@ -1566,12 +1531,8 @@ impl CppParser<'_, '_> {
                     if let Ok(parent_type) =
                         self.parse_unexposed_type(None, Some(name.clone()), None, None)
                     {
-                        if let CppType::Class(CppClassType {
-                            ref template_arguments,
-                            ..
-                        }) = parent_type
-                        {
-                            if let Some(ref template_arguments) = *template_arguments {
+                        if let CppType::Class(path) = parent_type {
+                            if let Some(ref template_arguments) = path.last().template_arguments {
                                 if template_arguments
                                     .iter()
                                     .any(|x| !x.is_template_parameter())

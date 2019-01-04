@@ -2,7 +2,7 @@ use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;
 use crate::cpp_ffi_data::CppTypeConversionToFfi;
 use crate::cpp_type::{
-    CppBuiltInNumericType, CppClassType, CppFunctionPointerType, CppSpecificNumericType,
+    CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
     CppSpecificNumericTypeKind, CppType, CppTypeRole,
 };
 
@@ -117,10 +117,7 @@ fn enum1() {
 
 #[test]
 fn class_value() {
-    let type1 = CppType::Class(CppClassType {
-        name: CppPath::from_str_unchecked("QPoint"),
-        template_arguments: None,
-    });
+    let type1 = CppType::Class(CppPath::from_str_unchecked("QPoint"));
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), true);
     assert_eq!(type1.is_template_parameter(), false);
@@ -131,13 +128,7 @@ fn class_value() {
     assert_eq!(&ffi_return_type.original_type, &type1);
     assert_eq!(
         &ffi_return_type.ffi_type,
-        &CppType::new_pointer(
-            false,
-            CppType::Class(CppClassType {
-                name: CppPath::from_str_unchecked("QPoint"),
-                template_arguments: None,
-            })
-        ),
+        &CppType::new_pointer(false, CppType::Class(CppPath::from_str_unchecked("QPoint"))),
     );
     assert_eq!(
         &ffi_return_type.ffi_type.to_cpp_code(None).unwrap(),
@@ -152,13 +143,7 @@ fn class_value() {
     assert_eq!(&ffi_arg.original_type, &type1);
     assert_eq!(
         &ffi_arg.ffi_type,
-        &CppType::new_pointer(
-            true,
-            CppType::Class(CppClassType {
-                name: CppPath::from_str_unchecked("QPoint"),
-                template_arguments: None,
-            })
-        )
+        &CppType::new_pointer(true, CppType::Class(CppPath::from_str_unchecked("QPoint")))
     );
     assert_eq!(
         &ffi_arg.ffi_type.to_cpp_code(None).unwrap(),
@@ -169,13 +154,7 @@ fn class_value() {
 
 #[test]
 fn class_const_ref() {
-    let type1 = CppType::new_reference(
-        true,
-        CppType::Class(CppClassType {
-            name: CppPath::from_str_unchecked("QRectF"),
-            template_arguments: None,
-        }),
-    );
+    let type1 = CppType::new_reference(true, CppType::Class(CppPath::from_str_unchecked("QRectF")));
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), false);
     assert_eq!(type1.is_template_parameter(), false);
@@ -187,13 +166,7 @@ fn class_const_ref() {
         assert_eq!(&ffi1.original_type, &type1);
         assert_eq!(
             &ffi1.ffi_type,
-            &CppType::new_pointer(
-                true,
-                CppType::Class(CppClassType {
-                    name: CppPath::from_str_unchecked("QRectF"),
-                    template_arguments: None,
-                })
-            )
+            &CppType::new_pointer(true, CppType::Class(CppPath::from_str_unchecked("QRectF")))
         );
         assert_eq!(&ffi1.ffi_type.to_cpp_code(None).unwrap(), "const QRectF*");
         assert_eq!(ffi1.conversion, CppTypeConversionToFfi::ReferenceToPointer);
@@ -202,13 +175,8 @@ fn class_const_ref() {
 
 #[test]
 fn class_mut_ref() {
-    let type1 = CppType::new_reference(
-        false,
-        CppType::Class(CppClassType {
-            name: CppPath::from_str_unchecked("QRectF"),
-            template_arguments: None,
-        }),
-    );
+    let type1 =
+        CppType::new_reference(false, CppType::Class(CppPath::from_str_unchecked("QRectF")));
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), false);
     assert_eq!(type1.is_template_parameter(), false);
@@ -220,13 +188,7 @@ fn class_mut_ref() {
         assert_eq!(&ffi1.original_type, &type1);
         assert_eq!(
             &ffi1.ffi_type,
-            &CppType::new_pointer(
-                false,
-                CppType::Class(CppClassType {
-                    name: CppPath::from_str_unchecked("QRectF"),
-                    template_arguments: None,
-                })
-            )
+            &CppType::new_pointer(false, CppType::Class(CppPath::from_str_unchecked("QRectF")))
         );
         assert_eq!(&ffi1.ffi_type.to_cpp_code(None).unwrap(), "QRectF*");
         assert_eq!(ffi1.conversion, CppTypeConversionToFfi::ReferenceToPointer);
@@ -237,10 +199,7 @@ fn class_mut_ref() {
 fn class_mut_ptr() {
     let type1 = CppType::new_pointer(
         false,
-        CppType::Class(CppClassType {
-            name: CppPath::from_str_unchecked("QObject"),
-            template_arguments: None,
-        }),
+        CppType::Class(CppPath::from_str_unchecked("QObject")),
     );
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), false);
@@ -252,17 +211,11 @@ fn class_mut_ptr() {
 
 #[test]
 fn class_with_template_args() {
-    let args = Some(vec![CppType::Class(CppClassType {
-        name: CppPath::from_str_unchecked("QString"),
-        template_arguments: None,
-    })]);
-    let type1 = CppType::Class(CppClassType {
-        name: CppPath::from_item(CppPathItem {
-            name: "QVector".into(),
-            template_arguments: args.clone(),
-        }),
+    let args = Some(vec![CppType::Class(CppPath::from_str_unchecked("QString"))]);
+    let type1 = CppType::Class(CppPath::from_item(CppPathItem {
+        name: "QVector".into(),
         template_arguments: args.clone(),
-    });
+    }));
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), true);
     assert_eq!(type1.is_template_parameter(), false);
@@ -275,13 +228,10 @@ fn class_with_template_args() {
         &ffi_return_type.ffi_type,
         &CppType::new_pointer(
             false,
-            CppType::Class(CppClassType {
-                name: CppPath::from_item(CppPathItem {
-                    name: "QVector".into(),
-                    template_arguments: args.clone()
-                }),
-                template_arguments: args.clone(),
-            })
+            CppType::Class(CppPath::from_item(CppPathItem {
+                name: "QVector".into(),
+                template_arguments: args.clone()
+            }))
         ),
     );
     assert_eq!(
@@ -299,13 +249,10 @@ fn class_with_template_args() {
         &ffi_arg.ffi_type,
         &CppType::new_pointer(
             true,
-            CppType::Class(CppClassType {
-                name: CppPath::from_item(CppPathItem {
-                    name: "QVector".into(),
-                    template_arguments: args.clone()
-                }),
-                template_arguments: args.clone(),
-            })
+            CppType::Class(CppPath::from_item(CppPathItem {
+                name: "QVector".into(),
+                template_arguments: args.clone()
+            }))
         )
     );
     assert_eq!(
@@ -317,30 +264,18 @@ fn class_with_template_args() {
 
 #[test]
 fn nested_template_cpp_code() {
-    let qlist_args = Some(vec![CppType::Class(CppClassType {
-        name: CppPath::from_str_unchecked("QString"),
-        template_arguments: None,
-    })]);
+    let qlist_args = Some(vec![CppType::Class(CppPath::from_str_unchecked("QString"))]);
     let qhash_args = Some(vec![
-        CppType::Class(CppClassType {
-            name: CppPath::from_str_unchecked("QString"),
-            template_arguments: None,
-        }),
-        CppType::Class(CppClassType {
-            name: CppPath::from_item(CppPathItem {
-                name: "QList".into(),
-                template_arguments: qlist_args.clone(),
-            }),
-            template_arguments: qlist_args,
-        }),
+        CppType::Class(CppPath::from_str_unchecked("QString")),
+        CppType::Class(CppPath::from_item(CppPathItem {
+            name: "QList".into(),
+            template_arguments: qlist_args.clone(),
+        })),
     ]);
-    let type1 = CppType::Class(CppClassType {
-        name: CppPath::from_item(CppPathItem {
-            name: "QHash".into(),
-            template_arguments: qhash_args.clone(),
-        }),
-        template_arguments: qhash_args,
-    });
+    let type1 = CppType::Class(CppPath::from_item(CppPathItem {
+        name: "QHash".into(),
+        template_arguments: qhash_args.clone(),
+    }));
     let code = type1.to_cpp_code(None).unwrap();
     assert_eq!(&code, "QHash< QString, QList< QString > >");
     assert!(!code.contains(">>"));
@@ -349,17 +284,13 @@ fn nested_template_cpp_code() {
 
 #[test]
 fn qflags() {
-    let args = Some(vec![CppType::Class(CppClassType {
-        name: CppPath::from_str_unchecked("Qt::AlignmentFlag"),
-        template_arguments: None,
-    })]);
-    let type1 = CppType::Class(CppClassType {
-        name: CppPath::from_item(CppPathItem {
-            name: "QFlags".into(),
-            template_arguments: args.clone(),
-        }),
+    let args = Some(vec![CppType::Class(CppPath::from_str_unchecked(
+        "Qt::AlignmentFlag",
+    ))]);
+    let type1 = CppType::Class(CppPath::from_item(CppPathItem {
+        name: "QFlags".into(),
         template_arguments: args.clone(),
-    });
+    }));
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), true);
     assert_eq!(type1.is_template_parameter(), false);

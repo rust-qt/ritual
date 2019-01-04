@@ -5,7 +5,6 @@ use crate::cpp_data::CppTemplateInstantiation;
 use crate::cpp_function::CppFunction;
 use crate::cpp_function::CppFunctionArgument;
 use crate::cpp_function::CppOperator;
-use crate::cpp_type::CppClassType;
 use crate::cpp_type::CppType;
 use crate::database::CppItemData;
 use crate::database::DatabaseItemSource;
@@ -14,18 +13,15 @@ use crate::processor::ProcessorData;
 
 /// Returns true if `type1` is a known template instantiation.
 fn check_template_type(data: &ProcessorData, type1: &CppType) -> Result<()> {
-    if let CppType::Class(CppClassType {
-        ref name,
-        ref template_arguments,
-    }) = type1
-    {
-        if let Some(ref template_arguments) = *template_arguments {
+    if let CppType::Class(ref path) = type1 {
+        if let Some(ref template_arguments) = path.last().template_arguments {
             let is_available = data
                 .all_items()
                 .iter()
                 .filter_map(|i| i.cpp_data.as_template_instantiation_ref())
                 .any(|inst| {
-                    &inst.class_name == name && &inst.template_arguments == template_arguments
+                    // TODO: fix after CppPath refactoring
+                    &inst.class_name == path && &inst.template_arguments == template_arguments
                 });
             if !is_available {
                 bail!("type not available: {:?}", type1);
@@ -51,26 +47,7 @@ fn apply_instantiation_to_method(
         format!("instantiation: {:?}", template_instantiation)
     });
     let mut new_method = method.clone();
-    if let Some(ref args) = method.template_arguments {
-        let matches = args.iter().enumerate().all(|(index1, arg)| {
-            if let CppType::TemplateParameter {
-                nested_level,
-                index,
-                ..
-            } = arg
-            {
-                nested_level1 == *nested_level && index1 == *index
-            } else {
-                false
-            }
-        });
-        if matches {
-            if args.len() != template_instantiation.template_arguments.len() {
-                bail!("template arguments count mismatch");
-            }
-            new_method.template_arguments = Some(template_instantiation.template_arguments.clone());
-        }
-    }
+
     new_method.arguments.clear();
     for arg in &method.arguments {
         new_method.arguments.push(CppFunctionArgument {
@@ -84,11 +61,10 @@ fn apply_instantiation_to_method(
     new_method.return_type = method
         .return_type
         .instantiate(nested_level1, &template_instantiation.template_arguments)?;
-    if let Some(ref mut info) = new_method.member {
-        info.class_type = info
-            .class_type
-            .instantiate(nested_level1, &template_instantiation.template_arguments)?;
-    }
+
+    new_method.name = new_method
+        .name
+        .instantiate(nested_level1, &template_instantiation.template_arguments)?;
     let mut conversion_type = None;
     if let Some(ref mut operator) = new_method.operator {
         if let CppOperator::Conversion(ref mut cpp_type) = *operator {
@@ -144,10 +120,7 @@ fn instantiate_templates(data: &mut ProcessorData) -> Result<()> {
         .filter_map(|item| item.cpp_data.as_function_ref())
     {
         for type1 in method.all_involved_types() {
-            let CppClassType {
-                ref name,
-                ref template_arguments,
-            } = match type1 {
+            let path = match type1 {
                 CppType::Class(ref class_type) => class_type,
                 CppType::PointerLike { ref target, .. } => match **target {
                     CppType::Class(ref class_type) => class_type,
@@ -155,7 +128,7 @@ fn instantiate_templates(data: &mut ProcessorData) -> Result<()> {
                 },
                 _ => continue,
             };
-            if let Some(ref template_arguments) = *template_arguments {
+            if let Some(ref template_arguments) = path.last().template_arguments {
                 assert!(!template_arguments.is_empty());
                 if template_arguments.iter().all(|x| x.is_template_parameter()) {
                     for template_instantiation in data
@@ -164,7 +137,8 @@ fn instantiate_templates(data: &mut ProcessorData) -> Result<()> {
                         .iter()
                         .filter_map(|item| item.cpp_data.as_template_instantiation_ref())
                     {
-                        if &template_instantiation.class_name == name {
+                        if &template_instantiation.class_name == path {
+                            // TODO: ignore last template args?
                             let nested_level =
                                 if let CppType::TemplateParameter { nested_level, .. } =
                                     template_arguments[0]
@@ -250,11 +224,8 @@ fn find_template_instantiations(data: &mut ProcessorData) -> Result<()> {
         result: &mut Vec<CppTemplateInstantiation>,
     ) {
         match type1 {
-            CppType::Class(CppClassType {
-                ref name,
-                ref template_arguments,
-            }) => {
-                if let Some(ref template_arguments) = *template_arguments {
+            CppType::Class(ref path) => {
+                if let Some(ref template_arguments) = path.last().template_arguments {
                     if !template_arguments
                         .iter()
                         .any(|x| x.is_or_contains_template_parameter())
@@ -264,21 +235,20 @@ fn find_template_instantiations(data: &mut ProcessorData) -> Result<()> {
                             .iter()
                             .filter_map(|item| item.cpp_data.as_template_instantiation_ref())
                             .any(|i| {
-                                &i.class_name == name && &i.template_arguments == template_arguments
+                                // TODO: ignore last template args?
+                                &i.class_name == path && &i.template_arguments == template_arguments
                             });
                         if !is_in_database {
                             let is_in_result = result.iter().any(|x| {
-                                &x.class_name == name && &x.template_arguments == template_arguments
+                                // TODO: ignore last template args?
+                                &x.class_name == path && &x.template_arguments == template_arguments
                             });
                             if !is_in_result {
                                 log::llog(log::DebugParser, || {
-                                    format!(
-                                        "Found template instantiation: {}<{:?}>",
-                                        name, template_arguments
-                                    )
+                                    format!("Found template instantiation: {}", path)
                                 });
                                 result.push(CppTemplateInstantiation {
-                                    class_name: name.clone(),
+                                    class_name: path.clone(),
                                     template_arguments: template_arguments.clone(),
                                 });
                             }

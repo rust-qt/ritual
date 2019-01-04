@@ -1,7 +1,6 @@
 use crate::common::errors::Result;
 use crate::common::log;
 use crate::cpp_data::CppPath;
-use crate::cpp_type::CppClassType;
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
 use crate::processor::ProcessingStep;
@@ -35,19 +34,16 @@ fn choose_allocation_places(data: &mut ProcessorData) -> Result<()> {
         data: &mut HashMap<CppPath, TypeStats>,
     ) {
         match cpp_type {
-            CppType::Class(CppClassType {
-                ref name,
-                ref template_arguments,
-            }) => {
-                if !data.contains_key(name) {
-                    data.insert(name.clone(), TypeStats::default());
+            CppType::Class(path) => {
+                if !data.contains_key(path) {
+                    data.insert(path.clone(), TypeStats::default());
                 }
                 if is_behind_pointer {
-                    data.get_mut(name).unwrap().pointers_count += 1;
+                    data.get_mut(path).unwrap().pointers_count += 1;
                 } else {
-                    data.get_mut(name).unwrap().not_pointers_count += 1;
+                    data.get_mut(path).unwrap().not_pointers_count += 1;
                 }
-                if let Some(ref args) = *template_arguments {
+                if let Some(ref args) = path.last().template_arguments {
                     for arg in args {
                         check_type(arg, false, data);
                     }
@@ -76,7 +72,7 @@ fn choose_allocation_places(data: &mut ProcessorData) -> Result<()> {
             .items
             .iter()
             .filter_map(|i| i.cpp_data.as_function_ref())
-            .any(|m| m.class_name() == Some(&type1.name) && m.is_virtual())
+            .any(|m| m.class_type().as_ref() == Some(&type1.name) && m.is_virtual())
         {
             if !data_map.contains_key(&type1.name) {
                 data_map.insert(type1.name.clone(), TypeStats::default());
