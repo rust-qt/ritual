@@ -8,12 +8,12 @@
 use crate::lib_configs::make_config;
 use cpp_to_rust_generator::common::errors::{err_msg, FancyUnwrap, Result};
 use cpp_to_rust_generator::common::file_utils::canonicalize;
-use cpp_to_rust_generator::common::log;
+use cpp_to_rust_generator::common::file_utils::path_to_str;
 use cpp_to_rust_generator::processor;
 use cpp_to_rust_generator::workspace::Workspace;
+use log::{error, info};
 use qt_generator_common::all_crate_names;
 use std::path::PathBuf;
-
 mod detect_signal_argument_types;
 mod detect_signals_and_slots;
 mod doc_decoder;
@@ -21,6 +21,7 @@ mod doc_parser;
 mod fix_header_names;
 mod lib_configs;
 mod versions;
+use flexi_logger::{Duplicate, LevelFilter, LogSpecification, Logger};
 
 fn run(matches: &clap::ArgMatches) -> Result<()> {
     let workspace_path = canonicalize(&PathBuf::from(
@@ -29,9 +30,16 @@ fn run(matches: &clap::ArgMatches) -> Result<()> {
             .ok_or_else(|| err_msg("clap arg missing"))?,
     ))?;
 
-    log::status(format!("Workspace: {}", workspace_path.display()));
+    info!("Workspace: {}", workspace_path.display());
     let mut workspace = Workspace::new(workspace_path)?;
-    workspace.set_disable_logging(matches.is_present("disable-logging"))?;
+
+    Logger::with(LogSpecification::default(LevelFilter::Trace).build())
+        .log_to_file()
+        .directory(path_to_str(&workspace.log_path()?)?)
+        .print_message()
+        .duplicate_to_stderr(Duplicate::Info)
+        .start()
+        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
 
     if let Some(value) = matches.value_of("local-paths") {
         workspace.set_write_dependencies_local_paths(value == "1")?;
@@ -57,7 +65,7 @@ fn run(matches: &clap::ArgMatches) -> Result<()> {
         .collect();
 
     if operations.is_empty() {
-        log::error("No action requested. Run \"qt_generator --help\".");
+        error!("No action requested. Run \"qt_generator --help\".");
         return Ok(());
     }
 
@@ -69,9 +77,9 @@ fn run(matches: &clap::ArgMatches) -> Result<()> {
 
     //workspace.save_data()?;
     if was_any_action {
-        log::status("qt_generator finished");
+        info!("qt_generator finished");
     } else {
-        log::error("No action requested. Run \"qt_generator --help\".");
+        error!("No action requested. Run \"qt_generator --help\".");
     }
     Ok(())
 }
@@ -84,7 +92,7 @@ pub fn main() {
                               See https://github.com/rust-qt/cpp_to_rust for more details.";
     const WORKSPACE_DIR_HELP: &str = "Directory for output and temporary files";
     const OPERATIONS_HELP: &str = "Operations to perform";
-    const DISABLE_LOGGING_HELP: &str = "Disable creating log files";
+    //const DISABLE_LOGGING_HELP: &str = "Disable creating log files";
 
     let crates_help = format!(
         "Process libraries (Qt modules). Specify \"all\" \
@@ -126,11 +134,11 @@ pub fn main() {
                 .required(true)
                 .use_delimiter(false),
         )
-        .arg(
-            Arg::with_name("disable-logging")
-                .long("disable-logging")
-                .help(DISABLE_LOGGING_HELP),
-        )
+        //        .arg(
+        //            Arg::with_name("disable-logging")
+        //                .long("disable-logging")
+        //                .help(DISABLE_LOGGING_HELP),
+        //        )
         .arg(
             Arg::with_name("local-paths")
                 .long("local-paths")

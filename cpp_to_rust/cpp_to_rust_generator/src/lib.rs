@@ -18,7 +18,6 @@ pub mod cpp_function;
 mod cpp_operator;
 pub mod cpp_type;
 pub mod database;
-pub mod html_logger;
 pub mod processor;
 pub mod workspace;
 

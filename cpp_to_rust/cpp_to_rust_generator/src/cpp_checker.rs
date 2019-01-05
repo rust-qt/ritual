@@ -3,21 +3,15 @@ use crate::common::cpp_lib_builder::{
 };
 use crate::common::errors::{bail, Result};
 use crate::common::file_utils::{create_dir_all, create_file, path_to_str, remove_dir_all};
-use crate::common::log;
 use crate::common::target::current_target;
 use crate::common::utils::MapIfOk;
-
-use crate::database::CppCheckerAddResult;
-use crate::database::CppCheckerInfo;
-
-use crate::database::CppCheckerEnv;
-
-use crate::processor::ProcessingStep;
-use crate::processor::ProcessorData;
-
 use crate::cpp_code_generator;
 use crate::cpp_ffi_data::CppFfiItem;
-use crate::html_logger::escape_html;
+use crate::database::CppCheckerAddResult;
+use crate::database::CppCheckerEnv;
+use crate::processor::ProcessingStep;
+use crate::processor::ProcessorData;
+use log::{debug, info};
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -97,7 +91,6 @@ impl CppChecker<'_, '_> {
                 .push(self.env.clone());
         }
 
-        self.data.html_logger.add_header(&["Item", "Status"])?;
         self.run_tests()?;
 
         let total_count = self.data.current_database.items.len();
@@ -105,7 +98,7 @@ impl CppChecker<'_, '_> {
             if let Some(ref mut ffi_items) = item.ffi_items {
                 for ffi_item in ffi_items {
                     if let Ok(snippet) = snippet_for_item(&ffi_item.cpp_item) {
-                        log::status(format!("Checking item {} / {}", index + 1, total_count));
+                        info!("Checking item {} / {}", index + 1, total_count);
 
                         let error_data =
                             match check_snippet(&self.main_cpp_path, &self.builder, &snippet)? {
@@ -114,28 +107,19 @@ impl CppChecker<'_, '_> {
                                     Some(format!("build failed: {}", output.stderr))
                                 }
                             };
-                        let error_data_text = CppCheckerInfo::error_to_log(&error_data);
-                        let r = ffi_item.checks.add(&self.env, error_data);
+                        let r = ffi_item.checks.add(&self.env, error_data.clone());
                         let change_text = match r {
                             CppCheckerAddResult::Added => "Added".to_string(),
                             CppCheckerAddResult::Unchanged => "Unchanged".to_string(),
-                            CppCheckerAddResult::Changed { ref old } => format!(
-                                "Changed! Old data for the same env: {}",
-                                CppCheckerInfo::error_to_log(old)
-                            ),
+                            CppCheckerAddResult::Changed { ref old } => {
+                                format!("Changed! Old data for the same env: {:?}", old)
+                            }
                         };
 
-                        self.data.html_logger.add(
-                            &[
-                                format!(
-                                    "{}<br><pre>{}</pre>",
-                                    escape_html(&format!("{:?}", ffi_item)),
-                                    escape_html(&snippet.code)
-                                ),
-                                format!("{}<br>{}", error_data_text, change_text),
-                            ],
-                            "cpp_checker_update",
-                        )?;
+                        debug!(
+                            "[cpp_checker_update] ffi_item = {:?}; snippet = {:?}; error = {:?}; {}",
+                            ffi_item, snippet.code, error_data, change_text
+                        );
                     }
                 }
             }
@@ -189,7 +173,7 @@ impl CppChecker<'_, '_> {
     }
 
     fn check_preliminary_test(&self, name: &str, snippet: &Snippet, expected: bool) -> Result<()> {
-        log::status(format!("Running preliminary test: {}", name));
+        info!("Running preliminary test: {}", name);
         match self.check_snippet(snippet)? {
             CppLibBuilderOutput::Success => {
                 if !expected {

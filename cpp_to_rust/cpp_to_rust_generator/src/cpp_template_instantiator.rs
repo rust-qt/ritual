@@ -1,5 +1,4 @@
 use crate::common::errors::{bail, Result};
-use crate::common::log;
 use crate::cpp_data::CppPathItem;
 use crate::cpp_data::CppTemplateInstantiation;
 use crate::cpp_function::CppFunction;
@@ -10,6 +9,7 @@ use crate::database::CppItemData;
 use crate::database::DatabaseItemSource;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
+use log::trace;
 
 /// Returns true if `type1` is a known template instantiation.
 fn check_template_type(data: &ProcessorData, type1: &CppType) -> Result<()> {
@@ -43,9 +43,10 @@ fn apply_instantiation_to_method(
     nested_level1: usize,
     template_instantiation: &CppTemplateInstantiation,
 ) -> Result<CppFunction> {
-    log::llog(log::DebugTemplateInstantiation, || {
-        format!("instantiation: {:?}", template_instantiation)
-    });
+    trace!(
+        "[DebugTemplateInstantiation] instantiation: {:?}",
+        template_instantiation
+    );
     let mut new_method = method.clone();
 
     new_method.arguments.clear();
@@ -94,9 +95,10 @@ fn apply_instantiation_to_method(
                     conversion_type.to_cpp_code(None)?
                 )));
         }
-        log::llog(log::DebugTemplateInstantiation, || {
-            format!("success: {}", new_method.short_text())
-        });
+        trace!(
+            "[DebugTemplateInstantiation] success: {}",
+            new_method.short_text()
+        );
         Ok(new_method)
     }
 }
@@ -112,7 +114,6 @@ pub fn instantiate_templates_step() -> ProcessingStep {
 /// Generates methods as template instantiations of
 /// methods of existing template classes and existing template methods.
 fn instantiate_templates(data: &mut ProcessorData) -> Result<()> {
-    log::status("Instantiating templates");
     let mut new_methods = Vec::new();
     for method in data
         .all_items()
@@ -147,16 +148,14 @@ fn instantiate_templates(data: &mut ProcessorData) -> Result<()> {
                                 } else {
                                     bail!("only template parameters can be here");
                                 };
-                            log::llog(log::DebugTemplateInstantiation, || "");
-                            log::llog(log::DebugTemplateInstantiation, || {
-                                format!("method: {}", method.short_text())
-                            });
-                            log::llog(log::DebugTemplateInstantiation, || {
-                                format!(
-                                    "found template instantiation: {:?}",
-                                    template_instantiation
-                                )
-                            });
+                            trace!(
+                                "[DebugTemplateInstantiation] method: {}",
+                                method.short_text()
+                            );
+                            trace!(
+                                "[DebugTemplateInstantiation] found template instantiation: {:?}",
+                                template_instantiation
+                            );
                             match apply_instantiation_to_method(
                                 method,
                                 nested_level,
@@ -169,15 +168,10 @@ fn instantiate_templates(data: &mut ProcessorData) -> Result<()> {
                                             Ok(_) => {}
                                             Err(msg) => {
                                                 ok = false;
-                                                log::llog(log::DebugTemplateInstantiation, || {
-                                                    format!(
-                                                        "method is not accepted: {}",
+                                                trace!("[DebugTemplateInstantiation] method is not accepted: {}",
                                                         method.short_text()
-                                                    )
-                                                });
-                                                log::llog(log::DebugTemplateInstantiation, || {
-                                                    format!("  {}", msg)
-                                                });
+                                                    );
+                                                trace!("[DebugTemplateInstantiation]   {}", msg);
                                             }
                                         }
                                     }
@@ -186,9 +180,7 @@ fn instantiate_templates(data: &mut ProcessorData) -> Result<()> {
                                     }
                                     break;
                                 }
-                                Err(msg) => log::llog(log::DebugTemplateInstantiation, || {
-                                    format!("failed: {}", msg)
-                                }),
+                                Err(msg) => trace!("[DebugTemplateInstantiation] failed: {}", msg),
                             }
                             break;
                         }
@@ -244,9 +236,7 @@ fn find_template_instantiations(data: &mut ProcessorData) -> Result<()> {
                                 &x.class_name == path && &x.template_arguments == template_arguments
                             });
                             if !is_in_result {
-                                log::llog(log::DebugParser, || {
-                                    format!("Found template instantiation: {}", path)
-                                });
+                                trace!("Found template instantiation: {}", path);
                                 result.push(CppTemplateInstantiation {
                                     class_name: path.clone(),
                                     template_arguments: template_arguments.clone(),

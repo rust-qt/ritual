@@ -1,10 +1,10 @@
 use cpp_to_rust_generator::common::errors::{Result, ResultExt};
 use cpp_to_rust_generator::common::file_utils::open_file;
-use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::cpp_data::CppPath;
 use cpp_to_rust_generator::database::CppItemData;
 use cpp_to_rust_generator::database::DatabaseItemSource;
 use cpp_to_rust_generator::processor::ProcessorData;
+use log::trace;
 use regex::Regex;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -69,7 +69,6 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
     if files.is_empty() {
         return Ok(());
     }
-    log::status("Detecting signals and slots");
     let re_signals = Regex::new(r"(signals|Q_SIGNALS)\s*:")?;
     let re_slots = Regex::new(r"(slots|Q_SLOTS)\s*:")?;
     let re_other = Regex::new(r"(public|protected|private)\s*:")?;
@@ -140,22 +139,14 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
                         if !matching_sections.is_empty() {
                             let section = matching_sections[matching_sections.len() - 1];
                             section_type = section.section_type.clone();
-                            if log::is_on(log::DebugSignals) {
-                                match section.section_type {
-                                    SectionType::Signals => {
-                                        log::log(
-                                            log::DebugSignals,
-                                            format!("Found signal: {}", method.short_text()),
-                                        );
-                                    }
-                                    SectionType::Slots => {
-                                        log::log(
-                                            log::DebugSignals,
-                                            format!("Found slot: {}", method.short_text()),
-                                        );
-                                    }
-                                    SectionType::Other => {}
+                            match section.section_type {
+                                SectionType::Signals => {
+                                    trace!("[DebugSignals] Found signal: {}", method.short_text());
                                 }
+                                SectionType::Slots => {
+                                    trace!("[DebugSignals] Found slot: {}", method.short_text());
+                                }
+                                SectionType::Other => {}
                             }
                         }
                     }

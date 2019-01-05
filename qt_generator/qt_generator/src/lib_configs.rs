@@ -1,24 +1,24 @@
 //! Generator configurations specific for each Qt module.
 
+use crate::detect_signal_argument_types::detect_signal_argument_types;
+use crate::detect_signals_and_slots::detect_signals_and_slots;
+use crate::doc_parser::parse_docs;
+use crate::fix_header_names::fix_header_names;
+use crate::lib_configs;
 use crate::versions;
 use cpp_to_rust_generator::common::cpp_build_config::CppLibraryType;
 use cpp_to_rust_generator::common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
 use cpp_to_rust_generator::common::errors::{bail, Result, ResultExt};
 use cpp_to_rust_generator::common::file_utils::repo_crate_local_path;
 use cpp_to_rust_generator::common::target;
-use cpp_to_rust_generator::common::{log, toml};
+use cpp_to_rust_generator::common::toml;
 use cpp_to_rust_generator::config::Config;
-use qt_generator_common::{get_full_build_config, lib_dependencies, lib_folder_name};
-use std::path::PathBuf;
-
-use crate::detect_signal_argument_types::detect_signal_argument_types;
-use crate::detect_signals_and_slots::detect_signals_and_slots;
-use crate::doc_parser::parse_docs;
-use crate::fix_header_names::fix_header_names;
-use crate::lib_configs;
 use cpp_to_rust_generator::config::CrateProperties;
 use cpp_to_rust_generator::cpp_data::CppPath;
 use cpp_to_rust_generator::processor::ProcessingStep;
+use log::info;
+use qt_generator_common::{get_full_build_config, lib_dependencies, lib_folder_name};
+use std::path::PathBuf;
 
 /*
 /// Helper method to blacklist all methods of `QList<T>` template instantiation that
@@ -449,10 +449,7 @@ pub fn extras_3d(config: &mut Config) -> Result<()> {
 
 /// Executes the generator for a single Qt module with given configuration.
 pub fn make_config(crate_name: &str) -> Result<Config> {
-    log::status(format!(
-        "Preparing generator config for crate: {}",
-        crate_name
-    ));
+    info!("Preparing generator config for crate: {}", crate_name);
     let mut crate_properties = CrateProperties::new(crate_name, versions::QT_OUTPUT_CRATES_VERSION);
     let mut custom_fields = toml::value::Table::new();
     let mut package_data = toml::value::Table::new();

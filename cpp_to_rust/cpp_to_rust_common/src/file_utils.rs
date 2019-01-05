@@ -1,7 +1,7 @@
 //! Various utilities for working with files
 
 use crate::errors::{bail, err_msg, Result, ResultExt};
-use crate::log;
+use log::trace;
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io::BufRead;
@@ -21,9 +21,7 @@ pub fn move_files(src: &PathBuf, dst: &PathBuf) -> Result<()> {
     let inner = || -> Result<()> {
         if src.as_path().is_dir() {
             if !dst.as_path().is_dir() {
-                log::llog(log::DebugMoveFiles, || {
-                    format!("New dir created: {}", dst.display())
-                });
+                trace!("[DebugMoveFiles] New dir created: {}", dst.display());
                 create_dir(dst)?;
             }
 
@@ -32,14 +30,10 @@ pub fn move_files(src: &PathBuf, dst: &PathBuf) -> Result<()> {
                 if !src.join(item.file_name()).as_path().exists() {
                     let path = item.path();
                     if path.as_path().is_dir() {
-                        log::llog(log::DebugMoveFiles, || {
-                            format!("Old dir removed: {}", path.display())
-                        });
+                        trace!("[DebugMoveFiles] Old dir removed: {}", path.display());
                         remove_dir_all(&path)?;
                     } else {
-                        log::llog(log::DebugMoveFiles, || {
-                            format!("Old file removed: {}", path.display())
-                        });
+                        trace!("[DebugMoveFiles] Old file removed: {}", path.display());
                         remove_file(&path)?;
                     }
                 }
@@ -100,14 +94,10 @@ fn move_one_file(old_path: &PathBuf, new_path: &PathBuf) -> Result<()> {
                 remove_file(&new_path)?;
             }
             rename_file(&old_path, &new_path)?;
-            log::llog(log::DebugMoveFiles, || {
-                format!("File changed: {}", new_path.display())
-            });
+            trace!("[DebugMoveFiles] File changed: {}", new_path.display());
         } else {
             remove_file(&old_path)?;
-            log::llog(log::DebugMoveFiles, || {
-                format!("File not changed: {}", new_path.display())
-            });
+            trace!("[DebugMoveFiles] File not changed: {}", new_path.display());
         }
         Ok(())
     };

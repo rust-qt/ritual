@@ -9,7 +9,6 @@
 use serde_derive::{Deserialize, Serialize};
 
 pub mod errors;
-pub mod log;
 
 pub mod file_utils;
 pub mod string_utils;

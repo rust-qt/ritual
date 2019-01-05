@@ -25,6 +25,7 @@ use crate::database::CppItemData;
 use crate::database::FfiItem;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
+use log::trace;
 use std::iter::once;
 
 pub struct FfiNameProvider {
@@ -78,17 +79,14 @@ fn run(mut data: &mut ProcessorData) -> Result<()> {
 
     for item in &mut data.current_database.items {
         if item.ffi_items.is_some() {
-            data.html_logger.add(
-                &[item.cpp_data.to_string(), "already processed".to_string()],
-                "already_processed",
-            )?;
+            trace!(
+                "cpp_data = {}; already processed",
+                item.cpp_data.to_string()
+            );
             continue;
         }
         if !should_process_item(&item.cpp_data)? {
-            data.html_logger.add(
-                &[item.cpp_data.to_string(), "skipped".to_string()],
-                "skipped",
-            )?;
+            trace!("cpp_data = {}; skipped", item.cpp_data.to_string());
             continue;
         }
         let result = match item.cpp_data {
@@ -117,21 +115,18 @@ fn run(mut data: &mut ProcessorData) -> Result<()> {
         match result {
             Err(msg) => {
                 item.ffi_items = Some(Vec::new());
-                data.html_logger
-                    .add(&[item.cpp_data.to_string(), msg.to_string()], "error")?;
+                trace!("cpp_data = {}; error: {}", item.cpp_data.to_string(), msg);
             }
             Ok(r) => {
-                data.html_logger.add(
-                    &[
-                        item.cpp_data.to_string(),
-                        match r.len() {
-                            0 => "no methods".to_string(),
-                            1 => format!("added method: {:?}", r[0]),
-                            _ => format!("added methods ({}): {:?}", r.len(), r),
-                        },
-                    ],
-                    "success",
-                )?;
+                trace!(
+                    "cpp_data = {}; success; {}",
+                    item.cpp_data.to_string(),
+                    match r.len() {
+                        0 => "no methods".to_string(),
+                        1 => format!("added method: {:?}", r[0]),
+                        _ => format!("added methods ({}): {:?}", r.len(), r),
+                    }
+                );
                 item.ffi_items = Some(r.into_iter().map(FfiItem::new).collect());
             }
         }

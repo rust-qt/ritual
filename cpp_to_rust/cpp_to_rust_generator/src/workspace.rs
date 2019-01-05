@@ -1,16 +1,12 @@
 use crate::common::errors::{bail, FancyUnwrap, Result};
-use crate::common::file_utils::{create_dir, create_dir_all, load_json, remove_dir_all, save_json};
-use crate::common::log;
-use crate::common::string_utils::CaseOperations;
+use crate::common::file_utils::{create_dir, load_json, save_json};
 
 use crate::database::Database;
 use serde_derive::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct WorkspaceConfig {
-    pub disable_logging: bool,
     pub write_dependencies_local_paths: bool,
 }
 
@@ -56,7 +52,6 @@ impl Workspace {
             },
             databases: Vec::new(),
         };
-        w.apply_logger_settings()?;
         Ok(w)
     }
 
@@ -139,15 +134,6 @@ impl Workspace {
         self.databases.push(EditedDatabase { database, saved });
     }
 
-    pub fn set_disable_logging(&mut self, value: bool) -> Result<()> {
-        if self.config.disable_logging == value {
-            return Ok(());
-        }
-        self.config.disable_logging = value;
-        self.apply_logger_settings()?;
-        self.save_config()
-    }
-
     pub fn set_write_dependencies_local_paths(&mut self, value: bool) -> Result<()> {
         if self.config.write_dependencies_local_paths == value {
             return Ok(());
@@ -158,62 +144,6 @@ impl Workspace {
 
     fn save_config(&self) -> Result<()> {
         save_json(config_path(&self.path), &self.config)
-    }
-
-    fn apply_logger_settings(&self) -> Result<()> {
-        let mut logger = log::default_logger();
-        logger.set_default_settings(log::LoggerSettings {
-            file_path: None,
-            write_to_stderr: false,
-        });
-        let mut category_settings = HashMap::new();
-        let debug_categories = vec![
-            log::DebugGeneral,
-            log::DebugMoveFiles,
-            log::DebugTemplateInstantiation,
-            log::DebugInheritance,
-            log::DebugParserSkips,
-            log::DebugParser,
-            log::DebugFfiSkips,
-            log::DebugSignals,
-            log::DebugAllocationPlace,
-            log::DebugRustSkips,
-            log::DebugQtDoc,
-            log::DebugQtHeaderNames,
-        ];
-        for category in &[log::Status, log::Error] {
-            category_settings.insert(
-                *category,
-                log::LoggerSettings {
-                    file_path: None,
-                    write_to_stderr: true,
-                },
-            );
-        }
-        if !self.config.disable_logging {
-            let logs_dir = self.log_path()?;
-            logger.log(
-                log::Status,
-                format!("Debug log will be saved to {}", logs_dir.display()),
-            );
-            if logs_dir.exists() {
-                remove_dir_all(&logs_dir)?;
-            }
-            create_dir_all(&logs_dir)?;
-            for category in debug_categories {
-                let name = format!("{:?}", category).to_snake_case();
-                let path = logs_dir.join(format!("{}.log", name));
-                category_settings.insert(
-                    category,
-                    log::LoggerSettings {
-                        file_path: Some(path),
-                        write_to_stderr: false,
-                    },
-                );
-            }
-        }
-        logger.set_all_category_settings(category_settings);
-        Ok(())
     }
 
     pub fn save_data(&mut self) -> Result<()> {

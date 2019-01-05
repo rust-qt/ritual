@@ -1,9 +1,9 @@
 use cpp_to_rust_generator::common::errors::Result;
-use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::database::CppItemData;
 use cpp_to_rust_generator::database::DatabaseItemSource;
 use cpp_to_rust_generator::processor::ProcessorData;
 use itertools::Itertools;
+use log::trace;
 use std::collections::HashSet;
 
 pub fn detect_signal_argument_types(data: &mut ProcessorData) -> Result<()> {
@@ -50,14 +50,12 @@ pub fn detect_signal_argument_types(data: &mut ProcessorData) -> Result<()> {
     }
     all_types.extend(types_with_omitted_args.into_iter());
 
-    log::llog(log::DebugSignals, || "Signal argument types:");
+    trace!("[DebugSignals] Signal argument types:");
     for t in &all_types {
-        log::llog(log::DebugSignals, || {
-            format!(
-                "  ({})",
-                t.iter().map(|x| x.to_cpp_pseudo_code()).join(", ")
-            )
-        });
+        trace!(
+            "[DebugSignals] * ({})",
+            t.iter().map(|x| x.to_cpp_pseudo_code()).join(", ")
+        );
     }
     for item in all_types {
         data.current_database.add_cpp_data(

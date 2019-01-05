@@ -21,4 +21,5 @@ tempdir = "0.3.7"   # temporary directory creation
 derive_more = "0.13.0"
 itertools = "0.8.0"
 pathdiff = "0.1.0"
+log = "0.4.6"
 

@@ -5,13 +5,13 @@ use crate::cpp_build_config::CppBuildPaths;
 use crate::cpp_build_config::CppLibraryType;
 use crate::errors::{err_msg, Result};
 use crate::file_utils::{create_dir_all, path_to_str};
-use crate::log;
 use crate::target;
 use crate::utils::run_command;
 use crate::utils::run_command_and_capture_output;
 use crate::utils::CommandOutput;
 use crate::utils::MapIfOk;
 use itertools::Itertools;
+use log::debug;
 use std::fmt::Display;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -179,14 +179,14 @@ impl CppLibBuilder {
             ::num_cpus::get()
         };
         if target::current_env() == target::Env::Msvc && num_jobs > 1 {
-            log::status("Checking for jom");
+            debug!("Checking for jom");
             if run_command(&mut Command::new("jom").arg("/version")).is_ok() {
-                log::status("jom will be used instead of nmake.");
+                debug!("jom will be used instead of nmake.");
                 make_command_name = "jom";
                 make_args.push("/J".to_string());
                 make_args.push(num_jobs.to_string());
             } else {
-                log::status("jom not found in PATH. Using nmake.")
+                debug!("jom not found in PATH. Using nmake.");
             }
         }
         if target::current_env() != target::Env::Msvc {

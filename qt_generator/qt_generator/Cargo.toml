@@ -17,3 +17,5 @@ rusqlite = "0.16.0"
 compress = "0.1.2"
 select = "0.4.2"   # html parsing
 itertools = "0.8.0"
+flexi_logger = "0.10.3"
+log = "0.4.6"

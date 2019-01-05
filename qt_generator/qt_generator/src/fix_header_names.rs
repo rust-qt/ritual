@@ -3,12 +3,11 @@
 
 use cpp_to_rust_generator::common::errors::{err_msg, Result, ResultExt};
 use cpp_to_rust_generator::common::file_utils::{file_to_string, os_str_to_str, read_dir};
-use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::common::utils::add_to_multihash;
-
 use cpp_to_rust_generator::database::CppItemData;
 use cpp_to_rust_generator::database::DatabaseItem;
 use cpp_to_rust_generator::database::DatabaseItemSource;
+use log::{info, trace};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -39,7 +38,7 @@ impl HeaderNameMap {
     fn new(headers_dir: &PathBuf) -> Result<HeaderNameMap> {
         let re = ::regex::Regex::new(r#"^#include "([a-zA-Z0-9._]+)"$"#)?;
         let mut map_real_to_all_fancy: HashMap<_, Vec<_>> = HashMap::new();
-        log::status("Detecting fancy Qt header names");
+        info!("Detecting fancy Qt header names");
         for header in read_dir(headers_dir)? {
             let header = header?;
             let header_path = header.path();
@@ -81,15 +80,11 @@ impl HeaderNameMap {
                     }
                 }
                 if !ok {
-                    log::llog(log::DebugQtHeaderNames, || {
-                        format!("{} -> {:?} (detect failed)", real_header, fancy_headers)
-                    });
+                    trace!("{} -> {:?} (detect failed)", real_header, fancy_headers);
                 }
                 result
             };
-            log::llog(log::DebugQtHeaderNames, || {
-                format!("{} -> {}", real_header, fancy_header)
-            });
+            trace!("{} -> {}", real_header, fancy_header);
             map_real_to_fancy.insert(real_header.clone(), fancy_header);
         }
         Ok(HeaderNameMap {

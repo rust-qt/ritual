@@ -13,7 +13,6 @@ use crate::cpp_data::CppPath;
 use crate::cpp_data::CppTemplateInstantiation;
 use crate::cpp_ffi_data::CppFfiItem;
 use crate::cpp_type::CppType;
-use crate::html_logger::escape_html;
 use crate::rust_type::RustName;
 use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
@@ -69,18 +68,6 @@ impl DatabaseItemSource {
 pub struct CppCheckerInfo {
     pub env: CppCheckerEnv,
     pub error: Option<String>,
-}
-
-impl CppCheckerInfo {
-    pub fn error_to_log(error: &Option<String>) -> String {
-        match error {
-            None => "<div class='ok'>OK</div>".to_string(),
-            Some(error) => format!(
-                "<div class='error'>Error<br><pre>{}</pre></div>",
-                escape_html(error)
-            ),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

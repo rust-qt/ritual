@@ -1,13 +1,11 @@
-//use crate::database::Database;
-use crate::processor::ProcessingStep;
-use crate::processor::ProcessorData;
-//use cpp_to_rust_common::log;
 use crate::common::errors::{bail, Result};
 use crate::cpp_checker::cpp_checker_step;
 use crate::cpp_type::CppType;
 use crate::database::CppItemData;
 use crate::database::DatabaseItem;
-use cpp_to_rust_common::log;
+use crate::processor::ProcessingStep;
+use crate::processor::ProcessorData;
+use log::trace;
 
 fn check_type(all_items: &[&DatabaseItem], cpp_type: &CppType) -> Result<()> {
     match cpp_type {
@@ -72,9 +70,9 @@ fn run(data: &mut ProcessorData) -> Result<()> {
             continue;
         }
         match is_cpp_item_resolvable(&all_items, &item.cpp_data) {
-            Ok(_) => unimplemented!(),
+            Ok(_) => {} //unimplemented!(),
             Err(err) => {
-                log::error(format!("skipping item: {}: {}", &item.cpp_data, err));
+                trace!("skipping item: {}: {}", &item.cpp_data, err);
             }
         }
     }

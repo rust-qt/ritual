@@ -12,3 +12,4 @@ repository = "https://github.com/rust-qt/cpp_to_rust/tree/master/qt_generator/qt
 
 [dependencies]
 cpp_to_rust_common = { version = "0.2.3", path = "../../cpp_to_rust/cpp_to_rust_common" }
+log = "0.4.6"

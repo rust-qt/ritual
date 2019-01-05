@@ -5,7 +5,6 @@ use crate::doc_decoder::DocData;
 use cpp_to_rust_generator::common::errors::{
     bail, err_msg, should_panic_on_unexpected, unexpected, Result, ResultExt,
 };
-use cpp_to_rust_generator::common::log;
 use cpp_to_rust_generator::cpp_data::CppPath;
 use cpp_to_rust_generator::cpp_data::CppTypeDoc;
 use cpp_to_rust_generator::cpp_data::CppVisibility;
@@ -13,6 +12,7 @@ use cpp_to_rust_generator::cpp_function::CppFunctionDoc;
 use cpp_to_rust_generator::database::CppItemData;
 use cpp_to_rust_generator::database::DatabaseItem;
 use cpp_to_rust_generator::processor::ProcessorData;
+use log::{debug, error, trace};
 use regex::Regex;
 use select::document::Document;
 use select::node::Node;
@@ -219,14 +219,13 @@ impl DocParser {
             }
         }
         if candidates.len() == 1 {
-            log::llog(log::DebugQtDocDeclarations, || {
-                format!(
-                    "\
-                     Declaration mismatch ignored because there is only one \
-                     method.\nDeclaration 1: {}\nDeclaration 2: {}\nDoc declaration: {:?}\n",
-                    declaration1, declaration2, candidates[0].declarations
-                )
-            });
+            trace!(
+                "[DebugQtDocDeclarations] Declaration mismatch ignored because there is only one \
+                 method.\nDeclaration 1: {}\nDeclaration 2: {}\nDoc declaration: {:?}\n",
+                declaration1,
+                declaration2,
+                candidates[0].declarations
+            );
 
             if candidates[0].html.is_empty() {
                 bail!("found empty documentation");
@@ -239,19 +238,15 @@ impl DocParser {
                 cross_references: candidates[0].cross_references.clone(),
             });
         }
-        log::llog(log::DebugQtDocDeclarations, || {
-            format!(
-                "Declaration mismatch!\nDeclaration 1: {}\nDeclaration 2: {}",
-                declaration1, declaration2
-            )
-        });
-        log::llog(log::DebugQtDocDeclarations, || "Candidates:");
+        trace!(
+            "[DebugQtDocDeclarations] Declaration mismatch!\nDeclaration 1: {}\nDeclaration 2: {}",
+            declaration1,
+            declaration2
+        );
+        trace!("[DebugQtDocDeclarations] Candidates:");
         for item in &candidates {
-            log::llog(log::DebugQtDocDeclarations, || {
-                format!("  {:?}", item.declarations)
-            });
+            trace!("[DebugQtDocDeclarations] * {:?}", item.declarations);
         }
-        log::llog(log::DebugQtDocDeclarations, || "");
         bail!("Declaration mismatch");
     }
 
@@ -331,19 +326,16 @@ impl DocParser {
             .find_index_item(|item| item.name == full_name)
             .is_none()
         {
-            log::llog(log::DebugQtDoc, || {
-                format!("mark_enum_variant_used failed for {}", full_name)
-            });
+            trace!(
+                "[DebugQtDoc] mark_enum_variant_used failed for {}",
+                full_name
+            );
         }
     }
 
     /// Lists unused documentation entries to the debug log.
     pub fn report_unused_anchors(&self) {
-        let mut logger = log::default_logger();
-        if !logger.is_on(log::DebugQtDoc) {
-            return;
-        }
-        logger.log(log::DebugQtDoc, "Unused entries in Qt documentation:");
+        trace!("[DebugQtDoc] Unused entries in Qt documentation:");
         for item in self.doc_data.index() {
             if !item.accessed {
                 if let Ok(file_name) = self.doc_data.file_name(item.document_id) {
@@ -352,10 +344,9 @@ impl DocParser {
                         continue;
                     }
                 }
-                logger.log(log::DebugQtDoc, item.name.as_str());
+                trace!("[DebugQtDoc] * {}", item.name);
             }
         }
-        logger.log(log::DebugQtDoc, "");
     }
 }
 
@@ -469,7 +460,7 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
         let anchor_node = if let Some(r) = anchor.next() {
             r
         } else {
-            log::llog(log::DebugGeneral, || "Failed to get anchor_node");
+            debug!("Failed to get anchor_node");
             continue;
         };
         let anchor_text = anchor_node
@@ -494,9 +485,7 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
         let mut node = if let Some(r) = h3.next() {
             r
         } else {
-            log::llog(log::DebugGeneral, || {
-                "Failed to find element next to h3_node"
-            });
+            debug!("Failed to find element next to h3_node");
             continue;
         };
         let mut enum_variants = Vec::new();
@@ -583,13 +572,11 @@ fn find_methods_docs(items: &mut [DatabaseItem], data: &mut DocParser) -> Result
                         {
                             // no error message
                         } else {
-                            log::llog(log::DebugQtDoc, || {
-                                format!(
-                                    "Failed to get documentation for method: {}: {}",
-                                    &cpp_method.short_text(),
-                                    msg
-                                )
-                            });
+                            trace!(
+                                "[DebugQtDoc] Failed to get documentation for method: {}: {}",
+                                &cpp_method.short_text(),
+                                msg
+                            );
                         }
                     }
                 }
@@ -604,7 +591,7 @@ pub fn parse_docs(data: &mut ProcessorData, qt_crate_name: &str, docs_path: &Pat
     let doc_data = match DocData::new(&qt_crate_name, &docs_path) {
         Ok(doc_data) => doc_data,
         Err(err) => {
-            log::error(format!("Failed to get Qt documentation: {}", err));
+            error!("Failed to get Qt documentation: {}", err);
             return Ok(());
         }
     };
@@ -620,7 +607,7 @@ pub fn parse_docs(data: &mut ProcessorData, qt_crate_name: &str, docs_path: &Pat
         if !type_doc_cache.contains_key(&type_name) {
             let doc = parser.doc_for_type(&type_name);
             if let Err(ref err) = doc {
-                log::error(format!("Failed to get Qt documentation: {}", err));
+                error!("Failed to get Qt documentation: {}", err);
             }
             type_doc_cache.insert(type_name.clone(), doc);
         }
@@ -637,12 +624,11 @@ pub fn parse_docs(data: &mut ProcessorData, qt_crate_name: &str, docs_path: &Pat
                         data.doc = Some(r.html.clone());
                         parser.mark_enum_variant_used(&data.full_name().to_string());
                     } else {
-                        log::llog(log::DebugQtDoc, || {
-                            format!(
-                                "Not found doc for enum variant: {}::{}",
-                                data.enum_path, data.name
-                            )
-                        });
+                        trace!(
+                            "[DebugQtDoc] Not found doc for enum variant: {}::{}",
+                            data.enum_path,
+                            data.name
+                        );
                     }
                 }
                 _ => unreachable!(),

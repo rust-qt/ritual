@@ -1,22 +1,20 @@
 use crate::common::errors::{bail, Result, ResultExt};
-use crate::common::log;
 
 use crate::common::utils::MapIfOk;
 use crate::config::Config;
 use crate::cpp_checker::cpp_checker_step;
+use crate::cpp_explicit_destructors::add_explicit_destructors_step;
 use crate::cpp_ffi_generator::cpp_ffi_generator_step;
 use crate::cpp_parser::cpp_parser_step;
-
-use crate::cpp_explicit_destructors::add_explicit_destructors_step;
 use crate::cpp_template_instantiator::find_template_instantiations_step;
 use crate::cpp_template_instantiator::instantiate_templates_step;
 use crate::crate_writer::crate_writer_step;
 use crate::database::{Database, DatabaseItem};
-use crate::html_logger::HtmlLogger;
 use crate::rust_name_resolver::rust_name_resolver_step;
 use crate::type_allocation_places::choose_allocation_places_step;
 use crate::workspace::Workspace;
 use itertools::Itertools;
+use log::info;
 use std::cmp::Ordering;
 use std::fmt;
 use std::iter::once;
@@ -65,7 +63,6 @@ pub struct ProcessorData<'a> {
     pub config: &'a Config,
     pub current_database: &'a mut Database,
     pub dep_databases: &'a [Database],
-    pub html_logger: &'a mut HtmlLogger,
 }
 
 impl<'a> ProcessorData<'a> {
@@ -131,38 +128,29 @@ impl ProcessingStep {
 }
 
 mod steps {
-    use crate::database::CppCheckerInfo;
-    use crate::html_logger::escape_html;
     use crate::processor::ProcessingStep;
-    use itertools::Itertools;
+    use log::trace;
 
     pub fn print_database() -> ProcessingStep {
         ProcessingStep {
             is_const: true,
             ..ProcessingStep::new_custom("print_database", |data| {
-                data.html_logger.add_header(&["Item", "Environments"])?;
-
                 for item in &data.current_database.items {
-                    data.html_logger.add(
-                        &[
-                            escape_html(&item.cpp_data.to_string()),
-                            format!("{:?}", item.source),
-                        ],
-                        "database_item",
-                    )?;
+                    trace!(
+                        "[database_item] cpp_data={}; source={:?}",
+                        item.cpp_data.to_string(),
+                        item.source
+                    );
                     if let Some(ref ffi_items) = item.ffi_items {
                         for ffi_item in ffi_items {
-                            let item_text = format!("{:?}", ffi_item.cpp_item);
-                            let mut item_texts = ffi_item.checks.items.iter().map(|item| {
-                                format!(
-                                    "<li>{}: {}</li>",
+                            trace!("[ffi_item] item={:?}; checks:", ffi_item.cpp_item);
+                            for item in &ffi_item.checks.items {
+                                trace!(
+                                    "[ffi_item] * env = {}; error = {:?}",
                                     item.env.short_text(),
-                                    CppCheckerInfo::error_to_log(&item.error)
-                                )
-                            });
-                            let env_text = format!("<ul>{}</ul>", item_texts.join(""));
-                            data.html_logger
-                                .add(&[escape_html(&item_text), env_text], "ffi_item")?;
+                                    item.error
+                                );
+                            }
                         }
                     }
                 }
@@ -217,10 +205,7 @@ impl Ord for MainItemRef<'_> {
 
 #[allow(clippy::useless_let_if_seq)]
 pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]) -> Result<()> {
-    log::status(format!(
-        "Processing crate: {}",
-        config.crate_properties().name()
-    ));
+    info!("Processing crate: {}", config.crate_properties().name());
     check_all_paths(&config)?;
 
     let standard_processing_steps = vec![
@@ -247,13 +232,13 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
     #[allow(unused_variables)]
     let remove_qt_prefix = config.crate_properties().name().starts_with("qt_");
 
-    log::status("Loading current crate data");
+    info!("Loading current crate data");
     let mut current_database = workspace
         .load_or_create_crate(config.crate_properties().name())
         .with_context(|_| "failed to load current crate data")?;
 
     if !config.dependent_cpp_crates().is_empty() {
-        log::status("Loading dependencies");
+        info!("Loading dependencies");
     }
     let dependent_cpp_crates = config.dependent_cpp_crates().iter().map_if_ok(|name| {
         workspace
@@ -299,18 +284,10 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
         };
 
         for step in steps {
-            log::status(format!("Running processor item: {}", &step.name));
-
-            let mut html_logger = HtmlLogger::new(
-                workspace
-                    .log_path()?
-                    .join(format!("{}_log.html", step.name)),
-                &format!("{} log", step.name),
-            )?;
+            info!("Running processor item: {}", &step.name);
 
             let mut data = ProcessorData {
                 workspace,
-                html_logger: &mut html_logger,
                 current_database: &mut current_database,
                 dep_databases: &dependent_cpp_crates,
                 config,
@@ -368,7 +345,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
     }
 
     if !current_database_saved {
-        log::status("Saving data");
+        info!("Saving data");
     }
 
     workspace.put_crate(current_database, current_database_saved);

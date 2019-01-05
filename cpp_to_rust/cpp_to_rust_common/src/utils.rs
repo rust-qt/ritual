@@ -1,8 +1,8 @@
 //! Various utilities.
 
 use crate::errors::{bail, Result, ResultExt};
-use crate::log;
 
+use log::debug;
 use std;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -47,7 +47,7 @@ where
 
 /// Runs a command and checks that it was successful
 pub fn run_command(command: &mut Command) -> Result<()> {
-    log::status(format!("Executing command: {:?}", command));
+    debug!("Executing command: {:?}", command);
     let status = command
         .status()
         .with_context(|_| format!("failed to run command: {:?}", command))?;
@@ -74,7 +74,7 @@ impl CommandOutput {
 /// Runs a command and returns its output regardless of
 /// whether it was successful
 pub fn run_command_and_capture_output(command: &mut Command) -> Result<CommandOutput> {
-    log::status(format!("Executing command: {:?}", command));
+    debug!("Executing command: {:?}", command);
     command.stdout(std::process::Stdio::piped());
     command.stderr(std::process::Stdio::piped());
     let output = command
@@ -89,7 +89,7 @@ pub fn run_command_and_capture_output(command: &mut Command) -> Result<CommandOu
 
 /// Runs a command and returns its stdout if it was successful
 pub fn get_command_output(command: &mut Command) -> Result<String> {
-    log::status(format!("Executing command: {:?}", command));
+    debug!("Executing command: {:?}", command);
     command.stdout(std::process::Stdio::piped());
     command.stderr(std::process::Stdio::piped());
     let output = command

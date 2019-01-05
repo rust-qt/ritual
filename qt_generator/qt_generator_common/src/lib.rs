@@ -8,10 +8,10 @@ use cpp_to_rust_common::cpp_build_config::{
     CppBuildConfig, CppBuildConfigData, CppBuildPaths, CppLibraryType,
 };
 use cpp_to_rust_common::errors::{bail, Result};
-use cpp_to_rust_common::log;
 use cpp_to_rust_common::string_utils::CaseOperations;
 use cpp_to_rust_common::target;
 use cpp_to_rust_common::utils::get_command_output;
+use log::debug;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -46,18 +46,15 @@ pub struct InstallationData {
 /// Detects properties of current Qt installation using `qmake` command line utility.
 pub fn get_installation_data(crate_name: &str) -> Result<InstallationData> {
     let qt_version = run_qmake_string_query("QT_VERSION")?;
-    log::status(format!("QT_VERSION = \"{}\"", qt_version));
-    log::status("Detecting Qt directories");
+    debug!("QT_VERSION = \"{}\"", qt_version);
+    debug!("Detecting Qt directories");
 
     let root_include_path = run_qmake_query("QT_INSTALL_HEADERS")?;
-    log::status(format!(
-        "QT_INSTALL_HEADERS = \"{}\"",
-        root_include_path.display()
-    ));
+    debug!("QT_INSTALL_HEADERS = \"{}\"", root_include_path.display());
     let lib_path = run_qmake_query("QT_INSTALL_LIBS")?;
-    log::status(format!("QT_INSTALL_LIBS = \"{}\"", lib_path.display()));
+    debug!("QT_INSTALL_LIBS = \"{}\"", lib_path.display());
     let docs_path = run_qmake_query("QT_INSTALL_DOCS")?;
-    log::status(format!("QT_INSTALL_DOCS = \"{}\"", docs_path.display()));
+    debug!("QT_INSTALL_DOCS = \"{}\"", docs_path.display());
     let folder_name = lib_folder_name(crate_name);
     let dir = root_include_path.join(&folder_name);
     if dir.exists() {

@@ -9,17 +9,16 @@
 //! for more information.
 
 use crate::common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
+use crate::common::cpp_lib_builder::c2r_cmake_vars;
 use crate::common::cpp_lib_builder::{BuildType, CppLibBuilder};
 use crate::common::errors::{bail, FancyUnwrap, Result, ResultExt};
 use crate::common::file_utils::{create_file, file_to_string, load_json, path_to_str};
-use crate::common::log;
 use crate::common::target::current_target;
 use crate::common::utils::{exe_suffix, get_command_output};
 use crate::common::BuildScriptData;
 pub use cpp_to_rust_common as common;
-
-use crate::common::cpp_lib_builder::c2r_cmake_vars;
 use cpp_to_rust_common::errors::err_msg;
+use log::info;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -105,7 +104,7 @@ impl Config {
         let c_lib_install_dir = out_dir.join("c_lib_install");
         let manifest_dir = manifest_dir()?;
         let profile = std::env::var("PROFILE").with_context(|_| "PROFILE env var is missing")?;
-        log::status("Building C++ wrapper library");
+        info!("Building C++ wrapper library");
 
         let library_type = cpp_build_config_data
             .library_type()
@@ -131,7 +130,7 @@ impl Config {
         }
         .run()?;
         {
-            log::status("Generating ffi.rs file");
+            info!("Generating ffi.rs file");
             let mut ffi_file = create_file(out_dir.join("ffi.rs"))?;
             if cpp_build_config_data.library_type() == Some(CppLibraryType::Shared) {
                 ffi_file.write(format!(
@@ -147,7 +146,7 @@ impl Config {
             ffi_file.write(file_to_string(manifest_dir.join("src").join("ffi.in.rs"))?)?;
         }
         {
-            log::status("Requesting type sizes");
+            info!("Requesting type sizes");
             let mut command =
                 Command::new(c_lib_install_dir.join(format!("type_sizes{}", exe_suffix())));
             let mut file = create_file(out_dir.join("type_sizes.rs"))?;
@@ -174,7 +173,7 @@ impl Config {
             "cargo:rustc-link-search=native={}",
             path_to_str(&c_lib_install_dir)?
         );
-        log::status("cpp_to_rust build script finished.");
+        info!("cpp_to_rust build script finished.");
         Ok(())
     }
 

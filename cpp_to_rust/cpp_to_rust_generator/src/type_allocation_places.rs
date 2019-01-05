@@ -1,10 +1,10 @@
 use crate::common::errors::Result;
-use crate::common::log;
 use crate::cpp_data::CppPath;
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
+use log::trace;
 use std::collections::HashMap;
 
 pub fn choose_allocation_places_step() -> ProcessingStep {
@@ -19,9 +19,7 @@ pub fn choose_allocation_places_step() -> ProcessingStep {
 /// API of all known methods. Doesn't actually change the data,
 /// only suggests stack allocated types for manual configuration.
 fn choose_allocation_places(data: &mut ProcessorData) -> Result<()> {
-    log::status("Detecting type allocation places");
-
-    #[derive(Default)]
+    #[derive(Default, Debug)]
     struct TypeStats {
         // has_derived_classes: bool,
         has_virtual_methods: bool,
@@ -90,23 +88,9 @@ fn choose_allocation_places(data: &mut ProcessorData) -> Result<()> {
             check_type(&type1, false, &mut data_map);
         }
     }
-    data.html_logger.add_header(&[
-        "Name",
-        "has_virtual_methods",
-        "pointers_count",
-        "not_pointers_count",
-    ])?;
 
     for (name, stats) in &data_map {
-        data.html_logger.add(
-            &[
-                name.to_string(),
-                format!("{}", stats.has_virtual_methods),
-                format!("{}", stats.pointers_count),
-                format!("{}", stats.not_pointers_count),
-            ],
-            "type_allocation_places_stats",
-        )?;
+        trace!("type = {}; stats = {:?}", name, stats);
     }
 
     let mut movable_types = Vec::new();
@@ -135,35 +119,26 @@ fn choose_allocation_places(data: &mut ProcessorData) -> Result<()> {
                 let min_safe_data_count = 5;
                 let min_not_pointers_percent = 0.3;
                 if stats.pointers_count + stats.not_pointers_count < min_safe_data_count {
-                    data.html_logger.add(
-                        &[
-                            name.to_string(),
-                            "Can't determine type allocation place: not enough data".to_string(),
-                        ],
-                        "type_allocation_places_error",
-                    )?;
+                    trace!(
+                        "type = {}; Can't determine type allocation place: not enough data",
+                        name
+                    );
                 } else if stats.not_pointers_count as f32
                     / (stats.pointers_count + stats.not_pointers_count) as f32
                     > min_not_pointers_percent
                 {
-                    data.html_logger.add(
-                        &[
-                            name.to_string(),
-                            "Can't determine type allocation place: many non-pointers".to_string(),
-                        ],
-                        "type_allocation_places_error",
-                    )?;
+                    trace!(
+                        "type = {}; Can't determine type allocation place: many non-pointers",
+                        name
+                    );
                 }
                 false
             }
         } else {
-            data.html_logger.add(
-                &[
-                    name.to_string(),
-                    "Can't determine type allocation place: no stats".to_string(),
-                ],
-                "type_allocation_places_error",
-            )?;
+            trace!(
+                "type = {}; Can't determine type allocation place: no stats",
+                name
+            );
             false
         };
 
@@ -174,20 +149,8 @@ fn choose_allocation_places(data: &mut ProcessorData) -> Result<()> {
         }
     }
 
-    data.html_logger.add(
-        &[
-            "Heap allocation is suggested for types:".to_string(),
-            format!("{:?}", immovable_types),
-        ],
-        "type_allocation_places_result",
-    )?;
-    data.html_logger.add(
-        &[
-            "Stack allocation is suggested for types:".to_string(),
-            format!("{:?}", movable_types),
-        ],
-        "type_allocation_places_result",
-    )?;
+    trace!("Presumably immovable types: {:?}", immovable_types);
+    trace!("Presumably movable types: {:?}", movable_types);
 
     Ok(())
 }

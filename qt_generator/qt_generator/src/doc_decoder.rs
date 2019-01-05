@@ -1,10 +1,9 @@
 //! Converts Qt docs from the internal format.
 
 use cpp_to_rust_generator::common::errors::{bail, err_msg, Result, ResultExt};
-use cpp_to_rust_generator::common::log;
+use log::info;
 use rusqlite;
 use select::document::Document;
-
 use std::path::Path;
 
 /// Decoded documentation data.
@@ -96,10 +95,7 @@ impl DocData {
                 doc_file_path.display()
             );
         }
-        log::status(format!(
-            "Adding Qt documentation from {}",
-            doc_file_path.display()
-        ));
+        info!("Adding Qt documentation from {}", doc_file_path.display());
         let connection = rusqlite::Connection::open_with_flags(
             &doc_file_path,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,

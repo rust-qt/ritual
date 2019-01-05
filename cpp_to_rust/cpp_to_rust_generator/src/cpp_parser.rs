@@ -2,7 +2,10 @@ use crate::common::errors::{
     bail, err_msg, should_panic_on_unexpected, unexpected, Result, ResultExt,
 };
 use crate::common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
-use crate::common::log;
+use crate::config::Config;
+use crate::cpp_data::CppPath;
+use crate::cpp_data::CppPathItem;
+use crate::cpp_data::CppTypeDataKind;
 use crate::cpp_data::{
     CppBaseSpecifier, CppClassField, CppEnumValue, CppOriginLocation, CppTypeData, CppVisibility,
 };
@@ -10,31 +13,24 @@ use crate::cpp_function::{
     CppFunction, CppFunctionArgument, CppFunctionKind, CppFunctionMemberData,
 };
 use crate::cpp_operator::CppOperator;
+use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::{
     CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
     CppSpecificNumericTypeKind, CppType,
 };
 use crate::database::CppItemData;
-use itertools::Itertools;
-use std::str::FromStr;
-
-use clang;
-use clang::*;
-
-use std::path::{Path, PathBuf};
-
-use crate::config::Config;
-use crate::cpp_data::CppTypeDataKind;
 use crate::database::DatabaseItemSource;
-
-use crate::cpp_data::CppPath;
-use crate::cpp_data::CppPathItem;
-use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
+use clang;
+use clang::*;
+use itertools::Itertools;
+use log::{debug, info, trace, warn};
 use regex::Regex;
 use std::collections::HashSet;
 use std::iter::once;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 fn entity_log_representation(entity: Entity) -> String {
     format!("{}; {:?}", get_full_name_display(entity), entity)
@@ -76,9 +72,11 @@ struct CppParser<'b, 'a: 'b> {
 /// `level` is current level of recursion.
 #[allow(dead_code)]
 fn dump_entity(entity: Entity, level: usize) {
-    log::llog(log::DebugParser, || {
-        format!("{}{:?}", (0..level).map(|_| ". ").join(""), entity)
-    });
+    trace!(
+        "[DebugParser] {}{:?}",
+        (0..level).map(|_| ". ").join(""),
+        entity
+    );
     if level <= 5 {
         for child in entity.get_children() {
             dump_entity(child, level + 1);
@@ -227,25 +225,23 @@ fn run_clang<R, F: FnMut(Entity) -> Result<R>>(
     }
     if let Ok(path) = ::std::env::var("CLANG_SYSTEM_INCLUDE_PATH") {
         if !Path::new(&path).exists() {
-            log::error(format!(
-                "Warning: CLANG_SYSTEM_INCLUDE_PATH environment variable is set to \"{}\" \
-                 but this path does not exist.",
+            warn!(
+                "CLANG_SYSTEM_INCLUDE_PATH environment variable is set to \"{}\" \
+                 but this path does not exist. This may result in parse errors related to system header includes.",
                 path
-            ));
-            log::error("This may result in parse errors related to system header includes.");
+            );
         }
         args.push("-isystem".to_string());
         args.push(path);
     } else {
-        log::error("Warning: CLANG_SYSTEM_INCLUDE_PATH environment variable is not set.");
-        log::error("This may result in parse errors related to system header includes.");
+        warn!("Warning: CLANG_SYSTEM_INCLUDE_PATH environment variable is not set. This may result in parse errors related to system header includes.");
     }
     for dir in config.cpp_build_paths().framework_paths() {
         let str = path_to_str(dir)?;
         args.push("-F".to_string());
         args.push(str.to_string());
     }
-    log::status(format!("clang arguments: {:?}", args));
+    debug!("clang arguments: {:?}", args);
 
     let tu = index
         .parser(&tmp_cpp_path)
@@ -257,9 +253,9 @@ fn run_clang<R, F: FnMut(Entity) -> Result<R>>(
     {
         let diagnostics = tu.get_diagnostics();
         if !diagnostics.is_empty() {
-            log::llog(log::DebugParser, || "Diagnostics:");
+            trace!("[DebugParser] Diagnostics:");
             for diag in &diagnostics {
-                log::llog(log::DebugParser, || format!("{}", diag));
+                trace!("[DebugParser] {}", diag);
             }
         }
         if diagnostics.iter().any(|d| {
@@ -312,19 +308,17 @@ fn add_namespaces(data: &mut ProcessorData) -> Result<()> {
 
 /// Runs the parser on specified data.
 fn run(data: &mut ProcessorData) -> Result<()> {
-    log::status(get_version());
-    log::status("Initializing clang...");
-    //let (mut parser, methods) =
+    debug!("clang version: {}", get_version());
+    debug!("Initializing clang...");
     let mut parser = CppParser { data };
-    parser.data.html_logger.add_header(&["Item", "Status"])?;
     run_clang(
         &parser.data.config,
         &parser.data.workspace.tmp_path()?,
         None,
         |translation_unit| {
-            log::status("Parsing types");
+            info!("Parsing types");
             parser.parse_types(translation_unit)?;
-            log::status("Parsing methods");
+            info!("Parsing methods");
             parser.parse_functions(translation_unit)?;
             Ok(())
         },
@@ -552,7 +546,6 @@ impl CppParser<'_, '_> {
                 }
                 let mut last_part = class_name.items.pop().expect("CppPath can't be empty");
                 last_part.template_arguments = Some(arg_types);
-                println!("pushing1 {:?}", last_part);
                 class_name.items.push(last_part);
                 return Ok(CppType::Class(class_name));
             }
@@ -572,10 +565,6 @@ impl CppParser<'_, '_> {
         context_class: Option<Entity>,
         context_method: Option<Entity>,
     ) -> Result<CppType> {
-        println!(
-            "parse_type {:?} {:?} {:?}",
-            type1, context_class, context_method
-        );
         if type1.is_volatile_qualified() {
             bail!("Volatile type");
         }
@@ -683,7 +672,6 @@ impl CppParser<'_, '_> {
                         .pop()
                         .expect("CppPath can't be empty");
                     last_part.template_arguments = template_arguments;
-                    println!("pushing2 {:?}", last_part);
                     declaration_name.items.push(last_part);
 
                     Ok(CppType::Class(declaration_name))
@@ -762,7 +750,6 @@ impl CppParser<'_, '_> {
                 }
             }
             TypeKind::Unexposed => {
-                println!("OKKK?");
                 let canonical = type1.get_canonical_type();
                 if canonical.get_kind() == TypeKind::Unexposed {
                     self.parse_unexposed_type(Some(type1), None, context_class, context_method)
@@ -992,9 +979,7 @@ impl CppParser<'_, '_> {
         if name.contains('<') {
             let regex = Regex::new(r"^([\w~]+)<[^<>]+>$")?;
             if let Some(matches) = regex.captures(name.clone().as_ref()) {
-                log::llog(log::DebugParser, || {
-                    format!("Fixing malformed method name: {}", name)
-                });
+                trace!("[DebugParser] Fixing malformed method name: {}", name);
                 name = matches
                     .get(1)
                     .ok_or_else(|| err_msg("invalid matches count"))?
@@ -1062,12 +1047,11 @@ impl CppParser<'_, '_> {
             .ok_or_else(|| err_msg("failed to get range of the function"))?;
         let tokens = source_range.tokenize();
         let declaration_code = if tokens.is_empty() {
-            log::llog(log::DebugParser, || {
-                format!(
-                    "Failed to tokenize method {} at {:?}",
-                    name_with_namespace, source_range
-                )
-            });
+            trace!(
+                "[DebugParser] Failed to tokenize method {} at {:?}",
+                name_with_namespace,
+                source_range
+            );
             let start = source_range.get_start().get_file_location();
             let end = source_range.get_end().get_file_location();
             let file_path = start
@@ -1107,13 +1091,12 @@ impl CppParser<'_, '_> {
             if let Some(index) = result.find(';') {
                 result = result[0..index].to_string();
             }
-            log::llog(log::DebugParser, || {
-                format!("The code extracted directly from header: {:?}", result)
-            });
+            trace!(
+                "[DebugParser] The code extracted directly from header: {:?}",
+                result
+            );
             if result.contains("volatile") {
-                log::llog(log::DebugParser, || {
-                    "Warning: volatile method is detected based on source code".to_string()
-                });
+                trace!("[DebugParser] Warning: volatile method is detected based on source code");
                 bail!("Probably a volatile method.");
             }
             Some(result)
@@ -1319,13 +1302,11 @@ impl CppParser<'_, '_> {
         for child in entity.get_children() {
             if child.get_kind() == EntityKind::FieldDecl {
                 if let Err(err) = self.parse_class_field(child, full_name.clone()) {
-                    self.data.html_logger.add(
-                        &[
-                            entity_log_representation(child),
-                            format!("failed to parse class field: {}", err),
-                        ],
-                        "cpp_parser_error",
-                    )?;
+                    trace!(
+                        "cpp_parser_error; entity = {}; failed to parse class field: {}",
+                        entity_log_representation(child),
+                        err
+                    );
                 }
             }
             if child.get_kind() == EntityKind::BaseSpecifier {
@@ -1442,13 +1423,11 @@ impl CppParser<'_, '_> {
                 }
                 if entity.get_name().is_some() && entity.is_definition() {
                     if let Err(error) = self.parse_enum(entity) {
-                        self.data.html_logger.add(
-                            &[
-                                entity_log_representation(entity),
-                                format!("failed to parse enum: {}", error),
-                            ],
-                            "cpp_parser_error",
-                        )?;
+                        trace!(
+                            "cpp_parser_error; entity = {}; failed to parse enum: {}",
+                            entity_log_representation(entity),
+                            error
+                        );
                     }
                 }
             }
@@ -1461,13 +1440,11 @@ impl CppParser<'_, '_> {
         entity.get_template().is_none(); // not a template specialization
                 if ok {
                     if let Err(error) = self.parse_class(entity) {
-                        self.data.html_logger.add(
-                            &[
-                                entity_log_representation(entity),
-                                format!("failed to parse class: {}", error),
-                            ],
-                            "cpp_parser_error",
-                        )?;
+                        trace!(
+                            "cpp_parser_error; entity = {}; failed to parse class: {}",
+                            entity_log_representation(entity),
+                            error
+                        );
                     }
                 }
             }
@@ -1509,13 +1486,11 @@ impl CppParser<'_, '_> {
                                 .add_cpp_data(info, CppItemData::Function(r));
                         }
                         Err(error) => {
-                            self.data.html_logger.add(
-                                &[
-                                    entity_log_representation(entity),
-                                    format!("failed to parse class: {}", error),
-                                ],
-                                "cpp_parser_error",
-                            )?;
+                            trace!(
+                                "cpp_parser_error; entity = {}; failed to parse class: {}",
+                                entity_log_representation(entity),
+                                error
+                            );
                         }
                     }
                 }
@@ -1534,13 +1509,10 @@ impl CppParser<'_, '_> {
                                     .iter()
                                     .any(|x| !x.is_template_parameter())
                                 {
-                                    self.data.html_logger.add(
-                                        &[
-                                            entity_log_representation(entity),
-                                            "skipping template partial specialization".into(),
-                                        ],
-                                        "cpp_parser_skip",
-                                    )?;
+                                    trace!(
+                                        "cpp_parser_skip; entity = {}; skipping template partial specialization",
+                                        entity_log_representation(entity)
+                                    );
                                     return Ok(());
                                 }
                             }
