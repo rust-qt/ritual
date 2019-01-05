@@ -124,16 +124,11 @@ pub trait MapIfOk<A> {
 }
 
 impl<A, T: IntoIterator<Item = A>> MapIfOk<A> for T {
-    fn map_if_ok<B, E, F: FnMut(A) -> std::result::Result<B, E>>(
-        self,
-        f: F,
-    ) -> std::result::Result<Vec<B>, E> {
-        let mut f = f;
-        let mut r = Vec::new();
-        for item in self {
-            r.push(f(item)?);
-        }
-        Ok(r)
+    fn map_if_ok<B, E, F>(self, f: F) -> std::result::Result<Vec<B>, E>
+    where
+        F: FnMut(A) -> std::result::Result<B, E>,
+    {
+        self.into_iter().map(f).collect()
     }
 }
 
