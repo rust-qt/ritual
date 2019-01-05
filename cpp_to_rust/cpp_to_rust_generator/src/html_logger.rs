@@ -1,12 +1,12 @@
 use crate::common::errors::{err_msg, Result};
-use crate::common::file_utils::{create_file, FileWrapper};
+use crate::common::file_utils::{create_file, File};
 use crate::common::log;
 
 use std::fmt::Display;
 use std::path::Path;
 
 pub struct HtmlLogger {
-    file: FileWrapper,
+    file: File,
 }
 
 pub fn escape_html(text: &str) -> String {

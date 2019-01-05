@@ -1076,7 +1076,7 @@ impl CppParser<'_, '_> {
                 .ok_or_else(|| err_msg("no file in source location"))?
                 .get_path();
             let file = open_file(&file_path)?;
-            let reader = BufReader::new(file.into_file());
+            let reader = BufReader::new(file.into_inner());
             let mut result = String::new();
             let range_line1 = (start.line - 1) as usize;
             let range_line2 = (end.line - 1) as usize;

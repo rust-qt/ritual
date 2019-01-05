@@ -111,14 +111,14 @@ fn move_one_file(old_path: &PathBuf, new_path: &PathBuf) -> Result<()> {
 }
 
 /// A wrapper over `std::fs::File` containing ths file's  path.
-pub struct FileWrapper {
+pub struct File {
     file: fs::File,
     path: PathBuf,
 }
 
 /// A wrapper over `std::fs::File::open` with better error reporting.
-pub fn open_file<P: AsRef<Path>>(path: P) -> Result<FileWrapper> {
-    Ok(FileWrapper {
+pub fn open_file<P: AsRef<Path>>(path: P) -> Result<File> {
+    Ok(File {
         file: fs::File::open(path.as_ref())
             .with_context(|_| format!("Failed to open file for reading: {:?}", path.as_ref()))?,
         path: path.as_ref().to_path_buf(),
@@ -132,8 +132,8 @@ pub fn file_to_string<P: AsRef<Path>>(path: P) -> Result<String> {
 }
 
 /// A wrapper over `std::fs::File::create` with better error reporting.
-pub fn create_file<P: AsRef<Path>>(path: P) -> Result<FileWrapper> {
-    Ok(FileWrapper {
+pub fn create_file<P: AsRef<Path>>(path: P) -> Result<File> {
+    Ok(File {
         file: fs::File::create(path.as_ref())
             .with_context(|_| format!("Failed to create file: {:?}", path.as_ref()))?,
         path: path.as_ref().to_path_buf(),
@@ -141,11 +141,8 @@ pub fn create_file<P: AsRef<Path>>(path: P) -> Result<FileWrapper> {
 }
 
 /// A wrapper over `std::fs::OpenOptions::open` with better error reporting.
-pub fn open_file_with_options<P: AsRef<Path>>(
-    path: P,
-    options: &fs::OpenOptions,
-) -> Result<FileWrapper> {
-    Ok(FileWrapper {
+pub fn open_file_with_options<P: AsRef<Path>>(path: P, options: &fs::OpenOptions) -> Result<File> {
+    Ok(File {
         file: options
             .open(path.as_ref())
             .with_context(|_| format!("Failed to open file: {:?}", path.as_ref()))?,
@@ -153,7 +150,7 @@ pub fn open_file_with_options<P: AsRef<Path>>(
     })
 }
 
-impl FileWrapper {
+impl File {
     /// Read content of the file to a string
     pub fn read_all(&mut self) -> Result<String> {
         let mut r = String::new();
@@ -177,7 +174,7 @@ impl FileWrapper {
     }
 
     /// Returns underlying `std::fs::File`
-    pub fn into_file(self) -> fs::File {
+    pub fn into_inner(self) -> fs::File {
         self.file
     }
 }
@@ -185,7 +182,7 @@ impl FileWrapper {
 /// Deserialize value from JSON file `path`.
 pub fn load_json<P: AsRef<Path>, T: serde::de::DeserializeOwned>(path: P) -> Result<T> {
     let file = open_file(path.as_ref())?;
-    Ok(::serde_json::from_reader(file.into_file())
+    Ok(::serde_json::from_reader(file.into_inner())
         .with_context(|_| format!("failed to parse file as JSON: {}", path.as_ref().display()))?)
 }
 
@@ -199,7 +196,7 @@ pub fn save_json<P: AsRef<Path>, T: ::serde::Serialize>(path: P, value: &T) -> R
     };
     {
         let file = create_file(&tmp_path)?;
-        ::serde_json::to_writer(&mut file.into_file(), value).with_context(|_| {
+        ::serde_json::to_writer(&mut file.into_inner(), value).with_context(|_| {
             format!(
                 "failed to serialize to JSON file: {}",
                 path.as_ref().display()
@@ -215,14 +212,14 @@ pub fn save_json<P: AsRef<Path>, T: ::serde::Serialize>(path: P, value: &T) -> R
 
 /// Deserialize value from binary file `path`.
 pub fn load_bincode<P: AsRef<Path>, T: serde::de::DeserializeOwned>(path: P) -> Result<T> {
-    let mut file = open_file(path.as_ref())?.into_file();
+    let mut file = open_file(path.as_ref())?.into_inner();
     Ok(bincode::deserialize_from(&mut file)
         .with_context(|_| format!("load_bincode failed: {}", path.as_ref().display()))?)
 }
 
 /// Serialize `value` into binary file `path`.
 pub fn save_bincode<P: AsRef<Path>, T: ::serde::Serialize>(path: P, value: &T) -> Result<()> {
-    let mut file = create_file(path.as_ref())?.into_file();
+    let mut file = create_file(path.as_ref())?.into_inner();
     bincode::serialize_into(&mut file, value)
         .with_context(|_| format!("save_bincode failed: {}", path.as_ref().display()))?;
     Ok(())
@@ -315,21 +312,21 @@ pub fn copy_file<P: AsRef<Path>, P2: AsRef<Path>>(path1: P, path2: P2) -> Result
 }
 
 /// A wrapper over `std::fs::DirEntry` iterator with better error reporting
-pub struct ReadDirWrapper {
+pub struct ReadDir {
     read_dir: fs::ReadDir,
     path: PathBuf,
 }
 
 /// A wrapper over `std::fs::read_dir` with better error reporting
-pub fn read_dir<P: AsRef<Path>>(path: P) -> Result<ReadDirWrapper> {
-    Ok(ReadDirWrapper {
+pub fn read_dir<P: AsRef<Path>>(path: P) -> Result<ReadDir> {
+    Ok(ReadDir {
         read_dir: fs::read_dir(path.as_ref())
             .with_context(|_| format!("Failed to read dir: {:?}", path.as_ref()))?,
         path: path.as_ref().to_path_buf(),
     })
 }
 
-impl Iterator for ReadDirWrapper {
+impl Iterator for ReadDir {
     type Item = Result<fs::DirEntry>;
     fn next(&mut self) -> Option<Result<fs::DirEntry>> {
         self.read_dir.next().map(|value| {

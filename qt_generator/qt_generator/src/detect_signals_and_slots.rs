@@ -80,7 +80,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
     for file_path in files {
         let mut file_sections = Vec::new();
         let file = open_file(&file_path)?;
-        let reader = BufReader::new(file.into_file());
+        let reader = BufReader::new(file.into_inner());
         for (line_num, line) in reader.lines().enumerate() {
             let line =
                 line.with_context(|_| format!("failed while reading lines from {}", &file_path))?;
