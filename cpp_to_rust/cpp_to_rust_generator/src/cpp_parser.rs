@@ -3,7 +3,6 @@ use crate::common::errors::{
 };
 use crate::common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
 use crate::common::log;
-use crate::common::string_utils::JoinWithSeparator;
 use crate::cpp_data::{
     CppBaseSpecifier, CppClassField, CppEnumValue, CppOriginLocation, CppTypeData, CppVisibility,
 };
@@ -16,6 +15,7 @@ use crate::cpp_type::{
     CppSpecificNumericTypeKind, CppType,
 };
 use crate::database::CppItemData;
+use itertools::Itertools;
 use std::str::FromStr;
 
 use clang;

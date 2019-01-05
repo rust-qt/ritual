@@ -1,6 +1,7 @@
 #[test]
 fn join() {
-    use crate::string_utils::JoinWithSeparator;
+    use itertools::Itertools;
+
     let a1 = vec!["a", "b", "c"];
     assert_eq!(a1.join(""), "abc");
     assert_eq!(a1.join("_"), "a_b_c");

@@ -2,7 +2,6 @@
 
 use crate::common::errors::{bail, should_panic_on_unexpected, unexpected, Result};
 use crate::common::file_utils::{create_file, path_to_str};
-use crate::common::string_utils::JoinWithSeparator;
 use crate::common::utils::get_command_output;
 use crate::common::utils::MapIfOk;
 use crate::cpp_ffi_data::{
@@ -11,6 +10,7 @@ use crate::cpp_ffi_data::{
 };
 use crate::cpp_function::ReturnValueAllocationPlace;
 use crate::cpp_type::CppType;
+use itertools::Itertools;
 
 use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_ffi_data::CppFfiItem;

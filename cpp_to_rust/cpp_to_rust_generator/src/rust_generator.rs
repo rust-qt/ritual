@@ -3,7 +3,7 @@
 use caption_strategy::TypeCaptionStrategy;
 use common::errors::{unexpected, ResultExt, Result};
 use common::log;
-use common::string_utils::JoinWithSeparator;
+use itertools::Itertools;
 use common::string_utils::{CaseOperations, WordIterator};
 use common::utils::{add_to_multihash, MapIfOk};
 use cpp_data::{CppDataWithDeps, CppEnumValue, CppTypeAllocationPlace, CppTypeKind};

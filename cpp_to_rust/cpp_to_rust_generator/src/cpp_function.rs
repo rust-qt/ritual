@@ -1,13 +1,13 @@
 //! Types for handling information about C++ methods.
 
 use crate::common::errors::{bail, Result};
-use crate::common::string_utils::JoinWithSeparator;
 use crate::common::utils::MapIfOk;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppVisibility;
 pub use crate::cpp_operator::{CppOperator, CppOperatorInfo};
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
+use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
 
 /// Information about an argument of a C++ method

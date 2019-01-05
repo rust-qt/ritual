@@ -7,7 +7,6 @@ use crate::cpp_checker::cpp_checker_step;
 use crate::cpp_ffi_generator::cpp_ffi_generator_step;
 use crate::cpp_parser::cpp_parser_step;
 
-use crate::common::string_utils::JoinWithSeparator;
 use crate::cpp_explicit_destructors::add_explicit_destructors_step;
 use crate::cpp_template_instantiator::find_template_instantiations_step;
 use crate::cpp_template_instantiator::instantiate_templates_step;
@@ -17,6 +16,7 @@ use crate::html_logger::HtmlLogger;
 use crate::rust_name_resolver::rust_name_resolver_step;
 use crate::type_allocation_places::choose_allocation_places_step;
 use crate::workspace::Workspace;
+use itertools::Itertools;
 use std::cmp::Ordering;
 use std::fmt;
 use std::iter::once;
@@ -131,10 +131,10 @@ impl ProcessingStep {
 }
 
 mod steps {
-    use crate::common::string_utils::JoinWithSeparator;
     use crate::database::CppCheckerInfo;
     use crate::html_logger::escape_html;
     use crate::processor::ProcessingStep;
+    use itertools::Itertools;
 
     pub fn print_database() -> ProcessingStep {
         ProcessingStep {
@@ -153,7 +153,7 @@ mod steps {
                     if let Some(ref ffi_items) = item.ffi_items {
                         for ffi_item in ffi_items {
                             let item_text = format!("{:?}", ffi_item.cpp_item);
-                            let item_texts = ffi_item.checks.items.iter().map(|item| {
+                            let mut item_texts = ffi_item.checks.items.iter().map(|item| {
                                 format!(
                                     "<li>{}: {}</li>",
                                     item.env.short_text(),

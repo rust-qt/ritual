@@ -1,9 +1,9 @@
 use cpp_to_rust_generator::common::errors::Result;
 use cpp_to_rust_generator::common::log;
-use cpp_to_rust_generator::common::string_utils::JoinWithSeparator;
 use cpp_to_rust_generator::database::CppItemData;
 use cpp_to_rust_generator::database::DatabaseItemSource;
 use cpp_to_rust_generator::processor::ProcessorData;
+use itertools::Itertools;
 use std::collections::HashSet;
 
 pub fn detect_signal_argument_types(data: &mut ProcessorData) -> Result<()> {

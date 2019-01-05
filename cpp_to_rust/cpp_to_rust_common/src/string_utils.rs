@@ -1,31 +1,6 @@
 //! Various utilities for string operations.
 
-/// Join items of a collection with separator.
-pub trait JoinWithSeparator<S> {
-    /// Result type of the operation
-    type Output;
-    /// Join items of `self` with `separator`.
-    fn join(self, separator: S) -> Self::Output;
-}
-
-impl<S, S2, X> JoinWithSeparator<S2> for X
-where
-    S: AsRef<str>,
-    S2: AsRef<str>,
-    X: Iterator<Item = S>,
-{
-    type Output = String;
-    fn join(self, separator: S2) -> String {
-        self.fold("".to_string(), |a, b| {
-            let m = if a.is_empty() {
-                a
-            } else {
-                a + separator.as_ref()
-            };
-            m + b.as_ref()
-        })
-    }
-}
+use itertools::Itertools;
 
 /// Iterator over words in a camel-case
 /// or snake-case string.

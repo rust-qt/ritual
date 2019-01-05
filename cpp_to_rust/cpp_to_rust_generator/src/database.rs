@@ -9,13 +9,13 @@ use crate::cpp_data::CppTypeDataKind;
 use crate::cpp_data::CppVisibility;
 use crate::cpp_function::CppFunction;
 
-use crate::common::string_utils::JoinWithSeparator;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppTemplateInstantiation;
 use crate::cpp_ffi_data::CppFfiItem;
 use crate::cpp_type::CppType;
 use crate::html_logger::escape_html;
 use crate::rust_type::RustName;
+use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::fmt::Formatter;

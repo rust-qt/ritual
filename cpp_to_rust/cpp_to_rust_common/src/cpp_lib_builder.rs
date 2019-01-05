@@ -6,12 +6,13 @@ use crate::cpp_build_config::CppLibraryType;
 use crate::errors::{err_msg, Result};
 use crate::file_utils::{create_dir_all, path_to_str};
 use crate::log;
-use crate::string_utils::JoinWithSeparator;
 use crate::target;
 use crate::utils::run_command;
 use crate::utils::run_command_and_capture_output;
 use crate::utils::CommandOutput;
 use crate::utils::MapIfOk;
+use itertools::Itertools;
+use std::fmt::Display;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -32,8 +33,8 @@ impl CMakeVar {
     /// Creates a new variable containing a list of values.
     pub fn new_list<I, S, L>(name: S, values: L) -> Result<CMakeVar>
     where
-        S: Into<String>,
-        I: AsRef<str>,
+        S: Display + Into<String>,
+        I: AsRef<str> + Display,
         L: IntoIterator<Item = I>,
     {
         let value = values
@@ -56,7 +57,7 @@ impl CMakeVar {
     /// Creates a new variable containing a list of paths.
     pub fn new_path_list<I, S, L>(name: S, paths: L) -> Result<CMakeVar>
     where
-        S: Into<String>,
+        S: Into<String> + Display,
         I: AsRef<Path>,
         L: IntoIterator<Item = I>,
     {
