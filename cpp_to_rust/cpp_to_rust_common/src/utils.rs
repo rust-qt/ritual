@@ -6,6 +6,7 @@ use crate::log;
 use std;
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::fmt::Display;
 use std::hash::BuildHasher;
 use std::hash::Hash;
 use std::path::PathBuf;
@@ -149,23 +150,13 @@ pub fn add_env_path_item(
     Ok(env::join_paths(new_paths).with_context(|_| "env::join_paths failed")?)
 }
 
-pub trait PushVec<T> {
-    fn push_vec(&mut self, vec: Vec<T>);
+pub trait Inspect {
+    fn inspect(self, text: impl Display) -> Self;
 }
 
-impl<T> PushVec<T> for Vec<T> {
-    fn push_vec(&mut self, mut vec: Vec<T>) {
-        self.append(&mut vec);
-    }
-}
-
-pub trait DebugPrint {
-    fn debug_print(self, text: &str) -> Self;
-}
-
-impl<T: Debug> DebugPrint for T {
-    fn debug_print(self, text: &str) -> Self {
-        println!("DebugPrint {} {:?}", text, self);
+impl<T: Debug> Inspect for T {
+    fn inspect(self, text: impl Display) -> Self {
+        println!("{} {:?}", text, self);
         self
     }
 }
