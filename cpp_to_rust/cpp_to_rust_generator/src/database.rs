@@ -380,18 +380,24 @@ impl RustItem {
         }
     }
 
-    /*fn rust_path(&self) -> Option<&RustPath> {
+    pub fn rust_path(&self) -> Option<&RustPath> {
         match *self {
-            RustItem::Function { ref rust_path } => {
-                rust_path.as_ref().map(|function_path| function_path.rust_path())
-            },
-            RustItem::Enum { ref rust_path } => rust_path.as_ref(),
-            RustItem::EnumValue { ref rust_path } => rust_path.as_ref(),
-            RustItem::Class { ref rust_path } => rust_path.is_some(),
-            RustItem::Namespace { ref rust_path } => rust_path.is_some(),
-            RustItem::QtPublicSlotWrapper { ref rust_path } => rust_path.is_some(),
+            RustItem::Function { ref rust_path, .. } => rust_path
+                .as_ref()
+                .and_then(|function_path| function_path.rust_path()),
+            RustItem::Enum { ref rust_path, .. } => rust_path.as_ref(),
+            RustItem::EnumValue { ref rust_path, .. } => rust_path.as_ref(),
+            RustItem::Class { ref rust_path, .. } => {
+                if let Some(RustClassPath::ConcreteClass { ref path, .. }) = rust_path {
+                    Some(path)
+                } else {
+                    None
+                }
+            }
+            RustItem::Namespace { .. } => None,
+            RustItem::QtPublicSlotWrapper { ref rust_path, .. } => rust_path.as_ref(),
         }
-    }*/
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
