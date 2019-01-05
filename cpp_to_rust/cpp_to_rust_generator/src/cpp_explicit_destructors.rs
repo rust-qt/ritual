@@ -37,10 +37,7 @@ fn add_explicit_destructors(data: &mut ProcessorData) -> Result<()> {
                     methods.push(CppFunction {
                         path: type1
                             .path
-                            .with_added(CppPathItem::from_str_unchecked(&format!(
-                                "~{}",
-                                class_name
-                            ))),
+                            .join(CppPathItem::from_str_unchecked(&format!("~{}", class_name))),
                         member: Some(CppFunctionMemberData {
                             is_virtual: false, // the destructor can actually be virtual but we don't care about it here
                             is_pure_virtual: false,

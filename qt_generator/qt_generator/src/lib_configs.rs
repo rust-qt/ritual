@@ -5,7 +5,6 @@ use cpp_to_rust_generator::common::cpp_build_config::CppLibraryType;
 use cpp_to_rust_generator::common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
 use cpp_to_rust_generator::common::errors::{bail, Result, ResultExt};
 use cpp_to_rust_generator::common::file_utils::repo_crate_local_path;
-use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
 use cpp_to_rust_generator::common::target;
 use cpp_to_rust_generator::common::{log, toml};
 use cpp_to_rust_generator::config::Config;
@@ -488,15 +487,15 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
         );
 
         config.add_include_directive(format!("{}.h", crate_name));
-        let moqt_sublib_path = moqt_path.with_added(crate_name);
+        let moqt_sublib_path = moqt_path.join(crate_name);
         if !moqt_sublib_path.exists() {
             bail!("Path does not exist: {}", moqt_sublib_path.display());
         }
-        let include_path = moqt_sublib_path.with_added("include");
+        let include_path = moqt_sublib_path.join("include");
         if !include_path.exists() {
             bail!("Path does not exist: {}", include_path.display());
         }
-        let lib_path = moqt_sublib_path.with_added("lib");
+        let lib_path = moqt_sublib_path.join("lib");
         if !lib_path.exists() {
             bail!("Path does not exist: {}", lib_path.display());
         }
@@ -600,8 +599,8 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
 
     config.set_crate_template_path(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .with_added("crate_templates")
-            .with_added(&crate_name),
+            .join("crate_templates")
+            .join(&crate_name),
     );
     match crate_name {
         "qt_core" => lib_configs::core(&mut config)?,

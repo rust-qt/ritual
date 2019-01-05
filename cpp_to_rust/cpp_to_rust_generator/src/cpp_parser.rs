@@ -18,7 +18,6 @@ use crate::cpp_type::{
 use crate::database::CppItemData;
 use std::str::FromStr;
 
-use crate::common::file_utils::PathBufWithAdded;
 use clang;
 use clang::*;
 
@@ -207,7 +206,7 @@ fn run_clang<R, F: FnMut(Entity) -> Result<R>>(
 ) -> Result<R> {
     let clang = init_clang()?;
     let index = Index::new(&clang, false, false);
-    let tmp_cpp_path = tmp_path.with_added("1.cpp");
+    let tmp_cpp_path = tmp_path.join("1.cpp");
     {
         let mut tmp_file = create_file(&tmp_cpp_path)?;
         for directive in config.include_directives() {

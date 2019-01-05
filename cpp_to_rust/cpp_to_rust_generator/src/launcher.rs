@@ -26,7 +26,7 @@ use std::collections::HashMap;
 /// processed in the cache directory `path`.
 fn load_dependency(path: &PathBuf) -> Result<DependencyInfo> {
   log::status(format!("Loading files from {}", path.display()));
-  let parser_cpp_data_path = path.with_added("parser_cpp_data.bin");
+  let parser_cpp_data_path = path.join("parser_cpp_data.bin");
   if !parser_cpp_data_path.exists() {
     return Err(
       format!("file not found: {}", parser_cpp_data_path.display()).into(),
@@ -36,7 +36,7 @@ fn load_dependency(path: &PathBuf) -> Result<DependencyInfo> {
 
 
 
-  let processed_cpp_data_path = path.with_added("processed_cpp_data.bin");
+  let processed_cpp_data_path = path.join("processed_cpp_data.bin");
   if !processed_cpp_data_path.exists() {
     return Err(
       format!("file not found: {}", processed_cpp_data_path.display()).into(),
@@ -47,7 +47,7 @@ fn load_dependency(path: &PathBuf) -> Result<DependencyInfo> {
     parser: parser_cpp_data,
     processed: processed_cpp_data,
   };
-  let rust_export_info_path = path.with_added("rust_export_info.bin");
+  let rust_export_info_path = path.join("rust_export_info.bin");
   if !rust_export_info_path.exists() {
     return Err(
       format!("file not found: {}", rust_export_info_path.display()).into(),
@@ -74,15 +74,15 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
         &config,
         dependencies.iter().map(|dep| &dep.cpp_data).collect(),
       )?;
-      let output_path_existed = config.output_dir_path().with_added("src").exists();
+      let output_path_existed = config.output_dir_path().join("src").exists();
 
-      let c_lib_path = config.output_dir_path().with_added("c_lib");
+      let c_lib_path = config.output_dir_path().join("c_lib");
       let c_lib_path_existed = c_lib_path.exists();
 
 
       let cpp_ffi_lib_name = format!("{}_c", &config.crate_properties().name());
       let c_lib_tmp_path = if c_lib_path_existed {
-        let path = config.cache_dir_path().with_added("c_lib.new");
+        let path = config.cache_dir_path().join("c_lib.new");
         if path.exists() {
           remove_dir_all(&path)?;
         }
@@ -110,7 +110,7 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
       code_gen.generate_files(&cpp_ffi_headers)?;
 
       let crate_new_path = if output_path_existed {
-        let path = config.cache_dir_path().with_added(format!(
+        let path = config.cache_dir_path().join(format!(
           "{}.new",
           &config.crate_properties().name()
         ));
@@ -166,7 +166,7 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
         }
       }
       {
-        let mut file = create_file(c_lib_tmp_path.with_added("type_sizes.cpp"))?;
+        let mut file = create_file(c_lib_tmp_path.join("type_sizes.cpp"))?;
         file.write(generate_cpp_type_size_requester(
           &cpp_type_size_requests,
           config.include_directives(),
@@ -182,7 +182,7 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
         output_path: path_to_str(config.output_dir_path())?.to_string(),
       };
       if config.write_cache() {
-        let rust_export_path = config.cache_dir_path().with_added("rust_export_info.bin");
+        let rust_export_path = config.cache_dir_path().join("rust_export_info.bin");
         log::status("Saving Rust export info");
         save_bincode(&rust_export_path, &rust_export_info)?;
         log::status(format!(
@@ -197,14 +197,14 @@ pub fn exec<T: Iterator<Item = Config>>(configs: T) -> Result<()> {
         for item in read_dir(&crate_new_path)? {
           let item = item?;
           move_files(
-            &crate_new_path.with_added(item.file_name()),
-            &config.output_dir_path().with_added(item.file_name()),
+            &crate_new_path.join(item.file_name()),
+            &config.output_dir_path().join(item.file_name()),
           )?;
         }
         remove_dir(&crate_new_path)?;
       }
       save_json(
-        config.output_dir_path().with_added(
+        config.output_dir_path().join(
           "build_script_data.json",
         ),
         &BuildScriptData {

@@ -1,7 +1,6 @@
 //! Converts Qt docs from the internal format.
 
 use cpp_to_rust_generator::common::errors::{bail, err_msg, Result, ResultExt};
-use cpp_to_rust_generator::common::file_utils::PathBufWithAdded;
 use cpp_to_rust_generator::common::log;
 use rusqlite;
 use select::document::Document;
@@ -90,7 +89,7 @@ impl DocData {
             qt_crate_name.replace("_", "")
         };
 
-        let doc_file_path = docs_path.with_added(format!("{}.qch", doc_file_name));
+        let doc_file_path = docs_path.join(format!("{}.qch", doc_file_name));
         if !doc_file_path.exists() {
             bail!(
                 "Documentation file does not exist: {}",

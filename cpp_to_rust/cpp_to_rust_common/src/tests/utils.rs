@@ -18,13 +18,12 @@ fn join() {
 
 #[test]
 fn path_buf_with_added() {
-    use crate::file_utils::PathBufWithAdded;
     use std::path::PathBuf;
     let x = PathBuf::from("/tmp");
     let mut y = x.clone();
     y.push("name");
-    assert_eq!(x.with_added("name"), y);
-    assert_eq!(x.as_path().with_added("name"), y);
+    assert_eq!(x.join("name"), y);
+    assert_eq!(x.as_path().join("name"), y);
 }
 
 #[test]

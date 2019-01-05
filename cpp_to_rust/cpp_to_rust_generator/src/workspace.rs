@@ -1,5 +1,4 @@
 use crate::common::errors::{bail, FancyUnwrap, Result};
-use crate::common::file_utils::PathBufWithAdded;
 use crate::common::file_utils::{create_dir, create_dir_all, load_json, remove_dir_all, save_json};
 use crate::common::log;
 use crate::common::string_utils::CaseOperations;
@@ -34,13 +33,11 @@ pub struct Workspace {
 }
 
 fn config_path(path: &Path) -> PathBuf {
-    path.with_added("config.json")
+    path.join("config.json")
 }
 
 fn database_path(workspace_path: &Path, crate_name: &str) -> PathBuf {
-    workspace_path
-        .with_added(crate_name)
-        .with_added("database.json")
+    workspace_path.join(crate_name).join("database.json")
 }
 
 impl Workspace {
@@ -68,7 +65,7 @@ impl Workspace {
     }
 
     pub fn tmp_path(&self) -> Result<PathBuf> {
-        let path = self.path.with_added("tmp");
+        let path = self.path.join("tmp");
         if !path.exists() {
             create_dir(&path)?;
         }
@@ -80,7 +77,7 @@ impl Workspace {
     }
 
     pub fn log_path(&self) -> Result<PathBuf> {
-        let path = self.path.with_added("log");
+        let path = self.path.join("log");
         if !path.exists() {
             create_dir(&path)?;
         }
@@ -88,7 +85,7 @@ impl Workspace {
     }
 
     pub fn crate_path(&self, crate_name: &str) -> Result<PathBuf> {
-        let path = self.path.with_added(crate_name);
+        let path = self.path.join(crate_name);
         if !path.exists() {
             create_dir(&path)?;
         }
@@ -112,7 +109,7 @@ impl Workspace {
     }
 
     pub fn create_crate(&mut self, crate_name: &str) -> Result<()> {
-      create_dir(self.path.with_added(crate_name))?;
+      create_dir(self.path.join(crate_name))?;
       save_json(database_path(&self.path, data.crate_name()), &Database::empty(crate_name))?;
       Ok(())
     }*/
@@ -205,7 +202,7 @@ impl Workspace {
             create_dir_all(&logs_dir)?;
             for category in debug_categories {
                 let name = format!("{:?}", category).to_snake_case();
-                let path = logs_dir.with_added(format!("{}.log", name));
+                let path = logs_dir.join(format!("{}.log", name));
                 category_settings.insert(
                     category,
                     log::LoggerSettings {

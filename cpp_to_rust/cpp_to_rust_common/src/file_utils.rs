@@ -24,7 +24,7 @@ pub fn move_files(src: &PathBuf, dst: &PathBuf) -> Result<()> {
 
             for item in read_dir(dst)? {
                 let item = item?;
-                if !src.with_added(item.file_name()).as_path().exists() {
+                if !src.join(item.file_name()).as_path().exists() {
                     let path = item.path();
                     if path.as_path().is_dir() {
                         log::llog(log::DebugMoveFiles, || {
@@ -43,7 +43,7 @@ pub fn move_files(src: &PathBuf, dst: &PathBuf) -> Result<()> {
             for item in read_dir(src)? {
                 let item = item?;
                 let from = item.path().to_path_buf();
-                let to = dst.with_added(item.file_name());
+                let to = dst.join(item.file_name());
                 move_files(&from, &to)?;
             }
             remove_dir_all(src)?;
@@ -66,7 +66,7 @@ pub fn copy_recursively(src: &PathBuf, dst: &PathBuf) -> Result<()> {
             for item in read_dir(src)? {
                 let item = item?;
                 let from = item.path().to_path_buf();
-                let to = dst.with_added(item.file_name());
+                let to = dst.join(item.file_name());
                 copy_recursively(&from, &to)?;
             }
         } else {
@@ -108,21 +108,6 @@ fn move_one_file(old_path: &PathBuf, new_path: &PathBuf) -> Result<()> {
     };
     inner().with_context(|_| format!("failed: move_one_file({:?}, {:?})", old_path, new_path))?;
     Ok(())
-}
-
-/// Adds `with_added` function for paths.
-pub trait PathBufWithAdded {
-    /// Appends `path` to `self` and returns it as new `PathBuf`,
-    /// leaving `self` unchanged.
-    fn with_added<P: AsRef<Path>>(&self, path: P) -> PathBuf;
-}
-
-impl<T: AsRef<Path>> PathBufWithAdded for T {
-    fn with_added<P: AsRef<Path>>(&self, path: P) -> PathBuf {
-        let mut p = self.as_ref().to_path_buf();
-        p.push(path);
-        p
-    }
 }
 
 /// A wrapper over `std::fs::File` containing ths file's  path.
@@ -407,7 +392,7 @@ pub fn repo_crate_local_path(relative_path: &str) -> Result<PathBuf> {
     let parent2 = parent
         .parent()
         .ok_or_else(|| err_msg("failed to get parent directory"))?;
-    let result = parent2.with_added(relative_path);
+    let result = parent2.join(relative_path);
     if !result.exists() {
         bail!("detected path does not exist: {}", result.display());
     }

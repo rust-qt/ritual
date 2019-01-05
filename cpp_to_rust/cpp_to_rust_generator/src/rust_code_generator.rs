@@ -149,7 +149,7 @@ pub fn run(config: RustCodeGeneratorConfig, data: &RustGeneratorOutput) -> Resul
       .crate_template_path
       .as_ref()
       .and_then(|crate_template_path| {
-        let template_rustfmt_config_path = crate_template_path.with_added("rustfmt.toml");
+        let template_rustfmt_config_path = crate_template_path.join("rustfmt.toml");
         if template_rustfmt_config_path.exists() {
           Some(template_rustfmt_config_path)
         } else {
@@ -708,8 +708,8 @@ impl<'a> RustCodeGenerator<'a> {
       code.push_str(&format!("{}pub mod {};\n", doc, &module.name));
     }
 
-    let src_path = self.config.output_path.with_added("src");
-    let lib_file_path = src_path.with_added("lib.rs");
+    let src_path = self.config.output_path.join("src");
+    let lib_file_path = src_path.join("lib.rs");
 
     self.save_src_file(&lib_file_path, &code)?;
     self.call_rustfmt(&lib_file_path);
@@ -1233,8 +1233,8 @@ impl<'a> {connections_mod}::Receiver for {type_name}<'a> {{
     }
     code.push_str("}\n");
 
-    let src_dir_path = self.config.output_path.with_added("src");
-    let file_path = src_dir_path.with_added("ffi.in.rs");
+    let src_dir_path = self.config.output_path.join("src");
+    let file_path = src_dir_path.join("ffi.in.rs");
     self.save_src_file(&file_path, &code)?;
     // no rustfmt for ffi file
     Ok(())

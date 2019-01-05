@@ -1,13 +1,11 @@
 /*use common::cpp_build_config::CppBuildConfigData;
 use common::cpp_lib_builder::{BuildType, CppLibBuilder};
 use common::errors::fancy_unwrap;
-use common::file_utils::{create_dir, PathBufWithAdded};
 use common::target;
 use common::utils::{add_env_path_item, run_command};
 use config::{Config, CrateProperties};
 use std::path::PathBuf;
 use std::process::Command;
-use common::file_utils::{canonicalize, create_dir_all, PathBufWithAdded};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -19,7 +17,7 @@ pub enum TempTestDir {
 impl TempTestDir {
     pub fn new(name: &str) -> TempTestDir {
         if let Ok(value) = ::std::env::var("CPP_TO_RUST_TEMP_TEST_DIR") {
-            let path = canonicalize(PathBuf::from(value)).unwrap().with_added(name);
+            let path = canonicalize(PathBuf::from(value)).unwrap().join(name);
             create_dir_all(&path).unwrap();
             TempTestDir::Custom(path)
         } else {
@@ -46,8 +44,8 @@ fn build_cpp_lib() -> TempTestDir {
     };
     assert!(cpp_lib_source_dir.exists());
     let temp_dir = TempTestDir::new("test_full_run");
-    let build_dir = temp_dir.path().with_added("build");
-    let install_dir = temp_dir.path().with_added("install");
+    let build_dir = temp_dir.path().join("build");
+    let install_dir = temp_dir.path().join("install");
     if !build_dir.exists() {
         create_dir(&build_dir).unwrap();
     }
@@ -71,14 +69,14 @@ fn build_cpp_lib() -> TempTestDir {
 #[test]
 fn full_run() {
     let temp_dir = build_cpp_lib();
-    let crate_dir = temp_dir.path().with_added("crate");
-    let cpp_install_lib_dir = temp_dir.path().with_added("install").with_added("lib");
+    let crate_dir = temp_dir.path().join("crate");
+    let cpp_install_lib_dir = temp_dir.path().join("install").join("lib");
     assert!(cpp_install_lib_dir.exists());
     let crate_properties = CrateProperties::new("rust_ctrt1", "0.0.0");
 
     let mut config = Config::new(
         &crate_dir,
-        temp_dir.path().with_added("cache"),
+        temp_dir.path().join("cache"),
         crate_properties,
     );
     config.add_include_directive("ctrt1/all.h");

@@ -343,8 +343,8 @@ pub fn generate_cpp_file(
 ) -> Result<()> {
     //    let cpp_path = self
     //      .lib_path
-    //      .with_added("src")
-    //      .with_added(format!("{}_{}.cpp", &self.lib_name, data.name));
+    //      .join("src")
+    //      .join(format!("{}_{}.cpp", &self.lib_name, data.name));
 
     let mut cpp_file = create_file(file_path)?;
     cpp_file.write(format!("#include \"{}\"\n", global_header_name))?;

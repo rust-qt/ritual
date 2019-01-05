@@ -2,7 +2,6 @@ use crate::common::cpp_lib_builder::{
     c2r_cmake_vars, BuildType, CppLibBuilder, CppLibBuilderOutput,
 };
 use crate::common::errors::{bail, Result};
-use crate::common::file_utils::PathBufWithAdded;
 use crate::common::file_utils::{create_dir_all, create_file, path_to_str, remove_dir_all};
 use crate::common::log;
 use crate::common::target::current_target;
@@ -212,15 +211,15 @@ impl CppChecker<'_, '_> {
 }
 
 fn run(data: &mut ProcessorData) -> Result<()> {
-    let root_path = data.workspace.tmp_path()?.with_added("cpp_checker");
+    let root_path = data.workspace.tmp_path()?.join("cpp_checker");
     if root_path.exists() {
         remove_dir_all(&root_path)?;
     }
-    let src_path = root_path.with_added("src");
+    let src_path = root_path.join("src");
     create_dir_all(&src_path)?;
-    create_file(src_path.with_added("CMakeLists.txt"))?
+    create_file(src_path.join("CMakeLists.txt"))?
         .write(include_str!("../templates/cpp_checker/CMakeLists.txt"))?;
-    create_file(src_path.with_added("utils.h"))?.write(format!(
+    create_file(src_path.join("utils.h"))?.write(format!(
         include_str!("../templates/cpp_checker/utils.h"),
         include_directives_code = data
             .config
@@ -231,7 +230,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
 
     let builder = CppLibBuilder {
         cmake_source_dir: src_path.clone(),
-        build_dir: root_path.with_added("build"),
+        build_dir: root_path.join("build"),
         install_dir: None,
         num_jobs: Some(1),
         build_type: BuildType::Debug,
@@ -251,7 +250,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
     let mut checker = CppChecker {
         data,
         builder,
-        main_cpp_path: src_path.with_added("main.cpp"),
+        main_cpp_path: src_path.join("main.cpp"),
         env,
     };
 

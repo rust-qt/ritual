@@ -15,7 +15,6 @@ use cpp_to_rust_common::file_utils::read_dir;
 use cpp_to_rust_common::file_utils::repo_crate_local_path;
 use cpp_to_rust_common::file_utils::save_json;
 use cpp_to_rust_common::file_utils::save_toml;
-use cpp_to_rust_common::file_utils::PathBufWithAdded;
 use cpp_to_rust_common::toml;
 use cpp_to_rust_common::utils::MapIfOk;
 use cpp_to_rust_common::BuildScriptData;
@@ -67,14 +66,14 @@ fn generate_crate_template(data: &mut ProcessorData) -> Result<()> {
             .crate_template_path()
             .as_ref()
             .and_then(|crate_template_path| {
-                let template_build_rs_path = crate_template_path.with_added("build.rs");
+                let template_build_rs_path = crate_template_path.join("build.rs");
                 if template_build_rs_path.exists() {
                     Some(template_build_rs_path)
                 } else {
                     None
                 }
             });
-    let output_build_rs_path = output_path.with_added("build.rs");
+    let output_build_rs_path = output_path.join("build.rs");
     if let Some(ref template_build_rs_path) = template_build_rs_path {
         copy_file(template_build_rs_path, output_build_rs_path)?;
     } else {
@@ -201,16 +200,16 @@ fn generate_crate_template(data: &mut ProcessorData) -> Result<()> {
             toml::Value::Table(data.config.crate_properties().custom_fields().clone()),
         )
     };
-    save_toml(output_path.with_added("Cargo.toml"), &cargo_toml_data)?;
+    save_toml(output_path.join("Cargo.toml"), &cargo_toml_data)?;
 
     if let Some(ref template_path) = data.config.crate_template_path() {
         for item in read_dir(template_path)? {
             let item = item?;
-            copy_recursively(&item.path(), &output_path.with_added(item.file_name()))?;
+            copy_recursively(&item.path(), &output_path.join(item.file_name()))?;
         }
     }
-    if !output_path.with_added("src").exists() {
-        create_dir_all(output_path.with_added("src"))?;
+    if !output_path.join("src").exists() {
+        create_dir_all(output_path.join("src"))?;
     }
     Ok(())
 }
@@ -223,7 +222,7 @@ fn generate_c_lib_template(
     include_directives: &[PathBuf],
 ) -> Result<()> {
     let name_upper = lib_name.to_uppercase();
-    let cmakelists_path = lib_path.with_added("CMakeLists.txt");
+    let cmakelists_path = lib_path.join("CMakeLists.txt");
     let mut cmakelists_file = create_file(&cmakelists_path)?;
 
     cmakelists_file.write(format!(
@@ -236,7 +235,7 @@ fn generate_c_lib_template(
         .map_if_ok(|d| -> Result<_> { Ok(format!("#include \"{}\"", path_to_str(d)?)) })?
         .join("\n");
 
-    let global_header_path = lib_path.with_added(&global_header_name);
+    let global_header_path = lib_path.join(&global_header_name);
     let mut global_header_file = create_file(&global_header_path)?;
     global_header_file.write(format!(
         include_str!("../templates/c_lib/global.h"),
@@ -252,7 +251,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         .workspace
         .crate_path(data.config.crate_properties().name())?;
 
-    let c_lib_path = output_path.with_added("c_lib");
+    let c_lib_path = output_path.join("c_lib");
     if !c_lib_path.exists() {
         create_dir(&c_lib_path)?;
     }
@@ -267,26 +266,26 @@ fn run(data: &mut ProcessorData) -> Result<()> {
 
     cpp_code_generator::generate_cpp_file(
         &data.current_database.items,
-        &c_lib_path.with_added("file1.cpp"),
+        &c_lib_path.join("file1.cpp"),
         &global_header_name,
     )?;
 
-    let mut file = create_file(c_lib_path.with_added("type_sizes.cxx"))?;
+    let mut file = create_file(c_lib_path.join("type_sizes.cxx"))?;
     file.write(generate_cpp_type_size_requester(
         &[], // TODO: generate requests from Rust type list
         data.config.include_directives(),
     )?)?;
 
-    let lib_file_path = output_path.with_added("src").with_added("lib.rs");
+    let lib_file_path = output_path.join("src").join("lib.rs");
     let mut file = create_file(&lib_file_path)?;
     file.write("// TODO: generate Rust code\n")?;
 
-    let ffi_file_path = output_path.with_added("src").with_added("ffi.in.rs");
+    let ffi_file_path = output_path.join("src").join("ffi.in.rs");
     let mut file = create_file(&ffi_file_path)?;
     file.write("extern \"C\" { // TODO: generate Rust code\n}\n")?;
 
     save_json(
-        output_path.with_added("build_script_data.json"),
+        output_path.join("build_script_data.json"),
         &BuildScriptData {
             cpp_build_config: data.config.cpp_build_config().clone(),
             cpp_wrapper_lib_name: c_lib_name,

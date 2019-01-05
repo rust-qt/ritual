@@ -163,7 +163,7 @@ impl CppPath {
             .join("::")
     }
 
-    pub fn with_added(&self, item: CppPathItem) -> CppPath {
+    pub fn join(&self, item: CppPathItem) -> CppPath {
         let mut result = self.clone();
         result.items.push(item);
         result

@@ -8,7 +8,6 @@ use cpp_to_rust_common::cpp_build_config::{
     CppBuildConfig, CppBuildConfigData, CppBuildPaths, CppLibraryType,
 };
 use cpp_to_rust_common::errors::{bail, Result};
-use cpp_to_rust_common::file_utils::PathBufWithAdded;
 use cpp_to_rust_common::log;
 use cpp_to_rust_common::string_utils::CaseOperations;
 use cpp_to_rust_common::target;
@@ -60,7 +59,7 @@ pub fn get_installation_data(crate_name: &str) -> Result<InstallationData> {
     let docs_path = run_qmake_query("QT_INSTALL_DOCS")?;
     log::status(format!("QT_INSTALL_DOCS = \"{}\"", docs_path.display()));
     let folder_name = lib_folder_name(crate_name);
-    let dir = root_include_path.with_added(&folder_name);
+    let dir = root_include_path.join(&folder_name);
     if dir.exists() {
         Ok(InstallationData {
             root_include_path,
@@ -71,7 +70,7 @@ pub fn get_installation_data(crate_name: &str) -> Result<InstallationData> {
             qt_version,
         })
     } else {
-        let dir2 = lib_path.with_added(format!("{}.framework/Headers", folder_name));
+        let dir2 = lib_path.join(format!("{}.framework/Headers", folder_name));
         if dir2.exists() {
             Ok(InstallationData {
                 root_include_path,

@@ -1,4 +1,3 @@
-use crate::common::file_utils::{create_dir, create_file, PathBufWithAdded};
 use crate::cpp_data::*;
 use crate::cpp_function::*;
 use crate::cpp_operator::CppOperator;
@@ -10,6 +9,8 @@ use crate::config::CrateProperties;
 use crate::cpp_parser::cpp_parser_step;
 use crate::processor;
 use crate::workspace::Workspace;
+use cpp_to_rust_common::file_utils::create_dir;
+use cpp_to_rust_common::file_utils::create_file;
 
 struct ParserCppData {
     types: Vec<CppTypeData>,
@@ -25,10 +26,10 @@ fn run_parser(code: &'static str) -> ParserCppData {
 
     let mut workspace = Workspace::new(dir.path().into()).unwrap();
 
-    let include_dir = dir.path().with_added("include");
+    let include_dir = dir.path().join("include");
     create_dir(&include_dir).unwrap();
     let include_name = "myfakelib.h";
-    let include_file_path = include_dir.with_added(&include_name);
+    let include_file_path = include_dir.join(&include_name);
     {
         let mut include_file = create_file(&include_file_path).unwrap();
         include_file.write(code).unwrap();
@@ -536,7 +537,7 @@ fn template_class_method() {
     assert_eq!(
         data.methods[0],
         CppFunction {
-            path: my_vector_path.with_added(CppPathItem::from_str_unchecked("get")),
+            path: my_vector_path.join(CppPathItem::from_str_unchecked("get")),
             member: Some(CppFunctionMemberData {
                 kind: CppFunctionKind::Regular,
                 is_virtual: false,
@@ -565,7 +566,7 @@ fn template_class_method() {
     );
     assert_eq!(
         data.methods[1].path,
-        my_vector_path.with_added(CppPathItem::from_str_unchecked("begin"))
+        my_vector_path.join(CppPathItem::from_str_unchecked("begin"))
     );
     assert_eq!(
         data.methods[1].return_type,

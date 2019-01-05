@@ -1,5 +1,4 @@
 use crate::common::errors::{bail, Result, ResultExt};
-use crate::common::file_utils::PathBufWithAdded;
 use crate::common::log;
 
 use crate::common::utils::MapIfOk;
@@ -305,7 +304,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
             let mut html_logger = HtmlLogger::new(
                 workspace
                     .log_path()?
-                    .with_added(format!("{}_log.html", step.name)),
+                    .join(format!("{}_log.html", step.name)),
                 &format!("{} log", step.name),
             )?;
 

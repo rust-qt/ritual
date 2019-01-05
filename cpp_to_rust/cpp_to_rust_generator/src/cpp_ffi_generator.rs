@@ -443,13 +443,13 @@ fn generate_field_accessors(
                 target: Box::new(field.field_type.clone()),
             };
             new_methods.push(create_method(
-                class_path.with_added(CppPathItem::from_str_unchecked(&field.name)),
+                class_path.join(CppPathItem::from_str_unchecked(&field.name)),
                 CppFieldAccessorType::ConstRefGetter,
                 type2_const,
                 Vec::new(),
             )?);
             new_methods.push(create_method(
-                class_path.with_added(CppPathItem::from_str_unchecked(&format!(
+                class_path.join(CppPathItem::from_str_unchecked(&format!(
                     "{}_mut",
                     field.name
                 ))),
@@ -459,7 +459,7 @@ fn generate_field_accessors(
             )?);
         } else {
             new_methods.push(create_method(
-                class_path.with_added(CppPathItem::from_str_unchecked(&field.name)),
+                class_path.join(CppPathItem::from_str_unchecked(&field.name)),
                 CppFieldAccessorType::CopyGetter,
                 field.field_type.clone(),
                 Vec::new(),
@@ -471,7 +471,7 @@ fn generate_field_accessors(
             has_default_value: false,
         };
         new_methods.push(create_method(
-            class_path.with_added(CppPathItem::from_str_unchecked(&format!(
+            class_path.join(CppPathItem::from_str_unchecked(&format!(
                 "set_{}",
                 field.name
             ))),
@@ -573,13 +573,13 @@ fn generate_slot_wrapper(
     let mut methods = Vec::new();
     methods.push(create_function(
         CppFunctionKind::Constructor,
-        class_path.with_added(CppPathItem::from_str_unchecked(&class_path.last().name)),
+        class_path.join(CppPathItem::from_str_unchecked(&class_path.last().name)),
         false,
         vec![],
     ));
     methods.push(create_function(
         CppFunctionKind::Destructor,
-        class_path.with_added(CppPathItem::from_str_unchecked(&format!(
+        class_path.join(CppPathItem::from_str_unchecked(&format!(
             "~{}",
             class_path.last().name
         ))),
@@ -600,14 +600,14 @@ fn generate_slot_wrapper(
     ];
     methods.push(create_function(
         CppFunctionKind::Regular,
-        class_path.with_added(CppPathItem::from_str_unchecked("set")),
+        class_path.join(CppPathItem::from_str_unchecked("set")),
         false,
         method_set_args,
     ));
 
     let method_custom_slot = create_function(
         CppFunctionKind::Regular,
-        class_path.with_added(CppPathItem::from_str_unchecked("custom_slot")),
+        class_path.join(CppPathItem::from_str_unchecked("custom_slot")),
         true,
         arguments
             .iter()

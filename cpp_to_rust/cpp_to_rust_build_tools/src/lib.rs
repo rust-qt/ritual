@@ -11,9 +11,7 @@
 use crate::common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
 use crate::common::cpp_lib_builder::{BuildType, CppLibBuilder};
 use crate::common::errors::{bail, FancyUnwrap, Result, ResultExt};
-use crate::common::file_utils::{
-    create_file, file_to_string, load_json, path_to_str, PathBufWithAdded,
-};
+use crate::common::file_utils::{create_file, file_to_string, load_json, path_to_str};
 use crate::common::log;
 use crate::common::target::current_target;
 use crate::common::utils::{exe_suffix, get_command_output};
@@ -43,7 +41,7 @@ fn out_dir() -> Result<PathBuf> {
 }
 
 fn build_script_data() -> Result<BuildScriptData> {
-    load_json(manifest_dir()?.with_added("build_script_data.json"))
+    load_json(manifest_dir()?.join("build_script_data.json"))
 }
 
 impl Config {
@@ -104,7 +102,7 @@ impl Config {
             .eval(&current_target())?;
 
         let out_dir = out_dir()?;
-        let c_lib_install_dir = out_dir.with_added("c_lib_install");
+        let c_lib_install_dir = out_dir.join("c_lib_install");
         let manifest_dir = manifest_dir()?;
         let profile = std::env::var("PROFILE").with_context(|_| "PROFILE env var is missing")?;
         log::status("Building C++ wrapper library");
@@ -114,8 +112,8 @@ impl Config {
             .ok_or_else(|| err_msg("library type (shared or static) is not set"))?;
 
         CppLibBuilder {
-            cmake_source_dir: manifest_dir.with_added("c_lib"),
-            build_dir: out_dir.with_added("c_lib_build"),
+            cmake_source_dir: manifest_dir.join("c_lib"),
+            build_dir: out_dir.join("c_lib_build"),
             install_dir: Some(c_lib_install_dir.clone()),
             num_jobs: std::env::var("NUM_JOBS").ok().and_then(|x| x.parse().ok()),
             cmake_vars: c2r_cmake_vars(
@@ -134,7 +132,7 @@ impl Config {
         .run()?;
         {
             log::status("Generating ffi.rs file");
-            let mut ffi_file = create_file(out_dir.with_added("ffi.rs"))?;
+            let mut ffi_file = create_file(out_dir.join("ffi.rs"))?;
             if cpp_build_config_data.library_type() == Some(CppLibraryType::Shared) {
                 ffi_file.write(format!(
                     "#[link(name = \"{}\")]\n",
@@ -146,15 +144,13 @@ impl Config {
                     &self.build_script_data.cpp_wrapper_lib_name
                 ))?;
             }
-            ffi_file.write(file_to_string(
-                manifest_dir.with_added("src").with_added("ffi.in.rs"),
-            )?)?;
+            ffi_file.write(file_to_string(manifest_dir.join("src").join("ffi.in.rs"))?)?;
         }
         {
             log::status("Requesting type sizes");
             let mut command =
-                Command::new(c_lib_install_dir.with_added(format!("type_sizes{}", exe_suffix())));
-            let mut file = create_file(out_dir.with_added("type_sizes.rs"))?;
+                Command::new(c_lib_install_dir.join(format!("type_sizes{}", exe_suffix())));
+            let mut file = create_file(out_dir.join("type_sizes.rs"))?;
             file.write(get_command_output(&mut command)?)?;
         }
 
