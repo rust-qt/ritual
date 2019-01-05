@@ -11,9 +11,10 @@ use crate::cpp_function::CppFunction;
 
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppTemplateInstantiation;
-use crate::cpp_ffi_data::CppFfiItem;
+use crate::cpp_ffi_data::CppFfiFunction;
+use crate::cpp_ffi_data::QtSlotWrapper;
 use crate::cpp_type::CppType;
-use crate::rust_type::RustName;
+use crate::rust_type::RustPath;
 use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::Display;
@@ -281,27 +282,116 @@ impl Display for CppItemData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FfiItem {
-    pub cpp_item: CppFfiItem,
-    pub checks: CppCheckerInfoList,
-    pub another_rust_item: Option<()>,
+pub struct RustPathScope {
+    path: RustPath,
+    prefix: Option<String>,
 }
 
-impl FfiItem {
-    pub fn new(cpp_item: CppFfiItem) -> Self {
-        FfiItem {
-            cpp_item,
-            checks: CppCheckerInfoList::default(),
-            another_rust_item: None,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RustClassPath {
+    TemplateClass {
+        instantiated: RustPathScope,
+    },
+    ConcreteClass {
+        path: RustPath,
+        nested: RustPathScope,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RustFunctionPath {
+    Inherent(RustPath),
+    Free(RustPath),
+    TraitImpl,
+}
+
+impl RustFunctionPath {
+    fn rust_path(&self) -> Option<&RustPath> {
+        match *self {
+            RustFunctionPath::Inherent(ref path) => Some(path),
+            RustFunctionPath::Free(ref path) => Some(path),
+            RustFunctionPath::TraitImpl => None,
         }
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RustItem {
-    pub path: RustName,
-    pub naming_strategy: (),
-    pub sclass_nested_path: Option<RustName>,
+pub enum RustItem {
+    Function {
+        cpp_ffi_function: CppFfiFunction,
+        checks: CppCheckerInfoList,
+        rust_path: Option<RustFunctionPath>,
+    },
+    Enum {
+        rust_path: Option<RustPath>,
+    },
+    EnumValue {
+        rust_path: Option<RustPath>,
+    },
+    Class {
+        qt_slot_wrapper: Option<QtSlotWrapper>,
+        checks: CppCheckerInfoList,
+        rust_path: Option<RustClassPath>,
+    },
+    Namespace {
+        rust_path: Option<RustPathScope>,
+    },
+    QtPublicSlotWrapper {
+        some_things: (),
+        rust_path: Option<RustPath>,
+    },
+}
+
+impl RustItem {
+    pub fn from_function(cpp_ffi_function: CppFfiFunction) -> Self {
+        RustItem::Function {
+            cpp_ffi_function,
+            checks: Default::default(),
+            rust_path: None,
+        }
+    }
+
+    pub fn from_qt_slot_wrapper(wrapper: QtSlotWrapper) -> Self {
+        RustItem::Class {
+            qt_slot_wrapper: Some(wrapper),
+            checks: Default::default(),
+            rust_path: None,
+        }
+    }
+
+    pub fn has_rust_path_resolved(&self) -> bool {
+        match *self {
+            RustItem::Function { ref rust_path, .. } => rust_path.is_some(),
+            RustItem::Enum { ref rust_path, .. } => rust_path.is_some(),
+            RustItem::EnumValue { ref rust_path, .. } => rust_path.is_some(),
+            RustItem::Class { ref rust_path, .. } => rust_path.is_some(),
+            RustItem::Namespace { ref rust_path, .. } => rust_path.is_some(),
+            RustItem::QtPublicSlotWrapper { ref rust_path, .. } => rust_path.is_some(),
+        }
+    }
+
+    pub fn checks_mut(&mut self) -> Option<&mut CppCheckerInfoList> {
+        match *self {
+            RustItem::Function { ref mut checks, .. } | RustItem::Class { ref mut checks, .. } => {
+                Some(checks)
+            }
+            _ => None,
+        }
+    }
+
+    /*fn rust_path(&self) -> Option<&RustPath> {
+        match *self {
+            RustItem::Function { ref rust_path } => {
+                rust_path.as_ref().map(|function_path| function_path.rust_path())
+            },
+            RustItem::Enum { ref rust_path } => rust_path.as_ref(),
+            RustItem::EnumValue { ref rust_path } => rust_path.as_ref(),
+            RustItem::Class { ref rust_path } => rust_path.is_some(),
+            RustItem::Namespace { ref rust_path } => rust_path.is_some(),
+            RustItem::QtPublicSlotWrapper { ref rust_path } => rust_path.is_some(),
+        }
+    }*/
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -309,8 +399,7 @@ pub struct DatabaseItem {
     pub cpp_data: CppItemData,
 
     pub source: DatabaseItemSource,
-    pub ffi_items: Option<Vec<FfiItem>>,
-    pub rust_item: Option<RustItem>,
+    pub rust_items: Option<Vec<RustItem>>, // TODO: remove Option if all database items have rust items
 }
 
 /// Represents all collected data related to a crate.
@@ -363,8 +452,7 @@ impl Database {
         self.items.push(DatabaseItem {
             cpp_data: data,
             source,
-            ffi_items: None,
-            rust_item: None,
+            rust_items: None,
         });
         true
     }

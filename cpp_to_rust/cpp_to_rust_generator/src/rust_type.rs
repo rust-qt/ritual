@@ -13,7 +13,7 @@ use serde_derive::{Deserialize, Serialize};
 /// Built-in types are represented
 /// by a single vector item, like `vec!["i32"]`.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct RustName {
+pub struct RustPath {
     /// Parts of the name
     pub parts: Vec<String>,
 }

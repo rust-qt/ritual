@@ -6,9 +6,9 @@ use crate::common::file_utils::{create_dir_all, create_file, path_to_str, remove
 use crate::common::target::current_target;
 use crate::common::utils::MapIfOk;
 use crate::cpp_code_generator;
-use crate::cpp_ffi_data::CppFfiItem;
 use crate::database::CppCheckerAddResult;
 use crate::database::CppCheckerEnv;
+use crate::database::RustItem;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use log::{debug, info};
@@ -36,12 +36,25 @@ fn check_snippet(
 }
 
 #[allow(unused_variables)]
-fn snippet_for_item(item: &CppFfiItem) -> Result<Snippet> {
+fn snippet_for_item(item: &RustItem) -> Result<Snippet> {
     match *item {
-        CppFfiItem::Function(ref function) => Ok(Snippet::new_global(
-            cpp_code_generator::function_implementation(function)?,
+        RustItem::Function {
+            ref cpp_ffi_function,
+            ..
+        } => Ok(Snippet::new_global(
+            cpp_code_generator::function_implementation(cpp_ffi_function)?,
         )),
-        CppFfiItem::QtSlotWrapper(_) => bail!("qt slot wrappers are not supported yet"),
+        RustItem::Class {
+            ref qt_slot_wrapper,
+            ..
+        } => {
+            if let Some(ref qt_slot_wrapper) = *qt_slot_wrapper {
+                bail!("qt slot wrappers are not supported yet");
+            } else {
+                bail!("no need to check this item")
+            }
+        }
+        _ => bail!("no need to check this item"),
     }
 }
 
@@ -95,9 +108,9 @@ impl CppChecker<'_, '_> {
 
         let total_count = self.data.current_database.items.len();
         for (index, item) in self.data.current_database.items.iter_mut().enumerate() {
-            if let Some(ref mut ffi_items) = item.ffi_items {
+            if let Some(ref mut ffi_items) = item.rust_items {
                 for ffi_item in ffi_items {
-                    if let Ok(snippet) = snippet_for_item(&ffi_item.cpp_item) {
+                    if let Ok(snippet) = snippet_for_item(ffi_item) {
                         info!("Checking item {} / {}", index + 1, total_count);
 
                         let error_data =
@@ -107,7 +120,10 @@ impl CppChecker<'_, '_> {
                                     Some(format!("build failed: {}", output.stderr))
                                 }
                             };
-                        let r = ffi_item.checks.add(&self.env, error_data.clone());
+                        let r = ffi_item
+                            .checks_mut()
+                            .unwrap()
+                            .add(&self.env, error_data.clone());
                         let change_text = match r {
                             CppCheckerAddResult::Added => "Added".to_string(),
                             CppCheckerAddResult::Unchanged => "Unchanged".to_string(),

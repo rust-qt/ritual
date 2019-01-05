@@ -13,9 +13,9 @@ use crate::cpp_type::CppType;
 use itertools::Itertools;
 
 use crate::cpp_ffi_data::CppFfiFunction;
-use crate::cpp_ffi_data::CppFfiItem;
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::database::DatabaseItem;
+use crate::database::RustItem;
 use std::iter::once;
 use std::path::Path;
 use std::path::PathBuf;
@@ -351,19 +351,28 @@ pub fn generate_cpp_file(
 
     let mut any_slot_wrappers = false;
     for item in data {
-        if let Some(ref ffi_items) = &item.ffi_items {
+        if let Some(ref ffi_items) = &item.rust_items {
             for ffi_item in ffi_items {
-                match ffi_item.cpp_item {
-                    CppFfiItem::Function(ref function) => {
+                match *ffi_item {
+                    RustItem::Function {
+                        ref cpp_ffi_function,
+                        ..
+                    } => {
                         // TODO: write less extern C
                         cpp_file.write("extern \"C\" {\n\n")?;
-                        cpp_file.write(function_implementation(function)?)?;
+                        cpp_file.write(function_implementation(cpp_ffi_function)?)?;
                         cpp_file.write("\n} // extern \"C\"\n\n")?;
                     }
-                    CppFfiItem::QtSlotWrapper(ref wrapper) => {
-                        any_slot_wrappers = true;
-                        cpp_file.write(qt_slot_wrapper(wrapper)?)?;
+                    RustItem::Class {
+                        ref qt_slot_wrapper,
+                        ..
+                    } => {
+                        if let Some(ref qt_slot_wrapper) = *qt_slot_wrapper {
+                            any_slot_wrappers = true;
+                            cpp_file.write(self::qt_slot_wrapper(qt_slot_wrapper)?)?;
+                        }
                     }
+                    _ => {}
                 }
             }
         }

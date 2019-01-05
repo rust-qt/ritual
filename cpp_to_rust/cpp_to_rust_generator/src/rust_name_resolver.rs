@@ -5,7 +5,6 @@ use crate::database::CppItemData;
 use crate::database::DatabaseItem;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
-use log::trace;
 
 fn check_type(all_items: &[&DatabaseItem], cpp_type: &CppType) -> Result<()> {
     match cpp_type {
@@ -66,15 +65,20 @@ fn is_cpp_item_resolvable(all_items: &[&DatabaseItem], item: &CppItemData) -> Re
 fn run(data: &mut ProcessorData) -> Result<()> {
     let all_items = data.all_items();
     for item in &data.current_database.items {
-        if item.rust_item.is_some() {
-            continue;
+        if let Some(ref rust_items) = item.rust_items {
+            for rust_item in rust_items {
+                if rust_item.has_rust_path_resolved() {
+                    continue;
+                }
+            }
         }
-        match is_cpp_item_resolvable(&all_items, &item.cpp_data) {
+
+        /*        match is_cpp_item_resolvable(&all_items, &item.cpp_data) {
             Ok(_) => {} //unimplemented!(),
             Err(err) => {
                 trace!("skipping item: {}: {}", &item.cpp_data, err);
             }
-        }
+        }*/
     }
     // TODO: everything
     Ok(())
@@ -107,8 +111,7 @@ fn it_should_check_functions() {
     let func_item = DatabaseItem {
         cpp_data: CppItemData::Function(func.clone()),
         source: DatabaseItemSource::ImplicitDestructor,
-        ffi_items: None,
-        rust_item: None,
+        rust_items: None,
     };
 
     let func2_item = DatabaseItem {
@@ -121,8 +124,7 @@ fn it_should_check_functions() {
             ..func
         }),
         source: DatabaseItemSource::ImplicitDestructor,
-        ffi_items: None,
-        rust_item: None,
+        rust_items: None,
     };
     let all_items = &[&func_item, &func2_item];
     assert!(is_cpp_item_resolvable(all_items, &func_item.cpp_data).is_ok());
@@ -136,8 +138,7 @@ fn it_should_check_functions() {
             is_movable: false,
         }),
         source: DatabaseItemSource::ImplicitDestructor,
-        ffi_items: None,
-        rust_item: None,
+        rust_items: None,
     };
     let all_items = &[&func_item, &func2_item, &class_item];
     assert!(is_cpp_item_resolvable(all_items, &func_item.cpp_data).is_ok());

@@ -3,7 +3,6 @@ use crate::cpp_data::CppClassField;
 use crate::cpp_data::CppPath;
 use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
 use crate::cpp_type::{CppFunctionPointerType, CppType};
-use derive_more::From;
 use serde_derive::{Deserialize, Serialize};
 
 /// Variation of a field accessor method
@@ -232,22 +231,6 @@ impl CppFfiFunction {
                 ref field,
                 ref accessor_type,
             } => format!("FFI field {:?}: {}", accessor_type, field.short_text()),
-        }
-    }
-}
-
-#[derive(From, Debug, Clone, Serialize, Deserialize)]
-#[allow(clippy::large_enum_variant)]
-pub enum CppFfiItem {
-    Function(CppFfiFunction),
-    QtSlotWrapper(QtSlotWrapper),
-}
-
-impl CppFfiItem {
-    pub fn is_qt_slot_wrapper(&self) -> bool {
-        match *self {
-            CppFfiItem::QtSlotWrapper(_) => true,
-            _ => false,
         }
     }
 }

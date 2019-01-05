@@ -141,16 +141,9 @@ mod steps {
                         item.cpp_data.to_string(),
                         item.source
                     );
-                    if let Some(ref ffi_items) = item.ffi_items {
-                        for ffi_item in ffi_items {
-                            trace!("[ffi_item] item={:?}; checks:", ffi_item.cpp_item);
-                            for item in &ffi_item.checks.items {
-                                trace!(
-                                    "[ffi_item] * env = {}; error = {:?}",
-                                    item.env.short_text(),
-                                    item.error
-                                );
-                            }
+                    if let Some(ref rust_items) = item.rust_items {
+                        for rust_item in rust_items {
+                            trace!("[rust_item] item={:?}", rust_item);
                         }
                     }
                 }
@@ -167,7 +160,7 @@ mod steps {
     pub fn clear_ffi() -> ProcessingStep {
         ProcessingStep::new_custom("clear_ffi", |data| {
             for item in &mut data.current_database.items {
-                item.ffi_items = None;
+                item.rust_items = None;
             }
             data.current_database.next_ffi_id = 0;
             Ok(())
