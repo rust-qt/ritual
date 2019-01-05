@@ -2,9 +2,14 @@
 
 use crate::errors::{bail, err_msg, Result, ResultExt};
 use crate::log;
-
+use std::ffi::{OsStr, OsString};
 use std::fs;
+use std::io::BufRead;
+use std::io::BufReader;
+use std::io::BufWriter;
+use std::io::Lines;
 use std::io::Read;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use toml;
 
@@ -110,17 +115,18 @@ fn move_one_file(old_path: &PathBuf, new_path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-/// A wrapper over `std::fs::File` containing ths file's  path.
-pub struct File {
-    file: fs::File,
+/// A wrapper over a buffered `std::fs::File` containing this file's  path.
+pub struct File<F> {
+    file: F,
     path: PathBuf,
 }
 
 /// A wrapper over `std::fs::File::open` with better error reporting.
-pub fn open_file<P: AsRef<Path>>(path: P) -> Result<File> {
+pub fn open_file<P: AsRef<Path>>(path: P) -> Result<File<BufReader<fs::File>>> {
+    let file = fs::File::open(path.as_ref())
+        .with_context(|_| format!("Failed to open file for reading: {:?}", path.as_ref()))?;
     Ok(File {
-        file: fs::File::open(path.as_ref())
-            .with_context(|_| format!("Failed to open file for reading: {:?}", path.as_ref()))?,
+        file: BufReader::new(file),
         path: path.as_ref().to_path_buf(),
     })
 }
@@ -132,25 +138,27 @@ pub fn file_to_string<P: AsRef<Path>>(path: P) -> Result<String> {
 }
 
 /// A wrapper over `std::fs::File::create` with better error reporting.
-pub fn create_file<P: AsRef<Path>>(path: P) -> Result<File> {
+pub fn create_file<P: AsRef<Path>>(path: P) -> Result<File<BufWriter<fs::File>>> {
+    let file = fs::File::create(path.as_ref())
+        .with_context(|_| format!("Failed to create file: {:?}", path.as_ref()))?;
     Ok(File {
-        file: fs::File::create(path.as_ref())
-            .with_context(|_| format!("Failed to create file: {:?}", path.as_ref()))?,
+        file: BufWriter::new(file),
         path: path.as_ref().to_path_buf(),
     })
 }
 
-/// A wrapper over `std::fs::OpenOptions::open` with better error reporting.
-pub fn open_file_with_options<P: AsRef<Path>>(path: P, options: &fs::OpenOptions) -> Result<File> {
-    Ok(File {
-        file: options
-            .open(path.as_ref())
-            .with_context(|_| format!("Failed to open file: {:?}", path.as_ref()))?,
-        path: path.as_ref().to_path_buf(),
-    })
+impl<F> File<F> {
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    /// Returns underlying `std::fs::File`
+    pub fn into_inner(self) -> F {
+        self.file
+    }
 }
 
-impl File {
+impl<F: Read> File<F> {
     /// Read content of the file to a string
     pub fn read_all(&mut self) -> Result<String> {
         let mut r = String::new();
@@ -159,23 +167,24 @@ impl File {
             .with_context(|_| format!("Failed to read from file: {:?}", self.path))?;
         Ok(r)
     }
+}
 
+impl<F: BufRead> File<F> {
+    pub fn lines(self) -> Lines<F>
+    where
+        F: Sized,
+    {
+        self.file.lines()
+    }
+}
+
+impl<F: Write> File<F> {
     /// Write `text` to the file
     pub fn write<S: AsRef<str>>(&mut self, text: S) -> Result<()> {
-        use std::io::Write;
         self.file
             .write_all(text.as_ref().as_bytes())
             .with_context(|_| format!("Failed to write to file: {:?}", self.path))?;
         Ok(())
-    }
-
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
-
-    /// Returns underlying `std::fs::File`
-    pub fn into_inner(self) -> fs::File {
-        self.file
     }
 }
 
@@ -356,8 +365,6 @@ pub fn path_to_str(path: &Path) -> Result<&str> {
     path.to_str()
         .ok_or_else(|| err_msg(format!("Path is not valid unicode: {}", path.display())))
 }
-
-use std::ffi::{OsStr, OsString};
 
 /// A wrapper over `OsStr::to_str` with better error reporting
 pub fn os_str_to_str(os_str: &OsStr) -> Result<&str> {

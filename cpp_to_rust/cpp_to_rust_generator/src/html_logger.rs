@@ -3,10 +3,12 @@ use crate::common::file_utils::{create_file, File};
 use crate::common::log;
 
 use std::fmt::Display;
+use std::fs;
+use std::io::BufWriter;
 use std::path::Path;
 
 pub struct HtmlLogger {
-    file: File,
+    file: File<BufWriter<fs::File>>,
 }
 
 pub fn escape_html(text: &str) -> String {

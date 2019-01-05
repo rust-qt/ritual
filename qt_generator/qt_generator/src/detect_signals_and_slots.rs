@@ -8,8 +8,6 @@ use cpp_to_rust_generator::processor::ProcessorData;
 use regex::Regex;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::io::BufRead;
-use std::io::BufReader;
 
 /// Checks if `class_name` types inherits `base_name` type directly or indirectly.
 pub fn inherits(
@@ -80,8 +78,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
     for file_path in files {
         let mut file_sections = Vec::new();
         let file = open_file(&file_path)?;
-        let reader = BufReader::new(file.into_inner());
-        for (line_num, line) in reader.lines().enumerate() {
+        for (line_num, line) in file.lines().enumerate() {
             let line =
                 line.with_context(|_| format!("failed while reading lines from {}", &file_path))?;
             let section_type = if re_signals.is_match(&line) {

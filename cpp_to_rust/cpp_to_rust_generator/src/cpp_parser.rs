@@ -21,7 +21,6 @@ use std::str::FromStr;
 use clang;
 use clang::*;
 
-use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 use crate::config::Config;
@@ -1076,13 +1075,12 @@ impl CppParser<'_, '_> {
                 .ok_or_else(|| err_msg("no file in source location"))?
                 .get_path();
             let file = open_file(&file_path)?;
-            let reader = BufReader::new(file.into_inner());
             let mut result = String::new();
             let range_line1 = (start.line - 1) as usize;
             let range_line2 = (end.line - 1) as usize;
             let range_col1 = (start.column - 1) as usize;
             let range_col2 = (end.column - 1) as usize;
-            for (line_num, line) in reader.lines().enumerate() {
+            for (line_num, line) in file.lines().enumerate() {
                 let line = line.with_context(|_| {
                     format!("failed while reading lines from {}", file_path.display())
                 })?;
