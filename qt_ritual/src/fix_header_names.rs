@@ -2,8 +2,8 @@
 //! Qt's shortcut header names.
 
 use log::{info, trace};
+use ritual::database::CppDatabaseItem;
 use ritual::database::CppItemData;
-use ritual::database::DatabaseItem;
 use ritual::database::DatabaseItemSource;
 use ritual_common::errors::{err_msg, Result, ResultExt};
 use ritual_common::file_utils::{file_to_string, os_str_to_str, read_dir};
@@ -95,7 +95,7 @@ impl HeaderNameMap {
 }
 
 /// Replaces names of header files in `data` with Qt's shortcut headers.
-pub fn fix_header_names(data: &mut [DatabaseItem], headers_dir: &PathBuf) -> Result<()> {
+pub fn fix_header_names(data: &mut [CppDatabaseItem], headers_dir: &PathBuf) -> Result<()> {
     // TODO: only run on new database items?
     let map = HeaderNameMap::new(headers_dir)?;
     for item in data {

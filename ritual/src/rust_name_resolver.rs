@@ -1,9 +1,9 @@
 use crate::cpp_checker::cpp_checker_step;
 use crate::cpp_data::CppPath;
 use crate::cpp_type::CppType;
+use crate::database::CppDatabaseItem;
+use crate::database::CppFfiItem;
 use crate::database::CppItemData;
-use crate::database::DatabaseItem;
-use crate::database::RustItem;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use crate::rust_type::RustPath;
@@ -13,8 +13,8 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::iter::once;
 
-struct State {
-    db_items: HashMap<CppPath, DatabaseItem>,
+/*struct State {
+    db_items: HashMap<CppPath, CppDatabaseItem>,
     rust_names: HashSet<RustPath>,
 }
 
@@ -22,7 +22,7 @@ impl State {
     fn new(data: &ProcessorData) -> State {
         let all_items = once(&data.current_database as &_)
             .chain(data.dep_databases.iter())
-            .flat_map(|d| d.items.iter());
+            .flat_map(|d| d.cpp_items.iter());
 
         let db_items = all_items
             .filter_map(|db_item| {
@@ -39,7 +39,7 @@ impl State {
 
         let rust_names = local_items
             .iter()
-            .filter_map(|db_item| db_item.rust_items.as_ref()) // -> Iterator<Item=&Vec<RustItem>>
+            .filter_map(|db_item| db_item.ffi_items.as_ref()) // -> Iterator<Item=&Vec<RustItem>>
             .flatten() // -> Iterator<Item=&RustItem>
             .filter_map(|rust_item| rust_item.rust_path()) // -> Iterator<Item=&RustPath>
             .cloned() // -> Iterator<Item=RustPath>
@@ -110,21 +110,21 @@ impl State {
         Ok(())
     }
 
-    fn give_name(&mut self, cpp_item: &CppItemData, rust_item: &mut RustItem) -> Result<()> {
+    fn give_name(&mut self, cpp_item: &CppItemData, rust_item: &mut CppFfiItem) -> Result<()> {
         unimplemented!("{:?}", (&self.rust_names, cpp_item, rust_item))
     }
-}
+}*/
 
 fn run(data: &mut ProcessorData) -> Result<()> {
-    let mut state = State::new(data);
+    /*let mut state = State::new(data);
 
-    for item in &mut data.current_database.items {
+    for item in &mut data.current_database.cpp_items {
         if let Err(err) = state.check_cpp_item_resolvable(&item.cpp_data) {
             trace!("skipping item: {}: {}", &item.cpp_data, err);
             continue;
         }
 
-        if let Some(ref mut rust_items) = item.rust_items {
+        if let Some(ref mut rust_items) = item.ffi_items {
             for mut rust_item in rust_items {
                 if rust_item.has_rust_path_resolved() {
                     continue;
@@ -133,7 +133,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
                 state.give_name(&item.cpp_data, &mut rust_item)?;
             }
         }
-    }
+    }*/
     Ok(())
 }
 

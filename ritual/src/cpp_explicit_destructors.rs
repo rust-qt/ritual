@@ -23,13 +23,13 @@ pub fn add_explicit_destructors_step() -> ProcessingStep {
 /// destructors implicitly available in C++.
 fn add_explicit_destructors(data: &mut ProcessorData) -> Result<()> {
     let mut methods = Vec::new();
-    for type1 in &data.current_database.items {
+    for type1 in &data.current_database.cpp_items {
         if let CppItemData::Type(ref type1) = type1.cpp_data {
             if type1.kind.is_class() {
                 let class_name = &type1.path;
                 let found_destructor = data
                     .current_database
-                    .items
+                    .cpp_items
                     .iter()
                     .filter_map(|item| item.cpp_data.as_function_ref())
                     .any(|m| m.is_destructor() && m.class_type().as_ref() == Some(class_name));

@@ -61,13 +61,13 @@ fn choose_allocation_places(data: &mut ProcessorData) -> Result<()> {
     let mut data_map = HashMap::new();
     for type1 in data
         .current_database
-        .items
+        .cpp_items
         .iter()
         .filter_map(|i| i.cpp_data.as_type_ref())
     {
         if data
             .current_database
-            .items
+            .cpp_items
             .iter()
             .filter_map(|i| i.cpp_data.as_function_ref())
             .any(|m| m.class_type().as_ref() == Some(&type1.path) && m.is_virtual())
@@ -80,7 +80,7 @@ fn choose_allocation_places(data: &mut ProcessorData) -> Result<()> {
     }
     for method in data
         .current_database
-        .items
+        .cpp_items
         .iter()
         .filter_map(|i| i.cpp_data.as_function_ref())
     {
@@ -98,7 +98,7 @@ fn choose_allocation_places(data: &mut ProcessorData) -> Result<()> {
 
     for type1 in data
         .current_database
-        .items
+        .cpp_items
         .iter()
         .filter_map(|i| i.cpp_data.as_type_ref())
     {

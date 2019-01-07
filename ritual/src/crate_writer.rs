@@ -261,7 +261,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
     )?;
 
     cpp_code_generator::generate_cpp_file(
-        &data.current_database.items,
+        &data.current_database.cpp_items,
         &c_lib_path.join("file1.cpp"),
         &global_header_name,
     )?;

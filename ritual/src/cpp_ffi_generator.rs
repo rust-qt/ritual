@@ -18,8 +18,8 @@ use crate::cpp_type::CppFunctionPointerType;
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
 use crate::cpp_type::CppTypeRole;
+use crate::database::CppFfiItem;
 use crate::database::CppItemData;
-use crate::database::RustItem;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use log::trace;
@@ -76,8 +76,8 @@ fn run(mut data: &mut ProcessorData) -> Result<()> {
     let mut name_provider =
         FfiNameProvider::new(cpp_ffi_lib_name.clone(), data.current_database.next_ffi_id);
 
-    for item in &mut data.current_database.items {
-        if item.rust_items.is_some() {
+    for item in &mut data.current_database.cpp_items {
+        if item.ffi_items.is_some() {
             trace!(
                 "cpp_data = {}; already processed",
                 item.cpp_data.to_string()
@@ -113,7 +113,7 @@ fn run(mut data: &mut ProcessorData) -> Result<()> {
 
         match result {
             Err(msg) => {
-                item.rust_items = Some(Vec::new());
+                item.ffi_items = Some(Vec::new());
                 trace!("cpp_data = {}; error: {}", item.cpp_data.to_string(), msg);
             }
             Ok(r) => {
@@ -126,7 +126,7 @@ fn run(mut data: &mut ProcessorData) -> Result<()> {
                         _ => format!("added methods ({}): {:?}", r.len(), r),
                     }
                 );
-                item.rust_items = Some(r);
+                item.ffi_items = Some(r);
             }
         }
     }
@@ -147,7 +147,7 @@ fn create_cast_method(
     from: &CppType,
     to: &CppType,
     name_provider: &mut FfiNameProvider,
-) -> Result<RustItem> {
+) -> Result<CppFfiItem> {
     let method = CppFunction {
         path: CppPath::from_item(CppPathItem {
             name: cast.cpp_method_name().into(),
@@ -173,7 +173,7 @@ fn create_cast_method(
     } else {
         unexpected!("to_ffi_method must return a value with CppFfiFunctionKind::Function",);
     }
-    Ok(RustItem::from_function(r))
+    Ok(CppFfiItem::from_function(r))
 }
 
 /// Performs a portion of `generate_casts` operation.
@@ -186,7 +186,7 @@ fn generate_casts_one(
     base_type: &CppPath,
     direct_base_index: Option<usize>,
     name_provider: &mut FfiNameProvider,
-) -> Result<Vec<RustItem>> {
+) -> Result<Vec<CppFfiItem>> {
     let target_ptr_type = CppType::PointerLike {
         is_const: false,
         kind: CppPointerLikeTypeKind::Pointer,
@@ -244,7 +244,7 @@ fn generate_casts(
     base: &CppBaseSpecifier,
     data: &[CppBaseSpecifier],
     name_provider: &mut FfiNameProvider,
-) -> Result<Vec<RustItem>> {
+) -> Result<Vec<CppFfiItem>> {
     //log::status("Adding cast functions");
     generate_casts_one(
         data,
@@ -259,10 +259,10 @@ fn generate_ffi_methods_for_method(
     method: &CppFunction,
     movable_types: &[CppPath],
     name_provider: &mut FfiNameProvider,
-) -> Result<Vec<RustItem>> {
+) -> Result<Vec<CppFfiItem>> {
     let mut methods = Vec::new();
     // TODO: don't use name here at all, generate names for all methods elsewhere
-    methods.push(RustItem::from_function(to_ffi_method(
+    methods.push(CppFfiItem::from_function(to_ffi_method(
         method,
         movable_types,
         name_provider,
@@ -286,7 +286,7 @@ fn generate_ffi_methods_for_method(
                 } else {
                     unexpected!("expected method kind here");
                 }
-                methods.push(RustItem::from_function(processed_method));
+                methods.push(CppFfiItem::from_function(processed_method));
             }
         }
     }
@@ -389,11 +389,11 @@ fn generate_field_accessors(
     field: &CppClassField,
     movable_types: &[CppPath],
     name_provider: &mut FfiNameProvider,
-) -> Result<Vec<RustItem>> {
+) -> Result<Vec<CppFfiItem>> {
     // TODO: fix doc generator for field accessors
     //log::status("Adding field accessors");
     let mut new_methods = Vec::new();
-    let mut create_method = |name, accessor_type, return_type, arguments| -> Result<RustItem> {
+    let mut create_method = |name, accessor_type, return_type, arguments| -> Result<CppFfiItem> {
         let fake_method = CppFunction {
             path: name,
             member: Some(CppFunctionMemberData {
@@ -421,7 +421,7 @@ fn generate_field_accessors(
             accessor_type,
             field: field.clone(),
         };
-        Ok(RustItem::from_function(ffi_method))
+        Ok(CppFfiItem::from_function(ffi_method))
     };
     let class_path = field.class_type.clone();
 
@@ -523,7 +523,7 @@ fn should_process_item(item: &CppItemData) -> Result<bool> {
 fn generate_slot_wrapper(
     arguments: &[CppType],
     name_provider: &mut FfiNameProvider,
-) -> Result<Vec<RustItem>> {
+) -> Result<Vec<CppFfiItem>> {
     let ffi_types = arguments.map_if_ok(|t| t.to_cpp_ffi_type(CppTypeRole::NotReturnType))?;
 
     let void_ptr = CppType::PointerLike {
@@ -631,7 +631,7 @@ fn generate_slot_wrapper(
         receiver_id,
     };
 
-    let mut items = vec![RustItem::from_qt_slot_wrapper(qt_slot_wrapper)];
+    let mut items = vec![CppFfiItem::from_qt_slot_wrapper(qt_slot_wrapper)];
     for method in methods {
         items.extend(
             generate_ffi_methods_for_method(&method, &[], name_provider)?

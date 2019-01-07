@@ -8,8 +8,8 @@ use ritual::cpp_data::CppPath;
 use ritual::cpp_data::CppTypeDoc;
 use ritual::cpp_data::CppVisibility;
 use ritual::cpp_function::CppFunctionDoc;
+use ritual::database::CppDatabaseItem;
 use ritual::database::CppItemData;
-use ritual::database::DatabaseItem;
 use ritual::processor::ProcessorData;
 use ritual_common::errors::{
     bail, err_msg, should_panic_on_unexpected, unexpected, Result, ResultExt,
@@ -549,7 +549,7 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
 }
 
 /// Adds documentation from `data` to `cpp_methods`.
-fn find_methods_docs(items: &mut [DatabaseItem], data: &mut DocParser) -> Result<()> {
+fn find_methods_docs(items: &mut [CppDatabaseItem], data: &mut DocParser) -> Result<()> {
     for item in items {
         if let CppItemData::Function(ref mut cpp_method) = item.cpp_data {
             if let Some(ref info) = cpp_method.member {
@@ -596,9 +596,9 @@ pub fn parse_docs(data: &mut ProcessorData, qt_crate_name: &str, docs_path: &Pat
         }
     };
     let mut parser = DocParser::new(doc_data);
-    find_methods_docs(&mut data.current_database.items, &mut parser)?;
+    find_methods_docs(&mut data.current_database.cpp_items, &mut parser)?;
     let mut type_doc_cache = HashMap::new();
-    for item in &mut data.current_database.items {
+    for item in &mut data.current_database.cpp_items {
         let type_name = match item.cpp_data {
             CppItemData::Type(ref data) => data.path.clone(),
             CppItemData::EnumValue(ref data) => data.enum_path.clone(),

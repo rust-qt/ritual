@@ -1,7 +1,8 @@
 use crate::cpp_code_generator;
 use crate::database::CppCheckerAddResult;
 use crate::database::CppCheckerEnv;
-use crate::database::RustItem;
+use crate::database::CppFfiItem;
+use crate::database::CppFfiItemKind;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use log::{debug, info};
@@ -36,25 +37,14 @@ fn check_snippet(
 }
 
 #[allow(unused_variables)]
-fn snippet_for_item(item: &RustItem) -> Result<Snippet> {
-    match *item {
-        RustItem::Function {
-            ref cpp_ffi_function,
-            ..
-        } => Ok(Snippet::new_global(
+fn snippet_for_item(item: &CppFfiItem) -> Result<Snippet> {
+    match item.kind {
+        CppFfiItemKind::Function(ref cpp_ffi_function) => Ok(Snippet::new_global(
             cpp_code_generator::function_implementation(cpp_ffi_function)?,
         )),
-        RustItem::Class {
-            ref qt_slot_wrapper,
-            ..
-        } => {
-            if let Some(ref qt_slot_wrapper) = *qt_slot_wrapper {
-                bail!("qt slot wrappers are not supported yet");
-            } else {
-                bail!("no need to check this item")
-            }
+        CppFfiItemKind::QtSlotWrapper(ref qt_slot_wrapper) => {
+            bail!("qt slot wrappers are not supported yet");
         }
-        _ => bail!("no need to check this item"),
     }
 }
 
@@ -106,9 +96,9 @@ impl CppChecker<'_, '_> {
 
         self.run_tests()?;
 
-        let total_count = self.data.current_database.items.len();
-        for (index, item) in self.data.current_database.items.iter_mut().enumerate() {
-            if let Some(ref mut ffi_items) = item.rust_items {
+        let total_count = self.data.current_database.cpp_items.len();
+        for (index, item) in self.data.current_database.cpp_items.iter_mut().enumerate() {
+            if let Some(ref mut ffi_items) = item.ffi_items {
                 for ffi_item in ffi_items {
                     if let Ok(snippet) = snippet_for_item(ffi_item) {
                         info!("Checking item {} / {}", index + 1, total_count);
@@ -120,10 +110,7 @@ impl CppChecker<'_, '_> {
                                     Some(format!("build failed: {}", output.stderr))
                                 }
                             };
-                        let r = ffi_item
-                            .checks_mut()
-                            .unwrap()
-                            .add(&self.env, error_data.clone());
+                        let r = ffi_item.checks.add(&self.env, error_data.clone());
                         let change_text = match r {
                             CppCheckerAddResult::Added => "Added".to_string(),
                             CppCheckerAddResult::Unchanged => "Unchanged".to_string(),

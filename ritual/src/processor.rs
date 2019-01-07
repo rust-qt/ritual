@@ -8,7 +8,7 @@ use crate::cpp_parser::cpp_parser_step;
 use crate::cpp_template_instantiator::find_template_instantiations_step;
 use crate::cpp_template_instantiator::instantiate_templates_step;
 use crate::crate_writer::crate_writer_step;
-use crate::database::{Database, DatabaseItem};
+use crate::database::{CppDatabaseItem, Database};
 use crate::rust_name_resolver::rust_name_resolver_step;
 use crate::type_allocation_places::choose_allocation_places_step;
 use crate::workspace::Workspace;
@@ -71,10 +71,10 @@ impl<'a> ProcessorData<'a> {
             .chain(self.dep_databases.iter())
             .collect()
     }
-    pub fn all_items(&self) -> Vec<&DatabaseItem> {
+    pub fn all_items(&self) -> Vec<&CppDatabaseItem> {
         once(&self.current_database as &_)
             .chain(self.dep_databases.iter())
-            .flat_map(|d| d.items.iter())
+            .flat_map(|d| d.cpp_items.iter())
             .collect()
     }
 }
@@ -135,13 +135,13 @@ mod steps {
         ProcessingStep {
             is_const: true,
             ..ProcessingStep::new_custom("print_database", |data| {
-                for item in &data.current_database.items {
+                for item in &data.current_database.cpp_items {
                     trace!(
                         "[database_item] cpp_data={}; source={:?}",
                         item.cpp_data.to_string(),
                         item.source
                     );
-                    if let Some(ref rust_items) = item.rust_items {
+                    if let Some(ref rust_items) = item.ffi_items {
                         for rust_item in rust_items {
                             trace!("[rust_item] item={:?}", rust_item);
                         }
@@ -159,8 +159,8 @@ mod steps {
     }
     pub fn clear_ffi() -> ProcessingStep {
         ProcessingStep::new_custom("clear_ffi", |data| {
-            for item in &mut data.current_database.items {
-                item.rust_items = None;
+            for item in &mut data.current_database.cpp_items {
+                item.ffi_items = None;
             }
             data.current_database.next_ffi_id = 0;
             Ok(())

@@ -10,7 +10,7 @@ pub fn detect_signal_argument_types(data: &mut ProcessorData) -> Result<()> {
     let mut all_types = HashSet::new();
     for method in data
         .current_database
-        .items
+        .cpp_items
         .iter()
         .filter_map(|i| i.cpp_data.as_function_ref())
     {

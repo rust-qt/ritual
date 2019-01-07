@@ -275,7 +275,7 @@ fn run_clang<R, F: FnMut(Entity) -> Result<R>>(
 
 fn add_namespaces(data: &mut ProcessorData) -> Result<()> {
     let mut namespaces = HashSet::new();
-    for item in &data.current_database.items {
+    for item in &data.current_database.cpp_items {
         let name = match item.cpp_data {
             CppItemData::Type(ref t) => &t.path,
             CppItemData::Function(ref f) => &f.path,
@@ -293,7 +293,7 @@ fn add_namespaces(data: &mut ProcessorData) -> Result<()> {
             }
         }
     }
-    for item in &data.current_database.items {
+    for item in &data.current_database.cpp_items {
         if let CppItemData::Type(ref t) = item.cpp_data {
             namespaces.remove(&t.path);
         }

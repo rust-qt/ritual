@@ -14,8 +14,8 @@ use ritual_common::utils::MapIfOk;
 
 use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_type::CppPointerLikeTypeKind;
-use crate::database::DatabaseItem;
-use crate::database::RustItem;
+use crate::database::CppDatabaseItem;
+use crate::database::CppFfiItemKind;
 use std::iter::once;
 use std::path::Path;
 use std::path::PathBuf;
@@ -337,7 +337,7 @@ pub fn function_implementation(method: &CppFfiFunction) -> Result<String> {
 
 /// Generates a source file with the specified FFI methods.
 pub fn generate_cpp_file(
-    data: &[DatabaseItem],
+    data: &[CppDatabaseItem],
     file_path: &Path,
     global_header_name: &str,
 ) -> Result<()> {
@@ -351,28 +351,19 @@ pub fn generate_cpp_file(
 
     let mut any_slot_wrappers = false;
     for item in data {
-        if let Some(ref ffi_items) = &item.rust_items {
+        if let Some(ref ffi_items) = &item.ffi_items {
             for ffi_item in ffi_items {
-                match *ffi_item {
-                    RustItem::Function {
-                        ref cpp_ffi_function,
-                        ..
-                    } => {
+                match ffi_item.kind {
+                    CppFfiItemKind::Function(ref cpp_ffi_function) => {
                         // TODO: write less extern C
                         cpp_file.write("extern \"C\" {\n\n")?;
                         cpp_file.write(function_implementation(cpp_ffi_function)?)?;
                         cpp_file.write("\n} // extern \"C\"\n\n")?;
                     }
-                    RustItem::Class {
-                        ref qt_slot_wrapper,
-                        ..
-                    } => {
-                        if let Some(ref qt_slot_wrapper) = *qt_slot_wrapper {
-                            any_slot_wrappers = true;
-                            cpp_file.write(self::qt_slot_wrapper(qt_slot_wrapper)?)?;
-                        }
+                    CppFfiItemKind::QtSlotWrapper(ref qt_slot_wrapper) => {
+                        any_slot_wrappers = true;
+                        cpp_file.write(self::qt_slot_wrapper(qt_slot_wrapper)?)?;
                     }
-                    _ => {}
                 }
             }
         }

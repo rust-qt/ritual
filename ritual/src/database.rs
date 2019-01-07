@@ -287,125 +287,56 @@ pub struct RustPathScope {
     prefix: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum RustClassPath {
-    TemplateClass {
-        instantiated: RustPathScope,
-    },
-    ConcreteClass {
-        path: RustPath,
-        nested: RustPathScope,
-    },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum RustFunctionPath {
-    Inherent(RustPath),
-    Free(RustPath),
-    TraitImpl,
-}
-
-impl RustFunctionPath {
-    fn rust_path(&self) -> Option<&RustPath> {
-        match *self {
-            RustFunctionPath::Inherent(ref path) => Some(path),
-            RustFunctionPath::Free(ref path) => Some(path),
-            RustFunctionPath::TraitImpl => None,
-        }
-    }
-}
-
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum RustItem {
-    Function {
-        cpp_ffi_function: CppFfiFunction,
-        checks: CppCheckerInfoList,
-        rust_path: Option<RustFunctionPath>,
-    },
-    Enum {
-        rust_path: Option<RustPath>,
-    },
-    EnumValue {
-        rust_path: Option<RustPath>,
-    },
-    Class {
-        qt_slot_wrapper: Option<QtSlotWrapper>,
-        checks: CppCheckerInfoList,
-        rust_path: Option<RustClassPath>,
-    },
-    Namespace {
-        rust_path: Option<RustPathScope>,
-    },
-    QtPublicSlotWrapper {
-        some_things: (),
-        rust_path: Option<RustPath>,
-    },
+pub enum CppFfiItemKind {
+    Function(CppFfiFunction),
+    QtSlotWrapper(QtSlotWrapper),
 }
 
-impl RustItem {
-    pub fn from_function(cpp_ffi_function: CppFfiFunction) -> Self {
-        RustItem::Function {
-            cpp_ffi_function,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CppFfiItem {
+    pub kind: CppFfiItemKind,
+    pub checks: CppCheckerInfoList,
+}
+
+impl CppFfiItem {
+    pub fn from_function(function: CppFfiFunction) -> Self {
+        CppFfiItem {
+            kind: CppFfiItemKind::Function(function),
             checks: Default::default(),
-            rust_path: None,
         }
     }
 
     pub fn from_qt_slot_wrapper(wrapper: QtSlotWrapper) -> Self {
-        RustItem::Class {
-            qt_slot_wrapper: Some(wrapper),
+        CppFfiItem {
+            kind: CppFfiItemKind::QtSlotWrapper(wrapper),
             checks: Default::default(),
-            rust_path: None,
-        }
-    }
-
-    pub fn has_rust_path_resolved(&self) -> bool {
-        match *self {
-            RustItem::Function { ref rust_path, .. } => rust_path.is_some(),
-            RustItem::Enum { ref rust_path, .. } => rust_path.is_some(),
-            RustItem::EnumValue { ref rust_path, .. } => rust_path.is_some(),
-            RustItem::Class { ref rust_path, .. } => rust_path.is_some(),
-            RustItem::Namespace { ref rust_path, .. } => rust_path.is_some(),
-            RustItem::QtPublicSlotWrapper { ref rust_path, .. } => rust_path.is_some(),
-        }
-    }
-
-    pub fn checks_mut(&mut self) -> Option<&mut CppCheckerInfoList> {
-        match *self {
-            RustItem::Function { ref mut checks, .. } | RustItem::Class { ref mut checks, .. } => {
-                Some(checks)
-            }
-            _ => None,
-        }
-    }
-
-    pub fn rust_path(&self) -> Option<&RustPath> {
-        match *self {
-            RustItem::Function { ref rust_path, .. } => rust_path
-                .as_ref()
-                .and_then(|function_path| function_path.rust_path()),
-            RustItem::Enum { ref rust_path, .. } => rust_path.as_ref(),
-            RustItem::EnumValue { ref rust_path, .. } => rust_path.as_ref(),
-            RustItem::Class { ref rust_path, .. } => {
-                if let Some(RustClassPath::ConcreteClass { ref path, .. }) = rust_path {
-                    Some(path)
-                } else {
-                    None
-                }
-            }
-            RustItem::Namespace { .. } => None,
-            RustItem::QtPublicSlotWrapper { ref rust_path, .. } => rust_path.as_ref(),
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DatabaseItem {
+pub struct CppDatabaseItem {
     pub cpp_data: CppItemData,
 
     pub source: DatabaseItemSource,
-    pub rust_items: Option<Vec<RustItem>>, // TODO: remove Option if all database items have rust items
+    pub ffi_items: Option<Vec<CppFfiItem>>, // TODO: remove Option if all database items have rust items
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RustItemKind {
+    Module {},
+    Struct {},
+    EnumValue {},
+    TraitImpl {},
+    Function {},
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RustDatabaseItem {
+    pub path: RustPath,
+    pub kind: RustItemKind,
 }
 
 /// Represents all collected data related to a crate.
@@ -413,7 +344,8 @@ pub struct DatabaseItem {
 pub struct Database {
     pub crate_name: String,
     pub crate_version: String,
-    pub items: Vec<DatabaseItem>,
+    pub cpp_items: Vec<CppDatabaseItem>,
+    pub rust_items: Vec<RustDatabaseItem>,
     pub environments: Vec<CppCheckerEnv>,
     pub next_ffi_id: u64,
 }
@@ -423,18 +355,19 @@ impl Database {
         Database {
             crate_name: crate_name.into(),
             crate_version: "0.0.0".into(),
-            items: Vec::new(),
+            cpp_items: Vec::new(),
+            rust_items: Vec::new(),
             environments: Vec::new(),
             next_ffi_id: 0,
         }
     }
 
-    pub fn items(&self) -> &[DatabaseItem] {
-        &self.items
+    pub fn items(&self) -> &[CppDatabaseItem] {
+        &self.cpp_items
     }
 
     pub fn clear(&mut self) {
-        self.items.clear();
+        self.cpp_items.clear();
         self.environments.clear();
         self.next_ffi_id = 0;
     }
@@ -445,7 +378,7 @@ impl Database {
 
     pub fn add_cpp_data(&mut self, source: DatabaseItemSource, data: CppItemData) -> bool {
         if let Some(item) = self
-            .items
+            .cpp_items
             .iter_mut()
             .find(|item| item.cpp_data.is_same(&data))
         {
@@ -455,10 +388,10 @@ impl Database {
             }
             return false;
         }
-        self.items.push(DatabaseItem {
+        self.cpp_items.push(CppDatabaseItem {
             cpp_data: data,
             source,
-            rust_items: None,
+            ffi_items: None,
         });
         true
     }

@@ -566,7 +566,7 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
         config.add_custom_processing_step(ProcessingStep::new(
             "qt_fix_header_names",
             vec!["cpp_parser".to_string()],
-            move |data| fix_header_names(&mut data.current_database.items, &lib_include_path),
+            move |data| fix_header_names(&mut data.current_database.cpp_items, &lib_include_path),
         ));
 
         config.add_custom_processing_step(ProcessingStep::new(

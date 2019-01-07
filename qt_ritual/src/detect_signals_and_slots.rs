@@ -36,7 +36,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
     // TODO: only run if it's a new class or it has some new methods; don't change existing old methods
     let mut files = HashSet::new();
 
-    for item in &data.current_database.items {
+    for item in &data.current_database.cpp_items {
         if let DatabaseItemSource::CppParser {
             ref origin_location,
             ..
@@ -103,7 +103,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
     }
 
     let mut sections_per_class = HashMap::new();
-    for item in &data.current_database.items {
+    for item in &data.current_database.cpp_items {
         if let DatabaseItemSource::CppParser {
             ref origin_location,
             ..
@@ -121,7 +121,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
         }
     }
 
-    for item in &mut data.current_database.items {
+    for item in &mut data.current_database.cpp_items {
         if let DatabaseItemSource::CppParser {
             ref origin_location,
             ..
