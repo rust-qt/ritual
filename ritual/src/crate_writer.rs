@@ -166,9 +166,9 @@ fn generate_crate_template(data: &mut ProcessorData) -> Result<()> {
                 .should_remove_default_build_dependencies()
             {
                 table.insert(
-                    "cpp_to_rust_build_tools".to_string(),
+                    "ritual_build".to_string(),
                     dep_value(
-                        versions::BUILD_TOOLS_VERSION,
+                        versions::RITUAL_BUILD_VERSION,
                         if data.workspace.config().write_dependencies_local_paths {
                             Some(repo_crate_local_path(
                                 "cpp_to_rust/cpp_to_rust_build_tools",

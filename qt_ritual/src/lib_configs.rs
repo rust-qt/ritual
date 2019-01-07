@@ -535,8 +535,8 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
     } else {
         crate_properties.remove_default_build_dependencies();
         crate_properties.add_build_dependency(
-            "qt_build_tools",
-            versions::QT_BUILD_TOOLS_VERSION,
+            "qt_ritual_build",
+            versions::QT_RITUAL_BUILD_VERSION,
             Some(repo_crate_local_path("qt_generator/qt_build_tools")?),
         );
 
