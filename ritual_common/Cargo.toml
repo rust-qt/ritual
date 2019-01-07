@@ -4,7 +4,7 @@ edition = "2018"
 
 # when changing version of this crate, change corresponding dependency version in
 # `cpp_to_rust_generator`, `cpp_to_rust_build_tools` and `qt_generator_common`
-version = "0.2.3"
+version = "0.0.0"
 
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 description = "Common utilities for cpp_to_rust_generator and cpp_to_rust_build_tools"

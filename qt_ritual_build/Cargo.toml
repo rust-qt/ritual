@@ -2,13 +2,15 @@
 name = "qt_ritual_build"
 edition = "2018"
 
-# when changing this version, update `qt_generator/qt_generator/src/versions.rs`
-version = "0.2.4"
+# Don't forget to update `qt_ritual/src/versions.rs`
+# when changing this version.
+version = "0.0.0"
+
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 license = "MIT"
 description = "Build script implementation for Rust Qt crates"
 repository = "https://github.com/rust-qt/cpp_to_rust/tree/master/qt_generator/qt_build_tools"
 
 [dependencies]
-ritual_build = { version = "0.2.3", path = "../ritual_build" }
-qt_ritual_common = { version = "0.2.3", path = "../qt_ritual_common" }
+ritual_build = { version = "0.0.0", path = "../ritual_build" }
+qt_ritual_common = { version = "0.0.0", path = "../qt_ritual_common" }

@@ -127,10 +127,6 @@ fn generate_crate_template(data: &mut ProcessorData) -> Result<()> {
                 .should_remove_default_dependencies()
             {
                 table.insert(
-                    "libc".to_string(),
-                    toml::Value::String(versions::LIBC_VERSION.to_string()),
-                );
-                table.insert(
                     "cpp_utils".to_string(),
                     dep_value(
                         versions::CPP_UTILS_VERSION,

@@ -2,9 +2,10 @@
 name = "cpp_utils"
 edition = "2018"
 
-# Don't forget to update `cpp_to_rust/cpp_to_rust_generator/src/versions.rs`
+# Don't forget to update `ritual/src/versions.rs`
 # when changing this version.
-version = "0.2.0"
+version = "0.2.1"
+
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 description = "Various C++-related types and functions needed for the cpp_to_rust project"
 license = "MIT"

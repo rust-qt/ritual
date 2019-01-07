@@ -1,16 +1,16 @@
 [package]
 name = "qt_ritual"
 edition = "2018"
-version = "0.2.0"
+version = "0.0.0"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 license = "MIT"
 description = "Generator of Rust-Qt crates"
 repository = "https://github.com/rust-qt/cpp_to_rust/tree/master/qt_generator/qt_generator"
 
 [dependencies]
-ritual = { version = "0.2.0", path = "../ritual" }
-qt_ritual_common = { version = "0.2.3", path = "../qt_ritual_common" }
-ritual_common = { version = "0.2.3", path = "../ritual_common" }
+ritual = { version = "0.0.0", path = "../ritual" }
+qt_ritual_common = { version = "0.0.0", path = "../qt_ritual_common" }
+ritual_common = { version = "0.0.0", path = "../ritual_common" }
 
 clap = "2.32.0"    # command line args parsing
 regex = "1.1.0"
