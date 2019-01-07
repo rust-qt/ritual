@@ -283,14 +283,28 @@ impl Display for CppItemData {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustPathScope {
-    path: RustPath,
-    prefix: Option<String>,
+    pub path: RustPath,
+    pub prefix: Option<String>,
+}
+
+impl RustPathScope {
+    pub fn apply(&self, name: &str) -> RustPath {
+        let full_name = if let Some(ref prefix) = self.prefix {
+            format!("{}{}", prefix, name)
+        } else {
+            name.to_string()
+        };
+        self.path.join(full_name)
+    }
 }
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CppFfiItemKind {
     Function(CppFfiFunction),
+
+    // TODO: separate custom C++ wrapper logic from core implementation,
+    // run cpp_parser on wrappers instead of constructing results manually
     QtSlotWrapper(QtSlotWrapper),
 }
 
@@ -298,6 +312,7 @@ pub enum CppFfiItemKind {
 pub struct CppFfiItem {
     pub kind: CppFfiItemKind,
     pub checks: CppCheckerInfoList,
+    pub is_rust_processed: bool,
 }
 
 impl CppFfiItem {
@@ -305,6 +320,7 @@ impl CppFfiItem {
         CppFfiItem {
             kind: CppFfiItemKind::Function(function),
             checks: Default::default(),
+            is_rust_processed: false,
         }
     }
 
@@ -312,6 +328,7 @@ impl CppFfiItem {
         CppFfiItem {
             kind: CppFfiItemKind::QtSlotWrapper(wrapper),
             checks: Default::default(),
+            is_rust_processed: false,
         }
     }
 }
@@ -321,12 +338,13 @@ pub struct CppDatabaseItem {
     pub cpp_data: CppItemData,
 
     pub source: DatabaseItemSource,
-    pub ffi_items: Option<Vec<CppFfiItem>>, // TODO: remove Option if all database items have rust items
+    pub ffi_items: Option<Vec<CppFfiItem>>, // TODO: remove Option
+    pub is_rust_processed: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RustItemKind {
-    Module {},
+    Module { doc: Option<String> },
     Struct {},
     EnumValue {},
     TraitImpl {},
@@ -337,6 +355,18 @@ pub enum RustItemKind {
 pub struct RustDatabaseItem {
     pub path: RustPath,
     pub kind: RustItemKind,
+    pub cpp_item_index: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RustDatabase {
+    pub items: Vec<RustDatabaseItem>,
+}
+
+impl RustDatabase {
+    pub fn find(&self, path: &RustPath) -> Option<&RustDatabaseItem> {
+        self.items.iter().find(|item| &item.path == path)
+    }
 }
 
 /// Represents all collected data related to a crate.
@@ -345,7 +375,7 @@ pub struct Database {
     pub crate_name: String,
     pub crate_version: String,
     pub cpp_items: Vec<CppDatabaseItem>,
-    pub rust_items: Vec<RustDatabaseItem>,
+    pub rust_database: RustDatabase,
     pub environments: Vec<CppCheckerEnv>,
     pub next_ffi_id: u64,
 }
@@ -356,7 +386,7 @@ impl Database {
             crate_name: crate_name.into(),
             crate_version: "0.0.0".into(),
             cpp_items: Vec::new(),
-            rust_items: Vec::new(),
+            rust_database: Default::default(),
             environments: Vec::new(),
             next_ffi_id: 0,
         }
@@ -392,6 +422,7 @@ impl Database {
             cpp_data: data,
             source,
             ffi_items: None,
+            is_rust_processed: false,
         });
         true
     }

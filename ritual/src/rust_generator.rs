@@ -180,21 +180,7 @@ fn include_file_to_module_name(include_file: &str, remove_qt_prefix: bool) -> St
   remove_qt_prefix_and_convert_case(&r, Case::Snake, remove_qt_prefix)
 }
 
-/// Adds "_" to a string if it is a reserved word in Rust
-#[cfg_attr(rustfmt, rustfmt_skip)]
-fn sanitize_rust_identifier(name: &str) -> String {
-  match name {
-    "abstract" | "alignof" | "as" | "become" | "box" | "break" | "const" |
-    "continue" | "crate" | "do" | "else" | "enum" | "extern" | "false" |
-    "final" | "fn" | "for" | "if" | "impl" | "in" | "let" | "loop" |
-    "macro" | "match" | "mod" | "move" | "mut" | "offsetof" | "override" |
-    "priv" | "proc" | "pub" | "pure" | "ref" | "return" | "Self" | "self" |
-    "sizeof" | "static" | "struct" | "super" | "trait" | "true" | "type" |
-    "typeof" | "unsafe" | "unsized" | "use" | "virtual" | "where" | "while" |
-    "yield" => format!("{}_", name),
-    _ => name.to_string()
-  }
-}
+
 
 /// Prepares enum variants for being represented in Rust:
 /// - Converts variant names to proper case;

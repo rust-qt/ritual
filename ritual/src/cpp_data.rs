@@ -176,6 +176,16 @@ impl CppPath {
     pub fn last_mut(&mut self) -> &mut CppPathItem {
         self.items.last_mut().expect("empty CppPath encountered")
     }
+
+    pub fn parent(&self) -> Option<CppPath> {
+        if self.items.len() > 1 {
+            Some(CppPath {
+                items: self.items[..self.items.len() - 1].to_vec(),
+            })
+        } else {
+            None
+        }
+    }
 }
 
 impl FromStr for CppPath {

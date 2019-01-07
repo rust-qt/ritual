@@ -20,6 +20,66 @@ pub struct RustPath {
     pub parts: Vec<String>,
 }
 
+impl RustPath {
+    /// Creates new `RustPath` consisting of `parts`.
+    pub fn from_parts(parts: Vec<String>) -> RustPath {
+        if parts.is_empty() {
+            panic!("RustPath can't be empty");
+        }
+        RustPath { parts }
+    }
+
+    /// Returns crate name of this name, or `None`
+    /// if this name does not contain the crate name (e.g. it's a built-in type).
+    pub fn crate_name(&self) -> Option<&str> {
+        if self.parts.is_empty() {
+            panic!("RustPath can't be empty");
+        }
+        if self.parts.len() > 1 {
+            Some(self.parts[0].as_str())
+        } else {
+            None
+        }
+    }
+
+    /// Returns last component of the name.
+    pub fn last(&self) -> &str {
+        self.parts.last().expect("RustPath can't be empty")
+    }
+
+    pub fn join(&self, name: impl Into<String>) -> RustPath {
+        let mut new_path = self.clone();
+        new_path.parts.push(name.into());
+        new_path
+    }
+
+    /// Returns formatted name for using within `current_crate`.
+    /// If `current_crate` is `None`, it's assumed that the formatted name
+    /// will be used outside of the crate it belongs to.
+    pub fn full_name(&self, current_crate: Option<&str>) -> String {
+        if let Some(current_crate) = current_crate {
+            if let Some(self_crate) = self.crate_name() {
+                if self_crate == current_crate {
+                    return format!("crate::{}", self.parts[1..].join("::"));
+                }
+            }
+        }
+        self.parts.join("::")
+    }
+
+    /// Returns true if `other` is nested within `self`.
+    pub fn includes(&self, other: &RustPath) -> bool {
+        let extra_modules_count = other.parts.len() as isize - self.parts.len() as isize;
+        extra_modules_count > 0 && other.parts[0..self.parts.len()] == self.parts[..]
+    }
+
+    /// Returns true if `other` is a direct child of `self`.
+    pub fn includes_directly(&self, other: &RustPath) -> bool {
+        let extra_modules_count = other.parts.len() as isize - self.parts.len() as isize;
+        self.includes(other) && extra_modules_count == 1
+    }
+}
+
 /// Conversion from public Rust API type to
 /// the corresponding FFI type
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -106,60 +166,6 @@ pub enum RustType {
         is_const: bool,
         target: Box<RustType>,
     },
-}
-
-impl RustPath {
-    /// Creates new `RustPath` consisting of `parts`.
-    pub fn from_parts(parts: Vec<String>) -> RustPath {
-        if parts.is_empty() {
-            panic!("RustPath can't be empty");
-        }
-        RustPath { parts }
-    }
-
-    /// Returns crate name of this name, or `None`
-    /// if this name does not contain the crate name (e.g. it's a built-in type).
-    pub fn crate_name(&self) -> Option<&str> {
-        if self.parts.is_empty() {
-            panic!("RustPath can't be empty");
-        }
-        if self.parts.len() > 1 {
-            Some(self.parts[0].as_str())
-        } else {
-            None
-        }
-    }
-
-    /// Returns last component of the name.
-    pub fn last(&self) -> &str {
-        self.parts.last().expect("RustPath can't be empty")
-    }
-
-    /// Returns formatted name for using within `current_crate`.
-    /// If `current_crate` is `None`, it's assumed that the formatted name
-    /// will be used outside of the crate it belongs to.
-    pub fn full_name(&self, current_crate: Option<&str>) -> String {
-        if let Some(current_crate) = current_crate {
-            if let Some(self_crate) = self.crate_name() {
-                if self_crate == current_crate {
-                    return format!("crate::{}", self.parts[1..].join("::"));
-                }
-            }
-        }
-        self.parts.join("::")
-    }
-
-    /// Returns true if `other` is nested within `self`.
-    pub fn includes(&self, other: &RustPath) -> bool {
-        let extra_modules_count = other.parts.len() as isize - self.parts.len() as isize;
-        extra_modules_count > 0 && other.parts[0..self.parts.len()] == self.parts[..]
-    }
-
-    /// Returns true if `other` is a direct child of `self`.
-    pub fn includes_directly(&self, other: &RustPath) -> bool {
-        let extra_modules_count = other.parts.len() as isize - self.parts.len() as isize;
-        self.includes(other) && extra_modules_count == 1
-    }
 }
 
 impl RustType {

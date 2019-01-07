@@ -85,11 +85,11 @@ fn generate_crate_template(data: &mut ProcessorData) -> Result<()> {
             let mut table = toml::value::Table::new();
             table.insert(
                 "name".to_string(),
-                toml::Value::String(data.config.crate_properties().name().clone()),
+                toml::Value::String(data.config.crate_properties().name().into()),
             );
             table.insert(
                 "version".to_string(),
-                toml::Value::String(data.config.crate_properties().version().clone()),
+                toml::Value::String(data.config.crate_properties().version().into()),
             );
             table.insert(
                 "build".to_string(),

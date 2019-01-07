@@ -112,11 +112,11 @@ impl CrateProperties {
     }
 
     /// Name of the crate
-    pub fn name(&self) -> &String {
+    pub fn name(&self) -> &str {
         &self.name
     }
     /// Version of the crate
-    pub fn version(&self) -> &String {
+    pub fn version(&self) -> &str {
         &self.version
     }
 

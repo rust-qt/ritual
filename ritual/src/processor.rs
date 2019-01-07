@@ -241,7 +241,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
 
     let mut current_database_saved = true;
 
-    if &current_database.crate_version != config.crate_properties().version() {
+    if current_database.crate_version != config.crate_properties().version() {
         current_database.crate_version = config.crate_properties().version().to_string();
         current_database_saved = false;
     }
