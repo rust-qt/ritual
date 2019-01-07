@@ -9,7 +9,7 @@ use common::utils::{add_to_multihash, MapIfOk};
 use cpp_data::{CppDataWithDeps, CppEnumValue, CppTypeAllocationPlace, CppTypeKind};
 use cpp_ffi_data::{
   CppAndFfiMethod, CppCast, CppFfiArgumentMeaning, CppFfiHeaderData, CppFfiMethodKind, CppFfiType,
-  CppIndirectionChange,
+  CppTypeConversionToFfi,
 };
 use cpp_method::{CppMethod, ReturnValueAllocationPlace};
 use cpp_operator::CppOperator;
@@ -481,14 +481,14 @@ fn complete_type(
   } = rust_api_type
   {
     match cpp_ffi_type.conversion {
-      CppIndirectionChange::NoChange => {
+      CppTypeConversionToFfi::NoChange => {
         if argument_meaning == &CppFfiArgumentMeaning::This {
           assert!(indirection == &RustTypeIndirection::Ptr);
           *indirection = RustTypeIndirection::Ref { lifetime: None };
           rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
         }
       }
-      CppIndirectionChange::ValueToPointer => {
+      CppTypeConversionToFfi::ValueToPointer => {
         assert!(indirection == &RustTypeIndirection::Ptr);
         if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
           if let Some(info) =
@@ -552,7 +552,7 @@ fn complete_type(
           *is_const2 = true;
         }
       }
-      CppIndirectionChange::ReferenceToPointer => {
+      CppTypeConversionToFfi::ReferenceToPointer => {
         match *indirection {
           RustTypeIndirection::Ptr => {
             *indirection = RustTypeIndirection::Ref { lifetime: None };
@@ -564,10 +564,10 @@ fn complete_type(
         }
         rust_api_to_c_conversion = RustToCTypeConversion::RefToPtr;
       }
-      CppIndirectionChange::QFlagsToUInt => {}
+      CppTypeConversionToFfi::QFlagsToUInt => {}
     }
   }
-  if cpp_ffi_type.conversion == CppIndirectionChange::QFlagsToUInt {
+  if cpp_ffi_type.conversion == CppTypeConversionToFfi::QFlagsToUInt {
     rust_api_to_c_conversion = RustToCTypeConversion::QFlagsToUInt;
     let enum_type = if let CppTypeBase::Class(CppTypeClassBase {
       ref template_arguments,
