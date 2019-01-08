@@ -9,6 +9,22 @@ use crate::cpp_function::CppFunctionDoc;
 use crate::rust_type::{CompleteType, RustPath, RustType};
 use serde_derive::{Deserialize, Serialize};
 
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub enum RustItemPath {
+    Path(RustPath),
+    TraitImpl {
+        parent_path: RustPath,
+        trait_type: RustType,
+        target_type: RustType,
+    },
+}
+
+impl RustItemPath {
+    pub fn new(path: RustPath) -> RustItemPath {
+        RustItemPath::Path(path)
+    }
+}
+
 /// One variant of a Rust enum
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustEnumValue {
@@ -81,7 +97,7 @@ pub struct RustStruct {
 /// or an item of information for an overloaded method.
 /// One value of `RustMethodDocItem` corresponds to a single
 /// C++ method.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustFunctionDoc {
     /// Rustdoc content that will appear before documentation for variants.
     pub common_doc: Option<String>,
@@ -92,7 +108,7 @@ pub struct RustFunctionDoc {
 }
 
 /// Location of a Rust method.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum RustFunctionScope {
     /// Inside `impl T {}`, where `T` is `target_type`.
     Impl { target_type: RustType },
@@ -103,7 +119,7 @@ pub enum RustFunctionScope {
 }
 
 /// Information about a Rust method argument.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustFunctionArgument {
     /// C++ and Rust types corresponding to this argument at all levels.
     pub argument_type: CompleteType,
@@ -114,13 +130,14 @@ pub struct RustFunctionArgument {
 }
 
 /// Type of a receiver in Qt connection system.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum RustQtReceiverType {
     Signal,
     Slot,
 }
 
 #[allow(clippy::large_enum_variant)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum RustFunctionKind {
     FfiWrapper {
         /// C++ method corresponding to this variant.
@@ -148,7 +165,7 @@ pub enum RustFunctionKind {
 }
 
 /// Information about a public API method.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustFunction {
     /// Location of the method.
     pub scope: RustFunctionScope,
@@ -170,7 +187,7 @@ pub struct RustFunction {
 }
 
 /// Information about type of `self` argument of the method.
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub enum RustFunctionSelfArgKind {
     /// No `self` argument (static method or a free function).
     None,
@@ -184,7 +201,7 @@ pub enum RustFunctionSelfArgKind {
 
 /// Information about an associated type value
 /// within a trait implementation.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct TraitAssociatedType {
     /// Name of the associated type.
     pub name: String,
@@ -193,8 +210,8 @@ pub struct TraitAssociatedType {
 }
 
 /// Information about a trait implementation.
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct TraitImpl {
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct RustTraitImpl {
     /// Type the trait is implemented for.
     pub target_type: RustType,
     /// Type of the trait.
@@ -206,7 +223,7 @@ pub struct TraitImpl {
 }
 
 /// Information about a Rust module.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustModule {
     /// Last name of the module.
     pub path: RustPath,
@@ -216,7 +233,7 @@ pub struct RustModule {
 
 /// Method of generating name suffixes for disambiguating multiple Rust methods
 /// with the same name.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RustFunctionCaptionStrategy {
     /// Only type of `self` is used.
     SelfOnly,
@@ -265,4 +282,49 @@ pub struct RustFFIFunction {
     pub path: RustPath,
     /// Arguments of the function.
     pub arguments: Vec<RustFFIArgument>,
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RustItemKind {
+    Module(RustModule),
+    Struct(RustStruct),
+    EnumValue(RustEnumValue),
+    TraitImpl(RustTraitImpl),
+    Function(RustFunction),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RustDatabaseItem {
+    pub path: RustItemPath,
+    pub kind: RustItemKind,
+    pub cpp_item_index: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RustDatabase {
+    pub items: Vec<RustDatabaseItem>,
+}
+
+impl RustDatabase {
+    pub fn find(&self, path: &RustItemPath) -> Option<&RustDatabaseItem> {
+        self.items.iter().find(|item| &item.path == path)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RustPathScope {
+    pub path: RustPath,
+    pub prefix: Option<String>,
+}
+
+impl RustPathScope {
+    pub fn apply(&self, name: &str) -> RustPath {
+        let full_name = if let Some(ref prefix) = self.prefix {
+            format!("{}{}", prefix, name)
+        } else {
+            name.to_string()
+        };
+        self.path.join(full_name)
+    }
 }

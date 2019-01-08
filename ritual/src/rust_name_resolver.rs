@@ -8,12 +8,14 @@ use crate::database::CppDatabaseItem;
 use crate::database::CppFfiItem;
 use crate::database::CppItemData;
 use crate::database::Database;
-use crate::database::RustDatabase;
-use crate::database::RustDatabaseItem;
-use crate::database::RustItemKind;
-use crate::database::RustPathScope;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
+use crate::rust_info::RustDatabase;
+use crate::rust_info::RustDatabaseItem;
+use crate::rust_info::RustItemKind;
+use crate::rust_info::RustItemPath;
+use crate::rust_info::RustModule;
+use crate::rust_info::RustPathScope;
 use crate::rust_type::RustPath;
 use log::trace;
 use ritual_common::errors::{bail, Result};
@@ -174,7 +176,8 @@ impl State<'_> {
                 assert!(path.last().template_arguments.is_none());
                 let sanitized_name = sanitize_rust_identifier(&path.last().name);
                 let rust_path = strategy.apply(&sanitized_name);
-                if let Some(rust_item) = self.rust_database.find(&rust_path) {
+                let rust_item_path = RustItemPath::new(rust_path.clone());
+                if let Some(rust_item) = self.rust_database.find(&rust_item_path) {
                     bail!(
                         "namespace name {:?} already exists! Rust item: {:?}",
                         rust_path,
@@ -182,10 +185,11 @@ impl State<'_> {
                     );
                 }
                 let rust_item = RustDatabaseItem {
-                    path: rust_path,
-                    kind: RustItemKind::Module {
+                    path: rust_item_path,
+                    kind: RustItemKind::Module(RustModule {
+                        path: rust_path,
                         doc: Some(format!("C++ namespace: `{}`", path.to_cpp_pseudo_code())),
-                    },
+                    }),
                     cpp_item_index,
                 };
                 self.rust_database.items.push(rust_item);

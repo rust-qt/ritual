@@ -14,7 +14,7 @@ use crate::cpp_data::CppTemplateInstantiation;
 use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_ffi_data::QtSlotWrapper;
 use crate::cpp_type::CppType;
-use crate::rust_type::RustPath;
+use crate::rust_info::RustDatabase;
 use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::Display;
@@ -281,23 +281,6 @@ impl Display for CppItemData {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RustPathScope {
-    pub path: RustPath,
-    pub prefix: Option<String>,
-}
-
-impl RustPathScope {
-    pub fn apply(&self, name: &str) -> RustPath {
-        let full_name = if let Some(ref prefix) = self.prefix {
-            format!("{}{}", prefix, name)
-        } else {
-            name.to_string()
-        };
-        self.path.join(full_name)
-    }
-}
-
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CppFfiItemKind {
@@ -340,33 +323,6 @@ pub struct CppDatabaseItem {
     pub source: DatabaseItemSource,
     pub ffi_items: Option<Vec<CppFfiItem>>, // TODO: remove Option
     pub is_rust_processed: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum RustItemKind {
-    Module { doc: Option<String> },
-    Struct {},
-    EnumValue {},
-    TraitImpl {},
-    Function {},
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RustDatabaseItem {
-    pub path: RustPath,
-    pub kind: RustItemKind,
-    pub cpp_item_index: usize,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct RustDatabase {
-    pub items: Vec<RustDatabaseItem>,
-}
-
-impl RustDatabase {
-    pub fn find(&self, path: &RustPath) -> Option<&RustDatabaseItem> {
-        self.items.iter().find(|item| &item.path == path)
-    }
 }
 
 /// Represents all collected data related to a crate.
