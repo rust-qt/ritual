@@ -27,7 +27,7 @@ mod rust_name_resolver;
 //mod rust_generator;
 //mod rust_code_generator;
 mod cpp_parser;
-//mod rust_info;
+mod rust_info;
 mod rust_type;
 mod versions;
 
