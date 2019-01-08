@@ -108,7 +108,6 @@ fn run(mut data: &mut ProcessorData) -> Result<()> {
             CppItemData::QtSignalArguments(ref signal_arguments) => {
                 generate_slot_wrapper(signal_arguments, &mut name_provider)
             }
-            CppItemData::TemplateInstantiation(..) => continue,
         };
 
         match result {

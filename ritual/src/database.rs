@@ -10,7 +10,6 @@ use crate::cpp_data::CppVisibility;
 use crate::cpp_function::CppFunction;
 
 use crate::cpp_data::CppPath;
-use crate::cpp_data::CppTemplateInstantiation;
 use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_ffi_data::QtSlotWrapper;
 use crate::cpp_type::CppType;
@@ -112,7 +111,6 @@ pub enum CppItemData {
     Function(CppFunction),
     ClassField(CppClassField),
     ClassBase(CppBaseSpecifier),
-    TemplateInstantiation(CppTemplateInstantiation),
     QtSignalArguments(Vec<CppType>),
 }
 
@@ -124,10 +122,6 @@ impl CppItemData {
             (&CppItemData::Function(ref v), &CppItemData::Function(ref v2)) => v.is_same(v2),
             (&CppItemData::ClassField(ref v), &CppItemData::ClassField(ref v2)) => v.is_same(v2),
             (&CppItemData::ClassBase(ref v), &CppItemData::ClassBase(ref v2)) => v == v2,
-            (
-                &CppItemData::TemplateInstantiation(ref v),
-                &CppItemData::TemplateInstantiation(ref v2),
-            ) => v == v2,
             (&CppItemData::QtSignalArguments(ref v), &CppItemData::QtSignalArguments(ref v2)) => {
                 v == v2
             }
@@ -157,7 +151,6 @@ impl CppItemData {
                 CppType::Class(base.derived_class_type.clone()),
             ],
             CppItemData::QtSignalArguments(ref args) => args.clone(),
-            CppItemData::TemplateInstantiation(ref data) => data.template_arguments.clone(),
         }
     }
 
@@ -204,13 +197,6 @@ impl CppItemData {
         }
     }
 
-    pub fn as_template_instantiation_ref(&self) -> Option<&CppTemplateInstantiation> {
-        if let CppItemData::TemplateInstantiation(ref data) = *self {
-            Some(data)
-        } else {
-            None
-        }
-    }
     pub fn as_signal_arguments_ref(&self) -> Option<&[CppType]> {
         if let CppItemData::QtSignalArguments(ref data) = *self {
             Some(data)
@@ -266,14 +252,6 @@ impl Display for CppItemData {
             CppItemData::QtSignalArguments(ref args) => format!(
                 "Qt signal args ({})",
                 args.iter().map(|arg| arg.to_cpp_pseudo_code()).join(", ")
-            ),
-            CppItemData::TemplateInstantiation(ref data) => format!(
-                "template instantiation: {}<{}>",
-                data.class_name,
-                data.template_arguments
-                    .iter()
-                    .map(|arg| arg.to_cpp_pseudo_code())
-                    .join(", ")
             ),
         };
 

@@ -296,16 +296,6 @@ impl CppTypeData {
     }
 }
 
-/// Information about a C++ template class
-/// instantiation.
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct CppTemplateInstantiation {
-    /// Template class name
-    pub class_name: CppPath,
-    /// List of template arguments used in this instantiation
-    pub template_arguments: Vec<CppType>, // TODO: refactor using new CppPath?
-}
-
 impl CppTypeDataKind {
     /// Checks if the type is a class type.
     pub fn is_class(&self) -> bool {
