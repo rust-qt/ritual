@@ -40,4 +40,4 @@ mod cpp_explicit_destructors;
 mod type_allocation_places;
 
 // TODO: deal with inheritance for subclassing support
-//mod cpp_inheritance;
+mod cpp_inheritance;
