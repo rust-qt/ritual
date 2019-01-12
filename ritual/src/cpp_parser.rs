@@ -1195,7 +1195,7 @@ impl CppParser<'_, '_> {
                     },
                     CppItemData::EnumValue(CppEnumValue {
                         path: enum_name.join(CppPathItem::from_str_unchecked(&value_name)),
-                        value: val.1,
+                        value: val.0,
                         doc: None,
                     }),
                 );

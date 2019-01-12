@@ -251,8 +251,8 @@ impl DocParser {
     }
 
     /// Returns documentation for C++ type `name`.
-    fn doc_for_type(&mut self, name: &CppPath) -> Result<DocForType> {
-        let name = name.to_string();
+    fn doc_for_type(&mut self, path: &CppPath) -> Result<DocForType> {
+        let name = path.to_string();
         let index_item = self
             .doc_data
             .find_index_item(|item| item.name == name)
@@ -269,6 +269,7 @@ impl DocParser {
             };
             return Ok(DocForType {
                 type_doc: CppTypeDoc {
+                    path: path.clone(),
                     html: result.html,
                     url: format!("{}{}#{}", self.base_url, file_name, anchor),
                     cross_references: result.cross_references,
@@ -310,6 +311,7 @@ impl DocParser {
         let (html, cross_references) = process_html(&result, &self.base_url)?;
         Ok(DocForType {
             type_doc: CppTypeDoc {
+                path: path.clone(),
                 html,
                 url,
                 cross_references: cross_references.into_iter().collect(),

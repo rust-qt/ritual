@@ -16,16 +16,17 @@ pub struct RustEnumValue {
     /// Corresponding value
     pub value: i64,
     /// Documentation of corresponding C++ variants
-    pub cpp_doc: CppEnumValueDoc,
+    pub doc: RustEnumValueDoc,
 }
 
 /// C++ documentation data for a enum variant
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct CppEnumValueDoc {
-    /// C++ name of the variant
-    pub variant_name: String,
+pub struct RustEnumValueDoc {
+    pub extra_doc: Option<String>,
+    /// C++ path of the variant
+    pub cpp_path: CppPath,
     /// HTML content
-    pub doc: Option<String>,
+    pub cpp_doc: Option<String>,
 }
 
 /// Information about a Qt slot wrapper on Rust side
@@ -48,8 +49,6 @@ pub enum RustWrapperTypeKind {
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustWrapperType {
-    /// Full name and template arguments of corresponding C++ type (class or enum).
-    pub cpp_path: CppPath,
     /// C++ documentation for this type
     pub cpp_doc: Option<CppTypeDoc>,
     pub kind: RustWrapperTypeKind,
@@ -67,7 +66,7 @@ pub enum RustStructKind {
 pub struct RustStruct {
     /// Additional documentation content that will appear before C++ documentation or any other
     /// automatically generated content.
-    pub rust_doc: Option<String>,
+    pub extra_doc: Option<String>,
     pub path: RustPath,
     /// Kind of the type and additional information.
     pub kind: RustStructKind,
@@ -205,13 +204,19 @@ pub struct RustTraitImpl {
     pub functions: Vec<RustFunction>,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct RustModuleDoc {
+    pub extra_doc: Option<String>,
+    pub cpp_path: Option<CppPath>,
+}
+
 /// Information about a Rust module.
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustModule {
     /// Last name of the module.
     pub path: RustPath,
     /// Markdown content of Rust documentation for this module.
-    pub doc: Option<String>,
+    pub doc: RustModuleDoc,
 }
 
 /// Method of generating name suffixes for disambiguating multiple Rust methods

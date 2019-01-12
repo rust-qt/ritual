@@ -12,8 +12,11 @@ use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use crate::rust_info::RustDatabase;
 use crate::rust_info::RustDatabaseItem;
+use crate::rust_info::RustEnumValue;
+use crate::rust_info::RustEnumValueDoc;
 use crate::rust_info::RustItemKind;
 use crate::rust_info::RustModule;
+use crate::rust_info::RustModuleDoc;
 use crate::rust_info::RustPathScope;
 use crate::rust_info::RustStruct;
 use crate::rust_info::RustStructKind;
@@ -118,7 +121,10 @@ impl State<'_> {
                 let rust_item = RustDatabaseItem {
                     kind: RustItemKind::Module(RustModule {
                         path: rust_path,
-                        doc: Some(format!("C++ namespace: `{}`", path.to_cpp_pseudo_code())),
+                        doc: RustModuleDoc {
+                            extra_doc: None,
+                            cpp_path: Some(path.clone()),
+                        },
                     }),
                     cpp_item_index,
                 };
@@ -134,13 +140,9 @@ impl State<'_> {
                 } else {
                     let rust_item = RustDatabaseItem {
                         kind: RustItemKind::Struct(RustStruct {
-                            rust_doc: Some(format!(
-                                "C++ enum: `{}`",
-                                data.path.to_cpp_pseudo_code()
-                            )),
+                            extra_doc: None,
                             path: rust_path,
                             kind: RustStructKind::WrapperType(RustWrapperType {
-                                cpp_path: data.path.clone(),
                                 cpp_doc: data.doc.clone(),
                                 kind: RustWrapperTypeKind::EnumWrapper,
                             }),
@@ -152,6 +154,25 @@ impl State<'_> {
                     *modified = true;
                     cpp_item.is_rust_processed = true;
                 }
+            }
+            CppItemData::EnumValue(value) => {
+                let rust_path = self.generate_rust_path(&value.path)?;
+
+                let rust_item = RustDatabaseItem {
+                    kind: RustItemKind::EnumValue(RustEnumValue {
+                        path: rust_path,
+                        value: value.value,
+                        doc: RustEnumValueDoc {
+                            cpp_path: value.path.clone(),
+                            cpp_doc: value.doc.clone(),
+                            extra_doc: None,
+                        },
+                    }),
+                    cpp_item_index,
+                };
+                self.rust_database.items.push(rust_item);
+                *modified = true;
+                cpp_item.is_rust_processed = true;
             }
             _ => bail!("unimplemented"),
             /*

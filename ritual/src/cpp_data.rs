@@ -15,7 +15,7 @@ pub struct CppEnumValue {
     /// Full path containing enum path and variant name.
     pub path: CppPath,
     /// Corresponding value
-    pub value: u64,
+    pub value: i64,
     /// C++ documentation for this item in HTML
     pub doc: Option<String>,
 }
@@ -130,6 +130,7 @@ pub enum CppVisibility {
 /// C++ documentation for a type
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct CppTypeDoc {
+    pub path: CppPath,
     /// HTML content
     pub html: String,
     /// Absolute URL to online documentation page for this type
