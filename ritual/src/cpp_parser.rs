@@ -1185,17 +1185,17 @@ impl CppParser<'_, '_> {
                     .get_enum_constant_value()
                     .ok_or_else(|| err_msg("failed to get value of enum variant"))?;
 
+                let value_name = child
+                    .get_name()
+                    .ok_or_else(|| err_msg("failed to get name of enum variant"))?;
                 self.data.current_database.add_cpp_data(
                     DatabaseItemSource::CppParser {
                         include_file: include_file.clone(),
                         origin_location: get_origin_location(child)?,
                     },
                     CppItemData::EnumValue(CppEnumValue {
-                        name: child
-                            .get_name()
-                            .ok_or_else(|| err_msg("failed to get name of enum variant"))?,
+                        path: enum_name.join(CppPathItem::from_str_unchecked(&value_name)),
                         value: val.1,
-                        enum_path: enum_name.clone(),
                         doc: None,
                     }),
                 );

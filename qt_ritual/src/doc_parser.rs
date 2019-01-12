@@ -601,7 +601,10 @@ pub fn parse_docs(data: &mut ProcessorData, qt_crate_name: &str, docs_path: &Pat
     for item in &mut data.current_database.cpp_items {
         let type_name = match item.cpp_data {
             CppItemData::Type(ref data) => data.path.clone(),
-            CppItemData::EnumValue(ref data) => data.enum_path.clone(),
+            CppItemData::EnumValue(ref data) => data
+                .path
+                .parent()
+                .expect("enum value must have parent path"),
             _ => continue,
         };
         if !type_doc_cache.contains_key(&type_name) {
@@ -620,15 +623,15 @@ pub fn parse_docs(data: &mut ProcessorData, qt_crate_name: &str, docs_path: &Pat
                     data.doc = Some(doc.type_doc.clone());
                 }
                 CppItemData::EnumValue(ref mut data) => {
-                    if let Some(r) = doc.enum_variants_doc.iter().find(|x| x.name == data.name) {
+                    if let Some(r) = doc
+                        .enum_variants_doc
+                        .iter()
+                        .find(|x| x.name == data.path.last().name)
+                    {
                         data.doc = Some(r.html.clone());
-                        parser.mark_enum_variant_used(&data.full_name().to_string());
+                        parser.mark_enum_variant_used(&data.unscoped_path().to_string());
                     } else {
-                        trace!(
-                            "[DebugQtDoc] Not found doc for enum variant: {}::{}",
-                            data.enum_path,
-                            data.name
-                        );
+                        trace!("[DebugQtDoc] Not found doc for enum variant: {}", data.path,);
                     }
                 }
                 _ => unreachable!(),

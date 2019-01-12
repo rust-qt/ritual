@@ -654,16 +654,14 @@ fn simple_enum() {
         data.enum_values,
         vec![
             CppEnumValue {
-                name: "Good".to_string(),
                 value: 0,
                 doc: None,
-                enum_path: CppPath::from_str_unchecked("Enum1"),
+                path: CppPath::from_str_unchecked("Enum1::Good"),
             },
             CppEnumValue {
-                name: "Bad".to_string(),
                 value: 1,
                 doc: None,
-                enum_path: CppPath::from_str_unchecked("Enum1"),
+                path: CppPath::from_str_unchecked("Enum1::Bad"),
             },
         ]
     );
@@ -691,22 +689,19 @@ fn simple_enum2() {
         data.enum_values,
         vec![
             CppEnumValue {
-                name: "Good".to_string(),
                 value: 1,
                 doc: None,
-                enum_path: CppPath::from_str_unchecked("ns1::Enum1"),
+                path: CppPath::from_str_unchecked("ns1::Enum1::Good"),
             },
             CppEnumValue {
-                name: "Bad".to_string(),
                 value: 2,
                 doc: None,
-                enum_path: CppPath::from_str_unchecked("ns1::Enum1"),
+                path: CppPath::from_str_unchecked("ns1::Enum1::Bad"),
             },
             CppEnumValue {
-                name: "Questionable".to_string(),
                 value: 3,
                 doc: None,
-                enum_path: CppPath::from_str_unchecked("ns1::Enum1"),
+                path: CppPath::from_str_unchecked("ns1::Enum1::Questionable"),
             },
         ]
     );

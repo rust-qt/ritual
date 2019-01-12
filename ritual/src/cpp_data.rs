@@ -12,27 +12,42 @@ use std::str::FromStr;
 /// One item of a C++ enum declaration
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct CppEnumValue {
-    /// Identifier
-    pub name: String,
+    /// Full path containing enum path and variant name.
+    pub path: CppPath,
     /// Corresponding value
     pub value: u64,
     /// C++ documentation for this item in HTML
     pub doc: Option<String>,
-    /// Full type name of the enum this item belongs to
-    pub enum_path: CppPath,
 }
 
 impl CppEnumValue {
     pub fn is_same(&self, other: &CppEnumValue) -> bool {
-        self.name == other.name && self.enum_path == other.enum_path && self.value == other.value
+        self.path == other.path && self.value == other.value
     }
 
-    pub fn full_name(&self) -> CppPath {
-        let mut name = self.enum_path.clone();
-        name.items.pop().expect("enum_name can't be empty");
-        name.items.push(CppPathItem::from_str_unchecked(&self.name));
+    pub fn unscoped_path(&self) -> CppPath {
+        let mut name = self.path.clone();
+        if name.items.len() < 2 {
+            panic!("enum path is too short: {:?}", name);
+        }
+        name.items.remove(name.items.len() - 2);
         name
     }
+}
+
+#[test]
+fn unscoped_path_should_work() {
+    fn check(path: &str, result: &str) {
+        let v = CppEnumValue {
+            path: CppPath::from_str_unchecked(path),
+            value: 0,
+            doc: None,
+        };
+        assert_eq!(v.unscoped_path(), CppPath::from_str_unchecked(result));
+    }
+
+    check("A::B::C::D", "A::B::D");
+    check("A::B", "B");
 }
 
 /// Member field of a C++ class declaration

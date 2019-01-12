@@ -138,7 +138,10 @@ impl CppItemData {
                 CppTypeDataKind::Class => vec![CppType::Class(t.path.clone())],
             },
             CppItemData::EnumValue(ref enum_value) => vec![CppType::Enum {
-                path: enum_value.enum_path.clone(),
+                path: enum_value
+                    .path
+                    .parent()
+                    .expect("enum value must have parent path"),
             }],
             CppItemData::Namespace(_) => Vec::new(),
             CppItemData::Function(ref function) => function.all_involved_types(),
@@ -219,10 +222,9 @@ impl Display for CppItemData {
                 CppTypeDataKind::Class => format!("class {}", type1.path.to_cpp_pseudo_code()),
             },
             CppItemData::Function(ref method) => method.short_text(),
-            CppItemData::EnumValue(ref value) => format!(
-                "enum {} {{ {} = {}, ... }}",
-                value.enum_path, value.name, value.value
-            ),
+            CppItemData::EnumValue(ref value) => {
+                format!("enum value {} = {}", value.path, value.value)
+            }
             CppItemData::ClassField(ref field) => field.short_text(),
             CppItemData::ClassBase(ref class_base) => {
                 let virtual_text = if class_base.is_virtual {
