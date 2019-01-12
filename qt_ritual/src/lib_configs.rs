@@ -537,7 +537,7 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
         crate_properties.add_build_dependency(
             "qt_ritual_build",
             versions::QT_RITUAL_BUILD_VERSION,
-            Some(repo_crate_local_path("qt_generator/qt_build_tools")?),
+            Some(repo_crate_local_path("qt_ritual_build")?),
         );
 
         let mut config = Config::new(crate_properties);

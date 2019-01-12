@@ -383,10 +383,7 @@ pub fn repo_crate_local_path(relative_path: &str) -> Result<PathBuf> {
     let parent = path
         .parent()
         .ok_or_else(|| err_msg("failed to get parent directory"))?;
-    let parent2 = parent
-        .parent()
-        .ok_or_else(|| err_msg("failed to get parent directory"))?;
-    let result = parent2.join(relative_path);
+    let result = parent.join(relative_path);
     if !result.exists() {
         bail!("detected path does not exist: {}", result.display());
     }
