@@ -15,6 +15,10 @@ use crate::rust_info::RustDatabaseItem;
 use crate::rust_info::RustItemKind;
 use crate::rust_info::RustModule;
 use crate::rust_info::RustPathScope;
+use crate::rust_info::RustStruct;
+use crate::rust_info::RustStructKind;
+use crate::rust_info::RustWrapperType;
+use crate::rust_info::RustWrapperTypeKind;
 use crate::rust_type::RustPath;
 use log::trace;
 use ritual_common::errors::*;
@@ -79,6 +83,29 @@ impl State<'_> {
         }
     }
 
+    fn generate_rust_path(&mut self, cpp_path: &CppPath) -> Result<RustPath> {
+        let strategy = if let Some(parent) = cpp_path.parent() {
+            self.get_strategy(&parent)?
+        } else {
+            self.default_strategy()
+        };
+
+        if cpp_path.last().template_arguments.is_none() {
+            bail!("naming items with template arguments is not supported");
+        }
+
+        let sanitized_name = sanitize_rust_identifier(&cpp_path.last().name);
+        let rust_path = strategy.apply(&sanitized_name);
+        if let Some(rust_item) = self.rust_database.find(&rust_path) {
+            bail!(
+                "name {:?} already exists! Rust item: {:?}",
+                rust_path,
+                rust_item
+            );
+        }
+        Ok(rust_path)
+    }
+
     fn generate_rust_items(
         &mut self,
         cpp_item: &mut CppDatabaseItem,
@@ -87,21 +114,7 @@ impl State<'_> {
     ) -> Result<()> {
         match &cpp_item.cpp_data {
             CppItemData::Namespace(path) => {
-                let strategy = if let Some(parent) = path.parent() {
-                    self.get_strategy(&parent)?
-                } else {
-                    self.default_strategy()
-                };
-                assert!(path.last().template_arguments.is_none());
-                let sanitized_name = sanitize_rust_identifier(&path.last().name);
-                let rust_path = strategy.apply(&sanitized_name);
-                if let Some(rust_item) = self.rust_database.find(&rust_path) {
-                    bail!(
-                        "namespace name {:?} already exists! Rust item: {:?}",
-                        rust_path,
-                        rust_item
-                    );
-                }
+                let rust_path = self.generate_rust_path(path)?;
                 let rust_item = RustDatabaseItem {
                     kind: RustItemKind::Module(RustModule {
                         path: rust_path,
@@ -112,6 +125,33 @@ impl State<'_> {
                 self.rust_database.items.push(rust_item);
                 *modified = true;
                 cpp_item.is_rust_processed = true;
+            }
+            CppItemData::Type(data) => {
+                let rust_path = self.generate_rust_path(&data.path)?;
+
+                if data.kind.is_class() {
+                    bail!("unimplemented");
+                } else {
+                    let rust_item = RustDatabaseItem {
+                        kind: RustItemKind::Struct(RustStruct {
+                            rust_doc: Some(format!(
+                                "C++ enum: `{}`",
+                                data.path.to_cpp_pseudo_code()
+                            )),
+                            path: rust_path,
+                            kind: RustStructKind::WrapperType(RustWrapperType {
+                                cpp_path: data.path.clone(),
+                                cpp_doc: data.doc.clone(),
+                                kind: RustWrapperTypeKind::EnumWrapper,
+                            }),
+                            is_public: false,
+                        }),
+                        cpp_item_index,
+                    };
+                    self.rust_database.items.push(rust_item);
+                    *modified = true;
+                    cpp_item.is_rust_processed = true;
+                }
             }
             _ => bail!("unimplemented"),
             /*

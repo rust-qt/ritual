@@ -282,7 +282,6 @@ pub enum CppTypeDataKind {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct CppTypeData {
     /// Identifier, including namespaces and nested classes
-    /// (separated with "::", like in C++)
     pub path: CppPath,
     pub kind: CppTypeDataKind,
     /// C++ documentation for the type
