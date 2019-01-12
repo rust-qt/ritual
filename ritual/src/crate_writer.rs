@@ -2,6 +2,7 @@ use crate::cpp_code_generator;
 use crate::cpp_code_generator::generate_cpp_type_size_requester;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
+use crate::rust_code_generator;
 use crate::rust_name_resolver::rust_name_resolver_step;
 use crate::versions;
 use pathdiff::diff_paths;
@@ -272,7 +273,11 @@ fn run(data: &mut ProcessorData) -> Result<()> {
 
     let lib_file_path = output_path.join("src").join("lib.rs");
     let mut file = create_file(&lib_file_path)?;
-    file.write("// TODO: generate Rust code\n")?;
+    rust_code_generator::run(
+        data.config.crate_properties().name(),
+        &data.current_database.rust_database,
+        &mut file,
+    )?;
 
     let ffi_file_path = output_path.join("src").join("ffi.in.rs");
     let mut file = create_file(&ffi_file_path)?;

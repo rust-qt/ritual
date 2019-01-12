@@ -13,12 +13,11 @@ use crate::processor::ProcessorData;
 use crate::rust_info::RustDatabase;
 use crate::rust_info::RustDatabaseItem;
 use crate::rust_info::RustItemKind;
-use crate::rust_info::RustItemPath;
 use crate::rust_info::RustModule;
 use crate::rust_info::RustPathScope;
 use crate::rust_type::RustPath;
 use log::trace;
-use ritual_common::errors::{bail, Result};
+use ritual_common::errors::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::iter::once;
@@ -144,11 +143,34 @@ struct State<'a> {
     dep_databases: &'a [Database],
     rust_database: &'a mut RustDatabase,
     config: &'a Config,
+    cpp_path_to_index: HashMap<CppPath, usize>,
 }
 
 impl State<'_> {
-    fn get_strategy(&self, _parent_path: &CppPath) -> RustPathScope {
-        self.default_strategy()
+    fn get_strategy(&self, parent_path: &CppPath) -> Result<RustPathScope> {
+        let index = match self.cpp_path_to_index.get(parent_path) {
+            Some(index) => index,
+            None => unexpected!("unknown parent path: {}", parent_path),
+        };
+
+        let rust_item = self
+            .rust_database
+            .items
+            .iter()
+            .find(|item| item.cpp_item_index == *index)
+            .ok_or_else(|| err_msg(format!("rust item not found for path: {:?}", parent_path)))?;
+
+        let rust_path = rust_item.path().ok_or_else(|| {
+            err_msg(format!(
+                "rust item doesn't have rust path (cpp_path = {:?})",
+                parent_path
+            ))
+        })?;
+
+        Ok(RustPathScope {
+            path: rust_path.clone(),
+            prefix: None,
+        })
     }
 
     fn default_strategy(&self) -> RustPathScope {
@@ -169,15 +191,14 @@ impl State<'_> {
         match &cpp_item.cpp_data {
             CppItemData::Namespace(path) => {
                 let strategy = if let Some(parent) = path.parent() {
-                    self.get_strategy(&parent)
+                    self.get_strategy(&parent)?
                 } else {
                     self.default_strategy()
                 };
                 assert!(path.last().template_arguments.is_none());
                 let sanitized_name = sanitize_rust_identifier(&path.last().name);
                 let rust_path = strategy.apply(&sanitized_name);
-                let rust_item_path = RustItemPath::new(rust_path.clone());
-                if let Some(rust_item) = self.rust_database.find(&rust_item_path) {
+                if let Some(rust_item) = self.rust_database.find(&rust_path) {
                     bail!(
                         "namespace name {:?} already exists! Rust item: {:?}",
                         rust_path,
@@ -185,7 +206,6 @@ impl State<'_> {
                     );
                 }
                 let rust_item = RustDatabaseItem {
-                    path: rust_item_path,
                     kind: RustItemKind::Module(RustModule {
                         path: rust_path,
                         doc: Some(format!("C++ namespace: `{}`", path.to_cpp_pseudo_code())),
@@ -196,9 +216,11 @@ impl State<'_> {
                 *modified = true;
                 cpp_item.is_rust_processed = true;
             }
+            _ => bail!("unimplemented"),
+            /*
             CppItemData::Type(t) => unimplemented!(),
             CppItemData::EnumValue(value) => unimplemented!(),
-            _ => unimplemented!(),
+            _ => unimplemented!(),*/
         }
         Ok(())
     }
@@ -209,6 +231,17 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         dep_databases: data.dep_databases,
         rust_database: &mut data.current_database.rust_database,
         config: data.config,
+        cpp_path_to_index: data
+            .current_database
+            .cpp_items
+            .iter()
+            .enumerate()
+            .filter_map(|(index, item)| match item.cpp_data {
+                CppItemData::Namespace(ref path) => Some((path.clone(), index)),
+                CppItemData::Type(ref data) => Some((data.path.clone(), index)),
+                _ => None,
+            })
+            .collect(),
     };
     let cpp_items = &mut data.current_database.cpp_items;
 
@@ -263,6 +296,23 @@ fn run(data: &mut ProcessorData) -> Result<()> {
 pub fn rust_name_resolver_step() -> ProcessingStep {
     // TODO: set dependencies
     ProcessingStep::new("rust_name_resolver", vec![cpp_checker_step().name], run)
+}
+
+pub fn clear_rust_info(data: &mut ProcessorData) -> Result<()> {
+    data.current_database.rust_database.items.clear();
+    for item in &mut data.current_database.cpp_items {
+        item.is_rust_processed = false;
+        if let Some(ffi_items) = &mut item.ffi_items {
+            for item in ffi_items {
+                item.is_rust_processed = false;
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn clear_rust_info_step() -> ProcessingStep {
+    ProcessingStep::new_custom("clear_rust_info", clear_rust_info)
 }
 
 // TODO: update this

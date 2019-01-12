@@ -9,27 +9,10 @@ use crate::cpp_function::CppFunctionDoc;
 use crate::rust_type::{CompleteType, RustPath, RustType};
 use serde_derive::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum RustItemPath {
-    Path(RustPath),
-    TraitImpl {
-        parent_path: RustPath,
-        trait_type: RustType,
-        target_type: RustType,
-    },
-}
-
-impl RustItemPath {
-    pub fn new(path: RustPath) -> RustItemPath {
-        RustItemPath::Path(path)
-    }
-}
-
 /// One variant of a Rust enum
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustEnumValue {
-    /// Identifier
-    pub name: String,
+    pub path: RustPath,
     /// Corresponding value
     pub value: i64,
     /// Documentation of corresponding C++ variants
@@ -77,7 +60,6 @@ pub struct RustWrapperType {
 pub enum RustStructKind {
     WrapperType(RustWrapperType),
     QtSlotWrapper(RustQtSlotWrapper),
-    SignalsOrSlots { target_path: RustPath },
 }
 
 /// Exported information about a Rust wrapper type
@@ -212,6 +194,7 @@ pub struct TraitAssociatedType {
 /// Information about a trait implementation.
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustTraitImpl {
+    pub parent_path: RustPath,
     /// Type the trait is implemented for.
     pub target_type: RustType,
     /// Type of the trait.
@@ -296,9 +279,31 @@ pub enum RustItemKind {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustDatabaseItem {
-    pub path: RustItemPath,
     pub kind: RustItemKind,
     pub cpp_item_index: usize,
+}
+
+impl RustDatabaseItem {
+    pub fn path(&self) -> Option<&RustPath> {
+        match self.kind {
+            RustItemKind::Module(ref data) => Some(&data.path),
+            RustItemKind::Struct(ref data) => Some(&data.path),
+            RustItemKind::EnumValue(ref data) => Some(&data.path),
+            RustItemKind::Function(ref data) => Some(&data.path),
+            RustItemKind::TraitImpl(_) => None,
+        }
+    }
+    pub fn is_child_of(&self, parent: &RustPath) -> bool {
+        match self.kind {
+            RustItemKind::TraitImpl(ref trait_impl) => &trait_impl.parent_path == parent,
+            _ => {
+                let path = self
+                    .path()
+                    .expect("item must have path because it's not a trait impl");
+                path.is_child_of(parent)
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -307,8 +312,15 @@ pub struct RustDatabase {
 }
 
 impl RustDatabase {
-    pub fn find(&self, path: &RustItemPath) -> Option<&RustDatabaseItem> {
-        self.items.iter().find(|item| &item.path == path)
+    pub fn find(&self, path: &RustPath) -> Option<&RustDatabaseItem> {
+        self.items.iter().find(|item| item.path() == Some(path))
+    }
+
+    pub fn children<'a>(
+        &'a self,
+        path: &'a RustPath,
+    ) -> impl Iterator<Item = &'a RustDatabaseItem> {
+        self.items.iter().filter(move |item| item.is_child_of(path))
     }
 }
 

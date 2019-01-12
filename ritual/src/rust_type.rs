@@ -78,6 +78,10 @@ impl RustPath {
         let extra_modules_count = other.parts.len() as isize - self.parts.len() as isize;
         self.includes(other) && extra_modules_count == 1
     }
+
+    pub fn is_child_of(&self, parent: &RustPath) -> bool {
+        parent.includes_directly(self)
+    }
 }
 
 /// Conversion from public Rust API type to

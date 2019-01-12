@@ -9,6 +9,7 @@ use crate::cpp_template_instantiator::find_template_instantiations_step;
 use crate::cpp_template_instantiator::instantiate_templates_step;
 use crate::crate_writer::crate_writer_step;
 use crate::database::{CppDatabaseItem, Database};
+use crate::rust_name_resolver::clear_rust_info_step;
 use crate::rust_name_resolver::rust_name_resolver_step;
 use crate::type_allocation_places::choose_allocation_places_step;
 use crate::workspace::Workspace;
@@ -215,6 +216,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
         steps::print_database(),
         steps::clear_ffi(),
         steps::clear(),
+        clear_rust_info_step(),
     ];
     let all_processing_steps: Vec<_> = standard_processing_steps
         .iter()

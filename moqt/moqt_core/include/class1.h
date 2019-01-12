@@ -48,3 +48,18 @@ public:
 private:
   int m_x;
 };
+
+namespace ns1 {
+    int x() {}
+
+    namespace ns2 {
+        int x() {}
+        int y() {}
+    }
+
+    namespace ns3 {
+        int a() {}
+        int b() {}
+    }
+
+}

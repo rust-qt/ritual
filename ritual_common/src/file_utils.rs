@@ -4,6 +4,7 @@ use crate::errors::{bail, err_msg, Result, ResultExt};
 use log::trace;
 use std::ffi::{OsStr, OsString};
 use std::fs;
+use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::BufWriter;
@@ -170,11 +171,32 @@ impl<F: BufRead> File<F> {
 
 impl<F: Write> File<F> {
     /// Write `text` to the file
+    // TODO: replace with write impl
     pub fn write<S: AsRef<str>>(&mut self, text: S) -> Result<()> {
         self.file
             .write_all(text.as_ref().as_bytes())
             .with_context(|_| format!("Failed to write to file: {:?}", self.path))?;
         Ok(())
+    }
+}
+
+impl<F: Write> Write for File<F> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.file.write(buf).map_err(|err| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to write to file: {:?}: {}", self.path, err),
+            )
+        })
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.file.flush().map_err(|err| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to flush file: {:?}: {}", self.path, err),
+            )
+        })
     }
 }
 
