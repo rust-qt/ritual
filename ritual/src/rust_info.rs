@@ -117,17 +117,22 @@ pub enum RustQtReceiverType {
     Slot,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct RustFfiWrapperData {
+    /// C++ method corresponding to this variant.
+    pub cpp_ffi_function: CppFfiFunction,
+
+    pub ffi_function_path: RustPath,
+    /// Index of the FFI function argument used for acquiring the return value,
+    /// if any. `None` if the return value is passed normally (as the return value
+    /// of the FFI function).
+    pub return_type_ffi_index: Option<usize>,
+}
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum RustFunctionKind {
-    FfiWrapper {
-        /// C++ method corresponding to this variant.
-        cpp_ffi_method: CppFfiFunction,
-        /// Index of the FFI function argument used for acquiring the return value,
-        /// if any. `None` if the return value is passed normally (as the return value
-        /// of the FFI function).
-        return_type_ffi_index: Option<usize>,
-    },
+    FfiWrapper(RustFfiWrapperData),
     CppDeletableImpl {
         deleter: RustPath,
     },
