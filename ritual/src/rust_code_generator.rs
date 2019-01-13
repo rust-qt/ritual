@@ -26,6 +26,7 @@ use crate::rust_type::RustType;
 use itertools::Itertools;
 use ritual_common::errors::{bail, err_msg, unexpected, Result};
 use ritual_common::utils::MapIfOk;
+use std::io;
 use std::io::Write;
 
 /// Generates Rust code representing type `rust_type` inside crate `crate_name`.
@@ -100,6 +101,16 @@ struct Generator<W> {
     destination: W,
 }
 
+impl<W: Write> Write for Generator<W> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.destination.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.destination.flush()
+    }
+}
+
 /// Generates documentation comments containing
 /// markdown code `doc`.
 fn format_doc(doc: &str) -> String {
@@ -143,21 +154,21 @@ impl<W: Write> Generator<W> {
 
     fn generate_module(&mut self, module: &RustModule, database: &RustDatabase) -> Result<()> {
         writeln!(
-            self.destination,
+            self,
             "{}",
             format_doc(&doc_formatter::module_doc(&module.doc))
         )?;
-        writeln!(self.destination, "pub mod {} {{", module.path.last())?;
+        writeln!(self, "pub mod {} {{", module.path.last())?;
 
         self.generate_children(&module.path, database)?;
 
-        writeln!(self.destination, "}}")?;
+        writeln!(self, "}}")?;
         Ok(())
     }
 
     fn generate_struct(&mut self, rust_struct: &RustStruct, database: &RustDatabase) -> Result<()> {
         writeln!(
-            self.destination,
+            self,
             "{}",
             format_doc(&doc_formatter::struct_doc(rust_struct))
         )?;
@@ -165,17 +176,14 @@ impl<W: Write> Generator<W> {
         match rust_struct.kind {
             RustStructKind::WrapperType(ref wrapper) => match wrapper.kind {
                 RustWrapperTypeKind::EnumWrapper => {
+                    writeln!(self, "#[derive(Debug, Clone, Copy, PartialEq, Eq)]")?;
                     writeln!(
-                        self.destination,
-                        "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
-                    )?;
-                    writeln!(
-                        self.destination,
+                        self,
                         "{}struct {}(::std::os::raw::c_int);",
                         visibility,
                         rust_struct.path.last()
                     )?;
-                    writeln!(self.destination)?;
+                    writeln!(self)?;
                 }
                 _ => unimplemented!(),
             },
@@ -219,7 +227,7 @@ impl<W: Write> Generator<W> {
                     })?
                     .join(", ");
                 writeln!(
-                    self.destination,
+                    self,
                     include_str!("../templates/crate/closure_slot_wrapper.rs.in"),
                     type_name = rust_struct.path.full_name(Some(&self.crate_name)),
                     pub_type_name = rust_struct.path.last(),
@@ -235,7 +243,7 @@ impl<W: Write> Generator<W> {
             }
             RustStructKind::FfiClassType(_) => {
                 writeln!(
-                    self.destination,
+                    self,
                     "{}struct {} {{ _unused: u8, }}",
                     visibility,
                     rust_struct.path.last()
@@ -247,10 +255,10 @@ impl<W: Write> Generator<W> {
         }
 
         if database.children(&rust_struct.path).next().is_some() {
-            writeln!(self.destination, "impl {} {{", rust_struct.path.last())?;
+            writeln!(self, "impl {} {{", rust_struct.path.last())?;
             self.generate_children(&rust_struct.path, database)?;
-            writeln!(self.destination, "}}")?;
-            writeln!(self.destination)?;
+            writeln!(self, "}}")?;
+            writeln!(self)?;
         }
 
         Ok(())
@@ -258,14 +266,14 @@ impl<W: Write> Generator<W> {
 
     fn generate_enum_value(&mut self, value: &RustEnumValue) -> Result<()> {
         writeln!(
-            self.destination,
+            self,
             "{}",
             format_doc(&doc_formatter::enum_value_doc(value))
         )?;
         let struct_path =
             self.rust_path_to_string(&value.path.parent().expect("enum value must have parent"));
         writeln!(
-            self.destination,
+            self,
             "pub const {value_name}: {struct_path} = {struct_path}({value});",
             value_name = value.path.last(),
             struct_path = struct_path,
@@ -653,7 +661,7 @@ impl<W: Write> Generator<W> {
         };
 
         writeln!(
-            self.destination,
+            self,
             "{doc}{maybe_pub}{maybe_unsafe}fn {name}{lifetimes_text}({args}){return_type} \
              {{\n{body}}}\n\n",
             doc = format_doc(&doc_formatter::function_doc(&func)),
@@ -670,20 +678,20 @@ impl<W: Write> Generator<W> {
 
     fn generate_lib_file(&mut self, database: &RustDatabase) -> Result<()> {
         if let Some(ref doc) = database.lib_extra_doc {
-            writeln!(self.destination, "{}", format_doc_extended(doc, true))?;
+            writeln!(self, "{}", format_doc_extended(doc, true))?;
         }
 
         // some ffi functions are not used because
         // some Rust methods are filtered
         // TODO: ideally dead_code shouldn't be needed
         writeln!(
-            self.destination,
+            self,
             "\
              #[allow(dead_code)]\nmod ffi {{ \ninclude!(concat!(env!(\"OUT_DIR\"), \
              \"/ffi.rs\")); \n}}\n",
         )?;
         writeln!(
-            self.destination,
+            self,
             "\
              mod _types {{ \ninclude!(concat!(env!(\"OUT_DIR\"), \
              \"/_types.rs\")); \n}}\n",
@@ -711,7 +719,7 @@ impl<W: Write> Generator<W> {
             .join("\n");
 
         writeln!(
-            self.destination,
+            self,
             "impl {} for {} {{\n{}",
             self.rust_type_to_code(&trait1.trait_type),
             self.rust_type_to_code(&trait1.target_type),
@@ -722,7 +730,7 @@ impl<W: Write> Generator<W> {
             self.generate_rust_final_function(func)?;
         }
 
-        writeln!(self.destination, "}}\n")?;
+        writeln!(self, "}}\n")?;
         Ok(())
     }
 
@@ -738,7 +746,7 @@ impl<W: Write> Generator<W> {
             code.push_str("\n");
         }
         code.push_str("}\n");
-        writeln!(self.destination, "{}", code)?;
+        writeln!(self, "{}", code)?;
         Ok(())
     }
 }
