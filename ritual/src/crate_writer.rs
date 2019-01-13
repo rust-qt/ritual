@@ -96,6 +96,10 @@ fn generate_crate_template(data: &mut ProcessorData) -> Result<()> {
                 "build".to_string(),
                 toml::Value::String("build.rs".to_string()),
             );
+            table.insert(
+                "edition".to_string(),
+                toml::Value::String("2018".to_string()),
+            );
             table
         });
         let dep_value = |version: &str, local_path: Option<PathBuf>| -> Result<toml::Value> {

@@ -7,8 +7,6 @@
 //! use the other `cpp_to_rust_build_tools` API in the custom build script to
 //! perform the necessary build steps.
 
-extern crate cpp_to_rust_build_tools;
-
 fn main() {
-  cpp_to_rust_build_tools::run()
+    ritual_build::run()
 }
