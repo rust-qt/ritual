@@ -7,37 +7,30 @@
 #![deny(unused_must_use)]
 
 pub mod config;
-pub mod cpp_checker;
+mod cpp_checker;
 mod cpp_code_generator;
 pub mod cpp_data;
+mod cpp_explicit_destructors;
 mod cpp_ffi_data;
-pub mod cpp_ffi_generator;
+mod cpp_ffi_generator;
 pub mod cpp_function;
+mod cpp_inheritance; // TODO: deal with inheritance for subclassing support
 mod cpp_operator;
-pub mod cpp_type;
-pub mod database;
-pub mod processor;
-pub mod workspace;
-
-mod crate_writer;
-mod rust_name_resolver;
-
-mod doc_formatter;
-//mod launcher;
-//mod rust_generator;
 mod cpp_parser;
+mod cpp_template_instantiator;
+pub mod cpp_type;
+mod crate_writer;
+pub mod database;
+mod doc_formatter;
+pub mod processor;
 mod rust_code_generator;
 mod rust_info;
+mod rust_name_resolver;
 mod rust_type;
-mod versions;
-
-mod cpp_template_instantiator;
-
 #[cfg(test)]
 mod tests;
-
-mod cpp_explicit_destructors;
 mod type_allocation_places;
+mod versions;
+pub mod workspace;
 
-// TODO: deal with inheritance for subclassing support
-mod cpp_inheritance;
+//mod rust_generator;
