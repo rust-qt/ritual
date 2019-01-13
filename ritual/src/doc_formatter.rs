@@ -7,6 +7,7 @@ use crate::cpp_ffi_data::CppFfiFunctionKind;
 use crate::cpp_ffi_data::CppFieldAccessorType;
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_info::RustFunctionKind;
+use crate::rust_info::RustModuleDoc;
 use crate::rust_info::RustStruct;
 use crate::rust_info::RustStructKind;
 use crate::rust_info::RustWrapperType;
@@ -26,7 +27,23 @@ pub fn wrap_cpp_doc_block(html: &str) -> String {
     )
 }
 
-pub fn type_doc(type1: &RustStruct) -> String {
+pub fn module_doc(doc: &RustModuleDoc) -> String {
+    let auto_doc = if let Some(ref path) = doc.cpp_path {
+        format!(
+            "C++ namespace: {}",
+            wrap_inline_cpp_code(&path.to_cpp_pseudo_code())
+        )
+    } else {
+        String::new()
+    };
+    if let Some(ref doc) = doc.extra_doc {
+        format!("{}\n\n{}", doc, auto_doc)
+    } else {
+        auto_doc
+    }
+}
+
+pub fn struct_doc(type1: &RustStruct) -> String {
     let auto_doc = match type1.kind {
         RustStructKind::WrapperType(RustWrapperType { ref doc_data, .. }) => {
             let cpp_type_code = doc_data.cpp_path.to_cpp_pseudo_code();

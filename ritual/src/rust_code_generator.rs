@@ -137,6 +137,11 @@ impl<W: Write> Generator<W> {
     }
 
     pub fn generate_module(&mut self, module: &RustModule, database: &RustDatabase) -> Result<()> {
+        writeln!(
+            self.destination,
+            "{}",
+            format_doc(&doc_formatter::module_doc(&module.doc))
+        )?;
         writeln!(self.destination, "pub mod {} {{", module.path.last())?;
 
         for item in database.children(&module.path) {
@@ -152,6 +157,11 @@ impl<W: Write> Generator<W> {
         rust_struct: &RustStruct,
         database: &RustDatabase,
     ) -> Result<()> {
+        writeln!(
+            self.destination,
+            "{}",
+            format_doc(&doc_formatter::struct_doc(rust_struct))
+        )?;
         let visibility = if rust_struct.is_public { "pub " } else { "" };
         match rust_struct.kind {
             RustStructKind::WrapperType(ref wrapper) => match wrapper.kind {
