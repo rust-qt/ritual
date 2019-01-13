@@ -22,7 +22,7 @@ pub mod workspace;
 mod crate_writer;
 mod rust_name_resolver;
 
-//mod doc_formatter;
+mod doc_formatter;
 //mod launcher;
 //mod rust_generator;
 mod cpp_parser;

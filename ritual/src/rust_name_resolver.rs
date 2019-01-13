@@ -21,6 +21,7 @@ use crate::rust_info::RustPathScope;
 use crate::rust_info::RustStruct;
 use crate::rust_info::RustStructKind;
 use crate::rust_info::RustWrapperType;
+use crate::rust_info::RustWrapperTypeDocData;
 use crate::rust_info::RustWrapperTypeKind;
 use crate::rust_type::RustPath;
 use log::trace;
@@ -143,7 +144,11 @@ impl State<'_> {
                             extra_doc: None,
                             path: rust_path,
                             kind: RustStructKind::WrapperType(RustWrapperType {
-                                cpp_doc: data.doc.clone(),
+                                doc_data: RustWrapperTypeDocData {
+                                    cpp_path: data.path.clone(),
+                                    cpp_doc: data.doc.clone(),
+                                    raw_qt_slot_wrapper: None,
+                                },
                                 kind: RustWrapperTypeKind::EnumWrapper,
                             }),
                             is_public: false,

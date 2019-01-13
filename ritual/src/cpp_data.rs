@@ -81,10 +81,10 @@ impl CppClassField {
             CppVisibility::Private => "private ",
         };
         format!(
-            "class {} {{ {}{} {}; }}",
-            self.class_type.to_cpp_pseudo_code(),
+            "{}{} {}::{}",
             visibility_text,
             self.field_type.to_cpp_pseudo_code(),
+            self.class_type.to_cpp_pseudo_code(),
             self.name
         )
     }
@@ -130,7 +130,6 @@ pub enum CppVisibility {
 /// C++ documentation for a type
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct CppTypeDoc {
-    pub path: CppPath,
     /// HTML content
     pub html: String,
     /// Absolute URL to online documentation page for this type

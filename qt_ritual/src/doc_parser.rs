@@ -267,7 +267,6 @@ impl DocParser {
             };
             return Ok(DocForType {
                 type_doc: CppTypeDoc {
-                    path: path.clone(),
                     html: result.html,
                     url: format!("{}{}#{}", self.base_url, file_name, anchor),
                     cross_references: result.cross_references,
@@ -309,7 +308,6 @@ impl DocParser {
         let (html, cross_references) = process_html(&result, &self.base_url)?;
         Ok(DocForType {
             type_doc: CppTypeDoc {
-                path: path.clone(),
                 html,
                 url,
                 cross_references: cross_references.into_iter().collect(),

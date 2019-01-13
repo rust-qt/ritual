@@ -48,9 +48,24 @@ pub enum RustWrapperTypeKind {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct RustWrapperType {
+pub struct RustRawQtSlotWrapperDocData {
+    pub public_wrapper_path: RustPath,
+    pub arguments: Vec<CompleteType>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct RustWrapperTypeDocData {
+    /// Corresponding C++ type (for generating docs).
+    pub cpp_path: CppPath,
     /// C++ documentation for this type
     pub cpp_doc: Option<CppTypeDoc>,
+
+    pub raw_qt_slot_wrapper: Option<RustRawQtSlotWrapperDocData>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct RustWrapperType {
+    pub doc_data: RustWrapperTypeDocData,
     pub kind: RustWrapperTypeKind,
 }
 
@@ -81,7 +96,7 @@ pub struct RustStruct {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustFunctionDoc {
     /// Rustdoc content that will appear before documentation for variants.
-    pub common_doc: Option<String>,
+    pub extra_doc: Option<String>,
     /// C++ documentation of the corresponding C++ method.
     pub doc: Option<CppFunctionDoc>,
     /// C++ code containing declaration of the corresponding C++ method.
@@ -140,7 +155,7 @@ pub enum RustFunctionKind {
         /// Name of the type.
         type_path: RustPath,
         /// C++ name of the signal or slot
-        original_method_name: String,
+        cpp_path: CppPath,
         /// Type of the receiver.
         receiver_type: RustQtReceiverType,
         /// Identifier of the signal or slot for passing to `QObject::connect`.
@@ -154,11 +169,14 @@ pub enum RustFunctionKind {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustFunction {
     /// Location of the method.
+    // TODO: maybe can be deleted
     pub scope: RustFunctionScope,
     /// True if the method is `unsafe`.
     pub is_unsafe: bool,
     /// Full name of the method.
     pub path: RustPath,
+
+    pub kind: RustFunctionKind,
 
     /// List of arguments. For an overloaded method, only the arguments
     /// involved in the overloading are listed in this field.

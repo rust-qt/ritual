@@ -2,12 +2,16 @@
 
 #![allow(dead_code)]
 
+use crate::doc_formatter;
 use crate::rust_info::RustDatabase;
 use crate::rust_info::RustDatabaseItem;
 use crate::rust_info::RustEnumValue;
 use crate::rust_info::RustFFIFunction;
 use crate::rust_info::RustFfiWrapperData;
+use crate::rust_info::RustFunction;
 use crate::rust_info::RustFunctionArgument;
+use crate::rust_info::RustFunctionKind;
+use crate::rust_info::RustFunctionScope;
 use crate::rust_info::RustItemKind;
 use crate::rust_info::RustModule;
 use crate::rust_info::RustStruct;
@@ -22,6 +26,72 @@ use itertools::Itertools;
 use ritual_common::errors::{bail, err_msg, unexpected, Result};
 use ritual_common::utils::MapIfOk;
 use std::io::Write;
+
+/// Generates Rust code representing type `rust_type` inside crate `crate_name`.
+/// Same as `RustCodeGenerator::rust_type_to_code`, but accessible by other modules.
+pub fn rust_type_to_code(rust_type: &RustType, current_crate: &str) -> String {
+    match *rust_type {
+        RustType::EmptyTuple => "()".to_string(),
+        RustType::PointerLike {
+            ref kind,
+            ref target,
+            ref is_const,
+        } => {
+            let target_code = rust_type_to_code(target, current_crate);
+            match *kind {
+                RustPointerLikeTypeKind::Pointer => {
+                    if *is_const {
+                        format!("*const {}", target_code)
+                    } else {
+                        format!("*mut {}", target_code)
+                    }
+                }
+                RustPointerLikeTypeKind::Reference { ref lifetime } => {
+                    let lifetime_text = match *lifetime {
+                        Some(ref lifetime) => format!("'{} ", lifetime),
+                        None => String::new(),
+                    };
+                    if *is_const {
+                        format!("&{}{}", lifetime_text, target_code)
+                    } else {
+                        format!("&{}mut {}", lifetime_text, target_code)
+                    }
+                }
+            }
+        }
+        RustType::Common {
+            ref path,
+            ref generic_arguments,
+            ..
+        } => {
+            let mut code = path.full_name(Some(current_crate));
+            if let Some(ref args) = *generic_arguments {
+                code = format!(
+                    "{}<{}>",
+                    code,
+                    args.iter()
+                        .map(|x| rust_type_to_code(x, current_crate))
+                        .join(", ",)
+                );
+            }
+            code
+        }
+        RustType::FunctionPointer {
+            ref return_type,
+            ref arguments,
+        } => format!(
+            "extern \"C\" fn({}){}",
+            arguments
+                .iter()
+                .map(|arg| rust_type_to_code(arg, current_crate))
+                .join(", "),
+            match return_type.as_ref() {
+                &RustType::EmptyTuple => String::new(),
+                return_type => format!(" -> {}", rust_type_to_code(return_type, current_crate)),
+            }
+        ),
+    }
+}
 
 struct Generator<W> {
     #[allow(dead_code)]
@@ -60,6 +130,10 @@ impl<W: Write> Generator<W> {
             RustItemKind::TraitImpl(_) => unimplemented!(),
             RustItemKind::Function(_) => unimplemented!(),
         }
+    }
+
+    pub fn rust_type_to_code(&self, rust_type: &RustType) -> String {
+        rust_type_to_code(rust_type, &self.crate_name)
     }
 
     pub fn generate_module(&mut self, module: &RustModule, database: &RustDatabase) -> Result<()> {
@@ -127,70 +201,6 @@ impl<W: Write> Generator<W> {
     // TODO: generate relative paths for better readability
     pub fn rust_path_to_string(&self, path: &RustPath) -> String {
         path.full_name(Some(&self.crate_name))
-    }
-
-    /// Generates Rust code representing type `rust_type` inside crate `crate_name`.
-    /// Same as `RustCodeGenerator::rust_type_to_code`, but accessible by other modules.
-    pub fn rust_type_to_code(&self, rust_type: &RustType) -> String {
-        match *rust_type {
-            RustType::EmptyTuple => "()".to_string(),
-            RustType::PointerLike {
-                ref kind,
-                ref target,
-                ref is_const,
-            } => {
-                let target_code = self.rust_type_to_code(target);
-                match *kind {
-                    RustPointerLikeTypeKind::Pointer => {
-                        if *is_const {
-                            format!("*const {}", target_code)
-                        } else {
-                            format!("*mut {}", target_code)
-                        }
-                    }
-                    RustPointerLikeTypeKind::Reference { ref lifetime } => {
-                        let lifetime_text = match *lifetime {
-                            Some(ref lifetime) => format!("'{} ", lifetime),
-                            None => String::new(),
-                        };
-                        if *is_const {
-                            format!("&{}{}", lifetime_text, target_code)
-                        } else {
-                            format!("&{}mut {}", lifetime_text, target_code)
-                        }
-                    }
-                }
-            }
-            RustType::Common {
-                ref path,
-                ref generic_arguments,
-                ..
-            } => {
-                let mut code = self.rust_path_to_string(path);
-                if let Some(ref args) = *generic_arguments {
-                    code = format!(
-                        "{}<{}>",
-                        code,
-                        args.iter().map(|x| self.rust_type_to_code(x)).join(", ",)
-                    );
-                }
-                code
-            }
-            RustType::FunctionPointer {
-                ref return_type,
-                ref arguments,
-            } => format!(
-                "extern \"C\" fn({}){}",
-                arguments
-                    .iter()
-                    .map(|arg| self.rust_type_to_code(arg))
-                    .join(", "),
-                match return_type.as_ref() {
-                    &RustType::EmptyTuple => String::new(),
-                    return_type => format!(" -> {}", self.rust_type_to_code(return_type)),
-                }
-            ),
-        }
     }
 
     /// Generates Rust code containing declaration of a FFI function `func`.
@@ -527,6 +537,58 @@ impl<W: Write> Generator<W> {
             })
             .collect()
     }
+
+    /// Generates complete code of a Rust wrapper function.
+    fn generate_rust_final_function(&self, func: &RustFunction) -> Result<String> {
+        let maybe_pub = match func.scope {
+            RustFunctionScope::TraitImpl => "",
+            _ => "pub ",
+        };
+        let maybe_unsafe = if func.is_unsafe { "unsafe " } else { "" };
+
+        let body = match func.kind {
+            RustFunctionKind::FfiWrapper(ref data) => {
+                self.generate_ffi_call(&func.arguments, &func.return_type, data, func.is_unsafe)?
+            }
+            RustFunctionKind::CppDeletableImpl { .. } => unimplemented!(),
+            RustFunctionKind::SignalOrSlotGetter { .. } => unimplemented!(),
+        };
+
+        let return_type_for_signature = if func.return_type.rust_api_type == RustType::EmptyTuple {
+            String::new()
+        } else {
+            format!(
+                " -> {}",
+                self.rust_type_to_code(&func.return_type.rust_api_type)
+            )
+        };
+        let all_lifetimes: Vec<_> = func
+            .arguments
+            .iter()
+            .filter_map(|x| x.argument_type.rust_api_type.lifetime())
+            .collect();
+        let lifetimes_text = if all_lifetimes.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "<{}>",
+                all_lifetimes.iter().map(|x| format!("'{}", x)).join(", ")
+            )
+        };
+
+        Ok(format!(
+            "{doc}{maybe_pub}{maybe_unsafe}fn {name}{lifetimes_text}({args}){return_type} \
+             {{\n{body}}}\n\n",
+            doc = format_doc(&doc_formatter::function_doc(&func)),
+            maybe_pub = maybe_pub,
+            maybe_unsafe = maybe_unsafe,
+            lifetimes_text = lifetimes_text,
+            name = func.path.last(),
+            args = self.arg_texts(&func.arguments, None).join(", "),
+            return_type = return_type_for_signature,
+            body = body
+        ))
+    }
 }
 
 pub fn run(crate_name: &str, database: &RustDatabase, destination: impl Write) -> Result<()> {
@@ -553,110 +615,6 @@ impl<'a> RustCodeGenerator<'a> {
 
 
 
-    /// Generates complete code of a Rust wrapper function.
-    fn generate_rust_final_function(&self, func: &RustMethod) -> Result<String> {
-        let maybe_pub = match func.scope {
-            RustMethodScope::TraitImpl => "",
-            _ => "pub ",
-        };
-        let maybe_unsafe = if func.is_unsafe { "unsafe " } else { "" };
-        Ok(match func.arguments {
-            RustFunctionArguments::SingleVariant(ref variant) => {
-                let body = self.generate_ffi_call(variant, &Vec::new(), func.is_unsafe)?;
-                let return_type_for_signature =
-                    if variant.return_type.rust_api_type == RustType::EmptyTuple {
-                        String::new()
-                    } else {
-                        format!(
-                            " -> {}",
-                            self.rust_type_to_code(&variant.return_type.rust_api_type)
-                        )
-                    };
-                let all_lifetimes: Vec<_> = variant
-                    .arguments
-                    .iter()
-                    .filter_map(|x| x.argument_type.rust_api_type.lifetime())
-                    .collect();
-                let lifetimes_text = if all_lifetimes.is_empty() {
-                    String::new()
-                } else {
-                    format!(
-                        "<{}>",
-                        all_lifetimes.iter().map(|x| format!("'{}", x)).join(", ")
-                    )
-                };
-
-                format!(
-                    "{doc}{maybe_pub}{maybe_unsafe}fn {name}{lifetimes_text}({args}){return_type} \
-                     {{\n{body}}}\n\n",
-                    doc = format_doc(&doc_formatter::method_doc(&func)),
-                    maybe_pub = maybe_pub,
-                    maybe_unsafe = maybe_unsafe,
-                    lifetimes_text = lifetimes_text,
-                    name = func.name.last_name()?,
-                    args = self.arg_texts(&variant.arguments, None).join(", "),
-                    return_type = return_type_for_signature,
-                    body = body
-                )
-            }
-            RustFunctionArguments::MultipleVariants {
-                ref params_trait_name,
-                ref params_trait_lifetime,
-                ref common_return_type,
-                ref shared_arguments,
-                ref variant_argument_name,
-                ..
-            } => {
-                let tpl_type = variant_argument_name.to_class_case();
-                let body = format!(
-                    "{}.exec({})",
-                    variant_argument_name,
-                    shared_arguments
-                        .iter()
-                        .map(|arg| arg.name.clone(),)
-                        .join(", ",)
-                );
-                let mut all_lifetimes: Vec<_> = shared_arguments
-                    .iter()
-                    .filter_map(|x| x.argument_type.rust_api_type.lifetime())
-                    .collect();
-                if let Some(ref params_trait_lifetime) = *params_trait_lifetime {
-                    if !all_lifetimes.iter().any(|x| x == &params_trait_lifetime) {
-                        all_lifetimes.push(params_trait_lifetime);
-                    }
-                }
-                let mut tpl_decl_texts: Vec<_> =
-                    all_lifetimes.iter().map(|x| format!("'{}", x)).collect();
-                tpl_decl_texts.push(tpl_type.clone());
-                let tpl_decl = tpl_decl_texts.join(", ");
-                let trait_lifetime_arg = match *params_trait_lifetime {
-                    Some(ref lifetime) => format!("<'{}>", lifetime),
-                    None => String::new(),
-                };
-                let mut args = self.arg_texts(shared_arguments, None);
-                args.push(format!("{}: {}", variant_argument_name, tpl_type));
-                let return_type_string = if let Some(ref t) = *common_return_type {
-                    self.rust_type_to_code(t)
-                } else {
-                    format!("{}::ReturnType", tpl_type)
-                };
-                format!(
-                    include_str!("../templates/crate/overloaded_function.rs.in"),
-                    doc = format_doc(&doc_formatter::method_doc(&func)),
-                    maybe_pub = maybe_pub,
-                    maybe_unsafe = maybe_unsafe,
-                    tpl_decl = tpl_decl,
-                    trait_lifetime_arg = trait_lifetime_arg,
-                    name = func.name.last_name()?,
-                    trait_name = params_trait_name,
-                    tpl_type = tpl_type,
-                    args = args.join(", "),
-                    body = body,
-                    return_type_string = return_type_string
-                )
-            }
-        })
-    }
 
     /// Generates `lib.rs` file.
     #[allow(clippy::collapsible_if)]
@@ -1326,8 +1284,8 @@ use common::utils::MapIfOk;
 use doc_formatter;
 use rust_generator::RustGeneratorOutput;
 use rust_info::{
-    DependencyInfo, RustFFIFunction, RustMethod, RustFunctionArgument, RustFunctionArguments,
-    RustFunctionArgumentsVariant, RustMethodScope, RustModule, RustQtReceiverType,
+    DependencyInfo, RustFFIFunction, RustFunction, RustFunctionArgument, RustFunctionArguments,
+    RustFunctionArgumentsVariant, RustFunctionScope, RustModule, RustQtReceiverType,
     RustTypeDeclarationKind, RustTypeWrapperKind, TraitImpl, TraitImplExtra,
 };
 use rust_type::{CompleteType, RustName, RustToFfiTypeConversion, RustType, RustTypeIndirection};
