@@ -55,11 +55,30 @@ namespace ns1 {
     namespace ns2 {
         int x() {}
         int y() {}
-    }
+
+        enum Enum1 {
+            Val1,
+            Val2,
+            Val3
+        };
+    };
 
     namespace ns3 {
         int a() {}
         int b() {}
-    }
+
+        enum Enum2 {
+            Val11 = 1,
+            Val12 = 2,
+            Val13 = 3,
+        };
+    };
 
 }
+
+enum impl {
+    trait,
+    use,
+    crate = trait + 1,
+    last = -1,
+};

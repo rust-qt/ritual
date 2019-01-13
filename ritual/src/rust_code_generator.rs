@@ -2,8 +2,12 @@
 
 use crate::rust_info::RustDatabase;
 use crate::rust_info::RustDatabaseItem;
+use crate::rust_info::RustEnumValue;
 use crate::rust_info::RustItemKind;
 use crate::rust_info::RustModule;
+use crate::rust_info::RustStruct;
+use crate::rust_info::RustStructKind;
+use crate::rust_info::RustWrapperTypeKind;
 use crate::rust_type::RustPath;
 use ritual_common::errors::Result;
 use std::io::Write;
@@ -22,8 +26,8 @@ impl<W: Write> Generator<W> {
     ) -> Result<()> {
         match item.kind {
             RustItemKind::Module(ref module) => self.generate_module(module, database),
-            RustItemKind::Struct(_) => unimplemented!(),
-            RustItemKind::EnumValue(_) => unimplemented!(),
+            RustItemKind::Struct(ref data) => self.generate_struct(data, database),
+            RustItemKind::EnumValue(ref value) => self.generate_enum_value(value),
             RustItemKind::TraitImpl(_) => unimplemented!(),
             RustItemKind::Function(_) => unimplemented!(),
         }
@@ -38,6 +42,62 @@ impl<W: Write> Generator<W> {
 
         writeln!(self.destination, "}}")?;
         Ok(())
+    }
+
+    pub fn generate_struct(
+        &mut self,
+        rust_struct: &RustStruct,
+        database: &RustDatabase,
+    ) -> Result<()> {
+        let visibility = if rust_struct.is_public { "pub " } else { "" };
+        match rust_struct.kind {
+            RustStructKind::WrapperType(ref wrapper) => match wrapper.kind {
+                RustWrapperTypeKind::EnumWrapper => {
+                    writeln!(
+                        self.destination,
+                        "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+                    )?;
+                    writeln!(
+                        self.destination,
+                        "{}struct {}(::std::os::raw::c_int);",
+                        visibility,
+                        rust_struct.path.last()
+                    )?;
+                    writeln!(self.destination)?;
+                }
+                _ => unimplemented!(),
+            },
+            _ => unimplemented!(),
+        }
+
+        if database.children(&rust_struct.path).next().is_some() {
+            writeln!(self.destination, "impl {} {{", rust_struct.path.last())?;
+            for item in database.children(&rust_struct.path) {
+                self.generate_item(item, database)?;
+            }
+            writeln!(self.destination, "}}")?;
+            writeln!(self.destination)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn generate_enum_value(&mut self, value: &RustEnumValue) -> Result<()> {
+        let struct_path =
+            self.rust_path_to_string(&value.path.parent().expect("enum value must have parent"));
+        writeln!(
+            self.destination,
+            "pub const {value_name}: {struct_path} = {struct_path}({value});",
+            value_name = value.path.last(),
+            struct_path = struct_path,
+            value = value.value
+        )?;
+        Ok(())
+    }
+
+    // TODO: generate relative paths for better readability
+    pub fn rust_path_to_string(&self, path: &RustPath) -> String {
+        path.full_name(Some(&self.crate_name))
     }
 }
 

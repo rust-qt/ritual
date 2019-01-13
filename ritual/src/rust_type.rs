@@ -64,7 +64,7 @@ impl RustPath {
                 }
             }
         }
-        self.parts.join("::")
+        format!("::{}", self.parts.join("::"))
     }
 
     /// Returns true if `other` is nested within `self`.
@@ -81,6 +81,16 @@ impl RustPath {
 
     pub fn is_child_of(&self, parent: &RustPath) -> bool {
         parent.includes_directly(self)
+    }
+
+    pub fn parent(&self) -> Option<RustPath> {
+        if self.parts.len() > 1 {
+            let mut new_path = self.clone();
+            new_path.parts.pop().unwrap();
+            Some(new_path)
+        } else {
+            None
+        }
     }
 }
 

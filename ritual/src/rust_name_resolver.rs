@@ -93,7 +93,7 @@ impl State<'_> {
             self.default_strategy()
         };
 
-        if cpp_path.last().template_arguments.is_none() {
+        if cpp_path.last().template_arguments.is_some() {
             bail!("naming items with template arguments is not supported");
         }
 
