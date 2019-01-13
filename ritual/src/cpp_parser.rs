@@ -23,9 +23,7 @@ use clang::*;
 use itertools::Itertools;
 use log::{debug, info, trace, warn};
 use regex::Regex;
-use ritual_common::errors::{
-    bail, err_msg, should_panic_on_unexpected, unexpected, Result, ResultExt,
-};
+use ritual_common::errors::{bail, err_msg, unexpected, Result, ResultExt};
 use ritual_common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
 use std::collections::HashSet;
 use std::iter::once;

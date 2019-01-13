@@ -11,9 +11,7 @@ use ritual::cpp_function::CppFunctionDoc;
 use ritual::database::CppDatabaseItem;
 use ritual::database::CppItemData;
 use ritual::processor::ProcessorData;
-use ritual_common::errors::{
-    bail, err_msg, should_panic_on_unexpected, unexpected, Result, ResultExt,
-};
+use ritual_common::errors::{bail, err_msg, unexpected, Result, ResultExt};
 use select::document::Document;
 use select::node::Node;
 use std::collections::{hash_map, HashMap, HashSet};

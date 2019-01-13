@@ -7,7 +7,7 @@ use crate::cpp_ffi_data::{
 use crate::cpp_function::ReturnValueAllocationPlace;
 use crate::cpp_type::CppType;
 use itertools::Itertools;
-use ritual_common::errors::{bail, should_panic_on_unexpected, unexpected, Result};
+use ritual_common::errors::{bail, unexpected, Result};
 use ritual_common::file_utils::{create_file, path_to_str};
 use ritual_common::utils::get_command_output;
 use ritual_common::utils::MapIfOk;

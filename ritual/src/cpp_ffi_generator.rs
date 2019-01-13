@@ -23,7 +23,7 @@ use crate::database::CppItemData;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use log::trace;
-use ritual_common::errors::{bail, should_panic_on_unexpected, unexpected, Result};
+use ritual_common::errors::{bail, unexpected, Result};
 use ritual_common::utils::MapIfOk;
 use std::iter::once;
 

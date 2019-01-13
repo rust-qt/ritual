@@ -59,14 +59,14 @@ pub fn should_panic_on_unexpected() -> bool {
 #[macro_export]
 macro_rules! unexpected {
     ($e:expr) => {
-        if should_panic_on_unexpected() {
+        if $crate::errors::should_panic_on_unexpected() {
             panic!($e);
         } else {
             bail!($e);
         }
     };
     ($fmt:expr, $($arg:tt)*) => {
-        if should_panic_on_unexpected() {
+        if $crate::errors::should_panic_on_unexpected() {
             panic!($fmt, $($arg)*);
         } else {
             bail!($fmt, $($arg)*);
