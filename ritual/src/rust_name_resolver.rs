@@ -107,6 +107,11 @@ impl State<'_> {
                 rust_item
             );
         }
+        // TODO: forbid reserved module names: `lib`, `main`
+        // TODO: check for conflicts with things that are not in rust database:
+        // - `crate::ffi`
+        // - `crate::_types`
+        // - types from crate template (how?)
         Ok(rust_path)
     }
 

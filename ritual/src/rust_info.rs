@@ -337,6 +337,7 @@ impl RustDatabaseItem {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RustDatabase {
     pub items: Vec<RustDatabaseItem>,
+    pub lib_extra_doc: Option<String>,
 }
 
 impl RustDatabase {
