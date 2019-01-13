@@ -18,5 +18,5 @@ else
   curl https://sh.rustup.rs -sSf | sh -s -- -y
   source $HOME/.cargo/env
 fi
-
-
+rustup component add clippy
+rustup component add rustfmt
