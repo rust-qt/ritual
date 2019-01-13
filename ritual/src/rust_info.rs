@@ -44,7 +44,7 @@ pub struct RustQtSlotWrapper {
 pub enum RustWrapperTypeKind {
     EnumWrapper,
     ImmovableClassWrapper { raw_type_path: RustPath },
-    MovableClassWrapper { verified_type_path: RustPath },
+    MovableClassWrapper { sized_type_path: RustPath },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -69,11 +69,19 @@ pub struct RustWrapperType {
     pub kind: RustWrapperTypeKind,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct RustFfiClassTypeDoc {
+    pub cpp_path: CppPath,
+    pub public_rust_path: RustPath,
+}
+
 /// Information about a Rust type wrapper
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum RustStructKind {
     WrapperType(RustWrapperType),
     QtSlotWrapper(RustQtSlotWrapper),
+    FfiClassType(RustFfiClassTypeDoc),
+    SizedType(CppPath),
 }
 
 /// Exported information about a Rust wrapper type

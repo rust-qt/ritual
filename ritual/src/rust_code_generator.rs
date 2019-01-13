@@ -233,6 +233,17 @@ impl<W: Write> Generator<W> {
                     cpp_args = cpp_args
                 )?;
             }
+            RustStructKind::FfiClassType(_) => {
+                writeln!(
+                    self.destination,
+                    "{}struct {} {{ _unused: u8, }}",
+                    visibility,
+                    rust_struct.path.last()
+                )?;
+            }
+            RustStructKind::SizedType(_) => {
+                bail!("sized struct can't be generated with rust code generator")
+            }
         }
 
         if database.children(&rust_struct.path).next().is_some() {

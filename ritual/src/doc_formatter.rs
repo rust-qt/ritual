@@ -44,6 +44,11 @@ pub fn module_doc(doc: &RustModuleDoc) -> String {
 }
 
 pub fn struct_doc(type1: &RustStruct) -> String {
+    let current_crate = type1
+        .path
+        .crate_name()
+        .expect("generated type's path must have crate name");
+
     let auto_doc = match type1.kind {
         RustStructKind::WrapperType(RustWrapperType { ref doc_data, .. }) => {
             let cpp_type_code = doc_data.cpp_path.to_cpp_pseudo_code();
@@ -64,10 +69,6 @@ pub fn struct_doc(type1: &RustStruct) -> String {
                     .map(|t| t.original_cpp_type.to_cpp_pseudo_code())
                     .join(", ");
 
-                let current_crate = type1
-                    .path
-                    .crate_name()
-                    .expect("generated type's path must have crate name");
                 let rust_args = slot_wrapper
                     .arguments
                     .iter()
@@ -99,6 +100,15 @@ pub fn struct_doc(type1: &RustStruct) -> String {
             // TODO: add docs for slot wrappers
             String::new()
         }
+        RustStructKind::FfiClassType(ref doc_data) => format!(
+            "FFI type corresponding to C++ type: {}.\n\n\
+             This type can only be used behind a pointer.\n\n\
+             Use `{}` for accessing public API for this type.",
+            wrap_inline_cpp_code(&doc_data.cpp_path.to_cpp_pseudo_code()),
+            doc_data.public_rust_path.full_name(Some(current_crate))
+        ),
+        // private struct, no doc needed
+        RustStructKind::SizedType(_) => String::new(),
     };
     if let Some(ref doc) = type1.extra_doc {
         format!("{}\n\n{}", doc, auto_doc)
@@ -183,7 +193,7 @@ pub fn function_doc(function: &RustFunction) -> String {
             }
         }
         RustFunctionKind::CppDeletableImpl { .. } => {
-            // should not need doc becaise trait doc will be propagated
+            // should not need doc because trait doc will be propagated
         }
         RustFunctionKind::SignalOrSlotGetter {
             ref receiver_type,
