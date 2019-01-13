@@ -3,6 +3,7 @@
 use crate::config::Config;
 use crate::cpp_checker::cpp_checker_step;
 use crate::cpp_data::CppPath;
+use crate::cpp_data::CppPathItem;
 use crate::cpp_type::CppType;
 use crate::database::CppDatabaseItem;
 use crate::database::CppFfiItem;
@@ -25,8 +26,10 @@ use crate::rust_info::RustWrapperType;
 use crate::rust_info::RustWrapperTypeDocData;
 use crate::rust_info::RustWrapperTypeKind;
 use crate::rust_type::RustPath;
+use itertools::Itertools;
 use log::trace;
 use ritual_common::errors::*;
+use ritual_common::utils::MapIfOk;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::iter::once;
@@ -45,7 +48,7 @@ fn sanitize_rust_identifier(name: &str) -> String {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NameType {
     General,
     FfiItem,
@@ -97,31 +100,75 @@ impl State<'_> {
     }
 
     fn generate_rust_path(&mut self, cpp_path: &CppPath, name_type: NameType) -> Result<RustPath> {
-        let strategy = if let Some(parent) = cpp_path.parent() {
-            self.get_strategy(&parent)?
-        } else {
-            self.default_strategy()
+        let strategy = match name_type {
+            NameType::FfiItem => RustPathScope {
+                path: RustPath {
+                    parts: vec![self.config.crate_properties().name().into(), "ffi".into()],
+                },
+                prefix: None,
+            },
+            NameType::SizedItem => RustPathScope {
+                path: RustPath {
+                    parts: vec![
+                        self.config.crate_properties().name().into(),
+                        "ffi".into(),
+                        "sized_types".into(),
+                    ],
+                },
+                prefix: None,
+            },
+            NameType::General | NameType::ClassPtr => {
+                if let Some(parent) = cpp_path.parent() {
+                    self.get_strategy(&parent)?
+                } else {
+                    self.default_strategy()
+                }
+            }
         };
 
-        if cpp_path.last().template_arguments.is_some() {
-            bail!("naming items with template arguments is not supported");
-        }
+        let cpp_path_item_to_name = |item: &CppPathItem| {
+            if item.template_arguments.is_some() {
+                bail!("naming items with template arguments is not supported");
+            }
+            Ok(item.name.clone())
+        };
 
-        let sanitized_name = sanitize_rust_identifier(&cpp_path.last().name);
-        let rust_path = strategy.apply(&sanitized_name);
-        if let Some(rust_item) = self.rust_database.find(&rust_path) {
-            bail!(
-                "name {:?} already exists! Rust item: {:?}",
-                rust_path,
-                rust_item
-            );
+        let namespaced_name = if name_type == NameType::FfiItem || name_type == NameType::SizedItem
+        {
+            cpp_path
+                .items
+                .iter()
+                .map_if_ok(|item| cpp_path_item_to_name(item))?
+                .join("_")
+        } else {
+            cpp_path_item_to_name(&cpp_path.last())?
+        };
+
+        let full_name = if name_type == NameType::ClassPtr {
+            format!("{}Ptr", namespaced_name)
+        } else {
+            namespaced_name
+        };
+
+        let mut number = None;
+        loop {
+            let name_try = match number {
+                None => full_name.clone(),
+                Some(n) => format!("{}{}", full_name, n),
+            };
+            let sanitized_name = sanitize_rust_identifier(&name_try);
+            let rust_path = strategy.apply(&sanitized_name);
+            if self.rust_database.find(&rust_path).is_none() {
+                return Ok(rust_path);
+            }
+
+            number = Some(number.unwrap_or(0) + 1);
         }
         // TODO: forbid reserved module names: `lib`, `main`
         // TODO: check for conflicts with things that are not in rust database:
         // - `crate::ffi`
         // - `crate::_types`
         // - types from crate template (how?)
-        Ok(rust_path)
     }
 
     fn generate_rust_items(
