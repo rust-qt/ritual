@@ -146,7 +146,8 @@ impl CppItemData {
             CppItemData::Namespace(_) => Vec::new(),
             CppItemData::Function(ref function) => function.all_involved_types(),
             CppItemData::ClassField(ref field) => {
-                let class_type = CppType::Class(field.class_type.clone());
+                let class_type =
+                    CppType::Class(field.path.parent().expect("field path must have parent"));
                 vec![class_type, field.field_type.clone()]
             }
             CppItemData::ClassBase(ref base) => vec![

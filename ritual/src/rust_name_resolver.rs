@@ -7,6 +7,7 @@ use crate::cpp_data::CppPathItem;
 use crate::cpp_type::CppType;
 use crate::database::CppDatabaseItem;
 use crate::database::CppFfiItem;
+use crate::database::CppFfiItemKind;
 use crate::database::CppItemData;
 use crate::database::Database;
 use crate::processor::ProcessingStep;
@@ -307,12 +308,25 @@ impl State<'_> {
                 *modified = true;
                 cpp_item.is_rust_processed = true;
             }
+            CppItemData::Function(_) | CppItemData::ClassField(_) | CppItemData::ClassBase(_) => {
+                // only need to process FFI items
+            }
             _ => bail!("unimplemented"),
-            /*
-            CppItemData::Type(t) => unimplemented!(),
-            CppItemData::EnumValue(value) => unimplemented!(),
-            _ => unimplemented!(),*/
         }
+        if let Some(ffi_items) = &cpp_item.ffi_items {
+            for ffi_item in ffi_items {
+                if ffi_item.is_rust_processed {
+                    continue;
+                }
+                match &ffi_item.kind {
+                    CppFfiItemKind::Function(function) => {
+                        //let rust_path = self.generate_rust_path(&value.path, NameType::General)?;
+                    }
+                    CppFfiItemKind::QtSlotWrapper(_) => {}
+                }
+            }
+        }
+
         Ok(())
     }
 }

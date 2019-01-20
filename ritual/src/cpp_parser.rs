@@ -1237,9 +1237,8 @@ impl CppParser<'_, '_> {
                 //          Ok(size) => Some(size),
                 //          Err(_) => None,
                 //        },
-                name: field_name,
+                path: class_type.join(CppPathItem::from_str_unchecked(&field_name)),
                 field_type,
-                class_type,
                 visibility: match entity.get_accessibility().unwrap_or(Accessibility::Public) {
                     Accessibility::Public => CppVisibility::Public,
                     Accessibility::Protected => CppVisibility::Protected,

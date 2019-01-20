@@ -53,16 +53,11 @@ fn unscoped_path_should_work() {
 /// Member field of a C++ class declaration
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppClassField {
-    /// Identifier
-    pub name: String, // TODO: merge with `class_type`
+    pub path: CppPath,
     /// Field type
     pub field_type: CppType,
     /// Visibility
     pub visibility: CppVisibility,
-    //  /// Size of type in bytes
-    //  pub size: Option<usize>,
-    /// Name and template arguments of the class type that owns this field
-    pub class_type: CppPath,
 
     pub is_const: bool,
     pub is_static: bool,
@@ -81,11 +76,10 @@ impl CppClassField {
             CppVisibility::Private => "private ",
         };
         format!(
-            "{}{} {}::{}",
+            "{}{} {}",
             visibility_text,
             self.field_type.to_cpp_pseudo_code(),
-            self.class_type.to_cpp_pseudo_code(),
-            self.name
+            self.path.to_cpp_pseudo_code(),
         )
     }
 }
@@ -248,7 +242,7 @@ impl CppPathItem {
     }
 
     pub fn from_str_unchecked(name: &str) -> CppPathItem {
-        // TODO: Result?
+        // TODO: Result? make checked version and use in parser
         assert!(
             !name.contains('<'),
             "attempted to construct CppPathItem containing template arguments"

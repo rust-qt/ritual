@@ -393,6 +393,7 @@ fn generate_field_accessors(
     //log::status("Adding field accessors");
     let mut new_methods = Vec::new();
     let mut create_method = |name, accessor_type, return_type, arguments| -> Result<CppFfiItem> {
+        // TODO: avoid fake method
         let fake_method = CppFunction {
             path: name,
             member: Some(CppFunctionMemberData {
@@ -422,7 +423,8 @@ fn generate_field_accessors(
         };
         Ok(CppFfiItem::from_function(ffi_method))
     };
-    let class_path = field.class_type.clone();
+
+    let class_path = field.path.parent().expect("field path must have parent");
 
     if field.visibility == CppVisibility::Public {
         if field.field_type.is_class() {
@@ -437,7 +439,7 @@ fn generate_field_accessors(
                 target: Box::new(field.field_type.clone()),
             };
             new_methods.push(create_method(
-                class_path.join(CppPathItem::from_str_unchecked(&field.name)),
+                field.path.clone(),
                 CppFieldAccessorType::ConstRefGetter,
                 type2_const,
                 Vec::new(),
@@ -445,7 +447,7 @@ fn generate_field_accessors(
             new_methods.push(create_method(
                 class_path.join(CppPathItem::from_str_unchecked(&format!(
                     "{}_mut",
-                    field.name
+                    field.path.last()
                 ))),
                 CppFieldAccessorType::MutRefGetter,
                 type2_mut,
@@ -453,7 +455,7 @@ fn generate_field_accessors(
             )?);
         } else {
             new_methods.push(create_method(
-                class_path.join(CppPathItem::from_str_unchecked(&field.name)),
+                field.path.clone(),
                 CppFieldAccessorType::CopyGetter,
                 field.field_type.clone(),
                 Vec::new(),
@@ -467,7 +469,7 @@ fn generate_field_accessors(
         new_methods.push(create_method(
             class_path.join(CppPathItem::from_str_unchecked(&format!(
                 "set_{}",
-                field.name
+                field.path.last()
             ))),
             CppFieldAccessorType::Setter,
             CppType::Void,

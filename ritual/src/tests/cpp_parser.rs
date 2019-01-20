@@ -150,14 +150,14 @@ fn functions_with_class_arg() {
     assert!(data.bases.is_empty());
 
     assert_eq!(data.fields.len(), 2);
-    assert_eq!(data.fields[0].name, "a");
+    assert_eq!(data.fields[0].path, CppPath::from_str_unchecked("Magic::a"));
     assert_eq!(
         data.fields[0].field_type,
         CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
     );
     assert_eq!(data.fields[0].visibility, CppVisibility::Public);
 
-    assert_eq!(data.fields[1].name, "b");
+    assert_eq!(data.fields[1].path, CppPath::from_str_unchecked("Magic::b"));
     assert_eq!(
         data.fields[1].field_type,
         CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
@@ -234,8 +234,8 @@ fn func_with_unknown_type() {
 #[test]
 fn variadic_func() {
     let data = run_parser("int my_printf ( const char * format, ... );");
+    assert_eq!(data.methods.len(), 1);
     assert!(data.types.is_empty());
-    assert!(data.methods.len() == 1);
     assert_eq!(
         data.methods[0],
         CppFunction {

@@ -237,7 +237,14 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
                     format!("{}::", cpp_function.class_type().unwrap().to_cpp_code()?)
                 } else if let Some(ref field) = method.kind.cpp_field().filter(|f| f.is_static) {
                     // static field
-                    format!("{}::", field.class_type.to_cpp_code()?)
+                    format!(
+                        "{}::",
+                        field
+                            .path
+                            .parent()
+                            .expect("field path must have parent")
+                            .to_cpp_code()?
+                    )
                 } else {
                     // regular member method/field or a free function
                     if let Some(arg) = method
@@ -274,11 +281,11 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
                             format!(
                                 "{}{} = {}",
                                 scope_specifier,
-                                field.name,
+                                field.path.last(),
                                 arguments_values(method)?
                             )
                         } else {
-                            format!("{}{}", scope_specifier, field.name)
+                            format!("{}{}", scope_specifier, field.path.last())
                         }
                     }
                     CppFfiFunctionKind::Function {
