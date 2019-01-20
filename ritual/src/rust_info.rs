@@ -176,9 +176,8 @@ pub enum RustFunctionKind {
 /// Information about a public API method.
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustFunction {
-    /// Location of the method.
-    // TODO: maybe can be deleted
-    pub scope: RustFunctionScope,
+    pub is_public: bool,
+
     /// True if the method is `unsafe`.
     pub is_unsafe: bool,
     /// Full name of the method.

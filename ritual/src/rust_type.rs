@@ -2,6 +2,7 @@
 
 use crate::cpp_ffi_data::CppTypeConversionToFfi;
 use crate::cpp_type::CppType;
+use itertools::Itertools;
 use ritual_common::errors::{bail, Result};
 use ritual_common::string_utils::CaseOperations;
 use ritual_common::utils::MapIfOk;
@@ -25,6 +26,17 @@ impl RustPath {
     pub fn from_parts(parts: Vec<String>) -> RustPath {
         if parts.is_empty() {
             panic!("RustPath can't be empty");
+        }
+        RustPath { parts }
+    }
+
+    pub fn from_str_unchecked(str: &str) -> RustPath {
+        let parts = str.split("::").map(String::from).collect_vec();
+        if parts.is_empty() {
+            panic!("RustPath can't be empty");
+        }
+        if parts.iter().any(|item| item.is_empty()) {
+            panic!("RustPath item can't be empty");
         }
         RustPath { parts }
     }

@@ -4,6 +4,13 @@ use crate::config::Config;
 use crate::cpp_checker::cpp_checker_step;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;
+use crate::cpp_ffi_data::CppFfiFunctionKind;
+use crate::cpp_ffi_data::CppFieldAccessorType;
+use crate::cpp_type::CppBuiltInNumericType;
+use crate::cpp_type::CppFunctionPointerType;
+use crate::cpp_type::CppPointerLikeTypeKind;
+use crate::cpp_type::CppSpecificNumericType;
+use crate::cpp_type::CppSpecificNumericTypeKind;
 use crate::cpp_type::CppType;
 use crate::database::CppDatabaseItem;
 use crate::database::CppFfiItem;
@@ -27,6 +34,8 @@ use crate::rust_info::RustWrapperType;
 use crate::rust_info::RustWrapperTypeDocData;
 use crate::rust_info::RustWrapperTypeKind;
 use crate::rust_type::RustPath;
+use crate::rust_type::RustPointerLikeTypeKind;
+use crate::rust_type::RustType;
 use itertools::Itertools;
 use log::trace;
 use ritual_common::errors::*;
@@ -34,6 +43,7 @@ use ritual_common::utils::MapIfOk;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::iter::once;
+use std::ops::Deref;
 
 /// Adds "_" to a string if it is a reserved word in Rust
 fn sanitize_rust_identifier(name: &str) -> String {
@@ -55,6 +65,7 @@ enum NameType {
     FfiItem,
     SizedItem,
     ClassPtr,
+    FieldAccessor(CppFieldAccessorType),
 }
 
 struct State<'a> {
@@ -65,18 +76,143 @@ struct State<'a> {
 }
 
 impl State<'_> {
-    fn get_strategy(&self, parent_path: &CppPath) -> Result<RustPathScope> {
-        let index = match self.cpp_path_to_index.get(parent_path) {
-            Some(index) => index,
-            None => unexpected!("unknown parent path: {}", parent_path),
+    /// Converts `CppType` to its exact Rust equivalent (FFI-compatible)
+    fn ffi_type_to_rust_ffi_type(&self, cpp_ffi_type: &CppType) -> Result<RustType> {
+        let rust_type = match cpp_ffi_type {
+            CppType::PointerLike {
+                ref kind,
+                ref is_const,
+                ref target,
+            } => {
+                let rust_target = if target.deref() == &CppType::Void {
+                    RustType::Common {
+                        path: RustPath::from_str_unchecked("std::ffi::c_void"),
+                        generic_arguments: None,
+                    }
+                } else {
+                    unimplemented!()
+                };
+                RustType::PointerLike {
+                    kind: match *kind {
+                        CppPointerLikeTypeKind::Pointer => RustPointerLikeTypeKind::Pointer,
+                        CppPointerLikeTypeKind::Reference
+                        | CppPointerLikeTypeKind::RValueReference => {
+                            bail!("references are not supported in FFI");
+                        }
+                    },
+                    target: Box::new(rust_target),
+                    is_const: *is_const,
+                }
+            }
+            CppType::Void => RustType::EmptyTuple,
+
+            CppType::BuiltInNumeric(ref numeric) => {
+                let rust_path = if numeric == &CppBuiltInNumericType::Bool {
+                    // TODO: bool may not be safe for FFI
+                    RustPath::from_str_unchecked("bool")
+                } else {
+                    let own_name = match *numeric {
+                        CppBuiltInNumericType::Bool => unreachable!(),
+                        CppBuiltInNumericType::Char => "c_char",
+                        CppBuiltInNumericType::SChar => "c_schar",
+                        CppBuiltInNumericType::UChar => "c_uchar",
+                        CppBuiltInNumericType::Short => "c_short",
+                        CppBuiltInNumericType::UShort => "c_ushort",
+                        CppBuiltInNumericType::Int => "c_int",
+                        CppBuiltInNumericType::UInt => "c_uint",
+                        CppBuiltInNumericType::Long => "c_long",
+                        CppBuiltInNumericType::ULong => "c_ulong",
+                        CppBuiltInNumericType::LongLong => "c_longlong",
+                        CppBuiltInNumericType::ULongLong => "c_ulonglong",
+                        CppBuiltInNumericType::Float => "c_float",
+                        CppBuiltInNumericType::Double => "c_double",
+                        _ => bail!("unsupported numeric type: {:?}", numeric),
+                    };
+                    RustPath::from_str_unchecked("std::os::raw").join(own_name)
+                };
+
+                RustType::Common {
+                    path: rust_path,
+                    generic_arguments: None,
+                }
+            }
+            CppType::SpecificNumeric(CppSpecificNumericType {
+                ref bits, ref kind, ..
+            }) => {
+                let letter = match *kind {
+                    CppSpecificNumericTypeKind::Integer { ref is_signed } => {
+                        if *is_signed {
+                            "i"
+                        } else {
+                            "u"
+                        }
+                    }
+                    CppSpecificNumericTypeKind::FloatingPoint => "f",
+                };
+                let path = RustPath::from_str_unchecked(&format!("{}{}", letter, bits));
+
+                RustType::Common {
+                    path,
+                    generic_arguments: None,
+                }
+            }
+            CppType::PointerSizedInteger { ref is_signed, .. } => {
+                let name = if *is_signed { "isize" } else { "usize" };
+                RustType::Common {
+                    path: RustPath::from_str_unchecked(name),
+                    generic_arguments: None,
+                }
+            }
+            CppType::Enum { ref path } | CppType::Class(ref path) => {
+                let rust_item = self.find_rust_item(path)?;
+                let path = rust_item
+                    .path()
+                    .ok_or_else(|| err_msg("RustDatabaseItem for class has no path"))?
+                    .clone();
+
+                RustType::Common {
+                    path,
+                    generic_arguments: None,
+                }
+            }
+            CppType::FunctionPointer(CppFunctionPointerType {
+                ref return_type,
+                ref arguments,
+                ref allows_variadic_arguments,
+            }) => {
+                if *allows_variadic_arguments {
+                    bail!("function pointers with variadic arguments are not supported");
+                }
+                let mut rust_args = arguments
+                    .iter()
+                    .map_if_ok(|arg| self.ffi_type_to_rust_ffi_type(arg))?;
+                let rust_return_type = self.ffi_type_to_rust_ffi_type(return_type)?;
+                RustType::FunctionPointer {
+                    arguments: rust_args,
+                    return_type: Box::new(rust_return_type),
+                }
+            }
+            CppType::TemplateParameter { .. } => bail!("invalid cpp type"),
         };
 
-        let rust_item = self
-            .rust_database
+        Ok(rust_type)
+    }
+
+    fn find_rust_item(&self, cpp_path: &CppPath) -> Result<&RustDatabaseItem> {
+        let index = match self.cpp_path_to_index.get(cpp_path) {
+            Some(index) => index,
+            None => bail!("unknown cpp path: {}", cpp_path),
+        };
+
+        self.rust_database
             .items
             .iter()
             .find(|item| item.cpp_item_index == *index)
-            .ok_or_else(|| err_msg(format!("rust item not found for path: {:?}", parent_path)))?;
+            .ok_or_else(|| err_msg(format!("rust item not found for path: {:?}", cpp_path)))
+    }
+
+    fn get_strategy(&self, parent_path: &CppPath) -> Result<RustPathScope> {
+        let rust_item = self.find_rust_item(parent_path)?;
 
         let rust_path = rust_item.path().ok_or_else(|| {
             err_msg(format!(
@@ -118,7 +254,7 @@ impl State<'_> {
                 },
                 prefix: None,
             },
-            NameType::General | NameType::ClassPtr => {
+            NameType::General | NameType::ClassPtr | NameType::FieldAccessor(_) => {
                 if let Some(parent) = cpp_path.parent() {
                     self.get_strategy(&parent)?
                 } else {
@@ -129,33 +265,35 @@ impl State<'_> {
 
         let cpp_path_item_to_name = |item: &CppPathItem| {
             if item.template_arguments.is_some() {
-                bail!("naming items with template arguments is not supported");
+                bail!("naming items with template arguments is not supported yet");
             }
             Ok(item.name.clone())
         };
 
-        let namespaced_name = if name_type == NameType::FfiItem || name_type == NameType::SizedItem
-        {
-            cpp_path
+        let full_last_name = match name_type {
+            NameType::FfiItem | NameType::SizedItem => cpp_path
                 .items
                 .iter()
                 .map_if_ok(|item| cpp_path_item_to_name(item))?
-                .join("_")
-        } else {
-            cpp_path_item_to_name(&cpp_path.last())?
-        };
-
-        let full_name = if name_type == NameType::ClassPtr {
-            format!("{}Ptr", namespaced_name)
-        } else {
-            namespaced_name
+                .join("_"),
+            NameType::ClassPtr => format!("{}Ptr", cpp_path_item_to_name(&cpp_path.last())?),
+            NameType::General => cpp_path_item_to_name(&cpp_path.last())?,
+            NameType::FieldAccessor(accessor_type) => {
+                let name = &cpp_path.last().name;
+                match accessor_type {
+                    CppFieldAccessorType::CopyGetter => name.to_string(),
+                    CppFieldAccessorType::ConstRefGetter => name.to_string(),
+                    CppFieldAccessorType::MutRefGetter => format!("{}_mut", name),
+                    CppFieldAccessorType::Setter => format!("set_{}", name),
+                }
+            }
         };
 
         let mut number = None;
         loop {
             let name_try = match number {
-                None => full_name.clone(),
-                Some(n) => format!("{}{}", full_name, n),
+                None => full_last_name.clone(),
+                Some(n) => format!("{}{}", full_last_name, n),
             };
             let sanitized_name = sanitize_rust_identifier(&name_try);
             let rust_path = strategy.apply(&sanitized_name);
@@ -320,9 +458,22 @@ impl State<'_> {
                 }
                 match &ffi_item.kind {
                     CppFfiItemKind::Function(function) => {
-                        //let rust_path = self.generate_rust_path(&value.path, NameType::General)?;
+                        let rust_path = match &function.kind {
+                            CppFfiFunctionKind::Function { cpp_function, .. } => {
+                                self.generate_rust_path(&cpp_function.path, NameType::General)?
+                            }
+                            CppFfiFunctionKind::FieldAccessor {
+                                field,
+                                accessor_type,
+                            } => {
+                                let name_type = NameType::FieldAccessor(*accessor_type);
+                                self.generate_rust_path(&field.path, name_type)?
+                            }
+                        };
                     }
-                    CppFfiItemKind::QtSlotWrapper(_) => {}
+                    CppFfiItemKind::QtSlotWrapper(_) => {
+                        bail!("not supported yet");
+                    }
                 }
             }
         }

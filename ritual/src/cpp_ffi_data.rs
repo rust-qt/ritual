@@ -6,7 +6,7 @@ use ritual_common::errors::Result;
 use serde_derive::{Deserialize, Serialize};
 
 /// Variation of a field accessor method
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize)]
 pub enum CppFieldAccessorType {
     /// Returns copy of the field
     CopyGetter,

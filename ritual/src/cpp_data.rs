@@ -300,7 +300,7 @@ pub struct CppTypeData {
 
 impl CppTypeData {
     pub fn is_same(&self, other: &CppTypeData) -> bool {
-        self.path == other.path && self.kind == other.kind
+        self.path == other.path
     }
 }
 

@@ -11,7 +11,6 @@ use crate::rust_info::RustFfiWrapperData;
 use crate::rust_info::RustFunction;
 use crate::rust_info::RustFunctionArgument;
 use crate::rust_info::RustFunctionKind;
-use crate::rust_info::RustFunctionScope;
 use crate::rust_info::RustItemKind;
 use crate::rust_info::RustModule;
 use crate::rust_info::RustStruct;
@@ -624,10 +623,7 @@ impl<W: Write> Generator<W> {
 
     /// Generates complete code of a Rust wrapper function.
     fn generate_rust_final_function(&mut self, func: &RustFunction) -> Result<()> {
-        let maybe_pub = match func.scope {
-            RustFunctionScope::TraitImpl => "",
-            _ => "pub ",
-        };
+        let maybe_pub = if func.is_public { "pub " } else { "" };
         let maybe_unsafe = if func.is_unsafe { "unsafe " } else { "" };
 
         let body = match func.kind {

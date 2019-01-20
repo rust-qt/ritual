@@ -427,6 +427,7 @@ fn generate_field_accessors(
     let class_path = field.path.parent().expect("field path must have parent");
 
     if field.visibility == CppVisibility::Public {
+        // TODO: add comment about choosing right accessor types
         if field.field_type.is_class() {
             let type2_const = CppType::PointerLike {
                 is_const: true,
