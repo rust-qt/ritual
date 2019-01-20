@@ -240,6 +240,25 @@ pub struct RustModuleDoc {
     pub cpp_path: Option<CppPath>,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
+pub enum RustModuleKind {
+    CrateRoot,
+    Ffi,
+    SizedTypes,
+    Normal,
+}
+
+impl RustModuleKind {
+    pub fn is_in_separate_file(self) -> bool {
+        match self {
+            RustModuleKind::CrateRoot => true,
+            RustModuleKind::Ffi => true,
+            RustModuleKind::SizedTypes => false,
+            RustModuleKind::Normal => true,
+        }
+    }
+}
+
 /// Information about a Rust module.
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustModule {
@@ -247,6 +266,8 @@ pub struct RustModule {
     pub path: RustPath,
     /// Markdown content of Rust documentation for this module.
     pub doc: RustModuleDoc,
+
+    pub kind: RustModuleKind,
 }
 
 /// Method of generating name suffixes for disambiguating multiple Rust methods
@@ -281,7 +302,7 @@ impl RustFunctionCaptionStrategy {
 }
 
 /// Information about an argument of a Rust FFI function.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RustFFIArgument {
     /// Name of the argument.
     pub name: String,
@@ -292,7 +313,7 @@ pub struct RustFFIArgument {
 /// Information about a Rust FFI function.
 /// Name and signature of this function must be the same
 /// as the corresponding C++ function on the other side of FFI.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RustFFIFunction {
     /// Return type of the function.
     pub return_type: RustType,
@@ -309,13 +330,24 @@ pub enum RustItemKind {
     Struct(RustStruct),
     EnumValue(RustEnumValue),
     TraitImpl(RustTraitImpl),
+    FfiFunction(RustFFIFunction), // TODO: merge FfiFunction and Function
     Function(RustFunction),
+}
+
+impl RustItemKind {
+    pub fn is_ffi_function(&self) -> bool {
+        if let RustItemKind::FfiFunction(_) = self {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustDatabaseItem {
     pub kind: RustItemKind,
-    pub cpp_item_index: usize,
+    pub cpp_item_index: Option<usize>,
 }
 
 impl RustDatabaseItem {
@@ -325,6 +357,7 @@ impl RustDatabaseItem {
             RustItemKind::Struct(ref data) => Some(&data.path),
             RustItemKind::EnumValue(ref data) => Some(&data.path),
             RustItemKind::Function(ref data) => Some(&data.path),
+            RustItemKind::FfiFunction(ref data) => Some(&data.path),
             RustItemKind::TraitImpl(_) => None,
         }
     }
@@ -337,6 +370,14 @@ impl RustDatabaseItem {
                     .expect("item must have path because it's not a trait impl");
                 path.is_child_of(parent)
             }
+        }
+    }
+
+    pub fn as_module_ref(&self) -> Option<&RustModule> {
+        if let RustItemKind::Module(ref data) = self.kind {
+            Some(data)
+        } else {
+            None
         }
     }
 }

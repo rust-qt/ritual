@@ -144,6 +144,7 @@ impl<W: Write> Generator<W> {
             RustItemKind::EnumValue(ref value) => self.generate_enum_value(value),
             RustItemKind::TraitImpl(ref value) => self.generate_trait_impl(value),
             RustItemKind::Function(ref value) => self.generate_rust_final_function(value),
+            RustItemKind::FfiFunction(ref value) => self.generate_ffi_function(value),
         }
     }
 
@@ -700,7 +701,24 @@ impl<W: Write> Generator<W> {
     }
 
     fn generate_children(&mut self, parent: &RustPath, database: &RustDatabase) -> Result<()> {
-        for item in database.children(&parent) {
+        if database
+            .children(&parent)
+            .any(|item| item.kind.is_ffi_function())
+        {
+            writeln!(self, "extern \"C\" {{\n")?;
+            for item in database
+                .children(&parent)
+                .filter(|item| item.kind.is_ffi_function())
+            {
+                self.generate_item(item, database)?;
+            }
+            writeln!(self, "}}\n")?;
+        }
+
+        for item in database
+            .children(&parent)
+            .filter(|item| !item.kind.is_ffi_function())
+        {
             self.generate_item(item, database)?;
         }
         // TODO: somehow add items from crate template
@@ -730,19 +748,8 @@ impl<W: Write> Generator<W> {
         Ok(())
     }
 
-    /// Generates `ffi.in.rs` file.
-    fn generate_ffi_code(&mut self, functions: &[(String, Vec<RustFFIFunction>)]) -> Result<()> {
-        let mut code = String::new();
-        code.push_str("extern \"C\" {\n");
-        for &(ref include_file, ref functions) in functions {
-            code.push_str(&format!("  // Header: {}\n", include_file));
-            for function in functions {
-                code.push_str(&self.rust_ffi_function_to_code(function));
-            }
-            code.push_str("\n");
-        }
-        code.push_str("}\n");
-        writeln!(self, "{}", code)?;
+    fn generate_ffi_function(&mut self, function: &RustFFIFunction) -> Result<()> {
+        writeln!(self, "{}", self.rust_ffi_function_to_code(function))?;
         Ok(())
     }
 }
@@ -757,20 +764,6 @@ pub fn generate_lib_file(
         destination,
     };
     generator.generate_lib_file(database)?;
-    Ok(())
-}
-
-pub fn generate_ffi_file(
-    crate_name: &str,
-    _database: &RustDatabase,
-    destination: impl Write,
-) -> Result<()> {
-    let mut generator = Generator {
-        crate_name: crate_name.to_string(),
-        destination,
-    };
-    // TODO: Rust FFI functions storage?
-    generator.generate_ffi_code(&[])?;
     Ok(())
 }
 

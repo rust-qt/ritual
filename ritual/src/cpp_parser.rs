@@ -1203,7 +1203,7 @@ impl CppParser<'_, '_> {
     }
 
     /// Parses a class field `entity`.
-    fn parse_class_field(&mut self, entity: Entity, class_type: CppPath) -> Result<()> {
+    fn parse_class_field(&mut self, entity: Entity, class_type: &CppPath) -> Result<()> {
         let include_file = self.entity_include_file(entity).with_context(|_| {
             format!(
                 "Origin of class field is unknown: {}; entity: {:?}",
@@ -1298,7 +1298,7 @@ impl CppParser<'_, '_> {
         let mut current_base_index = 0;
         for child in entity.get_children() {
             if child.get_kind() == EntityKind::FieldDecl {
-                if let Err(err) = self.parse_class_field(child, full_name.clone()) {
+                if let Err(err) = self.parse_class_field(child, &full_name) {
                     trace!(
                         "cpp_parser_error; entity = {}; failed to parse class field: {}",
                         entity_log_representation(child),

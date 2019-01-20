@@ -1,5 +1,3 @@
-#![allow(warnings)]
-
 use crate::config::Config;
 use crate::cpp_checker::cpp_checker_step;
 use crate::cpp_data::CppPath;
@@ -14,7 +12,6 @@ use crate::cpp_type::CppSpecificNumericType;
 use crate::cpp_type::CppSpecificNumericTypeKind;
 use crate::cpp_type::CppType;
 use crate::database::CppDatabaseItem;
-use crate::database::CppFfiItem;
 use crate::database::CppFfiItemKind;
 use crate::database::CppItemData;
 use crate::database::Database;
@@ -30,6 +27,7 @@ use crate::rust_info::RustFfiClassTypeDoc;
 use crate::rust_info::RustItemKind;
 use crate::rust_info::RustModule;
 use crate::rust_info::RustModuleDoc;
+use crate::rust_info::RustModuleKind;
 use crate::rust_info::RustPathScope;
 use crate::rust_info::RustStruct;
 use crate::rust_info::RustStructKind;
@@ -39,17 +37,14 @@ use crate::rust_info::RustWrapperTypeKind;
 use crate::rust_type::RustPath;
 use crate::rust_type::RustPointerLikeTypeKind;
 use crate::rust_type::RustType;
-use itertools::Itertools;
 use log::trace;
 use ritual_common::errors::*;
 use ritual_common::utils::MapIfOk;
 use std::collections::HashMap;
-use std::collections::HashSet;
-use std::iter::once;
 use std::ops::Deref;
 
 /// Adds "_" to a string if it is a reserved word in Rust
-fn sanitize_rust_identifier(name: &str) -> String {
+fn sanitize_rust_identifier(name: &str, is_module: bool) -> String {
     match name {
         "abstract" | "alignof" | "as" | "become" | "box" | "break" | "const" | "continue"
         | "crate" | "do" | "else" | "enum" | "extern" | "false" | "final" | "fn" | "for" | "if"
@@ -58,13 +53,27 @@ fn sanitize_rust_identifier(name: &str) -> String {
         | "Self" | "self" | "sizeof" | "static" | "struct" | "super" | "trait" | "true"
         | "type" | "typeof" | "unsafe" | "unsized" | "use" | "virtual" | "where" | "while"
         | "yield" => format!("{}_", name),
+        "lib" | "main" if is_module => format!("{}_", name),
         _ => name.to_string(),
     }
+}
+
+#[test]
+fn sanitize_rust_identifier_test() {
+    assert_eq!(&sanitize_rust_identifier("good", false), "good");
+    assert_eq!(&sanitize_rust_identifier("Self", false), "Self_");
+    assert_eq!(&sanitize_rust_identifier("mod", false), "mod_");
+    assert_eq!(&sanitize_rust_identifier("mod", true), "mod_");
+    assert_eq!(&sanitize_rust_identifier("main", false), "main");
+    assert_eq!(&sanitize_rust_identifier("main", true), "main_");
+    assert_eq!(&sanitize_rust_identifier("lib", false), "lib");
+    assert_eq!(&sanitize_rust_identifier("lib", true), "lib_");
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NameType {
     General,
+    Module,
     FfiStruct,
     FfiFunction,
     SizedItem,
@@ -82,6 +91,7 @@ struct State<'a> {
 impl State<'_> {
     /// Converts `CppType` to its exact Rust equivalent (FFI-compatible)
     fn ffi_type_to_rust_ffi_type(&self, cpp_ffi_type: &CppType) -> Result<RustType> {
+        // TODO: use dep_databases!
         let rust_type = match cpp_ffi_type {
             CppType::PointerLike {
                 ref kind,
@@ -187,7 +197,7 @@ impl State<'_> {
                 if *allows_variadic_arguments {
                     bail!("function pointers with variadic arguments are not supported");
                 }
-                let mut rust_args = arguments
+                let rust_args = arguments
                     .iter()
                     .map_if_ok(|arg| self.ffi_type_to_rust_ffi_type(arg))?;
                 let rust_return_type = self.ffi_type_to_rust_ffi_type(return_type)?;
@@ -208,7 +218,7 @@ impl State<'_> {
         for arg in &data.arguments {
             let rust_type = self.ffi_type_to_rust_ffi_type(&arg.argument_type.ffi_type)?;
             args.push(RustFFIArgument {
-                name: sanitize_rust_identifier(&arg.name),
+                name: sanitize_rust_identifier(&arg.name, false),
                 argument_type: rust_type,
             });
         }
@@ -228,7 +238,7 @@ impl State<'_> {
         self.rust_database
             .items
             .iter()
-            .find(|item| item.cpp_item_index == *index)
+            .find(|item| item.cpp_item_index == Some(*index))
             .ok_or_else(|| err_msg(format!("rust item not found for path: {:?}", cpp_path)))
     }
 
@@ -275,7 +285,10 @@ impl State<'_> {
                 },
                 prefix: None,
             },
-            NameType::General | NameType::ClassPtr | NameType::FieldAccessor(_) => {
+            NameType::General
+            | NameType::Module
+            | NameType::ClassPtr
+            | NameType::FieldAccessor(_) => {
                 if let Some(parent) = cpp_path.parent() {
                     self.get_strategy(&parent)?
                 } else {
@@ -299,7 +312,7 @@ impl State<'_> {
                 .join("_"),
             NameType::FfiFunction => cpp_path.last().to_string(),
             NameType::ClassPtr => format!("{}Ptr", cpp_path_item_to_name(&cpp_path.last())?),
-            NameType::General => cpp_path_item_to_name(&cpp_path.last())?,
+            NameType::General | NameType::Module => cpp_path_item_to_name(&cpp_path.last())?,
             NameType::FieldAccessor(accessor_type) => {
                 let name = &cpp_path.last().name;
                 match accessor_type {
@@ -325,7 +338,7 @@ impl State<'_> {
                 None => full_last_name.clone(),
                 Some(n) => format!("{}{}", full_last_name, n),
             };
-            let sanitized_name = sanitize_rust_identifier(&name_try);
+            let sanitized_name = sanitize_rust_identifier(&name_try, name_type == NameType::Module);
             let rust_path = strategy.apply(&sanitized_name);
             if self.rust_database.find(&rust_path).is_none() {
                 return Ok(rust_path);
@@ -334,11 +347,7 @@ impl State<'_> {
             number = Some(number.unwrap_or(0) + 1);
         }
 
-        // TODO: forbid reserved module names: `lib`, `main`
-        // TODO: check for conflicts with things that are not in rust database:
-        // - `crate::ffi`
-        // - `crate::_types`
-        // - types from crate template (how?)
+        // TODO: check for conflicts with types from crate template (how?)
     }
 
     fn generate_rust_items(
@@ -357,8 +366,9 @@ impl State<'_> {
                             extra_doc: None,
                             cpp_path: Some(path.clone()),
                         },
+                        kind: RustModuleKind::Normal,
                     }),
-                    cpp_item_index,
+                    cpp_item_index: Some(cpp_item_index),
                 };
                 self.rust_database.items.push(rust_item);
                 *modified = true;
@@ -401,7 +411,7 @@ impl State<'_> {
                             kind: internal_wrapper_kind,
                             is_public: true,
                         }),
-                        cpp_item_index,
+                        cpp_item_index: Some(cpp_item_index),
                     };
                     self.rust_database.items.push(internal_rust_item);
 
@@ -429,7 +439,7 @@ impl State<'_> {
                             }),
                             is_public: true,
                         }),
-                        cpp_item_index,
+                        cpp_item_index: Some(cpp_item_index),
                     };
                     self.rust_database.items.push(public_rust_item);
 
@@ -451,7 +461,7 @@ impl State<'_> {
                             }),
                             is_public: true,
                         }),
-                        cpp_item_index,
+                        cpp_item_index: Some(cpp_item_index),
                     };
                     self.rust_database.items.push(rust_item);
                     *modified = true;
@@ -471,7 +481,7 @@ impl State<'_> {
                             extra_doc: None,
                         },
                     }),
-                    cpp_item_index,
+                    cpp_item_index: Some(cpp_item_index),
                 };
                 self.rust_database.items.push(rust_item);
                 *modified = true;
@@ -482,14 +492,20 @@ impl State<'_> {
             }
             _ => bail!("unimplemented"),
         }
-        if let Some(ffi_items) = &cpp_item.ffi_items {
+        if let Some(ffi_items) = &mut cpp_item.ffi_items {
             for ffi_item in ffi_items {
                 if ffi_item.is_rust_processed {
                     continue;
                 }
                 match &ffi_item.kind {
                     CppFfiItemKind::Function(function) => {
-                        let rust_path = match &function.kind {
+                        let ffi_function = self.generate_ffi_function(&function)?;
+                        let rust_item = RustDatabaseItem {
+                            kind: RustItemKind::FfiFunction(ffi_function),
+                            cpp_item_index: Some(cpp_item_index),
+                        };
+
+                        let _rust_path = match &function.kind {
                             CppFfiFunctionKind::Function { cpp_function, .. } => {
                                 self.generate_rust_path(&cpp_function.path, NameType::General)?
                             }
@@ -501,6 +517,11 @@ impl State<'_> {
                                 self.generate_rust_path(&field.path, name_type)?
                             }
                         };
+                        // TODO: generate final Rust function
+
+                        self.rust_database.items.push(rust_item);
+                        *modified = true;
+                        ffi_item.is_rust_processed = true;
                     }
                     CppFfiItemKind::QtSlotWrapper(_) => {
                         bail!("not supported yet");
@@ -509,6 +530,45 @@ impl State<'_> {
             }
         }
 
+        Ok(())
+    }
+
+    fn generate_special_module(&mut self, kind: RustModuleKind) -> Result<()> {
+        if !self
+            .rust_database
+            .items
+            .iter()
+            .filter_map(|item| item.as_module_ref())
+            .any(|module| module.kind == kind)
+        {
+            let crate_name = self.config.crate_properties().name().to_string();
+            let rust_path_parts = match kind {
+                RustModuleKind::CrateRoot => vec![crate_name],
+                RustModuleKind::Ffi => vec![crate_name, "ffi".to_string()],
+                RustModuleKind::SizedTypes => {
+                    vec![crate_name, "ffi".to_string(), "sized_types".to_string()]
+                }
+                RustModuleKind::Normal => unreachable!(),
+            };
+            let rust_path = RustPath::from_parts(rust_path_parts);
+
+            if self.rust_database.find(&rust_path).is_some() {
+                bail!("special module path already taken: {:?}", rust_path);
+            }
+
+            let rust_item = RustDatabaseItem {
+                kind: RustItemKind::Module(RustModule {
+                    path: rust_path,
+                    doc: RustModuleDoc {
+                        extra_doc: None,
+                        cpp_path: None,
+                    },
+                    kind,
+                }),
+                cpp_item_index: None,
+            };
+            self.rust_database.items.push(rust_item);
+        }
         Ok(())
     }
 }
@@ -530,6 +590,10 @@ fn run(data: &mut ProcessorData) -> Result<()> {
             })
             .collect(),
     };
+    state.generate_special_module(RustModuleKind::CrateRoot)?;
+    state.generate_special_module(RustModuleKind::Ffi)?;
+    state.generate_special_module(RustModuleKind::SizedTypes)?;
+
     let cpp_items = &mut data.current_database.cpp_items;
 
     loop {

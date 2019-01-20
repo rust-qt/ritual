@@ -283,14 +283,6 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         &mut file,
     )?;
 
-    let ffi_file_path = output_path.join("src").join("ffi.in.rs");
-    let mut file = create_file(&ffi_file_path)?;
-    rust_code_generator::generate_ffi_file(
-        data.config.crate_properties().name(),
-        &data.current_database.rust_database,
-        &mut file,
-    )?;
-
     save_json(
         output_path.join("build_script_data.json"),
         &BuildScriptData {
