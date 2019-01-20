@@ -1628,30 +1628,7 @@ impl<'aa> RustGenerator<'aa> {
     Ok((Some(module), cpp_methods))
   }
 
-  /// Generates exact (FFI-compatible) Rust equivalent of `CppAndFfiMethod` object.
-  fn generate_ffi_function(&self, data: &CppAndFfiMethod) -> Result<RustFFIFunction> {
-    let mut args = Vec::new();
-    for arg in &data.c_signature.arguments {
-      let rust_type = ffi_type(
-        &self.processed_types,
-        &self.input_data.dependency_types,
-        &arg.argument_type.ffi_type,
-      )?;
-      args.push(RustFFIArgument {
-        name: sanitize_rust_identifier(&arg.name),
-        argument_type: rust_type,
-      });
-    }
-    Ok(RustFFIFunction {
-      return_type: ffi_type(
-        &self.processed_types,
-        &self.input_data.dependency_types,
-        &data.c_signature.return_type.ffi_type,
-      )?,
-      name: data.c_name.clone(),
-      arguments: args,
-    })
-  }
+
 
   /// Generates Rust representations of all FFI functions
   pub fn generate_ffi_functions(&self) -> Vec<(String, Vec<RustFFIFunction>)> {

@@ -4,6 +4,7 @@ use crate::config::Config;
 use crate::cpp_checker::cpp_checker_step;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;
+use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_ffi_data::CppFfiFunctionKind;
 use crate::cpp_ffi_data::CppFieldAccessorType;
 use crate::cpp_type::CppBuiltInNumericType;
@@ -23,6 +24,8 @@ use crate::rust_info::RustDatabase;
 use crate::rust_info::RustDatabaseItem;
 use crate::rust_info::RustEnumValue;
 use crate::rust_info::RustEnumValueDoc;
+use crate::rust_info::RustFFIArgument;
+use crate::rust_info::RustFFIFunction;
 use crate::rust_info::RustFfiClassTypeDoc;
 use crate::rust_info::RustItemKind;
 use crate::rust_info::RustModule;
@@ -62,7 +65,8 @@ fn sanitize_rust_identifier(name: &str) -> String {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NameType {
     General,
-    FfiItem,
+    FfiStruct,
+    FfiFunction,
     SizedItem,
     ClassPtr,
     FieldAccessor(CppFieldAccessorType),
@@ -198,6 +202,23 @@ impl State<'_> {
         Ok(rust_type)
     }
 
+    /// Generates exact (FFI-compatible) Rust equivalent of `CppAndFfiMethod` object.
+    fn generate_ffi_function(&self, data: &CppFfiFunction) -> Result<RustFFIFunction> {
+        let mut args = Vec::new();
+        for arg in &data.arguments {
+            let rust_type = self.ffi_type_to_rust_ffi_type(&arg.argument_type.ffi_type)?;
+            args.push(RustFFIArgument {
+                name: sanitize_rust_identifier(&arg.name),
+                argument_type: rust_type,
+            });
+        }
+        Ok(RustFFIFunction {
+            return_type: self.ffi_type_to_rust_ffi_type(&data.return_type.ffi_type)?,
+            path: self.generate_rust_path(&data.path, NameType::FfiFunction)?,
+            arguments: args,
+        })
+    }
+
     fn find_rust_item(&self, cpp_path: &CppPath) -> Result<&RustDatabaseItem> {
         let index = match self.cpp_path_to_index.get(cpp_path) {
             Some(index) => index,
@@ -236,9 +257,9 @@ impl State<'_> {
         }
     }
 
-    fn generate_rust_path(&mut self, cpp_path: &CppPath, name_type: NameType) -> Result<RustPath> {
+    fn generate_rust_path(&self, cpp_path: &CppPath, name_type: NameType) -> Result<RustPath> {
         let strategy = match name_type {
-            NameType::FfiItem => RustPathScope {
+            NameType::FfiStruct | NameType::FfiFunction => RustPathScope {
                 path: RustPath {
                     parts: vec![self.config.crate_properties().name().into(), "ffi".into()],
                 },
@@ -271,11 +292,12 @@ impl State<'_> {
         };
 
         let full_last_name = match name_type {
-            NameType::FfiItem | NameType::SizedItem => cpp_path
+            NameType::FfiStruct | NameType::SizedItem => cpp_path
                 .items
                 .iter()
                 .map_if_ok(|item| cpp_path_item_to_name(item))?
                 .join("_"),
+            NameType::FfiFunction => cpp_path.last().to_string(),
             NameType::ClassPtr => format!("{}Ptr", cpp_path_item_to_name(&cpp_path.last())?),
             NameType::General => cpp_path_item_to_name(&cpp_path.last())?,
             NameType::FieldAccessor(accessor_type) => {
@@ -290,6 +312,14 @@ impl State<'_> {
         };
 
         let mut number = None;
+        if name_type == NameType::FfiFunction {
+            let rust_path = strategy.apply(&full_last_name);
+            if self.rust_database.find(&rust_path).is_some() {
+                bail!("ffi function path already taken: {:?}", rust_path);
+            }
+            return Ok(rust_path);
+        }
+
         loop {
             let name_try = match number {
                 None => full_last_name.clone(),
@@ -303,6 +333,7 @@ impl State<'_> {
 
             number = Some(number.unwrap_or(0) + 1);
         }
+
         // TODO: forbid reserved module names: `lib`, `main`
         // TODO: check for conflicts with things that are not in rust database:
         // - `crate::ffi`
@@ -338,7 +369,7 @@ impl State<'_> {
                     let internal_name_type = if data.is_movable {
                         NameType::SizedItem
                     } else {
-                        NameType::FfiItem
+                        NameType::FfiStruct
                     };
                     let public_name_type = if data.is_movable {
                         NameType::General
