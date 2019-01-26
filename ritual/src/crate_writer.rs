@@ -269,11 +269,12 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         &global_header_name,
     )?;
 
-    let mut file = create_file(c_lib_path.join("type_sizes.cxx"))?;
-    file.write(generate_cpp_type_size_requester(
-        &[], // TODO: generate requests from Rust type list
+    let file = create_file(c_lib_path.join("sized_types.cxx"))?;
+    generate_cpp_type_size_requester(
+        &data.current_database.rust_database,
         data.config.include_directives(),
-    )?)?;
+        file,
+    )?;
 
     rust_code_generator::generate(
         data.config.crate_properties().name(),

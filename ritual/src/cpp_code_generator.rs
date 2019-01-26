@@ -16,6 +16,10 @@ use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::database::CppDatabaseItem;
 use crate::database::CppFfiItemKind;
+use crate::rust_info::RustDatabase;
+use crate::rust_info::RustItemKind;
+use crate::rust_info::RustStructKind;
+use std::io::Write;
 use std::iter::once;
 use std::path::Path;
 use std::path::PathBuf;
@@ -383,35 +387,40 @@ pub fn generate_cpp_file(
     Ok(())
 }
 
-/// Entry about a Rust struct with a buffer that must have the exact same size
-/// as its corresponding C++ class. This information is required for the C++ program
-/// that is launched by the build script to determine type sizes and generate `type_sizes.rs`.
-#[derive(Debug, Clone)]
-pub struct CppTypeSizeRequest {
-    /// C++ code representing the type. Used as argument to `sizeof`.
-    pub cpp_code: String,
-    /// Name of the constant in `type_sizes.rs`.
-    pub size_const_name: String,
-}
-
 /// Generates a C++ program that determines sizes of target C++ types
-/// on the current platform and outputs the Rust code for `type_sizes.rs` module
+/// on the current platform and outputs the Rust code for `sized_types.rs` module
 /// to the standard output.
 pub fn generate_cpp_type_size_requester(
-    requests: &[CppTypeSizeRequest],
+    rust_database: &RustDatabase,
     include_directives: &[PathBuf],
-) -> Result<String> {
-    let mut result = Vec::new();
+    mut output: impl Write,
+) -> Result<()> {
     for dir in include_directives {
-        result.push(format!("#include <{}>\n", path_to_str(dir)?));
+        writeln!(output, "#include <{}>", path_to_str(dir)?)?;
     }
-    result.push("#include <iostream>\n\nint main() {\n".to_string());
-    for request in requests {
-        result.push(format!(
-            "  std::cout << \"pub const {}: usize = \" << sizeof({}) << \";\\n\";\n",
-            request.size_const_name, request.cpp_code
-        ));
+    writeln!(output, "#include <stdio.h>\n\nint main() {{")?;
+
+    for item in &rust_database.items {
+        if let RustItemKind::Struct(ref data) = item.kind {
+            if let RustStructKind::SizedType(ref cpp_path) = data.kind {
+                let cpp_path_code = cpp_path.to_cpp_code()?;
+
+                writeln!(
+                    output,
+                    "printf(\"#[repr(C, align(%d))]\\n\", alignof({}));",
+                    cpp_path_code
+                )?;
+
+                writeln!(
+                    output,
+                    "printf(\"pub struct {}([u8; %d]);\\n\\n\", sizeof({}));",
+                    data.path.last(),
+                    cpp_path_code
+                )?;
+            }
+        }
     }
-    result.push("}\n".to_string());
-    Ok(result.join(""))
+
+    writeln!(output, "}}")?;
+    Ok(())
 }

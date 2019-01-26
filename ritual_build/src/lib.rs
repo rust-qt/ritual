@@ -148,8 +148,8 @@ impl Config {
         {
             info!("Requesting type sizes");
             let mut command =
-                Command::new(c_lib_install_dir.join(format!("type_sizes{}", exe_suffix())));
-            let mut file = create_file(out_dir.join("type_sizes.rs"))?;
+                Command::new(c_lib_install_dir.join(format!("sized_types{}", exe_suffix())));
+            let mut file = create_file(out_dir.join("sized_types.rs"))?;
             file.write(get_command_output(&mut command)?)?;
         }
 
@@ -182,7 +182,7 @@ impl Config {
     ///
     /// - Build the C++ wrapper library;
     /// - Generate `ffi.rs` file with actual link attributes;
-    /// - Determine C++ type sizes on current platform and generate `type_sizes.rs`;
+    /// - Determine C++ type sizes on current platform and generate `sized_types.rs`;
     /// - Report linking information to `cargo`.
     ///
     /// This function ends the process with the appropriate error code and never

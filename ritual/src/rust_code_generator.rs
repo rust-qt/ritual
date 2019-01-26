@@ -289,7 +289,6 @@ impl Generator {
                 RustWrapperTypeKind::MovableClassWrapper {
                     ref sized_type_path,
                 } => {
-                    writeln!(self, "#[derive(Debug)]")?;
                     writeln!(
                         self,
                         "{}struct {}({});",

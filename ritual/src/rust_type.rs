@@ -76,7 +76,13 @@ impl RustPath {
                 }
             }
         }
-        format!("::{}", self.parts.join("::"))
+
+        // TODO: 1-part path can theoretically point to a crate instead of a built-in type
+        if self.parts.len() == 1 {
+            self.parts[0].to_string()
+        } else {
+            format!("::{}", self.parts.join("::"))
+        }
     }
 
     /// Returns true if `other` is nested within `self`.

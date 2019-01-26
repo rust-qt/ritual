@@ -52,20 +52,20 @@ if(C2R_COMPILER_FLAGS)
   set (CMAKE_CXX_FLAGS "${{CMAKE_CXX_FLAGS}} ${{C2R_COMPILER_FLAGS}}")
 endif()
 
-add_executable(type_sizes type_sizes.cxx)
+add_executable(sized_types sized_types.cxx)
 
 if(C2R_LINKED_FRAMEWORKS)
   foreach(framework ${{C2R_LINKED_FRAMEWORKS}})
-    ADD_OSX_FRAMEWORK(${{framework}} type_sizes)
+    ADD_OSX_FRAMEWORK(${{framework}} sized_types)
   endforeach()
 endif()
 
 
-# disable qt verision tagging to allow compiling type_sizes without
+# disable qt verision tagging to allow compiling sized_types without
 # linking to the libraries
-target_compile_definitions(type_sizes PRIVATE QT_NO_VERSION_TAGGING)
+target_compile_definitions(sized_types PRIVATE QT_NO_VERSION_TAGGING)
 
-install(TARGETS {lib_name_lowercase} type_sizes
+install(TARGETS {lib_name_lowercase} sized_types
   LIBRARY DESTINATION .
   ARCHIVE DESTINATION .
   RUNTIME DESTINATION .

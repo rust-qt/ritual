@@ -1,9 +1,0 @@
-#[repr(C)]
-{maybe_pub}struct {name}([u8; ::type_sizes::{size_const_name}]);
-
-impl ::cpp_utils::new_uninitialized::NewUninitialized for {name} {{
-  unsafe fn new_uninitialized() -> {name} {{
-    {name}(::std::mem::uninitialized())
-  }}
-}}
-

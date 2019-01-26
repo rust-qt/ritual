@@ -48,12 +48,6 @@ if(C2R_COMPILER_FLAGS)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${C2R_COMPILER_FLAGS}")
 endif()
 
-if(C2R_LINKED_FRAMEWORKS)
-  foreach(framework ${C2R_LINKED_FRAMEWORKS})
-    ADD_OSX_FRAMEWORK(${framework} type_sizes)
-  endforeach()
-endif()
-
 add_custom_command(TARGET cpp_checker
                    POST_BUILD
                    COMMAND cpp_checker)

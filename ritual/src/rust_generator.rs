@@ -120,15 +120,6 @@ struct RustSingleMethod {
   doc: Option<RustMethodDocItem>,
 }
 
-/// Returns name of the constant that will hold size of `type_name`'s buffer in
-/// the generated `type_sizes.rs`.
-fn size_const_name(type_name: &RustName) -> String {
-  type_name
-    .parts
-    .iter()
-    .map(|x| x.to_upper_case_words())
-    .join("_")
-}
 
 /// Mode of case conversion
 enum Case {
