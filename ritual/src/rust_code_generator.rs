@@ -13,6 +13,7 @@ use crate::rust_info::RustFunctionArgument;
 use crate::rust_info::RustFunctionKind;
 use crate::rust_info::RustItemKind;
 use crate::rust_info::RustModule;
+use crate::rust_info::RustModuleKind;
 use crate::rust_info::RustStruct;
 use crate::rust_info::RustStructKind;
 use crate::rust_info::RustTraitImpl;
@@ -160,7 +161,14 @@ impl<W: Write> Generator<W> {
         )?;
         writeln!(self, "pub mod {} {{", module.path.last())?;
 
-        self.generate_children(&module.path, database)?;
+        if module.kind == RustModuleKind::SizedTypes {
+            writeln!(
+                self,
+                "include!(concat!(env!(\"OUT_DIR\"), \"/sized_types.rs\"));"
+            )?;
+        } else {
+            self.generate_children(&module.path, database)?;
+        }
 
         writeln!(self, "}}")?;
         Ok(())
@@ -709,12 +717,6 @@ impl<W: Write> Generator<W> {
             "\
              #[allow(dead_code)]\nmod ffi {{ \ninclude!(concat!(env!(\"OUT_DIR\"), \
              \"/ffi.rs\")); \n}}\n",
-        )?;
-        writeln!(
-            self,
-            "\
-             mod _types {{ \ninclude!(concat!(env!(\"OUT_DIR\"), \
-             \"/_types.rs\")); \n}}\n",
         )?;
 
         let root = RustPath::from_parts(vec![self.crate_name.clone()]);
