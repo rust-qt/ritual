@@ -25,9 +25,16 @@ use crate::rust_type::RustToFfiTypeConversion;
 use crate::rust_type::RustType;
 use itertools::Itertools;
 use ritual_common::errors::{bail, err_msg, unexpected, Result};
+use ritual_common::file_utils::create_dir_all;
+use ritual_common::file_utils::create_file;
+use ritual_common::file_utils::File;
 use ritual_common::utils::MapIfOk;
+use std::fs;
 use std::io;
+use std::io::BufWriter;
 use std::io::Write;
+use std::path::Path;
+use std::path::PathBuf;
 
 /// Generates Rust code representing type `rust_type` inside crate `crate_name`.
 /// Same as `RustCodeGenerator::rust_type_to_code`, but accessible by other modules.
@@ -95,19 +102,28 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: &str) -> String {
     }
 }
 
-struct Generator<W> {
+struct Generator {
     #[allow(dead_code)]
     crate_name: String,
-    destination: W,
+    output_src_path: PathBuf,
+    destination: Vec<File<BufWriter<fs::File>>>,
 }
 
-impl<W: Write> Write for Generator<W> {
+impl Write for Generator {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.destination.write(buf)
+        io::Write::write(
+            self.destination
+                .last_mut()
+                .expect("generator: no open files"),
+            buf,
+        )
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.destination.flush()
+        self.destination
+            .last_mut()
+            .expect("generator: no open files")
+            .flush()
     }
 }
 
@@ -137,7 +153,40 @@ fn format_doc_extended(doc: &str, is_outer: bool) -> String {
     }
 }
 
-impl<W: Write> Generator<W> {
+impl Generator {
+    fn module_path(&self, rust_path: &RustPath) -> Result<PathBuf> {
+        let parts = &rust_path.parts;
+
+        assert_eq!(
+            &parts[0], &self.crate_name,
+            "Generator::push_file expects path from this crate"
+        );
+
+        let path = if parts.len() == 1 {
+            self.output_src_path.join("lib.rs")
+        } else {
+            let mut path = self.output_src_path.clone();
+            for middle_part in &parts[1..parts.len() - 1] {
+                path.push(middle_part);
+            }
+            create_dir_all(&path)?;
+            path.push(format!("{}.rs", parts.last().expect("path is empty")));
+            path
+        };
+        Ok(path)
+    }
+
+    fn push_file(&mut self, path: &Path) -> Result<()> {
+        self.destination.push(create_file(path)?);
+        Ok(())
+    }
+
+    fn pop_file(&mut self) {
+        self.destination
+            .pop()
+            .expect("generator: too much pop_file");
+    }
+
     fn generate_item(&mut self, item: &RustDatabaseItem, database: &RustDatabase) -> Result<()> {
         match item.kind {
             RustItemKind::Module(ref module) => self.generate_module(module, database),
@@ -154,23 +203,56 @@ impl<W: Write> Generator<W> {
     }
 
     fn generate_module(&mut self, module: &RustModule, database: &RustDatabase) -> Result<()> {
+        if module.kind.is_in_separate_file() {
+            if module.kind != RustModuleKind::CrateRoot {
+                writeln!(self, "pub mod {};", module.path.last())?;
+            }
+            let path = self.module_path(&module.path)?;
+            self.push_file(&path)?;
+        } else {
+            assert_ne!(module.kind, RustModuleKind::CrateRoot);
+            writeln!(self, "pub mod {} {{", module.path.last())?;
+        }
+
+        if module.kind == RustModuleKind::Ffi {
+            writeln!(self, "#![allow(dead_code)]")?;
+        }
+
         writeln!(
             self,
             "{}",
-            format_doc(&doc_formatter::module_doc(&module.doc))
+            format_doc_extended(&doc_formatter::module_doc(&module.doc), true)
         )?;
-        writeln!(self, "pub mod {} {{", module.path.last())?;
 
-        if module.kind == RustModuleKind::SizedTypes {
-            writeln!(
-                self,
-                "include!(concat!(env!(\"OUT_DIR\"), \"/sized_types.rs\"));"
-            )?;
-        } else {
-            self.generate_children(&module.path, database)?;
+        match module.kind {
+            RustModuleKind::Ffi => {
+                writeln!(self, "include!(concat!(env!(\"OUT_DIR\"), \"/ffi.rs\"));")?;
+            }
+            RustModuleKind::SizedTypes => {
+                writeln!(
+                    self,
+                    "include!(concat!(env!(\"OUT_DIR\"), \"/sized_types.rs\"));"
+                )?;
+            }
+            RustModuleKind::CrateRoot | RustModuleKind::Normal => {
+                self.generate_children(&module.path, database)?;
+            }
         }
 
-        writeln!(self, "}}")?;
+        if module.kind.is_in_separate_file() {
+            self.pop_file();
+        } else {
+            // close `mod {}`
+            writeln!(self, "}}")?;
+        }
+
+        if module.kind == RustModuleKind::Ffi {
+            let path = self.output_src_path.join("ffi.in.rs");
+            self.destination.push(create_file(&path)?);
+            self.generate_children(&module.path, database)?;
+            self.pop_file();
+        }
+
         Ok(())
     }
 
@@ -704,27 +786,6 @@ impl<W: Write> Generator<W> {
         Ok(())
     }
 
-    fn generate_lib_file(&mut self, database: &RustDatabase) -> Result<()> {
-        if let Some(ref doc) = database.lib_extra_doc {
-            writeln!(self, "{}", format_doc_extended(doc, true))?;
-        }
-
-        // some ffi functions are not used because
-        // some Rust methods are filtered
-        // TODO: ideally dead_code shouldn't be needed
-        writeln!(
-            self,
-            "\
-             #[allow(dead_code)]\nmod ffi {{ \ninclude!(concat!(env!(\"OUT_DIR\"), \
-             \"/ffi.rs\")); \n}}\n",
-        )?;
-
-        let root = RustPath::from_parts(vec![self.crate_name.clone()]);
-        self.generate_children(&root, database)?;
-        // TODO: generate const with current lib version
-        Ok(())
-    }
-
     fn generate_children(&mut self, parent: &RustPath, database: &RustDatabase) -> Result<()> {
         if database
             .children(&parent)
@@ -779,16 +840,25 @@ impl<W: Write> Generator<W> {
     }
 }
 
-pub fn generate_lib_file(
+pub fn generate(
     crate_name: &str,
     database: &RustDatabase,
-    destination: impl Write,
+    output_src_path: impl Into<PathBuf>,
 ) -> Result<()> {
     let mut generator = Generator {
         crate_name: crate_name.to_string(),
-        destination,
+        destination: Vec::new(),
+        output_src_path: output_src_path.into(),
     };
-    generator.generate_lib_file(database)?;
+
+    let crate_root = database
+        .items
+        .iter()
+        .filter_map(|item| item.as_module_ref())
+        .find(|module| module.kind == RustModuleKind::CrateRoot)
+        .ok_or_else(|| err_msg("crate root not found"))?;
+
+    generator.generate_module(crate_root, database)?;
     Ok(())
 }
 

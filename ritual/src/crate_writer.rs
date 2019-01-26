@@ -275,12 +275,10 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         data.config.include_directives(),
     )?)?;
 
-    let lib_file_path = output_path.join("src").join("lib.rs");
-    let mut file = create_file(&lib_file_path)?;
-    rust_code_generator::generate_lib_file(
+    rust_code_generator::generate(
         data.config.crate_properties().name(),
         &data.current_database.rust_database,
-        &mut file,
+        &output_path.join("src"),
     )?;
 
     save_json(

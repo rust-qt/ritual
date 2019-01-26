@@ -252,7 +252,7 @@ impl RustModuleKind {
     pub fn is_in_separate_file(self) -> bool {
         match self {
             RustModuleKind::CrateRoot => true,
-            RustModuleKind::Ffi => true,
+            RustModuleKind::Ffi => false,
             RustModuleKind::SizedTypes => false,
             RustModuleKind::Normal => true,
         }
@@ -385,7 +385,6 @@ impl RustDatabaseItem {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RustDatabase {
     pub items: Vec<RustDatabaseItem>,
-    pub lib_extra_doc: Option<String>,
 }
 
 impl RustDatabase {
