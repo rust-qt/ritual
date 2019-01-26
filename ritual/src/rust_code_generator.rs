@@ -185,7 +185,30 @@ impl<W: Write> Generator<W> {
                     )?;
                     writeln!(self)?;
                 }
-                _ => unimplemented!(),
+                RustWrapperTypeKind::ImmovableClassWrapper { ref raw_type_path } => {
+                    writeln!(self, "#[derive(Debug)]")?;
+                    writeln!(
+                        self,
+                        "{}struct {}(*mut {});",
+                        visibility,
+                        rust_struct.path.last(),
+                        self.rust_path_to_string(raw_type_path),
+                    )?;
+                    writeln!(self)?;
+                }
+                RustWrapperTypeKind::MovableClassWrapper {
+                    ref sized_type_path,
+                } => {
+                    writeln!(self, "#[derive(Debug)]")?;
+                    writeln!(
+                        self,
+                        "{}struct {}({});",
+                        visibility,
+                        rust_struct.path.last(),
+                        self.rust_path_to_string(sized_type_path),
+                    )?;
+                    writeln!(self)?;
+                }
             },
             RustStructKind::QtSlotWrapper(ref slot_wrapper) => {
                 let arg_texts: Vec<_> = slot_wrapper
