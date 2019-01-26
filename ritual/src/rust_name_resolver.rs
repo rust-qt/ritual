@@ -104,7 +104,7 @@ impl State<'_> {
                         generic_arguments: None,
                     }
                 } else {
-                    unimplemented!()
+                    self.ffi_type_to_rust_ffi_type(target)?
                 };
                 RustType::PointerLike {
                     kind: match *kind {
