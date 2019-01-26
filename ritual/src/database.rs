@@ -307,6 +307,12 @@ pub struct CppDatabaseItem {
     pub is_rust_processed: bool,
 }
 
+impl CppDatabaseItem {
+    pub fn is_all_rust_processed(&self) -> bool {
+        self.is_rust_processed && self.ffi_items.iter().all(|m| m.is_rust_processed)
+    }
+}
+
 /// Represents all collected data related to a crate.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Database {
