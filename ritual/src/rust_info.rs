@@ -262,7 +262,7 @@ impl RustModuleKind {
 /// Information about a Rust module.
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustModule {
-    /// Last name of the module.
+    /// Path to the module.
     pub path: RustPath,
     /// Markdown content of Rust documentation for this module.
     pub doc: RustModuleDoc,

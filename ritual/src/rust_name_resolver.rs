@@ -269,22 +269,32 @@ impl State<'_> {
 
     fn generate_rust_path(&self, cpp_path: &CppPath, name_type: NameType) -> Result<RustPath> {
         let strategy = match name_type {
-            NameType::FfiStruct | NameType::FfiFunction => RustPathScope {
-                path: RustPath {
-                    parts: vec![self.config.crate_properties().name().into(), "ffi".into()],
-                },
-                prefix: None,
-            },
-            NameType::SizedItem => RustPathScope {
-                path: RustPath {
-                    parts: vec![
-                        self.config.crate_properties().name().into(),
-                        "ffi".into(),
-                        "sized_types".into(),
-                    ],
-                },
-                prefix: None,
-            },
+            NameType::FfiStruct | NameType::FfiFunction => {
+                let ffi_module = self
+                    .rust_database
+                    .items
+                    .iter()
+                    .filter_map(|item| item.as_module_ref())
+                    .find(|module| module.kind == RustModuleKind::Ffi)
+                    .ok_or_else(|| err_msg("ffi module not found"))?;
+                RustPathScope {
+                    path: ffi_module.path.clone(),
+                    prefix: None,
+                }
+            }
+            NameType::SizedItem => {
+                let sized_module = self
+                    .rust_database
+                    .items
+                    .iter()
+                    .filter_map(|item| item.as_module_ref())
+                    .find(|module| module.kind == RustModuleKind::SizedTypes)
+                    .ok_or_else(|| err_msg("sized_types module not found"))?;
+                RustPathScope {
+                    path: sized_module.path.clone(),
+                    prefix: None,
+                }
+            }
             NameType::General
             | NameType::Module
             | NameType::ClassPtr
