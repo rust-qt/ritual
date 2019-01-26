@@ -1174,7 +1174,6 @@ impl CppParser<'_, '_> {
                 kind: CppTypeDataKind::Enum,
                 path: enum_name.clone(),
                 doc: None,
-                is_movable: false,
             }),
         );
         for child in entity.get_children() {
@@ -1346,10 +1345,9 @@ impl CppParser<'_, '_> {
                 origin_location: get_origin_location(entity).unwrap(),
             },
             CppItemData::Type(CppTypeData {
-                kind: CppTypeDataKind::Class,
+                kind: CppTypeDataKind::Class { is_movable: false },
                 path: full_name,
                 doc: None,
-                is_movable: false,
             }),
         );
         Ok(())

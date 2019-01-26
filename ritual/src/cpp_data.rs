@@ -284,7 +284,7 @@ impl fmt::Display for CppPath {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum CppTypeDataKind {
     Enum,
-    Class,
+    Class { is_movable: bool },
 }
 
 /// Information about a C++ type declaration
@@ -295,7 +295,6 @@ pub struct CppTypeData {
     pub kind: CppTypeDataKind,
     /// C++ documentation for the type
     pub doc: Option<CppTypeDoc>,
-    pub is_movable: bool,
 }
 
 impl CppTypeData {
@@ -315,7 +314,7 @@ impl CppTypeDataKind {
 
     pub fn is_enum(&self) -> bool {
         match self {
-            CppTypeDataKind::Enum { .. } => true,
+            CppTypeDataKind::Enum => true,
             _ => false,
         }
     }

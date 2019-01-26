@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::cpp_checker::cpp_checker_step;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;
+use crate::cpp_data::CppTypeDataKind;
 use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_ffi_data::CppFfiFunctionKind;
 use crate::cpp_ffi_data::CppFieldAccessorType;
@@ -387,98 +388,103 @@ impl State<'_> {
                     cpp_item.is_rust_processed = true;
                 }
                 CppItemData::Type(data) => {
-                    if data.kind.is_class() {
-                        let internal_name_type = if data.is_movable {
-                            NameType::SizedItem
-                        } else {
-                            NameType::FfiStruct
-                        };
-                        let public_name_type = if data.is_movable {
-                            NameType::General
-                        } else {
-                            NameType::ClassPtr
-                        };
-                        let internal_path =
-                            self.generate_rust_path(&data.path, internal_name_type)?;
-                        let public_path = self.generate_rust_path(&data.path, public_name_type)?;
-                        if internal_path == public_path {
-                            bail!(
-                                "internal path is the same as public path: {:?}",
-                                internal_path
-                            );
+                    match data.kind {
+                        CppTypeDataKind::Class { is_movable } => {
+                            let internal_name_type = if is_movable {
+                                NameType::SizedItem
+                            } else {
+                                NameType::FfiStruct
+                            };
+                            let public_name_type = if is_movable {
+                                NameType::General
+                            } else {
+                                NameType::ClassPtr
+                            };
+                            let internal_path =
+                                self.generate_rust_path(&data.path, internal_name_type)?;
+                            let public_path =
+                                self.generate_rust_path(&data.path, public_name_type)?;
+                            if internal_path == public_path {
+                                bail!(
+                                    "internal path is the same as public path: {:?}",
+                                    internal_path
+                                );
+                            }
+
+                            let internal_wrapper_kind = if is_movable {
+                                RustStructKind::SizedType(data.path.clone())
+                            } else {
+                                RustStructKind::FfiClassType(RustFfiClassTypeDoc {
+                                    cpp_path: data.path.clone(),
+                                    public_rust_path: public_path.clone(),
+                                })
+                            };
+
+                            let internal_rust_item = RustDatabaseItem {
+                                kind: RustItemKind::Struct(RustStruct {
+                                    extra_doc: None,
+                                    path: internal_path.clone(),
+                                    kind: internal_wrapper_kind,
+                                    is_public: true,
+                                }),
+                                cpp_item_index: Some(cpp_item_index),
+                            };
+                            self.rust_database.items.push(internal_rust_item);
+
+                            let wrapper_kind = if is_movable {
+                                RustWrapperTypeKind::MovableClassWrapper {
+                                    sized_type_path: internal_path,
+                                }
+                            } else {
+                                RustWrapperTypeKind::ImmovableClassWrapper {
+                                    raw_type_path: internal_path,
+                                }
+                            };
+
+                            let public_rust_item = RustDatabaseItem {
+                                kind: RustItemKind::Struct(RustStruct {
+                                    extra_doc: None,
+                                    path: public_path,
+                                    kind: RustStructKind::WrapperType(RustWrapperType {
+                                        doc_data: RustWrapperTypeDocData {
+                                            cpp_path: data.path.clone(),
+                                            cpp_doc: data.doc.clone(),
+                                            raw_qt_slot_wrapper: None, // TODO: fix this
+                                        },
+                                        kind: wrapper_kind,
+                                    }),
+                                    is_public: true,
+                                }),
+                                cpp_item_index: Some(cpp_item_index),
+                            };
+                            self.rust_database.items.push(public_rust_item);
+
+                            *modified = true;
+                            cpp_item.is_rust_processed = true;
                         }
-
-                        let internal_wrapper_kind = if data.is_movable {
-                            RustStructKind::SizedType(data.path.clone())
-                        } else {
-                            RustStructKind::FfiClassType(RustFfiClassTypeDoc {
-                                cpp_path: data.path.clone(),
-                                public_rust_path: public_path.clone(),
-                            })
-                        };
-
-                        let internal_rust_item = RustDatabaseItem {
-                            kind: RustItemKind::Struct(RustStruct {
-                                extra_doc: None,
-                                path: internal_path.clone(),
-                                kind: internal_wrapper_kind,
-                                is_public: true,
-                            }),
-                            cpp_item_index: Some(cpp_item_index),
-                        };
-                        self.rust_database.items.push(internal_rust_item);
-
-                        let wrapper_kind = if data.is_movable {
-                            RustWrapperTypeKind::MovableClassWrapper {
-                                sized_type_path: internal_path,
-                            }
-                        } else {
-                            RustWrapperTypeKind::ImmovableClassWrapper {
-                                raw_type_path: internal_path,
-                            }
-                        };
-
-                        let public_rust_item = RustDatabaseItem {
-                            kind: RustItemKind::Struct(RustStruct {
-                                extra_doc: None,
-                                path: public_path,
-                                kind: RustStructKind::WrapperType(RustWrapperType {
-                                    doc_data: RustWrapperTypeDocData {
-                                        cpp_path: data.path.clone(),
-                                        cpp_doc: data.doc.clone(),
-                                        raw_qt_slot_wrapper: None, // TODO: fix this
-                                    },
-                                    kind: wrapper_kind,
+                        CppTypeDataKind::Enum => {
+                            let rust_path =
+                                self.generate_rust_path(&data.path, NameType::General)?;
+                            let rust_item = RustDatabaseItem {
+                                kind: RustItemKind::Struct(RustStruct {
+                                    extra_doc: None,
+                                    path: rust_path,
+                                    kind: RustStructKind::WrapperType(RustWrapperType {
+                                        doc_data: RustWrapperTypeDocData {
+                                            cpp_path: data.path.clone(),
+                                            cpp_doc: data.doc.clone(),
+                                            raw_qt_slot_wrapper: None,
+                                        },
+                                        kind: RustWrapperTypeKind::EnumWrapper,
+                                    }),
+                                    is_public: true,
                                 }),
-                                is_public: true,
-                            }),
-                            cpp_item_index: Some(cpp_item_index),
-                        };
-                        self.rust_database.items.push(public_rust_item);
-
-                        *modified = true;
-                        cpp_item.is_rust_processed = true;
-                    } else {
-                        let rust_path = self.generate_rust_path(&data.path, NameType::General)?;
-                        let rust_item = RustDatabaseItem {
-                            kind: RustItemKind::Struct(RustStruct {
-                                extra_doc: None,
-                                path: rust_path,
-                                kind: RustStructKind::WrapperType(RustWrapperType {
-                                    doc_data: RustWrapperTypeDocData {
-                                        cpp_path: data.path.clone(),
-                                        cpp_doc: data.doc.clone(),
-                                        raw_qt_slot_wrapper: None,
-                                    },
-                                    kind: RustWrapperTypeKind::EnumWrapper,
-                                }),
-                                is_public: true,
-                            }),
-                            cpp_item_index: Some(cpp_item_index),
-                        };
-                        self.rust_database.items.push(rust_item);
-                        *modified = true;
-                        cpp_item.is_rust_processed = true;
+                                cpp_item_index: Some(cpp_item_index),
+                            };
+                            self.rust_database.items.push(rust_item);
+                            *modified = true;
+                            cpp_item.is_rust_processed = true;
+                        }
                     }
                 }
                 CppItemData::EnumValue(value) => {

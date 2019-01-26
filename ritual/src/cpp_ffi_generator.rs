@@ -52,8 +52,10 @@ fn run(mut data: &mut ProcessorData) -> Result<()> {
         .iter()
         .filter_map(|item| {
             if let CppItemData::Type(ref type_data) = item.cpp_data {
-                if type_data.kind == CppTypeDataKind::Class && type_data.is_movable {
-                    return Some(type_data.path.clone());
+                if let CppTypeDataKind::Class { is_movable } = type_data.kind {
+                    if is_movable {
+                        return Some(type_data.path.clone());
+                    }
                 }
             }
             None

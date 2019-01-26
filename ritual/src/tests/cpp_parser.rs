@@ -145,7 +145,7 @@ fn functions_with_class_arg() {
     );
     assert_eq!(data.types.len(), 1);
     assert_eq!(data.types[0].path, CppPath::from_str_unchecked("Magic"));
-    assert_eq!(data.types[0].kind, CppTypeDataKind::Class);
+    assert!(data.types[0].kind.is_class());
 
     assert!(data.bases.is_empty());
 
@@ -346,7 +346,7 @@ fn simple_class_method() {
     );
     assert!(data.types.len() == 1);
     assert_eq!(data.types[0].path, CppPath::from_str_unchecked("MyClass"));
-    assert_eq!(data.types[0].kind, CppTypeDataKind::Class);
+    assert!(data.types[0].kind.is_class());
 
     assert!(data.bases.is_empty());
     assert!(data.fields.len() == 1);
@@ -529,7 +529,7 @@ fn template_class_method() {
     };
     let my_vector_path = CppPath::from_item(my_vector_item.clone());
     assert_eq!(data.types[0].path, my_vector_path);
-    assert_eq!(data.types[0].kind, CppTypeDataKind::Class);
+    assert!(data.types[0].kind.is_class());
 
     assert!(data.bases.is_empty());
     assert!(data.fields.is_empty());
@@ -968,7 +968,7 @@ fn template_class_with_base() {
         }]),
     };
     assert_eq!(data.types[0].path, CppPath::from_item(c1_item));
-    assert_eq!(data.types[0].kind, CppTypeDataKind::Class);
+    assert!(data.types[0].kind.is_class());
 
     let c2_item = CppPathItem {
         name: "C2".to_string(),
@@ -979,7 +979,7 @@ fn template_class_with_base() {
         }]),
     };
     assert_eq!(data.types[1].path, CppPath::from_item(c2_item));
-    assert_eq!(data.types[1].kind, CppTypeDataKind::Class);
+    assert!(data.types[1].kind.is_class());
     assert_eq!(data.bases.len(), 1);
     assert!(data.fields.is_empty());
 }
