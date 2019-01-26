@@ -358,19 +358,17 @@ pub fn generate_cpp_file(
 
     let mut any_slot_wrappers = false;
     for item in data {
-        if let Some(ref ffi_items) = &item.ffi_items {
-            for ffi_item in ffi_items {
-                match ffi_item.kind {
-                    CppFfiItemKind::Function(ref cpp_ffi_function) => {
-                        // TODO: write less extern C
-                        cpp_file.write("extern \"C\" {\n\n")?;
-                        cpp_file.write(function_implementation(cpp_ffi_function)?)?;
-                        cpp_file.write("\n} // extern \"C\"\n\n")?;
-                    }
-                    CppFfiItemKind::QtSlotWrapper(ref qt_slot_wrapper) => {
-                        any_slot_wrappers = true;
-                        cpp_file.write(self::qt_slot_wrapper(qt_slot_wrapper)?)?;
-                    }
+        for ffi_item in &item.ffi_items {
+            match ffi_item.kind {
+                CppFfiItemKind::Function(ref cpp_ffi_function) => {
+                    // TODO: write less extern C
+                    cpp_file.write("extern \"C\" {\n\n")?;
+                    cpp_file.write(function_implementation(cpp_ffi_function)?)?;
+                    cpp_file.write("\n} // extern \"C\"\n\n")?;
+                }
+                CppFfiItemKind::QtSlotWrapper(ref qt_slot_wrapper) => {
+                    any_slot_wrappers = true;
+                    cpp_file.write(self::qt_slot_wrapper(qt_slot_wrapper)?)?;
                 }
             }
         }

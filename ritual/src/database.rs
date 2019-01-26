@@ -302,7 +302,8 @@ pub struct CppDatabaseItem {
     pub cpp_data: CppItemData,
 
     pub source: DatabaseItemSource,
-    pub ffi_items: Option<Vec<CppFfiItem>>, // TODO: remove Option
+    pub ffi_items: Vec<CppFfiItem>,
+    pub is_cpp_ffi_processed: bool,
     pub is_rust_processed: bool,
 }
 
@@ -358,7 +359,8 @@ impl Database {
         self.cpp_items.push(CppDatabaseItem {
             cpp_data: data,
             source,
-            ffi_items: None,
+            ffi_items: Vec::new(),
+            is_cpp_ffi_processed: false,
             is_rust_processed: false,
         });
         true

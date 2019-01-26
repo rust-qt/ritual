@@ -77,7 +77,7 @@ fn run(mut data: &mut ProcessorData) -> Result<()> {
         FfiNameProvider::new(cpp_ffi_lib_name.clone(), data.current_database.next_ffi_id);
 
     for item in &mut data.current_database.cpp_items {
-        if item.ffi_items.is_some() {
+        if item.is_cpp_ffi_processed {
             trace!(
                 "cpp_data = {}; already processed",
                 item.cpp_data.to_string()
@@ -112,7 +112,6 @@ fn run(mut data: &mut ProcessorData) -> Result<()> {
 
         match result {
             Err(msg) => {
-                item.ffi_items = Some(Vec::new());
                 trace!("cpp_data = {}; error: {}", item.cpp_data.to_string(), msg);
             }
             Ok(r) => {
@@ -125,9 +124,10 @@ fn run(mut data: &mut ProcessorData) -> Result<()> {
                         _ => format!("added methods ({}): {:?}", r.len(), r),
                     }
                 );
-                item.ffi_items = Some(r);
+                item.ffi_items = r;
             }
         }
+        item.is_cpp_ffi_processed = true;
     }
     data.current_database.next_ffi_id = name_provider.next_id;
     Ok(())

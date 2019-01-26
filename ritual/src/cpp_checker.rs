@@ -98,32 +98,30 @@ impl CppChecker<'_, '_> {
 
         let total_count = self.data.current_database.cpp_items.len();
         for (index, item) in self.data.current_database.cpp_items.iter_mut().enumerate() {
-            if let Some(ref mut ffi_items) = item.ffi_items {
-                for ffi_item in ffi_items {
-                    if let Ok(snippet) = snippet_for_item(ffi_item) {
-                        info!("Checking item {} / {}", index + 1, total_count);
+            for ffi_item in &mut item.ffi_items {
+                if let Ok(snippet) = snippet_for_item(ffi_item) {
+                    info!("Checking item {} / {}", index + 1, total_count);
 
-                        let error_data =
-                            match check_snippet(&self.main_cpp_path, &self.builder, &snippet)? {
-                                CppLibBuilderOutput::Success => None, // no error
-                                CppLibBuilderOutput::Fail(output) => {
-                                    Some(format!("build failed: {}", output.stderr))
-                                }
-                            };
-                        let r = ffi_item.checks.add(&self.env, error_data.clone());
-                        let change_text = match r {
-                            CppCheckerAddResult::Added => "Added".to_string(),
-                            CppCheckerAddResult::Unchanged => "Unchanged".to_string(),
-                            CppCheckerAddResult::Changed { ref old } => {
-                                format!("Changed! Old data for the same env: {:?}", old)
+                    let error_data =
+                        match check_snippet(&self.main_cpp_path, &self.builder, &snippet)? {
+                            CppLibBuilderOutput::Success => None, // no error
+                            CppLibBuilderOutput::Fail(output) => {
+                                Some(format!("build failed: {}", output.stderr))
                             }
                         };
+                    let r = ffi_item.checks.add(&self.env, error_data.clone());
+                    let change_text = match r {
+                        CppCheckerAddResult::Added => "Added".to_string(),
+                        CppCheckerAddResult::Unchanged => "Unchanged".to_string(),
+                        CppCheckerAddResult::Changed { ref old } => {
+                            format!("Changed! Old data for the same env: {:?}", old)
+                        }
+                    };
 
-                        debug!(
-                            "[cpp_checker_update] ffi_item = {:?}; snippet = {:?}; error = {:?}; {}",
-                            ffi_item, snippet.code, error_data, change_text
-                        );
-                    }
+                    debug!(
+                        "[cpp_checker_update] ffi_item = {:?}; snippet = {:?}; error = {:?}; {}",
+                        ffi_item, snippet.code, error_data, change_text
+                    );
                 }
             }
         }

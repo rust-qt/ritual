@@ -142,10 +142,8 @@ mod steps {
                         item.cpp_data.to_string(),
                         item.source
                     );
-                    if let Some(ref rust_items) = item.ffi_items {
-                        for rust_item in rust_items {
-                            trace!("[rust_item] item={:?}", rust_item);
-                        }
+                    for ffi_item in &item.ffi_items {
+                        trace!("[database_item]   ffi_item={:?}", ffi_item);
                     }
                 }
                 Ok(())
@@ -161,7 +159,8 @@ mod steps {
     pub fn clear_ffi() -> ProcessingStep {
         ProcessingStep::new_custom("clear_ffi", |data| {
             for item in &mut data.current_database.cpp_items {
-                item.ffi_items = None;
+                item.ffi_items.clear();
+                item.is_cpp_ffi_processed = false;
             }
             data.current_database.next_ffi_id = 0;
             Ok(())
