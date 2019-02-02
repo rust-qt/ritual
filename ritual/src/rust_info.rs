@@ -84,6 +84,23 @@ pub enum RustStructKind {
     SizedType(CppPath),
 }
 
+impl RustStructKind {
+    pub fn is_wrapper_type(&self) -> bool {
+        if let RustStructKind::WrapperType(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_ffi_type(&self) -> bool {
+        match *self {
+            RustStructKind::FfiClassType(_) | RustStructKind::SizedType(_) => true,
+            _ => false,
+        }
+    }
+}
+
 /// Exported information about a Rust wrapper type
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustStruct {
@@ -338,6 +355,22 @@ impl RustItemKind {
     pub fn is_ffi_function(&self) -> bool {
         if let RustItemKind::FfiFunction(_) = self {
             true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_wrapper_type(&self) -> bool {
+        if let RustItemKind::Struct(data) = self {
+            data.kind.is_wrapper_type()
+        } else {
+            false
+        }
+    }
+
+    pub fn is_ffi_type(&self) -> bool {
+        if let RustItemKind::Struct(data) = self {
+            data.kind.is_ffi_type()
         } else {
             false
         }

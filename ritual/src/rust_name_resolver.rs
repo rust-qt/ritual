@@ -91,7 +91,6 @@ struct State<'a> {
 impl State<'_> {
     /// Converts `CppType` to its exact Rust equivalent (FFI-compatible)
     fn ffi_type_to_rust_ffi_type(&self, cpp_ffi_type: &CppType) -> Result<RustType> {
-        // TODO: use dep_databases!
         let rust_type = match cpp_ffi_type {
             CppType::PointerLike {
                 ref kind,
@@ -178,7 +177,7 @@ impl State<'_> {
                 }
             }
             CppType::Enum { ref path } | CppType::Class(ref path) => {
-                let rust_item = self.find_rust_item(path)?;
+                let rust_item = self.find_ffi_type(path)?;
                 let path = rust_item
                     .path()
                     .ok_or_else(|| err_msg("RustDatabaseItem for class has no path"))?
@@ -229,22 +228,58 @@ impl State<'_> {
         })
     }
 
-    fn find_rust_item(&self, cpp_path: &CppPath) -> Result<&RustDatabaseItem> {
-        // TODO: search in deps!
-        let index = match self.cpp_path_to_index.get(cpp_path) {
-            Some(index) => index,
-            None => bail!("unknown cpp path: {}", cpp_path),
-        };
+    fn find_rust_items(&self, cpp_path: &CppPath) -> Result<Vec<&RustDatabaseItem>> {
+        if let Some(index) = self.cpp_path_to_index.get(cpp_path) {
+            return Ok(self
+                .rust_database
+                .items
+                .iter()
+                .filter(|item| item.cpp_item_index == Some(*index))
+                .collect());
+        }
 
-        self.rust_database
-            .items
-            .iter()
-            .find(|item| item.cpp_item_index == Some(*index))
-            .ok_or_else(|| err_msg(format!("rust item not found for path: {:?}", cpp_path)))
+        for db in self.dep_databases {
+            if let Some(index) = db
+                .cpp_items
+                .iter()
+                .position(|cpp_item| cpp_item.cpp_data.path() == Some(cpp_path))
+            {
+                return Ok(db
+                    .rust_database
+                    .items
+                    .iter()
+                    .filter(|item| item.cpp_item_index == Some(index))
+                    .collect());
+            }
+        }
+
+        bail!("unknown cpp path: {}", cpp_path)
+    }
+
+    fn find_wrapper_type(&self, cpp_path: &CppPath) -> Result<&RustDatabaseItem> {
+        let rust_items = self.find_rust_items(cpp_path)?;
+        if rust_items.is_empty() {
+            bail!("no Rust items for {}", cpp_path);
+        }
+        rust_items
+            .into_iter()
+            .find(|item| item.kind.is_wrapper_type())
+            .ok_or_else(|| err_msg(format!("no Rust type wrapper for {}", cpp_path)))
+    }
+
+    fn find_ffi_type(&self, cpp_path: &CppPath) -> Result<&RustDatabaseItem> {
+        let rust_items = self.find_rust_items(cpp_path)?;
+        if rust_items.is_empty() {
+            bail!("no Rust items for {}", cpp_path);
+        }
+        rust_items
+            .into_iter()
+            .find(|item| item.kind.is_ffi_type())
+            .ok_or_else(|| err_msg(format!("no Rust FFI type for {}", cpp_path)))
     }
 
     fn get_strategy(&self, parent_path: &CppPath) -> Result<RustPathScope> {
-        let rust_item = self.find_rust_item(parent_path)?;
+        let rust_item = self.find_wrapper_type(parent_path)?;
 
         let rust_path = rust_item.path().ok_or_else(|| {
             err_msg(format!(
@@ -253,8 +288,18 @@ impl State<'_> {
             ))
         })?;
 
+        let mut rust_path = rust_path.clone();
+        let path_crate_name = rust_path
+            .crate_name()
+            .expect("rust item path must have crate name");
+        let current_crate_name = self.config.crate_properties().name();
+
+        if path_crate_name != current_crate_name {
+            rust_path.parts[0] = current_crate_name.to_string();
+        }
+
         Ok(RustPathScope {
-            path: rust_path.clone(),
+            path: rust_path,
             prefix: None,
         })
     }
@@ -603,11 +648,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
             .cpp_items
             .iter()
             .enumerate()
-            .filter_map(|(index, item)| match item.cpp_data {
-                CppItemData::Namespace(ref path) => Some((path.clone(), index)),
-                CppItemData::Type(ref data) => Some((data.path.clone(), index)),
-                _ => None,
-            })
+            .filter_map(|(index, item)| item.cpp_data.path().map(|path| (path.clone(), index)))
             .collect(),
     };
     state.generate_special_module(RustModuleKind::CrateRoot)?;

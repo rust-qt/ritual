@@ -129,6 +129,18 @@ impl CppItemData {
         }
     }
 
+    pub fn path(&self) -> Option<&CppPath> {
+        let path = match self {
+            CppItemData::Namespace(data) => data,
+            CppItemData::Type(data) => &data.path,
+            CppItemData::EnumValue(data) => &data.path,
+            CppItemData::Function(data) => &data.path,
+            CppItemData::ClassField(data) => &data.path,
+            CppItemData::ClassBase(_) | CppItemData::QtSignalArguments(_) => return None,
+        };
+        Some(path)
+    }
+
     pub fn all_involved_types(&self) -> Vec<CppType> {
         match *self {
             CppItemData::Type(ref t) => match t.kind {
