@@ -17,10 +17,12 @@ use ritual_common::file_utils::repo_crate_local_path;
 use ritual_common::file_utils::save_json;
 use ritual_common::file_utils::save_toml;
 use ritual_common::toml;
+use ritual_common::utils::run_command;
 use ritual_common::utils::MapIfOk;
 use ritual_common::BuildScriptData;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::Command;
 
 /// Merges `a` and `b` recursively. `b` take precedence over `a`.
 fn recursive_merge_toml(a: toml::Value, b: toml::Value) -> toml::Value {
@@ -280,6 +282,8 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         &data.current_database.rust_database,
         &output_path.join("src"),
     )?;
+
+    run_command(Command::new("cargo").arg("fmt").current_dir(&output_path))?;
 
     save_json(
         output_path.join("build_script_data.json"),
