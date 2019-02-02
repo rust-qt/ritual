@@ -2,6 +2,7 @@ use ritual_common::errors::{bail, FancyUnwrap, Result};
 use ritual_common::file_utils::{create_dir, load_json, save_json};
 
 use crate::database::Database;
+use ritual_common::file_utils::remove_file;
 use serde_derive::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -108,6 +109,16 @@ impl Workspace {
       save_json(database_path(&self.path, data.crate_name()), &Database::empty(crate_name))?;
       Ok(())
     }*/
+
+    pub fn delete_database_if_exists(&mut self, crate_name: &str) -> Result<()> {
+        self.databases
+            .retain(|d| d.database.crate_name != crate_name);
+        let path = database_path(&self.path, crate_name);
+        if path.exists() {
+            remove_file(path)?;
+        }
+        Ok(())
+    }
 
     pub fn load_crate(&mut self, crate_name: &str) -> Result<Database> {
         if let Some(r) = self.take_loaded_crate(crate_name) {
