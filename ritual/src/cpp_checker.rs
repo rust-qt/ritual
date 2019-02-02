@@ -5,7 +5,9 @@ use crate::database::CppFfiItem;
 use crate::database::CppFfiItemKind;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
-use log::{debug, info};
+use indicatif::ProgressBar;
+use indicatif::ProgressStyle;
+use log::debug;
 use ritual_common::cpp_lib_builder::{
     c2r_cmake_vars, BuildType, CppLibBuilder, CppLibBuilderOutput,
 };
@@ -79,6 +81,29 @@ impl Snippet {
     }
 }
 
+fn new_progress_bar(count: u64, message: &str) -> ProgressBar {
+    let progress_bar = ProgressBar::new(count);
+    progress_bar.set_style(ProgressStyle::default_bar().template("{pos}/{len} {msg} {wide_bar}"));
+    progress_bar.set_message(message);
+    progress_bar
+}
+
+struct PreliminaryTest {
+    name: String,
+    snippet: Snippet,
+    expected: bool,
+}
+
+impl PreliminaryTest {
+    fn new(name: &str, expected: bool, snippet: Snippet) -> Self {
+        Self {
+            name: name.into(),
+            expected,
+            snippet,
+        }
+    }
+}
+
 impl CppChecker<'_, '_> {
     fn run(&mut self) -> Result<()> {
         if !self
@@ -97,10 +122,13 @@ impl CppChecker<'_, '_> {
         self.run_tests()?;
 
         let total_count = self.data.current_database.cpp_items.len();
-        for (index, item) in self.data.current_database.cpp_items.iter_mut().enumerate() {
+        let progress_bar = new_progress_bar(total_count as u64, "Checking items");
+
+        for item in &mut self.data.current_database.cpp_items {
+            progress_bar.inc(1);
             for ffi_item in &mut item.ffi_items {
                 if let Ok(snippet) = snippet_for_item(ffi_item) {
-                    info!("Checking item {} / {}", index + 1, total_count);
+                    //info!("Checking item {} / {}", index + 1, total_count);
 
                     let error_data =
                         match check_snippet(&self.main_cpp_path, &self.builder, &snippet)? {
@@ -130,60 +158,67 @@ impl CppChecker<'_, '_> {
     }
 
     fn run_tests(&mut self) -> Result<()> {
-        self.check_preliminary_test(
-            "hello world",
-            &Snippet::new_in_main("std::cout << \"Hello world\\n\";"),
-            true,
-        )?;
-        self.builder.skip_cmake = true;
-        self.check_preliminary_test(
-            "correct assertion",
-            &Snippet::new_in_main("assert(2 + 2 == 4);"),
-            true,
-        )?;
-        self.check_preliminary_test(
-            "type traits",
-            &Snippet::new_in_main(
-                "\
-                 class C1 {}; \n\
-                 enum E1 {};  \n\
-                 assert(std::is_class<C1>::value); \n\
-                 assert(!std::is_class<E1>::value); \n\
-                 assert(!std::is_enum<C1>::value); \n\
-                 assert(std::is_enum<E1>::value); \
-                 assert(sizeof(C1) > 0);\
-                 assert(sizeof(E1) > 0);\n\
-                 ",
+        let tests = &[
+            PreliminaryTest::new(
+                "hello world",
+                true,
+                Snippet::new_in_main("std::cout << \"Hello world\\n\";"),
             ),
-            true,
-        )?;
-        self.check_preliminary_test(
-            "incorrect assertion in fn",
-            &Snippet::new_global("int f1() { assert(2 + 2 == 5); return 1; }"),
-            true,
-        )?;
+            PreliminaryTest::new(
+                "correct assertion",
+                true,
+                Snippet::new_in_main("assert(2 + 2 == 4);"),
+            ),
+            PreliminaryTest::new(
+                "type traits",
+                true,
+                Snippet::new_in_main(
+                    "\
+                     class C1 {}; \n\
+                     enum E1 {};  \n\
+                     assert(std::is_class<C1>::value); \n\
+                     assert(!std::is_class<E1>::value); \n\
+                     assert(!std::is_enum<C1>::value); \n\
+                     assert(std::is_enum<E1>::value); \
+                     assert(sizeof(C1) > 0);\
+                     assert(sizeof(E1) > 0);\n\
+                     ",
+                ),
+            ),
+            PreliminaryTest::new(
+                "incorrect assertion in fn",
+                true,
+                Snippet::new_global("int f1() { assert(2 + 2 == 5); return 1; }"),
+            ),
+            PreliminaryTest::new("syntax error", false, Snippet::new_in_main("}")),
+            PreliminaryTest::new(
+                "incorrect assertion",
+                false,
+                Snippet::new_in_main("assert(2 + 2 == 5)"),
+            ),
+            PreliminaryTest::new("status code 1", false, Snippet::new_in_main("return 1;")),
+        ];
 
-        self.check_preliminary_test("syntax error", &Snippet::new_in_main("}"), false)?;
-        self.check_preliminary_test(
-            "incorrect assertion",
-            &Snippet::new_in_main("assert(2 + 2 == 5)"),
-            false,
-        )?;
-        self.check_preliminary_test("status code 1", &Snippet::new_in_main("return 1;"), false)?;
+        let progress_bar = new_progress_bar(tests.len() as u64, "Running preliminary tests");
+        for test in tests {
+            progress_bar.inc(1);
+            self.check_preliminary_test(test)?;
+            self.builder.skip_cmake = true;
+        }
+
         Ok(())
     }
 
-    fn check_preliminary_test(&self, name: &str, snippet: &Snippet, expected: bool) -> Result<()> {
-        info!("Running preliminary test: {}", name);
-        match self.check_snippet(snippet)? {
+    fn check_preliminary_test(&self, test: &PreliminaryTest) -> Result<()> {
+        match self.check_snippet(&test.snippet)? {
             CppLibBuilderOutput::Success => {
-                if !expected {
-                    bail!("Nevative test ({}) succeeded", name);
+                if !test.expected {
+                    bail!("Nevative test ({}) succeeded", test.name);
                 }
             }
             CppLibBuilderOutput::Fail(output) => {
-                if expected {
-                    bail!("Positive test ({}) failed: {}", name, output.stderr);
+                if test.expected {
+                    bail!("Positive test ({}) failed: {}", test.name, output.stderr);
                 }
             }
         }

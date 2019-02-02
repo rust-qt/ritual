@@ -21,7 +21,7 @@ use crate::processor::ProcessorData;
 use clang;
 use clang::*;
 use itertools::Itertools;
-use log::{debug, info, trace, warn};
+use log::{debug, trace, warn};
 use regex::Regex;
 use ritual_common::errors::{bail, err_msg, unexpected, Result, ResultExt};
 use ritual_common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
@@ -314,9 +314,9 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         &parser.data.workspace.tmp_path()?,
         None,
         |translation_unit| {
-            info!("Parsing types");
+            debug!("Parsing types");
             parser.parse_types(translation_unit)?;
-            info!("Parsing methods");
+            debug!("Parsing methods");
             parser.parse_functions(translation_unit)?;
             Ok(())
         },
