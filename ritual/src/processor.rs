@@ -14,7 +14,7 @@ use crate::rust_name_resolver::rust_name_resolver_step;
 use crate::type_allocation_places::choose_allocation_places_step;
 use crate::workspace::Workspace;
 use itertools::Itertools;
-use log::info;
+use log::{error, info};
 use ritual_common::utils::MapIfOk;
 use std::cmp::Ordering;
 use std::fmt;
@@ -263,7 +263,13 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
         current_database_saved = false;
     }
 
+    let mut steps_result = Ok(());
+
     for step_name in step_names {
+        if steps_result.is_err() {
+            break;
+        }
+
         let step_names = if step_name == "main" {
             config.processing_steps().main_procedure.clone()
         } else {
@@ -291,7 +297,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
                 );
             };
 
-            info!("Running processor item: {}", &step.name);
+            info!("Running processing step: {}", &step.name);
 
             let mut data = ProcessorData {
                 workspace,
@@ -299,10 +305,15 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
                 dep_databases: &dependent_cpp_crates,
                 config,
             };
-            (step.function)(&mut data)?;
 
             if !step.is_const {
                 current_database_saved = false;
+            }
+
+            if let Err(err) = (step.function)(&mut data) {
+                steps_result = Err(err);
+                error!("Step failed! Aborting...");
+                break;
             }
         }
     }
@@ -357,5 +368,6 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
 
     workspace.put_crate(current_database, current_database_saved);
     workspace.save_data()?;
-    Ok(())
+
+    steps_result
 }
