@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-use crate::cpp_ffi_data::CppTypeConversionToFfi;
-use crate::cpp_type::CppType;
 use itertools::Itertools;
 use ritual_common::errors::{bail, Result};
 use ritual_common::string_utils::CaseOperations;
@@ -134,20 +132,14 @@ pub enum RustToFfiTypeConversion {
 /// Information about a completely processed type
 /// including its variations at each processing step.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct CompleteType {
-    /// Original C++ type used in the C++ library's API
-    pub original_cpp_type: CppType,
-    /// C++ type used in the C++ wrapper library's API
-    pub cpp_ffi_type: CppType,
-    /// Conversion from `cpp_type` to `cpp_ffi_type`
-    pub cpp_to_ffi_conversion: CppTypeConversionToFfi,
+pub struct RustFinalType {
     /// Rust type used in FFI functions
     /// (must be exactly the same as `cpp_ffi_type`)
-    pub rust_ffi_type: RustType,
+    pub ffi_type: RustType,
     /// Type used in public Rust API
-    pub rust_api_type: RustType,
+    pub api_type: RustType,
     /// Conversion from `rust_api_type` to `rust_ffi_type`
-    pub rust_api_to_ffi_conversion: RustToFfiTypeConversion,
+    pub api_to_ffi_conversion: RustToFfiTypeConversion,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -356,17 +348,17 @@ impl RustType {
     }
 }
 
-impl CompleteType {
+impl RustFinalType {
     /// Converts Rust API type from pointer to reference
     /// and modifies `rust_api_to_c_conversion` accordingly.
     /// `is_const1` specifies new constness of the created reference.
-    pub fn ptr_to_ref(&self, is_const1: bool) -> Result<CompleteType> {
+    pub fn ptr_to_ref(&self, is_const1: bool) -> Result<RustFinalType> {
         let mut r = self.clone();
         if let RustType::PointerLike {
             ref mut is_const,
             ref mut kind,
             ..
-        } = r.rust_api_type
+        } = r.api_type
         {
             if !kind.is_pointer() {
                 bail!("not a pointer type");
@@ -376,22 +368,22 @@ impl CompleteType {
         } else {
             bail!("not a PointerLike type");
         }
-        if r.rust_api_to_ffi_conversion != RustToFfiTypeConversion::None {
+        if r.api_to_ffi_conversion != RustToFfiTypeConversion::None {
             bail!("rust_api_to_ffi_conversion is not None");
         }
-        r.rust_api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
+        r.api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
         Ok(r)
     }
 
     /// Converts Rust API type from pointer to value
     /// and modifies `rust_api_to_c_conversion` accordingly.
-    pub fn ptr_to_value(&self) -> Result<CompleteType> {
+    pub fn ptr_to_value(&self) -> Result<RustFinalType> {
         let mut r = self.clone();
-        r.rust_api_type = if let RustType::PointerLike {
+        r.api_type = if let RustType::PointerLike {
             ref kind,
             ref target,
             ..
-        } = r.rust_api_type
+        } = r.api_type
         {
             if !kind.is_pointer() {
                 bail!("not a pointer type");
@@ -400,10 +392,10 @@ impl CompleteType {
         } else {
             bail!("not a RustType::Common");
         };
-        if r.rust_api_to_ffi_conversion != RustToFfiTypeConversion::None {
+        if r.api_to_ffi_conversion != RustToFfiTypeConversion::None {
             bail!("rust_api_to_ffi_conversion is not None");
         }
-        r.rust_api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
+        r.api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
         Ok(r)
     }
 }

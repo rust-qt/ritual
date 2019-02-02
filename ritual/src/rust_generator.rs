@@ -28,241 +28,6 @@ use rust_info::{
 use rust_type::{CompleteType, RustName, RustToCTypeConversion, RustType, RustTypeIndirection};
 use std::collections::{hash_map, HashMap, HashSet};
 
-impl ParserCppData {
-    /// Checks if specified class has explicitly declared protected or private destructor.
-    pub fn has_non_public_destructor(&self, class_type: &CppTypeClassBase) -> bool {
-        for method in &self.methods {
-            if let Some(ref info) = method.class_membership {
-                if info.kind == CppMethodKind::Destructor && &info.class_type == class_type {
-                    return info.visibility != CppVisibility::Public;
-                }
-            }
-        }
-        false
-    }
-}
-
-impl<'a> CppDataWithDeps<'a> {
-    /// Returns selected type allocation place for type `class_name`.
-    pub fn type_allocation_place(&self, class_name: &str) -> Result<CppTypeAllocationPlace> {
-        if let Some(r) = self
-            .current
-            .processed
-            .type_allocation_places
-            .get(class_name)
-        {
-            return Ok(r.clone());
-        }
-        for dep in &self.dependencies {
-            if let Some(r) = dep.processed.type_allocation_places.get(class_name) {
-                return Ok(r.clone());
-            }
-        }
-        Err(format!("no type allocation place information for {}", class_name).into())
-    }
-
-    /// Search for a `CppTypeData` object in this `CppData` and all dependencies.
-    pub fn find_type_info<F>(&self, f: F) -> Option<&CppTypeData>
-    where
-        F: Fn(&&CppTypeData) -> bool,
-    {
-        once(&self.current.parser.types)
-            .chain(self.dependencies.iter().map(|d| &d.parser.types))
-            .flat_map(|x| x)
-            .find(f)
-    }
-
-    /// Returns all include files found within this `CppData`
-    /// (excluding dependencies).
-    pub fn all_include_files(&self) -> Result<HashSet<String>> {
-        let mut result = HashSet::new();
-        for method in &self.current.parser.methods {
-            if !result.contains(&method.include_file) {
-                result.insert(method.include_file.clone());
-            }
-        }
-        for tp in &self.current.parser.types {
-            if !result.contains(&tp.include_file) {
-                result.insert(tp.include_file.clone());
-            }
-        }
-        for instantiations in &self.current.processed.template_instantiations {
-            let type_info = self
-                .find_type_info(|x| &x.name == &instantiations.class_name)
-                .with_context(|| {
-                    format!("type info not found for {}", &instantiations.class_name)
-                })?;
-            if !result.contains(&type_info.include_file) {
-                result.insert(type_info.include_file.clone());
-            }
-        }
-        Ok(result)
-    }
-}
-
-/// Intermediate data of a single C++ method converted to
-/// a Rust method before any overloading is applied.
-#[derive(Debug, PartialEq, Eq, Clone)]
-struct RustSingleMethod {
-    /// Location of the method
-    scope: RustMethodScope,
-    /// True if the method is `unsafe`.
-    is_unsafe: bool,
-    /// Name of the method. For free functions, this is the full name.
-    /// for `impl` methods, this is only the method's own name.
-    name: RustName,
-    /// Arguments of the method.
-    arguments: RustMethodArgumentsVariant,
-    /// Documentation data.
-    doc: Option<RustMethodDocItem>,
-}
-
-/// Mode of case conversion
-enum Case {
-    /// Class case: "OneTwo"
-    Class,
-    /// Snake case: "one_two"
-    Snake,
-}
-
-/// Returns name of the Rust function that will provide access
-/// to a C++ operator. Most of these functions should be replaced
-/// with trait implementations in the future.
-fn operator_rust_name(operator: &CppOperator) -> Result<String> {
-    Ok(match *operator {
-        CppOperator::Conversion(ref type1) => format!(
-            "as_{}",
-            type1.caption(TypeCaptionStrategy::Full)?.to_snake_case()
-        ),
-        _ => format!("op_{}", operator.c_name()?),
-    })
-}
-
-/// If `remove_qt_prefix` is true, removes "Q" or "Qt"
-/// if it is first word of the string and not the only one word.
-/// Also converts case of the words.
-#[allow(clippy::collapsible_if)]
-fn remove_qt_prefix_and_convert_case(s: &str, case: Case, remove_qt_prefix: bool) -> String {
-    let mut parts: Vec<_> = WordIterator::new(s).collect();
-    if remove_qt_prefix && parts.len() > 1 {
-        if (parts[0] == "Q" || parts[0] == "q" || parts[0] == "Qt")
-            && !parts[1].starts_with(|c: char| c.is_digit(10))
-        {
-            parts.remove(0);
-        }
-    }
-    match case {
-        Case::Snake => parts.to_snake_case(),
-        Case::Class => parts.to_class_case(),
-    }
-}
-
-/// Removes ".h" from include file name and performs the same
-/// processing as `remove_qt_prefix_and_convert_case()` for snake case.
-fn include_file_to_module_name(include_file: &str, remove_qt_prefix: bool) -> String {
-    let mut r = include_file.to_string();
-    if let Some(index) = r.find('.') {
-        r = r[0..index].to_string();
-    }
-    remove_qt_prefix_and_convert_case(&r, Case::Snake, remove_qt_prefix)
-}
-
-/// Prepares enum variants for being represented in Rust:
-/// - Converts variant names to proper case;
-/// - Removes duplicate variants that have the same associated value.
-/// Rust does not allow such duplicates.
-/// - If there is only one variant, adds another variant.
-/// Rust does not allow repr(C) enums having only one variant.
-fn prepare_enum_values(values: &[CppEnumValue]) -> Vec<RustEnumValue> {
-    use rust_info::CppEnumValueDocItem as DocItem;
-
-    let mut value_to_variant: HashMap<i64, RustEnumValue> = HashMap::new();
-    for variant in values {
-        let value = variant.value;
-        let doc_item = DocItem {
-            variant_name: variant.name.clone(),
-            doc: variant.doc.clone(),
-        };
-        match value_to_variant.entry(value) {
-            hash_map::Entry::Occupied(mut entry) => {
-                entry.get_mut().cpp_docs.push(doc_item);
-            }
-            hash_map::Entry::Vacant(entry) => {
-                entry.insert(RustEnumValue {
-                    name: sanitize_rust_identifier(&variant.name.to_class_case()),
-                    value: variant.value,
-                    cpp_docs: vec![doc_item],
-                    is_dummy: false,
-                });
-            }
-        }
-    }
-    let more_than_one = value_to_variant.len() > 1;
-    let dummy_value: i64 = if value_to_variant.contains_key(&0) {
-        1
-    } else {
-        0
-    };
-    let mut result: Vec<_> = value_to_variant.into_iter().map(|(_k, v)| v).collect();
-    if result.len() == 1 {
-        result.push(RustEnumValue {
-            name: "_Invalid".to_string(),
-            value: dummy_value,
-            cpp_docs: Vec::new(),
-            is_dummy: true,
-        });
-    }
-
-    if more_than_one {
-        let new_names = {
-            let all_words: Vec<Vec<&str>> = result
-                .iter()
-                .map(|x| WordIterator::new(&x.name).collect())
-                .collect();
-            let tmp_buffer = all_words[0].clone();
-            let mut common_prefix = &tmp_buffer[..];
-            let mut common_suffix = &tmp_buffer[..];
-            for item in &all_words {
-                while !common_prefix.is_empty()
-                    && (item.len() < common_prefix.len()
-                        || &item[..common_prefix.len()] != common_prefix)
-                {
-                    common_prefix = &common_prefix[..common_prefix.len() - 1];
-                }
-                while !common_suffix.is_empty()
-                    && (item.len() < common_suffix.len()
-                        || &item[item.len() - common_suffix.len()..] != common_suffix)
-                {
-                    common_suffix = &common_suffix[1..];
-                }
-            }
-            let new_names: Vec<_> = all_words
-                .iter()
-                .map(|item| item[common_prefix.len()..item.len() - common_suffix.len()].join(""))
-                .collect();
-            if new_names.iter().any(|item| {
-                if let Some(ch) = item.chars().next() {
-                    ch.is_digit(10)
-                } else {
-                    true
-                }
-            }) {
-                None
-            } else {
-                Some(new_names)
-            }
-        };
-        if let Some(new_names) = new_names {
-            assert_eq!(new_names.len(), result.len());
-            for i in 0..new_names.len() {
-                result[i].name = sanitize_rust_identifier(&new_names[i].clone());
-            }
-        }
-    }
-    result.sort_by(|a, b| a.value.cmp(&b.value));
-    result
-}
-
 /// Generator of the Rust public API of the crate.
 pub struct RustGenerator<'a> {
     /// Data collected on previous step of the generator workflow
@@ -283,8 +48,6 @@ pub struct RustGeneratorOutput {
     /// List of processed C++ types and their corresponding Rust names
     pub processed_types: Vec<RustProcessedTypeInfo>,
 }
-
-// TODO: implement removal of arbitrary prefixes (#25)
 
 /// Information required by Rust generator
 pub struct RustGeneratorInputData<'a> {
@@ -313,7 +76,6 @@ impl<'a> RustGeneratorInputData<'a> {
             processed_types: Vec::new(),
             input_data: self,
         };
-        generator.top_module_names = generator.calc_top_module_names()?;
 
         generator.processed_types = generator.calc_processed_types()?;
         let mut modules = Vec::new();
@@ -621,30 +383,6 @@ where
 }
 
 impl<'aa> RustGenerator<'aa> {
-    fn calc_top_module_names(&self) -> Result<HashMap<String, RustName>> {
-        let mut result = HashMap::new();
-        {
-            let mut check_header = |header: &str| -> Result<()> {
-                if !result.contains_key(header) {
-                    let mut parts = Vec::new();
-                    parts.push(self.input_data.crate_name.clone());
-                    parts.push(include_file_to_module_name(
-                        header,
-                        self.input_data.remove_qt_prefix,
-                    ));
-                    result.insert(header.to_string(), RustName::new(parts)?);
-                }
-                Ok(())
-            };
-            for header in self.input_data.cpp_data.all_include_files()? {
-                check_header(&header)?;
-            }
-            for header in &self.input_data.cpp_ffi_headers {
-                check_header(&header.include_file_base_name)?;
-            }
-        }
-        Ok(result)
-    }
 
     /// Converts specified C++ type to Rust.
     /// Returns:
@@ -1694,15 +1432,6 @@ impl<'aa> RustGenerator<'aa> {
                                 CppTypeAllocationPlace::Stack => Some(size_const_name(&rust_name)),
                                 CppTypeAllocationPlace::Heap => None,
                             },
-                            is_deletable: !self
-                                .input_data
-                                .cpp_data
-                                .current
-                                .parser
-                                .has_non_public_destructor(&CppTypeClassBase {
-                                    name: type_info.name.clone(),
-                                    template_arguments: None,
-                                }),
                             slot_wrapper: None,
                         },
                     },
@@ -1810,15 +1539,6 @@ impl<'aa> RustGenerator<'aa> {
                     cpp_template_arguments: Some(ins.template_arguments.clone()),
                     kind: RustTypeWrapperKind::Struct {
                         size_const_name: None,
-                        is_deletable: !self
-                            .input_data
-                            .cpp_data
-                            .current
-                            .parser
-                            .has_non_public_destructor(&CppTypeClassBase {
-                                name: template_instantiations.class_name.clone(),
-                                template_arguments: Some(ins.template_arguments.clone()),
-                            }),
                         slot_wrapper: None,
                     },
                     rust_name: rust_name,

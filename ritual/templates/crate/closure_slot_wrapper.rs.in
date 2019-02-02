@@ -1,17 +1,3 @@
-/// Allows to bind Qt signals with arguments `({cpp_args})` to a Rust closure.
-///
-/// Create an object using `new()` and bind your closure using `set()`.
-/// The closure will be called with the signal's arguments when the slot is invoked.
-/// Use `connect()` method of a `qt_core::connection::Signal` object to connect the signal
-/// to this slot. The closure will be executed each time the slot is invoked
-/// until source signals are disconnected or the slot object is destroyed.
-///
-/// The slot object takes ownership of the passed closure. If `set()` is called again,
-/// previously set closure is dropped. Make sure that the slot object does not outlive
-/// objects referenced by the closure.
-///
-/// If `set()` was not called, slot invokation has no effect.
-
 pub struct {pub_type_name}<'a> {{
   wrapper: ::cpp_utils::CppBox<{type_name}>,
   func: ::std::option::Option<Box<Box<FnMut({args}) + 'a>>>,

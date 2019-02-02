@@ -434,6 +434,8 @@ impl State<'_> {
                 CppItemData::Type(data) => {
                     match data.kind {
                         CppTypeDataKind::Class { is_movable } => {
+                            // TODO: if the type is `QFlags<T>` or `QUrlTwoFlags<T>`,
+                            //       generate `impl Flaggable` instead.
                             let internal_name_type = if is_movable {
                                 NameType::SizedItem
                             } else {
@@ -710,4 +712,57 @@ pub fn clear_rust_info(data: &mut ProcessorData) -> Result<()> {
 
 pub fn clear_rust_info_step() -> ProcessingStep {
     ProcessingStep::new("clear_rust_info", clear_rust_info)
+}
+
+#[allow(dead_code)]
+mod ported {
+    use crate::cpp_operator::CppOperator;
+    use ritual_common::errors::Result;
+    use ritual_common::string_utils::CaseOperations;
+    use ritual_common::string_utils::WordIterator;
+
+    /// Returns name of the Rust function that will provide access
+    /// to a C++ operator. Most of these functions should be replaced
+    /// with trait implementations in the future.
+    fn operator_rust_name(operator: &CppOperator) -> Result<String> {
+        Ok(match *operator {
+            CppOperator::Conversion(ref _type1) => {
+                // TODO: find corresponding Rust type and use it
+                let type_caption = "unimplemented";
+                format!("as_{}", type_caption)
+            }
+            _ => format!("operator_{}", operator.ascii_name()?),
+        })
+    }
+
+    /// Mode of case conversion
+    #[derive(Clone, Copy)]
+    enum Case {
+        /// Class case: "OneTwo"
+        Class,
+        /// Snake case: "one_two"
+        Snake,
+    }
+
+    // TODO: implement removal of arbitrary prefixes (#25)
+
+    /// If `remove_qt_prefix` is true, removes "Q" or "Qt"
+    /// if it is first word of the string and not the only one word.
+    /// Also converts case of the words.
+    #[allow(clippy::collapsible_if)]
+    fn remove_qt_prefix_and_convert_case(s: &str, case: Case, remove_qt_prefix: bool) -> String {
+        let mut parts: Vec<_> = WordIterator::new(s).collect();
+        if remove_qt_prefix && parts.len() > 1 {
+            if (parts[0] == "Q" || parts[0] == "q" || parts[0] == "Qt")
+                && !parts[1].starts_with(|c: char| c.is_digit(10))
+            {
+                parts.remove(0);
+            }
+        }
+        match case {
+            Case::Snake => parts.to_snake_case(),
+            Case::Class => parts.to_class_case(),
+        }
+    }
+
 }

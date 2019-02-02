@@ -64,15 +64,15 @@ pub fn struct_doc(type1: &RustStruct) -> String {
 
             if let Some(ref slot_wrapper) = doc_data.raw_qt_slot_wrapper {
                 let cpp_args = slot_wrapper
-                    .arguments
+                    .cpp_arguments
                     .iter()
-                    .map(|t| t.original_cpp_type.to_cpp_pseudo_code())
+                    .map(|t| t.to_cpp_pseudo_code())
                     .join(", ");
 
                 let rust_args = slot_wrapper
-                    .arguments
+                    .rust_arguments
                     .iter()
-                    .map(|t| rust_type_to_code(&t.rust_api_type, current_crate))
+                    .map(|t| rust_type_to_code(&t.api_type, current_crate))
                     .join(", ");
 
                 doc += &format!(
@@ -96,9 +96,28 @@ pub fn struct_doc(type1: &RustStruct) -> String {
             }
             doc
         }
-        RustStructKind::QtSlotWrapper(..) => {
-            // TODO: add docs for slot wrappers
-            String::new()
+        RustStructKind::QtSlotWrapper(ref slot_wrapper) => {
+            let cpp_args = slot_wrapper
+                .cpp_arguments
+                .iter()
+                .map(|t| t.to_cpp_pseudo_code())
+                .join(", ");
+
+            format!("\
+                Allows to bind Qt signals with arguments `({cpp_args})` to a Rust closure. \
+                \
+                Create an object using `new()` and bind your closure using `set()`.\
+                The closure will be called with the signal's arguments when the slot is invoked.\
+                Use `connect()` method of a `qt_core::connection::Signal` object to connect the signal\
+                to this slot. The closure will be executed each time the slot is invoked\
+                until source signals are disconnected or the slot object is destroyed.\
+                The slot object takes ownership of the passed closure. If `set()` is called again,\
+                previously set closure is dropped. Make sure that the slot object does not outlive\
+                objects referenced by the closure.\
+                If `set()` was not called, slot invokation has no effect.\
+            ",
+                    cpp_args = cpp_args
+            )
         }
         RustStructKind::FfiClassType(ref doc_data) => format!(
             "FFI type corresponding to C++ type: {}.\n\n\

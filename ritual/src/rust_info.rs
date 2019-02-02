@@ -6,7 +6,8 @@ use crate::cpp_data::CppPath;
 use crate::cpp_data::CppTypeDoc;
 use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_function::CppFunctionDoc;
-use crate::rust_type::{CompleteType, RustPath, RustType};
+use crate::cpp_type::CppType;
+use crate::rust_type::{RustFinalType, RustPath, RustType};
 use serde_derive::{Deserialize, Serialize};
 
 /// One variant of a Rust enum
@@ -33,11 +34,13 @@ pub struct RustEnumValueDoc {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustQtSlotWrapper {
     /// Argument types of the slot
-    pub arguments: Vec<CompleteType>,
+    pub arguments: Vec<RustFinalType>,
     /// Identifier of the slot for `QObject::connect`
     pub receiver_id: String,
     /// Name of the extern callback function of this wrapper
     pub callback_path: RustPath,
+
+    pub cpp_arguments: Vec<CppType>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -50,7 +53,8 @@ pub enum RustWrapperTypeKind {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustRawQtSlotWrapperDocData {
     pub public_wrapper_path: RustPath,
-    pub arguments: Vec<CompleteType>,
+    pub rust_arguments: Vec<RustFinalType>,
+    pub cpp_arguments: Vec<CppType>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -143,7 +147,7 @@ pub enum RustFunctionScope {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustFunctionArgument {
     /// C++ and Rust types corresponding to this argument at all levels.
-    pub argument_type: CompleteType,
+    pub argument_type: RustFinalType,
     /// Rust argument name.
     pub name: String,
     /// Index of the corresponding argument of the FFI function.
@@ -208,7 +212,7 @@ pub struct RustFunction {
     /// `self` argument), and they are not listed in this field.
     pub arguments: Vec<RustFunctionArgument>,
     /// C++ and Rust return types at all levels.
-    pub return_type: CompleteType,
+    pub return_type: RustFinalType,
 
     /// Documentation data.
     pub doc: RustFunctionDoc,
