@@ -125,7 +125,7 @@ impl State<'_> {
                     is_const: *is_const,
                 }
             }
-            CppType::Void => RustType::EmptyTuple,
+            CppType::Void => RustType::Unit,
 
             CppType::BuiltInNumeric(ref numeric) => {
                 let rust_path = if numeric == &CppBuiltInNumericType::Bool {
@@ -855,24 +855,14 @@ pub fn clear_rust_info_step() -> ProcessingStep {
 
 #[allow(dead_code)]
 mod ported {
+    use crate::cpp_ffi_data::CppFfiFunction;
+    use crate::cpp_ffi_data::CppFfiFunctionKind;
     use crate::cpp_operator::CppOperator;
+    use crate::rust_type::RustFinalType;
+    use crate::rust_type::RustPath;
     use ritual_common::errors::Result;
     use ritual_common::string_utils::CaseOperations;
     use ritual_common::string_utils::WordIterator;
-
-    /// Returns name of the Rust function that will provide access
-    /// to a C++ operator. Most of these functions should be replaced
-    /// with trait implementations in the future.
-    fn operator_rust_name(operator: &CppOperator) -> Result<String> {
-        Ok(match *operator {
-            CppOperator::Conversion(ref _type1) => {
-                // TODO: find corresponding Rust type and use it
-                let type_caption = "unimplemented";
-                format!("as_{}", type_caption)
-            }
-            _ => format!("operator_{}", operator.ascii_name()?),
-        })
-    }
 
     /// Mode of case conversion
     #[derive(Clone, Copy)]
@@ -902,6 +892,46 @@ mod ported {
             Case::Snake => parts.to_snake_case(),
             Case::Class => parts.to_class_case(),
         }
+    }
+
+    /// Returns name of the Rust function that will provide access
+    /// to a C++ operator. Most of these functions should be replaced
+    /// with trait implementations in the future.
+    fn operator_rust_name(
+        operator: &CppOperator,
+        return_type: &RustFinalType,
+        context: &RustPath,
+    ) -> Result<String> {
+        Ok(match *operator {
+            CppOperator::Conversion(_) => format!("as_{}", return_type.api_type.caption(context)?),
+            _ => format!("operator_{}", operator.ascii_name()?),
+        })
+    }
+
+    /// Returns method name. For class member functions, the name doesn't
+    /// include class name and scope. For free functions, the name includes
+    /// modules.
+    fn special_function_rust_name(
+        function: &CppFfiFunction,
+        return_type: &RustFinalType,
+        context: &RustPath,
+    ) -> Result<Option<String>> {
+        let r = if let CppFfiFunctionKind::Function {
+            ref cpp_function, ..
+        } = function.kind
+        {
+            if cpp_function.is_constructor() {
+                Some("new".to_string())
+            } else if let Some(ref operator) = cpp_function.operator {
+                Some(operator_rust_name(operator, return_type, context)?)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Ok(r)
     }
 
 }

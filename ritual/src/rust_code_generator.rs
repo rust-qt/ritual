@@ -40,7 +40,7 @@ use std::path::PathBuf;
 /// Same as `RustCodeGenerator::rust_type_to_code`, but accessible by other modules.
 pub fn rust_type_to_code(rust_type: &RustType, current_crate: &str) -> String {
     match *rust_type {
-        RustType::EmptyTuple => "()".to_string(),
+        RustType::Unit => "()".to_string(),
         RustType::PointerLike {
             ref kind,
             ref target,
@@ -95,7 +95,7 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: &str) -> String {
                 .map(|arg| rust_type_to_code(arg, current_crate))
                 .join(", "),
             match return_type.as_ref() {
-                &RustType::EmptyTuple => String::new(),
+                &RustType::Unit => String::new(),
                 return_type => format!(" -> {}", rust_type_to_code(return_type, current_crate)),
             }
         ),
@@ -412,7 +412,7 @@ impl Generator {
             func.path.last(),
             args.join(", "),
             match func.return_type {
-                RustType::EmptyTuple => String::new(),
+                RustType::Unit => String::new(),
                 _ => format!(" -> {}", self.rust_type_to_code(&func.return_type)),
             }
         )
@@ -742,7 +742,7 @@ impl Generator {
             RustFunctionKind::SignalOrSlotGetter { .. } => unimplemented!(),
         };
 
-        let return_type_for_signature = if func.return_type.api_type == RustType::EmptyTuple {
+        let return_type_for_signature = if func.return_type.api_type == RustType::Unit {
             String::new()
         } else {
             format!(" -> {}", self.rust_type_to_code(&func.return_type.api_type))

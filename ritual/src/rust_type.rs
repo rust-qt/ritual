@@ -169,8 +169,8 @@ impl RustPointerLikeTypeKind {
 /// A Rust type
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum RustType {
-    /// Empty tuple `()`, used as the replacement of C++'s `void` type.
-    EmptyTuple,
+    /// Unit type `()`, used as the replacement of C++'s `void` type.
+    Unit,
     /// A numeric, enum or struct type with some indirection
     Common {
         /// Full name of the base type
@@ -198,7 +198,7 @@ impl RustType {
     #[allow(dead_code)]
     pub fn caption(&self, context: &RustPath) -> Result<String> {
         Ok(match *self {
-            RustType::EmptyTuple => "empty".to_string(),
+            RustType::Unit => "unit".to_string(),
             RustType::PointerLike {
                 ref kind,
                 ref is_const,
@@ -336,7 +336,7 @@ impl RustType {
                 }
                 false
             }
-            RustType::EmptyTuple => false,
+            RustType::Unit => false,
             RustType::FunctionPointer {
                 ref return_type,
                 ref arguments,
