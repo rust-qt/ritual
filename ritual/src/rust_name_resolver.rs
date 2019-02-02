@@ -1,10 +1,16 @@
+#![allow(dead_code)]
+
 use crate::config::Config;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;
 use crate::cpp_data::CppTypeDataKind;
+use crate::cpp_ffi_data::CppFfiArgumentMeaning;
 use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_ffi_data::CppFfiFunctionKind;
+use crate::cpp_ffi_data::CppFfiType;
 use crate::cpp_ffi_data::CppFieldAccessorType;
+use crate::cpp_ffi_data::CppTypeConversionToFfi;
+use crate::cpp_function::ReturnValueAllocationPlace;
 use crate::cpp_type::CppBuiltInNumericType;
 use crate::cpp_type::CppFunctionPointerType;
 use crate::cpp_type::CppPointerLikeTypeKind;
@@ -34,8 +40,10 @@ use crate::rust_info::RustStructKind;
 use crate::rust_info::RustWrapperType;
 use crate::rust_info::RustWrapperTypeDocData;
 use crate::rust_info::RustWrapperTypeKind;
+use crate::rust_type::RustFinalType;
 use crate::rust_type::RustPath;
 use crate::rust_type::RustPointerLikeTypeKind;
+use crate::rust_type::RustToFfiTypeConversion;
 use crate::rust_type::RustType;
 use log::trace;
 use ritual_common::errors::*;
@@ -209,6 +217,137 @@ impl State<'_> {
         };
 
         Ok(rust_type)
+    }
+
+    /// Generates `CompleteType` from `CppFfiType`, adding
+    /// Rust API type, Rust FFI type and conversion between them.
+    fn rust_final_type(
+        &self,
+        cpp_ffi_type: &CppFfiType,
+        argument_meaning: &CppFfiArgumentMeaning,
+        is_template_argument: bool,
+        allocation_place: &ReturnValueAllocationPlace,
+    ) -> Result<RustFinalType> {
+        let rust_ffi_type = self.ffi_type_to_rust_ffi_type(&cpp_ffi_type.ffi_type)?;
+        let mut rust_api_type = rust_ffi_type.clone();
+        let mut api_to_ffi_conversion = RustToFfiTypeConversion::None;
+        if let RustType::PointerLike {
+            ref mut kind,
+            ref mut is_const,
+            ref target,
+        } = rust_api_type
+        {
+            match cpp_ffi_type.conversion {
+                CppTypeConversionToFfi::NoChange => {
+                    if argument_meaning == &CppFfiArgumentMeaning::This {
+                        assert!(kind == &RustPointerLikeTypeKind::Pointer);
+                        *kind = RustPointerLikeTypeKind::Reference { lifetime: None };
+                        api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
+                    }
+                }
+                CppTypeConversionToFfi::ValueToPointer => {
+                    assert!(kind == &RustPointerLikeTypeKind::Pointer);
+                    if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
+                        // TODO: return error if this rust type is not deletable
+                        match *allocation_place {
+                            ReturnValueAllocationPlace::Stack => {
+                                rust_api_type = (**target).clone();
+                                api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
+                            }
+                            ReturnValueAllocationPlace::Heap => {
+                                rust_api_type = RustType::Common {
+                                    path: RustPath::from_str_unchecked("cpp_utils::CppBox"),
+                                    generic_arguments: Some(vec![(**target).clone()]),
+                                };
+                                api_to_ffi_conversion = RustToFfiTypeConversion::CppBoxToPtr;
+                            }
+                            ReturnValueAllocationPlace::NotApplicable => {
+                                bail!("NotApplicable conflicts with ValueToPointer");
+                            }
+                        }
+                    } else if is_template_argument {
+                        rust_api_type = (**target).clone();
+                        api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
+                    } else {
+                        // there is no point in passing arguments by value because
+                        // there will be an implicit copy in any case
+                        *kind = RustPointerLikeTypeKind::Reference { lifetime: None };
+                        *is_const = true;
+                        api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
+                    }
+                }
+                CppTypeConversionToFfi::ReferenceToPointer => {
+                    assert!(kind == &RustPointerLikeTypeKind::Pointer);
+                    *kind = RustPointerLikeTypeKind::Reference { lifetime: None };
+                    api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
+                }
+                CppTypeConversionToFfi::QFlagsToUInt => unreachable!(),
+            }
+        }
+        if cpp_ffi_type.conversion == CppTypeConversionToFfi::QFlagsToUInt {
+            let qflags_type = match &cpp_ffi_type.original_type {
+                CppType::PointerLike {
+                    ref kind,
+                    ref is_const,
+                    ref target,
+                } => {
+                    if kind != &CppPointerLikeTypeKind::Reference {
+                        bail!(
+                            "unsupported indirection for QFlagsToUInt: {:?}",
+                            cpp_ffi_type
+                        );
+                    }
+                    if !*is_const {
+                        bail!("unsupported is_const for QFlagsToUInt: {:?}", cpp_ffi_type);
+                    }
+                    &*target
+                }
+                a => a,
+            };
+            let enum_type = if let CppType::Class(path) = qflags_type {
+                let template_arguments = path
+                    .last()
+                    .template_arguments
+                    .as_ref()
+                    .ok_or_else(|| err_msg("expected template arguments for QFlags"))?;
+                if template_arguments.len() != 1 {
+                    bail!("QFlags type must have exactly 1 template argument");
+                }
+                &template_arguments[0]
+            } else {
+                bail!("invalid original type for QFlagsToUInt: {:?}", cpp_ffi_type);
+            };
+
+            let enum_path = if let CppType::Enum { ref path } = enum_type {
+                path
+            } else {
+                bail!("invalid QFlags argument type: {:?}", enum_type);
+            };
+
+            let rust_enum_type = self.find_wrapper_type(enum_path)?;
+            let rust_enum_path = rust_enum_type.path().ok_or_else(|| {
+                err_msg(format!(
+                    "failed to get path from Rust enum type: {:?}",
+                    rust_enum_type
+                ))
+            })?;
+
+            rust_api_type = RustType::Common {
+                path: RustPath::from_str_unchecked("qt_core::QFlags"),
+                generic_arguments: Some(vec![RustType::Common {
+                    path: rust_enum_path.clone(),
+                    generic_arguments: None,
+                }]),
+            };
+
+            api_to_ffi_conversion = RustToFfiTypeConversion::QFlagsToUInt;
+        }
+
+        Ok(RustFinalType {
+            ffi_type: rust_ffi_type,
+            api_type: rust_api_type,
+            api_to_ffi_conversion,
+        })
     }
 
     /// Generates exact (FFI-compatible) Rust equivalent of `CppAndFfiMethod` object.
