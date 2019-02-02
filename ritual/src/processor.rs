@@ -114,6 +114,7 @@ impl Default for ProcessingSteps {
             cpp_checker_step(),
             rust_name_resolver_step(),
             crate_writer_step(),
+            steps::build_crate(),
         ];
 
         let main_procedure = main_steps.iter().map(|s| s.name.clone()).collect();
@@ -177,6 +178,8 @@ impl ProcessingStep {
 mod steps {
     use crate::processor::ProcessingStep;
     use log::trace;
+    use ritual_common::utils::run_command;
+    use std::process::Command;
 
     pub fn print_database() -> ProcessingStep {
         ProcessingStep::new_const("print_database", |data| {
@@ -193,6 +196,7 @@ mod steps {
             Ok(())
         })
     }
+
     pub fn clear_ffi() -> ProcessingStep {
         ProcessingStep::new("clear_ffi", |data| {
             for item in &mut data.current_database.cpp_items {
@@ -200,6 +204,21 @@ mod steps {
                 item.is_cpp_ffi_processed = false;
             }
             data.current_database.next_ffi_id = 0;
+            Ok(())
+        })
+    }
+
+    pub fn build_crate() -> ProcessingStep {
+        ProcessingStep::new("build_crate", |data| {
+            let path = data
+                .workspace
+                .crate_path(&data.current_database.crate_name)?;
+            for cargo_cmd in &["update", "build", /*"test",*/ "doc"] {
+                let mut command = Command::new("cargo");
+                command.arg(cargo_cmd);
+                command.current_dir(&path);
+                run_command(&mut command)?;
+            }
             Ok(())
         })
     }
@@ -272,6 +291,15 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
 
         let step_names = if step_name == "main" {
             config.processing_steps().main_procedure.clone()
+        } else if step_name.starts_with("from:") {
+            let start_step = &step_name["from:".len()..];
+            let start_index = config
+                .processing_steps()
+                .main_procedure
+                .iter()
+                .position(|s| s == start_step)
+                .ok_or_else(|| err_msg(format!("requested step not found: {}", start_step)))?;
+            config.processing_steps().main_procedure[start_index..].to_vec()
         } else {
             vec![step_name.to_string()]
         };
