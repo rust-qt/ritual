@@ -1,5 +1,4 @@
 use crate::config::Config;
-use crate::cpp_checker::cpp_checker_step;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;
 use crate::cpp_data::CppTypeDataKind;
@@ -654,8 +653,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
 }
 
 pub fn rust_name_resolver_step() -> ProcessingStep {
-    // TODO: set dependencies
-    ProcessingStep::new("rust_name_resolver", vec![cpp_checker_step().name], run)
+    ProcessingStep::new("rust_name_resolver", run)
 }
 
 pub fn clear_rust_info(data: &mut ProcessorData) -> Result<()> {
@@ -670,5 +668,5 @@ pub fn clear_rust_info(data: &mut ProcessorData) -> Result<()> {
 }
 
 pub fn clear_rust_info_step() -> ProcessingStep {
-    ProcessingStep::new_custom("clear_rust_info", clear_rust_info)
+    ProcessingStep::new("clear_rust_info", clear_rust_info)
 }

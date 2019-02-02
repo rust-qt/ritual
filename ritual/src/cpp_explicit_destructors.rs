@@ -11,11 +11,7 @@ use crate::processor::ProcessorData;
 use ritual_common::errors::Result;
 
 pub fn add_explicit_destructors_step() -> ProcessingStep {
-    ProcessingStep::new(
-        "add_explicit_destructors",
-        vec!["cpp_parser".to_string()],
-        add_explicit_destructors,
-    )
+    ProcessingStep::new("add_explicit_destructors", add_explicit_destructors)
 }
 
 /// Adds destructors for every class that does not have explicitly

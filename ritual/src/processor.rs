@@ -1,4 +1,4 @@
-use ritual_common::errors::{bail, Result, ResultExt};
+use ritual_common::errors::{bail, err_msg, Result, ResultExt};
 
 use crate::config::Config;
 use crate::cpp_checker::cpp_checker_step;
@@ -80,29 +80,78 @@ impl<'a> ProcessorData<'a> {
     }
 }
 
-#[derive(Debug)]
-pub struct ProcessorMainCycleItem {
-    pub run_after: Vec<String>,
-}
-
 pub struct ProcessingStep {
     pub name: String,
     pub is_const: bool,
-    pub main_cycle_items: Vec<ProcessorMainCycleItem>,
     pub function: Box<Fn(&mut ProcessorData) -> Result<()>>,
 }
 
 impl fmt::Debug for ProcessingStep {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ProcessingStep")
             .field("name", &self.name)
-            .field("main_cycle_items", &self.main_cycle_items)
+            .field("is_const", &self.is_const)
             .finish()
     }
 }
 
+#[derive(Debug)]
+pub struct ProcessingSteps {
+    all_steps: Vec<ProcessingStep>,
+    main_procedure: Vec<String>,
+}
+
+impl Default for ProcessingSteps {
+    fn default() -> Self {
+        let main_steps = vec![
+            cpp_parser_step(),
+            add_explicit_destructors_step(),
+            choose_allocation_places_step(),
+            find_template_instantiations_step(),
+            instantiate_templates_step(),
+            cpp_ffi_generator_step(),
+            // TODO: generate_slot_wrappers
+            cpp_checker_step(),
+            rust_name_resolver_step(),
+            crate_writer_step(),
+        ];
+
+        let main_procedure = main_steps.iter().map(|s| s.name.clone()).collect();
+
+        let mut all_steps = main_steps;
+        all_steps.extend(vec![
+            steps::print_database(),
+            steps::clear_ffi(),
+            clear_rust_info_step(),
+        ]);
+        Self {
+            all_steps,
+            main_procedure,
+        }
+    }
+}
+
+impl ProcessingSteps {
+    pub fn add_after(&mut self, after: &[&str], step: ProcessingStep) -> Result<()> {
+        let indexes: Vec<usize> = after.iter().map_if_ok(|s| {
+            self.main_procedure
+                .iter()
+                .position(|a| a == s)
+                .ok_or_else(|| err_msg(format!("requested step not found: {}", s)))
+        })?;
+
+        let max_index = indexes
+            .into_iter()
+            .max()
+            .ok_or_else(|| err_msg("no steps provided"))?;
+        self.main_procedure.insert(max_index + 1, step.name.clone());
+        self.all_steps.push(step);
+        Ok(())
+    }
+}
+
 impl ProcessingStep {
-    pub fn new_custom<S: Into<String>, F: 'static + Fn(&mut ProcessorData) -> Result<()>>(
+    pub fn new<S: Into<String>, F: 'static + Fn(&mut ProcessorData) -> Result<()>>(
         name: S,
         function: F,
     ) -> ProcessingStep {
@@ -110,20 +159,17 @@ impl ProcessingStep {
             name: name.into(),
             is_const: false,
             function: Box::new(function),
-            main_cycle_items: Vec::new(),
         }
     }
-    pub fn new<S: Into<String>, F: 'static + Fn(&mut ProcessorData) -> Result<()>>(
+    pub fn new_const<S: Into<String>, F: 'static + Fn(&mut ProcessorData) -> Result<()>>(
         name: S,
-        run_after: Vec<String>,
         function: F,
     ) -> ProcessingStep {
         let name = name.into();
         ProcessingStep {
             name,
-            is_const: false,
+            is_const: true,
             function: Box::new(function),
-            main_cycle_items: vec![ProcessorMainCycleItem { run_after }],
         }
     }
 }
@@ -133,31 +179,22 @@ mod steps {
     use log::trace;
 
     pub fn print_database() -> ProcessingStep {
-        ProcessingStep {
-            is_const: true,
-            ..ProcessingStep::new_custom("print_database", |data| {
-                for item in &data.current_database.cpp_items {
-                    trace!(
-                        "[database_item] cpp_data={}; source={:?}",
-                        item.cpp_data.to_string(),
-                        item.source
-                    );
-                    for ffi_item in &item.ffi_items {
-                        trace!("[database_item]   ffi_item={:?}", ffi_item);
-                    }
+        ProcessingStep::new_const("print_database", |data| {
+            for item in &data.current_database.cpp_items {
+                trace!(
+                    "[database_item] cpp_data={}; source={:?}",
+                    item.cpp_data.to_string(),
+                    item.source
+                );
+                for ffi_item in &item.ffi_items {
+                    trace!("[database_item]   ffi_item={:?}", ffi_item);
                 }
-                Ok(())
-            })
-        }
-    }
-    pub fn clear() -> ProcessingStep {
-        ProcessingStep::new_custom("clear", |data| {
-            data.current_database.clear();
+            }
             Ok(())
         })
     }
     pub fn clear_ffi() -> ProcessingStep {
-        ProcessingStep::new_custom("clear_ffi", |data| {
+        ProcessingStep::new("clear_ffi", |data| {
             for item in &mut data.current_database.cpp_items {
                 item.ffi_items.clear();
                 item.is_cpp_ffi_processed = false;
@@ -201,27 +238,6 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
     info!("Processing crate: {}", config.crate_properties().name());
     check_all_paths(&config)?;
 
-    let standard_processing_steps = vec![
-        cpp_parser_step(),
-        add_explicit_destructors_step(),
-        choose_allocation_places_step(),
-        find_template_instantiations_step(),
-        instantiate_templates_step(),
-        cpp_ffi_generator_step(),
-        // TODO: generate_slot_wrappers
-        cpp_checker_step(),
-        rust_name_resolver_step(),
-        crate_writer_step(),
-        steps::print_database(),
-        steps::clear_ffi(),
-        steps::clear(),
-        clear_rust_info_step(),
-    ];
-    let all_processing_steps: Vec<_> = standard_processing_steps
-        .iter()
-        .chain(config.custom_processing_steps().iter())
-        .collect();
-
     // TODO: allow to remove any prefix through `Config` (#25)
     #[allow(unused_variables)]
     let remove_qt_prefix = config.crate_properties().name().starts_with("qt_");
@@ -248,36 +264,33 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
     }
 
     for step_name in step_names {
-        let steps = if step_name == "main" {
-            let mut steps = Vec::new();
-            for step in &all_processing_steps {
-                for item in &step.main_cycle_items {
-                    steps.push(MainItemRef {
-                        step,
-                        run_after: &item.run_after,
-                    });
-                }
-            }
-            steps.sort();
-            steps.into_iter().map(|v| v.step).collect()
-        } else if let Some(item) = all_processing_steps
-            .iter()
-            .find(|item| &item.name == step_name)
-        {
-            vec![*item]
+        let step_names = if step_name == "main" {
+            config.processing_steps().main_procedure.clone()
         } else {
-            println!(
-                "Unknown operation: {}. Supported operations: main, {}.",
-                step_name,
-                all_processing_steps
-                    .iter()
-                    .map(|item| &item.name)
-                    .join(", ")
-            );
-            break;
+            vec![step_name.to_string()]
         };
 
-        for step in steps {
+        for step_name in step_names {
+            let step = if let Some(item) = config
+                .processing_steps()
+                .all_steps
+                .iter()
+                .find(|item| item.name == step_name)
+            {
+                item
+            } else {
+                bail!(
+                    "Unknown operation: {}. Supported operations: main, {}.",
+                    step_name,
+                    config
+                        .processing_steps()
+                        .all_steps
+                        .iter()
+                        .map(|item| &item.name)
+                        .join(", ")
+                );
+            };
+
             info!("Running processor item: {}", &step.name);
 
             let mut data = ProcessorData {

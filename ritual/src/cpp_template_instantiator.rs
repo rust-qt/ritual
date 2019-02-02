@@ -104,11 +104,7 @@ fn apply_instantiation_to_method(
 }
 
 pub fn instantiate_templates_step() -> ProcessingStep {
-    ProcessingStep::new(
-        "instantiate_templates",
-        vec!["find_template_instantiations".to_string()],
-        instantiate_templates,
-    )
+    ProcessingStep::new("instantiate_templates", instantiate_templates)
 }
 
 /// Generates methods as template instantiations of
@@ -205,11 +201,7 @@ fn instantiate_templates(data: &mut ProcessorData) -> Result<()> {
 }
 
 pub fn find_template_instantiations_step() -> ProcessingStep {
-    ProcessingStep::new(
-        "find_template_instantiations",
-        vec!["cpp_parser".to_string()],
-        find_template_instantiations,
-    )
+    ProcessingStep::new("find_template_instantiations", find_template_instantiations)
 }
 
 /// Searches for template instantiations in this library's API,

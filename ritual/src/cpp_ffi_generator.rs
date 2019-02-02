@@ -136,7 +136,7 @@ fn run(mut data: &mut ProcessorData) -> Result<()> {
 }
 
 pub fn cpp_ffi_generator_step() -> ProcessingStep {
-    ProcessingStep::new("cpp_ffi_generator", vec!["cpp_parser".to_string()], run)
+    ProcessingStep::new("cpp_ffi_generator", run)
 }
 
 /// Convenience function to create `CppMethod` object for

@@ -1,7 +1,7 @@
 //! Interface for configuring and running the generator.
 
 use crate::cpp_data::CppPath;
-use crate::processor::ProcessingStep;
+use crate::processor::ProcessingSteps;
 use ritual_common;
 use ritual_common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
 use ritual_common::toml;
@@ -159,7 +159,7 @@ pub struct Config {
     cpp_build_paths: CppBuildPaths,
     cpp_parser_arguments: Vec<String>,
     cpp_parser_blocked_names: Vec<CppPath>,
-    custom_processing_steps: Vec<ProcessingStep>,
+    processing_steps: ProcessingSteps,
 
     // TODO: revisit fields below when new rust name generator is done
     cpp_filtered_namespaces: Vec<CppPath>,
@@ -183,7 +183,7 @@ impl Config {
             cpp_filtered_namespaces: Default::default(),
             cpp_build_config: Default::default(),
             movable_types: Default::default(),
-            custom_processing_steps: Default::default(),
+            processing_steps: Default::default(),
             cpp_lib_version: None,
         }
     }
@@ -328,8 +328,12 @@ impl Config {
         self.cpp_lib_version.as_ref().map(|x| x.as_str())
     }
 
-    pub fn add_custom_processing_step(&mut self, step: ProcessingStep) {
-        self.custom_processing_steps.push(step);
+    pub fn processing_steps(&self) -> &ProcessingSteps {
+        &self.processing_steps
+    }
+
+    pub fn processing_steps_mut(&mut self) -> &mut ProcessingSteps {
+        &mut self.processing_steps
     }
 
     /// Returns crate properties passed to `Config::new`.
@@ -387,9 +391,5 @@ impl Config {
     /// Keys of the hash map are names of C++ types.
     pub fn movable_types(&self) -> &[CppPath] {
         &self.movable_types
-    }
-
-    pub fn custom_processing_steps(&self) -> &[ProcessingStep] {
-        &self.custom_processing_steps
     }
 }

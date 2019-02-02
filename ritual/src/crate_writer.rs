@@ -3,7 +3,6 @@ use crate::cpp_code_generator::generate_cpp_type_size_requester;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use crate::rust_code_generator;
-use crate::rust_name_resolver::rust_name_resolver_step;
 use crate::versions;
 use pathdiff::diff_paths;
 use ritual_common::errors::{err_msg, Result};
@@ -295,5 +294,5 @@ fn run(data: &mut ProcessorData) -> Result<()> {
 
 pub fn crate_writer_step() -> ProcessingStep {
     // TODO: set dependencies
-    ProcessingStep::new("crate_writer", vec![rust_name_resolver_step().name], run)
+    ProcessingStep::new("crate_writer", run)
 }

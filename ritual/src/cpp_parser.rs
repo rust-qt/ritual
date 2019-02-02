@@ -326,7 +326,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
 }
 
 pub fn cpp_parser_step() -> ProcessingStep {
-    ProcessingStep::new("cpp_parser", Vec::new(), run)
+    ProcessingStep::new("cpp_parser", run)
 }
 
 impl CppParser<'_, '_> {

@@ -245,9 +245,5 @@ fn run(data: &mut ProcessorData) -> Result<()> {
 }
 
 pub fn cpp_checker_step() -> ProcessingStep {
-    ProcessingStep::new(
-        "cpp_checker",
-        vec!["cpp_parser".to_string(), "cpp_ffi_generator".to_string()],
-        run,
-    )
+    ProcessingStep::new("cpp_checker", run)
 }

@@ -563,33 +563,33 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
 
         let lib_include_path = qt_config.installation_data.lib_include_path.clone();
 
-        config.add_custom_processing_step(ProcessingStep::new(
-            "qt_fix_header_names",
-            vec!["cpp_parser".to_string()],
-            move |data| fix_header_names(&mut data.current_database.cpp_items, &lib_include_path),
-        ));
+        let steps = config.processing_steps_mut();
+        steps.add_after(
+            &["cpp_parser"],
+            ProcessingStep::new("qt_fix_header_names", move |data| {
+                fix_header_names(&mut data.current_database.cpp_items, &lib_include_path)
+            }),
+        )?;
 
-        config.add_custom_processing_step(ProcessingStep::new(
-            "qt_detect_signals_and_slots",
-            vec!["cpp_parser".to_string()],
-            detect_signals_and_slots,
-        ));
-        config.add_custom_processing_step(ProcessingStep::new(
-            "detect_signal_argument_types",
-            vec![
-                "cpp_parser".to_string(),
-                "qt_detect_signals_and_slots".to_string(),
-            ],
-            detect_signal_argument_types,
-        ));
+        steps.add_after(
+            &["cpp_parser"],
+            ProcessingStep::new("qt_detect_signals_and_slots", detect_signals_and_slots),
+        )?;
+
+        steps.add_after(
+            &["cpp_parser", "qt_detect_signals_and_slots"],
+            ProcessingStep::new("detect_signal_argument_types", detect_signal_argument_types),
+        )?;
 
         let crate_name_clone = crate_name.to_string();
         let docs_path = qt_config.installation_data.docs_path.clone();
-        config.add_custom_processing_step(ProcessingStep::new(
-            "qt_doc_parser",
-            vec!["cpp_parser".to_string()],
-            move |data| parse_docs(data, &crate_name_clone, &docs_path),
-        ));
+
+        steps.add_after(
+            &["cpp_parser"],
+            ProcessingStep::new("qt_doc_parser", move |data| {
+                parse_docs(data, &crate_name_clone, &docs_path)
+            }),
+        )?;
 
         config
     };

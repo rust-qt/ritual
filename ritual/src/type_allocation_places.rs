@@ -8,11 +8,7 @@ use ritual_common::errors::Result;
 use std::collections::HashMap;
 
 pub fn choose_allocation_places_step() -> ProcessingStep {
-    ProcessingStep::new(
-        "choose_allocation_places",
-        Vec::new(),
-        choose_allocation_places,
-    )
+    ProcessingStep::new("choose_allocation_places", choose_allocation_places)
 }
 
 /// Detects the preferred type allocation place for each type based on
