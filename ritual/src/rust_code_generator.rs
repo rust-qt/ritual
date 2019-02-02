@@ -214,8 +214,15 @@ impl Generator {
             writeln!(self, "pub mod {} {{", module.path.last())?;
         }
 
-        if module.kind == RustModuleKind::Ffi {
-            writeln!(self, "#![allow(dead_code)]")?;
+        match module.kind {
+            RustModuleKind::Ffi => {
+                writeln!(self, "#![allow(dead_code)]")?;
+            }
+            RustModuleKind::CrateRoot => {
+                writeln!(self, "#![allow(non_camel_case_types)]")?;
+                writeln!(self, "#![allow(non_upper_case_globals)]")?;
+            }
+            _ => {}
         }
 
         writeln!(
@@ -354,6 +361,7 @@ impl Generator {
                 )?;
             }
             RustStructKind::FfiClassType(_) => {
+                writeln!(self, "#[repr(C)]")?;
                 writeln!(
                     self,
                     "{}struct {} {{ _unused: u8, }}",
