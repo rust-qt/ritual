@@ -235,8 +235,8 @@ pub fn function_doc(function: &RustFunction) -> String {
     // TODO: somehow handle docs for inherited methods (currently only for virtual functions).
 
     let variant_docs = doc.join("");
-    if let Some(ref common_doc) = function.doc.extra_doc {
-        format!("{}\n\n{}", common_doc, variant_docs)
+    if let Some(ref extra_doc) = function.extra_doc {
+        format!("{}\n\n{}", extra_doc, variant_docs)
     } else {
         variant_docs
     }

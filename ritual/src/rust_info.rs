@@ -5,7 +5,6 @@
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppTypeDoc;
 use crate::cpp_ffi_data::CppFfiFunction;
-use crate::cpp_function::CppFunctionDoc;
 use crate::cpp_type::CppType;
 use crate::rust_type::{RustFinalType, RustPath, RustType};
 use serde_derive::{Deserialize, Serialize};
@@ -118,20 +117,6 @@ pub struct RustStruct {
     pub is_public: bool,
 }
 
-/// Information for generating Rust documentation for a method
-/// or an item of information for an overloaded method.
-/// One value of `RustMethodDocItem` corresponds to a single
-/// C++ method.
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct RustFunctionDoc {
-    /// Rustdoc content that will appear before documentation for variants.
-    pub extra_doc: Option<String>,
-    /// C++ documentation of the corresponding C++ method.
-    pub doc: Option<CppFunctionDoc>,
-    /// C++ code containing declaration of the corresponding C++ method.
-    pub cpp_fn: String,
-}
-
 /// Location of a Rust method.
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum RustFunctionScope {
@@ -215,7 +200,7 @@ pub struct RustFunction {
     pub return_type: RustFinalType,
 
     /// Documentation data.
-    pub doc: RustFunctionDoc,
+    pub extra_doc: Option<String>,
 }
 
 /// Information about type of `self` argument of the method.

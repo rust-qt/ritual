@@ -30,6 +30,10 @@ use crate::rust_info::RustEnumValueDoc;
 use crate::rust_info::RustFFIArgument;
 use crate::rust_info::RustFFIFunction;
 use crate::rust_info::RustFfiClassTypeDoc;
+use crate::rust_info::RustFfiWrapperData;
+use crate::rust_info::RustFunction;
+use crate::rust_info::RustFunctionArgument;
+use crate::rust_info::RustFunctionKind;
 use crate::rust_info::RustItemKind;
 use crate::rust_info::RustModule;
 use crate::rust_info::RustModuleDoc;
@@ -45,8 +49,9 @@ use crate::rust_type::RustPath;
 use crate::rust_type::RustPointerLikeTypeKind;
 use crate::rust_type::RustToFfiTypeConversion;
 use crate::rust_type::RustType;
-use log::trace;
+use log::{debug, trace};
 use ritual_common::errors::*;
+use ritual_common::string_utils::CaseOperations;
 use ritual_common::utils::MapIfOk;
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -78,15 +83,15 @@ fn sanitize_rust_identifier_test() {
     assert_eq!(&sanitize_rust_identifier("lib", true), "lib_");
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum NameType {
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum NameType<'a> {
     General,
     Module,
     FfiStruct,
     FfiFunction,
+    Function(&'a CppFfiFunction),
     SizedItem,
     ClassPtr,
-    FieldAccessor(CppFieldAccessorType),
 }
 
 struct State<'a> {
@@ -362,8 +367,125 @@ impl State<'_> {
         }
         Ok(RustFFIFunction {
             return_type: self.ffi_type_to_rust_ffi_type(&data.return_type.ffi_type)?,
-            path: self.generate_rust_path(&data.path, NameType::FfiFunction)?,
+            path: self.generate_rust_path(&data.path, &NameType::FfiFunction)?,
             arguments: args,
+        })
+    }
+
+    /// Converts one function to a `RustSingleMethod`.
+    fn generate_rust_function(
+        &self,
+        function: &CppFfiFunction,
+        ffi_function_path: &RustPath,
+    ) -> Result<RustFunction> {
+        let mut arguments = Vec::new();
+        for (arg_index, arg) in function.arguments.iter().enumerate() {
+            if arg.meaning != CppFfiArgumentMeaning::ReturnValue {
+                let arg_type = self.rust_final_type(
+                    &arg.argument_type,
+                    &arg.meaning,
+                    false,
+                    &function.allocation_place,
+                )?;
+                arguments.push(RustFunctionArgument {
+                    ffi_index: arg_index,
+                    argument_type: arg_type,
+                    name: if arg.meaning == CppFfiArgumentMeaning::This {
+                        "self".to_string()
+                    } else {
+                        sanitize_rust_identifier(&arg.name.to_snake_case(), false)
+                    },
+                });
+            }
+        }
+        let (mut return_type, return_arg_index) = if let Some((arg_index, arg)) = function
+            .arguments
+            .iter()
+            .enumerate()
+            .find(|&(_arg_index, arg)| arg.meaning == CppFfiArgumentMeaning::ReturnValue)
+        {
+            // an argument has return value meaning, so
+            // FFI return type must be void
+            assert_eq!(function.return_type, CppFfiType::void());
+            (
+                self.rust_final_type(
+                    &arg.argument_type,
+                    &arg.meaning,
+                    false,
+                    &function.allocation_place,
+                )?,
+                Some(arg_index),
+            )
+        } else {
+            // none of the arguments has return value meaning,
+            // so FFI return value must be used
+            let return_type = self.rust_final_type(
+                &function.return_type,
+                &CppFfiArgumentMeaning::ReturnValue,
+                false,
+                &function.allocation_place,
+            )?;
+            (return_type, None)
+        };
+        if return_type.api_type.is_ref() && return_type.api_type.lifetime().is_none() {
+            let mut found = false;
+            for arg in &arguments {
+                if let Some(lifetime) = arg.argument_type.api_type.lifetime() {
+                    return_type.api_type = return_type.api_type.with_lifetime(lifetime.to_string());
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                let mut next_lifetime_num = 0;
+                for arg in &mut arguments {
+                    if arg.argument_type.api_type.is_ref()
+                        && arg.argument_type.api_type.lifetime().is_none()
+                    {
+                        arg.argument_type.api_type = arg
+                            .argument_type
+                            .api_type
+                            .with_lifetime(format!("l{}", next_lifetime_num));
+                        next_lifetime_num += 1;
+                    }
+                }
+                let return_lifetime = if next_lifetime_num == 0 {
+                    debug!(
+                            "Method returns a reference but doesn't receive a reference. Assuming static lifetime of return value: {}",
+                            function.short_text()
+                        );
+                    "static".to_string()
+                } else {
+                    "l0".to_string()
+                };
+                return_type.api_type = return_type.api_type.with_lifetime(return_lifetime);
+            }
+        }
+
+        let is_unsafe = arguments
+            .iter()
+            .any(|arg| arg.argument_type.api_type.is_unsafe_argument());
+
+        let cpp_path = match function.kind {
+            CppFfiFunctionKind::Function {
+                ref cpp_function, ..
+            } => &cpp_function.path,
+            CppFfiFunctionKind::FieldAccessor { ref field, .. } => &field.path,
+        };
+        let path = self.generate_rust_path(cpp_path, &NameType::Function(function))?;
+
+        Ok(RustFunction {
+            is_public: true,
+            path,
+            arguments,
+            return_type,
+            kind: RustFunctionKind::FfiWrapper(RustFfiWrapperData {
+                cpp_ffi_function: function.clone(),
+                ffi_function_path: ffi_function_path.clone(),
+                return_type_ffi_index: return_arg_index,
+            }),
+            extra_doc: None,
+            is_unsafe,
         })
     }
 
@@ -452,7 +574,7 @@ impl State<'_> {
         }
     }
 
-    fn generate_rust_path(&self, cpp_path: &CppPath, name_type: NameType) -> Result<RustPath> {
+    fn generate_rust_path(&self, cpp_path: &CppPath, name_type: &NameType<'_>) -> Result<RustPath> {
         let strategy = match name_type {
             NameType::FfiStruct | NameType::FfiFunction => {
                 let ffi_module = self
@@ -483,7 +605,7 @@ impl State<'_> {
             NameType::General
             | NameType::Module
             | NameType::ClassPtr
-            | NameType::FieldAccessor(_) => {
+            | NameType::Function { .. } => {
                 if let Some(parent) = cpp_path.parent() {
                     self.get_strategy(&parent)?
                 } else {
@@ -505,22 +627,20 @@ impl State<'_> {
                 .iter()
                 .map_if_ok(|item| cpp_path_item_to_name(item))?
                 .join("_"),
-            NameType::FfiFunction => cpp_path.last().to_string(),
-            NameType::ClassPtr => format!("{}Ptr", cpp_path_item_to_name(&cpp_path.last())?),
-            NameType::General | NameType::Module => cpp_path_item_to_name(&cpp_path.last())?,
-            NameType::FieldAccessor(accessor_type) => {
-                let name = &cpp_path.last().name;
-                match accessor_type {
-                    CppFieldAccessorType::CopyGetter => name.to_string(),
-                    CppFieldAccessorType::ConstRefGetter => name.to_string(),
-                    CppFieldAccessorType::MutRefGetter => format!("{}_mut", name),
-                    CppFieldAccessorType::Setter => format!("set_{}", name),
+            NameType::FfiFunction => cpp_path_item_to_name(cpp_path.last())?,
+            NameType::Function(function) => {
+                if let Some(last_name_override) = special_function_rust_name(function)? {
+                    last_name_override.clone()
+                } else {
+                    cpp_path_item_to_name(cpp_path.last())?
                 }
             }
+            NameType::ClassPtr => format!("{}Ptr", cpp_path_item_to_name(&cpp_path.last())?),
+            NameType::General | NameType::Module => cpp_path_item_to_name(&cpp_path.last())?,
         };
 
         let mut number = None;
-        if name_type == NameType::FfiFunction {
+        if name_type == &NameType::FfiFunction {
             let rust_path = strategy.apply(&full_last_name);
             if self.rust_database.find(&rust_path).is_some() {
                 bail!("ffi function path already taken: {:?}", rust_path);
@@ -533,7 +653,8 @@ impl State<'_> {
                 None => full_last_name.clone(),
                 Some(n) => format!("{}{}", full_last_name, n),
             };
-            let sanitized_name = sanitize_rust_identifier(&name_try, name_type == NameType::Module);
+            let sanitized_name =
+                sanitize_rust_identifier(&name_try, name_type == &NameType::Module);
             let rust_path = strategy.apply(&sanitized_name);
             if self.rust_database.find(&rust_path).is_none() {
                 return Ok(rust_path);
@@ -554,7 +675,7 @@ impl State<'_> {
         if !cpp_item.is_rust_processed {
             match &cpp_item.cpp_data {
                 CppItemData::Namespace(path) => {
-                    let rust_path = self.generate_rust_path(path, NameType::General)?;
+                    let rust_path = self.generate_rust_path(path, &NameType::General)?;
                     let rust_item = RustDatabaseItem {
                         kind: RustItemKind::Module(RustModule {
                             path: rust_path,
@@ -586,9 +707,9 @@ impl State<'_> {
                                 NameType::ClassPtr
                             };
                             let internal_path =
-                                self.generate_rust_path(&data.path, internal_name_type)?;
+                                self.generate_rust_path(&data.path, &internal_name_type)?;
                             let public_path =
-                                self.generate_rust_path(&data.path, public_name_type)?;
+                                self.generate_rust_path(&data.path, &public_name_type)?;
                             if internal_path == public_path {
                                 bail!(
                                     "internal path is the same as public path: {:?}",
@@ -649,7 +770,7 @@ impl State<'_> {
                         }
                         CppTypeDataKind::Enum => {
                             let rust_path =
-                                self.generate_rust_path(&data.path, NameType::General)?;
+                                self.generate_rust_path(&data.path, &NameType::General)?;
                             let rust_item = RustDatabaseItem {
                                 kind: RustItemKind::Struct(RustStruct {
                                     extra_doc: None,
@@ -673,7 +794,7 @@ impl State<'_> {
                     }
                 }
                 CppItemData::EnumValue(value) => {
-                    let rust_path = self.generate_rust_path(&value.path, NameType::General)?;
+                    let rust_path = self.generate_rust_path(&value.path, &NameType::General)?;
 
                     let rust_item = RustDatabaseItem {
                         kind: RustItemKind::EnumValue(RustEnumValue {
@@ -705,25 +826,16 @@ impl State<'_> {
                 continue;
             }
             match &ffi_item.kind {
-                CppFfiItemKind::Function(function) => {
-                    let ffi_function = self.generate_ffi_function(&function)?;
+                CppFfiItemKind::Function(cpp_ffi_function) => {
+                    let rust_ffi_function = self.generate_ffi_function(&cpp_ffi_function)?;
+                    let rust_ffi_function_path = rust_ffi_function.path.clone();
                     let rust_item = RustDatabaseItem {
-                        kind: RustItemKind::FfiFunction(ffi_function),
+                        kind: RustItemKind::FfiFunction(rust_ffi_function),
                         cpp_item_index: Some(cpp_item_index),
                     };
 
-                    let _rust_path = match &function.kind {
-                        CppFfiFunctionKind::Function { cpp_function, .. } => {
-                            self.generate_rust_path(&cpp_function.path, NameType::General)?
-                        }
-                        CppFfiFunctionKind::FieldAccessor {
-                            field,
-                            accessor_type,
-                        } => {
-                            let name_type = NameType::FieldAccessor(*accessor_type);
-                            self.generate_rust_path(&field.path, name_type)?
-                        }
-                    };
+                    let _func =
+                        self.generate_rust_function(cpp_ffi_function, &rust_ffi_function_path)?;
                     // TODO: generate final Rust function
 
                     self.rust_database.items.push(rust_item);
@@ -853,14 +965,43 @@ pub fn clear_rust_info_step() -> ProcessingStep {
     ProcessingStep::new("clear_rust_info", clear_rust_info)
 }
 
+/// Returns method name. For class member functions, the name doesn't
+/// include class name and scope. For free functions, the name includes
+/// modules.
+fn special_function_rust_name(function: &CppFfiFunction) -> Result<Option<String>> {
+    let r = match function.kind {
+        CppFfiFunctionKind::Function {
+            ref cpp_function, ..
+        } => {
+            if cpp_function.is_constructor() {
+                Some("new".to_string())
+            } else if let Some(ref operator) = cpp_function.operator {
+                Some(format!("operator_{}", operator.ascii_name()?))
+            } else {
+                None
+            }
+        }
+        CppFfiFunctionKind::FieldAccessor {
+            ref accessor_type,
+            ref field,
+        } => {
+            let name = &field.path.last().name;
+            let function_name = match accessor_type {
+                CppFieldAccessorType::CopyGetter => name.to_string(),
+                CppFieldAccessorType::ConstRefGetter => name.to_string(),
+                CppFieldAccessorType::MutRefGetter => format!("{}_mut", name),
+                CppFieldAccessorType::Setter => format!("set_{}", name),
+            };
+            Some(function_name)
+        }
+    };
+
+    Ok(r)
+}
+
 #[allow(dead_code)]
 mod ported {
-    use crate::cpp_ffi_data::CppFfiFunction;
-    use crate::cpp_ffi_data::CppFfiFunctionKind;
-    use crate::cpp_operator::CppOperator;
-    use crate::rust_type::RustFinalType;
-    use crate::rust_type::RustPath;
-    use ritual_common::errors::Result;
+    //use ritual_common::errors::Result;
     use ritual_common::string_utils::CaseOperations;
     use ritual_common::string_utils::WordIterator;
 
@@ -892,46 +1033,6 @@ mod ported {
             Case::Snake => parts.to_snake_case(),
             Case::Class => parts.to_class_case(),
         }
-    }
-
-    /// Returns name of the Rust function that will provide access
-    /// to a C++ operator. Most of these functions should be replaced
-    /// with trait implementations in the future.
-    fn operator_rust_name(
-        operator: &CppOperator,
-        return_type: &RustFinalType,
-        context: &RustPath,
-    ) -> Result<String> {
-        Ok(match *operator {
-            CppOperator::Conversion(_) => format!("as_{}", return_type.api_type.caption(context)?),
-            _ => format!("operator_{}", operator.ascii_name()?),
-        })
-    }
-
-    /// Returns method name. For class member functions, the name doesn't
-    /// include class name and scope. For free functions, the name includes
-    /// modules.
-    fn special_function_rust_name(
-        function: &CppFfiFunction,
-        return_type: &RustFinalType,
-        context: &RustPath,
-    ) -> Result<Option<String>> {
-        let r = if let CppFfiFunctionKind::Function {
-            ref cpp_function, ..
-        } = function.kind
-        {
-            if cpp_function.is_constructor() {
-                Some("new".to_string())
-            } else if let Some(ref operator) = cpp_function.operator {
-                Some(operator_rust_name(operator, return_type, context)?)
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        Ok(r)
     }
 
 }
