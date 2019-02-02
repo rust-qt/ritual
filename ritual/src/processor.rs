@@ -209,7 +209,7 @@ mod steps {
     }
 
     pub fn build_crate() -> ProcessingStep {
-        ProcessingStep::new("build_crate", |data| {
+        ProcessingStep::new_const("build_crate", |data| {
             let path = data
                 .workspace
                 .crate_path(&data.current_database.crate_name)?;

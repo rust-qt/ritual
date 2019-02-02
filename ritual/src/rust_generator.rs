@@ -254,10 +254,10 @@ impl<'aa> RustGenerator<'aa> {
     /// Generates trait implementations from `static_cast`, `dynamic_cast`
     /// or `qobject_cast` (to be implemented) C++ function wrappers.
     fn process_cpp_cast(&self, method: RustSingleMethod) -> Result<Vec<TraitImpl>> {
-        let mut results = Vec::new();
+        //let mut results = Vec::new();
         // TODO: qobject_cast
         let mut final_methods = vec![(method.clone(), false), (method.clone(), true)];
-        let args = &method.arguments;
+        /*let args = &method.arguments;
         let cpp_cast = if let CppFfiMethodKind::Cast(ref cast) = args.cpp_method.kind {
             cast
         } else {
@@ -277,12 +277,12 @@ impl<'aa> RustGenerator<'aa> {
                 "object".to_string(),
                 "Cast".to_string(),
             ],
-        };
-        if args.arguments.len() != 1 {
-            return Err(unexpected("1 argument expected").into());
-        }
-        let from_type = &args.arguments[0].argument_type;
-        let to_type = &args.return_type;
+        };*/
+//        if args.arguments.len() != 1 {
+//            return Err(unexpected("1 argument expected").into());
+//        }
+        /*let from_type = &args.arguments[0].argument_type;
+        let to_type = &args.return_type;*/
 
         for &mut (ref mut final_method, ref mut final_is_const) in &mut final_methods {
             let method_name = if *final_is_const {
@@ -290,11 +290,11 @@ impl<'aa> RustGenerator<'aa> {
             } else {
                 format!("{}_mut", args.cpp_method.cpp_method.name)
             };
-            final_method.scope = RustMethodScope::TraitImpl;
+            /*final_method.scope = RustMethodScope::TraitImpl;
             final_method.name = RustName::new(vec![method_name])?;
-            final_method.is_unsafe = cpp_cast.is_unsafe_static_cast();
-            let return_ref_type = args.return_type.ptr_to_ref(*final_is_const)?;
-            if &final_method.arguments.cpp_method.cpp_method.name == "static_cast" {
+            final_method.is_unsafe = cpp_cast.is_unsafe_static_cast();*/
+            /*let return_ref_type = args.return_type.ptr_to_ref(*final_is_const)?;*/
+            /*if &final_method.arguments.cpp_method.cpp_method.name == "static_cast" {
                 final_method.arguments.return_type = return_ref_type;
             } else {
                 final_method.arguments.return_type.rust_api_to_c_conversion =
@@ -310,11 +310,11 @@ impl<'aa> RustGenerator<'aa> {
                     is_const2: false,
                     generic_arguments: Some(vec![return_ref_type.rust_api_type]),
                 }
-            };
-            final_method.arguments.arguments[0].argument_type = final_method.arguments.arguments[0]
+            };*/
+            /*final_method.arguments.arguments[0].argument_type = final_method.arguments.arguments[0]
                 .argument_type
                 .ptr_to_ref(*final_is_const)?;
-            final_method.arguments.arguments[0].name = "self".to_string();
+            final_method.arguments.arguments[0].name = "self".to_string();*/
 
             if !cpp_cast.is_unsafe_static_cast() && cpp_cast.is_direct_static_cast() {
                 let mut deref_method = final_method.clone();
@@ -353,7 +353,7 @@ impl<'aa> RustGenerator<'aa> {
                 });
             }
         }
-        let trait_type = RustType::Common {
+        /*let trait_type = RustType::Common {
             base: RustName::new(trait_name)?,
             indirection: RustTypeIndirection::None,
             is_const: false,
@@ -370,7 +370,7 @@ impl<'aa> RustGenerator<'aa> {
                 .map(|x| x.0.to_rust_method())
                 .collect(),
         });
-        Ok(results)
+        Ok(results)*/
     }
 
     /// Generates a single overloaded method from all specified methods or

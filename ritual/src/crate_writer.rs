@@ -284,6 +284,11 @@ fn run(data: &mut ProcessorData) -> Result<()> {
     )?;
 
     run_command(Command::new("cargo").arg("fmt").current_dir(&output_path))?;
+    run_command(
+        Command::new("rustfmt")
+            .arg("src/ffi.in.rs")
+            .current_dir(&output_path),
+    )?;
 
     save_json(
         output_path.join("build_script_data.json"),
@@ -298,5 +303,5 @@ fn run(data: &mut ProcessorData) -> Result<()> {
 
 pub fn crate_writer_step() -> ProcessingStep {
     // TODO: set dependencies
-    ProcessingStep::new("crate_writer", run)
+    ProcessingStep::new_const("crate_writer", run)
 }

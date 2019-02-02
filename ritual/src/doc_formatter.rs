@@ -139,7 +139,11 @@ pub fn struct_doc(type1: &RustStruct) -> String {
 pub fn enum_value_doc(value: &RustEnumValue) -> String {
     let mut doc = format!(
         "C++ enum variant: {}",
-        wrap_inline_cpp_code(&format!("{} = {}", value.doc.cpp_path.last(), value.value))
+        wrap_inline_cpp_code(&format!(
+            "{} = {}",
+            value.doc.cpp_path.last().name,
+            value.value
+        ))
     );
     if let Some(ref cpp_doc) = value.doc.cpp_doc {
         doc = format!("{} ({})", cpp_doc, doc);

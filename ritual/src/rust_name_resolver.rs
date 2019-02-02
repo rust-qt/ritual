@@ -4,6 +4,7 @@ use crate::config::Config;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;
 use crate::cpp_data::CppTypeDataKind;
+use crate::cpp_ffi_data::CppCast;
 use crate::cpp_ffi_data::CppFfiArgumentMeaning;
 use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_ffi_data::CppFfiFunctionKind;
@@ -31,7 +32,6 @@ use crate::rust_info::RustFFIArgument;
 use crate::rust_info::RustFFIFunction;
 use crate::rust_info::RustFfiClassTypeDoc;
 use crate::rust_info::RustFfiWrapperData;
-use crate::rust_info::RustFunction;
 use crate::rust_info::RustFunctionArgument;
 use crate::rust_info::RustFunctionKind;
 use crate::rust_info::RustItemKind;
@@ -41,9 +41,11 @@ use crate::rust_info::RustModuleKind;
 use crate::rust_info::RustPathScope;
 use crate::rust_info::RustStruct;
 use crate::rust_info::RustStructKind;
+use crate::rust_info::RustTraitImpl;
 use crate::rust_info::RustWrapperType;
 use crate::rust_info::RustWrapperTypeDocData;
 use crate::rust_info::RustWrapperTypeKind;
+use crate::rust_info::UnnamedRustFunction;
 use crate::rust_type::RustFinalType;
 use crate::rust_type::RustPath;
 use crate::rust_type::RustPointerLikeTypeKind;
@@ -372,12 +374,114 @@ impl State<'_> {
         })
     }
 
+    fn fix_cast_function(
+        mut unnamed_function: UnnamedRustFunction,
+        cast: &CppCast,
+        is_const: bool,
+    ) -> Result<UnnamedRustFunction> {
+        let return_ref_type = unnamed_function.return_type.ptr_to_ref(is_const)?;
+        match cast {
+            CppCast::Static { .. } => {
+                unnamed_function.return_type = return_ref_type;
+            }
+            CppCast::Dynamic | CppCast::QObject => {
+                unnamed_function.return_type.api_to_ffi_conversion =
+                    RustToFfiTypeConversion::OptionRefToPtr;
+                unnamed_function.return_type.api_type = RustType::Common {
+                    path: RustPath::from_str_unchecked("std::option::Option"),
+                    generic_arguments: Some(vec![return_ref_type.api_type]),
+                }
+            }
+        }
+
+        unnamed_function.arguments[0].argument_type = unnamed_function.arguments[0]
+            .argument_type
+            .ptr_to_ref(is_const)?;
+        unnamed_function.arguments[0].name = "self".to_string();
+        Ok(unnamed_function)
+    }
+
+    fn process_cast(
+        mut unnamed_function: UnnamedRustFunction,
+        cast: &CppCast,
+    ) -> Result<Vec<RustItemKind>> {
+        let mut results = Vec::new();
+        let args = &unnamed_function.arguments;
+        if args.len() != 1 {
+            bail!("1 argument expected");
+        }
+
+        let from_type = &args[0].argument_type;
+        let to_type = &unnamed_function.return_type;
+
+        let trait_path;
+        let derived_type;
+        let cast_function_name;
+        let cast_function_name_mut;
+        unnamed_function.is_unsafe = false;
+        match cast {
+            CppCast::Static { ref is_unsafe, .. } => {
+                if *is_unsafe {
+                    trait_path = RustPath::from_str_unchecked("cpp_utils::UnsafeStaticCast");
+                    derived_type = to_type;
+                    unnamed_function.is_unsafe = true;
+                } else {
+                    trait_path = RustPath::from_str_unchecked("cpp_utils::StaticCast");
+                    derived_type = from_type;
+                }
+                cast_function_name = "static_cast";
+                cast_function_name_mut = "static_cast_mut";
+            }
+            CppCast::Dynamic => {
+                trait_path = RustPath::from_str_unchecked("cpp_utils::DynamicCast");
+                derived_type = to_type;
+                cast_function_name = "dynamic_cast";
+                cast_function_name_mut = "dynamic_cast_mut";
+            }
+            CppCast::QObject => {
+                trait_path = RustPath::from_str_unchecked("qt_core::qobject::Cast");
+                derived_type = to_type;
+                cast_function_name = "qobject_cast";
+                cast_function_name_mut = "qobject_cast_mut";
+            }
+        };
+
+        // TODO: add Deref and DerefMut trait impls
+
+        let cast_function = State::fix_cast_function(unnamed_function.clone(), cast, true)?
+            .with_path(trait_path.join(cast_function_name));
+
+        let cast_function_mut = State::fix_cast_function(unnamed_function.clone(), cast, false)?
+            .with_path(trait_path.join(cast_function_name_mut));
+
+        let parent_path = if let RustType::Common { ref path, .. } =
+            derived_type.ffi_type.pointer_like_to_target()?
+        {
+            path.parent().expect("cast argument path must have parent")
+        } else {
+            bail!("can't get parent for derived_type: {:?}", derived_type);
+        };
+
+        results.push(RustItemKind::TraitImpl(RustTraitImpl {
+            target_type: from_type.ptr_to_value()?.api_type,
+            parent_path,
+            trait_type: RustType::Common {
+                path: trait_path,
+                generic_arguments: Some(vec![to_type.ptr_to_value()?.api_type]),
+            },
+            associated_types: Vec::new(),
+            functions: vec![cast_function, cast_function_mut],
+        }));
+
+        Ok(results)
+    }
+
     /// Converts one function to a `RustSingleMethod`.
     fn generate_rust_function(
         &self,
         function: &CppFfiFunction,
         ffi_function_path: &RustPath,
-    ) -> Result<RustFunction> {
+    ) -> Result<Vec<RustItemKind>> {
         let mut arguments = Vec::new();
         for (arg_index, arg) in function.arguments.iter().enumerate() {
             if arg.meaning != CppFfiArgumentMeaning::ReturnValue {
@@ -462,9 +566,79 @@ impl State<'_> {
             }
         }
 
-        let is_unsafe = arguments
-            .iter()
-            .any(|arg| arg.argument_type.api_type.is_unsafe_argument());
+        let unnamed_function = UnnamedRustFunction {
+            is_public: true,
+            arguments: arguments.clone(),
+            return_type,
+            kind: RustFunctionKind::FfiWrapper(RustFfiWrapperData {
+                cpp_ffi_function: function.clone(),
+                ffi_function_path: ffi_function_path.clone(),
+                return_type_ffi_index: return_arg_index,
+            }),
+            extra_doc: None,
+            is_unsafe: true,
+        };
+
+        if let CppFfiFunctionKind::Function {
+            ref cpp_function,
+            ref cast,
+            ..
+        } = function.kind
+        {
+            if cpp_function.is_destructor() {
+                if arguments.len() != 1 {
+                    bail!("destructor must have one argument");
+                }
+                let target_type = arguments[0]
+                    .argument_type
+                    .api_type
+                    .pointer_like_to_target()?;
+
+                let parent_path = if let RustType::Common { ref path, .. } = target_type {
+                    path.parent()
+                        .expect("destructor argument path must have parent")
+                } else {
+                    bail!("can't get parent for target type: {:?}", target_type);
+                };
+
+                // TODO: CppDeletable for some types
+                let function_name;
+                let trait_path;
+                let is_unsafe;
+                match function.allocation_place {
+                    ReturnValueAllocationPlace::Stack => {
+                        function_name = "drop";
+                        trait_path = RustPath::from_str_unchecked("std::ops::Drop");
+                        is_unsafe = false;
+                    }
+                    ReturnValueAllocationPlace::Heap => {
+                        function_name = "delete";
+                        trait_path = RustPath::from_str_unchecked("cpp_utils::CppDeletable");
+                        is_unsafe = true;
+                    }
+                    ReturnValueAllocationPlace::NotApplicable => {
+                        bail!("invalid allocation_place for destructor");
+                    }
+                }
+                let mut function = unnamed_function.with_path(trait_path.join(function_name));
+                function.is_unsafe = is_unsafe;
+
+                let rust_item = RustItemKind::TraitImpl(RustTraitImpl {
+                    target_type,
+                    parent_path,
+                    trait_type: RustType::Common {
+                        path: trait_path,
+                        generic_arguments: None,
+                    },
+                    associated_types: Vec::new(),
+                    functions: vec![function],
+                });
+                return Ok(vec![rust_item]);
+            }
+            if let Some(cast) = cast {
+                return State::process_cast(unnamed_function, cast);
+            }
+        }
 
         let cpp_path = match function.kind {
             CppFfiFunctionKind::Function {
@@ -473,20 +647,8 @@ impl State<'_> {
             CppFfiFunctionKind::FieldAccessor { ref field, .. } => &field.path,
         };
         let path = self.generate_rust_path(cpp_path, &NameType::Function(function))?;
-
-        Ok(RustFunction {
-            is_public: true,
-            path,
-            arguments,
-            return_type,
-            kind: RustFunctionKind::FfiWrapper(RustFfiWrapperData {
-                cpp_ffi_function: function.clone(),
-                ffi_function_path: ffi_function_path.clone(),
-                return_type_ffi_index: return_arg_index,
-            }),
-            extra_doc: None,
-            is_unsafe,
-        })
+        let rust_item = RustItemKind::Function(unnamed_function.with_path(path));
+        Ok(vec![rust_item])
     }
 
     fn find_rust_items(&self, cpp_path: &CppPath) -> Result<Vec<&RustDatabaseItem>> {
@@ -829,16 +991,22 @@ impl State<'_> {
                 CppFfiItemKind::Function(cpp_ffi_function) => {
                     let rust_ffi_function = self.generate_ffi_function(&cpp_ffi_function)?;
                     let rust_ffi_function_path = rust_ffi_function.path.clone();
-                    let rust_item = RustDatabaseItem {
+                    let ffi_rust_item = RustDatabaseItem {
                         kind: RustItemKind::FfiFunction(rust_ffi_function),
                         cpp_item_index: Some(cpp_item_index),
                     };
 
-                    let _func =
-                        self.generate_rust_function(cpp_ffi_function, &rust_ffi_function_path)?;
-                    // TODO: generate final Rust function
+                    for item in
+                        self.generate_rust_function(cpp_ffi_function, &rust_ffi_function_path)?
+                    {
+                        let api_rust_item = RustDatabaseItem {
+                            kind: item,
+                            cpp_item_index: Some(cpp_item_index),
+                        };
+                        self.rust_database.items.push(api_rust_item);
+                    }
+                    self.rust_database.items.push(ffi_rust_item);
 
-                    self.rust_database.items.push(rust_item);
                     *modified = true;
                     ffi_item.is_rust_processed = true;
                 }

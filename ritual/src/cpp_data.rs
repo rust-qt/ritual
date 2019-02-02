@@ -132,7 +132,7 @@ pub struct CppTypeDoc {
     pub cross_references: Vec<String>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppPathItem {
     pub name: String,
     pub template_arguments: Option<Vec<CppType>>,
@@ -259,7 +259,7 @@ impl CppPathItem {
     }
 }
 
-impl fmt::Display for CppPathItem {
+impl fmt::Debug for CppPathItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
         write!(f, "{}", self.name)?;
         if let Some(ref args) = self.template_arguments {

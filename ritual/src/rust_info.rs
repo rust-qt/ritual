@@ -179,6 +179,30 @@ pub enum RustFunctionKind {
     },
 }
 
+#[derive(Debug, Clone)]
+pub struct UnnamedRustFunction {
+    pub is_public: bool,
+    pub is_unsafe: bool,
+    pub kind: RustFunctionKind,
+    pub arguments: Vec<RustFunctionArgument>,
+    pub return_type: RustFinalType,
+    pub extra_doc: Option<String>,
+}
+
+impl UnnamedRustFunction {
+    pub fn with_path(self, path: RustPath) -> RustFunction {
+        RustFunction {
+            path,
+            is_public: self.is_public,
+            is_unsafe: self.is_unsafe,
+            kind: self.kind,
+            arguments: self.arguments,
+            return_type: self.return_type,
+            extra_doc: self.extra_doc,
+        }
+    }
+}
+
 /// Information about a public API method.
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustFunction {

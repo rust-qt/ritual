@@ -346,6 +346,14 @@ impl RustType {
             }
         }
     }
+
+    pub fn pointer_like_to_target(&self) -> Result<RustType> {
+        if let RustType::PointerLike { target, .. } = self {
+            Ok((**target).clone())
+        } else {
+            bail!("not a pointer like type");
+        }
+    }
 }
 
 impl RustFinalType {

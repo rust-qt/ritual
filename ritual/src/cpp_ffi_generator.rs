@@ -450,7 +450,7 @@ fn generate_field_accessors(
             new_methods.push(create_method(
                 class_path.join(CppPathItem::from_str_unchecked(&format!(
                     "{}_mut",
-                    field.path.last()
+                    field.path.last().name
                 ))),
                 CppFieldAccessorType::MutRefGetter,
                 type2_mut,
@@ -472,7 +472,7 @@ fn generate_field_accessors(
         new_methods.push(create_method(
             class_path.join(CppPathItem::from_str_unchecked(&format!(
                 "set_{}",
-                field.path.last()
+                field.path.last().name
             ))),
             CppFieldAccessorType::Setter,
             CppType::Void,

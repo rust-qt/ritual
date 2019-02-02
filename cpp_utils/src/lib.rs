@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::{CppBox, CppDeletable, Deleter};
+    use crate::{CppBox, CppDeletable};
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -15,8 +15,8 @@ mod tests {
     }
 
     impl CppDeletable for Struct1 {
-        fn deleter() -> Deleter<Self> {
-            struct1_delete
+        unsafe fn delete(&mut self) {
+            struct1_delete(self);
         }
     }
 
@@ -33,13 +33,6 @@ mod tests {
         assert!(*value1.borrow() == 42);
     }
 }
-
-/// Deleter function type.
-///
-/// This is usually a C++ function imported via FFI
-/// from a wrapper library. The body of this function
-/// should be "delete this_ptr;".
-pub type Deleter<T> = unsafe extern "C" fn(this_ptr: *mut T);
 
 /// Indicates that the type can be put into a CppBox.
 ///
@@ -61,7 +54,7 @@ pub type Deleter<T> = unsafe extern "C" fn(this_ptr: *mut T);
 /// ```
 pub trait CppDeletable: Sized {
     /// Returns deleter function for this type.
-    fn deleter() -> Deleter<Self>;
+    unsafe fn delete(&mut self);
 }
 
 /// A C++ pointer wrapper to manage deletion of objects.
@@ -69,32 +62,29 @@ pub trait CppDeletable: Sized {
 /// Objects of CppBox should be created by calling into_box() for
 /// types that implement CppDeletable trait. The object will
 /// be deleted when corresponding CppBox is deleted.
-pub struct CppBox<T: CppDeletable> {
-    ptr: *mut T,
-    deleter: Deleter<T>,
-}
+pub struct CppBox<T: CppDeletable>(*mut T);
 
 impl<T: CppDeletable> CppBox<T> {
     /// Returns constant raw pointer to the value in the box.
     pub fn as_ptr(&self) -> *const T {
-        self.ptr
+        self.0
     }
     /// Returns mutable raw pointer to the value in the box.
     pub fn as_mut_ptr(&self) -> *mut T {
-        self.ptr
+        self.0
     }
     /// Returns the pointer that was used to create the object and destroys the box.
     /// The caller of the function becomes the owner of the object and should
     /// ensure that the object will be deleted at some point.
     pub fn into_raw(mut self) -> *mut T {
-        let ptr = self.ptr;
-        self.ptr = std::ptr::null_mut();
+        let ptr = self.0;
+        self.0 = std::ptr::null_mut();
         ptr
     }
 
     /// Returns true if the pointer is null.
     pub fn is_null(&self) -> bool {
-        self.ptr.is_null()
+        self.0.is_null()
     }
 }
 
@@ -123,43 +113,40 @@ impl<T: CppDeletable> CppBox<T> {
     /// a null pointer in a `CppBox`
     /// using `as_ref`, `as_mut`, `deref` or `deref_mut` will result in a panic.
     pub unsafe fn new(ptr: *mut T) -> CppBox<T> {
-        CppBox {
-            ptr,
-            deleter: CppDeletable::deleter(),
-        }
+        CppBox(ptr)
     }
 }
 
 impl<T: CppDeletable> AsRef<T> for CppBox<T> {
     fn as_ref(&self) -> &T {
-        unsafe { self.ptr.as_ref().unwrap() }
+        unsafe { self.0.as_ref().unwrap() }
     }
 }
 
 impl<T: CppDeletable> AsMut<T> for CppBox<T> {
     fn as_mut(&mut self) -> &mut T {
-        unsafe { self.ptr.as_mut().unwrap() }
+        unsafe { self.0.as_mut().unwrap() }
     }
 }
 
 impl<T: CppDeletable> std::ops::Deref for CppBox<T> {
     type Target = T;
     fn deref(&self) -> &T {
-        unsafe { self.ptr.as_ref().unwrap() }
+        unsafe { self.0.as_ref().unwrap() }
     }
 }
 
 impl<T: CppDeletable> std::ops::DerefMut for CppBox<T> {
     fn deref_mut(&mut self) -> &mut T {
-        unsafe { self.ptr.as_mut().unwrap() }
+        unsafe { self.0.as_mut().unwrap() }
     }
 }
 
 impl<T: CppDeletable> Drop for CppBox<T> {
     fn drop(&mut self) {
-        if !self.ptr.is_null() {
+        if !self.0.is_null() {
             unsafe {
-                (self.deleter)(self.ptr);
+                T::delete(&mut *self.0);
             }
         }
     }
@@ -167,10 +154,7 @@ impl<T: CppDeletable> Drop for CppBox<T> {
 
 impl<T: CppDeletable> Default for CppBox<T> {
     fn default() -> CppBox<T> {
-        CppBox {
-            ptr: std::ptr::null_mut(),
-            deleter: CppDeletable::deleter(),
-        }
+        CppBox(std::ptr::null_mut())
     }
 }
 

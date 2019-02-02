@@ -261,20 +261,6 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
                         "".to_string()
                     }
                 };
-                let template_args = if let Some(cpp_method) = method.kind.cpp_function() {
-                    match cpp_method.path.last().template_arguments {
-                        Some(ref args) => {
-                            let mut texts = Vec::new();
-                            for arg in args {
-                                texts.push(arg.to_cpp_code(None)?);
-                            }
-                            format!("<{}>", texts.join(", "))
-                        }
-                        None => String::new(),
-                    }
-                } else {
-                    String::new()
-                };
                 match method.kind {
                     CppFfiFunctionKind::FieldAccessor {
                         ref accessor_type,
@@ -285,16 +271,16 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
                             format!(
                                 "{}{} = {}",
                                 scope_specifier,
-                                field.path.last(),
+                                field.path.last().name,
                                 arguments_values(method)?
                             )
                         } else {
-                            format!("{}{}", scope_specifier, field.path.last())
+                            format!("{}{}", scope_specifier, field.path.last().name)
                         }
                     }
                     CppFfiFunctionKind::Function {
                         ref cpp_function, ..
-                    } => format!("{}{}{}", scope_specifier, cpp_function.path, template_args),
+                    } => format!("{}{}", scope_specifier, cpp_function.path.to_cpp_code()?),
                 }
             };
         if is_field_accessor {

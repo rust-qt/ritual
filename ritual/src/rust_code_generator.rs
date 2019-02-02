@@ -33,6 +33,7 @@ use std::fs;
 use std::io;
 use std::io::BufWriter;
 use std::io::Write;
+use std::iter;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -149,7 +150,8 @@ fn format_doc_extended(doc: &str, is_outer: bool) -> String {
                     format!("{}{}", prefix, x)
                 }
             })
-            .join("")
+            .chain(iter::once(String::new()))
+            .join("\n")
     }
 }
 
@@ -193,7 +195,7 @@ impl Generator {
             RustItemKind::Struct(ref data) => self.generate_struct(data, database),
             RustItemKind::EnumValue(ref value) => self.generate_enum_value(value),
             RustItemKind::TraitImpl(ref value) => self.generate_trait_impl(value),
-            RustItemKind::Function(ref value) => self.generate_rust_final_function(value),
+            RustItemKind::Function(ref value) => self.generate_rust_final_function(value, false),
             RustItemKind::FfiFunction(ref value) => self.generate_ffi_function(value),
         }
     }
@@ -730,8 +732,16 @@ impl Generator {
     }
 
     /// Generates complete code of a Rust wrapper function.
-    fn generate_rust_final_function(&mut self, func: &RustFunction) -> Result<()> {
-        let maybe_pub = if func.is_public { "pub " } else { "" };
+    fn generate_rust_final_function(
+        &mut self,
+        func: &RustFunction,
+        is_in_trait_context: bool,
+    ) -> Result<()> {
+        let maybe_pub = if func.is_public && !is_in_trait_context {
+            "pub "
+        } else {
+            ""
+        };
         let maybe_unsafe = if func.is_unsafe { "unsafe " } else { "" };
 
         let body = match func.kind {
@@ -818,7 +828,7 @@ impl Generator {
         )?;
 
         for func in &trait1.functions {
-            self.generate_rust_final_function(func)?;
+            self.generate_rust_final_function(func, true)?;
         }
 
         writeln!(self, "}}\n")?;
