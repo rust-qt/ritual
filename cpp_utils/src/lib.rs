@@ -38,7 +38,7 @@ mod tests {
 ///
 /// Example of implementation:
 /// ```
-/// use cpp_utils::{CppDeletable, Deleter};
+/// use cpp_utils::{CppDeletable};
 ///
 /// struct Struct1;
 ///
@@ -47,13 +47,13 @@ mod tests {
 /// }
 ///
 /// impl CppDeletable for Struct1 {
-///   fn deleter() -> Deleter<Self> {
-///     struct1_delete
-///   }
+///     unsafe fn delete(&mut self) {
+///         struct1_delete(self)
+///     }
 /// }
 /// ```
 pub trait CppDeletable: Sized {
-    /// Returns deleter function for this type.
+    /// Calls C++ `delete x` on `self`.
     unsafe fn delete(&mut self);
 }
 

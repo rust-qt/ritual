@@ -158,3 +158,27 @@ impl<'a> CaseOperations for Vec<&'a str> {
         iterator_to_upper_case_words(self.into_iter())
     }
 }
+
+pub fn trim_slice<T, F>(slice: &[T], mut f: F) -> &[T]
+where
+    F: FnMut(&T) -> bool,
+{
+    let first_good_index = if let Some(index) = slice.iter().position(|item| !f(item)) {
+        index
+    } else {
+        return &[];
+    };
+    let last_good_index = slice
+        .iter()
+        .rposition(|item| !f(item))
+        .expect("slice must contain good items as checked above");
+    &slice[first_good_index..=last_good_index]
+}
+
+#[test]
+fn test_trim_slice1() {
+    assert_eq!(
+        trim_slice(&["", "asd", "dsa", "", ""], |x| x.is_empty()),
+        &["asd", "dsa"]
+    );
+}

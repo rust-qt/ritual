@@ -28,12 +28,12 @@ use ritual_common::errors::{bail, err_msg, unexpected, Result};
 use ritual_common::file_utils::create_dir_all;
 use ritual_common::file_utils::create_file;
 use ritual_common::file_utils::File;
+use ritual_common::string_utils::trim_slice;
 use ritual_common::utils::MapIfOk;
 use std::fs;
 use std::io;
 use std::io::BufWriter;
 use std::io::Write;
-use std::iter;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -138,21 +138,26 @@ fn format_doc(doc: &str) -> String {
 /// markdown code `doc`.
 fn format_doc_extended(doc: &str, is_outer: bool) -> String {
     if doc.is_empty() {
-        String::new()
-    } else {
-        doc.split('\n')
-            .map(|x| {
-                let prefix = if is_outer { "//! " } else { "/// " };
-
-                if x.starts_with("    ") {
-                    format!("{}{}", prefix, x.replace("    ", "&#32;   "))
-                } else {
-                    format!("{}{}", prefix, x)
-                }
-            })
-            .chain(iter::once(String::new()))
-            .join("\n")
+        return String::new();
     }
+    let prefix = if is_outer { "//! " } else { "/// " };
+    let lines = doc.split('\n').collect_vec();
+    let lines = trim_slice(&lines, |x| x.is_empty());
+    if lines.is_empty() {
+        return String::new();
+    }
+    let extra_line_breaks = if is_outer { "\n\n" } else { "\n" };
+    lines
+        .iter()
+        .map(|x| {
+            if x.starts_with("    ") {
+                format!("{}{}", prefix, x.replace("    ", "&#32;   "))
+            } else {
+                format!("{}{}", prefix, x)
+            }
+        })
+        .join("\n")
+        + extra_line_breaks
 }
 
 impl Generator {
@@ -227,7 +232,7 @@ impl Generator {
             _ => {}
         }
 
-        writeln!(
+        write!(
             self,
             "{}",
             format_doc_extended(&doc_formatter::module_doc(&module.doc), true)
@@ -266,7 +271,7 @@ impl Generator {
     }
 
     fn generate_struct(&mut self, rust_struct: &RustStruct, database: &RustDatabase) -> Result<()> {
-        writeln!(
+        write!(
             self,
             "{}",
             format_doc(&doc_formatter::struct_doc(rust_struct))
@@ -378,7 +383,7 @@ impl Generator {
     }
 
     fn generate_enum_value(&mut self, value: &RustEnumValue) -> Result<()> {
-        writeln!(
+        write!(
             self,
             "{}",
             format_doc(&doc_formatter::enum_value_doc(value))
