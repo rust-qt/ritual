@@ -638,7 +638,6 @@ impl State<'_> {
                     bail!("can't get parent for target type: {:?}", target_type);
                 };
 
-                // TODO: CppDeletable for some types
                 let function_name;
                 let trait_path;
                 let is_unsafe;
@@ -1262,4 +1261,55 @@ mod ported {
         }
     }
 
+    #[test]
+    fn remove_qt_prefix_and_convert_case_test() {
+        assert_eq!(
+            remove_qt_prefix_and_convert_case(&"OneTwo".to_string(), Case::Class, false),
+            "OneTwo"
+        );
+        assert_eq!(
+            remove_qt_prefix_and_convert_case(&"OneTwo".to_string(), Case::Snake, false),
+            "one_two"
+        );
+        assert_eq!(
+            remove_qt_prefix_and_convert_case(&"OneTwo".to_string(), Case::Class, true),
+            "OneTwo"
+        );
+        assert_eq!(
+            remove_qt_prefix_and_convert_case(&"OneTwo".to_string(), Case::Snake, true),
+            "one_two"
+        );
+        assert_eq!(
+            remove_qt_prefix_and_convert_case(&"QDirIterator".to_string(), Case::Class, false),
+            "QDirIterator"
+        );
+        assert_eq!(
+            remove_qt_prefix_and_convert_case(&"QDirIterator".to_string(), Case::Snake, false),
+            "q_dir_iterator"
+        );
+        assert_eq!(
+            remove_qt_prefix_and_convert_case(&"QDirIterator".to_string(), Case::Class, true),
+            "DirIterator"
+        );
+        assert_eq!(
+            remove_qt_prefix_and_convert_case(&"QDirIterator".to_string(), Case::Snake, true),
+            "dir_iterator"
+        );
+        assert_eq!(
+            remove_qt_prefix_and_convert_case(&"Qt3DWindow".to_string(), Case::Class, false),
+            "Qt3DWindow"
+        );
+        assert_eq!(
+            remove_qt_prefix_and_convert_case(&"Qt3DWindow".to_string(), Case::Snake, false),
+            "qt_3d_window"
+        );
+        assert_eq!(
+            remove_qt_prefix_and_convert_case(&"Qt3DWindow".to_string(), Case::Class, true),
+            "Qt3DWindow"
+        );
+        assert_eq!(
+            remove_qt_prefix_and_convert_case(&"Qt3DWindow".to_string(), Case::Snake, true),
+            "qt_3d_window"
+        );
+    }
 }

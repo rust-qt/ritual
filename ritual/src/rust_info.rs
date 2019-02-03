@@ -6,8 +6,13 @@ use crate::cpp_data::CppPath;
 use crate::cpp_data::CppTypeDoc;
 use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_type::CppType;
+use crate::rust_type::RustPointerLikeTypeKind;
 use crate::rust_type::{RustFinalType, RustPath, RustType};
+use itertools::Itertools;
+use ritual_common::errors::{bail, Result};
+use ritual_common::utils::MapIfOk;
 use serde_derive::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 /// One variant of a Rust enum
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -201,21 +206,130 @@ impl UnnamedRustFunction {
             extra_doc: self.extra_doc,
         }
     }
+
+    /// Returns information about `self` argument of this method.
+    fn self_arg_kind(&self) -> Result<RustFunctionSelfArgKind> {
+        if let Some(arg) = self.arguments.get(0) {
+            if arg.name == "self" {
+                match arg.argument_type.api_type {
+                    RustType::PointerLike {
+                        ref kind,
+                        ref is_const,
+                        ..
+                    } => match *kind {
+                        RustPointerLikeTypeKind::Pointer => {
+                            bail!("pointer self arg is not supported")
+                        }
+                        RustPointerLikeTypeKind::Reference { .. } => {
+                            if *is_const {
+                                return Ok(RustFunctionSelfArgKind::ConstRef);
+                            } else {
+                                return Ok(RustFunctionSelfArgKind::MutRef);
+                            }
+                        }
+                    },
+                    RustType::Common { .. } => {
+                        return Ok(RustFunctionSelfArgKind::Value);
+                    }
+                    _ => {
+                        bail!("invalid self argument type: {:?}", self);
+                    }
+                }
+            }
+        }
+        Ok(RustFunctionSelfArgKind::None)
+    }
+
+    /// Generates name suffix for this function using `caption_strategy`.
+    /// `all_self_args` should contain all kinds of arguments found in
+    /// the functions that have to be disambiguated using the name suffix.
+    /// `index` is number of the function used in `RustFunctionCaptionStrategy::Index`.
+    #[allow(dead_code)]
+    fn name_suffix(
+        &self,
+        context: &RustPath,
+        caption_strategy: &RustFunctionCaptionStrategy,
+        all_self_args: &HashSet<RustFunctionSelfArgKind>,
+        index: usize,
+    ) -> Result<Option<String>> {
+        if caption_strategy == &RustFunctionCaptionStrategy::UnsafeOnly {
+            return Ok(if self.is_unsafe {
+                Some("unsafe".to_string())
+            } else {
+                None
+            });
+        }
+        let result = {
+            let self_arg_kind = self.self_arg_kind()?;
+            let self_arg_kind_caption =
+                if all_self_args.len() == 1 || self_arg_kind == RustFunctionSelfArgKind::ConstRef {
+                    None
+                } else if self_arg_kind == RustFunctionSelfArgKind::None {
+                    Some("static")
+                } else if self_arg_kind == RustFunctionSelfArgKind::MutRef {
+                    if all_self_args.contains(&RustFunctionSelfArgKind::ConstRef) {
+                        Some("mut")
+                    } else {
+                        None
+                    }
+                } else {
+                    bail!("unsupported self arg kinds combination");
+                };
+            let other_caption = match *caption_strategy {
+                RustFunctionCaptionStrategy::SelfOnly => None,
+                RustFunctionCaptionStrategy::UnsafeOnly => unreachable!(),
+                RustFunctionCaptionStrategy::SelfAndIndex => Some(index.to_string()),
+                RustFunctionCaptionStrategy::SelfAndArgNames => {
+                    if self.arguments.is_empty() {
+                        Some("no_args".to_string())
+                    } else {
+                        Some(self.arguments.iter().map(|a| &a.name).join("_"))
+                    }
+                }
+                RustFunctionCaptionStrategy::SelfAndArgTypes => {
+                    if self.arguments.is_empty() {
+                        Some("no_args".to_string())
+                    } else {
+                        Some(
+                            self.arguments
+                                .iter()
+                                .filter(|t| &t.name != "self")
+                                .map_if_ok(|t| t.argument_type.api_type.caption(context))?
+                                .join("_"),
+                        )
+                    }
+                }
+            };
+            let mut key_caption_items = Vec::new();
+            if let Some(c) = self_arg_kind_caption {
+                key_caption_items.push(c.to_string());
+            }
+            if let Some(c) = other_caption {
+                key_caption_items.push(c);
+            }
+            if key_caption_items.is_empty() {
+                None
+            } else {
+                Some(key_caption_items.join("_"))
+            }
+        };
+        Ok(result)
+    }
 }
 
-/// Information about a public API method.
+/// Information about a public API function.
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustFunction {
     pub is_public: bool,
 
-    /// True if the method is `unsafe`.
+    /// True if the function is `unsafe`.
     pub is_unsafe: bool,
-    /// Full name of the method.
+    /// Full name of the function.
     pub path: RustPath,
 
     pub kind: RustFunctionKind,
 
-    /// List of arguments. For an overloaded method, only the arguments
+    /// List of arguments. For an overloaded function, only the arguments
     /// involved in the overloading are listed in this field.
     /// There can also be arguments shared by all variants (typically the
     /// `self` argument), and they are not listed in this field.
@@ -227,10 +341,10 @@ pub struct RustFunction {
     pub extra_doc: Option<String>,
 }
 
-/// Information about type of `self` argument of the method.
+/// Information about type of `self` argument of the function.
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub enum RustFunctionSelfArgKind {
-    /// No `self` argument (static method or a free function).
+    /// No `self` argument (static function or a free function).
     None,
     /// `&self` argument.
     ConstRef,
@@ -300,19 +414,19 @@ pub struct RustModule {
     pub kind: RustModuleKind,
 }
 
-/// Method of generating name suffixes for disambiguating multiple Rust methods
+/// Function of generating name suffixes for disambiguating multiple Rust functions
 /// with the same name.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RustFunctionCaptionStrategy {
     /// Only type of `self` is used.
     SelfOnly,
-    /// Unsafe methods have `unsafe` suffix, and safe methods have no suffix.
+    /// Unsafe functions have `unsafe` suffix, and safe functions have no suffix.
     UnsafeOnly,
     /// Type of `self` and types of other arguments are used.
     SelfAndArgTypes,
     /// Type of `self` and names of other arguments are used.
     SelfAndArgNames,
-    /// Type of `self` and index of method are used.
+    /// Type of `self` and index of function are used.
     SelfAndIndex,
 }
 
