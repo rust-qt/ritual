@@ -810,11 +810,12 @@ impl State<'_> {
                 .map_if_ok(|item| cpp_path_item_to_name(item))?
                 .join("_"),
             NameType::ApiFunction(function) => {
-                if let Some(last_name_override) = special_function_rust_name(function)? {
+                let s = if let Some(last_name_override) = special_function_rust_name(function)? {
                     last_name_override.clone()
                 } else {
                     cpp_path_item_to_name(cpp_path.last())?
-                }
+                };
+                s.to_snake_case()
             }
             NameType::ClassPtr => format!("{}Ptr", cpp_path_item_to_name(&cpp_path.last())?),
             NameType::General | NameType::Module | NameType::FfiFunction | NameType::FfiStruct => {
