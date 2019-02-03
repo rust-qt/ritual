@@ -1,7 +1,5 @@
 //! Types and functions used for Rust code generation.
 
-#![allow(dead_code)]
-
 use crate::doc_formatter;
 use crate::rust_info::RustDatabase;
 use crate::rust_info::RustDatabaseItem;
@@ -104,7 +102,6 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: &str) -> String {
 }
 
 struct Generator {
-    #[allow(dead_code)]
     crate_name: String,
     output_src_path: PathBuf,
     destination: Vec<File<BufWriter<fs::File>>>,

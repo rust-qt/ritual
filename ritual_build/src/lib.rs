@@ -49,7 +49,6 @@ impl Config {
     /// located at the crate root. The caller may change
     /// `CppBuildPaths` and `CppBuildConfig` values stored in this object
     /// and call `config.run()` to apply them.
-    #[allow(clippy::new_ret_no_self)]
     pub fn new() -> Result<Config> {
         Ok(Config {
             build_script_data: build_script_data()?,

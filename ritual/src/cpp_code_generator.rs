@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::cpp_ffi_data::{
     CppFfiArgumentMeaning, CppFfiFunctionKind, CppFfiType, CppFieldAccessorType,
     CppTypeConversionToFfi, QtSlotWrapper,

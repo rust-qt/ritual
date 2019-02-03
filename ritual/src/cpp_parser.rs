@@ -19,6 +19,7 @@ use crate::database::DatabaseItemSource;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use clang;
+use clang::diagnostic::{Diagnostic, Severity};
 use clang::*;
 use itertools::Itertools;
 use log::{debug, trace, warn};
@@ -68,7 +69,6 @@ struct CppParser<'b, 'a: 'b> {
 
 /// Print representation of `entity` and its children to the log.
 /// `level` is current level of recursion.
-#[allow(dead_code)]
 fn dump_entity(entity: Entity, level: usize) {
     trace!(
         "[DebugParser] {}{:?}",
@@ -192,7 +192,6 @@ fn init_clang() -> Result<Clang> {
 /// If `cpp_code` is specified, it's written to the C++ file before parsing it.
 /// If successful, calls `f` and passes the topmost entity (the translation unit)
 /// as its argument. Returns output value of `f` or an error.
-#[allow(clippy::block_in_if_condition_stmt)]
 fn run_clang<R, F: FnMut(Entity) -> Result<R>>(
     config: &Config,
     tmp_path: &Path,
@@ -256,10 +255,10 @@ fn run_clang<R, F: FnMut(Entity) -> Result<R>>(
                 trace!("[DebugParser] {}", diag);
             }
         }
-        if diagnostics.iter().any(|d| {
-            d.get_severity() == clang::diagnostic::Severity::Error
-                || d.get_severity() == clang::diagnostic::Severity::Fatal
-        }) {
+        let should_print_error = |d: &Diagnostic| {
+            d.get_severity() == Severity::Error || d.get_severity() == Severity::Fatal
+        };
+        if diagnostics.iter().any(should_print_error) {
             bail!(
                 "fatal clang error:\n{}",
                 diagnostics.iter().map(|d| d.to_string()).join("\n")

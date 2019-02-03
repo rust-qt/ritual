@@ -13,7 +13,6 @@ use crate::rust_info::RustStructKind;
 use crate::rust_info::RustWrapperType;
 use crate::rust_info::{RustEnumValue, RustFunction, RustQtReceiverType};
 use itertools::Itertools;
-use log;
 
 pub fn wrap_inline_cpp_code(code: &str) -> String {
     format!("<span style='color: green;'>```{}```</span>", code)

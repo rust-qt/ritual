@@ -38,7 +38,6 @@ fn database_path(workspace_path: &Path, crate_name: &str) -> PathBuf {
 }
 
 impl Workspace {
-    #[allow(clippy::new_ret_no_self)]
     pub fn new(path: PathBuf) -> Result<Workspace> {
         if !path.is_dir() {
             bail!("No such directory: {}", path.display());
@@ -88,10 +87,7 @@ impl Workspace {
         Ok(path)
     }
 
-    #[allow(unused_variables)]
-    pub fn import_published_crate(&mut self, crate_name: &str) -> Result<()> {
-        unimplemented!()
-    }
+    // TODO: import published crates
 
     fn take_loaded_crate(&mut self, crate_name: &str) -> Option<Database> {
         self.databases

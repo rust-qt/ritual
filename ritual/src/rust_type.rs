@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use itertools::Itertools;
 use ritual_common::errors::{bail, Result};
 use ritual_common::string_utils::CaseOperations;
@@ -113,7 +111,6 @@ impl RustPath {
 /// Conversion from public Rust API type to
 /// the corresponding FFI type
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[allow(dead_code)]
 pub enum RustToFfiTypeConversion {
     /// Types are the same
     None,
@@ -195,7 +192,6 @@ pub enum RustType {
 impl RustType {
     /// Returns alphanumeric description of this type
     /// for purposes of name disambiguation.
-    #[allow(dead_code)]
     pub fn caption(&self, context: &RustPath) -> Result<String> {
         Ok(match *self {
             RustType::Unit => "unit".to_string(),
@@ -253,7 +249,6 @@ impl RustType {
     }
 
     /// Returns true if this type is a reference.
-    #[allow(dead_code)]
     pub fn is_ref(&self) -> bool {
         match *self {
             RustType::PointerLike { ref kind, .. } => kind.is_ref(),

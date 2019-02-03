@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //! Types holding information about generates Rust API.
 
 use crate::cpp_data::CppPath;
@@ -433,6 +431,7 @@ pub enum RustFunctionCaptionStrategy {
 impl RustFunctionCaptionStrategy {
     /// Returns list of all available strategies sorted by priority
     /// (more preferred strategies go first).
+    #[allow(dead_code)]
     pub fn all() -> &'static [RustFunctionCaptionStrategy] {
         use self::RustFunctionCaptionStrategy::*;
         &[

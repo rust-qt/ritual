@@ -206,7 +206,6 @@ pub fn find_template_instantiations_step() -> ProcessingStep {
 
 /// Searches for template instantiations in this library's API,
 /// excluding results that were already processed in dependencies.
-#[allow(clippy::block_in_if_condition_stmt)]
 fn find_template_instantiations(data: &mut ProcessorData) -> Result<()> {
     fn check_type(type1: &CppType, data: &ProcessorData, result: &mut Vec<CppPath>) {
         match type1 {

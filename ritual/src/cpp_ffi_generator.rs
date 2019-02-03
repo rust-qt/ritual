@@ -514,7 +514,6 @@ fn should_process_item(item: &CppItemData) -> Result<bool> {
 
 /// Generates slot wrappers for all encountered argument types
 /// (excluding types already handled in the dependencies).
-#[allow(dead_code)]
 fn generate_slot_wrapper(
     arguments: &[CppType],
     name_provider: &mut FfiNameProvider,

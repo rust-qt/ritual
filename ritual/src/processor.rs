@@ -1,5 +1,3 @@
-use ritual_common::errors::{bail, err_msg, Result, ResultExt};
-
 use crate::config::Config;
 use crate::cpp_checker::cpp_checker_step;
 use crate::cpp_explicit_destructors::add_explicit_destructors_step;
@@ -15,12 +13,12 @@ use crate::type_allocation_places::choose_allocation_places_step;
 use crate::workspace::Workspace;
 use itertools::Itertools;
 use log::{error, info};
+use ritual_common::errors::{bail, err_msg, Result, ResultExt};
 use ritual_common::utils::MapIfOk;
 use std::cmp::Ordering;
 use std::fmt;
 use std::iter::once;
 use std::path::PathBuf;
-//use cpp_post_processor::cpp_post_process;
 
 /// Creates output and cache directories if they don't exist.
 /// Returns `Err` if any path in `config` is invalid or relative.
@@ -257,8 +255,6 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
     check_all_paths(&config)?;
 
     // TODO: allow to remove any prefix through `Config` (#25)
-    #[allow(unused_variables)]
-    let remove_qt_prefix = config.crate_properties().name().starts_with("qt_");
 
     info!("Loading current crate data");
     let mut current_database = workspace
@@ -344,46 +340,6 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
             }
         }
     }
-
-    /*
-    if exec_config.write_dependencies_local_paths {
-    log::status(
-    "Output Cargo.toml file will contain local paths of used dependencies \
-      (use --no-local-paths to disable).",
-    );
-    } else {
-    log::status(
-    "Local paths will not be written to the output crate. Make sure all dependencies \
-      are published before trying to compile the crate.",
-    );
-    }
-
-    */
-
-    /*
-    parser_cpp_data.detect_signals_and_slots(
-      &dependent_cpp_crates,
-    )?;
-    // TODO: rename `cpp_data_filters` to `parser_cpp_data_filters`
-    if config.has_cpp_data_filters() {
-      log::status("Running custom filters for C++ parser data");
-      for filter in config.cpp_data_filters() {
-        filter(&mut parser_cpp_data).with_context(
-          || "cpp_data_filter failed",
-        )?;
-      }
-    }
-
-    log::status("Post-processing parse result");
-    let r = cpp_post_process(
-      parser_cpp_data,
-      dependent_cpp_crates,
-      config.type_allocation_places(),
-    )?;
-
-    //...
-
-    */
 
     for database in dependent_cpp_crates {
         workspace.put_crate(database, true);

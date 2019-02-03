@@ -74,7 +74,6 @@ impl DocData {
     }
 
     /// Parses Qt documentation of module `qt_crate_name` located at `docs_path`.
-    #[allow(clippy::new_ret_no_self)]
     pub fn new(qt_crate_name: &str, docs_path: &Path) -> Result<DocData> {
         if !docs_path.exists() {
             bail!(

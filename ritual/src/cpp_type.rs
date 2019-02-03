@@ -44,7 +44,6 @@ pub enum CppBuiltInNumericType {
 
 /// Information about a fixed-size primitive type
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
-#[allow(dead_code)]
 pub enum CppSpecificNumericTypeKind {
     Integer { is_signed: bool },
     FloatingPoint,
@@ -235,7 +234,6 @@ impl CppType {
         }
     }
 
-    #[allow(dead_code)]
     /// Returns true if this is `void` type.
     pub fn is_void(&self) -> bool {
         match *self {
@@ -358,7 +356,7 @@ impl CppType {
             CppType::FunctionPointer(..) => {
                 return self
                     .to_cpp_code(Some(&"FN_PTR".to_string()))
-                    .unwrap_or_else(|_| "[?]".to_string())
+                    .unwrap_or_else(|_| "[?]".to_string());
             }
             _ => {}
         };

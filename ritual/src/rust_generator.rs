@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::config::Config;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;

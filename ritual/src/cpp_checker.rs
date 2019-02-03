@@ -38,13 +38,12 @@ fn check_snippet(
     builder.run()
 }
 
-#[allow(unused_variables)]
 fn snippet_for_item(item: &CppFfiItem) -> Result<Snippet> {
     match item.kind {
         CppFfiItemKind::Function(ref cpp_ffi_function) => Ok(Snippet::new_global(
             cpp_code_generator::function_implementation(cpp_ffi_function)?,
         )),
-        CppFfiItemKind::QtSlotWrapper(ref qt_slot_wrapper) => {
+        CppFfiItemKind::QtSlotWrapper(ref _qt_slot_wrapper) => {
             bail!("qt slot wrappers are not supported yet");
         }
     }

@@ -144,6 +144,7 @@ impl CppFunctionKind {
             _ => false,
         }
     }
+
     /// Returns true if this method is a destructor
     pub fn is_destructor(&self) -> bool {
         match *self {
@@ -151,7 +152,7 @@ impl CppFunctionKind {
             _ => false,
         }
     }
-    #[allow(dead_code)]
+
     /// Returns true if this method is a regular method or a free function
     pub fn is_regular(&self) -> bool {
         match *self {
@@ -328,7 +329,6 @@ impl CppFunction {
         self.member.as_ref()
     }
 
-    #[allow(dead_code)]
     /// Returns true if this method is an operator.
     pub fn is_operator(&self) -> bool {
         self.operator.is_some()

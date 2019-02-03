@@ -114,7 +114,6 @@ fn iterator_to_upper_case_words<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> 
     it.map(|x| x.as_ref().to_uppercase()).join("_")
 }
 
-#[allow(clippy::needless_range_loop)]
 fn replace_all_sub_vecs(parts: &mut Vec<String>, needle: &[&str]) {
     let mut any_found = true;
     while any_found {

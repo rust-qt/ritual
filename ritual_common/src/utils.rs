@@ -136,13 +136,12 @@ impl<A, T: IntoIterator<Item = A>> MapIfOk<A> for T {
 /// Reads environment variable `env_var_name`, adds `new_paths`
 /// to acquired list of paths and returns the list formatted as path list
 /// (without applying it).
-#[allow(clippy::or_fun_call)]
 pub fn add_env_path_item(
     env_var_name: &str,
     mut new_paths: Vec<PathBuf>,
 ) -> Result<std::ffi::OsString> {
     use std::env;
-    for path in env::split_paths(&env::var(env_var_name).unwrap_or(String::new())) {
+    for path in env::split_paths(&env::var(env_var_name).unwrap_or_default()) {
         if new_paths.iter().find(|&x| x == &path).is_none() {
             new_paths.push(path);
         }

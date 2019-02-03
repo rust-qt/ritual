@@ -29,7 +29,6 @@ pub enum CppCast {
         base_index: usize,
     },
     Dynamic,
-    #[allow(unused)]
     QObject,
 }
 

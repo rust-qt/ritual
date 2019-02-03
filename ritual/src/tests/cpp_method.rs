@@ -453,7 +453,6 @@ fn c_signature_destructor() {
 }
 
 #[test]
-#[allow(clippy::cyclomatic_complexity)]
 fn c_signature_method_returning_class() {
     let mut method1 = empty_regular_method();
     method1.path = CppPath::from_str_unchecked("MyClass::empty");
