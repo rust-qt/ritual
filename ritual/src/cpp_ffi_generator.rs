@@ -76,18 +76,6 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         })
         .collect();
 
-    let all_class_bases: Vec<_> = data
-        .all_items()
-        .iter()
-        .filter_map(|item| {
-            if let CppItemData::ClassBase(ref base) = item.cpp_data {
-                Some(base.clone())
-            } else {
-                None
-            }
-        })
-        .collect();
-
     let existing_names = data
         .current_database
         .cpp_items
@@ -124,8 +112,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
                     .map(|v| v.into_iter().collect())
             }
             CppItemData::ClassBase(ref base) => {
-                generate_casts(base, &all_class_bases, &mut name_provider)
-                    .map(|v| v.into_iter().collect())
+                generate_casts(base, &mut name_provider).map(|v| v.into_iter().collect())
             }
             CppItemData::QtSignalArguments(ref signal_arguments) => {
                 generate_slot_wrapper(signal_arguments, &mut name_provider)
@@ -201,10 +188,9 @@ fn create_cast_method(
 /// `generate_casts_one` recursively to add casts between `target_type`
 /// and base types of `base_type`.
 fn generate_casts_one(
-    data: &[CppBaseSpecifier],
     target_type: &CppPath,
     base_type: &CppPath,
-    direct_base_index: Option<usize>,
+    direct_base_index: usize,
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiItem>> {
     let target_ptr_type = CppType::PointerLike {
@@ -221,7 +207,7 @@ fn generate_casts_one(
     new_methods.push(create_cast_method(
         CppCast::Static {
             is_unsafe: true,
-            direct_base_index,
+            base_index: direct_base_index,
         },
         &base_ptr_type,
         &target_ptr_type,
@@ -230,7 +216,7 @@ fn generate_casts_one(
     new_methods.push(create_cast_method(
         CppCast::Static {
             is_unsafe: false,
-            direct_base_index,
+            base_index: direct_base_index,
         },
         &target_ptr_type,
         &base_ptr_type,
@@ -243,18 +229,6 @@ fn generate_casts_one(
         name_provider,
     )?);
 
-    for base in data {
-        if &base.derived_class_type == base_type {
-            new_methods.append(&mut generate_casts_one(
-                data,
-                target_type,
-                &base.base_class_type,
-                None,
-                name_provider,
-            )?);
-        }
-    }
-
     Ok(new_methods)
 }
 
@@ -262,15 +236,13 @@ fn generate_casts_one(
 /// in this `CppData`.
 fn generate_casts(
     base: &CppBaseSpecifier,
-    data: &[CppBaseSpecifier],
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiItem>> {
     //log::status("Adding cast functions");
     generate_casts_one(
-        data,
         &base.derived_class_type,
         &base.base_class_type,
-        Some(base.base_index),
+        base.base_index,
         name_provider,
     )
 }
@@ -666,7 +638,7 @@ fn generate_slot_wrapper(
         );
     }
     items.extend(
-        generate_casts(&class_bases[0], &class_bases, name_provider)?
+        generate_casts(&class_bases[0], name_provider)?
             .into_iter()
             .map(Into::into),
     );

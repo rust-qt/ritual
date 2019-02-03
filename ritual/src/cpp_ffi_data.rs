@@ -24,10 +24,9 @@ pub enum CppCast {
         /// If true, this is an unsafe (from base to derived) `static_cast` wrapper.
         is_unsafe: bool,
 
-        /// If Some, this is a wrapper of `static_cast` between a class and its
-        /// direct base. Contains index of the base (e.g. 0 for the first base; always
+        /// Contains index of the base (e.g. 0 for the first base; always
         /// 0 if the class only has one base).
-        direct_base_index: Option<usize>,
+        base_index: usize,
     },
     Dynamic,
     #[allow(unused)]
@@ -49,12 +48,9 @@ impl CppCast {
             _ => false,
         }
     }
-    pub fn is_first_direct_static_cast(&self) -> bool {
+    pub fn is_first_static_cast(&self) -> bool {
         match *self {
-            CppCast::Static {
-                ref direct_base_index,
-                ..
-            } => direct_base_index == &Some(0),
+            CppCast::Static { ref base_index, .. } => base_index == &0,
             _ => false,
         }
     }
