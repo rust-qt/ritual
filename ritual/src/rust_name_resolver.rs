@@ -757,7 +757,7 @@ impl State<'_> {
 
     fn generate_rust_path(&self, cpp_path: &CppPath, name_type: &NameType<'_>) -> Result<RustPath> {
         let strategy = match name_type {
-            NameType::FfiStruct | NameType::FfiFunction => {
+            NameType::FfiFunction => {
                 let ffi_module = self
                     .rust_database
                     .items
@@ -784,6 +784,7 @@ impl State<'_> {
                 }
             }
             NameType::General
+            | NameType::FfiStruct
             | NameType::Module
             | NameType::ClassPtr
             | NameType::ApiFunction { .. } => {
@@ -803,12 +804,11 @@ impl State<'_> {
         };
 
         let full_last_name = match name_type {
-            NameType::FfiStruct | NameType::SizedItem => cpp_path
+            NameType::SizedItem => cpp_path
                 .items
                 .iter()
                 .map_if_ok(|item| cpp_path_item_to_name(item))?
                 .join("_"),
-            NameType::FfiFunction => cpp_path_item_to_name(cpp_path.last())?,
             NameType::ApiFunction(function) => {
                 if let Some(last_name_override) = special_function_rust_name(function)? {
                     last_name_override.clone()
@@ -817,7 +817,9 @@ impl State<'_> {
                 }
             }
             NameType::ClassPtr => format!("{}Ptr", cpp_path_item_to_name(&cpp_path.last())?),
-            NameType::General | NameType::Module => cpp_path_item_to_name(&cpp_path.last())?,
+            NameType::General | NameType::Module | NameType::FfiFunction | NameType::FfiStruct => {
+                cpp_path_item_to_name(&cpp_path.last())?
+            }
         };
 
         let mut number = None;
