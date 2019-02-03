@@ -1,4 +1,3 @@
-extern crate qt_core;
 use qt_core::connection::Signal;
 use qt_core::core_application::CoreApplication;
 use qt_core::variant::Variant;

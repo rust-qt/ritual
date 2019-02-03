@@ -1,5 +1,3 @@
-extern crate qt_core;
-
 #[test]
 fn it_works() {
   assert!(true);

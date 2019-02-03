@@ -1,5 +1,3 @@
-extern crate qt_widgets;
-
 use qt_widgets::application::Application;
 use qt_widgets::push_button::PushButton;
 use qt_widgets::qt_core::string::String;

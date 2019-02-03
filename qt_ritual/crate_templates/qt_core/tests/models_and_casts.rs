@@ -1,4 +1,3 @@
-extern crate qt_core;
 use qt_core::abstract_item_model::AbstractItemModel;
 use qt_core::abstract_table_model::AbstractTableModel;
 use qt_core::cpp_utils::*;

@@ -1,4 +1,3 @@
-extern crate qt_widgets;
 use qt_widgets::application::Application;
 use qt_widgets::cpp_utils::{CppBox, StaticCast};
 use qt_widgets::qt_core::connection::Signal;

@@ -1,5 +1,3 @@
-extern crate qt_core;
-
 use qt_core::vector::*;
 
 #[test]

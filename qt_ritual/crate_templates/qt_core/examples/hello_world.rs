@@ -1,4 +1,3 @@
-extern crate qt_core;
 use qt_core::core_application::CoreApplication;
 use qt_core::message_logger::MessageLogger;
 use qt_core::string::String;

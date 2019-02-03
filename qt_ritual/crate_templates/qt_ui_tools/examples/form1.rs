@@ -1,5 +1,3 @@
-extern crate qt_ui_tools;
-
 use qt_ui_tools::qt_core::file::File;
 use qt_ui_tools::qt_core::flags::Flags;
 use qt_ui_tools::qt_core::io_device::OpenModeFlag;

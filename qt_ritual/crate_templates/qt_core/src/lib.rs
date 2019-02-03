@@ -29,7 +29,6 @@
 //! when the application exists:
 //!
 //! ```rust,no_run
-//! extern crate qt_core;
 //! use qt_core::core_application::CoreApplication;
 //!
 //! fn main() {
@@ -48,7 +47,6 @@
 //! any other Rust code will only be executed by Qt if you bind it to a slot:
 //!
 //! ```rust
-//! extern crate qt_core;
 //! use qt_core::core_application::CoreApplication;
 //! use qt_core::variant::Variant;
 //! use qt_core::variant_animation::VariantAnimation;
