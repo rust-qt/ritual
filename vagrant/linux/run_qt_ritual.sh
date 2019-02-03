@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 cd /vagrant
 
 export LIBCLANG_PATH=/usr/lib/llvm-6.0/lib/

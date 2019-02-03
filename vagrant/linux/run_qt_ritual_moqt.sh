@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 dir=$(dirname $(readlink -f $0))
 
 $dir/moqt.sh

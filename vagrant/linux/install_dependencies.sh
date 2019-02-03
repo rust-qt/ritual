@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 # add llvm repository
 wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
 sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-6.0 main"

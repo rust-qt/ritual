@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 cd ~
 mkdir -p build_moqt/build_moqt_core
 cd build_moqt/build_moqt_core
