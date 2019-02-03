@@ -41,6 +41,7 @@ use crate::rust_info::RustModuleKind;
 use crate::rust_info::RustPathScope;
 use crate::rust_info::RustStruct;
 use crate::rust_info::RustStructKind;
+use crate::rust_info::RustTraitAssociatedType;
 use crate::rust_info::RustTraitImpl;
 use crate::rust_info::RustWrapperType;
 use crate::rust_info::RustWrapperTypeDocData;
@@ -446,12 +447,14 @@ impl State<'_> {
             }
         };
 
-        // TODO: add Deref and DerefMut trait impls
-
-        let cast_function = State::fix_cast_function(unnamed_function.clone(), cast, true)?
+        let fixed_function = State::fix_cast_function(unnamed_function.clone(), cast, true)?;
+        let cast_function = fixed_function
+            .clone()
             .with_path(trait_path.join(cast_function_name));
 
-        let cast_function_mut = State::fix_cast_function(unnamed_function.clone(), cast, false)?
+        let fixed_function_mut = State::fix_cast_function(unnamed_function.clone(), cast, false)?;
+        let cast_function_mut = fixed_function_mut
+            .clone()
             .with_path(trait_path.join(cast_function_name_mut));
 
         let parent_path = if let RustType::Common { ref path, .. } =
@@ -462,16 +465,50 @@ impl State<'_> {
             bail!("can't get parent for derived_type: {:?}", derived_type);
         };
 
+        let target_type = from_type.ptr_to_value()?.api_type;
+        let to_type_value = to_type.ptr_to_value()?.api_type;
         results.push(RustItemKind::TraitImpl(RustTraitImpl {
-            target_type: from_type.ptr_to_value()?.api_type,
-            parent_path,
+            target_type: target_type.clone(),
+            parent_path: parent_path.clone(),
             trait_type: RustType::Common {
                 path: trait_path,
-                generic_arguments: Some(vec![to_type.ptr_to_value()?.api_type]),
+                generic_arguments: Some(vec![to_type_value.clone()]),
             },
             associated_types: Vec::new(),
             functions: vec![cast_function, cast_function_mut],
         }));
+
+        if cast.is_first_static_cast() && !cast.is_unsafe_static_cast() {
+            let deref_trait_path = RustPath::from_str_unchecked("std::ops::Deref");
+            let deref_function = fixed_function.with_path(deref_trait_path.join("deref"));
+            results.push(RustItemKind::TraitImpl(RustTraitImpl {
+                target_type: target_type.clone(),
+                parent_path: parent_path.clone(),
+                trait_type: RustType::Common {
+                    path: deref_trait_path,
+                    generic_arguments: None,
+                },
+                associated_types: vec![RustTraitAssociatedType {
+                    name: "Target".to_string(),
+                    value: to_type_value,
+                }],
+                functions: vec![deref_function],
+            }));
+
+            let deref_mut_trait_path = RustPath::from_str_unchecked("std::ops::DerefMut");
+            let deref_mut_function =
+                fixed_function_mut.with_path(deref_mut_trait_path.join("deref_mut"));
+            results.push(RustItemKind::TraitImpl(RustTraitImpl {
+                target_type,
+                parent_path,
+                trait_type: RustType::Common {
+                    path: deref_mut_trait_path,
+                    generic_arguments: None,
+                },
+                associated_types: Vec::new(),
+                functions: vec![deref_mut_function],
+            }));
+        }
 
         Ok(results)
     }

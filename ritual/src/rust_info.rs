@@ -243,7 +243,7 @@ pub enum RustFunctionSelfArgKind {
 /// Information about an associated type value
 /// within a trait implementation.
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct TraitAssociatedType {
+pub struct RustTraitAssociatedType {
     /// Name of the associated type.
     pub name: String,
     /// Value of the associated type.
@@ -259,7 +259,7 @@ pub struct RustTraitImpl {
     /// Type of the trait.
     pub trait_type: RustType,
     /// Values of associated types of the trait.
-    pub associated_types: Vec<TraitAssociatedType>,
+    pub associated_types: Vec<RustTraitAssociatedType>,
     /// Functions that implement the trait.
     pub functions: Vec<RustFunction>,
 }
