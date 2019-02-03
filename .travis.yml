@@ -10,13 +10,13 @@ __common: &common
 
 matrix:
     include:
-    - <<: *common
+    -   <<: *common
         os: linux
         dist: trusty
         script:
-            - sudo apt-get install llvm-3.8 libclang-3.8-dev --yes --force-yes
-            - ci/travis/run.bash
-    - <<: *common
+        - sudo apt-get install llvm-3.8 libclang-3.8-dev --yes --force-yes
+        - ci/travis/run.bash
+    -   <<: *common
         os: osx
         script: ci/travis/run.bash
 
