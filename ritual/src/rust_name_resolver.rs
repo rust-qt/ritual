@@ -91,7 +91,7 @@ enum NameType<'a> {
     Module,
     FfiStruct,
     FfiFunction,
-    Function(&'a CppFfiFunction),
+    ApiFunction(&'a CppFfiFunction),
     SizedItem,
     ClassPtr,
 }
@@ -646,7 +646,7 @@ impl State<'_> {
             } => &cpp_function.path,
             CppFfiFunctionKind::FieldAccessor { ref field, .. } => &field.path,
         };
-        let path = self.generate_rust_path(cpp_path, &NameType::Function(function))?;
+        let path = self.generate_rust_path(cpp_path, &NameType::ApiFunction(function))?;
         let rust_item = RustItemKind::Function(unnamed_function.with_path(path));
         Ok(vec![rust_item])
     }
@@ -701,12 +701,31 @@ impl State<'_> {
             .ok_or_else(|| err_msg(format!("no Rust FFI type for {}", cpp_path)))
     }
 
-    fn get_strategy(&self, parent_path: &CppPath) -> Result<RustPathScope> {
-        let rust_item = self.find_wrapper_type(parent_path)?;
+    fn get_strategy(&self, parent_path: &CppPath, name_type: &NameType) -> Result<RustPathScope> {
+        let rust_items = self.find_rust_items(parent_path)?;
+        if rust_items.is_empty() {
+            bail!("no Rust items for {}", parent_path);
+        }
+
+        let rust_item = rust_items
+            .into_iter()
+            .find(|item| {
+                let is_good_type = match name_type {
+                    NameType::ApiFunction(_) => item.kind.is_ffi_type(),
+                    _ => item.kind.is_wrapper_type(),
+                };
+                is_good_type || item.kind.is_module()
+            })
+            .ok_or_else(|| {
+                err_msg(format!(
+                    "no Rust type wrapper or module for {}",
+                    parent_path
+                ))
+            })?;
 
         let rust_path = rust_item.path().ok_or_else(|| {
             err_msg(format!(
-                "rust item doesn't have rust path (cpp_path = {:?})",
+                "rust item doesn't have rust path (parent_path = {:?})",
                 parent_path
             ))
         })?;
@@ -767,9 +786,9 @@ impl State<'_> {
             NameType::General
             | NameType::Module
             | NameType::ClassPtr
-            | NameType::Function { .. } => {
+            | NameType::ApiFunction { .. } => {
                 if let Some(parent) = cpp_path.parent() {
-                    self.get_strategy(&parent)?
+                    self.get_strategy(&parent, name_type)?
                 } else {
                     self.default_strategy()
                 }
@@ -790,7 +809,7 @@ impl State<'_> {
                 .map_if_ok(|item| cpp_path_item_to_name(item))?
                 .join("_"),
             NameType::FfiFunction => cpp_path_item_to_name(cpp_path.last())?,
-            NameType::Function(function) => {
+            NameType::ApiFunction(function) => {
                 if let Some(last_name_override) = special_function_rust_name(function)? {
                     last_name_override.clone()
                 } else {

@@ -388,6 +388,14 @@ impl RustItemKind {
             false
         }
     }
+
+    pub fn is_module(&self) -> bool {
+        if let RustItemKind::Module(_) = self {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

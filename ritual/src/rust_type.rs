@@ -125,7 +125,7 @@ pub enum RustToFfiTypeConversion {
     ValueToPtr,
     /// `CppBox<T>` to `*const T` (or similar mutable type)
     CppBoxToPtr,
-    /// `qt_core::flags::Flags<T>` to `libc::c_uint`
+    /// `qt_core::flags::Flags<T>` to `c_int`
     QFlagsToUInt,
 }
 
