@@ -1,19 +1,22 @@
-extern crate rust_ctrt1;
-use rust_ctrt1::class1::Class1;
+use moqt_core::BasicClass;
 
 #[test]
 fn class1_overloaded_selfs() {
-  let mut v = Class1::new(1);
-  v.f1();
-  v.f1_mut();
-  Class1::f1_static(0);
+    unsafe {
+        let _v = BasicClass::new(1);
 
-  v.f2();
-  v.f2_mut();
+    }
+    /*
+    v.overloaded_normal_and_const();
+    v.overloaded_normal_and_const2();
+    Class1::overloaded_const_and_static2(0);
 
-  v.f3();
-  Class1::f3_static(0);
+    v.f2();
+    v.f2_mut();
 
-  v.f4();
-  Class1::f4_static(0);
+    v.f3();
+    Class1::f3_static(0);
+
+    v.f4();
+    Class1::f4_static(0);*/
 }

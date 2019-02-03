@@ -10,5 +10,6 @@ export MOQT_PATH=$HOME/moqt
 
 export CPLUS_INCLUDE_PATH=$MOQT_PATH/moqt_core/include
 export LIBRARY_PATH=$MOQT_PATH/moqt_core/lib
+export LD_LIBRARY_PATH=$MOQT_PATH/moqt_core/lib
 
 $dir/run_qt_ritual.sh $HOME/moqt_workspace "$@"

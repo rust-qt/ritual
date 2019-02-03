@@ -212,7 +212,7 @@ mod steps {
             let path = data
                 .workspace
                 .crate_path(&data.current_database.crate_name)?;
-            for cargo_cmd in &["update", "build", /*"test",*/ "doc"] {
+            for cargo_cmd in &["update", "build", "test", "doc"] {
                 let mut command = Command::new("cargo");
                 command.arg(cargo_cmd);
                 command.current_dir(&path);
