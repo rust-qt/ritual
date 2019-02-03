@@ -28,7 +28,6 @@ use crate::rust_info::RustEnumValue;
 use crate::rust_info::RustEnumValueDoc;
 use crate::rust_info::RustFFIArgument;
 use crate::rust_info::RustFFIFunction;
-use crate::rust_info::RustFfiClassTypeDoc;
 use crate::rust_info::RustFfiWrapperData;
 use crate::rust_info::RustFunctionArgument;
 use crate::rust_info::RustFunctionKind;
@@ -88,11 +87,9 @@ fn sanitize_rust_identifier_test() {
 enum NameType<'a> {
     General,
     Module,
-    FfiStruct,
     FfiFunction,
     ApiFunction(&'a CppFfiFunction),
     SizedItem,
-    ClassPtr,
 }
 
 struct State<'a> {
@@ -191,7 +188,7 @@ impl State<'_> {
                 }
             }
             CppType::Enum { ref path } | CppType::Class(ref path) => {
-                let rust_item = self.find_ffi_type(path)?;
+                let rust_item = self.find_wrapper_type(path)?;
                 let path = rust_item
                     .path()
                     .ok_or_else(|| err_msg("RustDatabaseItem for class has no path"))?
@@ -227,6 +224,7 @@ impl State<'_> {
 
     /// Generates `CompleteType` from `CppFfiType`, adding
     /// Rust API type, Rust FFI type and conversion between them.
+    #[allow(clippy::collapsible_if)]
     fn rust_final_type(
         &self,
         cpp_ffi_type: &CppFfiType,
@@ -249,6 +247,20 @@ impl State<'_> {
                         assert!(kind == &RustPointerLikeTypeKind::Pointer);
                         *kind = RustPointerLikeTypeKind::Reference { lifetime: None };
                         api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
+                    } else if kind == &RustPointerLikeTypeKind::Pointer {
+                        if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
+                            let wrapper = if *is_const {
+                                "cpp_utils::ConstPtr"
+                            } else {
+                                "cpp_utils::Ptr"
+                            };
+
+                            rust_api_type = RustType::Common {
+                                path: RustPath::from_str_unchecked(wrapper),
+                                generic_arguments: Some(vec![(**target).clone()]),
+                            };
+                            api_to_ffi_conversion = RustToFfiTypeConversion::PtrWrapperToPtr;
+                        }
                     }
                 }
                 CppTypeConversionToFfi::ValueToPointer => {
@@ -378,19 +390,16 @@ impl State<'_> {
         cast: &CppCast,
         is_const: bool,
     ) -> Result<UnnamedRustFunction> {
-        let return_ref_type = unnamed_function.return_type.ptr_to_ref(is_const)?;
         match cast {
-            CppCast::Static { .. } => {
-                unnamed_function.return_type = return_ref_type;
-            }
             CppCast::Dynamic | CppCast::QObject => {
                 unnamed_function.return_type.api_to_ffi_conversion =
-                    RustToFfiTypeConversion::OptionRefToPtr;
+                    RustToFfiTypeConversion::OptionPtrWrapperToPtr;
                 unnamed_function.return_type.api_type = RustType::Common {
                     path: RustPath::from_str_unchecked("std::option::Option"),
-                    generic_arguments: Some(vec![return_ref_type.api_type]),
+                    generic_arguments: Some(vec![unnamed_function.return_type.api_type]),
                 }
             }
+            CppCast::Static { .. } => {}
         }
 
         unnamed_function.arguments[0].argument_type = unnamed_function.arguments[0]
@@ -410,8 +419,8 @@ impl State<'_> {
             bail!("1 argument expected");
         }
 
-        let from_type = &args[0].argument_type;
-        let to_type = &unnamed_function.return_type;
+        let from_type = &args[0].argument_type.ffi_type;
+        let to_type = &unnamed_function.return_type.ffi_type;
 
         let trait_path;
         let derived_type;
@@ -456,16 +465,15 @@ impl State<'_> {
             .clone()
             .with_path(trait_path.join(cast_function_name_mut));
 
-        let parent_path = if let RustType::Common { ref path, .. } =
-            derived_type.ffi_type.pointer_like_to_target()?
-        {
-            path.parent().expect("cast argument path must have parent")
-        } else {
-            bail!("can't get parent for derived_type: {:?}", derived_type);
-        };
+        let parent_path =
+            if let RustType::Common { ref path, .. } = derived_type.pointer_like_to_target()? {
+                path.parent().expect("cast argument path must have parent")
+            } else {
+                bail!("can't get parent for derived_type: {:?}", derived_type);
+            };
 
-        let target_type = from_type.ptr_to_value()?.api_type;
-        let to_type_value = to_type.ptr_to_value()?.api_type;
+        let target_type = from_type.pointer_like_to_target()?;
+        let to_type_value = to_type.pointer_like_to_target()?;
         results.push(RustItemKind::TraitImpl(RustTraitImpl {
             target_type: target_type.clone(),
             parent_path: parent_path.clone(),
@@ -727,38 +735,8 @@ impl State<'_> {
             .ok_or_else(|| err_msg(format!("no Rust type wrapper for {}", cpp_path)))
     }
 
-    fn find_ffi_type(&self, cpp_path: &CppPath) -> Result<&RustDatabaseItem> {
-        let rust_items = self.find_rust_items(cpp_path)?;
-        if rust_items.is_empty() {
-            bail!("no Rust items for {}", cpp_path);
-        }
-        rust_items
-            .into_iter()
-            .find(|item| item.kind.is_ffi_type())
-            .ok_or_else(|| err_msg(format!("no Rust FFI type for {}", cpp_path)))
-    }
-
-    fn get_strategy(&self, parent_path: &CppPath, name_type: &NameType) -> Result<RustPathScope> {
-        let rust_items = self.find_rust_items(parent_path)?;
-        if rust_items.is_empty() {
-            bail!("no Rust items for {}", parent_path);
-        }
-
-        let rust_item = rust_items
-            .into_iter()
-            .find(|item| {
-                let is_good_type = match name_type {
-                    NameType::ApiFunction(_) => item.kind.is_ffi_type(),
-                    _ => item.kind.is_wrapper_type(),
-                };
-                is_good_type || item.kind.is_module()
-            })
-            .ok_or_else(|| {
-                err_msg(format!(
-                    "no Rust type wrapper or module for {}",
-                    parent_path
-                ))
-            })?;
+    fn get_strategy(&self, parent_path: &CppPath) -> Result<RustPathScope> {
+        let rust_item = self.find_wrapper_type(parent_path)?;
 
         let rust_path = rust_item.path().ok_or_else(|| {
             err_msg(format!(
@@ -820,13 +798,9 @@ impl State<'_> {
                     prefix: None,
                 }
             }
-            NameType::General
-            | NameType::FfiStruct
-            | NameType::Module
-            | NameType::ClassPtr
-            | NameType::ApiFunction { .. } => {
+            NameType::General | NameType::Module | NameType::ApiFunction { .. } => {
                 if let Some(parent) = cpp_path.parent() {
-                    self.get_strategy(&parent, name_type)?
+                    self.get_strategy(&parent)?
                 } else {
                     self.default_strategy()
                 }
@@ -854,8 +828,7 @@ impl State<'_> {
                 };
                 s.to_snake_case()
             }
-            NameType::ClassPtr => format!("{}Ptr", cpp_path_item_to_name(&cpp_path.last())?),
-            NameType::General | NameType::Module | NameType::FfiFunction | NameType::FfiStruct => {
+            NameType::General | NameType::Module | NameType::FfiFunction => {
                 cpp_path_item_to_name(&cpp_path.last())?
             }
         };
@@ -887,6 +860,7 @@ impl State<'_> {
         // TODO: check for conflicts with types from crate template (how?)
     }
 
+    #[allow(clippy::useless_let_if_seq)]
     fn generate_rust_items(
         &mut self,
         cpp_item: &mut CppDatabaseItem,
@@ -917,56 +891,40 @@ impl State<'_> {
                         CppTypeDataKind::Class { is_movable } => {
                             // TODO: if the type is `QFlags<T>` or `QUrlTwoFlags<T>`,
                             //       generate `impl Flaggable` instead.
-                            let internal_name_type = if is_movable {
-                                NameType::SizedItem
-                            } else {
-                                NameType::FfiStruct
-                            };
-                            let public_name_type = if is_movable {
-                                NameType::General
-                            } else {
-                                NameType::ClassPtr
-                            };
-                            let internal_path =
-                                self.generate_rust_path(&data.path, &internal_name_type)?;
+
                             let public_path =
-                                self.generate_rust_path(&data.path, &public_name_type)?;
-                            if internal_path == public_path {
-                                bail!(
-                                    "internal path is the same as public path: {:?}",
-                                    internal_path
-                                );
-                            }
+                                self.generate_rust_path(&data.path, &NameType::General)?;
 
-                            let internal_wrapper_kind = if is_movable {
-                                RustStructKind::SizedType(data.path.clone())
-                            } else {
-                                RustStructKind::FfiClassType(RustFfiClassTypeDoc {
-                                    cpp_path: data.path.clone(),
-                                    public_rust_path: public_path.clone(),
-                                })
-                            };
+                            let wrapper_kind;
+                            if is_movable {
+                                let internal_path =
+                                    self.generate_rust_path(&data.path, &NameType::SizedItem)?;
 
-                            let internal_rust_item = RustDatabaseItem {
-                                kind: RustItemKind::Struct(RustStruct {
-                                    extra_doc: None,
-                                    path: internal_path.clone(),
-                                    kind: internal_wrapper_kind,
-                                    is_public: true,
-                                }),
-                                cpp_item_index: Some(cpp_item_index),
-                            };
-                            self.rust_database.items.push(internal_rust_item);
+                                if internal_path == public_path {
+                                    bail!(
+                                        "internal path is the same as public path: {:?}",
+                                        internal_path
+                                    );
+                                }
 
-                            let wrapper_kind = if is_movable {
-                                RustWrapperTypeKind::MovableClassWrapper {
+                                let internal_rust_item = RustDatabaseItem {
+                                    kind: RustItemKind::Struct(RustStruct {
+                                        extra_doc: None,
+                                        path: internal_path.clone(),
+                                        kind: RustStructKind::SizedType(data.path.clone()),
+                                        is_public: true,
+                                    }),
+                                    cpp_item_index: Some(cpp_item_index),
+                                };
+
+                                self.rust_database.items.push(internal_rust_item);
+
+                                wrapper_kind = RustWrapperTypeKind::MovableClassWrapper {
                                     sized_type_path: internal_path,
-                                }
+                                };
                             } else {
-                                RustWrapperTypeKind::ImmovableClassWrapper {
-                                    raw_type_path: internal_path,
-                                }
-                            };
+                                wrapper_kind = RustWrapperTypeKind::ImmovableClassWrapper;
+                            }
 
                             let public_rust_item = RustDatabaseItem {
                                 kind: RustItemKind::Struct(RustStruct {
@@ -1167,6 +1125,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
             }
             Err(err) => {
                 trace!("skipping item: {}: {}", &cpp_item.cpp_data, err);
+                print_trace(err, log::Level::Trace);
             }
         }
     }

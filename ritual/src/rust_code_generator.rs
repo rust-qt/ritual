@@ -286,16 +286,14 @@ impl Generator {
                     )?;
                     writeln!(self)?;
                 }
-                RustWrapperTypeKind::ImmovableClassWrapper { ref raw_type_path } => {
-                    writeln!(self, "#[derive(Debug)]")?;
+                RustWrapperTypeKind::ImmovableClassWrapper => {
+                    writeln!(self, "#[repr(C)]")?;
                     writeln!(
                         self,
-                        "{}struct {}(*mut {});",
+                        "{}struct {} {{ _unused: u8, }}",
                         visibility,
-                        rust_struct.path.last(),
-                        self.rust_path_to_string(raw_type_path),
+                        rust_struct.path.last()
                     )?;
-                    writeln!(self)?;
                 }
                 RustWrapperTypeKind::MovableClassWrapper {
                     ref sized_type_path,
@@ -353,15 +351,6 @@ impl Generator {
                     object_type_name = object_type_name,
                     func_args = func_args,
                     callback_args = callback_args,
-                )?;
-            }
-            RustStructKind::FfiClassType(_) => {
-                writeln!(self, "#[repr(C)]")?;
-                writeln!(
-                    self,
-                    "{}struct {} {{ _unused: u8, }}",
-                    visibility,
-                    rust_struct.path.last()
                 )?;
             }
             RustStructKind::SizedType(_) => {
@@ -454,34 +443,9 @@ impl Generator {
         };
         let code2 = match type1.api_to_ffi_conversion {
             RustToFfiTypeConversion::None => unreachable!(),
-            RustToFfiTypeConversion::RefToPtr | RustToFfiTypeConversion::OptionRefToPtr => {
-                let api_is_const =
-                    if type1.api_to_ffi_conversion == RustToFfiTypeConversion::OptionRefToPtr {
-                        if let RustType::Common {
-                            ref generic_arguments,
-                            ..
-                        } = type1.api_type
-                        {
-                            let args = generic_arguments
-                                .as_ref()
-                                .ok_or_else(|| err_msg("Option with no generic_arguments"))?;
-                            if args.len() != 1 {
-                                bail!("Option with invalid args count");
-                            }
-                            args[0].last_is_const()?
-                        } else {
-                            bail!("Option type expected");
-                        }
-                    } else {
-                        type1.api_type.last_is_const()?
-                    };
-                let unwrap_code = match type1.api_to_ffi_conversion {
-                    RustToFfiTypeConversion::RefToPtr => {
-                        ".expect(\"Attempted to convert null pointer to reference\")"
-                    }
-                    RustToFfiTypeConversion::OptionRefToPtr => "",
-                    _ => unreachable!(),
-                };
+            RustToFfiTypeConversion::RefToPtr => {
+                let api_is_const = type1.api_type.is_const_pointer_like()?;
+                let unwrap_code = ".expect(\"Attempted to convert null pointer to reference\")";
                 format!(
                     "{unsafe_start}{}.{}(){unsafe_end}{}",
                     source_expr,
@@ -503,6 +467,20 @@ impl Generator {
                 unsafe_start = unsafe_start,
                 unsafe_end = unsafe_end
             ),
+            RustToFfiTypeConversion::PtrWrapperToPtr
+            | RustToFfiTypeConversion::OptionPtrWrapperToPtr => {
+                let is_const = type1.ffi_type.is_const_pointer_like()?;
+                let is_option =
+                    type1.api_to_ffi_conversion == RustToFfiTypeConversion::OptionPtrWrapperToPtr;
+                format!(
+                    "{unsafe_start}::cpp_utils::{}::{}({}){unsafe_end}",
+                    if is_const { "ConstPtr" } else { "Ptr" },
+                    if is_option { "new_option" } else { "new" },
+                    source_expr,
+                    unsafe_start = unsafe_start,
+                    unsafe_end = unsafe_end
+                )
+            }
             RustToFfiTypeConversion::QFlagsToUInt => {
                 let mut qflags_type = type1.api_type.clone();
                 if let RustType::Common {
@@ -547,7 +525,7 @@ impl Generator {
             let mut code = arg.name.clone();
             match arg.argument_type.api_to_ffi_conversion {
                 RustToFfiTypeConversion::None => {}
-                RustToFfiTypeConversion::OptionRefToPtr => {
+                RustToFfiTypeConversion::OptionPtrWrapperToPtr => {
                     bail!("OptionRefToPtr is not supported here yet");
                 }
                 RustToFfiTypeConversion::RefToPtr => {
@@ -570,27 +548,19 @@ impl Generator {
                         );
                     }
                 }
-                RustToFfiTypeConversion::ValueToPtr | RustToFfiTypeConversion::CppBoxToPtr => {
-                    let is_const = if let RustType::PointerLike { ref is_const, .. } =
-                        arg.argument_type.ffi_type
-                    {
-                        *is_const
-                    } else {
-                        unexpected!("void is not expected here at all!");
-                    };
-                    if arg.argument_type.api_to_ffi_conversion
-                        == RustToFfiTypeConversion::CppBoxToPtr
-                    {
-                        let method = if is_const { "as_ptr" } else { "as_mut_ptr" };
-                        code = format!("{}.{}()", code, method);
-                    } else {
-                        code = format!(
-                            "{}{} as {}",
-                            if is_const { "&" } else { "&mut " },
-                            code,
-                            self.rust_type_to_code(&arg.argument_type.ffi_type)
-                        );
-                    }
+                RustToFfiTypeConversion::ValueToPtr => {
+                    let is_const = arg.argument_type.ffi_type.is_const_pointer_like()?;
+                    code = format!(
+                        "{}{} as {}",
+                        if is_const { "&" } else { "&mut " },
+                        code,
+                        self.rust_type_to_code(&arg.argument_type.ffi_type)
+                    );
+                }
+                RustToFfiTypeConversion::CppBoxToPtr | RustToFfiTypeConversion::PtrWrapperToPtr => {
+                    let is_const = arg.argument_type.ffi_type.is_const_pointer_like()?;
+                    let method = if is_const { "as_ptr" } else { "as_mut_ptr" };
+                    code = format!("{}.{}()", code, method);
                 }
                 RustToFfiTypeConversion::QFlagsToUInt => {
                     code = format!("{}.to_int() as ::libc::c_uint", code);

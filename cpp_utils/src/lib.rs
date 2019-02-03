@@ -159,20 +159,6 @@ impl<T: CppDeletable> Default for CppBox<T> {
     }
 }
 
-/// This module contains `NewUninitialized` trait.
-/// It's an implementation detail of `cpp_to_rust` and should not be used directly.
-pub mod new_uninitialized {
-
-    /// A trait for types that can be created with
-    /// uninitialized internal buffer.
-    ///
-    /// This trait is an implementation detail of `cpp_to_rust` and should not be used directly.
-    pub trait NewUninitialized {
-        /// Creates new object with uninitialized internal buffer.
-        unsafe fn new_uninitialized() -> Self;
-    }
-}
-
 /// Provides access to C++ `static_cast` conversion from derived class to base class.
 ///
 /// This trait is automatically implemented by `cpp_to_rust`.
@@ -194,20 +180,20 @@ pub mod new_uninitialized {
 /// because runtime overhead of Rust wrapper functions is the same for all cast types.
 pub trait StaticUpcast<T> {
     /// Convert type of a const reference.
-    unsafe fn static_upcast(&self) -> &T;
+    unsafe fn static_upcast(&self) -> ConstPtr<T>;
     /// Convert type of a mutable reference.
-    unsafe fn static_upcast_mut(&mut self) -> &mut T;
+    unsafe fn static_upcast_mut(&mut self) -> Ptr<T>;
 }
 
 /// Converts type of a const pointer using `StaticCast` implementation of the type.
 /// If `ptr` is null, this function does nothing and returns null pointer.
-pub unsafe fn static_upcast<R, T: StaticUpcast<R>>(value: &T) -> &R {
+pub unsafe fn static_upcast<R, T: StaticUpcast<R>>(value: &T) -> ConstPtr<R> {
     value.static_upcast()
 }
 
 /// Converts type of a mutable pointer using `StaticCast` implementation of the type.
 /// If `ptr` is null, this function does nothing and returns null pointer.
-pub unsafe fn static_upcast_mut<R, T: StaticUpcast<R>>(value: &mut T) -> &mut R {
+pub unsafe fn static_upcast_mut<R, T: StaticUpcast<R>>(value: &mut T) -> Ptr<R> {
     value.static_upcast_mut()
 }
 
@@ -234,16 +220,16 @@ pub unsafe fn static_upcast_mut<R, T: StaticUpcast<R>>(value: &mut T) -> &mut R 
 /// because runtime overhead of Rust wrapper functions is the same for all cast types.
 pub trait StaticDowncast<T> {
     /// Convert type of a const reference.
-    unsafe fn static_downcast(&self) -> &T;
+    unsafe fn static_downcast(&self) -> ConstPtr<T>;
     /// Convert type of a mutable reference.
-    unsafe fn static_downcast_mut(&mut self) -> &mut T;
+    unsafe fn static_downcast_mut(&mut self) -> Ptr<T>;
 }
 
 /// Converts type of a const pointer using `UnsafeStaticCast` implementation of the type.
 /// `ptr` must be either a null pointer or a valid pointer to an instance of `R` class
 /// or a class derived from `R`.
 /// If `ptr` is null, this function does nothing and returns null pointer.
-pub unsafe fn static_downcast<R, T: StaticDowncast<R>>(value: &T) -> &R {
+pub unsafe fn static_downcast<R, T: StaticDowncast<R>>(value: &T) -> ConstPtr<R> {
     value.static_downcast()
 }
 
@@ -251,7 +237,7 @@ pub unsafe fn static_downcast<R, T: StaticDowncast<R>>(value: &T) -> &R {
 /// `ptr` must be either a null pointer or a valid pointer to an instance of `R` class
 /// or a class derived from `R`.
 /// If `ptr` is null, this function does nothing and returns null pointer.
-pub unsafe fn static_downcast_mut<R, T: StaticDowncast<R>>(value: &mut T) -> &mut R {
+pub unsafe fn static_downcast_mut<R, T: StaticDowncast<R>>(value: &mut T) -> Ptr<R> {
     value.static_downcast_mut()
 }
 
@@ -272,10 +258,10 @@ pub unsafe fn static_downcast_mut<R, T: StaticDowncast<R>>(value: &mut T) -> &mu
 pub trait DynamicCast<T> {
     /// Convert type of a const reference.
     /// Returns `None` if `self` is not an instance of `T`.
-    unsafe fn dynamic_cast(&self) -> Option<&T>;
+    unsafe fn dynamic_cast(&self) -> Option<ConstPtr<T>>;
     /// Convert type of a mutable reference.
     /// Returns `None` if `self` is not an instance of `T`.
-    unsafe fn dynamic_cast_mut(&mut self) -> Option<&mut T>;
+    unsafe fn dynamic_cast_mut(&mut self) -> Option<Ptr<T>>;
 }
 
 /// Converts type of a const pointer using `DynamicCast` implementation of the type.
@@ -285,7 +271,7 @@ pub trait DynamicCast<T> {
 /// a class derived from `R`.
 /// If `ptr` is null, this function does nothing and returns null pointer.
 
-pub unsafe fn dynamic_cast<R, T: DynamicCast<R>>(value: &T) -> Option<&R> {
+pub unsafe fn dynamic_cast<R, T: DynamicCast<R>>(value: &T) -> Option<ConstPtr<R>> {
     value.dynamic_cast()
 }
 
@@ -294,6 +280,96 @@ pub unsafe fn dynamic_cast<R, T: DynamicCast<R>>(value: &T) -> Option<&R> {
 /// or a class derived from `T`.
 /// Returns null pointer if `ptr` does not point to an instance of `R`.
 /// If `ptr` is null, this function does nothing and returns null pointer.
-pub unsafe fn dynamic_cast_mut<R, T: DynamicCast<R>>(value: &mut T) -> Option<&mut R> {
+pub unsafe fn dynamic_cast_mut<R, T: DynamicCast<R>>(value: &mut T) -> Option<Ptr<R>> {
     value.dynamic_cast_mut()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Ptr<T>(*mut T);
+
+impl<T> Ptr<T> {
+    pub unsafe fn new(ptr: *mut T) -> Self {
+        Ptr(ptr)
+    }
+
+    pub unsafe fn new_option(ptr: *mut T) -> Option<Self> {
+        if ptr.is_null() {
+            None
+        } else {
+            Some(Ptr(ptr))
+        }
+    }
+
+    /// Returns constant raw pointer to the value in the box.
+    pub fn as_ptr(&self) -> *const T {
+        self.0
+    }
+
+    /// Returns mutable raw pointer to the value in the box.
+    pub fn as_mut_ptr(&self) -> *mut T {
+        self.0
+    }
+
+    /// Returns true if the pointer is null.
+    pub fn is_null(&self) -> bool {
+        self.0.is_null()
+    }
+}
+
+impl<T> Deref for Ptr<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        if self.0.is_null() {
+            panic!("attempted to deref a null Ptr<T>");
+        }
+        unsafe { &(*self.0) }
+    }
+}
+
+impl<T> DerefMut for Ptr<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        if self.0.is_null() {
+            panic!("attempted to deref a null Ptr<T>");
+        }
+        unsafe { &mut (*self.0) }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConstPtr<T>(*const T);
+
+impl<T> ConstPtr<T> {
+    pub unsafe fn new(ptr: *const T) -> Self {
+        ConstPtr(ptr)
+    }
+
+    pub unsafe fn new_option(ptr: *const T) -> Option<Self> {
+        if ptr.is_null() {
+            None
+        } else {
+            Some(ConstPtr(ptr))
+        }
+    }
+
+    /// Returns constant raw pointer to the value in the box.
+    pub fn as_ptr(&self) -> *const T {
+        self.0
+    }
+
+    /// Returns true if the pointer is null.
+    pub fn is_null(&self) -> bool {
+        self.0.is_null()
+    }
+}
+
+impl<T> Deref for ConstPtr<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        if self.0.is_null() {
+            panic!("attempted to deref a null ConstPtr<T>");
+        }
+        unsafe { &(*self.0) }
+    }
 }

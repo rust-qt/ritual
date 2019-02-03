@@ -51,7 +51,11 @@ pub fn struct_doc(type1: &RustStruct) -> String {
     let auto_doc = match type1.kind {
         RustStructKind::WrapperType(RustWrapperType { ref doc_data, .. }) => {
             let cpp_type_code = doc_data.cpp_path.to_cpp_pseudo_code();
-            let mut doc = format!("C++ type: {}", wrap_inline_cpp_code(&cpp_type_code));
+            let mut doc = format!(
+                "Type corresponding to C++ type: {}.\n\n\
+                 This type can only be used behind a pointer or reference.",
+                wrap_inline_cpp_code(&cpp_type_code)
+            );
             // TODO: add description based on the wrapper kind (enum, immovable/movable class)
             if let Some(ref cpp_doc) = doc_data.cpp_doc {
                 doc += &format!(
@@ -118,13 +122,6 @@ pub fn struct_doc(type1: &RustStruct) -> String {
                     cpp_args = cpp_args
             )
         }
-        RustStructKind::FfiClassType(ref doc_data) => format!(
-            "FFI type corresponding to C++ type: {}.\n\n\
-             This type can only be used behind a pointer.\n\n\
-             Use `{}` for accessing public API for this type.",
-            wrap_inline_cpp_code(&doc_data.cpp_path.to_cpp_pseudo_code()),
-            doc_data.public_rust_path.full_name(Some(current_crate))
-        ),
         // private struct, no doc needed
         RustStructKind::SizedType(_) => String::new(),
     };

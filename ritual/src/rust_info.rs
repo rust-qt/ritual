@@ -48,7 +48,7 @@ pub struct RustQtSlotWrapper {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum RustWrapperTypeKind {
     EnumWrapper,
-    ImmovableClassWrapper { raw_type_path: RustPath },
+    ImmovableClassWrapper,
     MovableClassWrapper { sized_type_path: RustPath },
 }
 
@@ -86,7 +86,6 @@ pub struct RustFfiClassTypeDoc {
 pub enum RustStructKind {
     WrapperType(RustWrapperType),
     QtSlotWrapper(RustQtSlotWrapper),
-    FfiClassType(RustFfiClassTypeDoc),
     SizedType(CppPath),
 }
 
@@ -99,9 +98,9 @@ impl RustStructKind {
         }
     }
 
-    pub fn is_ffi_type(&self) -> bool {
+    pub fn is_sized_type(&self) -> bool {
         match *self {
-            RustStructKind::FfiClassType(_) | RustStructKind::SizedType(_) => true,
+            RustStructKind::SizedType(_) => true,
             _ => false,
         }
     }
@@ -489,14 +488,6 @@ impl RustItemKind {
     pub fn is_wrapper_type(&self) -> bool {
         if let RustItemKind::Struct(data) = self {
             data.kind.is_wrapper_type()
-        } else {
-            false
-        }
-    }
-
-    pub fn is_ffi_type(&self) -> bool {
-        if let RustItemKind::Struct(data) = self {
-            data.kind.is_ffi_type()
         } else {
             false
         }

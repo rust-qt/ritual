@@ -116,12 +116,14 @@ pub enum RustToFfiTypeConversion {
     None,
     /// `&T` to `*const T` (or similar mutable types)
     RefToPtr,
-    /// `Option<&T>` to `*const T` (or similar mutable types)
-    OptionRefToPtr,
+    /// `Option<ConstPtr<T>>` to `*const T` (or similar mutable types)
+    OptionPtrWrapperToPtr,
     /// `T` to `*const T` (or similar mutable type)
     ValueToPtr,
-    /// `CppBox<T>` to `*const T` (or similar mutable type)
+    /// `CppBox<T>` to `*mut T`
     CppBoxToPtr,
+    /// `ConstPtr<T>` to `*const T` (or similar mutable type)
+    PtrWrapperToPtr,
     /// `qt_core::flags::Flags<T>` to `c_int`
     QFlagsToUInt,
 }
@@ -281,7 +283,7 @@ impl RustType {
         None
     }
     /// Returns true if indirection that is applied last has const qualifier.
-    pub fn last_is_const(&self) -> Result<bool> {
+    pub fn is_const_pointer_like(&self) -> Result<bool> {
         if let RustType::PointerLike { ref is_const, .. } = *self {
             Ok(*is_const)
         } else {
