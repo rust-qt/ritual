@@ -9,8 +9,8 @@ use crate::cpp_template_instantiator::find_template_instantiations_step;
 use crate::cpp_template_instantiator::instantiate_templates_step;
 use crate::crate_writer::crate_writer_step;
 use crate::database::{CppDatabaseItem, Database};
-use crate::rust_name_resolver::clear_rust_info_step;
-use crate::rust_name_resolver::rust_name_resolver_step;
+use crate::rust_generator::clear_rust_info_step;
+use crate::rust_generator::rust_generator_step;
 use crate::type_allocation_places::choose_allocation_places_step;
 use crate::workspace::Workspace;
 use itertools::Itertools;
@@ -112,7 +112,7 @@ impl Default for ProcessingSteps {
             cpp_ffi_generator_step(),
             // TODO: generate_slot_wrappers
             cpp_checker_step(),
-            rust_name_resolver_step(),
+            rust_generator_step(),
             crate_writer_step(),
             steps::build_crate(),
         ];

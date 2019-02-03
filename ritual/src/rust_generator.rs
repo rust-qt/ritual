@@ -1172,8 +1172,8 @@ fn run(data: &mut ProcessorData) -> Result<()> {
     Ok(())
 }
 
-pub fn rust_name_resolver_step() -> ProcessingStep {
-    ProcessingStep::new("rust_name_resolver", run)
+pub fn rust_generator_step() -> ProcessingStep {
+    ProcessingStep::new("rust_generator", run)
 }
 
 pub fn clear_rust_info(data: &mut ProcessorData) -> Result<()> {

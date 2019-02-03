@@ -24,13 +24,11 @@ pub mod database;
 mod doc_formatter;
 pub mod processor;
 mod rust_code_generator;
+mod rust_generator;
 mod rust_info;
-mod rust_name_resolver;
 mod rust_type;
 #[cfg(test)]
 mod tests;
 mod type_allocation_places;
 mod versions;
 pub mod workspace;
-
-//mod rust_generator;
