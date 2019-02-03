@@ -22,30 +22,44 @@ use crate::database::CppFfiItem;
 use crate::database::CppItemData;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
+use itertools::Itertools;
 use log::trace;
 use ritual_common::errors::{bail, unexpected, Result};
 use ritual_common::utils::MapIfOk;
+use std::collections::HashSet;
 use std::iter::once;
 
 pub struct FfiNameProvider {
+    names: HashSet<String>,
     prefix: String,
-    next_id: u64,
 }
 
 impl FfiNameProvider {
-    pub fn new(prefix: String, next_id: u64) -> Self {
-        FfiNameProvider { prefix, next_id }
+    pub fn new(prefix: String, names: HashSet<String>) -> Self {
+        FfiNameProvider { prefix, names }
     }
-    pub fn next_path(&mut self) -> CppPath {
-        let id = self.next_id;
-        self.next_id += 1;
-        let item = CppPathItem::from_str_unchecked(&format!("{}{}", self.prefix, id));
+    pub fn create_path(&mut self, name: &str) -> CppPath {
+        let mut num: Option<u32> = None;
+        let full_name = loop {
+            let full_name = format!(
+                "{}_{}{}",
+                self.prefix,
+                name,
+                num.map_or(String::new(), |num| num.to_string())
+            );
+            if !self.names.contains(&full_name) {
+                break full_name;
+            }
+            num = Some(num.map_or(1, |num| num + 1));
+        };
+        let item = CppPathItem::from_str_unchecked(&full_name);
+        self.names.insert(full_name);
         CppPath::from_item(item)
     }
 }
 
 /// Runs the FFI generator
-fn run(mut data: &mut ProcessorData) -> Result<()> {
+fn run(data: &mut ProcessorData) -> Result<()> {
     let cpp_ffi_lib_name = format!("ctr_{}_ffi", &data.config.crate_properties().name());
     let movable_types: Vec<_> = data
         .all_items()
@@ -74,9 +88,15 @@ fn run(mut data: &mut ProcessorData) -> Result<()> {
         })
         .collect();
 
-    // TODO: save and use next_id
-    let mut name_provider =
-        FfiNameProvider::new(cpp_ffi_lib_name.clone(), data.current_database.next_ffi_id);
+    let existing_names = data
+        .current_database
+        .cpp_items
+        .iter()
+        .flat_map(|m| m.ffi_items.iter())
+        .map(|f| f.path().to_cpp_code().unwrap())
+        .collect();
+
+    let mut name_provider = FfiNameProvider::new(cpp_ffi_lib_name.clone(), existing_names);
 
     for item in &mut data.current_database.cpp_items {
         if item.is_cpp_ffi_processed {
@@ -131,7 +151,6 @@ fn run(mut data: &mut ProcessorData) -> Result<()> {
         }
         item.is_cpp_ffi_processed = true;
     }
-    data.current_database.next_ffi_id = name_provider.next_id;
     Ok(())
 }
 
@@ -295,45 +314,45 @@ fn generate_ffi_methods_for_method(
     Ok(methods)
 }
 
-/// Creates FFI method signature for this method:
+/// Creates FFI function signature for this function:
 /// - converts all types to FFI types;
 /// - adds "this" argument explicitly if present;
 /// - adds "output" argument for return value if
 ///   the return value is stack-allocated.
 pub fn to_ffi_method(
-    method: &CppFunction,
+    function: &CppFunction,
     movable_types: &[CppPath],
     name_provider: &mut FfiNameProvider,
 ) -> Result<CppFfiFunction> {
-    if method.allows_variadic_arguments {
+    if function.allows_variadic_arguments {
         bail!("Variable arguments are not supported");
     }
     let mut r = CppFfiFunction {
         arguments: Vec::new(),
         return_type: CppFfiType::void(),
-        path: name_provider.next_path(),
+        path: name_provider.create_path(&function.path.ascii_caption()),
         allocation_place: ReturnValueAllocationPlace::NotApplicable,
         kind: CppFfiFunctionKind::Function {
-            cpp_function: method.clone(),
+            cpp_function: function.clone(),
             omitted_arguments: None,
             cast: None,
         },
     };
-    if let Some(ref info) = method.member {
+    if let Some(ref info) = function.member {
         if !info.is_static && info.kind != CppFunctionKind::Constructor {
             r.arguments.push(CppFfiFunctionArgument {
                 name: "this_ptr".to_string(),
                 argument_type: CppType::PointerLike {
                     is_const: false,
                     kind: CppPointerLikeTypeKind::Pointer,
-                    target: Box::new(CppType::Class(method.class_type().unwrap())),
+                    target: Box::new(CppType::Class(function.class_type().unwrap())),
                 }
                 .to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
                 meaning: CppFfiArgumentMeaning::This,
             });
         }
     }
-    for (index, arg) in method.arguments.iter().enumerate() {
+    for (index, arg) in function.arguments.iter().enumerate() {
         let c_type = arg
             .argument_type
             .to_cpp_ffi_type(CppTypeRole::NotReturnType)?;
@@ -344,21 +363,21 @@ pub fn to_ffi_method(
         });
     }
 
-    if method.is_destructor() {
+    if function.is_destructor() {
         // destructor doesn't have a return type that needs special handling,
         // but its `allocation_place` must match `allocation_place` of the type's constructor
-        let class_type = &method.class_type().unwrap();
+        let class_type = &function.class_type().unwrap();
         r.allocation_place = if movable_types.iter().any(|t| t == class_type) {
             ReturnValueAllocationPlace::Stack
         } else {
             ReturnValueAllocationPlace::Heap
         };
     } else {
-        let real_return_type = match method.member {
+        let real_return_type = match function.member {
             Some(ref info) if info.kind.is_constructor() => {
-                CppType::Class(method.class_type().unwrap())
+                CppType::Class(function.class_type().unwrap())
             }
-            _ => method.return_type.clone(),
+            _ => function.return_type.clone(),
         };
         let real_return_type_ffi = real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
         match real_return_type {
@@ -538,7 +557,10 @@ fn generate_slot_wrapper(
     let func_arguments = once(void_ptr.clone())
         .chain(ffi_types.iter().map(|t| t.ffi_type.clone()))
         .collect();
-    let class_path = name_provider.next_path();
+    let class_path = name_provider.create_path(&format!(
+        "slot_wrapper_{}",
+        arguments.iter().map(|arg| arg.ascii_caption()).join("_")
+    ));
     let function_type = CppFunctionPointerType {
         return_type: Box::new(CppType::Void),
         arguments: func_arguments,

@@ -5,6 +5,7 @@ use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_ffi_data::CppTypeConversionToFfi;
 use crate::cpp_function::*;
 use crate::cpp_type::*;
+use std::collections::HashSet;
 
 #[test]
 fn cpp_method_kind() {
@@ -175,7 +176,7 @@ fn to_ffi(function: &CppFunction, force_stack: Option<CppPath>) -> CppFfiFunctio
     crate::cpp_ffi_generator::to_ffi_method(
         function,
         &movable_types,
-        &mut crate::cpp_ffi_generator::FfiNameProvider::new(String::new(), 0),
+        &mut crate::cpp_ffi_generator::FfiNameProvider::new(String::new(), HashSet::new()),
     )
     .unwrap()
 }

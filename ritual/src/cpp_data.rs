@@ -195,6 +195,36 @@ impl CppPath {
             None
         }
     }
+
+    pub fn ascii_caption(&self) -> String {
+        self.items
+            .iter()
+            .map(|item| {
+                let name: String = item
+                    .name
+                    .chars()
+                    .map(|c| {
+                        if c == '~' {
+                            'd'
+                        } else if !c.is_digit(36) && c != '_' {
+                            '_'
+                        } else {
+                            c
+                        }
+                    })
+                    .collect();
+                if let Some(ref args) = item.template_arguments {
+                    format!(
+                        "{}_{}",
+                        name,
+                        args.iter().map(|arg| arg.ascii_caption()).join("_")
+                    )
+                } else {
+                    name
+                }
+            })
+            .join("_")
+    }
 }
 
 impl FromStr for CppPath {

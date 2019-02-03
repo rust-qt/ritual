@@ -203,7 +203,6 @@ mod steps {
                 item.ffi_items.clear();
                 item.is_cpp_ffi_processed = false;
             }
-            data.current_database.next_ffi_id = 0;
             Ok(())
         })
     }

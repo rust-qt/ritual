@@ -309,6 +309,13 @@ impl CppFfiItem {
             is_rust_processed: false,
         }
     }
+
+    pub fn path(&self) -> &CppPath {
+        match self.kind {
+            CppFfiItemKind::Function(ref f) => &f.path,
+            CppFfiItemKind::QtSlotWrapper(ref s) => &s.class_path,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -335,7 +342,6 @@ pub struct Database {
     pub cpp_items: Vec<CppDatabaseItem>,
     pub rust_database: RustDatabase,
     pub environments: Vec<CppCheckerEnv>,
-    pub next_ffi_id: u64,
 }
 
 impl Database {
@@ -346,7 +352,6 @@ impl Database {
             cpp_items: Vec::new(),
             rust_database: Default::default(),
             environments: Vec::new(),
-            next_ffi_id: 0,
         }
     }
 
@@ -357,7 +362,6 @@ impl Database {
     pub fn clear(&mut self) {
         self.cpp_items.clear();
         self.environments.clear();
-        self.next_ffi_id = 0;
     }
 
     pub fn crate_name(&self) -> &str {

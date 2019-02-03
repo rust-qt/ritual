@@ -364,6 +364,34 @@ impl CppType {
         };
         self.to_cpp_code(None).unwrap_or_else(|_| "[?]".to_string())
     }
+
+    pub fn ascii_caption(&self) -> String {
+        match *self {
+            CppType::Void | CppType::BuiltInNumeric(_) => {
+                self.to_cpp_code(None).unwrap().replace(' ', "_")
+            }
+            CppType::SpecificNumeric(ref data) => data.path.ascii_caption(),
+            CppType::PointerSizedInteger { ref path, .. }
+            | CppType::Enum { ref path }
+            | CppType::Class(ref path) => path.ascii_caption(),
+            CppType::TemplateParameter { ref name, .. } => name.to_string(),
+            CppType::FunctionPointer(_) => "fn".into(),
+            CppType::PointerLike {
+                ref kind,
+                ref is_const,
+                ref target,
+            } => format!(
+                "{}{}{}",
+                if *is_const { "const_" } else { "" },
+                match *kind {
+                    CppPointerLikeTypeKind::Pointer => "ptr_",
+                    CppPointerLikeTypeKind::Reference => "ref_",
+                    CppPointerLikeTypeKind::RValueReference => "rref_",
+                },
+                target.ascii_caption()
+            ),
+        }
+    }
 }
 
 /// Context of usage for a C++ type
