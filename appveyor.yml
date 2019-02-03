@@ -1,6 +1,8 @@
 build_script: ci\appveyor\run.bat
 
 cache:
+- '%USERPROFILE%\.cargo'
+- '%USERPROFILE%\.rustup'
 - '%USERPROFILE%\cpp_to_rust_temp_test_dir'
 - 'target'
 
