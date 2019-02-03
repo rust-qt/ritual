@@ -1,5 +1,8 @@
 //! Various C++-related types and functions needed for the `cpp_to_rust` project.
 
+use std::ops::{Deref, DerefMut};
+use std::ptr;
+
 #[cfg(test)]
 mod tests {
     use crate::{CppBox, CppDeletable};
@@ -78,8 +81,18 @@ impl<T: CppDeletable> CppBox<T> {
     /// ensure that the object will be deleted at some point.
     pub fn into_raw(mut self) -> *mut T {
         let ptr = self.0;
-        self.0 = std::ptr::null_mut();
+        self.0 = ptr::null_mut();
         ptr
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub unsafe fn as_ref(&self) -> &T {
+        self.0.as_ref().unwrap()
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub unsafe fn as_mut(&mut self) -> &mut T {
+        self.0.as_mut().unwrap()
     }
 
     /// Returns true if the pointer is null.
@@ -117,26 +130,14 @@ impl<T: CppDeletable> CppBox<T> {
     }
 }
 
-impl<T: CppDeletable> AsRef<T> for CppBox<T> {
-    fn as_ref(&self) -> &T {
-        unsafe { self.0.as_ref().unwrap() }
-    }
-}
-
-impl<T: CppDeletable> AsMut<T> for CppBox<T> {
-    fn as_mut(&mut self) -> &mut T {
-        unsafe { self.0.as_mut().unwrap() }
-    }
-}
-
-impl<T: CppDeletable> std::ops::Deref for CppBox<T> {
+impl<T: CppDeletable> Deref for CppBox<T> {
     type Target = T;
     fn deref(&self) -> &T {
         unsafe { self.0.as_ref().unwrap() }
     }
 }
 
-impl<T: CppDeletable> std::ops::DerefMut for CppBox<T> {
+impl<T: CppDeletable> DerefMut for CppBox<T> {
     fn deref_mut(&mut self) -> &mut T {
         unsafe { self.0.as_mut().unwrap() }
     }
@@ -154,7 +155,7 @@ impl<T: CppDeletable> Drop for CppBox<T> {
 
 impl<T: CppDeletable> Default for CppBox<T> {
     fn default() -> CppBox<T> {
-        CppBox(std::ptr::null_mut())
+        CppBox(ptr::null_mut())
     }
 }
 
@@ -191,29 +192,23 @@ pub mod new_uninitialized {
 /// so all calls of `static_cast` are wrapper in FFI functions.
 /// Still, `static_cast` is faster than casts with runtime checks on C++ side
 /// because runtime overhead of Rust wrapper functions is the same for all cast types.
-pub trait StaticCast<T> {
+pub trait StaticUpcast<T> {
     /// Convert type of a const reference.
-    fn static_cast(&self) -> &T;
+    unsafe fn static_upcast(&self) -> &T;
     /// Convert type of a mutable reference.
-    fn static_cast_mut(&mut self) -> &mut T;
+    unsafe fn static_upcast_mut(&mut self) -> &mut T;
 }
 
 /// Converts type of a const pointer using `StaticCast` implementation of the type.
 /// If `ptr` is null, this function does nothing and returns null pointer.
-#[allow(clippy::not_unsafe_ptr_arg_deref)] // TODO: redesign casts API
-pub fn static_cast<R, T: StaticCast<R>>(ptr: *const T) -> *const R {
-    unsafe { ptr.as_ref() }
-        .map(|x| x.static_cast() as *const R)
-        .unwrap_or(std::ptr::null())
+pub unsafe fn static_upcast<R, T: StaticUpcast<R>>(value: &T) -> &R {
+    value.static_upcast()
 }
 
 /// Converts type of a mutable pointer using `StaticCast` implementation of the type.
 /// If `ptr` is null, this function does nothing and returns null pointer.
-#[allow(clippy::not_unsafe_ptr_arg_deref)] // TODO: redesign casts API
-pub fn static_cast_mut<R, T: StaticCast<R>>(ptr: *mut T) -> *mut R {
-    unsafe { ptr.as_mut() }
-        .map(|x| x.static_cast_mut() as *mut R)
-        .unwrap_or(std::ptr::null_mut())
+pub unsafe fn static_upcast_mut<R, T: StaticUpcast<R>>(value: &mut T) -> &mut R {
+    value.static_upcast_mut()
 }
 
 /// Provides access to C++ `static_cast` conversion from base class to derived class.
@@ -237,31 +232,27 @@ pub fn static_cast_mut<R, T: StaticCast<R>>(ptr: *mut T) -> *mut R {
 /// so all calls of `static_cast` are wrapper in FFI functions.
 /// Still, `static_cast` is faster than casts with runtime checks on C++ side
 /// because runtime overhead of Rust wrapper functions is the same for all cast types.
-pub trait UnsafeStaticCast<T> {
+pub trait StaticDowncast<T> {
     /// Convert type of a const reference.
-    unsafe fn static_cast(&self) -> &T;
+    unsafe fn static_downcast(&self) -> &T;
     /// Convert type of a mutable reference.
-    unsafe fn static_cast_mut(&mut self) -> &mut T;
+    unsafe fn static_downcast_mut(&mut self) -> &mut T;
 }
 
 /// Converts type of a const pointer using `UnsafeStaticCast` implementation of the type.
 /// `ptr` must be either a null pointer or a valid pointer to an instance of `R` class
 /// or a class derived from `R`.
 /// If `ptr` is null, this function does nothing and returns null pointer.
-pub unsafe fn unsafe_static_cast<R, T: UnsafeStaticCast<R>>(ptr: *const T) -> *const R {
-    ptr.as_ref()
-        .map(|x| x.static_cast() as *const R)
-        .unwrap_or(std::ptr::null())
+pub unsafe fn static_downcast<R, T: StaticDowncast<R>>(value: &T) -> &R {
+    value.static_downcast()
 }
 
 /// Converts type of a mutable pointer using `UnsafeStaticCast` implementation of the type.
 /// `ptr` must be either a null pointer or a valid pointer to an instance of `R` class
 /// or a class derived from `R`.
 /// If `ptr` is null, this function does nothing and returns null pointer.
-pub unsafe fn unsafe_static_cast_mut<R, T: UnsafeStaticCast<R>>(ptr: *mut T) -> *mut R {
-    ptr.as_mut()
-        .map(|x| x.static_cast_mut() as *mut R)
-        .unwrap_or(std::ptr::null_mut())
+pub unsafe fn static_downcast_mut<R, T: StaticDowncast<R>>(value: &mut T) -> &mut R {
+    value.static_downcast_mut()
 }
 
 /// Provides access to C++ `dynamic_cast` conversion.
@@ -281,10 +272,10 @@ pub unsafe fn unsafe_static_cast_mut<R, T: UnsafeStaticCast<R>>(ptr: *mut T) -> 
 pub trait DynamicCast<T> {
     /// Convert type of a const reference.
     /// Returns `None` if `self` is not an instance of `T`.
-    fn dynamic_cast(&self) -> Option<&T>;
+    unsafe fn dynamic_cast(&self) -> Option<&T>;
     /// Convert type of a mutable reference.
     /// Returns `None` if `self` is not an instance of `T`.
-    fn dynamic_cast_mut(&mut self) -> Option<&mut T>;
+    unsafe fn dynamic_cast_mut(&mut self) -> Option<&mut T>;
 }
 
 /// Converts type of a const pointer using `DynamicCast` implementation of the type.
@@ -293,11 +284,9 @@ pub trait DynamicCast<T> {
 /// Returns null pointer if `ptr` does not point to an instance of `R` or an instance of
 /// a class derived from `R`.
 /// If `ptr` is null, this function does nothing and returns null pointer.
-pub unsafe fn dynamic_cast<R, T: DynamicCast<R>>(ptr: *const T) -> *const R {
-    ptr.as_ref()
-        .and_then(|x| x.dynamic_cast())
-        .map(|x| x as *const R)
-        .unwrap_or(std::ptr::null())
+
+pub unsafe fn dynamic_cast<R, T: DynamicCast<R>>(value: &T) -> Option<&R> {
+    value.dynamic_cast()
 }
 
 /// Converts type of a mutable pointer using `DynamicCast` implementation of the type.
@@ -305,9 +294,6 @@ pub unsafe fn dynamic_cast<R, T: DynamicCast<R>>(ptr: *const T) -> *const R {
 /// or a class derived from `T`.
 /// Returns null pointer if `ptr` does not point to an instance of `R`.
 /// If `ptr` is null, this function does nothing and returns null pointer.
-pub unsafe fn dynamic_cast_mut<R, T: DynamicCast<R>>(ptr: *mut T) -> *mut R {
-    ptr.as_mut()
-        .and_then(|x| x.dynamic_cast_mut())
-        .map(|x| x as *mut R)
-        .unwrap_or(std::ptr::null_mut())
+pub unsafe fn dynamic_cast_mut<R, T: DynamicCast<R>>(value: &mut T) -> Option<&mut R> {
+    value.dynamic_cast_mut()
 }

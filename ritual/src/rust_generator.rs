@@ -417,19 +417,20 @@ impl State<'_> {
         let derived_type;
         let cast_function_name;
         let cast_function_name_mut;
-        unnamed_function.is_unsafe = false;
+        unnamed_function.is_unsafe = true;
         match cast {
             CppCast::Static { ref is_unsafe, .. } => {
                 if *is_unsafe {
-                    trait_path = RustPath::from_str_unchecked("cpp_utils::UnsafeStaticCast");
+                    trait_path = RustPath::from_str_unchecked("cpp_utils::StaticDowncast");
                     derived_type = to_type;
-                    unnamed_function.is_unsafe = true;
+                    cast_function_name = "static_downcast";
+                    cast_function_name_mut = "static_downcast_mut";
                 } else {
-                    trait_path = RustPath::from_str_unchecked("cpp_utils::StaticCast");
+                    trait_path = RustPath::from_str_unchecked("cpp_utils::StaticUpcast");
                     derived_type = from_type;
+                    cast_function_name = "static_upcast";
+                    cast_function_name_mut = "static_upcast_mut";
                 }
-                cast_function_name = "static_cast";
-                cast_function_name_mut = "static_cast_mut";
             }
             CppCast::Dynamic => {
                 trait_path = RustPath::from_str_unchecked("cpp_utils::DynamicCast");
@@ -438,7 +439,7 @@ impl State<'_> {
                 cast_function_name_mut = "dynamic_cast_mut";
             }
             CppCast::QObject => {
-                trait_path = RustPath::from_str_unchecked("qt_core::qobject::Cast");
+                trait_path = RustPath::from_str_unchecked("qt_core::QObjectCast");
                 derived_type = to_type;
                 cast_function_name = "qobject_cast";
                 cast_function_name_mut = "qobject_cast_mut";
@@ -478,7 +479,8 @@ impl State<'_> {
 
         if cast.is_first_static_cast() && !cast.is_unsafe_static_cast() {
             let deref_trait_path = RustPath::from_str_unchecked("std::ops::Deref");
-            let deref_function = fixed_function.with_path(deref_trait_path.join("deref"));
+            let mut deref_function = fixed_function.with_path(deref_trait_path.join("deref"));
+            deref_function.is_unsafe = false;
             results.push(RustItemKind::TraitImpl(RustTraitImpl {
                 target_type: target_type.clone(),
                 parent_path: parent_path.clone(),
@@ -494,8 +496,9 @@ impl State<'_> {
             }));
 
             let deref_mut_trait_path = RustPath::from_str_unchecked("std::ops::DerefMut");
-            let deref_mut_function =
+            let mut deref_mut_function =
                 fixed_function_mut.with_path(deref_mut_trait_path.join("deref_mut"));
+            deref_mut_function.is_unsafe = false;
             results.push(RustItemKind::TraitImpl(RustTraitImpl {
                 target_type,
                 parent_path,
