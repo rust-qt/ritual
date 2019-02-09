@@ -4,7 +4,7 @@ use cpp_utils::*;
 #[test]
 fn casts() {
     unsafe {
-        let mut derived = DerivedClass1::new();
+        let mut derived: CppBox<DerivedClass1> = DerivedClass1::new();
         assert_eq!(derived.base_function(), 1);
 
         let mut base: Ptr<BaseClass1> = derived.static_upcast_mut();
@@ -33,16 +33,16 @@ fn casts() {
 #[test]
 fn virtual_functions() {
     unsafe {
-        let derived = DerivedClass1::new();
+        let derived: CppBox<DerivedClass1> = DerivedClass1::new();
         assert_eq!(derived.virtual_function(), 43);
 
         let base: ConstPtr<BaseClass1> = derived.static_upcast();
         assert_eq!(base.virtual_function(), 43);
 
-        let base = BaseClass1::new();
+        let base: CppBox<BaseClass1> = BaseClass1::new();
         assert_eq!(base.virtual_function(), 42);
 
-        let derived = DerivedClass2::new();
+        let derived: CppBox<DerivedClass2> = DerivedClass2::new();
         assert_eq!(derived.virtual_function(), 44);
 
         let base: ConstPtr<BaseClass1> = derived.static_upcast();
@@ -53,7 +53,7 @@ fn virtual_functions() {
 #[test]
 fn pure_virtual_functions() {
     unsafe {
-        let mut derived = DerivedClass3::new();
+        let mut derived: CppBox<DerivedClass3> = DerivedClass3::new();
         assert_eq!(*derived.virtual_function(), 45);
 
         let mut base: Ptr<AbstractBaseClass1> = derived.static_upcast_mut();
