@@ -12,7 +12,8 @@ pub trait FancyUnwrap {
 }
 
 pub fn print_trace(err: failure::Error, log_level: log::Level) {
-    log!(log_level, "\nError:");
+    log!(log_level, "");
+    log!(log_level, "Error:");
     for cause in err.iter_chain() {
         log!(log_level, "   {}", cause);
     }
