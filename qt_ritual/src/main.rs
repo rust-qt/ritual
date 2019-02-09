@@ -23,6 +23,10 @@ mod doc_parser;
 mod fix_header_names;
 mod lib_configs;
 mod versions;
+
+#[cfg(test)]
+mod test_moqt;
+
 use flexi_logger::{Duplicate, LevelFilter, LogSpecification, Logger};
 
 #[derive(Debug, StructOpt)]
@@ -46,13 +50,10 @@ struct Options {
     operations: Vec<String>,
 }
 
-fn run() -> Result<()> {
-    let options = Options::from_args();
-
+fn run(options: Options) -> Result<()> {
     let workspace_path = canonicalize(options.workspace)?;
 
-    info!("Workspace: {}", workspace_path.display());
-    let mut workspace = Workspace::new(workspace_path)?;
+    let mut workspace = Workspace::new(workspace_path.clone())?;
 
     Logger::with(LogSpecification::default(LevelFilter::Trace).build())
         .log_to_file()
@@ -60,7 +61,9 @@ fn run() -> Result<()> {
         .print_message()
         .duplicate_to_stderr(Duplicate::Info)
         .start()
-        .unwrap_or_else(|e| panic!("Logger initialization failed with {}", e));
+        .unwrap_or_else(|e| panic!("Logger initialization failed: {}", e));
+
+    info!("Workspace: {}", workspace_path.display());
 
     if let Some(local_paths) = options.local_paths {
         workspace.set_write_dependencies_local_paths(local_paths)?;
@@ -105,5 +108,5 @@ fn run() -> Result<()> {
 }
 
 pub fn main() {
-    run().fancy_unwrap();
+    run(Options::from_args()).fancy_unwrap();
 }

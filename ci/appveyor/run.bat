@@ -8,8 +8,7 @@ call "%APPVEYOR_BUILD_FOLDER%\ci\appveyor\setup_sqlite.bat" || goto :error
 
 set RUST_BACKTRACE=1
 
-set CPP_TO_RUST_TEMP_TEST_DIR=%USERPROFILE%\cpp_to_rust_temp_test_dir
-if not exist "%CPP_TO_RUST_TEMP_TEST_DIR%" mkdir "%CPP_TO_RUST_TEMP_TEST_DIR%"
+set RITUAL_TEMP_TEST_DIR=%USERPROFILE%\ritual_temp_test_dir
 
 cd "%APPVEYOR_BUILD_FOLDER%"
 cargo clippy --all-targets || goto :error

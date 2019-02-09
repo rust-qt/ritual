@@ -401,6 +401,7 @@ pub fn os_string_into_string(s: OsString) -> Result<String> {
 /// Returns current absolute path of `relative_path`.
 /// `relative_path` is relative to the repository root.
 pub fn repo_crate_local_path(relative_path: &str) -> Result<PathBuf> {
+    // TODO: replace other uses of `CARGO_MANIFEST_DIR` with this function
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let parent = path
         .parent()

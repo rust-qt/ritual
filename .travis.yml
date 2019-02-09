@@ -5,7 +5,7 @@ __common: &common
         directories:
         - $HOME/.cargo
         - $HOME/.rustup
-        - $HOME/cpp_to_rust_temp_test_dir
+        - $HOME/ritual_temp_test_dir
         - target
 
 matrix:

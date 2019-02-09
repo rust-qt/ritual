@@ -5,4 +5,3 @@ mod cpp_method;
 mod cpp_operator;
 mod cpp_parser;
 mod cpp_type;
-mod full_run;
