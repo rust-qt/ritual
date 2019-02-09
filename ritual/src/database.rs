@@ -116,17 +116,57 @@ pub enum CppItemData {
 
 impl CppItemData {
     pub fn is_same(&self, other: &CppItemData) -> bool {
-        match (self, other) {
-            (&CppItemData::Namespace(ref v), &CppItemData::Namespace(ref v2)) => v == v2,
-            (&CppItemData::Type(ref v), &CppItemData::Type(ref v2)) => v.is_same(v2),
-            (&CppItemData::EnumValue(ref v), &CppItemData::EnumValue(ref v2)) => v.is_same(v2),
-            (&CppItemData::Function(ref v), &CppItemData::Function(ref v2)) => v.is_same(v2),
-            (&CppItemData::ClassField(ref v), &CppItemData::ClassField(ref v2)) => v.is_same(v2),
-            (&CppItemData::ClassBase(ref v), &CppItemData::ClassBase(ref v2)) => v == v2,
-            (&CppItemData::QtSignalArguments(ref v), &CppItemData::QtSignalArguments(ref v2)) => {
-                v == v2
+        use self::CppItemData::*;
+        match *self {
+            Namespace(ref v) => {
+                if let Namespace(ref v2) = other {
+                    v == v2
+                } else {
+                    false
+                }
             }
-            _ => false,
+            Type(ref v) => {
+                if let Type(ref v2) = other {
+                    v.is_same(v2)
+                } else {
+                    false
+                }
+            }
+            EnumValue(ref v) => {
+                if let EnumValue(ref v2) = other {
+                    v.is_same(v2)
+                } else {
+                    false
+                }
+            }
+            Function(ref v) => {
+                if let Function(ref v2) = other {
+                    v.is_same(v2)
+                } else {
+                    false
+                }
+            }
+            ClassField(ref v) => {
+                if let ClassField(ref v2) = other {
+                    v.is_same(v2)
+                } else {
+                    false
+                }
+            }
+            ClassBase(ref v) => {
+                if let ClassBase(ref v2) = other {
+                    v == v2
+                } else {
+                    false
+                }
+            }
+            QtSignalArguments(ref v) => {
+                if let QtSignalArguments(ref v2) = other {
+                    v == v2
+                } else {
+                    false
+                }
+            }
         }
     }
 
