@@ -1,4 +1,4 @@
-use moqt_core::{BaseClass1, DerivedClass1, DerivedClass2};
+use moqt_core::{BaseClass1, DerivedClass1, DerivedClass2, AbstractBaseClass1, DerivedClass3};
 use cpp_utils::*;
 
 #[test]
@@ -47,5 +47,16 @@ fn virtual_functions() {
 
         let base: ConstPtr<BaseClass1> = derived.static_upcast();
         assert_eq!(base.virtual_function(), 44);
+    }
+}
+
+#[test]
+fn pure_virtual_functions() {
+    unsafe {
+        let mut derived = DerivedClass3::new();
+        assert_eq!(*derived.virtual_function(), 45);
+
+        let mut base: Ptr<AbstractBaseClass1> = derived.static_upcast_mut();
+        assert_eq!(*base.virtual_function(), 45);
     }
 }

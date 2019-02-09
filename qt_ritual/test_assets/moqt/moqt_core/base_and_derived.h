@@ -29,3 +29,18 @@ public:
     DerivedClass2() {}
     int virtualFunction() const override { return 44; }
 };
+
+
+
+class MOQT_CORE_EXPORT AbstractBaseClass1 {
+public:
+    AbstractBaseClass1() {}
+    virtual ~AbstractBaseClass1() {}
+    virtual int* virtualFunction() = 0;
+};
+
+class MOQT_CORE_EXPORT DerivedClass3 : public AbstractBaseClass1 {
+public:
+    DerivedClass3() {}
+    int* virtualFunction() override { return new int(45); }
+};
