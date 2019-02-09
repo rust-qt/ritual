@@ -34,6 +34,7 @@ use std::io::BufWriter;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
+use crate::rust_type::RustCommonType;
 
 /// Generates Rust code representing type `rust_type` inside crate `crate_name`.
 /// Same as `RustCodeGenerator::rust_type_to_code`, but accessible by other modules.
@@ -67,11 +68,10 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: &str) -> String {
                 }
             }
         }
-        RustType::Common {
+        RustType::Common(RustCommonType {
             ref path,
             ref generic_arguments,
-            ..
-        } => {
+        }) => {
             let mut code = path.full_name(Some(current_crate));
             if let Some(ref args) = *generic_arguments {
                 code = format!(
@@ -469,12 +469,25 @@ impl Generator {
             ),
             RustToFfiTypeConversion::PtrWrapperToPtr
             | RustToFfiTypeConversion::OptionPtrWrapperToPtr => {
-                let is_const = type1.ffi_type.is_const_pointer_like()?;
                 let is_option =
                     type1.api_to_ffi_conversion == RustToFfiTypeConversion::OptionPtrWrapperToPtr;
+
+                let ptr_wrapper_type = if is_option {
+                    type1
+                        .api_type
+                        .as_common()?
+                        .generic_arguments
+                        .as_ref()
+                        .ok_or_else(|| err_msg("expected generic argument for Option"))?
+                        .get(0)
+                        .ok_or_else(|| err_msg("expected generic argument for Option"))?
+                } else {
+                    &type1.api_type
+                };
+                let ptr_wrapper_path = &ptr_wrapper_type.as_common()?.path;
                 format!(
-                    "{unsafe_start}::cpp_utils::{}::{}({}){unsafe_end}",
-                    if is_const { "ConstPtr" } else { "Ptr" },
+                    "{unsafe_start}{}::{}({}){unsafe_end}",
+                    self.rust_path_to_string(ptr_wrapper_path),
                     if is_option { "new_option" } else { "new" },
                     source_expr,
                     unsafe_start = unsafe_start,
@@ -483,10 +496,10 @@ impl Generator {
             }
             RustToFfiTypeConversion::QFlagsToUInt => {
                 let mut qflags_type = type1.api_type.clone();
-                if let RustType::Common {
+                if let RustType::Common(RustCommonType {
                     ref mut generic_arguments,
                     ..
-                } = qflags_type
+                }) = qflags_type
                 {
                     *generic_arguments = None;
                 } else {
@@ -580,10 +593,10 @@ impl Generator {
             }
             let struct_name =
                 if return_type.api_to_ffi_conversion == RustToFfiTypeConversion::CppBoxToPtr {
-                    if let RustType::Common {
+                    if let RustType::Common(RustCommonType {
                         ref generic_arguments,
                         ..
-                    } = return_type.api_type
+                    }) = return_type.api_type
                     {
                         let generic_arguments = generic_arguments
                             .as_ref()

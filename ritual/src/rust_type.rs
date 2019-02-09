@@ -165,18 +165,21 @@ impl RustPointerLikeTypeKind {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct RustCommonType {
+    /// Full name of the base type
+    pub path: RustPath,
+    /// Generic arguments, if any
+    pub generic_arguments: Option<Vec<RustType>>,
+}
+
 /// A Rust type
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum RustType {
     /// Unit type `()`, used as the replacement of C++'s `void` type.
     Unit,
     /// A numeric, enum or struct type with some indirection
-    Common {
-        /// Full name of the base type
-        path: RustPath,
-        /// Generic arguments, if any
-        generic_arguments: Option<Vec<RustType>>,
-    },
+    Common(RustCommonType),
     /// A function pointer type.
     FunctionPointer {
         /// Return type of the function.
@@ -209,10 +212,10 @@ impl RustType {
                 let const_text = if *is_const { "" } else { "mut_" };
                 format!("{}{}{}", kind_text, const_text, target.caption(context)?)
             }
-            RustType::Common {
+            RustType::Common(RustCommonType {
                 ref path,
                 ref generic_arguments,
-            } => {
+            }) => {
                 let mut name = if path.parts.len() == 1 {
                     path.parts[0].to_snake_case()
                 } else {
@@ -322,10 +325,10 @@ impl RustType {
                 ref target,
                 ..
             } => kind.is_pointer() || target.is_unsafe_argument(),
-            RustType::Common {
+            RustType::Common(RustCommonType {
                 ref generic_arguments,
                 ..
-            } => {
+            }) => {
                 if let Some(ref args) = *generic_arguments {
                     if args.iter().any(|arg| arg.is_unsafe_argument()) {
                         return true;
@@ -351,19 +354,14 @@ impl RustType {
             bail!("not a pointer like type");
         }
     }
-}
 
-impl RustFinalType {
-    /// Converts Rust API type from pointer to reference
-    /// and modifies `rust_api_to_c_conversion` accordingly.
-    /// `is_const1` specifies new constness of the created reference.
-    pub fn ptr_to_ref(&self, is_const1: bool) -> Result<RustFinalType> {
+    pub fn ptr_to_ref(&self, is_const1: bool) -> Result<Self> {
         let mut r = self.clone();
         if let RustType::PointerLike {
             ref mut is_const,
             ref mut kind,
             ..
-        } = r.api_type
+        } = r
         {
             if !kind.is_pointer() {
                 bail!("not a pointer type");
@@ -373,6 +371,25 @@ impl RustFinalType {
         } else {
             bail!("not a PointerLike type");
         }
+        Ok(r)
+    }
+
+    pub fn as_common(&self) -> Result<&RustCommonType> {
+        if let RustType::Common(ref r) = self {
+            Ok(r)
+        } else {
+            bail!("expected common type, got {:?}", self)
+        }
+    }
+}
+
+impl RustFinalType {
+    /// Converts Rust API type from pointer to reference
+    /// and modifies `rust_api_to_c_conversion` accordingly.
+    /// `is_const1` specifies new constness of the created reference.
+    pub fn ptr_to_ref(&self, is_const1: bool) -> Result<RustFinalType> {
+        let mut r = self.clone();
+        r.api_type = r.api_type.ptr_to_ref(is_const1)?;
         if r.api_to_ffi_conversion != RustToFfiTypeConversion::None {
             bail!("rust_api_to_ffi_conversion is not None");
         }

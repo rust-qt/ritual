@@ -2,7 +2,7 @@
 
 pub type Result<T> = std::result::Result<T, failure::Error>;
 pub use crate::unexpected;
-pub use failure::{bail, err_msg, Error, ResultExt};
+pub use failure::{bail, ensure, err_msg, Error, ResultExt};
 use log::log;
 use std::env;
 

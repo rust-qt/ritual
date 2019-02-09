@@ -480,7 +480,8 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
     let mut config = if crate_name.starts_with("moqt_") {
         let mut config = Config::new(crate_properties);
         let moqt_path = PathBuf::from(
-            ::std::env::var("MOQT_PATH").with_context(|_| "MOQT_PATH env var is missing")?,
+            ::std::env::var("MOQT_INSTALL_DIR")
+                .with_context(|_| "MOQT_INSTALL_DIR env var is missing")?,
         );
 
         config.add_include_directive(format!("{}.h", crate_name));

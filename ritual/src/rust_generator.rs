@@ -55,6 +55,7 @@ use ritual_common::string_utils::CaseOperations;
 use ritual_common::utils::MapIfOk;
 use std::collections::HashMap;
 use std::ops::Deref;
+use crate::rust_type::RustCommonType;
 
 /// Adds "_" to a string if it is a reserved word in Rust
 fn sanitize_rust_identifier(name: &str, is_module: bool) -> String {
@@ -109,10 +110,10 @@ impl State<'_> {
                 ref target,
             } => {
                 let rust_target = if target.deref() == &CppType::Void {
-                    RustType::Common {
+                    RustType::Common(RustCommonType {
                         path: RustPath::from_str_unchecked("std::ffi::c_void"),
                         generic_arguments: None,
-                    }
+                    })
                 } else {
                     self.ffi_type_to_rust_ffi_type(target)?
                 };
@@ -155,10 +156,10 @@ impl State<'_> {
                     RustPath::from_str_unchecked("std::os::raw").join(own_name)
                 };
 
-                RustType::Common {
+                RustType::Common(RustCommonType {
                     path: rust_path,
                     generic_arguments: None,
-                }
+                })
             }
             CppType::SpecificNumeric(CppSpecificNumericType {
                 ref bits, ref kind, ..
@@ -175,17 +176,17 @@ impl State<'_> {
                 };
                 let path = RustPath::from_str_unchecked(&format!("{}{}", letter, bits));
 
-                RustType::Common {
+                RustType::Common(RustCommonType {
                     path,
                     generic_arguments: None,
-                }
+                })
             }
             CppType::PointerSizedInteger { ref is_signed, .. } => {
                 let name = if *is_signed { "isize" } else { "usize" };
-                RustType::Common {
+                RustType::Common(RustCommonType {
                     path: RustPath::from_str_unchecked(name),
                     generic_arguments: None,
-                }
+                })
             }
             CppType::Enum { ref path } | CppType::Class(ref path) => {
                 let rust_item = self.find_wrapper_type(path)?;
@@ -194,10 +195,10 @@ impl State<'_> {
                     .ok_or_else(|| err_msg("RustDatabaseItem for class has no path"))?
                     .clone();
 
-                RustType::Common {
+                RustType::Common(RustCommonType {
                     path,
                     generic_arguments: None,
-                }
+                })
             }
             CppType::FunctionPointer(CppFunctionPointerType {
                 ref return_type,
@@ -255,10 +256,10 @@ impl State<'_> {
                                 "cpp_utils::Ptr"
                             };
 
-                            rust_api_type = RustType::Common {
+                            rust_api_type = RustType::Common(RustCommonType {
                                 path: RustPath::from_str_unchecked(wrapper),
                                 generic_arguments: Some(vec![(**target).clone()]),
-                            };
+                            });
                             api_to_ffi_conversion = RustToFfiTypeConversion::PtrWrapperToPtr;
                         }
                     }
@@ -273,10 +274,10 @@ impl State<'_> {
                                 api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
                             }
                             ReturnValueAllocationPlace::Heap => {
-                                rust_api_type = RustType::Common {
+                                rust_api_type = RustType::Common(RustCommonType {
                                     path: RustPath::from_str_unchecked("cpp_utils::CppBox"),
                                     generic_arguments: Some(vec![(**target).clone()]),
-                                };
+                                });
                                 api_to_ffi_conversion = RustToFfiTypeConversion::CppBoxToPtr;
                             }
                             ReturnValueAllocationPlace::NotApplicable => {
@@ -350,13 +351,13 @@ impl State<'_> {
                 ))
             })?;
 
-            rust_api_type = RustType::Common {
+            rust_api_type = RustType::Common(RustCommonType {
                 path: RustPath::from_str_unchecked("qt_core::QFlags"),
-                generic_arguments: Some(vec![RustType::Common {
+                generic_arguments: Some(vec![RustType::Common(RustCommonType {
                     path: rust_enum_path.clone(),
                     generic_arguments: None,
-                }]),
-            };
+                })]),
+            });
 
             api_to_ffi_conversion = RustToFfiTypeConversion::QFlagsToUInt;
         }
@@ -390,14 +391,25 @@ impl State<'_> {
         cast: &CppCast,
         is_const: bool,
     ) -> Result<UnnamedRustFunction> {
+        if is_const {
+            if let RustType::Common(RustCommonType { ref mut path, .. }) = unnamed_function.return_type.api_type {
+                ensure!(
+                    path.last() == "Ptr",
+                    "cast function expected to return Ptr<T>"
+                );
+                *path = RustPath::from_str_unchecked("cpp_utils::ConstPtr");
+            } else {
+                bail!("expected Ptr<T> type in cast function");
+            }
+        }
         match cast {
             CppCast::Dynamic | CppCast::QObject => {
                 unnamed_function.return_type.api_to_ffi_conversion =
                     RustToFfiTypeConversion::OptionPtrWrapperToPtr;
-                unnamed_function.return_type.api_type = RustType::Common {
+                unnamed_function.return_type.api_type = RustType::Common(RustCommonType {
                     path: RustPath::from_str_unchecked("std::option::Option"),
                     generic_arguments: Some(vec![unnamed_function.return_type.api_type]),
-                }
+                })
             }
             CppCast::Static { .. } => {}
         }
@@ -466,7 +478,7 @@ impl State<'_> {
             .with_path(trait_path.join(cast_function_name_mut));
 
         let parent_path =
-            if let RustType::Common { ref path, .. } = derived_type.pointer_like_to_target()? {
+            if let RustType::Common(RustCommonType { ref path, .. }) = derived_type.pointer_like_to_target()? {
                 path.parent().expect("cast argument path must have parent")
             } else {
                 bail!("can't get parent for derived_type: {:?}", derived_type);
@@ -477,25 +489,32 @@ impl State<'_> {
         results.push(RustItemKind::TraitImpl(RustTraitImpl {
             target_type: target_type.clone(),
             parent_path: parent_path.clone(),
-            trait_type: RustType::Common {
+            trait_type: RustType::Common(RustCommonType {
                 path: trait_path,
                 generic_arguments: Some(vec![to_type_value.clone()]),
-            },
+            }),
             associated_types: Vec::new(),
             functions: vec![cast_function, cast_function_mut],
         }));
 
         if cast.is_first_static_cast() && !cast.is_unsafe_static_cast() {
+            let fix_return_type = |type1: &mut RustFinalType, is_const: bool| -> Result<()> {
+                type1.api_type = type1.ffi_type.ptr_to_ref(is_const)?;
+                type1.api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
+                Ok(())
+            };
+
             let deref_trait_path = RustPath::from_str_unchecked("std::ops::Deref");
             let mut deref_function = fixed_function.with_path(deref_trait_path.join("deref"));
             deref_function.is_unsafe = false;
+            fix_return_type(&mut deref_function.return_type, true)?;
             results.push(RustItemKind::TraitImpl(RustTraitImpl {
                 target_type: target_type.clone(),
                 parent_path: parent_path.clone(),
-                trait_type: RustType::Common {
+                trait_type: RustType::Common(RustCommonType {
                     path: deref_trait_path,
                     generic_arguments: None,
-                },
+                }),
                 associated_types: vec![RustTraitAssociatedType {
                     name: "Target".to_string(),
                     value: to_type_value,
@@ -507,13 +526,14 @@ impl State<'_> {
             let mut deref_mut_function =
                 fixed_function_mut.with_path(deref_mut_trait_path.join("deref_mut"));
             deref_mut_function.is_unsafe = false;
+            fix_return_type(&mut deref_mut_function.return_type, false)?;
             results.push(RustItemKind::TraitImpl(RustTraitImpl {
                 target_type,
                 parent_path,
-                trait_type: RustType::Common {
+                trait_type: RustType::Common(RustCommonType {
                     path: deref_mut_trait_path,
                     generic_arguments: None,
-                },
+                }),
                 associated_types: Vec::new(),
                 functions: vec![deref_mut_function],
             }));
@@ -640,7 +660,7 @@ impl State<'_> {
                     .api_type
                     .pointer_like_to_target()?;
 
-                let parent_path = if let RustType::Common { ref path, .. } = target_type {
+                let parent_path = if let RustType::Common(RustCommonType { ref path, .. }) = target_type {
                     path.parent()
                         .expect("destructor argument path must have parent")
                 } else {
@@ -671,10 +691,10 @@ impl State<'_> {
                 let rust_item = RustItemKind::TraitImpl(RustTraitImpl {
                     target_type,
                     parent_path,
-                    trait_type: RustType::Common {
+                    trait_type: RustType::Common(RustCommonType {
                         path: trait_path,
                         generic_arguments: None,
-                    },
+                    }),
                     associated_types: Vec::new(),
                     functions: vec![function],
                 });
