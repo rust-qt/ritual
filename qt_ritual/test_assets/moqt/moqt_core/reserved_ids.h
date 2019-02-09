@@ -11,7 +11,9 @@ class MOQT_CORE_EXPORT unsafe {
 public:
     int loop() { return 1; }
     void yield(int as) {}
-    unsafe pub() {}
+    unsafe pub() {
+        return unsafe();
+    }
 
     float super;
 };
