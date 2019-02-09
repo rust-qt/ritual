@@ -29,3 +29,23 @@ fn casts() {
         assert_eq!(derived1.base_const_function(), 4);
     }
 }
+
+#[test]
+fn virtual_functions() {
+    unsafe {
+        let derived = DerivedClass1::new();
+        assert_eq!(derived.virtual_function(), 43);
+
+        let base: ConstPtr<BaseClass1> = derived.static_upcast();
+        assert_eq!(base.virtual_function(), 43);
+
+        let base = BaseClass1::new();
+        assert_eq!(base.virtual_function(), 42);
+
+        let derived = DerivedClass2::new();
+        assert_eq!(derived.virtual_function(), 44);
+
+        let base: ConstPtr<BaseClass1> = derived.static_upcast();
+        assert_eq!(base.virtual_function(), 44);
+    }
+}
