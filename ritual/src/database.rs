@@ -117,6 +117,7 @@ pub enum CppItemData {
 impl CppItemData {
     pub fn is_same(&self, other: &CppItemData) -> bool {
         match (self, other) {
+            (&CppItemData::Namespace(ref v), &CppItemData::Namespace(ref v2)) => v == v2,
             (&CppItemData::Type(ref v), &CppItemData::Type(ref v2)) => v.is_same(v2),
             (&CppItemData::EnumValue(ref v), &CppItemData::EnumValue(ref v2)) => v.is_same(v2),
             (&CppItemData::Function(ref v), &CppItemData::Function(ref v2)) => v.is_same(v2),
