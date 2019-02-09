@@ -315,7 +315,7 @@ pub fn to_ffi_method(
             r.arguments.push(CppFfiFunctionArgument {
                 name: "this_ptr".to_string(),
                 argument_type: CppType::PointerLike {
-                    is_const: false,
+                    is_const: info.is_const,
                     kind: CppPointerLikeTypeKind::Pointer,
                     target: Box::new(CppType::Class(function.class_type().unwrap())),
                 }
