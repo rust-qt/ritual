@@ -17,6 +17,7 @@ use crate::cpp_type::CppSpecificNumericType;
 use crate::cpp_type::CppSpecificNumericTypeKind;
 use crate::cpp_type::CppType;
 use crate::database::CppDatabaseItem;
+use crate::database::CppFfiItem;
 use crate::database::CppFfiItemKind;
 use crate::database::CppItemData;
 use crate::database::Database;
@@ -50,6 +51,7 @@ use crate::rust_type::RustPath;
 use crate::rust_type::RustPointerLikeTypeKind;
 use crate::rust_type::RustToFfiTypeConversion;
 use crate::rust_type::RustType;
+use itertools::Itertools;
 use log::{debug, trace};
 use ritual_common::errors::*;
 use ritual_common::string_utils::CaseOperations;
@@ -884,6 +886,42 @@ impl State<'_> {
         // TODO: check for conflicts with types from crate template (how?)
     }
 
+    fn process_ffi_item(
+        &mut self,
+        cpp_item_index: usize,
+        ffi_item: &mut CppFfiItem,
+        modified: &mut bool,
+    ) -> Result<()> {
+        match &ffi_item.kind {
+            CppFfiItemKind::Function(cpp_ffi_function) => {
+                let rust_ffi_function = self.generate_ffi_function(&cpp_ffi_function)?;
+                let rust_ffi_function_path = rust_ffi_function.path.clone();
+                let ffi_rust_item = RustDatabaseItem {
+                    kind: RustItemKind::FfiFunction(rust_ffi_function),
+                    cpp_item_index: Some(cpp_item_index),
+                };
+
+                for item in
+                    self.generate_rust_function(cpp_ffi_function, &rust_ffi_function_path)?
+                {
+                    let api_rust_item = RustDatabaseItem {
+                        kind: item,
+                        cpp_item_index: Some(cpp_item_index),
+                    };
+                    self.rust_database.items.push(api_rust_item);
+                }
+                self.rust_database.items.push(ffi_rust_item);
+
+                *modified = true;
+                ffi_item.is_rust_processed = true;
+            }
+            CppFfiItemKind::QtSlotWrapper(_) => {
+                bail!("not supported yet");
+            }
+        }
+        Ok(())
+    }
+
     #[allow(clippy::useless_let_if_seq)]
     fn generate_rust_items(
         &mut self,
@@ -1024,40 +1062,16 @@ impl State<'_> {
                 _ => bail!("unimplemented"),
             }
         }
-        for ffi_item in &mut cpp_item.ffi_items {
-            if ffi_item.is_rust_processed {
-                continue;
-            }
-            match &ffi_item.kind {
-                CppFfiItemKind::Function(cpp_ffi_function) => {
-                    let rust_ffi_function = self.generate_ffi_function(&cpp_ffi_function)?;
-                    let rust_ffi_function_path = rust_ffi_function.path.clone();
-                    let ffi_rust_item = RustDatabaseItem {
-                        kind: RustItemKind::FfiFunction(rust_ffi_function),
-                        cpp_item_index: Some(cpp_item_index),
-                    };
 
-                    for item in
-                        self.generate_rust_function(cpp_ffi_function, &rust_ffi_function_path)?
-                    {
-                        let api_rust_item = RustDatabaseItem {
-                            kind: item,
-                            cpp_item_index: Some(cpp_item_index),
-                        };
-                        self.rust_database.items.push(api_rust_item);
-                    }
-                    self.rust_database.items.push(ffi_rust_item);
+        let ffi_results = cpp_item
+            .ffi_items
+            .iter_mut()
+            .filter(|item| !item.is_rust_processed && item.checks.any_passed())
+            .map(|item| self.process_ffi_item(cpp_item_index, item, modified))
+            .collect_vec();
 
-                    *modified = true;
-                    ffi_item.is_rust_processed = true;
-                }
-                CppFfiItemKind::QtSlotWrapper(_) => {
-                    bail!("not supported yet");
-                }
-            }
-        }
-
-        Ok(())
+        // return first error, if any
+        ffi_results.into_iter().collect()
     }
 
     fn generate_special_module(&mut self, kind: RustModuleKind) -> Result<()> {
@@ -1140,17 +1154,9 @@ fn run(data: &mut ProcessorData) -> Result<()> {
             continue;
         }
 
-        match state.generate_rust_items(&mut cpp_item, index, &mut true) {
-            Ok(_) => {
-                bail!(
-                    "previous iteration had no success, so fail is expected! item: {:?}",
-                    cpp_item
-                );
-            }
-            Err(err) => {
-                trace!("skipping item: {}: {}", &cpp_item.cpp_data, err);
-                print_trace(err, log::Level::Trace);
-            }
+        if let Err(err) = state.generate_rust_items(&mut cpp_item, index, &mut true) {
+            trace!("skipping item: {}: {}", &cpp_item.cpp_data, err);
+            print_trace(err, log::Level::Trace);
         }
     }
     Ok(())

@@ -319,6 +319,9 @@ pub fn generate_cpp_file(
     let mut any_slot_wrappers = false;
     for item in data {
         for ffi_item in &item.ffi_items {
+            if !ffi_item.checks.any_passed() {
+                continue;
+            }
             match ffi_item.kind {
                 CppFfiItemKind::Function(ref cpp_ffi_function) => {
                     // TODO: write less extern C

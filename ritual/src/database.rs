@@ -100,6 +100,10 @@ impl CppCheckerInfoList {
         });
         CppCheckerAddResult::Added
     }
+
+    pub fn any_passed(&self) -> bool {
+        self.items.iter().any(|check| check.error.is_none())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
