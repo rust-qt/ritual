@@ -207,7 +207,9 @@ fn generate_crate_template(data: &mut ProcessorData) -> Result<()> {
         for item in read_dir(template_path)? {
             let item = item?;
             let target = output_path.join(item.file_name());
-            remove_dir_all(&target)?;
+            if target.exists() {
+                remove_dir_all(&target)?;
+            }
             copy_recursively(&item.path(), &target)?;
         }
     }
