@@ -13,6 +13,7 @@ use ritual_common::file_utils::create_dir_all;
 use ritual_common::file_utils::create_file;
 use ritual_common::file_utils::path_to_str;
 use ritual_common::file_utils::read_dir;
+use ritual_common::file_utils::remove_dir_all;
 use ritual_common::file_utils::repo_crate_local_path;
 use ritual_common::file_utils::save_json;
 use ritual_common::file_utils::save_toml;
@@ -205,7 +206,9 @@ fn generate_crate_template(data: &mut ProcessorData) -> Result<()> {
     if let Some(ref template_path) = data.config.crate_template_path() {
         for item in read_dir(template_path)? {
             let item = item?;
-            copy_recursively(&item.path(), &output_path.join(item.file_name()))?;
+            let target = output_path.join(item.file_name());
+            remove_dir_all(&target)?;
+            copy_recursively(&item.path(), &target)?;
         }
     }
     if !output_path.join("src").exists() {
