@@ -10,6 +10,10 @@ public:
         return m_baseFunctionResult;
     }
 
+    int baseConstFunction() const {
+        return m_baseFunctionResult;
+    }
+
 private:
     int m_baseFunctionResult = 0;
 };
