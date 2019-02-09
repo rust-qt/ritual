@@ -16,6 +16,7 @@ use crate::rust_info::RustStruct;
 use crate::rust_info::RustStructKind;
 use crate::rust_info::RustTraitImpl;
 use crate::rust_info::RustWrapperTypeKind;
+use crate::rust_type::RustCommonType;
 use crate::rust_type::RustFinalType;
 use crate::rust_type::RustPath;
 use crate::rust_type::RustPointerLikeTypeKind;
@@ -34,7 +35,6 @@ use std::io::BufWriter;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
-use crate::rust_type::RustCommonType;
 
 /// Generates Rust code representing type `rust_type` inside crate `crate_name`.
 /// Same as `RustCodeGenerator::rust_type_to_code`, but accessible by other modules.

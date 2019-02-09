@@ -44,6 +44,7 @@ use crate::rust_info::RustWrapperType;
 use crate::rust_info::RustWrapperTypeDocData;
 use crate::rust_info::RustWrapperTypeKind;
 use crate::rust_info::UnnamedRustFunction;
+use crate::rust_type::RustCommonType;
 use crate::rust_type::RustFinalType;
 use crate::rust_type::RustPath;
 use crate::rust_type::RustPointerLikeTypeKind;
@@ -55,7 +56,6 @@ use ritual_common::string_utils::CaseOperations;
 use ritual_common::utils::MapIfOk;
 use std::collections::HashMap;
 use std::ops::Deref;
-use crate::rust_type::RustCommonType;
 
 /// Adds "_" to a string if it is a reserved word in Rust
 fn sanitize_rust_identifier(name: &str, is_module: bool) -> String {
@@ -392,7 +392,9 @@ impl State<'_> {
         is_const: bool,
     ) -> Result<UnnamedRustFunction> {
         if is_const {
-            if let RustType::Common(RustCommonType { ref mut path, .. }) = unnamed_function.return_type.api_type {
+            if let RustType::Common(RustCommonType { ref mut path, .. }) =
+                unnamed_function.return_type.api_type
+            {
                 ensure!(
                     path.last() == "Ptr",
                     "cast function expected to return Ptr<T>"
@@ -477,12 +479,13 @@ impl State<'_> {
             .clone()
             .with_path(trait_path.join(cast_function_name_mut));
 
-        let parent_path =
-            if let RustType::Common(RustCommonType { ref path, .. }) = derived_type.pointer_like_to_target()? {
-                path.parent().expect("cast argument path must have parent")
-            } else {
-                bail!("can't get parent for derived_type: {:?}", derived_type);
-            };
+        let parent_path = if let RustType::Common(RustCommonType { ref path, .. }) =
+            derived_type.pointer_like_to_target()?
+        {
+            path.parent().expect("cast argument path must have parent")
+        } else {
+            bail!("can't get parent for derived_type: {:?}", derived_type);
+        };
 
         let target_type = from_type.pointer_like_to_target()?;
         let to_type_value = to_type.pointer_like_to_target()?;
@@ -660,12 +663,13 @@ impl State<'_> {
                     .api_type
                     .pointer_like_to_target()?;
 
-                let parent_path = if let RustType::Common(RustCommonType { ref path, .. }) = target_type {
-                    path.parent()
-                        .expect("destructor argument path must have parent")
-                } else {
-                    bail!("can't get parent for target type: {:?}", target_type);
-                };
+                let parent_path =
+                    if let RustType::Common(RustCommonType { ref path, .. }) = target_type {
+                        path.parent()
+                            .expect("destructor argument path must have parent")
+                    } else {
+                        bail!("can't get parent for target type: {:?}", target_type);
+                    };
 
                 let function_name;
                 let trait_path;
