@@ -203,8 +203,6 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
             unexpected!("no this arg in destructor");
         }
     } else {
-        let mut is_field_accessor = false;
-
         let result_without_args =
             if let Some(cpp_function) = method.kind.cpp_function().filter(|m| m.is_constructor()) {
                 match method.allocation_place {
@@ -231,58 +229,32 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
                     }
                 }
             } else {
-                // TODO: scope specifier should probably be stored in a field `cpp_full_name` of `CppFFiMethod`
-                let scope_specifier = if let Some(ref cpp_function) =
-                    method.kind.cpp_function().filter(|m| m.is_static_member())
-                {
-                    // static method
-                    format!("{}::", cpp_function.class_type().unwrap().to_cpp_code()?)
-                } else if let Some(ref field) = method.kind.cpp_field().filter(|f| f.is_static) {
-                    // static field
-                    format!(
-                        "{}::",
-                        field
-                            .path
-                            .parent()
-                            .expect("field path must have parent")
-                            .to_cpp_code()?
-                    )
-                } else {
-                    // regular member method/field or a free function
-                    if let Some(arg) = method
-                        .arguments
-                        .iter()
-                        .find(|x| x.meaning == CppFfiArgumentMeaning::This)
-                    {
-                        format!("{}->", arg.name)
-                    } else {
-                        "".to_string()
-                    }
-                };
-                match method.kind {
-                    CppFfiFunctionKind::FieldAccessor {
-                        ref accessor_type,
-                        ref field,
-                    } => {
-                        is_field_accessor = true;
-                        if accessor_type == &CppFieldAccessorType::Setter {
-                            format!(
-                                "{}{} = {}",
-                                scope_specifier,
-                                field.path.last().name,
-                                arguments_values(method)?
-                            )
-                        } else {
-                            format!("{}{}", scope_specifier, field.path.last().name)
-                        }
-                    }
+                let path = match method.kind {
                     CppFfiFunctionKind::Function {
                         ref cpp_function, ..
-                    } => format!("{}{}", scope_specifier, cpp_function.path.to_cpp_code()?),
+                    } => &cpp_function.path,
+                    CppFfiFunctionKind::FieldAccessor { ref field, .. } => &field.path,
+                };
+
+                if let Some(arg) = method
+                    .arguments
+                    .iter()
+                    .find(|x| x.meaning == CppFfiArgumentMeaning::This)
+                {
+                    format!("{}->{}", arg.name, path.last().to_cpp_code()?)
+                } else {
+                    path.to_cpp_code()?
                 }
             };
-        if is_field_accessor {
-            result_without_args
+        if let CppFfiFunctionKind::FieldAccessor {
+            ref accessor_type, ..
+        } = method.kind
+        {
+            if accessor_type == &CppFieldAccessorType::Setter {
+                format!("{} = {}", result_without_args, arguments_values(method)?)
+            } else {
+                result_without_args
+            }
         } else {
             format!("{}({})", result_without_args, arguments_values(method)?)
         }
