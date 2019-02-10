@@ -196,9 +196,17 @@ impl CppChecker<'_, '_> {
         }
         let src_path = root_path.join("src");
         create_dir_all(&src_path)?;
-        create_file(src_path.join("CMakeLists.txt"))?
-            .write(include_str!("../templates/cpp_checker/CMakeLists.txt"))?;
-        create_file(src_path.join("utils.h"))?.write(format!(
+
+        let mut cmake_file = create_file(src_path.join("CMakeLists.txt"))?;
+        write!(
+            cmake_file,
+            "{}",
+            include_str!("../templates/cpp_checker/CMakeLists.txt")
+        )?;
+
+        let mut utils_file = create_file(src_path.join("utils.h"))?;
+        write!(
+            utils_file,
             include_str!("../templates/cpp_checker/utils.h"),
             include_directives_code = self
                 .data
@@ -206,7 +214,7 @@ impl CppChecker<'_, '_> {
                 .include_directives()
                 .map_if_ok(|d| -> Result<_> { Ok(format!("#include \"{}\"", path_to_str(d)?)) })?
                 .join("\n")
-        ))?;
+        )?;
 
         let mut build_paths = self.data.config.cpp_build_paths().clone();
         build_paths.apply_env();

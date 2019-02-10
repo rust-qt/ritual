@@ -314,7 +314,7 @@ pub fn generate_cpp_file(
     //      .join(format!("{}_{}.cpp", &self.lib_name, data.name));
 
     let mut cpp_file = create_file(file_path)?;
-    cpp_file.write(format!("#include \"{}\"\n", global_header_name))?;
+    writeln!(cpp_file, "#include \"{}\"", global_header_name)?;
 
     let mut any_slot_wrappers = false;
     for item in data {
@@ -325,23 +325,24 @@ pub fn generate_cpp_file(
             match ffi_item.kind {
                 CppFfiItemKind::Function(ref cpp_ffi_function) => {
                     // TODO: write less extern C
-                    cpp_file.write("extern \"C\" {\n\n")?;
-                    cpp_file.write(function_implementation(cpp_ffi_function)?)?;
-                    cpp_file.write("\n} // extern \"C\"\n\n")?;
+                    writeln!(cpp_file, "extern \"C\" {{")?;
+                    writeln!(cpp_file, "{}", function_implementation(cpp_ffi_function)?)?;
+                    writeln!(cpp_file, "}} // extern \"C\"")?;
                 }
                 CppFfiItemKind::QtSlotWrapper(ref qt_slot_wrapper) => {
                     any_slot_wrappers = true;
-                    cpp_file.write(self::qt_slot_wrapper(qt_slot_wrapper)?)?;
+                    write!(cpp_file, "{}", self::qt_slot_wrapper(qt_slot_wrapper)?)?;
                 }
             }
         }
     }
     if any_slot_wrappers {
         let moc_output = get_command_output(Command::new("moc").arg("-i").arg(file_path))?;
-        cpp_file.write(format!(
-            "// start of MOC generated code\n{}\n// end of MOC generated code\n",
+        writeln!(
+            cpp_file,
+            "// start of MOC generated code\n{}\n// end of MOC generated code",
             moc_output
-        ))?;
+        )?;
     }
     Ok(())
 }

@@ -19,6 +19,7 @@ use ritual_common::file_utils::{create_file, file_to_string, load_json, path_to_
 use ritual_common::target::current_target;
 use ritual_common::utils::{exe_suffix, get_command_output};
 use ritual_common::BuildScriptData;
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -133,24 +134,30 @@ impl Config {
             info!("Generating ffi.rs file");
             let mut ffi_file = create_file(out_dir.join("ffi.rs"))?;
             if cpp_build_config_data.library_type() == Some(CppLibraryType::Shared) {
-                ffi_file.write(format!(
-                    "#[link(name = \"{}\")]\n",
+                writeln!(
+                    ffi_file,
+                    "#[link(name = \"{}\")]",
                     &self.build_script_data.cpp_wrapper_lib_name
-                ))?;
+                )?;
             } else {
-                ffi_file.write(format!(
-                    "#[link(name = \"{}\", kind = \"static\")]\n",
+                writeln!(
+                    ffi_file,
+                    "#[link(name = \"{}\", kind = \"static\")]",
                     &self.build_script_data.cpp_wrapper_lib_name
-                ))?;
+                )?;
             }
-            ffi_file.write(file_to_string(manifest_dir.join("src").join("ffi.in.rs"))?)?;
+            write!(
+                ffi_file,
+                "{}",
+                file_to_string(manifest_dir.join("src").join("ffi.in.rs"))?
+            )?;
         }
         {
             info!("Requesting type sizes");
             let mut command =
                 Command::new(c_lib_install_dir.join(format!("sized_types{}", exe_suffix())));
             let mut file = create_file(out_dir.join("sized_types.rs"))?;
-            file.write(get_command_output(&mut command)?)?;
+            write!(file, "{}", get_command_output(&mut command)?)?;
         }
 
         for name in cpp_build_config_data.linked_libs() {

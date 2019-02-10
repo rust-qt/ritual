@@ -169,17 +169,6 @@ impl<F: BufRead> File<F> {
     }
 }
 
-impl<F: Write> File<F> {
-    /// Write `text` to the file
-    // TODO: replace with write impl
-    pub fn write<S: AsRef<str>>(&mut self, text: S) -> Result<()> {
-        self.file
-            .write_all(text.as_ref().as_bytes())
-            .with_context(|_| format!("Failed to write to file: {:?}", self.path))?;
-        Ok(())
-    }
-}
-
 impl<F: Write> Write for File<F> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.file.write(buf).map_err(|err| {
@@ -262,7 +251,7 @@ pub fn load_toml<P: AsRef<Path>>(path: P) -> Result<toml::value::Table> {
 /// Save `data` to a TOML file
 pub fn save_toml<P: AsRef<Path>>(path: P, data: &toml::Value) -> Result<()> {
     let mut file = create_file(path.as_ref())?;
-    file.write(data.to_string())
+    write!(file, "{}", data)
         .with_context(|_| format!("failed to write to TOML file: {}", path.as_ref().display()))?;
     Ok(())
 }

@@ -21,6 +21,7 @@ use ritual_common::toml;
 use ritual_common::utils::run_command;
 use ritual_common::utils::MapIfOk;
 use ritual_common::BuildScriptData;
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -80,8 +81,12 @@ fn generate_crate_template(data: &mut ProcessorData) -> Result<()> {
     if let Some(ref template_build_rs_path) = template_build_rs_path {
         copy_file(template_build_rs_path, output_build_rs_path)?;
     } else {
-        let mut rustfmt_file = create_file(&output_build_rs_path)?;
-        rustfmt_file.write(include_str!("../templates/crate/build.rs"))?;
+        let mut build_rs_file = create_file(&output_build_rs_path)?;
+        write!(
+            build_rs_file,
+            "{}",
+            include_str!("../templates/crate/build.rs")
+        )?;
     }
     let cargo_toml_data = {
         let package = toml::value::Value::Table({
@@ -230,11 +235,12 @@ fn generate_c_lib_template(
     let cmakelists_path = lib_path.join("CMakeLists.txt");
     let mut cmakelists_file = create_file(&cmakelists_path)?;
 
-    cmakelists_file.write(format!(
+    write!(
+        cmakelists_file,
         include_str!("../templates/c_lib/CMakeLists.txt"),
         lib_name_lowercase = lib_name,
         lib_name_uppercase = name_upper
-    ))?;
+    )?;
 
     let include_directives_code = include_directives
         .map_if_ok(|d| -> Result<_> { Ok(format!("#include \"{}\"", path_to_str(d)?)) })?
@@ -242,10 +248,11 @@ fn generate_c_lib_template(
 
     let global_header_path = lib_path.join(&global_header_name);
     let mut global_header_file = create_file(&global_header_path)?;
-    global_header_file.write(format!(
+    write!(
+        global_header_file,
         include_str!("../templates/c_lib/global.h"),
         include_directives_code = include_directives_code
-    ))?;
+    )?;
     Ok(())
 }
 

@@ -1,16 +1,16 @@
+use crate::config::Config;
+use crate::config::CrateProperties;
 use crate::cpp_data::*;
 use crate::cpp_function::*;
 use crate::cpp_operator::CppOperator;
-use crate::cpp_type::*;
-
-use crate::config::Config;
-use crate::config::CrateProperties;
 use crate::cpp_parser::cpp_parser_step;
+use crate::cpp_type::*;
 use crate::processor;
 use crate::workspace::Workspace;
 use ritual_common::cpp_build_config::CppBuildPaths;
 use ritual_common::file_utils::create_dir;
 use ritual_common::file_utils::create_file;
+use std::io::Write;
 
 struct ParserCppData {
     types: Vec<CppTypeData>,
@@ -32,8 +32,7 @@ fn run_parser(code: &'static str) -> ParserCppData {
     let include_file_path = include_dir.join(&include_name);
     {
         let mut include_file = create_file(&include_file_path).unwrap();
-        include_file.write(code).unwrap();
-        include_file.write("\n").unwrap();
+        writeln!(include_file, "{}", code).unwrap();
     }
 
     let mut paths = CppBuildPaths::new();

@@ -27,6 +27,7 @@ use regex::Regex;
 use ritual_common::errors::{bail, err_msg, unexpected, Result, ResultExt};
 use ritual_common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
 use std::collections::HashSet;
+use std::io::Write;
 use std::iter::once;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -204,10 +205,10 @@ fn run_clang<R, F: FnMut(Entity) -> Result<R>>(
     {
         let mut tmp_file = create_file(&tmp_cpp_path)?;
         for directive in config.include_directives() {
-            tmp_file.write(format!("#include \"{}\"\n", path_to_str(directive)?))?;
+            writeln!(tmp_file, "#include \"{}\"", path_to_str(directive)?)?;
         }
         if let Some(cpp_code) = cpp_code {
-            tmp_file.write(cpp_code)?;
+            write!(tmp_file, "{}", cpp_code)?;
         }
     }
     let mut args = vec![
