@@ -24,7 +24,7 @@ use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use itertools::Itertools;
 use log::trace;
-use ritual_common::errors::{bail, unexpected, Result};
+use ritual_common::errors::{bail, Result};
 use ritual_common::utils::MapIfOk;
 use std::collections::HashSet;
 use std::iter::once;
@@ -173,13 +173,16 @@ fn create_cast_method(
         doc: None,
     };
     // no need for movable_types since all cast methods operate on pointers
-    let mut r = to_ffi_method(&method, &[], name_provider)?;
-    let cast1 = cast;
-    if let CppFfiFunctionKind::Function { ref mut cast, .. } = r.kind {
-        *cast = Some(cast1);
-    } else {
-        unexpected!("to_ffi_method must return a value with CppFfiFunctionKind::Function",);
-    }
+    let r = to_ffi_method(
+        CppFfiFunctionKind::Function {
+            cpp_function: method.clone(),
+            omitted_arguments: None,
+            cast: Some(cast),
+        },
+        &[],
+        name_provider,
+    )?;
+
     Ok(CppFfiItem::from_function(r))
 }
 
@@ -255,7 +258,11 @@ fn generate_ffi_methods_for_method(
     let mut methods = Vec::new();
     // TODO: don't use name here at all, generate names for all methods elsewhere
     methods.push(CppFfiItem::from_function(to_ffi_method(
-        method,
+        CppFfiFunctionKind::Function {
+            cpp_function: method.clone(),
+            omitted_arguments: None,
+            cast: None,
+        },
         movable_types,
         name_provider,
     )?));
@@ -267,17 +274,17 @@ fn generate_ffi_methods_for_method(
                 if !arg.has_default_value {
                     break;
                 }
-                let mut processed_method =
-                    to_ffi_method(&method_copy, movable_types, name_provider)?;
-                if let CppFfiFunctionKind::Function {
-                    ref mut omitted_arguments,
-                    ..
-                } = processed_method.kind
-                {
-                    *omitted_arguments = Some(method.arguments.len() - method_copy.arguments.len());
-                } else {
-                    unexpected!("expected method kind here");
-                }
+                let processed_method = to_ffi_method(
+                    CppFfiFunctionKind::Function {
+                        cpp_function: method_copy.clone(),
+                        omitted_arguments: Some(
+                            method.arguments.len() - method_copy.arguments.len(),
+                        ),
+                        cast: None,
+                    },
+                    movable_types,
+                    name_provider,
+                )?;
                 methods.push(CppFfiItem::from_function(processed_method));
             }
         }
@@ -292,39 +299,109 @@ fn generate_ffi_methods_for_method(
 /// - adds "output" argument for return value if
 ///   the return value is stack-allocated.
 pub fn to_ffi_method(
-    function: &CppFunction,
+    kind: CppFfiFunctionKind,
     movable_types: &[CppPath],
     name_provider: &mut FfiNameProvider,
 ) -> Result<CppFfiFunction> {
-    if function.allows_variadic_arguments {
-        bail!("Variable arguments are not supported");
-    }
+    let ascii_caption = match kind {
+        CppFfiFunctionKind::Function {
+            ref cpp_function, ..
+        } => cpp_function.path.ascii_caption(),
+        CppFfiFunctionKind::FieldAccessor {
+            ref field,
+            ref accessor_type,
+        } => {
+            let field_caption = field.path.ascii_caption();
+            match *accessor_type {
+                CppFieldAccessorType::CopyGetter => field_caption,
+                CppFieldAccessorType::ConstRefGetter => field_caption,
+                CppFieldAccessorType::MutRefGetter => format!("{}_mut", field_caption),
+                CppFieldAccessorType::Setter => format!("set_{}", field_caption),
+            }
+        }
+    };
+
     let mut r = CppFfiFunction {
         arguments: Vec::new(),
         return_type: CppFfiType::void(),
-        path: name_provider.create_path(&function.path.ascii_caption()),
+        path: name_provider.create_path(&ascii_caption),
         allocation_place: ReturnValueAllocationPlace::NotApplicable,
-        kind: CppFfiFunctionKind::Function {
-            cpp_function: function.clone(),
-            omitted_arguments: None,
-            cast: None,
-        },
+        kind: kind.clone(),
     };
-    if let Some(ref info) = function.member {
-        if !info.is_static && info.kind != CppFunctionKind::Constructor {
-            r.arguments.push(CppFfiFunctionArgument {
-                name: "this_ptr".to_string(),
-                argument_type: CppType::PointerLike {
-                    is_const: info.is_const,
-                    kind: CppPointerLikeTypeKind::Pointer,
-                    target: Box::new(CppType::Class(function.class_type().unwrap())),
-                }
-                .to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
-                meaning: CppFfiArgumentMeaning::This,
-            });
+
+    let this_arg_type = match kind {
+        CppFfiFunctionKind::Function {
+            ref cpp_function, ..
+        } => match cpp_function.member {
+            Some(ref info) if !info.is_static && info.kind != CppFunctionKind::Constructor => {
+                let class_type = CppType::Class(cpp_function.class_type().unwrap());
+                Some(CppType::new_pointer(info.is_const, class_type))
+            }
+            _ => None,
+        },
+        CppFfiFunctionKind::FieldAccessor {
+            ref field,
+            ref accessor_type,
+        } => {
+            if field.is_static {
+                None
+            } else {
+                let class_type = CppType::Class(field.path.parent()?);
+                let is_const = match *accessor_type {
+                    CppFieldAccessorType::CopyGetter | CppFieldAccessorType::ConstRefGetter => true,
+                    CppFieldAccessorType::MutRefGetter | CppFieldAccessorType::Setter => false,
+                };
+                Some(CppType::new_pointer(is_const, class_type))
+            }
         }
+    };
+
+    if let Some(this_arg_type) = this_arg_type {
+        r.arguments.push(CppFfiFunctionArgument {
+            name: "this_ptr".to_string(),
+            argument_type: this_arg_type.to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
+            meaning: CppFfiArgumentMeaning::This,
+        });
     }
-    for (index, arg) in function.arguments.iter().enumerate() {
+
+    let normal_args = match kind {
+        CppFfiFunctionKind::Function {
+            ref cpp_function, ..
+        } => {
+            if cpp_function.allows_variadic_arguments {
+                bail!("Variable arguments are not supported");
+            }
+
+            if cpp_function.is_destructor() {
+                // destructor doesn't have a return type that needs special handling,
+                // but its `allocation_place` must match `allocation_place` of the type's constructor
+                let class_type = &cpp_function.class_type().unwrap();
+                r.allocation_place = if movable_types.iter().any(|t| t == class_type) {
+                    ReturnValueAllocationPlace::Stack
+                } else {
+                    ReturnValueAllocationPlace::Heap
+                };
+            }
+            cpp_function.arguments.clone()
+        }
+        CppFfiFunctionKind::FieldAccessor {
+            ref field,
+            ref accessor_type,
+        } => {
+            if accessor_type == &CppFieldAccessorType::Setter {
+                let arg = CppFunctionArgument {
+                    name: "value".to_string(),
+                    argument_type: field.field_type.clone(),
+                    has_default_value: false,
+                };
+                vec![arg]
+            } else {
+                Vec::new()
+            }
+        }
+    };
+
+    for (index, arg) in normal_args.iter().enumerate() {
         let c_type = arg
             .argument_type
             .to_cpp_ffi_type(CppTypeRole::NotReturnType)?;
@@ -335,41 +412,47 @@ pub fn to_ffi_method(
         });
     }
 
-    if function.is_destructor() {
-        // destructor doesn't have a return type that needs special handling,
-        // but its `allocation_place` must match `allocation_place` of the type's constructor
-        let class_type = &function.class_type().unwrap();
-        r.allocation_place = if movable_types.iter().any(|t| t == class_type) {
-            ReturnValueAllocationPlace::Stack
-        } else {
-            ReturnValueAllocationPlace::Heap
-        };
-    } else {
-        let real_return_type = match function.member {
+    let real_return_type = match kind {
+        CppFfiFunctionKind::Function {
+            ref cpp_function, ..
+        } => match cpp_function.member {
             Some(ref info) if info.kind.is_constructor() => {
-                CppType::Class(function.class_type().unwrap())
+                CppType::Class(cpp_function.class_type().unwrap())
             }
-            _ => function.return_type.clone(),
-        };
-        let real_return_type_ffi = real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
-        match real_return_type {
-            // QFlags is converted to uint in FFI
-            CppType::Class(ref path) if !is_qflags(path) => {
-                if movable_types.iter().any(|t| t == path) {
-                    r.arguments.push(CppFfiFunctionArgument {
-                        name: "output".to_string(),
-                        argument_type: real_return_type_ffi,
-                        meaning: CppFfiArgumentMeaning::ReturnValue,
-                    });
-                    r.allocation_place = ReturnValueAllocationPlace::Stack;
-                } else {
-                    r.return_type = real_return_type_ffi;
-                    r.allocation_place = ReturnValueAllocationPlace::Heap;
-                }
+            _ => cpp_function.return_type.clone(),
+        },
+        CppFfiFunctionKind::FieldAccessor {
+            ref field,
+            ref accessor_type,
+        } => match *accessor_type {
+            CppFieldAccessorType::CopyGetter => field.field_type.clone(),
+            CppFieldAccessorType::ConstRefGetter => {
+                CppType::new_reference(true, field.field_type.clone())
             }
-            _ => {
+            CppFieldAccessorType::MutRefGetter => {
+                CppType::new_reference(false, field.field_type.clone())
+            }
+            CppFieldAccessorType::Setter => CppType::Void,
+        },
+    };
+    let real_return_type_ffi = real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
+    match real_return_type {
+        // QFlags is converted to uint in FFI
+        CppType::Class(ref path) if !is_qflags(path) => {
+            if movable_types.iter().any(|t| t == path) {
+                r.arguments.push(CppFfiFunctionArgument {
+                    name: "output".to_string(),
+                    argument_type: real_return_type_ffi,
+                    meaning: CppFfiArgumentMeaning::ReturnValue,
+                });
+                r.allocation_place = ReturnValueAllocationPlace::Stack;
+            } else {
                 r.return_type = real_return_type_ffi;
+                r.allocation_place = ReturnValueAllocationPlace::Heap;
             }
+        }
+        _ => {
+            r.return_type = real_return_type_ffi;
         }
     }
 
@@ -385,90 +468,24 @@ fn generate_field_accessors(
     // TODO: fix doc generator for field accessors
     //log::status("Adding field accessors");
     let mut new_methods = Vec::new();
-    let mut create_method = |name, accessor_type, return_type, arguments| -> Result<CppFfiItem> {
-        // TODO: avoid fake method
-        let fake_method = CppFunction {
-            path: name,
-            member: Some(CppFunctionMemberData {
-                kind: CppFunctionKind::Regular,
-                is_virtual: false,
-                is_pure_virtual: false,
-                is_const: match accessor_type {
-                    CppFieldAccessorType::CopyGetter | CppFieldAccessorType::ConstRefGetter => true,
-                    CppFieldAccessorType::MutRefGetter | CppFieldAccessorType::Setter => false,
-                },
-                is_static: false,
-                visibility: CppVisibility::Public,
-                is_signal: false,
-                is_slot: false,
-            }),
-            operator: None,
-            return_type,
-            arguments,
-            allows_variadic_arguments: false,
-            declaration_code: None,
-            doc: None,
-        };
-        let mut ffi_method = to_ffi_method(&fake_method, movable_types, name_provider)?;
-        ffi_method.kind = CppFfiFunctionKind::FieldAccessor {
-            accessor_type,
+    let mut create_method = |accessor_type| -> Result<CppFfiItem> {
+        let kind = CppFfiFunctionKind::FieldAccessor {
             field: field.clone(),
+            accessor_type,
         };
-        Ok(CppFfiItem::from_function(ffi_method))
+        let ffi_function = to_ffi_method(kind, movable_types, name_provider)?;
+        Ok(CppFfiItem::from_function(ffi_function))
     };
-
-    let class_path = field.path.parent().expect("field path must have parent");
 
     if field.visibility == CppVisibility::Public {
         // TODO: add comment about choosing right accessor types
         if field.field_type.is_class() {
-            let type2_const = CppType::PointerLike {
-                is_const: true,
-                kind: CppPointerLikeTypeKind::Reference,
-                target: Box::new(field.field_type.clone()),
-            };
-            let type2_mut = CppType::PointerLike {
-                is_const: false,
-                kind: CppPointerLikeTypeKind::Reference,
-                target: Box::new(field.field_type.clone()),
-            };
-            new_methods.push(create_method(
-                field.path.clone(),
-                CppFieldAccessorType::ConstRefGetter,
-                type2_const,
-                Vec::new(),
-            )?);
-            new_methods.push(create_method(
-                class_path.join(CppPathItem::from_str_unchecked(&format!(
-                    "{}_mut",
-                    field.path.last().name
-                ))),
-                CppFieldAccessorType::MutRefGetter,
-                type2_mut,
-                Vec::new(),
-            )?);
+            new_methods.push(create_method(CppFieldAccessorType::ConstRefGetter)?);
+            new_methods.push(create_method(CppFieldAccessorType::MutRefGetter)?);
         } else {
-            new_methods.push(create_method(
-                field.path.clone(),
-                CppFieldAccessorType::CopyGetter,
-                field.field_type.clone(),
-                Vec::new(),
-            )?);
+            new_methods.push(create_method(CppFieldAccessorType::CopyGetter)?);
         }
-        let arg = CppFunctionArgument {
-            argument_type: field.field_type.clone(),
-            name: "value".to_string(),
-            has_default_value: false,
-        };
-        new_methods.push(create_method(
-            class_path.join(CppPathItem::from_str_unchecked(&format!(
-                "set_{}",
-                field.path.last().name
-            ))),
-            CppFieldAccessorType::Setter,
-            CppType::Void,
-            vec![arg],
-        )?);
+        new_methods.push(create_method(CppFieldAccessorType::Setter)?);
     }
 
     Ok(new_methods)

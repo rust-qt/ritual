@@ -2,6 +2,7 @@ use crate::cpp_data::CppPath;
 use crate::cpp_data::CppVisibility;
 use crate::cpp_ffi_data::CppFfiArgumentMeaning;
 use crate::cpp_ffi_data::CppFfiFunction;
+use crate::cpp_ffi_data::CppFfiFunctionKind;
 use crate::cpp_ffi_data::CppTypeConversionToFfi;
 use crate::cpp_function::*;
 use crate::cpp_type::*;
@@ -174,7 +175,11 @@ fn argument_types_equal8() {
 fn to_ffi(function: &CppFunction, force_stack: Option<CppPath>) -> CppFfiFunction {
     let movable_types: Vec<_> = force_stack.into_iter().collect();
     crate::cpp_ffi_generator::to_ffi_method(
-        function,
+        CppFfiFunctionKind::Function {
+            cpp_function: function.clone(),
+            omitted_arguments: None,
+            cast: None,
+        },
         &movable_types,
         &mut crate::cpp_ffi_generator::FfiNameProvider::new(String::new(), HashSet::new()),
     )
