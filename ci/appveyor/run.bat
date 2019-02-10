@@ -11,7 +11,7 @@ set RUST_BACKTRACE=1
 set RITUAL_TEMP_TEST_DIR=%USERPROFILE%\ritual_temp_test_dir
 
 cd "%APPVEYOR_BUILD_FOLDER%"
-cargo clippy --all-targets || goto :error
+cargo clippy --all-targets -- -D warnings || goto :error
 cargo test -v -- --nocapture || goto :error
 cargo fmt -- --check || goto :error
 

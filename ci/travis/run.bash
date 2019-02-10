@@ -10,6 +10,6 @@ source "$TRAVIS_BUILD_DIR/ci/travis/setup_clang.bash"
 cd "$TRAVIS_BUILD_DIR"
 rustup component add clippy
 rustup component add rustfmt
-cargo clippy --all-targets
+cargo clippy --all-targets -- -D warnings
 cargo test -v
 cargo fmt -- --check
