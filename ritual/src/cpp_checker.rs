@@ -123,12 +123,15 @@ impl CppChecker<'_, '_> {
         let total_count = self.data.current_database.cpp_items.len();
         let progress_bar = new_progress_bar(total_count as u64, "Checking items");
 
+        let env = self.env.clone();
         for item in &mut self.data.current_database.cpp_items {
             progress_bar.inc(1);
             for ffi_item in &mut item.ffi_items {
-                if let Ok(snippet) = snippet_for_item(ffi_item) {
-                    //info!("Checking item {} / {}", index + 1, total_count);
+                if ffi_item.checks.items.iter().any(|check| check.env == env) {
+                    continue;
+                }
 
+                if let Ok(snippet) = snippet_for_item(ffi_item) {
                     let error_data =
                         match check_snippet(&self.main_cpp_path, &self.builder, &snippet)? {
                             CppLibBuilderOutput::Success => None, // no error
