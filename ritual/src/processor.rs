@@ -12,13 +12,14 @@ use crate::rust_generator::rust_generator_step;
 use crate::type_allocation_places::choose_allocation_places_step;
 use crate::workspace::Workspace;
 use itertools::Itertools;
-use log::{error, info};
+use log::{debug, error, info};
 use ritual_common::errors::{bail, err_msg, Result, ResultExt};
 use ritual_common::utils::MapIfOk;
 use std::cmp::Ordering;
 use std::fmt;
 use std::iter::once;
 use std::path::PathBuf;
+use std::time::Instant;
 
 /// Creates output and cache directories if they don't exist.
 /// Returns `Err` if any path in `config` is invalid or relative.
@@ -333,11 +334,19 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
                 current_database_saved = false;
             }
 
+            let started_time = Instant::now();
+
             if let Err(err) = (step.function)(&mut data) {
                 steps_result = Err(err);
                 error!("Step failed! Aborting...");
                 break;
             }
+
+            debug!(
+                "Step '{}' completed in {:?}",
+                step.name,
+                started_time.elapsed()
+            );
         }
     }
 
