@@ -10,14 +10,14 @@ use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use ritual_common::errors::Result;
 
-pub fn add_explicit_destructors_step() -> ProcessingStep {
-    ProcessingStep::new("add_explicit_destructors", add_explicit_destructors)
+pub fn add_explicit_xstructors_step() -> ProcessingStep {
+    ProcessingStep::new("add_explicit_xstructors", add_explicit_xstructors)
 }
 
-/// Adds destructors for every class that does not have explicitly
-/// defined destructor, allowing to create wrappings for
-/// destructors implicitly available in C++.
-fn add_explicit_destructors(data: &mut ProcessorData) -> Result<()> {
+/// Adds constructors and destructors for every class that does not have explicitly
+/// defined constructor or destructor, allowing to create wrappings for
+/// constructors and destructors implicitly available in C++.
+fn add_explicit_xstructors(data: &mut ProcessorData) -> Result<()> {
     let mut methods = Vec::new();
     for type1 in &data.current_database.cpp_items {
         if let CppItemData::Type(ref type1) = type1.cpp_data {

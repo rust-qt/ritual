@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::cpp_checker::cpp_checker_step;
-use crate::cpp_explicit_destructors::add_explicit_destructors_step;
+use crate::cpp_explicit_xstructors::add_explicit_xstructors_step;
 use crate::cpp_ffi_generator::cpp_ffi_generator_step;
 use crate::cpp_parser::cpp_parser_step;
 use crate::cpp_template_instantiator::find_template_instantiations_step;
@@ -103,7 +103,7 @@ impl Default for ProcessingSteps {
     fn default() -> Self {
         let main_steps = vec![
             cpp_parser_step(),
-            add_explicit_destructors_step(),
+            add_explicit_xstructors_step(),
             choose_allocation_places_step(),
             find_template_instantiations_step(),
             instantiate_templates_step(),
