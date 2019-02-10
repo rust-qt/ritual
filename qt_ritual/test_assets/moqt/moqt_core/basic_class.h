@@ -3,7 +3,16 @@
 
 class MOQT_CORE_EXPORT BasicClassField {
 public:
-    BasicClassField() {}
+    BasicClassField() { r = 42; }
+
+    int set(int v) {
+        int old = r;
+        r = v;
+        return old;
+    }
+    int get() const { return r; }
+private:
+    int r;
 };
 
 class MOQT_CORE_EXPORT BasicClass {
