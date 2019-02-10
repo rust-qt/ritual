@@ -65,6 +65,12 @@ struct Snippet {
     context: SnippetContext,
 }
 
+struct SnippetWithIndexes {
+    snippet: Snippet,
+    cpp_item_index: usize,
+    ffi_item_index: usize,
+}
+
 impl Snippet {
     fn new_in_main<S: Into<String>>(code: S) -> Snippet {
         Snippet {
@@ -118,42 +124,57 @@ impl CppChecker<'_, '_> {
                 .push(self.env.clone());
         }
 
-        self.run_tests()?;
-
-        let total_count = self.data.current_database.cpp_items.len();
-        let progress_bar = new_progress_bar(total_count as u64, "Checking items");
-
         let env = self.env.clone();
-        for item in &mut self.data.current_database.cpp_items {
-            progress_bar.inc(1);
-            for ffi_item in &mut item.ffi_items {
+        let mut snippets = Vec::new();
+        for (cpp_item_index, item) in self.data.current_database.cpp_items.iter().enumerate() {
+            for (ffi_item_index, ffi_item) in item.ffi_items.iter().enumerate() {
                 if ffi_item.checks.items.iter().any(|check| check.env == env) {
                     continue;
                 }
 
                 if let Ok(snippet) = snippet_for_item(ffi_item) {
-                    let error_data =
-                        match check_snippet(&self.main_cpp_path, &self.builder, &snippet)? {
-                            CppLibBuilderOutput::Success => None, // no error
-                            CppLibBuilderOutput::Fail(output) => {
-                                Some(format!("build failed: {}", output.stderr))
-                            }
-                        };
-                    let r = ffi_item.checks.add(&self.env, error_data.clone());
-                    let change_text = match r {
-                        CppCheckerAddResult::Added => "Added".to_string(),
-                        CppCheckerAddResult::Unchanged => "Unchanged".to_string(),
-                        CppCheckerAddResult::Changed { ref old } => {
-                            format!("Changed! Old data for the same env: {:?}", old)
-                        }
-                    };
-
-                    debug!(
-                        "[cpp_checker_update] ffi_item = {:?}; snippet = {:?}; error = {:?}; {}",
-                        ffi_item, snippet.code, error_data, change_text
-                    );
+                    snippets.push(SnippetWithIndexes {
+                        cpp_item_index,
+                        ffi_item_index,
+                        snippet,
+                    });
                 }
             }
+        }
+
+        if snippets.is_empty() {
+            return Ok(());
+        }
+
+        self.run_tests()?;
+
+        let progress_bar = new_progress_bar(snippets.len() as u64, "Checking items");
+        for snippet in snippets {
+            progress_bar.inc(1);
+            let output = check_snippet(&self.main_cpp_path, &self.builder, &snippet.snippet)?;
+            let error_data = match output {
+                CppLibBuilderOutput::Success => None, // no error
+                CppLibBuilderOutput::Fail(output) => {
+                    Some(format!("build failed: {}", output.stderr))
+                }
+            };
+
+            let cpp_item = &mut self.data.current_database.cpp_items[snippet.cpp_item_index];
+            let ffi_item = &mut cpp_item.ffi_items[snippet.ffi_item_index];
+
+            let r = ffi_item.checks.add(&self.env, error_data.clone());
+            let change_text = match r {
+                CppCheckerAddResult::Added => "Added".to_string(),
+                CppCheckerAddResult::Unchanged => "Unchanged".to_string(),
+                CppCheckerAddResult::Changed { ref old } => {
+                    format!("Changed! Old data for the same env: {:?}", old)
+                }
+            };
+
+            debug!(
+                "[cpp_checker_update] ffi_item = {:?}; snippet = {:?}; error = {:?}; {}",
+                ffi_item, snippet.snippet.code, error_data, change_text
+            );
         }
 
         Ok(())
