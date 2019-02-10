@@ -53,6 +53,7 @@ fn build_cpp_lib() -> Result<TempTestDir> {
         cmake_vars: Vec::new(),
         capture_output: false,
         skip_cmake: false,
+        skip_cmake_after_first_run: false,
     }
     .run()?;
 

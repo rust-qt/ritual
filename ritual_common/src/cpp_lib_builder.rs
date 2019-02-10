@@ -94,13 +94,12 @@ pub struct CppLibBuilder {
     pub build_type: BuildType,
     /// Additional variables passed to CMake
     pub cmake_vars: Vec<CMakeVar>,
-
     pub capture_output: bool,
-
     pub skip_cmake: bool,
+    pub skip_cmake_after_first_run: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CppLibBuilderOutput {
     Success,
     Fail(CommandOutput),
@@ -108,7 +107,7 @@ pub enum CppLibBuilderOutput {
 
 impl CppLibBuilder {
     /// Builds the library.
-    pub fn run(&self) -> Result<CppLibBuilderOutput> {
+    pub fn run(&mut self) -> Result<CppLibBuilderOutput> {
         if !self.build_dir.exists() {
             create_dir_all(&self.build_dir)?;
         }
@@ -161,6 +160,10 @@ impl CppLibBuilder {
             } else {
                 run_command(&mut cmake_command)?;
             }
+        }
+
+        if self.skip_cmake_after_first_run {
+            self.skip_cmake = true;
         }
 
         let mut make_command_name = if target::current_os() == target::OS::Windows {

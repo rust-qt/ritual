@@ -8,6 +8,10 @@ use crate::processor::ProcessorData;
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
 use log::debug;
+use rayon::iter::IndexedParallelIterator;
+use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
+use rayon::slice::ParallelSliceMut;
 use ritual_common::cpp_lib_builder::{
     c2r_cmake_vars, BuildType, CppLibBuilder, CppLibBuilderOutput,
 };
@@ -17,16 +21,15 @@ use ritual_common::target::current_target;
 use ritual_common::utils::MapIfOk;
 use std::io::Write;
 use std::iter;
-use std::path::Path;
 use std::path::PathBuf;
+use std::time::Instant;
 
 fn check_snippets<'a>(
-    main_cpp_path: &Path,
-    builder: &CppLibBuilder,
+    data: &mut CppCheckerData,
     snippets: impl Iterator<Item = &'a Snippet>,
 ) -> Result<CppLibBuilderOutput> {
     {
-        let mut file = create_file(main_cpp_path)?;
+        let mut file = create_file(&data.main_cpp_path)?;
         writeln!(file, "#include \"utils.h\"")?;
         writeln!(file)?;
         let mut main_content = Vec::new();
@@ -50,7 +53,10 @@ fn check_snippets<'a>(
         }
         writeln!(file, "}}")?;
     }
-    builder.run()
+    let instant = Instant::now();
+    let result = data.builder.run();
+    debug!("cpp builder time: {:?}", instant.elapsed());
+    result
 }
 
 fn snippet_for_item(item: &CppFfiItem) -> Result<Snippet> {
@@ -65,25 +71,27 @@ fn snippet_for_item(item: &CppFfiItem) -> Result<Snippet> {
 }
 
 struct CppCheckerData {
-    env: CppCheckerEnv,
     main_cpp_path: PathBuf,
     builder: CppLibBuilder,
 }
 
 struct CppChecker<'b, 'a: 'b> {
     data: &'b mut ProcessorData<'a>,
-    checker_data: CppCheckerData,
 }
 
+#[derive(Debug, Clone, Copy)]
 enum SnippetContext {
     Main,
     Global,
 }
+
+#[derive(Debug, Clone)]
 struct Snippet {
     code: String,
     context: SnippetContext,
 }
 
+#[derive(Debug, Clone)]
 struct SnippetWithIndexes {
     snippet: Snippet,
     cpp_item_index: usize,
@@ -131,27 +139,19 @@ impl PreliminaryTest {
 
 fn binary_check(
     snippets: &mut [SnippetWithIndexes],
-    data: &CppCheckerData,
+    data: &mut CppCheckerData,
     progress_bar: &ProgressBar,
 ) -> Result<()> {
     if snippets.len() < 3 {
-        for snippet in snippets {
-            let output = check_snippets(
-                &data.main_cpp_path,
-                &data.builder,
-                iter::once(&snippet.snippet),
-            )?;
+        for snippet in &mut *snippets {
+            let output = check_snippets(data, iter::once(&snippet.snippet))?;
             snippet.output = Some(output);
             progress_bar.inc(1);
         }
         return Ok(());
     }
 
-    let output = check_snippets(
-        &data.main_cpp_path,
-        &data.builder,
-        snippets.iter().map(|s| &s.snippet),
-    )?;
+    let output = check_snippets(data, snippets.iter().map(|s| &s.snippet))?;
     if let CppLibBuilderOutput::Success = output {
         for snippet in &mut *snippets {
             snippet.output = Some(output.clone());
@@ -166,22 +166,87 @@ fn binary_check(
     Ok(())
 }
 
+fn check_preliminary_test(data: &mut CppCheckerData, test: &PreliminaryTest) -> Result<()> {
+    match check_snippets(data, iter::once(&test.snippet))? {
+        CppLibBuilderOutput::Success => {
+            if !test.expected {
+                bail!("Nevative test ({}) succeeded", test.name);
+            }
+        }
+        CppLibBuilderOutput::Fail(output) => {
+            if test.expected {
+                bail!("Positive test ({}) failed: {}", test.name, output.stderr);
+            }
+        }
+    }
+    Ok(())
+}
+
 impl CppChecker<'_, '_> {
+    fn env(&self) -> CppCheckerEnv {
+        CppCheckerEnv {
+            target: current_target(),
+            cpp_library_version: self.data.config.cpp_lib_version().map(|s| s.to_string()),
+        }
+    }
+    fn create_instance(&self, id: &str) -> Result<CppCheckerData> {
+        let root_path = self.data.workspace.tmp_path()?.join("cpp_checker").join(id);
+        if root_path.exists() {
+            remove_dir_all(&root_path)?;
+        }
+        let src_path = root_path.join("src");
+        create_dir_all(&src_path)?;
+        create_file(src_path.join("CMakeLists.txt"))?
+            .write(include_str!("../templates/cpp_checker/CMakeLists.txt"))?;
+        create_file(src_path.join("utils.h"))?.write(format!(
+            include_str!("../templates/cpp_checker/utils.h"),
+            include_directives_code = self
+                .data
+                .config
+                .include_directives()
+                .map_if_ok(|d| -> Result<_> { Ok(format!("#include \"{}\"", path_to_str(d)?)) })?
+                .join("\n")
+        ))?;
+
+        let mut build_paths = self.data.config.cpp_build_paths().clone();
+        build_paths.apply_env();
+        let builder = CppLibBuilder {
+            cmake_source_dir: src_path.clone(),
+            build_dir: root_path.join("build"),
+            install_dir: None,
+            num_jobs: Some(1),
+            build_type: BuildType::Debug,
+            cmake_vars: c2r_cmake_vars(
+                &self
+                    .data
+                    .config
+                    .cpp_build_config()
+                    .eval(&current_target())?,
+                &build_paths,
+                None,
+            )?,
+            capture_output: true,
+            skip_cmake: false,
+            skip_cmake_after_first_run: true,
+        };
+
+        Ok(CppCheckerData {
+            builder,
+            main_cpp_path: src_path.join("main.cpp"),
+        })
+    }
     fn run(&mut self) -> Result<()> {
+        let env = self.env();
         if !self
             .data
             .current_database
             .environments
             .iter()
-            .any(|e| e == &self.checker_data.env)
+            .any(|e| e == &env)
         {
-            self.data
-                .current_database
-                .environments
-                .push(self.checker_data.env.clone());
+            self.data.current_database.environments.push(env.clone());
         }
 
-        let env = self.checker_data.env.clone();
         let mut snippets = Vec::new();
         for (cpp_item_index, item) in self.data.current_database.cpp_items.iter().enumerate() {
             for (ffi_item_index, ffi_item) in item.ffi_items.iter().enumerate() {
@@ -207,7 +272,22 @@ impl CppChecker<'_, '_> {
         self.run_tests()?;
 
         let progress_bar = new_progress_bar(snippets.len() as u64, "Checking items");
-        binary_check(&mut snippets, &self.checker_data, &progress_bar)?;
+        let num_threads = num_cpus::get();
+        let div_ceil = |x, y| (x + y - 1) / y;
+        let chunk_size = div_ceil(snippets.len(), num_threads);
+        let num_chunks = div_ceil(snippets.len(), chunk_size);
+
+        let instances =
+            (0..num_chunks).map_if_ok(|index| self.create_instance(&format!("main_{}", index)))?;
+
+        snippets
+            .par_chunks_mut(chunk_size)
+            .zip_eq(instances.into_par_iter())
+            .map(|(chunk, mut instance)| {
+                let progress_bar = progress_bar.clone();
+                binary_check(chunk, &mut instance, &progress_bar)
+            })
+            .collect::<Result<_>>()?;
 
         for snippet in snippets {
             let cpp_item = &mut self.data.current_database.cpp_items[snippet.cpp_item_index];
@@ -220,9 +300,7 @@ impl CppChecker<'_, '_> {
                 }
             };
 
-            let r = ffi_item
-                .checks
-                .add(&self.checker_data.env, error_data.clone());
+            let r = ffi_item.checks.add(&env, error_data.clone());
             let change_text = match r {
                 CppCheckerAddResult::Added => "Added".to_string(),
                 CppCheckerAddResult::Unchanged => "Unchanged".to_string(),
@@ -240,7 +318,7 @@ impl CppChecker<'_, '_> {
     }
 
     fn run_tests(&mut self) -> Result<()> {
-        let tests = &[
+        let positive_tests = &[
             PreliminaryTest::new(
                 "hello world",
                 true,
@@ -272,100 +350,39 @@ impl CppChecker<'_, '_> {
                 true,
                 Snippet::new_global("int f1() { assert(2 + 2 == 5); return 1; }"),
             ),
+        ];
+        assert!(positive_tests.iter().all(|t| t.expected));
+
+        let mut instance = self.create_instance("tests")?;
+        let all_positive_output =
+            check_snippets(&mut instance, positive_tests.iter().map(|t| &t.snippet))?;
+        if all_positive_output != CppLibBuilderOutput::Success {
+            for test in positive_tests {
+                check_preliminary_test(&mut instance, test)?;
+            }
+        }
+
+        let negative_tests = &[
             PreliminaryTest::new("syntax error", false, Snippet::new_in_main("}")),
             PreliminaryTest::new(
                 "incorrect assertion",
                 false,
-                Snippet::new_in_main("assert(2 + 2 == 5)"),
+                Snippet::new_in_main("assert(2 + 2 == 5);"),
             ),
             PreliminaryTest::new("status code 1", false, Snippet::new_in_main("return 1;")),
         ];
+        assert!(negative_tests.iter().all(|t| !t.expected));
 
-        let progress_bar = new_progress_bar(tests.len() as u64, "Running preliminary tests");
-        for test in tests {
-            progress_bar.inc(1);
-            self.check_preliminary_test(test)?;
-            self.checker_data.builder.skip_cmake = true;
+        for test in negative_tests {
+            check_preliminary_test(&mut instance, test)?;
         }
 
         Ok(())
-    }
-
-    fn check_preliminary_test(&self, test: &PreliminaryTest) -> Result<()> {
-        match self.check_snippets(iter::once(&test.snippet))? {
-            CppLibBuilderOutput::Success => {
-                if !test.expected {
-                    bail!("Nevative test ({}) succeeded", test.name);
-                }
-            }
-            CppLibBuilderOutput::Fail(output) => {
-                if test.expected {
-                    bail!("Positive test ({}) failed: {}", test.name, output.stderr);
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn check_snippets<'a>(
-        &self,
-        snippets: impl Iterator<Item = &'a Snippet>,
-    ) -> Result<CppLibBuilderOutput> {
-        check_snippets(
-            &self.checker_data.main_cpp_path,
-            &self.checker_data.builder,
-            snippets,
-        )
     }
 }
 
 fn run(data: &mut ProcessorData) -> Result<()> {
-    let root_path = data.workspace.tmp_path()?.join("cpp_checker");
-    if root_path.exists() {
-        remove_dir_all(&root_path)?;
-    }
-    let src_path = root_path.join("src");
-    create_dir_all(&src_path)?;
-    create_file(src_path.join("CMakeLists.txt"))?
-        .write(include_str!("../templates/cpp_checker/CMakeLists.txt"))?;
-    create_file(src_path.join("utils.h"))?.write(format!(
-        include_str!("../templates/cpp_checker/utils.h"),
-        include_directives_code = data
-            .config
-            .include_directives()
-            .map_if_ok(|d| -> Result<_> { Ok(format!("#include \"{}\"", path_to_str(d)?)) })?
-            .join("\n")
-    ))?;
-
-    let mut build_paths = data.config.cpp_build_paths().clone();
-    build_paths.apply_env();
-    let builder = CppLibBuilder {
-        cmake_source_dir: src_path.clone(),
-        build_dir: root_path.join("build"),
-        install_dir: None,
-        num_jobs: Some(1),
-        build_type: BuildType::Debug,
-        cmake_vars: c2r_cmake_vars(
-            &data.config.cpp_build_config().eval(&current_target())?,
-            &build_paths,
-            None,
-        )?,
-        capture_output: true,
-        skip_cmake: false,
-    };
-
-    let env = CppCheckerEnv {
-        target: current_target(),
-        cpp_library_version: data.config.cpp_lib_version().map(|s| s.to_string()),
-    };
-    let mut checker = CppChecker {
-        data,
-        checker_data: CppCheckerData {
-            builder,
-            main_cpp_path: src_path.join("main.cpp"),
-            env,
-        },
-    };
+    let mut checker = CppChecker { data };
 
     checker.run()?;
 
