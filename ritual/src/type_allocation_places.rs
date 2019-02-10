@@ -66,8 +66,9 @@ fn choose_allocation_places(data: &mut ProcessorData) -> Result<()> {
             .cpp_items
             .iter()
             .filter_map(|i| i.cpp_data.as_function_ref())
-            .any(|m| m.class_type().as_ref() == Some(&type1.path) && m.is_virtual())
+            .any(|m| m.class_type().ok().as_ref() == Some(&type1.path) && m.is_virtual())
         {
+            // TODO: de-duplicate code for searching items by class_type
             if !data_map.contains_key(&type1.path) {
                 data_map.insert(type1.path.clone(), TypeStats::default());
             }

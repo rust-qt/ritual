@@ -189,7 +189,7 @@ fn c_signature_empty() {
     assert!(!method1.is_constructor());
     assert!(!method1.is_destructor());
     assert!(!method1.is_operator());
-    assert_eq!(method1.class_type(), None);
+    assert!(method1.class_type().is_err());
 
     let r = to_ffi(&method1, None);
     assert!(r.arguments.is_empty());
@@ -239,8 +239,8 @@ fn c_signature_method_with_this() {
     assert!(!method1.is_destructor());
     assert!(!method1.is_operator());
     assert_eq!(
-        method1.class_type(),
-        Some(CppPath::from_str_unchecked("MyClass"))
+        method1.class_type().unwrap(),
+        CppPath::from_str_unchecked("MyClass")
     );
 
     let r = to_ffi(&method1, None);
@@ -325,8 +325,8 @@ fn c_signature_constructor() {
     assert!(!method1.is_destructor());
     assert!(!method1.is_operator());
     assert_eq!(
-        method1.class_type(),
-        Some(CppPath::from_str_unchecked("MyClass"))
+        method1.class_type().unwrap(),
+        CppPath::from_str_unchecked("MyClass")
     );
 
     let r_stack = to_ffi(&method1, Some(CppPath::from_str_unchecked("MyClass")));
@@ -417,8 +417,8 @@ fn c_signature_destructor() {
     assert!(method1.is_destructor());
     assert!(!method1.is_operator());
     assert_eq!(
-        method1.class_type(),
-        Some(CppPath::from_str_unchecked("MyClass"))
+        method1.class_type().unwrap(),
+        CppPath::from_str_unchecked("MyClass")
     );
 
     let r_stack = to_ffi(&method1, Some(CppPath::from_str_unchecked("MyClass")));
@@ -553,7 +553,7 @@ fn c_signature_method_returning_class() {
 fn full_name_free_function_in_namespace() {
     let mut method1 = empty_regular_method();
     method1.path = CppPath::from_str_unchecked("ns::func1");
-    assert_eq!(method1.class_type(), None);
+    assert!(method1.class_type().is_err());
 }
 
 #[test]
@@ -562,8 +562,8 @@ fn full_name_method() {
     method1.path = CppPath::from_str_unchecked("MyClass::func1");
     method1.member = Some(empty_membership());
     assert_eq!(
-        method1.class_type(),
-        Some(CppPath::from_str_unchecked("MyClass"))
+        method1.class_type().unwrap(),
+        CppPath::from_str_unchecked("MyClass")
     );
 }
 
@@ -577,8 +577,8 @@ fn full_name_static_method() {
         info
     });
     assert_eq!(
-        method1.class_type(),
-        Some(CppPath::from_str_unchecked("MyClass"))
+        method1.class_type().unwrap(),
+        CppPath::from_str_unchecked("MyClass")
     );
 }
 
@@ -588,8 +588,8 @@ fn full_name_nested_class_method() {
     method1.path = CppPath::from_str_unchecked("MyClass::Iterator::func1");
     method1.member = Some(empty_membership());
     assert_eq!(
-        method1.class_type(),
-        Some(CppPath::from_str_unchecked("MyClass::Iterator"))
+        method1.class_type().unwrap(),
+        CppPath::from_str_unchecked("MyClass::Iterator")
     );
 }
 

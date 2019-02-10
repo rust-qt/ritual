@@ -197,26 +197,6 @@ impl CppBuiltInNumericType {
     }
 }
 
-impl CppPath {
-    /// Attempts to replace template types at `nested_level1`
-    /// within this type with `template_arguments1`.
-    pub fn instantiate(
-        &self,
-        nested_level1: usize,
-        template_arguments1: &[CppType],
-    ) -> Result<CppPath> {
-        let mut new_path = self.clone();
-        for path_item in &mut new_path.items {
-            if let Some(ref mut template_arguments) = path_item.template_arguments {
-                for arg in template_arguments {
-                    *arg = arg.instantiate(nested_level1, template_arguments1)?;
-                }
-            }
-        }
-        Ok(new_path)
-    }
-}
-
 impl CppType {
     pub fn new_pointer(is_const: bool, target: CppType) -> Self {
         CppType::PointerLike {
@@ -275,7 +255,7 @@ impl CppType {
                         .iter()
                         .any(|arg| arg.is_or_contains_template_parameter())
             }
-            CppType::Class(ref path) => path.items.iter().any(|item| {
+            CppType::Class(ref path) => path.items().iter().any(|item| {
                 if let Some(ref template_arguments) = item.template_arguments {
                     template_arguments
                         .iter()
@@ -402,7 +382,7 @@ pub enum CppTypeRole {
 }
 
 pub fn is_qflags(path: &CppPath) -> bool {
-    path.items.len() == 1 && &path.items[0].name == "QFlags"
+    path.last().name == "QFlags" && !path.has_parent()
 }
 
 impl CppType {

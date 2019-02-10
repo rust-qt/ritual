@@ -160,7 +160,7 @@ fn get_full_name(entity: Entity) -> Result<CppPath> {
             _ => break, // TODO: panic?
         }
     }
-    Ok(CppPath { items: parts })
+    Ok(CppPath::from_items(parts))
 }
 
 fn get_full_name_display(entity: Entity) -> String {
@@ -278,16 +278,16 @@ fn add_namespaces(data: &mut ProcessorData) -> Result<()> {
             CppItemData::Function(ref f) => &f.path,
             _ => continue,
         };
-        if name.items.len() == 1 {
-            continue;
-        }
-        let mut namespace_name = name.clone();
-        namespace_name.items.pop().expect("name is empty");
+
+        let mut namespace_name = match name.parent() {
+            Err(_) => continue,
+            Ok(parent) => parent,
+        };
+
         namespaces.insert(namespace_name.clone());
-        while let Some(_) = namespace_name.items.pop() {
-            if !namespace_name.items.is_empty() {
-                namespaces.insert(namespace_name.clone());
-            }
+        while let Ok(r) = namespace_name.parent() {
+            namespaces.insert(r.clone());
+            namespace_name = r;
         }
     }
     for item in &data.current_database.cpp_items {
@@ -406,9 +406,7 @@ impl CppParser<'_, '_> {
                             unexpected!("invalid matches count in regexp");
                         }
                         let mut name = get_full_name(declaration)?;
-                        let mut last_item = name.items.pop().expect("CppPath can't be empty");
-                        last_item.template_arguments = Some(arg_types);
-                        name.items.push(last_item);
+                        name.last_mut().template_arguments = Some(arg_types);
                         return Ok(CppType::Class(name));
                     } else {
                         bail!("Can't parse declaration of an unexposed type: {}", name);
@@ -541,9 +539,7 @@ impl CppParser<'_, '_> {
                         }
                     }
                 }
-                let mut last_part = class_name.items.pop().expect("CppPath can't be empty");
-                last_part.template_arguments = Some(arg_types);
-                class_name.items.push(last_part);
+                class_name.last_mut().template_arguments = Some(arg_types);
                 return Ok(CppType::Class(class_name));
             }
         } else {
@@ -664,12 +660,7 @@ impl CppParser<'_, '_> {
                             Some(r)
                         }
                     };
-                    let mut last_part = declaration_name
-                        .items
-                        .pop()
-                        .expect("CppPath can't be empty");
-                    last_part.template_arguments = template_arguments;
-                    declaration_name.items.push(last_part);
+                    declaration_name.last_mut().template_arguments = template_arguments;
 
                     Ok(CppType::Class(declaration_name))
                 } else {
@@ -767,13 +758,11 @@ impl CppParser<'_, '_> {
                                 }) {
                                     if let Ok(ref mut parsed_canonical) = parsed_canonical {
                                         if let CppType::Class(ref mut path) = parsed_canonical {
-                                            let mut last_item =
-                                                path.items.pop().expect("CppPath can't be empty");
+                                            let mut last_item = path.last_mut();
                                             if last_item.template_arguments.is_some() {
                                                 last_item.template_arguments =
                                                     Some(template_arguments_unexposed.clone());
                                             }
-                                            path.items.push(last_item);
                                         }
                                     }
                                 }

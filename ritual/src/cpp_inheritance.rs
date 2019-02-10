@@ -63,7 +63,7 @@ fn detect_inherited_methods2(data: &ProcessorData) -> Result<Vec<CppFunction>> {
             .all_items()
             .iter()
             .filter_map(|x| x.cpp_data.as_function_ref())
-            .filter(|m| m.class_type().as_ref() == Some(&class.base_class_type))
+            .filter(|m| m.class_type().ok().as_ref() == Some(&class.base_class_type))
             .collect();
 
         for method in methods {

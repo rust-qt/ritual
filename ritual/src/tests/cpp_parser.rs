@@ -569,12 +569,10 @@ fn template_class_method() {
     );
     assert_eq!(
         data.methods[1].return_type,
-        CppType::Class(CppPath {
-            items: vec![
-                my_vector_item.clone(),
-                CppPathItem::from_str_unchecked("Iterator")
-            ],
-        })
+        CppType::Class(CppPath::from_items(vec![
+            my_vector_item.clone(),
+            CppPathItem::from_str_unchecked("Iterator")
+        ]))
     );
     assert!(data.namespaces.is_empty());
 }

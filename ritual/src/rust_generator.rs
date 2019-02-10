@@ -825,7 +825,7 @@ impl State<'_> {
                 }
             }
             NameType::General | NameType::Module | NameType::ApiFunction { .. } => {
-                if let Some(parent) = cpp_path.parent() {
+                if let Ok(parent) = cpp_path.parent() {
                     self.get_strategy(&parent)?
                 } else {
                     self.default_strategy()
@@ -842,7 +842,7 @@ impl State<'_> {
 
         let full_last_name = match name_type {
             NameType::SizedItem => cpp_path
-                .items
+                .items()
                 .iter()
                 .map_if_ok(|item| cpp_path_item_to_name(item))?
                 .join("_"),

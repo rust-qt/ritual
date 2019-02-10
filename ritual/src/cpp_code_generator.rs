@@ -215,14 +215,14 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
                             format!(
                                 "new({}) {}",
                                 arg.name,
-                                cpp_function.class_type().unwrap().to_cpp_code()?
+                                cpp_function.class_type()?.to_cpp_code()?
                             )
                         } else {
                             unexpected!("return value argument not found\n{:?}", method);
                         }
                     }
                     ReturnValueAllocationPlace::Heap => {
-                        format!("new {}", cpp_function.class_type().unwrap().to_cpp_code()?)
+                        format!("new {}", cpp_function.class_type()?.to_cpp_code()?)
                     }
                     ReturnValueAllocationPlace::NotApplicable => {
                         unexpected!("NotApplicable in constructor");

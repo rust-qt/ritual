@@ -476,7 +476,7 @@ fn generate_field_accessors(
 
 fn should_process_item(item: &CppItemData) -> Result<bool> {
     if let CppItemData::Function(ref method) = *item {
-        if let Some(class_name) = method.class_type() {
+        if let Ok(class_name) = method.class_type() {
             if is_qflags(&class_name) {
                 return Ok(false);
             }

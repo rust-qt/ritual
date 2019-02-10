@@ -6,7 +6,7 @@ pub use crate::cpp_operator::{CppOperator, CppOperatorInfo};
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
 use itertools::Itertools;
-use ritual_common::errors::{bail, Result};
+use ritual_common::errors::{bail, err_msg, Result, ResultExt};
 use ritual_common::utils::MapIfOk;
 use serde_derive::{Deserialize, Serialize};
 
@@ -187,16 +187,13 @@ impl CppFunction {
             && self.argument_types_equal(other)
     }
 
-    pub fn class_type(&self) -> Option<CppPath> {
+    pub fn class_type(&self) -> Result<CppPath> {
         if self.member.is_some() {
-            let mut path = self.path.clone();
-            path.items.pop().expect("CppPath can't be empty");
-            if path.items.is_empty() {
-                panic!("CppFunction is a class member but its path is not nested.");
-            }
-            Some(path)
+            Ok(self.path.parent().with_context(|_| {
+                err_msg("CppFunction is a class member but its path is not nested.")
+            })?)
         } else {
-            None
+            bail!("not a member function")
         }
     }
 

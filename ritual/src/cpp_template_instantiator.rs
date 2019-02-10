@@ -86,14 +86,10 @@ fn apply_instantiation_to_method(
         );
     } else {
         if let Some(conversion_type) = conversion_type {
-            new_method.path.items.pop().expect("CppPath can't be empty");
-            new_method
-                .path
-                .items
-                .push(CppPathItem::from_str_unchecked(&format!(
-                    "operator {}",
-                    conversion_type.to_cpp_code(None)?
-                )));
+            *new_method.path.last_mut() = CppPathItem::from_str_unchecked(&format!(
+                "operator {}",
+                conversion_type.to_cpp_code(None)?
+            ));
         }
         trace!(
             "[DebugTemplateInstantiation] success: {}",
@@ -134,7 +130,7 @@ fn instantiate_templates(data: &mut ProcessorData) -> Result<()> {
                         .iter()
                         .filter_map(|item| item.cpp_data.as_type_ref())
                     {
-                        let is_suitable = type1.path.parent() == path.parent()
+                        let is_suitable = type1.path.parent().ok() == path.parent().ok()
                             && type1.path.last().name == path.last().name
                             && type1.path.last().template_arguments.as_ref().map_or(
                                 false,
@@ -252,7 +248,7 @@ fn find_template_instantiations(data: &mut ProcessorData) -> Result<()> {
             .iter()
             .filter_map(|x| x.cpp_data.as_type_ref())
             .find(|t| {
-                t.path.parent() == item.parent()
+                t.path.parent().ok() == item.parent().ok()
                     && t.path.last().name == item.last().name
                     && t.path
                         .last()

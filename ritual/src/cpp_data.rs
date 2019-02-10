@@ -141,7 +141,7 @@ pub struct CppPathItem {
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppPath {
     /// Parts of the path
-    pub items: Vec<CppPathItem>,
+    items: Vec<CppPathItem>,
 }
 
 impl CppPath {
@@ -155,6 +155,14 @@ impl CppPath {
 
     pub fn from_items(items: Vec<CppPathItem>) -> CppPath {
         CppPath { items }
+    }
+
+    pub fn into_items(self) -> Vec<CppPathItem> {
+        self.items
+    }
+
+    pub fn items(&self) -> &[CppPathItem] {
+        &self.items
     }
 
     pub fn to_cpp_code(&self) -> Result<String> {
@@ -186,13 +194,17 @@ impl CppPath {
         self.items.last_mut().expect("empty CppPath encountered")
     }
 
-    pub fn parent(&self) -> Option<CppPath> {
+    pub fn has_parent(&self) -> bool {
+        self.items.len() > 1
+    }
+
+    pub fn parent(&self) -> Result<CppPath> {
         if self.items.len() > 1 {
-            Some(CppPath {
+            Ok(CppPath {
                 items: self.items[..self.items.len() - 1].to_vec(),
             })
         } else {
-            None
+            bail!("failed to get parent path for {:?}", self)
         }
     }
 
@@ -224,6 +236,24 @@ impl CppPath {
                 }
             })
             .join("_")
+    }
+
+    /// Attempts to replace template types at `nested_level1`
+    /// within this type with `template_arguments1`.
+    pub fn instantiate(
+        &self,
+        nested_level1: usize,
+        template_arguments1: &[CppType],
+    ) -> Result<CppPath> {
+        let mut new_path = self.clone();
+        for path_item in &mut new_path.items {
+            if let Some(ref mut template_arguments) = path_item.template_arguments {
+                for arg in template_arguments {
+                    *arg = arg.instantiate(nested_level1, template_arguments1)?;
+                }
+            }
+        }
+        Ok(new_path)
     }
 }
 

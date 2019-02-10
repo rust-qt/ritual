@@ -129,7 +129,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
         {
             if let CppItemData::Function(ref mut method) = item.cpp_data {
                 let mut section_type = SectionType::Other;
-                if let Some(class_name) = method.class_type() {
+                if let Ok(class_name) = method.class_type() {
                     if let Some(sections) = sections_per_class.get(&class_name) {
                         let matching_sections: Vec<_> = sections
                             .clone()

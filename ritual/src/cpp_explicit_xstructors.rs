@@ -28,7 +28,7 @@ fn add_explicit_xstructors(data: &mut ProcessorData) -> Result<()> {
                     .cpp_items
                     .iter()
                     .filter_map(|item| item.cpp_data.as_function_ref())
-                    .any(|m| m.is_destructor() && m.class_type().as_ref() == Some(class_path));
+                    .any(|m| m.is_destructor() && m.class_type().ok().as_ref() == Some(class_path));
                 if !found_destructor {
                     methods.push(CppFunction {
                         path: type1
@@ -58,12 +58,12 @@ fn add_explicit_xstructors(data: &mut ProcessorData) -> Result<()> {
                     .cpp_items
                     .iter()
                     .filter_map(|item| item.cpp_data.as_function_ref())
-                    .any(|m| m.is_constructor() && m.class_type().as_ref() == Some(class_path));
+                    .any(|m| {
+                        m.is_constructor() && m.class_type().ok().as_ref() == Some(class_path)
+                    });
                 if !found_constructor {
                     methods.push(CppFunction {
-                        path: type1
-                            .path
-                            .join(type1.path.items.last().expect("aaa").clone()),
+                        path: type1.path.join(type1.path.last().clone()),
                         member: Some(CppFunctionMemberData {
                             is_virtual: false,
                             is_pure_virtual: false,
