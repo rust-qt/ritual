@@ -12,7 +12,7 @@ set RITUAL_TEMP_TEST_DIR=%USERPROFILE%\ritual_temp_test_dir
 
 cd "%APPVEYOR_BUILD_FOLDER%"
 cargo clippy --all-targets || goto :error
-cargo test -v || goto :error
+cargo test -v -- --nocapture || goto :error
 cargo fmt -- --check || goto :error
 
 exit /b 0
