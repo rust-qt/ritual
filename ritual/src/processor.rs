@@ -296,6 +296,15 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
                 .position(|s| s == start_step)
                 .ok_or_else(|| err_msg(format!("requested step not found: {}", start_step)))?;
             config.processing_steps().main_procedure[start_index..].to_vec()
+        } else if step_name.starts_with("until:") {
+            let end_step = &step_name["until:".len()..];
+            let end_index = config
+                .processing_steps()
+                .main_procedure
+                .iter()
+                .position(|s| s == end_step)
+                .ok_or_else(|| err_msg(format!("requested step not found: {}", end_step)))?;
+            config.processing_steps().main_procedure[..end_index].to_vec()
         } else {
             vec![step_name.to_string()]
         };
