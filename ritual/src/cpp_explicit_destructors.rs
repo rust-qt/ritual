@@ -22,18 +22,18 @@ fn add_explicit_destructors(data: &mut ProcessorData) -> Result<()> {
     for type1 in &data.current_database.cpp_items {
         if let CppItemData::Type(ref type1) = type1.cpp_data {
             if type1.kind.is_class() {
-                let class_name = &type1.path;
+                let class_path = &type1.path;
                 let found_destructor = data
                     .current_database
                     .cpp_items
                     .iter()
                     .filter_map(|item| item.cpp_data.as_function_ref())
-                    .any(|m| m.is_destructor() && m.class_type().as_ref() == Some(class_name));
+                    .any(|m| m.is_destructor() && m.class_type().as_ref() == Some(class_path));
                 if !found_destructor {
                     methods.push(CppFunction {
                         path: type1
                             .path
-                            .join(CppPathItem::from_str_unchecked(&format!("~{}", class_name))),
+                            .join(CppPathItem::from_str_unchecked(&format!("~{}", class_path))),
                         member: Some(CppFunctionMemberData {
                             is_virtual: false, // the destructor can actually be virtual but we don't care about it here
                             is_pure_virtual: false,
@@ -43,6 +43,36 @@ fn add_explicit_destructors(data: &mut ProcessorData) -> Result<()> {
                             is_signal: false,
                             is_slot: false,
                             kind: CppFunctionKind::Destructor,
+                        }),
+                        operator: None,
+                        return_type: CppType::Void,
+                        arguments: vec![],
+                        allows_variadic_arguments: false,
+                        declaration_code: None,
+                        doc: None,
+                    });
+                }
+
+                let found_constructor = data
+                    .current_database
+                    .cpp_items
+                    .iter()
+                    .filter_map(|item| item.cpp_data.as_function_ref())
+                    .any(|m| m.is_constructor() && m.class_type().as_ref() == Some(class_path));
+                if !found_constructor {
+                    methods.push(CppFunction {
+                        path: type1
+                            .path
+                            .join(type1.path.items.last().expect("aaa").clone()),
+                        member: Some(CppFunctionMemberData {
+                            is_virtual: false,
+                            is_pure_virtual: false,
+                            is_const: false,
+                            is_static: false,
+                            visibility: CppVisibility::Public,
+                            is_signal: false,
+                            is_slot: false,
+                            kind: CppFunctionKind::Constructor,
                         }),
                         operator: None,
                         return_type: CppType::Void,
