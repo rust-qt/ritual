@@ -100,6 +100,7 @@ pub struct CppLibBuilder {
     pub skip_cmake: bool,
 }
 
+#[derive(Debug, Clone)]
 pub enum CppLibBuilderOutput {
     Success,
     Fail(CommandOutput),

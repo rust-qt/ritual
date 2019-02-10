@@ -58,7 +58,7 @@ pub fn run_command(command: &mut Command) -> Result<()> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CommandOutput {
     pub status: ::std::process::ExitStatus,
     pub stdout: String,
