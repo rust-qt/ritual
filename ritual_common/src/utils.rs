@@ -16,7 +16,7 @@ use std::process::Command;
 /// Returns proper executable file suffix on current platform.
 /// Returns `".exe"` on Windows and `""` on other platforms.
 pub fn exe_suffix() -> &'static str {
-    return ".exe";
+    ".exe"
 }
 
 #[cfg(not(windows))]
