@@ -316,6 +316,12 @@ impl<T> Ptr<T> {
     }
 }
 
+impl<T: CppDeletable> Ptr<T> {
+    pub unsafe fn to_box(&self) -> CppBox<T> {
+        CppBox::new(self.0)
+    }
+}
+
 impl<T> Deref for Ptr<T> {
     type Target = T;
 
