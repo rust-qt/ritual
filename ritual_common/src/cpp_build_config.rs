@@ -211,14 +211,20 @@ impl CppBuildPaths {
     /// their values override current values of the object.
     pub fn apply_env(&mut self) {
         use std::env;
-        if let Ok(paths) = env::var("CPP_TO_RUST_LIB_PATHS") {
-            self.lib_paths = env::split_paths(&paths).collect();
+        if let Ok(paths) = env::var("RITUAL_LIB_PATH") {
+            self.lib_paths = env::split_paths(&paths)
+                .filter(|s| !s.as_os_str().is_empty())
+                .collect();
         }
-        if let Ok(paths) = env::var("CPP_TO_RUST_FRAMEWORK_PATHS") {
-            self.framework_paths = env::split_paths(&paths).collect();
+        if let Ok(paths) = env::var("RITUAL_FRAMEWORK_PATH") {
+            self.framework_paths = env::split_paths(&paths)
+                .filter(|s| !s.as_os_str().is_empty())
+                .collect();
         }
-        if let Ok(paths) = env::var("CPP_TO_RUST_INCLUDE_PATHS") {
-            self.include_paths = env::split_paths(&paths).collect();
+        if let Ok(paths) = env::var("RITUAL_INCLUDE_PATH") {
+            self.include_paths = env::split_paths(&paths)
+                .filter(|s| !s.as_os_str().is_empty())
+                .collect();
         }
     }
 

@@ -247,6 +247,8 @@ fn run(data: &mut ProcessorData) -> Result<()> {
             .join("\n")
     ))?;
 
+    let mut build_paths = data.config.cpp_build_paths().clone();
+    build_paths.apply_env();
     let builder = CppLibBuilder {
         cmake_source_dir: src_path.clone(),
         build_dir: root_path.join("build"),
@@ -255,7 +257,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         build_type: BuildType::Debug,
         cmake_vars: c2r_cmake_vars(
             &data.config.cpp_build_config().eval(&current_target())?,
-            data.config.cpp_build_paths(),
+            &build_paths,
             None,
         )?,
         capture_output: true,
