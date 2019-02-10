@@ -56,16 +56,18 @@ fn build_cpp_lib() -> Result<TempTestDir> {
     }
     .run()?;
 
-    let add_env = |name, path| -> Result<()> {
-        let value = add_env_path_item(name, vec![path])?;
+    let add_env = |name, path: &Path| -> Result<()> {
+        let value = add_env_path_item(name, vec![path.to_path_buf()])?;
         env::set_var(name, value);
         Ok(())
     };
 
-    add_env("CPLUS_INCLUDE_PATH", install_dir.join("include"))?;
-    add_env("LIBRARY_PATH", install_dir.join("lib"))?;
-    add_env("LD_LIBRARY_PATH", install_dir.join("lib"))?;
-    env::set_var("MOQT_INSTALL_DIR", install_dir_parent);
+    add_env("CPLUS_INCLUDE_PATH", &install_dir.join("include"))?;
+    let lib_path = install_dir.join("lib");
+    add_env("LIBRARY_PATH", &lib_path)?;
+    add_env("LD_LIBRARY_PATH", &lib_path)?;
+    add_env("DYLD_LIBRARY_PATH", &lib_path)?;
+    env::set_var("MOQT_INSTALL_DIR", &install_dir_parent);
     Ok(temp_dir)
 }
 
