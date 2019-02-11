@@ -218,15 +218,9 @@ impl Generator {
             writeln!(self, "pub mod {} {{", module.path.last())?;
         }
 
-        match module.kind {
-            RustModuleKind::Ffi => {
-                writeln!(self, "#![allow(dead_code)]")?;
-            }
-            RustModuleKind::CrateRoot => {
-                writeln!(self, "#![allow(non_camel_case_types)]")?;
-                writeln!(self, "#![allow(non_upper_case_globals)]")?;
-            }
-            _ => {}
+        if let RustModuleKind::Ffi = module.kind {
+            // TODO: shouldn't need this
+            writeln!(self, "#![allow(dead_code)]")?;
         }
 
         write!(
@@ -374,6 +368,7 @@ impl Generator {
         )?;
         let struct_path =
             self.rust_path_to_string(&value.path.parent().expect("enum value must have parent"));
+        writeln!(self, "#[allow(non_upper_case_globals)]")?;
         writeln!(
             self,
             "pub const {value_name}: {struct_path} = {struct_path}({value});",

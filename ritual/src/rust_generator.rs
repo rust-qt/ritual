@@ -861,9 +861,9 @@ impl State<'_> {
                 };
                 s.to_snake_case()
             }
-            NameType::General | NameType::Module | NameType::FfiFunction => {
-                cpp_path_item_to_name(&cpp_path.last())?
-            }
+            NameType::General => cpp_path_item_to_name(&cpp_path.last())?.to_class_case(),
+            NameType::Module => cpp_path_item_to_name(&cpp_path.last())?.to_snake_case(),
+            NameType::FfiFunction => cpp_path.last().name.clone(),
         };
 
         let mut number = None;
@@ -939,7 +939,7 @@ impl State<'_> {
         if !cpp_item.is_rust_processed {
             match &cpp_item.cpp_data {
                 CppItemData::Namespace(path) => {
-                    let rust_path = self.generate_rust_path(path, &NameType::General)?;
+                    let rust_path = self.generate_rust_path(path, &NameType::Module)?;
                     let rust_item = RustDatabaseItem {
                         kind: RustItemKind::Module(RustModule {
                             path: rust_path,
