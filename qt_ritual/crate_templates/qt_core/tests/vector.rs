@@ -1,4 +1,4 @@
-use qt_core::vector::*;
+use qt_core::vector::VectorCInt;
 
 #[test]
 fn vector1() {

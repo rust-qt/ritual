@@ -121,6 +121,7 @@ pub enum CppItemData {
 impl CppItemData {
     pub fn is_same(&self, other: &CppItemData) -> bool {
         use self::CppItemData::*;
+
         match *self {
             Namespace(ref v) => {
                 if let Namespace(ref v2) = other {

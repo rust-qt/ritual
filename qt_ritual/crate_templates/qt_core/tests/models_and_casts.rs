@@ -1,6 +1,6 @@
 use qt_core::abstract_item_model::AbstractItemModel;
 use qt_core::abstract_table_model::AbstractTableModel;
-use qt_core::cpp_utils::*;
+use qt_core::cpp_utils::CppBox;
 use qt_core::qt::ItemDataRole;
 use qt_core::string::String;
 use qt_core::string_list::StringList;

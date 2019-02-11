@@ -131,6 +131,7 @@ impl CppOperator {
     /// Reports information about this operator
     pub fn info(&self) -> CppOperatorInfo {
         use self::CppOperator::*;
+
         fn oi(suffix: &'static str, count: usize) -> CppOperatorInfo {
             CppOperatorInfo {
                 function_name_suffix: Some(suffix),

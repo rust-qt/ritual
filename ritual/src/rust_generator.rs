@@ -53,7 +53,7 @@ use crate::rust_type::RustToFfiTypeConversion;
 use crate::rust_type::RustType;
 use itertools::Itertools;
 use log::{debug, trace};
-use ritual_common::errors::*;
+use ritual_common::errors::{bail, ensure, err_msg, format_err, print_trace, Result};
 use ritual_common::string_utils::CaseOperations;
 use ritual_common::utils::MapIfOk;
 use std::collections::HashMap;

@@ -261,6 +261,7 @@ impl Condition {
     /// `target` matches the condition.
     pub fn eval(&self, target: &Target) -> bool {
         use crate::target::Condition::*;
+
         match *self {
             Arch(ref arch) => &target.arch == arch,
             OS(ref os) => &target.os == os,
