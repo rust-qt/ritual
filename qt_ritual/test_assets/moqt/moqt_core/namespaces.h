@@ -18,7 +18,7 @@ namespace ns1 {
             Val2,
             Val3
         };
-    };
+    }
 
     namespace ns3 {
         MOQT_CORE_EXPORT int a() {
@@ -33,6 +33,13 @@ namespace ns1 {
             Val12 = 2,
             Val13 = 3,
         };
-    };
+
+        namespace ns4 {
+            class MOQT_CORE_EXPORT Class1 {
+            public:
+                Class1(int x) {}
+            };
+        }
+    }
 
 }
