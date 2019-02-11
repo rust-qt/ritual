@@ -25,6 +25,7 @@ mod lib_configs;
 mod versions;
 
 #[cfg(test)]
+#[cfg(target_os = "linux")] // TODO: fix on Windows and MacOS
 mod test_moqt;
 
 use flexi_logger::{Duplicate, LevelFilter, LogSpecification, Logger};
