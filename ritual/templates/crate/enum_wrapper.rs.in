@@ -1,0 +1,20 @@
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+{vis}struct {name}(::std::os::raw::c_int);
+
+impl From<::std::os::raw::c_int> for {name} {{
+    fn from(value: ::std::os::raw::c_int) -> Self {{
+        {name}(value)
+    }}
+}}
+
+impl From<{name}> for ::std::os::raw::c_int {{
+    fn from(value: {name}) -> Self {{
+        value.0
+    }}
+}}
+
+impl {name} {{
+    pub fn to_int(&self) -> ::std::os::raw::c_int {{
+        self.0
+    }}
+}}

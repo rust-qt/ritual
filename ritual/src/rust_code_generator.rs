@@ -277,14 +277,12 @@ impl Generator {
         match rust_struct.kind {
             RustStructKind::WrapperType(ref wrapper) => match wrapper.kind {
                 RustWrapperTypeKind::EnumWrapper => {
-                    writeln!(self, "#[derive(Debug, Clone, Copy, PartialEq, Eq)]")?;
                     writeln!(
                         self,
-                        "{}struct {}(::std::os::raw::c_int);",
-                        visibility,
-                        rust_struct.path.last()
+                        include_str!("../templates/crate/enum_wrapper.rs.in"),
+                        vis = visibility,
+                        name = rust_struct.path.last()
                     )?;
-                    writeln!(self)?;
                 }
                 RustWrapperTypeKind::ImmovableClassWrapper => {
                     writeln!(self, "#[repr(C)]")?;
