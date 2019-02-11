@@ -308,11 +308,6 @@ pub fn generate_cpp_file(
     file_path: &Path,
     global_header_name: &str,
 ) -> Result<()> {
-    //    let cpp_path = self
-    //      .lib_path
-    //      .join("src")
-    //      .join(format!("{}_{}.cpp", &self.lib_name, data.name));
-
     let mut cpp_file = create_file(file_path)?;
     writeln!(cpp_file, "#include \"{}\"", global_header_name)?;
 
@@ -322,20 +317,26 @@ pub fn generate_cpp_file(
             if !ffi_item.checks.any_passed() {
                 continue;
             }
-            match ffi_item.kind {
-                CppFfiItemKind::Function(ref cpp_ffi_function) => {
-                    // TODO: write less extern C
-                    writeln!(cpp_file, "extern \"C\" {{")?;
-                    writeln!(cpp_file, "{}", function_implementation(cpp_ffi_function)?)?;
-                    writeln!(cpp_file, "}} // extern \"C\"")?;
-                }
-                CppFfiItemKind::QtSlotWrapper(ref qt_slot_wrapper) => {
-                    any_slot_wrappers = true;
-                    write!(cpp_file, "{}", self::qt_slot_wrapper(qt_slot_wrapper)?)?;
-                }
+            if let CppFfiItemKind::QtSlotWrapper(ref qt_slot_wrapper) = ffi_item.kind {
+                any_slot_wrappers = true;
+                write!(cpp_file, "{}", self::qt_slot_wrapper(qt_slot_wrapper)?)?;
             }
         }
     }
+
+    writeln!(cpp_file, "extern \"C\" {{")?;
+    for item in data {
+        for ffi_item in &item.ffi_items {
+            if !ffi_item.checks.any_passed() {
+                continue;
+            }
+            if let CppFfiItemKind::Function(ref cpp_ffi_function) = ffi_item.kind {
+                writeln!(cpp_file, "{}", function_implementation(cpp_ffi_function)?)?;
+            }
+        }
+    }
+    writeln!(cpp_file, "}} // extern \"C\"")?;
+
     if any_slot_wrappers {
         let moc_output = get_command_output(Command::new("moc").arg("-i").arg(file_path))?;
         writeln!(
