@@ -144,8 +144,13 @@ fn get_path_item(entity: Entity) -> Result<CppPathItem> {
 fn get_full_name(entity: Entity) -> Result<CppPath> {
     let mut current_entity = entity;
     let mut parts = vec![get_path_item(entity)?];
-    while let Some(p) = current_entity.get_semantic_parent() {
+    loop {
+        let p = current_entity
+            .get_semantic_parent()
+            .ok_or_else(|| err_msg(format!("failed to get parent for {:?}", current_entity)))?;
+
         match p.get_kind() {
+            EntityKind::TranslationUnit => break,
             EntityKind::ClassDecl
             | EntityKind::ClassTemplate
             | EntityKind::StructDecl
@@ -158,7 +163,7 @@ fn get_full_name(entity: Entity) -> Result<CppPath> {
             EntityKind::Method => {
                 bail!("Type nested in a method");
             }
-            _ => break, // TODO: panic?
+            _ => bail!("get_full_name: unexpected parent kind: {:?}", p),
         }
     }
     Ok(CppPath::from_items(parts))
