@@ -289,10 +289,15 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         file,
     )?;
 
+    let rust_src_path = output_path.join("src");
+    if rust_src_path.exists() {
+        remove_dir_all(&rust_src_path)?;
+    }
+    create_dir_all(&rust_src_path)?;
     rust_code_generator::generate(
         data.config.crate_properties().name(),
         &data.current_database.rust_database,
-        &output_path.join("src"),
+        &rust_src_path,
     )?;
 
     run_command(Command::new("cargo").arg("fmt").current_dir(&output_path))?;
