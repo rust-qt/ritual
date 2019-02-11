@@ -762,7 +762,14 @@ impl State<'_> {
     }
 
     fn get_strategy(&self, parent_path: &CppPath) -> Result<RustPathScope> {
-        let rust_item = self.find_wrapper_type(parent_path)?;
+        let rust_items = self.find_rust_items(parent_path)?;
+        if rust_items.is_empty() {
+            bail!("no Rust items for {}", parent_path);
+        }
+        let rust_item = rust_items
+            .into_iter()
+            .find(|item| item.kind.is_wrapper_type() || item.kind.is_module())
+            .ok_or_else(|| err_msg(format!("no Rust type wrapper for {}", parent_path)))?;
 
         let rust_path = rust_item.path().ok_or_else(|| {
             err_msg(format!(
