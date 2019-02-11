@@ -13,7 +13,7 @@ use crate::type_allocation_places::choose_allocation_places_step;
 use crate::workspace::Workspace;
 use itertools::Itertools;
 use log::{debug, error, info};
-use ritual_common::errors::{bail, err_msg, Result, ResultExt};
+use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use ritual_common::utils::MapIfOk;
 use std::cmp::Ordering;
 use std::fmt;
@@ -137,7 +137,7 @@ impl ProcessingSteps {
             self.main_procedure
                 .iter()
                 .position(|a| a == s)
-                .ok_or_else(|| err_msg(format!("requested step not found: {}", s)))
+                .ok_or_else(|| format_err!("requested step not found: {}", s))
         })?;
 
         let max_index = indexes
@@ -294,7 +294,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
                 .main_procedure
                 .iter()
                 .position(|s| s == start_step)
-                .ok_or_else(|| err_msg(format!("requested step not found: {}", start_step)))?;
+                .ok_or_else(|| format_err!("requested step not found: {}", start_step))?;
             config.processing_steps().main_procedure[start_index..].to_vec()
         } else if step_name.starts_with("until:") {
             let end_step = &step_name["until:".len()..];
@@ -303,7 +303,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
                 .main_procedure
                 .iter()
                 .position(|s| s == end_step)
-                .ok_or_else(|| err_msg(format!("requested step not found: {}", end_step)))?;
+                .ok_or_else(|| format_err!("requested step not found: {}", end_step))?;
             config.processing_steps().main_procedure[..end_index].to_vec()
         } else {
             vec![step_name.to_string()]

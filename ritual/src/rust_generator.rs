@@ -347,10 +347,10 @@ impl State<'_> {
 
             let rust_enum_type = self.find_wrapper_type(enum_path)?;
             let rust_enum_path = rust_enum_type.path().ok_or_else(|| {
-                err_msg(format!(
+                format_err!(
                     "failed to get path from Rust enum type: {:?}",
                     rust_enum_type
-                ))
+                )
             })?;
 
             rust_api_type = RustType::Common(RustCommonType {
@@ -758,7 +758,7 @@ impl State<'_> {
         rust_items
             .into_iter()
             .find(|item| item.kind.is_wrapper_type())
-            .ok_or_else(|| err_msg(format!("no Rust type wrapper for {}", cpp_path)))
+            .ok_or_else(|| format_err!("no Rust type wrapper for {}", cpp_path))
     }
 
     fn get_strategy(&self, parent_path: &CppPath) -> Result<RustPathScope> {
@@ -769,13 +769,13 @@ impl State<'_> {
         let rust_item = rust_items
             .into_iter()
             .find(|item| item.kind.is_wrapper_type() || item.kind.is_module())
-            .ok_or_else(|| err_msg(format!("no Rust type wrapper for {}", parent_path)))?;
+            .ok_or_else(|| format_err!("no Rust type wrapper for {}", parent_path))?;
 
         let rust_path = rust_item.path().ok_or_else(|| {
-            err_msg(format!(
+            format_err!(
                 "rust item doesn't have rust path (parent_path = {:?})",
                 parent_path
-            ))
+            )
         })?;
 
         let mut rust_path = rust_path.clone();

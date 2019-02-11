@@ -11,7 +11,7 @@ use ritual::cpp_function::CppFunctionDoc;
 use ritual::database::CppDatabaseItem;
 use ritual::database::CppItemData;
 use ritual::processor::ProcessorData;
-use ritual_common::errors::{bail, err_msg, unexpected, Result, ResultExt};
+use ritual_common::errors::{bail, err_msg, format_err, unexpected, Result, ResultExt};
 use select::document::Document;
 use select::node::Node;
 use std::collections::{hash_map, HashMap, HashSet};
@@ -124,7 +124,7 @@ impl DocParser {
             .find_index_item(|item| {
                 item.name == corrected_name && (item.anchor.is_some() || anchor_override.is_some())
             })
-            .ok_or_else(|| err_msg(format!("No documentation entry for {}", corrected_name)))?;
+            .ok_or_else(|| format_err!("No documentation entry for {}", corrected_name))?;
         let anchor = match anchor_override {
             Some(x) => x,
             None => match index_item.anchor {
@@ -254,7 +254,7 @@ impl DocParser {
         let index_item = self
             .doc_data
             .find_index_item(|item| item.name == name)
-            .ok_or_else(|| err_msg(format!("No documentation entry for {}", name)))?;
+            .ok_or_else(|| format_err!("No documentation entry for {}", name))?;
         if let Some(ref anchor) = index_item.anchor {
             let (result, file_name) = {
                 let file_data = self.file_data(index_item.document_id)?;
@@ -262,7 +262,7 @@ impl DocParser {
                     .item_docs
                     .iter()
                     .find(|x| &x.anchor == anchor)
-                    .ok_or_else(|| err_msg(format!("no such anchor: {}", anchor)))?;
+                    .ok_or_else(|| format_err!("no such anchor: {}", anchor))?;
                 (result.clone(), file_data.file_name.clone())
             };
             return Ok(DocForType {

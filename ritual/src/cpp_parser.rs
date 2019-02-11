@@ -24,7 +24,7 @@ use clang::*;
 use itertools::Itertools;
 use log::{debug, trace, warn};
 use regex::Regex;
-use ritual_common::errors::{bail, err_msg, unexpected, Result, ResultExt};
+use ritual_common::errors::{bail, err_msg, format_err, unexpected, Result, ResultExt};
 use ritual_common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
 use std::collections::HashSet;
 use std::io::Write;
@@ -147,7 +147,7 @@ fn get_full_name(entity: Entity) -> Result<CppPath> {
     loop {
         let p = current_entity
             .get_semantic_parent()
-            .ok_or_else(|| err_msg(format!("failed to get parent for {:?}", current_entity)))?;
+            .ok_or_else(|| format_err!("failed to get parent for {:?}", current_entity))?;
 
         match p.get_kind() {
             EntityKind::TranslationUnit => break,
@@ -185,13 +185,13 @@ fn init_clang() -> Result<Clang> {
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
-    Clang::new().map_err(|err| err_msg(format!("clang init failed: {}", err)))
+    Clang::new().map_err(|err| format_err!("clang init failed: {}", err))
 }
 
 #[cfg(not(test))]
 /// Creates a `Clang` context.
 fn init_clang() -> Result<Clang> {
-    Clang::new().map_err(|err| err_msg(format!("clang init failed: {}", err)))
+    Clang::new().map_err(|err| format_err!("clang init failed: {}", err))
 }
 
 /// Runs `clang` parser with `config`.
@@ -917,10 +917,10 @@ impl CppParser<'_, '_> {
                 .get_name()
                 .unwrap_or_else(|| format!("arg{}", argument_number + 1));
             let clang_type = argument_entity.get_type().ok_or_else(|| {
-                err_msg(format!(
+                format_err!(
                     "failed to get type from argument entity: {:?}",
                     argument_entity
-                ))
+                )
             })?;
             if clang_type.get_display_name().ends_with("::QPrivateSignal") {
                 is_signal = true;
@@ -939,10 +939,10 @@ impl CppParser<'_, '_> {
             for token in argument_entity
                 .get_range()
                 .ok_or_else(|| {
-                    err_msg(format!(
+                    format_err!(
                         "failed to get range from argument entity: {:?}",
                         argument_entity
-                    ))
+                    )
                 })?
                 .tokenize()
             {
