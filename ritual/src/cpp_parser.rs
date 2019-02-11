@@ -1235,6 +1235,7 @@ impl CppParser<'_, '_> {
                 // TODO: determine `is_const` and `is_static` (switch to a newer clang?)
                 is_const: false,
                 is_static: false,
+                doc: None,
             }),
         );
 

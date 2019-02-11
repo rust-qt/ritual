@@ -50,6 +50,8 @@ fn unscoped_path_should_work() {
     check("A::B", "B");
 }
 
+pub type CppClassFieldDoc = ();
+
 /// Member field of a C++ class declaration
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppClassField {
@@ -61,12 +63,17 @@ pub struct CppClassField {
 
     pub is_const: bool,
     pub is_static: bool,
+
+    pub doc: Option<CppClassFieldDoc>,
 }
 
 impl CppClassField {
     pub fn is_same(&self, other: &CppClassField) -> bool {
-        // TODO: when doc is added to CppClassField, ignore it here
-        self == other
+        self.path == other.path
+            && self.field_type == other.field_type
+            && self.visibility == other.visibility
+            && self.is_static == other.is_static
+            && self.is_const == other.is_const
     }
 
     pub fn short_text(&self) -> String {
