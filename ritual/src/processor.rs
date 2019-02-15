@@ -9,7 +9,8 @@ use crate::crate_writer::crate_writer_step;
 use crate::database::{CppDatabaseItem, Database};
 use crate::rust_generator::clear_rust_info_step;
 use crate::rust_generator::rust_generator_step;
-use crate::type_allocation_places::choose_allocation_places_step;
+use crate::type_allocation_places::set_allocation_places_step;
+use crate::type_allocation_places::suggest_allocation_places_step;
 use crate::workspace::Workspace;
 use itertools::Itertools;
 use log::{debug, error, info};
@@ -105,7 +106,7 @@ impl Default for ProcessingSteps {
         let main_steps = vec![
             cpp_parser_step(),
             add_explicit_xstructors_step(),
-            choose_allocation_places_step(),
+            set_allocation_places_step(),
             find_template_instantiations_step(),
             instantiate_templates_step(),
             cpp_ffi_generator_step(),
@@ -123,6 +124,7 @@ impl Default for ProcessingSteps {
             steps::print_database(),
             steps::clear_ffi(),
             clear_rust_info_step(),
+            suggest_allocation_places_step(),
         ]);
         Self {
             all_steps,
