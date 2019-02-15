@@ -4,7 +4,6 @@ use crate::detect_signal_argument_types::detect_signal_argument_types;
 use crate::detect_signals_and_slots::detect_signals_and_slots;
 use crate::doc_parser::parse_docs;
 use crate::fix_header_names::fix_header_names;
-use crate::lib_configs;
 use crate::versions;
 use log::info;
 use qt_ritual_common::{get_full_build_config, lib_dependencies, lib_folder_name};
@@ -147,7 +146,7 @@ fn core_cpp_parser_blocked_names() -> Vec<&'static str> {
 }
 */
 /// QtCore specific configuration.
-pub fn core(config: &mut Config) -> Result<()> {
+fn core_config(config: &mut Config) -> Result<()> {
     // TODO: replace QVariant::Type with QMetaType::Type?
     //config.add_cpp_parser_blocked_names(core_cpp_parser_blocked_names());
     //config.add_cpp_parser_blocked_names(vec!["QtMetaTypePrivate", "QtPrivate"]);
@@ -264,7 +263,7 @@ pub fn core(config: &mut Config) -> Result<()> {
 }
 
 /// QtGui specific configuration.
-pub fn gui(_config: &mut Config) -> Result<()> {
+fn gui_config(_config: &mut Config) -> Result<()> {
     /*
       config.add_cpp_parser_blocked_names(vec![
         "QAbstractOpenGLFunctionsPrivate",
@@ -340,7 +339,7 @@ pub fn gui(_config: &mut Config) -> Result<()> {
 }
 
 /// QtWidgets specific configuration.
-pub fn widgets(_config: &mut Config) -> Result<()> {
+fn widgets_config(_config: &mut Config) -> Result<()> {
     /*
     config.add_cpp_parser_blocked_names(vec!["QWidgetData", "QWidgetItemV2"]);
 
@@ -369,14 +368,14 @@ pub fn widgets(_config: &mut Config) -> Result<()> {
 }
 
 /// Qt3DCore specific configuration.
-pub fn core_3d(config: &mut Config) -> Result<()> {
+fn core_3d_config(config: &mut Config) -> Result<()> {
     config.add_cpp_filtered_namespace(CppPath::from_str_unchecked("Qt3DCore"));
     //exclude_qvector_eq_based_methods(config, &["Qt3DCore::QNodeIdTypePair"]);
     Ok(())
 }
 
 /// Qt3DRender specific configuration.
-pub fn render_3d(config: &mut Config) -> Result<()> {
+fn render_3d_config(config: &mut Config) -> Result<()> {
     config.add_cpp_filtered_namespace(CppPath::from_str_unchecked("Qt3DRender"));
     /*
     config.add_cpp_parser_blocked_names(vec![
@@ -429,26 +428,34 @@ pub fn render_3d(config: &mut Config) -> Result<()> {
 }
 
 /// Qt3DInput specific configuration.
-pub fn input_3d(config: &mut Config) -> Result<()> {
+fn input_3d_config(config: &mut Config) -> Result<()> {
     config.add_cpp_filtered_namespace(CppPath::from_str_unchecked("Qt3DInput"));
     //config.add_cpp_parser_blocked_names(vec!["Qt3DInput::QWheelEvent"]);
     Ok(())
 }
 
 /// Qt3DLogic specific configuration.
-pub fn logic_3d(config: &mut Config) -> Result<()> {
+fn logic_3d_config(config: &mut Config) -> Result<()> {
     config.add_cpp_filtered_namespace(CppPath::from_str_unchecked("Qt3DLogic"));
     Ok(())
 }
 
 /// Qt3DExtras specific configuration.
-pub fn extras_3d(config: &mut Config) -> Result<()> {
+fn extras_3d_config(config: &mut Config) -> Result<()> {
     config.add_cpp_filtered_namespace(CppPath::from_str_unchecked("Qt3DExtras"));
     Ok(())
 }
 
+fn moqt_core_config(config: &mut Config) -> Result<()> {
+    Ok(())
+}
+
+fn empty_config(_config: &mut Config) -> Result<()> {
+    Ok(())
+}
+
 /// Executes the generator for a single Qt module with given configuration.
-pub fn make_config(crate_name: &str) -> Result<Config> {
+pub fn create_config(crate_name: &str) -> Result<Config> {
     info!("Preparing generator config for crate: {}", crate_name);
     let mut crate_properties = CrateProperties::new(crate_name, versions::QT_OUTPUT_CRATES_VERSION);
     let mut custom_fields = toml::value::Table::new();
@@ -603,20 +610,22 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
             .join("crate_templates")
             .join(&crate_name),
     );
-    match crate_name {
-        "qt_core" => lib_configs::core(&mut config)?,
-        "qt_gui" => lib_configs::gui(&mut config)?,
-        "qt_widgets" => lib_configs::widgets(&mut config)?,
-        "qt_3d_core" => lib_configs::core_3d(&mut config)?,
-        "qt_3d_render" => lib_configs::render_3d(&mut config)?,
-        "qt_3d_input" => lib_configs::input_3d(&mut config)?,
-        "qt_3d_logic" => lib_configs::logic_3d(&mut config)?,
-        "qt_3d_extras" => lib_configs::extras_3d(&mut config)?,
-        "qt_ui_tools" => {}
-        "moqt_core" => {}
-        "moqt_gui" => {}
+
+    let lib_config = match crate_name {
+        "qt_core" => core_config,
+        "qt_gui" => gui_config,
+        "qt_widgets" => widgets_config,
+        "qt_3d_core" => core_3d_config,
+        "qt_3d_render" => render_3d_config,
+        "qt_3d_input" => input_3d_config,
+        "qt_3d_logic" => logic_3d_config,
+        "qt_3d_extras" => extras_3d_config,
+        "qt_ui_tools" => empty_config,
+        "moqt_core" => moqt_core_config,
+        "moqt_gui" => empty_config,
         _ => bail!("Unknown crate name: {}", crate_name),
-    }
+    };
+    lib_config(&mut config)?;
 
     config.set_dependent_cpp_crates(
         lib_dependencies(crate_name)?

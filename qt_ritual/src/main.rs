@@ -5,7 +5,7 @@
 
 #![allow(clippy::collapsible_if)]
 
-use crate::lib_configs::make_config;
+use crate::lib_configs::create_config;
 use log::{error, info};
 use qt_ritual_common::all_crate_names;
 use ritual::processor;
@@ -94,7 +94,7 @@ fn run(options: Options) -> Result<()> {
             workspace.delete_database_if_exists(&crate_name)?;
         }
 
-        let config = make_config(&crate_name)?;
+        let config = create_config(&crate_name)?;
         was_any_action = true;
         processor::process(&mut workspace, &config, &operations)?;
     }
