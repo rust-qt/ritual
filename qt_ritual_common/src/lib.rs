@@ -180,34 +180,25 @@ pub fn all_crate_names() -> &'static [&'static str] {
 
 /// Returns list of modules this module depends on.
 pub fn lib_dependencies(crate_name: &str) -> Result<&'static [&'static str]> {
-    const CORE: &[&str] = &[];
-    const GUI: &[&str] = &["qt_core"];
-    const WIDGETS: &[&str] = &["qt_core", "qt_gui"];
-    const UI_TOOLS: &[&str] = &["qt_core", "qt_gui", "qt_widgets"];
-    const CORE3D: &[&str] = &["qt_core", "qt_gui"];
-    const RENDER3D: &[&str] = &["qt_core", "qt_gui", "qt_3d_core"];
-    const INPUT3D: &[&str] = &["qt_core", "qt_gui", "qt_3d_core"];
-    const LOGIC3D: &[&str] = &["qt_core", "qt_gui", "qt_3d_core"];
-    const EXTRAS3D: &[&str] = &[
-        "qt_core",
-        "qt_gui",
-        "qt_3d_core",
-        "qt_3d_render",
-        "qt_3d_input",
-        "qt_3d_logic",
-    ];
-    const MOQT_CORE: &[&str] = &[];
     Ok(match crate_name {
-        "qt_core" => CORE,
-        "qt_gui" => GUI,
-        "qt_widgets" => WIDGETS,
-        "qt_3d_core" => CORE3D,
-        "qt_3d_render" => RENDER3D,
-        "qt_3d_input" => INPUT3D,
-        "qt_3d_logic" => LOGIC3D,
-        "qt_3d_extras" => EXTRAS3D,
-        "qt_ui_tools" => UI_TOOLS,
-        "moqt_core" => MOQT_CORE,
+        "qt_core" => &[],
+        "qt_gui" => &["qt_core"],
+        "qt_widgets" => &["qt_core", "qt_gui"],
+        "qt_3d_core" => &["qt_core", "qt_gui"],
+        "qt_3d_render" => &["qt_core", "qt_gui", "qt_3d_core"],
+        "qt_3d_input" => &["qt_core", "qt_gui", "qt_3d_core"],
+        "qt_3d_logic" => &["qt_core", "qt_gui", "qt_3d_core"],
+        "qt_3d_extras" => &[
+            "qt_core",
+            "qt_gui",
+            "qt_3d_core",
+            "qt_3d_render",
+            "qt_3d_input",
+            "qt_3d_logic",
+        ],
+        "qt_ui_tools" => &["qt_core", "qt_gui", "qt_widgets"],
+        "moqt_core" => &[],
+        "moqt_gui" => &["moqt_core"],
         _ => bail!("Unknown crate name: {}", crate_name),
     })
 }
