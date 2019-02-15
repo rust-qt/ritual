@@ -138,12 +138,8 @@ fn convert_return_type(method: &CppFfiFunction, expression: String) -> Result<St
             .iter()
             .find(|x| x.meaning == CppFfiArgumentMeaning::ReturnValue)
         {
-            result = format!(
-                "new({}) {}({})",
-                arg.name,
-                method.return_type.original_type.to_cpp_code(None)?,
-                result
-            );
+            let type1 = arg.argument_type.ffi_type.pointer_like_to_target()?;
+            result = format!("new({}) {}({})", arg.name, type1.to_cpp_code(None)?, result);
         }
     }
     Ok(result)

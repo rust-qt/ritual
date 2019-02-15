@@ -370,6 +370,14 @@ impl CppType {
             ),
         }
     }
+
+    pub fn pointer_like_to_target(&self) -> Result<&CppType> {
+        if let CppType::PointerLike { ref target, .. } = self {
+            Ok(target)
+        } else {
+            bail!("not a pointer like type");
+        }
+    }
 }
 
 /// Context of usage for a C++ type
