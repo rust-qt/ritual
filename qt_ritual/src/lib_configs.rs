@@ -485,29 +485,32 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
         );
 
         config.add_include_directive(format!("{}.h", crate_name));
-        let moqt_sublib_path = moqt_path.join(crate_name);
-        if !moqt_sublib_path.exists() {
-            bail!("Path does not exist: {}", moqt_sublib_path.display());
-        }
-        let include_path = moqt_sublib_path.join("include");
+        let include_path = moqt_path.join("include");
         if !include_path.exists() {
             bail!("Path does not exist: {}", include_path.display());
         }
-        let lib_path = moqt_sublib_path.join("lib");
+        let lib_path = moqt_path.join("lib");
         if !lib_path.exists() {
             bail!("Path does not exist: {}", lib_path.display());
         }
+        let sublib_include_path = include_path.join(crate_name);
+        if !sublib_include_path.exists() {
+            bail!("Path does not exist: {}", sublib_include_path.display());
+        }
         {
             let mut paths = CppBuildPaths::new();
-            paths.add_include_path(&include_path);
+            paths.add_include_path(&sublib_include_path);
             paths.add_lib_path(&lib_path);
             config.set_cpp_build_paths(paths);
         }
-        config.add_target_include_path(&include_path);
+        config.add_target_include_path(&sublib_include_path);
 
         {
             let mut data = CppBuildConfigData::new();
-            data.add_linked_lib(crate_name.replace("_", ""));
+            data.add_linked_lib(crate_name);
+            for &lib in lib_dependencies(crate_name)? {
+                data.add_linked_lib(lib);
+            }
             data.set_library_type(CppLibraryType::Shared);
             config
                 .cpp_build_config_mut()
@@ -611,6 +614,7 @@ pub fn make_config(crate_name: &str) -> Result<Config> {
         "qt_3d_extras" => lib_configs::extras_3d(&mut config)?,
         "qt_ui_tools" => {}
         "moqt_core" => {}
+        "moqt_gui" => {}
         _ => bail!("Unknown crate name: {}", crate_name),
     }
 

@@ -1,6 +1,6 @@
 use crate::Options;
 use ritual_common::cpp_lib_builder::{BuildType, CppLibBuilder};
-use ritual_common::errors::Result;
+use ritual_common::errors::{FancyUnwrap, Result};
 use ritual_common::file_utils::canonicalize;
 use ritual_common::file_utils::create_dir_all;
 use ritual_common::file_utils::repo_crate_local_path;
@@ -36,12 +36,11 @@ impl TempTestDir {
 }
 
 fn build_cpp_lib() -> Result<TempTestDir> {
-    let cpp_lib_source_dir = repo_crate_local_path("qt_ritual/test_assets/moqt/moqt_core")?;
+    let cpp_lib_source_dir = repo_crate_local_path("qt_ritual/test_assets/moqt")?;
 
     let temp_dir = TempTestDir::new("test_full_run");
     let build_dir = temp_dir.path().join("build/moqt_core");
-    let install_dir_parent = temp_dir.path().join("install");
-    let install_dir = install_dir_parent.join("moqt_core");
+    let install_dir = temp_dir.path().join("install");
     create_dir_all(&build_dir)?;
     create_dir_all(&install_dir)?;
     CppLibBuilder {
@@ -63,14 +62,16 @@ fn build_cpp_lib() -> Result<TempTestDir> {
         Ok(())
     };
 
-    add_env("CPLUS_INCLUDE_PATH", &install_dir.join("include"))?;
+    for lib in &["moqt_core", "moqt_gui"] {
+        add_env("CPLUS_INCLUDE_PATH", &install_dir.join("include").join(lib))?;
+    }
     let lib_path = install_dir.join("lib");
     add_env("LIBRARY_PATH", &lib_path)?;
     add_env("LD_LIBRARY_PATH", &lib_path)?;
     add_env("DYLD_LIBRARY_PATH", &lib_path)?;
     add_env("PATH", &lib_path)?;
     add_env("RITUAL_LIB_PATH", &lib_path)?;
-    env::set_var("MOQT_INSTALL_DIR", &install_dir_parent);
+    env::set_var("MOQT_INSTALL_DIR", &install_dir);
     Ok(temp_dir)
 }
 
@@ -84,8 +85,8 @@ fn test_moqt() {
         workspace,
         local_paths: Some(true),
         delete_database: true,
-        crates: vec!["moqt_core".into()],
+        crates: vec!["moqt_core".into(), "moqt_gui".into()],
         operations: vec!["main".into()],
     })
-    .unwrap();
+    .fancy_unwrap();
 }
