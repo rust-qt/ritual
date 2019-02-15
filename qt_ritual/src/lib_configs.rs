@@ -447,6 +447,7 @@ fn extras_3d_config(config: &mut Config) -> Result<()> {
 }
 
 fn moqt_core_config(config: &mut Config) -> Result<()> {
+    config.set_movable_types(vec![CppPath::from_str_unchecked("QPoint")]);
     Ok(())
 }
 
