@@ -2,6 +2,7 @@
 #define QWINDOW_H
 
 #include <basic_class.h>
+#include "QPoint.h"
 
 class QWindow {
 public:
@@ -9,6 +10,12 @@ public:
 
     BasicClass getBasicClass() { return BasicClass(42); }
     BasicClass* getBasicClassPtr();
+
+    QPoint pos() const;
+    void setPos(const QPoint& pos);
+
+private:
+    QPoint m_pos;
 };
 QWindow* get_window();
 
