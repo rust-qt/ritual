@@ -290,6 +290,7 @@ impl Generator {
                 RustWrapperTypeKind::MovableClassWrapper {
                     ref sized_type_path,
                 } => {
+                    writeln!(self, "#[repr(transparent)]")?;
                     writeln!(
                         self,
                         "{}struct {}({});",
