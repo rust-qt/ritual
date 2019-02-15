@@ -604,9 +604,10 @@ impl Generator {
                 } else {
                     self.rust_type_to_code(&return_type.api_type)
                 };
+            // TODO: use MybeUninit when it's stable
             result.push(format!(
                 "{{\nlet mut {var}: {t} = {unsafe_start}\
-                 ::cpp_utils::new_uninitialized::NewUninitialized::new_uninitialized()\
+                 ::std::mem::uninitialized()\
                  {unsafe_end};\n",
                 var = return_var_name,
                 t = struct_name,
