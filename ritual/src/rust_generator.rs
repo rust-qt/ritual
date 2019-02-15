@@ -887,7 +887,7 @@ impl State<'_> {
                 return Ok(rust_path);
             }
 
-            number = Some(number.unwrap_or(0) + 1);
+            number = Some(number.unwrap_or(1) + 1);
         }
 
         // TODO: check for conflicts with types from crate template (how?)
