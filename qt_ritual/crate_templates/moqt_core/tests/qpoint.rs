@@ -22,3 +22,21 @@ fn modify() {
         assert_eq!(point.x(), 4);
     }
 }
+
+#[test]
+fn vec() {
+    unsafe {
+        let mut vec: Vec<QPoint> = (0..20).map(|y| QPoint::new2(1, y)).collect();
+        assert_eq!(vec.len(), 20);
+        assert_eq!(vec[5].x(), 1);
+        assert_eq!(vec[5].y(), 5);
+
+        assert_eq!(vec[7].x(), 1);
+        assert_eq!(vec[7].y(), 7);
+
+        vec.remove(0);
+        assert_eq!(vec[7].x(), 1);
+        assert_eq!(vec[7].y(), 8);
+
+    }
+}
