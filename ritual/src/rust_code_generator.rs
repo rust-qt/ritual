@@ -6,6 +6,7 @@ use crate::rust_info::RustDatabaseItem;
 use crate::rust_info::RustEnumValue;
 use crate::rust_info::RustFFIFunction;
 use crate::rust_info::RustFfiWrapperData;
+use crate::rust_info::RustFlagEnumImpl;
 use crate::rust_info::RustFunction;
 use crate::rust_info::RustFunctionArgument;
 use crate::rust_info::RustFunctionKind;
@@ -201,6 +202,7 @@ impl Generator {
             RustItemKind::TraitImpl(ref value) => self.generate_trait_impl(value),
             RustItemKind::Function(ref value) => self.generate_rust_final_function(value, false),
             RustItemKind::FfiFunction(ref value) => self.generate_ffi_function(value),
+            RustItemKind::FlagEnumImpl(ref value) => self.generate_flag_enum_impl(value),
         }
     }
 
@@ -526,7 +528,7 @@ impl Generator {
                     unreachable!();
                 }
                 format!(
-                    "{}::from_int({} as i32)",
+                    "{}::from({})",
                     self.rust_type_to_code(&qflags_type),
                     source_expr
                 )
@@ -596,11 +598,7 @@ impl Generator {
                     code = format!("{}.{}()", code, method);
                 }
                 RustToFfiTypeConversion::QFlagsToUInt => {
-                    code = format!(
-                        "{}.to_int() as {}",
-                        code,
-                        self.rust_type_to_code(&arg.argument_type.ffi_type)
-                    );
+                    code = format!("{}.to_int()", code);
                 }
             }
             final_args[arg.ffi_index] = Some(code);
@@ -847,6 +845,19 @@ impl Generator {
 
     fn generate_ffi_function(&mut self, function: &RustFFIFunction) -> Result<()> {
         writeln!(self, "{}", self.rust_ffi_function_to_code(function))?;
+        Ok(())
+    }
+
+    fn generate_flag_enum_impl(&mut self, data: &RustFlagEnumImpl) -> Result<()> {
+        let enum_path = self.rust_path_to_string(&data.enum_path);
+        let qflags = self.rust_path_to_string(&data.qflags);
+
+        writeln!(
+            self,
+            include_str!("../templates/crate/flag_enum_impl.rs.in"),
+            e = enum_path,
+            qflags = qflags
+        )?;
         Ok(())
     }
 }

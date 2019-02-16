@@ -469,6 +469,12 @@ pub struct RustFFIFunction {
     pub arguments: Vec<RustFFIArgument>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RustFlagEnumImpl {
+    pub enum_path: RustPath,
+    pub qflags: RustPath,
+}
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RustItemKind {
@@ -476,6 +482,7 @@ pub enum RustItemKind {
     Struct(RustStruct),
     EnumValue(RustEnumValue),
     TraitImpl(RustTraitImpl),
+    FlagEnumImpl(RustFlagEnumImpl),
     FfiFunction(RustFFIFunction), // TODO: merge FfiFunction and Function
     Function(RustFunction),
 }
@@ -521,11 +528,15 @@ impl RustDatabaseItem {
             RustItemKind::Function(ref data) => Some(&data.path),
             RustItemKind::FfiFunction(ref data) => Some(&data.path),
             RustItemKind::TraitImpl(_) => None,
+            RustItemKind::FlagEnumImpl(_) => None,
         }
     }
     pub fn is_child_of(&self, parent: &RustPath) -> bool {
         match self.kind {
             RustItemKind::TraitImpl(ref trait_impl) => &trait_impl.parent_path == parent,
+            RustItemKind::FlagEnumImpl(ref data) => {
+                data.enum_path.parent().as_ref() == Some(parent)
+            }
             _ => {
                 let path = self
                     .path()

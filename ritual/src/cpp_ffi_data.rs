@@ -113,7 +113,7 @@ pub enum CppTypeConversionToFfi {
     ReferenceToPointer,
     /// C++ argument is QFlags<T>
     /// and FFI argument is uint
-    QFlagsToUInt,
+    QFlagsToInt,
 }
 
 /// Information that indicates how an FFI function argument

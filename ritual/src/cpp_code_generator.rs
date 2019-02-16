@@ -81,7 +81,7 @@ fn convert_type_to_ffi(type1: &CppFfiType, expression: String) -> Result<String>
             expression
         ),
         CppTypeConversionToFfi::ReferenceToPointer => format!("&{}", expression),
-        CppTypeConversionToFfi::QFlagsToUInt => format!("uint({})", expression),
+        CppTypeConversionToFfi::QFlagsToInt => format!("int({})", expression),
     })
 }
 
@@ -121,8 +121,8 @@ fn convert_return_type(method: &CppFfiFunction, expression: String) -> Result<St
         CppTypeConversionToFfi::ReferenceToPointer => {
             result = format!("&{}", result);
         }
-        CppTypeConversionToFfi::QFlagsToUInt => {
-            result = format!("uint({})", result);
+        CppTypeConversionToFfi::QFlagsToInt => {
+            result = format!("int({})", result);
         }
     }
 
@@ -157,7 +157,7 @@ fn arguments_values(method: &CppFfiFunction) -> Result<String> {
                 CppTypeConversionToFfi::ValueToPointer
                 | CppTypeConversionToFfi::ReferenceToPointer => result = format!("*{}", result),
                 CppTypeConversionToFfi::NoChange => {}
-                CppTypeConversionToFfi::QFlagsToUInt => {
+                CppTypeConversionToFfi::QFlagsToInt => {
                     let type_text = if let CppType::PointerLike {
                         ref kind,
                         ref is_const,

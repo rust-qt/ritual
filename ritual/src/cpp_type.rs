@@ -390,7 +390,13 @@ pub enum CppTypeRole {
 }
 
 pub fn is_qflags(path: &CppPath) -> bool {
-    path.last().name == "QFlags" && !path.has_parent()
+    path.last().name == "QFlags"
+        && !path.has_parent()
+        && path
+            .last()
+            .template_arguments
+            .as_ref()
+            .map_or(false, |args| args.len() == 1)
 }
 
 impl CppType {
@@ -460,8 +466,8 @@ impl CppType {
                 CppType::Class(ref path) => {
                     if is_qflags(&path) {
                         return Ok(CppFfiType {
-                            ffi_type: CppType::BuiltInNumeric(CppBuiltInNumericType::UInt),
-                            conversion: CppTypeConversionToFfi::QFlagsToUInt,
+                            ffi_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
+                            conversion: CppTypeConversionToFfi::QFlagsToInt,
                             original_type: self.clone(),
                         });
                     } else {
@@ -489,10 +495,10 @@ impl CppType {
                                     if is_qflags(path) {
                                         return Ok(CppFfiType {
                                             ffi_type: CppType::BuiltInNumeric(
-                                                CppBuiltInNumericType::UInt,
+                                                CppBuiltInNumericType::Int,
                                             ),
                                             // TODO: use a separate conversion type (QFlagsConstRefToUInt)?
-                                            conversion: CppTypeConversionToFfi::QFlagsToUInt,
+                                            conversion: CppTypeConversionToFfi::QFlagsToInt,
                                             original_type: self.clone(),
                                         });
                                     }

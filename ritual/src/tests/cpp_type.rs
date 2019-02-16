@@ -311,7 +311,7 @@ fn qflags() {
             &ffi_type.ffi_type.to_cpp_code(None).unwrap(),
             "unsigned int"
         );
-        assert_eq!(ffi_type.conversion, CppTypeConversionToFfi::QFlagsToUInt);
+        assert_eq!(ffi_type.conversion, CppTypeConversionToFfi::QFlagsToInt);
     }
 }
 

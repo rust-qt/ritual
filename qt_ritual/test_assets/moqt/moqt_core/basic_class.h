@@ -29,9 +29,9 @@ public:
         Div5 = 0b100,
     };
 
-    //typedef QFlags<UpdateType> UpdateTypes;
+    typedef QFlags<UpdateType> UpdateTypes;
 
-    //void updateFoo(UpdateTypes updateTypes);
+    void updateFoo(UpdateTypes updateTypes);
 
 
     /*void overloaded_normal_const_and_static();

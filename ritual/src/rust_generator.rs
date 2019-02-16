@@ -10,6 +10,7 @@ use crate::cpp_ffi_data::CppFfiType;
 use crate::cpp_ffi_data::CppFieldAccessorType;
 use crate::cpp_ffi_data::CppTypeConversionToFfi;
 use crate::cpp_function::ReturnValueAllocationPlace;
+use crate::cpp_type::is_qflags;
 use crate::cpp_type::CppBuiltInNumericType;
 use crate::cpp_type::CppFunctionPointerType;
 use crate::cpp_type::CppPointerLikeTypeKind;
@@ -30,6 +31,7 @@ use crate::rust_info::RustEnumValueDoc;
 use crate::rust_info::RustFFIArgument;
 use crate::rust_info::RustFFIFunction;
 use crate::rust_info::RustFfiWrapperData;
+use crate::rust_info::RustFlagEnumImpl;
 use crate::rust_info::RustFunctionArgument;
 use crate::rust_info::RustFunctionKind;
 use crate::rust_info::RustItemKind;
@@ -226,6 +228,26 @@ impl State<'_> {
         Ok(rust_type)
     }
 
+    fn qflags_path(&self) -> &'static str {
+        if self.config.crate_properties().name().starts_with("moqt") {
+            "moqt_core::QFlags"
+        } else {
+            "qt_core::QFlags"
+        }
+    }
+
+    fn create_qflags(&self, arg: &RustPath) -> RustType {
+        let qflags_path = self.qflags_path();
+
+        RustType::Common(RustCommonType {
+            path: RustPath::from_str_unchecked(qflags_path),
+            generic_arguments: Some(vec![RustType::Common(RustCommonType {
+                path: arg.clone(),
+                generic_arguments: None,
+            })]),
+        })
+    }
+
     /// Generates `CompleteType` from `CppFfiType`, adding
     /// Rust API type, Rust FFI type and conversion between them.
     #[allow(clippy::collapsible_if)]
@@ -303,10 +325,10 @@ impl State<'_> {
                     *kind = RustPointerLikeTypeKind::Reference { lifetime: None };
                     api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
                 }
-                CppTypeConversionToFfi::QFlagsToUInt => unreachable!(),
+                CppTypeConversionToFfi::QFlagsToInt => unreachable!(),
             }
         }
-        if cpp_ffi_type.conversion == CppTypeConversionToFfi::QFlagsToUInt {
+        if cpp_ffi_type.conversion == CppTypeConversionToFfi::QFlagsToInt {
             let qflags_type = match &cpp_ffi_type.original_type {
                 CppType::PointerLike {
                     ref kind,
@@ -354,19 +376,7 @@ impl State<'_> {
                 )
             })?;
 
-            let qflags_path = if self.config.crate_properties().name().starts_with("moqt") {
-                "moqt_core::QFlags"
-            } else {
-                "qt_core::QFlags"
-            };
-
-            rust_api_type = RustType::Common(RustCommonType {
-                path: RustPath::from_str_unchecked(qflags_path),
-                generic_arguments: Some(vec![RustType::Common(RustCommonType {
-                    path: rust_enum_path.clone(),
-                    generic_arguments: None,
-                })]),
-            });
+            rust_api_type = self.create_qflags(rust_enum_path);
 
             api_to_ffi_conversion = RustToFfiTypeConversion::QFlagsToUInt;
         }
@@ -992,6 +1002,60 @@ impl State<'_> {
                         CppTypeDataKind::Class { is_movable } => {
                             // TODO: if the type is `QFlags<T>` or `QUrlTwoFlags<T>`,
                             //       generate `impl Flaggable` instead.
+                            if is_qflags(&data.path) {
+                                let argument =
+                                    &data.path.last().template_arguments.as_ref().unwrap()[0];
+                                if !argument.is_template_parameter() {
+                                    if let CppType::Enum { ref path } = argument {
+                                        let rust_type = self.find_wrapper_type(path)?;
+                                        let rust_type_path = rust_type
+                                            .path()
+                                            .expect("enum rust item must have path");
+                                        let qflags = self.qflags_path();
+                                        // From<E> for QFlags<E>
+                                        /*let from_function = RustFunction {
+                                            is_public: true,
+                                            is_unsafe: false,
+                                            path: RustPath::from_str_unchecked("std::convert::From::from"),
+                                            kind: RustFunctionKind::CustomImpl("Self::from(value.to_int())".into()),
+                                            arguments: vec![
+                                                RustFunctionArgument {
+                                                    argument_type: RustFinalType::void(),
+                                                    name: "value".to_string(),
+                                                    ffi_index: 0
+                                                }
+                                            ],
+                                            return_type: RustFinalType::void(),
+                                            extra_doc: None
+                                        };
+                                        let item_kind = RustItemKind::TraitImpl(RustTraitImpl {
+                                            target_type: qflags,
+                                            parent_path: rust_type_path.parent().unwrap(),
+                                            trait_type: RustType::Common(RustCommonType {
+                                                path: RustPath::from_str_unchecked("std::convert::From"),
+                                                generic_arguments: Some(
+                                                    vec![RustType::Common(RustCommonType {
+                                                        path: rust_type_path.clone(),
+                                                        generic_arguments: None,
+                                                    })],
+                                                ),
+                                            }),
+                                            associated_types: Vec::new(),
+                                            functions: vec![from_function],
+                                        });*/
+                                        self.rust_database.items.push(RustDatabaseItem {
+                                            kind: RustItemKind::FlagEnumImpl(RustFlagEnumImpl {
+                                                enum_path: rust_type_path.clone(),
+                                                qflags: RustPath::from_str_unchecked(qflags),
+                                            }),
+                                            cpp_item_index: Some(cpp_item_index),
+                                        });
+                                        *modified = true;
+                                        cpp_item.is_rust_processed = true;
+                                        return Ok(());
+                                    }
+                                }
+                            }
 
                             let public_path =
                                 self.generate_rust_path(&data.path, &NameType::Type)?;

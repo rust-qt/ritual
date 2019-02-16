@@ -48,4 +48,13 @@ fn nested_enum() {
     assert_eq!(x.to_int(), 1);
     assert_eq!(UpdateType::Mul3.to_int(), 2);
     assert_eq!(UpdateType::Div5.to_int(), 4);
+
+    unsafe {
+        let mut v = BasicClass::new(1);
+        v.set_foo(1);
+        v.update_foo(UpdateType::Mul3.into());
+        assert_eq!(v.foo(), 3);
+        v.update_foo(UpdateType::Mul3 | UpdateType::Div5);
+        assert_eq!(v.foo(), 1);
+    }
 }

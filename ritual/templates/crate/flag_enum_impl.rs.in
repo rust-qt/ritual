@@ -1,0 +1,12 @@
+impl From<{e}> for {qflags}<{e}> {{
+    fn from(value: {e}) -> Self {{
+        Self::from(value.to_int())
+    }}
+}}
+
+impl<T: Into<{qflags}<{e}>>> std::ops::BitOr<T> for {e} {{
+    type Output = {qflags}<{e}>;
+    fn bitor(self, rhs: T) -> {qflags}<{e}> {{
+        Into::<{qflags}<{e}>>::into(self) | rhs
+    }}
+}}
