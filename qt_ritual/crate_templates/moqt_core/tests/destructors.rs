@@ -1,5 +1,5 @@
-use moqt_core::{HandleFactory, BaseHandle};
-use cpp_utils::{CppDeletable, StaticUpcast, Ptr};
+use cpp_utils::{CppDeletable, Ptr, StaticUpcast};
+use moqt_core::{BaseHandle, HandleFactory};
 
 #[test]
 fn basic_destructors() {

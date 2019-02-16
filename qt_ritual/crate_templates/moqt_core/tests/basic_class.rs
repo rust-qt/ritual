@@ -1,5 +1,5 @@
-use moqt_core::{BasicClass, BasicClassField};
 use moqt_core::basic_class::UpdateType;
+use moqt_core::{BasicClass, BasicClassField};
 use std::ops::Deref;
 
 #[test]

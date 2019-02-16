@@ -1,5 +1,5 @@
-use moqt_core::{BaseClass1, DerivedClass1, DerivedClass2, AbstractBaseClass1, DerivedClass3};
-use cpp_utils::{CppBox, Ptr, ConstPtr, StaticUpcast, StaticDowncast, DynamicCast};
+use cpp_utils::{ConstPtr, CppBox, DynamicCast, Ptr, StaticDowncast, StaticUpcast};
+use moqt_core::{AbstractBaseClass1, BaseClass1, DerivedClass1, DerivedClass2, DerivedClass3};
 
 #[test]
 fn casts() {

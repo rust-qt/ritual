@@ -37,6 +37,5 @@ fn vec() {
         vec.remove(0);
         assert_eq!(vec[7].x(), 1);
         assert_eq!(vec[7].y(), 8);
-
     }
 }

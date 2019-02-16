@@ -1,3 +1,3 @@
 fn main() {
-  qt_build_tools::run("widgets")
+    qt_build_tools::run("widgets")
 }

@@ -1,4 +1,4 @@
-use moqt_core::{Impl, Unsafe, self_};
+use moqt_core::{self_, Impl, Unsafe};
 
 #[test]
 fn reserved_ids() {

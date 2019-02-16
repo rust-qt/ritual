@@ -1,6 +1,6 @@
-use moqt_gui::{QWindow, get_window};
-use moqt_core::{BasicClass, QPoint};
 use cpp_utils::{CppBox, Ptr};
+use moqt_core::{BasicClass, QPoint};
+use moqt_gui::{get_window, QWindow};
 
 #[test]
 fn test_qwindow() {

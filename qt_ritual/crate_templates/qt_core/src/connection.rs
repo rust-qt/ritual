@@ -28,31 +28,31 @@ pub trait ArgumentsCompatible<T> {}
 /// Both Qt signals and slots can act as receivers, i.e. there can be
 /// signal-to-signal and signal-to-slot connections.
 pub trait Receiver {
-  /// Tuple of argument types of this receiver.
-  type Arguments;
-  /// Returns reference to the `QObject` that owns this signal or slot.
-  fn object(&self) -> &::object::Object;
-  /// Returns a null-terminated Latin-1 string that identifies
-  /// this signal or slot within the owning `QObject` in Qt system.
-  fn receiver_id() -> &'static [u8];
+    /// Tuple of argument types of this receiver.
+    type Arguments;
+    /// Returns reference to the `QObject` that owns this signal or slot.
+    fn object(&self) -> &::object::Object;
+    /// Returns a null-terminated Latin-1 string that identifies
+    /// this signal or slot within the owning `QObject` in Qt system.
+    fn receiver_id() -> &'static [u8];
 }
 
 /// A Qt signal.
 pub trait Signal: Receiver {
-  /// Connects this signal to another signal or slot with compatible arguments.
-  fn connect<A, R: Receiver<Arguments = A>>(&self, receiver: &R) -> ::meta_object::Connection
-  where
-    Self::Arguments: ArgumentsCompatible<A>,
-  {
-    // TODO: allow to change connection type
-    // TODO: meta_object::Connection should have operator bool()
-    unsafe {
-      ::object::Object::connect_static((
-        self.object() as *const ::object::Object,
-        Self::receiver_id().as_ptr() as *const c_char,
-        receiver.object() as *const ::object::Object,
-        R::receiver_id().as_ptr() as *const c_char,
-      ))
+    /// Connects this signal to another signal or slot with compatible arguments.
+    fn connect<A, R: Receiver<Arguments = A>>(&self, receiver: &R) -> ::meta_object::Connection
+    where
+        Self::Arguments: ArgumentsCompatible<A>,
+    {
+        // TODO: allow to change connection type
+        // TODO: meta_object::Connection should have operator bool()
+        unsafe {
+            ::object::Object::connect_static((
+                self.object() as *const ::object::Object,
+                Self::receiver_id().as_ptr() as *const c_char,
+                receiver.object() as *const ::object::Object,
+                R::receiver_id().as_ptr() as *const c_char,
+            ))
+        }
     }
-  }
 }
