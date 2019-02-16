@@ -298,6 +298,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         data.config.crate_properties().name(),
         &data.current_database.rust_database,
         &rust_src_path,
+        data.config.crate_template_path().map(|s| s.join("src")),
     )?;
 
     run_command(Command::new("cargo").arg("fmt").current_dir(&output_path))?;

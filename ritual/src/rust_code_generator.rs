@@ -26,6 +26,7 @@ use itertools::Itertools;
 use ritual_common::errors::{bail, err_msg, unexpected, Result};
 use ritual_common::file_utils::create_dir_all;
 use ritual_common::file_utils::create_file;
+use ritual_common::file_utils::file_to_string;
 use ritual_common::file_utils::File;
 use ritual_common::string_utils::trim_slice;
 use ritual_common::utils::MapIfOk;
@@ -104,6 +105,7 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: &str) -> String {
 struct Generator {
     crate_name: String,
     output_src_path: PathBuf,
+    crate_template_src_path: Option<PathBuf>,
     destination: Vec<File<BufWriter<fs::File>>>,
 }
 
@@ -158,7 +160,7 @@ fn format_doc_extended(doc: &str, is_outer: bool) -> String {
 }
 
 impl Generator {
-    fn module_path(&self, rust_path: &RustPath) -> Result<PathBuf> {
+    fn module_path(&self, rust_path: &RustPath, root_path: &Path) -> Result<PathBuf> {
         let parts = &rust_path.parts;
 
         assert_eq!(
@@ -167,13 +169,12 @@ impl Generator {
         );
 
         let path = if parts.len() == 1 {
-            self.output_src_path.join("lib.rs")
+            root_path.join("lib.rs")
         } else {
-            let mut path = self.output_src_path.clone();
+            let mut path = root_path.to_path_buf();
             for middle_part in &parts[1..parts.len() - 1] {
                 path.push(middle_part);
             }
-            create_dir_all(&path)?;
             path.push(format!("{}.rs", parts.last().expect("path is empty")));
             path
         };
@@ -181,6 +182,7 @@ impl Generator {
     }
 
     fn push_file(&mut self, path: &Path) -> Result<()> {
+        create_dir_all(path.parent().expect("module file path must have parent"))?;
         self.destination.push(create_file(path)?);
         Ok(())
     }
@@ -216,12 +218,21 @@ impl Generator {
         }
 
         let vis = if module.is_public { "pub " } else { "" };
+        let mut content_from_template = None;
         if module.kind.is_in_separate_file() {
             if module.kind != RustModuleKind::CrateRoot {
                 writeln!(self, "{}mod {};", vis, module.path.last())?;
             }
-            let path = self.module_path(&module.path)?;
+            let path = self.module_path(&module.path, &self.output_src_path)?;
             self.push_file(&path)?;
+
+            if let Some(crate_template_src_path) = &self.crate_template_src_path {
+                let template_path = self.module_path(&module.path, crate_template_src_path)?;
+                if template_path.exists() {
+                    let content = file_to_string(template_path)?;
+                    content_from_template = Some(content);
+                }
+            }
         } else {
             assert_ne!(module.kind, RustModuleKind::CrateRoot);
             writeln!(self, "{}mod {} {{", vis, module.path.last())?;
@@ -237,6 +248,10 @@ impl Generator {
             "{}",
             format_doc_extended(&doc_formatter::module_doc(module), true)
         )?;
+
+        if let Some(content) = content_from_template {
+            writeln!(self, "{}", content)?;
+        }
 
         match module.kind {
             RustModuleKind::Ffi => {
@@ -581,7 +596,11 @@ impl Generator {
                     code = format!("{}.{}()", code, method);
                 }
                 RustToFfiTypeConversion::QFlagsToUInt => {
-                    code = format!("{}.to_int() as ::libc::c_uint", code);
+                    code = format!(
+                        "{}.to_int() as {}",
+                        code,
+                        self.rust_type_to_code(&arg.argument_type.ffi_type)
+                    );
                 }
             }
             final_args[arg.ffi_index] = Some(code);
@@ -836,11 +855,13 @@ pub fn generate(
     crate_name: &str,
     database: &RustDatabase,
     output_src_path: impl Into<PathBuf>,
+    crate_template_src_path: Option<impl Into<PathBuf>>,
 ) -> Result<()> {
     let mut generator = Generator {
         crate_name: crate_name.to_string(),
         destination: Vec::new(),
         output_src_path: output_src_path.into(),
+        crate_template_src_path: crate_template_src_path.map(Into::into),
     };
 
     let crate_root = database

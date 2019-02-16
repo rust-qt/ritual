@@ -354,8 +354,14 @@ impl State<'_> {
                 )
             })?;
 
+            let qflags_path = if self.config.crate_properties().name().starts_with("moqt") {
+                "moqt_core::QFlags"
+            } else {
+                "qt_core::QFlags"
+            };
+
             rust_api_type = RustType::Common(RustCommonType {
-                path: RustPath::from_str_unchecked("qt_core::QFlags"),
+                path: RustPath::from_str_unchecked(qflags_path),
                 generic_arguments: Some(vec![RustType::Common(RustCommonType {
                     path: rust_enum_path.clone(),
                     generic_arguments: None,
