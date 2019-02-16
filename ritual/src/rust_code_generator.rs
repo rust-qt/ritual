@@ -206,7 +206,15 @@ impl Generator {
         rust_type_to_code(rust_type, &self.crate_name)
     }
 
+    #[allow(clippy::collapsible_if)]
     fn generate_module(&mut self, module: &RustModule, database: &RustDatabase) -> Result<()> {
+        if module.kind == RustModuleKind::CppNestedType {
+            if database.children(&module.path).next().is_none() {
+                // skip empty module
+                return Ok(());
+            }
+        }
+
         if module.kind.is_in_separate_file() {
             if module.kind != RustModuleKind::CrateRoot {
                 writeln!(self, "pub mod {};", module.path.last())?;
@@ -226,7 +234,7 @@ impl Generator {
         write!(
             self,
             "{}",
-            format_doc_extended(&doc_formatter::module_doc(&module.doc), true)
+            format_doc_extended(&doc_formatter::module_doc(module), true)
         )?;
 
         match module.kind {

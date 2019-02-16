@@ -1,4 +1,5 @@
 use moqt_core::{BasicClass, BasicClassField};
+use moqt_core::basic_class::UpdateType;
 use std::ops::Deref;
 
 #[test]
@@ -39,4 +40,12 @@ fn basic_class() {
         drop(c);
         assert_eq!(v.class_field().get(), 42);
     }
+}
+
+#[test]
+fn nested_enum() {
+    let x: UpdateType = UpdateType::Add2;
+    assert_eq!(x.to_int(), 1);
+    assert_eq!(UpdateType::Mul3.to_int(), 2);
+    assert_eq!(UpdateType::Div5.to_int(), 4);
 }

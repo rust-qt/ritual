@@ -13,6 +13,7 @@ void BasicClass::setFoo(int foo) {
     m_foo = foo;
 }
 
+/*
 void BasicClass::updateFoo(UpdateTypes updateTypes) {
     if (updateTypes | Add2) {
         m_foo += 2;
@@ -24,3 +25,4 @@ void BasicClass::updateFoo(UpdateTypes updateTypes) {
         m_foo /= 5;
     }
 }
+*/

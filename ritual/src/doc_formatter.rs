@@ -7,7 +7,8 @@ use crate::cpp_ffi_data::CppFfiFunctionKind;
 use crate::cpp_ffi_data::CppFieldAccessorType;
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_info::RustFunctionKind;
-use crate::rust_info::RustModuleDoc;
+use crate::rust_info::RustModule;
+use crate::rust_info::RustModuleKind;
 use crate::rust_info::RustStruct;
 use crate::rust_info::RustStructKind;
 use crate::rust_info::RustWrapperType;
@@ -26,16 +27,37 @@ pub fn wrap_cpp_doc_block(html: &str) -> String {
     )
 }
 
-pub fn module_doc(doc: &RustModuleDoc) -> String {
-    let auto_doc = if let Some(ref path) = doc.cpp_path {
-        format!(
-            "C++ namespace: {}",
-            wrap_inline_cpp_code(&path.to_cpp_pseudo_code())
-        )
-    } else {
-        String::new()
+pub fn module_doc(module: &RustModule) -> String {
+    let auto_doc = match module.kind {
+        RustModuleKind::CrateRoot => {
+            // TODO: generate some useful docs for crate root
+            "Crate root".to_string()
+        }
+        RustModuleKind::Ffi => {
+            // TODO: make FFI module private or generate some docs
+            String::new()
+        }
+        RustModuleKind::SizedTypes => {
+            "Types with the same size and alignment as corresponding C++ types".into()
+        }
+        RustModuleKind::CppNamespace => {
+            if let Some(ref path) = module.doc.cpp_path {
+                let cpp_path_text = wrap_inline_cpp_code(&path.to_cpp_pseudo_code());
+                format!("C++ namespace: {}", cpp_path_text)
+            } else {
+                String::new()
+            }
+        }
+        RustModuleKind::CppNestedType => {
+            if let Some(ref path) = module.doc.cpp_path {
+                let cpp_path_text = wrap_inline_cpp_code(&path.to_cpp_pseudo_code());
+                format!("C++ type: {}", cpp_path_text)
+            } else {
+                String::new()
+            }
+        }
     };
-    if let Some(ref doc) = doc.extra_doc {
+    if let Some(ref doc) = module.doc.extra_doc {
         format!("{}\n\n{}", doc, auto_doc)
     } else {
         auto_doc

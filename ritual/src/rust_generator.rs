@@ -88,7 +88,8 @@ fn sanitize_rust_identifier_test() {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum NameType<'a> {
-    General,
+    Type,
+    EnumValue,
     Module,
     FfiFunction,
     ApiFunction(&'a CppFfiFunction),
@@ -763,14 +764,26 @@ impl State<'_> {
             })
     }
 
-    fn get_strategy(&self, parent_path: &CppPath) -> Result<RustPathScope> {
+    fn get_strategy(
+        &self,
+        parent_path: &CppPath,
+        name_type: &NameType<'_>,
+    ) -> Result<RustPathScope> {
         let rust_items = self.find_rust_items(parent_path)?;
         if rust_items.is_empty() {
             bail!("no Rust items for {}", parent_path.to_cpp_pseudo_code());
         }
+        let allow_parent_type = if let NameType::Type = name_type {
+            false
+        } else {
+            true
+        };
+
         let rust_item = rust_items
             .into_iter()
-            .find(|item| item.kind.is_wrapper_type() || item.kind.is_module())
+            .find(|item| {
+                (allow_parent_type && item.kind.is_wrapper_type()) || item.kind.is_module()
+            })
             .ok_or_else(|| {
                 format_err!(
                     "no Rust type wrapper for {}",
@@ -838,9 +851,12 @@ impl State<'_> {
                     prefix: None,
                 }
             }
-            NameType::General | NameType::Module | NameType::ApiFunction { .. } => {
+            NameType::Type
+            | NameType::Module
+            | NameType::EnumValue
+            | NameType::ApiFunction { .. } => {
                 if let Ok(parent) = cpp_path.parent() {
-                    self.get_strategy(&parent)?
+                    self.get_strategy(&parent, name_type)?
                 } else {
                     self.default_strategy()
                 }
@@ -868,7 +884,9 @@ impl State<'_> {
                 };
                 s.to_snake_case()
             }
-            NameType::General => cpp_path_item_to_name(&cpp_path.last())?.to_class_case(),
+            NameType::Type | NameType::EnumValue => {
+                cpp_path_item_to_name(&cpp_path.last())?.to_class_case()
+            }
             NameType::Module => cpp_path_item_to_name(&cpp_path.last())?.to_snake_case(),
             NameType::FfiFunction => cpp_path.last().name.clone(),
         };
@@ -969,7 +987,7 @@ impl State<'_> {
                             //       generate `impl Flaggable` instead.
 
                             let public_path =
-                                self.generate_rust_path(&data.path, &NameType::General)?;
+                                self.generate_rust_path(&data.path, &NameType::Type)?;
 
                             let wrapper_kind;
                             if is_movable {
@@ -1020,12 +1038,27 @@ impl State<'_> {
                             };
                             self.rust_database.items.push(public_rust_item);
 
+                            let nested_types_path =
+                                self.generate_rust_path(&data.path, &NameType::Module)?;
+
+                            let nested_types_rust_item = RustDatabaseItem {
+                                kind: RustItemKind::Module(RustModule {
+                                    path: nested_types_path,
+                                    doc: RustModuleDoc {
+                                        extra_doc: None,
+                                        cpp_path: Some(data.path.clone()),
+                                    },
+                                    kind: RustModuleKind::CppNestedType,
+                                }),
+                                cpp_item_index: Some(cpp_item_index),
+                            };
+                            self.rust_database.items.push(nested_types_rust_item);
+
                             *modified = true;
                             cpp_item.is_rust_processed = true;
                         }
                         CppTypeDataKind::Enum => {
-                            let rust_path =
-                                self.generate_rust_path(&data.path, &NameType::General)?;
+                            let rust_path = self.generate_rust_path(&data.path, &NameType::Type)?;
                             let rust_item = RustDatabaseItem {
                                 kind: RustItemKind::Struct(RustStruct {
                                     extra_doc: None,
@@ -1049,7 +1082,7 @@ impl State<'_> {
                     }
                 }
                 CppItemData::EnumValue(value) => {
-                    let rust_path = self.generate_rust_path(&value.path, &NameType::General)?;
+                    let rust_path = self.generate_rust_path(&value.path, &NameType::EnumValue)?;
 
                     let rust_item = RustDatabaseItem {
                         kind: RustItemKind::EnumValue(RustEnumValue {
