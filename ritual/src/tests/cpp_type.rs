@@ -305,12 +305,9 @@ fn qflags() {
         assert_eq!(&ffi_type.original_type, &type1);
         assert_eq!(
             &ffi_type.ffi_type,
-            &CppType::BuiltInNumeric(CppBuiltInNumericType::UInt),
+            &CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
         );
-        assert_eq!(
-            &ffi_type.ffi_type.to_cpp_code(None).unwrap(),
-            "unsigned int"
-        );
+        assert_eq!(&ffi_type.ffi_type.to_cpp_code(None).unwrap(), "int");
         assert_eq!(ffi_type.conversion, CppTypeConversionToFfi::QFlagsToInt);
     }
 }
