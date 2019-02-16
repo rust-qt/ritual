@@ -33,10 +33,7 @@ pub fn module_doc(module: &RustModule) -> String {
             // TODO: generate some useful docs for crate root
             "Crate root".to_string()
         }
-        RustModuleKind::Ffi => {
-            // TODO: make FFI module private or generate some docs
-            String::new()
-        }
+        RustModuleKind::Ffi => "Functions provided by the C++ wrapper library".into(),
         RustModuleKind::SizedTypes => {
             "Types with the same size and alignment as corresponding C++ types".into()
         }

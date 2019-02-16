@@ -215,15 +215,16 @@ impl Generator {
             }
         }
 
+        let vis = if module.is_public { "pub " } else { "" };
         if module.kind.is_in_separate_file() {
             if module.kind != RustModuleKind::CrateRoot {
-                writeln!(self, "pub mod {};", module.path.last())?;
+                writeln!(self, "{}mod {};", vis, module.path.last())?;
             }
             let path = self.module_path(&module.path)?;
             self.push_file(&path)?;
         } else {
             assert_ne!(module.kind, RustModuleKind::CrateRoot);
-            writeln!(self, "pub mod {} {{", module.path.last())?;
+            writeln!(self, "{}mod {} {{", vis, module.path.last())?;
         }
 
         if let RustModuleKind::Ffi = module.kind {

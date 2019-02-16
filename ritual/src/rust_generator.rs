@@ -967,6 +967,7 @@ impl State<'_> {
                     let rust_path = self.generate_rust_path(path, &NameType::Module)?;
                     let rust_item = RustDatabaseItem {
                         kind: RustItemKind::Module(RustModule {
+                            is_public: true,
                             path: rust_path,
                             doc: RustModuleDoc {
                                 extra_doc: None,
@@ -1043,6 +1044,7 @@ impl State<'_> {
 
                             let nested_types_rust_item = RustDatabaseItem {
                                 kind: RustItemKind::Module(RustModule {
+                                    is_public: true,
                                     path: nested_types_path,
                                     doc: RustModuleDoc {
                                         extra_doc: None,
@@ -1132,10 +1134,8 @@ impl State<'_> {
             let crate_name = self.config.crate_properties().name().to_string();
             let rust_path_parts = match kind {
                 RustModuleKind::CrateRoot => vec![crate_name],
-                RustModuleKind::Ffi => vec![crate_name, "ffi".to_string()],
-                RustModuleKind::SizedTypes => {
-                    vec![crate_name, "ffi".to_string(), "sized_types".to_string()]
-                }
+                RustModuleKind::Ffi => vec![crate_name, "__ffi".to_string()],
+                RustModuleKind::SizedTypes => vec![crate_name, "__sized_types".to_string()],
                 RustModuleKind::CppNamespace | RustModuleKind::CppNestedType => unreachable!(),
             };
             let rust_path = RustPath::from_parts(rust_path_parts);
@@ -1146,6 +1146,7 @@ impl State<'_> {
 
             let rust_item = RustDatabaseItem {
                 kind: RustItemKind::Module(RustModule {
+                    is_public: false,
                     path: rust_path,
                     doc: RustModuleDoc {
                         extra_doc: None,
