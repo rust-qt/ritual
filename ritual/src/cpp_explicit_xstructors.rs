@@ -31,9 +31,10 @@ fn add_explicit_xstructors(data: &mut ProcessorData) -> Result<()> {
                     .any(|m| m.is_destructor() && m.class_type().ok().as_ref() == Some(class_path));
                 if !found_destructor {
                     methods.push(CppFunction {
-                        path: type1
-                            .path
-                            .join(CppPathItem::from_str_unchecked(&format!("~{}", class_path))),
+                        path: type1.path.join(CppPathItem::from_str_unchecked(&format!(
+                            "~{}",
+                            class_path.last().name
+                        ))),
                         member: Some(CppFunctionMemberData {
                             is_virtual: false, // the destructor can actually be virtual but we don't care about it here
                             is_pure_virtual: false,
@@ -63,7 +64,9 @@ fn add_explicit_xstructors(data: &mut ProcessorData) -> Result<()> {
                     });
                 if !found_constructor {
                     methods.push(CppFunction {
-                        path: type1.path.join(type1.path.last().clone()),
+                        path: type1
+                            .path
+                            .join(CppPathItem::from_str_unchecked(&type1.path.last().name)),
                         member: Some(CppFunctionMemberData {
                             is_virtual: false,
                             is_pure_virtual: false,

@@ -5,3 +5,4 @@
 #include "base_and_derived.h"
 #include "destructors.h"
 #include "QPoint.h"
+#include "QFlags.h"

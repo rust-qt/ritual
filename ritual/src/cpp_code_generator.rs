@@ -62,7 +62,7 @@ fn qt_slot_wrapper(wrapper: &QtSlotWrapper) -> Result<String> {
         .join(", ");
     Ok(format!(
         include_str!("../templates/c_lib/qt_slot_wrapper.h"),
-        class_name = &wrapper.class_path,
+        class_name = wrapper.class_path.to_cpp_code()?,
         func_arg = func_type.to_cpp_code(Some("func"))?,
         func_field = func_type.to_cpp_code(Some("m_func"))?,
         method_args = method_args,

@@ -110,7 +110,7 @@ fn suggest_allocation_places(data: &mut ProcessorData) -> Result<()> {
     }
 
     for (name, stats) in &data_map {
-        trace!("type = {}; stats = {:?}", name, stats);
+        trace!("type = {}; stats = {:?}", name.to_cpp_pseudo_code(), stats);
     }
 
     let mut movable_types = Vec::new();
@@ -141,7 +141,7 @@ fn suggest_allocation_places(data: &mut ProcessorData) -> Result<()> {
                 if stats.pointers_count + stats.not_pointers_count < min_safe_data_count {
                     trace!(
                         "type = {}; Can't determine type allocation place: not enough data",
-                        name
+                        name.to_cpp_pseudo_code()
                     );
                 } else if stats.not_pointers_count as f32
                     / (stats.pointers_count + stats.not_pointers_count) as f32
@@ -149,7 +149,7 @@ fn suggest_allocation_places(data: &mut ProcessorData) -> Result<()> {
                 {
                     trace!(
                         "type = {}; Can't determine type allocation place: many non-pointers",
-                        name
+                        name.to_cpp_pseudo_code()
                     );
                 }
                 false
@@ -157,7 +157,7 @@ fn suggest_allocation_places(data: &mut ProcessorData) -> Result<()> {
         } else {
             trace!(
                 "type = {}; Can't determine type allocation place: no stats",
-                name
+                name.to_cpp_pseudo_code()
             );
             false
         };

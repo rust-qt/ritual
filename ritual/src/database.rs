@@ -282,7 +282,7 @@ impl CppItemData {
 impl Display for CppItemData {
     fn fmt(&self, f: &mut Formatter) -> ::std::result::Result<(), ::std::fmt::Error> {
         let s = match *self {
-            CppItemData::Namespace(ref path) => format!("namespace {}", path),
+            CppItemData::Namespace(ref path) => format!("namespace {}", path.to_cpp_pseudo_code()),
             CppItemData::Type(ref type1) => match type1.kind {
                 CppTypeDataKind::Enum => format!("enum {}", type1.path.to_cpp_pseudo_code()),
                 CppTypeDataKind::Class { .. } => {
@@ -290,9 +290,11 @@ impl Display for CppItemData {
                 }
             },
             CppItemData::Function(ref method) => method.short_text(),
-            CppItemData::EnumValue(ref value) => {
-                format!("enum value {} = {}", value.path, value.value)
-            }
+            CppItemData::EnumValue(ref value) => format!(
+                "enum value {} = {}",
+                value.path.to_cpp_pseudo_code(),
+                value.value
+            ),
             CppItemData::ClassField(ref field) => field.short_text(),
             CppItemData::ClassBase(ref class_base) => {
                 let virtual_text = if class_base.is_virtual {

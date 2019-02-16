@@ -239,7 +239,9 @@ impl Generator {
                     "include!(concat!(env!(\"OUT_DIR\"), \"/sized_types.rs\"));"
                 )?;
             }
-            RustModuleKind::CrateRoot | RustModuleKind::Normal => {
+            RustModuleKind::CrateRoot
+            | RustModuleKind::CppNamespace
+            | RustModuleKind::CppNestedType => {
                 self.generate_children(&module.path, database)?;
             }
         }

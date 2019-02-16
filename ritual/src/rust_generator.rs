@@ -747,29 +747,36 @@ impl State<'_> {
             }
         }
 
-        bail!("unknown cpp path: {}", cpp_path)
+        bail!("unknown cpp path: {}", cpp_path.to_cpp_pseudo_code())
     }
 
     fn find_wrapper_type(&self, cpp_path: &CppPath) -> Result<&RustDatabaseItem> {
         let rust_items = self.find_rust_items(cpp_path)?;
         if rust_items.is_empty() {
-            bail!("no Rust items for {}", cpp_path);
+            bail!("no Rust items for {}", cpp_path.to_cpp_pseudo_code());
         }
         rust_items
             .into_iter()
             .find(|item| item.kind.is_wrapper_type())
-            .ok_or_else(|| format_err!("no Rust type wrapper for {}", cpp_path))
+            .ok_or_else(|| {
+                format_err!("no Rust type wrapper for {}", cpp_path.to_cpp_pseudo_code())
+            })
     }
 
     fn get_strategy(&self, parent_path: &CppPath) -> Result<RustPathScope> {
         let rust_items = self.find_rust_items(parent_path)?;
         if rust_items.is_empty() {
-            bail!("no Rust items for {}", parent_path);
+            bail!("no Rust items for {}", parent_path.to_cpp_pseudo_code());
         }
         let rust_item = rust_items
             .into_iter()
             .find(|item| item.kind.is_wrapper_type() || item.kind.is_module())
-            .ok_or_else(|| format_err!("no Rust type wrapper for {}", parent_path))?;
+            .ok_or_else(|| {
+                format_err!(
+                    "no Rust type wrapper for {}",
+                    parent_path.to_cpp_pseudo_code()
+                )
+            })?;
 
         let rust_path = rust_item.path().ok_or_else(|| {
             format_err!(
@@ -947,7 +954,7 @@ impl State<'_> {
                                 extra_doc: None,
                                 cpp_path: Some(path.clone()),
                             },
-                            kind: RustModuleKind::Normal,
+                            kind: RustModuleKind::CppNamespace,
                         }),
                         cpp_item_index: Some(cpp_item_index),
                     };
@@ -1096,7 +1103,7 @@ impl State<'_> {
                 RustModuleKind::SizedTypes => {
                     vec![crate_name, "ffi".to_string(), "sized_types".to_string()]
                 }
-                RustModuleKind::Normal => unreachable!(),
+                RustModuleKind::CppNamespace | RustModuleKind::CppNestedType => unreachable!(),
             };
             let rust_path = RustPath::from_parts(rust_path_parts);
 

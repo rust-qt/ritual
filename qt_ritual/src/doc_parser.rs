@@ -250,7 +250,7 @@ impl DocParser {
 
     /// Returns documentation for C++ type `name`.
     fn doc_for_type(&mut self, path: &CppPath) -> Result<DocForType> {
-        let name = path.to_string();
+        let name = path.doc_id();
         let index_item = self
             .doc_data
             .find_index_item(|item| item.name == name)
@@ -557,7 +557,7 @@ fn find_methods_docs(items: &mut [CppDatabaseItem], data: &mut DocParser) -> Res
             }
             if let Some(ref declaration_code) = cpp_method.declaration_code {
                 match data.doc_for_method(
-                    &cpp_method.doc_id(),
+                    &cpp_method.path.doc_id(),
                     declaration_code,
                     &cpp_method.short_text(),
                 ) {
@@ -627,9 +627,12 @@ pub fn parse_docs(data: &mut ProcessorData, qt_crate_name: &str, docs_path: &Pat
                         .find(|x| x.name == data.path.last().name)
                     {
                         data.doc = Some(r.html.clone());
-                        parser.mark_enum_variant_used(&data.unscoped_path().to_string());
+                        parser.mark_enum_variant_used(&data.unscoped_path().doc_id());
                     } else {
-                        trace!("[DebugQtDoc] Not found doc for enum variant: {}", data.path,);
+                        trace!(
+                            "[DebugQtDoc] Not found doc for enum variant: {}",
+                            data.path.to_cpp_pseudo_code()
+                        );
                     }
                 }
                 _ => unreachable!(),

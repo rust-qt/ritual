@@ -386,7 +386,8 @@ pub enum RustModuleKind {
     CrateRoot,
     Ffi,
     SizedTypes,
-    Normal,
+    CppNamespace,
+    CppNestedType,
 }
 
 impl RustModuleKind {
@@ -395,7 +396,8 @@ impl RustModuleKind {
             RustModuleKind::CrateRoot => true,
             RustModuleKind::Ffi => false,
             RustModuleKind::SizedTypes => false,
-            RustModuleKind::Normal => true,
+            RustModuleKind::CppNamespace => true,
+            RustModuleKind::CppNestedType => false,
         }
     }
 }

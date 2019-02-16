@@ -12,3 +12,15 @@ int BasicClass::foo() {
 void BasicClass::setFoo(int foo) {
     m_foo = foo;
 }
+
+void BasicClass::updateFoo(UpdateTypes updateTypes) {
+    if (updateTypes | Add2) {
+        m_foo += 2;
+    }
+    if (updateTypes | Mul3) {
+        m_foo *= 3;
+    }
+    if (updateTypes | Div5) {
+        m_foo /= 5;
+    }
+}

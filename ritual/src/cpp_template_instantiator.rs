@@ -222,7 +222,10 @@ fn find_template_instantiations(data: &mut ProcessorData) -> Result<()> {
                                 x == path
                             });
                             if !is_in_result {
-                                trace!("Found template instantiation: {}", path);
+                                trace!(
+                                    "Found template instantiation: {}",
+                                    path.to_cpp_pseudo_code()
+                                );
                                 result.push(path.clone());
                             }
                         }

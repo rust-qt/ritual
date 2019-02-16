@@ -227,7 +227,7 @@ pub fn function_doc(function: &RustFunction) -> String {
                     RustQtReceiverType::Signal => "signal",
                     RustQtReceiverType::Slot => "slot",
                 },
-                cpp_path = cpp_path
+                cpp_path = cpp_path.to_cpp_pseudo_code()
             ));
             // TODO: add doc
         }

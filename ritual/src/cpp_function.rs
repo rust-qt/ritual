@@ -197,12 +197,6 @@ impl CppFunction {
         }
     }
 
-    /// Returns the identifier this method would be presented with
-    /// in Qt documentation.
-    pub fn doc_id(&self) -> String {
-        self.path.to_string() // TODO: remove all template args?
-    }
-
     /// Returns short text representing values in this method
     /// (only for debugging output).
     pub fn short_text(&self) -> String {
@@ -240,7 +234,7 @@ impl CppFunction {
             s = format!("{} [var args]", s);
         }
         s = format!("{} {}", s, self.return_type.to_cpp_pseudo_code());
-        s = format!("{} {}", s, self.path);
+        s = format!("{} {}", s, self.path.to_cpp_pseudo_code());
         s = format!(
             "{}({})",
             s,
@@ -314,7 +308,7 @@ impl CppFunction {
         Ok(format!(
             "{}{}({})",
             type_num,
-            self.path,
+            self.path.last().name,
             self.arguments
                 .iter()
                 .map_if_ok(|arg| arg.argument_type.to_cpp_code(None))?

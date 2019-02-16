@@ -1,5 +1,6 @@
 #include "moqt_core_exports.h"
 #include <cstdint>
+#include "QFlags.h"
 
 class MOQT_CORE_EXPORT BasicClassField {
 public:
@@ -21,6 +22,17 @@ public:
 
     void setFoo(int foo);
     int foo();
+
+    enum UpdateType {
+        Add2 = 0b1,
+        Mul3 = 0b10,
+        Div5 = 0b100,
+    };
+
+    typedef QFlags<UpdateType> UpdateTypes;
+
+    void updateFoo(UpdateTypes updateTypes);
+
 
     /*void overloaded_normal_const_and_static();
     void overloaded_normal_const_and_static() const;

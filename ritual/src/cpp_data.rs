@@ -245,6 +245,13 @@ impl CppPath {
             .join("_")
     }
 
+    /// Returns the identifier this method would be presented with
+    /// in Qt documentation.
+    pub fn doc_id(&self) -> String {
+        // we don't want template args here
+        self.items().iter().map(|item| &item.name).join("::")
+    }
+
     /// Attempts to replace template types at `nested_level1`
     /// within this type with `template_arguments1`.
     pub fn instantiate(
@@ -336,13 +343,6 @@ impl fmt::Debug for CppPathItem {
                 args.iter().map(|arg| arg.to_cpp_pseudo_code()).join(", ")
             )?;
         }
-        Ok(())
-    }
-}
-
-impl fmt::Display for CppPath {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
-        write!(f, "{}", self.to_cpp_pseudo_code())?;
         Ok(())
     }
 }

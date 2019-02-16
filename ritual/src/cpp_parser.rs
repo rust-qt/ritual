@@ -171,7 +171,7 @@ fn get_full_name(entity: Entity) -> Result<CppPath> {
 
 fn get_full_name_display(entity: Entity) -> String {
     match get_full_name(entity) {
-        Ok(name) => name.to_string(),
+        Ok(name) => name.to_cpp_pseudo_code(),
         Err(_) => "[unnamed]".into(),
     }
 }
@@ -505,7 +505,9 @@ impl CppParser<'_, '_> {
         if let Some(result) = self.parse_special_typedef(&name) {
             return Ok(result);
         }
-        if let Some(type_data) = self.find_type(|x| x.path.to_string() == name) {
+        if let Some(type_data) =
+            self.find_type(|x| x.path.to_cpp_code().ok().as_ref() == Some(&name))
+        {
             match type_data.kind {
                 CppTypeDataKind::Enum { .. } => {
                     return Ok(CppType::Enum {
@@ -1041,7 +1043,7 @@ impl CppParser<'_, '_> {
         let declaration_code = if tokens.is_empty() {
             trace!(
                 "[DebugParser] Failed to tokenize method {} at {:?}",
-                name_with_namespace,
+                name_with_namespace.to_cpp_pseudo_code(),
                 source_range
             );
             let start = source_range.get_start().get_file_location();
