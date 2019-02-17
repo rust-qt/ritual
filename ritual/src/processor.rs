@@ -213,7 +213,7 @@ mod steps {
             data.workspace.update_cargo_toml()?;
             let path = data.workspace.path();
             let crate_name = data.config.crate_properties().name();
-            run_command(Command::new("cargo").arg("update").current_dir(path))?;
+            //run_command(Command::new("cargo").arg("update").current_dir(path))?;
 
             for cargo_cmd in &["build", "test", "doc"] {
                 run_command(
