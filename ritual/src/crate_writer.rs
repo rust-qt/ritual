@@ -258,6 +258,7 @@ fn generate_c_lib_template(
 
 fn run(data: &mut ProcessorData) -> Result<()> {
     generate_crate_template(data)?;
+    data.workspace.update_cargo_toml()?;
 
     let output_path = data
         .workspace

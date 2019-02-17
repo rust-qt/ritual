@@ -210,14 +210,19 @@ mod steps {
 
     pub fn build_crate() -> ProcessingStep {
         ProcessingStep::new_const("build_crate", |data| {
-            let path = data
-                .workspace
-                .crate_path(&data.current_database.crate_name)?;
-            for cargo_cmd in &["update", "build", "test", "doc"] {
-                let mut command = Command::new("cargo");
-                command.arg(cargo_cmd);
-                command.current_dir(&path);
-                run_command(&mut command)?;
+            data.workspace.update_cargo_toml()?;
+            let path = data.workspace.path();
+            let crate_name = data.config.crate_properties().name();
+            run_command(Command::new("cargo").arg("update").current_dir(path))?;
+
+            for cargo_cmd in &["build", "test", "doc"] {
+                run_command(
+                    Command::new("cargo")
+                        .arg(cargo_cmd)
+                        .arg("-p")
+                        .arg(crate_name)
+                        .current_dir(path),
+                )?;
             }
             Ok(())
         })

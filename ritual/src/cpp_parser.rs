@@ -316,7 +316,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
     let mut parser = CppParser { data };
     run_clang(
         &parser.data.config,
-        &parser.data.workspace.tmp_path()?,
+        &parser.data.workspace.tmp_path(),
         None,
         |translation_unit| {
             debug!("Parsing types");

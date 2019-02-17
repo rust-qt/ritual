@@ -58,7 +58,7 @@ fn run(options: Options) -> Result<()> {
 
     Logger::with(LogSpecification::default(LevelFilter::Trace).build())
         .log_to_file()
-        .directory(path_to_str(&workspace.log_path()?)?)
+        .directory(path_to_str(&workspace.log_path())?)
         .print_message()
         .duplicate_to_stderr(Duplicate::Info)
         .start()

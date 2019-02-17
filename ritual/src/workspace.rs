@@ -2,7 +2,12 @@ use ritual_common::errors::{bail, FancyUnwrap, Result};
 use ritual_common::file_utils::{create_dir, load_json, save_json};
 
 use crate::database::Database;
+use ritual_common::file_utils::create_dir_all;
+use ritual_common::file_utils::os_string_into_string;
+use ritual_common::file_utils::read_dir;
 use ritual_common::file_utils::remove_file;
+use ritual_common::file_utils::save_toml;
+use ritual_common::toml;
 use serde_derive::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -34,7 +39,10 @@ fn config_path(path: &Path) -> PathBuf {
 }
 
 fn database_path(workspace_path: &Path, crate_name: &str) -> PathBuf {
-    workspace_path.join(crate_name).join("database.json")
+    workspace_path
+        .join("out")
+        .join(crate_name)
+        .join("database.json")
 }
 
 impl Workspace {
@@ -43,6 +51,9 @@ impl Workspace {
             bail!("No such directory: {}", path.display());
         }
         let config_path = config_path(&path);
+        for &dir in &["tmp", "out", "log"] {
+            create_dir_all(path.join(dir))?;
+        }
         let w = Workspace {
             path,
             config: if config_path.exists() {
@@ -59,28 +70,20 @@ impl Workspace {
         &self.path
     }
 
-    pub fn tmp_path(&self) -> Result<PathBuf> {
-        let path = self.path.join("tmp");
-        if !path.exists() {
-            create_dir(&path)?;
-        }
-        Ok(path)
+    pub fn tmp_path(&self) -> PathBuf {
+        self.path.join("tmp")
     }
 
     pub fn config(&self) -> &WorkspaceConfig {
         &self.config
     }
 
-    pub fn log_path(&self) -> Result<PathBuf> {
-        let path = self.path.join("log");
-        if !path.exists() {
-            create_dir(&path)?;
-        }
-        Ok(path)
+    pub fn log_path(&self) -> PathBuf {
+        self.path.join("log")
     }
 
     pub fn crate_path(&self, crate_name: &str) -> Result<PathBuf> {
-        let path = self.path.join(crate_name);
+        let path = self.path.join("out").join(crate_name);
         if !path.exists() {
             create_dir(&path)?;
         }
@@ -164,6 +167,30 @@ impl Workspace {
             }
         }
         //log::status("test1: save data success!");
+        Ok(())
+    }
+
+    pub fn update_cargo_toml(&self) -> Result<()> {
+        let mut members = Vec::new();
+        for item in read_dir(self.path.join("out"))? {
+            let item = item?;
+            let path = item.path().join("Cargo.toml");
+            if path.exists() {
+                let dir_name = os_string_into_string(item.file_name())?;
+                members.push(toml::Value::String(format!("out/{}", dir_name)));
+            }
+        }
+
+        let mut table = toml::value::Table::new();
+        table.insert("members".to_string(), toml::Value::Array(members));
+
+        let mut cargo_toml = toml::value::Table::new();
+        cargo_toml.insert("workspace".to_string(), toml::Value::Table(table));
+
+        save_toml(
+            self.path.join("Cargo.toml"),
+            &toml::Value::Table(cargo_toml),
+        )?;
         Ok(())
     }
 }

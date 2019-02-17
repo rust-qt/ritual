@@ -190,7 +190,7 @@ impl CppChecker<'_, '_> {
         }
     }
     fn create_instance(&self, id: &str) -> Result<CppCheckerData> {
-        let root_path = self.data.workspace.tmp_path()?.join("cpp_checker").join(id);
+        let root_path = self.data.workspace.tmp_path().join("cpp_checker").join(id);
         if root_path.exists() {
             remove_dir_all(&root_path)?;
         }
