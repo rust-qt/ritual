@@ -3,8 +3,8 @@ echo on
 echo "Setting VS environment"
 call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" amd64 || goto :error
 
-call "%APPVEYOR_BUILD_FOLDER%\ci\appveyor\setup_rust.bat" || goto :error
-call "%APPVEYOR_BUILD_FOLDER%\ci\appveyor\setup_sqlite.bat" || goto :error
+call "%APPVEYOR_BUILD_FOLDER%\scripts\ci\appveyor\setup_rust.bat" || goto :error
+call "%APPVEYOR_BUILD_FOLDER%\scripts\ci\appveyor\setup_sqlite.bat" || goto :error
 
 set RUST_BACKTRACE=1
 

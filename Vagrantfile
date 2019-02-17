@@ -3,18 +3,19 @@
 
 require 'yaml'
 dir = File.dirname(File.expand_path(__FILE__))
+vagrant_dir = "#{dir}/scripts/vagrant"
 
 # defaults
-local_settings = YAML::load_file("#{dir}/scripts/vagrant/local_settings.yml.example")
+local_settings = YAML::load_file("#{vagrant_dir}/local_settings.yml.example")
 
-if File.exist?("#{dir}/scripts/vagrant/local_settings.yml")
-    local_settings.merge!(YAML::load_file("#{dir}/vagrant/local_settings.yml"))
+if File.exist?("#{vagrant_dir}/local_settings.yml")
+    local_settings.merge!(YAML::load_file("#{vagrant_dir}/local_settings.yml"))
 end
 
 Vagrant.configure("2") do |config|
 
     config.vm.define "osx" do |osx|
-        osx.vm.box = "AndrewDryga/vagrant-box-osx"
+        osx.vm.box = "jhcook/osx-yosemite-10.10"
     end
 
     config.vm.define "linux" do |linux|
@@ -28,5 +29,10 @@ Vagrant.configure("2") do |config|
         else
             puts "local_settings[\"moqt_workspace_path\"] was not set."
         end
+    end
+
+    config.vm.define "windows" do |linux|
+        config.vm.box = "datacastle/windows7"
+        config.vm.box_version = "1.0"
     end
 end
