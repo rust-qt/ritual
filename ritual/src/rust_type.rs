@@ -218,6 +218,8 @@ impl RustType {
             }) => {
                 let mut name = if path.parts.len() == 1 {
                     path.parts[0].to_snake_case()
+                } else if path.crate_name() == Some("std") {
+                    path.last().to_snake_case()
                 } else {
                     let mut remaining_context: &[String] = &context.parts;
                     let parts: &[String] = &path.parts;

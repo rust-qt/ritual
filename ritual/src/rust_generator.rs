@@ -839,6 +839,28 @@ impl State<'_> {
         }
     }
 
+    fn cpp_path_item_to_name(&self, item: &CppPathItem, context: &RustPath) -> Result<String> {
+        if let Some(template_arguments) = &item.template_arguments {
+            let mut captions = Vec::new();
+            for arg in template_arguments {
+                let rust_type = self.rust_final_type(
+                    &CppFfiType {
+                        ffi_type: arg.clone(),
+                        original_type: arg.clone(),
+                        conversion: CppTypeConversionToFfi::NoChange,
+                    },
+                    &CppFfiArgumentMeaning::Argument(0),
+                    true,
+                    &ReturnValueAllocationPlace::NotApplicable,
+                )?;
+                captions.push(rust_type.api_type.caption(context)?);
+            }
+            Ok(format!("{}_of_{}", item.name, captions.join("_")))
+        } else {
+            Ok(item.name.clone())
+        }
+    }
+
     fn generate_rust_path(&self, cpp_path: &CppPath, name_type: &NameType<'_>) -> Result<RustPath> {
         let strategy = match name_type {
             NameType::FfiFunction => {
@@ -879,31 +901,26 @@ impl State<'_> {
             }
         };
 
-        let cpp_path_item_to_name = |item: &CppPathItem| {
-            if item.template_arguments.is_some() {
-                bail!("naming items with template arguments is not supported yet");
-            }
-            Ok(item.name.clone())
-        };
-
         let full_last_name = match name_type {
             NameType::SizedItem => cpp_path
                 .items()
                 .iter()
-                .map_if_ok(|item| cpp_path_item_to_name(item))?
+                .map_if_ok(|item| self.cpp_path_item_to_name(item, &strategy.path))?
                 .join("_"),
             NameType::ApiFunction(function) => {
                 let s = if let Some(last_name_override) = special_function_rust_name(function)? {
                     last_name_override.clone()
                 } else {
-                    cpp_path_item_to_name(cpp_path.last())?
+                    self.cpp_path_item_to_name(cpp_path.last(), &strategy.path)?
                 };
                 s.to_snake_case()
             }
-            NameType::Type | NameType::EnumValue => {
-                cpp_path_item_to_name(&cpp_path.last())?.to_class_case()
-            }
-            NameType::Module => cpp_path_item_to_name(&cpp_path.last())?.to_snake_case(),
+            NameType::Type | NameType::EnumValue => self
+                .cpp_path_item_to_name(&cpp_path.last(), &strategy.path)?
+                .to_class_case(),
+            NameType::Module => self
+                .cpp_path_item_to_name(&cpp_path.last(), &strategy.path)?
+                .to_snake_case(),
             NameType::FfiFunction => cpp_path.last().name.clone(),
         };
 
