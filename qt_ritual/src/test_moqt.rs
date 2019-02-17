@@ -77,7 +77,7 @@ fn build_cpp_lib() -> Result<TempTestDir> {
 
 #[test]
 fn test_moqt() {
-    let temp_dir = build_cpp_lib().unwrap();
+    let temp_dir = build_cpp_lib().fancy_unwrap();
     let workspace = temp_dir.path().join("workspace");
     create_dir_all(&workspace).unwrap();
 

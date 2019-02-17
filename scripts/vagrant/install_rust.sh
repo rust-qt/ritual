@@ -5,12 +5,12 @@ set -x
 
 # install Rust
 if rustup -V ; then
-  echo "rustup is already installed"
-  rustup update
+    echo "rustup is already installed"
+    rustup update
 else
-  echo "installing rustup"
-  curl https://sh.rustup.rs -sSf | sh -s -- -y
-  source $HOME/.cargo/env
+    echo "installing rustup"
+    curl https://sh.rustup.rs -sSf | sh -s -- -y
+    source $HOME/.cargo/env
 fi
 
 cd /vagrant

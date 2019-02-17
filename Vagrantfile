@@ -16,19 +16,18 @@ Vagrant.configure("2") do |config|
 
     config.vm.define "osx" do |osx|
         osx.vm.box = "jhcook/osx-yosemite-10.10"
+        osx.vm.synced_folder ".", "/vagrant", type: "rsync",
+            rsync__exclude: [".git/", "target/"],
+            group: "admin"
+
+        osx.vm.provision "install_dependencies", type: "shell",
+            path: "scripts/vagrant/osx/install_dependencies.sh"
     end
 
     config.vm.define "linux" do |linux|
         linux.vm.box = "ubuntu/bionic64"
         linux.vm.provision "install_dependencies", type: "shell",
             path: "scripts/vagrant/linux/install_dependencies.sh", privileged: false
-        linux.vm.provision "moqt", type: "shell", path: "scripts/vagrant/linux/build_moqt.sh", privileged: false
-
-        if local_settings["moqt_workspace_path"]
-            linux.vm.synced_folder local_settings["moqt_workspace_path"], "/home/vagrant/moqt_workspace"
-        else
-            puts "local_settings[\"moqt_workspace_path\"] was not set."
-        end
     end
 
     config.vm.define "windows" do |linux|
