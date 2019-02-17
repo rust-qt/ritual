@@ -176,11 +176,9 @@ fn instantiate_templates(data: &mut ProcessorData) -> Result<()> {
                                     if ok {
                                         new_methods.push(method);
                                     }
-                                    break;
                                 }
                                 Err(msg) => trace!("[DebugTemplateInstantiation] failed: {}", msg),
                             }
-                            break;
                         }
                     }
                 }
