@@ -58,3 +58,21 @@ fn nested_enum() {
         assert_eq!(v.foo(), 1);
     }
 }
+
+#[test]
+fn vector_getters() {
+    unsafe {
+        let v = BasicClass::new(2);
+        let mut vec = v.get_vector_int();
+        assert_eq!(vec.count(), 3);
+        assert_eq!(vec.at(0), &mut 1);
+        assert_eq!(vec.at(1), &mut 3);
+        assert_eq!(vec.at(2), &mut 5);
+
+        let mut vec2 = v.get_vector_class();
+        assert_eq!(vec2.count(), 3);
+        assert_eq!(vec2.at(0).get(), 2);
+        assert_eq!(vec2.at(1).get(), 4);
+        assert_eq!(vec2.at(2).get(), 6);
+    }
+}

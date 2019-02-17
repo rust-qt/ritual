@@ -1,6 +1,7 @@
 #include "moqt_core_exports.h"
 #include <cstdint>
 #include "QFlags.h"
+#include <QVector.h>
 
 class MOQT_CORE_EXPORT BasicClassField {
 public:
@@ -32,6 +33,9 @@ public:
     typedef QFlags<UpdateType> UpdateTypes;
 
     void updateFoo(UpdateTypes updateTypes);
+
+    QVector<int> get_vector_int() const;
+    QVector<BasicClassField> get_vector_class() const;
 
 
     /*void overloaded_normal_const_and_static();
