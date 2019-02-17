@@ -321,6 +321,5 @@ fn run(data: &mut ProcessorData) -> Result<()> {
 }
 
 pub fn crate_writer_step() -> ProcessingStep {
-    // TODO: set dependencies
     ProcessingStep::new_const("crate_writer", run)
 }
