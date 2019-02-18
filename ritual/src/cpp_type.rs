@@ -360,13 +360,13 @@ impl CppType {
                 ref target,
             } => format!(
                 "{}{}{}",
-                if *is_const { "const_" } else { "" },
+                target.ascii_caption(),
+                if *is_const { "_const" } else { "" },
                 match *kind {
-                    CppPointerLikeTypeKind::Pointer => "ptr_",
-                    CppPointerLikeTypeKind::Reference => "ref_",
-                    CppPointerLikeTypeKind::RValueReference => "rref_",
+                    CppPointerLikeTypeKind::Pointer => "_ptr",
+                    CppPointerLikeTypeKind::Reference => "_ref",
+                    CppPointerLikeTypeKind::RValueReference => "_rref",
                 },
-                target.ascii_caption()
             ),
         }
     }
