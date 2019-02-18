@@ -18,6 +18,10 @@ foreach(lib_name moqt_core moqt_gui)
     file(GLOB sources ${lib_name}/*.cpp)
     file(GLOB headers ${lib_name}/*.h)
     add_library(${lib_name} SHARED ${sources})
+    if(lib_name STREQUAL moqt_gui)
+        target_link_libraries(moqt_gui moqt_core)
+    endif()
+
     set_target_properties(${lib_name} PROPERTIES PUBLIC_HEADER "${headers}")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
     add_definitions(-D${lib_name_uppercase}_LIBRARY)
@@ -28,5 +32,4 @@ foreach(lib_name moqt_core moqt_gui)
         RUNTIME DESTINATION lib
         PUBLIC_HEADER DESTINATION include/${lib_name}
     )
-
 endforeach()

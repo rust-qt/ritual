@@ -1,4 +1,4 @@
-build_script: ci\appveyor\run.bat
+build_script: scripts\ci\appveyor\run.bat
 
 cache:
 - '%USERPROFILE%\.cargo'
