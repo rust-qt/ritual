@@ -326,18 +326,12 @@ impl<T> Deref for Ptr<T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        if self.0.is_null() {
-            panic!("attempted to deref a null Ptr<T>");
-        }
         unsafe { &(*self.0) }
     }
 }
 
 impl<T> DerefMut for Ptr<T> {
     fn deref_mut(&mut self) -> &mut T {
-        if self.0.is_null() {
-            panic!("attempted to deref a null Ptr<T>");
-        }
         unsafe { &mut (*self.0) }
     }
 }
