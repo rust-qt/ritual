@@ -15,14 +15,14 @@ fn basic_class() {
         assert_eq!(v.int_field(), 3);
 
         assert!(v.int_pointer_field().is_null());
-        let p = v.int_reference_field() as *mut i32;
-        v.set_int_pointer_field(p);
+        let mut p = v.int_reference_field();
+        v.set_int_pointer_field(&mut p);
         v.set_int_field(4);
-        assert_eq!(v.int_pointer_field().deref(), &4);
+        assert_eq!(*v.int_pointer_field(), 4);
 
-        assert_eq!(v.int_reference_field(), &4);
+        assert_eq!(*v.int_reference_field(), 4);
         v.set_int_field(7);
-        assert_eq!(v.int_reference_field(), &7);
+        assert_eq!(*v.int_reference_field(), 7);
         *v.int_reference_field() = 8;
         assert_eq!(v.int_field(), 8);
 
@@ -65,9 +65,9 @@ fn vector_getters() {
         let v = BasicClass::new(2);
         let mut vec = v.get_vector_int();
         assert_eq!(vec.count(), 3);
-        assert_eq!(vec.at(0), &mut 1);
-        assert_eq!(vec.at(1), &mut 3);
-        assert_eq!(vec.at(2), &mut 5);
+        assert_eq!(*vec.at(0), 1);
+        assert_eq!(*vec.at(1), 3);
+        assert_eq!(*vec.at(2), 5);
 
         let mut vec2 = v.get_vector_class();
         assert_eq!(vec2.count(), 3);

@@ -267,65 +267,63 @@ impl State<'_> {
             ref target,
         } = rust_api_type
         {
-            match cpp_ffi_type.conversion {
-                CppTypeConversionToFfi::NoChange => {
-                    if argument_meaning == &CppFfiArgumentMeaning::This {
-                        assert!(kind == &RustPointerLikeTypeKind::Pointer);
-                        *kind = RustPointerLikeTypeKind::Reference { lifetime: None };
-                        api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
-                    } else if kind == &RustPointerLikeTypeKind::Pointer {
-                        if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
-                            let wrapper = if *is_const {
-                                "cpp_utils::ConstPtr"
-                            } else {
-                                "cpp_utils::Ptr"
-                            };
-
+            if cpp_ffi_type.conversion == CppTypeConversionToFfi::ValueToPointer {
+                if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
+                    // TODO: return error if this rust type is not deletable
+                    match *allocation_place {
+                        ReturnValueAllocationPlace::Stack => {
+                            rust_api_type = (**target).clone();
+                            api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
+                        }
+                        ReturnValueAllocationPlace::Heap => {
                             rust_api_type = RustType::Common(RustCommonType {
-                                path: RustPath::from_str_unchecked(wrapper),
+                                path: RustPath::from_str_unchecked("cpp_utils::CppBox"),
                                 generic_arguments: Some(vec![(**target).clone()]),
                             });
-                            api_to_ffi_conversion = RustToFfiTypeConversion::PtrWrapperToPtr;
+                            api_to_ffi_conversion = RustToFfiTypeConversion::CppBoxToPtr;
+                        }
+                        ReturnValueAllocationPlace::NotApplicable => {
+                            bail!("NotApplicable conflicts with ValueToPointer");
                         }
                     }
-                }
-                CppTypeConversionToFfi::ValueToPointer => {
-                    assert!(kind == &RustPointerLikeTypeKind::Pointer);
+                } else if is_template_argument {
+                    rust_api_type = (**target).clone();
+                    api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
+                } else {
                     if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
-                        // TODO: return error if this rust type is not deletable
-                        match *allocation_place {
-                            ReturnValueAllocationPlace::Stack => {
-                                rust_api_type = (**target).clone();
-                                api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
-                            }
-                            ReturnValueAllocationPlace::Heap => {
-                                rust_api_type = RustType::Common(RustCommonType {
-                                    path: RustPath::from_str_unchecked("cpp_utils::CppBox"),
-                                    generic_arguments: Some(vec![(**target).clone()]),
-                                });
-                                api_to_ffi_conversion = RustToFfiTypeConversion::CppBoxToPtr;
-                            }
-                            ReturnValueAllocationPlace::NotApplicable => {
-                                bail!("NotApplicable conflicts with ValueToPointer");
-                            }
-                        }
-                    } else if is_template_argument {
-                        rust_api_type = (**target).clone();
-                        api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
+                        let wrapper = if *is_const {
+                            "cpp_utils::ConstPtr"
+                        } else {
+                            "cpp_utils::Ptr"
+                        };
+
+                        rust_api_type = RustType::Common(RustCommonType {
+                            path: RustPath::from_str_unchecked(wrapper),
+                            generic_arguments: Some(vec![(**target).clone()]),
+                        });
+                        api_to_ffi_conversion = RustToFfiTypeConversion::PtrWrapperToPtr;
                     } else {
-                        // there is no point in passing arguments by value because
-                        // there will be an implicit copy in any case
                         *kind = RustPointerLikeTypeKind::Reference { lifetime: None };
-                        *is_const = true;
                         api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
                     }
                 }
-                CppTypeConversionToFfi::ReferenceToPointer => {
-                    assert!(kind == &RustPointerLikeTypeKind::Pointer);
+            } else {
+                if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
+                    let wrapper = if *is_const {
+                        "cpp_utils::ConstPtr"
+                    } else {
+                        "cpp_utils::Ptr"
+                    };
+
+                    rust_api_type = RustType::Common(RustCommonType {
+                        path: RustPath::from_str_unchecked(wrapper),
+                        generic_arguments: Some(vec![(**target).clone()]),
+                    });
+                    api_to_ffi_conversion = RustToFfiTypeConversion::PtrWrapperToPtr;
+                } else if !is_template_argument {
                     *kind = RustPointerLikeTypeKind::Reference { lifetime: None };
                     api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
                 }
-                CppTypeConversionToFfi::QFlagsToInt => unreachable!(),
             }
         }
         if cpp_ffi_type.conversion == CppTypeConversionToFfi::QFlagsToInt {
@@ -435,9 +433,15 @@ impl State<'_> {
             CppCast::Static { .. } => {}
         }
 
-        unnamed_function.arguments[0].argument_type = unnamed_function.arguments[0]
-            .argument_type
-            .ptr_to_ref(is_const)?;
+        let is_const1 = is_const;
+        if let RustType::PointerLike {
+            ref mut is_const, ..
+        } = unnamed_function.arguments[0].argument_type.api_type
+        {
+            *is_const = is_const1;
+        } else {
+            bail!("argument 0 is not pointer like: {:?}", unnamed_function);
+        }
         unnamed_function.arguments[0].name = "self".to_string();
         Ok(unnamed_function)
     }

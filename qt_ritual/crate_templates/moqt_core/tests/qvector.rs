@@ -9,7 +9,7 @@ fn qvector_int() {
         vec.push(14);
         vec.push(16);
         assert_eq!(vec.count(), 4);
-        assert_eq!(vec.at(2), &mut 14);
+        assert_eq!(*vec.at(2), 14);
     }
 }
 

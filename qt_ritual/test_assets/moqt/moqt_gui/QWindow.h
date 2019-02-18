@@ -14,6 +14,9 @@ public:
     QPoint pos() const;
     void setPos(const QPoint& pos);
 
+    int showVectorOfInt(const QVector<int> &vec) { return vec.count(); }
+    int showVectorOfWindows(const QVector<QWindow*> &vec) { return vec.count(); }
+
 private:
     QPoint m_pos;
 };

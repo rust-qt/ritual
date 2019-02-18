@@ -20,8 +20,6 @@ public:
 
 private:
     std::vector<T> m_data;
-
-
 };
 
 

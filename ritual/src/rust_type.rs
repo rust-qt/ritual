@@ -205,12 +205,12 @@ impl RustType {
                 ref is_const,
                 ref target,
             } => {
+                let const_text = if *is_const { "_const" } else { "" };
                 let kind_text = match *kind {
-                    RustPointerLikeTypeKind::Pointer => "ptr_",
-                    RustPointerLikeTypeKind::Reference { .. } => "ref_",
+                    RustPointerLikeTypeKind::Pointer => "_ptr",
+                    RustPointerLikeTypeKind::Reference { .. } => "_ref",
                 };
-                let const_text = if *is_const { "" } else { "mut_" };
-                format!("{}{}{}", kind_text, const_text, target.caption(context)?)
+                format!("{}{}{}", target.caption(context)?, const_text, kind_text)
             }
             RustType::Common(RustCommonType {
                 ref path,

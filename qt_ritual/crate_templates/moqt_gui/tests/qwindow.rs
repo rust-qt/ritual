@@ -1,6 +1,6 @@
 use cpp_utils::{CppBox, Ptr};
-use moqt_core::{BasicClass, QPoint};
-use moqt_gui::{get_window, QWindow};
+use moqt_core::{BasicClass, QPoint, QVectorOfCInt};
+use moqt_gui::{get_window, QWindow, QVectorOfQWindowPtr};
 
 #[test]
 fn test_qwindow() {
@@ -26,5 +26,26 @@ fn test_get_window() {
     unsafe {
         let window: Ptr<QWindow> = get_window();
         assert!(window.is_null());
+    }
+}
+
+#[test]
+fn test_with_vectors() {
+    unsafe {
+        let mut window: CppBox<QWindow> = QWindow::new();
+
+        let mut vec = QVectorOfCInt::new();
+        vec.push(10);
+        vec.push(12);
+        vec.push(14);
+        vec.push(16);
+        let r = window.show_vector_of_int(&vec);
+        assert_eq!(r, 4);
+
+        let mut vec2 = QVectorOfQWindowPtr::new();
+        vec2.push(&mut get_window());
+        vec2.push(&mut get_window());
+        let r = window.show_vector_of_windows(&vec2);
+        assert_eq!(r, 2);
     }
 }
