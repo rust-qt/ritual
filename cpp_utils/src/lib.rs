@@ -379,3 +379,12 @@ impl<T> Deref for ConstPtr<T> {
         unsafe { &(*self.0) }
     }
 }
+
+#[test]
+fn ptr_deref() {
+    let mut i = 42;
+    unsafe {
+        let ptr: Ptr<i32> = Ptr::new(&mut i as *mut i32);
+        assert_eq!(*ptr, 42);
+    }
+}
