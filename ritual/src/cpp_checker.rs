@@ -60,11 +60,11 @@ fn check_snippets<'a>(
 }
 
 fn snippet_for_item(item: &CppFfiItem) -> Result<Snippet> {
-    match item.kind {
-        CppFfiItemKind::Function(ref cpp_ffi_function) => Ok(Snippet::new_global(
+    match &item.kind {
+        CppFfiItemKind::Function(cpp_ffi_function) => Ok(Snippet::new_global(
             cpp_code_generator::function_implementation(cpp_ffi_function)?,
         )),
-        CppFfiItemKind::QtSlotWrapper(ref _qt_slot_wrapper) => {
+        CppFfiItemKind::QtSlotWrapper(_qt_slot_wrapper) => {
             bail!("qt slot wrappers are not supported yet");
         }
     }
@@ -309,10 +309,10 @@ impl CppChecker<'_, '_> {
             };
 
             let r = ffi_item.checks.add(&env, error_data.clone());
-            let change_text = match r {
+            let change_text = match &r {
                 CppCheckerAddResult::Added => "Added".to_string(),
                 CppCheckerAddResult::Unchanged => "Unchanged".to_string(),
-                CppCheckerAddResult::Changed { ref old } => {
+                CppCheckerAddResult::Changed { old } => {
                     format!("Changed! Old data for the same env: {:?}", old)
                 }
             };

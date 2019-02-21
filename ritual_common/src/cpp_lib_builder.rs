@@ -142,7 +142,7 @@ impl CppLibBuilder {
                     BuildType::Debug => "Debug",
                 },
             ));
-            if let Some(ref install_dir) = self.install_dir {
+            if let Some(install_dir) = &self.install_dir {
                 actual_cmake_vars.push(CMakeVar::new(
                     "CMAKE_INSTALL_PREFIX",
                     path_to_str(install_dir)?,

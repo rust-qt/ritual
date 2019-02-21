@@ -14,8 +14,8 @@ use ritual_common::errors::{bail, Result};
 
 /// Returns true if `type1` is a known template instantiation.
 fn check_template_type(data: &ProcessorData, type1: &CppType) -> Result<()> {
-    if let CppType::Class(ref path) = type1 {
-        if let Some(ref template_arguments) = path.last().template_arguments {
+    if let CppType::Class(path) = &type1 {
+        if let Some(template_arguments) = &path.last().template_arguments {
             let is_available = data
                 .all_items()
                 .iter()
@@ -68,8 +68,8 @@ fn apply_instantiation_to_method(
 
     new_method.path = new_method.path.instantiate(nested_level1, inst_args)?;
     let mut conversion_type = None;
-    if let Some(ref mut operator) = new_method.operator {
-        if let CppOperator::Conversion(ref mut cpp_type) = *operator {
+    if let Some(operator) = &mut new_method.operator {
+        if let CppOperator::Conversion(cpp_type) = operator {
             let r = cpp_type.instantiate(nested_level1, inst_args)?;
             *cpp_type = r.clone();
             conversion_type = Some(r);
@@ -113,15 +113,15 @@ fn instantiate_templates(data: &mut ProcessorData) -> Result<()> {
         .filter_map(|item| item.cpp_data.as_function_ref())
     {
         for type1 in method.all_involved_types() {
-            let path = match type1 {
-                CppType::Class(ref class_type) => class_type,
-                CppType::PointerLike { ref target, .. } => match **target {
-                    CppType::Class(ref class_type) => class_type,
+            let path = match &type1 {
+                CppType::Class(class_type) => class_type,
+                CppType::PointerLike { target, .. } => match &**target {
+                    CppType::Class(class_type) => class_type,
                     _ => continue,
                 },
                 _ => continue,
             };
-            if let Some(ref template_arguments) = path.last().template_arguments {
+            if let Some(template_arguments) = &path.last().template_arguments {
                 assert!(!template_arguments.is_empty());
                 if template_arguments.iter().all(|x| x.is_template_parameter()) {
                     for type1 in data
@@ -202,9 +202,9 @@ pub fn find_template_instantiations_step() -> ProcessingStep {
 /// excluding results that were already processed in dependencies.
 fn find_template_instantiations(data: &mut ProcessorData) -> Result<()> {
     fn check_type(type1: &CppType, data: &ProcessorData, result: &mut Vec<CppPath>) {
-        match type1 {
-            CppType::Class(ref path) => {
-                if let Some(ref template_arguments) = path.last().template_arguments {
+        match &type1 {
+            CppType::Class(path) => {
+                if let Some(template_arguments) = &path.last().template_arguments {
                     if !template_arguments
                         .iter()
                         .any(|x| x.is_or_contains_template_parameter())
@@ -233,7 +233,7 @@ fn find_template_instantiations(data: &mut ProcessorData) -> Result<()> {
                     }
                 }
             }
-            CppType::PointerLike { ref target, .. } => check_type(target, data, result),
+            CppType::PointerLike { target, .. } => check_type(target, data, result),
             _ => {}
         }
     }

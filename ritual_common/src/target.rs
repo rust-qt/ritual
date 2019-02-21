@@ -262,16 +262,16 @@ impl Condition {
     pub fn eval(&self, target: &Target) -> bool {
         use crate::target::Condition::*;
 
-        match *self {
-            Arch(ref arch) => &target.arch == arch,
-            OS(ref os) => &target.os == os,
-            Family(ref family) => &target.family == family,
-            Env(ref env) => &target.env == env,
-            PointerWidth(ref pointer_width) => &target.pointer_width == pointer_width,
-            Endian(ref endian) => &target.endian == endian,
-            And(ref conditions) => conditions.iter().all(|c| c.eval(target)),
-            Or(ref conditions) => conditions.iter().any(|c| c.eval(target)),
-            Not(ref condition) => !condition.eval(target),
+        match self {
+            Arch(arch) => &target.arch == arch,
+            OS(os) => &target.os == os,
+            Family(family) => &target.family == family,
+            Env(env) => &target.env == env,
+            PointerWidth(pointer_width) => &target.pointer_width == pointer_width,
+            Endian(endian) => &target.endian == endian,
+            And(conditions) => conditions.iter().all(|c| c.eval(target)),
+            Or(conditions) => conditions.iter().any(|c| c.eval(target)),
+            Not(condition) => !condition.eval(target),
             True => true,
             False => false,
         }

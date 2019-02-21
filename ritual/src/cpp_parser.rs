@@ -280,9 +280,9 @@ fn run_clang<R, F: FnMut(Entity) -> Result<R>>(
 fn add_namespaces(data: &mut ProcessorData) -> Result<()> {
     let mut namespaces = HashSet::new();
     for item in &data.current_database.cpp_items {
-        let name = match item.cpp_data {
-            CppItemData::Type(ref t) => &t.path,
-            CppItemData::Function(ref f) => &f.path,
+        let name = match &item.cpp_data {
+            CppItemData::Type(t) => &t.path,
+            CppItemData::Function(f) => &f.path,
             _ => continue,
         };
 
@@ -298,7 +298,7 @@ fn add_namespaces(data: &mut ProcessorData) -> Result<()> {
         }
     }
     for item in &data.current_database.cpp_items {
-        if let CppItemData::Type(ref t) = item.cpp_data {
+        if let CppItemData::Type(t) = &item.cpp_data {
             namespaces.remove(&t.path);
         }
     }
@@ -343,7 +343,7 @@ impl CppParser<'_, '_> {
             once(self.data.current_database as &_).chain(self.data.dep_databases.iter());
         for database in databases {
             for item in database.items() {
-                if let CppItemData::Type(ref info) = item.cpp_data {
+                if let CppItemData::Type(info) = &item.cpp_data {
                     if f(info) {
                         return Some(info);
                     }
@@ -757,16 +757,16 @@ impl CppParser<'_, '_> {
                         self.parse_unexposed_type(Some(type1), None, context_class, context_method)
                     {
                         if let CppType::Class(path) = parsed_unexposed {
-                            if let Some(ref template_arguments_unexposed) =
-                                path.last().template_arguments
+                            if let Some(template_arguments_unexposed) =
+                                &path.last().template_arguments
                             {
                                 if template_arguments_unexposed.iter().any(|x| match x {
                                     CppType::SpecificNumeric { .. }
                                     | CppType::PointerSizedInteger { .. } => true,
                                     _ => false,
                                 }) {
-                                    if let Ok(ref mut parsed_canonical) = parsed_canonical {
-                                        if let CppType::Class(ref mut path) = parsed_canonical {
+                                    if let Ok(parsed_canonical) = &mut parsed_canonical {
+                                        if let CppType::Class(path) = parsed_canonical {
                                             let mut last_item = path.last_mut();
                                             if last_item.template_arguments.is_some() {
                                                 last_item.template_arguments =
@@ -1307,7 +1307,7 @@ impl CppParser<'_, '_> {
                 let base_type = self
                     .parse_type(child.get_type().unwrap(), Some(entity), None)
                     .with_context(|_| "Can't parse base class type")?;
-                if let CppType::Class(ref base_type) = base_type {
+                if let CppType::Class(base_type) = &base_type {
                     self.data.current_database.add_cpp_data(
                         DatabaseItemSource::CppParser {
                             include_file: include_file.clone(),
@@ -1497,7 +1497,7 @@ impl CppParser<'_, '_> {
                         self.parse_unexposed_type(None, Some(name.clone()), None, None)
                     {
                         if let CppType::Class(path) = parent_type {
-                            if let Some(ref template_arguments) = path.last().template_arguments {
+                            if let Some(template_arguments) = &path.last().template_arguments {
                                 if template_arguments
                                     .iter()
                                     .any(|x| !x.is_template_parameter())

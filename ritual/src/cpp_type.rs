@@ -245,18 +245,18 @@ impl CppType {
     /// Returns true if this is a template parameter or a type that
     /// contains any template parameters.
     pub fn is_or_contains_template_parameter(&self) -> bool {
-        match *self {
+        match self {
             CppType::TemplateParameter { .. } => true,
-            CppType::PointerLike { ref target, .. } => target.is_or_contains_template_parameter(),
-            CppType::FunctionPointer(ref type1) => {
+            CppType::PointerLike { target, .. } => target.is_or_contains_template_parameter(),
+            CppType::FunctionPointer(type1) => {
                 type1.return_type.is_or_contains_template_parameter()
                     || type1
                         .arguments
                         .iter()
                         .any(|arg| arg.is_or_contains_template_parameter())
             }
-            CppType::Class(ref path) => path.items().iter().any(|item| {
-                if let Some(ref template_arguments) = item.template_arguments {
+            CppType::Class(path) => path.items().iter().any(|item| {
+                if let Some(template_arguments) = &item.template_arguments {
                     template_arguments
                         .iter()
                         .any(|arg| arg.is_or_contains_template_parameter())
@@ -273,22 +273,20 @@ impl CppType {
         if !self.is_function_pointer() && function_pointer_inner_text.is_some() {
             bail!("unexpected function_pointer_inner_text");
         }
-        match *self {
+        match self {
             CppType::Void => Ok("void".to_string()),
-            CppType::BuiltInNumeric(ref t) => Ok(t.to_cpp_code().to_string()),
-            CppType::Enum { ref path }
-            | CppType::SpecificNumeric(CppSpecificNumericType { ref path, .. })
-            | CppType::PointerSizedInteger { ref path, .. } => path.to_cpp_code(),
-            //      CppTypeBase::SpecificNumeric { ref name, .. } => Ok(name.clone()),
-            //      CppTypeBase::PointerSizedInteger { ref name, .. } => Ok(name.clone()),
-            CppType::Class(ref path) => path.to_cpp_code(),
+            CppType::BuiltInNumeric(t) => Ok(t.to_cpp_code().to_string()),
+            CppType::Enum { path }
+            | CppType::SpecificNumeric(CppSpecificNumericType { path, .. })
+            | CppType::PointerSizedInteger { path, .. } => path.to_cpp_code(),
+            CppType::Class(path) => path.to_cpp_code(),
             CppType::TemplateParameter { .. } => {
                 bail!("template parameters are not allowed in C++ code generator");
             }
             CppType::FunctionPointer(CppFunctionPointerType {
-                ref return_type,
-                ref arguments,
-                ref allows_variadic_arguments,
+                return_type,
+                arguments,
+                allows_variadic_arguments,
             }) => {
                 if *allows_variadic_arguments {
                     bail!("function pointers with variadic arguments are not supported");
@@ -309,9 +307,9 @@ impl CppType {
                 }
             }
             CppType::PointerLike {
-                ref kind,
-                ref is_const,
-                ref target,
+                kind,
+                is_const,
+                target,
             } => Ok(format!(
                 "{}{}{}",
                 if *is_const { "const " } else { "" },
@@ -328,11 +326,11 @@ impl CppType {
     /// Generates string representation of this type
     /// for debugging output.
     pub fn to_cpp_pseudo_code(&self) -> String {
-        match *self {
-            CppType::TemplateParameter { ref name, .. } => {
+        match self {
+            CppType::TemplateParameter { name, .. } => {
                 return name.to_string(); // format!("T{}_{}", nested_level, index);
             }
-            CppType::Class(ref base) => return base.to_cpp_pseudo_code(),
+            CppType::Class(base) => return base.to_cpp_pseudo_code(),
             CppType::FunctionPointer(..) => {
                 return self
                     .to_cpp_code(Some(&"FN_PTR".to_string()))
@@ -344,20 +342,20 @@ impl CppType {
     }
 
     pub fn ascii_caption(&self) -> String {
-        match *self {
+        match self {
             CppType::Void | CppType::BuiltInNumeric(_) => {
                 self.to_cpp_code(None).unwrap().replace(' ', "_")
             }
-            CppType::SpecificNumeric(ref data) => data.path.ascii_caption(),
-            CppType::PointerSizedInteger { ref path, .. }
-            | CppType::Enum { ref path }
-            | CppType::Class(ref path) => path.ascii_caption(),
-            CppType::TemplateParameter { ref name, .. } => name.to_string(),
+            CppType::SpecificNumeric(data) => data.path.ascii_caption(),
+            CppType::PointerSizedInteger { path, .. }
+            | CppType::Enum { path }
+            | CppType::Class(path) => path.ascii_caption(),
+            CppType::TemplateParameter { name, .. } => name.to_string(),
             CppType::FunctionPointer(_) => "fn".into(),
             CppType::PointerLike {
-                ref kind,
-                ref is_const,
-                ref target,
+                kind,
+                is_const,
+                target,
             } => format!(
                 "{}{}{}",
                 target.ascii_caption(),
@@ -372,7 +370,7 @@ impl CppType {
     }
 
     pub fn pointer_like_to_target(&self) -> Result<&CppType> {
-        if let CppType::PointerLike { ref target, .. } = self {
+        if let CppType::PointerLike { target, .. } = self {
             Ok(target)
         } else {
             bail!("not a pointer like type");
@@ -401,12 +399,7 @@ pub fn is_qflags(path: &CppPath) -> bool {
 
 impl CppType {
     fn contains_reference(&self) -> bool {
-        if let CppType::PointerLike {
-            ref kind,
-            ref target,
-            ..
-        } = *self
-        {
+        if let CppType::PointerLike { kind, target, .. } = self {
             match *kind {
                 CppPointerLikeTypeKind::Pointer => target.contains_reference(),
                 CppPointerLikeTypeKind::Reference | CppPointerLikeTypeKind::RValueReference => true,
@@ -427,9 +420,9 @@ impl CppType {
             }
             match self {
                 CppType::FunctionPointer(CppFunctionPointerType {
-                    ref return_type,
-                    ref arguments,
-                    ref allows_variadic_arguments,
+                    return_type,
+                    arguments,
+                    allows_variadic_arguments,
                 }) => {
                     if *allows_variadic_arguments {
                         bail!("function pointers with variadic arguments are not supported");
@@ -463,7 +456,7 @@ impl CppType {
                         original_type: self.clone(),
                     });
                 }
-                CppType::Class(ref path) => {
+                CppType::Class(path) => {
                     if is_qflags(&path) {
                         return Ok(CppFfiType {
                             ffi_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
@@ -483,15 +476,15 @@ impl CppType {
                     }
                 }
                 CppType::PointerLike {
-                    ref kind,
-                    ref is_const,
-                    ref target,
+                    kind,
+                    is_const,
+                    target,
                 } => {
                     match *kind {
                         CppPointerLikeTypeKind::Pointer => {}
                         CppPointerLikeTypeKind::Reference => {
                             if *is_const {
-                                if let CppType::Class(ref path) = **target {
+                                if let CppType::Class(path) = &**target {
                                     if is_qflags(path) {
                                         return Ok(CppFfiType {
                                             ffi_type: CppType::BuiltInNumeric(
@@ -553,13 +546,13 @@ impl CppType {
                     Ok(self.clone())
                 }
             }
-            CppType::Class(ref type1) => Ok(CppType::Class(
+            CppType::Class(type1) => Ok(CppType::Class(
                 type1.instantiate(nested_level1, template_arguments1)?,
             )),
             CppType::PointerLike {
-                ref kind,
-                ref is_const,
-                ref target,
+                kind,
+                is_const,
+                target,
             } => Ok(CppType::PointerLike {
                 kind: kind.clone(),
                 is_const: *is_const,

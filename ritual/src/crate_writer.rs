@@ -78,7 +78,7 @@ fn generate_crate_template(data: &mut ProcessorData) -> Result<()> {
                 }
             });
     let output_build_rs_path = output_path.join("build.rs");
-    if let Some(ref template_build_rs_path) = template_build_rs_path {
+    if let Some(template_build_rs_path) = &template_build_rs_path {
         copy_file(template_build_rs_path, output_build_rs_path)?;
     } else {
         let mut build_rs_file = create_file(&output_build_rs_path)?;
@@ -208,7 +208,7 @@ fn generate_crate_template(data: &mut ProcessorData) -> Result<()> {
     };
     save_toml(output_path.join("Cargo.toml"), &cargo_toml_data)?;
 
-    if let Some(ref template_path) = data.config.crate_template_path() {
+    if let Some(template_path) = &data.config.crate_template_path() {
         for item in read_dir(template_path)? {
             let item = item?;
             let target = output_path.join(item.file_name());

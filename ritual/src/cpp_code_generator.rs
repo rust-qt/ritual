@@ -159,10 +159,10 @@ fn arguments_values(method: &CppFfiFunction) -> Result<String> {
                 CppTypeConversionToFfi::NoChange => {}
                 CppTypeConversionToFfi::QFlagsToInt => {
                     let type_text = if let CppType::PointerLike {
-                        ref kind,
-                        ref is_const,
-                        ref target,
-                    } = argument.argument_type.original_type
+                        kind,
+                        is_const,
+                        target,
+                    } = &argument.argument_type.original_type
                     {
                         if *kind == CppPointerLikeTypeKind::Reference && *is_const {
                             target.to_cpp_code(None)?
@@ -225,11 +225,9 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
                     }
                 }
             } else {
-                let path = match method.kind {
-                    CppFfiFunctionKind::Function {
-                        ref cpp_function, ..
-                    } => &cpp_function.path,
-                    CppFfiFunctionKind::FieldAccessor { ref field, .. } => &field.path,
+                let path = match &method.kind {
+                    CppFfiFunctionKind::Function { cpp_function, .. } => &cpp_function.path,
+                    CppFfiFunctionKind::FieldAccessor { field, .. } => &field.path,
                 };
 
                 if let Some(arg) = method
@@ -242,10 +240,7 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
                     path.to_cpp_code()?
                 }
             };
-        if let CppFfiFunctionKind::FieldAccessor {
-            ref accessor_type, ..
-        } = method.kind
-        {
+        if let CppFfiFunctionKind::FieldAccessor { accessor_type, .. } = &method.kind {
             if accessor_type == &CppFieldAccessorType::Setter {
                 format!("{} = {}", result_without_args, arguments_values(method)?)
             } else {
@@ -313,7 +308,7 @@ pub fn generate_cpp_file(
             if !ffi_item.checks.any_passed() {
                 continue;
             }
-            if let CppFfiItemKind::QtSlotWrapper(ref qt_slot_wrapper) = ffi_item.kind {
+            if let CppFfiItemKind::QtSlotWrapper(qt_slot_wrapper) = &ffi_item.kind {
                 any_slot_wrappers = true;
                 write!(cpp_file, "{}", self::qt_slot_wrapper(qt_slot_wrapper)?)?;
             }
@@ -326,7 +321,7 @@ pub fn generate_cpp_file(
             if !ffi_item.checks.any_passed() {
                 continue;
             }
-            if let CppFfiItemKind::Function(ref cpp_ffi_function) = ffi_item.kind {
+            if let CppFfiItemKind::Function(cpp_ffi_function) = &ffi_item.kind {
                 writeln!(cpp_file, "{}", function_implementation(cpp_ffi_function)?)?;
             }
         }
@@ -358,8 +353,8 @@ pub fn generate_cpp_type_size_requester(
     writeln!(output, "#include <stdio.h>\n\nint main() {{")?;
 
     for item in &rust_database.items {
-        if let RustItemKind::Struct(ref data) = item.kind {
-            if let RustStructKind::SizedType(ref cpp_path) = data.kind {
+        if let RustItemKind::Struct(data) = &item.kind {
+            if let RustStructKind::SizedType(cpp_path) = &data.kind {
                 let cpp_path_code = cpp_path.to_cpp_code()?;
 
                 writeln!(

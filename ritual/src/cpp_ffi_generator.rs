@@ -65,7 +65,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         .all_items()
         .iter()
         .filter_map(|item| {
-            if let CppItemData::Type(ref type_data) = item.cpp_data {
+            if let CppItemData::Type(type_data) = &item.cpp_data {
                 if let CppTypeDeclarationKind::Class { is_movable } = type_data.kind {
                     if is_movable {
                         return Some(type_data.path.clone());
@@ -98,23 +98,23 @@ fn run(data: &mut ProcessorData) -> Result<()> {
             trace!("cpp_data = {}; skipped", item.cpp_data.to_string());
             continue;
         }
-        let result = match item.cpp_data {
+        let result = match &item.cpp_data {
             CppItemData::Type(_) | CppItemData::EnumValue(_) | CppItemData::Namespace(_) => {
                 Ok(Vec::new())
                 // no FFI methods for these items
             }
-            CppItemData::Function(ref method) => {
+            CppItemData::Function(method) => {
                 generate_ffi_methods_for_method(method, &movable_types, &mut name_provider)
                     .map(|v| v.into_iter().collect())
             }
-            CppItemData::ClassField(ref field) => {
+            CppItemData::ClassField(field) => {
                 generate_field_accessors(field, &movable_types, &mut name_provider)
                     .map(|v| v.into_iter().collect())
             }
-            CppItemData::ClassBase(ref base) => {
+            CppItemData::ClassBase(base) => {
                 generate_casts(base, &mut name_provider).map(|v| v.into_iter().collect())
             }
-            CppItemData::QtSignalArguments(ref signal_arguments) => {
+            CppItemData::QtSignalArguments(signal_arguments) => {
                 generate_slot_wrapper(signal_arguments, &mut name_provider)
             }
         };
@@ -303,13 +303,11 @@ pub fn to_ffi_method(
     movable_types: &[CppPath],
     name_provider: &mut FfiNameProvider,
 ) -> Result<CppFfiFunction> {
-    let ascii_caption = match kind {
-        CppFfiFunctionKind::Function {
-            ref cpp_function, ..
-        } => cpp_function.path.ascii_caption(),
+    let ascii_caption = match &kind {
+        CppFfiFunctionKind::Function { cpp_function, .. } => cpp_function.path.ascii_caption(),
         CppFfiFunctionKind::FieldAccessor {
-            ref field,
-            ref accessor_type,
+            field,
+            accessor_type,
         } => {
             let field_caption = field.path.ascii_caption();
             match *accessor_type {
@@ -329,19 +327,17 @@ pub fn to_ffi_method(
         kind: kind.clone(),
     };
 
-    let this_arg_type = match kind {
-        CppFfiFunctionKind::Function {
-            ref cpp_function, ..
-        } => match cpp_function.member {
-            Some(ref info) if !info.is_static && info.kind != CppFunctionKind::Constructor => {
+    let this_arg_type = match &kind {
+        CppFfiFunctionKind::Function { cpp_function, .. } => match &cpp_function.member {
+            Some(info) if !info.is_static && info.kind != CppFunctionKind::Constructor => {
                 let class_type = CppType::Class(cpp_function.class_type().unwrap());
                 Some(CppType::new_pointer(info.is_const, class_type))
             }
             _ => None,
         },
         CppFfiFunctionKind::FieldAccessor {
-            ref field,
-            ref accessor_type,
+            field,
+            accessor_type,
         } => {
             if field.is_static {
                 None
@@ -364,10 +360,8 @@ pub fn to_ffi_method(
         });
     }
 
-    let normal_args = match kind {
-        CppFfiFunctionKind::Function {
-            ref cpp_function, ..
-        } => {
+    let normal_args = match &kind {
+        CppFfiFunctionKind::Function { cpp_function, .. } => {
             if cpp_function.allows_variadic_arguments {
                 bail!("Variable arguments are not supported");
             }
@@ -385,8 +379,8 @@ pub fn to_ffi_method(
             cpp_function.arguments.clone()
         }
         CppFfiFunctionKind::FieldAccessor {
-            ref field,
-            ref accessor_type,
+            field,
+            accessor_type,
         } => {
             if accessor_type == &CppFieldAccessorType::Setter {
                 let arg = CppFunctionArgument {
@@ -412,18 +406,16 @@ pub fn to_ffi_method(
         });
     }
 
-    let real_return_type = match kind {
-        CppFfiFunctionKind::Function {
-            ref cpp_function, ..
-        } => match cpp_function.member {
-            Some(ref info) if info.kind.is_constructor() => {
+    let real_return_type = match &kind {
+        CppFfiFunctionKind::Function { cpp_function, .. } => match &cpp_function.member {
+            Some(info) if info.kind.is_constructor() => {
                 CppType::Class(cpp_function.class_type().unwrap())
             }
             _ => cpp_function.return_type.clone(),
         },
         CppFfiFunctionKind::FieldAccessor {
-            ref field,
-            ref accessor_type,
+            field,
+            accessor_type,
         } => match *accessor_type {
             CppFieldAccessorType::CopyGetter => field.field_type.clone(),
             CppFieldAccessorType::ConstRefGetter => {
@@ -436,9 +428,9 @@ pub fn to_ffi_method(
         },
     };
     let real_return_type_ffi = real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
-    match real_return_type {
+    match &real_return_type {
         // QFlags is converted to uint in FFI
-        CppType::Class(ref path) if !is_qflags(path) => {
+        CppType::Class(path) if !is_qflags(path) => {
             if movable_types.iter().any(|t| t == path) {
                 r.arguments.push(CppFfiFunctionArgument {
                     name: "output".to_string(),
@@ -492,13 +484,13 @@ fn generate_field_accessors(
 }
 
 fn should_process_item(item: &CppItemData) -> Result<bool> {
-    if let CppItemData::Function(ref method) = *item {
+    if let CppItemData::Function(method) = item {
         if let Ok(class_name) = method.class_type() {
             if is_qflags(&class_name) {
                 return Ok(false);
             }
         }
-        if let Some(ref membership) = method.member {
+        if let Some(membership) = &method.member {
             if membership.visibility == CppVisibility::Private {
                 return Ok(false);
             }

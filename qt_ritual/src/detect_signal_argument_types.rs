@@ -14,7 +14,7 @@ pub fn detect_signal_argument_types(data: &mut ProcessorData) -> Result<()> {
         .iter()
         .filter_map(|i| i.cpp_data.as_function_ref())
     {
-        if let Some(ref method_info) = method.member {
+        if let Some(method_info) = &method.member {
             if method_info.is_signal {
                 let types: Vec<_> = method
                     .arguments

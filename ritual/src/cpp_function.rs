@@ -201,7 +201,7 @@ impl CppFunction {
     /// (only for debugging output).
     pub fn short_text(&self) -> String {
         let mut s = String::new();
-        if let Some(ref info) = self.member {
+        if let Some(info) = &self.member {
             if info.is_virtual {
                 if info.is_pure_virtual {
                     s = format!("{} pure virtual", s);
@@ -252,7 +252,7 @@ impl CppFunction {
                 ))
                 .join(", ")
         );
-        if let Some(ref info) = self.member {
+        if let Some(info) = &self.member {
             if info.is_const {
                 s = format!("{} const", s);
             }
@@ -262,31 +262,31 @@ impl CppFunction {
 
     /// Returns true if this method is a constructor.
     pub fn is_constructor(&self) -> bool {
-        match self.member {
-            Some(ref info) => info.kind.is_constructor(),
+        match &self.member {
+            Some(info) => info.kind.is_constructor(),
             None => false,
         }
     }
 
     /// Returns true if this method is a destructor.
     pub fn is_destructor(&self) -> bool {
-        match self.member {
-            Some(ref info) => info.kind.is_destructor(),
+        match &self.member {
+            Some(info) => info.kind.is_destructor(),
             None => false,
         }
     }
 
     /// Returns true if this method is static.
     pub fn is_static_member(&self) -> bool {
-        match self.member {
-            Some(ref info) => info.is_static,
+        match &self.member {
+            Some(info) => info.is_static,
             None => false,
         }
     }
 
     pub fn is_virtual(&self) -> bool {
-        match self.member {
-            Some(ref info) => info.is_virtual,
+        match &self.member {
+            Some(info) => info.is_virtual,
             None => false,
         }
     }
@@ -294,7 +294,7 @@ impl CppFunction {
     /// Returns the identifier that should be used in `QObject::connect`
     /// to specify this signal or slot.
     pub fn receiver_id(&self) -> Result<String> {
-        let type_num = if let Some(ref info) = self.member {
+        let type_num = if let Some(info) = &self.member {
             if info.is_slot {
                 "1"
             } else if info.is_signal {
@@ -329,7 +329,7 @@ impl CppFunction {
     /// including argument types, return type and type of `this` implicit parameter.
     pub fn all_involved_types(&self) -> Vec<CppType> {
         let mut result: Vec<CppType> = Vec::new();
-        if let Some(ref class_membership) = self.member {
+        if let Some(class_membership) = &self.member {
             result.push(CppType::PointerLike {
                 is_const: class_membership.is_const,
                 kind: CppPointerLikeTypeKind::Pointer,
@@ -340,13 +340,13 @@ impl CppFunction {
             result.push(t);
         }
         result.push(self.return_type.clone());
-        if let Some(ref operator) = self.operator {
-            if let CppOperator::Conversion(ref cpp_type) = *operator {
+        if let Some(operator) = &self.operator {
+            if let CppOperator::Conversion(cpp_type) = operator {
                 result.push(cpp_type.clone());
             }
         }
 
-        if let Some(ref template_arguments) = self.path.last().template_arguments {
+        if let Some(template_arguments) = &self.path.last().template_arguments {
             result.extend(template_arguments.clone());
         }
         result

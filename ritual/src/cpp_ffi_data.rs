@@ -42,14 +42,14 @@ impl CppCast {
     }
 
     pub fn is_unsafe_static_cast(&self) -> bool {
-        match *self {
-            CppCast::Static { ref is_unsafe, .. } => *is_unsafe,
+        match self {
+            CppCast::Static { is_unsafe, .. } => *is_unsafe,
             _ => false,
         }
     }
     pub fn is_first_static_cast(&self) -> bool {
-        match *self {
-            CppCast::Static { ref base_index, .. } => base_index == &0,
+        match self {
+            CppCast::Static { base_index, .. } => base_index == &0,
             _ => false,
         }
     }
@@ -81,17 +81,14 @@ pub enum CppFfiFunctionKind {
 
 impl CppFfiFunctionKind {
     pub fn cpp_function(&self) -> Option<&CppFunction> {
-        if let CppFfiFunctionKind::Function {
-            ref cpp_function, ..
-        } = *self
-        {
+        if let CppFfiFunctionKind::Function { cpp_function, .. } = self {
             Some(cpp_function)
         } else {
             None
         }
     }
     pub fn cpp_field(&self) -> Option<&CppClassField> {
-        if let CppFfiFunctionKind::FieldAccessor { ref field, .. } = *self {
+        if let CppFfiFunctionKind::FieldAccessor { field, .. } = self {
             Some(field)
         } else {
             None
@@ -205,10 +202,10 @@ impl CppFfiFunction {
     }
 
     pub fn short_text(&self) -> String {
-        match self.kind {
+        match &self.kind {
             CppFfiFunctionKind::Function {
-                ref cpp_function,
-                ref omitted_arguments,
+                cpp_function,
+                omitted_arguments,
                 ..
             } => {
                 let omitted_args_text = if let Some(args) = omitted_arguments {
@@ -223,8 +220,8 @@ impl CppFfiFunction {
                 )
             }
             CppFfiFunctionKind::FieldAccessor {
-                ref field,
-                ref accessor_type,
+                field,
+                accessor_type,
             } => format!("FFI field {:?}: {}", accessor_type, field.short_text()),
         }
     }

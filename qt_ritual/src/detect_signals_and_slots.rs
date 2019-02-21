@@ -16,7 +16,7 @@ pub fn inherits(
     base_class_name: &CppPath,
 ) -> bool {
     for item in data.all_items() {
-        if let CppItemData::ClassBase(ref base_data) = item.cpp_data {
+        if let CppItemData::ClassBase(base_data) = &item.cpp_data {
             if &base_data.derived_class_type == derived_class_name {
                 if &base_data.base_class_type == base_class_name {
                     return true;
@@ -38,11 +38,10 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
 
     for item in &data.current_database.cpp_items {
         if let DatabaseItemSource::CppParser {
-            ref origin_location,
-            ..
-        } = item.source
+            origin_location, ..
+        } = &item.source
         {
-            if let CppItemData::Type(ref type1) = item.cpp_data {
+            if let CppItemData::Type(type1) = &item.cpp_data {
                 if type1.kind.is_class() {
                     if inherits(&data, &type1.path, &CppPath::from_str_unchecked("QObject")) {
                         if !files.contains(&origin_location.include_file_path) {
@@ -105,11 +104,10 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
     let mut sections_per_class = HashMap::new();
     for item in &data.current_database.cpp_items {
         if let DatabaseItemSource::CppParser {
-            ref origin_location,
-            ..
-        } = item.source
+            origin_location, ..
+        } = &item.source
         {
-            if let CppItemData::Type(ref type1) = item.cpp_data {
+            if let CppItemData::Type(type1) = &item.cpp_data {
                 if let Some(sections) = sections.get(&origin_location.include_file_path) {
                     let sections_for_class: Vec<_> = sections
                         .iter()
@@ -123,11 +121,10 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
 
     for item in &mut data.current_database.cpp_items {
         if let DatabaseItemSource::CppParser {
-            ref origin_location,
-            ..
-        } = item.source
+            origin_location, ..
+        } = &item.source
         {
-            if let CppItemData::Function(ref mut method) = item.cpp_data {
+            if let CppItemData::Function(method) = &mut item.cpp_data {
                 let mut section_type = SectionType::Other;
                 if let Ok(class_name) = method.class_type() {
                     if let Some(sections) = sections_per_class.get(&class_name) {
@@ -151,7 +148,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
                         }
                     }
                 }
-                if let Some(ref mut info) = method.member {
+                if let Some(info) = &mut method.member {
                     match section_type {
                         SectionType::Signals => {
                             info.is_signal = true;

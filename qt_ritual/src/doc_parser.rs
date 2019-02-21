@@ -127,8 +127,8 @@ impl DocParser {
             .ok_or_else(|| format_err!("No documentation entry for {}", corrected_name))?;
         let anchor = match anchor_override {
             Some(x) => x,
-            None => match index_item.anchor {
-                Some(ref anchor) => anchor.clone(),
+            None => match &index_item.anchor {
+                Some(anchor) => anchor.clone(),
                 None => unexpected!("anchor is expected here!"),
             },
         };
@@ -153,7 +153,7 @@ impl DocParser {
         };
         for declaration in &[declaration1, declaration2] {
             let mut declaration_no_scope = declaration.to_string();
-            if let Some((ref prefix1, ref prefix2)) = scope_prefix {
+            if let Some((prefix1, prefix2)) = &scope_prefix {
                 declaration_no_scope = declaration_no_scope
                     .replace(prefix1, "")
                     .replace(prefix2, "");
@@ -174,7 +174,7 @@ impl DocParser {
                 for item_declaration in &item.declarations {
                     let mut item_declaration_imprint =
                         item_declaration.replace("virtual ", "").replace(" ", "");
-                    if let Some((ref prefix1, ref prefix2)) = scope_prefix {
+                    if let Some((prefix1, prefix2)) = &scope_prefix {
                         item_declaration_imprint = item_declaration_imprint
                             .replace(prefix1, "")
                             .replace(prefix2, "");
@@ -196,7 +196,7 @@ impl DocParser {
             for item in &candidates {
                 for item_declaration in &item.declarations {
                     let mut item_declaration_imprint = item_declaration.clone();
-                    if let Some((ref prefix1, ref prefix2)) = scope_prefix {
+                    if let Some((prefix1, prefix2)) = &scope_prefix {
                         item_declaration_imprint = item_declaration_imprint
                             .replace(prefix1, "")
                             .replace(prefix2, "");
@@ -255,7 +255,7 @@ impl DocParser {
             .doc_data
             .find_index_item(|item| item.name == name)
             .ok_or_else(|| format_err!("No documentation entry for {}", name))?;
-        if let Some(ref anchor) = index_item.anchor {
+        if let Some(anchor) = &index_item.anchor {
             let (result, file_name) = {
                 let file_data = self.file_data(index_item.document_id)?;
                 let result = file_data
@@ -549,13 +549,13 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
 /// Adds documentation from `data` to `cpp_methods`.
 fn find_methods_docs(items: &mut [CppDatabaseItem], data: &mut DocParser) -> Result<()> {
     for item in items {
-        if let CppItemData::Function(ref mut cpp_method) = item.cpp_data {
-            if let Some(ref info) = cpp_method.member {
+        if let CppItemData::Function(cpp_method) = &mut item.cpp_data {
+            if let Some(info) = &cpp_method.member {
                 if info.visibility == CppVisibility::Private {
                     continue;
                 }
             }
-            if let Some(ref declaration_code) = cpp_method.declaration_code {
+            if let Some(declaration_code) = &cpp_method.declaration_code {
                 match data.doc_for_method(
                     &cpp_method.path.doc_id(),
                     declaration_code,
@@ -597,9 +597,9 @@ pub fn parse_docs(data: &mut ProcessorData, qt_crate_name: &str, docs_path: &Pat
     find_methods_docs(&mut data.current_database.cpp_items, &mut parser)?;
     let mut type_doc_cache = HashMap::new();
     for item in &mut data.current_database.cpp_items {
-        let type_name = match item.cpp_data {
-            CppItemData::Type(ref data) => data.path.clone(),
-            CppItemData::EnumValue(ref data) => data
+        let type_name = match &item.cpp_data {
+            CppItemData::Type(data) => data.path.clone(),
+            CppItemData::EnumValue(data) => data
                 .path
                 .parent()
                 .expect("enum value must have parent path"),
@@ -607,7 +607,7 @@ pub fn parse_docs(data: &mut ProcessorData, qt_crate_name: &str, docs_path: &Pat
         };
         if !type_doc_cache.contains_key(&type_name) {
             let doc = parser.doc_for_type(&type_name);
-            if let Err(ref err) = doc {
+            if let Err(err) = &doc {
                 error!("Failed to get Qt documentation: {}", err);
             }
             type_doc_cache.insert(type_name.clone(), doc);
@@ -616,11 +616,11 @@ pub fn parse_docs(data: &mut ProcessorData, qt_crate_name: &str, docs_path: &Pat
             .get(&type_name)
             .expect("type_doc_cache is guaranteed to have an entry here because we added it above");
         if let Ok(doc) = doc {
-            match item.cpp_data {
-                CppItemData::Type(ref mut data) => {
+            match &mut item.cpp_data {
+                CppItemData::Type(data) => {
                     data.doc = Some(doc.type_doc.clone());
                 }
-                CppItemData::EnumValue(ref mut data) => {
+                CppItemData::EnumValue(data) => {
                     if let Some(r) = doc
                         .enum_variants_doc
                         .iter()

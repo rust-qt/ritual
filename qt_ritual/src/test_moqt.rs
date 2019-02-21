@@ -28,9 +28,9 @@ impl TempTestDir {
     }
 
     pub fn path(&self) -> &Path {
-        match *self {
-            TempTestDir::System(ref dir) => dir.path(),
-            TempTestDir::Custom(ref path) => path,
+        match self {
+            TempTestDir::System(dir) => dir.path(),
+            TempTestDir::Custom(path) => path,
         }
     }
 }

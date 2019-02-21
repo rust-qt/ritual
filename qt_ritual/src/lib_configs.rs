@@ -28,7 +28,7 @@ fn exclude_qlist_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(
 ) {
   let types: Vec<String> = types.into_iter().map(|x| x.as_ref().to_string()).collect();
   config.add_cpp_ffi_generator_filter(move |method| {
-    if let Some(ref info) = method.class_membership {
+    if let Some(info) = &method.class_membership {
       if info.class_type.name == "QList" {
         let args = info
           .class_type
@@ -65,7 +65,7 @@ fn exclude_qvector_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(
 ) {
   let types: Vec<String> = types.into_iter().map(|x| x.as_ref().to_string()).collect();
   config.add_cpp_ffi_generator_filter(move |method| {
-    if let Some(ref info) = method.class_membership {
+    if let Some(info) = &method.class_membership {
       if info.class_type.name == "QVector" {
         let args = info
           .class_type
@@ -197,7 +197,7 @@ fn core_config(config: &mut Config) -> Result<()> {
     );
 
     config.add_cpp_ffi_generator_filter(|method| {
-      if let Some(ref info) = method.class_membership {
+      if let Some(info) = &method.class_membership {
         if info.class_type.to_cpp_pseudo_code() == "QFuture<void>" {
           // template partial specialization removes these methods
           match method.name.as_ref() {
@@ -298,7 +298,7 @@ fn gui_config(_config: &mut Config) -> Result<()> {
         ],
       );
       config.add_cpp_ffi_generator_filter(|method| {
-        if let Some(ref info) = method.class_membership {
+        if let Some(info) = &method.class_membership {
           match info.class_type.to_cpp_pseudo_code().as_ref() {
             "QQueue<QInputMethodEvent::Attribute>"
             | "QQueue<QTextLayout::FormatRange>"
@@ -351,7 +351,7 @@ fn widgets_config(_config: &mut Config) -> Result<()> {
       &["QTableWidgetSelectionRange", "QTextEdit::ExtraSelection"],
     );
     config.add_cpp_ffi_generator_filter(|method| {
-      if let Some(ref info) = method.class_membership {
+      if let Some(info) = &method.class_membership {
         match info.class_type.to_cpp_pseudo_code().as_ref() {
           "QQueue<QTableWidgetSelectionRange>" | "QQueue<QTextEdit::ExtraSelection>" => {
             match method.name.as_ref() {
@@ -395,7 +395,7 @@ fn render_3d_config(config: &mut Config) -> Result<()> {
       "Qt3DRender::QSortCriterion",
     ]);
     config.add_cpp_ffi_generator_filter(|method| {
-      if let Some(ref info) = method.class_membership {
+      if let Some(info) = &method.class_membership {
         match info.class_type.to_cpp_pseudo_code().as_ref() {
           "Qt3DRender::QSpotLight" => match method.name.as_ref() {
             "attenuation" => return Ok(false),
@@ -415,7 +415,7 @@ fn render_3d_config(config: &mut Config) -> Result<()> {
       }
       if method.name == "Qt3DRender::operator==" || method.name == "Qt3DRender::operator!=" {
         if method.arguments.len() == 2 {
-          if let CppTypeBase::Class(ref base) = method.arguments[0].argument_type.base {
+          if let CppTypeBase::Class(base) = &method.arguments[0].argument_type.base {
             if &base.name == "Qt3DRender::QGraphicsApiFilter" {
               return Ok(false);
             }

@@ -198,12 +198,12 @@ impl RustType {
     /// Returns alphanumeric description of this type
     /// for purposes of name disambiguation.
     pub fn caption(&self, context: &RustPath) -> Result<String> {
-        Ok(match *self {
+        Ok(match self {
             RustType::Unit => "unit".to_string(),
             RustType::PointerLike {
-                ref kind,
-                ref is_const,
-                ref target,
+                kind,
+                is_const,
+                target,
             } => {
                 let const_text = if *is_const { "_const" } else { "" };
                 let kind_text = match *kind {
@@ -213,8 +213,8 @@ impl RustType {
                 format!("{}{}{}", target.caption(context)?, const_text, kind_text)
             }
             RustType::Common(RustCommonType {
-                ref path,
-                ref generic_arguments,
+                path,
+                generic_arguments,
             }) => {
                 let mut name = if path.parts.len() == 1 {
                     path.parts[0].to_snake_case()
@@ -242,7 +242,7 @@ impl RustType {
                         good_parts.join("_")
                     }
                 };
-                if let Some(ref args) = *generic_arguments {
+                if let Some(args) = generic_arguments {
                     name = format!(
                         "{}_{}",
                         name,
@@ -257,8 +257,8 @@ impl RustType {
 
     /// Returns true if this type is a reference.
     pub fn is_ref(&self) -> bool {
-        match *self {
-            RustType::PointerLike { ref kind, .. } => kind.is_ref(),
+        match self {
+            RustType::PointerLike { kind, .. } => kind.is_ref(),
             _ => false,
         }
     }
@@ -266,10 +266,10 @@ impl RustType {
     /// Returns a copy of this type with `new_lifetime` added, if possible.
     pub fn with_lifetime(&self, new_lifetime: String) -> RustType {
         let mut r = self.clone();
-        if let RustType::PointerLike { ref mut kind, .. } = r {
-            match *kind {
+        if let RustType::PointerLike { kind, .. } = &mut r {
+            match kind {
                 RustPointerLikeTypeKind::Pointer => {}
-                RustPointerLikeTypeKind::Reference { ref mut lifetime } => {
+                RustPointerLikeTypeKind::Reference { lifetime } => {
                     *lifetime = Some(new_lifetime);
                 }
             }
@@ -280,8 +280,8 @@ impl RustType {
     /// Returns name of the lifetime of this type,
     /// or `None` if there isn't any lifetime in this type.
     pub fn lifetime(&self) -> Option<&str> {
-        if let RustType::PointerLike { ref kind, .. } = *self {
-            if let RustPointerLikeTypeKind::Reference { ref lifetime } = *kind {
+        if let RustType::PointerLike { kind, .. } = self {
+            if let RustPointerLikeTypeKind::Reference { lifetime } = kind {
                 return lifetime.as_ref().map(|s| s.as_str());
             }
         }
@@ -289,7 +289,7 @@ impl RustType {
     }
     /// Returns true if indirection that is applied last has const qualifier.
     pub fn is_const_pointer_like(&self) -> Result<bool> {
-        if let RustType::PointerLike { ref is_const, .. } = *self {
+        if let RustType::PointerLike { is_const, .. } = self {
             Ok(*is_const)
         } else {
             bail!("not a PointerLike type");
@@ -298,18 +298,16 @@ impl RustType {
 
     /// Returns true if the first indirection of the type is const.
     pub fn is_const(&self) -> Result<bool> {
-        match *self {
-            RustType::PointerLike { ref is_const, .. } => Ok(*is_const),
+        match self {
+            RustType::PointerLike { is_const, .. } => Ok(*is_const),
             _ => bail!("not a PointerLike type"),
         }
     }
 
     /// Sets value of `is_const` for a `PointerLike` type.
     pub fn set_const(&mut self, value: bool) -> Result<()> {
-        match *self {
-            RustType::PointerLike {
-                ref mut is_const, ..
-            } => {
+        match self {
+            RustType::PointerLike { is_const, .. } => {
                 *is_const = value;
                 Ok(())
             }
@@ -321,17 +319,14 @@ impl RustType {
     /// should be assumed unsafe. Currently returns true if this type
     /// is or contains a raw pointer.
     pub fn is_unsafe_argument(&self) -> bool {
-        match *self {
-            RustType::PointerLike {
-                ref kind,
-                ref target,
-                ..
-            } => kind.is_pointer() || target.is_unsafe_argument(),
+        match self {
+            RustType::PointerLike { kind, target, .. } => {
+                kind.is_pointer() || target.is_unsafe_argument()
+            }
             RustType::Common(RustCommonType {
-                ref generic_arguments,
-                ..
+                generic_arguments, ..
             }) => {
-                if let Some(ref args) = *generic_arguments {
+                if let Some(args) = generic_arguments {
                     if args.iter().any(|arg| arg.is_unsafe_argument()) {
                         return true;
                     }
@@ -340,8 +335,8 @@ impl RustType {
             }
             RustType::Unit => false,
             RustType::FunctionPointer {
-                ref return_type,
-                ref arguments,
+                return_type,
+                arguments,
             } => {
                 return_type.is_unsafe_argument()
                     || arguments.iter().any(|arg| arg.is_unsafe_argument())
@@ -359,12 +354,7 @@ impl RustType {
 
     pub fn ptr_to_ref(&self, is_const1: bool) -> Result<Self> {
         let mut r = self.clone();
-        if let RustType::PointerLike {
-            ref mut is_const,
-            ref mut kind,
-            ..
-        } = r
-        {
+        if let RustType::PointerLike { is_const, kind, .. } = &mut r {
             if !kind.is_pointer() {
                 bail!("not a pointer type");
             }
@@ -377,7 +367,7 @@ impl RustType {
     }
 
     pub fn as_common(&self) -> Result<&RustCommonType> {
-        if let RustType::Common(ref r) = self {
+        if let RustType::Common(r) = self {
             Ok(r)
         } else {
             bail!("expected common type, got {:?}", self)
@@ -403,12 +393,7 @@ impl RustFinalType {
     /// and modifies `rust_api_to_c_conversion` accordingly.
     pub fn ptr_to_value(&self) -> Result<RustFinalType> {
         let mut r = self.clone();
-        r.api_type = if let RustType::PointerLike {
-            ref kind,
-            ref target,
-            ..
-        } = r.api_type
-        {
+        r.api_type = if let RustType::PointerLike { kind, target, .. } = &r.api_type {
             if !kind.is_pointer() {
                 bail!("not a pointer type");
             }

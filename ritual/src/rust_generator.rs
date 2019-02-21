@@ -108,11 +108,11 @@ struct State<'a> {
 impl State<'_> {
     /// Converts `CppType` to its exact Rust equivalent (FFI-compatible)
     fn ffi_type_to_rust_ffi_type(&self, cpp_ffi_type: &CppType) -> Result<RustType> {
-        let rust_type = match cpp_ffi_type {
+        let rust_type = match &cpp_ffi_type {
             CppType::PointerLike {
-                ref kind,
-                ref is_const,
-                ref target,
+                kind,
+                is_const,
+                target,
             } => {
                 let rust_target = if target.deref() == &CppType::Void {
                     RustType::Common(RustCommonType {
@@ -136,7 +136,7 @@ impl State<'_> {
             }
             CppType::Void => RustType::Unit,
 
-            CppType::BuiltInNumeric(ref numeric) => {
+            CppType::BuiltInNumeric(numeric) => {
                 let rust_path = if numeric == &CppBuiltInNumericType::Bool {
                     // TODO: bool may not be safe for FFI
                     RustPath::from_str_unchecked("bool")
@@ -166,11 +166,9 @@ impl State<'_> {
                     generic_arguments: None,
                 })
             }
-            CppType::SpecificNumeric(CppSpecificNumericType {
-                ref bits, ref kind, ..
-            }) => {
-                let letter = match *kind {
-                    CppSpecificNumericTypeKind::Integer { ref is_signed } => {
+            CppType::SpecificNumeric(CppSpecificNumericType { bits, kind, .. }) => {
+                let letter = match kind {
+                    CppSpecificNumericTypeKind::Integer { is_signed } => {
                         if *is_signed {
                             "i"
                         } else {
@@ -186,14 +184,14 @@ impl State<'_> {
                     generic_arguments: None,
                 })
             }
-            CppType::PointerSizedInteger { ref is_signed, .. } => {
+            CppType::PointerSizedInteger { is_signed, .. } => {
                 let name = if *is_signed { "isize" } else { "usize" };
                 RustType::Common(RustCommonType {
                     path: RustPath::from_str_unchecked(name),
                     generic_arguments: None,
                 })
             }
-            CppType::Enum { ref path } | CppType::Class(ref path) => {
+            CppType::Enum { path } | CppType::Class(path) => {
                 let rust_item = self.find_wrapper_type(path)?;
                 let path = rust_item
                     .path()
@@ -206,9 +204,9 @@ impl State<'_> {
                 })
             }
             CppType::FunctionPointer(CppFunctionPointerType {
-                ref return_type,
-                ref arguments,
-                ref allows_variadic_arguments,
+                return_type,
+                arguments,
+                allows_variadic_arguments,
             }) => {
                 if *allows_variadic_arguments {
                     bail!("function pointers with variadic arguments are not supported");
@@ -262,10 +260,10 @@ impl State<'_> {
         let mut rust_api_type = rust_ffi_type.clone();
         let mut api_to_ffi_conversion = RustToFfiTypeConversion::None;
         if let RustType::PointerLike {
-            ref mut kind,
-            ref mut is_const,
-            ref target,
-        } = rust_api_type
+            kind,
+            is_const,
+            target,
+        } = &mut rust_api_type
         {
             if cpp_ffi_type.conversion == CppTypeConversionToFfi::ValueToPointer {
                 if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
@@ -329,9 +327,9 @@ impl State<'_> {
         if cpp_ffi_type.conversion == CppTypeConversionToFfi::QFlagsToInt {
             let qflags_type = match &cpp_ffi_type.original_type {
                 CppType::PointerLike {
-                    ref kind,
-                    ref is_const,
-                    ref target,
+                    kind,
+                    is_const,
+                    target,
                 } => {
                     if kind != &CppPointerLikeTypeKind::Reference {
                         bail!(
@@ -360,7 +358,7 @@ impl State<'_> {
                 bail!("invalid original type for QFlagsToUInt: {:?}", cpp_ffi_type);
             };
 
-            let enum_path = if let CppType::Enum { ref path } = enum_type {
+            let enum_path = if let CppType::Enum { path } = &enum_type {
                 path
             } else {
                 bail!("invalid QFlags argument type: {:?}", enum_type);
@@ -409,8 +407,8 @@ impl State<'_> {
         is_const: bool,
     ) -> Result<UnnamedRustFunction> {
         if is_const {
-            if let RustType::Common(RustCommonType { ref mut path, .. }) =
-                unnamed_function.return_type.api_type
+            if let RustType::Common(RustCommonType { path, .. }) =
+                &mut unnamed_function.return_type.api_type
             {
                 ensure!(
                     path.last() == "Ptr",
@@ -434,9 +432,8 @@ impl State<'_> {
         }
 
         let is_const1 = is_const;
-        if let RustType::PointerLike {
-            ref mut is_const, ..
-        } = unnamed_function.arguments[0].argument_type.api_type
+        if let RustType::PointerLike { is_const, .. } =
+            &mut unnamed_function.arguments[0].argument_type.api_type
         {
             *is_const = is_const1;
         } else {
@@ -464,8 +461,8 @@ impl State<'_> {
         let cast_function_name;
         let cast_function_name_mut;
         unnamed_function.is_unsafe = true;
-        match cast {
-            CppCast::Static { ref is_unsafe, .. } => {
+        match &cast {
+            CppCast::Static { is_unsafe, .. } => {
                 if *is_unsafe {
                     trait_path = RustPath::from_str_unchecked("cpp_utils::StaticDowncast");
                     derived_type = to_type;
@@ -502,8 +499,8 @@ impl State<'_> {
             .clone()
             .with_path(trait_path.join(cast_function_name_mut));
 
-        let parent_path = if let RustType::Common(RustCommonType { ref path, .. }) =
-            derived_type.pointer_like_to_target()?
+        let parent_path = if let RustType::Common(RustCommonType { path, .. }) =
+            &derived_type.pointer_like_to_target()?
         {
             path.parent().expect("cast argument path must have parent")
         } else {
@@ -672,10 +669,8 @@ impl State<'_> {
         };
 
         if let CppFfiFunctionKind::Function {
-            ref cpp_function,
-            ref cast,
-            ..
-        } = function.kind
+            cpp_function, cast, ..
+        } = &function.kind
         {
             if cpp_function.is_destructor() {
                 if arguments.len() != 1 {
@@ -687,7 +682,7 @@ impl State<'_> {
                     .pointer_like_to_target()?;
 
                 let parent_path =
-                    if let RustType::Common(RustCommonType { ref path, .. }) = target_type {
+                    if let RustType::Common(RustCommonType { path, .. }) = &target_type {
                         path.parent()
                             .expect("destructor argument path must have parent")
                     } else {
@@ -732,11 +727,9 @@ impl State<'_> {
             }
         }
 
-        let cpp_path = match function.kind {
-            CppFfiFunctionKind::Function {
-                ref cpp_function, ..
-            } => &cpp_function.path,
-            CppFfiFunctionKind::FieldAccessor { ref field, .. } => &field.path,
+        let cpp_path = match &function.kind {
+            CppFfiFunctionKind::Function { cpp_function, .. } => &cpp_function.path,
+            CppFfiFunctionKind::FieldAccessor { field, .. } => &field.path,
         };
         let path = self.generate_rust_path(cpp_path, &NameType::ApiFunction(function))?;
         let rust_item = RustItemKind::Function(unnamed_function.with_path(path));
@@ -1027,7 +1020,7 @@ impl State<'_> {
                                 let argument =
                                     &data.path.last().template_arguments.as_ref().unwrap()[0];
                                 if !argument.is_template_parameter() {
-                                    if let CppType::Enum { ref path } = argument {
+                                    if let CppType::Enum { path } = &argument {
                                         let rust_type = self.find_wrapper_type(path)?;
                                         let rust_type_path = rust_type
                                             .path()
@@ -1324,21 +1317,19 @@ pub fn clear_rust_info_step() -> ProcessingStep {
 /// include class name and scope. For free functions, the name includes
 /// modules.
 fn special_function_rust_name(function: &CppFfiFunction) -> Result<Option<String>> {
-    let r = match function.kind {
-        CppFfiFunctionKind::Function {
-            ref cpp_function, ..
-        } => {
+    let r = match &function.kind {
+        CppFfiFunctionKind::Function { cpp_function, .. } => {
             if cpp_function.is_constructor() {
                 Some("new".to_string())
-            } else if let Some(ref operator) = cpp_function.operator {
+            } else if let Some(operator) = &cpp_function.operator {
                 Some(format!("operator_{}", operator.ascii_name()?))
             } else {
                 None
             }
         }
         CppFfiFunctionKind::FieldAccessor {
-            ref accessor_type,
-            ref field,
+            accessor_type,
+            field,
         } => {
             let name = &field.path.last().name;
             let function_name = match accessor_type {

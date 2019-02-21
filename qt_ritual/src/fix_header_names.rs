@@ -98,17 +98,13 @@ pub fn fix_header_names(data: &mut [CppDatabaseItem], headers_dir: &PathBuf) -> 
     // TODO: only run on new database items?
     let map = HeaderNameMap::new(headers_dir)?;
     for item in data {
-        let class_name = match item.cpp_data {
-            CppItemData::Type(ref data) => Some(data.path.doc_id()),
-            CppItemData::Function(ref data) => data.class_type().ok().map(|x| x.doc_id()),
+        let class_name = match &item.cpp_data {
+            CppItemData::Type(data) => Some(data.path.doc_id()),
+            CppItemData::Function(data) => data.class_type().ok().map(|x| x.doc_id()),
             _ => continue,
         };
 
-        if let DatabaseItemSource::CppParser {
-            ref mut include_file,
-            ..
-        } = item.source
-        {
+        if let DatabaseItemSource::CppParser { include_file, .. } = &mut item.source {
             let new_include_file =
                 map.real_to_fancy(include_file, class_name.as_ref().map(|s| s.as_str()));
             *include_file = new_include_file;

@@ -38,7 +38,7 @@ pub fn module_doc(module: &RustModule) -> String {
             "Types with the same size and alignment as corresponding C++ types".into()
         }
         RustModuleKind::CppNamespace => {
-            if let Some(ref path) = module.doc.cpp_path {
+            if let Some(path) = &module.doc.cpp_path {
                 let cpp_path_text = wrap_inline_cpp_code(&path.to_cpp_pseudo_code());
                 format!("C++ namespace: {}", cpp_path_text)
             } else {
@@ -46,7 +46,7 @@ pub fn module_doc(module: &RustModule) -> String {
             }
         }
         RustModuleKind::CppNestedType => {
-            if let Some(ref path) = module.doc.cpp_path {
+            if let Some(path) = &module.doc.cpp_path {
                 let cpp_path_text = wrap_inline_cpp_code(&path.to_cpp_pseudo_code());
                 format!("C++ type: {}", cpp_path_text)
             } else {
@@ -54,7 +54,7 @@ pub fn module_doc(module: &RustModule) -> String {
             }
         }
     };
-    if let Some(ref doc) = module.doc.extra_doc {
+    if let Some(doc) = &module.doc.extra_doc {
         format!("{}\n\n{}", doc, auto_doc)
     } else {
         auto_doc
@@ -67,8 +67,8 @@ pub fn struct_doc(type1: &RustStruct) -> String {
         .crate_name()
         .expect("generated type's path must have crate name");
 
-    let auto_doc = match type1.kind {
-        RustStructKind::WrapperType(RustWrapperType { ref doc_data, .. }) => {
+    let auto_doc = match &type1.kind {
+        RustStructKind::WrapperType(RustWrapperType { doc_data, .. }) => {
             let cpp_type_code = doc_data.cpp_path.to_cpp_pseudo_code();
             let mut doc = format!(
                 "Type corresponding to C++ type: {}.\n\n\
@@ -76,7 +76,7 @@ pub fn struct_doc(type1: &RustStruct) -> String {
                 wrap_inline_cpp_code(&cpp_type_code)
             );
             // TODO: add description based on the wrapper kind (enum, immovable/movable class)
-            if let Some(ref cpp_doc) = doc_data.cpp_doc {
+            if let Some(cpp_doc) = &doc_data.cpp_doc {
                 doc += &format!(
                     "\n\n<a href=\"{}\">C++ documentation:</a> {}",
                     cpp_doc.url,
@@ -84,7 +84,7 @@ pub fn struct_doc(type1: &RustStruct) -> String {
                 );
             }
 
-            if let Some(ref slot_wrapper) = doc_data.raw_qt_slot_wrapper {
+            if let Some(slot_wrapper) = &doc_data.raw_qt_slot_wrapper {
                 let cpp_args = slot_wrapper
                     .cpp_arguments
                     .iter()
@@ -118,7 +118,7 @@ pub fn struct_doc(type1: &RustStruct) -> String {
             }
             doc
         }
-        RustStructKind::QtSlotWrapper(ref slot_wrapper) => {
+        RustStructKind::QtSlotWrapper(slot_wrapper) => {
             let cpp_args = slot_wrapper
                 .cpp_arguments
                 .iter()
@@ -144,7 +144,7 @@ pub fn struct_doc(type1: &RustStruct) -> String {
         // private struct, no doc needed
         RustStructKind::SizedType(_) => String::new(),
     };
-    if let Some(ref doc) = type1.extra_doc {
+    if let Some(doc) = &type1.extra_doc {
         format!("{}\n\n{}", doc, auto_doc)
     } else {
         auto_doc
@@ -160,10 +160,10 @@ pub fn enum_value_doc(value: &RustEnumValue) -> String {
             value.value
         ))
     );
-    if let Some(ref cpp_doc) = value.doc.cpp_doc {
+    if let Some(cpp_doc) = &value.doc.cpp_doc {
         doc = format!("{} ({})", cpp_doc, doc);
     }
-    if let Some(ref extra_doc) = value.doc.extra_doc {
+    if let Some(extra_doc) = &value.doc.extra_doc {
         format!("{}\n\n{}", extra_doc, doc)
     } else {
         doc
@@ -173,19 +173,19 @@ pub fn enum_value_doc(value: &RustEnumValue) -> String {
 pub fn function_doc(function: &RustFunction) -> String {
     let mut doc = Vec::new();
 
-    match function.kind {
-        RustFunctionKind::FfiWrapper(ref data) => {
-            match data.cpp_ffi_function.kind {
+    match &function.kind {
+        RustFunctionKind::FfiWrapper(data) => {
+            match &data.cpp_ffi_function.kind {
                 CppFfiFunctionKind::Function {
-                    ref cpp_function,
-                    ref omitted_arguments,
+                    cpp_function,
+                    omitted_arguments,
                     ..
                 } => {
                     doc.push(format!(
                         "Calls C++ function: {}\n\n",
                         wrap_inline_cpp_code(&cpp_function.short_text())
                     ));
-                    if let Some(ref omitted_arguments) = *omitted_arguments {
+                    if let Some(omitted_arguments) = omitted_arguments {
                         // TODO: handle singular/plural form
                         doc.push(format!(
                             "This version of the function omits some arguments ({}).\n\n",
@@ -193,8 +193,8 @@ pub fn function_doc(function: &RustFunction) -> String {
                         ));
                     }
 
-                    if let Some(ref cpp_doc) = cpp_function.doc {
-                        let prefix = if let Some(ref declaration) = cpp_doc.mismatched_declaration {
+                    if let Some(cpp_doc) = &cpp_function.doc {
+                        let prefix = if let Some(declaration) = &cpp_doc.mismatched_declaration {
                             format!(
                                 "Warning: no exact match found in C++ documentation. \
                                  Below is the <a href=\"{}\">C++ documentation</a> \
@@ -209,8 +209,8 @@ pub fn function_doc(function: &RustFunction) -> String {
                     }
                 }
                 CppFfiFunctionKind::FieldAccessor {
-                    ref field,
-                    ref accessor_type,
+                    field,
+                    accessor_type,
                 } => {
                     let field_text = wrap_inline_cpp_code(&field.short_text());
                     let text = match *accessor_type {
@@ -234,8 +234,8 @@ pub fn function_doc(function: &RustFunction) -> String {
             // should not need doc because trait doc will be propagated
         }
         RustFunctionKind::SignalOrSlotGetter {
-            ref receiver_type,
-            ref cpp_path,
+            receiver_type,
+            cpp_path,
             ..
         } => {
             doc.push(format!(
@@ -254,7 +254,7 @@ pub fn function_doc(function: &RustFunction) -> String {
     // TODO: somehow handle docs for inherited methods (currently only for virtual functions).
 
     let variant_docs = doc.join("");
-    if let Some(ref extra_doc) = function.extra_doc {
+    if let Some(extra_doc) = &function.extra_doc {
         format!("{}\n\n{}", extra_doc, variant_docs)
     } else {
         variant_docs

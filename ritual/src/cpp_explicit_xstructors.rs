@@ -20,7 +20,7 @@ pub fn add_explicit_xstructors_step() -> ProcessingStep {
 fn add_explicit_xstructors(data: &mut ProcessorData) -> Result<()> {
     let mut methods = Vec::new();
     for type1 in &data.current_database.cpp_items {
-        if let CppItemData::Type(ref type1) = type1.cpp_data {
+        if let CppItemData::Type(type1) = &type1.cpp_data {
             if type1.kind.is_class() {
                 let class_path = &type1.path;
                 let found_destructor = data

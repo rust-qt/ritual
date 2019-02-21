@@ -24,10 +24,7 @@ pub fn set_allocation_places(data: &mut ProcessorData) -> Result<()> {
         .filter_map(|item| item.cpp_data.as_type_mut())
     {
         let path = &type1.path;
-        if let CppTypeDeclarationKind::Class {
-            ref mut is_movable, ..
-        } = type1.kind
-        {
+        if let CppTypeDeclarationKind::Class { is_movable, .. } = &mut type1.kind {
             *is_movable = data.config.movable_types().iter().any(|p| p == path);
         }
     }
@@ -60,17 +57,13 @@ fn suggest_allocation_places(data: &mut ProcessorData) -> Result<()> {
                 } else {
                     data.get_mut(path).unwrap().not_pointers_count += 1;
                 }
-                if let Some(ref args) = path.last().template_arguments {
+                if let Some(args) = &path.last().template_arguments {
                     for arg in args {
                         check_type(arg, false, data);
                     }
                 }
             }
-            CppType::PointerLike {
-                ref kind,
-                ref target,
-                ..
-            } => {
+            CppType::PointerLike { kind, target, .. } => {
                 check_type(target, *kind == CppPointerLikeTypeKind::Pointer, data);
             }
             _ => {}
@@ -130,7 +123,7 @@ fn suggest_allocation_places(data: &mut ProcessorData) -> Result<()> {
         if data.config.movable_types().iter().any(|n| n == name) {
             continue;
         }
-        let suggest_movable_types = if let Some(ref stats) = data_map.get(name) {
+        let suggest_movable_types = if let Some(stats) = data_map.get(name) {
             if stats.has_virtual_methods {
                 false
             } else if stats.pointers_count == 0 {

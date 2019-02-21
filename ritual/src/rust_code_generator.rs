@@ -41,15 +41,15 @@ use std::path::PathBuf;
 /// Generates Rust code representing type `rust_type` inside crate `crate_name`.
 /// Same as `RustCodeGenerator::rust_type_to_code`, but accessible by other modules.
 pub fn rust_type_to_code(rust_type: &RustType, current_crate: &str) -> String {
-    match *rust_type {
+    match rust_type {
         RustType::Unit => "()".to_string(),
         RustType::PointerLike {
-            ref kind,
-            ref target,
-            ref is_const,
+            kind,
+            target,
+            is_const,
         } => {
-            let target_code = rust_type_to_code(target, current_crate);
-            match *kind {
+            let target_code = rust_type_to_code(&*target, current_crate);
+            match kind {
                 RustPointerLikeTypeKind::Pointer => {
                     if *is_const {
                         format!("*const {}", target_code)
@@ -57,9 +57,9 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: &str) -> String {
                         format!("*mut {}", target_code)
                     }
                 }
-                RustPointerLikeTypeKind::Reference { ref lifetime } => {
-                    let lifetime_text = match *lifetime {
-                        Some(ref lifetime) => format!("'{} ", lifetime),
+                RustPointerLikeTypeKind::Reference { lifetime } => {
+                    let lifetime_text = match lifetime {
+                        Some(lifetime) => format!("'{} ", lifetime),
                         None => String::new(),
                     };
                     if *is_const {
@@ -71,11 +71,11 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: &str) -> String {
             }
         }
         RustType::Common(RustCommonType {
-            ref path,
-            ref generic_arguments,
+            path,
+            generic_arguments,
         }) => {
             let mut code = path.full_name(Some(current_crate));
-            if let Some(ref args) = *generic_arguments {
+            if let Some(args) = generic_arguments {
                 code = format!(
                     "{}<{}>",
                     code,
@@ -87,8 +87,8 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: &str) -> String {
             code
         }
         RustType::FunctionPointer {
-            ref return_type,
-            ref arguments,
+            return_type,
+            arguments,
         } => format!(
             "extern \"C\" fn({}){}",
             arguments
@@ -195,14 +195,14 @@ impl Generator {
     }
 
     fn generate_item(&mut self, item: &RustDatabaseItem, database: &RustDatabase) -> Result<()> {
-        match item.kind {
-            RustItemKind::Module(ref module) => self.generate_module(module, database),
-            RustItemKind::Struct(ref data) => self.generate_struct(data, database),
-            RustItemKind::EnumValue(ref value) => self.generate_enum_value(value),
-            RustItemKind::TraitImpl(ref value) => self.generate_trait_impl(value),
-            RustItemKind::Function(ref value) => self.generate_rust_final_function(value, false),
-            RustItemKind::FfiFunction(ref value) => self.generate_ffi_function(value),
-            RustItemKind::FlagEnumImpl(ref value) => self.generate_flag_enum_impl(value),
+        match &item.kind {
+            RustItemKind::Module(module) => self.generate_module(module, database),
+            RustItemKind::Struct(data) => self.generate_struct(data, database),
+            RustItemKind::EnumValue(value) => self.generate_enum_value(value),
+            RustItemKind::TraitImpl(value) => self.generate_trait_impl(value),
+            RustItemKind::Function(value) => self.generate_rust_final_function(value, false),
+            RustItemKind::FfiFunction(value) => self.generate_ffi_function(value),
+            RustItemKind::FlagEnumImpl(value) => self.generate_flag_enum_impl(value),
         }
     }
 
@@ -296,8 +296,8 @@ impl Generator {
             format_doc(&doc_formatter::struct_doc(rust_struct))
         )?;
         let visibility = if rust_struct.is_public { "pub " } else { "" };
-        match rust_struct.kind {
-            RustStructKind::WrapperType(ref wrapper) => match wrapper.kind {
+        match &rust_struct.kind {
+            RustStructKind::WrapperType(wrapper) => match &wrapper.kind {
                 RustWrapperTypeKind::EnumWrapper => {
                     writeln!(
                         self,
@@ -315,9 +315,7 @@ impl Generator {
                         rust_struct.path.last()
                     )?;
                 }
-                RustWrapperTypeKind::MovableClassWrapper {
-                    ref sized_type_path,
-                } => {
+                RustWrapperTypeKind::MovableClassWrapper { sized_type_path } => {
                     writeln!(self, "#[repr(transparent)]")?;
                     writeln!(
                         self,
@@ -329,7 +327,7 @@ impl Generator {
                     writeln!(self)?;
                 }
             },
-            RustStructKind::QtSlotWrapper(ref slot_wrapper) => {
+            RustStructKind::QtSlotWrapper(slot_wrapper) => {
                 let arg_texts: Vec<_> = slot_wrapper
                     .arguments
                     .iter()
@@ -519,9 +517,8 @@ impl Generator {
             RustToFfiTypeConversion::QFlagsToUInt => {
                 let mut qflags_type = type1.api_type.clone();
                 if let RustType::Common(RustCommonType {
-                    ref mut generic_arguments,
-                    ..
-                }) = qflags_type
+                    generic_arguments, ..
+                }) = &mut qflags_type
                 {
                     *generic_arguments = None;
                 } else {
@@ -606,7 +603,7 @@ impl Generator {
 
         let mut result = Vec::new();
         let mut maybe_result_var_name = None;
-        if let Some(ref i) = wrapper_data.return_type_ffi_index {
+        if let Some(i) = &wrapper_data.return_type_ffi_index {
             let mut return_var_name = "object".to_string();
             let mut ii = 1;
             while arguments.iter().any(|x| x.name == return_var_name) {
@@ -616,9 +613,8 @@ impl Generator {
             let struct_name =
                 if return_type.api_to_ffi_conversion == RustToFfiTypeConversion::CppBoxToPtr {
                     if let RustType::Common(RustCommonType {
-                        ref generic_arguments,
-                        ..
-                    }) = return_type.api_type
+                        generic_arguments, ..
+                    }) = &return_type.api_type
                     {
                         let generic_arguments = generic_arguments
                             .as_ref()
@@ -662,7 +658,7 @@ impl Generator {
             unsafe_start = unsafe_start,
             unsafe_end = unsafe_end
         ));
-        if let Some(ref name) = maybe_result_var_name {
+        if let Some(name) = &maybe_result_var_name {
             result.push(format!("{}\n}}", name));
         }
         let code = result.join("");
@@ -684,19 +680,13 @@ impl Generator {
                         }
                         None => arg.argument_type.api_type.clone(),
                     };
-                    match self_type {
+                    match &self_type {
                         RustType::Common { .. } => "self".to_string(),
-                        RustType::PointerLike {
-                            ref kind,
-                            ref is_const,
-                            ..
-                        } => {
-                            if let RustPointerLikeTypeKind::Reference { ref lifetime } = *kind {
+                        RustType::PointerLike { kind, is_const, .. } => {
+                            if let RustPointerLikeTypeKind::Reference { lifetime } = kind {
                                 let maybe_mut = if *is_const { "" } else { "mut " };
-                                match *lifetime {
-                                    Some(ref lifetime) => {
-                                        format!("&'{} {}self", lifetime, maybe_mut)
-                                    }
+                                match lifetime {
+                                    Some(lifetime) => format!("&'{} {}self", lifetime, maybe_mut),
                                     None => format!("&{}self", maybe_mut),
                                 }
                             } else {
@@ -713,8 +703,8 @@ impl Generator {
                         if arg.argument_type.api_to_ffi_conversion
                             == RustToFfiTypeConversion::ValueToPtr
                         {
-                            if let RustType::PointerLike { ref is_const, .. } =
-                                arg.argument_type.ffi_type
+                            if let RustType::PointerLike { is_const, .. } =
+                                &arg.argument_type.ffi_type
                             {
                                 if !*is_const {
                                     maybe_mut_declaration = "mut ";
@@ -752,11 +742,11 @@ impl Generator {
         };
         let maybe_unsafe = if func.is_unsafe { "unsafe " } else { "" };
 
-        let body = match func.kind {
-            RustFunctionKind::FfiWrapper(ref data) => {
+        let body = match &func.kind {
+            RustFunctionKind::FfiWrapper(data) => {
                 self.generate_ffi_call(&func.arguments, &func.return_type, data, func.is_unsafe)?
             }
-            RustFunctionKind::CppDeletableImpl { ref deleter } => self.rust_path_to_string(deleter),
+            RustFunctionKind::CppDeletableImpl { deleter } => self.rust_path_to_string(deleter),
             RustFunctionKind::SignalOrSlotGetter { .. } => unimplemented!(),
         };
 
@@ -886,25 +876,9 @@ pub fn generate(
     Ok(())
 }
 
-// TODO: reimplement impl FlaggableEnum
-/*
-    if *is_flaggable {
-        r = r + &format!(
-            include_str!("../templates/crate/impl_flaggable.rs.in"),
-            name = type1.name.last_name()?,
-            trait_type = RustName::new(vec![
-                "qt_core".to_string(),
-                "flags".to_string(),
-                "FlaggableEnum".to_string(),
-            ])?
-            .full_name(Some(&self.config.crate_properties.name()))
-        );
-    }
-*/
-
 // TODO: reimplement impl Receiver for raw slot wrapper
 /*
-if let Some(ref slot_wrapper) = *slot_wrapper {
+if let Some(slot_wrapper) = slot_wrapper {
     let arg_texts: Vec<_> = slot_wrapper
         .arguments
         .iter()

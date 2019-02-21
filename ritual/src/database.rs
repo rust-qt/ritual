@@ -122,51 +122,51 @@ impl CppItemData {
     pub fn is_same(&self, other: &CppItemData) -> bool {
         use self::CppItemData::*;
 
-        match *self {
-            Namespace(ref v) => {
-                if let Namespace(ref v2) = other {
+        match self {
+            Namespace(v) => {
+                if let Namespace(v2) = &other {
                     v == v2
                 } else {
                     false
                 }
             }
-            Type(ref v) => {
-                if let Type(ref v2) = other {
+            Type(v) => {
+                if let Type(v2) = &other {
                     v.is_same(v2)
                 } else {
                     false
                 }
             }
-            EnumValue(ref v) => {
-                if let EnumValue(ref v2) = other {
+            EnumValue(v) => {
+                if let EnumValue(v2) = &other {
                     v.is_same(v2)
                 } else {
                     false
                 }
             }
-            Function(ref v) => {
-                if let Function(ref v2) = other {
+            Function(v) => {
+                if let Function(v2) = &other {
                     v.is_same(v2)
                 } else {
                     false
                 }
             }
-            ClassField(ref v) => {
-                if let ClassField(ref v2) = other {
+            ClassField(v) => {
+                if let ClassField(v2) = &other {
                     v.is_same(v2)
                 } else {
                     false
                 }
             }
-            ClassBase(ref v) => {
-                if let ClassBase(ref v2) = other {
+            ClassBase(v) => {
+                if let ClassBase(v2) = &other {
                     v == v2
                 } else {
                     false
                 }
             }
-            QtSignalArguments(ref v) => {
-                if let QtSignalArguments(ref v2) = other {
+            QtSignalArguments(v) => {
+                if let QtSignalArguments(v2) = &other {
                     v == v2
                 } else {
                     false
@@ -188,78 +188,78 @@ impl CppItemData {
     }
 
     pub fn all_involved_types(&self) -> Vec<CppType> {
-        match *self {
-            CppItemData::Type(ref t) => match t.kind {
+        match self {
+            CppItemData::Type(t) => match t.kind {
                 CppTypeDeclarationKind::Enum => vec![CppType::Enum {
                     path: t.path.clone(),
                 }],
                 CppTypeDeclarationKind::Class { .. } => vec![CppType::Class(t.path.clone())],
             },
-            CppItemData::EnumValue(ref enum_value) => vec![CppType::Enum {
+            CppItemData::EnumValue(enum_value) => vec![CppType::Enum {
                 path: enum_value
                     .path
                     .parent()
                     .expect("enum value must have parent path"),
             }],
             CppItemData::Namespace(_) => Vec::new(),
-            CppItemData::Function(ref function) => function.all_involved_types(),
-            CppItemData::ClassField(ref field) => {
+            CppItemData::Function(function) => function.all_involved_types(),
+            CppItemData::ClassField(field) => {
                 let class_type =
                     CppType::Class(field.path.parent().expect("field path must have parent"));
                 vec![class_type, field.field_type.clone()]
             }
-            CppItemData::ClassBase(ref base) => vec![
+            CppItemData::ClassBase(base) => vec![
                 CppType::Class(base.base_class_type.clone()),
                 CppType::Class(base.derived_class_type.clone()),
             ],
-            CppItemData::QtSignalArguments(ref args) => args.clone(),
+            CppItemData::QtSignalArguments(args) => args.clone(),
         }
     }
 
     pub fn as_namespace_ref(&self) -> Option<&CppPath> {
-        if let CppItemData::Namespace(ref data) = *self {
+        if let CppItemData::Namespace(data) = self {
             Some(data)
         } else {
             None
         }
     }
     pub fn as_function_ref(&self) -> Option<&CppFunction> {
-        if let CppItemData::Function(ref data) = *self {
+        if let CppItemData::Function(data) = self {
             Some(data)
         } else {
             None
         }
     }
     pub fn as_field_ref(&self) -> Option<&CppClassField> {
-        if let CppItemData::ClassField(ref data) = *self {
+        if let CppItemData::ClassField(data) = self {
             Some(data)
         } else {
             None
         }
     }
     pub fn as_enum_value_ref(&self) -> Option<&CppEnumValue> {
-        if let CppItemData::EnumValue(ref data) = *self {
+        if let CppItemData::EnumValue(data) = self {
             Some(data)
         } else {
             None
         }
     }
     pub fn as_base_ref(&self) -> Option<&CppBaseSpecifier> {
-        if let CppItemData::ClassBase(ref data) = *self {
+        if let CppItemData::ClassBase(data) = self {
             Some(data)
         } else {
             None
         }
     }
     pub fn as_type_ref(&self) -> Option<&CppTypeDeclaration> {
-        if let CppItemData::Type(ref data) = *self {
+        if let CppItemData::Type(data) = self {
             Some(data)
         } else {
             None
         }
     }
     pub fn as_type_mut(&mut self) -> Option<&mut CppTypeDeclaration> {
-        if let CppItemData::Type(ref mut data) = *self {
+        if let CppItemData::Type(data) = self {
             Some(data)
         } else {
             None
@@ -267,7 +267,7 @@ impl CppItemData {
     }
 
     pub fn as_signal_arguments_ref(&self) -> Option<&[CppType]> {
-        if let CppItemData::QtSignalArguments(ref data) = *self {
+        if let CppItemData::QtSignalArguments(data) = self {
             Some(data)
         } else {
             None
@@ -281,22 +281,22 @@ impl CppItemData {
 
 impl Display for CppItemData {
     fn fmt(&self, f: &mut Formatter) -> ::std::result::Result<(), ::std::fmt::Error> {
-        let s = match *self {
-            CppItemData::Namespace(ref path) => format!("namespace {}", path.to_cpp_pseudo_code()),
-            CppItemData::Type(ref type1) => match type1.kind {
+        let s = match self {
+            CppItemData::Namespace(path) => format!("namespace {}", path.to_cpp_pseudo_code()),
+            CppItemData::Type(type1) => match type1.kind {
                 CppTypeDeclarationKind::Enum => format!("enum {}", type1.path.to_cpp_pseudo_code()),
                 CppTypeDeclarationKind::Class { .. } => {
                     format!("class {}", type1.path.to_cpp_pseudo_code())
                 }
             },
-            CppItemData::Function(ref method) => method.short_text(),
-            CppItemData::EnumValue(ref value) => format!(
+            CppItemData::Function(method) => method.short_text(),
+            CppItemData::EnumValue(value) => format!(
                 "enum value {} = {}",
                 value.path.to_cpp_pseudo_code(),
                 value.value
             ),
-            CppItemData::ClassField(ref field) => field.short_text(),
-            CppItemData::ClassBase(ref class_base) => {
+            CppItemData::ClassField(field) => field.short_text(),
+            CppItemData::ClassBase(class_base) => {
                 let virtual_text = if class_base.is_virtual {
                     "virtual "
                 } else {
@@ -321,7 +321,7 @@ impl Display for CppItemData {
                     index_text
                 )
             }
-            CppItemData::QtSignalArguments(ref args) => format!(
+            CppItemData::QtSignalArguments(args) => format!(
                 "Qt signal args ({})",
                 args.iter().map(|arg| arg.to_cpp_pseudo_code()).join(", ")
             ),
@@ -366,9 +366,9 @@ impl CppFfiItem {
     }
 
     pub fn path(&self) -> &CppPath {
-        match self.kind {
-            CppFfiItemKind::Function(ref f) => &f.path,
-            CppFfiItemKind::QtSlotWrapper(ref s) => &s.class_path,
+        match &self.kind {
+            CppFfiItemKind::Function(f) => &f.path,
+            CppFfiItemKind::QtSlotWrapper(s) => &s.class_path,
         }
     }
 }

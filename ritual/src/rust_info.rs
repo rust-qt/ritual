@@ -208,12 +208,8 @@ impl UnnamedRustFunction {
     fn self_arg_kind(&self) -> Result<RustFunctionSelfArgKind> {
         if let Some(arg) = self.arguments.get(0) {
             if arg.name == "self" {
-                match arg.argument_type.api_type {
-                    RustType::PointerLike {
-                        ref kind,
-                        ref is_const,
-                        ..
-                    } => match *kind {
+                match &arg.argument_type.api_type {
+                    RustType::PointerLike { kind, is_const, .. } => match *kind {
                         RustPointerLikeTypeKind::Pointer => {
                             bail!("pointer self arg is not supported")
                         }
@@ -521,22 +517,20 @@ pub struct RustDatabaseItem {
 
 impl RustDatabaseItem {
     pub fn path(&self) -> Option<&RustPath> {
-        match self.kind {
-            RustItemKind::Module(ref data) => Some(&data.path),
-            RustItemKind::Struct(ref data) => Some(&data.path),
-            RustItemKind::EnumValue(ref data) => Some(&data.path),
-            RustItemKind::Function(ref data) => Some(&data.path),
-            RustItemKind::FfiFunction(ref data) => Some(&data.path),
+        match &self.kind {
+            RustItemKind::Module(data) => Some(&data.path),
+            RustItemKind::Struct(data) => Some(&data.path),
+            RustItemKind::EnumValue(data) => Some(&data.path),
+            RustItemKind::Function(data) => Some(&data.path),
+            RustItemKind::FfiFunction(data) => Some(&data.path),
             RustItemKind::TraitImpl(_) => None,
             RustItemKind::FlagEnumImpl(_) => None,
         }
     }
     pub fn is_child_of(&self, parent: &RustPath) -> bool {
-        match self.kind {
-            RustItemKind::TraitImpl(ref trait_impl) => &trait_impl.parent_path == parent,
-            RustItemKind::FlagEnumImpl(ref data) => {
-                data.enum_path.parent().as_ref() == Some(parent)
-            }
+        match &self.kind {
+            RustItemKind::TraitImpl(trait_impl) => &trait_impl.parent_path == parent,
+            RustItemKind::FlagEnumImpl(data) => data.enum_path.parent().as_ref() == Some(parent),
             _ => {
                 let path = self
                     .path()
@@ -547,7 +541,7 @@ impl RustDatabaseItem {
     }
 
     pub fn as_module_ref(&self) -> Option<&RustModule> {
-        if let RustItemKind::Module(ref data) = self.kind {
+        if let RustItemKind::Module(data) = &self.kind {
             Some(data)
         } else {
             None
@@ -581,7 +575,7 @@ pub struct RustPathScope {
 
 impl RustPathScope {
     pub fn apply(&self, name: &str) -> RustPath {
-        let full_name = if let Some(ref prefix) = self.prefix {
+        let full_name = if let Some(prefix) = &self.prefix {
             format!("{}{}", prefix, name)
         } else {
             name.to_string()

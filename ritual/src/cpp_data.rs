@@ -232,7 +232,7 @@ impl CppPath {
                         }
                     })
                     .collect();
-                if let Some(ref args) = item.template_arguments {
+                if let Some(args) = &item.template_arguments {
                     format!(
                         "{}_{}",
                         name,
@@ -261,7 +261,7 @@ impl CppPath {
     ) -> Result<CppPath> {
         let mut new_path = self.clone();
         for path_item in &mut new_path.items {
-            if let Some(ref mut template_arguments) = path_item.template_arguments {
+            if let Some(template_arguments) = &mut path_item.template_arguments {
                 for arg in template_arguments {
                     *arg = arg.instantiate(nested_level1, template_arguments1)?;
                 }
@@ -294,9 +294,9 @@ impl FromStr for CppPath {
 
 impl CppPathItem {
     pub fn to_cpp_code(&self) -> Result<String> {
-        let args = match self.template_arguments {
+        let args = match &self.template_arguments {
             None => "".to_string(),
-            Some(ref args) => format!(
+            Some(args) => format!(
                 "< {} >",
                 args.map_if_ok(|arg| arg.to_cpp_code(None))?.join(", ")
             ),
@@ -305,9 +305,9 @@ impl CppPathItem {
     }
 
     pub fn to_cpp_pseudo_code(&self) -> String {
-        let args = match self.template_arguments {
+        let args = match &self.template_arguments {
             None => "".to_string(),
-            Some(ref args) => format!(
+            Some(args) => format!(
                 "<{}>",
                 args.iter().map(|arg| arg.to_cpp_pseudo_code()).join(", ")
             ),
@@ -336,7 +336,7 @@ impl CppPathItem {
 impl fmt::Debug for CppPathItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
         write!(f, "{}", self.name)?;
-        if let Some(ref args) = self.template_arguments {
+        if let Some(args) = &self.template_arguments {
             write!(
                 f,
                 "<{}>",
