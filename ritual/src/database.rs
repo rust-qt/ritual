@@ -2,8 +2,8 @@ use crate::cpp_data::CppBaseSpecifier;
 use crate::cpp_data::CppClassField;
 use crate::cpp_data::CppEnumValue;
 use crate::cpp_data::CppOriginLocation;
-use crate::cpp_data::CppTypeData;
-use crate::cpp_data::CppTypeDataKind;
+use crate::cpp_data::CppTypeDeclaration;
+use crate::cpp_data::CppTypeDeclarationKind;
 use ritual_common::target::Target;
 
 use crate::cpp_data::CppVisibility;
@@ -110,7 +110,7 @@ impl CppCheckerInfoList {
 #[allow(clippy::large_enum_variant)]
 pub enum CppItemData {
     Namespace(CppPath),
-    Type(CppTypeData),
+    Type(CppTypeDeclaration),
     EnumValue(CppEnumValue),
     Function(CppFunction),
     ClassField(CppClassField),
@@ -190,10 +190,10 @@ impl CppItemData {
     pub fn all_involved_types(&self) -> Vec<CppType> {
         match *self {
             CppItemData::Type(ref t) => match t.kind {
-                CppTypeDataKind::Enum => vec![CppType::Enum {
+                CppTypeDeclarationKind::Enum => vec![CppType::Enum {
                     path: t.path.clone(),
                 }],
-                CppTypeDataKind::Class { .. } => vec![CppType::Class(t.path.clone())],
+                CppTypeDeclarationKind::Class { .. } => vec![CppType::Class(t.path.clone())],
             },
             CppItemData::EnumValue(ref enum_value) => vec![CppType::Enum {
                 path: enum_value
@@ -251,14 +251,14 @@ impl CppItemData {
             None
         }
     }
-    pub fn as_type_ref(&self) -> Option<&CppTypeData> {
+    pub fn as_type_ref(&self) -> Option<&CppTypeDeclaration> {
         if let CppItemData::Type(ref data) = *self {
             Some(data)
         } else {
             None
         }
     }
-    pub fn as_type_mut(&mut self) -> Option<&mut CppTypeData> {
+    pub fn as_type_mut(&mut self) -> Option<&mut CppTypeDeclaration> {
         if let CppItemData::Type(ref mut data) = *self {
             Some(data)
         } else {
@@ -284,8 +284,8 @@ impl Display for CppItemData {
         let s = match *self {
             CppItemData::Namespace(ref path) => format!("namespace {}", path.to_cpp_pseudo_code()),
             CppItemData::Type(ref type1) => match type1.kind {
-                CppTypeDataKind::Enum => format!("enum {}", type1.path.to_cpp_pseudo_code()),
-                CppTypeDataKind::Class { .. } => {
+                CppTypeDeclarationKind::Enum => format!("enum {}", type1.path.to_cpp_pseudo_code()),
+                CppTypeDeclarationKind::Class { .. } => {
                     format!("class {}", type1.path.to_cpp_pseudo_code())
                 }
             },

@@ -13,7 +13,7 @@ use ritual_common::file_utils::create_file;
 use std::io::Write;
 
 struct ParserCppData {
-    types: Vec<CppTypeData>,
+    types: Vec<CppTypeDeclaration>,
     bases: Vec<CppBaseSpecifier>,
     fields: Vec<CppClassField>,
     methods: Vec<CppFunction>,
@@ -645,7 +645,7 @@ fn simple_enum() {
     );
     assert_eq!(data.types.len(), 1);
     assert_eq!(data.types[0].path, CppPath::from_str_unchecked("Enum1"));
-    assert_eq!(data.types[0].kind, CppTypeDataKind::Enum);
+    assert_eq!(data.types[0].kind, CppTypeDeclarationKind::Enum);
     assert_eq!(
         data.enum_values,
         vec![
@@ -680,7 +680,7 @@ fn simple_enum2() {
         data.types[0].path,
         CppPath::from_str_unchecked("ns1::Enum1")
     );
-    assert_eq!(data.types[0].kind, CppTypeDataKind::Enum);
+    assert_eq!(data.types[0].kind, CppTypeDeclarationKind::Enum);
     assert_eq!(
         data.enum_values,
         vec![

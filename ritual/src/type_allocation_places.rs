@@ -1,5 +1,5 @@
 use crate::cpp_data::CppPath;
-use crate::cpp_data::CppTypeDataKind;
+use crate::cpp_data::CppTypeDeclarationKind;
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
 use crate::processor::ProcessingStep;
@@ -24,7 +24,7 @@ pub fn set_allocation_places(data: &mut ProcessorData) -> Result<()> {
         .filter_map(|item| item.cpp_data.as_type_mut())
     {
         let path = &type1.path;
-        if let CppTypeDataKind::Class {
+        if let CppTypeDeclarationKind::Class {
             ref mut is_movable, ..
         } = type1.kind
         {

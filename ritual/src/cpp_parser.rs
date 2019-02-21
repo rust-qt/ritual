@@ -1,9 +1,10 @@
 use crate::config::Config;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;
-use crate::cpp_data::CppTypeDataKind;
+use crate::cpp_data::CppTypeDeclarationKind;
 use crate::cpp_data::{
-    CppBaseSpecifier, CppClassField, CppEnumValue, CppOriginLocation, CppTypeData, CppVisibility,
+    CppBaseSpecifier, CppClassField, CppEnumValue, CppOriginLocation, CppTypeDeclaration,
+    CppVisibility,
 };
 use crate::cpp_function::{
     CppFunction, CppFunctionArgument, CppFunctionKind, CppFunctionMemberData,
@@ -337,7 +338,7 @@ pub fn cpp_parser_step() -> ProcessingStep {
 impl CppParser<'_, '_> {
     /// Search for a C++ type information in the types found by the parser
     /// and in types of the dependencies.
-    fn find_type<F: Fn(&CppTypeData) -> bool>(&self, f: F) -> Option<&CppTypeData> {
+    fn find_type<F: Fn(&CppTypeDeclaration) -> bool>(&self, f: F) -> Option<&CppTypeDeclaration> {
         let databases =
             once(self.data.current_database as &_).chain(self.data.dep_databases.iter());
         for database in databases {
@@ -509,12 +510,12 @@ impl CppParser<'_, '_> {
             self.find_type(|x| x.path.to_cpp_code().ok().as_ref() == Some(&name))
         {
             match type_data.kind {
-                CppTypeDataKind::Enum { .. } => {
+                CppTypeDeclarationKind::Enum { .. } => {
                     return Ok(CppType::Enum {
                         path: CppPath::from_str(&name)?,
                     });
                 }
-                CppTypeDataKind::Class { .. } => {
+                CppTypeDeclarationKind::Class { .. } => {
                     return Ok(CppType::Class(CppPath::from_str(&name)?));
                 }
             }
@@ -1166,8 +1167,8 @@ impl CppParser<'_, '_> {
                 include_file: include_file.clone(),
                 origin_location: get_origin_location(entity)?,
             },
-            CppItemData::Type(CppTypeData {
-                kind: CppTypeDataKind::Enum,
+            CppItemData::Type(CppTypeDeclaration {
+                kind: CppTypeDeclarationKind::Enum,
                 path: enum_name.clone(),
                 doc: None,
             }),
@@ -1341,8 +1342,8 @@ impl CppParser<'_, '_> {
                 include_file,
                 origin_location: get_origin_location(entity).unwrap(),
             },
-            CppItemData::Type(CppTypeData {
-                kind: CppTypeDataKind::Class { is_movable: false },
+            CppItemData::Type(CppTypeDeclaration {
+                kind: CppTypeDeclarationKind::Class { is_movable: false },
                 path: full_name,
                 doc: None,
             }),

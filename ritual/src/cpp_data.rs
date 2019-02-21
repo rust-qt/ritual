@@ -349,39 +349,39 @@ impl fmt::Debug for CppPathItem {
 
 /// Information about a C++ type declaration
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum CppTypeDataKind {
+pub enum CppTypeDeclarationKind {
     Enum,
     Class { is_movable: bool },
 }
 
 /// Information about a C++ type declaration
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct CppTypeData {
+pub struct CppTypeDeclaration {
     /// Identifier, including namespaces and nested classes
     pub path: CppPath,
-    pub kind: CppTypeDataKind,
+    pub kind: CppTypeDeclarationKind,
     /// C++ documentation for the type
     pub doc: Option<CppTypeDoc>,
 }
 
-impl CppTypeData {
-    pub fn is_same(&self, other: &CppTypeData) -> bool {
+impl CppTypeDeclaration {
+    pub fn is_same(&self, other: &CppTypeDeclaration) -> bool {
         self.path == other.path
     }
 }
 
-impl CppTypeDataKind {
+impl CppTypeDeclarationKind {
     /// Checks if the type is a class type.
     pub fn is_class(&self) -> bool {
         match self {
-            CppTypeDataKind::Class { .. } => true,
+            CppTypeDeclarationKind::Class { .. } => true,
             _ => false,
         }
     }
 
     pub fn is_enum(&self) -> bool {
         match self {
-            CppTypeDataKind::Enum => true,
+            CppTypeDeclarationKind::Enum => true,
             _ => false,
         }
     }

@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;
-use crate::cpp_data::CppTypeDataKind;
+use crate::cpp_data::CppTypeDeclarationKind;
 use crate::cpp_ffi_data::CppCast;
 use crate::cpp_ffi_data::CppFfiArgumentMeaning;
 use crate::cpp_ffi_data::CppFfiFunction;
@@ -1020,7 +1020,7 @@ impl State<'_> {
                 }
                 CppItemData::Type(data) => {
                     match data.kind {
-                        CppTypeDataKind::Class { is_movable } => {
+                        CppTypeDeclarationKind::Class { is_movable } => {
                             // TODO: if the type is `QFlags<T>` or `QUrlTwoFlags<T>`,
                             //       generate `impl Flaggable` instead.
                             if is_qflags(&data.path) {
@@ -1150,7 +1150,7 @@ impl State<'_> {
                             *modified = true;
                             cpp_item.is_rust_processed = true;
                         }
-                        CppTypeDataKind::Enum => {
+                        CppTypeDeclarationKind::Enum => {
                             let rust_path = self.generate_rust_path(&data.path, &NameType::Type)?;
                             let rust_item = RustDatabaseItem {
                                 kind: RustItemKind::Struct(RustStruct {

@@ -2,7 +2,7 @@ use crate::cpp_data::CppBaseSpecifier;
 use crate::cpp_data::CppClassField;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;
-use crate::cpp_data::CppTypeDataKind;
+use crate::cpp_data::CppTypeDeclarationKind;
 use crate::cpp_data::CppVisibility;
 use crate::cpp_ffi_data::CppFfiArgumentMeaning;
 use crate::cpp_ffi_data::CppFfiFunctionArgument;
@@ -66,7 +66,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         .iter()
         .filter_map(|item| {
             if let CppItemData::Type(ref type_data) = item.cpp_data {
-                if let CppTypeDataKind::Class { is_movable } = type_data.kind {
+                if let CppTypeDeclarationKind::Class { is_movable } = type_data.kind {
                     if is_movable {
                         return Some(type_data.path.clone());
                     }
