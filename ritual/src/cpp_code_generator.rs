@@ -12,7 +12,7 @@ use ritual_common::utils::MapIfOk;
 
 use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_type::CppPointerLikeTypeKind;
-use crate::database::CppDatabaseItem;
+use crate::database::CppFfiItem;
 use crate::database::CppFfiItemKind;
 use crate::rust_info::RustDatabase;
 use crate::rust_info::RustItemKind;
@@ -295,7 +295,7 @@ pub fn function_implementation(method: &CppFfiFunction) -> Result<String> {
 
 /// Generates a source file with the specified FFI methods.
 pub fn generate_cpp_file(
-    data: &[CppDatabaseItem],
+    ffi_items: &[CppFfiItem],
     file_path: &Path,
     global_header_name: &str,
 ) -> Result<()> {
@@ -303,27 +303,23 @@ pub fn generate_cpp_file(
     writeln!(cpp_file, "#include \"{}\"", global_header_name)?;
 
     let mut any_slot_wrappers = false;
-    for item in data {
-        for ffi_item in &item.ffi_items {
-            if !ffi_item.checks.any_passed() {
-                continue;
-            }
-            if let CppFfiItemKind::QtSlotWrapper(qt_slot_wrapper) = &ffi_item.kind {
-                any_slot_wrappers = true;
-                write!(cpp_file, "{}", self::qt_slot_wrapper(qt_slot_wrapper)?)?;
-            }
+    for ffi_item in ffi_items {
+        if !ffi_item.checks.any_passed() {
+            continue;
+        }
+        if let CppFfiItemKind::QtSlotWrapper(qt_slot_wrapper) = &ffi_item.kind {
+            any_slot_wrappers = true;
+            write!(cpp_file, "{}", self::qt_slot_wrapper(qt_slot_wrapper)?)?;
         }
     }
 
     writeln!(cpp_file, "extern \"C\" {{")?;
-    for item in data {
-        for ffi_item in &item.ffi_items {
-            if !ffi_item.checks.any_passed() {
-                continue;
-            }
-            if let CppFfiItemKind::Function(cpp_ffi_function) = &ffi_item.kind {
-                writeln!(cpp_file, "{}", function_implementation(cpp_ffi_function)?)?;
-            }
+    for ffi_item in ffi_items {
+        if !ffi_item.checks.any_passed() {
+            continue;
+        }
+        if let CppFfiItemKind::Function(cpp_ffi_function) = &ffi_item.kind {
+            writeln!(cpp_file, "{}", function_implementation(cpp_ffi_function)?)?;
         }
     }
     writeln!(cpp_file, "}} // extern \"C\"")?;

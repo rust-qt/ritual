@@ -951,7 +951,6 @@ impl State<'_> {
 
     fn process_ffi_item(
         &self,
-        cpp_item_index: usize,
         ffi_item_index: usize,
         ffi_item: &CppFfiItem,
     ) -> Result<Vec<RustDatabaseItem>> {
@@ -964,7 +963,7 @@ impl State<'_> {
                 let rust_ffi_function_path = rust_ffi_function.path.clone();
                 let ffi_rust_item = RustDatabaseItem {
                     kind: RustItemKind::FfiFunction(rust_ffi_function),
-                    cpp_item_index: Some(cpp_item_index),
+                    cpp_item_index: None,
                     ffi_item_index: Some(ffi_item_index),
                 };
 
@@ -973,7 +972,7 @@ impl State<'_> {
                     .into_iter()
                     .map(|item| RustDatabaseItem {
                         kind: item,
-                        cpp_item_index: Some(cpp_item_index),
+                        cpp_item_index: None,
                         ffi_item_index: Some(ffi_item_index),
                     })
                     .chain(once(ffi_rust_item))
@@ -986,10 +985,10 @@ impl State<'_> {
     }
 
     #[allow(clippy::useless_let_if_seq)]
-    fn generate_rust_items(
+    fn process_cpp_item(
         &self,
-        cpp_item: &CppDatabaseItem,
         cpp_item_index: usize,
+        cpp_item: &CppDatabaseItem,
     ) -> Result<Vec<RustDatabaseItem>> {
         match &cpp_item.cpp_data {
             CppItemData::Namespace(path) => {
@@ -1218,30 +1217,30 @@ fn run(data: &mut ProcessorData) -> Result<()> {
     state.generate_special_module(RustModuleKind::SizedTypes)?;
 
     let cpp_items = &mut data.current_database.cpp_items;
+    let ffi_items = &mut data.current_database.ffi_items;
 
     loop {
         let mut something_changed = false;
 
         for (cpp_item_index, mut cpp_item) in cpp_items.iter_mut().enumerate() {
-            if !cpp_item.is_rust_processed {
-                if let Ok(rust_items) = state.generate_rust_items(cpp_item, cpp_item_index) {
-                    state.rust_database.items.extend(rust_items);
-                    cpp_item.is_rust_processed = true;
-                    something_changed = true;
-                }
+            if cpp_item.is_rust_processed {
+                continue;
             }
+            if let Ok(rust_items) = state.process_cpp_item(cpp_item_index, cpp_item) {
+                state.rust_database.items.extend(rust_items);
+                cpp_item.is_rust_processed = true;
+                something_changed = true;
+            }
+        }
 
-            for (ffi_item_index, mut ffi_item) in cpp_item.ffi_items.iter_mut().enumerate() {
-                if ffi_item.is_rust_processed {
-                    continue;
-                }
-                if let Ok(rust_items) =
-                    state.process_ffi_item(cpp_item_index, ffi_item_index, ffi_item)
-                {
-                    state.rust_database.items.extend(rust_items);
-                    ffi_item.is_rust_processed = true;
-                    something_changed = true;
-                }
+        for (ffi_item_index, mut ffi_item) in ffi_items.iter_mut().enumerate() {
+            if ffi_item.is_rust_processed {
+                continue;
+            }
+            if let Ok(rust_items) = state.process_ffi_item(ffi_item_index, ffi_item) {
+                state.rust_database.items.extend(rust_items);
+                ffi_item.is_rust_processed = true;
+                something_changed = true;
             }
         }
 
@@ -1251,21 +1250,24 @@ fn run(data: &mut ProcessorData) -> Result<()> {
     }
 
     for (cpp_item_index, cpp_item) in cpp_items.iter().enumerate() {
-        if !cpp_item.is_rust_processed {
-            if let Err(err) = state.generate_rust_items(cpp_item, cpp_item_index) {
-                trace!("skipping cpp item: {}: {}", &cpp_item.cpp_data, err);
-                print_trace(err, log::Level::Trace);
-            }
+        if cpp_item.is_rust_processed {
+            continue;
         }
 
-        for (ffi_item_index, ffi_item) in cpp_item.ffi_items.iter().enumerate() {
-            if ffi_item.is_rust_processed {
-                continue;
-            }
-            if let Err(err) = state.process_ffi_item(cpp_item_index, ffi_item_index, ffi_item) {
-                trace!("skipping ffi item: {:?}: {}", ffi_item, err);
-                print_trace(err, log::Level::Trace);
-            }
+        if let Err(err) = state.process_cpp_item(cpp_item_index, cpp_item) {
+            trace!("skipping cpp item: {}: {}", &cpp_item.cpp_data, err);
+            print_trace(err, log::Level::Trace);
+        }
+    }
+
+    for (ffi_item_index, ffi_item) in ffi_items.iter().enumerate() {
+        if ffi_item.is_rust_processed {
+            continue;
+        }
+
+        if let Err(err) = state.process_ffi_item(ffi_item_index, ffi_item) {
+            trace!("skipping ffi item: {:?}: {}", ffi_item, err);
+            print_trace(err, log::Level::Trace);
         }
     }
 
@@ -1280,9 +1282,9 @@ pub fn clear_rust_info(data: &mut ProcessorData) -> Result<()> {
     data.current_database.rust_database.items.clear();
     for item in &mut data.current_database.cpp_items {
         item.is_rust_processed = false;
-        for item in &mut item.ffi_items {
-            item.is_rust_processed = false;
-        }
+    }
+    for item in &mut data.current_database.ffi_items {
+        item.is_rust_processed = false;
     }
     Ok(())
 }

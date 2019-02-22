@@ -94,7 +94,6 @@ struct Snippet {
 #[derive(Debug, Clone)]
 struct SnippetWithIndexes {
     snippet: Snippet,
-    cpp_item_index: usize,
     ffi_item_index: usize,
     output: Option<CppLibBuilderOutput>,
 }
@@ -256,20 +255,17 @@ impl CppChecker<'_, '_> {
         }
 
         let mut snippets = Vec::new();
-        for (cpp_item_index, item) in self.data.current_database.cpp_items.iter().enumerate() {
-            for (ffi_item_index, ffi_item) in item.ffi_items.iter().enumerate() {
-                if ffi_item.checks.items.iter().any(|check| check.env == env) {
-                    continue;
-                }
+        for (ffi_item_index, ffi_item) in self.data.current_database.ffi_items.iter().enumerate() {
+            if ffi_item.checks.items.iter().any(|check| check.env == env) {
+                continue;
+            }
 
-                if let Ok(snippet) = snippet_for_item(ffi_item) {
-                    snippets.push(SnippetWithIndexes {
-                        cpp_item_index,
-                        ffi_item_index,
-                        snippet,
-                        output: None,
-                    });
-                }
+            if let Ok(snippet) = snippet_for_item(ffi_item) {
+                snippets.push(SnippetWithIndexes {
+                    ffi_item_index,
+                    snippet,
+                    output: None,
+                });
             }
         }
 
@@ -298,8 +294,7 @@ impl CppChecker<'_, '_> {
             .collect::<Result<_>>()?;
 
         for snippet in snippets {
-            let cpp_item = &mut self.data.current_database.cpp_items[snippet.cpp_item_index];
-            let ffi_item = &mut cpp_item.ffi_items[snippet.ffi_item_index];
+            let ffi_item = &mut self.data.current_database.ffi_items[snippet.ffi_item_index];
 
             let error_data = match snippet.output.unwrap() {
                 CppLibBuilderOutput::Success => None, // no error

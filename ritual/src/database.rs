@@ -378,15 +378,8 @@ pub struct CppDatabaseItem {
     pub cpp_data: CppItemData,
 
     pub source: DatabaseItemSource,
-    pub ffi_items: Vec<CppFfiItem>,
     pub is_cpp_ffi_processed: bool,
     pub is_rust_processed: bool,
-}
-
-impl CppDatabaseItem {
-    pub fn is_all_rust_processed(&self) -> bool {
-        self.is_rust_processed && self.ffi_items.iter().all(|m| m.is_rust_processed)
-    }
 }
 
 /// Represents all collected data related to a crate.
@@ -395,6 +388,7 @@ pub struct Database {
     pub crate_name: String,
     pub crate_version: String,
     pub cpp_items: Vec<CppDatabaseItem>,
+    pub ffi_items: Vec<CppFfiItem>,
     pub rust_database: RustDatabase,
     pub environments: Vec<CppCheckerEnv>,
 }
@@ -405,6 +399,7 @@ impl Database {
             crate_name: crate_name.into(),
             crate_version: "0.0.0".into(),
             cpp_items: Vec::new(),
+            ffi_items: Vec::new(),
             rust_database: Default::default(),
             environments: Vec::new(),
         }
@@ -438,7 +433,6 @@ impl Database {
         self.cpp_items.push(CppDatabaseItem {
             cpp_data: data,
             source,
-            ffi_items: Vec::new(),
             is_cpp_ffi_processed: false,
             is_rust_processed: false,
         });

@@ -121,7 +121,6 @@ impl Default for ProcessingSteps {
 
         let mut all_steps = main_steps;
         all_steps.extend(vec![
-            steps::print_database(),
             steps::clear_ffi(),
             clear_rust_info_step(),
             suggest_allocation_places_step(),
@@ -178,30 +177,13 @@ impl ProcessingStep {
 
 mod steps {
     use crate::processor::ProcessingStep;
-    use log::trace;
     use ritual_common::utils::run_command;
     use std::process::Command;
 
-    pub fn print_database() -> ProcessingStep {
-        ProcessingStep::new_const("print_database", |data| {
-            for item in &data.current_database.cpp_items {
-                trace!(
-                    "[database_item] cpp_data={}; source={:?}",
-                    item.cpp_data.to_string(),
-                    item.source
-                );
-                for ffi_item in &item.ffi_items {
-                    trace!("[database_item]   ffi_item={:?}", ffi_item);
-                }
-            }
-            Ok(())
-        })
-    }
-
     pub fn clear_ffi() -> ProcessingStep {
         ProcessingStep::new("clear_ffi", |data| {
+            data.current_database.ffi_items.clear();
             for item in &mut data.current_database.cpp_items {
-                item.ffi_items.clear();
                 item.is_cpp_ffi_processed = false;
             }
             Ok(())

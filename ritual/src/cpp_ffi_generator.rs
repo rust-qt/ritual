@@ -78,9 +78,8 @@ fn run(data: &mut ProcessorData) -> Result<()> {
 
     let existing_names = data
         .current_database
-        .cpp_items
+        .ffi_items
         .iter()
-        .flat_map(|m| m.ffi_items.iter())
         .map(|f| f.path().to_cpp_code().unwrap())
         .collect();
 
@@ -133,10 +132,10 @@ fn run(data: &mut ProcessorData) -> Result<()> {
                         _ => format!("added methods ({}): {:?}", r.len(), r),
                     }
                 );
-                item.ffi_items = r;
+                data.current_database.ffi_items.extend(r);
+                item.is_cpp_ffi_processed = true;
             }
         }
-        item.is_cpp_ffi_processed = true;
     }
     Ok(())
 }
