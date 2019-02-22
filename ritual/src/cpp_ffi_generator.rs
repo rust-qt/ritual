@@ -63,7 +63,6 @@ fn run(data: &mut ProcessorData) -> Result<()> {
     let cpp_ffi_lib_name = format!("ctr_{}_ffi", &data.config.crate_properties().name());
     let movable_types: Vec<_> = data
         .all_items()
-        .iter()
         .filter_map(|item| {
             if let CppItemData::Type(type_data) = &item.cpp_data {
                 if let CppTypeDeclarationKind::Class { is_movable } = type_data.kind {

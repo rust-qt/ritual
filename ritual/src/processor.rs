@@ -67,16 +67,13 @@ pub struct ProcessorData<'a> {
 }
 
 impl<'a> ProcessorData<'a> {
-    pub fn all_databases(&self) -> Vec<&Database> {
-        once(&self.current_database as &_)
-            .chain(self.dep_databases.iter())
-            .collect()
+    pub fn all_databases(&self) -> impl Iterator<Item = &Database> {
+        once(&self.current_database as &_).chain(self.dep_databases.iter())
     }
-    pub fn all_items(&self) -> Vec<&CppDatabaseItem> {
+    pub fn all_items(&self) -> impl Iterator<Item = &CppDatabaseItem> {
         once(&self.current_database as &_)
             .chain(self.dep_databases.iter())
             .flat_map(|d| d.cpp_items.iter())
-            .collect()
     }
 }
 

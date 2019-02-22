@@ -10,11 +10,7 @@ use ritual_common::errors::*;
 
 /// Checks if `class_name` types inherits `base_name` type directly or indirectly.
 pub fn inherits(class_name: &CppPath, base_name: &CppPath, data: &ProcessorData) -> bool {
-    for base in data
-        .all_items()
-        .iter()
-        .filter_map(|x| x.cpp_data.as_base_ref())
-    {
+    for base in data.all_items().filter_map(|x| x.cpp_data.as_base_ref()) {
         if &base.derived_class_type == class_name {
             if &base.base_class_type == base_name {
                 return true;
@@ -30,7 +26,6 @@ pub fn inherits(class_name: &CppPath, base_name: &CppPath, data: &ProcessorData)
 fn detect_inherited_methods2(data: &ProcessorData) -> Result<Vec<CppFunction>> {
     let mut remaining_classes: Vec<&CppBaseSpecifier> = data
         .all_items()
-        .iter()
         .filter_map(|x| x.cpp_data.as_base_ref())
         .filter(|b| b.visibility != CppVisibility::Private)
         .collect();
@@ -61,7 +56,6 @@ fn detect_inherited_methods2(data: &ProcessorData) -> Result<Vec<CppFunction>> {
         trace!("Detecting inherited methods for {:?}\n", class);
         let methods: Vec<_> = data
             .all_items()
-            .iter()
             .filter_map(|x| x.cpp_data.as_function_ref())
             .filter(|m| m.class_type().ok().as_ref() == Some(&class.base_class_type))
             .collect();

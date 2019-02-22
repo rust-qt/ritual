@@ -24,7 +24,6 @@ pub fn detect_signal_argument_types(data: &mut ProcessorData) -> Result<()> {
                 if !all_types.contains(&types)
                     && !data
                         .all_items()
-                        .iter()
                         .filter_map(|i| i.cpp_data.as_signal_arguments_ref())
                         .any(|d| d == &types[..])
                 {
@@ -40,7 +39,6 @@ pub fn detect_signal_argument_types(data: &mut ProcessorData) -> Result<()> {
         while let Some(_) = types.pop() {
             if !data
                 .all_items()
-                .iter()
                 .filter_map(|i| i.cpp_data.as_signal_arguments_ref())
                 .any(|d| d == &types[..])
             {

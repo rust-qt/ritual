@@ -1,4 +1,3 @@
-use crate::config::Config;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;
 use crate::cpp_data::CppTypeDeclarationKind;
@@ -21,10 +20,8 @@ use crate::database::CppDatabaseItem;
 use crate::database::CppFfiItem;
 use crate::database::CppFfiItemKind;
 use crate::database::CppItemData;
-use crate::database::Database;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
-use crate::rust_info::RustDatabase;
 use crate::rust_info::RustDatabaseItem;
 use crate::rust_info::RustEnumValue;
 use crate::rust_info::RustEnumValueDoc;
@@ -58,7 +55,6 @@ use log::{debug, trace};
 use ritual_common::errors::{bail, ensure, err_msg, format_err, print_trace, Result};
 use ritual_common::string_utils::CaseOperations;
 use ritual_common::utils::MapIfOk;
-use std::collections::HashMap;
 use std::iter::once;
 use std::ops::Deref;
 
@@ -99,14 +95,9 @@ enum NameType<'a> {
     SizedItem,
 }
 
-struct State<'a> {
-    dep_databases: &'a [Database],
-    rust_database: &'a mut RustDatabase,
-    config: &'a Config,
-    cpp_path_to_index: HashMap<CppPath, usize>,
-}
+struct State<'b, 'a: 'b>(&'b mut ProcessorData<'a>);
 
-impl State<'_> {
+impl State<'_, '_> {
     /// Converts `CppType` to its exact Rust equivalent (FFI-compatible)
     fn ffi_type_to_rust_ffi_type(&self, cpp_ffi_type: &CppType) -> Result<RustType> {
         let rust_type = match &cpp_ffi_type {
@@ -228,7 +219,7 @@ impl State<'_> {
     }
 
     fn qflags_path(&self) -> &'static str {
-        if self.config.crate_properties().name().starts_with("moqt") {
+        if self.0.config.crate_properties().name().starts_with("moqt") {
             "moqt_core::QFlags"
         } else {
             "qt_core::QFlags"
@@ -738,16 +729,7 @@ impl State<'_> {
     }
 
     fn find_rust_items(&self, cpp_path: &CppPath) -> Result<Vec<&RustDatabaseItem>> {
-        if let Some(index) = self.cpp_path_to_index.get(cpp_path) {
-            return Ok(self
-                .rust_database
-                .items
-                .iter()
-                .filter(|item| item.cpp_item_index == Some(*index))
-                .collect());
-        }
-
-        for db in self.dep_databases {
+        for db in self.0.all_databases() {
             if let Some(index) = db
                 .cpp_items
                 .iter()
@@ -816,7 +798,7 @@ impl State<'_> {
         let path_crate_name = rust_path
             .crate_name()
             .expect("rust item path must have crate name");
-        let current_crate_name = self.config.crate_properties().name();
+        let current_crate_name = self.0.config.crate_properties().name();
 
         if path_crate_name != current_crate_name {
             rust_path.parts[0] = current_crate_name.to_string();
@@ -831,7 +813,7 @@ impl State<'_> {
     fn default_strategy(&self) -> RustPathScope {
         RustPathScope {
             path: RustPath {
-                parts: vec![self.config.crate_properties().name().into()],
+                parts: vec![self.0.config.crate_properties().name().into()],
             },
             prefix: None,
         }
@@ -863,6 +845,8 @@ impl State<'_> {
         let strategy = match name_type {
             NameType::FfiFunction => {
                 let ffi_module = self
+                    .0
+                    .current_database
                     .rust_database
                     .items
                     .iter()
@@ -876,6 +860,8 @@ impl State<'_> {
             }
             NameType::SizedItem => {
                 let sized_module = self
+                    .0
+                    .current_database
                     .rust_database
                     .items
                     .iter()
@@ -925,7 +911,13 @@ impl State<'_> {
         let mut number = None;
         if name_type == &NameType::FfiFunction {
             let rust_path = strategy.apply(&full_last_name);
-            if self.rust_database.find(&rust_path).is_some() {
+            if self
+                .0
+                .current_database
+                .rust_database
+                .find(&rust_path)
+                .is_some()
+            {
                 bail!("ffi function path already taken: {:?}", rust_path);
             }
             return Ok(rust_path);
@@ -939,7 +931,13 @@ impl State<'_> {
             let sanitized_name =
                 sanitize_rust_identifier(&name_try, name_type == &NameType::Module);
             let rust_path = strategy.apply(&sanitized_name);
-            if self.rust_database.find(&rust_path).is_none() {
+            if self
+                .0
+                .current_database
+                .rust_database
+                .find(&rust_path)
+                .is_none()
+            {
                 return Ok(rust_path);
             }
 
@@ -1161,13 +1159,15 @@ impl State<'_> {
 
     fn generate_special_module(&mut self, kind: RustModuleKind) -> Result<()> {
         if !self
+            .0
+            .current_database
             .rust_database
             .items
             .iter()
             .filter_map(|item| item.as_module_ref())
             .any(|module| module.kind == kind)
         {
-            let crate_name = self.config.crate_properties().name().to_string();
+            let crate_name = self.0.config.crate_properties().name().to_string();
             let rust_path_parts = match kind {
                 RustModuleKind::CrateRoot => vec![crate_name],
                 RustModuleKind::Ffi => vec![crate_name, "__ffi".to_string()],
@@ -1176,7 +1176,13 @@ impl State<'_> {
             };
             let rust_path = RustPath::from_parts(rust_path_parts);
 
-            if self.rust_database.find(&rust_path).is_some() {
+            if self
+                .0
+                .current_database
+                .rust_database
+                .find(&rust_path)
+                .is_some()
+            {
                 bail!("special module path already taken: {:?}", rust_path);
             }
 
@@ -1193,63 +1199,65 @@ impl State<'_> {
                 cpp_item_index: None,
                 ffi_item_index: None,
             };
-            self.rust_database.items.push(rust_item);
+            self.0.current_database.rust_database.items.push(rust_item);
         }
         Ok(())
     }
 }
 
 fn run(data: &mut ProcessorData) -> Result<()> {
-    let mut state = State {
-        dep_databases: data.dep_databases,
-        rust_database: &mut data.current_database.rust_database,
-        config: data.config,
-        cpp_path_to_index: data
-            .current_database
-            .cpp_items
-            .iter()
-            .enumerate()
-            .filter_map(|(index, item)| item.cpp_data.path().map(|path| (path.clone(), index)))
-            .collect(),
-    };
+    let mut state = State(data);
     state.generate_special_module(RustModuleKind::CrateRoot)?;
     state.generate_special_module(RustModuleKind::Ffi)?;
     state.generate_special_module(RustModuleKind::SizedTypes)?;
 
-    let cpp_items = &mut data.current_database.cpp_items;
-    let ffi_items = &mut data.current_database.ffi_items;
-
     loop {
-        let mut something_changed = false;
-
-        for (cpp_item_index, mut cpp_item) in cpp_items.iter_mut().enumerate() {
+        let mut processed_cpp_indexes = Vec::new();
+        for (cpp_item_index, cpp_item) in state.0.current_database.cpp_items.iter().enumerate() {
             if cpp_item.is_rust_processed {
                 continue;
             }
             if let Ok(rust_items) = state.process_cpp_item(cpp_item_index, cpp_item) {
-                state.rust_database.items.extend(rust_items);
-                cpp_item.is_rust_processed = true;
-                something_changed = true;
+                state
+                    .0
+                    .current_database
+                    .rust_database
+                    .items
+                    .extend(rust_items);
+                processed_cpp_indexes.push(cpp_item_index);
             }
         }
 
-        for (ffi_item_index, mut ffi_item) in ffi_items.iter_mut().enumerate() {
+        for &index in &processed_cpp_indexes {
+            state.0.current_database.cpp_items[index].is_rust_processed = true;
+        }
+
+        let mut processed_ffi_indexes = Vec::new();
+        for (ffi_item_index, ffi_item) in state.0.current_database.ffi_items.iter().enumerate() {
             if ffi_item.is_rust_processed {
                 continue;
             }
             if let Ok(rust_items) = state.process_ffi_item(ffi_item_index, ffi_item) {
-                state.rust_database.items.extend(rust_items);
-                ffi_item.is_rust_processed = true;
-                something_changed = true;
+                state
+                    .0
+                    .current_database
+                    .rust_database
+                    .items
+                    .extend(rust_items);
+                processed_ffi_indexes.push(ffi_item_index);
             }
         }
 
-        if !something_changed {
+        for &index in &processed_ffi_indexes {
+            state.0.current_database.ffi_items[index].is_rust_processed = true;
+        }
+
+        if processed_cpp_indexes.is_empty() && processed_ffi_indexes.is_empty() {
             break;
         }
     }
 
-    for (cpp_item_index, cpp_item) in cpp_items.iter().enumerate() {
+    for (cpp_item_index, cpp_item) in state.0.current_database.cpp_items.iter().enumerate() {
         if cpp_item.is_rust_processed {
             continue;
         }
@@ -1260,7 +1268,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         }
     }
 
-    for (ffi_item_index, ffi_item) in ffi_items.iter().enumerate() {
+    for (ffi_item_index, ffi_item) in state.0.current_database.ffi_items.iter().enumerate() {
         if ffi_item.is_rust_processed {
             continue;
         }
