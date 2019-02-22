@@ -947,34 +947,18 @@ impl State<'_, '_> {
         // TODO: check for conflicts with types from crate template (how?)
     }
 
-    fn process_ffi_item(
-        &self,
-        ffi_item_index: usize,
-        ffi_item: &CppFfiItem,
-    ) -> Result<Vec<RustDatabaseItem>> {
+    fn process_ffi_item(&self, ffi_item: &CppFfiItem) -> Result<Vec<RustItemKind>> {
         if !ffi_item.checks.any_passed() {
             bail!("cpp checks failed");
         }
         match &ffi_item.kind {
             CppFfiItemKind::Function(cpp_ffi_function) => {
                 let rust_ffi_function = self.generate_ffi_function(&cpp_ffi_function)?;
-                let rust_ffi_function_path = rust_ffi_function.path.clone();
-                let ffi_rust_item = RustDatabaseItem {
-                    kind: RustItemKind::FfiFunction(rust_ffi_function),
-                    cpp_item_index: None,
-                    ffi_item_index: Some(ffi_item_index),
-                };
+                let public_items =
+                    self.generate_rust_function(cpp_ffi_function, &rust_ffi_function.path)?;
+                let ffi_rust_item = RustItemKind::FfiFunction(rust_ffi_function);
 
-                Ok(self
-                    .generate_rust_function(cpp_ffi_function, &rust_ffi_function_path)?
-                    .into_iter()
-                    .map(|item| RustDatabaseItem {
-                        kind: item,
-                        cpp_item_index: None,
-                        ffi_item_index: Some(ffi_item_index),
-                    })
-                    .chain(once(ffi_rust_item))
-                    .collect_vec())
+                Ok(once(ffi_rust_item).chain(public_items).collect_vec())
             }
             CppFfiItemKind::QtSlotWrapper(_) => {
                 bail!("not supported yet");
@@ -983,27 +967,19 @@ impl State<'_, '_> {
     }
 
     #[allow(clippy::useless_let_if_seq)]
-    fn process_cpp_item(
-        &self,
-        cpp_item_index: usize,
-        cpp_item: &CppDatabaseItem,
-    ) -> Result<Vec<RustDatabaseItem>> {
+    fn process_cpp_item(&self, cpp_item: &CppDatabaseItem) -> Result<Vec<RustItemKind>> {
         match &cpp_item.cpp_data {
             CppItemData::Namespace(path) => {
                 let rust_path = self.generate_rust_path(path, &NameType::Module)?;
-                let rust_item = RustDatabaseItem {
-                    kind: RustItemKind::Module(RustModule {
-                        is_public: true,
-                        path: rust_path,
-                        doc: RustModuleDoc {
-                            extra_doc: None,
-                            cpp_path: Some(path.clone()),
-                        },
-                        kind: RustModuleKind::CppNamespace,
-                    }),
-                    cpp_item_index: Some(cpp_item_index),
-                    ffi_item_index: None,
-                };
+                let rust_item = RustItemKind::Module(RustModule {
+                    is_public: true,
+                    path: rust_path,
+                    doc: RustModuleDoc {
+                        extra_doc: None,
+                        cpp_path: Some(path.clone()),
+                    },
+                    kind: RustModuleKind::CppNamespace,
+                });
                 Ok(vec![rust_item])
             }
             CppItemData::Type(data) => {
@@ -1020,14 +996,11 @@ impl State<'_, '_> {
                                     let rust_type_path =
                                         rust_type.path().expect("enum rust item must have path");
                                     let qflags = self.qflags_path();
-                                    return Ok(vec![RustDatabaseItem {
-                                        kind: RustItemKind::FlagEnumImpl(RustFlagEnumImpl {
-                                            enum_path: rust_type_path.clone(),
-                                            qflags: RustPath::from_str_unchecked(qflags),
-                                        }),
-                                        cpp_item_index: Some(cpp_item_index),
-                                        ffi_item_index: None,
-                                    }]);
+                                    let rust_item = RustItemKind::FlagEnumImpl(RustFlagEnumImpl {
+                                        enum_path: rust_type_path.clone(),
+                                        qflags: RustPath::from_str_unchecked(qflags),
+                                    });
+                                    return Ok(vec![rust_item]);
                                 }
                             }
                         }
@@ -1048,16 +1021,12 @@ impl State<'_, '_> {
                                 );
                             }
 
-                            let internal_rust_item = RustDatabaseItem {
-                                kind: RustItemKind::Struct(RustStruct {
-                                    extra_doc: None,
-                                    path: internal_path.clone(),
-                                    kind: RustStructKind::SizedType(data.path.clone()),
-                                    is_public: true,
-                                }),
-                                cpp_item_index: Some(cpp_item_index),
-                                ffi_item_index: None,
-                            };
+                            let internal_rust_item = RustItemKind::Struct(RustStruct {
+                                extra_doc: None,
+                                path: internal_path.clone(),
+                                kind: RustStructKind::SizedType(data.path.clone()),
+                                is_public: true,
+                            });
 
                             rust_items.push(internal_rust_item);
 
@@ -1068,63 +1037,51 @@ impl State<'_, '_> {
                             wrapper_kind = RustWrapperTypeKind::ImmovableClassWrapper;
                         }
 
-                        let public_rust_item = RustDatabaseItem {
-                            kind: RustItemKind::Struct(RustStruct {
-                                extra_doc: None,
-                                path: public_path,
-                                kind: RustStructKind::WrapperType(RustWrapperType {
-                                    doc_data: RustWrapperTypeDocData {
-                                        cpp_path: data.path.clone(),
-                                        cpp_doc: data.doc.clone(),
-                                        raw_qt_slot_wrapper: None, // TODO: fix this
-                                    },
-                                    kind: wrapper_kind,
-                                }),
-                                is_public: true,
+                        let public_rust_item = RustItemKind::Struct(RustStruct {
+                            extra_doc: None,
+                            path: public_path,
+                            kind: RustStructKind::WrapperType(RustWrapperType {
+                                doc_data: RustWrapperTypeDocData {
+                                    cpp_path: data.path.clone(),
+                                    cpp_doc: data.doc.clone(),
+                                    raw_qt_slot_wrapper: None, // TODO: fix this
+                                },
+                                kind: wrapper_kind,
                             }),
-                            cpp_item_index: Some(cpp_item_index),
-                            ffi_item_index: None,
-                        };
+                            is_public: true,
+                        });
                         rust_items.push(public_rust_item);
 
                         let nested_types_path =
                             self.generate_rust_path(&data.path, &NameType::Module)?;
 
-                        let nested_types_rust_item = RustDatabaseItem {
-                            kind: RustItemKind::Module(RustModule {
-                                is_public: true,
-                                path: nested_types_path,
-                                doc: RustModuleDoc {
-                                    extra_doc: None,
-                                    cpp_path: Some(data.path.clone()),
-                                },
-                                kind: RustModuleKind::CppNestedType,
-                            }),
-                            cpp_item_index: Some(cpp_item_index),
-                            ffi_item_index: None,
-                        };
+                        let nested_types_rust_item = RustItemKind::Module(RustModule {
+                            is_public: true,
+                            path: nested_types_path,
+                            doc: RustModuleDoc {
+                                extra_doc: None,
+                                cpp_path: Some(data.path.clone()),
+                            },
+                            kind: RustModuleKind::CppNestedType,
+                        });
                         rust_items.push(nested_types_rust_item);
                         Ok(rust_items)
                     }
                     CppTypeDeclarationKind::Enum => {
                         let rust_path = self.generate_rust_path(&data.path, &NameType::Type)?;
-                        let rust_item = RustDatabaseItem {
-                            kind: RustItemKind::Struct(RustStruct {
-                                extra_doc: None,
-                                path: rust_path,
-                                kind: RustStructKind::WrapperType(RustWrapperType {
-                                    doc_data: RustWrapperTypeDocData {
-                                        cpp_path: data.path.clone(),
-                                        cpp_doc: data.doc.clone(),
-                                        raw_qt_slot_wrapper: None,
-                                    },
-                                    kind: RustWrapperTypeKind::EnumWrapper,
-                                }),
-                                is_public: true,
+                        let rust_item = RustItemKind::Struct(RustStruct {
+                            extra_doc: None,
+                            path: rust_path,
+                            kind: RustStructKind::WrapperType(RustWrapperType {
+                                doc_data: RustWrapperTypeDocData {
+                                    cpp_path: data.path.clone(),
+                                    cpp_doc: data.doc.clone(),
+                                    raw_qt_slot_wrapper: None,
+                                },
+                                kind: RustWrapperTypeKind::EnumWrapper,
                             }),
-                            cpp_item_index: Some(cpp_item_index),
-                            ffi_item_index: None,
-                        };
+                            is_public: true,
+                        });
 
                         Ok(vec![rust_item])
                     }
@@ -1133,19 +1090,15 @@ impl State<'_, '_> {
             CppItemData::EnumValue(value) => {
                 let rust_path = self.generate_rust_path(&value.path, &NameType::EnumValue)?;
 
-                let rust_item = RustDatabaseItem {
-                    kind: RustItemKind::EnumValue(RustEnumValue {
-                        path: rust_path,
-                        value: value.value,
-                        doc: RustEnumValueDoc {
-                            cpp_path: value.path.clone(),
-                            cpp_doc: value.doc.clone(),
-                            extra_doc: None,
-                        },
-                    }),
-                    cpp_item_index: Some(cpp_item_index),
-                    ffi_item_index: None,
-                };
+                let rust_item = RustItemKind::EnumValue(RustEnumValue {
+                    path: rust_path,
+                    value: value.value,
+                    doc: RustEnumValueDoc {
+                        cpp_path: value.path.clone(),
+                        cpp_doc: value.doc.clone(),
+                        extra_doc: None,
+                    },
+                });
 
                 Ok(vec![rust_item])
             }
@@ -1217,13 +1170,15 @@ fn run(data: &mut ProcessorData) -> Result<()> {
             if cpp_item.is_rust_processed {
                 continue;
             }
-            if let Ok(rust_items) = state.process_cpp_item(cpp_item_index, cpp_item) {
-                state
-                    .0
-                    .current_database
-                    .rust_database
-                    .items
-                    .extend(rust_items);
+            if let Ok(rust_items) = state.process_cpp_item(cpp_item) {
+                for rust_item in rust_items {
+                    let item = RustDatabaseItem {
+                        kind: rust_item,
+                        cpp_item_index: Some(cpp_item_index),
+                        ffi_item_index: None,
+                    };
+                    state.0.current_database.rust_database.items.push(item);
+                }
                 processed_cpp_indexes.push(cpp_item_index);
             }
         }
@@ -1237,13 +1192,15 @@ fn run(data: &mut ProcessorData) -> Result<()> {
             if ffi_item.is_rust_processed {
                 continue;
             }
-            if let Ok(rust_items) = state.process_ffi_item(ffi_item_index, ffi_item) {
-                state
-                    .0
-                    .current_database
-                    .rust_database
-                    .items
-                    .extend(rust_items);
+            if let Ok(rust_items) = state.process_ffi_item(ffi_item) {
+                for rust_item in rust_items {
+                    let item = RustDatabaseItem {
+                        kind: rust_item,
+                        cpp_item_index: None,
+                        ffi_item_index: Some(ffi_item_index),
+                    };
+                    state.0.current_database.rust_database.items.push(item);
+                }
                 processed_ffi_indexes.push(ffi_item_index);
             }
         }
@@ -1257,23 +1214,23 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         }
     }
 
-    for (cpp_item_index, cpp_item) in state.0.current_database.cpp_items.iter().enumerate() {
+    for cpp_item in &state.0.current_database.cpp_items {
         if cpp_item.is_rust_processed {
             continue;
         }
 
-        if let Err(err) = state.process_cpp_item(cpp_item_index, cpp_item) {
+        if let Err(err) = state.process_cpp_item(cpp_item) {
             trace!("skipping cpp item: {}: {}", &cpp_item.cpp_data, err);
             print_trace(err, log::Level::Trace);
         }
     }
 
-    for (ffi_item_index, ffi_item) in state.0.current_database.ffi_items.iter().enumerate() {
+    for ffi_item in &state.0.current_database.ffi_items {
         if ffi_item.is_rust_processed {
             continue;
         }
 
-        if let Err(err) = state.process_ffi_item(ffi_item_index, ffi_item) {
+        if let Err(err) = state.process_ffi_item(ffi_item) {
             trace!("skipping ffi item: {:?}: {}", ffi_item, err);
             print_trace(err, log::Level::Trace);
         }
