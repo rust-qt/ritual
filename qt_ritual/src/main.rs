@@ -6,6 +6,7 @@
 #![allow(clippy::collapsible_if)]
 
 use crate::lib_configs::create_config;
+use itertools::Itertools;
 use log::{error, info};
 use qt_ritual_common::all_crate_names;
 use ritual::processor;
@@ -15,7 +16,6 @@ use ritual_common::file_utils::canonicalize;
 use ritual_common::file_utils::path_to_str;
 use std::path::PathBuf;
 use structopt::StructOpt;
-
 mod detect_signal_argument_types;
 mod detect_signals_and_slots;
 mod doc_decoder;
@@ -78,11 +78,11 @@ fn run(options: Options) -> Result<()> {
         options.crates.iter().map(|s| s.as_str()).collect()
     };
 
-    let operations: Vec<_> = options
+    let operations = options
         .operations
         .iter()
         .map(|s| s.to_lowercase())
-        .collect();
+        .collect_vec();
 
     if operations.is_empty() {
         error!("No action requested. Run \"qt_generator --help\".");

@@ -114,7 +114,7 @@ fn get_template_arguments(entity: Entity) -> Option<Vec<CppType>> {
             nested_level = parent_nested_level + 1;
         }
     }
-    let args: Vec<_> = entity
+    let args = entity
         .get_children()
         .into_iter()
         .filter(|c| c.get_kind() == EntityKind::TemplateTypeParameter)
@@ -124,7 +124,7 @@ fn get_template_arguments(entity: Entity) -> Option<Vec<CppType>> {
             index: i,
             nested_level,
         })
-        .collect();
+        .collect_vec();
     if args.is_empty() {
         None
     } else {

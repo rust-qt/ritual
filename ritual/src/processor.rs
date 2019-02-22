@@ -131,7 +131,7 @@ impl Default for ProcessingSteps {
 
 impl ProcessingSteps {
     pub fn add_after(&mut self, after: &[&str], step: ProcessingStep) -> Result<()> {
-        let indexes: Vec<usize> = after.iter().map_if_ok(|s| {
+        let indexes = after.iter().map_if_ok(|s| {
             self.main_procedure
                 .iter()
                 .position(|a| a == s)

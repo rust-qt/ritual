@@ -728,7 +728,10 @@ impl State<'_, '_> {
         Ok(vec![rust_item])
     }
 
-    fn find_rust_items(&self, cpp_path: &CppPath) -> Result<Vec<&RustDatabaseItem>> {
+    fn find_rust_items(
+        &self,
+        cpp_path: &CppPath,
+    ) -> Result<impl Iterator<Item = &RustDatabaseItem>> {
         for db in self.0.all_databases() {
             if let Some(index) = db
                 .cpp_items
@@ -739,8 +742,7 @@ impl State<'_, '_> {
                     .rust_database
                     .items
                     .iter()
-                    .filter(|item| item.cpp_item_index == Some(index))
-                    .collect());
+                    .filter(move |item| item.cpp_item_index == Some(index)));
             }
         }
 
@@ -748,12 +750,7 @@ impl State<'_, '_> {
     }
 
     fn find_wrapper_type(&self, cpp_path: &CppPath) -> Result<&RustDatabaseItem> {
-        let rust_items = self.find_rust_items(cpp_path)?;
-        if rust_items.is_empty() {
-            bail!("no Rust items for {}", cpp_path.to_cpp_pseudo_code());
-        }
-        rust_items
-            .into_iter()
+        self.find_rust_items(cpp_path)?
             .find(|item| item.kind.is_wrapper_type())
             .ok_or_else(|| {
                 format_err!("no Rust type wrapper for {}", cpp_path.to_cpp_pseudo_code())
@@ -765,18 +762,14 @@ impl State<'_, '_> {
         parent_path: &CppPath,
         name_type: &NameType<'_>,
     ) -> Result<RustPathScope> {
-        let rust_items = self.find_rust_items(parent_path)?;
-        if rust_items.is_empty() {
-            bail!("no Rust items for {}", parent_path.to_cpp_pseudo_code());
-        }
         let allow_parent_type = if let NameType::Type = name_type {
             false
         } else {
             true
         };
 
-        let rust_item = rust_items
-            .into_iter()
+        let rust_item = self
+            .find_rust_items(parent_path)?
             .find(|item| {
                 (allow_parent_type && item.kind.is_wrapper_type()) || item.kind.is_module()
             })

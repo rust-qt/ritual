@@ -6,6 +6,7 @@ use crate::cpp_ffi_data::CppFfiFunctionKind;
 use crate::cpp_ffi_data::CppTypeConversionToFfi;
 use crate::cpp_function::*;
 use crate::cpp_type::*;
+use itertools::Itertools;
 use std::collections::HashSet;
 
 #[test]
@@ -173,7 +174,7 @@ fn argument_types_equal8() {
 }
 
 fn to_ffi(function: &CppFunction, force_stack: Option<CppPath>) -> CppFfiFunction {
-    let movable_types: Vec<_> = force_stack.into_iter().collect();
+    let movable_types = force_stack.into_iter().collect_vec();
     crate::cpp_ffi_generator::to_ffi_method(
         CppFfiFunctionKind::Function {
             cpp_function: function.clone(),

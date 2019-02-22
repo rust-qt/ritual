@@ -2,6 +2,7 @@
 //! for reading Qt documentation.
 
 use crate::doc_decoder::DocData;
+use itertools::Itertools;
 use log::{debug, error, trace};
 use regex::Regex;
 use ritual::cpp_data::CppPath;
@@ -136,11 +137,11 @@ impl DocParser {
         let base_url = self.base_url.clone();
         let file_data = self.file_data(index_item.document_id)?;
         let file_url = format!("{}{}", base_url, file_data.file_name);
-        let candidates: Vec<_> = file_data
+        let candidates = file_data
             .item_docs
             .iter()
             .filter(|x| x.anchor == anchor || x.anchor.starts_with(&anchor_prefix))
-            .collect();
+            .collect_vec();
         if candidates.is_empty() {
             bail!("No matching anchors found for {}", name);
         }
@@ -497,7 +498,7 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
                 let mut parse_enum_variants = |value_list: Node| {
                     for tr in value_list.find(Name("tr")) {
                         let td_r = tr.find(Name("td"));
-                        let tds: Vec<_> = td_r.collect();
+                        let tds = td_r.collect_vec();
                         if tds.len() == 3 {
                             let name_orig = tds[0].text();
                             let mut name = name_orig.trim();

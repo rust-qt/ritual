@@ -328,11 +328,11 @@ impl Generator {
                 }
             },
             RustStructKind::QtSlotWrapper(slot_wrapper) => {
-                let arg_texts: Vec<_> = slot_wrapper
+                let arg_texts = slot_wrapper
                     .arguments
                     .iter()
                     .map(|t| self.rust_type_to_code(&t.api_type))
-                    .collect();
+                    .collect_vec();
                 let args = arg_texts.join(", ");
                 let args_tuple = format!("{}{}", args, if arg_texts.len() == 1 { "," } else { "" });
                 let connections_mod =
@@ -755,11 +755,11 @@ impl Generator {
         } else {
             format!(" -> {}", self.rust_type_to_code(&func.return_type.api_type))
         };
-        let all_lifetimes: Vec<_> = func
+        let all_lifetimes = func
             .arguments
             .iter()
             .filter_map(|x| x.argument_type.api_type.lifetime())
-            .collect();
+            .collect_vec();
         let lifetimes_text = if all_lifetimes.is_empty() {
             String::new()
         } else {

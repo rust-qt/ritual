@@ -54,11 +54,10 @@ fn detect_inherited_methods2(data: &ProcessorData) -> Result<Vec<CppFunction>> {
     let mut result = Vec::new();
     for class in ordered_classes {
         trace!("Detecting inherited methods for {:?}\n", class);
-        let methods: Vec<_> = data
+        let methods = data
             .all_items()
             .filter_map(|x| x.cpp_data.as_function_ref())
-            .filter(|m| m.class_type().ok().as_ref() == Some(&class.base_class_type))
-            .collect();
+            .filter(|m| m.class_type().ok().as_ref() == Some(&class.base_class_type));
 
         for method in methods {
             let mut new_method = (*method).clone();

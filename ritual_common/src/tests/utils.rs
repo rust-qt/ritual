@@ -6,7 +6,7 @@ fn join() {
     assert_eq!(a1.join(""), "abc");
     assert_eq!(a1.join("_"), "a_b_c");
 
-    let a2: Vec<String> = vec![];
+    let a2 = Vec::<String>::new();
     assert_eq!(a2.join(""), "");
     assert_eq!(a2.join("_"), "");
 

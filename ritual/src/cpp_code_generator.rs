@@ -147,7 +147,7 @@ fn convert_return_type(method: &CppFfiFunction, expression: String) -> Result<St
 
 /// Generates code for values passed to the original C++ method.
 fn arguments_values(method: &CppFfiFunction) -> Result<String> {
-    let r: Vec<_> = method
+    let r = method
         .arguments
         .iter()
         .filter(|arg| arg.meaning.is_argument())

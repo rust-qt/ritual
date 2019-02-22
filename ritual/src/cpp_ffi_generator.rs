@@ -61,7 +61,7 @@ impl FfiNameProvider {
 /// Runs the FFI generator
 fn run(data: &mut ProcessorData) -> Result<()> {
     let cpp_ffi_lib_name = format!("ctr_{}_ffi", &data.config.crate_properties().name());
-    let movable_types: Vec<_> = data
+    let movable_types = data
         .all_items()
         .filter_map(|item| {
             if let CppItemData::Type(type_data) = &item.cpp_data {
@@ -73,7 +73,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
             }
             None
         })
-        .collect();
+        .collect_vec();
 
     let existing_names = data
         .current_database

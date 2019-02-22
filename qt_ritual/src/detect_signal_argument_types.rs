@@ -16,11 +16,11 @@ pub fn detect_signal_argument_types(data: &mut ProcessorData) -> Result<()> {
     {
         if let Some(method_info) = &method.member {
             if method_info.is_signal {
-                let types: Vec<_> = method
+                let types = method
                     .arguments
                     .iter()
                     .map(|x| x.argument_type.clone())
-                    .collect();
+                    .collect_vec();
                 if !all_types.contains(&types)
                     && !data
                         .all_items()

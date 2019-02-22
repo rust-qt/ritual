@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use log::trace;
 use regex::Regex;
 use ritual::cpp_data::CppPath;
@@ -109,10 +110,10 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
         {
             if let CppItemData::Type(type1) = &item.cpp_data {
                 if let Some(sections) = sections.get(&origin_location.include_file_path) {
-                    let sections_for_class: Vec<_> = sections
+                    let sections_for_class = sections
                         .iter()
                         .filter(|x| x.line + 1 >= origin_location.line as usize)
-                        .collect();
+                        .collect_vec();
                     sections_per_class.insert(type1.path.clone(), sections_for_class);
                 }
             }
@@ -128,11 +129,11 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
                 let mut section_type = SectionType::Other;
                 if let Ok(class_name) = method.class_type() {
                     if let Some(sections) = sections_per_class.get(&class_name) {
-                        let matching_sections: Vec<_> = sections
+                        let matching_sections = sections
                             .clone()
                             .into_iter()
                             .filter(|x| x.line < origin_location.line as usize)
-                            .collect();
+                            .collect_vec();
                         if !matching_sections.is_empty() {
                             let section = matching_sections[matching_sections.len() - 1];
                             section_type = section.section_type.clone();
