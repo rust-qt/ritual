@@ -513,6 +513,7 @@ impl RustItemKind {
 pub struct RustDatabaseItem {
     pub kind: RustItemKind,
     pub cpp_item_index: Option<usize>,
+    pub ffi_item_index: Option<usize>,
 }
 
 impl RustDatabaseItem {

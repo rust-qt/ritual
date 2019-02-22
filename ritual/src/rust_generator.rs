@@ -59,6 +59,7 @@ use ritual_common::errors::{bail, ensure, err_msg, format_err, print_trace, Resu
 use ritual_common::string_utils::CaseOperations;
 use ritual_common::utils::MapIfOk;
 use std::collections::HashMap;
+use std::iter::once;
 use std::ops::Deref;
 
 /// Adds "_" to a string if it is a reserved word in Rust
@@ -949,11 +950,14 @@ impl State<'_> {
     }
 
     fn process_ffi_item(
-        &mut self,
+        &self,
         cpp_item_index: usize,
-        ffi_item: &mut CppFfiItem,
-        modified: &mut bool,
-    ) -> Result<()> {
+        ffi_item_index: usize,
+        ffi_item: &CppFfiItem,
+    ) -> Result<Vec<RustDatabaseItem>> {
+        if !ffi_item.checks.any_passed() {
+            bail!("cpp checks failed");
+        }
         match &ffi_item.kind {
             CppFfiItemKind::Function(cpp_ffi_function) => {
                 let rust_ffi_function = self.generate_ffi_function(&cpp_ffi_function)?;
@@ -961,250 +965,199 @@ impl State<'_> {
                 let ffi_rust_item = RustDatabaseItem {
                     kind: RustItemKind::FfiFunction(rust_ffi_function),
                     cpp_item_index: Some(cpp_item_index),
+                    ffi_item_index: Some(ffi_item_index),
                 };
 
-                for item in
-                    self.generate_rust_function(cpp_ffi_function, &rust_ffi_function_path)?
-                {
-                    let api_rust_item = RustDatabaseItem {
+                Ok(self
+                    .generate_rust_function(cpp_ffi_function, &rust_ffi_function_path)?
+                    .into_iter()
+                    .map(|item| RustDatabaseItem {
                         kind: item,
                         cpp_item_index: Some(cpp_item_index),
-                    };
-                    self.rust_database.items.push(api_rust_item);
-                }
-                self.rust_database.items.push(ffi_rust_item);
-
-                *modified = true;
-                ffi_item.is_rust_processed = true;
+                        ffi_item_index: Some(ffi_item_index),
+                    })
+                    .chain(once(ffi_rust_item))
+                    .collect_vec())
             }
             CppFfiItemKind::QtSlotWrapper(_) => {
                 bail!("not supported yet");
             }
         }
-        Ok(())
     }
 
     #[allow(clippy::useless_let_if_seq)]
     fn generate_rust_items(
-        &mut self,
-        cpp_item: &mut CppDatabaseItem,
+        &self,
+        cpp_item: &CppDatabaseItem,
         cpp_item_index: usize,
-        modified: &mut bool,
-    ) -> Result<()> {
-        if !cpp_item.is_rust_processed {
-            match &cpp_item.cpp_data {
-                CppItemData::Namespace(path) => {
-                    let rust_path = self.generate_rust_path(path, &NameType::Module)?;
-                    let rust_item = RustDatabaseItem {
-                        kind: RustItemKind::Module(RustModule {
-                            is_public: true,
-                            path: rust_path,
-                            doc: RustModuleDoc {
+    ) -> Result<Vec<RustDatabaseItem>> {
+        match &cpp_item.cpp_data {
+            CppItemData::Namespace(path) => {
+                let rust_path = self.generate_rust_path(path, &NameType::Module)?;
+                let rust_item = RustDatabaseItem {
+                    kind: RustItemKind::Module(RustModule {
+                        is_public: true,
+                        path: rust_path,
+                        doc: RustModuleDoc {
+                            extra_doc: None,
+                            cpp_path: Some(path.clone()),
+                        },
+                        kind: RustModuleKind::CppNamespace,
+                    }),
+                    cpp_item_index: Some(cpp_item_index),
+                    ffi_item_index: None,
+                };
+                Ok(vec![rust_item])
+            }
+            CppItemData::Type(data) => {
+                match data.kind {
+                    CppTypeDeclarationKind::Class { is_movable } => {
+                        // TODO: if the type is `QFlags<T>` or `QUrlTwoFlags<T>`,
+                        //       generate `impl Flaggable` instead.
+                        if is_qflags(&data.path) {
+                            let argument =
+                                &data.path.last().template_arguments.as_ref().unwrap()[0];
+                            if !argument.is_template_parameter() {
+                                if let CppType::Enum { path } = &argument {
+                                    let rust_type = self.find_wrapper_type(path)?;
+                                    let rust_type_path =
+                                        rust_type.path().expect("enum rust item must have path");
+                                    let qflags = self.qflags_path();
+                                    return Ok(vec![RustDatabaseItem {
+                                        kind: RustItemKind::FlagEnumImpl(RustFlagEnumImpl {
+                                            enum_path: rust_type_path.clone(),
+                                            qflags: RustPath::from_str_unchecked(qflags),
+                                        }),
+                                        cpp_item_index: Some(cpp_item_index),
+                                        ffi_item_index: None,
+                                    }]);
+                                }
+                            }
+                        }
+
+                        let public_path = self.generate_rust_path(&data.path, &NameType::Type)?;
+
+                        let mut rust_items = Vec::new();
+
+                        let wrapper_kind;
+                        if is_movable {
+                            let internal_path =
+                                self.generate_rust_path(&data.path, &NameType::SizedItem)?;
+
+                            if internal_path == public_path {
+                                bail!(
+                                    "internal path is the same as public path: {:?}",
+                                    internal_path
+                                );
+                            }
+
+                            let internal_rust_item = RustDatabaseItem {
+                                kind: RustItemKind::Struct(RustStruct {
+                                    extra_doc: None,
+                                    path: internal_path.clone(),
+                                    kind: RustStructKind::SizedType(data.path.clone()),
+                                    is_public: true,
+                                }),
+                                cpp_item_index: Some(cpp_item_index),
+                                ffi_item_index: None,
+                            };
+
+                            rust_items.push(internal_rust_item);
+
+                            wrapper_kind = RustWrapperTypeKind::MovableClassWrapper {
+                                sized_type_path: internal_path,
+                            };
+                        } else {
+                            wrapper_kind = RustWrapperTypeKind::ImmovableClassWrapper;
+                        }
+
+                        let public_rust_item = RustDatabaseItem {
+                            kind: RustItemKind::Struct(RustStruct {
                                 extra_doc: None,
-                                cpp_path: Some(path.clone()),
-                            },
-                            kind: RustModuleKind::CppNamespace,
-                        }),
-                        cpp_item_index: Some(cpp_item_index),
-                    };
-                    self.rust_database.items.push(rust_item);
-                    *modified = true;
-                    cpp_item.is_rust_processed = true;
-                }
-                CppItemData::Type(data) => {
-                    match data.kind {
-                        CppTypeDeclarationKind::Class { is_movable } => {
-                            // TODO: if the type is `QFlags<T>` or `QUrlTwoFlags<T>`,
-                            //       generate `impl Flaggable` instead.
-                            if is_qflags(&data.path) {
-                                let argument =
-                                    &data.path.last().template_arguments.as_ref().unwrap()[0];
-                                if !argument.is_template_parameter() {
-                                    if let CppType::Enum { path } = &argument {
-                                        let rust_type = self.find_wrapper_type(path)?;
-                                        let rust_type_path = rust_type
-                                            .path()
-                                            .expect("enum rust item must have path");
-                                        let qflags = self.qflags_path();
-                                        // From<E> for QFlags<E>
-                                        /*let from_function = RustFunction {
-                                            is_public: true,
-                                            is_unsafe: false,
-                                            path: RustPath::from_str_unchecked("std::convert::From::from"),
-                                            kind: RustFunctionKind::CustomImpl("Self::from(value.to_int())".into()),
-                                            arguments: vec![
-                                                RustFunctionArgument {
-                                                    argument_type: RustFinalType::void(),
-                                                    name: "value".to_string(),
-                                                    ffi_index: 0
-                                                }
-                                            ],
-                                            return_type: RustFinalType::void(),
-                                            extra_doc: None
-                                        };
-                                        let item_kind = RustItemKind::TraitImpl(RustTraitImpl {
-                                            target_type: qflags,
-                                            parent_path: rust_type_path.parent().unwrap(),
-                                            trait_type: RustType::Common(RustCommonType {
-                                                path: RustPath::from_str_unchecked("std::convert::From"),
-                                                generic_arguments: Some(
-                                                    vec![RustType::Common(RustCommonType {
-                                                        path: rust_type_path.clone(),
-                                                        generic_arguments: None,
-                                                    })],
-                                                ),
-                                            }),
-                                            associated_types: Vec::new(),
-                                            functions: vec![from_function],
-                                        });*/
-                                        self.rust_database.items.push(RustDatabaseItem {
-                                            kind: RustItemKind::FlagEnumImpl(RustFlagEnumImpl {
-                                                enum_path: rust_type_path.clone(),
-                                                qflags: RustPath::from_str_unchecked(qflags),
-                                            }),
-                                            cpp_item_index: Some(cpp_item_index),
-                                        });
-                                        *modified = true;
-                                        cpp_item.is_rust_processed = true;
-                                        return Ok(());
-                                    }
-                                }
-                            }
-
-                            let public_path =
-                                self.generate_rust_path(&data.path, &NameType::Type)?;
-
-                            let wrapper_kind;
-                            if is_movable {
-                                let internal_path =
-                                    self.generate_rust_path(&data.path, &NameType::SizedItem)?;
-
-                                if internal_path == public_path {
-                                    bail!(
-                                        "internal path is the same as public path: {:?}",
-                                        internal_path
-                                    );
-                                }
-
-                                let internal_rust_item = RustDatabaseItem {
-                                    kind: RustItemKind::Struct(RustStruct {
-                                        extra_doc: None,
-                                        path: internal_path.clone(),
-                                        kind: RustStructKind::SizedType(data.path.clone()),
-                                        is_public: true,
-                                    }),
-                                    cpp_item_index: Some(cpp_item_index),
-                                };
-
-                                self.rust_database.items.push(internal_rust_item);
-
-                                wrapper_kind = RustWrapperTypeKind::MovableClassWrapper {
-                                    sized_type_path: internal_path,
-                                };
-                            } else {
-                                wrapper_kind = RustWrapperTypeKind::ImmovableClassWrapper;
-                            }
-
-                            let public_rust_item = RustDatabaseItem {
-                                kind: RustItemKind::Struct(RustStruct {
-                                    extra_doc: None,
-                                    path: public_path,
-                                    kind: RustStructKind::WrapperType(RustWrapperType {
-                                        doc_data: RustWrapperTypeDocData {
-                                            cpp_path: data.path.clone(),
-                                            cpp_doc: data.doc.clone(),
-                                            raw_qt_slot_wrapper: None, // TODO: fix this
-                                        },
-                                        kind: wrapper_kind,
-                                    }),
-                                    is_public: true,
-                                }),
-                                cpp_item_index: Some(cpp_item_index),
-                            };
-                            self.rust_database.items.push(public_rust_item);
-
-                            let nested_types_path =
-                                self.generate_rust_path(&data.path, &NameType::Module)?;
-
-                            let nested_types_rust_item = RustDatabaseItem {
-                                kind: RustItemKind::Module(RustModule {
-                                    is_public: true,
-                                    path: nested_types_path,
-                                    doc: RustModuleDoc {
-                                        extra_doc: None,
-                                        cpp_path: Some(data.path.clone()),
+                                path: public_path,
+                                kind: RustStructKind::WrapperType(RustWrapperType {
+                                    doc_data: RustWrapperTypeDocData {
+                                        cpp_path: data.path.clone(),
+                                        cpp_doc: data.doc.clone(),
+                                        raw_qt_slot_wrapper: None, // TODO: fix this
                                     },
-                                    kind: RustModuleKind::CppNestedType,
+                                    kind: wrapper_kind,
                                 }),
-                                cpp_item_index: Some(cpp_item_index),
-                            };
-                            self.rust_database.items.push(nested_types_rust_item);
+                                is_public: true,
+                            }),
+                            cpp_item_index: Some(cpp_item_index),
+                            ffi_item_index: None,
+                        };
+                        rust_items.push(public_rust_item);
 
-                            *modified = true;
-                            cpp_item.is_rust_processed = true;
-                        }
-                        CppTypeDeclarationKind::Enum => {
-                            let rust_path = self.generate_rust_path(&data.path, &NameType::Type)?;
-                            let rust_item = RustDatabaseItem {
-                                kind: RustItemKind::Struct(RustStruct {
+                        let nested_types_path =
+                            self.generate_rust_path(&data.path, &NameType::Module)?;
+
+                        let nested_types_rust_item = RustDatabaseItem {
+                            kind: RustItemKind::Module(RustModule {
+                                is_public: true,
+                                path: nested_types_path,
+                                doc: RustModuleDoc {
                                     extra_doc: None,
-                                    path: rust_path,
-                                    kind: RustStructKind::WrapperType(RustWrapperType {
-                                        doc_data: RustWrapperTypeDocData {
-                                            cpp_path: data.path.clone(),
-                                            cpp_doc: data.doc.clone(),
-                                            raw_qt_slot_wrapper: None,
-                                        },
-                                        kind: RustWrapperTypeKind::EnumWrapper,
-                                    }),
-                                    is_public: true,
+                                    cpp_path: Some(data.path.clone()),
+                                },
+                                kind: RustModuleKind::CppNestedType,
+                            }),
+                            cpp_item_index: Some(cpp_item_index),
+                            ffi_item_index: None,
+                        };
+                        rust_items.push(nested_types_rust_item);
+                        Ok(rust_items)
+                    }
+                    CppTypeDeclarationKind::Enum => {
+                        let rust_path = self.generate_rust_path(&data.path, &NameType::Type)?;
+                        let rust_item = RustDatabaseItem {
+                            kind: RustItemKind::Struct(RustStruct {
+                                extra_doc: None,
+                                path: rust_path,
+                                kind: RustStructKind::WrapperType(RustWrapperType {
+                                    doc_data: RustWrapperTypeDocData {
+                                        cpp_path: data.path.clone(),
+                                        cpp_doc: data.doc.clone(),
+                                        raw_qt_slot_wrapper: None,
+                                    },
+                                    kind: RustWrapperTypeKind::EnumWrapper,
                                 }),
-                                cpp_item_index: Some(cpp_item_index),
-                            };
-                            self.rust_database.items.push(rust_item);
-                            *modified = true;
-                            cpp_item.is_rust_processed = true;
-                        }
+                                is_public: true,
+                            }),
+                            cpp_item_index: Some(cpp_item_index),
+                            ffi_item_index: None,
+                        };
+
+                        Ok(vec![rust_item])
                     }
                 }
-                CppItemData::EnumValue(value) => {
-                    let rust_path = self.generate_rust_path(&value.path, &NameType::EnumValue)?;
-
-                    let rust_item = RustDatabaseItem {
-                        kind: RustItemKind::EnumValue(RustEnumValue {
-                            path: rust_path,
-                            value: value.value,
-                            doc: RustEnumValueDoc {
-                                cpp_path: value.path.clone(),
-                                cpp_doc: value.doc.clone(),
-                                extra_doc: None,
-                            },
-                        }),
-                        cpp_item_index: Some(cpp_item_index),
-                    };
-                    self.rust_database.items.push(rust_item);
-                    *modified = true;
-                    cpp_item.is_rust_processed = true;
-                }
-                CppItemData::Function(_)
-                | CppItemData::ClassField(_)
-                | CppItemData::ClassBase(_) => {
-                    // only need to process FFI items
-                    cpp_item.is_rust_processed = true;
-                }
-                _ => bail!("unimplemented"),
             }
+            CppItemData::EnumValue(value) => {
+                let rust_path = self.generate_rust_path(&value.path, &NameType::EnumValue)?;
+
+                let rust_item = RustDatabaseItem {
+                    kind: RustItemKind::EnumValue(RustEnumValue {
+                        path: rust_path,
+                        value: value.value,
+                        doc: RustEnumValueDoc {
+                            cpp_path: value.path.clone(),
+                            cpp_doc: value.doc.clone(),
+                            extra_doc: None,
+                        },
+                    }),
+                    cpp_item_index: Some(cpp_item_index),
+                    ffi_item_index: None,
+                };
+
+                Ok(vec![rust_item])
+            }
+            CppItemData::Function(_) | CppItemData::ClassField(_) | CppItemData::ClassBase(_) => {
+                // only need to process FFI items
+                Ok(Vec::new())
+            }
+            _ => bail!("unimplemented"),
         }
-
-        let ffi_results = cpp_item
-            .ffi_items
-            .iter_mut()
-            .filter(|item| !item.is_rust_processed && item.checks.any_passed())
-            .map(|item| self.process_ffi_item(cpp_item_index, item, modified))
-            .collect_vec();
-
-        // return first error, if any
-        ffi_results.into_iter().collect()
     }
 
     fn generate_special_module(&mut self, kind: RustModuleKind) -> Result<()> {
@@ -1239,6 +1192,7 @@ impl State<'_> {
                     kind,
                 }),
                 cpp_item_index: None,
+                ffi_item_index: None,
             };
             self.rust_database.items.push(rust_item);
         }
@@ -1268,12 +1222,27 @@ fn run(data: &mut ProcessorData) -> Result<()> {
     loop {
         let mut something_changed = false;
 
-        for (index, mut cpp_item) in cpp_items.iter_mut().enumerate() {
-            if cpp_item.is_all_rust_processed() {
-                continue;
+        for (cpp_item_index, mut cpp_item) in cpp_items.iter_mut().enumerate() {
+            if !cpp_item.is_rust_processed {
+                if let Ok(rust_items) = state.generate_rust_items(cpp_item, cpp_item_index) {
+                    state.rust_database.items.extend(rust_items);
+                    cpp_item.is_rust_processed = true;
+                    something_changed = true;
+                }
             }
 
-            let _ = state.generate_rust_items(&mut cpp_item, index, &mut something_changed);
+            for (ffi_item_index, mut ffi_item) in cpp_item.ffi_items.iter_mut().enumerate() {
+                if ffi_item.is_rust_processed {
+                    continue;
+                }
+                if let Ok(rust_items) =
+                    state.process_ffi_item(cpp_item_index, ffi_item_index, ffi_item)
+                {
+                    state.rust_database.items.extend(rust_items);
+                    ffi_item.is_rust_processed = true;
+                    something_changed = true;
+                }
+            }
         }
 
         if !something_changed {
@@ -1281,16 +1250,25 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         }
     }
 
-    for (index, mut cpp_item) in cpp_items.iter_mut().enumerate() {
-        if cpp_item.is_all_rust_processed() {
-            continue;
+    for (cpp_item_index, cpp_item) in cpp_items.iter().enumerate() {
+        if !cpp_item.is_rust_processed {
+            if let Err(err) = state.generate_rust_items(cpp_item, cpp_item_index) {
+                trace!("skipping cpp item: {}: {}", &cpp_item.cpp_data, err);
+                print_trace(err, log::Level::Trace);
+            }
         }
 
-        if let Err(err) = state.generate_rust_items(&mut cpp_item, index, &mut true) {
-            trace!("skipping item: {}: {}", &cpp_item.cpp_data, err);
-            print_trace(err, log::Level::Trace);
+        for (ffi_item_index, ffi_item) in cpp_item.ffi_items.iter().enumerate() {
+            if ffi_item.is_rust_processed {
+                continue;
+            }
+            if let Err(err) = state.process_ffi_item(cpp_item_index, ffi_item_index, ffi_item) {
+                trace!("skipping ffi item: {:?}: {}", ffi_item, err);
+                print_trace(err, log::Level::Trace);
+            }
         }
     }
+
     Ok(())
 }
 
