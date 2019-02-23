@@ -22,6 +22,7 @@ mod doc_decoder;
 mod doc_parser;
 mod fix_header_names;
 mod lib_configs;
+mod slot_wrappers;
 mod versions;
 
 #[cfg(test)]

@@ -7,14 +7,10 @@ use crate::cpp_data::CppVisibility;
 use crate::cpp_ffi_data::CppFfiArgumentMeaning;
 use crate::cpp_ffi_data::CppFfiFunctionArgument;
 use crate::cpp_ffi_data::CppFfiType;
-use crate::cpp_ffi_data::QtSlotWrapper;
 use crate::cpp_ffi_data::{CppCast, CppFfiFunction, CppFfiFunctionKind, CppFieldAccessorType};
 use crate::cpp_function::ReturnValueAllocationPlace;
-use crate::cpp_function::{
-    CppFunction, CppFunctionArgument, CppFunctionKind, CppFunctionMemberData,
-};
+use crate::cpp_function::{CppFunction, CppFunctionArgument, CppFunctionKind};
 use crate::cpp_type::is_qflags;
-use crate::cpp_type::CppFunctionPointerType;
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
 use crate::cpp_type::CppTypeRole;
@@ -25,9 +21,7 @@ use crate::processor::ProcessorData;
 use itertools::Itertools;
 use log::trace;
 use ritual_common::errors::{bail, Result};
-use ritual_common::utils::MapIfOk;
 use std::collections::HashSet;
-use std::iter::once;
 
 pub struct FfiNameProvider {
     names: HashSet<String>,
@@ -35,9 +29,25 @@ pub struct FfiNameProvider {
 }
 
 impl FfiNameProvider {
-    pub fn new(prefix: String, names: HashSet<String>) -> Self {
+    pub fn new(data: &ProcessorData) -> Self {
+        let prefix = format!("ctr_{}_ffi", &data.config.crate_properties().name());
+        let names = data
+            .current_database
+            .ffi_items
+            .iter()
+            .map(|f| f.path().to_cpp_code().unwrap())
+            .collect();
+
         FfiNameProvider { prefix, names }
     }
+
+    pub fn testing() -> Self {
+        FfiNameProvider {
+            names: HashSet::new(),
+            prefix: String::new(),
+        }
+    }
+
     pub fn create_path(&mut self, name: &str) -> CppPath {
         let mut num: Option<u32> = None;
         let full_name = loop {
@@ -60,7 +70,6 @@ impl FfiNameProvider {
 
 /// Runs the FFI generator
 fn run(data: &mut ProcessorData) -> Result<()> {
-    let cpp_ffi_lib_name = format!("ctr_{}_ffi", &data.config.crate_properties().name());
     let movable_types = data
         .all_items()
         .filter_map(|item| {
@@ -75,14 +84,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         })
         .collect_vec();
 
-    let existing_names = data
-        .current_database
-        .ffi_items
-        .iter()
-        .map(|f| f.path().to_cpp_code().unwrap())
-        .collect();
-
-    let mut name_provider = FfiNameProvider::new(cpp_ffi_lib_name.clone(), existing_names);
+    let mut name_provider = FfiNameProvider::new(data);
 
     for item in &mut data.current_database.cpp_items {
         if item.is_cpp_ffi_processed {
@@ -111,9 +113,6 @@ fn run(data: &mut ProcessorData) -> Result<()> {
             }
             CppItemData::ClassBase(base) => {
                 generate_casts(base, &mut name_provider).map(|v| v.into_iter().collect())
-            }
-            CppItemData::QtSignalArguments(signal_arguments) => {
-                generate_slot_wrapper(signal_arguments, &mut name_provider)
             }
         };
 
@@ -517,136 +516,4 @@ fn should_process_item(item: &CppItemData) -> Result<bool> {
     // TODO: QObject::findChild and QObject::findChildren should be allowed
     //return Ok(false);
     //}
-}
-
-/// Generates slot wrappers for all encountered argument types
-/// (excluding types already handled in the dependencies).
-fn generate_slot_wrapper(
-    arguments: &[CppType],
-    name_provider: &mut FfiNameProvider,
-) -> Result<Vec<CppFfiItem>> {
-    let ffi_types = arguments.map_if_ok(|t| t.to_cpp_ffi_type(CppTypeRole::NotReturnType))?;
-
-    let void_ptr = CppType::PointerLike {
-        is_const: false,
-        kind: CppPointerLikeTypeKind::Pointer,
-        target: Box::new(CppType::Void),
-    };
-    let func_arguments = once(void_ptr.clone())
-        .chain(ffi_types.iter().map(|t| t.ffi_type.clone()))
-        .collect();
-    let class_path = name_provider.create_path(&format!(
-        "slot_wrapper_{}",
-        arguments.iter().map(|arg| arg.ascii_caption()).join("_")
-    ));
-    let function_type = CppFunctionPointerType {
-        return_type: Box::new(CppType::Void),
-        arguments: func_arguments,
-        allows_variadic_arguments: false,
-    };
-    let create_function = |kind: CppFunctionKind,
-                           path: CppPath,
-                           is_slot: bool,
-                           arguments: Vec<CppFunctionArgument>|
-     -> CppFunction {
-        CppFunction {
-            path,
-            member: Some(CppFunctionMemberData {
-                is_virtual: true,
-                is_pure_virtual: false,
-                is_const: false,
-                is_static: false,
-                visibility: CppVisibility::Public,
-                is_signal: false,
-                is_slot,
-                kind,
-            }),
-            operator: None,
-            return_type: CppType::Void,
-            arguments,
-            allows_variadic_arguments: false,
-            declaration_code: None,
-            doc: None,
-        }
-    };
-    let mut methods = Vec::new();
-    methods.push(create_function(
-        CppFunctionKind::Constructor,
-        class_path.join(CppPathItem::from_str_unchecked(&class_path.last().name)),
-        false,
-        vec![],
-    ));
-    methods.push(create_function(
-        CppFunctionKind::Destructor,
-        class_path.join(CppPathItem::from_str_unchecked(&format!(
-            "~{}",
-            class_path.last().name
-        ))),
-        false,
-        vec![],
-    ));
-    let method_set_args = vec![
-        CppFunctionArgument {
-            name: "func".to_string(),
-            argument_type: CppType::FunctionPointer(function_type.clone()),
-            has_default_value: false,
-        },
-        CppFunctionArgument {
-            name: "data".to_string(),
-            argument_type: void_ptr.clone(),
-            has_default_value: false,
-        },
-    ];
-    methods.push(create_function(
-        CppFunctionKind::Regular,
-        class_path.join(CppPathItem::from_str_unchecked("set")),
-        false,
-        method_set_args,
-    ));
-
-    let method_custom_slot = create_function(
-        CppFunctionKind::Regular,
-        class_path.join(CppPathItem::from_str_unchecked("custom_slot")),
-        true,
-        arguments
-            .iter()
-            .enumerate()
-            .map(|(num, t)| CppFunctionArgument {
-                name: format!("arg{}", num),
-                argument_type: t.clone(),
-                has_default_value: false,
-            })
-            .collect(),
-    );
-    let receiver_id = method_custom_slot.receiver_id()?;
-    methods.push(method_custom_slot);
-    let class_bases = vec![CppBaseSpecifier {
-        derived_class_type: class_path.clone(),
-        base_class_type: CppPath::from_str_unchecked("QObject"),
-        base_index: 0,
-        is_virtual: false,
-        visibility: CppVisibility::Public,
-    }];
-
-    let qt_slot_wrapper = QtSlotWrapper {
-        class_path: class_path.clone(),
-        arguments: ffi_types,
-        function_type: function_type.clone(),
-        receiver_id,
-    };
-
-    let mut items = vec![CppFfiItem::from_qt_slot_wrapper(qt_slot_wrapper)];
-    for method in methods {
-        items.extend(
-            generate_ffi_methods_for_method(&method, &[], name_provider)?
-                .into_iter()
-                .map(Into::into),
-        );
-    }
-    items.extend(
-        generate_casts(&class_bases[0], name_provider)?
-            .into_iter()
-            .map(Into::into),
-    );
-    Ok(items)
 }

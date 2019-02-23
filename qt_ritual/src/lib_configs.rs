@@ -1,9 +1,9 @@
 //! Generator configurations specific for each Qt module.
 
-use crate::detect_signal_argument_types::detect_signal_argument_types;
 use crate::detect_signals_and_slots::detect_signals_and_slots;
 use crate::doc_parser::parse_docs;
 use crate::fix_header_names::fix_header_names;
+use crate::slot_wrappers::add_slot_wrappers;
 use crate::versions;
 use log::info;
 use qt_ritual_common::{get_full_build_config, lib_dependencies, lib_folder_name};
@@ -589,8 +589,8 @@ pub fn create_config(crate_name: &str) -> Result<Config> {
         )?;
 
         steps.add_after(
-            &["cpp_parser", "qt_detect_signals_and_slots"],
-            ProcessingStep::new("detect_signal_argument_types", detect_signal_argument_types),
+            &["qt_detect_signals_and_slots"],
+            ProcessingStep::new("add_slot_wrappers", add_slot_wrappers),
         )?;
 
         let crate_name_clone = crate_name.to_string();

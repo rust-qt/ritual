@@ -1099,7 +1099,6 @@ impl State<'_, '_> {
                 // only need to process FFI items
                 Ok(Vec::new())
             }
-            _ => bail!("unimplemented"),
         }
     }
 

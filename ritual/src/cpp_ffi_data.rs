@@ -254,13 +254,14 @@ impl CppFfiType {
 /// certain slot arguments
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QtSlotWrapper {
+    pub signal_arguments: Vec<CppType>,
     /// Generated name of the wrapper class
     pub class_path: CppPath,
     /// Arguments of the slot.
     pub arguments: Vec<CppFfiType>,
     /// The function pointer type accepted by this wrapper
     pub function_type: CppFunctionPointerType,
-    /// String identifier passed to `QObject::connect` function to
-    /// specify the object's slot.
-    pub receiver_id: String,
+    // /// String identifier passed to `QObject::connect` function to
+    // /// specify the object's slot.
+    //pub receiver_id: String,
 }

@@ -11,8 +11,8 @@ mod cpp_checker;
 mod cpp_code_generator;
 pub mod cpp_data;
 mod cpp_explicit_xstructors;
-mod cpp_ffi_data;
-mod cpp_ffi_generator;
+pub mod cpp_ffi_data;
+pub mod cpp_ffi_generator;
 pub mod cpp_function;
 mod cpp_inheritance; // TODO: deal with inheritance for subclassing support
 mod cpp_operator;

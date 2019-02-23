@@ -14,7 +14,6 @@ use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_ffi_data::QtSlotWrapper;
 use crate::cpp_type::CppType;
 use crate::rust_info::RustDatabase;
-use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -115,7 +114,6 @@ pub enum CppItemData {
     Function(CppFunction),
     ClassField(CppClassField),
     ClassBase(CppBaseSpecifier),
-    QtSignalArguments(Vec<CppType>),
 }
 
 impl CppItemData {
@@ -165,13 +163,6 @@ impl CppItemData {
                     false
                 }
             }
-            QtSignalArguments(v) => {
-                if let QtSignalArguments(v2) = &other {
-                    v == v2
-                } else {
-                    false
-                }
-            }
         }
     }
 
@@ -182,7 +173,7 @@ impl CppItemData {
             CppItemData::EnumValue(data) => &data.path,
             CppItemData::Function(data) => &data.path,
             CppItemData::ClassField(data) => &data.path,
-            CppItemData::ClassBase(_) | CppItemData::QtSignalArguments(_) => return None,
+            CppItemData::ClassBase(_) => return None,
         };
         Some(path)
     }
@@ -212,7 +203,6 @@ impl CppItemData {
                 CppType::Class(base.base_class_type.clone()),
                 CppType::Class(base.derived_class_type.clone()),
             ],
-            CppItemData::QtSignalArguments(args) => args.clone(),
         }
     }
 
@@ -266,14 +256,6 @@ impl CppItemData {
         }
     }
 
-    pub fn as_signal_arguments_ref(&self) -> Option<&[CppType]> {
-        if let CppItemData::QtSignalArguments(data) = self {
-            Some(data)
-        } else {
-            None
-        }
-    }
-
     /*pub fn path(&self) -> Option<String> {
         unimplemented!()
     }*/
@@ -321,10 +303,6 @@ impl Display for CppItemData {
                     index_text
                 )
             }
-            CppItemData::QtSignalArguments(args) => format!(
-                "Qt signal args ({})",
-                args.iter().map(|arg| arg.to_cpp_pseudo_code()).join(", ")
-            ),
         };
 
         f.write_str(&s)
