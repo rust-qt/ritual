@@ -123,7 +123,7 @@ pub enum CppFfiArgumentMeaning {
     /// Value of this argument should be passed as an argument to
     /// the original C++ method. Associated value is index of the
     /// C++ method's argument (counting from 0).
-    Argument(i8),
+    Argument(usize),
     /// This argument receives pointer to the buffer where
     /// the return value should be transferred to using placement new.
     ReturnValue,

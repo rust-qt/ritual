@@ -142,7 +142,7 @@ pub struct RustFunctionArgument {
 }
 
 /// Type of a receiver in Qt connection system.
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum RustQtReceiverType {
     Signal,
     Slot,
@@ -168,16 +168,12 @@ pub enum RustFunctionKind {
         deleter: RustPath,
     },
     SignalOrSlotGetter {
-        /// Name of the type.
-        type_path: RustPath,
         /// C++ name of the signal or slot
         cpp_path: CppPath,
         /// Type of the receiver.
         receiver_type: RustQtReceiverType,
         /// Identifier of the signal or slot for passing to `QObject::connect`.
         receiver_id: String,
-        /// Types or arguments.
-        arguments: Vec<RustType>,
     },
 }
 

@@ -66,6 +66,10 @@ impl Workspace {
         Ok(w)
     }
 
+    pub fn database_path(&self, crate_name: &str) -> PathBuf {
+        database_path(&self.path, crate_name)
+    }
+
     pub fn path(&self) -> &Path {
         &self.path
     }

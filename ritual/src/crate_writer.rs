@@ -14,6 +14,7 @@ use ritual_common::file_utils::create_file;
 use ritual_common::file_utils::path_to_str;
 use ritual_common::file_utils::read_dir;
 use ritual_common::file_utils::remove_dir_all;
+use ritual_common::file_utils::remove_file;
 use ritual_common::file_utils::repo_crate_local_path;
 use ritual_common::file_utils::save_json;
 use ritual_common::file_utils::save_toml;
@@ -212,9 +213,6 @@ fn generate_crate_template(data: &mut ProcessorData) -> Result<()> {
         for item in read_dir(template_path)? {
             let item = item?;
             let target = output_path.join(item.file_name());
-            if target.exists() {
-                remove_dir_all(&target)?;
-            }
             copy_recursively(&item.path(), &target)?;
         }
     }
@@ -257,12 +255,28 @@ fn generate_c_lib_template(
 }
 
 fn run(data: &mut ProcessorData) -> Result<()> {
-    generate_crate_template(data)?;
-    data.workspace.update_cargo_toml()?;
-
     let output_path = data
         .workspace
         .crate_path(data.config.crate_properties().name())?;
+
+    for item in read_dir(&output_path)? {
+        let path = item?.path();
+        if path
+            == data
+                .workspace
+                .database_path(data.config.crate_properties().name())
+        {
+            continue;
+        }
+        if path.is_dir() {
+            remove_dir_all(&path)?;
+        } else {
+            remove_file(&path)?;
+        }
+    }
+
+    generate_crate_template(data)?;
+    data.workspace.update_cargo_toml()?;
 
     let c_lib_path = output_path.join("c_lib");
     if !c_lib_path.exists() {
@@ -290,15 +304,10 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         file,
     )?;
 
-    let rust_src_path = output_path.join("src");
-    if rust_src_path.exists() {
-        remove_dir_all(&rust_src_path)?;
-    }
-    create_dir_all(&rust_src_path)?;
     rust_code_generator::generate(
         data.config.crate_properties().name(),
         &data.current_database.rust_database,
-        &rust_src_path,
+        &output_path.join("src"),
         data.config.crate_template_path().map(|s| s.join("src")),
     )?;
 

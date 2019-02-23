@@ -16,6 +16,7 @@ use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppSpecificNumericType;
 use crate::cpp_type::CppSpecificNumericTypeKind;
 use crate::cpp_type::CppType;
+use crate::cpp_type::CppTypeRole;
 use crate::database::CppDatabaseItem;
 use crate::database::CppFfiItem;
 use crate::database::CppFfiItemKind;
@@ -29,6 +30,7 @@ use crate::rust_info::RustFFIArgument;
 use crate::rust_info::RustFFIFunction;
 use crate::rust_info::RustFfiWrapperData;
 use crate::rust_info::RustFlagEnumImpl;
+use crate::rust_info::RustFunction;
 use crate::rust_info::RustFunctionArgument;
 use crate::rust_info::RustFunctionKind;
 use crate::rust_info::RustItemKind;
@@ -36,6 +38,7 @@ use crate::rust_info::RustModule;
 use crate::rust_info::RustModuleDoc;
 use crate::rust_info::RustModuleKind;
 use crate::rust_info::RustPathScope;
+use crate::rust_info::RustQtReceiverType;
 use crate::rust_info::RustStruct;
 use crate::rust_info::RustStructKind;
 use crate::rust_info::RustTraitAssociatedType;
@@ -92,6 +95,7 @@ enum NameType<'a> {
     Module,
     FfiFunction,
     ApiFunction(&'a CppFfiFunction),
+    ReceiverFunction,
     SizedItem,
 }
 
@@ -218,19 +222,19 @@ impl State<'_, '_> {
         Ok(rust_type)
     }
 
-    fn qflags_path(&self) -> &'static str {
+    fn qt_core_path(&self) -> RustPath {
         if self.0.config.crate_properties().name().starts_with("moqt") {
-            "moqt_core::QFlags"
+            RustPath::from_str_unchecked("moqt_core")
         } else {
-            "qt_core::QFlags"
+            RustPath::from_str_unchecked("qt_core")
         }
     }
 
     fn create_qflags(&self, arg: &RustPath) -> RustType {
-        let qflags_path = self.qflags_path();
+        let path = self.qt_core_path().join("QFlags");
 
         RustType::Common(RustCommonType {
-            path: RustPath::from_str_unchecked(qflags_path),
+            path,
             generic_arguments: Some(vec![RustType::Common(RustCommonType {
                 path: arg.clone(),
                 generic_arguments: None,
@@ -869,7 +873,8 @@ impl State<'_, '_> {
             NameType::Type
             | NameType::Module
             | NameType::EnumValue
-            | NameType::ApiFunction { .. } => {
+            | NameType::ApiFunction { .. }
+            | NameType::ReceiverFunction => {
                 if let Ok(parent) = cpp_path.parent() {
                     self.get_strategy(&parent, name_type)?
                 } else {
@@ -892,6 +897,9 @@ impl State<'_, '_> {
                 };
                 s.to_snake_case()
             }
+            NameType::ReceiverFunction => self
+                .cpp_path_item_to_name(cpp_path.last(), &strategy.path)?
+                .to_snake_case(),
             NameType::Type | NameType::EnumValue => self
                 .cpp_path_item_to_name(&cpp_path.last(), &strategy.path)?
                 .to_class_case(),
@@ -988,10 +996,10 @@ impl State<'_, '_> {
                                     let rust_type = self.find_wrapper_type(path)?;
                                     let rust_type_path =
                                         rust_type.path().expect("enum rust item must have path");
-                                    let qflags = self.qflags_path();
+                                    let qflags = self.qt_core_path().join("QFlags");
                                     let rust_item = RustItemKind::FlagEnumImpl(RustFlagEnumImpl {
                                         enum_path: rust_type_path.clone(),
-                                        qflags: RustPath::from_str_unchecked(qflags),
+                                        qflags,
                                     });
                                     return Ok(vec![rust_item]);
                                 }
@@ -1095,7 +1103,91 @@ impl State<'_, '_> {
 
                 Ok(vec![rust_item])
             }
-            CppItemData::Function(_) | CppItemData::ClassField(_) | CppItemData::ClassBase(_) => {
+            CppItemData::Function(cpp_function) => {
+                let receiver_type = if let Some(member_data) = &cpp_function.member {
+                    if member_data.is_signal {
+                        RustQtReceiverType::Signal
+                    } else if member_data.is_slot {
+                        RustQtReceiverType::Slot
+                    } else {
+                        return Ok(Vec::new());
+                    }
+                } else {
+                    return Ok(Vec::new());
+                };
+                let receiver_id = cpp_function.receiver_id()?;
+                let function_kind = RustFunctionKind::SignalOrSlotGetter {
+                    cpp_path: cpp_function.path.clone(),
+                    receiver_type,
+                    receiver_id,
+                };
+
+                let path =
+                    self.generate_rust_path(&cpp_function.path, &NameType::ReceiverFunction)?;
+
+                let class_type = self.find_wrapper_type(&cpp_function.path.parent()?)?;
+                let self_type = RustType::PointerLike {
+                    kind: RustPointerLikeTypeKind::Reference { lifetime: None },
+                    is_const: true,
+                    target: Box::new(RustType::Common(RustCommonType {
+                        path: class_type.path().unwrap().clone(),
+                        generic_arguments: None,
+                    })),
+                };
+
+                let self_type = RustFinalType {
+                    ffi_type: self_type.clone(),
+                    api_type: self_type,
+                    api_to_ffi_conversion: RustToFfiTypeConversion::None,
+                };
+
+                let return_type_path = match receiver_type {
+                    RustQtReceiverType::Signal => self.qt_core_path().join("Signal"),
+                    RustQtReceiverType::Slot => self.qt_core_path().join("Receiver"),
+                };
+
+                let arguments = cpp_function.arguments.iter().enumerate().map_if_ok(
+                    |(index, arg)| -> Result<_> {
+                        let ffi_type = arg
+                            .argument_type
+                            .to_cpp_ffi_type(CppTypeRole::NotReturnType)?;
+                        let rust_type = self.rust_final_type(
+                            &ffi_type,
+                            &CppFfiArgumentMeaning::Argument(index),
+                            false,
+                            &ReturnValueAllocationPlace::NotApplicable,
+                        )?;
+                        Ok(rust_type.api_type)
+                    },
+                )?;
+
+                let return_type = RustType::Common(RustCommonType {
+                    path: return_type_path,
+                    generic_arguments: Some(vec![RustType::Tuple(arguments)]),
+                });
+
+                let return_type = RustFinalType {
+                    ffi_type: return_type.clone(),
+                    api_type: return_type,
+                    api_to_ffi_conversion: RustToFfiTypeConversion::None,
+                };
+
+                let rust_function = RustFunction {
+                    is_public: true,
+                    is_unsafe: false,
+                    path,
+                    kind: function_kind,
+                    arguments: vec![RustFunctionArgument {
+                        argument_type: self_type,
+                        name: "self".to_string(),
+                        ffi_index: 42,
+                    }],
+                    return_type,
+                    extra_doc: None,
+                };
+                Ok(vec![RustItemKind::Function(rust_function)])
+            }
+            CppItemData::ClassField(_) | CppItemData::ClassBase(_) => {
                 // only need to process FFI items
                 Ok(Vec::new())
             }

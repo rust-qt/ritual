@@ -7,10 +7,21 @@
 #define Q_SIGNALS public
 #define Q_SLOTS
 
+class QMetaObject {
+public:
+    class Connection {
+    public:
+    };
+};
+
 class MOQT_CORE_EXPORT QObject {
 public:
     QObject(QObject* parent = nullptr);
     virtual ~QObject();
+
+    static QMetaObject::Connection connect(
+        const QObject* sender, const char* signal,
+        const QObject* receiver, const char* method);
 
 private:
     struct QPrivateSignal {};

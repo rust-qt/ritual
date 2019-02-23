@@ -399,7 +399,7 @@ pub fn to_ffi_method(
         r.arguments.push(CppFfiFunctionArgument {
             name: arg.name.clone(),
             argument_type: c_type,
-            meaning: CppFfiArgumentMeaning::Argument(index as i8),
+            meaning: CppFfiArgumentMeaning::Argument(index),
         });
     }
 

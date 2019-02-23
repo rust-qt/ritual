@@ -38,11 +38,28 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
+// TODO: use everywhere
+fn wrap_unsafe(in_unsafe_context: bool, content: &str) -> String {
+    let (unsafe_start, unsafe_end) = if in_unsafe_context {
+        ("", "")
+    } else {
+        ("unsafe { ", " }")
+    };
+    format!("{}{}{}", unsafe_start, content, unsafe_end)
+}
+
 /// Generates Rust code representing type `rust_type` inside crate `crate_name`.
 /// Same as `RustCodeGenerator::rust_type_to_code`, but accessible by other modules.
 pub fn rust_type_to_code(rust_type: &RustType, current_crate: &str) -> String {
     match rust_type {
         RustType::Unit => "()".to_string(),
+        RustType::Tuple(types) => {
+            let types_text = types
+                .iter()
+                .map(|t| rust_type_to_code(t, current_crate))
+                .join(", ");
+            format!("({})", types_text)
+        }
         RustType::PointerLike {
             kind,
             target,
@@ -747,7 +764,15 @@ impl Generator {
                 self.generate_ffi_call(&func.arguments, &func.return_type, data, func.is_unsafe)?
             }
             RustFunctionKind::CppDeletableImpl { deleter } => self.rust_path_to_string(deleter),
-            RustFunctionKind::SignalOrSlotGetter { .. } => unimplemented!(),
+            RustFunctionKind::SignalOrSlotGetter { receiver_id, .. } => {
+                let path = &func.return_type.api_type.as_common()?.path;
+                let call = format!(
+                    "{}::new(self, std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"))",
+                    self.rust_path_to_string(path),
+                    receiver_id
+                );
+                wrap_unsafe(func.is_unsafe, &call)
+            }
         };
 
         let return_type_for_signature = if func.return_type.api_type == RustType::Unit {

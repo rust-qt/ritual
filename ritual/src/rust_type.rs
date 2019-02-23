@@ -178,6 +178,7 @@ pub struct RustCommonType {
 pub enum RustType {
     /// Unit type `()`, used as the replacement of C++'s `void` type.
     Unit,
+    Tuple(Vec<RustType>),
     /// A numeric, enum or struct type with some indirection
     Common(RustCommonType),
     /// A function pointer type.
@@ -200,6 +201,7 @@ impl RustType {
     pub fn caption(&self, context: &RustPath) -> Result<String> {
         Ok(match self {
             RustType::Unit => "unit".to_string(),
+            RustType::Tuple(types) => types.iter().map_if_ok(|t| t.caption(context))?.join("_"),
             RustType::PointerLike {
                 kind,
                 is_const,
@@ -334,6 +336,7 @@ impl RustType {
                 false
             }
             RustType::Unit => false,
+            RustType::Tuple(types) => types.iter().any(|arg| arg.is_unsafe_argument()),
             RustType::FunctionPointer {
                 return_type,
                 arguments,
