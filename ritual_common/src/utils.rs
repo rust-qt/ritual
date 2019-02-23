@@ -9,8 +9,12 @@ use std::fmt::Debug;
 use std::fmt::Display;
 use std::hash::BuildHasher;
 use std::hash::Hash;
+use std::io::stdout;
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 #[cfg(windows)]
 /// Returns proper executable file suffix on current platform.
@@ -157,5 +161,55 @@ impl<T: Debug> Inspect for T {
     fn inspect(self, text: impl Display) -> Self {
         println!("{} {:?}", text, self);
         self
+    }
+}
+
+#[derive(Debug)]
+struct ProgressBarInner {
+    message: String,
+    count: u64,
+    pos: u64,
+    last_line_len: usize,
+}
+
+#[derive(Clone, Debug)]
+pub struct ProgressBar(Arc<Mutex<ProgressBarInner>>);
+
+impl ProgressBar {
+    pub fn new(count: u64, message: impl Into<String>) -> Self {
+        let mut progress_bar = ProgressBarInner {
+            count,
+            message: message.into(),
+            pos: 0,
+            last_line_len: 0,
+        };
+        progress_bar.print();
+        ProgressBar(Arc::new(Mutex::new(progress_bar)))
+    }
+
+    pub fn add(&self, n: u64) {
+        self.0.lock().unwrap().inc(n);
+    }
+}
+
+impl ProgressBarInner {
+    fn clear_line(&self) {
+        print!("\r");
+        for _ in 0..self.last_line_len {
+            print!(" ");
+        }
+        print!("\r");
+    }
+    fn print(&mut self) {
+        self.clear_line();
+        let message = format!("{}: {} / {}", self.message, self.pos, self.count);
+        self.last_line_len = message.len();
+        print!("{}\r", message);
+        stdout().flush().unwrap();
+    }
+
+    fn inc(&mut self, n: u64) {
+        self.pos += n;
+        self.print();
     }
 }

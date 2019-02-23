@@ -5,8 +5,6 @@ use crate::database::CppFfiItem;
 use crate::database::CppFfiItemKind;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
-use indicatif::ProgressBar;
-use indicatif::ProgressStyle;
 use log::debug;
 use rayon::iter::IndexedParallelIterator;
 use rayon::iter::IntoParallelIterator;
@@ -19,6 +17,7 @@ use ritual_common::errors::{bail, Result};
 use ritual_common::file_utils::{create_dir_all, create_file, path_to_str, remove_dir_all};
 use ritual_common::target::current_target;
 use ritual_common::utils::MapIfOk;
+use ritual_common::utils::ProgressBar;
 use std::io::Write;
 use std::iter;
 use std::path::PathBuf;
@@ -113,13 +112,6 @@ impl Snippet {
     }
 }
 
-fn new_progress_bar(count: u64, message: &str) -> ProgressBar {
-    let progress_bar = ProgressBar::new(count);
-    progress_bar.set_style(ProgressStyle::default_bar().template("{pos}/{len} {msg} {wide_bar}"));
-    progress_bar.set_message(message);
-    progress_bar
-}
-
 struct PreliminaryTest {
     name: String,
     snippet: Snippet,
@@ -145,7 +137,7 @@ fn binary_check(
         for snippet in &mut *snippets {
             let output = check_snippets(data, iter::once(&snippet.snippet))?;
             snippet.output = Some(output);
-            progress_bar.inc(1);
+            progress_bar.add(1);
         }
         return Ok(());
     }
@@ -155,7 +147,7 @@ fn binary_check(
         for snippet in &mut *snippets {
             snippet.output = Some(output.clone());
         }
-        progress_bar.inc(snippets.len() as u64);
+        progress_bar.add(snippets.len() as u64);
     } else {
         let split_point = snippets.len() / 2;
         let (left, right) = snippets.split_at_mut(split_point);
@@ -275,7 +267,7 @@ impl CppChecker<'_, '_> {
 
         self.run_tests()?;
 
-        let progress_bar = new_progress_bar(snippets.len() as u64, "Checking items");
+        let progress_bar = ProgressBar::new(snippets.len() as u64, "Checking items");
         let num_threads = num_cpus::get();
         let div_ceil = |x, y| (x + y - 1) / y;
         let chunk_size = div_ceil(snippets.len(), num_threads);
