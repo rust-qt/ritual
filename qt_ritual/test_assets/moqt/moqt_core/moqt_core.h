@@ -6,3 +6,4 @@
 #include "destructors.h"
 #include "QPoint.h"
 #include "QFlags.h"
+#include "QObject.h"

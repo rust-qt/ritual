@@ -1,8 +1,10 @@
 #ifndef QFLAGS_H
 #define QFLAGS_H
 
+#include "moqt_core_exports.h"
+
 template<typename T>
-class QFlags {
+class MOQT_CORE_EXPORT QFlags {
 public:
     typedef unsigned int uint;
     QFlags(uint value) : m_value(value) {}

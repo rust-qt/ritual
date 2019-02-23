@@ -583,16 +583,6 @@ pub fn create_config(crate_name: &str) -> Result<Config> {
             }),
         )?;
 
-        steps.add_after(
-            &["cpp_parser"],
-            ProcessingStep::new("qt_detect_signals_and_slots", detect_signals_and_slots),
-        )?;
-
-        steps.add_after(
-            &["qt_detect_signals_and_slots"],
-            ProcessingStep::new("add_slot_wrappers", add_slot_wrappers),
-        )?;
-
         let crate_name_clone = crate_name.to_string();
         let docs_path = qt_config.installation_data.docs_path.clone();
 
@@ -605,6 +595,17 @@ pub fn create_config(crate_name: &str) -> Result<Config> {
 
         config
     };
+
+    let steps = config.processing_steps_mut();
+    steps.add_after(
+        &["cpp_parser"],
+        ProcessingStep::new("qt_detect_signals_and_slots", detect_signals_and_slots),
+    )?;
+
+    steps.add_after(
+        &["qt_detect_signals_and_slots"],
+        ProcessingStep::new("add_slot_wrappers", add_slot_wrappers),
+    )?;
 
     config.set_crate_template_path(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))

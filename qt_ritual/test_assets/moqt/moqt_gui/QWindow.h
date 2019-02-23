@@ -3,8 +3,9 @@
 
 #include <basic_class.h>
 #include "QPoint.h"
+#include "QObject.h"
 
-class QWindow {
+class QWindow : public QObject {
 public:
     QWindow() {}
 
@@ -16,6 +17,9 @@ public:
 
     int showVectorOfInt(const QVector<int> &vec) { return vec.count(); }
     int showVectorOfWindows(const QVector<QWindow*> &vec) { return vec.count(); }
+
+Q_SIGNALS:
+    void posChanged(const QPoint& pos);
 
 private:
     QPoint m_pos;

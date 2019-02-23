@@ -37,6 +37,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
     // TODO: only run if it's a new class or it has some new methods; don't change existing old methods
     let mut files = HashSet::new();
 
+    let qobject_path = CppPath::from_str_unchecked("QObject");
     for item in &data.current_database.cpp_items {
         if let DatabaseItemSource::CppParser {
             origin_location, ..
@@ -44,7 +45,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
         {
             if let CppItemData::Type(type1) = &item.cpp_data {
                 if type1.kind.is_class() {
-                    if inherits(&data, &type1.path, &CppPath::from_str_unchecked("QObject")) {
+                    if type1.path == qobject_path || inherits(&data, &type1.path, &qobject_path) {
                         if !files.contains(&origin_location.include_file_path) {
                             files.insert(origin_location.include_file_path.clone());
                         }
