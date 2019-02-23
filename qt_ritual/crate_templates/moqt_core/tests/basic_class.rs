@@ -1,5 +1,6 @@
 use moqt_core::basic_class::UpdateType;
 use moqt_core::{BasicClass, BasicClassField};
+use cpp_utils::Ptr;
 
 #[test]
 fn basic_class() {
@@ -14,8 +15,8 @@ fn basic_class() {
         assert_eq!(v.int_field(), 3);
 
         assert!(v.int_pointer_field().is_null());
-        let mut p = v.int_reference_field();
-        v.set_int_pointer_field(&mut p);
+        let p = v.int_reference_field();
+        v.set_int_pointer_field(p);
         v.set_int_field(4);
         assert_eq!(*v.int_pointer_field(), 4);
 
@@ -26,7 +27,7 @@ fn basic_class() {
         assert_eq!(v.int_field(), 8);
 
         // TODO: set_int_reference_field should have int arg
-        v.set_int_reference_field(&mut 9);
+        v.set_int_reference_field(Ptr::new(&mut 9));
         assert_eq!(v.int_field(), 9);
 
         assert_eq!(v.class_field().get(), 42);
@@ -34,7 +35,7 @@ fn basic_class() {
         assert_eq!(v.class_field().get(), 43);
 
         let c = BasicClassField::new();
-        v.set_class_field(&c);
+        v.set_class_field(c.as_ptr());
         assert_eq!(v.class_field().get(), 42);
         drop(c);
         assert_eq!(v.class_field().get(), 42);

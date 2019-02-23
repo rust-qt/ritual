@@ -1,5 +1,6 @@
 //! Various C++-related types and functions needed for the `cpp_to_rust` project.
 
+use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::ptr;
 
@@ -31,6 +32,7 @@ mod tests {
         };
         assert!(*value1.borrow() == 10);
         unsafe {
+            // TODO: remove all "as *mut _" because it's automatic
             CppBox::new(&mut object1 as *mut _);
         }
         assert!(*value1.borrow() == 42);
@@ -69,12 +71,13 @@ pub struct CppBox<T: CppDeletable>(*mut T);
 
 impl<T: CppDeletable> CppBox<T> {
     /// Returns constant raw pointer to the value in the box.
-    pub fn as_ptr(&self) -> *const T {
-        self.0
+    pub unsafe fn as_ptr(&self) -> ConstPtr<T> {
+        ConstPtr::new(self.0)
     }
+
     /// Returns mutable raw pointer to the value in the box.
-    pub fn as_mut_ptr(&self) -> *mut T {
-        self.0
+    pub unsafe fn as_mut_ptr(&self) -> Ptr<T> {
+        Ptr::new(self.0)
     }
     /// Returns the pointer that was used to create the object and destroys the box.
     /// The caller of the function becomes the owner of the object and should
@@ -336,8 +339,21 @@ impl<T> DerefMut for Ptr<T> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ConstPtr<T>(*const T);
+
+impl<T> Clone for ConstPtr<T> {
+    fn clone(&self) -> Self {
+        ConstPtr(self.0)
+    }
+}
+
+impl<T> Copy for ConstPtr<T> {}
+
+impl<T> fmt::Debug for ConstPtr<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ConstPtr({:?})", self.0)
+    }
+}
 
 impl<T> ConstPtr<T> {
     pub unsafe fn new(ptr: *const T) -> Self {
@@ -353,12 +369,12 @@ impl<T> ConstPtr<T> {
     }
 
     /// Returns constant raw pointer to the value in the box.
-    pub fn as_ptr(&self) -> *const T {
+    pub fn as_ptr(self) -> *const T {
         self.0
     }
 
     /// Returns true if the pointer is null.
-    pub fn is_null(&self) -> bool {
+    pub fn is_null(self) -> bool {
         self.0.is_null()
     }
 }

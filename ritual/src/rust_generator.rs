@@ -284,7 +284,10 @@ impl State<'_, '_> {
                     rust_api_type = (**target).clone();
                     api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
                 } else {
-                    if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
+                    if argument_meaning == &CppFfiArgumentMeaning::This {
+                        *kind = RustPointerLikeTypeKind::Reference { lifetime: None };
+                        api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
+                    } else {
                         let wrapper = if *is_const {
                             "cpp_utils::ConstPtr"
                         } else {
@@ -296,13 +299,13 @@ impl State<'_, '_> {
                             generic_arguments: Some(vec![(**target).clone()]),
                         });
                         api_to_ffi_conversion = RustToFfiTypeConversion::PtrWrapperToPtr;
-                    } else {
-                        *kind = RustPointerLikeTypeKind::Reference { lifetime: None };
-                        api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
                     }
                 }
             } else {
-                if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
+                if argument_meaning == &CppFfiArgumentMeaning::This {
+                    *kind = RustPointerLikeTypeKind::Reference { lifetime: None };
+                    api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
+                } else if !is_template_argument {
                     let wrapper = if *is_const {
                         "cpp_utils::ConstPtr"
                     } else {
@@ -314,9 +317,6 @@ impl State<'_, '_> {
                         generic_arguments: Some(vec![(**target).clone()]),
                     });
                     api_to_ffi_conversion = RustToFfiTypeConversion::PtrWrapperToPtr;
-                } else if !is_template_argument {
-                    *kind = RustPointerLikeTypeKind::Reference { lifetime: None };
-                    api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
                 }
             }
         }
@@ -427,13 +427,20 @@ impl State<'_, '_> {
             CppCast::Static { .. } => {}
         }
 
-        let is_const1 = is_const;
-        if let RustType::PointerLike { is_const, .. } =
-            &mut unnamed_function.arguments[0].argument_type.api_type
+        if let RustType::Common(RustCommonType {
+            generic_arguments, ..
+        }) = &unnamed_function.arguments[0].argument_type.api_type
         {
-            *is_const = is_const1;
+            unnamed_function.arguments[0].argument_type.api_type = RustType::PointerLike {
+                kind: RustPointerLikeTypeKind::Reference { lifetime: None },
+                is_const,
+                target: Box::new(generic_arguments.as_ref().unwrap()[0].clone()),
+            };
+            unnamed_function.arguments[0]
+                .argument_type
+                .api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
         } else {
-            bail!("argument 0 is not pointer like: {:?}", unnamed_function);
+            bail!("argument 0 has unexpected type: {:?}", unnamed_function);
         }
         unnamed_function.arguments[0].name = "self".to_string();
         Ok(unnamed_function)
@@ -1120,6 +1127,7 @@ impl State<'_, '_> {
                     cpp_path: cpp_function.path.clone(),
                     receiver_type,
                     receiver_id,
+                    qobject_path: self.qt_core_path().join("QObject"),
                 };
 
                 let path =

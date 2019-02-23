@@ -764,11 +764,17 @@ impl Generator {
                 self.generate_ffi_call(&func.arguments, &func.return_type, data, func.is_unsafe)?
             }
             RustFunctionKind::CppDeletableImpl { deleter } => self.rust_path_to_string(deleter),
-            RustFunctionKind::SignalOrSlotGetter { receiver_id, .. } => {
+            RustFunctionKind::SignalOrSlotGetter {
+                receiver_id,
+                qobject_path,
+                ..
+            } => {
                 let path = &func.return_type.api_type.as_common()?.path;
                 let call = format!(
-                    "{}::new(self, std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"))",
+                    "{}::new(cpp_utils::ConstPtr::new(self as &{}), \
+                     std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"))",
                     self.rust_path_to_string(path),
+                    self.rust_path_to_string(qobject_path),
                     receiver_id
                 );
                 wrap_unsafe(func.is_unsafe, &call)

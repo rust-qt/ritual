@@ -174,6 +174,8 @@ pub enum RustFunctionKind {
         receiver_type: RustQtReceiverType,
         /// Identifier of the signal or slot for passing to `QObject::connect`.
         receiver_id: String,
+
+        qobject_path: RustPath,
     },
 }
 

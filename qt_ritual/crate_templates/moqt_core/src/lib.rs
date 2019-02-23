@@ -1,6 +1,7 @@
 use std::os::raw::c_int;
 use std::ffi::CStr;
 use std::marker::PhantomData;
+use cpp_utils::ConstPtr;
 
 /// Rust alternative to Qt's `QFlags` types.
 ///
@@ -112,15 +113,15 @@ pub trait ArgumentsCompatible<T> {}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Receiver<Arguments> {
-    qobject: *const crate::QObject,
+    qobject: ConstPtr<QObject>,
     receiver_id: &'static CStr,
     _marker: PhantomData<Arguments>,
 }
 
 impl<A> Receiver<A> {
-    pub fn new(qobject: &crate::QObject, receiver_id: &'static CStr) -> Self {
+    pub fn new(qobject: ConstPtr<QObject>, receiver_id: &'static CStr) -> Self {
         Self {
-            qobject: qobject as *const _,
+            qobject: qobject,
             receiver_id,
             _marker: PhantomData,
         }
@@ -131,7 +132,7 @@ impl<A> Receiver<A> {
 pub struct Signal<Arguments>(Receiver<Arguments>);
 
 impl<A> Signal<A> {
-    pub fn new(qobject: &crate::QObject, receiver_id: &'static CStr) -> Self {
+    pub fn new(qobject: ConstPtr<QObject>, receiver_id: &'static CStr) -> Self {
         Signal(Receiver::new(qobject, receiver_id))
     }
 }
@@ -163,10 +164,10 @@ impl<SignalArguments> Signal<SignalArguments> {
         // TODO: meta_object::Connection should have operator bool()
 
         crate::QObject::connect(
-            &*self.0.qobject,
-            &*self.0.receiver_id.as_ptr(),
-            &*receiver.qobject,
-            &*receiver.receiver_id.as_ptr(),
+            self.0.qobject,
+            ConstPtr::new(self.0.receiver_id.as_ptr()),
+            receiver.qobject,
+            ConstPtr::new(receiver.receiver_id.as_ptr()),
         )
     }
 }
