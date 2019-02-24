@@ -1203,7 +1203,6 @@ impl CppParser<'_, '_> {
         let include_file = self.entity_include_file(entity).with_context(|_| {
             format!(
                 "Origin of class field is unknown: {}; entity: {:?}",
-                // TODO: add function for this
                 get_full_name_display(entity),
                 entity
             )
@@ -1229,10 +1228,6 @@ impl CppParser<'_, '_> {
                 origin_location: get_origin_location(entity)?,
             },
             CppItemData::ClassField(CppClassField {
-                //        size: match field_clang_type.get_sizeof() {
-                //          Ok(size) => Some(size),
-                //          Err(_) => None,
-                //        },
                 path: class_type.join(CppPathItem::from_good_str(&field_name)),
                 field_type,
                 visibility: match entity.get_accessibility().unwrap_or(Accessibility::Public) {
@@ -1240,9 +1235,7 @@ impl CppParser<'_, '_> {
                     Accessibility::Protected => CppVisibility::Protected,
                     Accessibility::Private => CppVisibility::Private,
                 },
-                // TODO: determine `is_const` and `is_static` (switch to a newer clang?)
-                is_const: false,
-                is_static: false,
+                is_static: entity.get_kind() == EntityKind::VarDecl,
                 doc: None,
             }),
         );
@@ -1280,13 +1273,6 @@ impl CppParser<'_, '_> {
         } else if template_arguments.is_some() {
             bail!("unexpected template arguments");
         }
-        //    let size = match entity.get_type() {
-        //      Some(type1) => type1.get_sizeof().ok(),
-        //      None => None,
-        //    };
-        //    if template_arguments.is_none() && size.is_none() {
-        //      bail!("Failed to request size, but the class is not a template class");
-        //    }
         if let Some(parent) = entity.get_semantic_parent() {
             if get_template_arguments(parent).is_some() {
                 bail!("Types nested into template types are not supported");
@@ -1294,7 +1280,8 @@ impl CppParser<'_, '_> {
         }
         let mut current_base_index = 0;
         for child in entity.get_children() {
-            if child.get_kind() == EntityKind::FieldDecl {
+            if child.get_kind() == EntityKind::FieldDecl || child.get_kind() == EntityKind::VarDecl
+            {
                 if let Err(err) = self.parse_class_field(child, &full_name) {
                     trace!(
                         "cpp_parser_error; entity = {}; failed to parse class field: {}",

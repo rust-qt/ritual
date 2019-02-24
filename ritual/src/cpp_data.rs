@@ -60,8 +60,6 @@ pub struct CppClassField {
     pub field_type: CppType,
     /// Visibility
     pub visibility: CppVisibility,
-
-    pub is_const: bool,
     pub is_static: bool,
 
     pub doc: Option<CppClassFieldDoc>,
@@ -73,7 +71,6 @@ impl CppClassField {
             && self.field_type == other.field_type
             && self.visibility == other.visibility
             && self.is_static == other.is_static
-            && self.is_const == other.is_const
     }
 
     pub fn short_text(&self) -> String {

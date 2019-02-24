@@ -147,6 +147,7 @@ fn functions_with_class_arg() {
         class Magic {
         public:
             int a, b;
+            static int c;
         };
         bool func1(Magic x);
         bool func1(Magic* x);
@@ -159,13 +160,14 @@ fn functions_with_class_arg() {
 
     assert!(data.bases.is_empty());
 
-    assert_eq!(data.fields.len(), 2);
+    assert_eq!(data.fields.len(), 3);
     assert_eq!(data.fields[0].path, CppPath::from_good_str("Magic::a"));
     assert_eq!(
         data.fields[0].field_type,
         CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
     );
     assert_eq!(data.fields[0].visibility, CppVisibility::Public);
+    assert_eq!(data.fields[0].is_static, false);
 
     assert_eq!(data.fields[1].path, CppPath::from_good_str("Magic::b"));
     assert_eq!(
@@ -173,6 +175,15 @@ fn functions_with_class_arg() {
         CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
     );
     assert_eq!(data.fields[1].visibility, CppVisibility::Public);
+    assert_eq!(data.fields[1].is_static, false);
+
+    assert_eq!(data.fields[2].path, CppPath::from_good_str("Magic::c"));
+    assert_eq!(
+        data.fields[2].field_type,
+        CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
+    );
+    assert_eq!(data.fields[2].visibility, CppVisibility::Public);
+    assert_eq!(data.fields[2].is_static, true);
 
     assert_eq!(data.methods.len(), 3);
     assert_eq!(
