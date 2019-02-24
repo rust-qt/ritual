@@ -97,13 +97,13 @@ impl RustPath {
         parent.includes_directly(self)
     }
 
-    pub fn parent(&self) -> Option<RustPath> {
+    pub fn parent(&self) -> Result<RustPath> {
         if self.parts.len() > 1 {
             let mut new_path = self.clone();
             new_path.parts.pop().unwrap();
-            Some(new_path)
+            Ok(new_path)
         } else {
-            None
+            bail!("failed to get parent path for {:?}", self)
         }
     }
 }

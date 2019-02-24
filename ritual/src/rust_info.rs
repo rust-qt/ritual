@@ -529,7 +529,7 @@ impl RustDatabaseItem {
     pub fn is_child_of(&self, parent: &RustPath) -> bool {
         match &self.kind {
             RustItemKind::TraitImpl(trait_impl) => &trait_impl.parent_path == parent,
-            RustItemKind::FlagEnumImpl(data) => data.enum_path.parent().as_ref() == Some(parent),
+            RustItemKind::FlagEnumImpl(data) => data.enum_path.is_child_of(parent),
             _ => {
                 let path = self
                     .path()
