@@ -90,7 +90,7 @@ fn run_parser(code: &'static str) -> ParserCppData {
 fn simple_func() {
     let data = run_parser("int func1(int x);");
     assert!(data.types.is_empty());
-    assert!(data.methods.len() == 1);
+    assert_eq!(data.methods.len(), 1);
     assert_eq!(
         data.methods[0],
         CppFunction {
@@ -112,9 +112,15 @@ fn simple_func() {
 
 #[test]
 fn simple_func_with_default_value() {
-    let data = run_parser("bool func1(int x = 42) {\nreturn false;\n}");
+    let data = run_parser(
+        "
+        bool func1(int x = 42) {
+            return false;
+        }
+        ",
+    );
     assert!(data.types.is_empty());
-    assert!(data.methods.len() == 1);
+    assert_eq!(data.methods.len(), 1);
     assert_eq!(
         data.methods[0],
         CppFunction {
@@ -137,10 +143,15 @@ fn simple_func_with_default_value() {
 #[test]
 fn functions_with_class_arg() {
     let data = run_parser(
-        "class Magic { public: int a, b; };
-  bool func1(Magic x);
-  bool func1(Magic* x);
-  bool func2(const Magic&);",
+        "
+        class Magic {
+        public:
+            int a, b;
+        };
+        bool func1(Magic x);
+        bool func1(Magic* x);
+        bool func2(const Magic&);
+        ",
     );
     assert_eq!(data.types.len(), 1);
     assert_eq!(data.types[0].path, CppPath::from_str_unchecked("Magic"));
@@ -163,7 +174,7 @@ fn functions_with_class_arg() {
     );
     assert_eq!(data.fields[1].visibility, CppVisibility::Public);
 
-    assert!(data.methods.len() == 3);
+    assert_eq!(data.methods.len(), 3);
     assert_eq!(
         data.methods[0],
         CppFunction {
@@ -225,7 +236,12 @@ fn functions_with_class_arg() {
 
 #[test]
 fn func_with_unknown_type() {
-    let data = run_parser("class SomeClass; \n int func1(SomeClass* x);");
+    let data = run_parser(
+        "
+        class SomeClass;
+        int func1(SomeClass* x);
+        ",
+    );
     assert!(data.types.is_empty());
     assert_eq!(data.methods.len(), 1);
 }
@@ -259,9 +275,16 @@ fn variadic_func() {
 
 #[test]
 fn free_template_func() {
-    let data = run_parser("template<typename T> T abs(T value) { return 2*value; }");
+    let data = run_parser(
+        "
+        template<typename T>
+        T abs(T value) {
+            return 2 * value;
+        }
+        ",
+    );
     assert!(data.types.is_empty());
-    assert!(data.methods.len() == 1);
+    assert_eq!(data.methods.len(), 1);
     let abs_item = CppPathItem {
         name: "abs".into(),
         template_arguments: Some(vec![CppType::TemplateParameter {
@@ -300,12 +323,18 @@ fn free_template_func() {
 #[test]
 fn free_func_operator_sub() {
     for code in &[
-        "class C1 {}; \n C1 operator-(C1 a, C1 b);",
-        "class C1 {}; \n C1 operator -(C1 a, C1 b);",
+        "
+        class C1 {};
+        C1 operator-(C1 a, C1 b);
+        ",
+        "\
+         class C1 {};\
+         C1 operator -(C1 a, C1 b);\
+         ",
     ] {
         let data = run_parser(code);
-        assert!(data.types.len() == 1);
-        assert!(data.methods.len() == 1);
+        assert_eq!(data.types.len(), 1);
+        assert_eq!(data.methods.len(), 1);
         assert_eq!(
             data.methods[0],
             CppFunction {
@@ -336,21 +365,23 @@ fn free_func_operator_sub() {
 #[test]
 fn simple_class_method() {
     let data = run_parser(
-        "class MyClass {
-    public:
-      int func1(int x);
-    private:
-      int m_x;
-    };",
+        "
+        class MyClass {
+        public:
+            int func1(int x);
+        private:
+            int m_x;
+        };
+        ",
     );
-    assert!(data.types.len() == 1);
+    assert_eq!(data.types.len(), 1);
     assert_eq!(data.types[0].path, CppPath::from_str_unchecked("MyClass"));
     assert!(data.types[0].kind.is_class());
 
     assert!(data.bases.is_empty());
-    assert!(data.fields.len() == 1);
+    assert_eq!(data.fields.len(), 1);
 
-    assert!(data.methods.len() == 1);
+    assert_eq!(data.methods.len(), 1);
     assert_eq!(
         data.methods[0],
         CppFunction {
@@ -382,20 +413,22 @@ fn simple_class_method() {
 #[test]
 fn advanced_class_methods() {
     let data = run_parser(
-        "class MyClass {
-    public:
-      MyClass(bool a, bool b, bool c);
-      virtual ~MyClass();
-      static int func1(int x);
-      virtual void func2();
-    protected:
-      virtual void func3() = 0;
-    public:
-      int func4() const { return 1; }
-      operator bool() const;
-      template<class K, class V>
-      int func6(V x) const { return 1; }
-    };",
+        "
+        class MyClass {
+        public:
+            MyClass(bool a, bool b, bool c);
+            virtual ~MyClass();
+            static int func1(int x);
+            virtual void func2();
+        protected:
+            virtual void func3() = 0;
+        public:
+            int func4() const { return 1; }
+            operator bool() const;
+            template<class K, class V>
+            int func6(V x) const { return 1; }
+        };
+        ",
     );
     assert_eq!(data.methods.len(), 8);
     assert_eq!(
@@ -508,13 +541,14 @@ fn advanced_class_methods() {
 fn template_class_method() {
     let data = run_parser(
         "
-  template<class T>
-  class MyVector {
-    public:
-      class Iterator {};
-      T get(int index);
-      Iterator begin();
-    };",
+        template<class T>
+        class MyVector {
+        public:
+            class Iterator {};
+            T get(int index);
+            Iterator begin();
+        };
+        ",
     );
     assert_eq!(data.types.len(), 1);
     let my_vector_item = CppPathItem {
@@ -580,14 +614,15 @@ fn template_class_method() {
 fn template_class_template_method() {
     let data = run_parser(
         "
-  template<class T>
-  class MyVector {
-    public:
-      template<typename F>
-      F get_f();
+        template<class T>
+        class MyVector {
+        public:
+            template<typename F>
+            F get_f();
 
-      T get_t();
-    };",
+            T get_t();
+        };
+        ",
     );
     let vector_item = CppPathItem {
         name: "MyVector".to_string(),
@@ -638,10 +673,11 @@ fn template_class_template_method() {
 fn simple_enum() {
     let data = run_parser(
         "
-  enum Enum1 {
-    Good,
-    Bad
-  };",
+        enum Enum1 {
+            Good,
+            Bad
+        };
+        ",
     );
     assert_eq!(data.types.len(), 1);
     assert_eq!(data.types[0].path, CppPath::from_str_unchecked("Enum1"));
@@ -667,13 +703,14 @@ fn simple_enum() {
 fn simple_enum2() {
     let data = run_parser(
         "
-  namespace ns1 {
-    enum Enum1 {
-      Good = 1,
-      Bad = 2,
-      Questionable = Good | Bad
-    };
-  }",
+        namespace ns1 {
+            enum Enum1 {
+                Good = 1,
+                Bad = 2,
+                Questionable = Good | Bad
+            };
+        }
+        ",
     );
     assert_eq!(data.types.len(), 1);
     assert_eq!(
@@ -708,12 +745,13 @@ fn simple_enum2() {
 fn template_instantiation() {
     let data = run_parser(
         "
-  template<typename T> class Vector {};
-  class C1 {
-  public:
-    Vector<int> values();
-  };
-",
+        template<typename T>
+        class Vector {};
+        class C1 {
+            public:
+            Vector<int> values();
+        };
+        ",
     );
     assert_eq!(data.methods.len(), 1);
     let int = CppType::BuiltInNumeric(CppBuiltInNumericType::Int);
@@ -725,35 +763,12 @@ fn template_instantiation() {
         data.methods[0].return_type,
         CppType::Class(CppPath::from_item(vector_int_item)),
     );
-    // TODO: test template_instantiations
-    /*
-    assert!(data
-              .template_instantiations
-              .iter()
-              .find(|x| &x.class_name == "Vector")
-              .is_some());
-    assert!(data
-              .template_instantiations
-              .iter()
-              .find(|x| &x.class_name == "Vector")
-              .unwrap()
-              .instantiations
-              .len() == 1);
-    assert!(&data
-               .template_instantiations
-               .iter()
-               .find(|x| &x.class_name == "Vector")
-               .unwrap()
-               .instantiations
-               .get(0)
-               .unwrap()
-               .template_arguments == &vec![int]);*/
 }
 
 #[test]
 fn derived_class_simple() {
     let data = run_parser("class Base {}; class Derived : public Base {};");
-    assert!(data.types.len() == 2);
+    assert_eq!(data.types.len(), 2);
     assert_eq!(data.types[0].path, CppPath::from_str_unchecked("Base"));
     assert_eq!(data.types[1].path, CppPath::from_str_unchecked("Derived"));
     assert_eq!(
@@ -771,7 +786,7 @@ fn derived_class_simple() {
 #[test]
 fn derived_class_simple_private() {
     let data = run_parser("class Base {}; class Derived : Base {};");
-    assert!(data.types.len() == 2);
+    assert_eq!(data.types.len(), 2);
     assert_eq!(data.types[0].path, CppPath::from_str_unchecked("Base"));
     assert_eq!(data.types[1].path, CppPath::from_str_unchecked("Derived"));
     assert_eq!(
@@ -789,7 +804,7 @@ fn derived_class_simple_private() {
 #[test]
 fn derived_class_simple_virtual() {
     let data = run_parser("class Base {}; class Derived : public virtual Base {};");
-    assert!(data.types.len() == 2);
+    assert_eq!(data.types.len(), 2);
     assert_eq!(data.types[0].path, CppPath::from_str_unchecked("Base"));
     assert_eq!(data.types[1].path, CppPath::from_str_unchecked("Derived"));
     assert_eq!(
@@ -808,10 +823,12 @@ fn derived_class_simple_virtual() {
 fn derived_class_multiple() {
     let data = run_parser(
         "
-    class Base1 {}; class Base2 {};
-    class Derived : public Base2, public Base1 {};",
+        class Base1 {};
+        class Base2 {};
+        class Derived : public Base2, public Base1 {};
+        ",
     );
-    assert!(data.types.len() == 3);
+    assert_eq!(data.types.len(), 3);
     assert_eq!(data.types[0].path, CppPath::from_str_unchecked("Base1"));
     assert_eq!(data.types[1].path, CppPath::from_str_unchecked("Base2"));
     assert_eq!(data.types[2].path, CppPath::from_str_unchecked("Derived"));
@@ -840,17 +857,17 @@ fn derived_class_multiple() {
 fn complex_const_types() {
     let data = run_parser(
         "
-    int f0();
-    const int f1();
-    int* f2();
-    const int* f3();
-    int* const f4();
-    int** f5();
-    int* const* f6();
-    const int* const* f7();
-    int const* const* f8();
-    int const* const* const f9();
-  ",
+        int f0();
+        const int f1();
+        int* f2();
+        const int* f3();
+        int* const f4();
+        int** f5();
+        int* const* f6();
+        const int* const* f7();
+        int const* const* f8();
+        int const* const* const f9();
+        ",
     );
     let base = CppType::BuiltInNumeric(CppBuiltInNumericType::Int);
     assert_eq!(data.methods.len(), 10);
@@ -893,11 +910,13 @@ fn complex_const_types() {
 #[test]
 fn anon_enum() {
     let data = run_parser(
-        "class X {
-    enum { v1, v2 } field;
-  };",
+        "
+        class X {
+            enum { v1, v2 } field;
+        };
+        ",
     );
-    assert!(data.types.len() == 1);
+    assert_eq!(data.types.len(), 1);
     assert_eq!(data.types[0].path, CppPath::from_str_unchecked("X"));
     assert!(data.fields.is_empty());
 }
@@ -905,9 +924,16 @@ fn anon_enum() {
 #[test]
 fn non_type_template_parameter() {
     let data = run_parser(
-        "\
-  template<int> struct QAtomicOpsSupport { enum { IsSupported = 0 }; };
-  template<> struct QAtomicOpsSupport<4> { enum { IsSupported = 1 }; };",
+        "
+        template<int>
+        struct QAtomicOpsSupport {
+            enum { IsSupported = 0 };
+        };
+        template<>
+        struct QAtomicOpsSupport<4> {
+            enum { IsSupported = 1 };
+        };
+        ",
     );
     assert!(data.types.is_empty());
 }
@@ -916,11 +942,12 @@ fn non_type_template_parameter() {
 fn fixed_size_integers() {
     let data = run_parser(
         "
-  typedef unsigned long long int GLuint64;
-  template<typename T> class QVector {};
-  GLuint64 f1();
-  QVector<GLuint64> f2();
-  ",
+        typedef unsigned long long int GLuint64;
+        template<typename T>
+        class QVector {};
+        GLuint64 f1();
+        QVector<GLuint64> f2();
+        ",
     );
     assert_eq!(data.methods.len(), 2);
     assert_eq!(&data.methods[0].path, &CppPath::from_str_unchecked("f1"));
@@ -947,14 +974,14 @@ fn fixed_size_integers() {
 fn template_class_with_base() {
     let data = run_parser(
         "
-  template<class T>
-  class C1 {};
+        template<class T>
+        class C1 {};
 
-  template<class T>
-  class C2: public C1<T> {};
-  ",
+        template<class T>
+        class C2: public C1<T> {};
+        ",
     );
-    assert!(data.types.len() == 2);
+    assert_eq!(data.types.len(), 2);
     let c1_item = CppPathItem {
         name: "C1".to_string(),
         template_arguments: Some(vec![CppType::TemplateParameter {
@@ -984,21 +1011,21 @@ fn template_class_with_base() {
 fn namespaces() {
     let data = run_parser(
         "
-            namespace a {
-                class X {};
-                namespace b {
-                    class Y {};
-                }
-                namespace c {
-                    void z() {}
-                }
+        namespace a {
+            class X {};
+            namespace b {
+                class Y {};
             }
-            namespace a {
-                class Z {};
+            namespace c {
+                void z() {}
             }
-            namespace a::b::c {
-                void x() {}
-            }
+        }
+        namespace a {
+            class Z {};
+        }
+        namespace a::b::c {
+            void x() {}
+        }
         ",
     );
     assert_eq!(data.namespaces.len(), 4);
@@ -1018,11 +1045,11 @@ fn namespaces() {
 fn empty_namespace() {
     let data = run_parser(
         "
-            namespace a {
-                namespace b {
-                    class Y {};
-                }
+        namespace a {
+            namespace b {
+                class Y {};
             }
+        }
         ",
     );
     assert_eq!(data.namespaces.len(), 2);
