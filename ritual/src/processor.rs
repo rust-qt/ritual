@@ -107,7 +107,6 @@ impl Default for ProcessingSteps {
             find_template_instantiations_step(),
             instantiate_templates_step(),
             cpp_ffi_generator_step(),
-            // TODO: generate_slot_wrappers
             cpp_checker_step(),
             rust_generator_step(),
             crate_writer_step(),

@@ -1,5 +1,6 @@
 use crate::detect_signal_argument_types::detect_signal_argument_types;
 use itertools::Itertools;
+use log::trace;
 use ritual::cpp_ffi_data::QtSlotWrapper;
 use ritual::cpp_ffi_generator::FfiNameProvider;
 use ritual::cpp_type::CppFunctionPointerType;
@@ -65,13 +66,25 @@ pub fn add_slot_wrappers(data: &mut ProcessorData) -> Result<()> {
                     false
                 }
             });
-        if !found {
-            let slot_wrapper = generate_slot_wrapper(&arg_types, &mut name_provider)?;
-            data.current_database
-                .ffi_items
-                .push(CppFfiItem::from_qt_slot_wrapper(slot_wrapper));
+        if found {
+            trace!("slot wrapper already exists: {:?}", arg_types);
+        } else {
+            match generate_slot_wrapper(&arg_types, &mut name_provider) {
+                Ok(slot_wrapper) => {
+                    data.current_database
+                        .ffi_items
+                        .push(CppFfiItem::from_qt_slot_wrapper(slot_wrapper));
+                    trace!("adding slot wrapper for args: {:?}", arg_types);
+                }
+                Err(err) => {
+                    trace!(
+                        "failed to add slot wrapper for args: {:?}: {}",
+                        arg_types,
+                        err
+                    );
+                }
+            }
         }
     }
-
     Ok(())
 }
