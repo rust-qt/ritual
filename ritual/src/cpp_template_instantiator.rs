@@ -98,6 +98,8 @@ fn apply_instantiation_to_method(
     }
 }
 
+// TODO: instantiations of QObject::findChild and QObject::findChildren should be available
+
 pub fn instantiate_templates_step() -> ProcessingStep {
     ProcessingStep::new("instantiate_templates", instantiate_templates)
 }

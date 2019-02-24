@@ -59,6 +59,8 @@ pub struct DocParser {
     base_url: String,
 }
 
+// TODO: support public field docs
+
 struct DocForType {
     type_doc: CppTypeDoc,
     enum_variants_doc: Vec<DocForEnumVariant>,

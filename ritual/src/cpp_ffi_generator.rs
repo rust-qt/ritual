@@ -253,7 +253,6 @@ fn generate_ffi_methods_for_method(
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiItem>> {
     let mut methods = Vec::new();
-    // TODO: don't use name here at all, generate names for all methods elsewhere
     methods.push(CppFfiItem::from_function(to_ffi_method(
         CppFfiFunctionKind::Function {
             cpp_function: method.clone(),
@@ -454,8 +453,6 @@ fn generate_field_accessors(
     movable_types: &[CppPath],
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiItem>> {
-    // TODO: fix doc generator for field accessors
-    //log::status("Adding field accessors");
     let mut new_methods = Vec::new();
     let mut create_method = |accessor_type| -> Result<CppFfiItem> {
         let kind = CppFfiFunctionKind::FieldAccessor {
@@ -467,7 +464,8 @@ fn generate_field_accessors(
     };
 
     if field.visibility == CppVisibility::Public {
-        // TODO: add comment about choosing right accessor types
+        // Classes may be non-copyable, so copy getters may not be possible for them,
+        // so we generate reference getters instead.
         if field.field_type.is_class() {
             new_methods.push(create_method(CppFieldAccessorType::ConstRefGetter)?);
             new_methods.push(create_method(CppFieldAccessorType::MutRefGetter)?);
@@ -510,10 +508,4 @@ fn should_process_item(item: &CppItemData) -> Result<bool> {
         return Ok(false);
     }
     Ok(true)
-
-    //if method.template_arguments_values.is_some() && !method.is_ffi_whitelisted {
-    // TODO: re-enable after template test compilation (#24) is implemented
-    // TODO: QObject::findChild and QObject::findChildren should be allowed
-    //return Ok(false);
-    //}
 }
