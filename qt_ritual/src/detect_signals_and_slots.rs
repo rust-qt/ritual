@@ -37,7 +37,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
     // TODO: only run if it's a new class or it has some new methods; don't change existing old methods
     let mut files = HashSet::new();
 
-    let qobject_path = CppPath::from_str_unchecked("QObject");
+    let qobject_path = CppPath::from_good_str("QObject");
     for item in &data.current_database.cpp_items {
         if let DatabaseItemSource::CppParser {
             origin_location, ..

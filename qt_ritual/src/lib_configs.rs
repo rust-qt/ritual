@@ -165,7 +165,7 @@ fn core_config(config: &mut Config) -> Result<()> {
 
     // QProcess::pid returns different types on different platforms,
     // but this method is obsolete anyway
-    config.add_cpp_parser_blocked_names(vec![CppPath::from_str_unchecked("QProcess::pid")]);
+    config.add_cpp_parser_blocked_names(vec![CppPath::from_good_str("QProcess::pid")]);
     /*
     exclude_qvector_eq_based_methods(config, &["QStaticPlugin", "QTimeZone::OffsetData"]);
     exclude_qlist_eq_based_methods(
@@ -369,14 +369,14 @@ fn widgets_config(_config: &mut Config) -> Result<()> {
 
 /// Qt3DCore specific configuration.
 fn core_3d_config(config: &mut Config) -> Result<()> {
-    config.add_cpp_filtered_namespace(CppPath::from_str_unchecked("Qt3DCore"));
+    config.add_cpp_filtered_namespace(CppPath::from_good_str("Qt3DCore"));
     //exclude_qvector_eq_based_methods(config, &["Qt3DCore::QNodeIdTypePair"]);
     Ok(())
 }
 
 /// Qt3DRender specific configuration.
 fn render_3d_config(config: &mut Config) -> Result<()> {
-    config.add_cpp_filtered_namespace(CppPath::from_str_unchecked("Qt3DRender"));
+    config.add_cpp_filtered_namespace(CppPath::from_good_str("Qt3DRender"));
     /*
     config.add_cpp_parser_blocked_names(vec![
       "Qt3DRender::QTexture1D",
@@ -429,27 +429,27 @@ fn render_3d_config(config: &mut Config) -> Result<()> {
 
 /// Qt3DInput specific configuration.
 fn input_3d_config(config: &mut Config) -> Result<()> {
-    config.add_cpp_filtered_namespace(CppPath::from_str_unchecked("Qt3DInput"));
+    config.add_cpp_filtered_namespace(CppPath::from_good_str("Qt3DInput"));
     //config.add_cpp_parser_blocked_names(vec!["Qt3DInput::QWheelEvent"]);
     Ok(())
 }
 
 /// Qt3DLogic specific configuration.
 fn logic_3d_config(config: &mut Config) -> Result<()> {
-    config.add_cpp_filtered_namespace(CppPath::from_str_unchecked("Qt3DLogic"));
+    config.add_cpp_filtered_namespace(CppPath::from_good_str("Qt3DLogic"));
     Ok(())
 }
 
 /// Qt3DExtras specific configuration.
 fn extras_3d_config(config: &mut Config) -> Result<()> {
-    config.add_cpp_filtered_namespace(CppPath::from_str_unchecked("Qt3DExtras"));
+    config.add_cpp_filtered_namespace(CppPath::from_good_str("Qt3DExtras"));
     Ok(())
 }
 
 fn moqt_core_config(config: &mut Config) -> Result<()> {
     config.set_movable_types(vec![
-        CppPath::from_str_unchecked("QPoint"),
-        CppPath::from_str_unchecked("QMetaObject::Connection"),
+        CppPath::from_good_str("QPoint"),
+        CppPath::from_good_str("QMetaObject::Connection"),
     ]);
     Ok(())
 }

@@ -565,9 +565,9 @@ fn find_methods_docs(items: &mut [CppDatabaseItem], data: &mut DocParser) -> Res
                     Ok(doc) => cpp_method.doc = Some(doc),
                     Err(msg) => {
                         if cpp_method.member.is_some()
-                            && (cpp_method.path == CppPath::from_str_unchecked("tr")
-                                || cpp_method.path == CppPath::from_str_unchecked("trUtf8")
-                                || cpp_method.path == CppPath::from_str_unchecked("metaObject"))
+                            && (cpp_method.path == CppPath::from_good_str("tr")
+                                || cpp_method.path == CppPath::from_good_str("trUtf8")
+                                || cpp_method.path == CppPath::from_good_str("metaObject"))
                         {
                             // no error message
                         } else {

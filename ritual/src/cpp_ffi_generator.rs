@@ -62,7 +62,7 @@ impl FfiNameProvider {
             }
             num = Some(num.map_or(1, |num| num + 1));
         };
-        let item = CppPathItem::from_str_unchecked(&full_name);
+        let item = CppPathItem::from_good_str(&full_name);
         self.names.insert(full_name);
         CppPath::from_item(item)
     }

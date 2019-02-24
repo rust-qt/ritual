@@ -112,7 +112,7 @@ impl State<'_, '_> {
             } => {
                 let rust_target = if target.deref() == &CppType::Void {
                     RustType::Common(RustCommonType {
-                        path: RustPath::from_str_unchecked("std::ffi::c_void"),
+                        path: RustPath::from_good_str("std::ffi::c_void"),
                         generic_arguments: None,
                     })
                 } else {
@@ -135,7 +135,7 @@ impl State<'_, '_> {
             CppType::BuiltInNumeric(numeric) => {
                 let rust_path = if numeric == &CppBuiltInNumericType::Bool {
                     // TODO: bool may not be safe for FFI
-                    RustPath::from_str_unchecked("bool")
+                    RustPath::from_good_str("bool")
                 } else {
                     let own_name = match *numeric {
                         CppBuiltInNumericType::Bool => unreachable!(),
@@ -154,7 +154,7 @@ impl State<'_, '_> {
                         CppBuiltInNumericType::Double => "c_double",
                         _ => bail!("unsupported numeric type: {:?}", numeric),
                     };
-                    RustPath::from_str_unchecked("std::os::raw").join(own_name)
+                    RustPath::from_good_str("std::os::raw").join(own_name)
                 };
 
                 RustType::Common(RustCommonType {
@@ -173,7 +173,7 @@ impl State<'_, '_> {
                     }
                     CppSpecificNumericTypeKind::FloatingPoint => "f",
                 };
-                let path = RustPath::from_str_unchecked(&format!("{}{}", letter, bits));
+                let path = RustPath::from_good_str(&format!("{}{}", letter, bits));
 
                 RustType::Common(RustCommonType {
                     path,
@@ -183,7 +183,7 @@ impl State<'_, '_> {
             CppType::PointerSizedInteger { is_signed, .. } => {
                 let name = if *is_signed { "isize" } else { "usize" };
                 RustType::Common(RustCommonType {
-                    path: RustPath::from_str_unchecked(name),
+                    path: RustPath::from_good_str(name),
                     generic_arguments: None,
                 })
             }
@@ -224,9 +224,9 @@ impl State<'_, '_> {
 
     fn qt_core_path(&self) -> RustPath {
         if self.0.config.crate_properties().name().starts_with("moqt") {
-            RustPath::from_str_unchecked("moqt_core")
+            RustPath::from_good_str("moqt_core")
         } else {
-            RustPath::from_str_unchecked("qt_core")
+            RustPath::from_good_str("qt_core")
         }
     }
 
@@ -271,7 +271,7 @@ impl State<'_, '_> {
                         }
                         ReturnValueAllocationPlace::Heap => {
                             rust_api_type = RustType::Common(RustCommonType {
-                                path: RustPath::from_str_unchecked("cpp_utils::CppBox"),
+                                path: RustPath::from_good_str("cpp_utils::CppBox"),
                                 generic_arguments: Some(vec![(**target).clone()]),
                             });
                             api_to_ffi_conversion = RustToFfiTypeConversion::CppBoxToPtr;
@@ -295,7 +295,7 @@ impl State<'_, '_> {
                         };
 
                         rust_api_type = RustType::Common(RustCommonType {
-                            path: RustPath::from_str_unchecked(wrapper),
+                            path: RustPath::from_good_str(wrapper),
                             generic_arguments: Some(vec![(**target).clone()]),
                         });
                         api_to_ffi_conversion = RustToFfiTypeConversion::PtrWrapperToPtr;
@@ -313,7 +313,7 @@ impl State<'_, '_> {
                     };
 
                     rust_api_type = RustType::Common(RustCommonType {
-                        path: RustPath::from_str_unchecked(wrapper),
+                        path: RustPath::from_good_str(wrapper),
                         generic_arguments: Some(vec![(**target).clone()]),
                     });
                     api_to_ffi_conversion = RustToFfiTypeConversion::PtrWrapperToPtr;
@@ -410,7 +410,7 @@ impl State<'_, '_> {
                     path.last() == "Ptr",
                     "cast function expected to return Ptr<T>"
                 );
-                *path = RustPath::from_str_unchecked("cpp_utils::ConstPtr");
+                *path = RustPath::from_good_str("cpp_utils::ConstPtr");
             } else {
                 bail!("expected Ptr<T> type in cast function");
             }
@@ -420,7 +420,7 @@ impl State<'_, '_> {
                 unnamed_function.return_type.api_to_ffi_conversion =
                     RustToFfiTypeConversion::OptionPtrWrapperToPtr;
                 unnamed_function.return_type.api_type = RustType::Common(RustCommonType {
-                    path: RustPath::from_str_unchecked("std::option::Option"),
+                    path: RustPath::from_good_str("std::option::Option"),
                     generic_arguments: Some(vec![unnamed_function.return_type.api_type]),
                 })
             }
@@ -467,25 +467,25 @@ impl State<'_, '_> {
         match &cast {
             CppCast::Static { is_unsafe, .. } => {
                 if *is_unsafe {
-                    trait_path = RustPath::from_str_unchecked("cpp_utils::StaticDowncast");
+                    trait_path = RustPath::from_good_str("cpp_utils::StaticDowncast");
                     derived_type = to_type;
                     cast_function_name = "static_downcast";
                     cast_function_name_mut = "static_downcast_mut";
                 } else {
-                    trait_path = RustPath::from_str_unchecked("cpp_utils::StaticUpcast");
+                    trait_path = RustPath::from_good_str("cpp_utils::StaticUpcast");
                     derived_type = from_type;
                     cast_function_name = "static_upcast";
                     cast_function_name_mut = "static_upcast_mut";
                 }
             }
             CppCast::Dynamic => {
-                trait_path = RustPath::from_str_unchecked("cpp_utils::DynamicCast");
+                trait_path = RustPath::from_good_str("cpp_utils::DynamicCast");
                 derived_type = to_type;
                 cast_function_name = "dynamic_cast";
                 cast_function_name_mut = "dynamic_cast_mut";
             }
             CppCast::QObject => {
-                trait_path = RustPath::from_str_unchecked("qt_core::QObjectCast");
+                trait_path = RustPath::from_good_str("qt_core::QObjectCast");
                 derived_type = to_type;
                 cast_function_name = "qobject_cast";
                 cast_function_name_mut = "qobject_cast_mut";
@@ -530,7 +530,7 @@ impl State<'_, '_> {
                 Ok(())
             };
 
-            let deref_trait_path = RustPath::from_str_unchecked("std::ops::Deref");
+            let deref_trait_path = RustPath::from_good_str("std::ops::Deref");
             let mut deref_function = fixed_function.with_path(deref_trait_path.join("deref"));
             deref_function.is_unsafe = false;
             fix_return_type(&mut deref_function.return_type, true)?;
@@ -548,7 +548,7 @@ impl State<'_, '_> {
                 functions: vec![deref_function],
             }));
 
-            let deref_mut_trait_path = RustPath::from_str_unchecked("std::ops::DerefMut");
+            let deref_mut_trait_path = RustPath::from_good_str("std::ops::DerefMut");
             let mut deref_mut_function =
                 fixed_function_mut.with_path(deref_mut_trait_path.join("deref_mut"));
             deref_mut_function.is_unsafe = false;
@@ -698,12 +698,12 @@ impl State<'_, '_> {
                 match function.allocation_place {
                     ReturnValueAllocationPlace::Stack => {
                         function_name = "drop";
-                        trait_path = RustPath::from_str_unchecked("std::ops::Drop");
+                        trait_path = RustPath::from_good_str("std::ops::Drop");
                         is_unsafe = false;
                     }
                     ReturnValueAllocationPlace::Heap => {
                         function_name = "delete";
-                        trait_path = RustPath::from_str_unchecked("cpp_utils::CppDeletable");
+                        trait_path = RustPath::from_good_str("cpp_utils::CppDeletable");
                         is_unsafe = true;
                     }
                     ReturnValueAllocationPlace::NotApplicable => {

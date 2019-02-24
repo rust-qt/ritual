@@ -3,7 +3,7 @@
 pub use crate::cpp_operator::CppOperator;
 use crate::cpp_type::CppType;
 use itertools::Itertools;
-use ritual_common::errors::{bail, Error, Result};
+use ritual_common::errors::{bail, ensure, Error, Result};
 use ritual_common::utils::MapIfOk;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt;
@@ -39,11 +39,11 @@ impl CppEnumValue {
 fn unscoped_path_should_work() {
     fn check(path: &str, result: &str) {
         let v = CppEnumValue {
-            path: CppPath::from_str_unchecked(path),
+            path: CppPath::from_good_str(path),
             value: 0,
             doc: None,
         };
-        assert_eq!(v.unscoped_path(), CppPath::from_str_unchecked(result));
+        assert_eq!(v.unscoped_path(), CppPath::from_good_str(result));
     }
 
     check("A::B::C::D", "A::B::D");
@@ -152,7 +152,7 @@ pub struct CppPath {
 }
 
 impl CppPath {
-    pub fn from_str_unchecked(path: &str) -> CppPath {
+    pub fn from_good_str(path: &str) -> CppPath {
         CppPath::from_str(path).unwrap()
     }
 
@@ -315,21 +315,28 @@ impl CppPathItem {
         format!("{}{}", self.name, args)
     }
 
-    pub fn from_str_unchecked(name: &str) -> CppPathItem {
-        // TODO: Result? make checked version and use in parser
-        assert!(
+    pub fn from_good_str(name: &str) -> CppPathItem {
+        Self::from_str(name).unwrap()
+    }
+}
+
+impl FromStr for CppPathItem {
+    type Err = Error;
+
+    fn from_str(name: &str) -> Result<CppPathItem> {
+        ensure!(
             !name.contains('<'),
             "attempted to construct CppPathItem containing template arguments"
         );
-        assert!(
+        ensure!(
             !name.contains('>'),
             "attempted to construct CppPathItem containing template arguments"
         );
-        assert!(!name.is_empty(), "attempted to construct empty CppPathItem");
-        CppPathItem {
+        ensure!(!name.is_empty(), "attempted to construct empty CppPathItem");
+        Ok(CppPathItem {
             name: name.into(),
             template_arguments: None,
-        }
+        })
     }
 }
 

@@ -26,15 +26,19 @@ impl RustPath {
         RustPath { parts }
     }
 
-    pub fn from_str_unchecked(str: &str) -> RustPath {
+    pub fn from_str(str: &str) -> Result<RustPath> {
         let parts = str.split("::").map(String::from).collect_vec();
         if parts.is_empty() {
-            panic!("RustPath can't be empty");
+            bail!("RustPath can't be empty");
         }
         if parts.iter().any(|item| item.is_empty()) {
-            panic!("RustPath item can't be empty");
+            bail!("RustPath item can't be empty");
         }
-        RustPath { parts }
+        Ok(RustPath { parts })
+    }
+
+    pub fn from_good_str(str: &str) -> RustPath {
+        Self::from_str(str).unwrap()
     }
 
     /// Returns crate name of this name, or `None`

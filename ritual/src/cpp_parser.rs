@@ -790,68 +790,68 @@ impl CppParser<'_, '_> {
         match name {
             "qint8" | "int8_t" | "GLbyte" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    path: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_good_str(name),
                     bits: 8,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
                 }))
             }
             "quint8" | "uint8_t" | "GLubyte" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    path: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_good_str(name),
                     bits: 8,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
                 }))
             }
             "qint16" | "int16_t" | "GLshort" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    path: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_good_str(name),
                     bits: 16,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
                 }))
             }
             "quint16" | "uint16_t" | "GLushort" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    path: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_good_str(name),
                     bits: 16,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
                 }))
             }
             "qint32" | "int32_t" | "GLint" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    path: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_good_str(name),
                     bits: 32,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
                 }))
             }
             "quint32" | "uint32_t" | "GLuint" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    path: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_good_str(name),
                     bits: 32,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
                 }))
             }
             "qint64" | "int64_t" | "qlonglong" | "GLint64" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    path: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_good_str(name),
                     bits: 64,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
                 }))
             }
             "quint64" | "uint64_t" | "qulonglong" | "GLuint64" => {
                 Some(CppType::SpecificNumeric(CppSpecificNumericType {
-                    path: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_good_str(name),
                     bits: 64,
                     kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
                 }))
             }
             "qintptr" | "qptrdiff" | "QList::difference_type" => {
                 Some(CppType::PointerSizedInteger {
-                    path: CppPath::from_str_unchecked(name),
+                    path: CppPath::from_good_str(name),
                     is_signed: true,
                 })
             }
             "quintptr" => Some(CppType::PointerSizedInteger {
-                path: CppPath::from_str_unchecked(name),
+                path: CppPath::from_good_str(name),
                 is_signed: false,
             }),
             _ => None,
@@ -1188,7 +1188,7 @@ impl CppParser<'_, '_> {
                         origin_location: get_origin_location(child)?,
                     },
                     CppItemData::EnumValue(CppEnumValue {
-                        path: enum_name.join(CppPathItem::from_str_unchecked(&value_name)),
+                        path: enum_name.join(CppPathItem::from_good_str(&value_name)),
                         value: val.0,
                         doc: None,
                     }),
@@ -1233,7 +1233,7 @@ impl CppParser<'_, '_> {
                 //          Ok(size) => Some(size),
                 //          Err(_) => None,
                 //        },
-                path: class_type.join(CppPathItem::from_str_unchecked(&field_name)),
+                path: class_type.join(CppPathItem::from_good_str(&field_name)),
                 field_type,
                 visibility: match entity.get_accessibility().unwrap_or(Accessibility::Public) {
                     Accessibility::Public => CppVisibility::Public,
