@@ -328,7 +328,7 @@ impl CppFunction {
     /// Returns collection of all types found in the signature of this method,
     /// including argument types, return type and type of `this` implicit parameter.
     pub fn all_involved_types(&self) -> Vec<CppType> {
-        let mut result: Vec<CppType> = Vec::new();
+        let mut result = Vec::<CppType>::new();
         if let Some(class_membership) = &self.member {
             result.push(CppType::PointerLike {
                 is_const: class_membership.is_const,

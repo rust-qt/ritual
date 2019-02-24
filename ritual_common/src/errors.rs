@@ -2,6 +2,7 @@
 
 pub type Result<T> = std::result::Result<T, failure::Error>;
 pub use failure::{bail, ensure, err_msg, format_err, Error, ResultExt};
+use itertools::Itertools;
 use log::log;
 use std::env;
 
@@ -22,7 +23,7 @@ pub fn print_trace(err: failure::Error, log_level: log::Level) {
             log!(log_level, "{}", backtrace);
         } else {
             log!(log_level, "Short backtrace:");
-            let mut lines: Vec<_> = backtrace.split('\n').collect();
+            let mut lines = backtrace.split('\n').collect_vec();
             if let Some(position) = lines
                 .iter()
                 .position(|line| line.contains("std::rt::lang_start::"))

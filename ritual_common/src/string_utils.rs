@@ -89,7 +89,7 @@ fn ends_with_digit<S: AsRef<str>>(s: S) -> bool {
 }
 
 fn iterator_to_snake_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {
-    let mut parts: Vec<_> = it.map(|x| x.as_ref().to_lowercase()).collect();
+    let mut parts = it.map(|x| x.as_ref().to_lowercase()).collect_vec();
     replace_all_sub_vecs(&mut parts, &["na", "n"]);
     replace_all_sub_vecs(&mut parts, &["open", "g", "l"]);
     replace_all_sub_vecs(&mut parts, &["i", "o"]);

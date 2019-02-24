@@ -568,8 +568,7 @@ impl Generator {
         };
         let mut final_args = Vec::new();
         final_args.resize(wrapper_data.cpp_ffi_function.arguments.len(), None);
-        let all_args: Vec<RustFunctionArgument> = Vec::from(arguments);
-        for arg in &all_args {
+        for arg in arguments {
             assert!(arg.ffi_index < final_args.len());
             let mut code = arg.name.clone();
             match arg.argument_type.api_to_ffi_conversion {
@@ -910,11 +909,11 @@ pub fn generate(
 // TODO: reimplement impl Receiver for raw slot wrapper
 /*
 if let Some(slot_wrapper) = slot_wrapper {
-    let arg_texts: Vec<_> = slot_wrapper
+    let arg_texts = slot_wrapper
         .arguments
         .iter()
         .map(|t| self.rust_type_to_code(&t.rust_api_type))
-        .collect();
+        .collect_vec();
     let args = arg_texts.join(", ");
     let args_tuple = format!(
         "{}{}",

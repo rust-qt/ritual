@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 
-use crate::cpp_data::CppBaseSpecifier;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppVisibility;
 use crate::cpp_function::CppFunction;
 use crate::processor::ProcessorData;
+use itertools::Itertools;
 use log::trace;
 use ritual_common::errors::*;
 
@@ -24,11 +24,11 @@ pub fn inherits(class_name: &CppPath, base_name: &CppPath, data: &ProcessorData)
 }
 
 fn detect_inherited_methods2(data: &ProcessorData) -> Result<Vec<CppFunction>> {
-    let mut remaining_classes: Vec<&CppBaseSpecifier> = data
+    let mut remaining_classes = data
         .all_items()
         .filter_map(|x| x.cpp_data.as_base_ref())
         .filter(|b| b.visibility != CppVisibility::Private)
-        .collect();
+        .collect_vec();
 
     let mut ordered_classes = Vec::new();
     while !remaining_classes.is_empty() {

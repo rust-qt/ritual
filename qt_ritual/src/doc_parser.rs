@@ -105,7 +105,7 @@ impl DocParser {
         declaration1: &str,
         declaration2: &str,
     ) -> Result<CppFunctionDoc> {
-        let mut name_parts: Vec<_> = name.split("::").collect();
+        let mut name_parts = name.split("::").collect_vec();
         let anchor_override = if name_parts.len() >= 2
             && name_parts[name_parts.len() - 1] == name_parts[name_parts.len() - 2]
         {

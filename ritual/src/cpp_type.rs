@@ -2,6 +2,7 @@
 
 use crate::cpp_data::CppPath;
 use crate::cpp_ffi_data::{CppFfiType, CppTypeConversionToFfi};
+use itertools::Itertools;
 use ritual_common::errors::{bail, Result, ResultExt};
 use serde_derive::{Deserialize, Serialize};
 use std::hash::Hash;
@@ -427,7 +428,7 @@ impl CppType {
                     if *allows_variadic_arguments {
                         bail!("function pointers with variadic arguments are not supported");
                     }
-                    let mut all_types: Vec<&CppType> = arguments.iter().collect();
+                    let mut all_types = arguments.iter().collect_vec();
                     all_types.push(return_type.as_ref());
                     for arg in all_types {
                         match *arg {

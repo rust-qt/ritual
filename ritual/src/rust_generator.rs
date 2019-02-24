@@ -1384,7 +1384,7 @@ fn special_function_rust_name(function: &CppFfiFunction) -> Result<Option<String
 
 #[allow(dead_code)]
 mod ported {
-    //use ritual_common::errors::Result;
+    use itertools::Itertools;
     use ritual_common::string_utils::CaseOperations;
     use ritual_common::string_utils::WordIterator;
 
@@ -1404,7 +1404,7 @@ mod ported {
     /// Also converts case of the words.
     #[allow(clippy::collapsible_if)]
     fn remove_qt_prefix_and_convert_case(s: &str, case: Case, remove_qt_prefix: bool) -> String {
-        let mut parts: Vec<_> = WordIterator::new(s).collect();
+        let mut parts = WordIterator::new(s).collect_vec();
         if remove_qt_prefix && parts.len() > 1 {
             if (parts[0] == "Q" || parts[0] == "q" || parts[0] == "Qt")
                 && !parts[1].starts_with(|c: char| c.is_digit(10))

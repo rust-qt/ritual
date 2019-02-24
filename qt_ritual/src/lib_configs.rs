@@ -26,7 +26,7 @@ fn exclude_qlist_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(
   config: &mut Config,
   types: I,
 ) {
-  let types: Vec<String> = types.into_iter().map(|x| x.as_ref().to_string()).collect();
+  let types = types.into_iter().map(|x| x.as_ref().to_string()).collect_vec();
   config.add_cpp_ffi_generator_filter(move |method| {
     if let Some(info) = &method.class_membership {
       if info.class_type.name == "QList" {
@@ -63,7 +63,7 @@ fn exclude_qvector_eq_based_methods<S: AsRef<str>, I: IntoIterator<Item = S>>(
   config: &mut Config,
   types: I,
 ) {
-  let types: Vec<String> = types.into_iter().map(|x| x.as_ref().to_string()).collect();
+  let types = types.into_iter().map(|x| x.as_ref().to_string()).collect_vec();
   config.add_cpp_ffi_generator_filter(move |method| {
     if let Some(info) = &method.class_membership {
       if info.class_type.name == "QVector" {
