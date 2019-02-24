@@ -1,7 +1,6 @@
 //! Error handling types based on `failure` crate.
 
 pub type Result<T> = std::result::Result<T, failure::Error>;
-pub use crate::unexpected;
 pub use failure::{bail, ensure, err_msg, format_err, Error, ResultExt};
 use log::log;
 use std::env;
@@ -53,27 +52,4 @@ impl<T> FancyUnwrap for Result<T> {
             }
         }
     }
-}
-
-// TODO: replace with a proper mechanism
-pub fn should_panic_on_unexpected() -> bool {
-    true
-}
-
-#[macro_export]
-macro_rules! unexpected {
-    ($e:expr) => {
-        if $crate::errors::should_panic_on_unexpected() {
-            panic!($e);
-        } else {
-            bail!($e);
-        }
-    };
-    ($fmt:expr, $($arg:tt)*) => {
-        if $crate::errors::should_panic_on_unexpected() {
-            panic!($fmt, $($arg)*);
-        } else {
-            bail!($fmt, $($arg)*);
-        }
-    };
 }

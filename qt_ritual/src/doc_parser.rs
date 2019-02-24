@@ -12,7 +12,7 @@ use ritual::cpp_function::CppFunctionDoc;
 use ritual::database::CppDatabaseItem;
 use ritual::database::CppItemData;
 use ritual::processor::ProcessorData;
-use ritual_common::errors::{bail, err_msg, format_err, unexpected, Result, ResultExt};
+use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use select::document::Document;
 use select::node::Node;
 use std::collections::{hash_map, HashMap, HashSet};
@@ -130,7 +130,7 @@ impl DocParser {
             Some(x) => x,
             None => match &index_item.anchor {
                 Some(anchor) => anchor.clone(),
-                None => unexpected!("anchor is expected here!"),
+                None => bail!("anchor is expected here!"),
             },
         };
         let anchor_prefix = format!("{}-", anchor);

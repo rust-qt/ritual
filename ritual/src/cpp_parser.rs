@@ -25,7 +25,7 @@ use clang::*;
 use itertools::Itertools;
 use log::{debug, trace, warn};
 use regex::Regex;
-use ritual_common::errors::{bail, err_msg, format_err, unexpected, Result, ResultExt};
+use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use ritual_common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
 use std::collections::HashSet;
 use std::io::Write;
@@ -372,7 +372,7 @@ impl CppParser<'_, '_> {
             let mut name = type1.get_display_name();
             let is_const_in_name = name.starts_with("const ");
             if is_const != is_const_in_name {
-                unexpected!("const inconsistency: {}, {:?}", is_const, type1);
+                bail!("const inconsistency: {}, {:?}", is_const, type1);
             }
             if is_const_in_name {
                 name = name[6..].to_string();
@@ -410,7 +410,7 @@ impl CppParser<'_, '_> {
                                 }
                             }
                         } else {
-                            unexpected!("invalid matches count in regexp");
+                            bail!("invalid matches count in regexp");
                         }
                         let mut name = get_full_name(declaration)?;
                         name.last_mut().template_arguments = Some(arg_types);
@@ -643,7 +643,7 @@ impl CppParser<'_, '_> {
                         Some(arg_types) => {
                             let mut r = Vec::new();
                             if arg_types.is_empty() {
-                                unexpected!("arg_types is empty");
+                                bail!("arg_types is empty");
                             }
                             for arg_type in arg_types {
                                 match arg_type {
@@ -1272,13 +1272,13 @@ impl CppParser<'_, '_> {
 
             if template_arguments.is_none() {
                 dump_entity(entity, 0);
-                unexpected!(
+                bail!(
                     "missing template arguments for {}",
                     entity_log_representation(entity)
                 );
             }
         } else if template_arguments.is_some() {
-            unexpected!("unexpected template arguments");
+            bail!("unexpected template arguments");
         }
         //    let size = match entity.get_type() {
         //      Some(type1) => type1.get_sizeof().ok(),

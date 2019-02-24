@@ -5,7 +5,7 @@ use crate::cpp_ffi_data::{
 use crate::cpp_function::ReturnValueAllocationPlace;
 use crate::cpp_type::CppType;
 use itertools::Itertools;
-use ritual_common::errors::{bail, unexpected, Result};
+use ritual_common::errors::{bail, Result};
 use ritual_common::file_utils::{create_file, path_to_str};
 use ritual_common::utils::get_command_output;
 use ritual_common::utils::MapIfOk;
@@ -94,10 +94,10 @@ fn convert_return_type(method: &CppFfiFunction, expression: String) -> Result<St
         CppTypeConversionToFfi::ValueToPointer => {
             match method.allocation_place {
                 ReturnValueAllocationPlace::Stack => {
-                    unexpected!("stack allocated wrappers are expected to return void");
+                    bail!("stack allocated wrappers are expected to return void");
                 }
                 ReturnValueAllocationPlace::NotApplicable => {
-                    unexpected!("ValueToPointer conflicts with NotApplicable");
+                    bail!("ValueToPointer conflicts with NotApplicable");
                 }
                 ReturnValueAllocationPlace::Heap => {
                     // constructors are said to return values in parse result,
@@ -196,7 +196,7 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
         {
             format!("c2r_call_destructor({})", arg.name)
         } else {
-            unexpected!("no this arg in destructor");
+            bail!("no this arg in destructor");
         }
     } else {
         let result_without_args =
@@ -214,14 +214,14 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
                                 cpp_function.class_type()?.to_cpp_code()?
                             )
                         } else {
-                            unexpected!("return value argument not found\n{:?}", method);
+                            bail!("return value argument not found\n{:?}", method);
                         }
                     }
                     ReturnValueAllocationPlace::Heap => {
                         format!("new {}", cpp_function.class_type()?.to_cpp_code()?)
                     }
                     ReturnValueAllocationPlace::NotApplicable => {
-                        unexpected!("NotApplicable in constructor");
+                        bail!("NotApplicable in constructor");
                     }
                 }
             } else {

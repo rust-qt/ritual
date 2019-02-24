@@ -24,7 +24,7 @@ use crate::rust_type::RustPointerLikeTypeKind;
 use crate::rust_type::RustToFfiTypeConversion;
 use crate::rust_type::RustType;
 use itertools::Itertools;
-use ritual_common::errors::{bail, err_msg, unexpected, Result};
+use ritual_common::errors::{bail, err_msg, Result};
 use ritual_common::file_utils::create_dir_all;
 use ritual_common::file_utils::create_file;
 use ritual_common::file_utils::file_to_string;
@@ -641,7 +641,7 @@ impl Generator {
                         })?;
                         self.rust_type_to_code(arg)
                     } else {
-                        unexpected!("CppBox type expected");
+                        bail!("CppBox type expected");
                     }
                 } else {
                     self.rust_type_to_code(&return_type.api_type)
