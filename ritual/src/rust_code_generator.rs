@@ -38,7 +38,6 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
-// TODO: use everywhere
 fn wrap_unsafe(in_unsafe_context: bool, content: &str) -> String {
     let (unsafe_start, unsafe_end) = if in_unsafe_context {
         ("", "")
@@ -461,11 +460,6 @@ impl Generator {
         in_unsafe_context: bool,
         use_ffi_result_var: bool,
     ) -> Result<String> {
-        let (unsafe_start, unsafe_end) = if in_unsafe_context {
-            ("", "")
-        } else {
-            ("unsafe { ", " }")
-        };
         if type1.api_to_ffi_conversion == RustToFfiTypeConversion::None {
             return Ok(expression);
         }
@@ -482,28 +476,25 @@ impl Generator {
             RustToFfiTypeConversion::None => unreachable!(),
             RustToFfiTypeConversion::RefToPtr => {
                 let api_is_const = type1.api_type.is_const_pointer_like()?;
-                let unwrap_code = ".expect(\"Attempted to convert null pointer to reference\")";
-                format!(
-                    "{unsafe_start}{}.{}(){unsafe_end}{}",
+                let code = format!(
+                    "{}.{}()",
                     source_expr,
                     if api_is_const { "as_ref" } else { "as_mut" },
-                    unwrap_code,
-                    unsafe_start = unsafe_start,
-                    unsafe_end = unsafe_end
+                );
+                let code = wrap_unsafe(in_unsafe_context, &code);
+                format!(
+                    "{}.expect(\"Attempted to convert null pointer to reference\")",
+                    code
                 )
             }
-            RustToFfiTypeConversion::ValueToPtr => format!(
-                "{unsafe_start}*{}{unsafe_end}",
-                source_expr,
-                unsafe_start = unsafe_start,
-                unsafe_end = unsafe_end
-            ),
-            RustToFfiTypeConversion::CppBoxToPtr => format!(
-                "{unsafe_start}::cpp_utils::CppBox::new({}){unsafe_end}",
-                source_expr,
-                unsafe_start = unsafe_start,
-                unsafe_end = unsafe_end
-            ),
+            RustToFfiTypeConversion::ValueToPtr => {
+                let code = format!("*{}", source_expr);
+                wrap_unsafe(in_unsafe_context, &code)
+            }
+            RustToFfiTypeConversion::CppBoxToPtr => {
+                let code = format!("::cpp_utils::CppBox::new({})", source_expr);
+                wrap_unsafe(in_unsafe_context, &code)
+            }
             RustToFfiTypeConversion::PtrWrapperToPtr
             | RustToFfiTypeConversion::OptionPtrWrapperToPtr => {
                 let is_option =
@@ -522,14 +513,14 @@ impl Generator {
                     &type1.api_type
                 };
                 let ptr_wrapper_path = &ptr_wrapper_type.as_common()?.path;
-                format!(
-                    "{unsafe_start}{}::{}({}){unsafe_end}",
+
+                let code = format!(
+                    "{}::{}({})",
                     self.rust_path_to_string(ptr_wrapper_path),
                     if is_option { "new_option" } else { "new" },
                     source_expr,
-                    unsafe_start = unsafe_start,
-                    unsafe_end = unsafe_end
-                )
+                );
+                wrap_unsafe(in_unsafe_context, &code)
             }
             RustToFfiTypeConversion::QFlagsToUInt => {
                 let mut qflags_type = type1.api_type.clone();
@@ -561,11 +552,6 @@ impl Generator {
         wrapper_data: &RustFfiWrapperData,
         in_unsafe_context: bool,
     ) -> Result<String> {
-        let (unsafe_start, unsafe_end) = if in_unsafe_context {
-            ("", "")
-        } else {
-            ("unsafe { ", " }")
-        };
         let mut final_args = Vec::new();
         final_args.resize(wrapper_data.cpp_ffi_function.arguments.len(), None);
         for arg in arguments {
@@ -646,14 +632,12 @@ impl Generator {
                     self.rust_type_to_code(&return_type.api_type)
                 };
             // TODO: use MybeUninit when it's stable
+            let expr = wrap_unsafe(in_unsafe_context, "::std::mem::uninitialized()");
             result.push(format!(
-                "{{\nlet mut {var}: {t} = {unsafe_start}\
-                 ::std::mem::uninitialized()\
-                 {unsafe_end};\n",
+                "{{\nlet mut {var}: {t} = {e};\n",
                 var = return_var_name,
                 t = struct_name,
-                unsafe_start = unsafe_start,
-                unsafe_end = unsafe_end
+                e = expr
             ));
             final_args[*i as usize] = Some(format!("&mut {}", return_var_name));
             maybe_result_var_name = Some(return_var_name);
@@ -662,17 +646,18 @@ impl Generator {
             .into_iter()
             .map_if_ok(|x| x.ok_or_else(|| err_msg("ffi argument is missing")))?;
 
-        result.push(format!(
-            "{unsafe_start}{}({}){maybe_semicolon}{unsafe_end}",
-            self.rust_path_to_string(&wrapper_data.ffi_function_path),
-            final_args.join(", "),
-            maybe_semicolon = if maybe_result_var_name.is_some() {
-                ";"
-            } else {
-                ""
-            },
-            unsafe_start = unsafe_start,
-            unsafe_end = unsafe_end
+        result.push(wrap_unsafe(
+            in_unsafe_context,
+            &format!(
+                "{}({}){maybe_semicolon}",
+                self.rust_path_to_string(&wrapper_data.ffi_function_path),
+                final_args.join(", "),
+                maybe_semicolon = if maybe_result_var_name.is_some() {
+                    ";"
+                } else {
+                    ""
+                },
+            ),
         ));
         if let Some(name) = &maybe_result_var_name {
             result.push(format!("{}\n}}", name));

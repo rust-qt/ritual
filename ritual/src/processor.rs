@@ -240,8 +240,6 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
     info!("Processing crate: {}", config.crate_properties().name());
     check_all_paths(&config)?;
 
-    // TODO: allow to remove any prefix through `Config` (#25)
-
     info!("Loading current crate data");
     let mut current_database = workspace
         .load_or_create_crate(config.crate_properties().name())
