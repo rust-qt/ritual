@@ -3,7 +3,7 @@ use ritual_common::cpp_lib_builder::{BuildType, CppLibBuilder};
 use ritual_common::errors::{FancyUnwrap, Result};
 use ritual_common::file_utils::canonicalize;
 use ritual_common::file_utils::create_dir_all;
-use ritual_common::file_utils::repo_crate_local_path;
+use ritual_common::file_utils::repo_dir_path;
 use ritual_common::utils::add_env_path_item;
 use std::env;
 use std::path::{Path, PathBuf};
@@ -36,7 +36,7 @@ impl TempTestDir {
 }
 
 fn build_cpp_lib() -> Result<TempTestDir> {
-    let cpp_lib_source_dir = repo_crate_local_path("qt_ritual/test_assets/moqt")?;
+    let cpp_lib_source_dir = repo_dir_path("qt_ritual/test_assets/moqt")?;
 
     let temp_dir = TempTestDir::new("test_full_run");
     let build_dir = temp_dir.path().join("build/moqt_core");

@@ -9,6 +9,7 @@ use ritual_common::errors::{err_msg, Result, ResultExt};
 use ritual_common::file_utils::{file_to_string, os_str_to_str, read_dir};
 use ritual_common::utils::add_to_multihash;
 use std::collections::HashMap;
+use std::path::Path;
 use std::path::PathBuf;
 
 struct HeaderNameMap {
@@ -34,7 +35,7 @@ impl HeaderNameMap {
         real_header.to_string()
     }
 
-    fn new(headers_dir: &PathBuf) -> Result<HeaderNameMap> {
+    fn new(headers_dir: &Path) -> Result<HeaderNameMap> {
         let re = ::regex::Regex::new(r#"^#include "([a-zA-Z0-9._]+)"$"#)?;
         let mut map_real_to_all_fancy: HashMap<_, Vec<_>> = HashMap::new();
         info!("Detecting fancy Qt header names");
@@ -115,12 +116,10 @@ pub fn fix_header_names(data: &mut [CppDatabaseItem], headers_dir: &PathBuf) -> 
 
 #[test]
 fn test_qt_fix_header_names() {
-    let map = HeaderNameMap::new(
-        &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("test_assets")
-            .join("qt_headers"),
-    )
-    .unwrap();
+    use ritual_common::file_utils::repo_dir_path;
+
+    let map =
+        HeaderNameMap::new(&repo_dir_path("qt_ritual/test_assets/qt_headers").unwrap()).unwrap();
     assert_eq!(map.real_to_fancy("qfile.h", None), "QFile");
     assert_eq!(map.real_to_fancy("qfile.h", Some("QFile")), "QFile");
     assert_eq!(map.real_to_fancy("qnotmap.h", None), "qnotmap.h");

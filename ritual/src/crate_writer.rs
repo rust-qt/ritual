@@ -15,7 +15,7 @@ use ritual_common::file_utils::path_to_str;
 use ritual_common::file_utils::read_dir;
 use ritual_common::file_utils::remove_dir_all;
 use ritual_common::file_utils::remove_file;
-use ritual_common::file_utils::repo_crate_local_path;
+use ritual_common::file_utils::repo_dir_path;
 use ritual_common::file_utils::save_json;
 use ritual_common::file_utils::save_toml;
 use ritual_common::toml;
@@ -144,7 +144,7 @@ fn generate_crate_template(data: &mut ProcessorData) -> Result<()> {
                     dep_value(
                         versions::CPP_UTILS_VERSION,
                         if data.workspace.config().write_dependencies_local_paths {
-                            Some(repo_crate_local_path("cpp_utils")?)
+                            Some(repo_dir_path("cpp_utils")?)
                         } else {
                             None
                         },
@@ -183,7 +183,7 @@ fn generate_crate_template(data: &mut ProcessorData) -> Result<()> {
                     dep_value(
                         versions::RITUAL_BUILD_VERSION,
                         if data.workspace.config().write_dependencies_local_paths {
-                            Some(repo_crate_local_path("ritual_build")?)
+                            Some(repo_dir_path("ritual_build")?)
                         } else {
                             None
                         },

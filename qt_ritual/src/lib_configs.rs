@@ -14,7 +14,7 @@ use ritual::processor::ProcessingStep;
 use ritual_common::cpp_build_config::CppLibraryType;
 use ritual_common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
 use ritual_common::errors::{bail, Result, ResultExt};
-use ritual_common::file_utils::repo_crate_local_path;
+use ritual_common::file_utils::repo_dir_path;
 use ritual_common::target;
 use ritual_common::toml;
 use std::path::PathBuf;
@@ -552,7 +552,7 @@ pub fn create_config(crate_name: &str) -> Result<Config> {
         crate_properties.add_build_dependency(
             "qt_ritual_build",
             versions::QT_RITUAL_BUILD_VERSION,
-            Some(repo_crate_local_path("qt_ritual_build")?),
+            Some(repo_dir_path("qt_ritual_build")?),
         );
 
         let mut config = Config::new(crate_properties);
@@ -610,11 +610,7 @@ pub fn create_config(crate_name: &str) -> Result<Config> {
         ProcessingStep::new("add_slot_wrappers", add_slot_wrappers),
     )?;
 
-    config.set_crate_template_path(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("crate_templates")
-            .join(&crate_name),
-    );
+    config.set_crate_template_path(repo_dir_path("qt_ritual/crate_templates")?.join(&crate_name));
 
     let lib_config = match crate_name {
         "qt_core" => core_config,
