@@ -60,6 +60,19 @@ The project consists of the following Rust crates:
 
 See `README.md` in each crate for detailed description.
 
+## License
+
+This project is licensed under either of
+
+ * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
+   http://www.apache.org/licenses/LICENSE-2.0)
+ * MIT license ([LICENSE-MIT](LICENSE-MIT) or
+   http://opensource.org/licenses/MIT)
+
+at your option.
+
+If you use Qt, you should also take into account [Qt licensing](https://www.qt.io/licensing/).
+
 ## Contributing
 
 Contributions are always welcome! You can contribute in different ways:
@@ -69,3 +82,9 @@ Contributions are always welcome! You can contribute in different ways:
 - Write a test for `cpp_to_rust_generator` crate;
 - Write a test or an example for a Qt crate (porting examples from the official Qt documentation is a good option);
 - Pick up an issue with [help wanted](https://github.com/rust-qt/cpp_to_rust/labels/help%20wanted) tag or any other issue you like.
+
+Please use `develop` as the target branch for your pull requests.
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in the project by you, as defined in the Apache-2.0 license, shall be
+dual licensed as above, without any additional terms or conditions.
