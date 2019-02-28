@@ -68,7 +68,7 @@ fn build_cpp_lib() -> Result<TempTestDir> {
     let lib_path = install_dir.join("lib");
     add_env("LIBRARY_PATH", &lib_path)?;
     add_env("LD_LIBRARY_PATH", &lib_path)?;
-    add_env("DYLD_LIBRARY_PATH", &lib_path)?;
+    //add_env("DYLD_LIBRARY_PATH", &lib_path)?;
     add_env("PATH", &lib_path)?;
     add_env("RITUAL_LIB_PATH", &lib_path)?;
     env::set_var("MOQT_INSTALL_DIR", &install_dir);
