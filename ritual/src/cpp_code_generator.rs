@@ -355,13 +355,13 @@ pub fn generate_cpp_type_size_requester(
 
                 writeln!(
                     output,
-                    "printf(\"#[repr(C, align(%d))]\\n\", alignof({}));",
+                    "printf(\"#[repr(C, align(%zu))]\\n\", alignof({}));",
                     cpp_path_code
                 )?;
 
                 writeln!(
                     output,
-                    "printf(\"pub struct {}([u8; %d]);\\n\\n\", sizeof({}));",
+                    "printf(\"pub struct {}([u8; %zu]);\\n\\n\", sizeof({}));",
                     data.path.last(),
                     cpp_path_code
                 )?;
