@@ -19,5 +19,5 @@ public:
 };
 
 namespace self {
-    MOQT_CORE_EXPORT void box(int a) {}
+    MOQT_CORE_EXPORT void box(int a);
 }

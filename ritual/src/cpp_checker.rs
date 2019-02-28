@@ -327,7 +327,7 @@ impl CppChecker<'_, '_> {
             PreliminaryTest::new(
                 "correct assertion",
                 true,
-                Snippet::new_in_main("assert(2 + 2 == 4);"),
+                Snippet::new_in_main("ritual_assert(2 + 2 == 4);"),
             ),
             PreliminaryTest::new(
                 "type traits",
@@ -336,19 +336,19 @@ impl CppChecker<'_, '_> {
                     "\
                      class C1 {}; \n\
                      enum E1 {};  \n\
-                     assert(std::is_class<C1>::value); \n\
-                     assert(!std::is_class<E1>::value); \n\
-                     assert(!std::is_enum<C1>::value); \n\
-                     assert(std::is_enum<E1>::value); \
-                     assert(sizeof(C1) > 0);\
-                     assert(sizeof(E1) > 0);\n\
+                     ritual_assert(std::is_class<C1>::value); \n\
+                     ritual_assert(!std::is_class<E1>::value); \n\
+                     ritual_assert(!std::is_enum<C1>::value); \n\
+                     ritual_assert(std::is_enum<E1>::value); \
+                     ritual_assert(sizeof(C1) > 0);\
+                     ritual_assert(sizeof(E1) > 0);\n\
                      ",
                 ),
             ),
             PreliminaryTest::new(
                 "incorrect assertion in fn",
                 true,
-                Snippet::new_global("int f1() { assert(2 + 2 == 5); return 1; }"),
+                Snippet::new_global("int f1() { ritual_assert(2 + 2 == 5); return 1; }"),
             ),
         ];
         assert!(positive_tests.iter().all(|t| t.expected));
@@ -367,7 +367,7 @@ impl CppChecker<'_, '_> {
             PreliminaryTest::new(
                 "incorrect assertion",
                 false,
-                Snippet::new_in_main("assert(2 + 2 == 5);"),
+                Snippet::new_in_main("ritual_assert(2 + 2 == 5);"),
             ),
             PreliminaryTest::new("status code 1", false, Snippet::new_in_main("return 1;")),
         ];
