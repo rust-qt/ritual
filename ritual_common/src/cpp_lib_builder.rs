@@ -176,6 +176,12 @@ impl CppLibBuilder {
             "make"
         };
 
+        run_command(
+            Command::new(&make_command_name)
+                .arg("clean")
+                .current_dir(&self.build_dir),
+        )?;
+
         let mut make_args = Vec::new();
         let num_jobs = if let Some(x) = self.num_jobs {
             x
