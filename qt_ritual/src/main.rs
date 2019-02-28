@@ -25,8 +25,6 @@ mod lib_configs;
 mod slot_wrappers;
 mod versions;
 
-#[cfg(test)]
-#[cfg(target_os = "linux")] // TODO: fix on Windows and MacOS
 mod test_moqt;
 
 use flexi_logger::{Duplicate, LevelFilter, LogSpecification, Logger};
@@ -111,4 +109,9 @@ fn run(options: Options) -> Result<()> {
 
 pub fn main() {
     run(Options::from_args()).fancy_unwrap();
+}
+
+#[test]
+fn qt_ritual_test1() {
+    assert_eq!(true, true);
 }
