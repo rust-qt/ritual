@@ -25,6 +25,7 @@ mod lib_configs;
 mod slot_wrappers;
 mod versions;
 
+#[cfg(test)]
 mod test_moqt;
 
 use flexi_logger::{Duplicate, LevelFilter, LogSpecification, Logger};
