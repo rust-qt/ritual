@@ -5,7 +5,7 @@ use crate::database::CppFfiItem;
 use crate::database::CppFfiItemKind;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
-use log::{debug, info};
+use log::debug;
 use rayon::iter::IndexedParallelIterator;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
@@ -52,11 +52,6 @@ fn check_snippets<'a>(
         }
         writeln!(file, "}}")?;
     }
-    info!("env:");
-    info!(
-        "DYLD_LIBRARY_PATH = {:?}",
-        std::env::var("DYLD_LIBRARY_PATH")
-    );
     let instant = Instant::now();
     let result = data.builder.run();
     debug!("cpp builder time: {:?}", instant.elapsed());
