@@ -9,17 +9,19 @@ class MOQT_CORE_EXPORT QVector {
 public:
     QVector() {}
     void push(T value) {
-        m_data.push_back(value);
+        m_data[m_size] = value;
+        m_size++;
     }
     T& at(int pos) {
-        return m_data.at(pos);
+        return m_data[pos];
     }
     int count() const {
-        return m_data.size();
+        return m_size;
     }
 
 private:
-    std::vector<T> m_data;
+    T m_data[32];
+    int m_size = 0;
 };
 
 

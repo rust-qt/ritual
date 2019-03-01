@@ -1,11 +1,12 @@
 #ifndef QWINDOW_H
 #define QWINDOW_H
 
+#include "moqt_gui_exports.h"
 #include <basic_class.h>
 #include "QPoint.h"
 #include "QObject.h"
 
-class QWindow : public QObject {
+class MOQT_GUI_EXPORT QWindow : public QObject {
 public:
     QWindow() {}
 
@@ -24,7 +25,7 @@ Q_SIGNALS:
 private:
     QPoint m_pos;
 };
-QWindow* get_window();
+MOQT_GUI_EXPORT QWindow* get_window();
 
 
 #endif //QWINDOW_H
