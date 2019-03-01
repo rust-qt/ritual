@@ -2,6 +2,8 @@
 # See the template at "cpp_to_rust/cpp_to_rust_generator/templates/cpp_checker/CMakeLists.txt".
 
 cmake_minimum_required(VERSION 3.0.0 FATAL_ERROR)
+SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
 project (cpp_checker)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
@@ -51,3 +53,4 @@ endif()
 add_custom_command(TARGET cpp_checker
                    POST_BUILD
                    COMMAND cpp_checker)
+
