@@ -512,6 +512,14 @@ pub fn create_config(crate_name: &str) -> Result<Config> {
             let mut paths = CppBuildPaths::new();
             paths.add_include_path(&sublib_include_path);
             paths.add_lib_path(&lib_path);
+
+            for &lib in lib_dependencies(crate_name)? {
+                let dep_include_path = include_path.join(lib);
+                if !dep_include_path.exists() {
+                    bail!("Path does not exist: {}", dep_include_path.display());
+                }
+                paths.add_include_path(&dep_include_path);
+            }
             config.set_cpp_build_paths(paths);
         }
         config.add_target_include_path(&sublib_include_path);
