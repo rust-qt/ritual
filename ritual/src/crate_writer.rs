@@ -255,9 +255,8 @@ fn generate_c_lib_template(
 }
 
 fn run(data: &mut ProcessorData) -> Result<()> {
-    let output_path = data
-        .workspace
-        .crate_path(data.config.crate_properties().name())?;
+    let crate_name = data.config.crate_properties().name();
+    let output_path = data.workspace.crate_path(crate_name)?;
 
     for item in read_dir(&output_path)? {
         let path = item?.path();
@@ -311,7 +310,14 @@ fn run(data: &mut ProcessorData) -> Result<()> {
         data.config.crate_template_path().map(|s| s.join("src")),
     )?;
 
-    run_command(Command::new("cargo").arg("fmt").current_dir(&output_path))?;
+    // -p shouldn't be needed, it's a workaround for this bug on Windows:
+    // https://github.com/rust-lang/rustfmt/issues/2694
+    run_command(
+        Command::new("cargo")
+            .arg("fmt")
+            .arg(format!("-p{}", crate_name))
+            .current_dir(&output_path),
+    )?;
     run_command(
         Command::new("rustfmt")
             .arg("src/ffi.in.rs")
