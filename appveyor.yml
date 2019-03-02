@@ -4,4 +4,4 @@ cache:
 - '%USERPROFILE%\.cargo'
 - '%USERPROFILE%\.rustup'
 - '%USERPROFILE%\ritual_temp_test_dir'
-- 'target'
+- '111target'
