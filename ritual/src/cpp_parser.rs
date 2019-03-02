@@ -23,7 +23,7 @@ use clang;
 use clang::diagnostic::{Diagnostic, Severity};
 use clang::*;
 use itertools::Itertools;
-use log::{debug, info, trace, warn};
+use log::{debug, trace, warn};
 use regex::Regex;
 use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use ritual_common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
@@ -1403,7 +1403,6 @@ impl CppParser<'_, '_> {
         if !self.should_process_entity(entity) {
             return Ok(());
         }
-        info!("entity: {:?}", entity);
         match entity.get_kind() {
             EntityKind::EnumDecl => {
                 if entity.get_accessibility() == Some(Accessibility::Private) {
