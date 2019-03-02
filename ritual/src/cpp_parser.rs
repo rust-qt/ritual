@@ -23,7 +23,7 @@ use clang;
 use clang::diagnostic::{Diagnostic, Severity};
 use clang::*;
 use itertools::Itertools;
-use log::{debug, trace, warn};
+use log::{debug, info, trace, warn};
 use regex::Regex;
 use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use ritual_common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
@@ -1363,20 +1363,25 @@ impl CppParser<'_, '_> {
 
     /// Returns false if this `entity` was blacklisted in some way.
     fn should_process_entity(&self, entity: Entity) -> bool {
-        if let Ok(full_name) = get_full_name(entity) {
-            if let Ok(file_path) = self.entity_include_path(entity) {
-                let file_path_buf = PathBuf::from(&file_path);
-                if !self.data.config.target_include_paths().is_empty()
-                    && !self
-                        .data
-                        .config
-                        .target_include_paths()
-                        .iter()
-                        .any(|x| file_path_buf.starts_with(x))
-                {
-                    return false;
-                }
+        if entity.get_kind() == EntityKind::TranslationUnit {
+            return true;
+        }
+        if let Ok(file_path) = self.entity_include_path(entity) {
+            let file_path = Path::new(&file_path);
+            if !self.data.config.target_include_paths().is_empty()
+                && !self
+                    .data
+                    .config
+                    .target_include_paths()
+                    .iter()
+                    .any(|x| file_path.starts_with(x))
+            {
+                return false;
             }
+        } else {
+            return false;
+        }
+        if let Ok(full_name) = get_full_name(entity) {
             if self
                 .data
                 .config
@@ -1386,6 +1391,8 @@ impl CppParser<'_, '_> {
             {
                 return false;
             }
+        } else {
+            return false;
         }
         true
     }
@@ -1396,6 +1403,7 @@ impl CppParser<'_, '_> {
         if !self.should_process_entity(entity) {
             return Ok(());
         }
+        info!("entity: {:?}", entity);
         match entity.get_kind() {
             EntityKind::EnumDecl => {
                 if entity.get_accessibility() == Some(Accessibility::Private) {
