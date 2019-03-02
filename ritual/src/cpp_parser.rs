@@ -1363,20 +1363,25 @@ impl CppParser<'_, '_> {
 
     /// Returns false if this `entity` was blacklisted in some way.
     fn should_process_entity(&self, entity: Entity) -> bool {
-        if let Ok(full_name) = get_full_name(entity) {
-            if let Ok(file_path) = self.entity_include_path(entity) {
-                let file_path_buf = PathBuf::from(&file_path);
-                if !self.data.config.target_include_paths().is_empty()
-                    && !self
-                        .data
-                        .config
-                        .target_include_paths()
-                        .iter()
-                        .any(|x| file_path_buf.starts_with(x))
-                {
-                    return false;
-                }
+        if entity.get_kind() == EntityKind::TranslationUnit {
+            return true;
+        }
+        if let Ok(file_path) = self.entity_include_path(entity) {
+            let file_path = Path::new(&file_path);
+            if !self.data.config.target_include_paths().is_empty()
+                && !self
+                    .data
+                    .config
+                    .target_include_paths()
+                    .iter()
+                    .any(|x| file_path.starts_with(x))
+            {
+                return false;
             }
+        } else {
+            return false;
+        }
+        if let Ok(full_name) = get_full_name(entity) {
             if self
                 .data
                 .config
@@ -1386,6 +1391,8 @@ impl CppParser<'_, '_> {
             {
                 return false;
             }
+        } else {
+            return false;
         }
         true
     }

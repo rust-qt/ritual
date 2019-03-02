@@ -51,3 +51,4 @@ endif()
 add_custom_command(TARGET cpp_checker
                    POST_BUILD
                    COMMAND cpp_checker)
+

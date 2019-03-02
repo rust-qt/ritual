@@ -63,7 +63,9 @@ fn build_cpp_lib() -> Result<TempTestDir> {
     };
 
     for lib in &["moqt_core", "moqt_gui"] {
-        add_env("CPLUS_INCLUDE_PATH", &install_dir.join("include").join(lib))?;
+        let path = install_dir.join("include").join(lib);
+        add_env("CPLUS_INCLUDE_PATH", &path)?;
+        add_env("INCLUDE", &path)?; // for Windows
     }
     let lib_path = install_dir.join("lib");
     add_env("LIBRARY_PATH", &lib_path)?;

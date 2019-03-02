@@ -25,8 +25,8 @@ mod lib_configs;
 mod slot_wrappers;
 mod versions;
 
+#[cfg(not(target_os = "macos"))]
 #[cfg(test)]
-#[cfg(target_os = "linux")] // TODO: fix on Windows and MacOS
 mod test_moqt;
 
 use flexi_logger::{Duplicate, LevelFilter, LogSpecification, Logger};

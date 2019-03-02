@@ -4,7 +4,7 @@ use crate::cpp_build_config::CppBuildConfigData;
 use crate::cpp_build_config::CppBuildPaths;
 use crate::cpp_build_config::CppLibraryType;
 use crate::errors::{err_msg, Result};
-use crate::file_utils::{create_dir_all, path_to_str};
+use crate::file_utils::{create_dir_all, file_to_string, path_to_str};
 use crate::target;
 use crate::utils::run_command;
 use crate::utils::run_command_and_capture_output;
@@ -176,6 +176,26 @@ impl CppLibBuilder {
             "make"
         };
 
+        if target::current_env() == target::Env::Msvc && self.capture_output {
+            let path = self.build_dir.join("nmake_output.txt");
+            run_command(
+                Command::new("cmd")
+                    .arg("/C")
+                    .arg(format!(
+                        "{} clean > {} 2>&1",
+                        make_command_name,
+                        path_to_str(&path)?
+                    ))
+                    .current_dir(&self.build_dir),
+            )?;
+        } else {
+            run_command(
+                Command::new(&make_command_name)
+                    .arg("clean")
+                    .current_dir(&self.build_dir),
+            )?;
+        }
+
         let mut make_args = Vec::new();
         let num_jobs = if let Some(x) = self.num_jobs {
             x
@@ -199,12 +219,46 @@ impl CppLibBuilder {
         if self.install_dir.is_some() {
             make_args.push("install".to_string());
         }
-        let mut make_command = Command::new(make_command_name);
-        make_command.args(&make_args).current_dir(&self.build_dir);
+
+        let mut capture_output_file = None;
+        let mut make_command = if target::current_env() == target::Env::Msvc && self.capture_output
+        {
+            let path = self.build_dir.join("nmake_output.txt");
+            let mut make_command = Command::new("cmd");
+            make_command.arg("/C").arg(format!(
+                "{} {} > {} 2>&1",
+                make_command_name,
+                make_args.join(" "),
+                path_to_str(&path)?
+            ));
+            capture_output_file = Some(path);
+            make_command
+        } else {
+            let mut make_command = Command::new(make_command_name);
+            make_command.args(&make_args);
+            make_command
+        };
+
+        make_command.current_dir(&self.build_dir);
         if self.capture_output {
-            let output = run_command_and_capture_output(&mut make_command)?;
-            if !output.is_success() {
-                return Ok(CppLibBuilderOutput::Fail(output));
+            if let Some(capture_output_file) = capture_output_file {
+                if let Err(err) = run_command(&mut make_command) {
+                    let output = CommandOutput {
+                        status: unsafe { std::mem::zeroed() },
+                        stderr: format!(
+                            "{}\n{}",
+                            err.to_string(),
+                            file_to_string(capture_output_file)?
+                        ),
+                        stdout: String::new(),
+                    };
+                    return Ok(CppLibBuilderOutput::Fail(output));
+                }
+            } else {
+                let output = run_command_and_capture_output(&mut make_command)?;
+                if !output.is_success() {
+                    return Ok(CppLibBuilderOutput::Fail(output));
+                }
             }
         } else {
             run_command(&mut make_command)?;
