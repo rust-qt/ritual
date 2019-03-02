@@ -48,7 +48,16 @@ if(C2R_COMPILER_FLAGS)
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${C2R_COMPILER_FLAGS}")
 endif()
 
-add_custom_command(TARGET cpp_checker
-                   POST_BUILD
-                   COMMAND cpp_checker)
+if(APPLE)
+    add_custom_command(
+        TARGET cpp_checker
+        POST_BUILD
+        COMMAND DYLD_LIBRARY_PATH=$ENV{DYLD_LIBRARY_PATH} $<TARGET_FILE:cpp_checker>)
+else()
+    add_custom_command(
+        TARGET cpp_checker
+        POST_BUILD
+        COMMAND cpp_checker)
+endif()
+
 

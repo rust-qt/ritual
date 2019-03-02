@@ -12,8 +12,6 @@ cd "$TRAVIS_BUILD_DIR"
 rustup component add clippy
 rustup component add rustfmt
 
-echo $DYLD_LIBRARY_PATH
-
 cargo clippy --all-targets -- -D warnings
 cargo test -v
 cargo fmt -- --check
