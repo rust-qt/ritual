@@ -25,6 +25,7 @@ mod lib_configs;
 mod slot_wrappers;
 mod versions;
 
+#[cfg(not(target_os = "macos"))]
 #[cfg(test)]
 mod test_moqt;
 
