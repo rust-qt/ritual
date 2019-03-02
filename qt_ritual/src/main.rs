@@ -111,8 +111,3 @@ fn run(options: Options) -> Result<()> {
 pub fn main() {
     run(Options::from_args()).fancy_unwrap();
 }
-
-#[test]
-fn qt_ritual_test1() {
-    assert_eq!(true, true);
-}
