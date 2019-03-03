@@ -19,14 +19,14 @@ pub struct RustPath {
 
 impl RustPath {
     /// Creates new `RustPath` consisting of `parts`.
-    pub fn from_parts(parts: Vec<String>) -> RustPath {
+    pub fn from_parts(parts: Vec<String>) -> Self {
         if parts.is_empty() {
             panic!("RustPath can't be empty");
         }
         RustPath { parts }
     }
 
-    pub fn from_str(str: &str) -> Result<RustPath> {
+    pub fn from_str(str: &str) -> Result<Self> {
         let parts = str.split("::").map(String::from).collect_vec();
         if parts.is_empty() {
             bail!("RustPath can't be empty");
@@ -37,7 +37,7 @@ impl RustPath {
         Ok(RustPath { parts })
     }
 
-    pub fn from_good_str(str: &str) -> RustPath {
+    pub fn from_good_str(str: &str) -> Self {
         Self::from_str(str).unwrap()
     }
 
@@ -238,7 +238,6 @@ impl RustType {
                             let snake_part = part.to_snake_case();
                             if good_parts.last() != Some(&snake_part) {
                                 good_parts.push(snake_part);
-                            } else {
                             }
                         }
                     }

@@ -32,7 +32,7 @@ use flexi_logger::{Duplicate, LevelFilter, LogSpecification, Logger};
 
 #[derive(Debug, StructOpt)]
 /// Generates rust_qt crates using ritual.
-/// See https://github.com/rust-qt/cpp_to_rust for more details.
+/// See [ritual](https://github.com/rust-qt/ritual) for more details.
 struct Options {
     #[structopt(parse(from_os_str))]
     /// Directory for output and temporary files

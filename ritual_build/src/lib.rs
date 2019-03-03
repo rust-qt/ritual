@@ -50,7 +50,7 @@ impl Config {
     /// located at the crate root. The caller may change
     /// `CppBuildPaths` and `CppBuildConfig` values stored in this object
     /// and call `config.run()` to apply them.
-    pub fn new() -> Result<Config> {
+    pub fn new() -> Result<Self> {
         Ok(Config {
             build_script_data: build_script_data()?,
             cpp_build_paths: CppBuildPaths::default(),

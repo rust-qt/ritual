@@ -46,7 +46,7 @@ fn database_path(workspace_path: &Path, crate_name: &str) -> PathBuf {
 }
 
 impl Workspace {
-    pub fn new(path: PathBuf) -> Result<Workspace> {
+    pub fn new(path: PathBuf) -> Result<Self> {
         if !path.is_dir() {
             bail!("No such directory: {}", path.display());
         }

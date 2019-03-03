@@ -61,7 +61,7 @@ fn recursive_merge_toml(a: toml::Value, b: toml::Value) -> toml::Value {
 /// Generates `Cargo.toml` file and skeleton of the crate.
 /// If a crate template was supplied, files from it are
 /// copied to the output location.
-fn generate_crate_template(data: &mut ProcessorData) -> Result<()> {
+fn generate_crate_template(data: &mut ProcessorData<'_>) -> Result<()> {
     let output_path = data
         .workspace
         .crate_path(data.config.crate_properties().name())?;
@@ -254,7 +254,7 @@ fn generate_c_lib_template(
     Ok(())
 }
 
-fn run(data: &mut ProcessorData) -> Result<()> {
+fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let crate_name = data.config.crate_properties().name();
     let output_path = data.workspace.crate_path(crate_name)?;
 

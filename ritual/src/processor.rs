@@ -80,7 +80,7 @@ impl<'a> ProcessorData<'a> {
 pub struct ProcessingStep {
     pub name: String,
     pub is_const: bool,
-    pub function: Box<Fn(&mut ProcessorData) -> Result<()>>,
+    pub function: Box<dyn Fn(&mut ProcessorData<'_>) -> Result<()>>,
 }
 
 impl fmt::Debug for ProcessingStep {
@@ -148,20 +148,20 @@ impl ProcessingSteps {
 }
 
 impl ProcessingStep {
-    pub fn new<S: Into<String>, F: 'static + Fn(&mut ProcessorData) -> Result<()>>(
+    pub fn new<S: Into<String>, F: 'static + Fn(&mut ProcessorData<'_>) -> Result<()>>(
         name: S,
         function: F,
-    ) -> ProcessingStep {
+    ) -> Self {
         ProcessingStep {
             name: name.into(),
             is_const: false,
             function: Box::new(function),
         }
     }
-    pub fn new_const<S: Into<String>, F: 'static + Fn(&mut ProcessorData) -> Result<()>>(
+    pub fn new_const<S: Into<String>, F: 'static + Fn(&mut ProcessorData<'_>) -> Result<()>>(
         name: S,
         function: F,
-    ) -> ProcessingStep {
+    ) -> Self {
         let name = name.into();
         ProcessingStep {
             name,
@@ -214,13 +214,13 @@ struct MainItemRef<'a> {
 }
 
 impl PartialEq for MainItemRef<'_> {
-    fn eq(&self, other: &MainItemRef) -> bool {
+    fn eq(&self, other: &MainItemRef<'_>) -> bool {
         self.step.name == other.step.name
     }
 }
 
 impl PartialOrd for MainItemRef<'_> {
-    fn partial_cmp(&self, other: &MainItemRef) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &MainItemRef<'_>) -> Option<Ordering> {
         if self.run_after.contains(&other.step.name) {
             Some(Ordering::Greater)
         } else {

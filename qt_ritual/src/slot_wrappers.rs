@@ -50,7 +50,7 @@ fn generate_slot_wrapper(
     Ok(qt_slot_wrapper)
 }
 
-pub fn add_slot_wrappers(data: &mut ProcessorData) -> Result<()> {
+pub fn add_slot_wrappers(data: &mut ProcessorData<'_>) -> Result<()> {
     let all_types = detect_signal_argument_types(data)?;
 
     let mut name_provider = FfiNameProvider::new(data);

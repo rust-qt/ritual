@@ -4,8 +4,6 @@
 //! (https://github.com/rust-qt/cpp_to_rust/tree/master/cpp_to_rust/cpp_to_rust_generator)
 //! for more information.
 
-#![deny(unused_must_use)]
-
 pub mod config;
 mod cpp_checker;
 mod cpp_code_generator;

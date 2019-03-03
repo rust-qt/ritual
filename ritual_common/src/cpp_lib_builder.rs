@@ -24,14 +24,14 @@ pub struct CMakeVar {
 }
 impl CMakeVar {
     /// Creates a new variable.
-    pub fn new<S1: Into<String>, S2: Into<String>>(name: S1, value: S2) -> CMakeVar {
+    pub fn new<S1: Into<String>, S2: Into<String>>(name: S1, value: S2) -> Self {
         CMakeVar {
             name: name.into(),
             value: value.into(),
         }
     }
     /// Creates a new variable containing a list of values.
-    pub fn new_list<I, S, L>(name: S, values: L) -> Result<CMakeVar>
+    pub fn new_list<I, S, L>(name: S, values: L) -> Result<Self>
     where
         S: Display + Into<String>,
         I: AsRef<str> + Display,

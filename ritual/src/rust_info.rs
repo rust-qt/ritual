@@ -387,11 +387,10 @@ pub enum RustModuleKind {
 impl RustModuleKind {
     pub fn is_in_separate_file(self) -> bool {
         match self {
-            RustModuleKind::CrateRoot => true,
-            RustModuleKind::Ffi => false,
-            RustModuleKind::SizedTypes => false,
-            RustModuleKind::CppNamespace => true,
-            RustModuleKind::CppNestedType => false,
+            RustModuleKind::CrateRoot | RustModuleKind::CppNamespace => true,
+            RustModuleKind::Ffi | RustModuleKind::SizedTypes | RustModuleKind::CppNestedType => {
+                false
+            }
         }
     }
 }
@@ -429,7 +428,7 @@ impl RustFunctionCaptionStrategy {
     /// Returns list of all available strategies sorted by priority
     /// (more preferred strategies go first).
     #[allow(dead_code)]
-    pub fn all() -> &'static [RustFunctionCaptionStrategy] {
+    pub fn all() -> &'static [Self] {
         use self::RustFunctionCaptionStrategy::*;
         &[
             SelfOnly,
@@ -522,8 +521,7 @@ impl RustDatabaseItem {
             RustItemKind::EnumValue(data) => Some(&data.path),
             RustItemKind::Function(data) => Some(&data.path),
             RustItemKind::FfiFunction(data) => Some(&data.path),
-            RustItemKind::TraitImpl(_) => None,
-            RustItemKind::FlagEnumImpl(_) => None,
+            RustItemKind::TraitImpl(_) | RustItemKind::FlagEnumImpl(_) => None,
         }
     }
     pub fn is_child_of(&self, parent: &RustPath) -> bool {

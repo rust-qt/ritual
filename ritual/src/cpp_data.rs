@@ -149,15 +149,15 @@ pub struct CppPath {
 }
 
 impl CppPath {
-    pub fn from_good_str(path: &str) -> CppPath {
+    pub fn from_good_str(path: &str) -> Self {
         CppPath::from_str(path).unwrap()
     }
 
-    pub fn from_item(item: CppPathItem) -> CppPath {
+    pub fn from_item(item: CppPathItem) -> Self {
         CppPath { items: vec![item] }
     }
 
-    pub fn from_items(items: Vec<CppPathItem>) -> CppPath {
+    pub fn from_items(items: Vec<CppPathItem>) -> Self {
         CppPath { items }
     }
 
@@ -312,7 +312,7 @@ impl CppPathItem {
         format!("{}{}", self.name, args)
     }
 
-    pub fn from_good_str(name: &str) -> CppPathItem {
+    pub fn from_good_str(name: &str) -> Self {
         Self::from_str(name).unwrap()
     }
 }

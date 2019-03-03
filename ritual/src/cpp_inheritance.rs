@@ -9,7 +9,7 @@ use log::trace;
 use ritual_common::errors::*;
 
 /// Checks if `class_name` types inherits `base_name` type directly or indirectly.
-pub fn inherits(class_name: &CppPath, base_name: &CppPath, data: &ProcessorData) -> bool {
+pub fn inherits(class_name: &CppPath, base_name: &CppPath, data: &ProcessorData<'_>) -> bool {
     for base in data.all_items().filter_map(|x| x.cpp_data.as_base_ref()) {
         if &base.derived_class_type == class_name {
             if &base.base_class_type == base_name {
@@ -23,7 +23,7 @@ pub fn inherits(class_name: &CppPath, base_name: &CppPath, data: &ProcessorData)
     false
 }
 
-fn detect_inherited_methods2(data: &ProcessorData) -> Result<Vec<CppFunction>> {
+fn detect_inherited_methods2(data: &ProcessorData<'_>) -> Result<Vec<CppFunction>> {
     let mut remaining_classes = data
         .all_items()
         .filter_map(|x| x.cpp_data.as_base_ref())

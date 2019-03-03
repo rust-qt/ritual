@@ -53,8 +53,8 @@ pub struct CrateProperties {
 
 impl CrateProperties {
     /// Creates a new object with `name` and `version`.
-    pub fn new<S1: Into<String>, S2: Into<String>>(name: S1, version: S2) -> CrateProperties {
-        CrateProperties {
+    pub fn new<S1: Into<String>, S2: Into<String>>(name: S1, version: S2) -> Self {
+        Self {
             name: name.into(),
             version: version.into(),
             custom_fields: Default::default(),
@@ -170,7 +170,7 @@ pub struct Config {
 impl Config {
     /// Creates a `Config`.
     /// `crate_properties` are used in Cargo.toml of the generated crate.
-    pub fn new(crate_properties: CrateProperties) -> Config {
+    pub fn new(crate_properties: CrateProperties) -> Self {
         Config {
             crate_properties,
             crate_template_path: Default::default(),
@@ -184,7 +184,7 @@ impl Config {
             cpp_build_config: Default::default(),
             movable_types: Default::default(),
             processing_steps: Default::default(),
-            cpp_lib_version: None,
+            cpp_lib_version: Default::default(),
         }
     }
 

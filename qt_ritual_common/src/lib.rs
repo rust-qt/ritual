@@ -185,9 +185,7 @@ pub fn lib_dependencies(crate_name: &str) -> Result<&'static [&'static str]> {
         "qt_gui" => &["qt_core"],
         "qt_widgets" => &["qt_core", "qt_gui"],
         "qt_3d_core" => &["qt_core", "qt_gui"],
-        "qt_3d_render" => &["qt_core", "qt_gui", "qt_3d_core"],
-        "qt_3d_input" => &["qt_core", "qt_gui", "qt_3d_core"],
-        "qt_3d_logic" => &["qt_core", "qt_gui", "qt_3d_core"],
+        "qt_3d_render" | "qt_3d_input" | "qt_3d_logic" => &["qt_core", "qt_gui", "qt_3d_core"],
         "qt_3d_extras" => &[
             "qt_core",
             "qt_gui",

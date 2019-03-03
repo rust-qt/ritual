@@ -13,7 +13,7 @@ use ritual_common::errors::err_msg;
 use ritual_common::errors::{bail, Result};
 
 /// Returns true if `type1` is a known template instantiation.
-fn check_template_type(data: &ProcessorData, type1: &CppType) -> Result<()> {
+fn check_template_type(data: &ProcessorData<'_>, type1: &CppType) -> Result<()> {
     if let CppType::Class(path) = &type1 {
         if let Some(template_arguments) = &path.last().template_arguments {
             let is_available = data
@@ -106,7 +106,7 @@ pub fn instantiate_templates_step() -> ProcessingStep {
 
 /// Generates methods as template instantiations of
 /// methods of existing template classes and existing template methods.
-fn instantiate_templates(data: &mut ProcessorData) -> Result<()> {
+fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut new_methods = Vec::new();
     for method in data
         .all_items()
@@ -200,8 +200,8 @@ pub fn find_template_instantiations_step() -> ProcessingStep {
 
 /// Searches for template instantiations in this library's API,
 /// excluding results that were already processed in dependencies.
-fn find_template_instantiations(data: &mut ProcessorData) -> Result<()> {
-    fn check_type(type1: &CppType, data: &ProcessorData, result: &mut Vec<CppPath>) {
+fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> {
+    fn check_type(type1: &CppType, data: &ProcessorData<'_>, result: &mut Vec<CppPath>) {
         match &type1 {
             CppType::Class(path) => {
                 if let Some(template_arguments) = &path.last().template_arguments {

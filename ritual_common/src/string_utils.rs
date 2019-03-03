@@ -11,7 +11,7 @@ pub struct WordIterator<'a> {
 
 impl<'a> WordIterator<'a> {
     /// Create iterator over `string`.
-    pub fn new(string: &str) -> WordIterator {
+    pub fn new(string: &str) -> WordIterator<'_> {
         WordIterator { string, index: 0 }
     }
 }

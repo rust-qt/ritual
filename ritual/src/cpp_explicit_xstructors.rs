@@ -17,7 +17,7 @@ pub fn add_explicit_xstructors_step() -> ProcessingStep {
 /// Adds constructors and destructors for every class that does not have explicitly
 /// defined constructor or destructor, allowing to create wrappings for
 /// constructors and destructors implicitly available in C++.
-fn add_explicit_xstructors(data: &mut ProcessorData) -> Result<()> {
+fn add_explicit_xstructors(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut methods = Vec::new();
     for type1 in &data.current_database.cpp_items {
         if let CppItemData::Type(type1) = &type1.cpp_data {

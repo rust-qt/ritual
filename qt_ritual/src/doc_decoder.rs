@@ -74,7 +74,7 @@ impl DocData {
     }
 
     /// Parses Qt documentation of module `qt_crate_name` located at `docs_path`.
-    pub fn new(qt_crate_name: &str, docs_path: &Path) -> Result<DocData> {
+    pub fn new(qt_crate_name: &str, docs_path: &Path) -> Result<Self> {
         if !docs_path.exists() {
             bail!(
                 "Documentation directory does not exist: {}",

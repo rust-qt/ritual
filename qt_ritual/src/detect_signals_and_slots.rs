@@ -12,7 +12,7 @@ use std::collections::HashSet;
 
 /// Checks if `class_name` types inherits `base_name` type directly or indirectly.
 pub fn inherits(
-    data: &ProcessorData,
+    data: &ProcessorData<'_>,
     derived_class_name: &CppPath,
     base_class_name: &CppPath,
 ) -> bool {
@@ -31,9 +31,21 @@ pub fn inherits(
     false
 }
 
+#[derive(Debug, Clone)]
+enum SectionType {
+    Signals,
+    Slots,
+    Other,
+}
+#[derive(Debug)]
+struct Section {
+    line: usize,
+    section_type: SectionType,
+}
+
 /// Parses include files to detect which methods are signals or slots.
 #[allow(clippy::cyclomatic_complexity)]
-pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
+pub fn detect_signals_and_slots(data: &mut ProcessorData<'_>) -> Result<()> {
     // TODO: only run if it's a new class or it has some new methods; don't change existing old methods
     let mut files = HashSet::new();
 
@@ -53,18 +65,6 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData) -> Result<()> {
                 }
             }
         }
-    }
-
-    #[derive(Debug, Clone)]
-    enum SectionType {
-        Signals,
-        Slots,
-        Other,
-    }
-    #[derive(Debug)]
-    struct Section {
-        line: usize,
-        section_type: SectionType,
     }
 
     if files.is_empty() {

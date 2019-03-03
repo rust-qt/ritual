@@ -106,8 +106,7 @@ fn convert_return_type(method: &CppFfiFunction, expression: String) -> Result<St
                     if !method
                         .kind
                         .cpp_function()
-                        .map(|m| m.is_constructor())
-                        .unwrap_or(false)
+                        .map_or(false, |m| m.is_constructor())
                     {
                         result = format!(
                             "new {}({})",
@@ -130,8 +129,7 @@ fn convert_return_type(method: &CppFfiFunction, expression: String) -> Result<St
         && !method
             .kind
             .cpp_function()
-            .map(|m| m.is_constructor())
-            .unwrap_or(false)
+            .map_or(false, |m| m.is_constructor())
     {
         if let Some(arg) = method
             .arguments
@@ -186,8 +184,7 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
     let result = if method
         .kind
         .cpp_function()
-        .map(|m| m.is_destructor())
-        .unwrap_or(false)
+        .map_or(false, |m| m.is_destructor())
     {
         if let Some(arg) = method
             .arguments
@@ -258,8 +255,7 @@ fn source_body(method: &CppFfiFunction) -> Result<String> {
     if method
         .kind
         .cpp_function()
-        .map(|m| m.is_destructor())
-        .unwrap_or(false)
+        .map_or(false, |m| m.is_destructor())
         && method.allocation_place == ReturnValueAllocationPlace::Heap
     {
         if let Some(arg) = method

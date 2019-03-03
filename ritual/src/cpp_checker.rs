@@ -97,13 +97,13 @@ struct SnippetWithIndexes {
 }
 
 impl Snippet {
-    fn new_in_main<S: Into<String>>(code: S) -> Snippet {
+    fn new_in_main<S: Into<String>>(code: S) -> Self {
         Snippet {
             code: code.into(),
             context: SnippetContext::Main,
         }
     }
-    fn new_global<S: Into<String>>(code: S) -> Snippet {
+    fn new_global<S: Into<String>>(code: S) -> Self {
         Snippet {
             code: code.into(),
             context: SnippetContext::Global,
@@ -361,7 +361,7 @@ impl CppChecker<'_, '_> {
     }
 }
 
-fn run(data: &mut ProcessorData) -> Result<()> {
+fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut checker = CppChecker { data };
 
     checker.run()?;

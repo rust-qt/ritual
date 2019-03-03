@@ -1250,7 +1250,7 @@ impl State<'_, '_> {
     }
 }
 
-fn run(data: &mut ProcessorData) -> Result<()> {
+fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut state = State(data);
     state.generate_special_module(RustModuleKind::CrateRoot)?;
     state.generate_special_module(RustModuleKind::Ffi)?;
@@ -1313,7 +1313,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
 
         if let Err(err) = state.process_cpp_item(cpp_item) {
             trace!("skipping cpp item: {}: {}", &cpp_item.cpp_data, err);
-            print_trace(err, log::Level::Trace);
+            print_trace(&err, log::Level::Trace);
         }
     }
 
@@ -1324,7 +1324,7 @@ fn run(data: &mut ProcessorData) -> Result<()> {
 
         if let Err(err) = state.process_ffi_item(ffi_item) {
             trace!("skipping ffi item: {:?}: {}", ffi_item, err);
-            print_trace(err, log::Level::Trace);
+            print_trace(&err, log::Level::Trace);
         }
     }
 
@@ -1335,7 +1335,7 @@ pub fn rust_generator_step() -> ProcessingStep {
     ProcessingStep::new("rust_generator", run)
 }
 
-pub fn clear_rust_info(data: &mut ProcessorData) -> Result<()> {
+pub fn clear_rust_info(data: &mut ProcessorData<'_>) -> Result<()> {
     data.current_database.rust_database.items.clear();
     for item in &mut data.current_database.cpp_items {
         item.is_rust_processed = false;
@@ -1370,8 +1370,9 @@ fn special_function_rust_name(function: &CppFfiFunction) -> Result<Option<String
         } => {
             let name = &field.path.last().name;
             let function_name = match accessor_type {
-                CppFieldAccessorType::CopyGetter => name.to_string(),
-                CppFieldAccessorType::ConstRefGetter => name.to_string(),
+                CppFieldAccessorType::CopyGetter | CppFieldAccessorType::ConstRefGetter => {
+                    name.to_string()
+                }
                 CppFieldAccessorType::MutRefGetter => format!("{}_mut", name),
                 CppFieldAccessorType::Setter => format!("set_{}", name),
             };

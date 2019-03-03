@@ -33,7 +33,7 @@ use std::iter::once;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-fn entity_log_representation(entity: Entity) -> String {
+fn entity_log_representation(entity: Entity<'_>) -> String {
     format!("{}; {:?}", get_full_name_display(entity), entity)
 }
 
@@ -71,7 +71,7 @@ struct CppParser<'b, 'a: 'b> {
 
 /// Print representation of `entity` and its children to the log.
 /// `level` is current level of recursion.
-fn dump_entity(entity: Entity, level: usize) {
+fn dump_entity(entity: Entity<'_>, level: usize) {
     trace!(
         "[DebugParser] {}{:?}",
         (0..level).map(|_| ". ").join(""),
@@ -85,7 +85,7 @@ fn dump_entity(entity: Entity, level: usize) {
 }
 
 /// Extract `clang`'s location information for `entity` to `CppOriginLocation`.
-fn get_origin_location(entity: Entity) -> Result<CppOriginLocation> {
+fn get_origin_location(entity: Entity<'_>) -> Result<CppOriginLocation> {
     match entity.get_location() {
         Some(loc) => {
             let location = loc.get_presumed_location();
@@ -100,16 +100,19 @@ fn get_origin_location(entity: Entity) -> Result<CppOriginLocation> {
 }
 
 /// Extract template argument declarations from a class or method definition `entity`.
-fn get_template_arguments(entity: Entity) -> Option<Vec<CppType>> {
+fn get_template_arguments(entity: Entity<'_>) -> Option<Vec<CppType>> {
     let mut nested_level = 0;
     if let Some(parent) = entity.get_semantic_parent() {
         if let Some(args) = get_template_arguments(parent) {
-            let parent_nested_level =
-                if let CppType::TemplateParameter { nested_level, .. } = args[0] {
-                    nested_level
-                } else {
-                    panic!("this value should always be a template parameter")
-                };
+            let parent_nested_level = if let CppType::TemplateParameter {
+                nested_level: level,
+                ..
+            } = args[0]
+            {
+                level
+            } else {
+                panic!("this value should always be a template parameter")
+            };
 
             nested_level = parent_nested_level + 1;
         }
@@ -132,7 +135,7 @@ fn get_template_arguments(entity: Entity) -> Option<Vec<CppType>> {
     }
 }
 
-fn get_path_item(entity: Entity) -> Result<CppPathItem> {
+fn get_path_item(entity: Entity<'_>) -> Result<CppPathItem> {
     let name = entity.get_name().ok_or_else(|| err_msg("Anonymous type"))?;
     let template_arguments = get_template_arguments(entity);
     Ok(CppPathItem {
@@ -142,7 +145,7 @@ fn get_path_item(entity: Entity) -> Result<CppPathItem> {
 }
 
 /// Returns fully qualified name of `entity`.
-fn get_full_name(entity: Entity) -> Result<CppPath> {
+fn get_full_name(entity: Entity<'_>) -> Result<CppPath> {
     let mut current_entity = entity;
     let mut parts = vec![get_path_item(entity)?];
     loop {
@@ -170,7 +173,7 @@ fn get_full_name(entity: Entity) -> Result<CppPath> {
     Ok(CppPath::from_items(parts))
 }
 
-fn get_full_name_display(entity: Entity) -> String {
+fn get_full_name_display(entity: Entity<'_>) -> String {
     match get_full_name(entity) {
         Ok(name) => name.to_cpp_pseudo_code(),
         Err(_) => "[unnamed]".into(),
@@ -199,7 +202,7 @@ fn init_clang() -> Result<Clang> {
 /// If `cpp_code` is specified, it's written to the C++ file before parsing it.
 /// If successful, calls `f` and passes the topmost entity (the translation unit)
 /// as its argument. Returns output value of `f` or an error.
-fn run_clang<R, F: FnMut(Entity) -> Result<R>>(
+fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
     config: &Config,
     tmp_path: &Path,
     cpp_code: Option<String>,
@@ -262,7 +265,7 @@ fn run_clang<R, F: FnMut(Entity) -> Result<R>>(
                 trace!("[DebugParser] {}", diag);
             }
         }
-        let should_print_error = |d: &Diagnostic| {
+        let should_print_error = |d: &Diagnostic<'_>| {
             d.get_severity() == Severity::Error || d.get_severity() == Severity::Fatal
         };
         if diagnostics.iter().any(should_print_error) {
@@ -277,7 +280,7 @@ fn run_clang<R, F: FnMut(Entity) -> Result<R>>(
     result
 }
 
-fn add_namespaces(data: &mut ProcessorData) -> Result<()> {
+fn add_namespaces(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut namespaces = HashSet::new();
     for item in &data.current_database.cpp_items {
         let name = match &item.cpp_data {
@@ -311,7 +314,7 @@ fn add_namespaces(data: &mut ProcessorData) -> Result<()> {
 }
 
 /// Runs the parser on specified data.
-fn run(data: &mut ProcessorData) -> Result<()> {
+fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     debug!("clang version: {}", get_version());
     debug!("Initializing clang...");
     let mut parser = CppParser { data };
@@ -361,10 +364,10 @@ impl CppParser<'_, '_> {
     #[allow(clippy::cyclomatic_complexity)]
     fn parse_unexposed_type(
         &self,
-        type1: Option<Type>,
+        type1: Option<Type<'_>>,
         string: Option<String>,
-        context_class: Option<Entity>,
-        context_method: Option<Entity>,
+        context_class: Option<Entity<'_>>,
+        context_method: Option<Entity<'_>>,
     ) -> Result<CppType> {
         let template_class_regex = Regex::new(r"^([\w:]+)<(.+)>$")?;
         let (is_const, name) = if let Some(type1) = type1 {
@@ -563,9 +566,9 @@ impl CppParser<'_, '_> {
     /// method may be specified in `context_class` and `context_method`.
     fn parse_type(
         &self,
-        type1: Type,
-        context_class: Option<Entity>,
-        context_method: Option<Entity>,
+        type1: Type<'_>,
+        context_class: Option<Entity<'_>>,
+        context_method: Option<Entity<'_>>,
     ) -> Result<CppType> {
         if type1.is_volatile_qualified() {
             bail!("Volatile type");
@@ -860,7 +863,7 @@ impl CppParser<'_, '_> {
 
     /// Parses a function `entity`.
     #[allow(clippy::cyclomatic_complexity)]
-    fn parse_function(&self, entity: Entity) -> Result<(CppFunction, DatabaseItemSource)> {
+    fn parse_function(&self, entity: Entity<'_>) -> Result<(CppFunction, DatabaseItemSource)> {
         let (class_name, class_entity) = match entity.get_semantic_parent() {
             Some(p) => match p.get_kind() {
                 EntityKind::ClassDecl | EntityKind::ClassTemplate | EntityKind::StructDecl => {
@@ -1153,7 +1156,7 @@ impl CppParser<'_, '_> {
     }
 
     /// Parses an enum `entity`.
-    fn parse_enum(&mut self, entity: Entity) -> Result<()> {
+    fn parse_enum(&mut self, entity: Entity<'_>) -> Result<()> {
         let include_file = self.entity_include_file(entity).with_context(|_| {
             format!(
                 "Origin of type is unknown: {}; entity: {:?}",
@@ -1199,7 +1202,7 @@ impl CppParser<'_, '_> {
     }
 
     /// Parses a class field `entity`.
-    fn parse_class_field(&mut self, entity: Entity, class_type: &CppPath) -> Result<()> {
+    fn parse_class_field(&mut self, entity: Entity<'_>, class_type: &CppPath) -> Result<()> {
         let include_file = self.entity_include_file(entity).with_context(|_| {
             format!(
                 "Origin of class field is unknown: {}; entity: {:?}",
@@ -1244,7 +1247,7 @@ impl CppParser<'_, '_> {
     }
 
     /// Parses a class or a struct `entity`.
-    fn parse_class(&mut self, entity: Entity) -> Result<()> {
+    fn parse_class(&mut self, entity: Entity<'_>) -> Result<()> {
         let include_file = self.entity_include_file(entity).with_context(|_| {
             format!(
                 "Origin of type is unknown: {}; entity: {:?}",
@@ -1339,7 +1342,7 @@ impl CppParser<'_, '_> {
     }
 
     /// Determines file path of the include file this `entity` is located in.
-    fn entity_include_path(&self, entity: Entity) -> Result<String> {
+    fn entity_include_path(&self, entity: Entity<'_>) -> Result<String> {
         if let Some(location) = entity.get_location() {
             let file_path = location.get_presumed_location().0;
             if file_path.is_empty() {
@@ -1353,7 +1356,7 @@ impl CppParser<'_, '_> {
     }
 
     /// Determines file name of the include file this `entity` is located in.
-    fn entity_include_file(&self, entity: Entity) -> Result<String> {
+    fn entity_include_file(&self, entity: Entity<'_>) -> Result<String> {
         let file_path_buf = PathBuf::from(self.entity_include_path(entity)?);
         let file_name = file_path_buf
             .file_name()
@@ -1362,7 +1365,7 @@ impl CppParser<'_, '_> {
     }
 
     /// Returns false if this `entity` was blacklisted in some way.
-    fn should_process_entity(&self, entity: Entity) -> bool {
+    fn should_process_entity(&self, entity: Entity<'_>) -> bool {
         if entity.get_kind() == EntityKind::TranslationUnit {
             return true;
         }
@@ -1399,7 +1402,7 @@ impl CppParser<'_, '_> {
 
     /// Parses type declarations in translation unit `entity`
     /// and saves them to `self`.
-    fn parse_types(&mut self, entity: Entity) -> Result<()> {
+    fn parse_types(&mut self, entity: Entity<'_>) -> Result<()> {
         if !self.should_process_entity(entity) {
             return Ok(());
         }
@@ -1454,7 +1457,7 @@ impl CppParser<'_, '_> {
     }
 
     /// Parses methods in translation unit `entity`.
-    fn parse_functions(&mut self, entity: Entity) -> Result<()> {
+    fn parse_functions(&mut self, entity: Entity<'_>) -> Result<()> {
         if !self.should_process_entity(entity) {
             return Ok(());
         }

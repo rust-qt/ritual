@@ -54,8 +54,8 @@ pub struct CppBuildConfigData {
 
 impl CppBuildConfigData {
     /// Constructs an empty object.
-    pub fn new() -> CppBuildConfigData {
-        CppBuildConfigData::default()
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Adds a library for linking. Used as `-l` option to the linker.
@@ -129,8 +129,8 @@ impl CppBuildConfigData {
 
 impl CppBuildConfig {
     /// Create an empty configuration
-    pub fn new() -> CppBuildConfig {
-        CppBuildConfig::default()
+    pub fn new() -> Self {
+        Self::default()
     }
     /// Add `data` with `condition`.
     pub fn add(&mut self, condition: Condition, data: CppBuildConfigData) {
@@ -174,8 +174,8 @@ pub struct CppBuildPaths {
 
 impl CppBuildPaths {
     /// Constructs an empty configuration object.
-    pub fn new() -> CppBuildPaths {
-        CppBuildPaths::default()
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Adds `path` to a lib directory.

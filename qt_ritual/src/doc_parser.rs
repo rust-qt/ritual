@@ -68,7 +68,7 @@ struct DocForType {
 
 impl DocParser {
     /// Creates new parser with `data`.
-    pub fn new(data: DocData) -> DocParser {
+    pub fn new(data: DocData) -> Self {
         DocParser {
             doc_data: data,
             file_data: HashMap::new(),
@@ -364,17 +364,6 @@ fn arguments_from_declaration(declaration: &str) -> Option<Vec<&str>> {
 
 /// Returns true if argument types in two declarations are equal.
 fn are_argument_types_equal(declaration1: &str, declaration2: &str) -> bool {
-    let args1 = match arguments_from_declaration(declaration1) {
-        Some(r) => r,
-        None => return false,
-    };
-    let args2 = match arguments_from_declaration(declaration2) {
-        Some(r) => r,
-        None => return false,
-    };
-    if args1.len() != args2.len() {
-        return false;
-    }
     fn arg_prepare(arg: &str) -> &str {
         let arg1 = arg.trim();
         match arg1.find('=') {
@@ -389,6 +378,19 @@ fn are_argument_types_equal(declaration1: &str, declaration2: &str) -> bool {
             None => arg,
         }
     }
+
+    let args1 = match arguments_from_declaration(declaration1) {
+        Some(r) => r,
+        None => return false,
+    };
+    let args2 = match arguments_from_declaration(declaration2) {
+        Some(r) => r,
+        None => return false,
+    };
+    if args1.len() != args2.len() {
+        return false;
+    }
+
     for i in 0..args1.len() {
         let arg1 = arg_prepare(args1[i]);
         let arg2 = arg_prepare(args2[i]);
@@ -439,7 +441,7 @@ fn process_html(html: &str, base_url: &str) -> Result<(String, HashSet<String>)>
     let link_regex = Regex::new("(href|src)=\"([^\"]*)\"").with_context(|_| "invalid regex")?;
     let mut cross_references = HashSet::new();
     let html = link_regex
-        .replace_all(html.trim(), |captures: &::regex::Captures| {
+        .replace_all(html.trim(), |captures: &::regex::Captures<'_>| {
             let mut link = bad_subfolder_regex.replace(&captures[2], "").to_string();
             if !link.contains(':') {
                 link = format!("{}{}", base_url, link);
@@ -497,7 +499,7 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
             }
             if node.as_comment().is_none() {
                 let value_list_condition = And(Name("table"), Class("valuelist"));
-                let mut parse_enum_variants = |value_list: Node| {
+                let mut parse_enum_variants = |value_list: Node<'_>| {
                     for tr in value_list.find(Name("tr")) {
                         let td_r = tr.find(Name("td"));
                         let tds = td_r.collect_vec();
@@ -587,7 +589,11 @@ fn find_methods_docs(items: &mut [CppDatabaseItem], data: &mut DocParser) -> Res
     Ok(())
 }
 
-pub fn parse_docs(data: &mut ProcessorData, qt_crate_name: &str, docs_path: &Path) -> Result<()> {
+pub fn parse_docs(
+    data: &mut ProcessorData<'_>,
+    qt_crate_name: &str,
+    docs_path: &Path,
+) -> Result<()> {
     // TODO: only run on new database items?
     let doc_data = match DocData::new(&qt_crate_name, &docs_path) {
         Ok(doc_data) => doc_data,

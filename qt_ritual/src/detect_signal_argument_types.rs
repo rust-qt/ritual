@@ -5,7 +5,7 @@ use ritual::processor::ProcessorData;
 use ritual_common::errors::Result;
 use std::collections::HashSet;
 
-pub fn detect_signal_argument_types(data: &mut ProcessorData) -> Result<HashSet<Vec<CppType>>> {
+pub fn detect_signal_argument_types(data: &mut ProcessorData<'_>) -> Result<HashSet<Vec<CppType>>> {
     let mut all_types = HashSet::new();
     for method in data
         .current_database

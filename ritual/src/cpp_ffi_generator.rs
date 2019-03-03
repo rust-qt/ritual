@@ -29,7 +29,7 @@ pub struct FfiNameProvider {
 }
 
 impl FfiNameProvider {
-    pub fn new(data: &ProcessorData) -> Self {
+    pub fn new(data: &ProcessorData<'_>) -> Self {
         let prefix = format!("ctr_{}_ffi", &data.config.crate_properties().name());
         let names = data
             .current_database
@@ -69,7 +69,7 @@ impl FfiNameProvider {
 }
 
 /// Runs the FFI generator
-fn run(data: &mut ProcessorData) -> Result<()> {
+fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let movable_types = data
         .all_items()
         .filter_map(|item| {
@@ -171,7 +171,7 @@ fn create_cast_method(
     };
     // no need for movable_types since all cast methods operate on pointers
     let r = to_ffi_method(
-        CppFfiFunctionKind::Function {
+        &CppFfiFunctionKind::Function {
             cpp_function: method.clone(),
             omitted_arguments: None,
             cast: Some(cast),
@@ -254,7 +254,7 @@ fn generate_ffi_methods_for_method(
 ) -> Result<Vec<CppFfiItem>> {
     let mut methods = Vec::new();
     methods.push(CppFfiItem::from_function(to_ffi_method(
-        CppFfiFunctionKind::Function {
+        &CppFfiFunctionKind::Function {
             cpp_function: method.clone(),
             omitted_arguments: None,
             cast: None,
@@ -271,7 +271,7 @@ fn generate_ffi_methods_for_method(
                     break;
                 }
                 let processed_method = to_ffi_method(
-                    CppFfiFunctionKind::Function {
+                    &CppFfiFunctionKind::Function {
                         cpp_function: method_copy.clone(),
                         omitted_arguments: Some(
                             method.arguments.len() - method_copy.arguments.len(),
@@ -295,7 +295,7 @@ fn generate_ffi_methods_for_method(
 /// - adds "output" argument for return value if
 ///   the return value is stack-allocated.
 pub fn to_ffi_method(
-    kind: CppFfiFunctionKind,
+    kind: &CppFfiFunctionKind,
     movable_types: &[CppPath],
     name_provider: &mut FfiNameProvider,
 ) -> Result<CppFfiFunction> {
@@ -307,8 +307,9 @@ pub fn to_ffi_method(
         } => {
             let field_caption = field.path.ascii_caption();
             match *accessor_type {
-                CppFieldAccessorType::CopyGetter => field_caption,
-                CppFieldAccessorType::ConstRefGetter => field_caption,
+                CppFieldAccessorType::CopyGetter | CppFieldAccessorType::ConstRefGetter => {
+                    field_caption
+                }
                 CppFieldAccessorType::MutRefGetter => format!("{}_mut", field_caption),
                 CppFieldAccessorType::Setter => format!("set_{}", field_caption),
             }
@@ -459,7 +460,7 @@ fn generate_field_accessors(
             field: field.clone(),
             accessor_type,
         };
-        let ffi_function = to_ffi_method(kind, movable_types, name_provider)?;
+        let ffi_function = to_ffi_method(&kind, movable_types, name_provider)?;
         Ok(CppFfiItem::from_function(ffi_function))
     };
 

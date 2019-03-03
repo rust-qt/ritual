@@ -175,7 +175,7 @@ fn argument_types_equal8() {
 fn to_ffi(function: &CppFunction, force_stack: Option<CppPath>) -> CppFfiFunction {
     let movable_types = force_stack.into_iter().collect_vec();
     crate::cpp_ffi_generator::to_ffi_method(
-        CppFfiFunctionKind::Function {
+        &CppFfiFunctionKind::Function {
             cpp_function: function.clone(),
             omitted_arguments: None,
             cast: None,

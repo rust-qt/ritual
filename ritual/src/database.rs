@@ -30,8 +30,7 @@ impl CppCheckerEnv {
             "{}/{:?}-{:?}-{:?}-{:?}",
             self.cpp_library_version
                 .as_ref()
-                .map(|s| s.as_str())
-                .unwrap_or("None"),
+                .map_or("None", |s| s.as_str()),
             self.target.arch,
             self.target.os,
             self.target.family,
@@ -244,7 +243,7 @@ impl CppItemData {
 }
 
 impl Display for CppItemData {
-    fn fmt(&self, f: &mut Formatter) -> ::std::result::Result<(), ::std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> ::std::result::Result<(), ::std::fmt::Error> {
         let s = match self {
             CppItemData::Namespace(path) => format!("namespace {}", path.to_cpp_pseudo_code()),
             CppItemData::Type(type1) => match type1.kind {
@@ -312,7 +311,7 @@ impl CppFfiItem {
     pub fn from_function(function: CppFfiFunction) -> Self {
         CppFfiItem {
             kind: CppFfiItemKind::Function(function),
-            checks: Default::default(),
+            checks: CppChecks::default(),
             is_rust_processed: false,
         }
     }
@@ -320,7 +319,7 @@ impl CppFfiItem {
     pub fn from_qt_slot_wrapper(wrapper: QtSlotWrapper) -> Self {
         CppFfiItem {
             kind: CppFfiItemKind::QtSlotWrapper(wrapper),
-            checks: Default::default(),
+            checks: CppChecks::default(),
             is_rust_processed: false,
         }
     }
@@ -354,13 +353,13 @@ pub struct Database {
 }
 
 impl Database {
-    pub fn empty(crate_name: impl Into<String>) -> Database {
+    pub fn empty(crate_name: impl Into<String>) -> Self {
         Database {
             crate_name: crate_name.into(),
             crate_version: "0.0.0".into(),
             cpp_items: Vec::new(),
             ffi_items: Vec::new(),
-            rust_database: Default::default(),
+            rust_database: RustDatabase::default(),
             environments: Vec::new(),
         }
     }

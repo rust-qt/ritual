@@ -11,7 +11,7 @@ pub trait FancyUnwrap {
     fn fancy_unwrap(self) -> Self::Output;
 }
 
-pub fn print_trace(err: failure::Error, log_level: log::Level) {
+pub fn print_trace(err: &failure::Error, log_level: log::Level) {
     log!(log_level, "");
     log!(log_level, "Error:");
     for cause in err.iter_chain() {
@@ -48,7 +48,7 @@ impl<T> FancyUnwrap for Result<T> {
         match self {
             Ok(value) => value,
             Err(err) => {
-                print_trace(err, log::Level::Error);
+                print_trace(&err, log::Level::Error);
                 std::process::exit(1);
             }
         }
