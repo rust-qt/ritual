@@ -152,14 +152,14 @@ fn generate_crate_template(data: &mut ProcessorData<'_>) -> Result<()> {
                 );
                 for dep in data.dep_databases {
                     let relative_path =
-                        diff_paths(&data.workspace.crate_path(&dep.crate_name)?, &output_path)
+                        diff_paths(&data.workspace.crate_path(dep.crate_name())?, &output_path)
                             .ok_or_else(|| {
                                 err_msg("failed to get relative path to the dependency")
                             })?;
 
                     table.insert(
-                        dep.crate_name.clone(),
-                        dep_value(&dep.crate_version, Some(relative_path))?,
+                        dep.crate_name().to_string(),
+                        dep_value(&dep.crate_version(), Some(relative_path))?,
                     );
                 }
             }
@@ -291,21 +291,21 @@ fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     )?;
 
     cpp_code_generator::generate_cpp_file(
-        &data.current_database.ffi_items,
+        data.current_database.ffi_items(),
         &c_lib_path.join("file1.cpp"),
         &global_header_name,
     )?;
 
     let file = create_file(c_lib_path.join("sized_types.cxx"))?;
     generate_cpp_type_size_requester(
-        &data.current_database.rust_database,
+        data.current_database.rust_database(),
         data.config.include_directives(),
         file,
     )?;
 
     rust_code_generator::generate(
         data.config.crate_properties().name(),
-        &data.current_database.rust_database,
+        data.current_database.rust_database(),
         &output_path.join("src"),
         data.config.crate_template_path().map(|s| s.join("src")),
     )?;

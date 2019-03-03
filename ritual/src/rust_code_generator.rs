@@ -881,7 +881,7 @@ pub fn generate(
     };
 
     let crate_root = database
-        .items
+        .items()
         .iter()
         .filter_map(|item| item.as_module_ref())
         .find(|module| module.kind == RustModuleKind::CrateRoot)

@@ -50,7 +50,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut files = HashSet::new();
 
     let qobject_path = CppPath::from_good_str("QObject");
-    for item in &data.current_database.cpp_items {
+    for item in data.current_database.cpp_items() {
         if let DatabaseItemSource::CppParser {
             origin_location, ..
         } = &item.source
@@ -104,7 +104,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData<'_>) -> Result<()> {
     }
 
     let mut sections_per_class = HashMap::new();
-    for item in &data.current_database.cpp_items {
+    for item in data.current_database.cpp_items() {
         if let DatabaseItemSource::CppParser {
             origin_location, ..
         } = &item.source
@@ -121,7 +121,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData<'_>) -> Result<()> {
         }
     }
 
-    for item in &mut data.current_database.cpp_items {
+    for item in data.current_database.cpp_items_mut() {
         if let DatabaseItemSource::CppParser {
             origin_location, ..
         } = &item.source

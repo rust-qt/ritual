@@ -33,7 +33,7 @@ impl FfiNameProvider {
         let prefix = format!("ctr_{}_ffi", &data.config.crate_properties().name());
         let names = data
             .current_database
-            .ffi_items
+            .ffi_items()
             .iter()
             .map(|f| f.path().to_cpp_code().unwrap())
             .collect();
@@ -86,7 +86,8 @@ fn run(data: &mut ProcessorData<'_>) -> Result<()> {
 
     let mut name_provider = FfiNameProvider::new(data);
 
-    for item in &mut data.current_database.cpp_items {
+    for index in 0..data.current_database.cpp_items().len() {
+        let item = &mut data.current_database.cpp_items_mut()[index];
         if item.is_cpp_ffi_processed {
             trace!(
                 "cpp_data = {}; already processed",
@@ -129,8 +130,8 @@ fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                 for item in &r {
                     trace!("* {:?}", item);
                 }
-                data.current_database.ffi_items.extend(r);
                 item.is_cpp_ffi_processed = true;
+                data.current_database.add_ffi_items(r);
             }
         }
     }

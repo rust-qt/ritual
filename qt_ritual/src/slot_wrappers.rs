@@ -63,7 +63,7 @@ pub fn add_slot_wrappers(data: &mut ProcessorData<'_>) -> Result<()> {
 
         let found = data
             .all_databases()
-            .flat_map(|db| &db.ffi_items)
+            .flat_map(|db| db.ffi_items())
             .any(|ffi_item| {
                 if let CppFfiItemKind::QtSlotWrapper(data) = &ffi_item.kind {
                     data.signal_arguments == arg_types
@@ -77,8 +77,7 @@ pub fn add_slot_wrappers(data: &mut ProcessorData<'_>) -> Result<()> {
             match generate_slot_wrapper(&arg_types, &mut name_provider) {
                 Ok(slot_wrapper) => {
                     data.current_database
-                        .ffi_items
-                        .push(CppFfiItem::from_qt_slot_wrapper(slot_wrapper));
+                        .add_ffi_item(CppFfiItem::from_qt_slot_wrapper(slot_wrapper));
                     trace!("adding slot wrapper for args: ({})", arg_types_text);
                 }
                 Err(err) => {

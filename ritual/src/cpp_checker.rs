@@ -235,18 +235,11 @@ impl CppChecker<'_, '_> {
     }
     fn run(&mut self) -> Result<()> {
         let env = self.env();
-        if !self
-            .data
-            .current_database
-            .environments
-            .iter()
-            .any(|e| e == &env)
-        {
-            self.data.current_database.environments.push(env.clone());
-        }
+        self.data.current_database.add_environment(env.clone());
 
         let mut snippets = Vec::new();
-        for (ffi_item_index, ffi_item) in self.data.current_database.ffi_items.iter().enumerate() {
+        for (ffi_item_index, ffi_item) in self.data.current_database.ffi_items().iter().enumerate()
+        {
             if ffi_item.checks.has_env(&env) {
                 continue;
             }
@@ -285,7 +278,7 @@ impl CppChecker<'_, '_> {
             .collect::<Result<_>>()?;
 
         for snippet in snippets {
-            let ffi_item = &mut self.data.current_database.ffi_items[snippet.ffi_item_index];
+            let ffi_item = &mut self.data.current_database.ffi_items_mut()[snippet.ffi_item_index];
             let output = snippet.output.unwrap();
             if output.is_success() {
                 debug!("success: {}", ffi_item.kind.short_text());

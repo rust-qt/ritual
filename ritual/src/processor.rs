@@ -73,7 +73,7 @@ impl<'a> ProcessorData<'a> {
     pub fn all_items(&self) -> impl Iterator<Item = &CppDatabaseItem> {
         once(&self.current_database as &_)
             .chain(self.dep_databases.iter())
-            .flat_map(|d| d.cpp_items.iter())
+            .flat_map(|d| d.cpp_items().iter())
     }
 }
 
@@ -178,10 +178,7 @@ mod steps {
 
     pub fn clear_ffi() -> ProcessingStep {
         ProcessingStep::new("clear_ffi", |data| {
-            data.current_database.ffi_items.clear();
-            for item in &mut data.current_database.cpp_items {
-                item.is_cpp_ffi_processed = false;
-            }
+            data.current_database.clear_ffi();
             Ok(())
         })
     }
@@ -254,12 +251,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
             .with_context(|_| "failed to load dependency")
     })?;
 
-    let mut current_database_saved = true;
-
-    if current_database.crate_version != config.crate_properties().version() {
-        current_database.crate_version = config.crate_properties().version().to_string();
-        current_database_saved = false;
-    }
+    current_database.set_crate_version(config.crate_properties().version().to_string());
 
     let mut steps_result = Ok(());
 
@@ -322,10 +314,6 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
                 config,
             };
 
-            if !step.is_const {
-                current_database_saved = false;
-            }
-
             let started_time = Instant::now();
 
             if let Err(err) = (step.function)(&mut data) {
@@ -343,14 +331,14 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
     }
 
     for database in dependent_cpp_crates {
-        workspace.put_crate(database, true);
+        workspace.put_crate(database);
     }
 
-    if !current_database_saved {
+    if current_database.is_modified() {
         info!("Saving data");
     }
 
-    workspace.put_crate(current_database, current_database_saved);
+    workspace.put_crate(current_database);
     workspace.save_data()?;
 
     steps_result

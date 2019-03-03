@@ -19,7 +19,7 @@ pub fn set_allocation_places_step() -> ProcessingStep {
 pub fn set_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
     for type1 in data
         .current_database
-        .cpp_items
+        .cpp_items_mut()
         .iter_mut()
         .filter_map(|item| item.cpp_data.as_type_mut())
     {
@@ -73,13 +73,13 @@ fn suggest_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut data_map = HashMap::new();
     for type1 in data
         .current_database
-        .cpp_items
+        .cpp_items()
         .iter()
         .filter_map(|i| i.cpp_data.as_type_ref())
     {
         if data
             .current_database
-            .cpp_items
+            .cpp_items()
             .iter()
             .filter_map(|i| i.cpp_data.as_function_ref())
             .any(|m| m.class_type().ok().as_ref() == Some(&type1.path) && m.is_virtual())
@@ -93,7 +93,7 @@ fn suggest_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
     }
     for method in data
         .current_database
-        .cpp_items
+        .cpp_items()
         .iter()
         .filter_map(|i| i.cpp_data.as_function_ref())
     {
@@ -111,7 +111,7 @@ fn suggest_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
 
     for type1 in data
         .current_database
-        .cpp_items
+        .cpp_items()
         .iter()
         .filter_map(|i| i.cpp_data.as_type_ref())
     {

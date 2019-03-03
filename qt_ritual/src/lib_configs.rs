@@ -591,7 +591,7 @@ pub fn create_config(crate_name: &str) -> Result<Config> {
         steps.add_after(
             &["cpp_parser"],
             ProcessingStep::new("qt_fix_header_names", move |data| {
-                fix_header_names(&mut data.current_database.cpp_items, &lib_include_path)
+                fix_header_names(data.current_database.cpp_items_mut(), &lib_include_path)
             }),
         )?;
 

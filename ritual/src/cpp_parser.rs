@@ -278,7 +278,7 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
 
 fn add_namespaces(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut namespaces = HashSet::new();
-    for item in &data.current_database.cpp_items {
+    for item in data.current_database.cpp_items() {
         let name = match &item.cpp_data {
             CppItemData::Type(t) => &t.path,
             CppItemData::Function(f) => &f.path,
@@ -296,7 +296,7 @@ fn add_namespaces(data: &mut ProcessorData<'_>) -> Result<()> {
             namespace_name = r;
         }
     }
-    for item in &data.current_database.cpp_items {
+    for item in data.current_database.cpp_items() {
         if let CppItemData::Type(t) = &item.cpp_data {
             namespaces.remove(&t.path);
         }
@@ -341,7 +341,7 @@ impl CppParser<'_, '_> {
         let databases =
             once(self.data.current_database as &_).chain(self.data.dep_databases.iter());
         for database in databases {
-            for item in database.items() {
+            for item in database.cpp_items() {
                 if let CppItemData::Type(info) = &item.cpp_data {
                     if f(info) {
                         return Some(info);

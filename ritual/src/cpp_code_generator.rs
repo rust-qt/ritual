@@ -344,7 +344,7 @@ pub fn generate_cpp_type_size_requester(
     }
     writeln!(output, "#include <stdio.h>\n\nint main() {{")?;
 
-    for item in &rust_database.items {
+    for item in rust_database.items() {
         if let RustItemKind::Struct(data) = &item.kind {
             if let RustStructKind::SizedType(cpp_path) = &data.kind {
                 let cpp_path_code = cpp_path.to_cpp_code()?;

@@ -746,13 +746,12 @@ impl State<'_, '_> {
     ) -> Result<impl Iterator<Item = &RustDatabaseItem>> {
         for db in self.0.all_databases() {
             if let Some(index) = db
-                .cpp_items
+                .cpp_items()
                 .iter()
                 .position(|cpp_item| cpp_item.cpp_data.path() == Some(cpp_path))
             {
                 return Ok(db
-                    .rust_database
-                    .items
+                    .rust_items()
                     .iter()
                     .filter(move |item| item.cpp_item_index == Some(index)));
             }
@@ -852,8 +851,7 @@ impl State<'_, '_> {
                 let ffi_module = self
                     .0
                     .current_database
-                    .rust_database
-                    .items
+                    .rust_items()
                     .iter()
                     .filter_map(|item| item.as_module_ref())
                     .find(|module| module.kind == RustModuleKind::Ffi)
@@ -867,8 +865,7 @@ impl State<'_, '_> {
                 let sized_module = self
                     .0
                     .current_database
-                    .rust_database
-                    .items
+                    .rust_items()
                     .iter()
                     .filter_map(|item| item.as_module_ref())
                     .find(|module| module.kind == RustModuleKind::SizedTypes)
@@ -923,7 +920,7 @@ impl State<'_, '_> {
             if self
                 .0
                 .current_database
-                .rust_database
+                .rust_database()
                 .find(&rust_path)
                 .is_some()
             {
@@ -943,7 +940,7 @@ impl State<'_, '_> {
             if self
                 .0
                 .current_database
-                .rust_database
+                .rust_database()
                 .find(&rust_path)
                 .is_none()
             {
@@ -1207,8 +1204,7 @@ impl State<'_, '_> {
         if !self
             .0
             .current_database
-            .rust_database
-            .items
+            .rust_items()
             .iter()
             .filter_map(|item| item.as_module_ref())
             .any(|module| module.kind == kind)
@@ -1225,7 +1221,7 @@ impl State<'_, '_> {
             if self
                 .0
                 .current_database
-                .rust_database
+                .rust_database()
                 .find(&rust_path)
                 .is_some()
             {
@@ -1245,7 +1241,7 @@ impl State<'_, '_> {
                 cpp_item_index: None,
                 ffi_item_index: None,
             };
-            self.0.current_database.rust_database.items.push(rust_item);
+            self.0.current_database.add_rust_item(rust_item);
         }
         Ok(())
     }
@@ -1258,12 +1254,14 @@ fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     state.generate_special_module(RustModuleKind::SizedTypes)?;
 
     loop {
-        let mut processed_cpp_indexes = Vec::new();
-        for (cpp_item_index, cpp_item) in state.0.current_database.cpp_items.iter().enumerate() {
+        let mut any_processed = false;
+        for cpp_item_index in 0..state.0.current_database.cpp_items().len() {
+            let cpp_item = &state.0.current_database.cpp_items()[cpp_item_index];
             if cpp_item.is_rust_processed {
                 continue;
             }
             if let Ok(rust_items) = state.process_cpp_item(cpp_item) {
+                let cpp_item_text = cpp_item.cpp_data.to_string();
                 for rust_item in rust_items {
                     let item = RustDatabaseItem {
                         kind: rust_item,
@@ -1273,25 +1271,23 @@ fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                     debug!(
                         "added rust item: {} (cpp item: {})",
                         item.kind.short_text(),
-                        cpp_item.cpp_data
+                        cpp_item_text
                     );
                     trace!("rust item data: {:?}", item);
-                    state.0.current_database.rust_database.items.push(item);
+                    state.0.current_database.add_rust_item(item);
                 }
-                processed_cpp_indexes.push(cpp_item_index);
+                state.0.current_database.cpp_items_mut()[cpp_item_index].is_rust_processed = true;
+                any_processed = true;
             }
         }
 
-        for &index in &processed_cpp_indexes {
-            state.0.current_database.cpp_items[index].is_rust_processed = true;
-        }
-
-        let mut processed_ffi_indexes = Vec::new();
-        for (ffi_item_index, ffi_item) in state.0.current_database.ffi_items.iter().enumerate() {
+        for ffi_item_index in 0..state.0.current_database.ffi_items().len() {
+            let ffi_item = &state.0.current_database.ffi_items()[ffi_item_index];
             if ffi_item.is_rust_processed {
                 continue;
             }
             if let Ok(rust_items) = state.process_ffi_item(ffi_item) {
+                let ffi_item_text = ffi_item.kind.short_text();
                 for rust_item in rust_items {
                     let item = RustDatabaseItem {
                         kind: rust_item,
@@ -1301,25 +1297,22 @@ fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                     debug!(
                         "added rust item: {} (ffi item: {})",
                         item.kind.short_text(),
-                        ffi_item.kind.short_text()
+                        ffi_item_text
                     );
                     trace!("rust item data: {:?}", item);
-                    state.0.current_database.rust_database.items.push(item);
+                    state.0.current_database.add_rust_item(item);
                 }
-                processed_ffi_indexes.push(ffi_item_index);
+                state.0.current_database.ffi_items_mut()[ffi_item_index].is_rust_processed = true;
+                any_processed = true;
             }
         }
 
-        for &index in &processed_ffi_indexes {
-            state.0.current_database.ffi_items[index].is_rust_processed = true;
-        }
-
-        if processed_cpp_indexes.is_empty() && processed_ffi_indexes.is_empty() {
+        if !any_processed {
             break;
         }
     }
 
-    for cpp_item in &state.0.current_database.cpp_items {
+    for cpp_item in state.0.current_database.cpp_items() {
         if cpp_item.is_rust_processed {
             continue;
         }
@@ -1333,7 +1326,7 @@ fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         }
     }
 
-    for ffi_item in &state.0.current_database.ffi_items {
+    for ffi_item in state.0.current_database.ffi_items() {
         if ffi_item.is_rust_processed {
             continue;
         }
@@ -1356,13 +1349,7 @@ pub fn rust_generator_step() -> ProcessingStep {
 }
 
 pub fn clear_rust_info(data: &mut ProcessorData<'_>) -> Result<()> {
-    data.current_database.rust_database.items.clear();
-    for item in &mut data.current_database.cpp_items {
-        item.is_rust_processed = false;
-    }
-    for item in &mut data.current_database.ffi_items {
-        item.is_rust_processed = false;
-    }
+    data.current_database.clear_rust_info();
     Ok(())
 }
 

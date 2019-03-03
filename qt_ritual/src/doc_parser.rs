@@ -603,9 +603,9 @@ pub fn parse_docs(
         }
     };
     let mut parser = DocParser::new(doc_data);
-    find_methods_docs(&mut data.current_database.cpp_items, &mut parser)?;
+    find_methods_docs(data.current_database.cpp_items_mut(), &mut parser)?;
     let mut type_doc_cache = HashMap::new();
-    for item in &mut data.current_database.cpp_items {
+    for item in data.current_database.cpp_items_mut() {
         let type_name = match &item.cpp_data {
             CppItemData::Type(data) => data.path.clone(),
             CppItemData::EnumValue(data) => data

@@ -567,7 +567,7 @@ impl RustDatabaseItem {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RustDatabase {
-    pub items: Vec<RustDatabaseItem>,
+    items: Vec<RustDatabaseItem>,
 }
 
 impl RustDatabase {
@@ -580,6 +580,18 @@ impl RustDatabase {
         path: &'a RustPath,
     ) -> impl Iterator<Item = &'a RustDatabaseItem> {
         self.items.iter().filter(move |item| item.is_child_of(path))
+    }
+
+    pub fn items(&self) -> &[RustDatabaseItem] {
+        &self.items
+    }
+
+    pub fn add_item(&mut self, item: RustDatabaseItem) {
+        self.items.push(item);
+    }
+
+    pub fn clear(&mut self) {
+        self.items.clear();
     }
 }
 

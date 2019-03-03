@@ -119,7 +119,7 @@ fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
                 if template_arguments.iter().all(|x| x.is_template_parameter()) {
                     for type1 in data
                         .current_database
-                        .cpp_items
+                        .cpp_items()
                         .iter()
                         .filter_map(|item| item.cpp_data.as_type_ref())
                     {
@@ -224,7 +224,7 @@ fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> {
         }
     }
     let mut result = Vec::new();
-    for item in &data.current_database.cpp_items {
+    for item in data.current_database.cpp_items() {
         for type1 in item.cpp_data.all_involved_types() {
             check_type(&type1, &data, &mut result);
         }

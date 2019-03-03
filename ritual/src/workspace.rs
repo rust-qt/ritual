@@ -16,12 +16,6 @@ pub struct WorkspaceConfig {
     pub write_dependencies_local_paths: bool,
 }
 
-#[derive(Debug)]
-struct EditedDatabase {
-    database: Database,
-    saved: bool,
-}
-
 /// Provides access to data stored in the user's project directory.
 /// The directory contains a subdirectory for each crate the user wants
 /// to process. When running any operations, the data is read from and
@@ -31,7 +25,7 @@ struct EditedDatabase {
 pub struct Workspace {
     path: PathBuf,
     config: WorkspaceConfig,
-    databases: Vec<EditedDatabase>,
+    databases: Vec<Database>,
 }
 
 fn config_path(path: &Path) -> PathBuf {
@@ -99,8 +93,8 @@ impl Workspace {
     fn take_loaded_crate(&mut self, crate_name: &str) -> Option<Database> {
         self.databases
             .iter()
-            .position(|d| d.database.crate_name() == crate_name)
-            .and_then(|i| Some(self.databases.swap_remove(i).database))
+            .position(|d| d.crate_name() == crate_name)
+            .and_then(|i| Some(self.databases.swap_remove(i)))
     }
     /*
     pub fn crate_exists(&self, crate_name: &str) -> bool {
@@ -114,8 +108,7 @@ impl Workspace {
     }*/
 
     pub fn delete_database_if_exists(&mut self, crate_name: &str) -> Result<()> {
-        self.databases
-            .retain(|d| d.database.crate_name != crate_name);
+        self.databases.retain(|d| d.crate_name() != crate_name);
         let path = database_path(&self.path, crate_name);
         if path.exists() {
             remove_file(path)?;
@@ -144,8 +137,8 @@ impl Workspace {
         }
     }
 
-    pub fn put_crate(&mut self, database: Database, saved: bool) {
-        self.databases.push(EditedDatabase { database, saved });
+    pub fn put_crate(&mut self, database: Database) {
+        self.databases.push(database);
     }
 
     pub fn set_write_dependencies_local_paths(&mut self, value: bool) -> Result<()> {
@@ -161,16 +154,12 @@ impl Workspace {
     }
 
     pub fn save_data(&mut self) -> Result<()> {
-        //log::status("test1: save data start!");
         for database in &mut self.databases {
-            if !database.saved {
-                //log::status("test1: save data - saving crate");
-                let data = &database.database;
-                save_json(database_path(&self.path, data.crate_name()), &data)?;
-                database.saved = true;
+            if database.is_modified() {
+                save_json(database_path(&self.path, database.crate_name()), &database)?;
+                database.set_saved();
             }
         }
-        //log::status("test1: save data success!");
         Ok(())
     }
 
