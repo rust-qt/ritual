@@ -451,6 +451,7 @@ fn moqt_core_config(config: &mut Config) -> Result<()> {
         CppPath::from_good_str("QPoint"),
         CppPath::from_good_str("QMetaObject::Connection"),
     ]);
+    // TODO: blacklist QFlags<T>
     Ok(())
 }
 

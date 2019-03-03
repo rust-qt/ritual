@@ -33,10 +33,6 @@ use std::iter::once;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-fn entity_log_representation(entity: Entity<'_>) -> String {
-    format!("{}; {:?}", get_full_name_display(entity), entity)
-}
-
 fn convert_type_kind(kind: TypeKind) -> CppBuiltInNumericType {
     match kind {
         TypeKind::Bool => CppBuiltInNumericType::Bool,
@@ -308,7 +304,7 @@ fn add_namespaces(data: &mut ProcessorData<'_>) -> Result<()> {
     for name in namespaces {
         let item = CppItemData::Namespace(name);
         data.current_database
-            .add_cpp_data(DatabaseItemSource::NamespaceInfering, item);
+            .add_cpp_item(DatabaseItemSource::NamespaceInfering, item);
     }
     Ok(())
 }
@@ -316,7 +312,7 @@ fn add_namespaces(data: &mut ProcessorData<'_>) -> Result<()> {
 /// Runs the parser on specified data.
 fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     debug!("clang version: {}", get_version());
-    debug!("Initializing clang...");
+    debug!("Initializing clang");
     let mut parser = CppParser { data };
     run_clang(
         &parser.data.config,
@@ -1165,7 +1161,7 @@ impl CppParser<'_, '_> {
             )
         })?;
         let enum_name = get_full_name(entity)?;
-        self.data.current_database.add_cpp_data(
+        self.data.current_database.add_cpp_item(
             DatabaseItemSource::CppParser {
                 include_file: include_file.clone(),
                 origin_location: get_origin_location(entity)?,
@@ -1185,7 +1181,7 @@ impl CppParser<'_, '_> {
                 let value_name = child
                     .get_name()
                     .ok_or_else(|| err_msg("failed to get name of enum variant"))?;
-                self.data.current_database.add_cpp_data(
+                self.data.current_database.add_cpp_item(
                     DatabaseItemSource::CppParser {
                         include_file: include_file.clone(),
                         origin_location: get_origin_location(child)?,
@@ -1203,13 +1199,9 @@ impl CppParser<'_, '_> {
 
     /// Parses a class field `entity`.
     fn parse_class_field(&mut self, entity: Entity<'_>, class_type: &CppPath) -> Result<()> {
-        let include_file = self.entity_include_file(entity).with_context(|_| {
-            format!(
-                "Origin of class field is unknown: {}; entity: {:?}",
-                get_full_name_display(entity),
-                entity
-            )
-        })?;
+        let include_file = self
+            .entity_include_file(entity)
+            .with_context(|_| err_msg("Origin of class field is unknown"))?;
         let field_name = entity
             .get_name()
             .ok_or_else(|| err_msg("failed to get field name"))?;
@@ -1218,14 +1210,8 @@ impl CppParser<'_, '_> {
             .ok_or_else(|| err_msg("failed to get field type"))?;
         let field_type = self
             .parse_type(field_clang_type, Some(entity), None)
-            .with_context(|_| {
-                format!(
-                    "failed to parse field type: {}::{}",
-                    entity_log_representation(entity),
-                    field_name
-                )
-            })?;
-        self.data.current_database.add_cpp_data(
+            .with_context(|_| err_msg("failed to parse field type"))?;
+        self.data.current_database.add_cpp_item(
             DatabaseItemSource::CppParser {
                 include_file,
                 origin_location: get_origin_location(entity)?,
@@ -1268,10 +1254,7 @@ impl CppParser<'_, '_> {
 
             if template_arguments.is_none() {
                 dump_entity(entity, 0);
-                bail!(
-                    "missing template arguments for {}",
-                    entity_log_representation(entity)
-                );
+                bail!("missing template arguments");
             }
         } else if template_arguments.is_some() {
             bail!("unexpected template arguments");
@@ -1286,11 +1269,12 @@ impl CppParser<'_, '_> {
             if child.get_kind() == EntityKind::FieldDecl || child.get_kind() == EntityKind::VarDecl
             {
                 if let Err(err) = self.parse_class_field(child, &full_name) {
-                    trace!(
-                        "cpp_parser_error; entity = {}; failed to parse class field: {}",
-                        entity_log_representation(child),
+                    debug!(
+                        "failed to parse class field: {}: {}",
+                        get_full_name_display(child),
                         err
                     );
+                    trace!("entity: {:?}", entity);
                 }
             }
             if child.get_kind() == EntityKind::BaseSpecifier {
@@ -1298,7 +1282,7 @@ impl CppParser<'_, '_> {
                     .parse_type(child.get_type().unwrap(), Some(entity), None)
                     .with_context(|_| "Can't parse base class type")?;
                 if let CppType::Class(base_type) = &base_type {
-                    self.data.current_database.add_cpp_data(
+                    self.data.current_database.add_cpp_item(
                         DatabaseItemSource::CppParser {
                             include_file: include_file.clone(),
                             origin_location: get_origin_location(entity).unwrap(),
@@ -1327,7 +1311,7 @@ impl CppParser<'_, '_> {
                 bail!("Non-type template parameter is not supported");
             }
         }
-        self.data.current_database.add_cpp_data(
+        self.data.current_database.add_cpp_item(
             DatabaseItemSource::CppParser {
                 include_file,
                 origin_location: get_origin_location(entity).unwrap(),
@@ -1413,11 +1397,12 @@ impl CppParser<'_, '_> {
                 }
                 if entity.get_name().is_some() && entity.is_definition() {
                     if let Err(error) = self.parse_enum(entity) {
-                        trace!(
-                            "cpp_parser_error; entity = {}; failed to parse enum: {}",
-                            entity_log_representation(entity),
+                        debug!(
+                            "failed to parse enum: {}: {}",
+                            get_full_name_display(entity),
                             error
                         );
+                        trace!("entity: {:?}", entity);
                     }
                 }
             }
@@ -1426,15 +1411,16 @@ impl CppParser<'_, '_> {
                     return Ok(()); // skipping private stuff
                 }
                 let ok = entity.get_name().is_some() && // not an anonymous struct
-        entity.is_definition() && // not a forward declaration
-        entity.get_template().is_none(); // not a template specialization
+                    entity.is_definition() && // not a forward declaration
+                    entity.get_template().is_none(); // not a template specialization
                 if ok {
                     if let Err(error) = self.parse_class(entity) {
-                        trace!(
-                            "cpp_parser_error; entity = {}; failed to parse class: {}",
-                            entity_log_representation(entity),
+                        debug!(
+                            "failed to parse class: {}: {}",
+                            get_full_name_display(entity),
                             error
                         );
+                        trace!("entity: {:?}", entity);
                     }
                 }
             }
@@ -1473,14 +1459,15 @@ impl CppParser<'_, '_> {
                         Ok((r, info)) => {
                             self.data
                                 .current_database
-                                .add_cpp_data(info, CppItemData::Function(r));
+                                .add_cpp_item(info, CppItemData::Function(r));
                         }
                         Err(error) => {
-                            trace!(
-                                "cpp_parser_error; entity = {}; failed to parse class: {}",
-                                entity_log_representation(entity),
+                            debug!(
+                                "failed to parse function: {}: {}",
+                                get_full_name_display(entity),
                                 error
                             );
+                            trace!("entity: {:?}", entity);
                         }
                     }
                 }
@@ -1500,9 +1487,10 @@ impl CppParser<'_, '_> {
                                     .any(|x| !x.is_template_parameter())
                                 {
                                     trace!(
-                                        "cpp_parser_skip; entity = {}; skipping template partial specialization",
-                                        entity_log_representation(entity)
+                                        "skipping template partial specialization: {}",
+                                        get_full_name_display(entity),
                                     );
+                                    trace!("entity: {:?}", entity);
                                     return Ok(());
                                 }
                             }

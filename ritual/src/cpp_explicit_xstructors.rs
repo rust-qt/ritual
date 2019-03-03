@@ -89,7 +89,7 @@ fn add_explicit_xstructors(data: &mut ProcessorData<'_>) -> Result<()> {
         }
     }
     for method in methods {
-        data.current_database.add_cpp_data(
+        data.current_database.add_cpp_item(
             DatabaseItemSource::ImplicitDestructor,
             CppItemData::Function(method),
         );

@@ -13,7 +13,7 @@ use crate::type_allocation_places::set_allocation_places_step;
 use crate::type_allocation_places::suggest_allocation_places_step;
 use crate::workspace::Workspace;
 use itertools::Itertools;
-use log::{debug, error, info};
+use log::{error, info, trace};
 use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use ritual_common::utils::MapIfOk;
 use std::cmp::Ordering;
@@ -334,7 +334,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
                 break;
             }
 
-            debug!(
+            trace!(
                 "Step '{}' completed in {:?}",
                 step.name,
                 started_time.elapsed()

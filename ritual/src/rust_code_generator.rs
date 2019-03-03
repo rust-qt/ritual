@@ -49,7 +49,7 @@ fn wrap_unsafe(in_unsafe_context: bool, content: &str) -> String {
 
 /// Generates Rust code representing type `rust_type` inside crate `crate_name`.
 /// Same as `RustCodeGenerator::rust_type_to_code`, but accessible by other modules.
-pub fn rust_type_to_code(rust_type: &RustType, current_crate: &str) -> String {
+pub fn rust_type_to_code(rust_type: &RustType, current_crate: Option<&str>) -> String {
     match rust_type {
         RustType::Unit => "()".to_string(),
         RustType::Tuple(types) => {
@@ -90,7 +90,7 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: &str) -> String {
             path,
             generic_arguments,
         }) => {
-            let mut code = path.full_name(Some(current_crate));
+            let mut code = path.full_name(current_crate);
             if let Some(args) = generic_arguments {
                 code = format!(
                     "{}<{}>",
@@ -223,7 +223,7 @@ impl Generator {
     }
 
     fn rust_type_to_code(&self, rust_type: &RustType) -> String {
-        rust_type_to_code(rust_type, &self.crate_name)
+        rust_type_to_code(rust_type, Some(&self.crate_name))
     }
 
     #[allow(clippy::collapsible_if)]

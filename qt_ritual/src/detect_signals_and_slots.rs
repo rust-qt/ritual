@@ -140,10 +140,10 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData<'_>) -> Result<()> {
                             section_type = section.section_type.clone();
                             match section.section_type {
                                 SectionType::Signals => {
-                                    trace!("[DebugSignals] Found signal: {}", method.short_text());
+                                    trace!("Found signal: {}", method.short_text());
                                 }
                                 SectionType::Slots => {
-                                    trace!("[DebugSignals] Found slot: {}", method.short_text());
+                                    trace!("Found slot: {}", method.short_text());
                                 }
                                 SectionType::Other => {}
                             }

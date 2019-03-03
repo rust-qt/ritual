@@ -4,6 +4,7 @@ use crate::cpp_data::CppPath;
 use crate::cpp_data::CppTypeDoc;
 use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_type::CppType;
+use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_type::RustPointerLikeTypeKind;
 use crate::rust_type::{RustFinalType, RustPath, RustType};
 use itertools::Itertools;
@@ -502,6 +503,24 @@ impl RustItemKind {
             true
         } else {
             false
+        }
+    }
+
+    pub fn short_text(&self) -> String {
+        match self {
+            RustItemKind::Module(data) => format!("mod {}", data.path.full_name(None)),
+            RustItemKind::Struct(data) => format!("struct {}", data.path.full_name(None)),
+            RustItemKind::EnumValue(data) => format!("enum value {}", data.path.full_name(None)),
+            RustItemKind::TraitImpl(data) => format!(
+                "impl {} for {}",
+                rust_type_to_code(&data.trait_type, None),
+                rust_type_to_code(&data.target_type, None)
+            ),
+            RustItemKind::FlagEnumImpl(data) => {
+                format!("enum flag impl {}", data.enum_path.full_name(None))
+            }
+            RustItemKind::FfiFunction(data) => format!("ffi fn {}", data.path.full_name(None)),
+            RustItemKind::Function(data) => format!("fn {}", data.path.full_name(None)),
         }
     }
 }

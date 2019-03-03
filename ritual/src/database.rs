@@ -2,18 +2,18 @@ use crate::cpp_data::CppBaseSpecifier;
 use crate::cpp_data::CppClassField;
 use crate::cpp_data::CppEnumValue;
 use crate::cpp_data::CppOriginLocation;
+use crate::cpp_data::CppPath;
 use crate::cpp_data::CppTypeDeclaration;
 use crate::cpp_data::CppTypeDeclarationKind;
-use ritual_common::target::Target;
-
 use crate::cpp_data::CppVisibility;
-use crate::cpp_function::CppFunction;
-
-use crate::cpp_data::CppPath;
-use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_ffi_data::QtSlotWrapper;
+use crate::cpp_ffi_data::{CppFfiFunction, CppFfiFunctionKind};
+use crate::cpp_function::CppFunction;
 use crate::cpp_type::CppType;
 use crate::rust_info::RustDatabase;
+use itertools::Itertools;
+use log::{debug, trace};
+use ritual_common::target::Target;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -300,6 +300,38 @@ pub enum CppFfiItemKind {
     QtSlotWrapper(QtSlotWrapper),
 }
 
+impl CppFfiItemKind {
+    pub fn short_text(&self) -> String {
+        match self {
+            CppFfiItemKind::Function(function) => match &function.kind {
+                CppFfiFunctionKind::Function {
+                    cpp_function,
+                    omitted_arguments,
+                    ..
+                } => {
+                    if let Some(num) = omitted_arguments {
+                        format!("[omitted arguments: {}] {}", num, cpp_function.short_text())
+                    } else {
+                        cpp_function.short_text()
+                    }
+                }
+                CppFfiFunctionKind::FieldAccessor {
+                    accessor_type,
+                    field,
+                } => format!("[{:?}] {}", accessor_type, field.short_text()),
+            },
+            CppFfiItemKind::QtSlotWrapper(slot_wrapper) => format!(
+                "slot wrapper for ({})",
+                slot_wrapper
+                    .signal_arguments
+                    .iter()
+                    .map(|arg| arg.to_cpp_pseudo_code())
+                    .join(", ")
+            ),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CppFfiItem {
     pub kind: CppFfiItemKind,
@@ -377,7 +409,7 @@ impl Database {
         &self.crate_name
     }
 
-    pub fn add_cpp_data(&mut self, source: DatabaseItemSource, data: CppItemData) -> bool {
+    pub fn add_cpp_item(&mut self, source: DatabaseItemSource, data: CppItemData) -> bool {
         if let Some(item) = self
             .cpp_items
             .iter_mut()
@@ -389,6 +421,8 @@ impl Database {
             }
             return false;
         }
+        debug!("added cpp item: {}, source: {:?}", data, source);
+        trace!("cpp item data: {:?}", data);
         self.cpp_items.push(CppDatabaseItem {
             cpp_data: data,
             source,

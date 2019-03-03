@@ -8,7 +8,7 @@ use crate::database::CppItemData;
 use crate::database::DatabaseItemSource;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
-use log::{trace, warn};
+use log::{debug, trace};
 use ritual_common::errors::err_msg;
 use ritual_common::errors::{bail, Result};
 
@@ -43,10 +43,6 @@ fn apply_instantiation_to_method(
     nested_level1: usize,
     template_instantiation: &CppPath,
 ) -> Result<CppFunction> {
-    trace!(
-        "[DebugTemplateInstantiation] instantiation: {:?}",
-        template_instantiation
-    );
     let mut new_method = method.clone();
 
     let inst_args = template_instantiation
@@ -90,10 +86,7 @@ fn apply_instantiation_to_method(
                 conversion_type.to_cpp_code(None)?
             ));
         }
-        trace!(
-            "[DebugTemplateInstantiation] success: {}",
-            new_method.short_text()
-        );
+        trace!("success: {}", new_method.short_text());
         Ok(new_method)
     }
 }
@@ -150,13 +143,10 @@ fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
                                 } else {
                                     bail!("only template parameters can be here");
                                 };
+                            trace!("method: {}", method.short_text());
                             trace!(
-                                "[DebugTemplateInstantiation] method: {}",
-                                method.short_text()
-                            );
-                            trace!(
-                                "[DebugTemplateInstantiation] found template instantiation: {:?}",
-                                type1
+                                "found template instantiation: {}",
+                                type1.path.to_cpp_pseudo_code()
                             );
                             match apply_instantiation_to_method(method, nested_level, &type1.path) {
                                 Ok(method) => {
@@ -166,10 +156,11 @@ fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
                                             Ok(_) => {}
                                             Err(msg) => {
                                                 ok = false;
-                                                trace!("[DebugTemplateInstantiation] method is not accepted: {}",
-                                                        method.short_text()
-                                                    );
-                                                trace!("[DebugTemplateInstantiation]   {}", msg);
+                                                trace!(
+                                                    "method is not accepted: {}",
+                                                    method.short_text()
+                                                );
+                                                trace!("  {}", msg);
                                             }
                                         }
                                     }
@@ -177,7 +168,7 @@ fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
                                         new_methods.push(method);
                                     }
                                 }
-                                Err(msg) => trace!("[DebugTemplateInstantiation] failed: {}", msg),
+                                Err(msg) => trace!("failed: {}", msg),
                             }
                         }
                     }
@@ -186,7 +177,7 @@ fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
         }
     }
     for item in new_methods {
-        data.current_database.add_cpp_data(
+        data.current_database.add_cpp_item(
             DatabaseItemSource::TemplateInstantiation,
             CppItemData::Function(item),
         );
@@ -219,10 +210,6 @@ fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> {
                                 x == path
                             });
                             if !is_in_result {
-                                trace!(
-                                    "Found template instantiation: {}",
-                                    path.to_cpp_pseudo_code()
-                                );
                                 result.push(path.clone());
                             }
                         }
@@ -260,12 +247,15 @@ fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> {
         if let Some(original_type) = original_type {
             let mut new_type = original_type.clone();
             new_type.path = item;
-            data.current_database.add_cpp_data(
+            data.current_database.add_cpp_item(
                 DatabaseItemSource::TemplateInstantiation,
                 CppItemData::Type(new_type),
             );
         } else {
-            warn!("original type not found for instantiation: {:?}", item);
+            debug!(
+                "original type not found for instantiation: {}",
+                item.to_cpp_pseudo_code()
+            );
         }
     }
     Ok(())

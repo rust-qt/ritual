@@ -19,7 +19,7 @@ use crate::database::CppItemData;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use itertools::Itertools;
-use log::trace;
+use log::{debug, trace};
 use ritual_common::errors::{bail, Result};
 use std::collections::HashSet;
 
@@ -94,42 +94,41 @@ fn run(data: &mut ProcessorData<'_>) -> Result<()> {
             );
             continue;
         }
-        if !should_process_item(&item.cpp_data)? {
-            trace!("cpp_data = {}; skipped", item.cpp_data.to_string());
+        if let Err(err) = check_preconditions(&item.cpp_data) {
+            trace!("skipping {}: {}", item.cpp_data, err);
             continue;
         }
         let result = match &item.cpp_data {
-            CppItemData::Type(_) | CppItemData::EnumValue(_) | CppItemData::Namespace(_) => {
-                Ok(Vec::new())
-                // no FFI methods for these items
-            }
             CppItemData::Function(method) => {
                 generate_ffi_methods_for_method(method, &movable_types, &mut name_provider)
-                    .map(|v| v.into_iter().collect())
+                    .map(|v| v.into_iter().collect_vec())
             }
             CppItemData::ClassField(field) => {
                 generate_field_accessors(field, &movable_types, &mut name_provider)
-                    .map(|v| v.into_iter().collect())
+                    .map(|v| v.into_iter().collect_vec())
             }
             CppItemData::ClassBase(base) => {
-                generate_casts(base, &mut name_provider).map(|v| v.into_iter().collect())
+                generate_casts(base, &mut name_provider).map(|v| v.into_iter().collect_vec())
+            }
+            CppItemData::Type(_) | CppItemData::EnumValue(_) | CppItemData::Namespace(_) => {
+                // no FFI methods for these items
+                continue;
             }
         };
 
         match result {
-            Err(msg) => {
-                trace!("cpp_data = {}; error: {}", item.cpp_data.to_string(), msg);
+            Err(error) => {
+                debug!("failed to add FFI item: {}: {}", item.cpp_data, error);
             }
             Ok(r) => {
-                trace!(
-                    "cpp_data = {}; success; {}",
-                    item.cpp_data.to_string(),
-                    match r.len() {
-                        0 => "no methods".to_string(),
-                        1 => format!("added method: {:?}", r[0]),
-                        _ => format!("added methods ({}): {:?}", r.len(), r),
-                    }
+                debug!(
+                    "added FFI items (count: {}) for: {}",
+                    r.len(),
+                    item.cpp_data
                 );
+                for item in &r {
+                    trace!("* {:?}", item);
+                }
                 data.current_database.ffi_items.extend(r);
                 item.is_cpp_ffi_processed = true;
             }
@@ -479,34 +478,40 @@ fn generate_field_accessors(
     Ok(new_methods)
 }
 
-fn should_process_item(item: &CppItemData) -> Result<bool> {
-    if let CppItemData::Function(method) = item {
-        if let Ok(class_name) = method.class_type() {
-            if is_qflags(&class_name) {
-                return Ok(false);
+fn check_preconditions(item: &CppItemData) -> Result<()> {
+    match item {
+        CppItemData::Function(function) => {
+            if let Some(membership) = &function.member {
+                if membership.visibility == CppVisibility::Private {
+                    bail!("function is private");
+                }
+                if membership.visibility == CppVisibility::Protected {
+                    bail!("function is protected");
+                }
+                if membership.is_signal {
+                    bail!("signals are excluded");
+                }
+            }
+            if function.path.last().template_arguments.is_some() {
+                bail!("template functions are excluded");
             }
         }
-        if let Some(membership) = &method.member {
-            if membership.visibility == CppVisibility::Private {
-                return Ok(false);
+        CppItemData::ClassField(field) => {
+            if field.visibility == CppVisibility::Private {
+                bail!("field is private");
             }
-            if membership.visibility == CppVisibility::Protected {
-                return Ok(false);
-            }
-            if membership.is_signal {
-                return Ok(false);
+            if field.visibility == CppVisibility::Protected {
+                bail!("field is protected");
             }
         }
-        if method.path.last().template_arguments.is_some() {
-            return Ok(false);
-        }
+        _ => {}
     }
     if item
         .all_involved_types()
         .iter()
         .any(|x| x.is_or_contains_template_parameter())
     {
-        return Ok(false);
+        bail!("item contains template parameter");
     }
-    Ok(true)
+    Ok(())
 }

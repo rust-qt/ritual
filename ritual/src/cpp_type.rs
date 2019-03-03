@@ -329,13 +329,29 @@ impl CppType {
     pub fn to_cpp_pseudo_code(&self) -> String {
         match self {
             CppType::TemplateParameter { name, .. } => {
-                return name.to_string(); // format!("T{}_{}", nested_level, index);
+                return name.to_string();
             }
             CppType::Class(base) => return base.to_cpp_pseudo_code(),
             CppType::FunctionPointer(..) => {
                 return self
                     .to_cpp_code(Some(&"FN_PTR".to_string()))
                     .unwrap_or_else(|_| "[?]".to_string());
+            }
+            CppType::PointerLike {
+                kind,
+                is_const,
+                target,
+            } => {
+                return format!(
+                    "{}{}{}",
+                    if *is_const { "const " } else { "" },
+                    target.to_cpp_pseudo_code(),
+                    match *kind {
+                        CppPointerLikeTypeKind::Pointer => "*",
+                        CppPointerLikeTypeKind::Reference => "&",
+                        CppPointerLikeTypeKind::RValueReference => "&&",
+                    }
+                );
             }
             _ => {}
         };

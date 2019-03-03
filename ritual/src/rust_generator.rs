@@ -647,9 +647,10 @@ impl State<'_, '_> {
                 }
                 let return_lifetime = if next_lifetime_num == 0 {
                     debug!(
-                            "Method returns a reference but doesn't receive a reference. Assuming static lifetime of return value: {}",
-                            function.short_text()
-                        );
+                        "Method returns a reference but doesn't receive a reference. \
+                         Assuming static lifetime of return value: {}",
+                        function.short_text()
+                    );
                     "static".to_string()
                 } else {
                     "l0".to_string()
@@ -1269,6 +1270,12 @@ fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                         cpp_item_index: Some(cpp_item_index),
                         ffi_item_index: None,
                     };
+                    debug!(
+                        "added rust item: {} (cpp item: {})",
+                        item.kind.short_text(),
+                        cpp_item.cpp_data
+                    );
+                    trace!("rust item data: {:?}", item);
                     state.0.current_database.rust_database.items.push(item);
                 }
                 processed_cpp_indexes.push(cpp_item_index);
@@ -1291,6 +1298,12 @@ fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                         cpp_item_index: None,
                         ffi_item_index: Some(ffi_item_index),
                     };
+                    debug!(
+                        "added rust item: {} (ffi item: {})",
+                        item.kind.short_text(),
+                        ffi_item.kind.short_text()
+                    );
+                    trace!("rust item data: {:?}", item);
                     state.0.current_database.rust_database.items.push(item);
                 }
                 processed_ffi_indexes.push(ffi_item_index);
@@ -1312,7 +1325,10 @@ fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         }
 
         if let Err(err) = state.process_cpp_item(cpp_item) {
-            trace!("skipping cpp item: {}: {}", &cpp_item.cpp_data, err);
+            debug!(
+                "failed to process cpp item: {}: {}",
+                &cpp_item.cpp_data, err
+            );
             print_trace(&err, log::Level::Trace);
         }
     }
@@ -1323,7 +1339,11 @@ fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         }
 
         if let Err(err) = state.process_ffi_item(ffi_item) {
-            trace!("skipping ffi item: {:?}: {}", ffi_item, err);
+            debug!(
+                "failed to process ffi item: {}: {}",
+                ffi_item.kind.short_text(),
+                err
+            );
             print_trace(&err, log::Level::Trace);
         }
     }

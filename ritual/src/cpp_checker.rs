@@ -4,7 +4,7 @@ use crate::database::CppFfiItem;
 use crate::database::CppFfiItemKind;
 use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
-use log::debug;
+use log::{debug, trace};
 use rayon::iter::IndexedParallelIterator;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
@@ -53,7 +53,7 @@ fn check_snippets<'a>(
     }
     let instant = Instant::now();
     let result = data.builder.run();
-    debug!("cpp builder time: {:?}", instant.elapsed());
+    trace!("cpp builder time: {:?}", instant.elapsed());
     result
 }
 
@@ -288,9 +288,10 @@ impl CppChecker<'_, '_> {
             let ffi_item = &mut self.data.current_database.ffi_items[snippet.ffi_item_index];
             let output = snippet.output.unwrap();
             if output.is_success() {
-                debug!("success: {:?}", ffi_item);
+                debug!("success: {}", ffi_item.kind.short_text());
             } else {
-                debug!("error: {:?}: {:?}", ffi_item, output);
+                debug!("error: {}: {:?}", ffi_item.kind.short_text(), output);
+                trace!("snippet: {:?}", snippet.snippet);
             }
             ffi_item.checks.add(env.clone(), output.is_success());
         }

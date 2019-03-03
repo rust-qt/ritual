@@ -56,6 +56,11 @@ pub fn add_slot_wrappers(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut name_provider = FfiNameProvider::new(data);
 
     for arg_types in all_types {
+        let arg_types_text = arg_types
+            .iter()
+            .map(|arg| arg.to_cpp_pseudo_code())
+            .join(", ");
+
         let found = data
             .all_databases()
             .flat_map(|db| &db.ffi_items)
@@ -67,19 +72,19 @@ pub fn add_slot_wrappers(data: &mut ProcessorData<'_>) -> Result<()> {
                 }
             });
         if found {
-            trace!("slot wrapper already exists: {:?}", arg_types);
+            trace!("slot wrapper already exists: {}", arg_types_text);
         } else {
             match generate_slot_wrapper(&arg_types, &mut name_provider) {
                 Ok(slot_wrapper) => {
                     data.current_database
                         .ffi_items
                         .push(CppFfiItem::from_qt_slot_wrapper(slot_wrapper));
-                    trace!("adding slot wrapper for args: {:?}", arg_types);
+                    trace!("adding slot wrapper for args: ({})", arg_types_text);
                 }
                 Err(err) => {
                     trace!(
-                        "failed to add slot wrapper for args: {:?}: {}",
-                        arg_types,
+                        "failed to add slot wrapper for args: ({}): {}",
+                        arg_types_text,
                         err
                     );
                 }

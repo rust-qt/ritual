@@ -34,10 +34,10 @@ pub fn detect_signal_argument_types(data: &mut ProcessorData<'_>) -> Result<Hash
     }
     all_types.extend(types_with_omitted_args.into_iter());
 
-    trace!("[DebugSignals] Signal argument types:");
+    trace!("Signal argument types:");
     for t in &all_types {
         trace!(
-            "[DebugSignals] * ({})",
+            "* ({})",
             t.iter().map(|x| x.to_cpp_pseudo_code()).join(", ")
         );
     }
