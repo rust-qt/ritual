@@ -1,6 +1,5 @@
 use crate::cpp_code_generator;
 use crate::cpp_code_generator::generate_cpp_type_size_requester;
-use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use crate::rust_code_generator;
 use crate::versions;
@@ -254,7 +253,7 @@ fn generate_c_lib_template(
     Ok(())
 }
 
-fn run(data: &mut ProcessorData<'_>) -> Result<()> {
+pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let crate_name = data.config.crate_properties().name();
     let output_path = data.workspace.crate_path(crate_name)?;
 
@@ -333,8 +332,4 @@ fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         },
     )?;
     Ok(())
-}
-
-pub fn crate_writer_step() -> ProcessingStep {
-    ProcessingStep::new_const("crate_writer", run)
 }

@@ -17,7 +17,6 @@ use crate::cpp_type::{
 };
 use crate::database::CppItemData;
 use crate::database::DatabaseItemSource;
-use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use clang;
 use clang::diagnostic::{Diagnostic, Severity};
@@ -310,7 +309,7 @@ fn add_namespaces(data: &mut ProcessorData<'_>) -> Result<()> {
 }
 
 /// Runs the parser on specified data.
-fn run(data: &mut ProcessorData<'_>) -> Result<()> {
+pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     debug!("clang version: {}", get_version());
     debug!("Initializing clang");
     let mut parser = CppParser { data };
@@ -328,10 +327,6 @@ fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     )?;
     add_namespaces(parser.data)?;
     Ok(())
-}
-
-pub fn cpp_parser_step() -> ProcessingStep {
-    ProcessingStep::new("cpp_parser", run)
 }
 
 impl CppParser<'_, '_> {

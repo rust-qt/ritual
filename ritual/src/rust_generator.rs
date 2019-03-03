@@ -21,7 +21,6 @@ use crate::database::CppDatabaseItem;
 use crate::database::CppFfiItem;
 use crate::database::CppFfiItemKind;
 use crate::database::CppItemData;
-use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use crate::rust_info::RustDatabaseItem;
 use crate::rust_info::RustEnumValue;
@@ -1247,7 +1246,7 @@ impl State<'_, '_> {
     }
 }
 
-fn run(data: &mut ProcessorData<'_>) -> Result<()> {
+pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut state = State(data);
     state.generate_special_module(RustModuleKind::CrateRoot)?;
     state.generate_special_module(RustModuleKind::Ffi)?;
@@ -1342,19 +1341,6 @@ fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     }
 
     Ok(())
-}
-
-pub fn rust_generator_step() -> ProcessingStep {
-    ProcessingStep::new("rust_generator", run)
-}
-
-pub fn clear_rust_info(data: &mut ProcessorData<'_>) -> Result<()> {
-    data.current_database.clear_rust_info();
-    Ok(())
-}
-
-pub fn clear_rust_info_step() -> ProcessingStep {
-    ProcessingStep::new("clear_rust_info", clear_rust_info)
 }
 
 /// Returns method name. For class member functions, the name doesn't

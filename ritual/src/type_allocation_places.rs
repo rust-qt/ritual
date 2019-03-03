@@ -2,19 +2,10 @@ use crate::cpp_data::CppPath;
 use crate::cpp_data::CppTypeDeclarationKind;
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
-use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use log::trace;
 use ritual_common::errors::Result;
 use std::collections::HashMap;
-
-pub fn suggest_allocation_places_step() -> ProcessingStep {
-    ProcessingStep::new("suggest_allocation_places", suggest_allocation_places)
-}
-
-pub fn set_allocation_places_step() -> ProcessingStep {
-    ProcessingStep::new("set_allocation_places", set_allocation_places)
-}
 
 pub fn set_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
     for type1 in data
@@ -34,7 +25,7 @@ pub fn set_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
 /// Detects the preferred type allocation place for each type based on
 /// API of all known methods. Doesn't actually change the data,
 /// only suggests stack allocated types for manual configuration.
-fn suggest_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
+pub fn suggest_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
     #[derive(Default, Debug)]
     struct TypeStats {
         // has_derived_classes: bool,

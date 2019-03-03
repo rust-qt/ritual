@@ -3,7 +3,6 @@ use crate::config::CrateProperties;
 use crate::cpp_data::*;
 use crate::cpp_function::*;
 use crate::cpp_operator::CppOperator;
-use crate::cpp_parser::cpp_parser_step;
 use crate::cpp_type::*;
 use crate::processor;
 use crate::workspace::Workspace;
@@ -42,7 +41,7 @@ fn run_parser(code: &'static str) -> ParserCppData {
     config.add_include_directive(include_name);
     config.set_cpp_build_paths(paths);
 
-    processor::process(&mut workspace, &config, &[cpp_parser_step().name]).unwrap();
+    processor::process(&mut workspace, &config, &["cpp_parser".into()]).unwrap();
 
     let database = workspace.load_or_create_crate("A").unwrap();
 

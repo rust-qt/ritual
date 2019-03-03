@@ -1,25 +1,19 @@
 use crate::config::Config;
-use crate::cpp_checker::cpp_checker_step;
-use crate::cpp_explicit_xstructors::add_explicit_xstructors_step;
-use crate::cpp_ffi_generator::cpp_ffi_generator_step;
-use crate::cpp_parser::cpp_parser_step;
-use crate::cpp_template_instantiator::find_template_instantiations_step;
-use crate::cpp_template_instantiator::instantiate_templates_step;
-use crate::crate_writer::crate_writer_step;
 use crate::database::{CppDatabaseItem, Database};
-use crate::rust_generator::clear_rust_info_step;
-use crate::rust_generator::rust_generator_step;
-use crate::type_allocation_places::set_allocation_places_step;
-use crate::type_allocation_places::suggest_allocation_places_step;
 use crate::workspace::Workspace;
+use crate::{
+    cpp_checker, cpp_explicit_xstructors, cpp_ffi_generator, cpp_parser, cpp_template_instantiator,
+    crate_writer, rust_generator, type_allocation_places,
+};
 use itertools::Itertools;
 use log::{error, info, trace};
 use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
-use ritual_common::utils::MapIfOk;
+use ritual_common::utils::{run_command, MapIfOk};
 use std::cmp::Ordering;
 use std::fmt;
 use std::iter::once;
 use std::path::PathBuf;
+use std::process::Command;
 use std::time::Instant;
 
 /// Creates output and cache directories if they don't exist.
@@ -77,17 +71,15 @@ impl<'a> ProcessorData<'a> {
     }
 }
 
-pub struct ProcessingStep {
-    pub name: String,
-    pub is_const: bool,
-    pub function: Box<dyn Fn(&mut ProcessorData<'_>) -> Result<()>>,
+struct ProcessingStep {
+    name: String,
+    function: Box<dyn Fn(&mut ProcessorData<'_>) -> Result<()>>,
 }
 
 impl fmt::Debug for ProcessingStep {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ProcessingStep")
             .field("name", &self.name)
-            .field("is_const", &self.is_const)
             .finish()
     }
 }
@@ -100,36 +92,55 @@ pub struct ProcessingSteps {
 
 impl Default for ProcessingSteps {
     fn default() -> Self {
-        let main_steps = vec![
-            cpp_parser_step(),
-            add_explicit_xstructors_step(),
-            set_allocation_places_step(),
-            find_template_instantiations_step(),
-            instantiate_templates_step(),
-            cpp_ffi_generator_step(),
-            cpp_checker_step(),
-            rust_generator_step(),
-            crate_writer_step(),
-            steps::build_crate(),
-        ];
+        let mut s = ProcessingSteps {
+            all_steps: Vec::new(),
+            main_procedure: Vec::new(),
+        };
 
-        let main_procedure = main_steps.iter().map(|s| s.name.clone()).collect();
+        s.push("cpp_parser", cpp_parser::run);
+        s.push("add_explicit_xstructors", cpp_explicit_xstructors::run);
+        s.push(
+            "set_allocation_places",
+            type_allocation_places::set_allocation_places,
+        );
+        s.push(
+            "find_template_instantiations",
+            cpp_template_instantiator::find_template_instantiations,
+        );
+        s.push(
+            "instantiate_templates",
+            cpp_template_instantiator::instantiate_templates,
+        );
+        s.push("cpp_ffi_generator", cpp_ffi_generator::run);
+        s.push("cpp_checker", cpp_checker::run);
+        s.push("rust_generator", rust_generator::run);
+        s.push("crate_writer", crate_writer::run);
+        s.push("build_crate", build_crate);
 
-        let mut all_steps = main_steps;
-        all_steps.extend(vec![
-            steps::clear_ffi(),
-            clear_rust_info_step(),
-            suggest_allocation_places_step(),
-        ]);
-        Self {
-            all_steps,
-            main_procedure,
-        }
+        s.add_custom("clear_ffi", |data| {
+            data.current_database.clear_ffi();
+            Ok(())
+        });
+        s.add_custom("clear_rust_info", |data| {
+            data.current_database.clear_rust_info();
+            Ok(())
+        });
+
+        s.add_custom(
+            "suggest_allocation_places",
+            type_allocation_places::suggest_allocation_places,
+        );
+        s
     }
 }
 
 impl ProcessingSteps {
-    pub fn add_after(&mut self, after: &[&str], step: ProcessingStep) -> Result<()> {
+    pub fn add_after<F: 'static + Fn(&mut ProcessorData<'_>) -> Result<()>>(
+        &mut self,
+        after: &[&str],
+        name: &str,
+        func: F,
+    ) -> Result<()> {
         let indexes = after.iter().map_if_ok(|s| {
             self.main_procedure
                 .iter()
@@ -141,9 +152,26 @@ impl ProcessingSteps {
             .into_iter()
             .max()
             .ok_or_else(|| err_msg("no steps provided"))?;
-        self.main_procedure.insert(max_index + 1, step.name.clone());
-        self.all_steps.push(step);
+        self.main_procedure.insert(max_index + 1, name.to_string());
+        self.all_steps.push(ProcessingStep::new(name, func));
         Ok(())
+    }
+
+    pub fn push<F: 'static + Fn(&mut ProcessorData<'_>) -> Result<()>>(
+        &mut self,
+        name: &str,
+        func: F,
+    ) {
+        self.main_procedure.push(name.to_string());
+        self.all_steps.push(ProcessingStep::new(name, func));
+    }
+
+    pub fn add_custom<F: 'static + Fn(&mut ProcessorData<'_>) -> Result<()>>(
+        &mut self,
+        name: &str,
+        func: F,
+    ) {
+        self.all_steps.push(ProcessingStep::new(name, func));
     }
 }
 
@@ -154,54 +182,27 @@ impl ProcessingStep {
     ) -> Self {
         ProcessingStep {
             name: name.into(),
-            is_const: false,
-            function: Box::new(function),
-        }
-    }
-    pub fn new_const<S: Into<String>, F: 'static + Fn(&mut ProcessorData<'_>) -> Result<()>>(
-        name: S,
-        function: F,
-    ) -> Self {
-        let name = name.into();
-        ProcessingStep {
-            name,
-            is_const: true,
             function: Box::new(function),
         }
     }
 }
 
-mod steps {
-    use crate::processor::ProcessingStep;
-    use ritual_common::utils::run_command;
-    use std::process::Command;
+fn build_crate(data: &mut ProcessorData<'_>) -> Result<()> {
+    data.workspace.update_cargo_toml()?;
+    let path = data.workspace.path();
+    let crate_name = data.config.crate_properties().name();
+    //run_command(Command::new("cargo").arg("update").current_dir(path))?;
 
-    pub fn clear_ffi() -> ProcessingStep {
-        ProcessingStep::new("clear_ffi", |data| {
-            data.current_database.clear_ffi();
-            Ok(())
-        })
+    for cargo_cmd in &["build", "test", "doc"] {
+        run_command(
+            Command::new("cargo")
+                .arg(cargo_cmd)
+                .arg("-p")
+                .arg(crate_name)
+                .current_dir(path),
+        )?;
     }
-
-    pub fn build_crate() -> ProcessingStep {
-        ProcessingStep::new_const("build_crate", |data| {
-            data.workspace.update_cargo_toml()?;
-            let path = data.workspace.path();
-            let crate_name = data.config.crate_properties().name();
-            //run_command(Command::new("cargo").arg("update").current_dir(path))?;
-
-            for cargo_cmd in &["build", "test", "doc"] {
-                run_command(
-                    Command::new("cargo")
-                        .arg(cargo_cmd)
-                        .arg("-p")
-                        .arg(crate_name)
-                        .current_dir(path),
-                )?;
-            }
-            Ok(())
-        })
-    }
+    Ok(())
 }
 
 #[derive(Debug)]

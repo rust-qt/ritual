@@ -2,7 +2,6 @@ use crate::cpp_code_generator;
 use crate::database::CppCheckerEnv;
 use crate::database::CppFfiItem;
 use crate::database::CppFfiItemKind;
-use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use log::{debug, trace};
 use rayon::iter::IndexedParallelIterator;
@@ -355,14 +354,10 @@ impl CppChecker<'_, '_> {
     }
 }
 
-fn run(data: &mut ProcessorData<'_>) -> Result<()> {
+pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut checker = CppChecker { data };
 
     checker.run()?;
 
     Ok(())
-}
-
-pub fn cpp_checker_step() -> ProcessingStep {
-    ProcessingStep::new("cpp_checker", run)
 }

@@ -16,7 +16,6 @@ use crate::cpp_type::CppType;
 use crate::cpp_type::CppTypeRole;
 use crate::database::CppFfiItem;
 use crate::database::CppItemData;
-use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use itertools::Itertools;
 use log::{debug, trace};
@@ -69,7 +68,7 @@ impl FfiNameProvider {
 }
 
 /// Runs the FFI generator
-fn run(data: &mut ProcessorData<'_>) -> Result<()> {
+pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let movable_types = data
         .all_items()
         .filter_map(|item| {
@@ -136,10 +135,6 @@ fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         }
     }
     Ok(())
-}
-
-pub fn cpp_ffi_generator_step() -> ProcessingStep {
-    ProcessingStep::new("cpp_ffi_generator", run)
 }
 
 /// Convenience function to create `CppMethod` object for

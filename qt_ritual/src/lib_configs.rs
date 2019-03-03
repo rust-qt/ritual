@@ -10,7 +10,6 @@ use qt_ritual_common::{get_full_build_config, lib_dependencies, lib_folder_name}
 use ritual::config::Config;
 use ritual::config::CrateProperties;
 use ritual::cpp_data::CppPath;
-use ritual::processor::ProcessingStep;
 use ritual_common::cpp_build_config::CppLibraryType;
 use ritual_common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
 use ritual_common::errors::{bail, Result, ResultExt};
@@ -588,22 +587,16 @@ pub fn create_config(crate_name: &str) -> Result<Config> {
         let lib_include_path = qt_config.installation_data.lib_include_path.clone();
 
         let steps = config.processing_steps_mut();
-        steps.add_after(
-            &["cpp_parser"],
-            ProcessingStep::new("qt_fix_header_names", move |data| {
-                fix_header_names(data.current_database.cpp_items_mut(), &lib_include_path)
-            }),
-        )?;
+        steps.add_after(&["cpp_parser"], "qt_fix_header_names", move |data| {
+            fix_header_names(data.current_database.cpp_items_mut(), &lib_include_path)
+        })?;
 
         let crate_name_clone = crate_name.to_string();
         let docs_path = qt_config.installation_data.docs_path.clone();
 
-        steps.add_after(
-            &["cpp_parser"],
-            ProcessingStep::new("qt_doc_parser", move |data| {
-                parse_docs(data, &crate_name_clone, &docs_path)
-            }),
-        )?;
+        steps.add_after(&["cpp_parser"], "qt_doc_parser", move |data| {
+            parse_docs(data, &crate_name_clone, &docs_path)
+        })?;
 
         config
     };
@@ -611,12 +604,14 @@ pub fn create_config(crate_name: &str) -> Result<Config> {
     let steps = config.processing_steps_mut();
     steps.add_after(
         &["cpp_parser"],
-        ProcessingStep::new("qt_detect_signals_and_slots", detect_signals_and_slots),
+        "qt_detect_signals_and_slots",
+        detect_signals_and_slots,
     )?;
 
     steps.add_after(
         &["qt_detect_signals_and_slots"],
-        ProcessingStep::new("add_slot_wrappers", add_slot_wrappers),
+        "add_slot_wrappers",
+        add_slot_wrappers,
     )?;
 
     config.set_crate_template_path(repo_dir_path("qt_ritual/crate_templates")?.join(&crate_name));

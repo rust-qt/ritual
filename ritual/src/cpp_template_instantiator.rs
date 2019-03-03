@@ -6,7 +6,6 @@ use crate::cpp_function::CppOperator;
 use crate::cpp_type::CppType;
 use crate::database::CppItemData;
 use crate::database::DatabaseItemSource;
-use crate::processor::ProcessingStep;
 use crate::processor::ProcessorData;
 use log::{debug, trace};
 use ritual_common::errors::err_msg;
@@ -93,13 +92,9 @@ fn apply_instantiation_to_method(
 
 // TODO: instantiations of QObject::findChild and QObject::findChildren should be available
 
-pub fn instantiate_templates_step() -> ProcessingStep {
-    ProcessingStep::new("instantiate_templates", instantiate_templates)
-}
-
 /// Generates methods as template instantiations of
 /// methods of existing template classes and existing template methods.
-fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
+pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut new_methods = Vec::new();
     for method in data
         .all_items()
@@ -185,13 +180,9 @@ fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
     Ok(())
 }
 
-pub fn find_template_instantiations_step() -> ProcessingStep {
-    ProcessingStep::new("find_template_instantiations", find_template_instantiations)
-}
-
 /// Searches for template instantiations in this library's API,
 /// excluding results that were already processed in dependencies.
-fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> {
+pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> {
     fn check_type(type1: &CppType, data: &ProcessorData<'_>, result: &mut Vec<CppPath>) {
         match &type1 {
             CppType::Class(path) => {
