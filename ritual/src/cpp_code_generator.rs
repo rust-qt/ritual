@@ -304,7 +304,7 @@ pub fn generate_cpp_file(
 
     let mut any_slot_wrappers = false;
     for ffi_item in ffi_items {
-        if !ffi_item.checks.any_passed() {
+        if !ffi_item.checks.any_success() {
             continue;
         }
         if let CppFfiItemKind::QtSlotWrapper(qt_slot_wrapper) = &ffi_item.kind {
@@ -315,7 +315,7 @@ pub fn generate_cpp_file(
 
     writeln!(cpp_file, "extern \"C\" {{")?;
     for ffi_item in ffi_items {
-        if !ffi_item.checks.any_passed() {
+        if !ffi_item.checks.any_success() {
             continue;
         }
         if let CppFfiItemKind::Function(cpp_ffi_function) = &ffi_item.kind {

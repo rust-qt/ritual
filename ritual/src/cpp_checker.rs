@@ -1,5 +1,4 @@
 use crate::cpp_code_generator;
-use crate::database::CppCheckerAddResult;
 use crate::database::CppCheckerEnv;
 use crate::database::CppFfiItem;
 use crate::database::CppFfiItemKind;
@@ -248,7 +247,7 @@ impl CppChecker<'_, '_> {
 
         let mut snippets = Vec::new();
         for (ffi_item_index, ffi_item) in self.data.current_database.ffi_items.iter().enumerate() {
-            if ffi_item.checks.items.iter().any(|check| check.env == env) {
+            if ffi_item.checks.has_env(&env) {
                 continue;
             }
 
@@ -287,27 +286,13 @@ impl CppChecker<'_, '_> {
 
         for snippet in snippets {
             let ffi_item = &mut self.data.current_database.ffi_items[snippet.ffi_item_index];
-
-            let error_data = match snippet.output.unwrap() {
-                CppLibBuilderOutput::Success => None, // no error
-                CppLibBuilderOutput::Fail(output) => {
-                    Some(format!("build failed: {}", output.stderr))
-                }
-            };
-
-            let r = ffi_item.checks.add(&env, error_data.clone());
-            let change_text = match &r {
-                CppCheckerAddResult::Added => "Added".to_string(),
-                CppCheckerAddResult::Unchanged => "Unchanged".to_string(),
-                CppCheckerAddResult::Changed { old } => {
-                    format!("Changed! Old data for the same env: {:?}", old)
-                }
-            };
-
-            debug!(
-                "[cpp_checker_update] ffi_item = {:?}; snippet = {:?}; error = {:?}; {}",
-                ffi_item, snippet.snippet.code, error_data, change_text
-            );
+            let output = snippet.output.unwrap();
+            if output.is_success() {
+                debug!("success: {:?}", ffi_item);
+            } else {
+                debug!("error: {:?}: {:?}", ffi_item, output);
+            }
+            ffi_item.checks.add(env.clone(), output.is_success());
         }
         Ok(())
     }

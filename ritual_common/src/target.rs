@@ -3,7 +3,7 @@
 use serde_derive::{Deserialize, Serialize};
 
 /// CPU architecture, as reported by `target_arch`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Arch {
     X86,
     X86_64,
@@ -15,7 +15,7 @@ pub enum Arch {
 }
 
 /// Operating system, as reported by `target_os`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum OS {
     Windows,
     MacOS,
@@ -30,7 +30,7 @@ pub enum OS {
 }
 
 /// Operating system family, as reported by `target_family`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Family {
     Windows,
     Unix,
@@ -38,7 +38,7 @@ pub enum Family {
 
 /// Further disambiguates the target platform with information about the ABI/libc,
 /// as reported by `target_env`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Env {
     Gnu,
     Msvc,
@@ -48,14 +48,14 @@ pub enum Env {
 
 /// Pointer width in bits,
 /// as reported by `target_pointer_width`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum PointerWidth {
     P64,
     P32,
 }
 
 /// CPU endianness, as reported by `target_endian`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Endian {
     Little,
     Big,
@@ -63,7 +63,7 @@ pub enum Endian {
 
 /// Combined information about a target, as reported by configuration
 /// values of the Rust compiler.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct Target {
     /// CPU architecture
     pub arch: Arch,

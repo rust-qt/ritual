@@ -18,7 +18,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::fmt::Formatter;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct CppCheckerEnv {
     pub target: Target,
     pub cpp_library_version: Option<String>,
@@ -64,44 +64,26 @@ impl DatabaseItemSource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CppCheckerInfo {
+struct CppChecksItem {
     pub env: CppCheckerEnv,
-    pub error: Option<String>,
+    pub is_success: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CppCheckerInfoList {
-    pub items: Vec<CppCheckerInfo>,
-}
+pub struct CppChecks(Vec<CppChecksItem>);
 
-pub enum CppCheckerAddResult {
-    Added,
-    Changed { old: Option<String> },
-    Unchanged,
-}
-
-impl CppCheckerInfoList {
-    pub fn add(&mut self, env: &CppCheckerEnv, error: Option<String>) -> CppCheckerAddResult {
-        if let Some(item) = self.items.iter_mut().find(|i| &i.env == env) {
-            let r = if item.error == error {
-                CppCheckerAddResult::Unchanged
-            } else {
-                CppCheckerAddResult::Changed {
-                    old: item.error.clone(),
-                }
-            };
-            item.error = error;
-            return r;
-        }
-        self.items.push(CppCheckerInfo {
-            env: env.clone(),
-            error,
-        });
-        CppCheckerAddResult::Added
+impl CppChecks {
+    pub fn has_env(&self, env: &CppCheckerEnv) -> bool {
+        self.0.iter().any(|item| &item.env == env)
     }
 
-    pub fn any_passed(&self) -> bool {
-        self.items.iter().any(|check| check.error.is_none())
+    pub fn add(&mut self, env: CppCheckerEnv, is_success: bool) {
+        self.0.retain(|item| item.env != env);
+        self.0.push(CppChecksItem { env, is_success });
+    }
+
+    pub fn any_success(&self) -> bool {
+        self.0.iter().any(|item| item.is_success)
     }
 }
 
@@ -322,7 +304,7 @@ pub enum CppFfiItemKind {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CppFfiItem {
     pub kind: CppFfiItemKind,
-    pub checks: CppCheckerInfoList,
+    pub checks: CppChecks,
     pub is_rust_processed: bool,
 }
 

@@ -956,7 +956,7 @@ impl State<'_, '_> {
     }
 
     fn process_ffi_item(&self, ffi_item: &CppFfiItem) -> Result<Vec<RustItemKind>> {
-        if !ffi_item.checks.any_passed() {
+        if !ffi_item.checks.any_success() {
             bail!("cpp checks failed");
         }
         match &ffi_item.kind {

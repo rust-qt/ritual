@@ -105,6 +105,12 @@ pub enum CppLibBuilderOutput {
     Fail(CommandOutput),
 }
 
+impl CppLibBuilderOutput {
+    pub fn is_success(&self) -> bool {
+        self == &CppLibBuilderOutput::Success
+    }
+}
+
 impl CppLibBuilder {
     /// Builds the library.
     pub fn run(&mut self) -> Result<CppLibBuilderOutput> {
