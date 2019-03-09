@@ -23,6 +23,16 @@ public:
         const QObject* sender, const char* signal,
         const QObject* receiver, const char* method);
 
+    class ConnectArgs {
+    public:
+        const QObject* sender;
+        const char* signal;
+        const QObject* receiver;
+        const char* method;
+    };
+
+    static ConnectArgs nextConnectArgs();
+
 private:
     struct QPrivateSignal {};
 

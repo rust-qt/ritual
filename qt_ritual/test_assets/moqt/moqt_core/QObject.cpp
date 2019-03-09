@@ -1,4 +1,16 @@
 #include "QObject.h"
+#include <mutex>
+#include <string>
+#include <deque>
+#include <cstring>
+
+std::mutex connectArgsMutex;
+std::deque<QObject::ConnectArgs> connectArgs;
+
+const char* copyToHeap(const char* string) {
+    auto buf = new char[strlen(string) + 1];
+    return strcpy(buf, string);
+}
 
 QObject::QObject(QObject* parent) {
 
@@ -23,5 +35,24 @@ QMetaObject::Connection QObject::connect(
     const QObject* sender, const char* signal,
     const QObject* receiver, const char* method)
 {
+    std::lock_guard<std::mutex> lock(connectArgsMutex);
+    ConnectArgs args;
+    args.sender = sender;
+    args.signal = copyToHeap(signal);
+    args.receiver = receiver;
+    args.method = copyToHeap(method);
+    connectArgs.push_back(args);
+
     return QMetaObject::Connection();
+}
+
+QObject::ConnectArgs QObject::nextConnectArgs() {
+    std::lock_guard<std::mutex> lock(connectArgsMutex);
+    if (connectArgs.empty()) {
+        printf("nextConnectArgs: no data\n");
+        exit(1);
+    }
+    auto result = connectArgs.front();
+    connectArgs.pop_front();
+    return result;
 }
