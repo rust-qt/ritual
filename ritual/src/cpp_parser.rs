@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::cpp_code_generator;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;
 use crate::cpp_data::CppTypeDeclarationKind;
@@ -15,8 +16,8 @@ use crate::cpp_type::{
     CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
     CppSpecificNumericTypeKind, CppType,
 };
-use crate::database::CppItemData;
 use crate::database::DatabaseItemSource;
+use crate::database::{CppFfiItemKind, CppItemData};
 use crate::processor::ProcessorData;
 use clang;
 use clang::diagnostic::{Diagnostic, Severity};
@@ -62,6 +63,8 @@ fn convert_type_kind(kind: TypeKind) -> CppBuiltInNumericType {
 /// about the C++ library's API from its headers.
 struct CppParser<'b, 'a: 'b> {
     data: &'b mut ProcessorData<'a>,
+    current_target_path: Vec<PathBuf>,
+    source_ffi_item: Option<usize>,
 }
 
 /// Print representation of `entity` and its children to the log.
@@ -303,7 +306,7 @@ fn add_namespaces(data: &mut ProcessorData<'_>) -> Result<()> {
     for name in namespaces {
         let item = CppItemData::Namespace(name);
         data.current_database
-            .add_cpp_item(DatabaseItemSource::NamespaceInfering, item);
+            .add_cpp_item(DatabaseItemSource::NamespaceInferring, item);
     }
     Ok(())
 }
@@ -312,20 +315,42 @@ fn add_namespaces(data: &mut ProcessorData<'_>) -> Result<()> {
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     debug!("clang version: {}", get_version());
     debug!("Initializing clang");
-    let mut parser = CppParser { data };
+    let mut parser = CppParser {
+        current_target_path: data.config.target_include_paths().to_vec(),
+        source_ffi_item: None,
+        data,
+    };
     run_clang(
         &parser.data.config,
         &parser.data.workspace.tmp_path(),
         None,
-        |translation_unit| {
-            debug!("Parsing types");
-            parser.parse_types(translation_unit)?;
-            debug!("Parsing methods");
-            parser.parse_functions(translation_unit)?;
-            Ok(())
-        },
+        |translation_unit| parser.parse(translation_unit),
     )?;
     add_namespaces(parser.data)?;
+    Ok(())
+}
+
+pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
+    for ffi_index in 0..data.current_database.ffi_items().len() {
+        let ffi_item = &data.current_database.ffi_items()[ffi_index];
+        if let CppFfiItemKind::QtSlotWrapper(slot_wrapper) = &ffi_item.kind {
+            let code = cpp_code_generator::qt_slot_wrapper(slot_wrapper)?;
+            let mut parser = CppParser {
+                current_target_path: vec![data.workspace.tmp_path()],
+                source_ffi_item: Some(ffi_index),
+                data,
+            };
+            run_clang(
+                &parser.data.config,
+                &parser.data.workspace.tmp_path(),
+                Some(code),
+                |translation_unit| {
+                    parser.parse(translation_unit)?;
+                    Ok(())
+                },
+            )?;
+        }
+    }
     Ok(())
 }
 
@@ -1377,6 +1402,14 @@ impl CppParser<'_, '_> {
             return false;
         }
         true
+    }
+
+    fn parse(&mut self, entity: Entity<'_>) -> Result<()> {
+        debug!("Parsing types");
+        self.parse_types(entity)?;
+        debug!("Parsing functions");
+        self.parse_functions(entity)?;
+        Ok(())
     }
 
     /// Parses type declarations in translation unit `entity`

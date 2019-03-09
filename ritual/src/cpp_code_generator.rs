@@ -41,7 +41,7 @@ fn function_signature(method: &CppFfiFunction) -> Result<String> {
 }
 
 /// Generates code for a Qt slot wrapper
-fn qt_slot_wrapper(wrapper: &QtSlotWrapper) -> Result<String> {
+pub fn qt_slot_wrapper(wrapper: &QtSlotWrapper) -> Result<String> {
     let func_type = CppType::FunctionPointer(wrapper.function_type.clone());
     let method_args = wrapper
         .arguments

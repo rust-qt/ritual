@@ -49,8 +49,7 @@ pub enum DatabaseItemSource {
     },
     ImplicitDestructor,
     TemplateInstantiation,
-    NamespaceInfering,
-    QtSignalArguments,
+    NamespaceInferring,
 }
 
 impl DatabaseItemSource {
@@ -367,7 +366,6 @@ impl CppFfiItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CppDatabaseItem {
     pub cpp_data: CppItemData,
-
     pub source: DatabaseItemSource,
     pub is_cpp_ffi_processed: bool,
     pub is_rust_processed: bool,
