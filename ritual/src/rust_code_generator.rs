@@ -55,8 +55,8 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: Option<&str>) -> S
         RustType::Tuple(types) => {
             let types_text = types
                 .iter()
-                .map(|t| rust_type_to_code(t, current_crate))
-                .join(", ");
+                .map(|t| rust_type_to_code(t, current_crate) + ",")
+                .join("");
             format!("({})", types_text)
         }
         RustType::PointerLike {
