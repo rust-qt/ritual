@@ -129,7 +129,7 @@ impl State<'_, '_> {
                     is_const: *is_const,
                 }
             }
-            CppType::Void => RustType::Unit,
+            CppType::Void => RustType::unit(),
 
             CppType::BuiltInNumeric(numeric) => {
                 let rust_path = if numeric == &CppBuiltInNumericType::Bool {

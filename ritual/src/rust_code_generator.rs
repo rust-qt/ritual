@@ -51,7 +51,6 @@ fn wrap_unsafe(in_unsafe_context: bool, content: &str) -> String {
 /// Same as `RustCodeGenerator::rust_type_to_code`, but accessible by other modules.
 pub fn rust_type_to_code(rust_type: &RustType, current_crate: Option<&str>) -> String {
     match rust_type {
-        RustType::Unit => "()".to_string(),
         RustType::Tuple(types) => {
             let types_text = types
                 .iter()
@@ -111,9 +110,10 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: Option<&str>) -> S
                 .iter()
                 .map(|arg| rust_type_to_code(arg, current_crate))
                 .join(", "),
-            match return_type.as_ref() {
-                &RustType::Unit => String::new(),
-                return_type => format!(" -> {}", rust_type_to_code(return_type, current_crate)),
+            if return_type.is_unit() {
+                String::new()
+            } else {
+                format!(" -> {}", rust_type_to_code(return_type, current_crate))
             }
         ),
     }
@@ -440,9 +440,10 @@ impl Generator {
             "  pub fn {}({}){};\n",
             func.path.last(),
             args.join(", "),
-            match func.return_type {
-                RustType::Unit => String::new(),
-                _ => format!(" -> {}", self.rust_type_to_code(&func.return_type)),
+            if func.return_type.is_unit() {
+                String::new()
+            } else {
+                format!(" -> {}", self.rust_type_to_code(&func.return_type))
             }
         )
     }
@@ -765,7 +766,7 @@ impl Generator {
             }
         };
 
-        let return_type_for_signature = if func.return_type.api_type == RustType::Unit {
+        let return_type_for_signature = if func.return_type.api_type.is_unit() {
             String::new()
         } else {
             format!(" -> {}", self.rust_type_to_code(&func.return_type.api_type))
