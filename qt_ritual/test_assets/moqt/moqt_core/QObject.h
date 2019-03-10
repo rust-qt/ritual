@@ -2,7 +2,6 @@
 #define QOBJECT_H
 
 #include "moqt_core_exports.h"
-#include <string>
 
 #define Q_SIGNALS public
 #define Q_SLOTS
@@ -13,6 +12,8 @@ public:
     public:
     };
 };
+
+#define Q_OBJECT
 
 class MOQT_CORE_EXPORT QObject {
 public:
@@ -38,7 +39,7 @@ private:
 
 Q_SIGNALS:
     void destroyed(QObject *objectName = nullptr);
-    void objectNameChanged(const std::string &objectName, QPrivateSignal);
+    void objectNameChanged(int objectName, QPrivateSignal);
 
 public Q_SLOTS:
     void deleteLater();

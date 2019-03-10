@@ -63,7 +63,7 @@ fn convert_type_kind(kind: TypeKind) -> CppBuiltInNumericType {
 /// about the C++ library's API from its headers.
 struct CppParser<'b, 'a: 'b> {
     data: &'b mut ProcessorData<'a>,
-    current_target_path: Vec<PathBuf>,
+    current_target_paths: Vec<PathBuf>,
     source_ffi_item: Option<usize>,
 }
 
@@ -306,7 +306,7 @@ fn add_namespaces(data: &mut ProcessorData<'_>) -> Result<()> {
     for name in namespaces {
         let item = CppItemData::Namespace(name);
         data.current_database
-            .add_cpp_item(DatabaseItemSource::NamespaceInferring, item);
+            .add_cpp_item(DatabaseItemSource::NamespaceInferring, None, item);
     }
     Ok(())
 }
@@ -316,7 +316,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     debug!("clang version: {}", get_version());
     debug!("Initializing clang");
     let mut parser = CppParser {
-        current_target_path: data.config.target_include_paths().to_vec(),
+        current_target_paths: data.config.target_include_paths().to_vec(),
         source_ffi_item: None,
         data,
     };
@@ -336,7 +336,7 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
         if let CppFfiItemKind::QtSlotWrapper(slot_wrapper) = &ffi_item.kind {
             let code = cpp_code_generator::qt_slot_wrapper(slot_wrapper)?;
             let mut parser = CppParser {
-                current_target_path: vec![data.workspace.tmp_path()],
+                current_target_paths: vec![data.workspace.tmp_path()],
                 source_ffi_item: Some(ffi_index),
                 data,
             };
@@ -351,6 +351,7 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
             )?;
         }
     }
+    add_namespaces(data)?;
     Ok(())
 }
 
@@ -1186,6 +1187,7 @@ impl CppParser<'_, '_> {
                 include_file: include_file.clone(),
                 origin_location: get_origin_location(entity)?,
             },
+            self.source_ffi_item,
             CppItemData::Type(CppTypeDeclaration {
                 kind: CppTypeDeclarationKind::Enum,
                 path: enum_name.clone(),
@@ -1206,6 +1208,7 @@ impl CppParser<'_, '_> {
                         include_file: include_file.clone(),
                         origin_location: get_origin_location(child)?,
                     },
+                    self.source_ffi_item,
                     CppItemData::EnumValue(CppEnumValue {
                         path: enum_name.join(CppPathItem::from_good_str(&value_name)),
                         value: val.0,
@@ -1236,6 +1239,7 @@ impl CppParser<'_, '_> {
                 include_file,
                 origin_location: get_origin_location(entity)?,
             },
+            self.source_ffi_item,
             CppItemData::ClassField(CppClassField {
                 path: class_type.join(CppPathItem::from_good_str(&field_name)),
                 field_type,
@@ -1307,6 +1311,7 @@ impl CppParser<'_, '_> {
                             include_file: include_file.clone(),
                             origin_location: get_origin_location(entity).unwrap(),
                         },
+                        self.source_ffi_item,
                         CppItemData::ClassBase(CppBaseSpecifier {
                             base_class_type: base_type.clone(),
                             is_virtual: child.is_virtual_base(),
@@ -1336,6 +1341,7 @@ impl CppParser<'_, '_> {
                 include_file,
                 origin_location: get_origin_location(entity).unwrap(),
             },
+            self.source_ffi_item,
             CppItemData::Type(CppTypeDeclaration {
                 kind: CppTypeDeclarationKind::Class { is_movable: false },
                 path: full_name,
@@ -1375,11 +1381,9 @@ impl CppParser<'_, '_> {
         }
         if let Ok(file_path) = self.entity_include_path(entity) {
             let file_path = Path::new(&file_path);
-            if !self.data.config.target_include_paths().is_empty()
+            if !self.current_target_paths.is_empty()
                 && !self
-                    .data
-                    .config
-                    .target_include_paths()
+                    .current_target_paths
                     .iter()
                     .any(|x| file_path.starts_with(x))
             {
@@ -1485,9 +1489,11 @@ impl CppParser<'_, '_> {
                 if entity.get_canonical_entity() == entity {
                     match self.parse_function(entity) {
                         Ok((r, info)) => {
-                            self.data
-                                .current_database
-                                .add_cpp_item(info, CppItemData::Function(r));
+                            self.data.current_database.add_cpp_item(
+                                info,
+                                self.source_ffi_item,
+                                CppItemData::Function(r),
+                            );
                         }
                         Err(error) => {
                             debug!(

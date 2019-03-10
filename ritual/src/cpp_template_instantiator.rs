@@ -174,6 +174,7 @@ pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
     for item in new_methods {
         data.current_database.add_cpp_item(
             DatabaseItemSource::TemplateInstantiation,
+            None, // TODO: what is the source ffi item?
             CppItemData::Function(item),
         );
     }
@@ -240,6 +241,7 @@ pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> 
             new_type.path = item;
             data.current_database.add_cpp_item(
                 DatabaseItemSource::TemplateInstantiation,
+                None, // TODO: what is the source ffi item?
                 CppItemData::Type(new_type),
             );
         } else {

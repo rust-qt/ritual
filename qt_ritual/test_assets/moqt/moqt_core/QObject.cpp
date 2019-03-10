@@ -23,7 +23,7 @@ void QObject::destroyed(QObject *objectName) {
 
 }
 
-void QObject::objectNameChanged(const std::string &objectName, QPrivateSignal) {
+void QObject::objectNameChanged(int objectName, QPrivateSignal) {
 
 }
 

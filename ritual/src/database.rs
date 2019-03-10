@@ -366,6 +366,7 @@ impl CppFfiItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CppDatabaseItem {
     pub cpp_data: CppItemData,
+    pub source_ffi_item: Option<usize>,
     pub source: DatabaseItemSource,
     pub is_cpp_ffi_processed: bool,
     pub is_rust_processed: bool,
@@ -462,7 +463,12 @@ impl Database {
         }
     }
 
-    pub fn add_cpp_item(&mut self, source: DatabaseItemSource, data: CppItemData) -> bool {
+    pub fn add_cpp_item(
+        &mut self,
+        source: DatabaseItemSource,
+        source_ffi_item: Option<usize>,
+        data: CppItemData,
+    ) -> bool {
         if let Some(item) = self
             .cpp_items
             .iter_mut()
@@ -476,13 +482,15 @@ impl Database {
         }
         self.is_modified = true;
         debug!("added cpp item: {}, source: {:?}", data, source);
-        trace!("cpp item data: {:?}", data);
-        self.cpp_items.push(CppDatabaseItem {
+        let item = CppDatabaseItem {
             cpp_data: data,
             source,
+            source_ffi_item,
             is_cpp_ffi_processed: false,
             is_rust_processed: false,
-        });
+        };
+        trace!("cpp item data: {:?}", item);
+        self.cpp_items.push(item);
         true
     }
 

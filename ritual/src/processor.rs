@@ -113,6 +113,7 @@ impl Default for ProcessingSteps {
         );
         s.push("cpp_ffi_generator", cpp_ffi_generator::run);
         s.push("cpp_checker", cpp_checker::run);
+        s.push("cpp_parser_stage2", cpp_parser::parse_generated_items);
         s.push("rust_generator", rust_generator::run);
         s.push("crate_writer", crate_writer::run);
         s.push("build_crate", build_crate);

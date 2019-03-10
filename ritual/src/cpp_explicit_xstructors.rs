@@ -15,9 +15,9 @@ use ritual_common::errors::Result;
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut methods = Vec::new();
     for type1 in data.current_database.cpp_items() {
-        if let CppItemData::Type(type1) = &type1.cpp_data {
-            if type1.kind.is_class() {
-                let class_path = &type1.path;
+        if let CppItemData::Type(declaration) = &type1.cpp_data {
+            if declaration.kind.is_class() {
+                let class_path = &declaration.path;
                 let found_destructor = data
                     .current_database
                     .cpp_items()
@@ -25,8 +25,8 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                     .filter_map(|item| item.cpp_data.as_function_ref())
                     .any(|m| m.is_destructor() && m.class_type().ok().as_ref() == Some(class_path));
                 if !found_destructor {
-                    methods.push(CppFunction {
-                        path: type1.path.join(CppPathItem::from_good_str(&format!(
+                    let function = CppFunction {
+                        path: declaration.path.join(CppPathItem::from_good_str(&format!(
                             "~{}",
                             class_path.last().name
                         ))),
@@ -46,7 +46,8 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                         allows_variadic_arguments: false,
                         declaration_code: None,
                         doc: None,
-                    });
+                    };
+                    methods.push((type1.source_ffi_item, function));
                 }
 
                 let found_constructor = data
@@ -58,10 +59,10 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                         m.is_constructor() && m.class_type().ok().as_ref() == Some(class_path)
                     });
                 if !found_constructor {
-                    methods.push(CppFunction {
-                        path: type1
+                    let function = CppFunction {
+                        path: declaration
                             .path
-                            .join(CppPathItem::from_good_str(&type1.path.last().name)),
+                            .join(CppPathItem::from_good_str(&declaration.path.last().name)),
                         member: Some(CppFunctionMemberData {
                             is_virtual: false,
                             is_pure_virtual: false,
@@ -78,14 +79,16 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                         allows_variadic_arguments: false,
                         declaration_code: None,
                         doc: None,
-                    });
+                    };
+                    methods.push((type1.source_ffi_item, function));
                 }
             }
         }
     }
-    for method in methods {
+    for (source_ffi_item, method) in methods {
         data.current_database.add_cpp_item(
             DatabaseItemSource::ImplicitDestructor,
+            source_ffi_item,
             CppItemData::Function(method),
         );
     }
