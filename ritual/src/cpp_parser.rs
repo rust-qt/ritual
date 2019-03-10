@@ -754,11 +754,17 @@ impl CppParser<'_, '_> {
                                     _ => unreachable!(),
                                 };
 
-                                Ok(CppType::PointerLike {
-                                    kind: original_type_indirection,
-                                    is_const: pointee.is_const_qualified(),
-                                    target: Box::new(subtype),
-                                })
+                                if original_type_indirection == CppPointerLikeTypeKind::Pointer
+                                    && subtype.is_function_pointer()
+                                {
+                                    Ok(subtype)
+                                } else {
+                                    Ok(CppType::PointerLike {
+                                        kind: original_type_indirection,
+                                        is_const: pointee.is_const_qualified(),
+                                        target: Box::new(subtype),
+                                    })
+                                }
                             }
                             Err(msg) => Err(msg),
                         }

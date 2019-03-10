@@ -1057,3 +1057,31 @@ fn empty_namespace() {
     assert!(data.namespaces.contains(&CppPath::from_good_str("a")));
     assert!(data.namespaces.contains(&CppPath::from_good_str("a::b")));
 }
+
+#[test]
+fn function_pointer() {
+    let data = run_parser("void set(void (*func)(void*), void* data);");
+    assert_eq!(data.methods.len(), 1);
+    let function = &data.methods[0];
+    assert_eq!(function.arguments.len(), 2);
+
+    let arg0 = &function.arguments[0];
+    assert_eq!(arg0.name, "func");
+    assert_eq!(
+        arg0.argument_type,
+        CppType::FunctionPointer(CppFunctionPointerType {
+            arguments: vec![CppType::new_pointer(false, CppType::Void)],
+            return_type: Box::new(CppType::Void),
+            allows_variadic_arguments: false,
+        })
+    );
+    assert_eq!(arg0.has_default_value, false);
+
+    let arg1 = &function.arguments[1];
+    assert_eq!(arg1.name, "data");
+    assert_eq!(
+        arg1.argument_type,
+        CppType::new_pointer(false, CppType::Void)
+    );
+    assert_eq!(arg1.has_default_value, false);
+}
