@@ -1,5 +1,8 @@
-use moqt_core::QObject;
+use moqt_core::{QObject, RawSlotOfCInt};
+use cpp_utils::Ptr;
 use std::ffi::CStr;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::os::raw::{c_void, c_int};
 
 #[test]
 fn qobject() {
@@ -17,5 +20,23 @@ fn qobject() {
 
         let method = CStr::from_ptr(args.method().as_ptr()).to_str().unwrap();
         assert_eq!(method, "1deleteLater()");
+    }
+}
+
+#[test]
+fn raw_slot() {
+    unsafe {
+        static FLAG: AtomicBool = AtomicBool::new(false);
+        extern "C" fn hook(data: *mut c_void, value: c_int) {
+            assert_eq!(value, 7);
+            let old = FLAG.swap(true, Ordering::SeqCst);
+            assert!(!old);
+        }
+
+        let mut obj = RawSlotOfCInt::new();
+        obj.set(hook, Ptr::new(5 as *mut c_void));
+        assert!(!FLAG.load(Ordering::SeqCst));
+        obj.custom_slot(7);
+        assert!(FLAG.load(Ordering::SeqCst));
     }
 }
