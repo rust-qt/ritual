@@ -96,6 +96,7 @@ enum NameType<'a> {
     ApiFunction(&'a CppFfiFunction),
     ReceiverFunction,
     SizedItem,
+    RawQtSlotWrapper { signal_arguments: Vec<CppType> },
 }
 
 struct State<'b, 'a: 'b>(&'b mut ProcessorData<'a>);
@@ -822,23 +823,28 @@ impl State<'_, '_> {
         }
     }
 
+    fn type_list_caption(&self, types: &[CppType], context: &RustPath) -> Result<String> {
+        let mut captions = Vec::new();
+        for arg in types {
+            let rust_type = self.rust_final_type(
+                &CppFfiType {
+                    ffi_type: arg.clone(),
+                    original_type: arg.clone(),
+                    conversion: CppTypeConversionToFfi::NoChange,
+                },
+                &CppFfiArgumentMeaning::Argument(0),
+                true,
+                &ReturnValueAllocationPlace::NotApplicable,
+            )?;
+            captions.push(rust_type.api_type.caption(context)?);
+        }
+        Ok(captions.join("_"))
+    }
+
     fn cpp_path_item_to_name(&self, item: &CppPathItem, context: &RustPath) -> Result<String> {
         if let Some(template_arguments) = &item.template_arguments {
-            let mut captions = Vec::new();
-            for arg in template_arguments {
-                let rust_type = self.rust_final_type(
-                    &CppFfiType {
-                        ffi_type: arg.clone(),
-                        original_type: arg.clone(),
-                        conversion: CppTypeConversionToFfi::NoChange,
-                    },
-                    &CppFfiArgumentMeaning::Argument(0),
-                    true,
-                    &ReturnValueAllocationPlace::NotApplicable,
-                )?;
-                captions.push(rust_type.api_type.caption(context)?);
-            }
-            Ok(format!("{}_of_{}", item.name, captions.join("_")))
+            let captions = self.type_list_caption(template_arguments, context)?;
+            Ok(format!("{}_of_{}", item.name, captions))
         } else {
             Ok(item.name.clone())
         }
@@ -873,6 +879,10 @@ impl State<'_, '_> {
                     path: sized_module.path.clone(),
                     prefix: None,
                 }
+            }
+            NameType::RawQtSlotWrapper { .. } => {
+                // crate root
+                self.default_strategy()
             }
             NameType::Type
             | NameType::Module
@@ -911,6 +921,14 @@ impl State<'_, '_> {
                 .cpp_path_item_to_name(&cpp_path.last(), &strategy.path)?
                 .to_snake_case(),
             NameType::FfiFunction => cpp_path.last().name.clone(),
+            NameType::RawQtSlotWrapper { signal_arguments } => {
+                if signal_arguments.is_empty() {
+                    "RawSlot".to_string()
+                } else {
+                    let captions = self.type_list_caption(signal_arguments, &strategy.path)?;
+                    format!("RawSlotOf_{}", captions).to_class_case()
+                }
+            }
         };
 
         let mut number = None;
@@ -1010,7 +1028,22 @@ impl State<'_, '_> {
                             }
                         }
 
-                        let public_path = self.generate_rust_path(&data.path, &NameType::Type)?;
+                        let mut public_name_type = NameType::Type;
+                        if let Some(ffi_index) = cpp_item.source_ffi_item {
+                            let ffi_item = self
+                                .0
+                                .current_database
+                                .ffi_items()
+                                .get(ffi_index)
+                                .ok_or_else(|| err_msg("cpp item references invalid ffi index"))?;
+                            if let CppFfiItemKind::QtSlotWrapper(wrapper) = &ffi_item.kind {
+                                public_name_type = NameType::RawQtSlotWrapper {
+                                    signal_arguments: wrapper.signal_arguments.clone(),
+                                }
+                            }
+                        }
+
+                        let public_path = self.generate_rust_path(&data.path, &public_name_type)?;
 
                         let mut rust_items = Vec::new();
 
