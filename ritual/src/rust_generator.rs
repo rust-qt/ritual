@@ -8,7 +8,7 @@ use crate::cpp_ffi_data::CppFfiFunctionKind;
 use crate::cpp_ffi_data::CppFfiType;
 use crate::cpp_ffi_data::CppFieldAccessorType;
 use crate::cpp_ffi_data::CppTypeConversionToFfi;
-use crate::cpp_function::ReturnValueAllocationPlace;
+use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
 use crate::cpp_type::is_qflags;
 use crate::cpp_type::CppBuiltInNumericType;
 use crate::cpp_type::CppFunctionPointerType;
@@ -22,13 +22,11 @@ use crate::database::CppFfiItem;
 use crate::database::CppFfiItemKind;
 use crate::database::CppItemData;
 use crate::processor::ProcessorData;
-use crate::rust_info::RustDatabaseItem;
 use crate::rust_info::RustEnumValue;
 use crate::rust_info::RustEnumValueDoc;
 use crate::rust_info::RustFFIArgument;
 use crate::rust_info::RustFFIFunction;
 use crate::rust_info::RustFfiWrapperData;
-use crate::rust_info::RustFlagEnumImpl;
 use crate::rust_info::RustFunction;
 use crate::rust_info::RustFunctionArgument;
 use crate::rust_info::RustFunctionKind;
@@ -46,6 +44,7 @@ use crate::rust_info::RustWrapperType;
 use crate::rust_info::RustWrapperTypeDocData;
 use crate::rust_info::RustWrapperTypeKind;
 use crate::rust_info::UnnamedRustFunction;
+use crate::rust_info::{RustDatabaseItem, RustExtraImpl, RustExtraImplKind, RustRawSlotReceiver};
 use crate::rust_type::RustCommonType;
 use crate::rust_type::RustFinalType;
 use crate::rust_type::RustPath;
@@ -1018,17 +1017,19 @@ impl State<'_, '_> {
                                     let rust_type = self.find_wrapper_type(path)?;
                                     let rust_type_path =
                                         rust_type.path().expect("enum rust item must have path");
-                                    let qflags = self.qt_core_path().join("QFlags");
-                                    let rust_item = RustItemKind::FlagEnumImpl(RustFlagEnumImpl {
-                                        enum_path: rust_type_path.clone(),
-                                        qflags,
+                                    let rust_item = RustItemKind::ExtraImpl(RustExtraImpl {
+                                        parent_path: rust_type_path.parent()?,
+                                        kind: RustExtraImplKind::FlagEnum {
+                                            enum_path: rust_type_path.clone(),
+                                            qt_core_path: self.qt_core_path(),
+                                        },
                                     });
                                     return Ok(vec![rust_item]);
                                 }
                             }
                         }
 
-                        let mut public_name_type = NameType::Type;
+                        let mut qt_slot_wrapper = None;
                         if let Some(ffi_index) = cpp_item.source_ffi_item {
                             let ffi_item = self
                                 .0
@@ -1037,11 +1038,17 @@ impl State<'_, '_> {
                                 .get(ffi_index)
                                 .ok_or_else(|| err_msg("cpp item references invalid ffi index"))?;
                             if let CppFfiItemKind::QtSlotWrapper(wrapper) = &ffi_item.kind {
-                                public_name_type = NameType::RawQtSlotWrapper {
-                                    signal_arguments: wrapper.signal_arguments.clone(),
-                                }
+                                qt_slot_wrapper = Some(wrapper);
                             }
                         }
+
+                        let public_name_type = if let Some(wrapper) = qt_slot_wrapper {
+                            NameType::RawQtSlotWrapper {
+                                signal_arguments: wrapper.signal_arguments.clone(),
+                            }
+                        } else {
+                            NameType::Type
+                        };
 
                         let public_path = self.generate_rust_path(&data.path, &public_name_type)?;
 
@@ -1077,7 +1084,7 @@ impl State<'_, '_> {
 
                         let public_rust_item = RustItemKind::Struct(RustStruct {
                             extra_doc: None,
-                            path: public_path,
+                            path: public_path.clone(),
                             kind: RustStructKind::WrapperType(RustWrapperType {
                                 doc_data: RustWrapperTypeDocData {
                                     cpp_path: data.path.clone(),
@@ -1103,6 +1110,31 @@ impl State<'_, '_> {
                             kind: RustModuleKind::CppNestedType,
                         });
                         rust_items.push(nested_types_rust_item);
+
+                        if let Some(wrapper) = qt_slot_wrapper {
+                            let arg_types = wrapper
+                                .signal_arguments
+                                .iter()
+                                .map_if_ok(|t| self.ffi_type_to_rust_ffi_type(t))?;
+
+                            let receiver_id = CppFunction::receiver_id_from_data(
+                                RustQtReceiverType::Slot,
+                                "custom_slot",
+                                &wrapper.signal_arguments,
+                            )?;
+
+                            let impl_item = RustItemKind::ExtraImpl(RustExtraImpl {
+                                parent_path: public_path.parent()?,
+                                kind: RustExtraImplKind::RawSlotReceiver(RustRawSlotReceiver {
+                                    qt_core_path: self.qt_core_path(),
+                                    receiver_id,
+                                    target_path: public_path,
+                                    arguments: RustType::Tuple(arg_types),
+                                }),
+                            });
+                            rust_items.push(impl_item);
+                        }
+
                         Ok(rust_items)
                     }
                     CppTypeDeclarationKind::Enum => {

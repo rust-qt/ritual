@@ -137,27 +137,30 @@ impl<A> Signal<A> {
     }
 }
 
-pub trait AsReceiver<Arguments> {
-    fn as_receiver(self) -> Receiver<Arguments>;
+pub trait AsReceiver {
+    type Arguments;
+    fn as_receiver(self) -> Receiver<Self::Arguments>;
 }
 
-impl<A> AsReceiver<A> for Receiver<A> {
+impl<A> AsReceiver for Receiver<A> {
+    type Arguments = A;
     fn as_receiver(self) -> Receiver<A> {
         self
     }
 }
 
-impl<A> AsReceiver<A> for Signal<A> {
+impl<A> AsReceiver for Signal<A> {
+    type Arguments = A;
     fn as_receiver(self) -> Receiver<A> {
         self.0
     }
 }
 
 impl<SignalArguments> Signal<SignalArguments> {
-    pub unsafe fn connect<ReceiverArguments, R>(&self, receiver: R) -> crate::q_meta_object::Connection
+    pub unsafe fn connect<R>(&self, receiver: R) -> crate::q_meta_object::Connection
         where
-            R: AsReceiver<ReceiverArguments>,
-            SignalArguments: ArgumentsCompatible<ReceiverArguments>,
+            R: AsReceiver,
+            SignalArguments: ArgumentsCompatible<R::Arguments>,
     {
         let receiver = receiver.as_receiver();
         // TODO: allow to change connection type

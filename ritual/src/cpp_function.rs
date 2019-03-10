@@ -5,6 +5,7 @@ use crate::cpp_data::CppVisibility;
 pub use crate::cpp_operator::{CppOperator, CppOperatorInfo};
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
+use crate::rust_info::RustQtReceiverType;
 use itertools::Itertools;
 use ritual_common::errors::{bail, err_msg, Result, ResultExt};
 use ritual_common::utils::MapIfOk;
@@ -291,29 +292,42 @@ impl CppFunction {
         }
     }
 
+    pub fn receiver_id_from_data<'a>(
+        receiver_type: RustQtReceiverType,
+        name: &'a str,
+        arguments: impl IntoIterator<Item = &'a CppType>,
+    ) -> Result<String> {
+        let type_num = match receiver_type {
+            RustQtReceiverType::Signal => "2",
+            RustQtReceiverType::Slot => "1",
+        };
+        Ok(format!(
+            "{}{}({})",
+            type_num,
+            name,
+            arguments.map_if_ok(|arg| arg.to_cpp_code(None))?.join(",")
+        ))
+    }
+
     /// Returns the identifier that should be used in `QObject::connect`
     /// to specify this signal or slot.
     pub fn receiver_id(&self) -> Result<String> {
-        let type_num = if let Some(info) = &self.member {
+        let receiver_type = if let Some(info) = &self.member {
             if info.is_slot {
-                "1"
+                RustQtReceiverType::Slot
             } else if info.is_signal {
-                "2"
+                RustQtReceiverType::Signal
             } else {
                 bail!("not a signal or slot");
             }
         } else {
             bail!("not a class method");
         };
-        Ok(format!(
-            "{}{}({})",
-            type_num,
-            self.path.last().name,
-            self.arguments
-                .iter()
-                .map_if_ok(|arg| arg.argument_type.to_cpp_code(None))?
-                .join(",")
-        ))
+        Self::receiver_id_from_data(
+            receiver_type,
+            &self.path.last().name,
+            self.arguments.iter().map(|arg| &arg.argument_type),
+        )
     }
 
     pub fn member(&self) -> Option<&CppFunctionMemberData> {

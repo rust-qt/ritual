@@ -1,12 +1,11 @@
 //! Types and functions used for Rust code generation.
 
 use crate::doc_formatter;
-use crate::rust_info::RustDatabase;
 use crate::rust_info::RustDatabaseItem;
 use crate::rust_info::RustEnumValue;
+use crate::rust_info::RustExtraImpl;
 use crate::rust_info::RustFFIFunction;
 use crate::rust_info::RustFfiWrapperData;
-use crate::rust_info::RustFlagEnumImpl;
 use crate::rust_info::RustFunction;
 use crate::rust_info::RustFunctionArgument;
 use crate::rust_info::RustFunctionKind;
@@ -17,6 +16,7 @@ use crate::rust_info::RustStruct;
 use crate::rust_info::RustStructKind;
 use crate::rust_info::RustTraitImpl;
 use crate::rust_info::RustWrapperTypeKind;
+use crate::rust_info::{RustDatabase, RustExtraImplKind};
 use crate::rust_type::RustCommonType;
 use crate::rust_type::RustFinalType;
 use crate::rust_type::RustPath;
@@ -218,7 +218,7 @@ impl Generator {
             RustItemKind::TraitImpl(value) => self.generate_trait_impl(value),
             RustItemKind::Function(value) => self.generate_rust_final_function(value, false),
             RustItemKind::FfiFunction(value) => self.generate_ffi_function(value),
-            RustItemKind::FlagEnumImpl(value) => self.generate_flag_enum_impl(value),
+            RustItemKind::ExtraImpl(value) => self.generate_extra_impl(value),
         }
     }
 
@@ -854,16 +854,38 @@ impl Generator {
         Ok(())
     }
 
-    fn generate_flag_enum_impl(&mut self, data: &RustFlagEnumImpl) -> Result<()> {
-        let enum_path = self.rust_path_to_string(&data.enum_path);
-        let qflags = self.rust_path_to_string(&data.qflags);
+    fn generate_extra_impl(&mut self, data: &RustExtraImpl) -> Result<()> {
+        match &data.kind {
+            RustExtraImplKind::FlagEnum {
+                enum_path,
+                qt_core_path,
+            } => {
+                let enum_path = self.rust_path_to_string(enum_path);
+                let qflags = self.rust_path_to_string(&qt_core_path.join("QFlags"));
 
-        writeln!(
-            self,
-            include_str!("../templates/crate/flag_enum_impl.rs.in"),
-            e = enum_path,
-            qflags = qflags
-        )?;
+                writeln!(
+                    self,
+                    include_str!("../templates/crate/flag_enum_impl.rs.in"),
+                    e = enum_path,
+                    qflags = qflags
+                )?;
+            }
+            RustExtraImplKind::RawSlotReceiver(data) => {
+                let qt_core = if data.qt_core_path.parts[0] == self.crate_name {
+                    "crate".to_string()
+                } else {
+                    format!("::{}", data.qt_core_path.parts[0])
+                };
+                writeln!(
+                    self,
+                    include_str!("../templates/crate/impl_receiver_for_raw_slot.rs.in"),
+                    qt_core = qt_core,
+                    type_path = self.rust_path_to_string(&data.target_path),
+                    args = self.rust_type_to_code(&data.arguments),
+                    receiver_id = data.receiver_id,
+                )?;
+            }
+        }
         Ok(())
     }
 }

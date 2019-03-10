@@ -464,9 +464,26 @@ pub struct RustFFIFunction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RustFlagEnumImpl {
-    pub enum_path: RustPath,
-    pub qflags: RustPath,
+pub struct RustRawSlotReceiver {
+    pub qt_core_path: RustPath,
+    pub target_path: RustPath,
+    pub arguments: RustType,
+    pub receiver_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RustExtraImplKind {
+    FlagEnum {
+        enum_path: RustPath,
+        qt_core_path: RustPath,
+    },
+    RawSlotReceiver(RustRawSlotReceiver),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RustExtraImpl {
+    pub parent_path: RustPath,
+    pub kind: RustExtraImplKind,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -476,7 +493,7 @@ pub enum RustItemKind {
     Struct(RustStruct),
     EnumValue(RustEnumValue),
     TraitImpl(RustTraitImpl),
-    FlagEnumImpl(RustFlagEnumImpl),
+    ExtraImpl(RustExtraImpl),
     FfiFunction(RustFFIFunction), // TODO: merge FfiFunction and Function
     Function(RustFunction),
 }
@@ -516,9 +533,7 @@ impl RustItemKind {
                 rust_type_to_code(&data.trait_type, None),
                 rust_type_to_code(&data.target_type, None)
             ),
-            RustItemKind::FlagEnumImpl(data) => {
-                format!("enum flag impl {}", data.enum_path.full_name(None))
-            }
+            RustItemKind::ExtraImpl(data) => format!("extra impl {:?}", data.kind),
             RustItemKind::FfiFunction(data) => format!("ffi fn {}", data.path.full_name(None)),
             RustItemKind::Function(data) => format!("fn {}", data.path.full_name(None)),
         }
@@ -540,13 +555,13 @@ impl RustDatabaseItem {
             RustItemKind::EnumValue(data) => Some(&data.path),
             RustItemKind::Function(data) => Some(&data.path),
             RustItemKind::FfiFunction(data) => Some(&data.path),
-            RustItemKind::TraitImpl(_) | RustItemKind::FlagEnumImpl(_) => None,
+            RustItemKind::TraitImpl(_) | RustItemKind::ExtraImpl(_) => None,
         }
     }
     pub fn is_child_of(&self, parent: &RustPath) -> bool {
         match &self.kind {
             RustItemKind::TraitImpl(trait_impl) => &trait_impl.parent_path == parent,
-            RustItemKind::FlagEnumImpl(data) => data.enum_path.is_child_of(parent),
+            RustItemKind::ExtraImpl(data) => &data.parent_path == parent,
             _ => {
                 let path = self
                     .path()

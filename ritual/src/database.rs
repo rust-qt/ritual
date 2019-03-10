@@ -302,6 +302,14 @@ pub enum CppFfiItemKind {
 }
 
 impl CppFfiItemKind {
+    pub fn as_function_ref(&self) -> Option<&CppFfiFunction> {
+        if let CppFfiItemKind::Function(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+
     pub fn short_text(&self) -> String {
         match self {
             CppFfiItemKind::Function(function) => match &function.kind {
