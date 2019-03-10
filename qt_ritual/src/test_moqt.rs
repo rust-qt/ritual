@@ -1,4 +1,6 @@
-use crate::Options;
+use crate::lib_configs::global_config;
+use ritual::cli;
+use ritual::cli::Options;
 use ritual_common::cpp_lib_builder::{BuildType, CppLibBuilder};
 use ritual_common::errors::{FancyUnwrap, Result};
 use ritual_common::file_utils::canonicalize;
@@ -83,12 +85,15 @@ fn test_moqt() {
     let workspace = temp_dir.path().join("workspace");
     create_dir_all(&workspace).unwrap();
 
-    crate::run(Options {
-        workspace,
-        local_paths: Some(true),
-        delete_database: true,
-        crates: vec!["moqt_core".into(), "moqt_gui".into()],
-        operations: vec!["main".into()],
-    })
+    cli::run(
+        Options {
+            workspace,
+            local_paths: Some(true),
+            delete_database: true,
+            crates: vec!["moqt_core".into(), "moqt_gui".into()],
+            operations: vec!["main".into()],
+        },
+        global_config(),
+    )
     .fancy_unwrap();
 }

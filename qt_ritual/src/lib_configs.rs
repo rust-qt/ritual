@@ -6,9 +6,9 @@ use crate::fix_header_names::fix_header_names;
 use crate::slot_wrappers::add_slot_wrappers;
 use crate::versions;
 use log::info;
-use qt_ritual_common::{get_full_build_config, lib_dependencies, lib_folder_name};
-use ritual::config::Config;
+use qt_ritual_common::{all_crate_names, get_full_build_config, lib_dependencies, lib_folder_name};
 use ritual::config::CrateProperties;
+use ritual::config::{Config, GlobalConfig};
 use ritual::cpp_data::CppPath;
 use ritual_common::cpp_build_config::CppLibraryType;
 use ritual_common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
@@ -639,4 +639,11 @@ pub fn create_config(crate_name: &str) -> Result<Config> {
             .collect(),
     );
     Ok(config)
+}
+
+pub fn global_config() -> GlobalConfig {
+    let mut config = GlobalConfig::new();
+    config.set_all_crate_names(all_crate_names().iter().map(|s| s.to_string()).collect());
+    config.set_create_config_hook(create_config);
+    config
 }

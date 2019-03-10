@@ -4,6 +4,7 @@ use crate::cpp_data::CppPath;
 use crate::processor::ProcessingSteps;
 use ritual_common;
 use ritual_common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
+use ritual_common::errors::Result;
 use ritual_common::toml;
 use std::path::PathBuf;
 
@@ -391,5 +392,35 @@ impl Config {
     /// Keys of the hash map are names of C++ types.
     pub fn movable_types(&self) -> &[CppPath] {
         &self.movable_types
+    }
+}
+
+#[derive(Default)]
+pub struct GlobalConfig {
+    create_config_hook: Option<Box<dyn FnMut(&str) -> Result<Config>>>,
+    all_crate_names: Vec<String>,
+}
+
+impl GlobalConfig {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn set_create_config_hook<F: FnMut(&str) -> Result<Config> + 'static>(&mut self, f: F) {
+        self.create_config_hook = Some(Box::new(f));
+    }
+
+    pub fn create_config_hook(
+        &mut self,
+    ) -> Option<&mut (dyn FnMut(&str) -> Result<Config> + 'static)> {
+        self.create_config_hook.as_mut().map(|b| &mut **b)
+    }
+
+    pub fn set_all_crate_names(&mut self, names: Vec<String>) {
+        self.all_crate_names = names;
+    }
+
+    pub fn all_crate_names(&self) -> &[String] {
+        &self.all_crate_names
     }
 }
