@@ -293,6 +293,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         data.current_database.ffi_items(),
         &c_lib_path.join("file1.cpp"),
         &global_header_name,
+        data.current_database.crate_name(),
     )?;
 
     let file = create_file(c_lib_path.join("sized_types.cxx"))?;

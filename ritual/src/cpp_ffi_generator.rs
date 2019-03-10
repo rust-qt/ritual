@@ -99,16 +99,23 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
             continue;
         }
         let result = match &item.cpp_data {
-            CppItemData::Function(method) => {
-                generate_ffi_methods_for_method(method, &movable_types, &mut name_provider)
-                    .map(|v| v.into_iter().collect_vec())
-            }
-            CppItemData::ClassField(field) => {
-                generate_field_accessors(field, &movable_types, &mut name_provider)
-                    .map(|v| v.into_iter().collect_vec())
-            }
+            CppItemData::Function(method) => generate_ffi_methods_for_method(
+                method,
+                &movable_types,
+                item.source_ffi_item,
+                &mut name_provider,
+            )
+            .map(|v| v.into_iter().collect_vec()),
+            CppItemData::ClassField(field) => generate_field_accessors(
+                field,
+                &movable_types,
+                item.source_ffi_item,
+                &mut name_provider,
+            )
+            .map(|v| v.into_iter().collect_vec()),
             CppItemData::ClassBase(base) => {
-                generate_casts(base, &mut name_provider).map(|v| v.into_iter().collect_vec())
+                generate_casts(base, item.source_ffi_item, &mut name_provider)
+                    .map(|v| v.into_iter().collect_vec())
             }
             CppItemData::Type(_) | CppItemData::EnumValue(_) | CppItemData::Namespace(_) => {
                 // no FFI methods for these items
@@ -145,6 +152,7 @@ fn create_cast_method(
     cast: CppCast,
     from: &CppType,
     to: &CppType,
+    source_ffi_item: Option<usize>,
     name_provider: &mut FfiNameProvider,
 ) -> Result<CppFfiItem> {
     let method = CppFunction {
@@ -175,7 +183,7 @@ fn create_cast_method(
         name_provider,
     )?;
 
-    Ok(CppFfiItem::from_function(r))
+    Ok(CppFfiItem::from_function(r, source_ffi_item))
 }
 
 /// Performs a portion of `generate_casts` operation.
@@ -186,6 +194,7 @@ fn generate_casts_one(
     target_type: &CppPath,
     base_type: &CppPath,
     direct_base_index: usize,
+    source_ffi_item: Option<usize>,
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiItem>> {
     let target_ptr_type = CppType::PointerLike {
@@ -206,6 +215,7 @@ fn generate_casts_one(
         },
         &base_ptr_type,
         &target_ptr_type,
+        source_ffi_item,
         name_provider,
     )?);
     new_methods.push(create_cast_method(
@@ -215,12 +225,14 @@ fn generate_casts_one(
         },
         &target_ptr_type,
         &base_ptr_type,
+        source_ffi_item,
         name_provider,
     )?);
     new_methods.push(create_cast_method(
         CppCast::Dynamic,
         &base_ptr_type,
         &target_ptr_type,
+        source_ffi_item,
         name_provider,
     )?);
 
@@ -231,6 +243,7 @@ fn generate_casts_one(
 /// in this `CppData`.
 fn generate_casts(
     base: &CppBaseSpecifier,
+    source_ffi_item: Option<usize>,
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiItem>> {
     //log::status("Adding cast functions");
@@ -238,6 +251,7 @@ fn generate_casts(
         &base.derived_class_type,
         &base.base_class_type,
         base.base_index,
+        source_ffi_item,
         name_provider,
     )
 }
@@ -245,18 +259,22 @@ fn generate_casts(
 fn generate_ffi_methods_for_method(
     method: &CppFunction,
     movable_types: &[CppPath],
+    source_ffi_item: Option<usize>,
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiItem>> {
     let mut methods = Vec::new();
-    methods.push(CppFfiItem::from_function(to_ffi_method(
-        &CppFfiFunctionKind::Function {
-            cpp_function: method.clone(),
-            omitted_arguments: None,
-            cast: None,
-        },
-        movable_types,
-        name_provider,
-    )?));
+    methods.push(CppFfiItem::from_function(
+        to_ffi_method(
+            &CppFfiFunctionKind::Function {
+                cpp_function: method.clone(),
+                omitted_arguments: None,
+                cast: None,
+            },
+            movable_types,
+            name_provider,
+        )?,
+        source_ffi_item,
+    ));
 
     if let Some(last_arg) = method.arguments.last() {
         if last_arg.has_default_value {
@@ -276,7 +294,7 @@ fn generate_ffi_methods_for_method(
                     movable_types,
                     name_provider,
                 )?;
-                methods.push(CppFfiItem::from_function(processed_method));
+                methods.push(CppFfiItem::from_function(processed_method, source_ffi_item));
             }
         }
     }
@@ -447,6 +465,7 @@ pub fn to_ffi_method(
 fn generate_field_accessors(
     field: &CppClassField,
     movable_types: &[CppPath],
+    source_ffi_item: Option<usize>,
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiItem>> {
     let mut new_methods = Vec::new();
@@ -456,7 +475,7 @@ fn generate_field_accessors(
             accessor_type,
         };
         let ffi_function = to_ffi_method(&kind, movable_types, name_provider)?;
-        Ok(CppFfiItem::from_function(ffi_function))
+        Ok(CppFfiItem::from_function(ffi_function, source_ffi_item))
     };
 
     if field.visibility == CppVisibility::Public {

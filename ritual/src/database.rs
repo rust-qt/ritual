@@ -1,3 +1,4 @@
+use crate::cpp_code_generator;
 use crate::cpp_data::CppBaseSpecifier;
 use crate::cpp_data::CppClassField;
 use crate::cpp_data::CppEnumValue;
@@ -13,6 +14,7 @@ use crate::cpp_type::CppType;
 use crate::rust_info::{RustDatabase, RustDatabaseItem};
 use itertools::Itertools;
 use log::{debug, trace};
+use ritual_common::errors::{bail, Result};
 use ritual_common::target::Target;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::Display;
@@ -334,22 +336,25 @@ impl CppFfiItemKind {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CppFfiItem {
     pub kind: CppFfiItemKind,
+    pub source_ffi_item: Option<usize>,
     pub checks: CppChecks,
     pub is_rust_processed: bool,
 }
 
 impl CppFfiItem {
-    pub fn from_function(function: CppFfiFunction) -> Self {
+    pub fn from_function(function: CppFfiFunction, source_ffi_item: Option<usize>) -> Self {
         CppFfiItem {
             kind: CppFfiItemKind::Function(function),
+            source_ffi_item,
             checks: CppChecks::default(),
             is_rust_processed: false,
         }
     }
 
-    pub fn from_qt_slot_wrapper(wrapper: QtSlotWrapper) -> Self {
+    pub fn from_qt_slot_wrapper(wrapper: QtSlotWrapper, source_ffi_item: Option<usize>) -> Self {
         CppFfiItem {
             kind: CppFfiItemKind::QtSlotWrapper(wrapper),
+            source_ffi_item,
             checks: CppChecks::default(),
             is_rust_processed: false,
         }
@@ -359,6 +364,22 @@ impl CppFfiItem {
         match &self.kind {
             CppFfiItemKind::Function(f) => &f.path,
             CppFfiItemKind::QtSlotWrapper(s) => &s.class_path,
+        }
+    }
+
+    pub fn is_source_item(&self) -> bool {
+        match &self.kind {
+            CppFfiItemKind::Function(_) => false,
+            CppFfiItemKind::QtSlotWrapper(_) => true,
+        }
+    }
+
+    pub fn source_item_cpp_code(&self) -> Result<String> {
+        match &self.kind {
+            CppFfiItemKind::Function(_) => bail!("not a source item"),
+            CppFfiItemKind::QtSlotWrapper(slot_wrapper) => {
+                cpp_code_generator::qt_slot_wrapper(slot_wrapper)
+            }
         }
     }
 }
@@ -446,6 +467,8 @@ impl Database {
         for item in &mut self.cpp_items {
             item.is_cpp_ffi_processed = false;
         }
+        self.cpp_items.retain(|item| item.source_ffi_item.is_none());
+        // TODO: deal with rust items that now have invalid index references
     }
 
     pub fn crate_name(&self) -> &str {

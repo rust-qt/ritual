@@ -11,7 +11,7 @@ use rayon::slice::ParallelSliceMut;
 use ritual_common::cpp_lib_builder::{
     c2r_cmake_vars, BuildType, CppLibBuilder, CppLibBuilderOutput,
 };
-use ritual_common::errors::{bail, Result};
+use ritual_common::errors::{bail, err_msg, Result};
 use ritual_common::file_utils::{create_dir_all, create_file, path_to_str, remove_dir_all};
 use ritual_common::target::current_target;
 use ritual_common::utils::MapIfOk;
@@ -56,14 +56,22 @@ fn check_snippets<'a>(
     result
 }
 
-fn snippet_for_item(item: &CppFfiItem) -> Result<Snippet> {
+fn snippet_for_item(item: &CppFfiItem, all_items: &[CppFfiItem]) -> Result<Snippet> {
     match &item.kind {
-        CppFfiItemKind::Function(cpp_ffi_function) => Ok(Snippet::new_global(
-            cpp_code_generator::function_implementation(cpp_ffi_function)?,
-        )),
-        CppFfiItemKind::QtSlotWrapper(_qt_slot_wrapper) => {
-            bail!("qt slot wrappers are not supported yet");
+        CppFfiItemKind::Function(cpp_ffi_function) => {
+            let item_code = cpp_code_generator::function_implementation(cpp_ffi_function)?;
+            let full_code = if let Some(index) = item.source_ffi_item {
+                let source_item = all_items
+                    .get(index)
+                    .ok_or_else(|| err_msg("ffi item references invalid index"))?;
+                let source_item_code = source_item.source_item_cpp_code()?;
+                format!("{}\n{}", source_item_code, item_code)
+            } else {
+                item_code
+            };
+            Ok(Snippet::new_global(full_code))
         }
+        CppFfiItemKind::QtSlotWrapper(_) => Ok(Snippet::new_global(item.source_item_cpp_code()?)),
     }
 }
 
@@ -243,12 +251,21 @@ impl CppChecker<'_, '_> {
                 continue;
             }
 
-            if let Ok(snippet) = snippet_for_item(ffi_item) {
-                snippets.push(SnippetWithIndexes {
-                    ffi_item_index,
-                    snippet,
-                    output: None,
-                });
+            match snippet_for_item(ffi_item, self.data.current_database.ffi_items()) {
+                Ok(snippet) => {
+                    snippets.push(SnippetWithIndexes {
+                        ffi_item_index,
+                        snippet,
+                        output: None,
+                    });
+                }
+                Err(err) => {
+                    debug!(
+                        "can't create snippet: {}: {:?}",
+                        ffi_item.kind.short_text(),
+                        err
+                    );
+                }
             }
         }
 

@@ -294,6 +294,7 @@ pub fn generate_cpp_file(
     ffi_items: &[CppFfiItem],
     file_path: &Path,
     global_header_name: &str,
+    crate_name: &str,
 ) -> Result<()> {
     let mut cpp_file = create_file(file_path)?;
     writeln!(cpp_file, "#include \"{}\"", global_header_name)?;
@@ -320,7 +321,7 @@ pub fn generate_cpp_file(
     }
     writeln!(cpp_file, "}} // extern \"C\"")?;
 
-    if any_slot_wrappers {
+    if any_slot_wrappers && !crate_name.starts_with("moqt_") {
         let moc_output = get_command_output(Command::new("moc").arg("-i").arg(file_path))?;
         writeln!(
             cpp_file,
