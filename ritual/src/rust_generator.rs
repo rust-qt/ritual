@@ -22,7 +22,6 @@ use crate::database::CppFfiItem;
 use crate::database::CppFfiItemKind;
 use crate::database::CppItemData;
 use crate::processor::ProcessorData;
-use crate::rust_info::RustEnumValue;
 use crate::rust_info::RustEnumValueDoc;
 use crate::rust_info::RustFFIArgument;
 use crate::rust_info::RustFFIFunction;
@@ -45,6 +44,7 @@ use crate::rust_info::RustWrapperTypeDocData;
 use crate::rust_info::RustWrapperTypeKind;
 use crate::rust_info::UnnamedRustFunction;
 use crate::rust_info::{RustDatabaseItem, RustExtraImpl, RustExtraImplKind, RustRawSlotReceiver};
+use crate::rust_info::{RustEnumValue, RustQtSlotWrapper};
 use crate::rust_type::RustCommonType;
 use crate::rust_type::RustFinalType;
 use crate::rust_type::RustPath;
@@ -58,6 +58,14 @@ use ritual_common::string_utils::CaseOperations;
 use ritual_common::utils::MapIfOk;
 use std::iter::once;
 use std::ops::Deref;
+
+pub fn qt_core_path(crate_name: &str) -> RustPath {
+    if crate_name.starts_with("moqt_") {
+        RustPath::from_good_str("moqt_core")
+    } else {
+        RustPath::from_good_str("qt_core")
+    }
+}
 
 /// Adds "_" to a string if it is a reserved word in Rust
 fn sanitize_rust_identifier(name: &str, is_module: bool) -> String {
@@ -95,7 +103,10 @@ enum NameType<'a> {
     ApiFunction(&'a CppFfiFunction),
     ReceiverFunction,
     SizedItem,
-    RawQtSlotWrapper { signal_arguments: Vec<CppType> },
+    QtSlotWrapper {
+        signal_arguments: Vec<CppType>,
+        is_public: bool,
+    },
 }
 
 struct State<'b, 'a: 'b>(&'b mut ProcessorData<'a>);
@@ -210,10 +221,14 @@ impl State<'_, '_> {
                     .iter()
                     .map_if_ok(|arg| self.ffi_type_to_rust_ffi_type(arg))?;
                 let rust_return_type = self.ffi_type_to_rust_ffi_type(return_type)?;
-                RustType::FunctionPointer {
+                let pointer = RustType::FunctionPointer {
                     arguments: rust_args,
                     return_type: Box::new(rust_return_type),
-                }
+                };
+                RustType::Common(RustCommonType {
+                    path: RustPath::from_good_str("std::option::Option"),
+                    generic_arguments: Some(vec![pointer]),
+                })
             }
             CppType::TemplateParameter { .. } => bail!("invalid cpp type"),
         };
@@ -222,11 +237,7 @@ impl State<'_, '_> {
     }
 
     fn qt_core_path(&self) -> RustPath {
-        if self.0.config.crate_properties().name().starts_with("moqt") {
-            RustPath::from_good_str("moqt_core")
-        } else {
-            RustPath::from_good_str("qt_core")
-        }
+        qt_core_path(self.0.config.crate_properties().name())
     }
 
     fn create_qflags(&self, arg: &RustPath) -> RustType {
@@ -249,7 +260,7 @@ impl State<'_, '_> {
         cpp_ffi_type: &CppFfiType,
         argument_meaning: &CppFfiArgumentMeaning,
         is_template_argument: bool,
-        allocation_place: &ReturnValueAllocationPlace,
+        allocation_place: ReturnValueAllocationPlace,
     ) -> Result<RustFinalType> {
         let rust_ffi_type = self.ffi_type_to_rust_ffi_type(&cpp_ffi_type.ffi_type)?;
         let mut rust_api_type = rust_ffi_type.clone();
@@ -263,7 +274,7 @@ impl State<'_, '_> {
             if cpp_ffi_type.conversion == CppTypeConversionToFfi::ValueToPointer {
                 if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
                     // TODO: return error if this rust type is not deletable
-                    match *allocation_place {
+                    match allocation_place {
                         ReturnValueAllocationPlace::Stack => {
                             rust_api_type = (**target).clone();
                             api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
@@ -580,7 +591,7 @@ impl State<'_, '_> {
                     &arg.argument_type,
                     &arg.meaning,
                     false,
-                    &function.allocation_place,
+                    function.allocation_place,
                 )?;
                 arguments.push(RustFunctionArgument {
                     ffi_index: arg_index,
@@ -607,7 +618,7 @@ impl State<'_, '_> {
                     &arg.argument_type,
                     &arg.meaning,
                     false,
-                    &function.allocation_place,
+                    function.allocation_place,
                 )?,
                 Some(arg_index),
             )
@@ -618,7 +629,7 @@ impl State<'_, '_> {
                 &function.return_type,
                 &CppFfiArgumentMeaning::ReturnValue,
                 false,
-                &function.allocation_place,
+                function.allocation_place,
             )?;
             (return_type, None)
         };
@@ -833,7 +844,7 @@ impl State<'_, '_> {
                 },
                 &CppFfiArgumentMeaning::Argument(0),
                 true,
-                &ReturnValueAllocationPlace::NotApplicable,
+                ReturnValueAllocationPlace::NotApplicable,
             )?;
             captions.push(rust_type.api_type.caption(context)?);
         }
@@ -879,7 +890,7 @@ impl State<'_, '_> {
                     prefix: None,
                 }
             }
-            NameType::RawQtSlotWrapper { .. } => {
+            NameType::QtSlotWrapper { .. } => {
                 // crate root
                 self.default_strategy()
             }
@@ -920,12 +931,16 @@ impl State<'_, '_> {
                 .cpp_path_item_to_name(&cpp_path.last(), &strategy.path)?
                 .to_snake_case(),
             NameType::FfiFunction => cpp_path.last().name.clone(),
-            NameType::RawQtSlotWrapper { signal_arguments } => {
+            NameType::QtSlotWrapper {
+                signal_arguments,
+                is_public,
+            } => {
+                let name = if *is_public { "Slot" } else { "RawSlot" };
                 if signal_arguments.is_empty() {
-                    "RawSlot".to_string()
+                    name.to_string()
                 } else {
                     let captions = self.type_list_caption(signal_arguments, &strategy.path)?;
-                    format!("RawSlotOf_{}", captions).to_class_case()
+                    format!("{}_Of_{}", name, captions).to_class_case()
                 }
             }
         };
@@ -1021,7 +1036,6 @@ impl State<'_, '_> {
                                         parent_path: rust_type_path.parent()?,
                                         kind: RustExtraImplKind::FlagEnum {
                                             enum_path: rust_type_path.clone(),
-                                            qt_core_path: self.qt_core_path(),
                                         },
                                     });
                                     return Ok(vec![rust_item]);
@@ -1043,8 +1057,9 @@ impl State<'_, '_> {
                         }
 
                         let public_name_type = if let Some(wrapper) = qt_slot_wrapper {
-                            NameType::RawQtSlotWrapper {
+                            NameType::QtSlotWrapper {
                                 signal_arguments: wrapper.signal_arguments.clone(),
+                                is_public: false,
                             }
                         } else {
                             NameType::Type
@@ -1126,13 +1141,42 @@ impl State<'_, '_> {
                             let impl_item = RustItemKind::ExtraImpl(RustExtraImpl {
                                 parent_path: public_path.parent()?,
                                 kind: RustExtraImplKind::RawSlotReceiver(RustRawSlotReceiver {
-                                    qt_core_path: self.qt_core_path(),
                                     receiver_id,
-                                    target_path: public_path,
+                                    target_path: public_path.clone(),
                                     arguments: RustType::Tuple(arg_types),
                                 }),
                             });
                             rust_items.push(impl_item);
+
+                            let closure_item_path = self.generate_rust_path(
+                                &data.path,
+                                &NameType::QtSlotWrapper {
+                                    signal_arguments: wrapper.signal_arguments.clone(),
+                                    is_public: true,
+                                },
+                            )?;
+
+                            let public_args = wrapper.arguments.iter().map_if_ok(|arg| {
+                                self.rust_final_type(
+                                    arg,
+                                    // TODO: this is kind of a return type but not quite
+                                    &CppFfiArgumentMeaning::Argument(0),
+                                    false,
+                                    ReturnValueAllocationPlace::NotApplicable,
+                                )
+                            })?;
+
+                            let public_item = RustItemKind::Struct(RustStruct {
+                                is_public: true,
+                                kind: RustStructKind::QtSlotWrapper(RustQtSlotWrapper {
+                                    arguments: public_args,
+                                    signal_arguments: wrapper.signal_arguments.clone(),
+                                    raw_slot_wrapper: public_path,
+                                }),
+                                path: closure_item_path,
+                                extra_doc: None,
+                            });
+                            rust_items.push(public_item);
                         }
 
                         Ok(rust_items)
@@ -1225,7 +1269,7 @@ impl State<'_, '_> {
                             &ffi_type,
                             &CppFfiArgumentMeaning::Argument(index),
                             false,
-                            &ReturnValueAllocationPlace::NotApplicable,
+                            ReturnValueAllocationPlace::NotApplicable,
                         )?;
                         Ok(rust_type.api_type)
                     },

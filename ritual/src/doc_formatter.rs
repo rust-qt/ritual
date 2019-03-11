@@ -120,7 +120,7 @@ pub fn struct_doc(type1: &RustStruct) -> String {
         }
         RustStructKind::QtSlotWrapper(slot_wrapper) => {
             let cpp_args = slot_wrapper
-                .cpp_arguments
+                .signal_arguments
                 .iter()
                 .map(|t| t.to_cpp_pseudo_code())
                 .join(", ");

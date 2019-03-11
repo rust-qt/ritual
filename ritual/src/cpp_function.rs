@@ -124,7 +124,7 @@ pub struct CppFunction {
 }
 
 /// Chosen type allocation place for the method
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize)]
 pub enum ReturnValueAllocationPlace {
     /// The method returns a class object by value (or is a constructor), and
     /// it's translated to "output" FFI argument and placement new

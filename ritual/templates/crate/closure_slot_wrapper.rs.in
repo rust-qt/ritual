@@ -1,58 +1,63 @@
 pub struct {pub_type_name}<'a> {{
-  wrapper: ::cpp_utils::CppBox<{type_name}>,
-  func: ::std::option::Option<Box<Box<FnMut({args}) + 'a>>>,
+    raw_slot: ::cpp_utils::CppBox<{type_name}>,
+    func: ::std::option::Option<Box<Box<dyn FnMut({args}) + 'a>>>,
 }}
 
 impl<'a> {pub_type_name}<'a> {{
-  /// Constructs a new object.
-  pub fn new<F: FnMut({args}) + 'a>(f: F) -> {pub_type_name}<'a> {{
-    let mut obj = {pub_type_name}::default();
-    obj.set(f);
-    obj
-  }}
-
-  /// Sets `f` as the callback closure. If `set()` is called again, previous closure is dropped.
-  pub fn set<F: FnMut({args}) + 'a>(&mut self, f: F) {{
-    self.clear();
-    let mut func_box: Box<Box<FnMut({args}) + 'a>> = Box::new(Box::new(f));
-    unsafe {{
-      self.wrapper.set({callback_name}, ::std::mem::transmute(func_box.as_mut()));
+    /// Constructs a new object.
+    pub fn new<F: FnMut({args}) + 'a>(f: F) -> {pub_type_name}<'a> {{
+        let mut obj = {pub_type_name}::default();
+        obj.set(f);
+        obj
     }}
-    self.func = Some(func_box);
-  }}
 
-  /// Drops the previously set closure, if any. After this, slot invokation will have no effect
-  /// until a new closure is set.
-  pub fn clear(&mut self) {{
-    if self.func.is_some() {{
-      unsafe {{
-        self.wrapper.set( ::std::mem::transmute(0usize), ::std::ptr::null_mut());
-      }}
-      self.func = None;
+    /// Sets `f` as the callback closure. If `set()` is called again, previous closure is dropped.
+    pub fn set<F: FnMut({args}) + 'a>(&mut self, f: F) {{
+        extern "C" fn callback(data: *mut ::std::ffi::c_void, {callback_args}) {{
+            let func = unsafe {{ &mut *(data as *mut Box<dyn FnMut({args})>) }};
+            func({func_args});
+        }}
+
+        self.clear();
+        // TODO: avoid second Box
+        let mut func_box: Box<Box<FnMut({args}) + 'a>> = Box::new(Box::new(f));
+        unsafe {{
+            self.raw_slot.set(
+                Some(callback),
+                ::cpp_utils::Ptr::new(&mut*func_box as *mut Box<_> as *mut ::std::ffi::c_void)
+            );
+        }}
+        self.func = Some(func_box);
     }}
-  }}
+
+    /// Drops the previously set closure, if any. After this, slot invokation will have no effect
+    /// until a new closure is set.
+    pub fn clear(&mut self) {{
+        if self.func.is_some() {{
+            unsafe {{
+                self.raw_slot.set(None, ::cpp_utils::Ptr::new(::std::ptr::null_mut()));
+            }}
+            self.func = None;
+        }}
+    }}
+
+    pub unsafe fn as_raw(&self) -> ::cpp_utils::Ptr<{type_name}> {{
+        self.raw_slot.as_mut_ptr()
+    }}
 }}
 
 impl<'a> Default for {pub_type_name}<'a> {{
-  fn default() -> Self {{
-    {pub_type_name} {{
-      wrapper: {type_name}::new(),
-      func: None,
+    fn default() -> Self {{
+        {pub_type_name} {{
+            raw_slot: unsafe {{ {type_name}::new() }},
+            func: None,
+        }}
     }}
-  }}
 }}
 
-impl<'a> {connections_mod}::Receiver for {pub_type_name}<'a> {{
-  type Arguments = ({args_tuple});
-  fn object(&self) -> &{object_type_name} {{
-    {connections_mod}::Receiver::object(self.wrapper.as_ref())
-  }}
-  fn receiver_id() -> &'static [u8] {{
-    <{type_name} as {connections_mod}::Receiver>::receiver_id()
-  }}
-}}
-
-extern "C" fn {callback_name}(data: *mut ::libc::c_void, {callback_args}) {{
-  let func: &mut Box<FnMut({args})> = unsafe {{ ::std::mem::transmute(data) }};
-  func({func_args});
+impl<'a, 'b: 'a> {qt_core}::AsReceiver for &'b {pub_type_name}<'a> {{
+    type Arguments = <&'a {type_name} as {qt_core}::AsReceiver>::Arguments;
+    fn as_receiver(self) -> {qt_core}::Receiver<Self::Arguments> {{
+        self.raw_slot.as_receiver()
+    }}
 }}

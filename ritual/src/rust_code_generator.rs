@@ -1,6 +1,7 @@
 //! Types and functions used for Rust code generation.
 
 use crate::doc_formatter;
+use crate::rust_generator::qt_core_path;
 use crate::rust_info::RustDatabaseItem;
 use crate::rust_info::RustEnumValue;
 use crate::rust_info::RustExtraImpl;
@@ -305,6 +306,19 @@ impl Generator {
         Ok(())
     }
 
+    fn qt_core_path(&self) -> RustPath {
+        qt_core_path(&self.crate_name)
+    }
+
+    fn qt_core_prefix(&self) -> String {
+        let qt_core_path = self.qt_core_path();
+        if qt_core_path.parts[0] == self.crate_name {
+            "crate".to_string()
+        } else {
+            format!("::{}", qt_core_path.parts[0])
+        }
+    }
+
     fn generate_struct(&mut self, rust_struct: &RustStruct, database: &RustDatabase) -> Result<()> {
         write!(
             self,
@@ -350,16 +364,7 @@ impl Generator {
                     .map(|t| self.rust_type_to_code(&t.api_type))
                     .collect_vec();
                 let args = arg_texts.join(", ");
-                let args_tuple = format!("{}{}", args, if arg_texts.len() == 1 { "," } else { "" });
-                let connections_mod =
-                    RustPath::from_parts(vec!["qt_core".to_string(), "connection".to_string()])
-                        .full_name(Some(&self.crate_name));
-                let object_type_name = RustPath::from_parts(vec![
-                    "qt_core".to_string(),
-                    "object".to_string(),
-                    "Object".to_string(),
-                ])
-                .full_name(Some(&self.crate_name));
+
                 let callback_args = slot_wrapper
                     .arguments
                     .iter()
@@ -377,13 +382,10 @@ impl Generator {
                 writeln!(
                     self,
                     include_str!("../templates/crate/closure_slot_wrapper.rs.in"),
-                    type_name = rust_struct.path.full_name(Some(&self.crate_name)),
+                    qt_core = self.qt_core_prefix(),
+                    type_name = self.rust_path_to_string(&slot_wrapper.raw_slot_wrapper),
                     pub_type_name = rust_struct.path.last(),
-                    callback_name = self.rust_path_to_string(&slot_wrapper.callback_path),
                     args = args,
-                    args_tuple = args_tuple,
-                    connections_mod = connections_mod,
-                    object_type_name = object_type_name,
                     func_args = func_args,
                     callback_args = callback_args,
                 )?;
@@ -856,12 +858,9 @@ impl Generator {
 
     fn generate_extra_impl(&mut self, data: &RustExtraImpl) -> Result<()> {
         match &data.kind {
-            RustExtraImplKind::FlagEnum {
-                enum_path,
-                qt_core_path,
-            } => {
+            RustExtraImplKind::FlagEnum { enum_path } => {
                 let enum_path = self.rust_path_to_string(enum_path);
-                let qflags = self.rust_path_to_string(&qt_core_path.join("QFlags"));
+                let qflags = self.rust_path_to_string(&self.qt_core_path().join("QFlags"));
 
                 writeln!(
                     self,
@@ -871,15 +870,10 @@ impl Generator {
                 )?;
             }
             RustExtraImplKind::RawSlotReceiver(data) => {
-                let qt_core = if data.qt_core_path.parts[0] == self.crate_name {
-                    "crate".to_string()
-                } else {
-                    format!("::{}", data.qt_core_path.parts[0])
-                };
                 writeln!(
                     self,
                     include_str!("../templates/crate/impl_receiver_for_raw_slot.rs.in"),
-                    qt_core = qt_core,
+                    qt_core = self.qt_core_prefix(),
                     type_path = self.rust_path_to_string(&data.target_path),
                     args = self.rust_type_to_code(&data.arguments),
                     receiver_id = data.receiver_id,

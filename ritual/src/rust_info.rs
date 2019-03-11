@@ -38,12 +38,8 @@ pub struct RustEnumValueDoc {
 pub struct RustQtSlotWrapper {
     /// Argument types of the slot
     pub arguments: Vec<RustFinalType>,
-    /// Identifier of the slot for `QObject::connect`
-    pub receiver_id: String,
-    /// Name of the extern callback function of this wrapper
-    pub callback_path: RustPath,
-
-    pub cpp_arguments: Vec<CppType>,
+    pub signal_arguments: Vec<CppType>,
+    pub raw_slot_wrapper: RustPath,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -465,7 +461,6 @@ pub struct RustFFIFunction {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustRawSlotReceiver {
-    pub qt_core_path: RustPath,
     pub target_path: RustPath,
     pub arguments: RustType,
     pub receiver_id: String,
@@ -473,10 +468,7 @@ pub struct RustRawSlotReceiver {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RustExtraImplKind {
-    FlagEnum {
-        enum_path: RustPath,
-        qt_core_path: RustPath,
-    },
+    FlagEnum { enum_path: RustPath },
     RawSlotReceiver(RustRawSlotReceiver),
 }
 
