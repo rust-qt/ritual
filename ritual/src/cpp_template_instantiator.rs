@@ -18,12 +18,9 @@ fn check_template_type(data: &ProcessorData<'_>, type1: &CppType) -> Result<()> 
             let is_available = data
                 .all_items()
                 .filter_map(|i| i.cpp_data.as_type_ref())
-                .any(|inst| {
-                    // TODO: fix after CppPath refactoring
-                    &inst.path == path
-                });
+                .any(|inst| &inst.path == path);
             if !is_available {
-                bail!("type not available: {:?}", type1);
+                bail!("type is not available: {:?}", type1);
             }
             for arg in template_arguments {
                 check_template_type(data, arg)?;
@@ -197,10 +194,7 @@ pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> 
                             .filter_map(|item| item.cpp_data.as_type_ref())
                             .any(|i| &i.path == path);
                         if !is_in_database {
-                            let is_in_result = result.iter().any(|x| {
-                                // TODO: ignore last template args?
-                                x == path
-                            });
+                            let is_in_result = result.iter().any(|x| x == path);
                             if !is_in_result {
                                 result.push(path.clone());
                             }

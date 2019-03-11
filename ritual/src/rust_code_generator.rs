@@ -257,11 +257,6 @@ impl Generator {
             writeln!(self, "{}mod {} {{", vis, module.path.last())?;
         }
 
-        if let RustModuleKind::Ffi = module.kind {
-            // TODO: shouldn't need this
-            writeln!(self, "#![allow(dead_code)]")?;
-        }
-
         write!(
             self,
             "{}",
@@ -824,7 +819,6 @@ impl Generator {
         {
             self.generate_item(item, database)?;
         }
-        // TODO: somehow add items from crate template
         Ok(())
     }
 
@@ -907,43 +901,3 @@ pub fn generate(
     generator.generate_module(crate_root, database)?;
     Ok(())
 }
-
-// TODO: reimplement impl Receiver for raw slot wrapper
-/*
-if let Some(slot_wrapper) = slot_wrapper {
-    let arg_texts = slot_wrapper
-        .arguments
-        .iter()
-        .map(|t| self.rust_type_to_code(&t.rust_api_type))
-        .collect_vec();
-    let args = arg_texts.join(", ");
-    let args_tuple = format!(
-        "{}{}",
-        args,
-        if arg_texts.len() == 1 { "," } else { "" }
-    );
-    let connections_mod = RustName::new(vec![
-        "qt_core".to_string(),
-        "connection".to_string(),
-    ])?
-    .full_name(Some(&self.config.crate_properties.name()));
-    let object_type_name = RustName::new(vec![
-        "qt_core".to_string(),
-        "object".to_string(),
-        "Object".to_string(),
-    ])?
-    .full_name(Some(&self.config.crate_properties.name()));
-    r.push_str(&format!(
-        include_str!(
-            "../templates/crate/extern_slot_impl_receiver.rs.in"
-        ),
-        type_name = type1
-            .name
-            .full_name(Some(&self.config.crate_properties.name())),
-        args_tuple = args_tuple,
-        receiver_id = slot_wrapper.receiver_id,
-        connections_mod = connections_mod,
-        object_type_name = object_type_name
-    ));
-}
-*/

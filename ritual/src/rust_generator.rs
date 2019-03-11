@@ -1022,8 +1022,7 @@ impl State<'_, '_> {
             CppItemData::Type(data) => {
                 match data.kind {
                     CppTypeDeclarationKind::Class { is_movable } => {
-                        // TODO: if the type is `QFlags<T>` or `QUrlTwoFlags<T>`,
-                        //       generate `impl Flaggable` instead.
+                        // TODO: do something about `QUrlTwoFlags<T1, T2>`
                         if is_qflags(&data.path) {
                             let argument =
                                 &data.path.last().template_arguments.as_ref().unwrap()[0];

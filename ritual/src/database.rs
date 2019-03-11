@@ -295,9 +295,6 @@ impl Display for CppItemData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CppFfiItemKind {
     Function(CppFfiFunction),
-
-    // TODO: separate custom C++ wrapper logic from core implementation,
-    // run cpp_parser on wrappers instead of constructing results manually
     QtSlotWrapper(QtSlotWrapper),
 }
 

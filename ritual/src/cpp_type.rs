@@ -449,7 +449,6 @@ impl CppType {
                     for arg in all_types {
                         match *arg {
                             CppType::FunctionPointer(..) => {
-                                // TODO: also ban pointers to function pointers
                                 bail!(
                                     "function pointers containing nested function pointers are \
                                      not supported"
