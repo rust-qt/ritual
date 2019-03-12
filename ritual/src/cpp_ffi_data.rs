@@ -1,7 +1,7 @@
 use crate::cpp_data::CppClassField;
 use crate::cpp_data::CppPath;
 use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
-use crate::cpp_type::{CppFunctionPointerType, CppType};
+use crate::cpp_type::{CppBuiltInNumericType, CppFunctionPointerType, CppType};
 use ritual_common::errors::Result;
 use serde_derive::{Deserialize, Serialize};
 
@@ -98,13 +98,13 @@ impl CppFfiFunctionKind {
 
 /// Relation between original C++ method's argument value
 /// and corresponding FFI function's argument value
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum CppTypeConversionToFfi {
     /// Argument types are identical
     NoChange,
     /// C++ argument is a class value (like QPoint)
     /// and FFI argument is a pointer (like QPoint*)
-    ValueToPointer,
+    ValueToPointer { is_ffi_const: bool },
     /// C++ argument is a reference (like QPoint&)
     /// and FFI argument is a pointer (like QPoint*)
     ReferenceToPointer,
@@ -232,14 +232,43 @@ impl CppFfiFunction {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct CppFfiType {
     /// Original C++ type
-    pub original_type: CppType,
+    original_type: CppType,
     /// FFI function type
-    pub ffi_type: CppType,
+    ffi_type: CppType,
     /// Relation
-    pub conversion: CppTypeConversionToFfi,
+    conversion: CppTypeConversionToFfi,
 }
 
 impl CppFfiType {
+    pub fn new(original_type: CppType, conversion: CppTypeConversionToFfi) -> Result<Self> {
+        match conversion {
+            CppTypeConversionToFfi::NoChange => Ok(CppFfiType {
+                ffi_type: original_type.clone(),
+                original_type,
+                conversion,
+            }),
+            CppTypeConversionToFfi::ValueToPointer { is_ffi_const } => Ok(CppFfiType {
+                ffi_type: CppType::new_pointer(is_ffi_const, original_type.clone()),
+                original_type,
+                conversion,
+            }),
+            CppTypeConversionToFfi::ReferenceToPointer => {
+                let target = original_type.pointer_like_to_target()?;
+                let is_const = original_type.pointer_like_is_const()?;
+                Ok(CppFfiType {
+                    ffi_type: CppType::new_pointer(is_const, target.clone()),
+                    original_type,
+                    conversion,
+                })
+            }
+            CppTypeConversionToFfi::QFlagsToInt => Ok(CppFfiType {
+                ffi_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
+                original_type,
+                conversion,
+            }),
+        }
+    }
+
     /// Generates an object representing the void type
     pub fn void() -> Self {
         CppFfiType {
@@ -247,6 +276,18 @@ impl CppFfiType {
             ffi_type: CppType::Void,
             conversion: CppTypeConversionToFfi::NoChange,
         }
+    }
+
+    pub fn original_type(&self) -> &CppType {
+        &self.original_type
+    }
+
+    pub fn ffi_type(&self) -> &CppType {
+        &self.ffi_type
+    }
+
+    pub fn conversion(&self) -> CppTypeConversionToFfi {
+        self.conversion
     }
 }
 

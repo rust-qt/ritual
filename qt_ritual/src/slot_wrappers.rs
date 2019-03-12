@@ -32,7 +32,7 @@ fn generate_slot_wrapper(
         target: Box::new(CppType::Void),
     };
     let func_arguments = once(void_ptr.clone())
-        .chain(ffi_types.iter().map(|t| t.ffi_type.clone()))
+        .chain(ffi_types.iter().map(|t| t.ffi_type().clone()))
         .collect();
 
     let function_type = CppFunctionPointerType {

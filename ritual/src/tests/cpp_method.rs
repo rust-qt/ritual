@@ -198,7 +198,7 @@ fn c_signature_empty() {
 
     let r = to_ffi(&method1, None);
     assert!(r.arguments.is_empty());
-    assert!(r.return_type.ffi_type.is_void());
+    assert!(r.return_type.ffi_type().is_void());
 }
 
 #[test]
@@ -216,16 +216,16 @@ fn c_signature_simple_func() {
     assert!(r.arguments.len() == 1);
     assert_eq!(r.arguments[0].name, "arg1");
     assert_eq!(
-        r.arguments[0].argument_type.ffi_type,
-        method1.arguments[0].argument_type
+        r.arguments[0].argument_type.ffi_type(),
+        &method1.arguments[0].argument_type
     );
     assert_eq!(
-        r.arguments[0].argument_type.conversion,
+        r.arguments[0].argument_type.conversion(),
         CppTypeConversionToFfi::NoChange
     );
     assert_eq!(r.arguments[0].meaning, CppFfiArgumentMeaning::Argument(0));
-    assert_eq!(r.return_type.ffi_type, method1.return_type);
-    assert_eq!(r.return_type.conversion, CppTypeConversionToFfi::NoChange);
+    assert_eq!(r.return_type.ffi_type(), &method1.return_type);
+    assert_eq!(r.return_type.conversion(), CppTypeConversionToFfi::NoChange);
 }
 
 #[test]
@@ -252,26 +252,26 @@ fn c_signature_method_with_this() {
     assert!(r.arguments.len() == 2);
     assert_eq!(r.arguments[0].name, "this_ptr");
     assert_eq!(
-        r.arguments[0].argument_type.ffi_type,
-        CppType::new_pointer(false, CppType::Class(method1.class_type().unwrap()))
+        r.arguments[0].argument_type.ffi_type(),
+        &CppType::new_pointer(false, CppType::Class(method1.class_type().unwrap()))
     );
     assert_eq!(
-        r.arguments[0].argument_type.conversion,
+        r.arguments[0].argument_type.conversion(),
         CppTypeConversionToFfi::NoChange
     );
     assert_eq!(r.arguments[0].meaning, CppFfiArgumentMeaning::This);
 
     assert_eq!(r.arguments[1].name, "my_arg");
     assert_eq!(
-        r.arguments[1].argument_type.ffi_type,
-        CppType::new_pointer(true, method1.arguments[0].argument_type.clone())
+        r.arguments[1].argument_type.ffi_type(),
+        &CppType::new_pointer(true, method1.arguments[0].argument_type.clone())
     );
     assert_eq!(
-        r.arguments[1].argument_type.conversion,
-        CppTypeConversionToFfi::ValueToPointer
+        r.arguments[1].argument_type.conversion(),
+        CppTypeConversionToFfi::ValueToPointer { is_ffi_const: true }
     );
     assert_eq!(r.arguments[1].meaning, CppFfiArgumentMeaning::Argument(0));
-    assert_eq!(r.return_type.ffi_type, method1.return_type);
+    assert_eq!(r.return_type.ffi_type(), &method1.return_type);
 }
 
 #[test]
@@ -295,15 +295,15 @@ fn c_signature_static_method() {
     assert!(r.arguments.len() == 1);
     assert_eq!(r.arguments[0].name, "arg1");
     assert_eq!(
-        r.arguments[0].argument_type.ffi_type,
-        method1.arguments[0].argument_type
+        r.arguments[0].argument_type.ffi_type(),
+        &method1.arguments[0].argument_type
     );
     assert_eq!(
-        r.arguments[0].argument_type.conversion,
+        r.arguments[0].argument_type.conversion(),
         CppTypeConversionToFfi::NoChange
     );
     assert_eq!(r.arguments[0].meaning, CppFfiArgumentMeaning::Argument(0));
-    assert_eq!(r.return_type.ffi_type, method1.return_type);
+    assert_eq!(r.return_type.ffi_type(), &method1.return_type);
 }
 
 #[test]
@@ -339,8 +339,8 @@ fn c_signature_constructor() {
     assert!(r_stack.arguments.len() == 2);
     assert_eq!(r_stack.arguments[0].name, "arg1");
     assert_eq!(
-        r_stack.arguments[0].argument_type.ffi_type,
-        CppType::new_pointer(
+        r_stack.arguments[0].argument_type.ffi_type(),
+        &CppType::new_pointer(
             true,
             CppType::Enum {
                 path: CppPath::from_good_str("Enum1"),
@@ -348,7 +348,7 @@ fn c_signature_constructor() {
         )
     );
     assert_eq!(
-        r_stack.arguments[0].argument_type.conversion,
+        r_stack.arguments[0].argument_type.conversion(),
         CppTypeConversionToFfi::ReferenceToPointer
     );
     assert_eq!(
@@ -358,26 +358,28 @@ fn c_signature_constructor() {
 
     assert_eq!(r_stack.arguments[1].name, "output");
     assert_eq!(
-        r_stack.arguments[1].argument_type.ffi_type,
-        CppType::new_pointer(false, CppType::Class(CppPath::from_good_str("MyClass"))),
+        r_stack.arguments[1].argument_type.ffi_type(),
+        &CppType::new_pointer(false, CppType::Class(CppPath::from_good_str("MyClass"))),
     );
     assert_eq!(
-        r_stack.arguments[1].argument_type.conversion,
-        CppTypeConversionToFfi::ValueToPointer
+        r_stack.arguments[1].argument_type.conversion(),
+        CppTypeConversionToFfi::ValueToPointer {
+            is_ffi_const: false
+        }
     );
     assert_eq!(
         r_stack.arguments[1].meaning,
         CppFfiArgumentMeaning::ReturnValue
     );
 
-    assert!(r_stack.return_type.ffi_type.is_void());
+    assert!(r_stack.return_type.ffi_type().is_void());
 
     let r_heap = to_ffi(&method1, None);
     assert!(r_heap.arguments.len() == 1);
     assert_eq!(r_heap.arguments[0].name, "arg1");
     assert_eq!(
-        r_heap.arguments[0].argument_type.ffi_type,
-        CppType::new_pointer(
+        r_heap.arguments[0].argument_type.ffi_type(),
+        &CppType::new_pointer(
             true,
             CppType::Enum {
                 path: CppPath::from_good_str("Enum1"),
@@ -385,7 +387,7 @@ fn c_signature_constructor() {
         ),
     );
     assert_eq!(
-        r_heap.arguments[0].argument_type.conversion,
+        r_heap.arguments[0].argument_type.conversion(),
         CppTypeConversionToFfi::ReferenceToPointer
     );
     assert_eq!(
@@ -393,12 +395,14 @@ fn c_signature_constructor() {
         CppFfiArgumentMeaning::Argument(0)
     );
     assert_eq!(
-        r_heap.return_type.ffi_type,
-        CppType::new_pointer(false, CppType::Class(CppPath::from_good_str("MyClass"))),
+        r_heap.return_type.ffi_type(),
+        &CppType::new_pointer(false, CppType::Class(CppPath::from_good_str("MyClass"))),
     );
     assert_eq!(
-        r_heap.return_type.conversion,
-        CppTypeConversionToFfi::ValueToPointer
+        r_heap.return_type.conversion(),
+        CppTypeConversionToFfi::ValueToPointer {
+            is_ffi_const: false
+        }
     );
 }
 
@@ -424,31 +428,31 @@ fn c_signature_destructor() {
     assert_eq!(r_stack.arguments.len(), 1);
     assert_eq!(r_stack.arguments[0].name, "this_ptr");
     assert_eq!(
-        r_stack.arguments[0].argument_type.ffi_type,
-        CppType::new_pointer(false, CppType::Class(method1.class_type().unwrap()))
+        r_stack.arguments[0].argument_type.ffi_type(),
+        &CppType::new_pointer(false, CppType::Class(method1.class_type().unwrap()))
     );
     assert_eq!(
-        r_stack.arguments[0].argument_type.conversion,
+        r_stack.arguments[0].argument_type.conversion(),
         CppTypeConversionToFfi::NoChange
     );
     assert_eq!(r_stack.arguments[0].meaning, CppFfiArgumentMeaning::This);
 
-    assert!(r_stack.return_type.ffi_type.is_void());
+    assert!(r_stack.return_type.ffi_type().is_void());
 
     let r_heap = to_ffi(&method1, None);
     assert!(r_heap.arguments.len() == 1);
     assert_eq!(r_heap.arguments[0].name, "this_ptr");
     assert_eq!(
-        r_heap.arguments[0].argument_type.ffi_type,
-        CppType::new_pointer(false, CppType::Class(method1.class_type().unwrap()))
+        r_heap.arguments[0].argument_type.ffi_type(),
+        &CppType::new_pointer(false, CppType::Class(method1.class_type().unwrap()))
     );
     assert_eq!(
-        r_heap.arguments[0].argument_type.conversion,
+        r_heap.arguments[0].argument_type.conversion(),
         CppTypeConversionToFfi::NoChange
     );
     assert_eq!(r_heap.arguments[0].meaning, CppFfiArgumentMeaning::This);
 
-    assert!(r_heap.return_type.ffi_type.is_void());
+    assert!(r_heap.return_type.ffi_type().is_void());
 }
 
 #[test]
@@ -466,23 +470,23 @@ fn c_signature_method_returning_class() {
     assert!(r_stack.arguments.len() == 3);
     assert_eq!(r_stack.arguments[0].name, "this_ptr");
     assert_eq!(
-        r_stack.arguments[0].argument_type.ffi_type,
-        CppType::new_pointer(false, CppType::Class(method1.class_type().unwrap()))
+        r_stack.arguments[0].argument_type.ffi_type(),
+        &CppType::new_pointer(false, CppType::Class(method1.class_type().unwrap()))
     );
     assert_eq!(
-        r_stack.arguments[0].argument_type.conversion,
+        r_stack.arguments[0].argument_type.conversion(),
         CppTypeConversionToFfi::NoChange
     );
     assert_eq!(r_stack.arguments[0].meaning, CppFfiArgumentMeaning::This);
 
     assert_eq!(r_stack.arguments[1].name, "my_arg");
     assert_eq!(
-        r_stack.arguments[1].argument_type.ffi_type,
-        CppType::new_pointer(true, method1.arguments[0].argument_type.clone())
+        r_stack.arguments[1].argument_type.ffi_type(),
+        &CppType::new_pointer(true, method1.arguments[0].argument_type.clone())
     );
     assert_eq!(
-        r_stack.arguments[1].argument_type.conversion,
-        CppTypeConversionToFfi::ValueToPointer
+        r_stack.arguments[1].argument_type.conversion(),
+        CppTypeConversionToFfi::ValueToPointer { is_ffi_const: true }
     );
     assert_eq!(
         r_stack.arguments[1].meaning,
@@ -491,41 +495,43 @@ fn c_signature_method_returning_class() {
 
     assert_eq!(r_stack.arguments[2].name, "output");
     assert_eq!(
-        r_stack.arguments[2].argument_type.ffi_type,
-        CppType::new_pointer(false, CppType::Class(CppPath::from_good_str("MyClass3"))),
+        r_stack.arguments[2].argument_type.ffi_type(),
+        &CppType::new_pointer(false, CppType::Class(CppPath::from_good_str("MyClass3"))),
     );
     assert_eq!(
-        r_stack.arguments[2].argument_type.conversion,
-        CppTypeConversionToFfi::ValueToPointer
+        r_stack.arguments[2].argument_type.conversion(),
+        CppTypeConversionToFfi::ValueToPointer {
+            is_ffi_const: false
+        }
     );
     assert_eq!(
         r_stack.arguments[2].meaning,
         CppFfiArgumentMeaning::ReturnValue
     );
 
-    assert!(r_stack.return_type.ffi_type.is_void());
+    assert!(r_stack.return_type.ffi_type().is_void());
 
     let r_heap = to_ffi(&method1, None);
     assert!(r_heap.arguments.len() == 2);
     assert_eq!(r_heap.arguments[0].name, "this_ptr");
     assert_eq!(
-        r_heap.arguments[0].argument_type.ffi_type,
-        CppType::new_pointer(false, CppType::Class(method1.class_type().unwrap()))
+        r_heap.arguments[0].argument_type.ffi_type(),
+        &CppType::new_pointer(false, CppType::Class(method1.class_type().unwrap()))
     );
     assert_eq!(
-        r_heap.arguments[0].argument_type.conversion,
+        r_heap.arguments[0].argument_type.conversion(),
         CppTypeConversionToFfi::NoChange
     );
     assert_eq!(r_heap.arguments[0].meaning, CppFfiArgumentMeaning::This);
 
     assert_eq!(r_heap.arguments[1].name, "my_arg");
     assert_eq!(
-        r_heap.arguments[1].argument_type.ffi_type,
-        CppType::new_pointer(true, method1.arguments[0].argument_type.clone())
+        r_heap.arguments[1].argument_type.ffi_type(),
+        &CppType::new_pointer(true, method1.arguments[0].argument_type.clone())
     );
     assert_eq!(
-        r_heap.arguments[1].argument_type.conversion,
-        CppTypeConversionToFfi::ValueToPointer
+        r_heap.arguments[1].argument_type.conversion(),
+        CppTypeConversionToFfi::ValueToPointer { is_ffi_const: true }
     );
     assert_eq!(
         r_heap.arguments[1].meaning,
@@ -533,12 +539,14 @@ fn c_signature_method_returning_class() {
     );
 
     assert_eq!(
-        r_heap.return_type.ffi_type,
-        CppType::new_pointer(false, CppType::Class(CppPath::from_good_str("MyClass3"))),
+        r_heap.return_type.ffi_type(),
+        &CppType::new_pointer(false, CppType::Class(CppPath::from_good_str("MyClass3"))),
     );
     assert_eq!(
-        r_heap.return_type.conversion,
-        CppTypeConversionToFfi::ValueToPointer
+        r_heap.return_type.conversion(),
+        CppTypeConversionToFfi::ValueToPointer {
+            is_ffi_const: false
+        }
     );
 }
 

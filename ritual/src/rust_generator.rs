@@ -262,7 +262,7 @@ impl State<'_, '_> {
         is_template_argument: bool,
         allocation_place: ReturnValueAllocationPlace,
     ) -> Result<RustFinalType> {
-        let rust_ffi_type = self.ffi_type_to_rust_ffi_type(&cpp_ffi_type.ffi_type)?;
+        let rust_ffi_type = self.ffi_type_to_rust_ffi_type(cpp_ffi_type.ffi_type())?;
         let mut rust_api_type = rust_ffi_type.clone();
         let mut api_to_ffi_conversion = RustToFfiTypeConversion::None;
         if let RustType::PointerLike {
@@ -271,7 +271,7 @@ impl State<'_, '_> {
             target,
         } = &mut rust_api_type
         {
-            if cpp_ffi_type.conversion == CppTypeConversionToFfi::ValueToPointer {
+            if let CppTypeConversionToFfi::ValueToPointer { .. } = cpp_ffi_type.conversion() {
                 if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
                     // TODO: return error if this rust type is not deletable
                     match allocation_place {
@@ -330,8 +330,8 @@ impl State<'_, '_> {
                 }
             }
         }
-        if cpp_ffi_type.conversion == CppTypeConversionToFfi::QFlagsToInt {
-            let qflags_type = match &cpp_ffi_type.original_type {
+        if cpp_ffi_type.conversion() == CppTypeConversionToFfi::QFlagsToInt {
+            let qflags_type = match cpp_ffi_type.original_type() {
                 CppType::PointerLike {
                     kind,
                     is_const,
@@ -394,14 +394,14 @@ impl State<'_, '_> {
     fn generate_ffi_function(&self, data: &CppFfiFunction) -> Result<RustFFIFunction> {
         let mut args = Vec::new();
         for arg in &data.arguments {
-            let rust_type = self.ffi_type_to_rust_ffi_type(&arg.argument_type.ffi_type)?;
+            let rust_type = self.ffi_type_to_rust_ffi_type(arg.argument_type.ffi_type())?;
             args.push(RustFFIArgument {
                 name: sanitize_rust_identifier(&arg.name, false),
                 argument_type: rust_type,
             });
         }
         Ok(RustFFIFunction {
-            return_type: self.ffi_type_to_rust_ffi_type(&data.return_type.ffi_type)?,
+            return_type: self.ffi_type_to_rust_ffi_type(data.return_type.ffi_type())?,
             path: self.generate_rust_path(&data.path, &NameType::FfiFunction)?,
             arguments: args,
         })
@@ -837,11 +837,7 @@ impl State<'_, '_> {
         let mut captions = Vec::new();
         for arg in types {
             let rust_type = self.rust_final_type(
-                &CppFfiType {
-                    ffi_type: arg.clone(),
-                    original_type: arg.clone(),
-                    conversion: CppTypeConversionToFfi::NoChange,
-                },
+                &CppFfiType::new(arg.clone(), CppTypeConversionToFfi::NoChange)?,
                 &CppFfiArgumentMeaning::Argument(0),
                 true,
                 ReturnValueAllocationPlace::NotApplicable,

@@ -17,11 +17,11 @@ fn argument_meaning() {
 fn argument_int() {
     let arg = CppFfiFunctionArgument {
         name: "arg1".to_string(),
-        argument_type: CppFfiType {
-            original_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
-            ffi_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
-            conversion: CppTypeConversionToFfi::NoChange,
-        },
+        argument_type: CppFfiType::new(
+            CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
+            CppTypeConversionToFfi::NoChange,
+        )
+        .unwrap(),
         meaning: CppFfiArgumentMeaning::Argument(0),
     };
 
@@ -32,17 +32,11 @@ fn argument_int() {
 fn argument_int_ptr() {
     let arg = CppFfiFunctionArgument {
         name: "arg1".to_string(),
-        argument_type: CppFfiType {
-            original_type: CppType::new_pointer(
-                false,
-                CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
-            ),
-            ffi_type: CppType::new_pointer(
-                false,
-                CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
-            ),
-            conversion: CppTypeConversionToFfi::NoChange,
-        },
+        argument_type: CppFfiType::new(
+            CppType::new_pointer(false, CppType::BuiltInNumeric(CppBuiltInNumericType::Int)),
+            CppTypeConversionToFfi::NoChange,
+        )
+        .unwrap(),
         meaning: CppFfiArgumentMeaning::Argument(0),
     };
     assert_eq!(arg.to_cpp_code().unwrap(), "int* arg1");
@@ -61,11 +55,7 @@ fn argument_func() {
 
     let arg = CppFfiFunctionArgument {
         name: "arg1".to_string(),
-        argument_type: CppFfiType {
-            original_type: type1.clone(),
-            ffi_type: type1.clone(),
-            conversion: CppTypeConversionToFfi::NoChange,
-        },
+        argument_type: CppFfiType::new(type1.clone(), CppTypeConversionToFfi::NoChange).unwrap(),
         meaning: CppFfiArgumentMeaning::Argument(0),
     };
     assert_eq!(arg.to_cpp_code().unwrap(), "int (*arg1)(int, bool*)");
@@ -74,7 +64,7 @@ fn argument_func() {
 #[test]
 fn cpp_ffi_type_void() {
     let t = CppFfiType::void();
-    assert!(t.original_type.is_void());
-    assert!(t.ffi_type.is_void());
-    assert_eq!(t.conversion, CppTypeConversionToFfi::NoChange);
+    assert!(t.original_type().is_void());
+    assert!(t.ffi_type().is_void());
+    assert_eq!(t.conversion(), CppTypeConversionToFfi::NoChange);
 }

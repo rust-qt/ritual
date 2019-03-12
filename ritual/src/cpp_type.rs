@@ -393,6 +393,14 @@ impl CppType {
             bail!("not a pointer like type");
         }
     }
+
+    pub fn pointer_like_is_const(&self) -> Result<bool> {
+        if let CppType::PointerLike { is_const, .. } = self {
+            Ok(*is_const)
+        } else {
+            bail!("not a pointer like type");
+        }
+    }
 }
 
 /// Context of usage for a C++ type
@@ -435,7 +443,7 @@ impl CppType {
             if self.is_or_contains_template_parameter() {
                 bail!("template parameters cannot be expressed in FFI");
             }
-            match self {
+            let conversion = match self {
                 CppType::FunctionPointer(CppFunctionPointerType {
                     return_type,
                     arguments,
@@ -466,29 +474,15 @@ impl CppType {
                             bail!("Function pointers containing references are not supported");
                         }
                     }
-                    return Ok(CppFfiType {
-                        ffi_type: self.clone(),
-                        conversion: CppTypeConversionToFfi::NoChange,
-                        original_type: self.clone(),
-                    });
+                    CppTypeConversionToFfi::NoChange
                 }
                 CppType::Class(path) => {
                     if is_qflags(&path) {
-                        return Ok(CppFfiType {
-                            ffi_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
-                            conversion: CppTypeConversionToFfi::QFlagsToInt,
-                            original_type: self.clone(),
-                        });
+                        CppTypeConversionToFfi::QFlagsToInt
                     } else {
-                        return Ok(CppFfiType {
-                            ffi_type: CppType::PointerLike {
-                                is_const: role != CppTypeRole::ReturnType,
-                                kind: CppPointerLikeTypeKind::Pointer,
-                                target: Box::new(self.clone()),
-                            },
-                            conversion: CppTypeConversionToFfi::ValueToPointer,
-                            original_type: self.clone(),
-                        });
+                        CppTypeConversionToFfi::ValueToPointer {
+                            is_ffi_const: role != CppTypeRole::ReturnType,
+                        }
                     }
                 }
                 CppType::PointerLike {
@@ -497,44 +491,24 @@ impl CppType {
                     target,
                 } => {
                     match *kind {
-                        CppPointerLikeTypeKind::Pointer => {}
+                        CppPointerLikeTypeKind::Pointer => CppTypeConversionToFfi::NoChange,
                         CppPointerLikeTypeKind::Reference => {
-                            if *is_const {
-                                if let CppType::Class(path) = &**target {
-                                    if is_qflags(path) {
-                                        return Ok(CppFfiType {
-                                            ffi_type: CppType::BuiltInNumeric(
-                                                CppBuiltInNumericType::Int,
-                                            ),
-                                            // TODO: use a separate conversion type (QFlagsConstRefToUInt)?
-                                            conversion: CppTypeConversionToFfi::QFlagsToInt,
-                                            original_type: self.clone(),
-                                        });
-                                    }
+                            match &**target {
+                                CppType::Class(path) if *is_const && is_qflags(path) => {
+                                    // TODO: use a separate conversion type (QFlagsConstRefToUInt)?
+                                    CppTypeConversionToFfi::QFlagsToInt
                                 }
+                                _ => CppTypeConversionToFfi::ReferenceToPointer,
                             }
-                            return Ok(CppFfiType {
-                                ffi_type: CppType::PointerLike {
-                                    is_const: *is_const,
-                                    kind: CppPointerLikeTypeKind::Pointer,
-                                    target: target.clone(),
-                                },
-                                conversion: CppTypeConversionToFfi::ReferenceToPointer,
-                                original_type: self.clone(),
-                            });
                         }
                         CppPointerLikeTypeKind::RValueReference => {
                             bail!("rvalue references are not supported");
                         }
                     }
                 }
-                _ => {}
-            }
-            Ok(CppFfiType {
-                ffi_type: self.clone(),
-                conversion: CppTypeConversionToFfi::NoChange,
-                original_type: self.clone(),
-            })
+                _ => CppTypeConversionToFfi::NoChange,
+            };
+            CppFfiType::new(self.clone(), conversion)
         };
         Ok(inner().with_context(|_| format!("Can't express type to FFI: {:?}", self))?)
     }
