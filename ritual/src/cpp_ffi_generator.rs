@@ -4,23 +4,102 @@ use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;
 use crate::cpp_data::CppTypeDeclarationKind;
 use crate::cpp_data::CppVisibility;
-use crate::cpp_ffi_data::CppFfiArgumentMeaning;
 use crate::cpp_ffi_data::CppFfiFunctionArgument;
 use crate::cpp_ffi_data::CppFfiType;
 use crate::cpp_ffi_data::{CppCast, CppFfiFunction, CppFfiFunctionKind, CppFieldAccessorType};
+use crate::cpp_ffi_data::{CppFfiArgumentMeaning, CppTypeConversionToFfi};
 use crate::cpp_function::ReturnValueAllocationPlace;
 use crate::cpp_function::{CppFunction, CppFunctionArgument, CppFunctionKind};
-use crate::cpp_type::is_qflags;
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
 use crate::cpp_type::CppTypeRole;
+use crate::cpp_type::{is_qflags, CppFunctionPointerType};
 use crate::database::CppFfiItem;
 use crate::database::CppItemData;
 use crate::processor::ProcessorData;
 use itertools::Itertools;
 use log::{debug, trace};
-use ritual_common::errors::{bail, Result};
+use ritual_common::errors::{bail, Result, ResultExt};
 use std::collections::HashSet;
+
+/// Converts this C++ type to its adaptation for FFI interface,
+/// removing all features not supported by C ABI
+/// (e.g. references and passing objects by value).
+#[allow(clippy::collapsible_if)]
+pub fn ffi_type(original_type: &CppType, role: CppTypeRole) -> Result<CppFfiType> {
+    let inner = || -> Result<CppFfiType> {
+        if original_type.is_or_contains_template_parameter() {
+            bail!("template parameters cannot be expressed in FFI");
+        }
+        let conversion = match original_type {
+            CppType::FunctionPointer(CppFunctionPointerType {
+                return_type,
+                arguments,
+                allows_variadic_arguments,
+            }) => {
+                if *allows_variadic_arguments {
+                    bail!("function pointers with variadic arguments are not supported");
+                }
+                let mut all_types = arguments.iter().collect_vec();
+                all_types.push(return_type.as_ref());
+                for arg in all_types {
+                    match *arg {
+                        CppType::FunctionPointer(..) => {
+                            bail!(
+                                "function pointers containing nested function pointers are \
+                                 not supported"
+                            );
+                        }
+                        CppType::Class(..) => {
+                            bail!(
+                                "Function pointers containing classes by value are not \
+                                 supported"
+                            );
+                        }
+                        _ => {}
+                    }
+                    if arg.contains_reference() {
+                        bail!("Function pointers containing references are not supported");
+                    }
+                }
+                CppTypeConversionToFfi::NoChange
+            }
+            CppType::Class(path) => {
+                if is_qflags(&path) {
+                    CppTypeConversionToFfi::QFlagsToInt
+                } else {
+                    CppTypeConversionToFfi::ValueToPointer {
+                        is_ffi_const: role != CppTypeRole::ReturnType,
+                    }
+                }
+            }
+            CppType::PointerLike {
+                kind,
+                is_const,
+                target,
+            } => {
+                match *kind {
+                    CppPointerLikeTypeKind::Pointer => CppTypeConversionToFfi::NoChange,
+                    CppPointerLikeTypeKind::Reference => {
+                        match &**target {
+                            CppType::Class(path) if *is_const && is_qflags(path) => {
+                                // TODO: use a separate conversion type (QFlagsConstRefToUInt)?
+                                CppTypeConversionToFfi::QFlagsToInt
+                            }
+                            _ => CppTypeConversionToFfi::ReferenceToPointer,
+                        }
+                    }
+                    CppPointerLikeTypeKind::RValueReference => {
+                        bail!("rvalue references are not supported");
+                    }
+                }
+            }
+            _ => CppTypeConversionToFfi::NoChange,
+        };
+        CppFfiType::new(original_type.clone(), conversion)
+    };
+    Ok(inner().with_context(|_| format!("Can't express type to FFI: {:?}", original_type))?)
+}
 
 pub struct FfiNameProvider {
     names: HashSet<String>,
@@ -365,7 +444,7 @@ pub fn to_ffi_method(
     if let Some(this_arg_type) = this_arg_type {
         r.arguments.push(CppFfiFunctionArgument {
             name: "this_ptr".to_string(),
-            argument_type: this_arg_type.to_cpp_ffi_type(CppTypeRole::NotReturnType)?,
+            argument_type: ffi_type(&this_arg_type, CppTypeRole::NotReturnType)?,
             meaning: CppFfiArgumentMeaning::This,
         });
     }
@@ -406,9 +485,7 @@ pub fn to_ffi_method(
     };
 
     for (index, arg) in normal_args.iter().enumerate() {
-        let c_type = arg
-            .argument_type
-            .to_cpp_ffi_type(CppTypeRole::NotReturnType)?;
+        let c_type = ffi_type(&arg.argument_type, CppTypeRole::NotReturnType)?;
         r.arguments.push(CppFfiFunctionArgument {
             name: arg.name.clone(),
             argument_type: c_type,
@@ -437,7 +514,7 @@ pub fn to_ffi_method(
             CppFieldAccessorType::Setter => CppType::Void,
         },
     };
-    let real_return_type_ffi = real_return_type.to_cpp_ffi_type(CppTypeRole::ReturnType)?;
+    let real_return_type_ffi = ffi_type(&real_return_type, CppTypeRole::ReturnType)?;
     match &real_return_type {
         // QFlags is converted to uint in FFI
         CppType::Class(path) if !is_qflags(path) => {

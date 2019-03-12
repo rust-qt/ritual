@@ -8,6 +8,7 @@ use crate::cpp_ffi_data::CppFfiFunctionKind;
 use crate::cpp_ffi_data::CppFfiType;
 use crate::cpp_ffi_data::CppFieldAccessorType;
 use crate::cpp_ffi_data::CppTypeConversionToFfi;
+use crate::cpp_ffi_generator::ffi_type;
 use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
 use crate::cpp_type::is_qflags;
 use crate::cpp_type::CppBuiltInNumericType;
@@ -1257,9 +1258,8 @@ impl State<'_, '_> {
 
                 let arguments = cpp_function.arguments.iter().enumerate().map_if_ok(
                     |(index, arg)| -> Result<_> {
-                        let ffi_type = arg
-                            .argument_type
-                            .to_cpp_ffi_type(CppTypeRole::NotReturnType)?;
+                        // TODO: rust generator shouldn't know about cpp ffi types
+                        let ffi_type = ffi_type(&arg.argument_type, CppTypeRole::NotReturnType)?;
                         let rust_type = self.rust_final_type(
                             &ffi_type,
                             &CppFfiArgumentMeaning::Argument(index),

@@ -2,7 +2,7 @@ use crate::detect_signal_argument_types::detect_signal_argument_types;
 use itertools::Itertools;
 use log::trace;
 use ritual::cpp_ffi_data::QtSlotWrapper;
-use ritual::cpp_ffi_generator::FfiNameProvider;
+use ritual::cpp_ffi_generator::{ffi_type, FfiNameProvider};
 use ritual::cpp_type::CppFunctionPointerType;
 use ritual::cpp_type::CppPointerLikeTypeKind;
 use ritual::cpp_type::CppType;
@@ -20,7 +20,7 @@ fn generate_slot_wrapper(
     arguments: &[CppType],
     name_provider: &mut FfiNameProvider,
 ) -> Result<QtSlotWrapper> {
-    let ffi_types = arguments.map_if_ok(|t| t.to_cpp_ffi_type(CppTypeRole::NotReturnType))?;
+    let ffi_types = arguments.map_if_ok(|t| ffi_type(&t, CppTypeRole::NotReturnType))?;
     let class_path = name_provider.create_path(&format!(
         "slot_wrapper_{}",
         arguments.iter().map(|arg| arg.ascii_caption()).join("_")
