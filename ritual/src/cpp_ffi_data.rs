@@ -99,7 +99,7 @@ impl CppFfiFunctionKind {
 /// Relation between original C++ method's argument value
 /// and corresponding FFI function's argument value
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
-pub enum CppTypeConversionToFfi {
+pub enum CppToFfiTypeConversion {
     /// Argument types are identical
     NoChange,
     /// C++ argument is a class value (like QPoint)
@@ -236,23 +236,23 @@ pub struct CppFfiType {
     /// FFI function type
     ffi_type: CppType,
     /// Relation
-    conversion: CppTypeConversionToFfi,
+    conversion: CppToFfiTypeConversion,
 }
 
 impl CppFfiType {
-    pub fn new(original_type: CppType, conversion: CppTypeConversionToFfi) -> Result<Self> {
+    pub fn new(original_type: CppType, conversion: CppToFfiTypeConversion) -> Result<Self> {
         match conversion {
-            CppTypeConversionToFfi::NoChange => Ok(CppFfiType {
+            CppToFfiTypeConversion::NoChange => Ok(CppFfiType {
                 ffi_type: original_type.clone(),
                 original_type,
                 conversion,
             }),
-            CppTypeConversionToFfi::ValueToPointer { is_ffi_const } => Ok(CppFfiType {
+            CppToFfiTypeConversion::ValueToPointer { is_ffi_const } => Ok(CppFfiType {
                 ffi_type: CppType::new_pointer(is_ffi_const, original_type.clone()),
                 original_type,
                 conversion,
             }),
-            CppTypeConversionToFfi::ReferenceToPointer => {
+            CppToFfiTypeConversion::ReferenceToPointer => {
                 let target = original_type.pointer_like_to_target()?;
                 let is_const = original_type.pointer_like_is_const()?;
                 Ok(CppFfiType {
@@ -261,7 +261,7 @@ impl CppFfiType {
                     conversion,
                 })
             }
-            CppTypeConversionToFfi::QFlagsToInt => Ok(CppFfiType {
+            CppToFfiTypeConversion::QFlagsToInt => Ok(CppFfiType {
                 ffi_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
                 original_type,
                 conversion,
@@ -274,7 +274,7 @@ impl CppFfiType {
         CppFfiType {
             original_type: CppType::Void,
             ffi_type: CppType::Void,
-            conversion: CppTypeConversionToFfi::NoChange,
+            conversion: CppToFfiTypeConversion::NoChange,
         }
     }
 
@@ -286,7 +286,7 @@ impl CppFfiType {
         &self.ffi_type
     }
 
-    pub fn conversion(&self) -> CppTypeConversionToFfi {
+    pub fn conversion(&self) -> CppToFfiTypeConversion {
         self.conversion
     }
 }

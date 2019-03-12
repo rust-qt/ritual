@@ -356,7 +356,7 @@ impl Generator {
                 let arg_texts = slot_wrapper
                     .arguments
                     .iter()
-                    .map(|t| self.rust_type_to_code(&t.api_type))
+                    .map(|t| self.rust_type_to_code(t.api_type()))
                     .collect_vec();
                 let args = arg_texts.join(", ");
 
@@ -364,7 +364,7 @@ impl Generator {
                     .arguments
                     .iter()
                     .enumerate()
-                    .map(|(num, t)| format!("arg{}: {}", num, self.rust_type_to_code(&t.ffi_type)))
+                    .map(|(num, t)| format!("arg{}: {}", num, self.rust_type_to_code(t.ffi_type())))
                     .join(", ");
                 let func_args = slot_wrapper
                     .arguments
@@ -458,7 +458,7 @@ impl Generator {
         in_unsafe_context: bool,
         use_ffi_result_var: bool,
     ) -> Result<String> {
-        if type1.api_to_ffi_conversion == RustToFfiTypeConversion::None {
+        if type1.conversion() == &RustToFfiTypeConversion::None {
             return Ok(expression);
         }
 
@@ -470,10 +470,10 @@ impl Generator {
         } else {
             (String::new(), expression)
         };
-        let code2 = match type1.api_to_ffi_conversion {
+        let code2 = match type1.conversion() {
             RustToFfiTypeConversion::None => unreachable!(),
-            RustToFfiTypeConversion::RefToPtr => {
-                let api_is_const = type1.api_type.is_const_pointer_like()?;
+            RustToFfiTypeConversion::RefToPtr { .. } => {
+                let api_is_const = type1.api_type().is_const_pointer_like()?;
                 let code = format!(
                     "{}.{}()",
                     source_expr,
@@ -493,14 +493,13 @@ impl Generator {
                 let code = format!("::cpp_utils::CppBox::new({})", source_expr);
                 wrap_unsafe(in_unsafe_context, &code)
             }
-            RustToFfiTypeConversion::PtrWrapperToPtr
-            | RustToFfiTypeConversion::OptionPtrWrapperToPtr => {
-                let is_option =
-                    type1.api_to_ffi_conversion == RustToFfiTypeConversion::OptionPtrWrapperToPtr;
+            RustToFfiTypeConversion::UtilsPtrToPtr { .. }
+            | RustToFfiTypeConversion::OptionUtilsPtrToPtr { .. } => {
+                let is_option = type1.conversion().is_option_utils_ptr_to_ptr();
 
                 let ptr_wrapper_type = if is_option {
                     type1
-                        .api_type
+                        .api_type()
                         .as_common()?
                         .generic_arguments
                         .as_ref()
@@ -508,7 +507,7 @@ impl Generator {
                         .get(0)
                         .ok_or_else(|| err_msg("expected generic argument for Option"))?
                 } else {
-                    &type1.api_type
+                    type1.api_type()
                 };
                 let ptr_wrapper_path = &ptr_wrapper_type.as_common()?.path;
 
@@ -520,8 +519,8 @@ impl Generator {
                 );
                 wrap_unsafe(in_unsafe_context, &code)
             }
-            RustToFfiTypeConversion::QFlagsToUInt => {
-                let mut qflags_type = type1.api_type.clone();
+            RustToFfiTypeConversion::QFlagsToUInt { .. } => {
+                let mut qflags_type = type1.api_type().clone();
                 if let RustType::Common(RustCommonType {
                     generic_arguments, ..
                 }) = &mut qflags_type
@@ -555,46 +554,47 @@ impl Generator {
         for arg in arguments {
             assert!(arg.ffi_index < final_args.len());
             let mut code = arg.name.clone();
-            match arg.argument_type.api_to_ffi_conversion {
+            match arg.argument_type.conversion() {
                 RustToFfiTypeConversion::None => {}
-                RustToFfiTypeConversion::OptionPtrWrapperToPtr => {
+                RustToFfiTypeConversion::OptionUtilsPtrToPtr { .. } => {
                     bail!("OptionRefToPtr is not supported here yet");
                 }
-                RustToFfiTypeConversion::RefToPtr => {
-                    if arg.argument_type.api_type.is_const()?
-                        && !arg.argument_type.ffi_type.is_const()?
+                RustToFfiTypeConversion::RefToPtr { .. } => {
+                    if arg.argument_type.api_type().is_const()?
+                        && !arg.argument_type.ffi_type().is_const()?
                     {
-                        let mut intermediate_type = arg.argument_type.ffi_type.clone();
+                        let mut intermediate_type = arg.argument_type.ffi_type().clone();
                         intermediate_type.set_const(true)?;
                         code = format!(
                             "{} as {} as {}",
                             code,
                             self.rust_type_to_code(&intermediate_type),
-                            self.rust_type_to_code(&arg.argument_type.ffi_type)
+                            self.rust_type_to_code(arg.argument_type.ffi_type())
                         );
                     } else {
                         code = format!(
                             "{} as {}",
                             code,
-                            self.rust_type_to_code(&arg.argument_type.ffi_type)
+                            self.rust_type_to_code(arg.argument_type.ffi_type())
                         );
                     }
                 }
                 RustToFfiTypeConversion::ValueToPtr => {
-                    let is_const = arg.argument_type.ffi_type.is_const_pointer_like()?;
+                    let is_const = arg.argument_type.ffi_type().is_const_pointer_like()?;
                     code = format!(
                         "{}{} as {}",
                         if is_const { "&" } else { "&mut " },
                         code,
-                        self.rust_type_to_code(&arg.argument_type.ffi_type)
+                        self.rust_type_to_code(arg.argument_type.ffi_type())
                     );
                 }
-                RustToFfiTypeConversion::CppBoxToPtr | RustToFfiTypeConversion::PtrWrapperToPtr => {
-                    let is_const = arg.argument_type.ffi_type.is_const_pointer_like()?;
+                RustToFfiTypeConversion::CppBoxToPtr
+                | RustToFfiTypeConversion::UtilsPtrToPtr { .. } => {
+                    let is_const = arg.argument_type.ffi_type().is_const_pointer_like()?;
                     let method = if is_const { "as_ptr" } else { "as_mut_ptr" };
                     code = format!("{}.{}()", code, method);
                 }
-                RustToFfiTypeConversion::QFlagsToUInt => {
+                RustToFfiTypeConversion::QFlagsToUInt { .. } => {
                     code = format!("{}.to_int()", code);
                 }
             }
@@ -610,25 +610,24 @@ impl Generator {
                 ii += 1;
                 return_var_name = format!("object{}", ii);
             }
-            let struct_name =
-                if return_type.api_to_ffi_conversion == RustToFfiTypeConversion::CppBoxToPtr {
-                    if let RustType::Common(RustCommonType {
-                        generic_arguments, ..
-                    }) = &return_type.api_type
-                    {
-                        let generic_arguments = generic_arguments
-                            .as_ref()
-                            .ok_or_else(|| err_msg("CppBox must have generic_arguments"))?;
-                        let arg = generic_arguments.get(0).ok_or_else(|| {
-                            err_msg("CppBox must have non-empty generic_arguments")
-                        })?;
-                        self.rust_type_to_code(arg)
-                    } else {
-                        bail!("CppBox type expected");
-                    }
+            let struct_name = if return_type.conversion() == &RustToFfiTypeConversion::CppBoxToPtr {
+                if let RustType::Common(RustCommonType {
+                    generic_arguments, ..
+                }) = return_type.api_type()
+                {
+                    let generic_arguments = generic_arguments
+                        .as_ref()
+                        .ok_or_else(|| err_msg("CppBox must have generic_arguments"))?;
+                    let arg = generic_arguments
+                        .get(0)
+                        .ok_or_else(|| err_msg("CppBox must have non-empty generic_arguments"))?;
+                    self.rust_type_to_code(arg)
                 } else {
-                    self.rust_type_to_code(&return_type.api_type)
-                };
+                    bail!("CppBox type expected");
+                }
+            } else {
+                self.rust_type_to_code(return_type.api_type())
+            };
             // TODO: use MybeUninit when it's stable
             let expr = wrap_unsafe(in_unsafe_context, "::std::mem::uninitialized()");
             result.push(format!(
@@ -675,9 +674,9 @@ impl Generator {
                 if &arg.name == "self" {
                     let self_type = match lifetime {
                         Some(lifetime) => {
-                            arg.argument_type.api_type.with_lifetime(lifetime.clone())
+                            arg.argument_type.api_type().with_lifetime(lifetime.clone())
                         }
-                        None => arg.argument_type.api_type.clone(),
+                        None => arg.argument_type.api_type().clone(),
                     };
                     match &self_type {
                         RustType::Common { .. } => "self".to_string(),
@@ -698,12 +697,10 @@ impl Generator {
                     }
                 } else {
                     let mut maybe_mut_declaration = "";
-                    if let RustType::Common { .. } = arg.argument_type.api_type {
-                        if arg.argument_type.api_to_ffi_conversion
-                            == RustToFfiTypeConversion::ValueToPtr
-                        {
+                    if let RustType::Common { .. } = arg.argument_type.api_type() {
+                        if arg.argument_type.conversion() == &RustToFfiTypeConversion::ValueToPtr {
                             if let RustType::PointerLike { is_const, .. } =
-                                &arg.argument_type.ffi_type
+                                &arg.argument_type.ffi_type()
                             {
                                 if !*is_const {
                                     maybe_mut_declaration = "mut ";
@@ -718,9 +715,9 @@ impl Generator {
                         arg.name,
                         match lifetime {
                             Some(lifetime) => self.rust_type_to_code(
-                                &arg.argument_type.api_type.with_lifetime(lifetime.clone(),)
+                                &arg.argument_type.api_type().with_lifetime(lifetime.clone())
                             ),
-                            None => self.rust_type_to_code(&arg.argument_type.api_type),
+                            None => self.rust_type_to_code(arg.argument_type.api_type()),
                         }
                     )
                 }
@@ -751,11 +748,11 @@ impl Generator {
                 qobject_path,
                 ..
             } => {
-                let path = &func.return_type.api_type.as_common()?.path;
+                let path = &func.return_type.api_type().as_common()?.path;
                 let call = format!(
                     "{}::new(cpp_utils::ConstPtr::new(self as &{}), \
                      std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"))",
-                    self.rust_path_to_string(path),
+                    self.rust_path_to_string(&path),
                     self.rust_path_to_string(qobject_path),
                     receiver_id
                 );
@@ -763,15 +760,18 @@ impl Generator {
             }
         };
 
-        let return_type_for_signature = if func.return_type.api_type.is_unit() {
+        let return_type_for_signature = if func.return_type.api_type().is_unit() {
             String::new()
         } else {
-            format!(" -> {}", self.rust_type_to_code(&func.return_type.api_type))
+            format!(
+                " -> {}",
+                self.rust_type_to_code(func.return_type.api_type())
+            )
         };
         let all_lifetimes = func
             .arguments
             .iter()
-            .filter_map(|x| x.argument_type.api_type.lifetime())
+            .filter_map(|x| x.argument_type.api_type().lifetime())
             .collect_vec();
         let lifetimes_text = if all_lifetimes.is_empty() {
             String::new()

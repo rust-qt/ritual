@@ -7,7 +7,7 @@ use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_ffi_data::CppFfiFunctionKind;
 use crate::cpp_ffi_data::CppFfiType;
 use crate::cpp_ffi_data::CppFieldAccessorType;
-use crate::cpp_ffi_data::CppTypeConversionToFfi;
+use crate::cpp_ffi_data::CppToFfiTypeConversion;
 use crate::cpp_ffi_generator::ffi_type;
 use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
 use crate::cpp_type::is_qflags;
@@ -54,7 +54,7 @@ use crate::rust_type::RustToFfiTypeConversion;
 use crate::rust_type::RustType;
 use itertools::Itertools;
 use log::{debug, trace};
-use ritual_common::errors::{bail, ensure, err_msg, format_err, print_trace, Result};
+use ritual_common::errors::{bail, err_msg, format_err, print_trace, Result};
 use ritual_common::string_utils::CaseOperations;
 use ritual_common::utils::MapIfOk;
 use std::iter::once;
@@ -264,27 +264,16 @@ impl State<'_, '_> {
         allocation_place: ReturnValueAllocationPlace,
     ) -> Result<RustFinalType> {
         let rust_ffi_type = self.ffi_type_to_rust_ffi_type(cpp_ffi_type.ffi_type())?;
-        let mut rust_api_type = rust_ffi_type.clone();
         let mut api_to_ffi_conversion = RustToFfiTypeConversion::None;
-        if let RustType::PointerLike {
-            kind,
-            is_const,
-            target,
-        } = &mut rust_api_type
-        {
-            if let CppTypeConversionToFfi::ValueToPointer { .. } = cpp_ffi_type.conversion() {
+        if let RustType::PointerLike { .. } = &rust_ffi_type {
+            if let CppToFfiTypeConversion::ValueToPointer { .. } = cpp_ffi_type.conversion() {
                 if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
                     // TODO: return error if this rust type is not deletable
                     match allocation_place {
                         ReturnValueAllocationPlace::Stack => {
-                            rust_api_type = (**target).clone();
                             api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
                         }
                         ReturnValueAllocationPlace::Heap => {
-                            rust_api_type = RustType::Common(RustCommonType {
-                                path: RustPath::from_good_str("cpp_utils::CppBox"),
-                                generic_arguments: Some(vec![(**target).clone()]),
-                            });
                             api_to_ffi_conversion = RustToFfiTypeConversion::CppBoxToPtr;
                         }
                         ReturnValueAllocationPlace::NotApplicable => {
@@ -292,46 +281,33 @@ impl State<'_, '_> {
                         }
                     }
                 } else if is_template_argument {
-                    rust_api_type = (**target).clone();
                     api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
                 } else {
                     if argument_meaning == &CppFfiArgumentMeaning::This {
-                        *kind = RustPointerLikeTypeKind::Reference { lifetime: None };
-                        api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
-                    } else {
-                        let wrapper = if *is_const {
-                            "cpp_utils::ConstPtr"
-                        } else {
-                            "cpp_utils::Ptr"
+                        api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr {
+                            force_api_is_const: None,
+                            lifetime: None,
                         };
-
-                        rust_api_type = RustType::Common(RustCommonType {
-                            path: RustPath::from_good_str(wrapper),
-                            generic_arguments: Some(vec![(**target).clone()]),
-                        });
-                        api_to_ffi_conversion = RustToFfiTypeConversion::PtrWrapperToPtr;
+                    } else {
+                        api_to_ffi_conversion = RustToFfiTypeConversion::UtilsPtrToPtr {
+                            force_api_is_const: None,
+                        };
                     }
                 }
             } else {
                 if argument_meaning == &CppFfiArgumentMeaning::This {
-                    *kind = RustPointerLikeTypeKind::Reference { lifetime: None };
-                    api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
-                } else if !is_template_argument {
-                    let wrapper = if *is_const {
-                        "cpp_utils::ConstPtr"
-                    } else {
-                        "cpp_utils::Ptr"
+                    api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr {
+                        force_api_is_const: None,
+                        lifetime: None,
                     };
-
-                    rust_api_type = RustType::Common(RustCommonType {
-                        path: RustPath::from_good_str(wrapper),
-                        generic_arguments: Some(vec![(**target).clone()]),
-                    });
-                    api_to_ffi_conversion = RustToFfiTypeConversion::PtrWrapperToPtr;
+                } else if !is_template_argument {
+                    api_to_ffi_conversion = RustToFfiTypeConversion::UtilsPtrToPtr {
+                        force_api_is_const: None,
+                    };
                 }
             }
         }
-        if cpp_ffi_type.conversion() == CppTypeConversionToFfi::QFlagsToInt {
+        if cpp_ffi_type.conversion() == CppToFfiTypeConversion::QFlagsToInt {
             let qflags_type = match cpp_ffi_type.original_type() {
                 CppType::PointerLike {
                     kind,
@@ -379,16 +355,12 @@ impl State<'_, '_> {
                 )
             })?;
 
-            rust_api_type = self.create_qflags(rust_enum_path);
+            api_to_ffi_conversion = RustToFfiTypeConversion::QFlagsToUInt {
+                api_type: self.create_qflags(rust_enum_path),
+            };
+        };
 
-            api_to_ffi_conversion = RustToFfiTypeConversion::QFlagsToUInt;
-        }
-
-        Ok(RustFinalType {
-            ffi_type: rust_ffi_type,
-            api_type: rust_api_type,
-            api_to_ffi_conversion,
-        })
+        RustFinalType::new(rust_ffi_type, api_to_ffi_conversion)
     }
 
     /// Generates exact (FFI-compatible) Rust equivalent of `CppAndFfiMethod` object.
@@ -413,46 +385,30 @@ impl State<'_, '_> {
         cast: &CppCast,
         is_const: bool,
     ) -> Result<UnnamedRustFunction> {
-        if is_const {
-            if let RustType::Common(RustCommonType { path, .. }) =
-                &mut unnamed_function.return_type.api_type
-            {
-                ensure!(
-                    path.last() == "Ptr",
-                    "cast function expected to return Ptr<T>"
-                );
-                *path = RustPath::from_good_str("cpp_utils::ConstPtr");
-            } else {
-                bail!("expected Ptr<T> type in cast function");
-            }
-        }
-        match cast {
-            CppCast::Dynamic | CppCast::QObject => {
-                unnamed_function.return_type.api_to_ffi_conversion =
-                    RustToFfiTypeConversion::OptionPtrWrapperToPtr;
-                unnamed_function.return_type.api_type = RustType::Common(RustCommonType {
-                    path: RustPath::from_good_str("std::option::Option"),
-                    generic_arguments: Some(vec![unnamed_function.return_type.api_type]),
-                })
-            }
-            CppCast::Static { .. } => {}
-        }
+        let force_const = if is_const { Some(true) } else { None };
+        let return_type_conversion = match cast {
+            CppCast::Dynamic | CppCast::QObject => RustToFfiTypeConversion::OptionUtilsPtrToPtr {
+                force_api_is_const: force_const,
+            },
+            CppCast::Static { .. } => RustToFfiTypeConversion::UtilsPtrToPtr {
+                force_api_is_const: force_const,
+            },
+        };
+        unnamed_function.return_type = RustFinalType::new(
+            unnamed_function.return_type.ffi_type().clone(),
+            return_type_conversion,
+        )?;
 
-        if let RustType::Common(RustCommonType {
-            generic_arguments, ..
-        }) = &unnamed_function.arguments[0].argument_type.api_type
-        {
-            unnamed_function.arguments[0].argument_type.api_type = RustType::PointerLike {
-                kind: RustPointerLikeTypeKind::Reference { lifetime: None },
-                is_const,
-                target: Box::new(generic_arguments.as_ref().unwrap()[0].clone()),
-            };
+        unnamed_function.arguments[0].argument_type = RustFinalType::new(
             unnamed_function.arguments[0]
                 .argument_type
-                .api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
-        } else {
-            bail!("argument 0 has unexpected type: {:?}", unnamed_function);
-        }
+                .ffi_type()
+                .clone(),
+            RustToFfiTypeConversion::RefToPtr {
+                force_api_is_const: force_const,
+                lifetime: None,
+            },
+        )?;
         unnamed_function.arguments[0].name = "self".to_string();
         Ok(unnamed_function)
     }
@@ -467,8 +423,8 @@ impl State<'_, '_> {
             bail!("1 argument expected");
         }
 
-        let from_type = &args[0].argument_type.ffi_type;
-        let to_type = &unnamed_function.return_type.ffi_type;
+        let from_type = args[0].argument_type.ffi_type();
+        let to_type = unnamed_function.return_type.ffi_type();
 
         let trait_path;
         let derived_type;
@@ -536,8 +492,13 @@ impl State<'_, '_> {
 
         if cast.is_first_static_cast() && !cast.is_unsafe_static_cast() {
             let fix_return_type = |type1: &mut RustFinalType, is_const: bool| -> Result<()> {
-                type1.api_type = type1.ffi_type.ptr_to_ref(is_const)?;
-                type1.api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
+                *type1 = RustFinalType::new(
+                    type1.ffi_type().clone(),
+                    RustToFfiTypeConversion::RefToPtr {
+                        force_api_is_const: if is_const { Some(true) } else { None },
+                        lifetime: None,
+                    },
+                )?;
                 Ok(())
             };
 
@@ -634,11 +595,11 @@ impl State<'_, '_> {
             )?;
             (return_type, None)
         };
-        if return_type.api_type.is_ref() && return_type.api_type.lifetime().is_none() {
+        if return_type.api_type().is_ref() && return_type.api_type().lifetime().is_none() {
             let mut found = false;
             for arg in &arguments {
-                if let Some(lifetime) = arg.argument_type.api_type.lifetime() {
-                    return_type.api_type = return_type.api_type.with_lifetime(lifetime.to_string());
+                if let Some(lifetime) = arg.argument_type.api_type().lifetime() {
+                    return_type = return_type.with_lifetime(lifetime.to_string())?;
                     found = true;
                     break;
                 }
@@ -646,13 +607,12 @@ impl State<'_, '_> {
             if !found {
                 let mut next_lifetime_num = 0;
                 for arg in &mut arguments {
-                    if arg.argument_type.api_type.is_ref()
-                        && arg.argument_type.api_type.lifetime().is_none()
+                    if arg.argument_type.api_type().is_ref()
+                        && arg.argument_type.api_type().lifetime().is_none()
                     {
-                        arg.argument_type.api_type = arg
+                        arg.argument_type = arg
                             .argument_type
-                            .api_type
-                            .with_lifetime(format!("l{}", next_lifetime_num));
+                            .with_lifetime(format!("l{}", next_lifetime_num))?;
                         next_lifetime_num += 1;
                     }
                 }
@@ -666,7 +626,7 @@ impl State<'_, '_> {
                 } else {
                     "l0".to_string()
                 };
-                return_type.api_type = return_type.api_type.with_lifetime(return_lifetime);
+                return_type = return_type.with_lifetime(return_lifetime)?;
             }
         }
 
@@ -693,7 +653,7 @@ impl State<'_, '_> {
                 }
                 let target_type = arguments[0]
                     .argument_type
-                    .api_type
+                    .api_type()
                     .pointer_like_to_target()?;
 
                 let parent_path =
@@ -838,12 +798,12 @@ impl State<'_, '_> {
         let mut captions = Vec::new();
         for arg in types {
             let rust_type = self.rust_final_type(
-                &CppFfiType::new(arg.clone(), CppTypeConversionToFfi::NoChange)?,
+                &CppFfiType::new(arg.clone(), CppToFfiTypeConversion::NoChange)?,
                 &CppFfiArgumentMeaning::Argument(0),
                 true,
                 ReturnValueAllocationPlace::NotApplicable,
             )?;
-            captions.push(rust_type.api_type.caption(context)?);
+            captions.push(rust_type.api_type().caption(context)?);
         }
         Ok(captions.join("_"))
     }
@@ -1245,11 +1205,7 @@ impl State<'_, '_> {
                     })),
                 };
 
-                let self_type = RustFinalType {
-                    ffi_type: self_type.clone(),
-                    api_type: self_type,
-                    api_to_ffi_conversion: RustToFfiTypeConversion::None,
-                };
+                let self_type = RustFinalType::new(self_type, RustToFfiTypeConversion::None)?;
 
                 let return_type_path = match receiver_type {
                     RustQtReceiverType::Signal => self.qt_core_path().join("Signal"),
@@ -1266,7 +1222,7 @@ impl State<'_, '_> {
                             false,
                             ReturnValueAllocationPlace::NotApplicable,
                         )?;
-                        Ok(rust_type.api_type)
+                        Ok(rust_type.api_type().clone())
                     },
                 )?;
 
@@ -1275,11 +1231,7 @@ impl State<'_, '_> {
                     generic_arguments: Some(vec![RustType::Tuple(arguments)]),
                 });
 
-                let return_type = RustFinalType {
-                    ffi_type: return_type.clone(),
-                    api_type: return_type,
-                    api_to_ffi_conversion: RustToFfiTypeConversion::None,
-                };
+                let return_type = RustFinalType::new(return_type, RustToFfiTypeConversion::None)?;
 
                 let rust_function = RustFunction {
                     is_public: true,

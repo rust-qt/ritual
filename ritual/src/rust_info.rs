@@ -203,7 +203,7 @@ impl UnnamedRustFunction {
     fn self_arg_kind(&self) -> Result<RustFunctionSelfArgKind> {
         if let Some(arg) = self.arguments.get(0) {
             if arg.name == "self" {
-                match &arg.argument_type.api_type {
+                match arg.argument_type.api_type() {
                     RustType::PointerLike { kind, is_const, .. } => match *kind {
                         RustPointerLikeTypeKind::Pointer => {
                             bail!("pointer self arg is not supported")
@@ -282,7 +282,7 @@ impl UnnamedRustFunction {
                             self.arguments
                                 .iter()
                                 .filter(|t| &t.name != "self")
-                                .map_if_ok(|t| t.argument_type.api_type.caption(context))?
+                                .map_if_ok(|t| t.argument_type.api_type().caption(context))?
                                 .join("_"),
                         )
                     }

@@ -94,7 +94,7 @@ pub fn struct_doc(type1: &RustStruct) -> String {
                 let rust_args = slot_wrapper
                     .rust_arguments
                     .iter()
-                    .map(|t| rust_type_to_code(&t.api_type, Some(current_crate)))
+                    .map(|t| rust_type_to_code(t.api_type(), Some(current_crate)))
                     .join(", ");
 
                 doc += &format!(

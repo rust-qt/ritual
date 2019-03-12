@@ -1,6 +1,6 @@
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;
-use crate::cpp_ffi_data::CppTypeConversionToFfi;
+use crate::cpp_ffi_data::CppToFfiTypeConversion;
 use crate::cpp_ffi_generator::ffi_type;
 use crate::cpp_type::{
     CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
@@ -9,10 +9,10 @@ use crate::cpp_type::{
 
 fn assert_type_to_ffi_unchanged(t: &CppType) {
     for role in &[CppTypeRole::NotReturnType, CppTypeRole::ReturnType] {
-        let ffi1 = ffi_type(t, role.clone()).unwrap();
+        let ffi1 = ffi_type(t, *role).unwrap();
         assert_eq!(ffi1.original_type(), t);
         assert_eq!(ffi1.ffi_type(), t);
-        assert_eq!(ffi1.conversion(), CppTypeConversionToFfi::NoChange);
+        assert_eq!(ffi1.conversion(), CppToFfiTypeConversion::NoChange);
     }
 }
 
@@ -137,7 +137,7 @@ fn class_value() {
     );
     assert_eq!(
         ffi_return_type.conversion(),
-        CppTypeConversionToFfi::ValueToPointer {
+        CppToFfiTypeConversion::ValueToPointer {
             is_ffi_const: false
         }
     );
@@ -154,7 +154,7 @@ fn class_value() {
     );
     assert_eq!(
         ffi_arg.conversion(),
-        CppTypeConversionToFfi::ValueToPointer { is_ffi_const: true }
+        CppToFfiTypeConversion::ValueToPointer { is_ffi_const: true }
     );
 }
 
@@ -168,7 +168,7 @@ fn class_const_ref() {
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
 
     for role in &[CppTypeRole::NotReturnType, CppTypeRole::ReturnType] {
-        let ffi1 = ffi_type(&type1, role.clone()).unwrap();
+        let ffi1 = ffi_type(&type1, *role).unwrap();
         assert_eq!(ffi1.original_type(), &type1);
         assert_eq!(
             ffi1.ffi_type(),
@@ -177,7 +177,7 @@ fn class_const_ref() {
         assert_eq!(ffi1.ffi_type().to_cpp_code(None).unwrap(), "const QRectF*");
         assert_eq!(
             ffi1.conversion(),
-            CppTypeConversionToFfi::ReferenceToPointer
+            CppToFfiTypeConversion::ReferenceToPointer
         );
     }
 }
@@ -192,7 +192,7 @@ fn class_mut_ref() {
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
 
     for role in &[CppTypeRole::NotReturnType, CppTypeRole::ReturnType] {
-        let ffi1 = ffi_type(&type1, role.clone()).unwrap();
+        let ffi1 = ffi_type(&type1, *role).unwrap();
         assert_eq!(ffi1.original_type(), &type1);
         assert_eq!(
             ffi1.ffi_type(),
@@ -201,7 +201,7 @@ fn class_mut_ref() {
         assert_eq!(ffi1.ffi_type().to_cpp_code(None).unwrap(), "QRectF*");
         assert_eq!(
             ffi1.conversion(),
-            CppTypeConversionToFfi::ReferenceToPointer
+            CppToFfiTypeConversion::ReferenceToPointer
         );
     }
 }
@@ -248,7 +248,7 @@ fn class_with_template_args() {
     );
     assert_eq!(
         ffi_return_type.conversion(),
-        CppTypeConversionToFfi::ValueToPointer {
+        CppToFfiTypeConversion::ValueToPointer {
             is_ffi_const: false
         }
     );
@@ -271,7 +271,7 @@ fn class_with_template_args() {
     );
     assert_eq!(
         ffi_arg.conversion(),
-        CppTypeConversionToFfi::ValueToPointer { is_ffi_const: true }
+        CppToFfiTypeConversion::ValueToPointer { is_ffi_const: true }
     );
 }
 
@@ -314,14 +314,14 @@ fn qflags() {
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
 
     for role in &[CppTypeRole::NotReturnType, CppTypeRole::ReturnType] {
-        let ffi_type = ffi_type(&type1, role.clone()).unwrap();
+        let ffi_type = ffi_type(&type1, *role).unwrap();
         assert_eq!(ffi_type.original_type(), &type1);
         assert_eq!(
             ffi_type.ffi_type(),
             &CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
         );
         assert_eq!(ffi_type.ffi_type().to_cpp_code(None).unwrap(), "int");
-        assert_eq!(ffi_type.conversion(), CppTypeConversionToFfi::QFlagsToInt);
+        assert_eq!(ffi_type.conversion(), CppToFfiTypeConversion::QFlagsToInt);
     }
 }
 

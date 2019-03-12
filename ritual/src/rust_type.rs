@@ -119,17 +119,30 @@ pub enum RustToFfiTypeConversion {
     /// Types are the same
     None,
     /// `&T` to `*const T` (or similar mutable types)
-    RefToPtr,
+    RefToPtr {
+        force_api_is_const: Option<bool>,
+        lifetime: Option<String>,
+    },
+    /// `ConstPtr<T>` to `*const T` (or similar mutable type)
+    UtilsPtrToPtr { force_api_is_const: Option<bool> },
     /// `Option<ConstPtr<T>>` to `*const T` (or similar mutable types)
-    OptionPtrWrapperToPtr,
+    OptionUtilsPtrToPtr { force_api_is_const: Option<bool> },
     /// `T` to `*const T` (or similar mutable type)
     ValueToPtr,
     /// `CppBox<T>` to `*mut T`
     CppBoxToPtr,
-    /// `ConstPtr<T>` to `*const T` (or similar mutable type)
-    PtrWrapperToPtr,
     /// `qt_core::flags::Flags<T>` to `c_int`
-    QFlagsToUInt,
+    QFlagsToUInt { api_type: RustType },
+}
+
+impl RustToFfiTypeConversion {
+    pub fn is_option_utils_ptr_to_ptr(&self) -> bool {
+        if let RustToFfiTypeConversion::OptionUtilsPtrToPtr { .. } = self {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 /// Information about a completely processed type
@@ -138,11 +151,106 @@ pub enum RustToFfiTypeConversion {
 pub struct RustFinalType {
     /// Rust type used in FFI functions
     /// (must be exactly the same as `cpp_ffi_type`)
-    pub ffi_type: RustType,
+    ffi_type: RustType,
     /// Type used in public Rust API
-    pub api_type: RustType,
+    api_type: RustType,
     /// Conversion from `rust_api_type` to `rust_ffi_type`
-    pub api_to_ffi_conversion: RustToFfiTypeConversion,
+    conversion: RustToFfiTypeConversion,
+}
+
+impl RustFinalType {
+    pub fn new(ffi_type: RustType, api_to_ffi_conversion: RustToFfiTypeConversion) -> Result<Self> {
+        fn utils_ptr(ffi_type: &RustType, force_api_is_const: Option<bool>) -> Result<RustType> {
+            let is_const = if let Some(v) = force_api_is_const {
+                v
+            } else {
+                ffi_type.is_const_pointer_like()?
+            };
+            let name = if is_const {
+                "cpp_utils::ConstPtr"
+            } else {
+                "cpp_utils::Ptr"
+            };
+
+            let target = ffi_type.pointer_like_to_target()?.clone();
+            Ok(RustType::Common(RustCommonType {
+                path: RustPath::from_good_str(name),
+                generic_arguments: Some(vec![target]),
+            }))
+        }
+        let api_type = match &api_to_ffi_conversion {
+            RustToFfiTypeConversion::None => ffi_type.clone(),
+            RustToFfiTypeConversion::RefToPtr {
+                force_api_is_const,
+                lifetime,
+            } => {
+                if let RustType::PointerLike {
+                    is_const, target, ..
+                } = &ffi_type
+                {
+                    let is_const = force_api_is_const.unwrap_or(*is_const);
+                    RustType::PointerLike {
+                        is_const,
+                        kind: RustPointerLikeTypeKind::Reference {
+                            lifetime: lifetime.clone(),
+                        },
+                        target: target.clone(),
+                    }
+                } else {
+                    bail!("not a pointer like type");
+                }
+            }
+            RustToFfiTypeConversion::UtilsPtrToPtr { force_api_is_const } => {
+                utils_ptr(&ffi_type, *force_api_is_const)?
+            }
+            RustToFfiTypeConversion::OptionUtilsPtrToPtr { force_api_is_const } => {
+                RustType::new_option(utils_ptr(&ffi_type, *force_api_is_const)?)
+            }
+            RustToFfiTypeConversion::ValueToPtr => ffi_type.pointer_like_to_target()?,
+            RustToFfiTypeConversion::CppBoxToPtr => {
+                let target = ffi_type.pointer_like_to_target()?;
+                RustType::Common(RustCommonType {
+                    path: RustPath::from_good_str("cpp_utils::CppBox"),
+                    generic_arguments: Some(vec![target.clone()]),
+                })
+            }
+            RustToFfiTypeConversion::QFlagsToUInt { api_type } => api_type.clone(),
+        };
+        Ok(RustFinalType {
+            api_type,
+            ffi_type,
+            conversion: api_to_ffi_conversion,
+        })
+    }
+
+    pub fn api_type(&self) -> &RustType {
+        &self.api_type
+    }
+
+    pub fn ffi_type(&self) -> &RustType {
+        &self.ffi_type
+    }
+
+    pub fn conversion(&self) -> &RustToFfiTypeConversion {
+        &self.conversion
+    }
+
+    pub fn with_lifetime(&self, lifetime: String) -> Result<Self> {
+        if let RustToFfiTypeConversion::RefToPtr {
+            force_api_is_const, ..
+        } = &self.conversion
+        {
+            RustFinalType::new(
+                self.ffi_type.clone(),
+                RustToFfiTypeConversion::RefToPtr {
+                    force_api_is_const: *force_api_is_const,
+                    lifetime: Some(lifetime),
+                },
+            )
+        } else {
+            bail!("not a RefToPtr type");
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -201,6 +309,21 @@ impl RustType {
     /// Constructs the unit type `()`, used as the replacement of C++'s `void` type.
     pub fn unit() -> Self {
         RustType::Tuple(Vec::new())
+    }
+
+    pub fn new_pointer(is_const: bool, target: RustType) -> Self {
+        RustType::PointerLike {
+            kind: RustPointerLikeTypeKind::Pointer,
+            is_const,
+            target: Box::new(target),
+        }
+    }
+
+    pub fn new_option(target: RustType) -> Self {
+        RustType::Common(RustCommonType {
+            path: RustPath::from_good_str("std::option::Option"),
+            generic_arguments: Some(vec![target]),
+        })
     }
 
     pub fn is_unit(&self) -> bool {
@@ -387,39 +510,5 @@ impl RustType {
         } else {
             bail!("expected common type, got {:?}", self)
         }
-    }
-}
-
-impl RustFinalType {
-    /// Converts Rust API type from pointer to reference
-    /// and modifies `rust_api_to_c_conversion` accordingly.
-    /// `is_const1` specifies new constness of the created reference.
-    pub fn ptr_to_ref(&self, is_const1: bool) -> Result<RustFinalType> {
-        let mut r = self.clone();
-        r.api_type = r.api_type.ptr_to_ref(is_const1)?;
-        if r.api_to_ffi_conversion != RustToFfiTypeConversion::None {
-            bail!("rust_api_to_ffi_conversion is not None");
-        }
-        r.api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr;
-        Ok(r)
-    }
-
-    /// Converts Rust API type from pointer to value
-    /// and modifies `rust_api_to_c_conversion` accordingly.
-    pub fn ptr_to_value(&self) -> Result<RustFinalType> {
-        let mut r = self.clone();
-        r.api_type = if let RustType::PointerLike { kind, target, .. } = &r.api_type {
-            if !kind.is_pointer() {
-                bail!("not a pointer type");
-            }
-            (**target).clone()
-        } else {
-            bail!("not a RustType::Common");
-        };
-        if r.api_to_ffi_conversion != RustToFfiTypeConversion::None {
-            bail!("rust_api_to_ffi_conversion is not None");
-        }
-        r.api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
-        Ok(r)
     }
 }

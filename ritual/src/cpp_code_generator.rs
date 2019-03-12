@@ -1,6 +1,6 @@
 use crate::cpp_ffi_data::{
     CppFfiArgumentMeaning, CppFfiFunctionKind, CppFfiType, CppFieldAccessorType,
-    CppTypeConversionToFfi, QtSlotWrapper,
+    CppToFfiTypeConversion, QtSlotWrapper,
 };
 use crate::cpp_function::ReturnValueAllocationPlace;
 use crate::cpp_type::CppType;
@@ -78,14 +78,14 @@ pub fn qt_slot_wrapper(wrapper: &QtSlotWrapper) -> Result<String> {
 /// converts it to type `type1.ffi_type`
 fn convert_type_to_ffi(type1: &CppFfiType, expression: String) -> Result<String> {
     Ok(match type1.conversion() {
-        CppTypeConversionToFfi::NoChange => expression,
-        CppTypeConversionToFfi::ValueToPointer { .. } => format!(
+        CppToFfiTypeConversion::NoChange => expression,
+        CppToFfiTypeConversion::ValueToPointer { .. } => format!(
             "new {}({})",
             type1.original_type().to_cpp_code(None)?,
             expression
         ),
-        CppTypeConversionToFfi::ReferenceToPointer => format!("&{}", expression),
-        CppTypeConversionToFfi::QFlagsToInt => format!("int({})", expression),
+        CppToFfiTypeConversion::ReferenceToPointer => format!("&{}", expression),
+        CppToFfiTypeConversion::QFlagsToInt => format!("int({})", expression),
     })
 }
 
@@ -94,8 +94,8 @@ fn convert_type_to_ffi(type1: &CppFfiType, expression: String) -> Result<String>
 fn convert_return_type(method: &CppFfiFunction, expression: String) -> Result<String> {
     let mut result = expression;
     match method.return_type.conversion() {
-        CppTypeConversionToFfi::NoChange => {}
-        CppTypeConversionToFfi::ValueToPointer { .. } => {
+        CppToFfiTypeConversion::NoChange => {}
+        CppToFfiTypeConversion::ValueToPointer { .. } => {
             match method.allocation_place {
                 ReturnValueAllocationPlace::Stack => {
                     bail!("stack allocated wrappers are expected to return void");
@@ -121,10 +121,10 @@ fn convert_return_type(method: &CppFfiFunction, expression: String) -> Result<St
                 }
             }
         }
-        CppTypeConversionToFfi::ReferenceToPointer => {
+        CppToFfiTypeConversion::ReferenceToPointer => {
             result = format!("&{}", result);
         }
-        CppTypeConversionToFfi::QFlagsToInt => {
+        CppToFfiTypeConversion::QFlagsToInt => {
             result = format!("int({})", result);
         }
     }
@@ -156,10 +156,10 @@ fn arguments_values(method: &CppFfiFunction) -> Result<String> {
         .map_if_ok(|argument| -> Result<_> {
             let mut result = argument.name.clone();
             match argument.argument_type.conversion() {
-                CppTypeConversionToFfi::ValueToPointer { .. }
-                | CppTypeConversionToFfi::ReferenceToPointer => result = format!("*{}", result),
-                CppTypeConversionToFfi::NoChange => {}
-                CppTypeConversionToFfi::QFlagsToInt => {
+                CppToFfiTypeConversion::ValueToPointer { .. }
+                | CppToFfiTypeConversion::ReferenceToPointer => result = format!("*{}", result),
+                CppToFfiTypeConversion::NoChange => {}
+                CppToFfiTypeConversion::QFlagsToInt => {
                     let type_text = if let CppType::PointerLike {
                         kind,
                         is_const,

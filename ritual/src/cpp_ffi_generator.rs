@@ -7,7 +7,7 @@ use crate::cpp_data::CppVisibility;
 use crate::cpp_ffi_data::CppFfiFunctionArgument;
 use crate::cpp_ffi_data::CppFfiType;
 use crate::cpp_ffi_data::{CppCast, CppFfiFunction, CppFfiFunctionKind, CppFieldAccessorType};
-use crate::cpp_ffi_data::{CppFfiArgumentMeaning, CppTypeConversionToFfi};
+use crate::cpp_ffi_data::{CppFfiArgumentMeaning, CppToFfiTypeConversion};
 use crate::cpp_function::ReturnValueAllocationPlace;
 use crate::cpp_function::{CppFunction, CppFunctionArgument, CppFunctionKind};
 use crate::cpp_type::CppPointerLikeTypeKind;
@@ -62,13 +62,13 @@ pub fn ffi_type(original_type: &CppType, role: CppTypeRole) -> Result<CppFfiType
                         bail!("Function pointers containing references are not supported");
                     }
                 }
-                CppTypeConversionToFfi::NoChange
+                CppToFfiTypeConversion::NoChange
             }
             CppType::Class(path) => {
                 if is_qflags(&path) {
-                    CppTypeConversionToFfi::QFlagsToInt
+                    CppToFfiTypeConversion::QFlagsToInt
                 } else {
-                    CppTypeConversionToFfi::ValueToPointer {
+                    CppToFfiTypeConversion::ValueToPointer {
                         is_ffi_const: role != CppTypeRole::ReturnType,
                     }
                 }
@@ -79,14 +79,14 @@ pub fn ffi_type(original_type: &CppType, role: CppTypeRole) -> Result<CppFfiType
                 target,
             } => {
                 match *kind {
-                    CppPointerLikeTypeKind::Pointer => CppTypeConversionToFfi::NoChange,
+                    CppPointerLikeTypeKind::Pointer => CppToFfiTypeConversion::NoChange,
                     CppPointerLikeTypeKind::Reference => {
                         match &**target {
                             CppType::Class(path) if *is_const && is_qflags(path) => {
                                 // TODO: use a separate conversion type (QFlagsConstRefToUInt)?
-                                CppTypeConversionToFfi::QFlagsToInt
+                                CppToFfiTypeConversion::QFlagsToInt
                             }
-                            _ => CppTypeConversionToFfi::ReferenceToPointer,
+                            _ => CppToFfiTypeConversion::ReferenceToPointer,
                         }
                     }
                     CppPointerLikeTypeKind::RValueReference => {
@@ -94,7 +94,7 @@ pub fn ffi_type(original_type: &CppType, role: CppTypeRole) -> Result<CppFfiType
                     }
                 }
             }
-            _ => CppTypeConversionToFfi::NoChange,
+            _ => CppToFfiTypeConversion::NoChange,
         };
         CppFfiType::new(original_type.clone(), conversion)
     };
