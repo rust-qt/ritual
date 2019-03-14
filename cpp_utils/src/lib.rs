@@ -6,7 +6,7 @@ use std::ptr;
 
 #[cfg(test)]
 mod tests {
-    use crate::{CppBox, CppDeletable};
+    use crate::{CppBox, CppDeletable, Ptr};
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -33,7 +33,7 @@ mod tests {
         assert!(*value1.borrow() == 10);
         unsafe {
             // TODO: remove all "as *mut _" because it's automatic
-            CppBox::new(&mut object1 as *mut _);
+            CppBox::new(Ptr::new(&mut object1));
         }
         assert!(*value1.borrow() == 42);
     }
@@ -128,7 +128,11 @@ impl<T: CppDeletable> CppBox<T> {
     /// will not be called for a null pointer. However, attempting to dereference
     /// a null pointer in a `CppBox`
     /// using `as_ref`, `as_mut`, `deref` or `deref_mut` will result in a panic.
-    pub unsafe fn new(ptr: *mut T) -> CppBox<T> {
+    pub unsafe fn new(ptr: Ptr<T>) -> Self {
+        CppBox(ptr.0)
+    }
+
+    pub unsafe fn from_raw(ptr: *mut T) -> Self {
         CppBox(ptr)
     }
 }
@@ -287,8 +291,16 @@ pub unsafe fn dynamic_cast_mut<R, T: DynamicCast<R>>(value: &mut T) -> Option<Pt
     value.dynamic_cast_mut()
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Ptr<T>(*mut T);
+
+impl<T> Clone for Ptr<T> {
+    fn clone(&self) -> Self {
+        Ptr(self.0)
+    }
+}
+
+impl<T> Copy for Ptr<T> {}
 
 impl<T> Ptr<T> {
     pub unsafe fn new(ptr: *mut T) -> Self {
@@ -304,24 +316,18 @@ impl<T> Ptr<T> {
     }
 
     /// Returns constant raw pointer to the value in the box.
-    pub fn as_ptr(&self) -> *const T {
+    pub fn as_ptr(self) -> *const T {
         self.0
     }
 
     /// Returns mutable raw pointer to the value in the box.
-    pub fn as_mut_ptr(&self) -> *mut T {
+    pub fn as_mut_ptr(self) -> *mut T {
         self.0
     }
 
     /// Returns true if the pointer is null.
-    pub fn is_null(&self) -> bool {
+    pub fn is_null(self) -> bool {
         self.0.is_null()
-    }
-}
-
-impl<T: CppDeletable> Ptr<T> {
-    pub unsafe fn to_box(&self) -> CppBox<T> {
-        CppBox::new(self.0)
     }
 }
 
@@ -387,6 +393,12 @@ impl<T> Deref for ConstPtr<T> {
             panic!("attempted to deref a null ConstPtr<T>");
         }
         unsafe { &(*self.0) }
+    }
+}
+
+impl<T> From<Ptr<T>> for ConstPtr<T> {
+    fn from(value: Ptr<T>) -> Self {
+        ConstPtr(value.0)
     }
 }
 

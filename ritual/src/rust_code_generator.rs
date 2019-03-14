@@ -490,7 +490,7 @@ impl Generator {
                 wrap_unsafe(in_unsafe_context, &code)
             }
             RustToFfiTypeConversion::CppBoxToPtr => {
-                let code = format!("::cpp_utils::CppBox::new({})", source_expr);
+                let code = format!("::cpp_utils::CppBox::from_raw({})", source_expr);
                 wrap_unsafe(in_unsafe_context, &code)
             }
             RustToFfiTypeConversion::UtilsPtrToPtr { .. }

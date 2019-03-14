@@ -1,4 +1,4 @@
-use cpp_utils::{CppDeletable, Ptr, StaticUpcast};
+use cpp_utils::{CppDeletable, Ptr, StaticUpcast, CppBox};
 use moqt_core::{BaseHandle, HandleFactory};
 
 #[test]
@@ -7,7 +7,7 @@ fn basic_destructors() {
         let mut factory = HandleFactory::new();
         assert_eq!(factory.counter(), 0);
 
-        let h1 = factory.create().to_box();
+        let h1 = CppBox::new(factory.create());
         let mut h2 = factory.create();
         assert_eq!(factory.counter(), 2);
         drop(h1);
@@ -23,7 +23,7 @@ fn virtual_destructors() {
         let mut factory = HandleFactory::new();
         assert_eq!(factory.counter(), 0);
 
-        let h1 = factory.create_derived().to_box();
+        let h1 = CppBox::new(factory.create_derived());
         assert_eq!(factory.counter(), 2);
         let mut h2 = factory.create_derived2();
         assert_eq!(factory.counter(), 5);
@@ -33,7 +33,7 @@ fn virtual_destructors() {
         h2_base.delete();
         assert_eq!(factory.counter(), 0);
 
-        let h3 = factory.create_base().to_box();
+        let h3 = CppBox::new(factory.create_base());
         assert_eq!(factory.counter(), 1);
         drop(h3);
         assert_eq!(factory.counter(), 0);
