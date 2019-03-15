@@ -30,6 +30,13 @@ public:
         Div5 = 0b100,
     };
 
+    struct InnerStruct {
+        enum InnerEnum {
+            Something = 42,
+        };
+        int field;
+    };
+
     typedef QFlags<UpdateType> UpdateTypes;
 
     void updateFoo(UpdateTypes updateTypes);

@@ -515,6 +515,14 @@ impl RustItemKind {
         }
     }
 
+    pub fn is_module_for_nested(&self) -> bool {
+        if let RustItemKind::Module(module) = self {
+            module.kind == RustModuleKind::CppNestedType
+        } else {
+            false
+        }
+    }
+
     pub fn short_text(&self) -> String {
         match self {
             RustItemKind::Module(data) => format!("mod {}", data.path.full_name(None)),

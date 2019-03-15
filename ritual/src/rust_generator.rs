@@ -744,16 +744,25 @@ impl State<'_, '_> {
         parent_path: &CppPath,
         name_type: &NameType<'_>,
     ) -> Result<RustPathScope> {
-        let allow_parent_type = if let NameType::Type = name_type {
-            false
-        } else {
-            true
+        let allow_module_for_nested;
+        let allow_wrapper_type;
+        match name_type {
+            NameType::Type | NameType::Module => {
+                allow_module_for_nested = true;
+                allow_wrapper_type = false;
+            }
+            _ => {
+                allow_module_for_nested = false;
+                allow_wrapper_type = true;
+            }
         };
 
         let rust_item = self
             .find_rust_items(parent_path)?
             .find(|item| {
-                (allow_parent_type && item.kind.is_wrapper_type()) || item.kind.is_module()
+                (allow_wrapper_type && item.kind.is_wrapper_type())
+                    || (item.kind.is_module() && !item.kind.is_module_for_nested())
+                    || (allow_module_for_nested && item.kind.is_module_for_nested())
             })
             .ok_or_else(|| {
                 format_err!(

@@ -1,4 +1,4 @@
-use moqt_core::basic_class::UpdateType;
+use moqt_core::basic_class::{UpdateType, inner_struct::InnerEnum};
 use moqt_core::{BasicClass, BasicClassField};
 use cpp_utils::Ptr;
 
@@ -62,6 +62,9 @@ fn nested_enum() {
         v.update_foo(UpdateType::Mul3 | UpdateType::Div5);
         assert_eq!(v.foo(), 1);
     }
+
+    let x: InnerEnum = InnerEnum::Something;
+    assert_eq!(x.to_int(), 42);
 }
 
 #[test]
