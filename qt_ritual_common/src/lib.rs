@@ -143,6 +143,11 @@ pub fn get_full_build_config(crate_name: &str) -> Result<FullBuildConfig> {
         data.set_library_type(CppLibraryType::Shared);
         cpp_build_config.add(target::Condition::Env(target::Env::Msvc), data);
     }
+    {
+        let mut data = CppBuildConfigData::new();
+        data.set_library_type(CppLibraryType::Static);
+        cpp_build_config.add(target::Condition::Env(target::Env::Msvc).negate(), data);
+    }
     Ok(FullBuildConfig {
         installation_data,
         cpp_build_config,
