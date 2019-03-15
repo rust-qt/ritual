@@ -77,10 +77,10 @@ fn apply_instantiation_to_method(
         );
     } else {
         if let Some(conversion_type) = conversion_type {
-            *new_method.path.last_mut() = CppPathItem::from_good_str(&format!(
-                "operator {}",
-                conversion_type.to_cpp_code(None)?
-            ));
+            *new_method.path.last_mut() = CppPathItem {
+                name: format!("operator {}", conversion_type.to_cpp_code(None)?),
+                template_arguments: None,
+            };
         }
         trace!("success: {}", new_method.short_text());
         Ok(new_method)

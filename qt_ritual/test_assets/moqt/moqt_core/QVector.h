@@ -5,6 +5,9 @@
 #include <vector>
 
 template<typename T>
+class MOQT_CORE_EXPORT SomethingElse {};
+
+template<typename T>
 class MOQT_CORE_EXPORT QVector {
 public:
     QVector() {}
@@ -17,6 +20,10 @@ public:
     }
     int count() const {
         return m_size;
+    }
+
+    operator SomethingElse<T>() {
+        return SomethingElse<T>();
     }
 
 private:

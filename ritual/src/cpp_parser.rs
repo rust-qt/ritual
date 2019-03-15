@@ -1056,7 +1056,11 @@ impl CppParser<'_, '_> {
 
         if method_operator.is_none() && name.starts_with("operator ") {
             method_operator = Some(CppOperator::Conversion(return_type_parsed.clone()));
-            name = format!("operator {}", return_type_parsed.to_cpp_pseudo_code());
+            if let Ok(text) = return_type_parsed.to_cpp_code(None) {
+                name = format!("operator {}", text);
+            } else {
+                name = format!("operator {}", return_type_parsed.to_cpp_pseudo_code());
+            }
         }
 
         name_with_namespace.last_mut().name = name.clone();
