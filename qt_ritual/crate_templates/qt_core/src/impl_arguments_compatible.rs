@@ -1,4 +1,4 @@
-use connection::ArgumentsCompatible;
+use crate::ArgumentsCompatible;
 
 // generated with impl_arguments_compatible.py script
 impl ArgumentsCompatible<()> for () {}
