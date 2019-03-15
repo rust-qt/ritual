@@ -9,7 +9,7 @@ use crate::cpp_ffi_data::CppFfiType;
 use crate::cpp_ffi_data::CppFieldAccessorType;
 use crate::cpp_ffi_data::CppToFfiTypeConversion;
 use crate::cpp_ffi_generator::ffi_type;
-use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
+use crate::cpp_function::{CppFunction, CppOperator, ReturnValueAllocationPlace};
 use crate::cpp_type::is_qflags;
 use crate::cpp_type::CppBuiltInNumericType;
 use crate::cpp_type::CppFunctionPointerType;
@@ -260,14 +260,16 @@ impl State<'_, '_> {
         &self,
         cpp_ffi_type: &CppFfiType,
         argument_meaning: &CppFfiArgumentMeaning,
-        is_template_argument: bool,
+        naming_mode: bool,
         allocation_place: ReturnValueAllocationPlace,
     ) -> Result<RustFinalType> {
         let rust_ffi_type = self.ffi_type_to_rust_ffi_type(cpp_ffi_type.ffi_type())?;
         let mut api_to_ffi_conversion = RustToFfiTypeConversion::None;
         if let RustType::PointerLike { .. } = &rust_ffi_type {
             if let CppToFfiTypeConversion::ValueToPointer { .. } = cpp_ffi_type.conversion() {
-                if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
+                if naming_mode {
+                    api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
+                } else if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
                     // TODO: return error if this rust type is not deletable
                     match allocation_place {
                         ReturnValueAllocationPlace::Stack => {
@@ -280,8 +282,6 @@ impl State<'_, '_> {
                             bail!("NotApplicable conflicts with ValueToPointer");
                         }
                     }
-                } else if is_template_argument {
-                    api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
                 } else {
                     if argument_meaning == &CppFfiArgumentMeaning::This {
                         api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr {
@@ -300,7 +300,7 @@ impl State<'_, '_> {
                         force_api_is_const: None,
                         lifetime: None,
                     };
-                } else if !is_template_argument {
+                } else if !naming_mode {
                     api_to_ffi_conversion = RustToFfiTypeConversion::UtilsPtrToPtr {
                         force_api_is_const: None,
                     };
@@ -808,6 +808,53 @@ impl State<'_, '_> {
         Ok(captions.join("_"))
     }
 
+    /// Returns method name. For class member functions, the name doesn't
+    /// include class name and scope. For free functions, the name includes
+    /// modules.
+    fn special_function_rust_name(
+        &self,
+        function: &CppFfiFunction,
+        context: &RustPath,
+    ) -> Result<Option<String>> {
+        let r = match &function.kind {
+            CppFfiFunctionKind::Function { cpp_function, .. } => {
+                if cpp_function.is_constructor() {
+                    Some("new".to_string())
+                } else if let Some(operator) = &cpp_function.operator {
+                    if let CppOperator::Conversion(type1) = operator {
+                        let rust_type = self.rust_final_type(
+                            &ffi_type(type1, CppTypeRole::ReturnType)?,
+                            &CppFfiArgumentMeaning::ReturnValue,
+                            true,
+                            function.allocation_place,
+                        )?;
+                        Some(format!("to_{}", rust_type.api_type().caption(context)?))
+                    } else {
+                        Some(format!("operator_{}", operator.ascii_name()?))
+                    }
+                } else {
+                    None
+                }
+            }
+            CppFfiFunctionKind::FieldAccessor {
+                accessor_type,
+                field,
+            } => {
+                let name = &field.path.last().name;
+                let function_name = match accessor_type {
+                    CppFieldAccessorType::CopyGetter | CppFieldAccessorType::ConstRefGetter => {
+                        name.to_string()
+                    }
+                    CppFieldAccessorType::MutRefGetter => format!("{}_mut", name),
+                    CppFieldAccessorType::Setter => format!("set_{}", name),
+                };
+                Some(function_name)
+            }
+        };
+
+        Ok(r)
+    }
+
     fn cpp_path_item_to_name(&self, item: &CppPathItem, context: &RustPath) -> Result<String> {
         if let Some(template_arguments) = &item.template_arguments {
             let captions = self.type_list_caption(template_arguments, context)?;
@@ -871,7 +918,9 @@ impl State<'_, '_> {
                 .map_if_ok(|item| self.cpp_path_item_to_name(item, &strategy.path))?
                 .join("_"),
             NameType::ApiFunction(function) => {
-                let s = if let Some(last_name_override) = special_function_rust_name(function)? {
+                let s = if let Some(last_name_override) =
+                    self.special_function_rust_name(function, &strategy.path)?
+                {
                     last_name_override.clone()
                 } else {
                     self.cpp_path_item_to_name(cpp_path.last(), &strategy.path)?
@@ -955,7 +1004,7 @@ impl State<'_, '_> {
                 Ok(once(ffi_rust_item).chain(public_items).collect_vec())
             }
             CppFfiItemKind::QtSlotWrapper(_) => {
-                bail!("not supported yet");
+                bail!("slot wrappers do not need to be processed here");
             }
         }
     }
@@ -1397,39 +1446,6 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     }
 
     Ok(())
-}
-
-/// Returns method name. For class member functions, the name doesn't
-/// include class name and scope. For free functions, the name includes
-/// modules.
-fn special_function_rust_name(function: &CppFfiFunction) -> Result<Option<String>> {
-    let r = match &function.kind {
-        CppFfiFunctionKind::Function { cpp_function, .. } => {
-            if cpp_function.is_constructor() {
-                Some("new".to_string())
-            } else if let Some(operator) = &cpp_function.operator {
-                Some(format!("operator_{}", operator.ascii_name()?))
-            } else {
-                None
-            }
-        }
-        CppFfiFunctionKind::FieldAccessor {
-            accessor_type,
-            field,
-        } => {
-            let name = &field.path.last().name;
-            let function_name = match accessor_type {
-                CppFieldAccessorType::CopyGetter | CppFieldAccessorType::ConstRefGetter => {
-                    name.to_string()
-                }
-                CppFieldAccessorType::MutRefGetter => format!("{}_mut", name),
-                CppFieldAccessorType::Setter => format!("set_{}", name),
-            };
-            Some(function_name)
-        }
-    };
-
-    Ok(r)
 }
 
 #[allow(dead_code)]

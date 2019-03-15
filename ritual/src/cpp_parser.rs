@@ -1023,9 +1023,6 @@ impl CppParser<'_, '_> {
             _ => None,
         };
 
-        name_with_namespace.last_mut().name = name.clone();
-        name_with_namespace.last_mut().template_arguments = template_arguments;
-
         let allows_variadic_arguments = entity.is_variadic();
         let has_this_argument = class_name.is_some() && !entity.is_static_method();
         let real_arguments_count = arguments.len() + if has_this_argument { 1 } else { 0 };
@@ -1055,14 +1052,16 @@ impl CppParser<'_, '_> {
             }
         }
 
+        dump_entity(entity, 0);
+
         if method_operator.is_none() && name.starts_with("operator ") {
-            let op = name["operator ".len()..].trim();
-            match self.parse_unexposed_type(None, Some(op.to_string()), class_entity, Some(entity))
-            {
-                Ok(t) => method_operator = Some(CppOperator::Conversion(t)),
-                Err(_) => bail!("Unknown type in conversion operator: '{}'", op),
-            }
+            method_operator = Some(CppOperator::Conversion(return_type_parsed.clone()));
+            name = format!("operator {}", return_type_parsed.to_cpp_pseudo_code());
         }
+
+        name_with_namespace.last_mut().name = name.clone();
+        name_with_namespace.last_mut().template_arguments = template_arguments;
+
         let source_range = entity
             .get_range()
             .ok_or_else(|| err_msg("failed to get range of the function"))?;

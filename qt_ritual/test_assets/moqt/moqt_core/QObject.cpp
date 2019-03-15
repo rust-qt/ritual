@@ -4,8 +4,8 @@
 #include <deque>
 #include <cstring>
 
-std::mutex connectArgsMutex;
-std::deque<QObject::ConnectArgs> connectArgs;
+thread_local std::mutex connectArgsMutex;
+thread_local std::deque<QObject::ConnectArgs> connectArgs;
 
 const char* copyToHeap(const char* string) {
     auto buf = new char[strlen(string) + 1];

@@ -1085,3 +1085,32 @@ fn function_pointer() {
     );
     assert_eq!(arg1.has_default_value, false);
 }
+
+#[test]
+fn template_conversion_operator() {
+    let data = run_parser(
+        "
+        template<typename T>
+        class Vec {};
+
+        class A {
+        public:
+            operator Vec<int>() {}
+        };
+        ",
+    );
+    assert_eq!(data.methods.len(), 1);
+
+    let vec_item = CppPathItem {
+        name: "Vec".to_string(),
+        template_arguments: Some(vec![CppType::BuiltInNumeric(CppBuiltInNumericType::Int)]),
+    };
+    let vec_type = CppType::Class(CppPath::from_item(vec_item));
+
+    let func = &data.methods[0];
+    assert_eq!(
+        func.operator,
+        Some(CppOperator::Conversion(vec_type.clone()))
+    );
+    assert_eq!(func.return_type, vec_type);
+}

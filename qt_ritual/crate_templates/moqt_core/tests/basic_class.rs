@@ -39,6 +39,11 @@ fn basic_class() {
         assert_eq!(v.class_field().get(), 42);
         drop(c);
         assert_eq!(v.class_field().get(), 42);
+
+        assert_eq!(v.to_c_int(), 3);
+        let mut converted = v.to_q_vector_of_c_int();
+        assert_eq!(converted.count(), 1);
+        assert_eq!(*converted.at(0), 7);
     }
 }
 

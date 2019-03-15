@@ -45,3 +45,12 @@ QVector<BasicClassField> BasicClass::get_vector_class() const {
     r.push(value);
     return r;
 }
+
+BasicClass::operator int() {
+    return 3;
+}
+BasicClass::operator QVector<int>() {
+    auto r = QVector<int>();
+    r.push(7);
+    return r;
+}
