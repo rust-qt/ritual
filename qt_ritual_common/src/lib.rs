@@ -47,6 +47,15 @@ pub struct InstallationData {
 pub fn get_installation_data(crate_name: &str) -> Result<InstallationData> {
     let qt_version = run_qmake_string_query("QT_VERSION")?;
     debug!("QT_VERSION = \"{}\"", qt_version);
+
+    let qt_version_parsed = semver::Version::parse(&qt_version)?;
+    if qt_version_parsed.major != 5 {
+        bail!(
+            "only Qt 5 is supported! \"{}\" is not supported",
+            qt_version
+        );
+    }
+
     debug!("Detecting Qt directories");
 
     let root_include_path = run_qmake_query("QT_INSTALL_HEADERS")?;
