@@ -4,10 +4,9 @@ use crate::database::CppFfiItem;
 use crate::database::CppFfiItemKind;
 use crate::processor::ProcessorData;
 use log::{debug, trace};
-use rayon::iter::IndexedParallelIterator;
-use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 use rayon::slice::ParallelSliceMut;
+use ritual_common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
 use ritual_common::cpp_lib_builder::{
     c2r_cmake_vars, BuildType, CppLibBuilder, CppLibBuilderOutput,
 };
@@ -16,10 +15,16 @@ use ritual_common::file_utils::{create_dir_all, create_file, path_to_str, remove
 use ritual_common::target::current_target;
 use ritual_common::utils::MapIfOk;
 use ritual_common::utils::ProgressBar;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::io::Write;
-use std::iter;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::thread::ThreadId;
 use std::time::Instant;
+use std::{iter, thread};
+
+const PARALLEL_CHUNKS: usize = 64;
 
 fn check_snippets<'a>(
     data: &mut CppCheckerData,
@@ -82,6 +87,7 @@ struct CppCheckerData {
 
 struct CppChecker<'b, 'a: 'b> {
     data: &'b mut ProcessorData<'a>,
+    instance_provider: InstanceProvider,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -179,15 +185,17 @@ fn check_preliminary_test(data: &mut CppCheckerData, test: &PreliminaryTest) -> 
     Ok(())
 }
 
-impl CppChecker<'_, '_> {
-    fn env(&self) -> CppCheckerEnv {
-        CppCheckerEnv {
-            target: current_target(),
-            cpp_library_version: self.data.config.cpp_lib_version().map(|s| s.to_string()),
-        }
-    }
-    fn create_instance(&self, id: &str) -> Result<CppCheckerData> {
-        let root_path = self.data.workspace.tmp_path().join("cpp_checker").join(id);
+#[derive(Debug, Clone)]
+struct InstanceProvider {
+    parent_path: PathBuf,
+    include_directives: Vec<PathBuf>,
+    cpp_build_config: CppBuildConfigData,
+    cpp_build_paths: CppBuildPaths,
+}
+
+impl InstanceProvider {
+    fn get(&self, id: &str) -> Result<CppCheckerData> {
+        let root_path = self.parent_path.join(id);
         if root_path.exists() {
             remove_dir_all(&root_path)?;
         }
@@ -206,30 +214,19 @@ impl CppChecker<'_, '_> {
             utils_file,
             include_str!("../templates/cpp_checker/utils.h"),
             include_directives_code = self
-                .data
-                .config
-                .include_directives()
+                .include_directives
+                .iter()
                 .map_if_ok(|d| -> Result<_> { Ok(format!("#include \"{}\"", path_to_str(d)?)) })?
                 .join("\n")
         )?;
 
-        let mut build_paths = self.data.config.cpp_build_paths().clone();
-        build_paths.apply_env();
         let builder = CppLibBuilder {
             cmake_source_dir: src_path.clone(),
             build_dir: root_path.join("build"),
             install_dir: None,
             num_jobs: Some(1),
             build_type: BuildType::Debug,
-            cmake_vars: c2r_cmake_vars(
-                &self
-                    .data
-                    .config
-                    .cpp_build_config()
-                    .eval(&current_target())?,
-                &build_paths,
-                None,
-            )?,
+            cmake_vars: c2r_cmake_vars(&self.cpp_build_config, &self.cpp_build_paths, None)?,
             capture_output: true,
             skip_cmake: false,
             skip_cmake_after_first_run: true,
@@ -240,6 +237,42 @@ impl CppChecker<'_, '_> {
             main_cpp_path: src_path.join("main.cpp"),
         })
     }
+}
+
+struct InstanceStorage {
+    instances: Arc<Mutex<HashMap<ThreadId, Arc<Mutex<CppCheckerData>>>>>,
+    provider: InstanceProvider,
+}
+
+impl InstanceStorage {
+    fn new(provider: InstanceProvider) -> Self {
+        Self {
+            provider,
+            instances: Default::default(),
+        }
+    }
+    fn current(&self) -> Result<Arc<Mutex<CppCheckerData>>> {
+        let mut instances = self.instances.lock().unwrap();
+        let instances_len = instances.len();
+        let instance = match instances.entry(thread::current().id()) {
+            Entry::Vacant(entry) => {
+                let instance = self.provider.get(&format!("main_{}", instances_len))?;
+                entry.insert(Arc::new(Mutex::new(instance)))
+            }
+            Entry::Occupied(entry) => entry.into_mut(),
+        };
+        Ok(Arc::clone(instance))
+    }
+}
+
+impl CppChecker<'_, '_> {
+    fn env(&self) -> CppCheckerEnv {
+        CppCheckerEnv {
+            target: current_target(),
+            cpp_library_version: self.data.config.cpp_lib_version().map(|s| s.to_string()),
+        }
+    }
+
     fn run(&mut self) -> Result<()> {
         let env = self.env();
         self.data.current_database.add_environment(env.clone());
@@ -276,19 +309,15 @@ impl CppChecker<'_, '_> {
         self.run_tests()?;
 
         let progress_bar = ProgressBar::new(snippets.len() as u64, "Checking items");
-        let num_threads = num_cpus::get();
-        let div_ceil = |x, y| (x + y - 1) / y;
-        let chunk_size = div_ceil(snippets.len(), num_threads);
-        let num_chunks = div_ceil(snippets.len(), chunk_size);
 
-        let instances =
-            (0..num_chunks).map_if_ok(|index| self.create_instance(&format!("main_{}", index)))?;
+        let instances = InstanceStorage::new(self.instance_provider.clone());
 
         snippets
-            .par_chunks_mut(chunk_size)
-            .zip_eq(instances.into_par_iter())
-            .map(|(chunk, mut instance)| {
+            .par_chunks_mut(PARALLEL_CHUNKS)
+            .map(|chunk| {
                 let progress_bar = progress_bar.clone();
+                let instance = instances.current()?;
+                let mut instance = instance.lock().unwrap();
                 binary_check(chunk, &mut instance, &progress_bar)
             })
             .collect::<Result<_>>()?;
@@ -343,7 +372,7 @@ impl CppChecker<'_, '_> {
         ];
         assert!(positive_tests.iter().all(|t| t.expected));
 
-        let mut instance = self.create_instance("tests")?;
+        let mut instance = self.instance_provider.get("tests")?;
         let all_positive_output =
             check_snippets(&mut instance, positive_tests.iter().map(|t| &t.snippet))?;
         if all_positive_output != CppLibBuilderOutput::Success {
@@ -372,7 +401,20 @@ impl CppChecker<'_, '_> {
 }
 
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
-    let mut checker = CppChecker { data };
+    let instance_provider = InstanceProvider {
+        parent_path: data.workspace.tmp_path().join("cpp_checker"),
+        include_directives: data.config.include_directives().to_vec(),
+        cpp_build_paths: {
+            let mut data = data.config.cpp_build_paths().clone();
+            data.apply_env();
+            data
+        },
+        cpp_build_config: data.config.cpp_build_config().eval(&current_target())?,
+    };
+    let mut checker = CppChecker {
+        data,
+        instance_provider,
+    };
 
     checker.run()?;
 
