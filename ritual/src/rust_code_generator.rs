@@ -750,8 +750,8 @@ impl Generator {
             } => {
                 let path = &func.return_type.api_type().as_common()?.path;
                 let call = format!(
-                    "{}::new(cpp_utils::ConstPtr::new(self as &{}), \
-                     std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"))",
+                    "{}::new(::cpp_utils::ConstPtr::new(self as &{}), \
+                     ::std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"))",
                     self.rust_path_to_string(&path),
                     self.rust_path_to_string(qobject_path),
                     receiver_id

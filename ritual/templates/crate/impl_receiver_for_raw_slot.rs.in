@@ -4,7 +4,7 @@ impl<'a> {qt_core}::AsReceiver for &'a {type_path} {{
         unsafe {{
             {qt_core}::Receiver::new(
                 ::cpp_utils::StaticUpcast::static_upcast(self),
-                std::ffi::CStr::from_bytes_with_nul_unchecked(b"{receiver_id}\0")
+                ::std::ffi::CStr::from_bytes_with_nul_unchecked(b"{receiver_id}\0")
             )
         }}
     }}
