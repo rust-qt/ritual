@@ -97,28 +97,34 @@ impl Default for ProcessingSteps {
             main_procedure: Vec::new(),
         };
 
-        let push_cpp_post_processing = |s: &mut Self| {
-            s.push("add_explicit_xstructors", cpp_explicit_xstructors::run);
+        let push_cpp_post_processing = |s: &mut Self, suffix: &str| {
             s.push(
-                "set_allocation_places",
+                &format!("add_explicit_xstructors{}", suffix),
+                cpp_explicit_xstructors::run,
+            );
+            s.push(
+                &format!("set_allocation_places{}", suffix),
                 type_allocation_places::set_allocation_places,
             );
             s.push(
-                "find_template_instantiations",
+                &format!("find_template_instantiations{}", suffix),
                 cpp_template_instantiator::find_template_instantiations,
             );
             s.push(
-                "instantiate_templates",
+                &format!("instantiate_templates{}", suffix),
                 cpp_template_instantiator::instantiate_templates,
             );
-            s.push("cpp_ffi_generator", cpp_ffi_generator::run);
-            s.push("cpp_checker", cpp_checker::run);
+            s.push(
+                &format!("cpp_ffi_generator{}", suffix),
+                cpp_ffi_generator::run,
+            );
+            s.push(&format!("cpp_checker{}", suffix), cpp_checker::run);
         };
 
         s.push("cpp_parser", cpp_parser::run);
-        push_cpp_post_processing(&mut s);
+        push_cpp_post_processing(&mut s, "");
         s.push("cpp_parser_stage2", cpp_parser::parse_generated_items);
-        push_cpp_post_processing(&mut s);
+        push_cpp_post_processing(&mut s, "_stage2");
         s.push("rust_generator", rust_generator::run);
         s.push("crate_writer", crate_writer::run);
         s.push("build_crate", build_crate);
