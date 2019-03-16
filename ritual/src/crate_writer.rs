@@ -331,6 +331,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
             cpp_wrapper_lib_name: c_lib_name,
             cpp_lib_version: data.config.cpp_lib_version().map(|s| s.to_string()),
         },
+        None,
     )?;
     Ok(())
 }

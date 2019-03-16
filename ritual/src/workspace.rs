@@ -45,7 +45,7 @@ impl Workspace {
             bail!("No such directory: {}", path.display());
         }
         let config_path = config_path(&path);
-        for &dir in &["tmp", "out", "log"] {
+        for &dir in &["tmp", "out", "log", "backup"] {
             create_dir_all(path.join(dir))?;
         }
         let w = Workspace {
@@ -150,13 +150,23 @@ impl Workspace {
     }
 
     fn save_config(&self) -> Result<()> {
-        save_json(config_path(&self.path), &self.config)
+        save_json(config_path(&self.path), &self.config, None)
     }
 
     pub fn save_database(&self, database: &mut Database) -> Result<()> {
         if database.is_modified() {
             info!("Saving data");
-            save_json(database_path(&self.path, database.crate_name()), database)?;
+            let date = chrono::Local::now();
+            let backup_path = self.path.join("backup").join(format!(
+                "db_{}_{}.json",
+                database.crate_name(),
+                date.format("%Y-%m-%d_%H-%M-%S")
+            ));
+            save_json(
+                database_path(&self.path, database.crate_name()),
+                database,
+                Some(&backup_path),
+            )?;
             database.set_saved();
         }
         Ok(())

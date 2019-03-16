@@ -218,13 +218,15 @@ impl QCoreApplicationArgs {
     /// Although this is the cheapest way to construct a `CoreApplicationArgs`
     /// object, it's not clear whether Qt considers empty arguments list valid.
     pub fn empty() -> QCoreApplicationArgs {
-        QCoreApplicationArgs::from(Vec::new())
+        QCoreApplicationArgs::new(Vec::new())
     }
 
     /// Returns `(argc, argv)` values in the form accepted by the application objects'
     /// constructors.
-    pub fn get(&mut self) -> (&mut ::std::os::raw::c_int, *mut *mut ::std::os::raw::c_char) {
-        (self.argc.as_mut(), self.argv.as_mut_ptr())
+    pub fn get(&mut self) -> (::cpp_utils::Ptr<::std::os::raw::c_int>, ::cpp_utils::Ptr<*mut ::std::os::raw::c_char>) {
+        let argc = ::cpp_utils::Ptr::new(self.argc.as_mut());
+        let argv = ::cpp_utils::Ptr::new(self.argv.as_mut_ptr());
+        (argc, argv)
     }
 
     #[cfg(unix)]
@@ -234,7 +236,7 @@ impl QCoreApplicationArgs {
     pub fn from_real() -> QCoreApplicationArgs {
         use ::std::os::unix::ffi::OsStringExt;
         let args = ::std::env::args_os().map(|arg| arg.into_vec()).collect();
-        QCoreApplicationArgs::from(args)
+        QCoreApplicationArgs::new(args)
     }
     #[cfg(windows)]
     /// Creates an object representing real arguments of the application.
@@ -266,7 +268,8 @@ impl QCoreApplication {
     pub fn create_and_exit<F: FnOnce(&mut QCoreApplication) -> i32>(f: F) -> ! {
         let exit_code = {
             let mut args = QCoreApplicationArgs::from_real();
-            let mut app = unsafe { QCoreApplication::new(args.get()) };
+            let (argc, argv) = args.get();
+            let mut app = unsafe { QCoreApplication::new2(argc, argv) };
             f(app.as_mut())
         }; // drop `app` and `args`
         ::std::process::exit(exit_code)

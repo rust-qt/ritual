@@ -197,7 +197,11 @@ pub fn load_json<P: AsRef<Path>, T: serde::de::DeserializeOwned>(path: P) -> Res
 }
 
 /// Serialize `value` into JSON file `path`.
-pub fn save_json<P: AsRef<Path>, T: ::serde::Serialize>(path: P, value: &T) -> Result<()> {
+pub fn save_json<P: AsRef<Path>, T: ::serde::Serialize>(
+    path: P,
+    value: &T,
+    backup_path: Option<&Path>,
+) -> Result<()> {
     let tmp_path = {
         let mut buf = path.as_ref().to_path_buf();
         let tmp_file_name = format!("{}.new", os_str_to_str(&buf.file_name().unwrap())?);
@@ -214,7 +218,11 @@ pub fn save_json<P: AsRef<Path>, T: ::serde::Serialize>(path: P, value: &T) -> R
         })?;
     }
     if path.as_ref().exists() {
-        remove_file(path.as_ref())?;
+        if let Some(backup_path) = backup_path {
+            rename_file(path.as_ref(), backup_path)?;
+        } else {
+            remove_file(path.as_ref())?;
+        }
     }
     rename_file(&tmp_path, path.as_ref())?;
     Ok(())
