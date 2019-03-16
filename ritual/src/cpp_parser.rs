@@ -238,7 +238,7 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
         args.push("-isystem".to_string());
         args.push(path);
     } else {
-        warn!("Warning: CLANG_SYSTEM_INCLUDE_PATH environment variable is not set. This may result in parse errors related to system header includes.");
+        trace!("CLANG_SYSTEM_INCLUDE_PATH environment variable is not set. This may result in parse errors related to system header includes.");
     }
     for dir in config.cpp_build_paths().framework_paths() {
         let str = path_to_str(dir)?;
