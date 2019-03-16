@@ -76,7 +76,7 @@ impl<T: CppDeletable> CppBox<T> {
     }
 
     /// Returns mutable raw pointer to the value in the box.
-    pub unsafe fn as_mut_ptr(&self) -> Ptr<T> {
+    pub unsafe fn as_mut_ptr(&mut self) -> Ptr<T> {
         Ptr::new(self.0)
     }
     /// Returns the pointer that was used to create the object and destroys the box.
