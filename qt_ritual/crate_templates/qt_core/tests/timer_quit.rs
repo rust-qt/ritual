@@ -1,9 +1,9 @@
-use qt_core::connection::Signal;
-use qt_core::core_application::CoreApplication;
-use qt_core::timer::Timer;
+use qt_core::QCoreApplication;
+use qt_core::QTimer;
+use qt_core::RawSlot;
+use qt_core::Signal;
+use std::ffi::c_void;
 
-use qt_core::libc::c_void;
-use qt_core::slots::raw::RawSlotNoArgs;
 extern "C" fn func1(data: *mut c_void) {
     let data: usize = unsafe { std::mem::transmute(data) };
     println!("about_to_quit: {}", data);
@@ -12,16 +12,16 @@ extern "C" fn func1(data: *mut c_void) {
 #[test]
 fn timer_quit() {
     println!("timer_quit: Started");
-    CoreApplication::create_and_exit(|app| {
-        let mut slot1 = RawSlotNoArgs::new();
+    QCoreApplication::create_and_exit(|app| {
+        let mut slot1 = RawSlot::new();
         unsafe {
-            slot1.set(func1, std::mem::transmute(42usize));
+            slot1.set(func1, 42 as *mut c_void);
         }
-        app.signals().about_to_quit().connect(slot1.as_ref());
+        app.about_to_quit().connect(&slot1);
 
-        let mut timer = Timer::new();
-        timer.signals().timeout().connect(&app.slots().quit());
+        let mut timer = QTimer::new();
+        timer.timeout().connect(&app.quit());
         timer.start(1000);
-        CoreApplication::exec()
+        QCoreApplication::exec()
     })
 }

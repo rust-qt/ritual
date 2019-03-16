@@ -1,23 +1,23 @@
-use qt_core::abstract_item_model::AbstractItemModel;
-use qt_core::abstract_table_model::AbstractTableModel;
-use qt_core::cpp_utils::CppBox;
+use qt_core::QAbstractItemModel;
+use qt_core::QAbstractTableModel;
+use cpp_utils::CppBox;
 use qt_core::qt::ItemDataRole;
-use qt_core::string::String;
-use qt_core::string_list::StringList;
-use qt_core::string_list_model::StringListModel;
+use qt_core::QString;
+use qt_core::QStringList;
+use qt_core::QStringListModel;
 
 #[test]
 fn models_and_casts() {
-    let mut string_list = StringList::new(());
-    string_list.append(&String::from("text1"));
-    string_list.append(&String::from("text2"));
-    let mut string_list_model = StringListModel::new(&string_list);
+    let mut string_list = QStringList::new();
+    string_list.append(&QString::from("text1"));
+    string_list.append(&QString::from("text2"));
+    let mut string_list_model = QStringListModel::new(&string_list);
     assert_eq!(string_list_model.row_count(()), 2);
     {
         let index = string_list_model.index((0, 0));
         assert_eq!(
             string_list_model
-                .data(&index, ItemDataRole::Display as i32)
+                .data(&index, QItemDataRole::Display as i32)
                 .to_string()
                 .to_std_string(),
             "text1"

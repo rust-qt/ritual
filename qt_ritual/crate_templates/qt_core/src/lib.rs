@@ -223,9 +223,9 @@ impl QCoreApplicationArgs {
 
     /// Returns `(argc, argv)` values in the form accepted by the application objects'
     /// constructors.
-    pub fn get(&mut self) -> (::cpp_utils::Ptr<::std::os::raw::c_int>, ::cpp_utils::Ptr<*mut ::std::os::raw::c_char>) {
-        let argc = ::cpp_utils::Ptr::new(self.argc.as_mut());
-        let argv = ::cpp_utils::Ptr::new(self.argv.as_mut_ptr());
+    pub fn get(&mut self) -> (*mut ::std::os::raw::c_int, *mut *mut ::std::os::raw::c_char) {
+        let argc = self.argc.as_mut();
+        let argv = self.argv.as_mut_ptr();
         (argc, argv)
     }
 
@@ -265,15 +265,21 @@ impl QCoreApplication {
     ///   })
     /// }
     /// ```
-    pub fn create_and_exit<F: FnOnce(&mut QCoreApplication) -> i32>(f: F) -> ! {
+    pub fn create_and_exit<F: FnOnce(::cpp_utils::Ptr<QCoreApplication>) -> i32>(f: F) -> ! {
         let exit_code = {
             let mut args = QCoreApplicationArgs::from_real();
             let (argc, argv) = args.get();
-            let mut app = unsafe { QCoreApplication::new2(argc, argv) };
-            f(app.as_mut())
+            unsafe {
+                let mut app = QCoreApplication::new2(
+                    ::cpp_utils::Ptr::new(argc),
+                    ::cpp_utils::Ptr::new(argv),
+                );
+                f(app.as_mut_ptr())
+            }
         }; // drop `app` and `args`
         ::std::process::exit(exit_code)
     }
 }
 
 // TODO: split to multiple files
+mod impl_qstring;

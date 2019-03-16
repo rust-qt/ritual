@@ -1,23 +1,23 @@
-use qt_core::connection::Signal;
-use qt_core::core_application::CoreApplication;
-use qt_core::slots::SlotVariantRef;
-use qt_core::variant::Variant;
-use qt_core::variant_animation::VariantAnimation;
+use qt_core::Signal;
+use qt_core::QCoreApplication;
+use qt_core::SlotVariantRef;
+use qt_core::QVariant;
+use qt_core::QVariantAnimation;
 
 #[test]
 fn variant_animation2() {
-    CoreApplication::create_and_exit(|app| {
+    QCoreApplication::create_and_exit(|app| {
         let slot1 = SlotVariantRef::new(|value| {
             println!("value_changed: {}", value.to_string().to_std_string());
         });
 
-        let mut animation = VariantAnimation::new();
-        animation.signals().value_changed().connect(&slot1);
-        animation.signals().finished().connect(&app.slots().quit());
-        animation.set_start_value(&Variant::new0(1));
-        animation.set_end_value(&Variant::new0(5));
+        let mut animation = QVariantAnimation::new();
+        animation.value_changed().connect(&slot1);
+        animation.finished().connect(&app.slots().quit());
+        animation.set_start_value(&QVariant::new0(1));
+        animation.set_end_value(&QVariant::new0(5));
         animation.set_duration(5000);
-        animation.start(());
-        CoreApplication::exec()
+        animation.start();
+        QCoreApplication::exec()
     })
 }
