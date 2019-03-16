@@ -1,4 +1,5 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
 {vis}struct {name}(::std::os::raw::c_int);
 
 impl From<::std::os::raw::c_int> for {name} {{
