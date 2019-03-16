@@ -1114,3 +1114,25 @@ fn template_conversion_operator() {
     );
     assert_eq!(func.return_type, vec_type);
 }
+
+#[test]
+fn elaborated_enum_type() {
+    let data = run_parser(
+        "
+        class A {
+        public:
+            enum E { E1, E2, };
+        };
+        A::E fn1();
+        ",
+    );
+
+    assert_eq!(data.methods.len(), 1);
+    let func = &data.methods[0];
+    assert_eq!(
+        func.return_type,
+        CppType::Enum {
+            path: CppPath::from_good_str("A::E")
+        }
+    );
+}

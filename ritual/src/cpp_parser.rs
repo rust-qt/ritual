@@ -645,7 +645,7 @@ impl CppParser<'_, '_> {
                     bail!("failed to get enum declaration: {:?}", type1);
                 }
             }
-            TypeKind::Elaborated | TypeKind::Record => {
+            TypeKind::Record => {
                 if let Some(declaration) = type1.get_declaration() {
                     if declaration
                         .get_accessibility()
@@ -771,6 +771,9 @@ impl CppParser<'_, '_> {
                     }
                     None => bail!("can't get pointee type"),
                 }
+            }
+            TypeKind::Elaborated => {
+                self.parse_type(type1.get_canonical_type(), context_class, context_method)
             }
             TypeKind::Unexposed => {
                 let canonical = type1.get_canonical_type();
