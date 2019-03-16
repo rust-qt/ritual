@@ -354,11 +354,6 @@ impl CppFunction {
             result.push(t);
         }
         result.push(self.return_type.clone());
-        if let Some(operator) = &self.operator {
-            if let CppOperator::Conversion(cpp_type) = operator {
-                result.push(cpp_type.clone());
-            }
-        }
 
         if let Some(template_arguments) = &self.path.last().template_arguments {
             result.extend(template_arguments.clone());

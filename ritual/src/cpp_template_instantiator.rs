@@ -13,19 +13,25 @@ use ritual_common::errors::{bail, Result};
 
 /// Returns true if `type1` is a known template instantiation.
 fn check_template_type(data: &ProcessorData<'_>, type1: &CppType) -> Result<()> {
-    if let CppType::Class(path) = &type1 {
-        if let Some(template_arguments) = &path.last().template_arguments {
-            let is_available = data
-                .all_items()
-                .filter_map(|i| i.cpp_data.as_type_ref())
-                .any(|inst| &inst.path == path);
-            if !is_available {
-                bail!("type is not available: {:?}", type1);
-            }
-            for arg in template_arguments {
-                check_template_type(data, arg)?;
+    match &type1 {
+        CppType::Class(path) => {
+            if let Some(template_arguments) = &path.last().template_arguments {
+                let is_available = data
+                    .all_items()
+                    .filter_map(|i| i.cpp_data.as_type_ref())
+                    .any(|inst| &inst.path == path);
+                if !is_available {
+                    bail!("type is not available: {:?}", type1);
+                }
+                for arg in template_arguments {
+                    check_template_type(data, arg)?;
+                }
             }
         }
+        CppType::PointerLike { ref target, .. } => {
+            check_template_type(data, target)?;
+        }
+        _ => {}
     }
     Ok(())
 }
