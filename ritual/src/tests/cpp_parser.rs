@@ -43,7 +43,7 @@ fn run_parser(code: &'static str) -> ParserCppData {
 
     processor::process(&mut workspace, &config, &["cpp_parser".into()]).unwrap();
 
-    let database = workspace.load_or_create_crate("A").unwrap();
+    let database = workspace.get_database("A", true, false).unwrap();
 
     ParserCppData {
         types: database

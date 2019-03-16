@@ -116,25 +116,27 @@ impl Workspace {
         Ok(())
     }
 
-    pub fn load_crate(&mut self, crate_name: &str) -> Result<Database> {
-        if let Some(r) = self.take_loaded_crate(crate_name) {
-            return Ok(r);
+    pub fn get_database(
+        &mut self,
+        crate_name: &str,
+        allow_load: bool,
+        allow_create: bool,
+    ) -> Result<Database> {
+        if allow_load {
+            if let Some(r) = self.take_loaded_crate(crate_name) {
+                return Ok(r);
+            }
+            let path = database_path(&self.path, crate_name);
+            if path.exists() {
+                return load_json(path);
+            }
         }
-        load_json(database_path(&self.path, crate_name))
-    }
-
-    pub fn load_or_create_crate(&mut self, crate_name: &str) -> Result<Database> {
-        if let Some(r) = self.take_loaded_crate(crate_name) {
-            return Ok(r);
-        }
-        let path = database_path(&self.path, crate_name);
-        if path.exists() {
-            load_json(path)
-        } else {
+        if allow_create {
             // make sure crate dir exists
             let _ = self.crate_path(crate_name)?;
-            Ok(Database::empty(crate_name))
+            return Ok(Database::empty(crate_name));
         }
+        bail!("can't get database");
     }
 
     pub fn put_crate(&mut self, database: Database) {
@@ -153,15 +155,19 @@ impl Workspace {
         save_json(config_path(&self.path), &self.config, None)
     }
 
+    fn database_backup_path(&self, crate_name: &str) -> PathBuf {
+        let date = chrono::Local::now();
+        self.path.join("backup").join(format!(
+            "db_{}_{}.json",
+            crate_name,
+            date.format("%Y-%m-%d_%H-%M-%S")
+        ))
+    }
+
     pub fn save_database(&self, database: &mut Database) -> Result<()> {
         if database.is_modified() {
             info!("Saving data");
-            let date = chrono::Local::now();
-            let backup_path = self.path.join("backup").join(format!(
-                "db_{}_{}.json",
-                database.crate_name(),
-                date.format("%Y-%m-%d_%H-%M-%S")
-            ));
+            let backup_path = self.database_backup_path(database.crate_name());
             save_json(
                 database_path(&self.path, database.crate_name()),
                 database,

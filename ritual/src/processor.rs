@@ -251,13 +251,25 @@ impl Ord for MainItemRef<'_> {
 }
 
 #[allow(clippy::useless_let_if_seq)]
-pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]) -> Result<()> {
+pub fn process(
+    workspace: &mut Workspace,
+    config: &Config,
+    mut step_names: &[String],
+) -> Result<()> {
     info!("Processing crate: {}", config.crate_properties().name());
     check_all_paths(&config)?;
 
-    info!("Loading current crate data");
+    let allow_load;
+    if step_names.get(0).map(|s| s.as_str()) == Some("discard") {
+        allow_load = false;
+        step_names = &step_names[1..];
+    } else {
+        allow_load = true;
+        info!("Loading current crate data");
+    }
+
     let mut current_database = workspace
-        .load_or_create_crate(config.crate_properties().name())
+        .get_database(config.crate_properties().name(), allow_load, true)
         .with_context(|_| "failed to load current crate data")?;
 
     if !config.dependent_cpp_crates().is_empty() {
@@ -265,7 +277,7 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
     }
     let dependent_cpp_crates = config.dependent_cpp_crates().iter().map_if_ok(|name| {
         workspace
-            .load_crate(name)
+            .get_database(name, true, false)
             .with_context(|_| "failed to load dependency")
     })?;
 

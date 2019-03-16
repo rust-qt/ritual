@@ -25,9 +25,6 @@ pub struct Options {
     #[structopt(long = "local-paths")]
     /// Write local paths to `ritual` crates in generated `Cargo.toml`
     pub local_paths: Option<bool>,
-    #[structopt(long = "delete-database")]
-    /// Delete previously created database before processing
-    pub delete_database: bool,
     #[structopt(short = "c", long = "crates", required = true)]
     /// Crates to process (e.g. `qt_core`)
     pub crates: Vec<String>,
@@ -83,10 +80,6 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
     }
 
     for crate_name in &final_crates {
-        if options.delete_database {
-            workspace.delete_database_if_exists(&crate_name)?;
-        }
-
         let create_config = config
             .create_config_hook()
             .ok_or_else(|| err_msg("create_config_hook is missing"))?;

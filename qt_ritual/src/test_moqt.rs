@@ -89,9 +89,8 @@ fn test_moqt() {
         Options {
             workspace,
             local_paths: Some(true),
-            delete_database: true,
             crates: vec!["moqt_core".into(), "moqt_gui".into()],
-            operations: vec!["main".into()],
+            operations: vec!["discard".into(), "main".into()],
         },
         global_config(),
     )
