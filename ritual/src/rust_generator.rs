@@ -253,6 +253,31 @@ impl State<'_, '_> {
         })
     }
 
+    fn is_type_deletable(&self, ffi_type: &CppType) -> Result<bool> {
+        let class_type = ffi_type.pointer_like_to_target()?;
+        let class_path = if let CppType::Class(path) = class_type {
+            path
+        } else {
+            bail!("not a pointer to class");
+        };
+        let found = self.0.all_ffi_items().any(|item| {
+            if !item.checks.all_success() || item.checks.is_empty() {
+                return false;
+            }
+            if let CppFfiItemKind::Function(func) = &item.kind {
+                if let CppFfiFunctionKind::Function { cpp_function, .. } = &func.kind {
+                    cpp_function.is_destructor()
+                        && &cpp_function.class_type().unwrap() == class_path
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        });
+        Ok(found)
+    }
+
     /// Generates `CompleteType` from `CppFfiType`, adding
     /// Rust API type, Rust FFI type and conversion between them.
     #[allow(clippy::collapsible_if)]
@@ -276,7 +301,13 @@ impl State<'_, '_> {
                             api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
                         }
                         ReturnValueAllocationPlace::Heap => {
-                            api_to_ffi_conversion = RustToFfiTypeConversion::CppBoxToPtr;
+                            if self.is_type_deletable(cpp_ffi_type.ffi_type())? {
+                                api_to_ffi_conversion = RustToFfiTypeConversion::CppBoxToPtr;
+                            } else {
+                                api_to_ffi_conversion = RustToFfiTypeConversion::UtilsPtrToPtr {
+                                    force_api_is_const: None,
+                                };
+                            }
                         }
                         ReturnValueAllocationPlace::NotApplicable => {
                             bail!("NotApplicable conflicts with ValueToPointer");

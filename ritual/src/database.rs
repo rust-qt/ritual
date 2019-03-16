@@ -85,6 +85,14 @@ impl CppChecks {
     pub fn any_success(&self) -> bool {
         self.0.iter().any(|item| item.is_success)
     }
+
+    pub fn all_success(&self) -> bool {
+        self.0.iter().all(|item| item.is_success)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

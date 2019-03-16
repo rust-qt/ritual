@@ -67,3 +67,10 @@ public:
     }
 };
 
+class MOQT_CORE_EXPORT DestructorLess {
+public:
+    DestructorLess();
+private:
+    ~DestructorLess();
+
+};

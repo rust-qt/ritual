@@ -12,3 +12,10 @@ DerivedHandle* HandleFactory::createDerived() {
 DerivedHandle2* HandleFactory::createDerived2() {
     return new DerivedHandle2(this);
 }
+
+DestructorLess::DestructorLess() {
+
+}
+DestructorLess::~DestructorLess() {
+
+}

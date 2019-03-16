@@ -16,7 +16,7 @@ pub fn inherits(
     derived_class_name: &CppPath,
     base_class_name: &CppPath,
 ) -> bool {
-    for item in data.all_items() {
+    for item in data.all_cpp_items() {
         if let CppItemData::ClassBase(base_data) = &item.cpp_data {
             if &base_data.derived_class_type == derived_class_name {
                 if &base_data.base_class_type == base_class_name {

@@ -149,7 +149,7 @@ impl FfiNameProvider {
 /// Runs the FFI generator
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let movable_types = data
-        .all_items()
+        .all_cpp_items()
         .filter_map(|item| {
             if let CppItemData::Type(type_data) = &item.cpp_data {
                 if let CppTypeDeclarationKind::Class { is_movable } = type_data.kind {
