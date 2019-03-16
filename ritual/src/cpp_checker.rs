@@ -79,7 +79,7 @@ fn snippet_for_item(item: &CppFfiItem, all_items: &[CppFfiItem]) -> Result<Snipp
                 let source_item = all_items
                     .get(index)
                     .ok_or_else(|| err_msg("ffi item references invalid index"))?;
-                match &item.kind {
+                match &source_item.kind {
                     CppFfiItemKind::Function(_) => {}
                     CppFfiItemKind::QtSlotWrapper(_) => needs_moc = true,
                 }
