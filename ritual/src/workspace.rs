@@ -1,12 +1,12 @@
-use ritual_common::errors::{bail, FancyUnwrap, Result};
-use ritual_common::file_utils::{create_dir, load_json, save_json};
-
 use crate::database::Database;
+use log::info;
+use ritual_common::errors::{bail, Result};
 use ritual_common::file_utils::create_dir_all;
 use ritual_common::file_utils::os_string_into_string;
 use ritual_common::file_utils::read_dir;
 use ritual_common::file_utils::remove_file;
 use ritual_common::file_utils::save_toml;
+use ritual_common::file_utils::{create_dir, load_json, save_json};
 use ritual_common::toml;
 use serde_derive::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -153,12 +153,11 @@ impl Workspace {
         save_json(config_path(&self.path), &self.config)
     }
 
-    pub fn save_data(&mut self) -> Result<()> {
-        for database in &mut self.databases {
-            if database.is_modified() {
-                save_json(database_path(&self.path, database.crate_name()), &database)?;
-                database.set_saved();
-            }
+    pub fn save_database(&self, database: &mut Database) -> Result<()> {
+        if database.is_modified() {
+            info!("Saving data");
+            save_json(database_path(&self.path, database.crate_name()), database)?;
+            database.set_saved();
         }
         Ok(())
     }
@@ -185,12 +184,5 @@ impl Workspace {
             &toml::Value::Table(cargo_toml),
         )?;
         Ok(())
-    }
-}
-
-impl Drop for Workspace {
-    fn drop(&mut self) {
-        //log::status("test1: Workspace drop!");
-        self.save_data().fancy_unwrap();
     }
 }

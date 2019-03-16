@@ -14,7 +14,7 @@ use std::fmt;
 use std::iter::once;
 use std::path::PathBuf;
 use std::process::Command;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// Creates output and cache directories if they don't exist.
 /// Returns `Err` if any path in `config` is invalid or relative.
@@ -335,11 +335,12 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
                 break;
             }
 
-            trace!(
-                "Step '{}' completed in {:?}",
-                step.name,
-                started_time.elapsed()
-            );
+            let elapsed = started_time.elapsed();
+            trace!("Step '{}' completed in {:?}", step.name, elapsed);
+
+            if elapsed > Duration::from_secs(15) {
+                workspace.save_database(&mut current_database)?;
+            }
         }
     }
 
@@ -347,12 +348,8 @@ pub fn process(workspace: &mut Workspace, config: &Config, step_names: &[String]
         workspace.put_crate(database);
     }
 
-    if current_database.is_modified() {
-        info!("Saving data");
-    }
-
+    workspace.save_database(&mut current_database)?;
     workspace.put_crate(current_database);
-    workspace.save_data()?;
 
     steps_result
 }
