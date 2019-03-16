@@ -229,11 +229,9 @@ impl Generator {
 
     #[allow(clippy::collapsible_if)]
     fn generate_module(&mut self, module: &RustModule, database: &RustDatabase) -> Result<()> {
-        if module.kind == RustModuleKind::CppNestedType {
-            if database.children(&module.path).next().is_none() {
-                // skip empty module
-                return Ok(());
-            }
+        if database.children(&module.path).next().is_none() {
+            // skip empty module
+            return Ok(());
         }
 
         let vis = if module.is_public { "pub " } else { "" };
