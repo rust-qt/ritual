@@ -138,6 +138,17 @@ pub fn create_file<P: AsRef<Path>>(path: P) -> Result<File<BufWriter<fs::File>>>
     })
 }
 
+pub fn create_file_for_append<P: AsRef<Path>>(path: P) -> Result<File<BufWriter<fs::File>>> {
+    let file = fs::OpenOptions::new()
+        .append(true)
+        .open(path.as_ref())
+        .with_context(|_| format!("Failed to open file: {:?}", path.as_ref()))?;
+    Ok(File {
+        file: BufWriter::new(file),
+        path: path.as_ref().to_path_buf(),
+    })
+}
+
 impl<F> File<F> {
     pub fn path(&self) -> &Path {
         &self.path

@@ -6,7 +6,7 @@ use crate::cpp_function::ReturnValueAllocationPlace;
 use crate::cpp_type::CppType;
 use itertools::Itertools;
 use ritual_common::errors::{bail, Result};
-use ritual_common::file_utils::{create_file, path_to_str};
+use ritual_common::file_utils::{create_file, create_file_for_append, path_to_str};
 use ritual_common::utils::get_command_output;
 use ritual_common::utils::MapIfOk;
 
@@ -324,15 +324,22 @@ pub fn generate_cpp_file(
         }
     }
     writeln!(cpp_file, "}} // extern \"C\"")?;
+    drop(cpp_file);
 
     if any_slot_wrappers && !crate_name.starts_with("moqt_") {
-        let moc_output = get_command_output(Command::new("moc").arg("-i").arg(file_path))?;
-        writeln!(
-            cpp_file,
-            "// start of MOC generated code\n{}\n// end of MOC generated code",
-            moc_output
-        )?;
+        apply_moc(file_path)?;
     }
+    Ok(())
+}
+
+pub fn apply_moc(file_path: &Path) -> Result<()> {
+    let moc_output = get_command_output(Command::new("moc").arg("-i").arg(file_path))?;
+    let mut cpp_file = create_file_for_append(file_path)?;
+    writeln!(
+        cpp_file,
+        "// start of MOC generated code\n{}\n// end of MOC generated code",
+        moc_output
+    )?;
     Ok(())
 }
 

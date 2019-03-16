@@ -315,6 +315,14 @@ impl CppFfiItemKind {
         }
     }
 
+    pub fn is_slot_wrapper(&self) -> bool {
+        if let CppFfiItemKind::QtSlotWrapper(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn short_text(&self) -> String {
         match self {
             CppFfiItemKind::Function(function) => match &function.kind {

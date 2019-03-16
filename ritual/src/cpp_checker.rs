@@ -1,4 +1,5 @@
 use crate::cpp_code_generator;
+use crate::cpp_code_generator::apply_moc;
 use crate::database::CppCheckerEnv;
 use crate::database::CppFfiItem;
 use crate::database::CppFfiItemKind;
@@ -30,12 +31,16 @@ fn check_snippets<'a>(
     data: &mut CppCheckerData,
     snippets: impl Iterator<Item = &'a Snippet>,
 ) -> Result<CppLibBuilderOutput> {
+    let mut any_needs_moc = false;
     {
         let mut file = create_file(&data.main_cpp_path)?;
         writeln!(file, "#include \"utils.h\"")?;
         writeln!(file)?;
         let mut main_content = Vec::new();
         for snippet in snippets {
+            if snippet.needs_moc {
+                any_needs_moc = true;
+            }
             match snippet.context {
                 SnippetContext::Main => {
                     main_content.push(&snippet.code);
@@ -55,6 +60,10 @@ fn check_snippets<'a>(
         }
         writeln!(file, "}}")?;
     }
+    if any_needs_moc && !data.crate_name.starts_with("moqt_") {
+        apply_moc(&data.main_cpp_path)?;
+    }
+
     let instant = Instant::now();
     let result = data.builder.run();
     trace!("cpp builder time: {:?}", instant.elapsed());
@@ -65,23 +74,31 @@ fn snippet_for_item(item: &CppFfiItem, all_items: &[CppFfiItem]) -> Result<Snipp
     match &item.kind {
         CppFfiItemKind::Function(cpp_ffi_function) => {
             let item_code = cpp_code_generator::function_implementation(cpp_ffi_function)?;
+            let mut needs_moc = false;
             let full_code = if let Some(index) = item.source_ffi_item {
                 let source_item = all_items
                     .get(index)
                     .ok_or_else(|| err_msg("ffi item references invalid index"))?;
+                match &item.kind {
+                    CppFfiItemKind::Function(_) => {}
+                    CppFfiItemKind::QtSlotWrapper(_) => needs_moc = true,
+                }
                 let source_item_code = source_item.source_item_cpp_code()?;
                 format!("{}\n{}", source_item_code, item_code)
             } else {
                 item_code
             };
-            Ok(Snippet::new_global(full_code))
+            Ok(Snippet::new_global(full_code, needs_moc))
         }
-        CppFfiItemKind::QtSlotWrapper(_) => Ok(Snippet::new_global(item.source_item_cpp_code()?)),
+        CppFfiItemKind::QtSlotWrapper(_) => {
+            Ok(Snippet::new_global(item.source_item_cpp_code()?, true))
+        }
     }
 }
 
 struct CppCheckerData {
     main_cpp_path: PathBuf,
+    crate_name: String,
     builder: CppLibBuilder,
 }
 
@@ -100,6 +117,7 @@ enum SnippetContext {
 struct Snippet {
     code: String,
     context: SnippetContext,
+    needs_moc: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -110,16 +128,18 @@ struct SnippetWithIndexes {
 }
 
 impl Snippet {
-    fn new_in_main<S: Into<String>>(code: S) -> Self {
+    fn new_in_main<S: Into<String>>(code: S, needs_moc: bool) -> Self {
         Snippet {
             code: code.into(),
             context: SnippetContext::Main,
+            needs_moc,
         }
     }
-    fn new_global<S: Into<String>>(code: S) -> Self {
+    fn new_global<S: Into<String>>(code: S, needs_moc: bool) -> Self {
         Snippet {
             code: code.into(),
             context: SnippetContext::Global,
+            needs_moc,
         }
     }
 }
@@ -189,6 +209,7 @@ fn check_preliminary_test(data: &mut CppCheckerData, test: &PreliminaryTest) -> 
 struct InstanceProvider {
     parent_path: PathBuf,
     include_directives: Vec<PathBuf>,
+    crate_name: String,
     cpp_build_config: CppBuildConfigData,
     cpp_build_paths: CppBuildPaths,
 }
@@ -235,6 +256,7 @@ impl InstanceProvider {
         Ok(CppCheckerData {
             builder,
             main_cpp_path: src_path.join("main.cpp"),
+            crate_name: self.crate_name.clone(),
         })
     }
 }
@@ -341,12 +363,12 @@ impl CppChecker<'_, '_> {
             PreliminaryTest::new(
                 "hello world",
                 true,
-                Snippet::new_in_main("std::cout << \"Hello world\\n\";"),
+                Snippet::new_in_main("std::cout << \"Hello world\\n\";", false),
             ),
             PreliminaryTest::new(
                 "correct assertion",
                 true,
-                Snippet::new_in_main("ritual_assert(2 + 2 == 4);"),
+                Snippet::new_in_main("ritual_assert(2 + 2 == 4);", false),
             ),
             PreliminaryTest::new(
                 "type traits",
@@ -362,12 +384,13 @@ impl CppChecker<'_, '_> {
                      ritual_assert(sizeof(C1) > 0);\
                      ritual_assert(sizeof(E1) > 0);\n\
                      ",
+                    false,
                 ),
             ),
             PreliminaryTest::new(
                 "incorrect assertion in fn",
                 true,
-                Snippet::new_global("int f1() { ritual_assert(2 + 2 == 5); return 1; }"),
+                Snippet::new_global("int f1() { ritual_assert(2 + 2 == 5); return 1; }", false),
             ),
         ];
         assert!(positive_tests.iter().all(|t| t.expected));
@@ -382,13 +405,17 @@ impl CppChecker<'_, '_> {
         }
 
         let negative_tests = &[
-            PreliminaryTest::new("syntax error", false, Snippet::new_in_main("}")),
+            PreliminaryTest::new("syntax error", false, Snippet::new_in_main("}", false)),
             PreliminaryTest::new(
                 "incorrect assertion",
                 false,
-                Snippet::new_in_main("ritual_assert(2 + 2 == 5);"),
+                Snippet::new_in_main("ritual_assert(2 + 2 == 5);", false),
             ),
-            PreliminaryTest::new("status code 1", false, Snippet::new_in_main("return 1;")),
+            PreliminaryTest::new(
+                "status code 1",
+                false,
+                Snippet::new_in_main("return 1;", false),
+            ),
         ];
         assert!(negative_tests.iter().all(|t| !t.expected));
 
@@ -404,6 +431,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let instance_provider = InstanceProvider {
         parent_path: data.workspace.tmp_path().join("cpp_checker"),
         include_directives: data.config.include_directives().to_vec(),
+        crate_name: data.current_database.crate_name().to_string(),
         cpp_build_paths: {
             let mut data = data.config.cpp_build_paths().clone();
             data.apply_env();
