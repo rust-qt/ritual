@@ -7,8 +7,8 @@ use crate::slot_wrappers::add_slot_wrappers;
 use crate::versions;
 use log::info;
 use qt_ritual_common::{all_crate_names, get_full_build_config, lib_dependencies, lib_folder_name};
-use ritual::config::CrateProperties;
 use ritual::config::{Config, GlobalConfig};
+use ritual::config::{CrateProperties, MovableTypesHookOutput};
 use ritual::cpp_data::CppPath;
 use ritual_common::cpp_build_config::CppLibraryType;
 use ritual_common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
@@ -146,6 +146,15 @@ fn core_cpp_parser_blocked_names() -> Vec<&'static str> {
 */
 /// QtCore specific configuration.
 fn core_config(config: &mut Config) -> Result<()> {
+    config.set_movable_types_hook(|path| {
+        let string = path.to_templateless_string();
+        let movable = &["QMetaObject::Connection"];
+        if movable.contains(&string.as_str()) {
+            return Ok(MovableTypesHookOutput::Movable);
+        }
+        Ok(MovableTypesHookOutput::Unknown)
+    });
+
     // TODO: replace QVariant::Type with QMetaType::Type?
     //config.add_cpp_parser_blocked_names(core_cpp_parser_blocked_names());
     //config.add_cpp_parser_blocked_names(vec!["QtMetaTypePrivate", "QtPrivate"]);
@@ -446,11 +455,15 @@ fn extras_3d_config(config: &mut Config) -> Result<()> {
 }
 
 fn moqt_core_config(config: &mut Config) -> Result<()> {
-    config.set_movable_types(vec![
-        CppPath::from_good_str("QPoint"),
-        CppPath::from_good_str("QMetaObject::Connection"),
-    ]);
-    // TODO: blacklist QFlags<T>
+    config.set_movable_types_hook(|path| {
+        let string = path.to_templateless_string();
+        let movable = &["QMetaObject::Connection", "QPoint"];
+        if movable.contains(&string.as_str()) {
+            return Ok(MovableTypesHookOutput::Movable);
+        }
+        Ok(MovableTypesHookOutput::Unknown)
+    });
+    // TODO: blacklist QFlags<T> for FFI
     Ok(())
 }
 
@@ -574,6 +587,11 @@ pub fn create_config(crate_name: &str) -> Result<Config> {
         // TODO: does parsing work on MacOS without adding "-F"?
 
         config.add_include_directive(&lib_folder_name(crate_name));
+
+        // DEBUG!
+        //config.add_include_directive("QObject");
+        //config.add_include_directive("QMetaObject");
+
         // TODO: allow to override parser flags
         config.add_cpp_parser_arguments(vec!["-fPIC", "-fcxx-exceptions"]);
 

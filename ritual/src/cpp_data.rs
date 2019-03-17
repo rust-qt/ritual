@@ -245,7 +245,10 @@ impl CppPath {
     /// Returns the identifier this method would be presented with
     /// in Qt documentation.
     pub fn doc_id(&self) -> String {
-        // we don't want template args here
+        self.to_templateless_string()
+    }
+
+    pub fn to_templateless_string(&self) -> String {
         self.items().iter().map(|item| &item.name).join("::")
     }
 
@@ -265,6 +268,24 @@ impl CppPath {
             }
         }
         Ok(new_path)
+    }
+
+    pub fn deinstantiate(&self) -> CppPath {
+        let mut path = self.clone();
+        let mut nested_level = 0;
+        for item in &mut path.items {
+            if let Some(args) = &mut item.template_arguments {
+                *args = (0..args.len())
+                    .map(|index| CppType::TemplateParameter {
+                        nested_level,
+                        index,
+                        name: format!("T{}_{}", nested_level, index),
+                    })
+                    .collect();
+                nested_level += 1;
+            }
+        }
+        path
     }
 }
 

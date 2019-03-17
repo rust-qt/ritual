@@ -147,7 +147,6 @@ impl CrateProperties {
 /// Create a `Config` object, set its properties,
 /// add custom functions if necessary, and start
 /// the processing with `Config::exec`.
-#[derive(Debug)]
 pub struct Config {
     // see setters documentation for information about these properties
     crate_properties: CrateProperties,
@@ -165,7 +164,14 @@ pub struct Config {
     // TODO: revisit fields below when new rust name generator is done
     cpp_filtered_namespaces: Vec<CppPath>,
 
-    movable_types: Vec<CppPath>,
+    movable_types_hook: Option<Box<dyn Fn(&CppPath) -> Result<MovableTypesHookOutput>>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MovableTypesHookOutput {
+    Movable,
+    Immovable,
+    Unknown,
 }
 
 impl Config {
@@ -183,7 +189,7 @@ impl Config {
             cpp_parser_blocked_names: Default::default(),
             cpp_filtered_namespaces: Default::default(),
             cpp_build_config: Default::default(),
-            movable_types: Default::default(),
+            movable_types_hook: Default::default(),
             processing_steps: Default::default(),
             cpp_lib_version: Default::default(),
         }
@@ -303,12 +309,6 @@ impl Config {
         }
     }
 
-    /// Overrides automatic selection of type allocation place for `type_name` and uses `place`
-    /// instead. See `CppTypeAllocationPlace` for more information.
-    pub fn set_movable_types(&mut self, names: Vec<CppPath>) {
-        self.movable_types = names;
-    }
-
     /// Sets `CppBuildConfig` value that will be passed to the build script
     /// of the generated crate.
     pub fn set_cpp_build_config(&mut self, cpp_build_config: CppBuildConfig) {
@@ -388,10 +388,18 @@ impl Config {
     pub fn cpp_build_config(&self) -> &CppBuildConfig {
         &self.cpp_build_config
     }
-    /// Returns values added by `Config::set_movable_types`.
-    /// Keys of the hash map are names of C++ types.
-    pub fn movable_types(&self) -> &[CppPath] {
-        &self.movable_types
+
+    pub fn set_movable_types_hook(
+        &mut self,
+        hook: impl Fn(&CppPath) -> Result<MovableTypesHookOutput> + 'static,
+    ) {
+        self.movable_types_hook = Some(Box::new(hook));
+    }
+
+    pub fn movable_types_hook(
+        &self,
+    ) -> Option<&(dyn Fn(&CppPath) -> Result<MovableTypesHookOutput> + 'static)> {
+        self.movable_types_hook.as_ref().map(|b| &**b)
     }
 }
 
