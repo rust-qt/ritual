@@ -358,7 +358,10 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
 impl CppParser<'_, '_> {
     /// Search for a C++ type information in the types found by the parser
     /// and in types of the dependencies.
-    fn find_type<F: Fn(&CppTypeDeclaration) -> bool>(&self, f: F) -> Option<&CppTypeDeclaration> {
+    fn find_type(
+        &self,
+        mut f: impl FnMut(&CppTypeDeclaration) -> bool,
+    ) -> Option<&CppTypeDeclaration> {
         let databases =
             once(self.data.current_database as &_).chain(self.data.dep_databases.iter());
         for database in databases {

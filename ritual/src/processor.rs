@@ -152,11 +152,11 @@ impl Default for ProcessingSteps {
 }
 
 impl ProcessingSteps {
-    pub fn add_after<F: 'static + Fn(&mut ProcessorData<'_>) -> Result<()>>(
+    pub fn add_after(
         &mut self,
         after: &[&str],
         name: &str,
-        func: F,
+        func: impl Fn(&mut ProcessorData<'_>) -> Result<()> + 'static,
     ) -> Result<()> {
         let indexes = after.iter().map_if_ok(|s| {
             self.main_procedure
@@ -174,19 +174,19 @@ impl ProcessingSteps {
         Ok(())
     }
 
-    pub fn push<F: 'static + Fn(&mut ProcessorData<'_>) -> Result<()>>(
+    pub fn push(
         &mut self,
         name: &str,
-        func: F,
+        func: impl Fn(&mut ProcessorData<'_>) -> Result<()> + 'static,
     ) {
         self.main_procedure.push(name.to_string());
         self.all_steps.push(ProcessingStep::new(name, func));
     }
 
-    pub fn add_custom<F: 'static + Fn(&mut ProcessorData<'_>) -> Result<()>>(
+    pub fn add_custom(
         &mut self,
         name: &str,
-        func: F,
+        func: impl Fn(&mut ProcessorData<'_>) -> Result<()> + 'static,
     ) {
         self.all_steps.push(ProcessingStep::new(name, func));
     }

@@ -66,7 +66,10 @@ impl DocData {
     }
 
     /// Searches for an index item by lambda condition.
-    pub fn find_index_item<F: Fn(&DocIndexItem) -> bool>(&mut self, f: F) -> Option<DocIndexItem> {
+    pub fn find_index_item(
+        &mut self,
+        mut f: impl FnMut(&DocIndexItem) -> bool,
+    ) -> Option<DocIndexItem> {
         self.index.iter_mut().find(|item| f(item)).and_then(|item| {
             item.accessed = true;
             Some(item.clone())
