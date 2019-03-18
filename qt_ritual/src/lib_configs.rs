@@ -155,6 +155,66 @@ fn core_config(config: &mut Config) -> Result<()> {
         Ok(MovableTypesHookOutput::Unknown)
     });
 
+    config.set_cpp_parser_path_hook(|path| {
+        let string = path.to_templateless_string();
+        let blocked = &[
+            // Qt internals, not intended for direct use
+            "QtPrivate",
+            "QAlgorithmsPrivate",
+            "QtMetaTypePrivate",
+            "qFlagLocation",
+            "QArrayData",
+            "QTypedArrayData",
+            "QStaticByteArrayData",
+            "QListData",
+            "QObjectData",
+            "QObjectUserData",
+            "QMapNodeBase",
+            "QMapNode",
+            "QMapDataBase",
+            "QMapData",
+            "QHashData",
+            "QContiguousCacheData",
+            "QLinkedListData",
+            "QLinkedListNode",
+            // undocumented function that does nothing
+            "qt_noop",
+            // undocumented, unknown purpose
+            "qTerminate",
+            "qt_error_string",
+            "QFutureInterfaceBase",
+            "QFutureInterfaceBase",
+            // for Q_ASSERT, Q_ASSERT_X macros, no need to access this from Rust
+            "qt_assert",
+            "qt_assert_x",
+            // for Q_CHECK_PTR macro, no need to access this from Rust
+            "qt_check_pointer",
+            // atomic operations, useless in Rust
+            "QGenericAtomicOps",
+            "QAtomicTraits",
+            "QAtomicOps",
+            "QBasicAtomicInteger",
+            "QBasicAtomicPointer",
+            "qAtomicAssign",
+            "qAtomicDetach",
+            // works on overloading, can't be useful in Rust
+            "Qt::qt_getEnumName",
+            // reimplemented in Rust
+            "QFlags",
+            "QFlag",
+            "QIncompatibleFlag",
+            // not useful in Rust
+            "QtSharedPointer",
+            "QSharedPointer",
+            "QWeakPointer",
+        ];
+        if blocked.contains(&string.as_str()) {
+            return Ok(false);
+        }
+
+        Ok(true)
+    });
+
     // TODO: replace QVariant::Type with QMetaType::Type?
     //config.add_cpp_parser_blocked_names(core_cpp_parser_blocked_names());
     //config.add_cpp_parser_blocked_names(vec!["QtMetaTypePrivate", "QtPrivate"]);
@@ -173,7 +233,7 @@ fn core_config(config: &mut Config) -> Result<()> {
 
     // QProcess::pid returns different types on different platforms,
     // but this method is obsolete anyway
-    config.add_cpp_parser_blocked_names(vec![CppPath::from_good_str("QProcess::pid")]);
+    //config.add_cpp_parser_blocked_names(vec![CppPath::from_good_str("QProcess::pid")]);
     /*
     exclude_qvector_eq_based_methods(config, &["QStaticPlugin", "QTimeZone::OffsetData"]);
     exclude_qlist_eq_based_methods(

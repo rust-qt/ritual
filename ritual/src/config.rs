@@ -158,13 +158,13 @@ pub struct Config {
     cpp_build_config: CppBuildConfig,
     cpp_build_paths: CppBuildPaths,
     cpp_parser_arguments: Vec<String>,
-    cpp_parser_blocked_names: Vec<CppPath>,
     processing_steps: ProcessingSteps,
 
-    // TODO: revisit fields below when new rust name generator is done
+    // TODO: revisit `cpp_filtered_namespaces` when new rust name generator is done
     cpp_filtered_namespaces: Vec<CppPath>,
 
     movable_types_hook: Option<Box<dyn Fn(&CppPath) -> Result<MovableTypesHookOutput>>>,
+    cpp_parser_path_hook: Option<Box<dyn Fn(&CppPath) -> Result<bool>>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -186,12 +186,12 @@ impl Config {
             target_include_paths: Default::default(),
             include_directives: Default::default(),
             cpp_parser_arguments: Default::default(),
-            cpp_parser_blocked_names: Default::default(),
             cpp_filtered_namespaces: Default::default(),
             cpp_build_config: Default::default(),
             movable_types_hook: Default::default(),
             processing_steps: Default::default(),
             cpp_lib_version: Default::default(),
+            cpp_parser_path_hook: Default::default(),
         }
     }
 
@@ -223,30 +223,6 @@ impl Config {
     /// dependencies and re-use their types.
     pub fn set_dependent_cpp_crates(&mut self, paths: Vec<String>) {
         self.dependent_cpp_crates = paths;
-    }
-
-    /// Adds a C++ identifier that should be skipped
-    /// by the C++ parser. Identifier can contain namespaces
-    /// and nested classes, with `::` separator (like in
-    /// C++ identifiers). Identifier may refer to a method,
-    /// a class, a enum or a namespace. All entities inside blacklisted
-    /// entity (e.g. the methods of a blocked class or
-    /// the contents of a blocked namespace)
-    /// will also be skipped.
-    /// All class methods with names matching the blocked name
-    /// will be skipped, regardless of class name.
-    pub fn add_cpp_parser_blocked_name(&mut self, path: CppPath) {
-        self.cpp_parser_blocked_names.push(path);
-    }
-
-    /// Adds multiple blocked names. See `Config::add_cpp_parser_blocked_name`.
-    pub fn add_cpp_parser_blocked_names<Iter>(&mut self, items: Iter)
-    where
-        Iter: IntoIterator<Item = CppPath>,
-    {
-        for item in items {
-            self.cpp_parser_blocked_names.push(item);
-        }
     }
 
     /// Adds a command line argument for clang C++ parser.
@@ -352,12 +328,6 @@ impl Config {
         &self.dependent_cpp_crates
     }
 
-    /// Returns names added with `Config::add_cpp_parser_blocked_name`
-    /// and similar methods.
-    pub fn cpp_parser_blocked_names(&self) -> &[CppPath] {
-        &self.cpp_parser_blocked_names
-    }
-
     /// Returns names added with `Config::add_cpp_parser_argument`
     /// and similar methods.
     pub fn cpp_parser_arguments(&self) -> &[String] {
@@ -400,6 +370,24 @@ impl Config {
         &self,
     ) -> Option<&(dyn Fn(&CppPath) -> Result<MovableTypesHookOutput> + 'static)> {
         self.movable_types_hook.as_ref().map(|b| &**b)
+    }
+
+    /// Adds a C++ identifier that should be skipped
+    /// by the C++ parser. Identifier can contain namespaces
+    /// and nested classes, with `::` separator (like in
+    /// C++ identifiers). Identifier may refer to a method,
+    /// a class, a enum or a namespace. All entities inside blacklisted
+    /// entity (e.g. the methods of a blocked class or
+    /// the contents of a blocked namespace)
+    /// will also be skipped.
+    /// All class methods with names matching the blocked name
+    /// will be skipped, regardless of class name.
+    pub fn set_cpp_parser_path_hook(&mut self, hook: impl Fn(&CppPath) -> Result<bool> + 'static) {
+        self.cpp_parser_path_hook = Some(Box::new(hook));
+    }
+
+    pub fn cpp_parser_path_hook(&self) -> Option<&(dyn Fn(&CppPath) -> Result<bool> + 'static)> {
+        self.cpp_parser_path_hook.as_ref().map(|b| &**b)
     }
 }
 

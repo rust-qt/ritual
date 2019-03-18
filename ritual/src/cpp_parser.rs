@@ -532,14 +532,18 @@ impl CppParser<'_, '_> {
         if let Some(type_data) =
             self.find_type(|x| x.path.to_cpp_code().ok().as_ref() == Some(&name))
         {
+            let path = CppPath::from_str(&name)?;
+            if let Some(hook) = self.data.config.cpp_parser_path_hook() {
+                if !hook(&path)? {
+                    bail!("blacklisted path: {}", path.to_cpp_pseudo_code());
+                }
+            }
             match type_data.kind {
                 CppTypeDeclarationKind::Enum { .. } => {
-                    return Ok(CppType::Enum {
-                        path: CppPath::from_str(&name)?,
-                    });
+                    return Ok(CppType::Enum { path });
                 }
                 CppTypeDeclarationKind::Class { .. } => {
-                    return Ok(CppType::Class(CppPath::from_str(&name)?));
+                    return Ok(CppType::Class(path));
                 }
             }
         }
@@ -641,9 +645,13 @@ impl CppParser<'_, '_> {
             }
             TypeKind::Enum => {
                 if let Some(declaration) = type1.get_declaration() {
-                    Ok(CppType::Enum {
-                        path: get_full_name(declaration)?,
-                    })
+                    let path = get_full_name(declaration)?;
+                    if let Some(hook) = self.data.config.cpp_parser_path_hook() {
+                        if !hook(&path)? {
+                            bail!("blacklisted path: {}", path.to_cpp_pseudo_code());
+                        }
+                    }
+                    Ok(CppType::Enum { path })
                 } else {
                     bail!("failed to get enum declaration: {:?}", type1);
                 }
@@ -661,6 +669,14 @@ impl CppParser<'_, '_> {
                         );
                     }
                     let mut declaration_name = get_full_name(declaration)?;
+                    if let Some(hook) = self.data.config.cpp_parser_path_hook() {
+                        if !hook(&declaration_name)? {
+                            bail!(
+                                "blacklisted path: {}",
+                                declaration_name.to_cpp_pseudo_code()
+                            );
+                        }
+                    }
                     let template_arguments = match type1.get_template_argument_types() {
                         None => None,
                         Some(arg_types) => {
@@ -1390,9 +1406,9 @@ impl CppParser<'_, '_> {
     }
 
     /// Returns false if this `entity` was blacklisted in some way.
-    fn should_process_entity(&self, entity: Entity<'_>) -> bool {
+    fn should_process_entity(&self, entity: Entity<'_>) -> Result<bool> {
         if entity.get_kind() == EntityKind::TranslationUnit {
-            return true;
+            return Ok(true);
         }
         if let Ok(file_path) = self.entity_include_path(entity) {
             let file_path = Path::new(&file_path);
@@ -1402,25 +1418,21 @@ impl CppParser<'_, '_> {
                     .iter()
                     .any(|x| file_path.starts_with(x))
             {
-                return false;
+                return Ok(false);
             }
         } else {
-            return false;
+            return Ok(false);
         }
         if let Ok(full_name) = get_full_name(entity) {
-            if self
-                .data
-                .config
-                .cpp_parser_blocked_names()
-                .iter()
-                .any(|x| x == &full_name)
-            {
-                return false;
+            if let Some(hook) = self.data.config.cpp_parser_path_hook() {
+                if !hook(&full_name)? {
+                    return Ok(false);
+                }
             }
         } else {
-            return false;
+            return Ok(false);
         }
-        true
+        Ok(true)
     }
 
     fn parse(&mut self, entity: Entity<'_>) -> Result<()> {
@@ -1434,7 +1446,7 @@ impl CppParser<'_, '_> {
     /// Parses type declarations in translation unit `entity`
     /// and saves them to `self`.
     fn parse_types(&mut self, entity: Entity<'_>) -> Result<()> {
-        if !self.should_process_entity(entity) {
+        if !self.should_process_entity(entity)? {
             return Ok(());
         }
         match entity.get_kind() {
@@ -1491,7 +1503,7 @@ impl CppParser<'_, '_> {
 
     /// Parses methods in translation unit `entity`.
     fn parse_functions(&mut self, entity: Entity<'_>) -> Result<()> {
-        if !self.should_process_entity(entity) {
+        if !self.should_process_entity(entity)? {
             return Ok(());
         }
         match entity.get_kind() {

@@ -145,6 +145,15 @@ impl DocParser {
             .filter(|x| x.anchor == anchor || x.anchor.starts_with(&anchor_prefix))
             .collect_vec();
         if candidates.is_empty() {
+            trace!(
+                "failed searching for anchor: {}; prefix: {}",
+                anchor,
+                anchor_prefix
+            );
+            trace!(
+                "available anchors: {:?}",
+                file_data.item_docs.iter().map(|x| &x.anchor).collect_vec()
+            );
             bail!("No matching anchors found for {}", name);
         }
         let scope_prefix = match name.find("::") {
@@ -221,7 +230,7 @@ impl DocParser {
         }
         if candidates.len() == 1 {
             trace!(
-                "[DebugQtDocDeclarations] Declaration mismatch ignored because there is only one \
+                "Declaration mismatch ignored because there is only one \
                  method.\nDeclaration 1: {}\nDeclaration 2: {}\nDoc declaration: {:?}\n",
                 declaration1,
                 declaration2,
@@ -240,13 +249,13 @@ impl DocParser {
             });
         }
         trace!(
-            "[DebugQtDocDeclarations] Declaration mismatch!\nDeclaration 1: {}\nDeclaration 2: {}",
+            "Declaration mismatch!\nDeclaration 1: {}\nDeclaration 2: {}",
             declaration1,
             declaration2
         );
-        trace!("[DebugQtDocDeclarations] Candidates:");
+        trace!("Candidates:");
         for item in &candidates {
-            trace!("[DebugQtDocDeclarations] * {:?}", item.declarations);
+            trace!("* {:?}", item.declarations);
         }
         bail!("Declaration mismatch");
     }
@@ -327,16 +336,13 @@ impl DocParser {
             .find_index_item(|item| item.name == full_name)
             .is_none()
         {
-            trace!(
-                "[DebugQtDoc] mark_enum_variant_used failed for {}",
-                full_name
-            );
+            trace!("mark_enum_variant_used failed for {}", full_name);
         }
     }
 
     /// Lists unused documentation entries to the debug log.
     pub fn report_unused_anchors(&self) {
-        trace!("[DebugQtDoc] Unused entries in Qt documentation:");
+        trace!("Unused entries in Qt documentation:");
         for item in self.doc_data.index() {
             if !item.accessed {
                 if let Ok(file_name) = self.doc_data.file_name(item.document_id) {
@@ -345,7 +351,7 @@ impl DocParser {
                         continue;
                     }
                 }
-                trace!("[DebugQtDoc] * {}", item.name);
+                trace!("* {}", item.name);
             }
         }
     }
@@ -554,6 +560,9 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
 /// Adds documentation from `data` to `cpp_methods`.
 fn find_methods_docs(items: &mut [CppDatabaseItem], data: &mut DocParser) -> Result<()> {
     for item in items {
+        if !item.source.is_parser() {
+            continue;
+        }
         if let CppItemData::Function(cpp_method) = &mut item.cpp_data {
             if let Some(info) = &cpp_method.member {
                 if info.visibility == CppVisibility::Private {
@@ -569,17 +578,26 @@ fn find_methods_docs(items: &mut [CppDatabaseItem], data: &mut DocParser) -> Res
                     Ok(doc) => cpp_method.doc = Some(doc),
                     Err(msg) => {
                         if cpp_method.member.is_some()
-                            && (cpp_method.path == CppPath::from_good_str("tr")
-                                || cpp_method.path == CppPath::from_good_str("trUtf8")
-                                || cpp_method.path == CppPath::from_good_str("metaObject"))
+                            && (cpp_method.path.last().name == "tr"
+                                || cpp_method.path.last().name == "trUtf8"
+                                || cpp_method.path.last().name == "metaObject")
                         {
                             // no error message
+                            // TODO: add docs from `QObject::*` for these methods
                         } else {
-                            trace!(
-                                "[DebugQtDoc] Failed to get documentation for method: {}: {}",
-                                &cpp_method.short_text(),
-                                msg
-                            );
+                            let templateless_path = cpp_method.path.to_templateless_string();
+                            // undocumented but probably useful
+                            let suppressed = [
+                                // checks if Qt build is shared (?)
+                                "qSharedBuild",
+                            ];
+                            if !suppressed.contains(&templateless_path.as_str()) {
+                                trace!(
+                                    "Failed to get Qt documentation for method: {}: {}",
+                                    &cpp_method.short_text(),
+                                    msg
+                                );
+                            }
                         }
                     }
                 }
@@ -606,6 +624,9 @@ pub fn parse_docs(
     find_methods_docs(data.current_database.cpp_items_mut(), &mut parser)?;
     let mut type_doc_cache = HashMap::new();
     for item in data.current_database.cpp_items_mut() {
+        if !item.source.is_parser() {
+            continue;
+        }
         let type_name = match &item.cpp_data {
             CppItemData::Type(data) => data.path.clone(),
             CppItemData::EnumValue(data) => data
@@ -617,7 +638,11 @@ pub fn parse_docs(
         if !type_doc_cache.contains_key(&type_name) {
             let doc = parser.doc_for_type(&type_name);
             if let Err(err) = &doc {
-                error!("Failed to get Qt documentation: {}", err);
+                trace!(
+                    "Failed to get Qt documentation for type: {}: {}",
+                    type_name.to_cpp_pseudo_code(),
+                    err
+                );
             }
             type_doc_cache.insert(type_name.clone(), doc);
         }
@@ -639,7 +664,7 @@ pub fn parse_docs(
                         parser.mark_enum_variant_used(&data.unscoped_path().doc_id());
                     } else {
                         trace!(
-                            "[DebugQtDoc] Not found doc for enum variant: {}",
+                            "Failed to get Qt documentation for enum variant: {}",
                             data.path.to_cpp_pseudo_code()
                         );
                     }
