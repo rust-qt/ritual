@@ -99,6 +99,7 @@ impl DocParser {
     /// the C++ parser, and the other one is constructed based on
     /// the parsed signature data. Declarations are used to distinguish between
     /// multiple methods with the same name.
+    #[allow(clippy::cyclomatic_complexity)]
     fn doc_for_method(
         &mut self,
         name: &str,
