@@ -356,7 +356,7 @@ impl<T> Clone for ConstPtr<T> {
 impl<T> Copy for ConstPtr<T> {}
 
 impl<T> fmt::Debug for ConstPtr<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ConstPtr({:?})", self.0)
     }
 }
