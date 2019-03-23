@@ -354,6 +354,13 @@ impl CppFunction {
         }
     }
 
+    pub fn is_private(&self) -> bool {
+        match &self.member {
+            Some(info) => info.visibility == CppVisibility::Private,
+            None => false,
+        }
+    }
+
     pub fn receiver_id_from_data<'a>(
         receiver_type: RustQtReceiverType,
         name: &'a str,
