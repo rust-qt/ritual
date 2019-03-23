@@ -162,6 +162,7 @@ fn core_config(config: &mut Config) -> Result<()> {
             "QtPrivate",
             "QAlgorithmsPrivate",
             "QtMetaTypePrivate",
+            "QInternal",
             "qFlagLocation",
             "QArrayData",
             "QTypedArrayData",
@@ -174,9 +175,16 @@ fn core_config(config: &mut Config) -> Result<()> {
             "QMapDataBase",
             "QMapData",
             "QHashData",
+            "QHashDummyValue",
+            "QHashNode",
             "QContiguousCacheData",
             "QLinkedListData",
             "QLinkedListNode",
+            "QThreadStorageData",
+            "QVariant::Private",
+            "QVariant::PrivateShared",
+            "QByteArrayDataPtr",
+            "QStringDataPtr",
             // undocumented function that does nothing
             "qt_noop",
             // undocumented, unknown purpose
@@ -184,11 +192,13 @@ fn core_config(config: &mut Config) -> Result<()> {
             "qt_error_string",
             "QFutureInterfaceBase",
             "QFutureInterfaceBase",
+            "Qt::Initialization",
             // for Q_ASSERT, Q_ASSERT_X macros, no need to access this from Rust
             "qt_assert",
             "qt_assert_x",
             // for Q_CHECK_PTR macro, no need to access this from Rust
             "qt_check_pointer",
+            "q_check_ptr",
             // atomic operations, useless in Rust
             "QGenericAtomicOps",
             "QAtomicTraits",
@@ -197,6 +207,7 @@ fn core_config(config: &mut Config) -> Result<()> {
             "QBasicAtomicPointer",
             "qAtomicAssign",
             "qAtomicDetach",
+            "QAtomicAdditiveType",
             // works on overloading, can't be useful in Rust
             "Qt::qt_getEnumName",
             // reimplemented in Rust
@@ -207,6 +218,8 @@ fn core_config(config: &mut Config) -> Result<()> {
             "QtSharedPointer",
             "QSharedPointer",
             "QWeakPointer",
+            // throws exception, so useless here
+            "qBadAlloc",
         ];
         if blocked.contains(&string.as_str()) {
             return Ok(false);
