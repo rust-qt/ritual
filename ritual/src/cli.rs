@@ -10,8 +10,8 @@ use flexi_logger::{Duplicate, LevelFilter, LogSpecification, Logger};
 use itertools::Itertools;
 use log::{error, info};
 use ritual_common::errors::{bail, err_msg, Result};
-use ritual_common::file_utils::canonicalize;
 use ritual_common::file_utils::path_to_str;
+use ritual_common::file_utils::{canonicalize, create_dir};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -38,6 +38,9 @@ pub fn run_from_args(config: GlobalConfig) -> Result<()> {
 }
 
 pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
+    if !options.workspace.exists() {
+        create_dir(&options.workspace)?;
+    }
     let workspace_path = canonicalize(options.workspace)?;
 
     let mut workspace = Workspace::new(workspace_path.clone())?;
