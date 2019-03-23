@@ -1466,7 +1466,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                 "failed to process cpp item: {}: {}",
                 &cpp_item.cpp_data, err
             );
-            print_trace(&err, log::Level::Trace);
+            print_trace(&err, Some(log::Level::Trace));
         }
     }
 
@@ -1481,7 +1481,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                 ffi_item.kind.short_text(),
                 err
             );
-            print_trace(&err, log::Level::Trace);
+            print_trace(&err, Some(log::Level::Trace));
         }
     }
 

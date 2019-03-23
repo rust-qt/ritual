@@ -3,7 +3,7 @@
 pub type Result<T> = std::result::Result<T, failure::Error>;
 pub use failure::{bail, ensure, err_msg, format_err, Error, ResultExt};
 use itertools::Itertools;
-use log::log;
+use log::{log, log_enabled, Level};
 use std::env;
 
 pub trait FancyUnwrap {
@@ -11,17 +11,29 @@ pub trait FancyUnwrap {
     fn fancy_unwrap(self) -> Self::Output;
 }
 
-pub fn print_trace(err: &failure::Error, log_level: log::Level) {
-    log!(log_level, "Error:");
+macro_rules! log_or_print {
+    ($lvl:expr, $($arg:tt)+) => {
+        if let Some(level) = $lvl {
+            log!(level, $($arg)+);
+        } else if log_enabled!(Level::Error) {
+            log!(Level::Error, $($arg)+);
+        } else {
+            eprintln!($($arg)+);
+        }
+    };
+}
+
+pub fn print_trace(err: &failure::Error, log_level: Option<log::Level>) {
+    log_or_print!(log_level, "Error:");
     for cause in err.iter_chain() {
-        log!(log_level, "   {}", cause);
+        log_or_print!(log_level, "   {}", cause);
     }
     let backtrace = err.backtrace().to_string();
     if !backtrace.is_empty() {
         if env::var("RUST_BACKTRACE").as_ref().map(|v| v.as_str()) == Ok("full") {
-            log!(log_level, "{}", backtrace);
+            log_or_print!(log_level, "{}", backtrace);
         } else {
-            log!(log_level, "Short backtrace:");
+            log_or_print!(log_level, "Short backtrace:");
             let mut lines = backtrace.split('\n').collect_vec();
             if let Some(position) = lines
                 .iter()
@@ -36,7 +48,7 @@ pub fn print_trace(err: &failure::Error, log_level: log::Level) {
                 lines.drain(0..position + 2);
             }
             for line in lines {
-                log!(log_level, "{}", line);
+                log_or_print!(log_level, "{}", line);
             }
         }
     }
@@ -49,7 +61,7 @@ impl<T> FancyUnwrap for Result<T> {
         match self {
             Ok(value) => value,
             Err(err) => {
-                print_trace(&err, log::Level::Error);
+                print_trace(&err, None);
                 std::process::exit(1);
             }
         }
