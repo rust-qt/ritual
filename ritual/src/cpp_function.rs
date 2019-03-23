@@ -10,6 +10,7 @@ use itertools::Itertools;
 use ritual_common::errors::{bail, err_msg, Result, ResultExt};
 use ritual_common::utils::MapIfOk;
 use serde_derive::{Deserialize, Serialize};
+use std::fmt::Write;
 
 /// Information about an argument of a C++ method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
@@ -23,6 +24,21 @@ pub struct CppFunctionArgument {
     /// Flag indicating that the argument has default value and
     /// therefore can be omitted when calling the method
     pub has_default_value: bool,
+}
+
+impl CppFunctionArgument {
+    /// Generates C++ code for the argument declaration
+    pub fn to_cpp_code(&self) -> Result<String> {
+        if let CppType::FunctionPointer(..) = self.argument_type {
+            Ok(self.argument_type.to_cpp_code(Some(&self.name))?)
+        } else {
+            Ok(format!(
+                "{} {}",
+                self.argument_type.to_cpp_code(None)?,
+                self.name
+            ))
+        }
+    }
 }
 
 /// Enumerator indicating special cases of C++ methods.
@@ -196,6 +212,52 @@ impl CppFunction {
         } else {
             bail!("not a member function")
         }
+    }
+
+    pub fn pseudo_declaration(&self) -> String {
+        let mut s = String::new();
+        if let Some(info) = &self.member {
+            if info.is_virtual {
+                write!(s, " virtual").unwrap();
+            }
+            if info.is_static {
+                write!(s, " static").unwrap();
+            }
+            if info.visibility == CppVisibility::Protected {
+                write!(s, " protected").unwrap();
+            }
+            if info.visibility == CppVisibility::Private {
+                write!(s, " private").unwrap();
+            }
+        }
+        write!(s, " {}", self.return_type.to_cpp_pseudo_code()).unwrap();
+        write!(s, " {}", self.path.to_cpp_pseudo_code()).unwrap();
+        let args = self
+            .arguments
+            .iter()
+            .map(|arg| {
+                arg.to_cpp_code().unwrap_or_else(|_| {
+                    format!("{} {}", arg.argument_type.to_cpp_pseudo_code(), arg.name,)
+                })
+            })
+            .join(", ");
+        write!(
+            s,
+            "({}{})",
+            args,
+            if self.allows_variadic_arguments {
+                ", ..."
+            } else {
+                ""
+            }
+        )
+        .unwrap();
+        if let Some(info) = &self.member {
+            if info.is_const {
+                write!(s, " const").unwrap();
+            }
+        }
+        s.trim().to_string()
     }
 
     /// Returns short text representing values in this method

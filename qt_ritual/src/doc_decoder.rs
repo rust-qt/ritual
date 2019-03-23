@@ -1,6 +1,6 @@
 //! Converts Qt docs from the internal format.
 
-use log::info;
+use log::{info, trace};
 use ritual_common::errors::{bail, err_msg, Result, ResultExt};
 use rusqlite;
 use select::document::Document;
@@ -122,6 +122,7 @@ impl DocData {
                 });
             }
         }
+        trace!("doc index: {:?}", index_data);
         Ok(DocData {
             index: index_data,
             connection,

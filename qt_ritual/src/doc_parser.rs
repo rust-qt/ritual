@@ -61,6 +61,7 @@ pub struct DocParser {
 
 // TODO: support public field docs
 
+#[derive(Debug)]
 struct DocForType {
     type_doc: CppTypeDoc,
     enum_variants_doc: Vec<DocForEnumVariant>,
@@ -171,18 +172,26 @@ impl DocParser {
                     .replace(prefix1, "")
                     .replace(prefix2, "");
             }
-            let mut query_imprint = declaration_no_scope
-                .replace("Q_REQUIRED_RESULT", "")
-                .replace("Q_DECL_NOTHROW", "")
-                .replace("Q_DECL_CONST_FUNCTION", "")
-                .replace("Q_DECL_CONSTEXPR", "")
-                .replace("QT_FASTCALL", "")
-                .replace("inline ", "")
-                .replace("virtual ", "")
-                .replace(" ", "");
-            if let Some(index) = query_imprint.find("Q_DECL_NOEXCEPT_EXPR") {
-                query_imprint = query_imprint[0..index].to_string();
+            let mut query_imprint = declaration_no_scope.clone();
+            for text in &[
+                "Q_REQUIRED_RESULT",
+                "Q_DECL_NOTHROW",
+                "Q_DECL_CONST_FUNCTION",
+                "Q_DECL_CONSTEXPR",
+                "QT_FASTCALL",
+                "Q_DECL_COLD_FUNCTION",
+                "inline ",
+                "virtual ",
+                " ",
+            ] {
+                query_imprint = query_imprint.replace(text, "");
             }
+            for text in &["Q_DECL_NOEXCEPT_EXPR", "Q_ATTRIBUTE_FORMAT_PRINTF"] {
+                if let Some(index) = query_imprint.find(text) {
+                    query_imprint = query_imprint[..index].to_string();
+                }
+            }
+            trace!("query_imprint = {:?}", query_imprint);
             for item in &candidates {
                 for item_declaration in &item.declarations {
                     let mut item_declaration_imprint =
@@ -192,6 +201,7 @@ impl DocParser {
                             .replace(prefix1, "")
                             .replace(prefix2, "");
                     }
+                    trace!("item_declaration_imprint = {:?}", item_declaration_imprint);
                     if item_declaration_imprint == query_imprint {
                         if item.html.find(|c| c != '\n').is_none() {
                             bail!("found empty documentation");
@@ -249,11 +259,8 @@ impl DocParser {
                 cross_references: candidates[0].cross_references.clone(),
             });
         }
-        trace!(
-            "Declaration mismatch!\nDeclaration 1: {}\nDeclaration 2: {}",
-            declaration1,
-            declaration2
-        );
+        trace!("Declaration mismatch! Declaration 1: {}", declaration1);
+        trace!("Declaration 2: {}", declaration2);
         trace!("Candidates:");
         for item in &candidates {
             trace!("* {:?}", item.declarations);
@@ -460,62 +467,94 @@ fn process_html(html: &str, base_url: &str) -> Result<(String, HashSet<String>)>
     Ok((html, cross_references))
 }
 
-/// Parses document to a list of `ItemDoc`s.
-fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
-    let mut results = Vec::new();
-    use select::predicate::{And, Attr, Class, Name, Or};
-    let h3s = doc.find(And(Name("h3"), Or(Class("fn"), Class("flags"))));
-    for h3 in h3s {
-        let mut anchor = h3.find(And(Name("a"), Attr("name", ())));
-        let anchor_node = if let Some(r) = anchor.next() {
-            r
-        } else {
-            debug!("Failed to get anchor_node");
-            continue;
-        };
-        let anchor_text = anchor_node
-            .attr("name")
-            .ok_or_else(|| err_msg("anchor_node doesn't have name attribute"))?
-            .to_string();
-        let mut main_declaration = h3
-            .text()
-            .replace("[static]", "static")
-            .replace("[protected]", "protected")
-            .replace("[virtual]", "virtual")
-            .replace("[signal]", "")
-            .replace("[slot]", "");
-        if main_declaration.find("[pure virtual]").is_some() {
-            main_declaration = format!(
-                "virtual {} = 0",
-                main_declaration.replace("[pure virtual]", "")
-            );
-        }
-        let mut declarations = vec![main_declaration];
-        let mut result = String::new();
-        let mut node = if let Some(r) = h3.next() {
-            r
-        } else {
-            debug!("Failed to find element next to h3_node");
-            continue;
-        };
-        let mut enum_variants = Vec::new();
-        let mut all_cross_references = HashSet::new();
-        loop {
-            if node.name() == Some("h3") {
-                break; // end of method
+fn reformat_qt_declaration(declaration: &str) -> String {
+    let mut declaration = declaration
+        .replace("[static]", "static")
+        .replace("[protected]", "protected")
+        .replace("[virtual]", "virtual")
+        .replace("[signal]", "")
+        .replace("[slot]", "");
+    if declaration.find("[pure virtual]").is_some() {
+        declaration = format!("virtual {} = 0", declaration.replace("[pure virtual]", ""));
+    }
+    declaration
+}
+
+fn parse_item_doc(h3: Node<'_>, base_url: &str) -> Result<ItemDoc> {
+    use select::predicate::{And, Attr, Class, Name};
+
+    let mut anchor = h3.find(And(Name("a"), Attr("name", ())));
+    let anchor_node = if let Some(r) = anchor.next() {
+        r
+    } else {
+        bail!("Failed to get anchor_node");
+    };
+    let anchor_text = anchor_node
+        .attr("name")
+        .ok_or_else(|| err_msg("anchor_node doesn't have name attribute"))?
+        .to_string();
+    let main_declaration = reformat_qt_declaration(&h3.text());
+    let mut declarations = vec![main_declaration];
+    let mut result = String::new();
+    let mut node = if let Some(r) = h3.next() {
+        r
+    } else {
+        bail!("Failed to find element next to h3_node");
+    };
+    let mut enum_variants = Vec::new();
+    let mut all_cross_references = HashSet::new();
+    let mut pending_wide_enum_variant: Option<(String, String)> = None;
+    let value_list_condition = And(Name("table"), Class("valuelist"));
+    loop {
+        if node.name() == Some("h3") {
+            if let Some(pending_wide_enum_variant) = pending_wide_enum_variant.take() {
+                if !pending_wide_enum_variant.1.is_empty() {
+                    let (html, cross_references) =
+                        process_html(&pending_wide_enum_variant.1, base_url).unwrap();
+                    all_cross_references.extend(cross_references.into_iter());
+                    enum_variants.push(DocForEnumVariant {
+                        name: pending_wide_enum_variant.0,
+                        html,
+                    });
+                }
             }
-            if node.as_comment().is_none() {
-                let value_list_condition = And(Name("table"), Class("valuelist"));
-                let mut parse_enum_variants = |value_list: Node<'_>| {
-                    for tr in value_list.find(Name("tr")) {
-                        let td_r = tr.find(Name("td"));
-                        let tds = td_r.collect_vec();
+            break; // end of method
+        }
+        if node.as_comment().is_none() {
+            let value_list_node = if node.is(value_list_condition) {
+                Some(node)
+            } else {
+                let mut value_list_r = node.find(value_list_condition);
+                if let Some(value_list) = value_list_r.next() {
+                    Some(value_list)
+                } else {
+                    None
+                }
+            };
+
+            if let Some(value_list_node) = value_list_node {
+                if let Some(pending_wide_enum_variant) = pending_wide_enum_variant.take() {
+                    if !pending_wide_enum_variant.1.is_empty() {
+                        let (html, cross_references) =
+                            process_html(&pending_wide_enum_variant.1, base_url).unwrap();
+                        all_cross_references.extend(cross_references.into_iter());
+                        enum_variants.push(DocForEnumVariant {
+                            name: pending_wide_enum_variant.0,
+                            html,
+                        });
+                    }
+                }
+                let tr_count = value_list_node.find(Name("tr")).count();
+                for tr in value_list_node.find(Name("tr")) {
+                    let td_r = tr.find(Name("td"));
+                    let tds = td_r.collect_vec();
+                    if tds.len() == 3 || (tds.len() == 2 && tr_count == 2) {
+                        let name_orig = tds[0].text();
+                        let mut name = name_orig.trim();
+                        if let Some(i) = name.rfind("::") {
+                            name = &name[i + 2..];
+                        }
                         if tds.len() == 3 {
-                            let name_orig = tds[0].text();
-                            let mut name = name_orig.trim();
-                            if let Some(i) = name.rfind("::") {
-                                name = &name[i + 2..];
-                            }
                             let (html, cross_references) =
                                 process_html(&tds[2].inner_html(), base_url).unwrap();
                             all_cross_references.extend(cross_references.into_iter());
@@ -523,37 +562,53 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
                                 name: name.to_string(),
                                 html,
                             });
+                        } else {
+                            // tds.len() == 2 && tr_count == 1
+                            pending_wide_enum_variant = Some((name.to_string(), String::new()));
                         }
                     }
-                };
-                let mut value_list_r = node.find(value_list_condition);
-                if node.is(value_list_condition) {
-                    parse_enum_variants(node);
-                } else if let Some(value_list) = value_list_r.next() {
-                    parse_enum_variants(value_list);
+                }
+            } else {
+                if let Some(pending_wide_enum_variant) = &mut pending_wide_enum_variant {
+                    pending_wide_enum_variant.1.push_str(&node.html());
                 } else {
-                    result.push_str(node.html().as_ref());
-                    for td1 in node.find(And(Name("td"), Class("memItemLeft"))) {
-                        let td2 = td1.next().ok_or_else(|| err_msg("td1.next() failed"))?;
-                        let declaration = format!("{} {}", td1.text(), td2.text());
-                        declarations.push(declaration);
-                    }
+                    result.push_str(&node.html());
+                }
+                for td1 in node.find(And(Name("td"), Class("memItemLeft"))) {
+                    let td2 = td1.next().ok_or_else(|| err_msg("td1.next() failed"))?;
+                    let declaration = format!("{} {}", td1.text(), td2.text());
+                    declarations.push(declaration);
                 }
             }
-            match node.next() {
-                Some(r) => node = r,
-                None => break,
-            }
         }
-        let (html, cross_references) = process_html(&result, base_url)?;
-        all_cross_references.extend(cross_references.into_iter());
-        results.push(ItemDoc {
-            declarations,
-            html,
-            anchor: anchor_text,
-            enum_variants,
-            cross_references: all_cross_references.into_iter().collect(),
-        });
+        match node.next() {
+            Some(r) => node = r,
+            None => break,
+        }
+    }
+    let (html, cross_references) = process_html(&result, base_url)?;
+    all_cross_references.extend(cross_references.into_iter());
+    Ok(ItemDoc {
+        declarations,
+        html,
+        anchor: anchor_text,
+        enum_variants,
+        cross_references: all_cross_references.into_iter().collect(),
+    })
+}
+
+/// Parses document to a list of `ItemDoc`s.
+fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
+    use select::predicate::{And, Class, Name, Or};
+
+    let mut results = Vec::new();
+    let h3s = doc.find(And(Name("h3"), Or(Class("fn"), Class("flags"))));
+    for h3 in h3s {
+        trace!("parsing item doc: {}", h3.html());
+        match parse_item_doc(h3, base_url) {
+            Ok(v) => results.push(v),
+            Err(err) => debug!("parse_item_doc failed: {}", err),
+        }
     }
     Ok(results)
 }
@@ -574,7 +629,7 @@ fn find_methods_docs(items: &mut [CppDatabaseItem], data: &mut DocParser) -> Res
                 match data.doc_for_method(
                     &cpp_method.path.doc_id(),
                     declaration_code,
-                    &cpp_method.short_text(),
+                    &cpp_method.pseudo_declaration(),
                 ) {
                     Ok(doc) => cpp_method.doc = Some(doc),
                     Err(msg) => {
@@ -661,13 +716,19 @@ pub fn parse_docs(
                         .iter()
                         .find(|x| x.name == data.path.last().name)
                     {
+                        trace!(
+                            "Got Qt documentation for enum variant: {}: {}",
+                            data.path.to_cpp_pseudo_code(),
+                            r.html,
+                        );
                         data.doc = Some(r.html.clone());
                         parser.mark_enum_variant_used(&data.unscoped_path().doc_id());
                     } else {
-                        trace!(
+                        debug!(
                             "Failed to get Qt documentation for enum variant: {}",
                             data.path.to_cpp_pseudo_code()
                         );
+                        //trace!("type data: {:?}", doc);
                     }
                 }
                 _ => unreachable!(),
