@@ -11,11 +11,11 @@ fn test_qwindow() {
         let mut object_ptr: Ptr<BasicClass> = window.get_basic_class_ptr();
         assert_eq!(object_ptr.foo(), 43);
 
-        let point: QPoint = window.pos();
+        let point: CppBox<QPoint> = window.pos();
         assert_eq!(point.x(), 0);
         assert_eq!(point.y(), 0);
-        window.set_pos(ConstPtr::new(&QPoint::new2(2, -3)));
-        let point: QPoint = window.pos();
+        window.set_pos(QPoint::new2(2, -3).as_ptr());
+        let point: CppBox<QPoint> = window.pos();
         assert_eq!(point.x(), 55);
         assert_eq!(point.y(), -3);
     }

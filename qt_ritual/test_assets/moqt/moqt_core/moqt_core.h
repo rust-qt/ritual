@@ -7,3 +7,5 @@
 #include "QPoint.h"
 #include "QFlags.h"
 #include "QObject.h"
+#include "QCoreApplication.h"
+#include "QString.h"

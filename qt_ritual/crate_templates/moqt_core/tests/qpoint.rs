@@ -1,9 +1,10 @@
 use moqt_core::QPoint;
+use cpp_utils::CppBox;
 
 #[test]
 fn create() {
     unsafe {
-        let point: QPoint = QPoint::new();
+        let point: CppBox<QPoint> = QPoint::new();
         assert_eq!(point.x(), 0);
         assert_eq!(point.y(), 0);
     }
@@ -12,7 +13,7 @@ fn create() {
 #[test]
 fn modify() {
     unsafe {
-        let mut point: QPoint = QPoint::new2(2, 3);
+        let mut point: CppBox<QPoint> = QPoint::new2(2, 3);
         assert_eq!(point.x(), 2);
         assert_eq!(point.y(), 3);
         point.set_x(4);
@@ -26,7 +27,7 @@ fn modify() {
 #[test]
 fn vec() {
     unsafe {
-        let mut vec: Vec<QPoint> = (0..20).map(|y| QPoint::new2(1, y)).collect();
+        let mut vec: Vec<CppBox<QPoint>> = (0..20).map(|y| QPoint::new2(1, y)).collect();
         assert_eq!(vec.len(), 20);
         assert_eq!(vec[5].x(), 1);
         assert_eq!(vec[5].y(), 5);
