@@ -7,8 +7,8 @@ use crate::slot_wrappers::add_slot_wrappers;
 use crate::versions;
 use log::info;
 use qt_ritual_common::{all_crate_names, get_full_build_config, lib_dependencies, lib_folder_name};
+use ritual::config::CrateProperties;
 use ritual::config::{Config, GlobalConfig};
-use ritual::config::{CrateProperties, MovableTypesHookOutput};
 use ritual::cpp_data::CppPath;
 use ritual_common::cpp_build_config::CppLibraryType;
 use ritual_common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
@@ -146,7 +146,7 @@ fn core_cpp_parser_blocked_names() -> Vec<&'static str> {
 */
 /// QtCore specific configuration.
 fn core_config(config: &mut Config) -> Result<()> {
-    config.set_movable_types_hook(|path| {
+    /*config.set_movable_types_hook(|path| {
         let string = path.to_templateless_string();
         let movable = &[
             "QMetaObject::Connection",
@@ -405,7 +405,7 @@ fn core_config(config: &mut Config) -> Result<()> {
             return Ok(MovableTypesHookOutput::Immovable);
         }
         Ok(MovableTypesHookOutput::Unknown)
-    });
+    });*/
 
     config.set_cpp_parser_path_hook(|path| {
         let string = path.to_templateless_string();
@@ -820,15 +820,15 @@ fn extras_3d_config(config: &mut Config) -> Result<()> {
     Ok(())
 }
 
-fn moqt_core_config(config: &mut Config) -> Result<()> {
-    config.set_movable_types_hook(|path| {
+fn moqt_core_config(_config: &mut Config) -> Result<()> {
+    /*config.set_movable_types_hook(|path| {
         let string = path.to_templateless_string();
         let movable = &["QMetaObject::Connection", "QPoint"];
         if movable.contains(&string.as_str()) {
             return Ok(MovableTypesHookOutput::Movable);
         }
         Ok(MovableTypesHookOutput::Unknown)
-    });
+    });*/
     // TODO: blacklist QFlags<T> for FFI
     Ok(())
 }

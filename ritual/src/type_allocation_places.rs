@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::config::MovableTypesHookOutput;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppTypeDeclarationKind;

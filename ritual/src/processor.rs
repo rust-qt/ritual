@@ -3,7 +3,7 @@ use crate::database::{CppDatabaseItem, CppFfiItem, Database};
 use crate::workspace::Workspace;
 use crate::{
     cpp_checker, cpp_explicit_xstructors, cpp_ffi_generator, cpp_parser, cpp_template_instantiator,
-    crate_writer, rust_generator, type_allocation_places,
+    crate_writer, rust_generator,
 };
 use itertools::Itertools;
 use log::{error, info, trace};
@@ -107,10 +107,10 @@ impl Default for ProcessingSteps {
                 &format!("add_explicit_xstructors{}", suffix),
                 cpp_explicit_xstructors::run,
             );
-            s.push(
-                &format!("set_allocation_places{}", suffix),
-                type_allocation_places::set_allocation_places,
-            );
+            //            s.push(
+            //                &format!("set_allocation_places{}", suffix),
+            //                type_allocation_places::set_allocation_places,
+            //            );
             s.push(
                 &format!("find_template_instantiations{}", suffix),
                 cpp_template_instantiator::find_template_instantiations,
@@ -143,10 +143,10 @@ impl Default for ProcessingSteps {
             Ok(())
         });
 
-        s.add_custom(
-            "suggest_allocation_places",
-            type_allocation_places::suggest_allocation_places,
-        );
+        //        s.add_custom(
+        //            "suggest_allocation_places",
+        //            type_allocation_places::suggest_allocation_places,
+        //        );
         s
     }
 }
