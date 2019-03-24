@@ -360,12 +360,12 @@ impl FromStr for CppPathItem {
 
 impl fmt::Debug for CppPathItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
-        write!(f, "{}", self.name)?;
+        write!(f, "{:?}", self.name)?;
         if let Some(args) = &self.template_arguments {
             write!(
                 f,
                 "<{}>",
-                args.iter().map(|arg| arg.to_cpp_pseudo_code()).join(", ")
+                args.iter().map(|arg| format!("{:?}", arg)).join(", ")
             )?;
         }
         Ok(())

@@ -946,6 +946,29 @@ fn non_type_template_parameter() {
 }
 
 #[test]
+fn template_specialization() {
+    let data = run_parser(
+        "
+        template<class T>
+        class QVector {};
+
+        template <typename T>
+        class QFutureInterface {
+            void reportResults(const QVector<T> &value);
+        };
+
+        template <>
+        class QFutureInterface<void> {
+            void reportResults(const QVector<void> &value);
+        };
+        ",
+    );
+    assert_eq!(data.types.len(), 2);
+    println!("{:?}", data.methods);
+    assert_eq!(data.methods.len(), 1);
+}
+
+#[test]
 fn fixed_size_integers() {
     let data = run_parser(
         "

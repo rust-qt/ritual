@@ -552,9 +552,9 @@ impl CppParser<'_, '_> {
             if matches.len() < 3 {
                 bail!("invalid matches len in regexp");
             }
-            let mut class_name = CppPath::from_str(&matches[1])?;
+            let class_text = &matches[1];
             if self
-                .find_type(|x| x.path == class_name && x.kind.is_class())
+                .find_type(|x| x.kind.is_class() && x.path.to_templateless_string() == class_text)
                 .is_some()
             {
                 let mut arg_types = Vec::new();
@@ -575,6 +575,7 @@ impl CppParser<'_, '_> {
                         }
                     }
                 }
+                let mut class_name = CppPath::from_str(class_text)?;
                 class_name.last_mut().template_arguments = Some(arg_types);
                 return Ok(CppType::Class(class_name));
             }
