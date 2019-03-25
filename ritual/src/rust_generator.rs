@@ -775,6 +775,12 @@ impl State<'_, '_> {
         parent_path: &CppPath,
         name_type: &NameType<'_>,
     ) -> Result<RustPathScope> {
+        if let Some(hook) = self.0.config.rust_path_scope_hook() {
+            if let Some(strategy) = hook(parent_path)? {
+                return Ok(strategy);
+            }
+        }
+
         let allow_module_for_nested;
         let allow_wrapper_type;
         match name_type {
@@ -838,7 +844,7 @@ impl State<'_, '_> {
         let mut captions = Vec::new();
         for arg in types {
             let rust_type = self.rust_final_type(
-                &CppFfiType::new(arg.clone(), CppToFfiTypeConversion::NoChange)?,
+                &ffi_type(arg, CppTypeRole::NotReturnType)?,
                 &CppFfiArgumentMeaning::Argument(0),
                 true,
                 ReturnValueAllocationPlace::NotApplicable,
@@ -1173,9 +1179,9 @@ impl State<'_, '_> {
 
                         if let Some(wrapper) = qt_slot_wrapper {
                             let arg_types = wrapper
-                                .signal_arguments
+                                .arguments
                                 .iter()
-                                .map_if_ok(|t| self.ffi_type_to_rust_ffi_type(t))?;
+                                .map_if_ok(|t| self.ffi_type_to_rust_ffi_type(t.ffi_type()))?;
 
                             let receiver_id = CppFunction::receiver_id_from_data(
                                 RustQtReceiverType::Slot,
@@ -1301,19 +1307,14 @@ impl State<'_, '_> {
                     RustQtReceiverType::Slot => self.qt_core_path().join("Receiver"),
                 };
 
-                let arguments = cpp_function.arguments.iter().enumerate().map_if_ok(
-                    |(index, arg)| -> Result<_> {
+                let arguments = cpp_function
+                    .arguments
+                    .iter()
+                    .map_if_ok(|arg| -> Result<_> {
                         // TODO: rust generator shouldn't know about cpp ffi types
                         let ffi_type = ffi_type(&arg.argument_type, CppTypeRole::NotReturnType)?;
-                        let rust_type = self.rust_final_type(
-                            &ffi_type,
-                            &CppFfiArgumentMeaning::Argument(index),
-                            false,
-                            ReturnValueAllocationPlace::NotApplicable,
-                        )?;
-                        Ok(rust_type.api_type().clone())
-                    },
-                )?;
+                        self.ffi_type_to_rust_ffi_type(ffi_type.ffi_type())
+                    })?;
 
                 let return_type = RustType::Common(RustCommonType {
                     path: return_type_path,

@@ -2,6 +2,7 @@
 
 use crate::cpp_data::CppPath;
 use crate::processor::ProcessingSteps;
+use crate::rust_info::RustPathScope;
 use ritual_common;
 use ritual_common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
 use ritual_common::errors::Result;
@@ -143,6 +144,8 @@ impl CrateProperties {
     }
 }
 
+pub type RustPathScopeHook = dyn Fn(&CppPath) -> Result<Option<RustPathScope>> + 'static;
+
 /// The starting point of `cpp_to_rust` API.
 /// Create a `Config` object, set its properties,
 /// add custom functions if necessary, and start
@@ -159,12 +162,9 @@ pub struct Config {
     cpp_build_paths: CppBuildPaths,
     cpp_parser_arguments: Vec<String>,
     processing_steps: ProcessingSteps,
-
-    // TODO: revisit `cpp_filtered_namespaces` when new rust name generator is done
-    cpp_filtered_namespaces: Vec<CppPath>,
-
     movable_types_hook: Option<Box<dyn Fn(&CppPath) -> Result<MovableTypesHookOutput>>>,
     cpp_parser_path_hook: Option<Box<dyn Fn(&CppPath) -> Result<bool>>>,
+    rust_path_scope_hook: Option<Box<RustPathScopeHook>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -186,12 +186,12 @@ impl Config {
             target_include_paths: Default::default(),
             include_directives: Default::default(),
             cpp_parser_arguments: Default::default(),
-            cpp_filtered_namespaces: Default::default(),
             cpp_build_config: Default::default(),
             movable_types_hook: Default::default(),
             processing_steps: Default::default(),
             cpp_lib_version: Default::default(),
             cpp_parser_path_hook: Default::default(),
+            rust_path_scope_hook: Default::default(),
         }
     }
 
@@ -273,18 +273,6 @@ impl Config {
         self.include_directives.push(path.into());
     }
 
-    /// Adds a namespace to filter out before rust code generation.
-    pub fn add_cpp_filtered_namespace(&mut self, namespace: CppPath) {
-        self.cpp_filtered_namespaces.push(namespace);
-    }
-
-    /// Adds multiple namespaces to filter out before rust code generation.
-    pub fn add_cpp_filtered_namespaces(&mut self, namespaces: impl IntoIterator<Item = CppPath>) {
-        for namespace in namespaces {
-            self.cpp_filtered_namespaces.push(namespace);
-        }
-    }
-
     /// Sets `CppBuildConfig` value that will be passed to the build script
     /// of the generated crate.
     pub fn set_cpp_build_config(&mut self, cpp_build_config: CppBuildConfig) {
@@ -349,11 +337,6 @@ impl Config {
         &self.include_directives
     }
 
-    /// Returns values added by `Config::add_cpp_filtered_namespace`.
-    pub fn cpp_filtered_namespaces(&self) -> &[CppPath] {
-        &self.cpp_filtered_namespaces
-    }
-
     /// Returns current `CppBuildConfig` value.
     pub fn cpp_build_config(&self) -> &CppBuildConfig {
         &self.cpp_build_config
@@ -388,6 +371,17 @@ impl Config {
 
     pub fn cpp_parser_path_hook(&self) -> Option<&(dyn Fn(&CppPath) -> Result<bool> + 'static)> {
         self.cpp_parser_path_hook.as_ref().map(|b| &**b)
+    }
+
+    pub fn set_rust_path_scope_hook(
+        &mut self,
+        hook: impl Fn(&CppPath) -> Result<Option<RustPathScope>> + 'static,
+    ) {
+        self.rust_path_scope_hook = Some(Box::new(hook));
+    }
+
+    pub fn rust_path_scope_hook(&self) -> Option<&RustPathScopeHook> {
+        self.rust_path_scope_hook.as_ref().map(|b| &**b)
     }
 }
 

@@ -24,8 +24,8 @@ mod doc_formatter;
 pub mod processor;
 mod rust_code_generator;
 mod rust_generator;
-mod rust_info;
-mod rust_type;
+pub mod rust_info;
+pub mod rust_type;
 #[cfg(test)]
 mod tests;
 mod type_allocation_places;

@@ -1,8 +1,9 @@
 use itertools::Itertools;
-use ritual_common::errors::{bail, Result};
+use ritual_common::errors::{bail, Error, Result};
 use ritual_common::string_utils::CaseOperations;
 use ritual_common::utils::MapIfOk;
 use serde_derive::{Deserialize, Serialize};
+use std::str::FromStr;
 
 /// Rust identifier. Represented by
 /// a vector of name parts. For a regular name,
@@ -17,16 +18,10 @@ pub struct RustPath {
     pub parts: Vec<String>,
 }
 
-impl RustPath {
-    /// Creates new `RustPath` consisting of `parts`.
-    pub fn from_parts(parts: Vec<String>) -> Self {
-        if parts.is_empty() {
-            panic!("RustPath can't be empty");
-        }
-        RustPath { parts }
-    }
+impl FromStr for RustPath {
+    type Err = Error;
 
-    pub fn from_str(str: &str) -> Result<Self> {
+    fn from_str(str: &str) -> Result<Self> {
         let parts = str.split("::").map(String::from).collect_vec();
         if parts.is_empty() {
             bail!("RustPath can't be empty");
@@ -35,6 +30,16 @@ impl RustPath {
             bail!("RustPath item can't be empty");
         }
         Ok(RustPath { parts })
+    }
+}
+
+impl RustPath {
+    /// Creates new `RustPath` consisting of `parts`.
+    pub fn from_parts(parts: Vec<String>) -> Self {
+        if parts.is_empty() {
+            panic!("RustPath can't be empty");
+        }
+        RustPath { parts }
     }
 
     pub fn from_good_str(str: &str) -> Self {
@@ -358,7 +363,13 @@ impl RustType {
                 let mut name = if path.parts.len() == 1 {
                     path.parts[0].to_snake_case()
                 } else if path.crate_name() == Some("std") {
-                    path.last().to_snake_case()
+                    let last = path.last();
+                    let last = if last.starts_with("c_") {
+                        &last[2..]
+                    } else {
+                        last
+                    };
+                    last.to_snake_case()
                 } else {
                     let mut remaining_context: &[String] = &context.parts;
                     let parts: &[String] = &path.parts;

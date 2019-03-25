@@ -10,6 +10,8 @@ use qt_ritual_common::{all_crate_names, get_full_build_config, lib_dependencies,
 use ritual::config::CrateProperties;
 use ritual::config::{Config, GlobalConfig};
 use ritual::cpp_data::CppPath;
+use ritual::rust_info::RustPathScope;
+use ritual::rust_type::RustPath;
 use ritual_common::cpp_build_config::CppLibraryType;
 use ritual_common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
 use ritual_common::errors::{bail, Result, ResultExt};
@@ -146,6 +148,17 @@ fn core_cpp_parser_blocked_names() -> Vec<&'static str> {
 */
 /// QtCore specific configuration.
 fn core_config(config: &mut Config) -> Result<()> {
+    let namespace = CppPath::from_good_str("Qt");
+    config.set_rust_path_scope_hook(move |path| {
+        if path == &namespace {
+            return Ok(Some(RustPathScope {
+                path: RustPath::from_good_str("qt_core"),
+                prefix: None,
+            }));
+        }
+        Ok(None)
+    });
+
     /*config.set_movable_types_hook(|path| {
         let string = path.to_templateless_string();
         let movable = &[
@@ -513,6 +526,8 @@ fn core_config(config: &mut Config) -> Result<()> {
             "QGenericReturnArgument",
             "QNonConstOverload",
             "QConstOverload",
+            // global functions that redirects to member functions
+            "swap",
         ];
         if blocked.contains(&string.as_str()) {
             return Ok(false);
@@ -743,14 +758,32 @@ fn widgets_config(_config: &mut Config) -> Result<()> {
 
 /// Qt3DCore specific configuration.
 fn core_3d_config(config: &mut Config) -> Result<()> {
-    config.add_cpp_filtered_namespace(CppPath::from_good_str("Qt3DCore"));
+    let namespace = CppPath::from_good_str("Qt3DCore");
+    config.set_rust_path_scope_hook(move |path| {
+        if path == &namespace {
+            return Ok(Some(RustPathScope {
+                path: RustPath::from_good_str("qt_3d_core"),
+                prefix: None,
+            }));
+        }
+        Ok(None)
+    });
     //exclude_qvector_eq_based_methods(config, &["Qt3DCore::QNodeIdTypePair"]);
     Ok(())
 }
 
 /// Qt3DRender specific configuration.
 fn render_3d_config(config: &mut Config) -> Result<()> {
-    config.add_cpp_filtered_namespace(CppPath::from_good_str("Qt3DRender"));
+    let namespace = CppPath::from_good_str("Qt3DRender");
+    config.set_rust_path_scope_hook(move |path| {
+        if path == &namespace {
+            return Ok(Some(RustPathScope {
+                path: RustPath::from_good_str("qt_3d_render"),
+                prefix: None,
+            }));
+        }
+        Ok(None)
+    });
     /*
     config.add_cpp_parser_blocked_names(vec![
       "Qt3DRender::QTexture1D",
@@ -803,20 +836,47 @@ fn render_3d_config(config: &mut Config) -> Result<()> {
 
 /// Qt3DInput specific configuration.
 fn input_3d_config(config: &mut Config) -> Result<()> {
-    config.add_cpp_filtered_namespace(CppPath::from_good_str("Qt3DInput"));
+    let namespace = CppPath::from_good_str("Qt3DInput");
+    config.set_rust_path_scope_hook(move |path| {
+        if path == &namespace {
+            return Ok(Some(RustPathScope {
+                path: RustPath::from_good_str("qt_3d_input"),
+                prefix: None,
+            }));
+        }
+        Ok(None)
+    });
     //config.add_cpp_parser_blocked_names(vec!["Qt3DInput::QWheelEvent"]);
     Ok(())
 }
 
 /// Qt3DLogic specific configuration.
 fn logic_3d_config(config: &mut Config) -> Result<()> {
-    config.add_cpp_filtered_namespace(CppPath::from_good_str("Qt3DLogic"));
+    let namespace = CppPath::from_good_str("Qt3DLogic");
+    config.set_rust_path_scope_hook(move |path| {
+        if path == &namespace {
+            return Ok(Some(RustPathScope {
+                path: RustPath::from_good_str("qt_3d_logic"),
+                prefix: None,
+            }));
+        }
+        Ok(None)
+    });
     Ok(())
 }
 
 /// Qt3DExtras specific configuration.
 fn extras_3d_config(config: &mut Config) -> Result<()> {
-    config.add_cpp_filtered_namespace(CppPath::from_good_str("Qt3DExtras"));
+    let namespace = CppPath::from_good_str("Qt3DExtras");
+    config.set_rust_path_scope_hook(move |path| {
+        if path == &namespace {
+            return Ok(Some(RustPathScope {
+                path: RustPath::from_good_str("qt_3d_extras"),
+                prefix: None,
+            }));
+        }
+        Ok(None)
+    });
     Ok(())
 }
 
