@@ -22,7 +22,8 @@ public:
 
     static QMetaObject::Connection connect(
         const QObject* sender, const char* signal,
-        const QObject* receiver, const char* method);
+        const QObject* receiver, const char* method,
+        int connectionType = 0);
 
     class ConnectArgs {
     public:

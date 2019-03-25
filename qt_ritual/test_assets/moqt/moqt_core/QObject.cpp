@@ -33,7 +33,8 @@ void QObject::deleteLater() {
 
 QMetaObject::Connection QObject::connect(
     const QObject* sender, const char* signal,
-    const QObject* receiver, const char* method)
+    const QObject* receiver, const char* method,
+    int connectionType)
 {
     std::lock_guard<std::mutex> lock(connectArgsMutex);
     ConnectArgs args;

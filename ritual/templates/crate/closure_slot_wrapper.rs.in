@@ -56,8 +56,8 @@ impl<'a> Default for {pub_type_name}<'a> {{
 }}
 
 impl<'a, 'b: 'a> {qt_core}::AsReceiver for &'b {pub_type_name}<'a> {{
-    type Arguments = <&'a {type_name} as {qt_core}::AsReceiver>::Arguments;
-    fn as_receiver(self) -> {qt_core}::Receiver<Self::Arguments> {{
+    type Arguments = <{type_name} as {qt_core}::AsReceiver>::Arguments;
+    fn as_receiver(&self) -> {qt_core}::Receiver<Self::Arguments> {{
         self.raw_slot.as_receiver()
     }}
 }}

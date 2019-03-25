@@ -1,4 +1,4 @@
-use cpp_utils::{CppDeletable, Ptr, StaticUpcast, CppBox};
+use cpp_utils::{CppBox, CppDeletable, Ptr, StaticUpcast};
 use moqt_core::{BaseHandle, HandleFactory};
 
 #[test]

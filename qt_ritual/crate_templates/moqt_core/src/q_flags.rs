@@ -1,5 +1,5 @@
-use std::os::raw::c_int;
 use std::marker::PhantomData;
+use std::os::raw::c_int;
 
 /// Rust alternative to Qt's `QFlags` types.
 ///

@@ -1,29 +1,11 @@
-impl<'a> {qt_core}::AsReceiver for &'a {type_path} {{
+impl {qt_core}::AsReceiver for {type_path} {{
     type Arguments = {args};
-    fn as_receiver(self) -> {qt_core}::Receiver<Self::Arguments> {{
+    fn as_receiver(&self) -> {qt_core}::Receiver<Self::Arguments> {{
         unsafe {{
             {qt_core}::Receiver::new(
                 ::cpp_utils::StaticUpcast::static_upcast(self),
                 ::std::ffi::CStr::from_bytes_with_nul_unchecked(b"{receiver_id}\0")
             )
         }}
-    }}
-}}
-impl {qt_core}::AsReceiver for ::cpp_utils::Ptr<{type_path}> {{
-    type Arguments = {args};
-    fn as_receiver(self) -> {qt_core}::Receiver<Self::Arguments> {{
-        (*self).as_receiver()
-    }}
-}}
-impl {qt_core}::AsReceiver for ::cpp_utils::ConstPtr<{type_path}> {{
-    type Arguments = {args};
-    fn as_receiver(self) -> {qt_core}::Receiver<Self::Arguments> {{
-        (*self).as_receiver()
-    }}
-}}
-impl<'a> {qt_core}::AsReceiver for &'a ::cpp_utils::CppBox<{type_path}> {{
-    type Arguments = {args};
-    fn as_receiver(self) -> {qt_core}::Receiver<Self::Arguments> {{
-        (**self).as_receiver()
     }}
 }}

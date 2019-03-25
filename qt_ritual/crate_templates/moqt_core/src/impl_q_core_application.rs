@@ -1,5 +1,5 @@
 use crate::QCoreApplication;
-use std::os::raw::{c_int, c_char};
+use std::os::raw::{c_char, c_int};
 use std::{env, process};
 
 /// A struct providing valid `argc` and `argv` values for Qt application
@@ -82,7 +82,7 @@ impl QCoreApplication {
     /// closure `f(app)` with the application object and exist the process with the exit code
     /// returned by the closure. The closure should perform the initialization of the application
     /// and either return immediately or call `CoreApplication::exec()` and return its return value:
-    /// ```
+    /// ```no_run
     /// use moqt_core::QCoreApplication;
     ///
     /// fn main() {

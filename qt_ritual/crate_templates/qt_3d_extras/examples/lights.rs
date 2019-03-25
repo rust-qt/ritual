@@ -1,18 +1,18 @@
-extern crate qt_core;
-extern crate qt_gui;
 extern crate qt_3d_core;
+extern crate qt_3d_extras;
 extern crate qt_3d_input;
 extern crate qt_3d_logic;
 extern crate qt_3d_render;
-extern crate qt_3d_extras;
+extern crate qt_core;
+extern crate qt_gui;
 
 use std::cell::*;
 
 use qt_core::connection::*;
 use qt_core::slots::*;
 
-use qt_gui::gui_application::GuiApplication;
 use qt_gui::color::*;
+use qt_gui::gui_application::GuiApplication;
 use qt_gui::surface_format::*;
 use qt_gui::vector_3d::*;
 
@@ -28,10 +28,10 @@ use qt_3d_render::directional_light::*;
 use qt_3d_render::point_light::*;
 use qt_3d_render::spot_light::*;
 
-use qt_3d_extras::qt_3d_window::*;
 use qt_3d_extras::metal_rough_material::*;
 use qt_3d_extras::orbit_camera_controller::*;
 use qt_3d_extras::plane_mesh::*;
+use qt_3d_extras::qt_3d_window::*;
 use qt_3d_extras::sphere_mesh::*;
 
 fn to_node_ptr(entity: &mut Entity) -> *mut Node {
@@ -160,8 +160,14 @@ fn main() {
         let mut keyboard_handler = KeyboardHandler::new();
         unsafe { keyboard_handler.set_source_device(keyboard_device.into_raw()) };
         keyboard_handler.set_focus(true);
-        keyboard_handler.signals().tab_pressed().connect(&next_light_slot);
-        keyboard_handler.signals().space_pressed().connect(&next_light_slot);
+        keyboard_handler
+            .signals()
+            .tab_pressed()
+            .connect(&next_light_slot);
+        keyboard_handler
+            .signals()
+            .space_pressed()
+            .connect(&next_light_slot);
         unsafe { handler.add_component(static_cast_mut(keyboard_handler.into_raw())) };
         handler.into_raw();
 

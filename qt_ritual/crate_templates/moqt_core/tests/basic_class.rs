@@ -1,6 +1,6 @@
-use moqt_core::basic_class::{UpdateType, inner_struct::InnerEnum};
-use moqt_core::{BasicClass, BasicClassField};
 use cpp_utils::Ptr;
+use moqt_core::basic_class::{inner_struct::InnerEnum, UpdateType};
+use moqt_core::{BasicClass, BasicClassField};
 
 #[test]
 fn basic_class() {
@@ -40,8 +40,8 @@ fn basic_class() {
         drop(c);
         assert_eq!(v.class_field().get(), 42);
 
-        assert_eq!(v.to_c_int(), 3);
-        let mut converted = v.to_q_vector_of_c_int();
+        assert_eq!(v.to_int(), 3);
+        let mut converted = v.to_q_vector_of_int();
         assert_eq!(converted.count(), 1);
         assert_eq!(*converted.at(0), 7);
     }

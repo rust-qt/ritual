@@ -1,6 +1,6 @@
-use cpp_utils::{CppBox, Ptr, ConstPtr};
-use moqt_core::{BasicClass, QPoint, QVectorOfCInt};
-use moqt_gui::{get_window, QWindow, QVectorOfQWindowPtr};
+use cpp_utils::{CppBox, Ptr};
+use moqt_core::{BasicClass, QPoint, QVectorOfInt};
+use moqt_gui::{get_window, QVectorOfQWindowPtr, QWindow};
 
 #[test]
 fn test_qwindow() {
@@ -34,7 +34,7 @@ fn test_with_vectors() {
     unsafe {
         let mut window: CppBox<QWindow> = QWindow::new();
 
-        let mut vec = QVectorOfCInt::new();
+        let mut vec = QVectorOfInt::new();
         vec.push(10);
         vec.push(12);
         vec.push(14);

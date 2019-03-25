@@ -1,5 +1,5 @@
-use moqt_core::QPoint;
 use cpp_utils::CppBox;
+use moqt_core::QPoint;
 
 #[test]
 fn create() {

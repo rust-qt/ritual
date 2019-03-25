@@ -1,10 +1,10 @@
-use moqt_core::{QObject, RawSlotOfCInt, SlotOfCInt};
 use cpp_utils::{Ptr, StaticUpcast};
-use std::ffi::CStr;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::os::raw::{c_void, c_int};
-use std::rc::Rc;
+use moqt_core::{QObject, RawSlotOfInt, SlotOfInt};
 use std::cell::RefCell;
+use std::ffi::CStr;
+use std::os::raw::{c_int, c_void};
+use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[test]
 fn qobject() {
@@ -36,7 +36,7 @@ fn raw_slot() {
             assert!(!old);
         }
 
-        let mut obj = RawSlotOfCInt::new();
+        let mut obj = RawSlotOfInt::new();
         obj.set(Some(hook), Ptr::new(5 as *mut c_void));
         assert!(!FLAG.load(Ordering::SeqCst));
         obj.custom_slot(7);
@@ -48,7 +48,7 @@ fn raw_slot() {
 fn raw_slot_connect() {
     unsafe {
         let obj1 = QObject::new2();
-        let mut slot = RawSlotOfCInt::new();
+        let mut slot = RawSlotOfInt::new();
         obj1.object_name_changed().connect(&slot);
 
         let args = QObject::next_connect_args();
@@ -70,7 +70,7 @@ fn closure_slot_connect() {
         let obj1 = QObject::new2();
         let counter = Rc::new(RefCell::new(0));
         let counter_handle = Rc::clone(&counter);
-        let mut slot = SlotOfCInt::new(move |arg| {
+        let mut slot = SlotOfInt::new(move |arg| {
             *counter_handle.borrow_mut() += arg;
         });
         obj1.object_name_changed().connect(&slot);
