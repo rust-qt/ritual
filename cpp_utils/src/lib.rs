@@ -315,6 +315,10 @@ impl<T> Ptr<T> {
         }
     }
 
+    pub unsafe fn null() -> Self {
+        Ptr(std::ptr::null_mut())
+    }
+
     /// Returns constant raw pointer to the value in the box.
     pub fn as_ptr(self) -> *const T {
         self.0
@@ -335,12 +339,18 @@ impl<T> Deref for Ptr<T> {
     type Target = T;
 
     fn deref(&self) -> &T {
+        if self.0.is_null() {
+            panic!("attempted to deref a null Ptr<T>");
+        }
         unsafe { &(*self.0) }
     }
 }
 
 impl<T> DerefMut for Ptr<T> {
     fn deref_mut(&mut self) -> &mut T {
+        if self.0.is_null() {
+            panic!("attempted to deref a null Ptr<T>");
+        }
         unsafe { &mut (*self.0) }
     }
 }
@@ -372,6 +382,10 @@ impl<T> ConstPtr<T> {
         } else {
             Some(ConstPtr(ptr))
         }
+    }
+
+    pub unsafe fn null() -> Self {
+        ConstPtr(std::ptr::null())
     }
 
     /// Returns constant raw pointer to the value in the box.
