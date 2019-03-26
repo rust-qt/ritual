@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
-use crate::cpp_data::CppPath;
-use crate::cpp_data::CppVisibility;
+use crate::cpp_data::{CppPath, CppVisibility};
 use crate::cpp_function::CppFunction;
 use crate::processor::ProcessorData;
 use itertools::Itertools;

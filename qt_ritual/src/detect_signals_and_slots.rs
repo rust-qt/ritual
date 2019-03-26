@@ -2,13 +2,11 @@ use itertools::Itertools;
 use log::trace;
 use regex::Regex;
 use ritual::cpp_data::CppPath;
-use ritual::database::CppItemData;
-use ritual::database::DatabaseItemSource;
+use ritual::database::{CppItemData, DatabaseItemSource};
 use ritual::processor::ProcessorData;
 use ritual_common::errors::{Result, ResultExt};
 use ritual_common::file_utils::open_file;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// Checks if `class_name` types inherits `base_name` type directly or indirectly.
 pub fn inherits(

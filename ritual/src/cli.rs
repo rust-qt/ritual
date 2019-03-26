@@ -10,8 +10,7 @@ use flexi_logger::{Duplicate, LevelFilter, LogSpecification, Logger};
 use itertools::Itertools;
 use log::{error, info};
 use ritual_common::errors::{bail, err_msg, Result};
-use ritual_common::file_utils::path_to_str;
-use ritual_common::file_utils::{canonicalize, create_dir};
+use ritual_common::file_utils::{canonicalize, create_dir, path_to_str};
 use std::path::PathBuf;
 use structopt::StructOpt;
 

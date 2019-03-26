@@ -26,8 +26,9 @@ mod rust_code_generator;
 mod rust_generator;
 pub mod rust_info;
 pub mod rust_type;
-#[cfg(test)]
-mod tests;
 mod type_allocation_places;
 mod versions;
 pub mod workspace;
+
+#[cfg(test)]
+mod tests;

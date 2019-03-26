@@ -1,24 +1,18 @@
 use crate::config::Config;
-use crate::cpp_data::CppPath;
-use crate::cpp_data::CppPathItem;
-use crate::cpp_data::CppTypeDeclarationKind;
 use crate::cpp_data::{
-    CppBaseSpecifier, CppClassField, CppEnumValue, CppOriginLocation, CppTypeDeclaration,
-    CppVisibility,
+    CppBaseSpecifier, CppClassField, CppEnumValue, CppOriginLocation, CppPath, CppPathItem,
+    CppTypeDeclaration, CppTypeDeclarationKind, CppVisibility,
 };
 use crate::cpp_function::{
     CppFunction, CppFunctionArgument, CppFunctionKind, CppFunctionMemberData,
 };
 use crate::cpp_operator::CppOperator;
-use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::{
-    CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
+    CppBuiltInNumericType, CppFunctionPointerType, CppPointerLikeTypeKind, CppSpecificNumericType,
     CppSpecificNumericTypeKind, CppType,
 };
-use crate::database::CppItemData;
-use crate::database::DatabaseItemSource;
+use crate::database::{CppItemData, DatabaseItemSource};
 use crate::processor::ProcessorData;
-use clang;
 use clang::diagnostic::{Diagnostic, Severity};
 use clang::*;
 use itertools::Itertools;

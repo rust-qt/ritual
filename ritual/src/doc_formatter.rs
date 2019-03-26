@@ -3,16 +3,12 @@
 
 #![allow(dead_code)]
 
-use crate::cpp_ffi_data::CppFfiFunctionKind;
-use crate::cpp_ffi_data::CppFieldAccessorType;
+use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFieldAccessorType};
 use crate::rust_code_generator::rust_type_to_code;
-use crate::rust_info::RustFunctionKind;
-use crate::rust_info::RustModule;
-use crate::rust_info::RustModuleKind;
-use crate::rust_info::RustStruct;
-use crate::rust_info::RustStructKind;
-use crate::rust_info::RustWrapperType;
-use crate::rust_info::{RustEnumValue, RustFunction, RustQtReceiverType};
+use crate::rust_info::{
+    RustEnumValue, RustFunction, RustFunctionKind, RustModule, RustModuleKind, RustQtReceiverType,
+    RustStruct, RustStructKind, RustWrapperType,
+};
 use itertools::Itertools;
 
 pub fn wrap_inline_cpp_code(code: &str) -> String {

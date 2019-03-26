@@ -1,5 +1,4 @@
-use crate::cpp_data::CppPath;
-use crate::cpp_data::CppPathItem;
+use crate::cpp_data::{CppPath, CppPathItem};
 use crate::cpp_ffi_data::CppToFfiTypeConversion;
 use crate::cpp_ffi_generator::ffi_type;
 use crate::cpp_type::{

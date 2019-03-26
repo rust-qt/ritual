@@ -2,42 +2,24 @@
 
 use crate::doc_formatter;
 use crate::rust_generator::qt_core_path;
-use crate::rust_info::RustDatabaseItem;
-use crate::rust_info::RustEnumValue;
-use crate::rust_info::RustExtraImpl;
-use crate::rust_info::RustFFIFunction;
-use crate::rust_info::RustFfiWrapperData;
-use crate::rust_info::RustFunction;
-use crate::rust_info::RustFunctionArgument;
-use crate::rust_info::RustFunctionKind;
-use crate::rust_info::RustItemKind;
-use crate::rust_info::RustModule;
-use crate::rust_info::RustModuleKind;
-use crate::rust_info::RustStruct;
-use crate::rust_info::RustStructKind;
-use crate::rust_info::RustTraitImpl;
-use crate::rust_info::RustWrapperTypeKind;
-use crate::rust_info::{RustDatabase, RustExtraImplKind};
-use crate::rust_type::RustCommonType;
-use crate::rust_type::RustFinalType;
-use crate::rust_type::RustPath;
-use crate::rust_type::RustPointerLikeTypeKind;
-use crate::rust_type::RustToFfiTypeConversion;
-use crate::rust_type::RustType;
+use crate::rust_info::{
+    RustDatabase, RustDatabaseItem, RustEnumValue, RustExtraImpl, RustExtraImplKind,
+    RustFFIFunction, RustFfiWrapperData, RustFunction, RustFunctionArgument, RustFunctionKind,
+    RustItemKind, RustModule, RustModuleKind, RustStruct, RustStructKind, RustTraitImpl,
+    RustWrapperTypeKind,
+};
+use crate::rust_type::{
+    RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
+    RustType,
+};
 use itertools::Itertools;
 use ritual_common::errors::{bail, err_msg, Result};
-use ritual_common::file_utils::create_dir_all;
-use ritual_common::file_utils::create_file;
-use ritual_common::file_utils::file_to_string;
-use ritual_common::file_utils::File;
+use ritual_common::file_utils::{create_dir_all, create_file, file_to_string, File};
 use ritual_common::string_utils::trim_slice;
 use ritual_common::utils::MapIfOk;
 use std::fs;
-use std::io;
-use std::io::BufWriter;
-use std::io::Write;
-use std::path::Path;
-use std::path::PathBuf;
+use std::io::{self, BufWriter, Write};
+use std::path::{Path, PathBuf};
 
 fn wrap_unsafe(in_unsafe_context: bool, content: &str) -> String {
     let (unsafe_start, unsafe_end) = if in_unsafe_context {

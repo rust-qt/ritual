@@ -1,15 +1,10 @@
 //! Implements building a CMake-based C++ library.
 
-use crate::cpp_build_config::CppBuildConfigData;
-use crate::cpp_build_config::CppBuildPaths;
-use crate::cpp_build_config::CppLibraryType;
+use crate::cpp_build_config::{CppBuildConfigData, CppBuildPaths, CppLibraryType};
 use crate::errors::{err_msg, Result};
 use crate::file_utils::{create_dir_all, file_to_string, path_to_str};
 use crate::target;
-use crate::utils::run_command;
-use crate::utils::run_command_and_capture_output;
-use crate::utils::CommandOutput;
-use crate::utils::MapIfOk;
+use crate::utils::{run_command, run_command_and_capture_output, CommandOutput, MapIfOk};
 use itertools::Itertools;
 use log::debug;
 use std::fmt::Display;

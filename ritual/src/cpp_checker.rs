@@ -1,8 +1,6 @@
 use crate::cpp_code_generator;
 use crate::cpp_code_generator::apply_moc;
-use crate::database::CppCheckerEnv;
-use crate::database::CppFfiItem;
-use crate::database::CppFfiItemKind;
+use crate::database::{CppCheckerEnv, CppFfiItem, CppFfiItemKind};
 use crate::processor::ProcessorData;
 use log::{debug, trace};
 use rayon::iter::ParallelIterator;
@@ -14,10 +12,8 @@ use ritual_common::cpp_lib_builder::{
 use ritual_common::errors::{bail, err_msg, Result};
 use ritual_common::file_utils::{create_dir_all, create_file, path_to_str, remove_dir_all};
 use ritual_common::target::current_target;
-use ritual_common::utils::MapIfOk;
-use ritual_common::utils::ProgressBar;
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+use ritual_common::utils::{MapIfOk, ProgressBar};
+use std::collections::{hash_map::Entry, HashMap};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};

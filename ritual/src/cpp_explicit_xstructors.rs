@@ -1,11 +1,7 @@
-use crate::cpp_data::CppPathItem;
-use crate::cpp_data::CppVisibility;
-use crate::cpp_function::CppFunction;
-use crate::cpp_function::CppFunctionKind;
-use crate::cpp_function::CppFunctionMemberData;
+use crate::cpp_data::{CppPathItem, CppVisibility};
+use crate::cpp_function::{CppFunction, CppFunctionKind, CppFunctionMemberData};
 use crate::cpp_type::CppType;
-use crate::database::CppItemData;
-use crate::database::DatabaseItemSource;
+use crate::database::{CppItemData, DatabaseItemSource};
 use crate::processor::ProcessorData;
 use ritual_common::errors::Result;
 

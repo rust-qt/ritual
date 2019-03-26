@@ -1,10 +1,8 @@
 //! Types for handling information about C++ methods.
 
-use crate::cpp_data::CppPath;
-use crate::cpp_data::CppVisibility;
+use crate::cpp_data::{CppPath, CppVisibility};
 pub use crate::cpp_operator::{CppOperator, CppOperatorInfo};
-use crate::cpp_type::CppPointerLikeTypeKind;
-use crate::cpp_type::CppType;
+use crate::cpp_type::{CppPointerLikeTypeKind, CppType};
 use crate::rust_info::RustQtReceiverType;
 use itertools::Itertools;
 use ritual_common::errors::{bail, err_msg, Result, ResultExt};

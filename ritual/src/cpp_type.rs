@@ -3,8 +3,7 @@
 use crate::cpp_data::CppPath;
 use ritual_common::errors::{bail, Result};
 use serde_derive::{Deserialize, Serialize};
-use std::hash::Hash;
-use std::hash::Hasher;
+use std::hash::{Hash, Hasher};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub enum CppPointerLikeTypeKind {

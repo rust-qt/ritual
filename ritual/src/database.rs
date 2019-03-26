@@ -1,14 +1,9 @@
 use crate::cpp_code_generator;
-use crate::cpp_data::CppBaseSpecifier;
-use crate::cpp_data::CppClassField;
-use crate::cpp_data::CppEnumValue;
-use crate::cpp_data::CppOriginLocation;
-use crate::cpp_data::CppPath;
-use crate::cpp_data::CppTypeDeclaration;
-use crate::cpp_data::CppTypeDeclarationKind;
-use crate::cpp_data::CppVisibility;
-use crate::cpp_ffi_data::QtSlotWrapper;
-use crate::cpp_ffi_data::{CppFfiFunction, CppFfiFunctionKind};
+use crate::cpp_data::{
+    CppBaseSpecifier, CppClassField, CppEnumValue, CppOriginLocation, CppPath, CppTypeDeclaration,
+    CppTypeDeclarationKind, CppVisibility,
+};
+use crate::cpp_ffi_data::{CppFfiFunction, CppFfiFunctionKind, QtSlotWrapper};
 use crate::cpp_function::CppFunction;
 use crate::cpp_type::CppType;
 use crate::rust_info::{RustDatabase, RustDatabaseItem};
@@ -17,8 +12,7 @@ use log::{debug, trace};
 use ritual_common::errors::{bail, Result};
 use ritual_common::target::Target;
 use serde_derive::{Deserialize, Serialize};
-use std::fmt::Display;
-use std::fmt::Formatter;
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct CppCheckerEnv {
@@ -251,8 +245,8 @@ impl CppItemData {
     }*/
 }
 
-impl Display for CppItemData {
-    fn fmt(&self, f: &mut Formatter<'_>) -> ::std::result::Result<(), ::std::fmt::Error> {
+impl fmt::Display for CppItemData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
             CppItemData::Namespace(path) => format!("namespace {}", path.to_cpp_pseudo_code()),
             CppItemData::Type(type1) => match type1.kind {

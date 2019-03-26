@@ -1,26 +1,20 @@
+use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_ffi_data::{
     CppFfiArgumentMeaning, CppFfiFunctionKind, CppFfiType, CppFieldAccessorType,
     CppToFfiTypeConversion, QtSlotWrapper,
 };
 use crate::cpp_function::ReturnValueAllocationPlace;
+use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
+use crate::database::{CppFfiItem, CppFfiItemKind};
+use crate::rust_info::{RustDatabase, RustItemKind, RustStructKind};
 use itertools::Itertools;
 use ritual_common::errors::{bail, Result};
 use ritual_common::file_utils::{create_file, create_file_for_append, path_to_str};
-use ritual_common::utils::get_command_output;
-use ritual_common::utils::MapIfOk;
-
-use crate::cpp_ffi_data::CppFfiFunction;
-use crate::cpp_type::CppPointerLikeTypeKind;
-use crate::database::CppFfiItem;
-use crate::database::CppFfiItemKind;
-use crate::rust_info::RustDatabase;
-use crate::rust_info::RustItemKind;
-use crate::rust_info::RustStructKind;
+use ritual_common::utils::{get_command_output, MapIfOk};
 use std::io::Write;
 use std::iter::once;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Generates function name, return type and arguments list

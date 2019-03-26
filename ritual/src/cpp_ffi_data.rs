@@ -1,5 +1,4 @@
-use crate::cpp_data::CppClassField;
-use crate::cpp_data::CppPath;
+use crate::cpp_data::{CppClassField, CppPath};
 use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
 use crate::cpp_type::{CppBuiltInNumericType, CppFunctionPointerType, CppType};
 use ritual_common::errors::Result;

@@ -1,7 +1,9 @@
+use crate::string_utils::{CaseOperations, WordIterator};
+use itertools::Itertools;
+use std::path::PathBuf;
+
 #[test]
 fn join() {
-    use itertools::Itertools;
-
     let a1 = vec!["a", "b", "c"];
     assert_eq!(a1.join(""), "abc");
     assert_eq!(a1.join("_"), "a_b_c");
@@ -19,7 +21,6 @@ fn join() {
 
 #[test]
 fn path_buf_with_added() {
-    use std::path::PathBuf;
     let x = PathBuf::from("/tmp");
     let mut y = x.clone();
     y.push("name");
@@ -29,7 +30,6 @@ fn path_buf_with_added() {
 
 #[test]
 fn word_iterator() {
-    use crate::string_utils::WordIterator;
     let string = "one_two_three".to_string();
     let mut a1 = WordIterator::new(&string);
     assert_eq!(a1.next(), Some("one"));
@@ -40,7 +40,6 @@ fn word_iterator() {
 
 #[test]
 fn word_iterator2() {
-    use crate::string_utils::WordIterator;
     let string = "RustIsAwesome".to_string();
     let mut a1 = WordIterator::new(&string);
     assert_eq!(a1.next(), Some("Rust"));
@@ -50,7 +49,6 @@ fn word_iterator2() {
 }
 
 fn split_to_words(s: &'static str) -> Vec<&'static str> {
-    use crate::string_utils::WordIterator;
     WordIterator::new(s).collect()
 }
 
@@ -64,8 +62,6 @@ fn word_iterator3() {
 
 #[test]
 fn case_operations() {
-    use crate::string_utils::CaseOperations;
-
     let s1 = "first_second_last".to_string();
     assert_eq!(s1.to_class_case(), "FirstSecondLast");
     assert_eq!(s1.to_snake_case(), "first_second_last");

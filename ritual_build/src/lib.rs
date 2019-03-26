@@ -11,10 +11,8 @@
 use log::info;
 pub use ritual_common as common;
 use ritual_common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
-use ritual_common::cpp_lib_builder::c2r_cmake_vars;
-use ritual_common::cpp_lib_builder::{BuildType, CppLibBuilder};
-use ritual_common::errors::err_msg;
-use ritual_common::errors::{bail, FancyUnwrap, Result, ResultExt};
+use ritual_common::cpp_lib_builder::{c2r_cmake_vars, BuildType, CppLibBuilder};
+use ritual_common::errors::{bail, err_msg, FancyUnwrap, Result, ResultExt};
 use ritual_common::file_utils::{create_file, file_to_string, load_json, path_to_str};
 use ritual_common::target::current_target;
 use ritual_common::utils::{exe_suffix, get_command_output};

@@ -1,12 +1,10 @@
 //! Types holding information about generates Rust API.
 
-use crate::cpp_data::CppPath;
-use crate::cpp_data::CppTypeDoc;
+use crate::cpp_data::{CppPath, CppTypeDoc};
 use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_type::CppType;
 use crate::rust_code_generator::rust_type_to_code;
-use crate::rust_type::RustPointerLikeTypeKind;
-use crate::rust_type::{RustFinalType, RustPath, RustType};
+use crate::rust_type::{RustFinalType, RustPath, RustPointerLikeTypeKind, RustType};
 use ritual_common::errors::{bail, Result};
 use serde_derive::{Deserialize, Serialize};
 

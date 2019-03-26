@@ -8,16 +8,17 @@
 
 use serde_derive::{Deserialize, Serialize};
 
-pub mod errors;
-
-pub mod file_utils;
-pub mod string_utils;
-pub mod utils;
-
 pub mod cpp_build_config;
 pub mod cpp_lib_builder;
+pub mod errors;
+pub mod file_utils;
+pub mod string_utils;
 pub mod target;
+pub mod utils;
 pub use toml;
+
+#[cfg(test)]
+mod tests;
 
 /// This type contains data serialized by the generator and placed to the
 /// generated crate's directory. The build script reads and uses this value.
@@ -30,6 +31,3 @@ pub struct BuildScriptData {
     /// Name of C++ wrapper library
     pub cpp_wrapper_lib_name: String,
 }
-
-#[cfg(test)]
-mod tests;

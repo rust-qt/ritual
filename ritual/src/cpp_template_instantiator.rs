@@ -1,15 +1,10 @@
-use crate::cpp_data::CppPath;
-use crate::cpp_data::CppPathItem;
-use crate::cpp_function::CppFunction;
-use crate::cpp_function::CppFunctionArgument;
-use crate::cpp_function::CppOperator;
+use crate::cpp_data::{CppPath, CppPathItem};
+use crate::cpp_function::{CppFunction, CppFunctionArgument, CppOperator};
 use crate::cpp_type::CppType;
-use crate::database::CppItemData;
-use crate::database::DatabaseItemSource;
+use crate::database::{CppItemData, DatabaseItemSource};
 use crate::processor::ProcessorData;
 use log::{debug, trace};
-use ritual_common::errors::err_msg;
-use ritual_common::errors::{bail, Result};
+use ritual_common::errors::{bail, err_msg, Result};
 
 /// Returns true if `type1` is a known template instantiation.
 fn check_template_type(data: &ProcessorData<'_>, type1: &CppType) -> Result<()> {

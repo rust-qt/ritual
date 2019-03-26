@@ -1,10 +1,8 @@
 #![allow(dead_code)]
 
 use crate::config::MovableTypesHookOutput;
-use crate::cpp_data::CppPath;
-use crate::cpp_data::CppTypeDeclarationKind;
-use crate::cpp_type::CppPointerLikeTypeKind;
-use crate::cpp_type::CppType;
+use crate::cpp_data::{CppPath, CppTypeDeclarationKind};
+use crate::cpp_type::{CppPointerLikeTypeKind, CppType};
 use crate::database::CppItemData;
 use crate::processor::ProcessorData;
 use log::{info, trace};

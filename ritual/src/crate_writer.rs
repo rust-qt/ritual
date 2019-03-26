@@ -5,25 +5,15 @@ use crate::rust_code_generator;
 use crate::versions;
 use pathdiff::diff_paths;
 use ritual_common::errors::{err_msg, Result};
-use ritual_common::file_utils::copy_file;
-use ritual_common::file_utils::copy_recursively;
-use ritual_common::file_utils::create_dir;
-use ritual_common::file_utils::create_dir_all;
-use ritual_common::file_utils::create_file;
-use ritual_common::file_utils::path_to_str;
-use ritual_common::file_utils::read_dir;
-use ritual_common::file_utils::remove_dir_all;
-use ritual_common::file_utils::remove_file;
-use ritual_common::file_utils::repo_dir_path;
-use ritual_common::file_utils::save_json;
-use ritual_common::file_utils::save_toml;
+use ritual_common::file_utils::{
+    copy_file, copy_recursively, create_dir, create_dir_all, create_file, path_to_str, read_dir,
+    remove_dir_all, remove_file, repo_dir_path, save_json, save_toml,
+};
 use ritual_common::toml;
-use ritual_common::utils::run_command;
-use ritual_common::utils::MapIfOk;
+use ritual_common::utils::{run_command, MapIfOk};
 use ritual_common::BuildScriptData;
 use std::io::Write;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Merges `a` and `b` recursively. `b` take precedence over `a`.

@@ -2,15 +2,12 @@
 //! Qt's shortcut header names.
 
 use log::{info, trace};
-use ritual::database::CppDatabaseItem;
-use ritual::database::CppItemData;
-use ritual::database::DatabaseItemSource;
+use ritual::database::{CppDatabaseItem, CppItemData, DatabaseItemSource};
 use ritual_common::errors::{err_msg, Result, ResultExt};
 use ritual_common::file_utils::{file_to_string, os_str_to_str, read_dir};
 use ritual_common::utils::add_to_multihash;
 use std::collections::HashMap;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 struct HeaderNameMap {
     map_real_to_all_fancy: HashMap<String, Vec<String>>,

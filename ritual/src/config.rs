@@ -3,7 +3,6 @@
 use crate::cpp_data::CppPath;
 use crate::processor::ProcessingSteps;
 use crate::rust_info::RustPathScope;
-use ritual_common;
 use ritual_common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
 use ritual_common::errors::Result;
 use ritual_common::toml;

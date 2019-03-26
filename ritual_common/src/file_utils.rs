@@ -4,13 +4,7 @@ use crate::errors::{bail, err_msg, Result, ResultExt};
 use log::trace;
 use std::ffi::{OsStr, OsString};
 use std::fs;
-use std::io;
-use std::io::BufRead;
-use std::io::BufReader;
-use std::io::BufWriter;
-use std::io::Lines;
-use std::io::Read;
-use std::io::Write;
+use std::io::{self, BufRead, BufReader, BufWriter, Lines, Read, Write};
 use std::path::{Path, PathBuf};
 use toml;
 

@@ -1,5 +1,4 @@
-use crate::config::Config;
-use crate::config::CrateProperties;
+use crate::config::{Config, CrateProperties};
 use crate::cpp_data::*;
 use crate::cpp_function::*;
 use crate::cpp_operator::CppOperator;

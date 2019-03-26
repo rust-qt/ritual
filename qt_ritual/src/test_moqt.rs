@@ -1,11 +1,8 @@
 use crate::lib_configs::global_config;
-use ritual::cli;
-use ritual::cli::Options;
+use ritual::cli::{self, Options};
 use ritual_common::cpp_lib_builder::{BuildType, CppLibBuilder};
 use ritual_common::errors::{FancyUnwrap, Result};
-use ritual_common::file_utils::canonicalize;
-use ritual_common::file_utils::create_dir_all;
-use ritual_common::file_utils::repo_dir_path;
+use ritual_common::file_utils::{canonicalize, create_dir_all, repo_dir_path};
 use ritual_common::utils::add_env_path_item;
 use std::env;
 use std::path::{Path, PathBuf};

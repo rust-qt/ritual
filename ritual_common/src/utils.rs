@@ -1,20 +1,16 @@
 //! Various utilities.
 
 use crate::errors::{bail, Result, ResultExt};
-
 use log::trace;
-use std;
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::fmt::Display;
-use std::hash::BuildHasher;
-use std::hash::Hash;
-use std::io::stdout;
-use std::io::Write;
+use std::collections::hash_map::{Entry, HashMap};
+use std::ffi::OsString;
+use std::fmt::{Debug, Display};
+use std::hash::{BuildHasher, Hash};
+use std::io::{stderr, stdout, Write};
 use std::path::PathBuf;
-use std::process::Command;
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::process::{Command, ExitStatus};
+use std::sync::{Arc, Mutex};
+use std::{env, iter, process};
 
 #[cfg(windows)]
 /// Returns proper executable file suffix on current platform.
@@ -38,12 +34,11 @@ where
     V: Default + Extend<T>,
     S: BuildHasher,
 {
-    use std::collections::hash_map::Entry;
     match hash.entry(key) {
-        Entry::Occupied(mut entry) => entry.get_mut().extend(std::iter::once(value)),
+        Entry::Occupied(mut entry) => entry.get_mut().extend(iter::once(value)),
         Entry::Vacant(entry) => {
             let mut r = V::default();
-            r.extend(std::iter::once(value));
+            r.extend(iter::once(value));
             entry.insert(r);
         }
     }
@@ -64,7 +59,7 @@ pub fn run_command(command: &mut Command) -> Result<()> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandOutput {
-    pub status: ::std::process::ExitStatus,
+    pub status: ExitStatus,
     pub stdout: String,
     pub stderr: String,
 }
@@ -79,8 +74,8 @@ impl CommandOutput {
 /// whether it was successful
 pub fn run_command_and_capture_output(command: &mut Command) -> Result<CommandOutput> {
     trace!("Executing command: {:?}", command);
-    command.stdout(std::process::Stdio::piped());
-    command.stderr(std::process::Stdio::piped());
+    command.stdout(process::Stdio::piped());
+    command.stderr(process::Stdio::piped());
     let output = command
         .output()
         .with_context(|_| format!("failed to run command: {:?}", command))?;
@@ -94,8 +89,8 @@ pub fn run_command_and_capture_output(command: &mut Command) -> Result<CommandOu
 /// Runs a command and returns its stdout if it was successful
 pub fn get_command_output(command: &mut Command) -> Result<String> {
     trace!("Executing command: {:?}", command);
-    command.stdout(std::process::Stdio::piped());
-    command.stderr(std::process::Stdio::piped());
+    command.stdout(process::Stdio::piped());
+    command.stderr(process::Stdio::piped());
     let output = command
         .output()
         .with_context(|_| format!("failed to run command: {:?}", command))?;
@@ -103,8 +98,7 @@ pub fn get_command_output(command: &mut Command) -> Result<String> {
         Ok(String::from_utf8(output.stdout)
             .with_context(|_| "comand output is not valid unicode")?)
     } else {
-        use std::io::Write;
-        let mut stderr = std::io::stderr();
+        let mut stderr = stderr();
         writeln!(stderr, "Stdout:")?;
         stderr
             .write_all(&output.stdout)
@@ -140,11 +134,7 @@ impl<A, T: IntoIterator<Item = A>> MapIfOk<A> for T {
 /// Reads environment variable `env_var_name`, adds `new_paths`
 /// to acquired list of paths and returns the list formatted as path list
 /// (without applying it).
-pub fn add_env_path_item(
-    env_var_name: &str,
-    mut new_paths: Vec<PathBuf>,
-) -> Result<std::ffi::OsString> {
-    use std::env;
+pub fn add_env_path_item(env_var_name: &str, mut new_paths: Vec<PathBuf>) -> Result<OsString> {
     for path in env::split_paths(&env::var(env_var_name).unwrap_or_default()) {
         if new_paths.iter().find(|&x| x == &path).is_none() {
             new_paths.push(path);
