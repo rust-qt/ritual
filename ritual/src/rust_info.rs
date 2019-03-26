@@ -7,11 +7,8 @@ use crate::cpp_type::CppType;
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_type::RustPointerLikeTypeKind;
 use crate::rust_type::{RustFinalType, RustPath, RustType};
-use itertools::Itertools;
 use ritual_common::errors::{bail, Result};
-use ritual_common::utils::MapIfOk;
 use serde_derive::{Deserialize, Serialize};
-use std::collections::HashSet;
 
 /// One variant of a Rust enum
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -200,6 +197,7 @@ impl UnnamedRustFunction {
     }
 
     /// Returns information about `self` argument of this method.
+    #[allow(dead_code)]
     fn self_arg_kind(&self) -> Result<RustFunctionSelfArgKind> {
         if let Some(arg) = self.arguments.get(0) {
             if arg.name == "self" {
@@ -228,7 +226,7 @@ impl UnnamedRustFunction {
         Ok(RustFunctionSelfArgKind::None)
     }
 
-    /// Generates name suffix for this function using `caption_strategy`.
+    /*/// Generates name suffix for this function using `caption_strategy`.
     /// `all_self_args` should contain all kinds of arguments found in
     /// the functions that have to be disambiguated using the name suffix.
     /// `index` is number of the function used in `RustFunctionCaptionStrategy::Index`.
@@ -302,7 +300,7 @@ impl UnnamedRustFunction {
             }
         };
         Ok(result)
-    }
+    }*/
 }
 
 /// Information about a public API function.
@@ -405,35 +403,62 @@ pub struct RustModule {
     pub kind: RustModuleKind,
 }
 
-/// Function of generating name suffixes for disambiguating multiple Rust functions
-/// with the same name.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum RustFunctionCaptionStrategy {
-    /// Only type of `self` is used.
-    SelfOnly,
-    /// Unsafe functions have `unsafe` suffix, and safe functions have no suffix.
-    UnsafeOnly,
-    /// Type of `self` and types of other arguments are used.
-    SelfAndArgTypes,
-    /// Type of `self` and names of other arguments are used.
-    SelfAndArgNames,
-    /// Type of `self` and index of function are used.
-    SelfAndIndex,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct RustFunctionCaptionStrategy {
+    pub mut_: bool,
+    pub args_count: bool,
+    pub arg_names: bool,
+    pub arg_types: bool,
+    pub static_: bool,
+    pub index: bool,
 }
 
 impl RustFunctionCaptionStrategy {
     /// Returns list of all available strategies sorted by priority
     /// (more preferred strategies go first).
     #[allow(dead_code)]
-    pub fn all() -> &'static [Self] {
-        use self::RustFunctionCaptionStrategy::*;
-        &[
-            SelfOnly,
-            UnsafeOnly,
-            SelfAndArgTypes,
-            SelfAndArgNames,
-            SelfAndIndex,
-        ]
+    pub fn all() -> Vec<Self> {
+        use self::RustFunctionCaptionStrategy as S;
+
+        let mut all = Vec::new();
+        all.push(S {
+            mut_: true,
+            ..S::default()
+        });
+
+        let other = &[
+            S {
+                args_count: true,
+                ..S::default()
+            },
+            S {
+                arg_names: true,
+                ..S::default()
+            },
+            S {
+                arg_types: true,
+                ..S::default()
+            },
+            S {
+                static_: true,
+                ..S::default()
+            },
+        ];
+
+        for item in other {
+            all.push(item.clone());
+            all.push(S {
+                mut_: true,
+                ..item.clone()
+            });
+        }
+
+        all.push(S {
+            index: true,
+            ..S::default()
+        });
+
+        all
     }
 }
 
