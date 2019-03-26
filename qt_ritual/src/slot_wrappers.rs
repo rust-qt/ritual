@@ -4,7 +4,7 @@ use log::trace;
 use ritual::cpp_ffi_data::QtSlotWrapper;
 use ritual::cpp_ffi_generator::{ffi_type, FfiNameProvider};
 use ritual::cpp_type::{CppFunctionPointerType, CppPointerLikeTypeKind, CppType, CppTypeRole};
-use ritual::database::{CppFfiItem, CppFfiItemKind};
+use ritual::database::{CppFfiDatabaseItem, CppFfiItem};
 use ritual::processor::ProcessorData;
 use ritual_common::errors::Result;
 use ritual_common::utils::MapIfOk;
@@ -61,7 +61,7 @@ pub fn add_slot_wrappers(data: &mut ProcessorData<'_>) -> Result<()> {
             .all_databases()
             .flat_map(|db| db.ffi_items())
             .any(|ffi_item| {
-                if let CppFfiItemKind::QtSlotWrapper(data) = &ffi_item.kind {
+                if let CppFfiItem::QtSlotWrapper(data) = &ffi_item.item {
                     data.signal_arguments == arg_types
                 } else {
                     false
@@ -73,7 +73,7 @@ pub fn add_slot_wrappers(data: &mut ProcessorData<'_>) -> Result<()> {
             match generate_slot_wrapper(&arg_types, &mut name_provider) {
                 Ok(slot_wrapper) => {
                     data.current_database
-                        .add_ffi_item(CppFfiItem::from_qt_slot_wrapper(slot_wrapper, None));
+                        .add_ffi_item(CppFfiDatabaseItem::from_qt_slot_wrapper(slot_wrapper, None));
                     trace!("adding slot wrapper for args: ({})", arg_types_text);
                 }
                 Err(err) => {

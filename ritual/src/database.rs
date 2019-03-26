@@ -91,7 +91,7 @@ impl CppChecks {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
-pub enum CppItemData {
+pub enum CppItem {
     Namespace(CppPath),
     Type(CppTypeDeclaration),
     EnumValue(CppEnumValue),
@@ -100,9 +100,9 @@ pub enum CppItemData {
     ClassBase(CppBaseSpecifier),
 }
 
-impl CppItemData {
-    pub fn is_same(&self, other: &CppItemData) -> bool {
-        use self::CppItemData::*;
+impl CppItem {
+    pub fn is_same(&self, other: &CppItem) -> bool {
+        use self::CppItem::*;
 
         match self {
             Namespace(v) => {
@@ -152,38 +152,38 @@ impl CppItemData {
 
     pub fn path(&self) -> Option<&CppPath> {
         let path = match self {
-            CppItemData::Namespace(data) => data,
-            CppItemData::Type(data) => &data.path,
-            CppItemData::EnumValue(data) => &data.path,
-            CppItemData::Function(data) => &data.path,
-            CppItemData::ClassField(data) => &data.path,
-            CppItemData::ClassBase(_) => return None,
+            CppItem::Namespace(data) => data,
+            CppItem::Type(data) => &data.path,
+            CppItem::EnumValue(data) => &data.path,
+            CppItem::Function(data) => &data.path,
+            CppItem::ClassField(data) => &data.path,
+            CppItem::ClassBase(_) => return None,
         };
         Some(path)
     }
 
     pub fn all_involved_types(&self) -> Vec<CppType> {
         match self {
-            CppItemData::Type(t) => match t.kind {
+            CppItem::Type(t) => match t.kind {
                 CppTypeDeclarationKind::Enum => vec![CppType::Enum {
                     path: t.path.clone(),
                 }],
                 CppTypeDeclarationKind::Class { .. } => vec![CppType::Class(t.path.clone())],
             },
-            CppItemData::EnumValue(enum_value) => vec![CppType::Enum {
+            CppItem::EnumValue(enum_value) => vec![CppType::Enum {
                 path: enum_value
                     .path
                     .parent()
                     .expect("enum value must have parent path"),
             }],
-            CppItemData::Namespace(_) => Vec::new(),
-            CppItemData::Function(function) => function.all_involved_types(),
-            CppItemData::ClassField(field) => {
+            CppItem::Namespace(_) => Vec::new(),
+            CppItem::Function(function) => function.all_involved_types(),
+            CppItem::ClassField(field) => {
                 let class_type =
                     CppType::Class(field.path.parent().expect("field path must have parent"));
                 vec![class_type, field.field_type.clone()]
             }
-            CppItemData::ClassBase(base) => vec![
+            CppItem::ClassBase(base) => vec![
                 CppType::Class(base.base_class_type.clone()),
                 CppType::Class(base.derived_class_type.clone()),
             ],
@@ -191,49 +191,49 @@ impl CppItemData {
     }
 
     pub fn as_namespace_ref(&self) -> Option<&CppPath> {
-        if let CppItemData::Namespace(data) = self {
+        if let CppItem::Namespace(data) = self {
             Some(data)
         } else {
             None
         }
     }
     pub fn as_function_ref(&self) -> Option<&CppFunction> {
-        if let CppItemData::Function(data) = self {
+        if let CppItem::Function(data) = self {
             Some(data)
         } else {
             None
         }
     }
     pub fn as_field_ref(&self) -> Option<&CppClassField> {
-        if let CppItemData::ClassField(data) = self {
+        if let CppItem::ClassField(data) = self {
             Some(data)
         } else {
             None
         }
     }
     pub fn as_enum_value_ref(&self) -> Option<&CppEnumValue> {
-        if let CppItemData::EnumValue(data) = self {
+        if let CppItem::EnumValue(data) = self {
             Some(data)
         } else {
             None
         }
     }
     pub fn as_base_ref(&self) -> Option<&CppBaseSpecifier> {
-        if let CppItemData::ClassBase(data) = self {
+        if let CppItem::ClassBase(data) = self {
             Some(data)
         } else {
             None
         }
     }
     pub fn as_type_ref(&self) -> Option<&CppTypeDeclaration> {
-        if let CppItemData::Type(data) = self {
+        if let CppItem::Type(data) = self {
             Some(data)
         } else {
             None
         }
     }
     pub fn as_type_mut(&mut self) -> Option<&mut CppTypeDeclaration> {
-        if let CppItemData::Type(data) = self {
+        if let CppItem::Type(data) = self {
             Some(data)
         } else {
             None
@@ -245,24 +245,24 @@ impl CppItemData {
     }*/
 }
 
-impl fmt::Display for CppItemData {
+impl fmt::Display for CppItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
-            CppItemData::Namespace(path) => format!("namespace {}", path.to_cpp_pseudo_code()),
-            CppItemData::Type(type1) => match type1.kind {
+            CppItem::Namespace(path) => format!("namespace {}", path.to_cpp_pseudo_code()),
+            CppItem::Type(type1) => match type1.kind {
                 CppTypeDeclarationKind::Enum => format!("enum {}", type1.path.to_cpp_pseudo_code()),
                 CppTypeDeclarationKind::Class { .. } => {
                     format!("class {}", type1.path.to_cpp_pseudo_code())
                 }
             },
-            CppItemData::Function(method) => method.short_text(),
-            CppItemData::EnumValue(value) => format!(
+            CppItem::Function(method) => method.short_text(),
+            CppItem::EnumValue(value) => format!(
                 "enum value {} = {}",
                 value.path.to_cpp_pseudo_code(),
                 value.value
             ),
-            CppItemData::ClassField(field) => field.short_text(),
-            CppItemData::ClassBase(class_base) => {
+            CppItem::ClassField(field) => field.short_text(),
+            CppItem::ClassBase(class_base) => {
                 let virtual_text = if class_base.is_virtual {
                     "virtual "
                 } else {
@@ -295,14 +295,14 @@ impl fmt::Display for CppItemData {
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum CppFfiItemKind {
+pub enum CppFfiItem {
     Function(CppFfiFunction),
     QtSlotWrapper(QtSlotWrapper),
 }
 
-impl CppFfiItemKind {
+impl CppFfiItem {
     pub fn as_function_ref(&self) -> Option<&CppFfiFunction> {
-        if let CppFfiItemKind::Function(data) = self {
+        if let CppFfiItem::Function(data) = self {
             Some(data)
         } else {
             None
@@ -310,7 +310,7 @@ impl CppFfiItemKind {
     }
 
     pub fn is_slot_wrapper(&self) -> bool {
-        if let CppFfiItemKind::QtSlotWrapper(_) = self {
+        if let CppFfiItem::QtSlotWrapper(_) = self {
             true
         } else {
             false
@@ -319,7 +319,7 @@ impl CppFfiItemKind {
 
     pub fn short_text(&self) -> String {
         match self {
-            CppFfiItemKind::Function(function) => match &function.kind {
+            CppFfiItem::Function(function) => match &function.kind {
                 CppFfiFunctionKind::Function {
                     cpp_function,
                     omitted_arguments,
@@ -336,7 +336,7 @@ impl CppFfiItemKind {
                     field,
                 } => format!("[{:?}] {}", accessor_type, field.short_text()),
             },
-            CppFfiItemKind::QtSlotWrapper(slot_wrapper) => format!(
+            CppFfiItem::QtSlotWrapper(slot_wrapper) => format!(
                 "slot wrapper for ({})",
                 slot_wrapper
                     .signal_arguments
@@ -349,17 +349,17 @@ impl CppFfiItemKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CppFfiItem {
-    pub kind: CppFfiItemKind,
+pub struct CppFfiDatabaseItem {
+    pub item: CppFfiItem,
     pub source_ffi_item: Option<usize>,
     pub checks: CppChecks,
     pub is_rust_processed: bool,
 }
 
-impl CppFfiItem {
+impl CppFfiDatabaseItem {
     pub fn from_function(function: CppFfiFunction, source_ffi_item: Option<usize>) -> Self {
-        CppFfiItem {
-            kind: CppFfiItemKind::Function(function),
+        CppFfiDatabaseItem {
+            item: CppFfiItem::Function(function),
             source_ffi_item,
             checks: CppChecks::default(),
             is_rust_processed: false,
@@ -367,8 +367,8 @@ impl CppFfiItem {
     }
 
     pub fn from_qt_slot_wrapper(wrapper: QtSlotWrapper, source_ffi_item: Option<usize>) -> Self {
-        CppFfiItem {
-            kind: CppFfiItemKind::QtSlotWrapper(wrapper),
+        CppFfiDatabaseItem {
+            item: CppFfiItem::QtSlotWrapper(wrapper),
             source_ffi_item,
             checks: CppChecks::default(),
             is_rust_processed: false,
@@ -376,23 +376,23 @@ impl CppFfiItem {
     }
 
     pub fn path(&self) -> &CppPath {
-        match &self.kind {
-            CppFfiItemKind::Function(f) => &f.path,
-            CppFfiItemKind::QtSlotWrapper(s) => &s.class_path,
+        match &self.item {
+            CppFfiItem::Function(f) => &f.path,
+            CppFfiItem::QtSlotWrapper(s) => &s.class_path,
         }
     }
 
     pub fn is_source_item(&self) -> bool {
-        match &self.kind {
-            CppFfiItemKind::Function(_) => false,
-            CppFfiItemKind::QtSlotWrapper(_) => true,
+        match &self.item {
+            CppFfiItem::Function(_) => false,
+            CppFfiItem::QtSlotWrapper(_) => true,
         }
     }
 
     pub fn source_item_cpp_code(&self) -> Result<String> {
-        match &self.kind {
-            CppFfiItemKind::Function(_) => bail!("not a source item"),
-            CppFfiItemKind::QtSlotWrapper(slot_wrapper) => {
+        match &self.item {
+            CppFfiItem::Function(_) => bail!("not a source item"),
+            CppFfiItem::QtSlotWrapper(slot_wrapper) => {
                 cpp_code_generator::qt_slot_wrapper(slot_wrapper)
             }
         }
@@ -401,9 +401,9 @@ impl CppFfiItem {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CppDatabaseItem {
-    pub cpp_data: CppItemData,
-    pub source_ffi_item: Option<usize>,
+    pub cpp_item: CppItem,
     pub source: DatabaseItemSource,
+    pub source_ffi_item: Option<usize>,
     pub is_cpp_ffi_processed: bool,
     pub is_rust_processed: bool,
 }
@@ -414,7 +414,7 @@ pub struct Database {
     crate_name: String,
     crate_version: String,
     cpp_items: Vec<CppDatabaseItem>,
-    ffi_items: Vec<CppFfiItem>,
+    ffi_items: Vec<CppFfiDatabaseItem>,
     rust_database: RustDatabase,
     environments: Vec<CppCheckerEnv>,
     #[serde(skip)]
@@ -451,21 +451,21 @@ impl Database {
         &mut self.cpp_items
     }
 
-    pub fn ffi_items(&self) -> &[CppFfiItem] {
+    pub fn ffi_items(&self) -> &[CppFfiDatabaseItem] {
         &self.ffi_items
     }
 
-    pub fn ffi_items_mut(&mut self) -> &mut [CppFfiItem] {
+    pub fn ffi_items_mut(&mut self) -> &mut [CppFfiDatabaseItem] {
         self.is_modified = true;
         &mut self.ffi_items
     }
 
-    pub fn add_ffi_item(&mut self, item: CppFfiItem) {
+    pub fn add_ffi_item(&mut self, item: CppFfiDatabaseItem) {
         self.is_modified = true;
         self.ffi_items.push(item);
     }
 
-    pub fn add_ffi_items(&mut self, items: Vec<CppFfiItem>) {
+    pub fn add_ffi_items(&mut self, items: Vec<CppFfiDatabaseItem>) {
         self.is_modified = true;
         self.ffi_items.extend(items);
     }
@@ -505,12 +505,12 @@ impl Database {
         &mut self,
         source: DatabaseItemSource,
         source_ffi_item: Option<usize>,
-        data: CppItemData,
+        data: CppItem,
     ) -> bool {
         if let Some(item) = self
             .cpp_items
             .iter_mut()
-            .find(|item| item.cpp_data.is_same(&data))
+            .find(|item| item.cpp_item.is_same(&data))
         {
             // parser data takes priority
             if source.is_parser() && !item.source.is_parser() {
@@ -521,7 +521,7 @@ impl Database {
         self.is_modified = true;
         debug!("added cpp item: {}, source: {:?}", data, source);
         let item = CppDatabaseItem {
-            cpp_data: data,
+            cpp_item: data,
             source,
             source_ffi_item,
             is_cpp_ffi_processed: false,

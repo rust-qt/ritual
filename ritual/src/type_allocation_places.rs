@@ -3,7 +3,7 @@
 use crate::config::MovableTypesHookOutput;
 use crate::cpp_data::{CppPath, CppTypeDeclarationKind};
 use crate::cpp_type::{CppPointerLikeTypeKind, CppType};
-use crate::database::CppItemData;
+use crate::database::CppItem;
 use crate::processor::ProcessorData;
 use log::{info, trace};
 use ritual_common::errors::Result;
@@ -15,7 +15,7 @@ pub fn set_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
             .current_database
             .cpp_items_mut()
             .iter_mut()
-            .filter_map(|item| item.cpp_data.as_type_mut())
+            .filter_map(|item| item.cpp_item.as_type_mut())
         {
             if let CppTypeDeclarationKind::Class { is_movable, .. } = &mut type1.kind {
                 *is_movable = hook(&type1.path)? == MovableTypesHookOutput::Movable;
@@ -127,7 +127,7 @@ pub fn suggest_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
         if !item.source.is_parser() || item.source_ffi_item.is_some() {
             continue;
         }
-        if let CppItemData::Type(type1) = &item.cpp_data {
+        if let CppItem::Type(type1) = &item.cpp_item {
             if !type1.kind.is_class() {
                 continue;
             }
@@ -145,7 +145,7 @@ pub fn suggest_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
         if !item.source.is_parser() || item.source_ffi_item.is_some() {
             continue;
         }
-        if let CppItemData::Function(function) = &item.cpp_data {
+        if let CppItem::Function(function) = &item.cpp_item {
             if function.is_private() {
                 continue;
             }

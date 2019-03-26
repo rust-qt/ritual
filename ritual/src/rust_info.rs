@@ -503,7 +503,7 @@ pub struct RustExtraImpl {
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum RustItemKind {
+pub enum RustItem {
     Module(RustModule),
     Struct(RustStruct),
     EnumValue(RustEnumValue),
@@ -513,9 +513,9 @@ pub enum RustItemKind {
     Function(RustFunction),
 }
 
-impl RustItemKind {
+impl RustItem {
     pub fn is_ffi_function(&self) -> bool {
-        if let RustItemKind::FfiFunction(_) = self {
+        if let RustItem::FfiFunction(_) = self {
             true
         } else {
             false
@@ -523,7 +523,7 @@ impl RustItemKind {
     }
 
     pub fn is_wrapper_type(&self) -> bool {
-        if let RustItemKind::Struct(data) = self {
+        if let RustItem::Struct(data) = self {
             data.kind.is_wrapper_type()
         } else {
             false
@@ -531,7 +531,7 @@ impl RustItemKind {
     }
 
     pub fn is_module(&self) -> bool {
-        if let RustItemKind::Module(_) = self {
+        if let RustItem::Module(_) = self {
             true
         } else {
             false
@@ -539,7 +539,7 @@ impl RustItemKind {
     }
 
     pub fn is_module_for_nested(&self) -> bool {
-        if let RustItemKind::Module(module) = self {
+        if let RustItem::Module(module) = self {
             module.kind == RustModuleKind::CppNestedType
         } else {
             false
@@ -548,43 +548,43 @@ impl RustItemKind {
 
     pub fn short_text(&self) -> String {
         match self {
-            RustItemKind::Module(data) => format!("mod {}", data.path.full_name(None)),
-            RustItemKind::Struct(data) => format!("struct {}", data.path.full_name(None)),
-            RustItemKind::EnumValue(data) => format!("enum value {}", data.path.full_name(None)),
-            RustItemKind::TraitImpl(data) => format!(
+            RustItem::Module(data) => format!("mod {}", data.path.full_name(None)),
+            RustItem::Struct(data) => format!("struct {}", data.path.full_name(None)),
+            RustItem::EnumValue(data) => format!("enum value {}", data.path.full_name(None)),
+            RustItem::TraitImpl(data) => format!(
                 "impl {} for {}",
                 rust_type_to_code(&data.trait_type, None),
                 rust_type_to_code(&data.target_type, None)
             ),
-            RustItemKind::ExtraImpl(data) => format!("extra impl {:?}", data.kind),
-            RustItemKind::FfiFunction(data) => format!("ffi fn {}", data.path.full_name(None)),
-            RustItemKind::Function(data) => format!("fn {}", data.path.full_name(None)),
+            RustItem::ExtraImpl(data) => format!("extra impl {:?}", data.kind),
+            RustItem::FfiFunction(data) => format!("ffi fn {}", data.path.full_name(None)),
+            RustItem::Function(data) => format!("fn {}", data.path.full_name(None)),
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustDatabaseItem {
-    pub kind: RustItemKind,
+    pub item: RustItem,
     pub cpp_item_index: Option<usize>,
     pub ffi_item_index: Option<usize>,
 }
 
 impl RustDatabaseItem {
     pub fn path(&self) -> Option<&RustPath> {
-        match &self.kind {
-            RustItemKind::Module(data) => Some(&data.path),
-            RustItemKind::Struct(data) => Some(&data.path),
-            RustItemKind::EnumValue(data) => Some(&data.path),
-            RustItemKind::Function(data) => Some(&data.path),
-            RustItemKind::FfiFunction(data) => Some(&data.path),
-            RustItemKind::TraitImpl(_) | RustItemKind::ExtraImpl(_) => None,
+        match &self.item {
+            RustItem::Module(data) => Some(&data.path),
+            RustItem::Struct(data) => Some(&data.path),
+            RustItem::EnumValue(data) => Some(&data.path),
+            RustItem::Function(data) => Some(&data.path),
+            RustItem::FfiFunction(data) => Some(&data.path),
+            RustItem::TraitImpl(_) | RustItem::ExtraImpl(_) => None,
         }
     }
     pub fn is_child_of(&self, parent: &RustPath) -> bool {
-        match &self.kind {
-            RustItemKind::TraitImpl(trait_impl) => &trait_impl.parent_path == parent,
-            RustItemKind::ExtraImpl(data) => &data.parent_path == parent,
+        match &self.item {
+            RustItem::TraitImpl(trait_impl) => &trait_impl.parent_path == parent,
+            RustItem::ExtraImpl(data) => &data.parent_path == parent,
             _ => {
                 let path = self
                     .path()
@@ -595,7 +595,7 @@ impl RustDatabaseItem {
     }
 
     pub fn as_module_ref(&self) -> Option<&RustModule> {
-        if let RustItemKind::Module(data) = &self.kind {
+        if let RustItem::Module(data) = &self.item {
             Some(data)
         } else {
             None

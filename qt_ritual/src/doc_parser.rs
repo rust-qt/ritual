@@ -7,7 +7,7 @@ use log::{debug, error, trace};
 use regex::Regex;
 use ritual::cpp_data::{CppPath, CppTypeDoc, CppVisibility};
 use ritual::cpp_function::CppFunctionDoc;
-use ritual::database::{CppDatabaseItem, CppItemData};
+use ritual::database::{CppDatabaseItem, CppItem};
 use ritual::processor::ProcessorData;
 use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use select::document::Document;
@@ -616,7 +616,7 @@ fn find_methods_docs(items: &mut [CppDatabaseItem], data: &mut DocParser) -> Res
         if !item.source.is_parser() {
             continue;
         }
-        if let CppItemData::Function(cpp_method) = &mut item.cpp_data {
+        if let CppItem::Function(cpp_method) = &mut item.cpp_item {
             if let Some(info) = &cpp_method.member {
                 if info.visibility == CppVisibility::Private {
                     continue;
@@ -680,9 +680,9 @@ pub fn parse_docs(
         if !item.source.is_parser() {
             continue;
         }
-        let type_name = match &item.cpp_data {
-            CppItemData::Type(data) => data.path.clone(),
-            CppItemData::EnumValue(data) => data
+        let type_name = match &item.cpp_item {
+            CppItem::Type(data) => data.path.clone(),
+            CppItem::EnumValue(data) => data
                 .path
                 .parent()
                 .expect("enum value must have parent path"),
@@ -703,11 +703,11 @@ pub fn parse_docs(
             .get(&type_name)
             .expect("type_doc_cache is guaranteed to have an entry here because we added it above");
         if let Ok(doc) = doc {
-            match &mut item.cpp_data {
-                CppItemData::Type(data) => {
+            match &mut item.cpp_item {
+                CppItem::Type(data) => {
                     data.doc = Some(doc.type_doc.clone());
                 }
-                CppItemData::EnumValue(data) => {
+                CppItem::EnumValue(data) => {
                     if let Some(r) = doc
                         .enum_variants_doc
                         .iter()

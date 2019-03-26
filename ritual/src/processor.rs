@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::database::{CppDatabaseItem, CppFfiItem, Database};
+use crate::database::{CppDatabaseItem, CppFfiDatabaseItem, Database};
 use crate::workspace::Workspace;
 use crate::{
     cpp_checker, cpp_explicit_xstructors, cpp_ffi_generator, cpp_parser, cpp_template_instantiator,
@@ -69,7 +69,7 @@ impl<'a> ProcessorData<'a> {
             .chain(self.dep_databases.iter())
             .flat_map(|d| d.cpp_items().iter())
     }
-    pub fn all_ffi_items(&self) -> impl Iterator<Item = &CppFfiItem> {
+    pub fn all_ffi_items(&self) -> impl Iterator<Item = &CppFfiDatabaseItem> {
         once(&self.current_database as &_)
             .chain(self.dep_databases.iter())
             .flat_map(|d| d.ffi_items().iter())

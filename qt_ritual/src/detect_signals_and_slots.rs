@@ -2,7 +2,7 @@ use itertools::Itertools;
 use log::trace;
 use regex::Regex;
 use ritual::cpp_data::CppPath;
-use ritual::database::{CppItemData, DatabaseItemSource};
+use ritual::database::{CppItem, DatabaseItemSource};
 use ritual::processor::ProcessorData;
 use ritual_common::errors::{Result, ResultExt};
 use ritual_common::file_utils::open_file;
@@ -15,7 +15,7 @@ pub fn inherits(
     base_class_name: &CppPath,
 ) -> bool {
     for item in data.all_cpp_items() {
-        if let CppItemData::ClassBase(base_data) = &item.cpp_data {
+        if let CppItem::ClassBase(base_data) = &item.cpp_item {
             if &base_data.derived_class_type == derived_class_name {
                 if &base_data.base_class_type == base_class_name {
                     return true;
@@ -53,7 +53,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData<'_>) -> Result<()> {
             origin_location, ..
         } = &item.source
         {
-            if let CppItemData::Type(type1) = &item.cpp_data {
+            if let CppItem::Type(type1) = &item.cpp_item {
                 if type1.kind.is_class() {
                     if type1.path == qobject_path || inherits(&data, &type1.path, &qobject_path) {
                         if !files.contains(&origin_location.include_file_path) {
@@ -107,7 +107,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData<'_>) -> Result<()> {
             origin_location, ..
         } = &item.source
         {
-            if let CppItemData::Type(type1) = &item.cpp_data {
+            if let CppItem::Type(type1) = &item.cpp_item {
                 if let Some(sections) = sections.get(&origin_location.include_file_path) {
                     let sections_for_class = sections
                         .iter()
@@ -124,7 +124,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData<'_>) -> Result<()> {
             origin_location, ..
         } = &item.source
         {
-            if let CppItemData::Function(method) = &mut item.cpp_data {
+            if let CppItem::Function(method) = &mut item.cpp_item {
                 let mut section_type = SectionType::Other;
                 if let Ok(class_name) = method.class_type() {
                     if let Some(sections) = sections_per_class.get(&class_name) {

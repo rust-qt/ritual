@@ -6,8 +6,8 @@ use crate::cpp_ffi_data::{
 use crate::cpp_function::ReturnValueAllocationPlace;
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
-use crate::database::{CppFfiItem, CppFfiItemKind};
-use crate::rust_info::{RustDatabase, RustItemKind, RustStructKind};
+use crate::database::{CppFfiDatabaseItem, CppFfiItem};
+use crate::rust_info::{RustDatabase, RustItem, RustStructKind};
 use itertools::Itertools;
 use ritual_common::errors::{bail, Result};
 use ritual_common::file_utils::{create_file, create_file_for_append, path_to_str};
@@ -289,7 +289,7 @@ pub fn function_implementation(method: &CppFfiFunction) -> Result<String> {
 
 /// Generates a source file with the specified FFI methods.
 pub fn generate_cpp_file(
-    ffi_items: &[CppFfiItem],
+    ffi_items: &[CppFfiDatabaseItem],
     file_path: &Path,
     global_header_name: &str,
     crate_name: &str,
@@ -302,7 +302,7 @@ pub fn generate_cpp_file(
         if !ffi_item.checks.any_success() {
             continue;
         }
-        if let CppFfiItemKind::QtSlotWrapper(qt_slot_wrapper) = &ffi_item.kind {
+        if let CppFfiItem::QtSlotWrapper(qt_slot_wrapper) = &ffi_item.item {
             any_slot_wrappers = true;
             write!(cpp_file, "{}", self::qt_slot_wrapper(qt_slot_wrapper)?)?;
         }
@@ -313,7 +313,7 @@ pub fn generate_cpp_file(
         if !ffi_item.checks.any_success() {
             continue;
         }
-        if let CppFfiItemKind::Function(cpp_ffi_function) = &ffi_item.kind {
+        if let CppFfiItem::Function(cpp_ffi_function) = &ffi_item.item {
             writeln!(cpp_file, "{}", function_implementation(cpp_ffi_function)?)?;
         }
     }
@@ -351,7 +351,7 @@ pub fn generate_cpp_type_size_requester(
     writeln!(output, "#include <stdio.h>\n\nint main() {{")?;
 
     for item in rust_database.items() {
-        if let RustItemKind::Struct(data) = &item.kind {
+        if let RustItem::Struct(data) = &item.item {
             if let RustStructKind::SizedType(cpp_path) = &data.kind {
                 let cpp_path_code = cpp_path.to_cpp_code()?;
 

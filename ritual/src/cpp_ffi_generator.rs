@@ -14,7 +14,7 @@ use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
 use crate::cpp_type::CppTypeRole;
 use crate::cpp_type::{is_qflags, CppFunctionPointerType};
-use crate::database::{CppFfiItem, CppItemData};
+use crate::database::{CppFfiDatabaseItem, CppItem};
 use crate::processor::ProcessorData;
 use itertools::Itertools;
 use log::{debug, trace};
@@ -150,7 +150,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let movable_types = data
         .all_cpp_items()
         .filter_map(|item| {
-            if let CppItemData::Type(type_data) = &item.cpp_data {
+            if let CppItem::Type(type_data) = &item.cpp_item {
                 if let CppTypeDeclarationKind::Class { is_movable } = type_data.kind {
                     if is_movable {
                         return Some(type_data.path.clone());
@@ -168,34 +168,34 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         if item.is_cpp_ffi_processed {
             trace!(
                 "cpp_data = {}; already processed",
-                item.cpp_data.to_string()
+                item.cpp_item.to_string()
             );
             continue;
         }
-        if let Err(err) = check_preconditions(&item.cpp_data) {
-            trace!("skipping {}: {}", item.cpp_data, err);
+        if let Err(err) = check_preconditions(&item.cpp_item) {
+            trace!("skipping {}: {}", item.cpp_item, err);
             continue;
         }
-        let result = match &item.cpp_data {
-            CppItemData::Function(method) => generate_ffi_methods_for_method(
+        let result = match &item.cpp_item {
+            CppItem::Function(method) => generate_ffi_methods_for_method(
                 method,
                 &movable_types,
                 item.source_ffi_item,
                 &mut name_provider,
             )
             .map(|v| v.into_iter().collect_vec()),
-            CppItemData::ClassField(field) => generate_field_accessors(
+            CppItem::ClassField(field) => generate_field_accessors(
                 field,
                 &movable_types,
                 item.source_ffi_item,
                 &mut name_provider,
             )
             .map(|v| v.into_iter().collect_vec()),
-            CppItemData::ClassBase(base) => {
+            CppItem::ClassBase(base) => {
                 generate_casts(base, item.source_ffi_item, &mut name_provider)
                     .map(|v| v.into_iter().collect_vec())
             }
-            CppItemData::Type(_) | CppItemData::EnumValue(_) | CppItemData::Namespace(_) => {
+            CppItem::Type(_) | CppItem::EnumValue(_) | CppItem::Namespace(_) => {
                 // no FFI methods for these items
                 continue;
             }
@@ -203,13 +203,13 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
 
         match result {
             Err(error) => {
-                debug!("failed to add FFI item: {}: {}", item.cpp_data, error);
+                debug!("failed to add FFI item: {}: {}", item.cpp_item, error);
             }
             Ok(r) => {
                 debug!(
                     "added FFI items (count: {}) for: {}",
                     r.len(),
-                    item.cpp_data
+                    item.cpp_item
                 );
                 for item in &r {
                     trace!("* {:?}", item);
@@ -232,7 +232,7 @@ fn create_cast_method(
     to: &CppType,
     source_ffi_item: Option<usize>,
     name_provider: &mut FfiNameProvider,
-) -> Result<CppFfiItem> {
+) -> Result<CppFfiDatabaseItem> {
     let method = CppFunction {
         path: CppPath::from_item(CppPathItem {
             name: cast.cpp_method_name().into(),
@@ -261,7 +261,7 @@ fn create_cast_method(
         name_provider,
     )?;
 
-    Ok(CppFfiItem::from_function(r, source_ffi_item))
+    Ok(CppFfiDatabaseItem::from_function(r, source_ffi_item))
 }
 
 /// Performs a portion of `generate_casts` operation.
@@ -274,7 +274,7 @@ fn generate_casts_one(
     direct_base_index: usize,
     source_ffi_item: Option<usize>,
     name_provider: &mut FfiNameProvider,
-) -> Result<Vec<CppFfiItem>> {
+) -> Result<Vec<CppFfiDatabaseItem>> {
     let target_ptr_type = CppType::PointerLike {
         is_const: false,
         kind: CppPointerLikeTypeKind::Pointer,
@@ -323,7 +323,7 @@ fn generate_casts(
     base: &CppBaseSpecifier,
     source_ffi_item: Option<usize>,
     name_provider: &mut FfiNameProvider,
-) -> Result<Vec<CppFfiItem>> {
+) -> Result<Vec<CppFfiDatabaseItem>> {
     //log::status("Adding cast functions");
     generate_casts_one(
         &base.derived_class_type,
@@ -339,9 +339,9 @@ fn generate_ffi_methods_for_method(
     movable_types: &[CppPath],
     source_ffi_item: Option<usize>,
     name_provider: &mut FfiNameProvider,
-) -> Result<Vec<CppFfiItem>> {
+) -> Result<Vec<CppFfiDatabaseItem>> {
     let mut methods = Vec::new();
-    methods.push(CppFfiItem::from_function(
+    methods.push(CppFfiDatabaseItem::from_function(
         to_ffi_method(
             &CppFfiFunctionKind::Function {
                 cpp_function: method.clone(),
@@ -372,7 +372,10 @@ fn generate_ffi_methods_for_method(
                     movable_types,
                     name_provider,
                 )?;
-                methods.push(CppFfiItem::from_function(processed_method, source_ffi_item));
+                methods.push(CppFfiDatabaseItem::from_function(
+                    processed_method,
+                    source_ffi_item,
+                ));
             }
         }
     }
@@ -543,15 +546,18 @@ fn generate_field_accessors(
     movable_types: &[CppPath],
     source_ffi_item: Option<usize>,
     name_provider: &mut FfiNameProvider,
-) -> Result<Vec<CppFfiItem>> {
+) -> Result<Vec<CppFfiDatabaseItem>> {
     let mut new_methods = Vec::new();
-    let mut create_method = |accessor_type| -> Result<CppFfiItem> {
+    let mut create_method = |accessor_type| -> Result<CppFfiDatabaseItem> {
         let kind = CppFfiFunctionKind::FieldAccessor {
             field: field.clone(),
             accessor_type,
         };
         let ffi_function = to_ffi_method(&kind, movable_types, name_provider)?;
-        Ok(CppFfiItem::from_function(ffi_function, source_ffi_item))
+        Ok(CppFfiDatabaseItem::from_function(
+            ffi_function,
+            source_ffi_item,
+        ))
     };
 
     if field.visibility == CppVisibility::Public {
@@ -569,9 +575,9 @@ fn generate_field_accessors(
     Ok(new_methods)
 }
 
-fn check_preconditions(item: &CppItemData) -> Result<()> {
+fn check_preconditions(item: &CppItem) -> Result<()> {
     match item {
-        CppItemData::Function(function) => {
+        CppItem::Function(function) => {
             if let Some(membership) = &function.member {
                 if membership.visibility == CppVisibility::Private {
                     bail!("function is private");
@@ -587,7 +593,7 @@ fn check_preconditions(item: &CppItemData) -> Result<()> {
                 bail!("template functions are excluded");
             }
         }
-        CppItemData::ClassField(field) => {
+        CppItem::ClassField(field) => {
             if field.visibility == CppVisibility::Private {
                 bail!("field is private");
             }

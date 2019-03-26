@@ -5,7 +5,7 @@ use crate::rust_generator::qt_core_path;
 use crate::rust_info::{
     RustDatabase, RustDatabaseItem, RustEnumValue, RustExtraImpl, RustExtraImplKind,
     RustFFIFunction, RustFfiWrapperData, RustFunction, RustFunctionArgument, RustFunctionKind,
-    RustItemKind, RustModule, RustModuleKind, RustStruct, RustStructKind, RustTraitImpl,
+    RustItem, RustModule, RustModuleKind, RustStruct, RustStructKind, RustTraitImpl,
     RustWrapperTypeKind,
 };
 use crate::rust_type::{
@@ -194,14 +194,14 @@ impl Generator {
     }
 
     fn generate_item(&mut self, item: &RustDatabaseItem, database: &RustDatabase) -> Result<()> {
-        match &item.kind {
-            RustItemKind::Module(module) => self.generate_module(module, database),
-            RustItemKind::Struct(data) => self.generate_struct(data, database),
-            RustItemKind::EnumValue(value) => self.generate_enum_value(value),
-            RustItemKind::TraitImpl(value) => self.generate_trait_impl(value),
-            RustItemKind::Function(value) => self.generate_rust_final_function(value, false),
-            RustItemKind::FfiFunction(value) => self.generate_ffi_function(value),
-            RustItemKind::ExtraImpl(value) => self.generate_extra_impl(value),
+        match &item.item {
+            RustItem::Module(module) => self.generate_module(module, database),
+            RustItem::Struct(data) => self.generate_struct(data, database),
+            RustItem::EnumValue(value) => self.generate_enum_value(value),
+            RustItem::TraitImpl(value) => self.generate_trait_impl(value),
+            RustItem::Function(value) => self.generate_rust_final_function(value, false),
+            RustItem::FfiFunction(value) => self.generate_ffi_function(value),
+            RustItem::ExtraImpl(value) => self.generate_extra_impl(value),
         }
     }
 
@@ -781,12 +781,12 @@ impl Generator {
     fn generate_children(&mut self, parent: &RustPath, database: &RustDatabase) -> Result<()> {
         if database
             .children(&parent)
-            .any(|item| item.kind.is_ffi_function())
+            .any(|item| item.item.is_ffi_function())
         {
             writeln!(self, "extern \"C\" {{\n")?;
             for item in database
                 .children(&parent)
-                .filter(|item| item.kind.is_ffi_function())
+                .filter(|item| item.item.is_ffi_function())
             {
                 self.generate_item(item, database)?;
             }
@@ -795,7 +795,7 @@ impl Generator {
 
         for item in database
             .children(&parent)
-            .filter(|item| !item.kind.is_ffi_function())
+            .filter(|item| !item.item.is_ffi_function())
         {
             self.generate_item(item, database)?;
         }

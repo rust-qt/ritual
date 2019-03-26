@@ -1,6 +1,6 @@
 use crate::cpp_code_generator;
 use crate::cpp_code_generator::apply_moc;
-use crate::database::{CppCheckerEnv, CppFfiItem, CppFfiItemKind};
+use crate::database::{CppCheckerEnv, CppFfiDatabaseItem, CppFfiItem};
 use crate::processor::ProcessorData;
 use log::{debug, trace};
 use rayon::iter::ParallelIterator;
@@ -66,18 +66,21 @@ fn check_snippets<'a>(
     result
 }
 
-fn snippet_for_item(item: &CppFfiItem, all_items: &[CppFfiItem]) -> Result<Snippet> {
-    match &item.kind {
-        CppFfiItemKind::Function(cpp_ffi_function) => {
+fn snippet_for_item(
+    item: &CppFfiDatabaseItem,
+    all_items: &[CppFfiDatabaseItem],
+) -> Result<Snippet> {
+    match &item.item {
+        CppFfiItem::Function(cpp_ffi_function) => {
             let item_code = cpp_code_generator::function_implementation(cpp_ffi_function)?;
             let mut needs_moc = false;
             let full_code = if let Some(index) = item.source_ffi_item {
                 let source_item = all_items
                     .get(index)
                     .ok_or_else(|| err_msg("ffi item references invalid index"))?;
-                match &source_item.kind {
-                    CppFfiItemKind::Function(_) => {}
-                    CppFfiItemKind::QtSlotWrapper(_) => needs_moc = true,
+                match &source_item.item {
+                    CppFfiItem::Function(_) => {}
+                    CppFfiItem::QtSlotWrapper(_) => needs_moc = true,
                 }
                 let source_item_code = source_item.source_item_cpp_code()?;
                 format!("{}\n{}", source_item_code, item_code)
@@ -86,9 +89,7 @@ fn snippet_for_item(item: &CppFfiItem, all_items: &[CppFfiItem]) -> Result<Snipp
             };
             Ok(Snippet::new_global(full_code, needs_moc))
         }
-        CppFfiItemKind::QtSlotWrapper(_) => {
-            Ok(Snippet::new_global(item.source_item_cpp_code()?, true))
-        }
+        CppFfiItem::QtSlotWrapper(_) => Ok(Snippet::new_global(item.source_item_cpp_code()?, true)),
     }
 }
 
@@ -313,7 +314,7 @@ impl CppChecker<'_, '_> {
                 Err(err) => {
                     debug!(
                         "can't create snippet: {}: {:?}",
-                        ffi_item.kind.short_text(),
+                        ffi_item.item.short_text(),
                         err
                     );
                 }
@@ -344,9 +345,9 @@ impl CppChecker<'_, '_> {
             let ffi_item = &mut self.data.current_database.ffi_items_mut()[snippet.ffi_item_index];
             let output = snippet.output.unwrap();
             if output.is_success() {
-                debug!("success: {}", ffi_item.kind.short_text());
+                debug!("success: {}", ffi_item.item.short_text());
             } else {
-                debug!("error: {}: {:?}", ffi_item.kind.short_text(), output);
+                debug!("error: {}: {:?}", ffi_item.item.short_text(), output);
                 trace!("snippet: {:?}", snippet.snippet);
             }
             ffi_item.checks.add(env.clone(), output.is_success());

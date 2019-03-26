@@ -11,7 +11,7 @@ use crate::cpp_type::{
     CppBuiltInNumericType, CppFunctionPointerType, CppPointerLikeTypeKind, CppSpecificNumericType,
     CppSpecificNumericTypeKind, CppType,
 };
-use crate::database::{CppItemData, DatabaseItemSource};
+use crate::database::{CppItem, DatabaseItemSource};
 use crate::processor::ProcessorData;
 use clang::diagnostic::{Diagnostic, Severity};
 use clang::*;
@@ -274,9 +274,9 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
 fn add_namespaces(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut namespaces = HashSet::new();
     for item in data.current_database.cpp_items() {
-        let name = match &item.cpp_data {
-            CppItemData::Type(t) => &t.path,
-            CppItemData::Function(f) => &f.path,
+        let name = match &item.cpp_item {
+            CppItem::Type(t) => &t.path,
+            CppItem::Function(f) => &f.path,
             _ => continue,
         };
 
@@ -292,12 +292,12 @@ fn add_namespaces(data: &mut ProcessorData<'_>) -> Result<()> {
         }
     }
     for item in data.current_database.cpp_items() {
-        if let CppItemData::Type(t) = &item.cpp_data {
+        if let CppItem::Type(t) = &item.cpp_item {
             namespaces.remove(&t.path);
         }
     }
     for name in namespaces {
-        let item = CppItemData::Namespace(name);
+        let item = CppItem::Namespace(name);
         data.current_database
             .add_cpp_item(DatabaseItemSource::NamespaceInferring, None, item);
     }
@@ -360,7 +360,7 @@ impl CppParser<'_, '_> {
             once(self.data.current_database as &_).chain(self.data.dep_databases.iter());
         for database in databases {
             for item in database.cpp_items() {
-                if let CppItemData::Type(info) = &item.cpp_data {
+                if let CppItem::Type(info) = &item.cpp_item {
                     if f(info) {
                         return Some(info);
                     }
@@ -1214,7 +1214,7 @@ impl CppParser<'_, '_> {
                 origin_location: get_origin_location(entity)?,
             },
             self.source_ffi_item,
-            CppItemData::Type(CppTypeDeclaration {
+            CppItem::Type(CppTypeDeclaration {
                 kind: CppTypeDeclarationKind::Enum,
                 path: enum_name.clone(),
                 doc: None,
@@ -1235,7 +1235,7 @@ impl CppParser<'_, '_> {
                         origin_location: get_origin_location(child)?,
                     },
                     self.source_ffi_item,
-                    CppItemData::EnumValue(CppEnumValue {
+                    CppItem::EnumValue(CppEnumValue {
                         path: enum_name.join(CppPathItem::from_good_str(&value_name)),
                         value: val.0,
                         doc: None,
@@ -1266,7 +1266,7 @@ impl CppParser<'_, '_> {
                 origin_location: get_origin_location(entity)?,
             },
             self.source_ffi_item,
-            CppItemData::ClassField(CppClassField {
+            CppItem::ClassField(CppClassField {
                 path: class_type.join(CppPathItem::from_good_str(&field_name)),
                 field_type,
                 visibility: match entity.get_accessibility().unwrap_or(Accessibility::Public) {
@@ -1338,7 +1338,7 @@ impl CppParser<'_, '_> {
                             origin_location: get_origin_location(entity).unwrap(),
                         },
                         self.source_ffi_item,
-                        CppItemData::ClassBase(CppBaseSpecifier {
+                        CppItem::ClassBase(CppBaseSpecifier {
                             base_class_type: base_type.clone(),
                             is_virtual: child.is_virtual_base(),
                             visibility: match child
@@ -1368,7 +1368,7 @@ impl CppParser<'_, '_> {
                 origin_location: get_origin_location(entity).unwrap(),
             },
             self.source_ffi_item,
-            CppItemData::Type(CppTypeDeclaration {
+            CppItem::Type(CppTypeDeclaration {
                 kind: CppTypeDeclarationKind::Class { is_movable: false },
                 path: full_name,
                 doc: None,
@@ -1514,7 +1514,7 @@ impl CppParser<'_, '_> {
                             self.data.current_database.add_cpp_item(
                                 info,
                                 self.source_ffi_item,
-                                CppItemData::Function(r),
+                                CppItem::Function(r),
                             );
                         }
                         Err(error) => {

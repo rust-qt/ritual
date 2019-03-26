@@ -1,7 +1,7 @@
 use crate::cpp_data::{CppPathItem, CppVisibility};
 use crate::cpp_function::{CppFunction, CppFunctionKind, CppFunctionMemberData};
 use crate::cpp_type::CppType;
-use crate::database::{CppItemData, DatabaseItemSource};
+use crate::database::{CppItem, DatabaseItemSource};
 use crate::processor::ProcessorData;
 use ritual_common::errors::Result;
 
@@ -11,14 +11,14 @@ use ritual_common::errors::Result;
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut methods = Vec::new();
     for type1 in data.current_database.cpp_items() {
-        if let CppItemData::Type(declaration) = &type1.cpp_data {
+        if let CppItem::Type(declaration) = &type1.cpp_item {
             if declaration.kind.is_class() {
                 let class_path = &declaration.path;
                 let found_destructor = data
                     .current_database
                     .cpp_items()
                     .iter()
-                    .filter_map(|item| item.cpp_data.as_function_ref())
+                    .filter_map(|item| item.cpp_item.as_function_ref())
                     .any(|m| m.is_destructor() && m.class_type().ok().as_ref() == Some(class_path));
                 if !found_destructor {
                     let function = CppFunction {
@@ -50,7 +50,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                     .current_database
                     .cpp_items()
                     .iter()
-                    .filter_map(|item| item.cpp_data.as_function_ref())
+                    .filter_map(|item| item.cpp_item.as_function_ref())
                     .any(|m| {
                         m.is_constructor() && m.class_type().ok().as_ref() == Some(class_path)
                     });
@@ -85,7 +85,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         data.current_database.add_cpp_item(
             DatabaseItemSource::ImplicitDestructor,
             source_ffi_item,
-            CppItemData::Function(method),
+            CppItem::Function(method),
         );
     }
     Ok(())
