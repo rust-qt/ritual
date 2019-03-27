@@ -14,7 +14,7 @@ impl QString {
     pub fn from_std_str<S: AsRef<str>>(s: S) -> CppBox<QString> {
         let slice = s.as_ref().as_bytes();
         unsafe {
-            QString::from_utf8(
+            QString::from_utf8_2a(
                 ConstPtr::new(slice.as_ptr() as *const c_char),
                 slice.len() as c_int,
             )

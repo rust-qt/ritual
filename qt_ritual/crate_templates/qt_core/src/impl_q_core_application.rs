@@ -99,7 +99,7 @@ impl QCoreApplication {
             let mut args = QCoreApplicationArgs::from_real();
             let (argc, argv) = args.get();
             unsafe {
-                let mut app = QCoreApplication::new2(
+                let mut app = QCoreApplication::new_2a(
                     ::cpp_utils::Ptr::new(argc),
                     ::cpp_utils::Ptr::new(argv),
                 );

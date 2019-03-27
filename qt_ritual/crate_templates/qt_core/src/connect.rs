@@ -146,7 +146,7 @@ impl<SignalArguments> Signal<SignalArguments> {
         // TODO: allow to change connection type
         // TODO: meta_object::Connection should have operator bool()
 
-        crate::QObject::connect2(
+        crate::QObject::connect_4a(
             self.0.q_object,
             ConstPtr::new(self.0.receiver_id.as_ptr()),
             receiver.q_object,

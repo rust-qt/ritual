@@ -14,7 +14,7 @@ fn test_qwindow() {
         let point: CppBox<QPoint> = window.pos();
         assert_eq!(point.x(), 0);
         assert_eq!(point.y(), 0);
-        window.set_pos(QPoint::new2(2, -3).as_ptr());
+        window.set_pos(QPoint::new_2a(2, -3).as_ptr());
         let point: CppBox<QPoint> = window.pos();
         assert_eq!(point.x(), 55);
         assert_eq!(point.y(), -3);
