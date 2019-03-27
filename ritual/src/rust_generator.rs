@@ -1529,6 +1529,9 @@ impl State<'_, '_> {
                         }
                     }
                 }
+                if chosen_strategy.is_none() {
+                    trace!("  all strategies failed, indexes will be used");
+                }
             }
 
             for function in functions {

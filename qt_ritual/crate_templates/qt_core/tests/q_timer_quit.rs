@@ -14,9 +14,9 @@ fn timer_quit() {
         slot1.set(Some(func1), Ptr::new(42 as *mut c_void));
         app.about_to_quit().connect(&slot1);
 
-        let mut timer = QTimer::new2();
-        timer.timeout().connect(app.quit());
-        timer.start3(1000);
+        let mut timer = QTimer::new_0a();
+        timer.timeout().connect(app.slot_quit());
+        timer.start_1a(1000);
         QCoreApplication::exec()
     })
 }
