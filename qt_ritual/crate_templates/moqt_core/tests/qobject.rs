@@ -11,7 +11,7 @@ fn qobject() {
     unsafe {
         let obj1 = QObject::new_0a();
         let obj2 = QObject::new_0a();
-        obj1.destroyed().connect(obj2.delete_later());
+        obj1.destroyed().connect(obj2.slot_delete_later());
 
         let args = QObject::next_connect_args();
         assert_eq!(args.sender().as_ptr(), obj1.as_ptr().as_ptr());

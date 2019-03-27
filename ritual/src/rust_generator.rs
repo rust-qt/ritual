@@ -938,7 +938,7 @@ impl State<'_, '_> {
             | NameType::Module
             | NameType::EnumValue
             | NameType::ApiFunction { .. }
-            | NameType::ReceiverFunction => {
+            | NameType::ReceiverFunction { .. } => {
                 if let Ok(parent) = cpp_path.parent() {
                     self.get_path_scope(&parent, name_type)?
                 } else {
@@ -963,9 +963,15 @@ impl State<'_, '_> {
                 };
                 s.to_snake_case()
             }
-            NameType::ReceiverFunction => self
-                .cpp_path_item_to_name(cpp_path.last(), &strategy.path)?
-                .to_snake_case(),
+            NameType::ReceiverFunction { receiver_type } => {
+                let name = self
+                    .cpp_path_item_to_name(cpp_path.last(), &strategy.path)?
+                    .to_snake_case();
+                match receiver_type {
+                    RustQtReceiverType::Signal => name,
+                    RustQtReceiverType::Slot => format!("slot_{}", name),
+                }
+            }
             NameType::Type | NameType::EnumValue => self
                 .cpp_path_item_to_name(&cpp_path.last(), &strategy.path)?
                 .to_class_case(),
@@ -1266,8 +1272,10 @@ impl State<'_, '_> {
                     qobject_path: self.qt_core_path().join("QObject"),
                 };
 
-                let path =
-                    self.generate_rust_path(&cpp_function.path, &NameType::ReceiverFunction)?;
+                let path = self.generate_rust_path(
+                    &cpp_function.path,
+                    &NameType::ReceiverFunction { receiver_type },
+                )?;
 
                 let class_type = self.find_wrapper_type(&cpp_function.path.parent()?)?;
                 let self_type = RustType::PointerLike {
@@ -1505,15 +1513,19 @@ impl State<'_, '_> {
         for (_group_path, functions) in grouped_functions {
             let mut chosen_strategy = None;
             if functions.len() > 1 {
-                trace!("choosing caption strategy for {:?}", functions);
+                trace!("choosing caption strategy for:");
+                for function in &functions {
+                    trace!("* {}", function.function.kind.short_text());
+                }
                 for strategy in &all_strategies {
                     match self.try_caption_strategy(&functions, strategy) {
                         Ok(_) => {
+                            trace!("  chosen strategy: {:?}", strategy);
                             chosen_strategy = Some(strategy);
                             break;
                         }
                         Err(err) => {
-                            trace!("strategy failed: {:?}: {}", strategy, err);
+                            trace!("  strategy failed: {:?}: {}", strategy, err);
                         }
                     }
                 }

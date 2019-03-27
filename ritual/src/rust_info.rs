@@ -172,6 +172,18 @@ pub enum RustFunctionKind {
     },
 }
 
+impl RustFunctionKind {
+    pub fn short_text(&self) -> String {
+        match self {
+            RustFunctionKind::FfiWrapper(data) => data.cpp_ffi_function.short_text(),
+            RustFunctionKind::CppDeletableImpl { .. } => format!("{:?}", self),
+            RustFunctionKind::SignalOrSlotGetter { cpp_path, .. } => {
+                format!("SignalOrSlotGetter({}", cpp_path.to_cpp_pseudo_code())
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct UnnamedRustFunction {
     pub is_public: bool,
@@ -681,7 +693,9 @@ pub enum NameType<'a> {
     Module,
     FfiFunction,
     ApiFunction(&'a CppFfiFunction),
-    ReceiverFunction,
+    ReceiverFunction {
+        receiver_type: RustQtReceiverType,
+    },
     SizedItem,
     QtSlotWrapper {
         signal_arguments: Vec<CppType>,
