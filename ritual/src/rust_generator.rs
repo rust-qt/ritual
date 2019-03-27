@@ -12,7 +12,7 @@ use crate::cpp_type::{
 use crate::database::{CppDatabaseItem, CppFfiDatabaseItem, CppFfiItem, CppItem};
 use crate::processor::ProcessorData;
 use crate::rust_info::{
-    RustDatabaseItem, RustEnumValue, RustEnumValueDoc, RustExtraImpl, RustExtraImplKind,
+    NameType, RustDatabaseItem, RustEnumValue, RustEnumValueDoc, RustExtraImpl, RustExtraImplKind,
     RustFFIArgument, RustFFIFunction, RustFfiWrapperData, RustFunction, RustFunctionArgument,
     RustFunctionCaptionStrategy, RustFunctionKind, RustFunctionSelfArgKind, RustItem, RustModule,
     RustModuleDoc, RustModuleKind, RustPathScope, RustQtReceiverType, RustQtSlotWrapper,
@@ -64,30 +64,6 @@ fn sanitize_rust_identifier_test() {
     assert_eq!(&sanitize_rust_identifier("main", true), "main_");
     assert_eq!(&sanitize_rust_identifier("lib", false), "lib");
     assert_eq!(&sanitize_rust_identifier("lib", true), "lib_");
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum NameType<'a> {
-    Type,
-    EnumValue,
-    Module,
-    FfiFunction,
-    ApiFunction(&'a CppFfiFunction),
-    ReceiverFunction,
-    SizedItem,
-    QtSlotWrapper {
-        signal_arguments: Vec<CppType>,
-        is_public: bool,
-    },
-}
-
-impl NameType<'_> {
-    fn is_api_function(&self) -> bool {
-        match self {
-            NameType::ApiFunction(_) => true,
-            _ => false,
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -920,6 +896,11 @@ impl State<'_, '_> {
     }
 
     fn generate_rust_path(&self, cpp_path: &CppPath, name_type: &NameType<'_>) -> Result<RustPath> {
+        if let Some(hook) = self.0.config.rust_path_hook() {
+            if let Some(path) = hook(cpp_path, name_type, &self.0)? {
+                return Ok(path);
+            }
+        }
         let strategy = match name_type {
             NameType::FfiFunction => {
                 let ffi_module = self

@@ -673,3 +673,27 @@ impl RustPathScope {
         self.path.join(full_name)
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NameType<'a> {
+    Type,
+    EnumValue,
+    Module,
+    FfiFunction,
+    ApiFunction(&'a CppFfiFunction),
+    ReceiverFunction,
+    SizedItem,
+    QtSlotWrapper {
+        signal_arguments: Vec<CppType>,
+        is_public: bool,
+    },
+}
+
+impl NameType<'_> {
+    pub fn is_api_function(&self) -> bool {
+        match self {
+            NameType::ApiFunction(_) => true,
+            _ => false,
+        }
+    }
+}

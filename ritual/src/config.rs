@@ -1,8 +1,9 @@
 //! Interface for configuring and running the generator.
 
 use crate::cpp_data::CppPath;
-use crate::processor::ProcessingSteps;
-use crate::rust_info::RustPathScope;
+use crate::processor::{ProcessingSteps, ProcessorData};
+use crate::rust_info::{NameType, RustPathScope};
+use crate::rust_type::RustPath;
 use ritual_common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
 use ritual_common::errors::Result;
 use ritual_common::toml;
@@ -144,6 +145,8 @@ impl CrateProperties {
 }
 
 pub type RustPathScopeHook = dyn Fn(&CppPath) -> Result<Option<RustPathScope>> + 'static;
+pub type RustPathHook =
+    dyn Fn(&CppPath, &NameType<'_>, &ProcessorData<'_>) -> Result<Option<RustPath>> + 'static;
 
 /// The starting point of `cpp_to_rust` API.
 /// Create a `Config` object, set its properties,
@@ -164,6 +167,7 @@ pub struct Config {
     movable_types_hook: Option<Box<dyn Fn(&CppPath) -> Result<MovableTypesHookOutput>>>,
     cpp_parser_path_hook: Option<Box<dyn Fn(&CppPath) -> Result<bool>>>,
     rust_path_scope_hook: Option<Box<RustPathScopeHook>>,
+    rust_path_hook: Option<Box<RustPathHook>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -191,6 +195,7 @@ impl Config {
             cpp_lib_version: Default::default(),
             cpp_parser_path_hook: Default::default(),
             rust_path_scope_hook: Default::default(),
+            rust_path_hook: Default::default(),
         }
     }
 
@@ -381,6 +386,17 @@ impl Config {
 
     pub fn rust_path_scope_hook(&self) -> Option<&RustPathScopeHook> {
         self.rust_path_scope_hook.as_ref().map(|b| &**b)
+    }
+
+    pub fn set_rust_path_hook(
+        &mut self,
+        hook: impl Fn(&CppPath, &NameType<'_>, &ProcessorData<'_>) -> Result<Option<RustPath>> + 'static,
+    ) {
+        self.rust_path_hook = Some(Box::new(hook));
+    }
+
+    pub fn rust_path_hook(&self) -> Option<&RustPathHook> {
+        self.rust_path_hook.as_ref().map(|b| &**b)
     }
 }
 

@@ -10,7 +10,9 @@ use qt_ritual_common::{all_crate_names, get_full_build_config, lib_dependencies,
 use ritual::config::CrateProperties;
 use ritual::config::{Config, GlobalConfig};
 use ritual::cpp_data::CppPath;
-use ritual::rust_info::RustPathScope;
+use ritual::cpp_ffi_data::CppFfiFunctionKind;
+use ritual::cpp_type::CppType;
+use ritual::rust_info::{NameType, RustPathScope};
 use ritual::rust_type::RustPath;
 use ritual_common::cpp_build_config::CppLibraryType;
 use ritual_common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
@@ -880,7 +882,41 @@ fn extras_3d_config(config: &mut Config) -> Result<()> {
     Ok(())
 }
 
-fn moqt_core_config(_config: &mut Config) -> Result<()> {
+fn moqt_core_config(config: &mut Config) -> Result<()> {
+    let namespace = CppPath::from_good_str("Qt");
+    config.set_rust_path_scope_hook(move |path| {
+        if path == &namespace {
+            return Ok(Some(RustPathScope {
+                path: RustPath::from_good_str("moqt_core"),
+                prefix: None,
+            }));
+        }
+        Ok(None)
+    });
+
+    let connect_path = CppPath::from_good_str("QObject::connect");
+    let qmetamethod_ref_type =
+        CppType::new_reference(true, CppType::Class(CppPath::from_good_str("QMetaMethod")));
+    config.set_rust_path_hook(move |_path, name_type, data| {
+        if let NameType::ApiFunction(function) = name_type {
+            if let CppFfiFunctionKind::Function { cpp_function, .. } = &function.kind {
+                if cpp_function.path == connect_path && cpp_function.arguments.len() >= 3 {
+                    if !cpp_function.is_static_member() {
+                        bail!("non-static QObject::connect is blacklisted");
+                    }
+                    let arg = &cpp_function.arguments[1].argument_type;
+                    if arg == &qmetamethod_ref_type {
+                        return Ok(Some(RustPath::from_good_str(&format!(
+                            "{}::QObject::connect_by_meta_methods",
+                            data.current_database.crate_name()
+                        ))));
+                    }
+                }
+            }
+        }
+        Ok(None)
+    });
+
     /*config.set_movable_types_hook(|path| {
         let string = path.to_templateless_string();
         let movable = &["QMetaObject::Connection", "QPoint"];
