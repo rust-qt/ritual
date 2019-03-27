@@ -15,15 +15,34 @@ public:
 
 #define Q_OBJECT
 
+namespace Qt {
+    enum ConnectionType {
+        AutoConnection,
+        DirectConnection,
+        QueuedConnection,
+        BlockingQueuedConnection,
+        UniqueConnection =  0x80
+    };
+}
+
+class MOQT_CORE_EXPORT QMetaMethod {};
+
 class MOQT_CORE_EXPORT QObject {
 public:
     QObject(QObject* parent = nullptr);
     virtual ~QObject();
 
-    static QMetaObject::Connection connect(
-        const QObject* sender, const char* signal,
-        const QObject* receiver, const char* method,
-        int connectionType = 0);
+    static QMetaObject::Connection connect(const QObject *sender, const char *signal,
+                                           const QObject *receiver, const char *member, Qt::ConnectionType = Qt::AutoConnection);
+
+    static QMetaObject::Connection connect(const QObject *sender, const QMetaMethod &signal,
+                                           const QObject *receiver, const QMetaMethod &method,
+                                           Qt::ConnectionType type = Qt::AutoConnection);
+
+    inline QMetaObject::Connection connect(const QObject *sender, const char *signal,
+                                           const char *member, Qt::ConnectionType type = Qt::AutoConnection) const {
+        return QMetaObject::Connection();
+    }
 
     class ConnectArgs {
     public:

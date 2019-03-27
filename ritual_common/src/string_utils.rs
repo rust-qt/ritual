@@ -75,7 +75,7 @@ fn iterator_to_class_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String
     .join("")
 }
 
-fn ends_with_digit<S: AsRef<str>>(s: S) -> bool {
+pub fn ends_with_digit<S: AsRef<str>>(s: S) -> bool {
     let str = s.as_ref();
     if str.is_empty() {
         false

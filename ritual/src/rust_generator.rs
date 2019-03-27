@@ -14,10 +14,10 @@ use crate::processor::ProcessorData;
 use crate::rust_info::{
     RustDatabaseItem, RustEnumValue, RustEnumValueDoc, RustExtraImpl, RustExtraImplKind,
     RustFFIArgument, RustFFIFunction, RustFfiWrapperData, RustFunction, RustFunctionArgument,
-    RustFunctionCaptionStrategy, RustFunctionKind, RustItem, RustModule, RustModuleDoc,
-    RustModuleKind, RustPathScope, RustQtReceiverType, RustQtSlotWrapper, RustRawSlotReceiver,
-    RustStruct, RustStructKind, RustTraitAssociatedType, RustTraitImpl, RustWrapperType,
-    RustWrapperTypeDocData, RustWrapperTypeKind, UnnamedRustFunction,
+    RustFunctionCaptionStrategy, RustFunctionKind, RustFunctionSelfArgKind, RustItem, RustModule,
+    RustModuleDoc, RustModuleKind, RustPathScope, RustQtReceiverType, RustQtSlotWrapper,
+    RustRawSlotReceiver, RustStruct, RustStructKind, RustTraitAssociatedType, RustTraitImpl,
+    RustWrapperType, RustWrapperTypeDocData, RustWrapperTypeKind, UnnamedRustFunction,
 };
 use crate::rust_type::{
     RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
@@ -28,7 +28,7 @@ use log::{debug, trace};
 use ritual_common::errors::{bail, err_msg, format_err, print_trace, Result};
 use ritual_common::string_utils::CaseOperations;
 use ritual_common::utils::MapIfOk;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Deref;
 
 pub fn qt_core_path(crate_name: &str) -> RustPath {
@@ -90,6 +90,7 @@ impl NameType<'_> {
     }
 }
 
+#[derive(Debug)]
 struct FunctionWithDesiredPath {
     function: UnnamedRustFunction,
     desired_path: RustPath,
@@ -1005,7 +1006,6 @@ impl State<'_, '_> {
             }
         };
 
-        let mut number = None;
         if name_type == &NameType::FfiFunction {
             let rust_path = strategy.apply(&full_last_name);
             if self
@@ -1020,29 +1020,19 @@ impl State<'_, '_> {
             return Ok(rust_path);
         }
 
-        loop {
-            let name_try = match number {
-                None => full_last_name.clone(),
-                Some(n) => format!("{}{}", full_last_name, n),
-            };
-            let sanitized_name =
-                sanitize_rust_identifier(&name_try, name_type == &NameType::Module);
-            let rust_path = strategy.apply(&sanitized_name);
-            if !name_type.is_api_function()
-                && self
-                    .0
-                    .current_database
-                    .rust_database()
-                    .find(&rust_path)
-                    .is_none()
-            {
-                return Ok(rust_path);
-            }
+        let sanitized_name =
+            sanitize_rust_identifier(&full_last_name, name_type == &NameType::Module);
+        let rust_path = strategy.apply(&sanitized_name);
 
-            number = Some(number.unwrap_or(1) + 1);
+        if name_type.is_api_function() {
+            Ok(rust_path)
+        } else {
+            Ok(self
+                .0
+                .current_database
+                .rust_database()
+                .make_unique_path(&rust_path))
         }
-
-        // TODO: check for conflicts with types from crate template (how?)
     }
 
     fn process_ffi_item(
@@ -1494,10 +1484,35 @@ impl State<'_, '_> {
                         err
                     );
                 }
-                _ => {}
             }
         }
         Ok(grouped_functions)
+    }
+
+    fn try_caption_strategy(
+        &self,
+        functions: &[FunctionWithDesiredPath],
+        strategy: &RustFunctionCaptionStrategy,
+    ) -> Result<()> {
+        let mut paths = BTreeSet::new();
+        for function in functions {
+            let path = function.apply_strategy(strategy)?;
+            if paths.contains(&path) {
+                bail!("conflicting path: {:?}", path);
+            }
+            if self
+                .0
+                .current_database
+                .rust_database()
+                .find(&path)
+                .is_some()
+            {
+                bail!("path already taken by an existing item: {:?}", path);
+            }
+            paths.insert(path);
+        }
+
+        Ok(())
     }
 
     fn finalize_functions(
@@ -1507,7 +1522,42 @@ impl State<'_, '_> {
         let all_strategies = RustFunctionCaptionStrategy::all();
 
         for (_group_path, functions) in grouped_functions {
-            for strategy in &all_strategies {}
+            let mut chosen_strategy = None;
+            if functions.len() > 1 {
+                trace!("choosing caption strategy for {:?}", functions);
+                for strategy in &all_strategies {
+                    match self.try_caption_strategy(&functions, strategy) {
+                        Ok(_) => {
+                            chosen_strategy = Some(strategy);
+                            break;
+                        }
+                        Err(err) => {
+                            trace!("strategy failed: {:?}: {}", strategy, err);
+                        }
+                    }
+                }
+            }
+
+            for function in functions {
+                let path = if let Some(strategy) = &chosen_strategy {
+                    function.apply_strategy(strategy).unwrap()
+                } else {
+                    function.desired_path
+                };
+                let final_path = self
+                    .0
+                    .current_database
+                    .rust_database()
+                    .make_unique_path(&path);
+                let item = RustDatabaseItem {
+                    item: RustItem::Function(function.function.with_path(final_path)),
+                    cpp_item_index: None,
+                    ffi_item_index: Some(function.ffi_item_index),
+                };
+                debug!("added rust item: {}", item.item.short_text(),);
+                trace!("rust item data: {:?}", item);
+                self.0.current_database.add_rust_item(item);
+            }
         }
         Ok(())
     }
@@ -1526,8 +1576,49 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
 }
 
 impl FunctionWithDesiredPath {
-    fn name(&self, _strategy: &RustFunctionCaptionStrategy) -> Result<String> {
-        unimplemented!()
+    fn apply_strategy(&self, strategy: &RustFunctionCaptionStrategy) -> Result<RustPath> {
+        let mut suffix = String::new();
+        let normal_args = self
+            .function
+            .arguments
+            .iter()
+            .filter(|arg| arg.name != "self")
+            .collect_vec();
+        if strategy.args_count {
+            suffix.push_str(&format!("_{}a", normal_args.len()));
+        }
+        if strategy.arg_names && !normal_args.is_empty() {
+            let names = normal_args.iter().map(|arg| &arg.name).join("_");
+            suffix.push_str(&format!("_from_{}", names));
+        }
+        if strategy.arg_types && !normal_args.is_empty() {
+            let context = self.desired_path.parent()?;
+            let types = normal_args
+                .map_if_ok(|arg| arg.argument_type.api_type().caption(&context))?
+                .join("_");
+            suffix.push_str(&format!("_from_{}", types));
+        }
+        match self.function.self_arg_kind()? {
+            RustFunctionSelfArgKind::ConstRef | RustFunctionSelfArgKind::Value => {}
+            RustFunctionSelfArgKind::None => {
+                if strategy.static_ {
+                    suffix.push_str("_static");
+                }
+            }
+            RustFunctionSelfArgKind::MutRef => {
+                if strategy.mut_ {
+                    suffix.push_str("_mut");
+                }
+            }
+        }
+
+        if suffix.len() > 16 {
+            bail!("suffix is too long ({})", suffix.len());
+        }
+
+        let name = format!("{}_{}", self.desired_path.last(), suffix);
+        let name = sanitize_rust_identifier(&name.to_snake_case(), false);
+        Ok(self.desired_path.parent()?.join(name))
     }
 }
 

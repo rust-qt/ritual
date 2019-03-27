@@ -15,6 +15,7 @@ const char* copyToHeap(const char* string) {
 QObject::QObject(QObject* parent) {
 
 }
+
 QObject::~QObject() {
 
 }
@@ -31,19 +32,22 @@ void QObject::deleteLater() {
 
 }
 
-QMetaObject::Connection QObject::connect(
-    const QObject* sender, const char* signal,
-    const QObject* receiver, const char* method,
-    int connectionType)
-{
+QMetaObject::Connection QObject::connect(const QObject *sender, const char *signal,
+                                       const QObject *receiver, const char *member, Qt::ConnectionType) {
     std::lock_guard<std::mutex> lock(connectArgsMutex);
     ConnectArgs args;
     args.sender = sender;
     args.signal = copyToHeap(signal);
     args.receiver = receiver;
-    args.method = copyToHeap(method);
+    args.method = copyToHeap(member);
     connectArgs.push_back(args);
 
+    return QMetaObject::Connection();
+}
+
+QMetaObject::Connection QObject::connect(const QObject *sender, const QMetaMethod &signal,
+                                       const QObject *receiver, const QMetaMethod &method,
+                                       Qt::ConnectionType type) {
     return QMetaObject::Connection();
 }
 

@@ -6,6 +6,7 @@ use crate::cpp_type::CppType;
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_type::{RustFinalType, RustPath, RustPointerLikeTypeKind, RustType};
 use ritual_common::errors::{bail, Result};
+use ritual_common::string_utils::ends_with_digit;
 use serde_derive::{Deserialize, Serialize};
 
 /// One variant of a Rust enum
@@ -195,8 +196,7 @@ impl UnnamedRustFunction {
     }
 
     /// Returns information about `self` argument of this method.
-    #[allow(dead_code)]
-    fn self_arg_kind(&self) -> Result<RustFunctionSelfArgKind> {
+    pub fn self_arg_kind(&self) -> Result<RustFunctionSelfArgKind> {
         if let Some(arg) = self.arguments.get(0) {
             if arg.name == "self" {
                 match arg.argument_type.api_type() {
@@ -408,7 +408,6 @@ pub struct RustFunctionCaptionStrategy {
     pub arg_names: bool,
     pub arg_types: bool,
     pub static_: bool,
-    pub index: bool,
 }
 
 impl RustFunctionCaptionStrategy {
@@ -451,10 +450,10 @@ impl RustFunctionCaptionStrategy {
             });
         }
 
-        all.push(S {
-            index: true,
-            ..S::default()
-        });
+        //        all.push(S {
+        //            index: true,
+        //            ..S::default()
+        //        });
 
         all
     }
@@ -630,6 +629,31 @@ impl RustDatabase {
 
     pub fn clear(&mut self) {
         self.items.clear();
+    }
+
+    pub fn make_unique_path(&self, path: &RustPath) -> RustPath {
+        let mut number = None;
+        let mut path_try = path.clone();
+        loop {
+            if let Some(number) = number {
+                *path_try.last_mut() = format!(
+                    "{}{}{}",
+                    path.last(),
+                    if ends_with_digit(path.last()) {
+                        "_"
+                    } else {
+                        ""
+                    },
+                    number
+                );
+            }
+            if self.find(&path_try).is_none() {
+                return path_try;
+            }
+
+            number = Some(number.unwrap_or(1) + 1);
+        }
+        // TODO: check for conflicts with types from crate template (how?)
     }
 }
 

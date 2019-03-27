@@ -63,6 +63,9 @@ impl RustPath {
     pub fn last(&self) -> &str {
         self.parts.last().expect("RustPath can't be empty")
     }
+    pub fn last_mut(&mut self) -> &mut String {
+        self.parts.last_mut().expect("RustPath can't be empty")
+    }
 
     pub fn join(&self, name: impl Into<String>) -> RustPath {
         let mut new_path = self.clone();
@@ -360,6 +363,14 @@ impl RustType {
                 path,
                 generic_arguments,
             }) => {
+                if path == &RustPath::from_good_str("cpp_utils::Ptr")
+                    || path == &RustPath::from_good_str("cpp_utils::ConstPtr")
+                    || path == &RustPath::from_good_str("cpp_utils::CppBox")
+                {
+                    let arg = &generic_arguments.as_ref().unwrap()[0];
+                    return arg.caption(context);
+                }
+
                 let mut name = if path.parts.len() == 1 {
                     path.parts[0].to_snake_case()
                 } else if path.crate_name() == Some("std") {
