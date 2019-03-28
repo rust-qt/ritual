@@ -1,10 +1,11 @@
-use crate::cpp_checks::{CppCheckerEnv, CppChecks};
+use crate::cpp_checks::CppChecks;
 use crate::cpp_code_generator;
 use crate::cpp_data::{CppItem, CppOriginLocation, CppPath};
 use crate::cpp_ffi_data::{CppFfiFunction, CppFfiItem, QtSlotWrapper};
 use crate::rust_info::{RustDatabase, RustDatabaseItem};
 use log::{debug, trace};
 use ritual_common::errors::{bail, Result};
+use ritual_common::target::LibraryTarget;
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -98,7 +99,7 @@ pub struct Database {
     cpp_items: Vec<CppDatabaseItem>,
     ffi_items: Vec<CppFfiDatabaseItem>,
     rust_database: RustDatabase,
-    environments: Vec<CppCheckerEnv>,
+    environments: Vec<LibraryTarget>,
     #[serde(skip)]
     is_modified: bool,
 }
@@ -238,14 +239,14 @@ impl Database {
         }
     }
 
-    pub fn add_environment(&mut self, env: CppCheckerEnv) {
+    pub fn add_environment(&mut self, env: LibraryTarget) {
         if !self.environments.iter().any(|e| e == &env) {
             self.is_modified = true;
             self.environments.push(env.clone());
         }
     }
 
-    pub fn environments(&self) -> &[CppCheckerEnv] {
+    pub fn environments(&self) -> &[LibraryTarget] {
         &self.environments
     }
 }

@@ -1,31 +1,10 @@
 use itertools::Itertools;
-use ritual_common::target::{Arch, Endian, Env, Family, PointerWidth, Target, OS};
+use ritual_common::target::{Arch, Endian, Env, Family, LibraryTarget, PointerWidth, OS};
 use serde_derive::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
-pub struct CppCheckerEnv {
-    pub target: Target,
-    pub cpp_library_version: Option<String>,
-}
-
-impl CppCheckerEnv {
-    pub fn short_text(&self) -> String {
-        format!(
-            "{}/{:?}-{:?}-{:?}-{:?}",
-            self.cpp_library_version
-                .as_ref()
-                .map_or("None", |s| s.as_str()),
-            self.target.arch,
-            self.target.os,
-            self.target.family,
-            self.target.env
-        )
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct CppChecksItem {
-    pub env: CppCheckerEnv,
+    pub env: LibraryTarget,
     pub is_success: bool,
 }
 
@@ -33,11 +12,11 @@ struct CppChecksItem {
 pub struct CppChecks(Vec<CppChecksItem>);
 
 impl CppChecks {
-    pub fn has_env(&self, env: &CppCheckerEnv) -> bool {
+    pub fn has_env(&self, env: &LibraryTarget) -> bool {
         self.0.iter().any(|item| &item.env == env)
     }
 
-    pub fn add(&mut self, env: CppCheckerEnv, is_success: bool) {
+    pub fn add(&mut self, env: LibraryTarget, is_success: bool) {
         self.0.retain(|item| item.env != env);
         self.0.push(CppChecksItem { env, is_success });
     }
@@ -46,7 +25,7 @@ impl CppChecks {
         self.0.iter().any(|item| item.is_success)
     }
 
-    pub fn all_success(&self, environments: &[CppCheckerEnv]) -> bool {
+    pub fn all_success(&self, environments: &[LibraryTarget]) -> bool {
         environments.iter().all(|env| {
             self.0
                 .iter()
@@ -58,7 +37,7 @@ impl CppChecks {
         self.0.is_empty()
     }
 
-    pub fn condition(&self, environments: &[CppCheckerEnv]) -> Condition {
+    pub fn condition(&self, environments: &[LibraryTarget]) -> Condition {
         if !self.any_success() {
             return Condition::False;
         }

@@ -1,4 +1,4 @@
-use crate::cpp_checks::{Condition, CppCheckerEnv};
+use crate::cpp_checks::Condition;
 use crate::cpp_ffi_data::{
     CppFfiArgumentMeaning, CppFfiFunctionKind, CppFfiType, CppFieldAccessorType,
     CppToFfiTypeConversion, QtSlotWrapper,
@@ -13,6 +13,7 @@ use itertools::Itertools;
 use ritual_common::cpp_lib_builder::version_to_number;
 use ritual_common::errors::{bail, Result};
 use ritual_common::file_utils::{create_file, create_file_for_append, path_to_str};
+use ritual_common::target::LibraryTarget;
 use ritual_common::utils::{get_command_output, MapIfOk};
 use std::io::Write;
 use std::iter::once;
@@ -329,7 +330,7 @@ fn wrap_with_condition(code: &str, condition: &Condition) -> String {
 /// Generates a source file with the specified FFI methods.
 pub fn generate_cpp_file(
     ffi_items: &[CppFfiDatabaseItem],
-    environments: &[CppCheckerEnv],
+    environments: &[LibraryTarget],
     file_path: &Path,
     global_header_name: &str,
     crate_name: &str,

@@ -14,7 +14,7 @@ use ritual_common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryT
 use ritual_common::cpp_lib_builder::{BuildType, CMakeConfigData, CppLibBuilder};
 use ritual_common::errors::{bail, err_msg, FancyUnwrap, Result, ResultExt};
 use ritual_common::file_utils::{create_file, file_to_string, load_json, path_to_str};
-use ritual_common::target::current_target;
+use ritual_common::target::{current_target, LibraryTarget};
 use ritual_common::utils::{exe_suffix, get_command_output};
 use ritual_common::{env_var_names, BuildScriptData};
 use std::env;
@@ -65,11 +65,8 @@ impl Config {
     /// Returns version of the native C++ library used for generating this crate.
     /// This is the value set with `Config::set_cpp_lib_version` during generation,
     /// or `None` if the version was not set.
-    pub fn original_cpp_lib_version(&self) -> Option<&str> {
-        self.build_script_data
-            .cpp_lib_version
-            .as_ref()
-            .map(|x| x.as_str())
+    pub fn known_targets(&self) -> &[LibraryTarget] {
+        &self.build_script_data.known_targets
     }
 
     /// Returns current `CppBuildConfig` data.
@@ -99,11 +96,34 @@ impl Config {
 
     /// Same as `run()`, but result of the operation is returned to the caller.
     pub fn run_and_return(mut self) -> Result<()> {
+        let current_target = LibraryTarget {
+            target: current_target(),
+            cpp_library_version: self.current_cpp_library_version.clone(),
+        };
+
+        let is_known_target = self
+            .build_script_data
+            .known_targets
+            .contains(&current_target);
+
+        if !is_known_target {
+            println!(
+                "cargo:warning=Current target is unknown: {}",
+                current_target.short_text()
+            );
+            println!("cargo:warning=Known targets:");
+            for target in &self.build_script_data.known_targets {
+                println!("cargo:warning=* {}", target.short_text());
+            }
+            // TODO: if the current version or target is unknown,
+            //       emit a warning and set the closest known version instead
+        }
+
         self.cpp_build_paths.apply_env();
         let cpp_build_config_data = self
             .build_script_data
             .cpp_build_config
-            .eval(&current_target())?;
+            .eval(&current_target.target)?;
 
         let out_dir = out_dir()?;
         let c_lib_install_dir = out_dir.join("c_lib_install");
@@ -190,7 +210,6 @@ impl Config {
         );
 
         if let Some(version) = self.current_cpp_library_version {
-            // TODO: if the current version is unknown, report the closest known version instead
             println!("cargo:rustc-cfg=cpp_lib_version={:?}", version);
         }
         println!("cargo:rustc-cfg=ritual_true");

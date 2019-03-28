@@ -280,3 +280,23 @@ impl Condition {
         Condition::Not(Box::new(self.clone()))
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LibraryTarget {
+    pub target: Target,
+    pub cpp_library_version: Option<String>,
+}
+
+impl LibraryTarget {
+    pub fn short_text(&self) -> String {
+        let target_text = format!(
+            "{:?}-{:?}-{:?}-{:?}",
+            self.target.arch, self.target.os, self.target.family, self.target.env
+        );
+        if let Some(cpp_library_version) = &self.cpp_library_version {
+            format!("v{} on {}", cpp_library_version, target_text)
+        } else {
+            target_text
+        }
+    }
+}

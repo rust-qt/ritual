@@ -1,6 +1,6 @@
 //! Types and functions used for Rust code generation.
 
-use crate::cpp_checks::{Condition, CppCheckerEnv};
+use crate::cpp_checks::Condition;
 use crate::database::CppFfiDatabaseItem;
 use crate::doc_formatter;
 use crate::rust_generator::qt_core_path;
@@ -18,6 +18,7 @@ use itertools::Itertools;
 use ritual_common::errors::{bail, err_msg, Result};
 use ritual_common::file_utils::{create_dir_all, create_file, file_to_string, File};
 use ritual_common::string_utils::trim_slice;
+use ritual_common::target::LibraryTarget;
 use ritual_common::utils::MapIfOk;
 use std::fs;
 use std::io::{self, BufWriter, Write};
@@ -110,7 +111,7 @@ struct Generator<'a> {
     crate_template_src_path: Option<PathBuf>,
     destination: Vec<File<BufWriter<fs::File>>>,
     ffi_items: &'a [CppFfiDatabaseItem],
-    environments: &'a [CppCheckerEnv],
+    environments: &'a [LibraryTarget],
 }
 
 impl Write for Generator<'_> {
@@ -934,7 +935,7 @@ impl Generator<'_> {
 pub fn generate(
     crate_name: &str,
     ffi_items: &[CppFfiDatabaseItem],
-    environments: &[CppCheckerEnv],
+    environments: &[LibraryTarget],
     database: &RustDatabase,
     output_src_path: impl Into<PathBuf>,
     crate_template_src_path: Option<impl Into<PathBuf>>,

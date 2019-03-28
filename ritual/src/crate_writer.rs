@@ -322,7 +322,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         &BuildScriptData {
             cpp_build_config: data.config.cpp_build_config().clone(),
             cpp_wrapper_lib_name: c_lib_name,
-            cpp_lib_version: data.config.cpp_lib_version().map(|s| s.to_string()),
+            known_targets: data.current_database.environments().to_vec(),
         },
         None,
     )?;

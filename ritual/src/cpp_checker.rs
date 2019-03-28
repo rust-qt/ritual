@@ -1,4 +1,3 @@
-use crate::cpp_checks::CppCheckerEnv;
 use crate::cpp_code_generator;
 use crate::cpp_code_generator::apply_moc;
 use crate::cpp_ffi_data::CppFfiItem;
@@ -13,7 +12,7 @@ use ritual_common::cpp_lib_builder::{
 };
 use ritual_common::errors::{bail, err_msg, Result};
 use ritual_common::file_utils::{create_dir_all, create_file, path_to_str, remove_dir_all};
-use ritual_common::target::current_target;
+use ritual_common::target::{current_target, LibraryTarget};
 use ritual_common::utils::{MapIfOk, ProgressBar};
 use std::collections::{hash_map::Entry, HashMap};
 use std::io::Write;
@@ -294,8 +293,8 @@ impl InstanceStorage {
 }
 
 impl CppChecker<'_, '_> {
-    fn env(&self) -> CppCheckerEnv {
-        CppCheckerEnv {
+    fn env(&self) -> LibraryTarget {
+        LibraryTarget {
             target: current_target(),
             cpp_library_version: self.data.config.cpp_lib_version().map(|s| s.to_string()),
         }
