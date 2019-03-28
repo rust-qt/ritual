@@ -1,12 +1,12 @@
-use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_ffi_data::{
     CppFfiArgumentMeaning, CppFfiFunctionKind, CppFfiType, CppFieldAccessorType,
     CppToFfiTypeConversion, QtSlotWrapper,
 };
+use crate::cpp_ffi_data::{CppFfiFunction, CppFfiItem};
 use crate::cpp_function::ReturnValueAllocationPlace;
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
-use crate::database::{CppFfiDatabaseItem, CppFfiItem};
+use crate::database::CppFfiDatabaseItem;
 use crate::rust_info::{RustDatabase, RustItem, RustStructKind};
 use itertools::Itertools;
 use ritual_common::errors::{bail, Result};

@@ -1,7 +1,7 @@
-use crate::cpp_data::{CppPath, CppPathItem};
+use crate::cpp_data::{CppItem, CppPath, CppPathItem};
 use crate::cpp_function::{CppFunction, CppFunctionArgument, CppOperator};
 use crate::cpp_type::CppType;
-use crate::database::{CppItem, DatabaseItemSource};
+use crate::database::DatabaseItemSource;
 use crate::processor::ProcessorData;
 use log::{debug, trace};
 use ritual_common::errors::{bail, err_msg, Result};

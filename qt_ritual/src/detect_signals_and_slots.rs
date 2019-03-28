@@ -1,8 +1,8 @@
 use itertools::Itertools;
 use log::trace;
 use regex::Regex;
-use ritual::cpp_data::CppPath;
-use ritual::database::{CppItem, DatabaseItemSource};
+use ritual::cpp_data::{CppItem, CppPath};
+use ritual::database::DatabaseItemSource;
 use ritual::processor::ProcessorData;
 use ritual_common::errors::{Result, ResultExt};
 use ritual_common::file_utils::open_file;

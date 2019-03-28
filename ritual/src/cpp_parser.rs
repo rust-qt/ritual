@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::cpp_data::{
-    CppBaseSpecifier, CppClassField, CppEnumValue, CppOriginLocation, CppPath, CppPathItem,
-    CppTypeDeclaration, CppTypeDeclarationKind, CppVisibility,
+    CppBaseSpecifier, CppClassField, CppEnumValue, CppItem, CppOriginLocation, CppPath,
+    CppPathItem, CppTypeDeclaration, CppTypeDeclarationKind, CppVisibility,
 };
 use crate::cpp_function::{
     CppFunction, CppFunctionArgument, CppFunctionDoc, CppFunctionKind, CppFunctionMemberData,
@@ -11,7 +11,7 @@ use crate::cpp_type::{
     CppBuiltInNumericType, CppFunctionPointerType, CppPointerLikeTypeKind, CppSpecificNumericType,
     CppSpecificNumericTypeKind, CppType,
 };
-use crate::database::{CppItem, DatabaseItemSource};
+use crate::database::DatabaseItemSource;
 use crate::processor::ProcessorData;
 use clang::diagnostic::{Diagnostic, Severity};
 use clang::*;

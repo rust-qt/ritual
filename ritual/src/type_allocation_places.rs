@@ -1,9 +1,8 @@
 #![allow(dead_code)]
 
 use crate::config::MovableTypesHookOutput;
-use crate::cpp_data::{CppPath, CppTypeDeclarationKind};
+use crate::cpp_data::{CppItem, CppPath, CppTypeDeclarationKind};
 use crate::cpp_type::{CppPointerLikeTypeKind, CppType};
-use crate::database::CppItem;
 use crate::processor::ProcessorData;
 use log::{info, trace};
 use ritual_common::errors::Result;

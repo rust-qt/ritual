@@ -1,6 +1,7 @@
 use crate::cpp_data::{CppClassField, CppPath};
 use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
 use crate::cpp_type::{CppBuiltInNumericType, CppFunctionPointerType, CppType};
+use itertools::Itertools;
 use ritual_common::errors::Result;
 use serde_derive::{Deserialize, Serialize};
 
@@ -301,4 +302,43 @@ pub struct QtSlotWrapper {
     // /// String identifier passed to `QObject::connect` function to
     // /// specify the object's slot.
     //pub receiver_id: String,
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum CppFfiItem {
+    Function(CppFfiFunction),
+    QtSlotWrapper(QtSlotWrapper),
+}
+
+impl CppFfiItem {
+    pub fn as_function_ref(&self) -> Option<&CppFfiFunction> {
+        if let CppFfiItem::Function(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+
+    pub fn is_slot_wrapper(&self) -> bool {
+        if let CppFfiItem::QtSlotWrapper(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn short_text(&self) -> String {
+        match self {
+            CppFfiItem::Function(function) => function.short_text(),
+            CppFfiItem::QtSlotWrapper(slot_wrapper) => format!(
+                "slot wrapper for ({})",
+                slot_wrapper
+                    .signal_arguments
+                    .iter()
+                    .map(|arg| arg.to_cpp_pseudo_code())
+                    .join(", ")
+            ),
+        }
+    }
 }

@@ -1,10 +1,10 @@
 use crate::detect_signal_argument_types::detect_signal_argument_types;
 use itertools::Itertools;
 use log::trace;
-use ritual::cpp_ffi_data::QtSlotWrapper;
+use ritual::cpp_ffi_data::{CppFfiItem, QtSlotWrapper};
 use ritual::cpp_ffi_generator::{ffi_type, FfiNameProvider};
 use ritual::cpp_type::{CppFunctionPointerType, CppPointerLikeTypeKind, CppType, CppTypeRole};
-use ritual::database::{CppFfiDatabaseItem, CppFfiItem};
+use ritual::database::CppFfiDatabaseItem;
 use ritual::processor::ProcessorData;
 use ritual_common::errors::Result;
 use ritual_common::utils::MapIfOk;

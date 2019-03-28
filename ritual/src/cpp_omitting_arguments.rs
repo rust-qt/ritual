@@ -1,4 +1,5 @@
-use crate::database::{CppItem, DatabaseItemSource};
+use crate::cpp_data::CppItem;
+use crate::database::DatabaseItemSource;
 use crate::processor::ProcessorData;
 use ritual_common::errors::Result;
 

@@ -7,6 +7,7 @@
 pub mod cli;
 pub mod config;
 mod cpp_checker;
+mod cpp_checks;
 mod cpp_code_generator;
 pub mod cpp_data;
 mod cpp_explicit_xstructors;

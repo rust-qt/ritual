@@ -1,6 +1,8 @@
+use crate::cpp_checks::CppCheckerEnv;
 use crate::cpp_code_generator;
 use crate::cpp_code_generator::apply_moc;
-use crate::database::{CppCheckerEnv, CppFfiDatabaseItem, CppFfiItem};
+use crate::cpp_ffi_data::CppFfiItem;
+use crate::database::CppFfiDatabaseItem;
 use crate::processor::ProcessorData;
 use log::{debug, trace};
 use rayon::iter::ParallelIterator;

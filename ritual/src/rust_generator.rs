@@ -1,6 +1,6 @@
-use crate::cpp_data::{CppPath, CppPathItem, CppTypeDeclarationKind};
+use crate::cpp_data::{CppItem, CppPath, CppPathItem, CppTypeDeclarationKind};
 use crate::cpp_ffi_data::{
-    CppCast, CppFfiArgumentMeaning, CppFfiFunction, CppFfiFunctionKind, CppFfiType,
+    CppCast, CppFfiArgumentMeaning, CppFfiFunction, CppFfiFunctionKind, CppFfiItem, CppFfiType,
     CppFieldAccessorType, CppToFfiTypeConversion,
 };
 use crate::cpp_ffi_generator::ffi_type;
@@ -9,7 +9,7 @@ use crate::cpp_type::{
     is_qflags, CppBuiltInNumericType, CppFunctionPointerType, CppPointerLikeTypeKind,
     CppSpecificNumericType, CppSpecificNumericTypeKind, CppType, CppTypeRole,
 };
-use crate::database::{CppDatabaseItem, CppFfiDatabaseItem, CppFfiItem, CppItem};
+use crate::database::{CppDatabaseItem, CppFfiDatabaseItem};
 use crate::processor::ProcessorData;
 use crate::rust_info::{
     NameType, RustDatabaseItem, RustEnumValue, RustEnumValueDoc, RustExtraImpl, RustExtraImplKind,

@@ -94,7 +94,6 @@ pub enum Condition {
     Family(Family),
     Env(Env),
     PointerWidth(PointerWidth),
-    // Vendor(Vendor),
     Endian(Endian),
     And(Vec<Condition>),
     Or(Vec<Condition>),

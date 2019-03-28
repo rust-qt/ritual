@@ -1,5 +1,6 @@
 //! Types for handling information about C++ library APIs.
 
+use crate::cpp_function::CppFunction;
 pub use crate::cpp_operator::CppOperator;
 use crate::cpp_type::CppType;
 use itertools::Itertools;
@@ -409,5 +410,209 @@ impl CppTypeDeclarationKind {
             CppTypeDeclarationKind::Enum => true,
             _ => false,
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
+pub enum CppItem {
+    Namespace(CppPath),
+    Type(CppTypeDeclaration),
+    EnumValue(CppEnumValue),
+    Function(CppFunction),
+    ClassField(CppClassField),
+    ClassBase(CppBaseSpecifier),
+}
+
+impl CppItem {
+    pub fn is_same(&self, other: &CppItem) -> bool {
+        use self::CppItem::*;
+
+        match self {
+            Namespace(v) => {
+                if let Namespace(v2) = &other {
+                    v == v2
+                } else {
+                    false
+                }
+            }
+            Type(v) => {
+                if let Type(v2) = &other {
+                    v.is_same(v2)
+                } else {
+                    false
+                }
+            }
+            EnumValue(v) => {
+                if let EnumValue(v2) = &other {
+                    v.is_same(v2)
+                } else {
+                    false
+                }
+            }
+            Function(v) => {
+                if let Function(v2) = &other {
+                    v.is_same(v2)
+                } else {
+                    false
+                }
+            }
+            ClassField(v) => {
+                if let ClassField(v2) = &other {
+                    v.is_same(v2)
+                } else {
+                    false
+                }
+            }
+            ClassBase(v) => {
+                if let ClassBase(v2) = &other {
+                    v == v2
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
+    pub fn path(&self) -> Option<&CppPath> {
+        let path = match self {
+            CppItem::Namespace(data) => data,
+            CppItem::Type(data) => &data.path,
+            CppItem::EnumValue(data) => &data.path,
+            CppItem::Function(data) => &data.path,
+            CppItem::ClassField(data) => &data.path,
+            CppItem::ClassBase(_) => return None,
+        };
+        Some(path)
+    }
+
+    pub fn all_involved_types(&self) -> Vec<CppType> {
+        match self {
+            CppItem::Type(t) => match t.kind {
+                CppTypeDeclarationKind::Enum => vec![CppType::Enum {
+                    path: t.path.clone(),
+                }],
+                CppTypeDeclarationKind::Class { .. } => vec![CppType::Class(t.path.clone())],
+            },
+            CppItem::EnumValue(enum_value) => vec![CppType::Enum {
+                path: enum_value
+                    .path
+                    .parent()
+                    .expect("enum value must have parent path"),
+            }],
+            CppItem::Namespace(_) => Vec::new(),
+            CppItem::Function(function) => function.all_involved_types(),
+            CppItem::ClassField(field) => {
+                let class_type =
+                    CppType::Class(field.path.parent().expect("field path must have parent"));
+                vec![class_type, field.field_type.clone()]
+            }
+            CppItem::ClassBase(base) => vec![
+                CppType::Class(base.base_class_type.clone()),
+                CppType::Class(base.derived_class_type.clone()),
+            ],
+        }
+    }
+
+    pub fn as_namespace_ref(&self) -> Option<&CppPath> {
+        if let CppItem::Namespace(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+    pub fn as_function_ref(&self) -> Option<&CppFunction> {
+        if let CppItem::Function(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+    pub fn as_field_ref(&self) -> Option<&CppClassField> {
+        if let CppItem::ClassField(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+    pub fn as_enum_value_ref(&self) -> Option<&CppEnumValue> {
+        if let CppItem::EnumValue(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+    pub fn as_base_ref(&self) -> Option<&CppBaseSpecifier> {
+        if let CppItem::ClassBase(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+    pub fn as_type_ref(&self) -> Option<&CppTypeDeclaration> {
+        if let CppItem::Type(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+    pub fn as_type_mut(&mut self) -> Option<&mut CppTypeDeclaration> {
+        if let CppItem::Type(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+
+    /*pub fn path(&self) -> Option<String> {
+        unimplemented!()
+    }*/
+}
+
+impl fmt::Display for CppItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            CppItem::Namespace(path) => format!("namespace {}", path.to_cpp_pseudo_code()),
+            CppItem::Type(type1) => match type1.kind {
+                CppTypeDeclarationKind::Enum => format!("enum {}", type1.path.to_cpp_pseudo_code()),
+                CppTypeDeclarationKind::Class { .. } => {
+                    format!("class {}", type1.path.to_cpp_pseudo_code())
+                }
+            },
+            CppItem::Function(method) => method.short_text(),
+            CppItem::EnumValue(value) => format!(
+                "enum value {} = {}",
+                value.path.to_cpp_pseudo_code(),
+                value.value
+            ),
+            CppItem::ClassField(field) => field.short_text(),
+            CppItem::ClassBase(class_base) => {
+                let virtual_text = if class_base.is_virtual {
+                    "virtual "
+                } else {
+                    ""
+                };
+                let visibility_text = match class_base.visibility {
+                    CppVisibility::Public => "public",
+                    CppVisibility::Protected => "protected",
+                    CppVisibility::Private => "private",
+                };
+                let index_text = if class_base.base_index > 0 {
+                    format!(" (index: {}", class_base.base_index)
+                } else {
+                    String::new()
+                };
+                format!(
+                    "class {} : {}{} {}{}",
+                    class_base.derived_class_type.to_cpp_pseudo_code(),
+                    virtual_text,
+                    visibility_text,
+                    class_base.base_class_type.to_cpp_pseudo_code(),
+                    index_text
+                )
+            }
+        };
+
+        f.write_str(&s)
     }
 }

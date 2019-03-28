@@ -2,7 +2,8 @@
 //! Qt's shortcut header names.
 
 use log::{info, trace};
-use ritual::database::{CppDatabaseItem, CppItem, DatabaseItemSource};
+use ritual::cpp_data::CppItem;
+use ritual::database::{CppDatabaseItem, DatabaseItemSource};
 use ritual_common::errors::{err_msg, Result, ResultExt};
 use ritual_common::file_utils::{file_to_string, os_str_to_str, read_dir};
 use ritual_common::utils::add_to_multihash;
