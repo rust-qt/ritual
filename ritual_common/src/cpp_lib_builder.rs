@@ -276,7 +276,7 @@ pub fn c2r_cmake_vars(
     let mut cmake_vars = Vec::new();
     if let Some(library_type) = library_type {
         cmake_vars.push(CMakeVar::new(
-            "C2R_LIBRARY_TYPE",
+            "RITUAL_LIBRARY_TYPE",
             match *library_type {
                 CppLibraryType::Shared => "SHARED",
                 CppLibraryType::Static => "STATIC",
@@ -284,27 +284,27 @@ pub fn c2r_cmake_vars(
         ));
     }
     cmake_vars.push(CMakeVar::new_path_list(
-        "C2R_INCLUDE_PATHS",
+        "RITUAL_INCLUDE_PATHS",
         cpp_build_paths.include_paths(),
     )?);
     cmake_vars.push(CMakeVar::new_path_list(
-        "C2R_LIB_PATHS",
+        "RITUAL_LIB_PATHS",
         cpp_build_paths.lib_paths(),
     )?);
     cmake_vars.push(CMakeVar::new_path_list(
-        "C2R_FRAMEWORK_PATHS",
+        "RITUAL_FRAMEWORK_PATHS",
         cpp_build_paths.framework_paths(),
     )?);
     cmake_vars.push(CMakeVar::new_list(
-        "C2R_LINKED_LIBS",
+        "RITUAL_LINKED_LIBS",
         cpp_build_config_data.linked_libs(),
     )?);
     cmake_vars.push(CMakeVar::new_list(
-        "C2R_LINKED_FRAMEWORKS",
+        "RITUAL_LINKED_FRAMEWORKS",
         cpp_build_config_data.linked_frameworks(),
     )?);
     cmake_vars.push(CMakeVar::new(
-        "C2R_COMPILER_FLAGS",
+        "RITUAL_COMPILER_FLAGS",
         cpp_build_config_data.compiler_flags().join(" "),
     ));
     Ok(cmake_vars)

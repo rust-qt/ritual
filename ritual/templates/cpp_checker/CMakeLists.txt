@@ -5,11 +5,13 @@ cmake_minimum_required(VERSION 3.0.0 FATAL_ERROR)
 project (cpp_checker)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
-if(C2R_INCLUDE_PATHS)
-  include_directories(${C2R_INCLUDE_PATHS})
+if(RITUAL_INCLUDE_PATHS)
+    message(STATUS "RITUAL_INCLUDE_PATHS=${RITUAL_INCLUDE_PATHS}")
+    include_directories(${RITUAL_INCLUDE_PATHS})
 endif()
-if(C2R_LIB_PATHS)
-  link_directories(${C2R_LIB_PATHS})
+if(RITUAL_LIB_PATHS)
+    message(STATUS "RITUAL_LIB_PATHS=${RITUAL_LIB_PATHS}")
+    link_directories(${RITUAL_LIB_PATHS})
 endif()
 
 file(GLOB sources *.cpp)
@@ -17,47 +19,54 @@ file(GLOB headers *.h)
 
 add_executable(cpp_checker ${sources})
 
-if(C2R_LINKED_LIBS)
-  target_link_libraries(cpp_checker ${C2R_LINKED_LIBS})
+if(RITUAL_LINKED_LIBS)
+    message(STATUS "RITUAL_LINKED_LIBS=${RITUAL_LINKED_LIBS}")
+    target_link_libraries(cpp_checker ${RITUAL_LINKED_LIBS})
 endif()
 
 macro(add_osx_framework fwname target)
-  find_library(FRAMEWORK_${fwname}
-    NAMES ${fwname}
-    PATHS ${C2R_FRAMEWORK_PATHS}
-    NO_DEFAULT_PATH)
-  if( ${FRAMEWORK_${fwname} STREQUAL FRAMEWORK_${fwname}-NOTFOUND)
-    message(FATAL_ERROR "Framework not found: ${fwname} (paths: ${C2R_FRAMEWORK_PATHS})")
-  else()
-    target_link_libraries(${target} "${FRAMEWORK_${fwname}/${fwname}")
-    message(STATUS "Framework ${fwname} found at ${FRAMEWORK_${fwname}")
-  endif()
+    find_library(FRAMEWORK_${fwname}
+            NAMES ${fwname}
+            PATHS ${RITUAL_FRAMEWORK_PATHS}
+            NO_DEFAULT_PATH)
+    if( ${FRAMEWORK_${fwname} STREQUAL FRAMEWORK_${fwname}-NOTFOUND)
+        message(FATAL_ERROR "Framework not found: ${fwname}")
+    else()
+        target_link_libraries(${target} "${FRAMEWORK_${fwname}/${fwname}")
+        message(STATUS "Framework ${fwname} found at ${FRAMEWORK_${fwname}")
+    endif()
 endmacro(add_osx_framework)
 
-if(C2R_LINKED_FRAMEWORKS)
-  foreach(framework ${C2R_LINKED_FRAMEWORKS})
-    ADD_OSX_FRAMEWORK(${framework} cpp_checker)
-  endforeach()
+if(RITUAL_FRAMEWORK_PATHS)
+    message(STATUS "RITUAL_FRAMEWORK_PATHS=${RITUAL_FRAMEWORK_PATHS}")
+endif()
+
+if(RITUAL_LINKED_FRAMEWORKS)
+    message(STATUS "RITUAL_LINKED_FRAMEWORKS=${RITUAL_LINKED_FRAMEWORKS}")
+    foreach(framework ${RITUAL_LINKED_FRAMEWORKS})
+        ADD_OSX_FRAMEWORK(${framework} cpp_checker)
+    endforeach()
 endif()
 
 if(${CMAKE_COMPILER_IS_GNUCXX})
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror=return-type")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror=return-type")
 endif()
 
-if(C2R_COMPILER_FLAGS)
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${C2R_COMPILER_FLAGS}")
+if(RITUAL_COMPILER_FLAGS)
+    message(STATUS "RITUAL_COMPILER_FLAGS=${RITUAL_COMPILER_FLAGS}")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${RITUAL_COMPILER_FLAGS}")
 endif()
 
 if(APPLE)
     add_custom_command(
-        TARGET cpp_checker
-        POST_BUILD
-        COMMAND DYLD_LIBRARY_PATH=$ENV{DYLD_LIBRARY_PATH} $<TARGET_FILE:cpp_checker>)
+            TARGET cpp_checker
+            POST_BUILD
+            COMMAND DYLD_LIBRARY_PATH=$ENV{DYLD_LIBRARY_PATH} $<TARGET_FILE:cpp_checker>)
 else()
     add_custom_command(
-        TARGET cpp_checker
-        POST_BUILD
-        COMMAND cpp_checker)
+            TARGET cpp_checker
+            POST_BUILD
+            COMMAND cpp_checker)
 endif()
 
 
