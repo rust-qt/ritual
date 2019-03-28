@@ -24,6 +24,8 @@ pub fn run_and_return(crate_name: &str) -> Result<()> {
         );
     }
 
+    config.set_current_cpp_library_version(Some(qt_config.installation_data.qt_version));
+
     config.set_cpp_build_config(qt_config.cpp_build_config);
     config.set_cpp_build_paths(qt_config.cpp_build_paths);
     config.run_and_return()

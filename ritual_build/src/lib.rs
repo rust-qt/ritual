@@ -11,7 +11,7 @@
 use log::info;
 pub use ritual_common as common;
 use ritual_common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
-use ritual_common::cpp_lib_builder::{c2r_cmake_vars, BuildType, CppLibBuilder};
+use ritual_common::cpp_lib_builder::{BuildType, CMakeConfigData, CppLibBuilder};
 use ritual_common::errors::{bail, err_msg, FancyUnwrap, Result, ResultExt};
 use ritual_common::file_utils::{create_file, file_to_string, load_json, path_to_str};
 use ritual_common::target::current_target;
@@ -26,6 +26,7 @@ use std::process::Command;
 pub struct Config {
     cpp_build_paths: CppBuildPaths,
     build_script_data: BuildScriptData,
+    current_cpp_library_version: Option<String>,
 }
 
 fn manifest_dir() -> Result<PathBuf> {
@@ -52,7 +53,12 @@ impl Config {
         Ok(Config {
             build_script_data: build_script_data()?,
             cpp_build_paths: CppBuildPaths::default(),
+            current_cpp_library_version: None,
         })
+    }
+
+    pub fn set_current_cpp_library_version(&mut self, version: Option<String>) {
+        self.current_cpp_library_version = version;
     }
 
     /// Returns version of the native C++ library used for generating this crate.
@@ -108,16 +114,19 @@ impl Config {
             .library_type()
             .ok_or_else(|| err_msg("library type (shared or static) is not set"))?;
 
+        let cmake_config = CMakeConfigData {
+            cpp_build_config_data: &cpp_build_config_data,
+            cpp_build_paths: &self.cpp_build_paths,
+            library_type: Some(library_type),
+            cpp_library_version: self.current_cpp_library_version.clone(),
+        };
+
         CppLibBuilder {
             cmake_source_dir: manifest_dir.join("c_lib"),
             build_dir: out_dir.join("c_lib_build"),
             install_dir: Some(c_lib_install_dir.clone()),
             num_jobs: std::env::var("NUM_JOBS").ok().and_then(|x| x.parse().ok()),
-            cmake_vars: c2r_cmake_vars(
-                &cpp_build_config_data,
-                &self.cpp_build_paths,
-                Some(&library_type),
-            )?,
+            cmake_vars: cmake_config.cmake_vars()?,
             build_type: match profile.as_str() {
                 "debug" => BuildType::Debug,
                 "release" => BuildType::Release,

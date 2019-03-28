@@ -1,3 +1,4 @@
+use crate::cpp_checks::Condition;
 use crate::cpp_ffi_data::{
     CppFfiArgumentMeaning, CppFfiFunctionKind, CppFfiType, CppFieldAccessorType,
     CppToFfiTypeConversion, QtSlotWrapper,
@@ -9,6 +10,7 @@ use crate::cpp_type::CppType;
 use crate::database::CppFfiDatabaseItem;
 use crate::rust_info::{RustDatabase, RustItem, RustStructKind};
 use itertools::Itertools;
+use ritual_common::cpp_lib_builder::version_to_number;
 use ritual_common::errors::{bail, Result};
 use ritual_common::file_utils::{create_file, create_file_for_append, path_to_str};
 use ritual_common::utils::{get_command_output, MapIfOk};
@@ -287,6 +289,43 @@ pub fn function_implementation(method: &CppFfiFunction) -> Result<String> {
     ))
 }
 
+fn condition_expression(condition: &Condition) -> String {
+    match condition {
+        Condition::CppLibraryVersion(version) => {
+            let value = version_to_number(version).expect("version_to_number failed");
+            format!("RITUAL_CPP_LIB_VERSION == {}", value)
+        }
+        Condition::Arch(_) => unimplemented!(),
+        Condition::OS(_) => unimplemented!(),
+        Condition::Family(_) => unimplemented!(),
+        Condition::Env(_) => unimplemented!(),
+        Condition::PointerWidth(_) => unimplemented!(),
+        Condition::Endian(_) => unimplemented!(),
+        Condition::And(conditions) => conditions
+            .iter()
+            .map(|c| format!("({})", condition_expression(c)))
+            .join("&&"),
+        Condition::Or(conditions) => conditions
+            .iter()
+            .map(|c| format!("({})", condition_expression(c)))
+            .join("||"),
+        Condition::Not(condition) => format!("!({})", condition_expression(condition)),
+        Condition::True => "true".to_string(),
+        Condition::False => "false".to_string(),
+    }
+}
+
+fn wrap_with_condition(code: &str, condition: &Condition) -> String {
+    if condition == &Condition::True {
+        return code.to_string();
+    }
+    format!(
+        "#if {}\n{}\n#endif\n",
+        condition_expression(condition),
+        code
+    )
+}
+
 /// Generates a source file with the specified FFI methods.
 pub fn generate_cpp_file(
     ffi_items: &[CppFfiDatabaseItem],
@@ -304,7 +343,9 @@ pub fn generate_cpp_file(
         }
         if let CppFfiItem::QtSlotWrapper(qt_slot_wrapper) = &ffi_item.item {
             any_slot_wrappers = true;
-            write!(cpp_file, "{}", self::qt_slot_wrapper(qt_slot_wrapper)?)?;
+            let condition = ffi_item.checks.condition();
+            let code = self::qt_slot_wrapper(qt_slot_wrapper)?;
+            write!(cpp_file, "{}", wrap_with_condition(&code, &condition))?;
         }
     }
 
@@ -314,7 +355,9 @@ pub fn generate_cpp_file(
             continue;
         }
         if let CppFfiItem::Function(cpp_ffi_function) = &ffi_item.item {
-            writeln!(cpp_file, "{}", function_implementation(cpp_ffi_function)?)?;
+            let condition = ffi_item.checks.condition();
+            let code = function_implementation(cpp_ffi_function)?;
+            writeln!(cpp_file, "{}", wrap_with_condition(&code, &condition))?;
         }
     }
     writeln!(cpp_file, "}} // extern \"C\"")?;

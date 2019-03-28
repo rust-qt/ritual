@@ -9,7 +9,7 @@ use rayon::iter::ParallelIterator;
 use rayon::slice::ParallelSliceMut;
 use ritual_common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
 use ritual_common::cpp_lib_builder::{
-    c2r_cmake_vars, BuildType, CppLibBuilder, CppLibBuilderOutput,
+    BuildType, CMakeConfigData, CppLibBuilder, CppLibBuilderOutput,
 };
 use ritual_common::errors::{bail, err_msg, Result};
 use ritual_common::file_utils::{create_dir_all, create_file, path_to_str, remove_dir_all};
@@ -240,13 +240,20 @@ impl InstanceProvider {
                 .join("\n")
         )?;
 
+        let cmake_config = CMakeConfigData {
+            cpp_build_config_data: &self.cpp_build_config,
+            cpp_build_paths: &self.cpp_build_paths,
+            library_type: None,
+            cpp_library_version: None,
+        };
+
         let builder = CppLibBuilder {
             cmake_source_dir: src_path.clone(),
             build_dir: root_path.join("build"),
             install_dir: None,
             num_jobs: Some(1),
             build_type: BuildType::Debug,
-            cmake_vars: c2r_cmake_vars(&self.cpp_build_config, &self.cpp_build_paths, None)?,
+            cmake_vars: cmake_config.cmake_vars()?,
             capture_output: true,
             skip_cmake: false,
             skip_cmake_after_first_run: true,

@@ -268,44 +268,62 @@ impl CppLibBuilder {
     }
 }
 
-pub fn c2r_cmake_vars(
-    cpp_build_config_data: &CppBuildConfigData,
-    cpp_build_paths: &CppBuildPaths,
-    library_type: Option<&CppLibraryType>,
-) -> Result<Vec<CMakeVar>> {
-    let mut cmake_vars = Vec::new();
-    if let Some(library_type) = library_type {
+pub struct CMakeConfigData<'a, 'b> {
+    pub cpp_build_config_data: &'a CppBuildConfigData,
+    pub cpp_build_paths: &'b CppBuildPaths,
+    pub library_type: Option<CppLibraryType>,
+    pub cpp_library_version: Option<String>,
+}
+
+pub fn version_to_number(version: &str) -> Result<u32> {
+    const COEF: u64 = 100;
+    let parsed = semver::Version::parse(version)?;
+    let value = parsed.major * COEF * COEF + parsed.minor * COEF + parsed.patch;
+    Ok(value as u32)
+}
+
+impl<'a, 'b> CMakeConfigData<'a, 'b> {
+    pub fn cmake_vars(&self) -> Result<Vec<CMakeVar>> {
+        let mut cmake_vars = Vec::new();
+        if let Some(library_type) = self.library_type {
+            cmake_vars.push(CMakeVar::new(
+                "RITUAL_LIBRARY_TYPE",
+                match library_type {
+                    CppLibraryType::Shared => "SHARED",
+                    CppLibraryType::Static => "STATIC",
+                },
+            ));
+        }
+        if let Some(version) = &self.cpp_library_version {
+            cmake_vars.push(CMakeVar::new(
+                "RITUAL_CPP_LIB_VERSION",
+                version_to_number(version)?.to_string(),
+            ));
+        }
+        cmake_vars.push(CMakeVar::new_path_list(
+            "RITUAL_INCLUDE_PATHS",
+            self.cpp_build_paths.include_paths(),
+        )?);
+        cmake_vars.push(CMakeVar::new_path_list(
+            "RITUAL_LIB_PATHS",
+            self.cpp_build_paths.lib_paths(),
+        )?);
+        cmake_vars.push(CMakeVar::new_path_list(
+            "RITUAL_FRAMEWORK_PATHS",
+            self.cpp_build_paths.framework_paths(),
+        )?);
+        cmake_vars.push(CMakeVar::new_list(
+            "RITUAL_LINKED_LIBS",
+            self.cpp_build_config_data.linked_libs(),
+        )?);
+        cmake_vars.push(CMakeVar::new_list(
+            "RITUAL_LINKED_FRAMEWORKS",
+            self.cpp_build_config_data.linked_frameworks(),
+        )?);
         cmake_vars.push(CMakeVar::new(
-            "RITUAL_LIBRARY_TYPE",
-            match *library_type {
-                CppLibraryType::Shared => "SHARED",
-                CppLibraryType::Static => "STATIC",
-            },
+            "RITUAL_COMPILER_FLAGS",
+            self.cpp_build_config_data.compiler_flags().join(" "),
         ));
+        Ok(cmake_vars)
     }
-    cmake_vars.push(CMakeVar::new_path_list(
-        "RITUAL_INCLUDE_PATHS",
-        cpp_build_paths.include_paths(),
-    )?);
-    cmake_vars.push(CMakeVar::new_path_list(
-        "RITUAL_LIB_PATHS",
-        cpp_build_paths.lib_paths(),
-    )?);
-    cmake_vars.push(CMakeVar::new_path_list(
-        "RITUAL_FRAMEWORK_PATHS",
-        cpp_build_paths.framework_paths(),
-    )?);
-    cmake_vars.push(CMakeVar::new_list(
-        "RITUAL_LINKED_LIBS",
-        cpp_build_config_data.linked_libs(),
-    )?);
-    cmake_vars.push(CMakeVar::new_list(
-        "RITUAL_LINKED_FRAMEWORKS",
-        cpp_build_config_data.linked_frameworks(),
-    )?);
-    cmake_vars.push(CMakeVar::new(
-        "RITUAL_COMPILER_FLAGS",
-        cpp_build_config_data.compiler_flags().join(" "),
-    ));
-    Ok(cmake_vars)
 }

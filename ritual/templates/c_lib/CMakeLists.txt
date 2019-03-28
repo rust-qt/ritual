@@ -53,6 +53,11 @@ endif()
 
 add_definitions(-D{lib_name_uppercase}_LIBRARY)
 
+if(RITUAL_CPP_LIB_VERSION)
+    message(STATUS "RITUAL_CPP_LIB_VERSION=${{RITUAL_CPP_LIB_VERSION}}")
+    add_definitions(-DRITUAL_CPP_LIB_VERSION=${{RITUAL_CPP_LIB_VERSION}})
+endif()
+
 if(${{CMAKE_COMPILER_IS_GNUCXX}})
     set(CMAKE_CXX_FLAGS "${{CMAKE_CXX_FLAGS}} -Wall -Wextra -Werror=return-type")
 endif()
