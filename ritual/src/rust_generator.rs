@@ -1264,12 +1264,15 @@ impl State<'_, '_> {
                 } else {
                     return Ok(Vec::new());
                 };
+                if cpp_function.doc.arguments_before_omitting.is_some() {
+                    return Ok(Vec::new());
+                }
                 let receiver_id = cpp_function.receiver_id()?;
                 let function_kind = RustFunctionKind::SignalOrSlotGetter {
                     cpp_path: cpp_function.path.clone(),
                     receiver_type,
                     receiver_id,
-                    qobject_path: self.qt_core_path().join("QObject"),
+                    cpp_doc: cpp_function.doc.external_doc.clone(),
                 };
 
                 let path = self.generate_rust_path(

@@ -4,6 +4,7 @@
 #![allow(dead_code)]
 
 use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFieldAccessorType};
+use crate::cpp_function::CppFunctionExternalDoc;
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_info::{
     RustEnumValue, RustFunction, RustFunctionKind, RustModule, RustModuleKind, RustQtReceiverType,
@@ -166,6 +167,21 @@ pub fn enum_value_doc(value: &RustEnumValue) -> String {
     }
 }
 
+fn format_external_doc(cpp_doc: &CppFunctionExternalDoc) -> String {
+    let prefix = if let Some(declaration) = &cpp_doc.mismatched_declaration {
+        format!(
+            "Warning: no exact match found in C++ documentation. \
+             Below is the <a href=\"{}\">C++ documentation</a> \
+             for {}:",
+            cpp_doc.url,
+            wrap_inline_cpp_code(declaration)
+        )
+    } else {
+        format!("<a href=\"{}\">C++ documentation:</a>", cpp_doc.url)
+    };
+    format!("{} {}", prefix, wrap_cpp_doc_block(&cpp_doc.html))
+}
+
 pub fn function_doc(function: &RustFunction) -> String {
     let mut doc = Vec::new();
 
@@ -188,18 +204,7 @@ pub fn function_doc(function: &RustFunction) -> String {
                     }
 
                     if let Some(cpp_doc) = &cpp_function.doc.external_doc {
-                        let prefix = if let Some(declaration) = &cpp_doc.mismatched_declaration {
-                            format!(
-                                "Warning: no exact match found in C++ documentation. \
-                                 Below is the <a href=\"{}\">C++ documentation</a> \
-                                 for {}:",
-                                cpp_doc.url,
-                                wrap_inline_cpp_code(declaration)
-                            )
-                        } else {
-                            format!("<a href=\"{}\">C++ documentation:</a>", cpp_doc.url)
-                        };
-                        doc.push(format!("{} {}", prefix, wrap_cpp_doc_block(&cpp_doc.html)));
+                        doc.push(format_external_doc(cpp_doc));
                     }
                 }
                 CppFfiFunctionKind::FieldAccessor {
@@ -230,6 +235,7 @@ pub fn function_doc(function: &RustFunction) -> String {
         RustFunctionKind::SignalOrSlotGetter {
             receiver_type,
             cpp_path,
+            cpp_doc,
             ..
         } => {
             doc.push(format!(
@@ -242,7 +248,10 @@ pub fn function_doc(function: &RustFunction) -> String {
                 },
                 cpp_path = cpp_path.to_cpp_pseudo_code()
             ));
-            // TODO: add doc
+
+            if let Some(cpp_doc) = cpp_doc {
+                doc.push(format_external_doc(cpp_doc));
+            }
         }
     }
     // TODO: somehow handle docs for inherited methods (currently only for virtual functions).

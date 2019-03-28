@@ -2,6 +2,7 @@
 
 use crate::cpp_data::{CppPath, CppTypeDoc};
 use crate::cpp_ffi_data::CppFfiFunction;
+use crate::cpp_function::CppFunctionExternalDoc;
 use crate::cpp_type::CppType;
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_type::{RustFinalType, RustPath, RustPointerLikeTypeKind, RustType};
@@ -168,7 +169,7 @@ pub enum RustFunctionKind {
         /// Identifier of the signal or slot for passing to `QObject::connect`.
         receiver_id: String,
 
-        qobject_path: RustPath,
+        cpp_doc: Option<CppFunctionExternalDoc>,
     },
 }
 
