@@ -9,7 +9,7 @@ use crate::cpp_ffi_data::CppFfiType;
 use crate::cpp_ffi_data::{CppCast, CppFfiFunction, CppFfiFunctionKind, CppFieldAccessorType};
 use crate::cpp_ffi_data::{CppFfiArgumentMeaning, CppToFfiTypeConversion};
 use crate::cpp_function::ReturnValueAllocationPlace;
-use crate::cpp_function::{CppFunction, CppFunctionArgument, CppFunctionKind};
+use crate::cpp_function::{CppFunction, CppFunctionArgument, CppFunctionDoc, CppFunctionKind};
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
 use crate::cpp_type::CppTypeRole;
@@ -150,7 +150,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let movable_types = data
         .all_cpp_items()
         .filter_map(|item| {
-            if let CppItem::Type(type_data) = &item.cpp_item {
+            if let CppItem::Type(type_data) = &item.item {
                 if let CppTypeDeclarationKind::Class { is_movable } = type_data.kind {
                     if is_movable {
                         return Some(type_data.path.clone());
@@ -166,17 +166,14 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     for index in 0..data.current_database.cpp_items().len() {
         let item = &mut data.current_database.cpp_items_mut()[index];
         if item.is_cpp_ffi_processed {
-            trace!(
-                "cpp_data = {}; already processed",
-                item.cpp_item.to_string()
-            );
+            trace!("cpp_data = {}; already processed", item.item.to_string());
             continue;
         }
-        if let Err(err) = check_preconditions(&item.cpp_item) {
-            trace!("skipping {}: {}", item.cpp_item, err);
+        if let Err(err) = check_preconditions(&item.item) {
+            trace!("skipping {}: {}", item.item, err);
             continue;
         }
-        let result = match &item.cpp_item {
+        let result = match &item.item {
             CppItem::Function(method) => generate_ffi_methods_for_method(
                 method,
                 &movable_types,
@@ -203,14 +200,10 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
 
         match result {
             Err(error) => {
-                debug!("failed to add FFI item: {}: {}", item.cpp_item, error);
+                debug!("failed to add FFI item: {}: {}", item.item, error);
             }
             Ok(r) => {
-                debug!(
-                    "added FFI items (count: {}) for: {}",
-                    r.len(),
-                    item.cpp_item
-                );
+                debug!("added FFI items (count: {}) for: {}", r.len(), item.item);
                 for item in &r {
                     trace!("* {:?}", item);
                 }
@@ -233,7 +226,7 @@ fn create_cast_method(
     source_ffi_item: Option<usize>,
     name_provider: &mut FfiNameProvider,
 ) -> Result<CppFfiDatabaseItem> {
-    let method = CppFunction {
+    let method: CppFunction = CppFunction {
         path: CppPath::from_item(CppPathItem {
             name: cast.cpp_method_name().into(),
             template_arguments: Some(vec![to.clone()]),
@@ -248,13 +241,12 @@ fn create_cast_method(
         }],
         allows_variadic_arguments: false,
         declaration_code: None,
-        doc: None,
+        doc: CppFunctionDoc::default(),
     };
     // no need for movable_types since all cast methods operate on pointers
     let r = to_ffi_method(
         &CppFfiFunctionKind::Function {
             cpp_function: method.clone(),
-            omitted_arguments: None,
             cast: Some(cast),
         },
         &[],
@@ -345,7 +337,6 @@ fn generate_ffi_methods_for_method(
         to_ffi_method(
             &CppFfiFunctionKind::Function {
                 cpp_function: method.clone(),
-                omitted_arguments: None,
                 cast: None,
             },
             movable_types,
@@ -353,32 +344,6 @@ fn generate_ffi_methods_for_method(
         )?,
         source_ffi_item,
     ));
-
-    if let Some(last_arg) = method.arguments.last() {
-        if last_arg.has_default_value {
-            let mut method_copy = method.clone();
-            while let Some(arg) = method_copy.arguments.pop() {
-                if !arg.has_default_value {
-                    break;
-                }
-                let processed_method = to_ffi_method(
-                    &CppFfiFunctionKind::Function {
-                        cpp_function: method_copy.clone(),
-                        omitted_arguments: Some(
-                            method.arguments.len() - method_copy.arguments.len(),
-                        ),
-                        cast: None,
-                    },
-                    movable_types,
-                    name_provider,
-                )?;
-                methods.push(CppFfiDatabaseItem::from_function(
-                    processed_method,
-                    source_ffi_item,
-                ));
-            }
-        }
-    }
 
     Ok(methods)
 }

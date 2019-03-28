@@ -3,7 +3,7 @@ use crate::cpp_data::{
     CppBaseSpecifier, CppClassField, CppEnumValue, CppOriginLocation, CppPath, CppTypeDeclaration,
     CppTypeDeclarationKind, CppVisibility,
 };
-use crate::cpp_ffi_data::{CppFfiFunction, CppFfiFunctionKind, QtSlotWrapper};
+use crate::cpp_ffi_data::{CppFfiFunction, QtSlotWrapper};
 use crate::cpp_function::CppFunction;
 use crate::cpp_type::CppType;
 use crate::rust_info::{RustDatabase, RustDatabaseItem};
@@ -43,9 +43,10 @@ pub enum DatabaseItemSource {
         /// Exact location of the declaration
         origin_location: CppOriginLocation,
     },
-    ImplicitDestructor,
+    ImplicitXstructor,
     TemplateInstantiation,
     NamespaceInferring,
+    OmittingArguments,
 }
 
 impl DatabaseItemSource {
@@ -319,23 +320,7 @@ impl CppFfiItem {
 
     pub fn short_text(&self) -> String {
         match self {
-            CppFfiItem::Function(function) => match &function.kind {
-                CppFfiFunctionKind::Function {
-                    cpp_function,
-                    omitted_arguments,
-                    ..
-                } => {
-                    if let Some(num) = omitted_arguments {
-                        format!("[omitted arguments: {}] {}", num, cpp_function.short_text())
-                    } else {
-                        cpp_function.short_text()
-                    }
-                }
-                CppFfiFunctionKind::FieldAccessor {
-                    accessor_type,
-                    field,
-                } => format!("[{:?}] {}", accessor_type, field.short_text()),
-            },
+            CppFfiItem::Function(function) => function.short_text(),
             CppFfiItem::QtSlotWrapper(slot_wrapper) => format!(
                 "slot wrapper for ({})",
                 slot_wrapper
@@ -401,7 +386,7 @@ impl CppFfiDatabaseItem {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CppDatabaseItem {
-    pub cpp_item: CppItem,
+    pub item: CppItem,
     pub source: DatabaseItemSource,
     pub source_ffi_item: Option<usize>,
     pub is_cpp_ffi_processed: bool,
@@ -510,7 +495,7 @@ impl Database {
         if let Some(item) = self
             .cpp_items
             .iter_mut()
-            .find(|item| item.cpp_item.is_same(&data))
+            .find(|item| item.item.is_same(&data))
         {
             // parser data takes priority
             if source.is_parser() && !item.source.is_parser() {
@@ -521,7 +506,7 @@ impl Database {
         self.is_modified = true;
         debug!("added cpp item: {}, source: {:?}", data, source);
         let item = CppDatabaseItem {
-            cpp_item: data,
+            item: data,
             source,
             source_ffi_item,
             is_cpp_ffi_processed: false,

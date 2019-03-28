@@ -15,7 +15,7 @@ pub fn set_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
             .current_database
             .cpp_items_mut()
             .iter_mut()
-            .filter_map(|item| item.cpp_item.as_type_mut())
+            .filter_map(|item| item.item.as_type_mut())
         {
             if let CppTypeDeclarationKind::Class { is_movable, .. } = &mut type1.kind {
                 *is_movable = hook(&type1.path)? == MovableTypesHookOutput::Movable;
@@ -127,7 +127,7 @@ pub fn suggest_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
         if !item.source.is_parser() || item.source_ffi_item.is_some() {
             continue;
         }
-        if let CppItem::Type(type1) = &item.cpp_item {
+        if let CppItem::Type(type1) = &item.item {
             if !type1.kind.is_class() {
                 continue;
             }
@@ -145,7 +145,7 @@ pub fn suggest_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
         if !item.source.is_parser() || item.source_ffi_item.is_some() {
             continue;
         }
-        if let CppItem::Function(function) = &item.cpp_item {
+        if let CppItem::Function(function) = &item.item {
             if function.is_private() {
                 continue;
             }

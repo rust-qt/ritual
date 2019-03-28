@@ -15,7 +15,7 @@ pub fn inherits(
     base_class_name: &CppPath,
 ) -> bool {
     for item in data.all_cpp_items() {
-        if let CppItem::ClassBase(base_data) = &item.cpp_item {
+        if let CppItem::ClassBase(base_data) = &item.item {
             if &base_data.derived_class_type == derived_class_name {
                 if &base_data.base_class_type == base_class_name {
                     return true;
@@ -53,7 +53,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData<'_>) -> Result<()> {
             origin_location, ..
         } = &item.source
         {
-            if let CppItem::Type(type1) = &item.cpp_item {
+            if let CppItem::Type(type1) = &item.item {
                 if type1.kind.is_class() {
                     if type1.path == qobject_path || inherits(&data, &type1.path, &qobject_path) {
                         if !files.contains(&origin_location.include_file_path) {
@@ -107,7 +107,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData<'_>) -> Result<()> {
             origin_location, ..
         } = &item.source
         {
-            if let CppItem::Type(type1) = &item.cpp_item {
+            if let CppItem::Type(type1) = &item.item {
                 if let Some(sections) = sections.get(&origin_location.include_file_path) {
                     let sections_for_class = sections
                         .iter()
@@ -124,7 +124,7 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData<'_>) -> Result<()> {
             origin_location, ..
         } = &item.source
         {
-            if let CppItem::Function(method) = &mut item.cpp_item {
+            if let CppItem::Function(method) = &mut item.item {
                 let mut section_type = SectionType::Other;
                 if let Ok(class_name) = method.class_type() {
                     if let Some(sections) = sections_per_class.get(&class_name) {

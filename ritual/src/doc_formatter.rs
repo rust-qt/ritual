@@ -172,24 +172,22 @@ pub fn function_doc(function: &RustFunction) -> String {
     match &function.kind {
         RustFunctionKind::FfiWrapper(data) => {
             match &data.cpp_ffi_function.kind {
-                CppFfiFunctionKind::Function {
-                    cpp_function,
-                    omitted_arguments,
-                    ..
-                } => {
+                CppFfiFunctionKind::Function { cpp_function, .. } => {
                     doc.push(format!(
                         "Calls C++ function: {}\n\n",
                         wrap_inline_cpp_code(&cpp_function.short_text())
                     ));
-                    if let Some(omitted_arguments) = omitted_arguments {
+                    if let Some(arguments_before_omitting) =
+                        &cpp_function.doc.arguments_before_omitting
+                    {
                         // TODO: handle singular/plural form
                         doc.push(format!(
                             "This version of the function omits some arguments ({}).\n\n",
-                            omitted_arguments
+                            arguments_before_omitting.len() - cpp_function.arguments.len()
                         ));
                     }
 
-                    if let Some(cpp_doc) = &cpp_function.doc {
+                    if let Some(cpp_doc) = &cpp_function.doc.external_doc {
                         let prefix = if let Some(declaration) = &cpp_doc.mismatched_declaration {
                             format!(
                                 "Warning: no exact match found in C++ documentation. \

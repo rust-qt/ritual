@@ -4,7 +4,7 @@ use crate::cpp_data::{
     CppTypeDeclaration, CppTypeDeclarationKind, CppVisibility,
 };
 use crate::cpp_function::{
-    CppFunction, CppFunctionArgument, CppFunctionKind, CppFunctionMemberData,
+    CppFunction, CppFunctionArgument, CppFunctionDoc, CppFunctionKind, CppFunctionMemberData,
 };
 use crate::cpp_operator::CppOperator;
 use crate::cpp_type::{
@@ -274,7 +274,7 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
 fn add_namespaces(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut namespaces = HashSet::new();
     for item in data.current_database.cpp_items() {
-        let name = match &item.cpp_item {
+        let name = match &item.item {
             CppItem::Type(t) => &t.path,
             CppItem::Function(f) => &f.path,
             _ => continue,
@@ -292,7 +292,7 @@ fn add_namespaces(data: &mut ProcessorData<'_>) -> Result<()> {
         }
     }
     for item in data.current_database.cpp_items() {
-        if let CppItem::Type(t) = &item.cpp_item {
+        if let CppItem::Type(t) = &item.item {
             namespaces.remove(&t.path);
         }
     }
@@ -360,7 +360,7 @@ impl CppParser<'_, '_> {
             once(self.data.current_database as &_).chain(self.data.dep_databases.iter());
         for database in databases {
             for item in database.cpp_items() {
-                if let CppItem::Type(info) = &item.cpp_item {
+                if let CppItem::Type(info) = &item.item {
                     if f(info) {
                         return Some(info);
                     }
@@ -1189,7 +1189,7 @@ impl CppParser<'_, '_> {
                 allows_variadic_arguments,
                 return_type: return_type_parsed,
                 declaration_code,
-                doc: None,
+                doc: CppFunctionDoc::default(),
             },
             DatabaseItemSource::CppParser {
                 include_file: self.entity_include_file(entity)?,

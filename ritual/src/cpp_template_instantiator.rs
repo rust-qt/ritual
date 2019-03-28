@@ -13,7 +13,7 @@ fn check_template_type(data: &ProcessorData<'_>, type1: &CppType) -> Result<()> 
             if let Some(template_arguments) = &path.last().template_arguments {
                 let is_available = data
                     .all_cpp_items()
-                    .filter_map(|i| i.cpp_item.as_type_ref())
+                    .filter_map(|i| i.item.as_type_ref())
                     .any(|inst| &inst.path == path);
                 if !is_available {
                     bail!("type is not available: {:?}", type1);
@@ -96,7 +96,7 @@ pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut new_methods = Vec::new();
     for method in data
         .all_cpp_items()
-        .filter_map(|item| item.cpp_item.as_function_ref())
+        .filter_map(|item| item.item.as_function_ref())
     {
         for type1 in method.all_involved_types() {
             let path = match &type1 {
@@ -114,7 +114,7 @@ pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
                         .current_database
                         .cpp_items()
                         .iter()
-                        .filter_map(|item| item.cpp_item.as_type_ref())
+                        .filter_map(|item| item.item.as_type_ref())
                     {
                         let is_suitable = type1.path.parent().ok() == path.parent().ok()
                             && type1.path.last().name == path.last().name
@@ -192,7 +192,7 @@ pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> 
                     {
                         let is_in_database = data
                             .all_cpp_items()
-                            .filter_map(|item| item.cpp_item.as_type_ref())
+                            .filter_map(|item| item.item.as_type_ref())
                             .any(|i| &i.path == path);
                         if !is_in_database {
                             let is_in_result = result.iter().any(|x| x == path);
@@ -212,14 +212,14 @@ pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> 
     }
     let mut result = Vec::new();
     for item in data.current_database.cpp_items() {
-        for type1 in item.cpp_item.all_involved_types() {
+        for type1 in item.item.all_involved_types() {
             check_type(&type1, &data, &mut result);
         }
     }
     for item in result {
         let original_type = data
             .all_cpp_items()
-            .filter_map(|x| x.cpp_item.as_type_ref())
+            .filter_map(|x| x.item.as_type_ref())
             .find(|t| {
                 t.path.parent().ok() == item.parent().ok()
                     && t.path.last().name == item.last().name

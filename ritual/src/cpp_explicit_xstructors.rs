@@ -1,5 +1,5 @@
 use crate::cpp_data::{CppPathItem, CppVisibility};
-use crate::cpp_function::{CppFunction, CppFunctionKind, CppFunctionMemberData};
+use crate::cpp_function::{CppFunction, CppFunctionDoc, CppFunctionKind, CppFunctionMemberData};
 use crate::cpp_type::CppType;
 use crate::database::{CppItem, DatabaseItemSource};
 use crate::processor::ProcessorData;
@@ -11,14 +11,14 @@ use ritual_common::errors::Result;
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut methods = Vec::new();
     for type1 in data.current_database.cpp_items() {
-        if let CppItem::Type(declaration) = &type1.cpp_item {
+        if let CppItem::Type(declaration) = &type1.item {
             if declaration.kind.is_class() {
                 let class_path = &declaration.path;
                 let found_destructor = data
                     .current_database
                     .cpp_items()
                     .iter()
-                    .filter_map(|item| item.cpp_item.as_function_ref())
+                    .filter_map(|item| item.item.as_function_ref())
                     .any(|m| m.is_destructor() && m.class_type().ok().as_ref() == Some(class_path));
                 if !found_destructor {
                     let function = CppFunction {
@@ -41,7 +41,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                         arguments: vec![],
                         allows_variadic_arguments: false,
                         declaration_code: None,
-                        doc: None,
+                        doc: CppFunctionDoc::default(),
                     };
                     methods.push((type1.source_ffi_item, function));
                 }
@@ -50,7 +50,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                     .current_database
                     .cpp_items()
                     .iter()
-                    .filter_map(|item| item.cpp_item.as_function_ref())
+                    .filter_map(|item| item.item.as_function_ref())
                     .any(|m| {
                         m.is_constructor() && m.class_type().ok().as_ref() == Some(class_path)
                     });
@@ -74,7 +74,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                         arguments: vec![],
                         allows_variadic_arguments: false,
                         declaration_code: None,
-                        doc: None,
+                        doc: CppFunctionDoc::default(),
                     };
                     methods.push((type1.source_ffi_item, function));
                 }
@@ -83,7 +83,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     }
     for (source_ffi_item, method) in methods {
         data.current_database.add_cpp_item(
-            DatabaseItemSource::ImplicitDestructor,
+            DatabaseItemSource::ImplicitXstructor,
             source_ffi_item,
             CppItem::Function(method),
         );

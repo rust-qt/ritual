@@ -735,7 +735,7 @@ impl State<'_, '_> {
             if let Some(index) = db
                 .cpp_items()
                 .iter()
-                .position(|cpp_item| cpp_item.cpp_item.path() == Some(cpp_path))
+                .position(|cpp_item| cpp_item.item.path() == Some(cpp_path))
             {
                 return Ok(db
                     .rust_items()
@@ -1042,7 +1042,7 @@ impl State<'_, '_> {
 
     #[allow(clippy::useless_let_if_seq)]
     fn process_cpp_item(&self, cpp_item: &CppDatabaseItem) -> Result<Vec<RustItem>> {
-        match &cpp_item.cpp_item {
+        match &cpp_item.item {
             CppItem::Namespace(path) => {
                 let rust_path = self.generate_rust_path(path, &NameType::Module)?;
                 let rust_item = RustItem::Module(RustModule {
@@ -1387,7 +1387,7 @@ impl State<'_, '_> {
                     continue;
                 }
                 if let Ok(rust_items) = self.process_cpp_item(cpp_item) {
-                    let cpp_item_text = cpp_item.cpp_item.to_string();
+                    let cpp_item_text = cpp_item.item.to_string();
                     for rust_item in rust_items {
                         let item = RustDatabaseItem {
                             item: rust_item,
@@ -1419,10 +1419,7 @@ impl State<'_, '_> {
             }
 
             if let Err(err) = self.process_cpp_item(cpp_item) {
-                debug!(
-                    "failed to process cpp item: {}: {}",
-                    &cpp_item.cpp_item, err
-                );
+                debug!("failed to process cpp item: {}: {}", &cpp_item.item, err);
                 print_trace(&err, Some(log::Level::Trace));
             }
         }

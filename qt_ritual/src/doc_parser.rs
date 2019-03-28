@@ -6,7 +6,7 @@ use itertools::Itertools;
 use log::{debug, error, trace};
 use regex::Regex;
 use ritual::cpp_data::{CppPath, CppTypeDoc, CppVisibility};
-use ritual::cpp_function::CppFunctionDoc;
+use ritual::cpp_function::CppFunctionExternalDoc;
 use ritual::database::{CppDatabaseItem, CppItem};
 use ritual::processor::ProcessorData;
 use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
@@ -103,7 +103,7 @@ impl DocParser {
         name: &str,
         declaration1: &str,
         declaration2: &str,
-    ) -> Result<CppFunctionDoc> {
+    ) -> Result<CppFunctionExternalDoc> {
         let mut name_parts = name.split("::").collect_vec();
         let anchor_override = if name_parts.len() >= 2
             && name_parts[name_parts.len() - 1] == name_parts[name_parts.len() - 2]
@@ -203,7 +203,7 @@ impl DocParser {
                         if item.html.find(|c| c != '\n').is_none() {
                             bail!("found empty documentation");
                         }
-                        return Ok(CppFunctionDoc {
+                        return Ok(CppFunctionExternalDoc {
                             html: item.html.clone(),
                             anchor: item.anchor.clone(),
                             mismatched_declaration: None,
@@ -225,7 +225,7 @@ impl DocParser {
                         if item.html.find(|c| c != '\n').is_none() {
                             bail!("found empty documentation");
                         }
-                        return Ok(CppFunctionDoc {
+                        return Ok(CppFunctionExternalDoc {
                             html: item.html.clone(),
                             anchor: item.anchor.clone(),
                             mismatched_declaration: None,
@@ -248,7 +248,7 @@ impl DocParser {
             if candidates[0].html.is_empty() {
                 bail!("found empty documentation");
             }
-            return Ok(CppFunctionDoc {
+            return Ok(CppFunctionExternalDoc {
                 html: candidates[0].html.clone(),
                 anchor: candidates[0].anchor.clone(),
                 url: format!("{}#{}", file_url, candidates[0].anchor),
@@ -616,7 +616,7 @@ fn find_methods_docs(items: &mut [CppDatabaseItem], data: &mut DocParser) -> Res
         if !item.source.is_parser() {
             continue;
         }
-        if let CppItem::Function(cpp_method) = &mut item.cpp_item {
+        if let CppItem::Function(cpp_method) = &mut item.item {
             if let Some(info) = &cpp_method.member {
                 if info.visibility == CppVisibility::Private {
                     continue;
@@ -628,7 +628,7 @@ fn find_methods_docs(items: &mut [CppDatabaseItem], data: &mut DocParser) -> Res
                     declaration_code,
                     &cpp_method.pseudo_declaration(),
                 ) {
-                    Ok(doc) => cpp_method.doc = Some(doc),
+                    Ok(doc) => cpp_method.doc.external_doc = Some(doc),
                     Err(msg) => {
                         if cpp_method.member.is_some()
                             && (cpp_method.path.last().name == "tr"
@@ -680,7 +680,7 @@ pub fn parse_docs(
         if !item.source.is_parser() {
             continue;
         }
-        let type_name = match &item.cpp_item {
+        let type_name = match &item.item {
             CppItem::Type(data) => data.path.clone(),
             CppItem::EnumValue(data) => data
                 .path
@@ -703,7 +703,7 @@ pub fn parse_docs(
             .get(&type_name)
             .expect("type_doc_cache is guaranteed to have an entry here because we added it above");
         if let Ok(doc) = doc {
-            match &mut item.cpp_item {
+            match &mut item.item {
                 CppItem::Type(data) => {
                     data.doc = Some(doc.type_doc.clone());
                 }

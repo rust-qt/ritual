@@ -48,37 +48,37 @@ fn run_parser(code: &'static str) -> ParserCppData {
         types: database
             .cpp_items()
             .iter()
-            .filter_map(|item| item.cpp_item.as_type_ref())
+            .filter_map(|item| item.item.as_type_ref())
             .cloned()
             .collect(),
         bases: database
             .cpp_items()
             .iter()
-            .filter_map(|item| item.cpp_item.as_base_ref())
+            .filter_map(|item| item.item.as_base_ref())
             .cloned()
             .collect(),
         fields: database
             .cpp_items()
             .iter()
-            .filter_map(|item| item.cpp_item.as_field_ref())
+            .filter_map(|item| item.item.as_field_ref())
             .cloned()
             .collect(),
         enum_values: database
             .cpp_items()
             .iter()
-            .filter_map(|item| item.cpp_item.as_enum_value_ref())
+            .filter_map(|item| item.item.as_enum_value_ref())
             .cloned()
             .collect(),
         methods: database
             .cpp_items()
             .iter()
-            .filter_map(|item| item.cpp_item.as_function_ref())
+            .filter_map(|item| item.item.as_function_ref())
             .cloned()
             .collect(),
         namespaces: database
             .cpp_items()
             .iter()
-            .filter_map(|item| item.cpp_item.as_namespace_ref())
+            .filter_map(|item| item.item.as_namespace_ref())
             .cloned()
             .collect(),
     }
@@ -101,7 +101,7 @@ fn simple_func() {
                 argument_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
                 has_default_value: false,
             }],
-            doc: None,
+            doc: Default::default(),
             allows_variadic_arguments: false,
             declaration_code: Some("int func1 ( int x )".to_string()),
         }
@@ -131,7 +131,7 @@ fn simple_func_with_default_value() {
                 argument_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
                 has_default_value: true,
             }],
-            doc: None,
+            doc: Default::default(),
             allows_variadic_arguments: false,
             declaration_code: Some("bool func1 ( int x = 42 )".to_string()),
         }
@@ -196,7 +196,7 @@ fn functions_with_class_arg() {
                 argument_type: CppType::Class(CppPath::from_good_str("Magic")),
                 has_default_value: false,
             }],
-            doc: None,
+            doc: Default::default(),
             allows_variadic_arguments: false,
             declaration_code: Some("bool func1 ( Magic x )".to_string()),
         }
@@ -216,7 +216,7 @@ fn functions_with_class_arg() {
                 ),
                 has_default_value: false,
             }],
-            doc: None,
+            doc: Default::default(),
             allows_variadic_arguments: false,
             declaration_code: Some("bool func1 ( Magic * x )".to_string()),
         }
@@ -236,7 +236,7 @@ fn functions_with_class_arg() {
                 ),
                 has_default_value: false,
             }],
-            doc: None,
+            doc: Default::default(),
             allows_variadic_arguments: false,
             declaration_code: Some("bool func2 ( const Magic & )".to_string()),
         }
@@ -275,7 +275,7 @@ fn variadic_func() {
                 ),
                 has_default_value: false,
             }],
-            doc: None,
+            doc: Default::default(),
             allows_variadic_arguments: true,
             declaration_code: Some("int my_printf ( const char * format , ... )".to_string()),
         }
@@ -322,7 +322,7 @@ fn free_template_func() {
                 },
                 has_default_value: false,
             }],
-            doc: None,
+            doc: Default::default(),
             allows_variadic_arguments: false,
             declaration_code: Some("template < typename T > T abs ( T value )".to_string()),
         }
@@ -363,7 +363,7 @@ fn free_func_operator_sub() {
                         has_default_value: false,
                     },
                 ],
-                doc: None,
+                doc: Default::default(),
                 allows_variadic_arguments: false,
                 declaration_code: Some("C1 operator - ( C1 a , C1 b )".to_string()),
             }
@@ -412,7 +412,7 @@ fn simple_class_method() {
                 argument_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
                 has_default_value: false,
             }],
-            doc: None,
+            doc: Default::default(),
             allows_variadic_arguments: false,
             declaration_code: Some("int func1 ( int x )".to_string()),
         }
@@ -600,7 +600,7 @@ fn template_class_method() {
                 argument_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
                 has_default_value: false,
             }],
-            doc: None,
+            doc: Default::default(),
             allows_variadic_arguments: false,
             declaration_code: Some("T get ( int index )".to_string()),
         }

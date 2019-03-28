@@ -14,6 +14,7 @@ pub mod cpp_ffi_data;
 pub mod cpp_ffi_generator;
 pub mod cpp_function;
 mod cpp_inheritance; // TODO: deal with inheritance for subclassing support
+mod cpp_omitting_arguments;
 mod cpp_operator;
 mod cpp_parser;
 mod cpp_template_instantiator;

@@ -38,7 +38,7 @@ pub fn empty_regular_method() -> CppFunction {
         member: None,
         return_type: CppType::Void,
         arguments: vec![],
-        doc: None,
+        doc: Default::default(),
         allows_variadic_arguments: false,
         operator: None,
         declaration_code: None,
@@ -173,7 +173,6 @@ fn to_ffi(function: &CppFunction, force_stack: Option<CppPath>) -> CppFfiFunctio
     crate::cpp_ffi_generator::to_ffi_method(
         &CppFfiFunctionKind::Function {
             cpp_function: function.clone(),
-            omitted_arguments: None,
             cast: None,
         },
         &movable_types,
@@ -618,7 +617,7 @@ fn short_text1() {
                 has_default_value: true,
             },
         ],
-        doc: None,
+        doc: Default::default(),
         allows_variadic_arguments: false,
         declaration_code: None,
     };

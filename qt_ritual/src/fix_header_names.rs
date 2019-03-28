@@ -96,7 +96,7 @@ pub fn fix_header_names(data: &mut [CppDatabaseItem], headers_dir: &PathBuf) -> 
     // TODO: only run on new database items?
     let map = HeaderNameMap::new(headers_dir)?;
     for item in data {
-        let class_name = match &item.cpp_item {
+        let class_name = match &item.item {
             CppItem::Type(data) => Some(data.path.doc_id()),
             CppItem::Function(data) => data.class_type().ok().map(|x| x.doc_id()),
             _ => continue,

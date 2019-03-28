@@ -74,7 +74,7 @@ pub struct CppFunctionMemberData {
 
 /// C++ documentation for a method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
-pub struct CppFunctionDoc {
+pub struct CppFunctionExternalDoc {
     /// HTML anchor of this documentation entry
     /// (used to detect duplicates)
     pub anchor: String,
@@ -88,6 +88,12 @@ pub struct CppFunctionDoc {
     pub url: String,
     /// Absolute documentation URLs encountered in the content
     pub cross_references: Vec<String>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize, Default)]
+pub struct CppFunctionDoc {
+    pub arguments_before_omitting: Option<Vec<CppFunctionArgument>>,
+    pub external_doc: Option<CppFunctionExternalDoc>,
 }
 
 /// Information about a C++ method
@@ -124,17 +130,13 @@ pub struct CppFunction {
     pub return_type: CppType,
     /// List of the method's arguments
     pub arguments: Vec<CppFunctionArgument>,
-    //  /// If Some, the method is derived from another method by omitting arguments,
-    //  /// and this field contains all arguments of the original method.
-    //  pub arguments_before_omitting: Option<Vec<CppMethodArgument>>,
     /// Whether the argument list is terminated with "..."
     pub allows_variadic_arguments: bool,
-    //pub template_arguments_values: Option<Vec<CppType>>,
     /// C++ code of the method's declaration.
     /// None if the method was not explicitly declared.
     pub declaration_code: Option<String>,
     /// C++ documentation data for this method
-    pub doc: Option<CppFunctionDoc>,
+    pub doc: CppFunctionDoc,
 }
 
 /// Chosen type allocation place for the method

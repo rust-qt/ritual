@@ -61,9 +61,6 @@ pub enum CppFfiFunctionKind {
     /// This is a real C++ function.
     Function {
         cpp_function: CppFunction,
-        /// If `Some`, the method is derived from another method by omitting arguments,
-        /// and this field contains the number of omitted arguments.
-        omitted_arguments: Option<usize>,
         /// If Some, this is an instance of `static_cast`, `dynamic_cast` or
         /// `qobject_cast` function call.
         cast: Option<CppCast>,
@@ -202,16 +199,16 @@ impl CppFfiFunction {
 
     pub fn short_text(&self) -> String {
         match &self.kind {
-            CppFfiFunctionKind::Function {
-                cpp_function,
-                omitted_arguments,
-                ..
-            } => {
-                let omitted_args_text = if let Some(args) = omitted_arguments {
-                    format!(" (omitted arguments: {}", args)
-                } else {
-                    String::new()
-                };
+            CppFfiFunctionKind::Function { cpp_function, .. } => {
+                let omitted_args_text =
+                    if let Some(args) = &cpp_function.doc.arguments_before_omitting {
+                        format!(
+                            " (omitted arguments: {})",
+                            args.len() - cpp_function.arguments.len()
+                        )
+                    } else {
+                        String::new()
+                    };
                 format!(
                     "FFI function call{}: {}",
                     omitted_args_text,

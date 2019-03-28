@@ -2,8 +2,8 @@ use crate::config::Config;
 use crate::database::{CppDatabaseItem, CppFfiDatabaseItem, Database};
 use crate::workspace::Workspace;
 use crate::{
-    cpp_checker, cpp_explicit_xstructors, cpp_ffi_generator, cpp_parser, cpp_template_instantiator,
-    crate_writer, rust_generator,
+    cpp_checker, cpp_explicit_xstructors, cpp_ffi_generator, cpp_omitting_arguments, cpp_parser,
+    cpp_template_instantiator, crate_writer, rust_generator,
 };
 use itertools::Itertools;
 use log::{error, info, trace};
@@ -118,6 +118,10 @@ impl Default for ProcessingSteps {
             s.push(
                 &format!("instantiate_templates{}", suffix),
                 cpp_template_instantiator::instantiate_templates,
+            );
+            s.push(
+                &format!("omitting_arguments{}", suffix),
+                cpp_omitting_arguments::run,
             );
             s.push(
                 &format!("cpp_ffi_generator{}", suffix),
