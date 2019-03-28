@@ -147,6 +147,7 @@ impl CrateProperties {
 pub type RustPathScopeHook = dyn Fn(&CppPath) -> Result<Option<RustPathScope>> + 'static;
 pub type RustPathHook =
     dyn Fn(&CppPath, &NameType<'_>, &ProcessorData<'_>) -> Result<Option<RustPath>> + 'static;
+pub type AfterCppParserHook = dyn Fn(&mut ProcessorData<'_>) -> Result<()> + 'static;
 
 /// The starting point of `cpp_to_rust` API.
 /// Create a `Config` object, set its properties,
@@ -168,6 +169,7 @@ pub struct Config {
     cpp_parser_path_hook: Option<Box<dyn Fn(&CppPath) -> Result<bool>>>,
     rust_path_scope_hook: Option<Box<RustPathScopeHook>>,
     rust_path_hook: Option<Box<RustPathHook>>,
+    after_cpp_parser_hook: Option<Box<AfterCppParserHook>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -196,6 +198,7 @@ impl Config {
             cpp_parser_path_hook: Default::default(),
             rust_path_scope_hook: Default::default(),
             rust_path_hook: Default::default(),
+            after_cpp_parser_hook: Default::default(),
         }
     }
 
@@ -397,6 +400,17 @@ impl Config {
 
     pub fn rust_path_hook(&self) -> Option<&RustPathHook> {
         self.rust_path_hook.as_ref().map(|b| &**b)
+    }
+
+    pub fn set_after_cpp_parser_hook(
+        &mut self,
+        hook: impl Fn(&mut ProcessorData<'_>) -> Result<()> + 'static,
+    ) {
+        self.after_cpp_parser_hook = Some(Box::new(hook));
+    }
+
+    pub fn after_cpp_parser_hook(&self) -> Option<&AfterCppParserHook> {
+        self.after_cpp_parser_hook.as_ref().map(|b| &**b)
     }
 }
 

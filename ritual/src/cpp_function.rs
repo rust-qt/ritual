@@ -72,6 +72,14 @@ pub struct CppFunctionMemberData {
     pub is_slot: bool,
 }
 
+impl CppFunctionMemberData {
+    fn is_same(&self, other: &CppFunctionMemberData) -> bool {
+        self.kind == other.kind
+            && self.is_const == other.is_const
+            && self.is_static == other.is_static
+    }
+}
+
 /// C++ documentation for a method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppFunctionExternalDoc {
@@ -197,8 +205,13 @@ impl CppFunction {
     }
 
     pub fn is_same(&self, other: &CppFunction) -> bool {
+        let member_is_same = match (&self.member, &other.member) {
+            (Some(m1), Some(m2)) => m1.is_same(m2),
+            (None, None) => true,
+            _ => false,
+        };
         self.path == other.path
-            && self.member == other.member
+            && member_is_same
             && self.operator == other.operator
             && self.return_type == other.return_type
             && self.argument_types_equal(other)

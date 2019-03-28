@@ -319,7 +319,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         None,
         |translation_unit| parser.parse(translation_unit),
     )?;
-    add_namespaces(parser.data)?;
+
     Ok(())
 }
 
@@ -345,7 +345,6 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
             },
         )?;
     }
-    add_namespaces(data)?;
     Ok(())
 }
 
@@ -1435,6 +1434,10 @@ impl CppParser<'_, '_> {
         self.parse_types(entity)?;
         debug!("Parsing functions");
         self.parse_functions(entity)?;
+        add_namespaces(self.data)?;
+        if let Some(hook) = self.data.config.after_cpp_parser_hook() {
+            hook(self.data)?;
+        }
         Ok(())
     }
 

@@ -181,18 +181,12 @@ pub fn create_config(crate_name: &str) -> Result<Config> {
         config
     };
 
-    let steps = config.processing_steps_mut();
-    steps.add_after(
-        &["cpp_parser"],
-        "qt_detect_signals_and_slots",
-        detect_signals_and_slots,
-    )?;
+    config.set_after_cpp_parser_hook(detect_signals_and_slots);
 
-    steps.add_after(
-        &["qt_detect_signals_and_slots"],
-        "add_slot_wrappers",
-        add_slot_wrappers,
-    )?;
+    let steps = config.processing_steps_mut();
+    for cpp_parser_stage in &["cpp_parser", "cpp_parser_stage2"] {
+        steps.add_after(&[cpp_parser_stage], "add_slot_wrappers", add_slot_wrappers)?;
+    }
 
     config.set_crate_template_path(repo_dir_path("qt_ritual/crate_templates")?.join(&crate_name));
 
