@@ -5,13 +5,13 @@ cmake_minimum_required(VERSION 3.0.0 FATAL_ERROR)
 project ({lib_name_lowercase})
 
 include_directories(${{CMAKE_CURRENT_SOURCE_DIR}} ${{CMAKE_CURRENT_BINARY_DIR}})
-if(RITUAL_INCLUDE_PATHS)
-    message(STATUS "RITUAL_INCLUDE_PATHS=${{RITUAL_INCLUDE_PATHS}}")
-    include_directories(${{RITUAL_INCLUDE_PATHS}})
+if(RITUAL_INCLUDE_PATH)
+    message(STATUS "RITUAL_INCLUDE_PATH=${{RITUAL_INCLUDE_PATH}}")
+    include_directories(${{RITUAL_INCLUDE_PATH}})
 endif()
-if(RITUAL_LIB_PATHS)
-    message(STATUS "RITUAL_LIB_PATHS=${{RITUAL_LIB_PATHS}}")
-    link_directories(${{RITUAL_LIB_PATHS}})
+if(RITUAL_LIBRARY_PATH)
+    message(STATUS "RITUAL_LIBRARY_PATH=${{RITUAL_LIBRARY_PATH}}")
+    link_directories(${{RITUAL_LIBRARY_PATH}})
 endif()
 
 file(GLOB sources *.cpp)
@@ -29,7 +29,7 @@ endif()
 macro(add_osx_framework fwname target)
     find_library(FRAMEWORK_${{fwname}}
             NAMES ${{fwname}}
-            PATHS ${{RITUAL_FRAMEWORK_PATHS}}
+            PATHS ${{RITUAL_FRAMEWORK_PATH}}
             NO_DEFAULT_PATH)
     if( ${{FRAMEWORK_${{fwname}}}} STREQUAL FRAMEWORK_${{fwname}}-NOTFOUND)
         message(FATAL_ERROR "Framework not found: ${{fwname}}")
@@ -39,8 +39,8 @@ macro(add_osx_framework fwname target)
     endif()
 endmacro(add_osx_framework)
 
-if(RITUAL_FRAMEWORK_PATHS)
-    message(STATUS "RITUAL_FRAMEWORK_PATHS=${{RITUAL_FRAMEWORK_PATHS}}")
+if(RITUAL_FRAMEWORK_PATH)
+    message(STATUS "RITUAL_FRAMEWORK_PATH=${{RITUAL_FRAMEWORK_PATH}}")
 endif()
 
 if(RITUAL_LINKED_FRAMEWORKS)

@@ -149,6 +149,7 @@ impl CppBuildConfig {
     }
 }
 
+use crate::env_var_names;
 use std::path::PathBuf;
 
 /// Machine-specific information required to build the C++ wrapper library.
@@ -211,17 +212,17 @@ impl CppBuildPaths {
     /// their values override current values of the object.
     pub fn apply_env(&mut self) {
         use std::env;
-        if let Ok(paths) = env::var("RITUAL_LIB_PATH") {
+        if let Ok(paths) = env::var(env_var_names::LIBRARY_PATH) {
             self.lib_paths = env::split_paths(&paths)
                 .filter(|s| !s.as_os_str().is_empty())
                 .collect();
         }
-        if let Ok(paths) = env::var("RITUAL_FRAMEWORK_PATH") {
+        if let Ok(paths) = env::var(env_var_names::FRAMEWORK_PATH) {
             self.framework_paths = env::split_paths(&paths)
                 .filter(|s| !s.as_os_str().is_empty())
                 .collect();
         }
-        if let Ok(paths) = env::var("RITUAL_INCLUDE_PATH") {
+        if let Ok(paths) = env::var(env_var_names::INCLUDE_PATH) {
             self.include_paths = env::split_paths(&paths)
                 .filter(|s| !s.as_os_str().is_empty())
                 .collect();

@@ -1,6 +1,7 @@
-use crate::lib_configs::global_config;
+use crate::lib_configs::{global_config, MOQT_INSTALL_DIR_ENV_VAR_NAME};
 use ritual::cli::{self, Options};
 use ritual_common::cpp_lib_builder::{BuildType, CppLibBuilder};
+use ritual_common::env_var_names;
 use ritual_common::errors::{FancyUnwrap, Result};
 use ritual_common::file_utils::{canonicalize, create_dir_all, repo_dir_path};
 use ritual_common::utils::add_env_path_item;
@@ -71,8 +72,8 @@ fn build_cpp_lib() -> Result<TempTestDir> {
     add_env("LD_LIBRARY_PATH", &lib_path)?;
     add_env("DYLD_LIBRARY_PATH", &lib_path)?;
     add_env("PATH", &lib_path)?;
-    add_env("RITUAL_LIB_PATH", &lib_path)?;
-    env::set_var("MOQT_INSTALL_DIR", &install_dir);
+    add_env(env_var_names::LIBRARY_PATH, &lib_path)?;
+    env::set_var(MOQT_INSTALL_DIR_ENV_VAR_NAME, &install_dir);
     Ok(temp_dir)
 }
 

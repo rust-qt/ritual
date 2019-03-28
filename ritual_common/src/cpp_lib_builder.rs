@@ -301,15 +301,15 @@ impl<'a, 'b> CMakeConfigData<'a, 'b> {
             ));
         }
         cmake_vars.push(CMakeVar::new_path_list(
-            "RITUAL_INCLUDE_PATHS",
+            "RITUAL_INCLUDE_PATH",
             self.cpp_build_paths.include_paths(),
         )?);
         cmake_vars.push(CMakeVar::new_path_list(
-            "RITUAL_LIB_PATHS",
+            "RITUAL_LIBRARY_PATH",
             self.cpp_build_paths.lib_paths(),
         )?);
         cmake_vars.push(CMakeVar::new_path_list(
-            "RITUAL_FRAMEWORK_PATHS",
+            "RITUAL_FRAMEWORK_PATH",
             self.cpp_build_paths.framework_paths(),
         )?);
         cmake_vars.push(CMakeVar::new_list(

@@ -7,6 +7,7 @@ use crate::{
 };
 use itertools::Itertools;
 use log::{error, info, trace};
+use ritual_common::env_var_names;
 use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use ritual_common::utils::{run_command, MapIfOk};
 use std::cmp::Ordering;
@@ -215,13 +216,16 @@ fn build_crate(data: &mut ProcessorData<'_>) -> Result<()> {
     //run_command(Command::new("cargo").arg("update").current_dir(path))?;
 
     for cargo_cmd in &["build", "test", "doc"] {
-        run_command(
-            Command::new("cargo")
-                .arg(cargo_cmd)
-                .arg("-p")
-                .arg(crate_name)
-                .current_dir(path),
-        )?;
+        let mut command = Command::new("cargo");
+        command
+            .arg(cargo_cmd)
+            .arg("-p")
+            .arg(crate_name)
+            .current_dir(path);
+        if cargo_cmd == &"doc" {
+            command.env(env_var_names::RUSTDOC, "1");
+        }
+        run_command(&mut command)?;
     }
     Ok(())
 }

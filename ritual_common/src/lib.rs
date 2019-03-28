@@ -16,6 +16,7 @@ pub mod string_utils;
 pub mod target;
 pub mod utils;
 pub use toml;
+pub mod env_var_names;
 
 #[cfg(test)]
 mod tests;

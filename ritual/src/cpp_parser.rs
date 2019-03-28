@@ -18,6 +18,7 @@ use clang::*;
 use itertools::Itertools;
 use log::{debug, trace, warn};
 use regex::Regex;
+use ritual_common::env_var_names;
 use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use ritual_common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
 use std::collections::HashSet;
@@ -221,18 +222,19 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
         args.push("-I".to_string());
         args.push(str.to_string());
     }
-    if let Ok(path) = ::std::env::var("CLANG_SYSTEM_INCLUDE_PATH") {
+    if let Ok(path) = ::std::env::var(env_var_names::CLANG_SYSTEM_INCLUDE_PATH) {
         if !Path::new(&path).exists() {
             warn!(
-                "CLANG_SYSTEM_INCLUDE_PATH environment variable is set to \"{}\" \
+                "{} environment variable is set to \"{}\" \
                  but this path does not exist. This may result in parse errors related to system header includes.",
+                env_var_names::CLANG_SYSTEM_INCLUDE_PATH,
                 path
             );
         }
         args.push("-isystem".to_string());
         args.push(path);
     } else {
-        trace!("CLANG_SYSTEM_INCLUDE_PATH environment variable is not set. This may result in parse errors related to system header includes.");
+        trace!("{} environment variable is not set. This may result in parse errors related to system header includes.", env_var_names::CLANG_SYSTEM_INCLUDE_PATH);
     }
     for dir in config.cpp_build_paths().framework_paths() {
         let str = path_to_str(dir)?;

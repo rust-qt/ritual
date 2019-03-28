@@ -229,7 +229,11 @@ impl State<'_, '_> {
             bail!("not a pointer to class");
         };
         let found = self.0.all_ffi_items().any(|item| {
-            if !item.checks.all_success() || item.checks.is_empty() {
+            if !item
+                .checks
+                .all_success(self.0.current_database.environments())
+                || item.checks.is_empty()
+            {
                 return false;
             }
             if let CppFfiItem::Function(func) = &item.item {

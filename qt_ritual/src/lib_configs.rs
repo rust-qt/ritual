@@ -11,7 +11,7 @@ use ritual::config::CrateProperties;
 use ritual::config::{Config, GlobalConfig};
 use ritual_common::cpp_build_config::CppLibraryType;
 use ritual_common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
-use ritual_common::errors::{bail, Result, ResultExt};
+use ritual_common::errors::{bail, format_err, Result, ResultExt};
 use ritual_common::file_utils::repo_dir_path;
 use ritual_common::target;
 use ritual_common::toml;
@@ -28,6 +28,9 @@ use self::_3d::{
 use self::core::core_config;
 use self::gui::gui_config;
 use self::widgets::widgets_config;
+use std::env;
+
+pub const MOQT_INSTALL_DIR_ENV_VAR_NAME: &str = "MOQT_INSTALL_DIR";
 
 fn empty_config(_config: &mut Config) -> Result<()> {
     Ok(())
@@ -65,10 +68,10 @@ pub fn create_config(crate_name: &str) -> Result<Config> {
     crate_properties.set_custom_fields(custom_fields);
     let mut config = if crate_name.starts_with("moqt_") {
         let mut config = Config::new(crate_properties);
-        let moqt_path = PathBuf::from(
-            ::std::env::var("MOQT_INSTALL_DIR")
-                .with_context(|_| "MOQT_INSTALL_DIR env var is missing")?,
-        );
+        let moqt_path =
+            PathBuf::from(env::var(MOQT_INSTALL_DIR_ENV_VAR_NAME).with_context(|_| {
+                format_err!("{} env var is missing", MOQT_INSTALL_DIR_ENV_VAR_NAME)
+            })?);
 
         config.add_include_directive(format!("{}.h", crate_name));
         let include_path = moqt_path.join("include");

@@ -281,6 +281,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
 
     cpp_code_generator::generate_cpp_file(
         data.current_database.ffi_items(),
+        data.current_database.environments(),
         &c_lib_path.join("file1.cpp"),
         &global_header_name,
         data.current_database.crate_name(),
@@ -295,6 +296,8 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
 
     rust_code_generator::generate(
         data.config.crate_properties().name(),
+        data.current_database.ffi_items(),
+        data.current_database.environments(),
         data.current_database.rust_database(),
         &output_path.join("src"),
         data.config.crate_template_path().map(|s| s.join("src")),

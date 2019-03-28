@@ -46,19 +46,23 @@ impl CppChecks {
         self.0.iter().any(|item| item.is_success)
     }
 
-    pub fn all_success(&self) -> bool {
-        self.0.iter().all(|item| item.is_success)
+    pub fn all_success(&self, environments: &[CppCheckerEnv]) -> bool {
+        environments.iter().all(|env| {
+            self.0
+                .iter()
+                .any(|check| &check.env == env && check.is_success)
+        })
     }
 
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
-    pub fn condition(&self) -> Condition {
+    pub fn condition(&self, environments: &[CppCheckerEnv]) -> Condition {
         if !self.any_success() {
             return Condition::False;
         }
-        if self.all_success() {
+        if self.all_success(environments) {
             return Condition::True;
         }
         if self

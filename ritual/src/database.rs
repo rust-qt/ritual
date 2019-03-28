@@ -244,4 +244,8 @@ impl Database {
             self.environments.push(env.clone());
         }
     }
+
+    pub fn environments(&self) -> &[CppCheckerEnv] {
+        &self.environments
+    }
 }

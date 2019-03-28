@@ -16,10 +16,11 @@ use ritual_common::errors::{bail, err_msg, FancyUnwrap, Result, ResultExt};
 use ritual_common::file_utils::{create_file, file_to_string, load_json, path_to_str};
 use ritual_common::target::current_target;
 use ritual_common::utils::{exe_suffix, get_command_output};
-use ritual_common::BuildScriptData;
+use ritual_common::{env_var_names, BuildScriptData};
+use std::env;
 use std::io::Write;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{self, Command};
 
 /// Configuration of the build script.
 #[derive(Debug)]
@@ -30,12 +31,12 @@ pub struct Config {
 }
 
 fn manifest_dir() -> Result<PathBuf> {
-    let dir = std::env::var("CARGO_MANIFEST_DIR")
-        .with_context(|_| "CARGO_MANIFEST_DIR env var is missing")?;
+    let dir =
+        env::var("CARGO_MANIFEST_DIR").with_context(|_| "CARGO_MANIFEST_DIR env var is missing")?;
     Ok(PathBuf::from(dir))
 }
 fn out_dir() -> Result<PathBuf> {
-    let dir = std::env::var("OUT_DIR").with_context(|_| "OUT_DIR env var is missing")?;
+    let dir = env::var("OUT_DIR").with_context(|_| "OUT_DIR env var is missing")?;
     Ok(PathBuf::from(dir))
 }
 
@@ -107,7 +108,7 @@ impl Config {
         let out_dir = out_dir()?;
         let c_lib_install_dir = out_dir.join("c_lib_install");
         let manifest_dir = manifest_dir()?;
-        let profile = std::env::var("PROFILE").with_context(|_| "PROFILE env var is missing")?;
+        let profile = env::var("PROFILE").with_context(|_| "PROFILE env var is missing")?;
         info!("Building C++ wrapper library");
 
         let library_type = cpp_build_config_data
@@ -125,7 +126,7 @@ impl Config {
             cmake_source_dir: manifest_dir.join("c_lib"),
             build_dir: out_dir.join("c_lib_build"),
             install_dir: Some(c_lib_install_dir.clone()),
-            num_jobs: std::env::var("NUM_JOBS").ok().and_then(|x| x.parse().ok()),
+            num_jobs: env::var("NUM_JOBS").ok().and_then(|x| x.parse().ok()),
             cmake_vars: cmake_config.cmake_vars()?,
             build_type: match profile.as_str() {
                 "debug" => BuildType::Debug,
@@ -187,6 +188,24 @@ impl Config {
             "cargo:rustc-link-search=native={}",
             path_to_str(&c_lib_install_dir)?
         );
+
+        if let Some(version) = self.current_cpp_library_version {
+            // TODO: if the current version is unknown, report the closest known version instead
+            println!("cargo:rustc-cfg=cpp_lib_version={:?}", version);
+        }
+        println!("cargo:rustc-cfg=ritual_true");
+        if env::var(env_var_names::RUSTDOC).is_ok() {
+            println!("cargo:rustc-cfg=ritual_rustdoc");
+        }
+
+        for var in &[
+            env_var_names::RUSTDOC,
+            env_var_names::LIBRARY_PATH,
+            env_var_names::FRAMEWORK_PATH,
+            env_var_names::INCLUDE_PATH,
+        ] {
+            println!("cargo:rerun-if-env-changed={}", var);
+        }
         info!("cpp_to_rust build script finished.");
         Ok(())
     }
@@ -203,7 +222,7 @@ impl Config {
     /// returns to the caller.
     pub fn run(self) -> ! {
         self.run_and_return().fancy_unwrap();
-        std::process::exit(0)
+        process::exit(0)
     }
 }
 

@@ -1,3 +1,4 @@
+{condition_attribute}
 impl {qt_core}::AsReceiver for {type_path} {{
     type Arguments = {args};
     fn as_receiver(&self) -> {qt_core}::Receiver<Self::Arguments> {{

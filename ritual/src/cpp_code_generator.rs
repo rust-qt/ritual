@@ -1,4 +1,4 @@
-use crate::cpp_checks::Condition;
+use crate::cpp_checks::{Condition, CppCheckerEnv};
 use crate::cpp_ffi_data::{
     CppFfiArgumentMeaning, CppFfiFunctionKind, CppFfiType, CppFieldAccessorType,
     CppToFfiTypeConversion, QtSlotWrapper,
@@ -329,6 +329,7 @@ fn wrap_with_condition(code: &str, condition: &Condition) -> String {
 /// Generates a source file with the specified FFI methods.
 pub fn generate_cpp_file(
     ffi_items: &[CppFfiDatabaseItem],
+    environments: &[CppCheckerEnv],
     file_path: &Path,
     global_header_name: &str,
     crate_name: &str,
@@ -343,7 +344,7 @@ pub fn generate_cpp_file(
         }
         if let CppFfiItem::QtSlotWrapper(qt_slot_wrapper) = &ffi_item.item {
             any_slot_wrappers = true;
-            let condition = ffi_item.checks.condition();
+            let condition = ffi_item.checks.condition(environments);
             let code = self::qt_slot_wrapper(qt_slot_wrapper)?;
             write!(cpp_file, "{}", wrap_with_condition(&code, &condition))?;
         }
@@ -355,7 +356,7 @@ pub fn generate_cpp_file(
             continue;
         }
         if let CppFfiItem::Function(cpp_ffi_function) = &ffi_item.item {
-            let condition = ffi_item.checks.condition();
+            let condition = ffi_item.checks.condition(environments);
             let code = function_implementation(cpp_ffi_function)?;
             writeln!(cpp_file, "{}", wrap_with_condition(&code, &condition))?;
         }

@@ -1,5 +1,7 @@
 //! Types and functions used for Rust code generation.
 
+use crate::cpp_checks::{Condition, CppCheckerEnv};
+use crate::database::CppFfiDatabaseItem;
 use crate::doc_formatter;
 use crate::rust_generator::qt_core_path;
 use crate::rust_info::{
@@ -102,14 +104,16 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: Option<&str>) -> S
     }
 }
 
-struct Generator {
+struct Generator<'a> {
     crate_name: String,
     output_src_path: PathBuf,
     crate_template_src_path: Option<PathBuf>,
     destination: Vec<File<BufWriter<fs::File>>>,
+    ffi_items: &'a [CppFfiDatabaseItem],
+    environments: &'a [CppCheckerEnv],
 }
 
-impl Write for Generator {
+impl Write for Generator<'_> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         io::Write::write(
             self.destination
@@ -131,6 +135,12 @@ impl Write for Generator {
 /// markdown code `doc`.
 fn format_doc(doc: &str) -> String {
     format_doc_extended(doc, false)
+}
+
+#[derive(Debug, Default)]
+struct ConditionTexts {
+    attribute: String,
+    doc_text: String,
 }
 
 /// Generates documentation comments containing
@@ -159,7 +169,36 @@ fn format_doc_extended(doc: &str, is_outer: bool) -> String {
         + extra_line_breaks
 }
 
-impl Generator {
+fn condition_expression(condition: &Condition) -> String {
+    match condition {
+        Condition::CppLibraryVersion(version) => format!("cpp_lib_version={:?}", version),
+        Condition::Arch(_) => unimplemented!(),
+        Condition::OS(_) => unimplemented!(),
+        Condition::Family(_) => unimplemented!(),
+        Condition::Env(_) => unimplemented!(),
+        Condition::PointerWidth(_) => unimplemented!(),
+        Condition::Endian(_) => unimplemented!(),
+        Condition::And(conditions) => {
+            let list = conditions
+                .iter()
+                .map(|c| format!("({})", condition_expression(c)))
+                .join(", ");
+            format!("all({})", list)
+        }
+        Condition::Or(conditions) => {
+            let list = conditions
+                .iter()
+                .map(|c| format!("({})", condition_expression(c)))
+                .join(", ");
+            format!("any({})", list)
+        }
+        Condition::Not(condition) => format!("not({})", condition_expression(condition)),
+        Condition::True => "ritual_true".to_string(),
+        Condition::False => "ritual_false".to_string(),
+    }
+}
+
+impl Generator<'_> {
     fn module_path(&self, rust_path: &RustPath, root_path: &Path) -> Result<PathBuf> {
         let parts = &rust_path.parts;
 
@@ -194,14 +233,32 @@ impl Generator {
     }
 
     fn generate_item(&mut self, item: &RustDatabaseItem, database: &RustDatabase) -> Result<()> {
+        let mut condition_texts = ConditionTexts::default();
+        if let Some(index) = item.ffi_item_index {
+            let ffi_item = self
+                .ffi_items
+                .get(index)
+                .ok_or_else(|| err_msg("rust item refers to invalid ffi item index"))?;
+            let condition = ffi_item.checks.condition(self.environments);
+            if condition != Condition::True {
+                let expression = condition_expression(&condition);
+                condition_texts.attribute =
+                    format!("#[cfg(any({}, ritual_rustdoc))]\n", expression);
+                condition_texts.doc_text =
+                    format!("\n\nThis item is available if `{}`.", expression);
+            }
+        }
+
         match &item.item {
             RustItem::Module(module) => self.generate_module(module, database),
             RustItem::Struct(data) => self.generate_struct(data, database),
             RustItem::EnumValue(value) => self.generate_enum_value(value),
-            RustItem::TraitImpl(value) => self.generate_trait_impl(value),
-            RustItem::Function(value) => self.generate_rust_final_function(value, false),
-            RustItem::FfiFunction(value) => self.generate_ffi_function(value),
-            RustItem::ExtraImpl(value) => self.generate_extra_impl(value),
+            RustItem::TraitImpl(value) => self.generate_trait_impl(value, &condition_texts),
+            RustItem::Function(value) => {
+                self.generate_rust_final_function(value, false, &condition_texts)
+            }
+            RustItem::FfiFunction(value) => self.generate_ffi_function(value, &condition_texts),
+            RustItem::ExtraImpl(value) => self.generate_extra_impl(value, &condition_texts),
         }
     }
 
@@ -710,6 +767,7 @@ impl Generator {
         &mut self,
         func: &RustFunction,
         is_in_trait_context: bool,
+        condition_texts: &ConditionTexts,
     ) -> Result<()> {
         let maybe_pub = if func.is_public && !is_in_trait_context {
             "pub "
@@ -758,11 +816,13 @@ impl Generator {
             )
         };
 
+        let doc = doc_formatter::function_doc(&func) + &condition_texts.doc_text;
         writeln!(
             self,
-            "{doc}{maybe_pub}{maybe_unsafe}fn {name}{lifetimes_text}({args}){return_type} \
+            "{doc}{condition}{maybe_pub}{maybe_unsafe}fn {name}{lifetimes_text}({args}){return_type} \
              {{\n{body}}}\n\n",
-            doc = format_doc(&doc_formatter::function_doc(&func)),
+            doc = format_doc(&doc),
+            condition = condition_texts.attribute,
             maybe_pub = maybe_pub,
             maybe_unsafe = maybe_unsafe,
             lifetimes_text = lifetimes_text,
@@ -798,35 +858,50 @@ impl Generator {
         Ok(())
     }
 
-    fn generate_trait_impl(&mut self, trait1: &RustTraitImpl) -> Result<()> {
+    fn generate_trait_impl(
+        &mut self,
+        trait1: &RustTraitImpl,
+        condition_texts: &ConditionTexts,
+    ) -> Result<()> {
         let associated_types_text = trait1
             .associated_types
             .iter()
             .map(|t| format!("type {} = {};", t.name, self.rust_type_to_code(&t.value)))
             .join("\n");
 
+        // TODO: use condition_texts.doc_text
         writeln!(
             self,
-            "impl {} for {} {{\n{}",
+            "{}impl {} for {} {{\n{}",
+            condition_texts.attribute,
             self.rust_type_to_code(&trait1.trait_type),
             self.rust_type_to_code(&trait1.target_type),
             associated_types_text,
         )?;
 
         for func in &trait1.functions {
-            self.generate_rust_final_function(func, true)?;
+            self.generate_rust_final_function(func, true, &ConditionTexts::default())?;
         }
 
         writeln!(self, "}}\n")?;
         Ok(())
     }
 
-    fn generate_ffi_function(&mut self, function: &RustFFIFunction) -> Result<()> {
+    fn generate_ffi_function(
+        &mut self,
+        function: &RustFFIFunction,
+        condition_texts: &ConditionTexts,
+    ) -> Result<()> {
+        writeln!(self, "{}", condition_texts.attribute)?;
         writeln!(self, "{}", self.rust_ffi_function_to_code(function))?;
         Ok(())
     }
 
-    fn generate_extra_impl(&mut self, data: &RustExtraImpl) -> Result<()> {
+    fn generate_extra_impl(
+        &mut self,
+        data: &RustExtraImpl,
+        condition_texts: &ConditionTexts,
+    ) -> Result<()> {
         match &data.kind {
             RustExtraImplKind::FlagEnum { enum_path } => {
                 let enum_path = self.rust_path_to_string(enum_path);
@@ -847,7 +922,9 @@ impl Generator {
                     type_path = self.rust_path_to_string(&data.target_path),
                     args = self.rust_type_to_code(&data.arguments),
                     receiver_id = data.receiver_id,
+                    condition_attribute = condition_texts.attribute,
                 )?;
+                // TODO: use condition_texts.doc_text
             }
         }
         Ok(())
@@ -856,6 +933,8 @@ impl Generator {
 
 pub fn generate(
     crate_name: &str,
+    ffi_items: &[CppFfiDatabaseItem],
+    environments: &[CppCheckerEnv],
     database: &RustDatabase,
     output_src_path: impl Into<PathBuf>,
     crate_template_src_path: Option<impl Into<PathBuf>>,
@@ -865,6 +944,8 @@ pub fn generate(
         destination: Vec::new(),
         output_src_path: output_src_path.into(),
         crate_template_src_path: crate_template_src_path.map(Into::into),
+        ffi_items,
+        environments,
     };
 
     let crate_root = database
