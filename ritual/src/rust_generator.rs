@@ -854,18 +854,24 @@ impl State<'_, '_> {
         let r = match &function.kind {
             CppFfiFunctionKind::Function { cpp_function, .. } => {
                 if cpp_function.is_constructor() {
-                    Some("new".to_string())
-                } else if let Some(operator) = &cpp_function.operator {
-                    if let CppOperator::Conversion(type1) = operator {
-                        let rust_type = self.rust_final_type(
-                            &ffi_type(type1, CppTypeRole::ReturnType)?,
-                            &CppFfiArgumentMeaning::ReturnValue,
-                            true,
-                            function.allocation_place,
-                        )?;
-                        Some(format!("to_{}", rust_type.api_type().caption(context)?))
+                    if cpp_function.is_copy_constructor() {
+                        Some("new_copy".to_string())
                     } else {
-                        Some(format!("operator_{}", operator.ascii_name()?))
+                        Some("new".to_string())
+                    }
+                } else if let Some(operator) = &cpp_function.operator {
+                    match operator {
+                        CppOperator::Conversion(type1) => {
+                            let rust_type = self.rust_final_type(
+                                &ffi_type(type1, CppTypeRole::ReturnType)?,
+                                &CppFfiArgumentMeaning::ReturnValue,
+                                true,
+                                function.allocation_place,
+                            )?;
+                            Some(format!("to_{}", rust_type.api_type().caption(context)?))
+                        }
+                        CppOperator::Assignment => Some("copy_from".to_string()),
+                        _ => Some(format!("operator_{}", operator.ascii_name()?)),
                     }
                 } else {
                     None

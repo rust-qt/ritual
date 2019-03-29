@@ -10,10 +10,10 @@ mod cpp_checker;
 mod cpp_checks;
 mod cpp_code_generator;
 pub mod cpp_data;
-mod cpp_explicit_xstructors;
 pub mod cpp_ffi_data;
 pub mod cpp_ffi_generator;
 pub mod cpp_function;
+mod cpp_implicit_methods;
 mod cpp_inheritance; // TODO: deal with inheritance for subclassing support
 mod cpp_omitting_arguments;
 mod cpp_operator;

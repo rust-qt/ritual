@@ -16,7 +16,7 @@ pub enum DatabaseItemSource {
         /// Exact location of the declaration
         origin_location: CppOriginLocation,
     },
-    ImplicitXstructor,
+    ImplicitMethod,
     TemplateInstantiation,
     NamespaceInferring,
     OmittingArguments,

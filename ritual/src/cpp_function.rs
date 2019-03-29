@@ -344,6 +344,17 @@ impl CppFunction {
         }
     }
 
+    pub fn is_copy_constructor(&self) -> bool {
+        if !self.is_constructor() {
+            return false;
+        }
+        if self.arguments.len() != 1 {
+            return false;
+        }
+        let arg = CppType::new_reference(true, CppType::Class(self.class_type().unwrap()));
+        arg == self.arguments[0].argument_type
+    }
+
     /// Returns true if this method is a destructor.
     pub fn is_destructor(&self) -> bool {
         match &self.member {

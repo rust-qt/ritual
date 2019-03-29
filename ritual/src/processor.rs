@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::database::{CppDatabaseItem, CppFfiDatabaseItem, Database};
 use crate::workspace::Workspace;
 use crate::{
-    cpp_checker, cpp_explicit_xstructors, cpp_ffi_generator, cpp_omitting_arguments, cpp_parser,
+    cpp_checker, cpp_ffi_generator, cpp_implicit_methods, cpp_omitting_arguments, cpp_parser,
     cpp_template_instantiator, crate_writer, rust_generator,
 };
 use itertools::Itertools;
@@ -105,8 +105,8 @@ impl Default for ProcessingSteps {
 
         let push_cpp_post_processing = |s: &mut Self, suffix: &str| {
             s.push(
-                &format!("add_explicit_xstructors{}", suffix),
-                cpp_explicit_xstructors::run,
+                &format!("add_implicit_methods{}", suffix),
+                cpp_implicit_methods::run,
             );
             //            s.push(
             //                &format!("set_allocation_places{}", suffix),

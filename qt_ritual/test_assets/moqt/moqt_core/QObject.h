@@ -57,6 +57,9 @@ public:
 private:
     struct QPrivateSignal {};
 
+    QObject(const QObject& other) = delete;
+    QObject &operator=(const QObject& other) = delete;
+
 Q_SIGNALS:
     void destroyed(QObject *objectName = nullptr);
     void objectNameChanged(int objectName, QPrivateSignal);
