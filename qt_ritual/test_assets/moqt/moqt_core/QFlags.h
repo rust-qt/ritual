@@ -8,11 +8,20 @@ class MOQT_CORE_EXPORT QFlags {
 public:
     typedef unsigned int uint;
     QFlags(uint value) : m_value(value) {}
-    operator uint const() { return m_value; }
-    QFlags operator|(T other) const { return QFlags(m_value | uint(other)); }
+    operator uint const() {
+        return m_value;
+    }
+    QFlags operator|(T other) const {
+        return QFlags(m_value | uint(other));
+    }
 
 private:
     int m_value;
 };
+
+template<typename T>
+void operator|=(QFlags<T>& flags, T other) {
+    flags.m_value |= uint(other);
+}
 
 #endif //QFLAGS_H

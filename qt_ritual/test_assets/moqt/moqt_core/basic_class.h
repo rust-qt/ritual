@@ -85,3 +85,5 @@ public:
 private:
     int m_foo;
 };
+
+QFlags<BasicClass::UpdateType> operator|(BasicClass::UpdateType f1, BasicClass::UpdateType f2);

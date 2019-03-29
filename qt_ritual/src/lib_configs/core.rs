@@ -1,5 +1,5 @@
 use ritual::config::Config;
-use ritual::cpp_data::CppPath;
+use ritual::cpp_data::{CppItem, CppPath};
 use ritual::cpp_ffi_data::CppFfiFunctionKind;
 use ritual::cpp_type::CppType;
 use ritual::rust_info::{NameType, RustPathScope};
@@ -72,6 +72,7 @@ pub fn core_config(config: &mut Config) -> Result<()> {
             "qt_qFindChildren_helper",
             "qt_sharedpointer_cast_check",
             "qThreadStorage_deleteData",
+            "qbswap_helper",
             // deprecated
             "qGreater",
             "qLess",
@@ -177,6 +178,24 @@ pub fn core_config(config: &mut Config) -> Result<()> {
         }
         Ok(None)
     });
-    // TODO: blacklist QFlags<T> for FFI
+
+    config.set_ffi_generator_hook(|item| {
+        if let CppItem::Function(function) = &item.item {
+            if let Ok(class_type) = function.class_type() {
+                let class_text = class_type.to_templateless_string();
+                if class_text == "QFlags" {
+                    return Ok(false);
+                }
+            }
+            if function.is_operator() {
+                if let CppType::Class(path) = &function.return_type {
+                    if path.to_templateless_string() == "QFlags" {
+                        return Ok(false);
+                    }
+                }
+            }
+        }
+        Ok(true)
+    });
     Ok(())
 }
