@@ -79,6 +79,15 @@ pub struct Target {
     pub endian: Endian,
 }
 
+impl Target {
+    pub fn short_text(&self) -> String {
+        format!(
+            "{:?}-{:?}-{:?}-{:?}",
+            self.arch, self.os, self.family, self.env
+        )
+    }
+}
+
 /// Condition on properties of the target. Simple conditions
 /// are considered true if the property of the current platform
 /// is the same as the associated value of the enum. For
@@ -289,14 +298,10 @@ pub struct LibraryTarget {
 
 impl LibraryTarget {
     pub fn short_text(&self) -> String {
-        let target_text = format!(
-            "{:?}-{:?}-{:?}-{:?}",
-            self.target.arch, self.target.os, self.target.family, self.target.env
-        );
         if let Some(cpp_library_version) = &self.cpp_library_version {
-            format!("v{} on {}", cpp_library_version, target_text)
+            format!("v{} on {}", cpp_library_version, self.target.short_text())
         } else {
-            target_text
+            self.target.short_text()
         }
     }
 }

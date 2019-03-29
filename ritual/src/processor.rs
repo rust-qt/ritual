@@ -267,6 +267,10 @@ pub fn process(
     info!("Processing crate: {}", config.crate_properties().name());
     check_all_paths(&config)?;
 
+    if let Some(version) = config.cpp_lib_version() {
+        info!("Current C++ library version: {}", version);
+    }
+
     let allow_load;
     if step_names.get(0).map(|s| s.as_str()) == Some("discard") {
         allow_load = false;

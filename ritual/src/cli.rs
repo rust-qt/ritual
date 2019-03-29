@@ -11,6 +11,7 @@ use itertools::Itertools;
 use log::{error, info};
 use ritual_common::errors::{bail, err_msg, Result};
 use ritual_common::file_utils::{canonicalize, create_dir, path_to_str};
+use ritual_common::target::current_target;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -53,6 +54,7 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
         .unwrap_or_else(|e| panic!("Logger initialization failed: {}", e));
 
     info!("Workspace: {}", workspace_path.display());
+    info!("Current target: {}", current_target().short_text());
 
     if let Some(local_paths) = options.local_paths {
         workspace.set_write_dependencies_local_paths(local_paths)?;
