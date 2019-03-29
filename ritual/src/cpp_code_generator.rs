@@ -192,7 +192,7 @@ fn returned_expression(method: &CppFfiFunction) -> Result<String> {
             .iter()
             .find(|x| x.meaning == CppFfiArgumentMeaning::This)
         {
-            format!("c2r_call_destructor({})", arg.name)
+            format!("ritual_call_destructor({})", arg.name)
         } else {
             bail!("no this arg in destructor");
         }
@@ -284,7 +284,7 @@ fn source_body(method: &CppFfiFunction) -> Result<String> {
 /// Generates implementation of the FFI method for the source file.
 pub fn function_implementation(method: &CppFfiFunction) -> Result<String> {
     Ok(format!(
-        "C2R_EXPORT {} {{\n  {}}}\n\n",
+        "RITUAL_EXPORT {} {{\n  {}}}\n\n",
         function_signature(method)?,
         source_body(&method)?
     ))

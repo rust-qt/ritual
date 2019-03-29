@@ -225,7 +225,7 @@ impl Config {
         ] {
             println!("cargo:rerun-if-env-changed={}", var);
         }
-        info!("cpp_to_rust build script finished.");
+        info!("ritual build script finished.");
         Ok(())
     }
 

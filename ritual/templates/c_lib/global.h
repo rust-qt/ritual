@@ -1,5 +1,5 @@
-#ifndef C2R_GLOBAL_H
-#define C2R_GLOBAL_H
+#ifndef RITUAL_GLOBAL_H
+#define RITUAL_GLOBAL_H
 
 // This header includes system headers and declares functions
 // required by all regular headers of the library.
@@ -14,9 +14,9 @@
 {include_directives_code}
 
 #ifdef _WIN32
-    #define C2R_EXPORT __declspec(dllexport)
+    #define RITUAL_EXPORT __declspec(dllexport)
 #else
-    #define C2R_EXPORT
+    #define RITUAL_EXPORT
 #endif
 
 
@@ -24,9 +24,9 @@
 // is necessary because it's not possible to use `x->~T()`
 // syntax directly if `T` contains `::`.
 template<typename T>
-void c2r_call_destructor(T* x) {{
+void ritual_call_destructor(T* x) {{
     x->~T();
 }}
 
 
-#endif // C2R_GLOBAL_H
+#endif // RITUAL_GLOBAL_H
