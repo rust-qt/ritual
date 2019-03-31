@@ -180,17 +180,11 @@ fn condition_expression(condition: &Condition) -> String {
         Condition::PointerWidth(_) => unimplemented!(),
         Condition::Endian(_) => unimplemented!(),
         Condition::And(conditions) => {
-            let list = conditions
-                .iter()
-                .map(|c| format!("({})", condition_expression(c)))
-                .join(", ");
+            let list = conditions.iter().map(condition_expression).join(", ");
             format!("all({})", list)
         }
         Condition::Or(conditions) => {
-            let list = conditions
-                .iter()
-                .map(|c| format!("({})", condition_expression(c)))
-                .join(", ");
+            let list = conditions.iter().map(condition_expression).join(", ");
             format!("any({})", list)
         }
         Condition::Not(condition) => format!("not({})", condition_expression(condition)),
