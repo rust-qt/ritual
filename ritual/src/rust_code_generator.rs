@@ -1,7 +1,7 @@
 //! Types and functions used for Rust code generation.
 
 use crate::cpp_checks::Condition;
-use crate::database::CppFfiDatabaseItem;
+use crate::database::Database;
 use crate::doc_formatter;
 use crate::rust_generator::qt_core_path;
 use crate::rust_info::{
@@ -18,7 +18,6 @@ use itertools::Itertools;
 use ritual_common::errors::{bail, err_msg, Result};
 use ritual_common::file_utils::{create_dir_all, create_file, file_to_string, File};
 use ritual_common::string_utils::trim_slice;
-use ritual_common::target::LibraryTarget;
 use ritual_common::utils::MapIfOk;
 use std::fs;
 use std::io::{self, BufWriter, Write};
@@ -110,8 +109,7 @@ struct Generator<'a> {
     output_src_path: PathBuf,
     crate_template_src_path: Option<PathBuf>,
     destination: Vec<File<BufWriter<fs::File>>>,
-    ffi_items: &'a [CppFfiDatabaseItem],
-    environments: &'a [LibraryTarget],
+    current_database: &'a Database,
 }
 
 impl Write for Generator<'_> {
@@ -228,13 +226,38 @@ impl Generator<'_> {
     }
 
     fn generate_item(&mut self, item: &RustDatabaseItem, database: &RustDatabase) -> Result<()> {
-        let mut condition_texts = ConditionTexts::default();
-        if let Some(index) = item.ffi_item_index {
-            let ffi_item = self
-                .ffi_items
+        let ffi_item = if let Some(index) = item.ffi_item_index {
+            Some(
+                self.current_database
+                    .ffi_items()
+                    .get(index)
+                    .ok_or_else(|| err_msg("rust item refers to invalid ffi item index"))?,
+            )
+        } else if let Some(index) = item.cpp_item_index {
+            let cpp_item = self
+                .current_database
+                .cpp_items()
                 .get(index)
-                .ok_or_else(|| err_msg("rust item refers to invalid ffi item index"))?;
-            let condition = ffi_item.checks.condition(self.environments);
+                .ok_or_else(|| err_msg("rust item refers to invalid cpp item index"))?;
+            if let Some(index) = cpp_item.source_ffi_item {
+                Some(
+                    self.current_database
+                        .ffi_items()
+                        .get(index)
+                        .ok_or_else(|| err_msg("cpp item refers to invalid ffi item index"))?,
+                )
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let mut condition_texts = ConditionTexts::default();
+        if let Some(ffi_item) = ffi_item {
+            let condition = ffi_item
+                .checks
+                .condition(self.current_database.environments());
             if condition != Condition::True {
                 let expression = condition_expression(&condition);
                 condition_texts.attribute =
@@ -246,7 +269,7 @@ impl Generator<'_> {
 
         match &item.item {
             RustItem::Module(module) => self.generate_module(module, database),
-            RustItem::Struct(data) => self.generate_struct(data, database),
+            RustItem::Struct(data) => self.generate_struct(data, database, &condition_texts),
             RustItem::EnumValue(value) => self.generate_enum_value(value),
             RustItem::TraitImpl(value) => self.generate_trait_impl(value, &condition_texts),
             RustItem::Function(value) => {
@@ -346,12 +369,15 @@ impl Generator<'_> {
         }
     }
 
-    fn generate_struct(&mut self, rust_struct: &RustStruct, database: &RustDatabase) -> Result<()> {
-        write!(
-            self,
-            "{}",
-            format_doc(&doc_formatter::struct_doc(rust_struct))
-        )?;
+    fn generate_struct(
+        &mut self,
+        rust_struct: &RustStruct,
+        database: &RustDatabase,
+        condition_texts: &ConditionTexts,
+    ) -> Result<()> {
+        let doc = doc_formatter::struct_doc(rust_struct) + &condition_texts.doc_text;
+        write!(self, "{}", format_doc(&doc))?;
+
         let visibility = if rust_struct.is_public { "pub " } else { "" };
         match &rust_struct.kind {
             RustStructKind::WrapperType(wrapper) => match &wrapper.kind {
@@ -415,6 +441,7 @@ impl Generator<'_> {
                     args = args,
                     func_args = func_args,
                     callback_args = callback_args,
+                    condition_attribute = condition_texts.attribute,
                 )?;
             }
             RustStructKind::SizedType(_) => {
@@ -928,8 +955,7 @@ impl Generator<'_> {
 
 pub fn generate(
     crate_name: &str,
-    ffi_items: &[CppFfiDatabaseItem],
-    environments: &[LibraryTarget],
+    current_database: &Database,
     database: &RustDatabase,
     output_src_path: impl Into<PathBuf>,
     crate_template_src_path: Option<impl Into<PathBuf>>,
@@ -939,8 +965,7 @@ pub fn generate(
         destination: Vec::new(),
         output_src_path: output_src_path.into(),
         crate_template_src_path: crate_template_src_path.map(Into::into),
-        ffi_items,
-        environments,
+        current_database,
     };
 
     let crate_root = database

@@ -1,8 +1,10 @@
+{condition_attribute}
 pub struct {pub_type_name}<'a> {{
     raw_slot: ::cpp_utils::CppBox<{type_name}>,
     func: ::std::option::Option<Box<Box<dyn FnMut({args}) + 'a>>>,
 }}
 
+{condition_attribute}
 impl<'a> {pub_type_name}<'a> {{
     /// Constructs a new object.
     pub fn new<F: FnMut({args}) + 'a>(f: F) -> {pub_type_name}<'a> {{
@@ -46,6 +48,7 @@ impl<'a> {pub_type_name}<'a> {{
     }}
 }}
 
+{condition_attribute}
 impl<'a> Default for {pub_type_name}<'a> {{
     fn default() -> Self {{
         {pub_type_name} {{
@@ -55,6 +58,7 @@ impl<'a> Default for {pub_type_name}<'a> {{
     }}
 }}
 
+{condition_attribute}
 impl<'a, 'b: 'a> {qt_core}::AsReceiver for &'b {pub_type_name}<'a> {{
     type Arguments = <{type_name} as {qt_core}::AsReceiver>::Arguments;
     fn as_receiver(&self) -> {qt_core}::Receiver<Self::Arguments> {{

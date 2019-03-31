@@ -296,8 +296,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
 
     rust_code_generator::generate(
         data.config.crate_properties().name(),
-        data.current_database.ffi_items(),
-        data.current_database.environments(),
+        &data.current_database,
         data.current_database.rust_database(),
         &output_path.join("src"),
         data.config.crate_template_path().map(|s| s.join("src")),
