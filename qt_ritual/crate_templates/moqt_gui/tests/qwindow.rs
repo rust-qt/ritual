@@ -34,7 +34,7 @@ fn test_with_vectors() {
     unsafe {
         let mut window: CppBox<QWindow> = QWindow::new();
 
-        let mut vec = QVectorOfInt::new();
+        let mut vec = QVectorOfInt::new_0a();
         vec.push(10);
         vec.push(12);
         vec.push(14);

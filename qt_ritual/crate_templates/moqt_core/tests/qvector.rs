@@ -3,7 +3,7 @@ use moqt_core::{BasicClassField, QVectorOfBasicClassField, QVectorOfInt};
 #[test]
 fn qvector_int() {
     unsafe {
-        let mut vec = QVectorOfInt::new();
+        let mut vec = QVectorOfInt::new_0a();
         vec.push(10);
         vec.push(12);
         vec.push(14);
