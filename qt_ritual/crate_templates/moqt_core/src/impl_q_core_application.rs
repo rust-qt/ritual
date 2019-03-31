@@ -1,6 +1,6 @@
 use crate::QCoreApplication;
 use std::os::raw::{c_char, c_int};
-use std::{env, process};
+use std::process;
 
 /// A struct providing valid `argc` and `argv` values for Qt application
 /// objects.
@@ -60,7 +60,8 @@ impl QCoreApplicationArgs {
     /// Qt doesn't use `argc` and `argv` on Windows at all.
     pub fn from_real() -> QCoreApplicationArgs {
         use std::os::unix::ffi::OsStringExt;
-        let args = env::args_os().map(|arg| arg.into_vec()).collect();
+
+        let args = std::env::args_os().map(|arg| arg.into_vec()).collect();
         QCoreApplicationArgs::new(args)
     }
     #[cfg(windows)]
