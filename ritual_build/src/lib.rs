@@ -11,7 +11,7 @@
 use log::info;
 pub use ritual_common as common;
 use ritual_common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
-use ritual_common::cpp_lib_builder::{BuildType, CMakeConfigData, CppLibBuilder};
+use ritual_common::cpp_lib_builder::{BuildType, CMakeConfigData, CMakeVar, CppLibBuilder};
 use ritual_common::errors::{bail, err_msg, FancyUnwrap, Result, ResultExt};
 use ritual_common::file_utils::{create_file, file_to_string, load_json, path_to_str};
 use ritual_common::target::{current_target, LibraryTarget};
@@ -28,6 +28,7 @@ pub struct Config {
     cpp_build_paths: CppBuildPaths,
     build_script_data: BuildScriptData,
     current_cpp_library_version: Option<String>,
+    extra_cmake_vars: Vec<CMakeVar>,
 }
 
 fn manifest_dir() -> Result<PathBuf> {
@@ -54,12 +55,17 @@ impl Config {
         Ok(Config {
             build_script_data: build_script_data()?,
             cpp_build_paths: CppBuildPaths::default(),
+            extra_cmake_vars: Vec::default(),
             current_cpp_library_version: None,
         })
     }
 
     pub fn set_current_cpp_library_version(&mut self, version: Option<String>) {
         self.current_cpp_library_version = version;
+    }
+
+    pub fn add_cmake_var(&mut self, var: CMakeVar) {
+        self.extra_cmake_vars.push(var);
     }
 
     /// Returns version of the native C++ library used for generating this crate.
@@ -142,12 +148,17 @@ impl Config {
             cpp_library_version: self.current_cpp_library_version.clone(),
         };
 
+        let cmake_vars = cmake_config
+            .cmake_vars()?
+            .into_iter()
+            .chain(self.extra_cmake_vars)
+            .collect();
         CppLibBuilder {
             cmake_source_dir: manifest_dir.join("c_lib"),
             build_dir: out_dir.join("c_lib_build"),
             install_dir: Some(c_lib_install_dir.clone()),
             num_jobs: env::var("NUM_JOBS").ok().and_then(|x| x.parse().ok()),
-            cmake_vars: cmake_config.cmake_vars()?,
+            cmake_vars,
             build_type: match profile.as_str() {
                 "debug" => BuildType::Debug,
                 "release" => BuildType::Release,

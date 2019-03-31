@@ -11,8 +11,8 @@ use crate::database::CppFfiDatabaseItem;
 use crate::rust_info::{RustDatabase, RustItem, RustStructKind};
 use itertools::Itertools;
 use ritual_common::cpp_lib_builder::version_to_number;
-use ritual_common::errors::{bail, Result};
-use ritual_common::file_utils::{create_file, create_file_for_append, path_to_str};
+use ritual_common::errors::{bail, err_msg, Result};
+use ritual_common::file_utils::{create_file, create_file_for_append, os_str_to_str, path_to_str};
 use ritual_common::target::LibraryTarget;
 use ritual_common::utils::{get_command_output, MapIfOk};
 use std::io::Write;
@@ -363,10 +363,12 @@ pub fn generate_cpp_file(
         }
     }
     writeln!(cpp_file, "}} // extern \"C\"")?;
-    drop(cpp_file);
 
     if any_slot_wrappers && !crate_name.starts_with("moqt_") {
-        apply_moc(file_path)?;
+        let stem = file_path
+            .file_stem()
+            .ok_or_else(|| err_msg("failed to get file stem"))?;
+        writeln!(cpp_file, "#include \"{}.moc\"", os_str_to_str(stem)?)?;
     }
     Ok(())
 }
