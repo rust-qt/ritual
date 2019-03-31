@@ -71,6 +71,15 @@ impl CppChecks {
         // TODO: implement more sensible conditions generation
         Condition::True
     }
+
+    pub fn is_always_success_for(&self, other: &CppChecks) -> bool {
+        for item in &other.0 {
+            if item.is_success && !self.0.iter().any(|i| i.env == item.env && i.is_success) {
+                return false;
+            }
+        }
+        true
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

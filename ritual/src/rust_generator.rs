@@ -1,3 +1,4 @@
+use crate::cpp_checks::CppChecks;
 use crate::cpp_data::{CppItem, CppPath, CppPathItem, CppTypeDeclarationKind};
 use crate::cpp_ffi_data::{
     CppCast, CppFfiArgumentMeaning, CppFfiFunction, CppFfiFunctionKind, CppFfiItem, CppFfiType,
@@ -221,7 +222,7 @@ impl State<'_, '_> {
         })
     }
 
-    fn is_type_deletable(&self, ffi_type: &CppType) -> Result<bool> {
+    fn is_type_deletable(&self, ffi_type: &CppType, checks: &CppChecks) -> Result<bool> {
         let class_type = ffi_type.pointer_like_to_target()?;
         let class_path = if let CppType::Class(path) = class_type {
             path
@@ -229,11 +230,7 @@ impl State<'_, '_> {
             bail!("not a pointer to class");
         };
         let found = self.0.all_ffi_items().any(|item| {
-            if !item
-                .checks
-                .all_success(self.0.current_database.environments())
-                || item.checks.is_empty()
-            {
+            if !item.checks.is_always_success_for(checks) || item.checks.is_empty() {
                 return false;
             }
             if let CppFfiItem::Function(func) = &item.item {
@@ -259,6 +256,7 @@ impl State<'_, '_> {
         argument_meaning: &CppFfiArgumentMeaning,
         naming_mode: bool,
         allocation_place: ReturnValueAllocationPlace,
+        checks: Option<&CppChecks>,
     ) -> Result<RustFinalType> {
         let rust_ffi_type = self.ffi_type_to_rust_ffi_type(cpp_ffi_type.ffi_type())?;
         let mut api_to_ffi_conversion = RustToFfiTypeConversion::None;
@@ -267,13 +265,18 @@ impl State<'_, '_> {
                 if naming_mode {
                     api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
                 } else if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
-                    // TODO: return error if this rust type is not deletable
                     match allocation_place {
                         ReturnValueAllocationPlace::Stack => {
                             api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
                         }
                         ReturnValueAllocationPlace::Heap => {
-                            if self.is_type_deletable(cpp_ffi_type.ffi_type())? {
+                            let is_deletable = if let Some(checks) = checks {
+                                self.is_type_deletable(cpp_ffi_type.ffi_type(), checks)?
+                            } else {
+                                true
+                            };
+
+                            if is_deletable {
                                 api_to_ffi_conversion = RustToFfiTypeConversion::CppBoxToPtr;
                             } else {
                                 api_to_ffi_conversion = RustToFfiTypeConversion::UtilsPtrToPtr {
@@ -548,6 +551,7 @@ impl State<'_, '_> {
         &self,
         ffi_item_index: usize,
         function: &CppFfiFunction,
+        checks: &CppChecks,
     ) -> Result<Vec<ProcessedFfiItem>> {
         let rust_ffi_function = self.generate_ffi_function(&function)?;
         let ffi_function_path = rust_ffi_function.path.clone();
@@ -563,6 +567,7 @@ impl State<'_, '_> {
                     &arg.meaning,
                     false,
                     function.allocation_place,
+                    Some(checks),
                 )?;
                 arguments.push(RustFunctionArgument {
                     ffi_index: arg_index,
@@ -590,6 +595,7 @@ impl State<'_, '_> {
                     &arg.meaning,
                     false,
                     function.allocation_place,
+                    Some(checks),
                 )?,
                 Some(arg_index),
             )
@@ -601,6 +607,7 @@ impl State<'_, '_> {
                 &CppFfiArgumentMeaning::ReturnValue,
                 false,
                 function.allocation_place,
+                Some(checks),
             )?;
             (return_type, None)
         };
@@ -837,6 +844,7 @@ impl State<'_, '_> {
                 &CppFfiArgumentMeaning::Argument(0),
                 true,
                 ReturnValueAllocationPlace::NotApplicable,
+                None,
             )?;
             captions.push(rust_type.api_type().caption(context)?);
         }
@@ -867,6 +875,7 @@ impl State<'_, '_> {
                                 &CppFfiArgumentMeaning::ReturnValue,
                                 true,
                                 function.allocation_place,
+                                None,
                             )?;
                             Some(format!("to_{}", rust_type.api_type().caption(context)?))
                         }
@@ -1042,7 +1051,7 @@ impl State<'_, '_> {
         }
         match &ffi_item.item {
             CppFfiItem::Function(cpp_ffi_function) => {
-                self.process_rust_function(ffi_item_index, cpp_ffi_function)
+                self.process_rust_function(ffi_item_index, cpp_ffi_function, &ffi_item.checks)
             }
             CppFfiItem::QtSlotWrapper(_) => {
                 bail!("slot wrappers do not need to be processed here");
@@ -1098,11 +1107,11 @@ impl State<'_, '_> {
                                 .get(ffi_index)
                                 .ok_or_else(|| err_msg("cpp item references invalid ffi index"))?;
                             if let CppFfiItem::QtSlotWrapper(wrapper) = &ffi_item.item {
-                                qt_slot_wrapper = Some(wrapper);
+                                qt_slot_wrapper = Some((wrapper, &ffi_item.checks));
                             }
                         }
 
-                        let public_name_type = if let Some(wrapper) = qt_slot_wrapper {
+                        let public_name_type = if let Some((wrapper, _)) = qt_slot_wrapper {
                             NameType::QtSlotWrapper {
                                 signal_arguments: wrapper.signal_arguments.clone(),
                                 is_public: false,
@@ -1172,7 +1181,7 @@ impl State<'_, '_> {
                         });
                         rust_items.push(nested_types_rust_item);
 
-                        if let Some(wrapper) = qt_slot_wrapper {
+                        if let Some((wrapper, checks)) = qt_slot_wrapper {
                             let arg_types = wrapper
                                 .arguments
                                 .iter()
@@ -1209,6 +1218,7 @@ impl State<'_, '_> {
                                     &CppFfiArgumentMeaning::Argument(0),
                                     false,
                                     ReturnValueAllocationPlace::NotApplicable,
+                                    Some(checks),
                                 )
                             })?;
 
