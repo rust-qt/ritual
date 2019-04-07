@@ -6,7 +6,6 @@ use crate::file_utils::{create_dir_all, file_to_string, path_to_str};
 use crate::target;
 use crate::utils::{run_command, run_command_and_capture_output, CommandOutput, MapIfOk};
 use itertools::Itertools;
-use log::debug;
 use std::fmt::Display;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -167,53 +166,35 @@ impl CppLibBuilder {
             self.skip_cmake = true;
         }
 
-        let mut make_command_name = if target::current_os() == target::OS::Windows {
-            match target::current_env() {
-                target::Env::Msvc => "nmake",
-                target::Env::Gnu => "mingw32-make",
-                _ => "make",
-            }
-        } else {
-            "make"
-        };
-
         if target::current_env() == target::Env::Msvc && self.capture_output {
             let path = self.build_dir.join("nmake_output.txt");
             run_command(
                 Command::new("cmd")
                     .arg("/C")
                     .arg(format!(
-                        "{} clean > {} 2>&1",
-                        make_command_name,
+                        "cmake --build . -- clean > {} 2>&1",
                         path_to_str(&path)?
                     ))
                     .current_dir(&self.build_dir),
             )?;
         } else {
             run_command(
-                Command::new(&make_command_name)
+                Command::new("cmake")
+                    .arg("--build")
+                    .arg(".")
+                    .arg("--")
                     .arg("clean")
                     .current_dir(&self.build_dir),
             )?;
         }
 
-        let mut make_args = Vec::new();
+        let mut make_args = vec!["--build".to_string(), ".".to_string(), "--".to_string()];
         let num_jobs = if let Some(x) = self.num_jobs {
             x
         } else {
             ::num_cpus::get()
         };
-        if target::current_env() == target::Env::Msvc && num_jobs > 1 {
-            debug!("Checking for jom");
-            if run_command(&mut Command::new("jom").arg("/version")).is_ok() {
-                debug!("jom will be used instead of nmake.");
-                make_command_name = "jom";
-                make_args.push("/J".to_string());
-                make_args.push(num_jobs.to_string());
-            } else {
-                debug!("jom not found in PATH. Using nmake.");
-            }
-        }
+
         if target::current_env() != target::Env::Msvc {
             make_args.push(format!("-j{}", num_jobs));
         }
@@ -227,15 +208,14 @@ impl CppLibBuilder {
             let path = self.build_dir.join("nmake_output.txt");
             let mut make_command = Command::new("cmd");
             make_command.arg("/C").arg(format!(
-                "{} {} > {} 2>&1",
-                make_command_name,
+                "cmake {} > {} 2>&1",
                 make_args.join(" "),
                 path_to_str(&path)?
             ));
             capture_output_file = Some(path);
             make_command
         } else {
-            let mut make_command = Command::new(make_command_name);
+            let mut make_command = Command::new("cmake");
             make_command.args(&make_args);
             make_command
         };
