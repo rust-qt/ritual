@@ -4,6 +4,11 @@
 cmake_minimum_required(VERSION 3.0.0 FATAL_ERROR)
 project (cpp_checker)
 
+if(RITUAL_QT)
+    set(CMAKE_AUTOMOC ON)
+    find_package(Qt5Core CONFIG REQUIRED)
+endif()
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 if(RITUAL_INCLUDE_PATH)
     message(STATUS "RITUAL_INCLUDE_PATH=${RITUAL_INCLUDE_PATH}")

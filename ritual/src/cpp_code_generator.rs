@@ -12,13 +12,12 @@ use crate::rust_info::{RustDatabase, RustItem, RustStructKind};
 use itertools::Itertools;
 use ritual_common::cpp_lib_builder::version_to_number;
 use ritual_common::errors::{bail, err_msg, Result};
-use ritual_common::file_utils::{create_file, create_file_for_append, os_str_to_str, path_to_str};
+use ritual_common::file_utils::{create_file, os_str_to_str, path_to_str};
 use ritual_common::target::LibraryTarget;
-use ritual_common::utils::{get_command_output, MapIfOk};
+use ritual_common::utils::MapIfOk;
 use std::io::Write;
 use std::iter::once;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 /// Generates function name, return type and arguments list
 /// as it appears in both function declaration and implementation.
@@ -370,17 +369,6 @@ pub fn generate_cpp_file(
             .ok_or_else(|| err_msg("failed to get file stem"))?;
         writeln!(cpp_file, "#include \"{}.moc\"", os_str_to_str(stem)?)?;
     }
-    Ok(())
-}
-
-pub fn apply_moc(file_path: &Path) -> Result<()> {
-    let moc_output = get_command_output(Command::new("moc").arg("-i").arg(file_path))?;
-    let mut cpp_file = create_file_for_append(file_path)?;
-    writeln!(
-        cpp_file,
-        "// start of MOC generated code\n{}\n// end of MOC generated code",
-        moc_output
-    )?;
     Ok(())
 }
 

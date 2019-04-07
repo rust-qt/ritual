@@ -1,5 +1,4 @@
 use crate::cpp_code_generator;
-use crate::cpp_code_generator::apply_moc;
 use crate::cpp_ffi_data::CppFfiItem;
 use crate::database::CppFfiDatabaseItem;
 use crate::processor::ProcessorData;
@@ -11,7 +10,9 @@ use ritual_common::cpp_lib_builder::{
     BuildType, CMakeConfigData, CppLibBuilder, CppLibBuilderOutput,
 };
 use ritual_common::errors::{bail, err_msg, Result};
-use ritual_common::file_utils::{create_dir_all, create_file, path_to_str, remove_dir_all};
+use ritual_common::file_utils::{
+    create_dir_all, create_file, os_str_to_str, path_to_str, remove_dir_all,
+};
 use ritual_common::target::{current_target, LibraryTarget};
 use ritual_common::utils::{MapIfOk, ProgressBar};
 use std::collections::{hash_map::Entry, HashMap};
@@ -29,37 +30,43 @@ fn check_snippets<'a>(
     snippets: impl Iterator<Item = &'a Snippet>,
 ) -> Result<CppLibBuilderOutput> {
     let mut any_needs_moc = false;
-    {
-        let mut file = create_file(&data.main_cpp_path)?;
-        writeln!(file, "#include \"utils.h\"")?;
-        writeln!(file)?;
-        let mut main_content = Vec::new();
-        for snippet in snippets {
-            if snippet.needs_moc {
-                any_needs_moc = true;
-            }
-            match snippet.context {
-                SnippetContext::Main => {
-                    main_content.push(&snippet.code);
-                }
-                SnippetContext::Global => {
-                    writeln!(file, "{}", snippet.code)?;
-                    writeln!(file)?;
-                }
-            }
-        }
 
-        writeln!(file, "int main() {{")?;
-        for item in main_content {
-            writeln!(file, "{{")?;
-            writeln!(file, "{}", item)?;
-            writeln!(file, "}}")?;
+    let mut file = create_file(&data.main_cpp_path)?;
+    writeln!(file, "#include \"utils.h\"")?;
+    writeln!(file)?;
+    let mut main_content = Vec::new();
+    for snippet in snippets {
+        if snippet.needs_moc {
+            any_needs_moc = true;
         }
+        match snippet.context {
+            SnippetContext::Main => {
+                main_content.push(&snippet.code);
+            }
+            SnippetContext::Global => {
+                writeln!(file, "{}", snippet.code)?;
+                writeln!(file)?;
+            }
+        }
+    }
+
+    writeln!(file, "int main() {{")?;
+    for item in main_content {
+        writeln!(file, "{{")?;
+        writeln!(file, "{}", item)?;
         writeln!(file, "}}")?;
     }
+    writeln!(file, "}}")?;
+
     if any_needs_moc && !data.crate_name.starts_with("moqt_") {
-        apply_moc(&data.main_cpp_path)?;
+        let stem = data
+            .main_cpp_path
+            .file_stem()
+            .ok_or_else(|| err_msg("failed to get file stem"))?;
+        writeln!(file, "#include \"{}.moc\"", os_str_to_str(stem)?)?;
     }
+
+    drop(file);
 
     let instant = Instant::now();
     let result = data.builder.run();
