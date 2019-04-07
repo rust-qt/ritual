@@ -262,6 +262,13 @@ pub fn load_toml_table<P: AsRef<Path>>(path: P) -> Result<toml::value::Table> {
     }
 }
 
+pub fn load_toml<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> Result<T> {
+    let data = file_to_string(path.as_ref())?;
+    let value = toml::from_str(&data)
+        .with_context(|_| format!("failed to parse TOML file: {}", path.as_ref().display()))?;
+    Ok(value)
+}
+
 /// Save `data` to a TOML file
 pub fn save_toml_table<P: AsRef<Path>>(path: P, data: &toml::Value) -> Result<()> {
     let mut file = create_file(path.as_ref())?;
