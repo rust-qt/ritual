@@ -2,6 +2,7 @@
 
 use crate::errors::{bail, err_msg, Result, ResultExt};
 use log::trace;
+use serde::de::DeserializeOwned;
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io::{self, BufRead, BufReader, BufWriter, Lines, Read, Write};
@@ -249,7 +250,7 @@ pub fn save_bincode<P: AsRef<Path>, T: ::serde::Serialize>(path: P, value: &T) -
 }
 
 /// Load data from a TOML file
-pub fn load_toml<P: AsRef<Path>>(path: P) -> Result<toml::value::Table> {
+pub fn load_toml_table<P: AsRef<Path>>(path: P) -> Result<toml::value::Table> {
     let data = file_to_string(path.as_ref())?;
     let value = data
         .parse::<toml::Value>()
@@ -262,7 +263,7 @@ pub fn load_toml<P: AsRef<Path>>(path: P) -> Result<toml::value::Table> {
 }
 
 /// Save `data` to a TOML file
-pub fn save_toml<P: AsRef<Path>>(path: P, data: &toml::Value) -> Result<()> {
+pub fn save_toml_table<P: AsRef<Path>>(path: P, data: &toml::Value) -> Result<()> {
     let mut file = create_file(path.as_ref())?;
     write!(file, "{}", data)
         .with_context(|_| format!("failed to write to TOML file: {}", path.as_ref().display()))?;

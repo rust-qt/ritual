@@ -3,7 +3,7 @@ use log::info;
 use ritual_common::errors::{bail, Result};
 use ritual_common::file_utils::{
     create_dir, create_dir_all, load_json, os_string_into_string, read_dir, remove_file, save_json,
-    save_toml,
+    save_toml_table,
 };
 use ritual_common::toml;
 use serde_derive::{Deserialize, Serialize};
@@ -193,7 +193,7 @@ impl Workspace {
         let mut cargo_toml = toml::value::Table::new();
         cargo_toml.insert("workspace".to_string(), toml::Value::Table(table));
 
-        save_toml(
+        save_toml_table(
             self.path.join("Cargo.toml"),
             &toml::Value::Table(cargo_toml),
         )?;
