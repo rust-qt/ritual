@@ -6,6 +6,7 @@ use crate::file_utils::{create_dir_all, file_to_string, path_to_str};
 use crate::target;
 use crate::utils::{run_command, run_command_and_capture_output, CommandOutput, MapIfOk};
 use itertools::Itertools;
+use serde_derive::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -93,7 +94,7 @@ pub struct CppLibBuilder {
     pub skip_cmake_after_first_run: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CppLibBuilderOutput {
     Success,
     Fail(CommandOutput),

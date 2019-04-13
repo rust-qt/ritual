@@ -16,6 +16,7 @@ use ritual_common::file_utils::{
 };
 use ritual_common::target::{current_target, LibraryTarget};
 use ritual_common::utils::{MapIfOk, ProgressBar};
+use serde_derive::{Deserialize, Serialize};
 use std::collections::{hash_map::Entry, HashMap};
 use std::io::Write;
 use std::path::PathBuf;
@@ -24,7 +25,7 @@ use std::thread::ThreadId;
 use std::time::Instant;
 use std::{iter, thread};
 
-const PARALLEL_CHUNKS: usize = 64;
+pub const CHUNK_SIZE: usize = 64;
 
 fn check_snippets<'a>(
     data: &mut CppCheckerData,
@@ -113,13 +114,13 @@ struct CppChecker<'b, 'a: 'b> {
     instance_provider: InstanceProvider,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 enum SnippetContext {
     Main,
     Global,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Snippet {
     code: String,
     context: SnippetContext,
@@ -366,7 +367,7 @@ impl CppChecker<'_, '_> {
         let instances = InstanceStorage::new(self.instance_provider.clone());
 
         snippets
-            .par_chunks_mut(PARALLEL_CHUNKS)
+            .par_chunks_mut(CHUNK_SIZE)
             .map(|chunk| {
                 let progress_bar = progress_bar.clone();
                 let instance = instances.current()?;
