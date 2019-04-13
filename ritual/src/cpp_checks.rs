@@ -16,6 +16,10 @@ impl CppChecks {
         self.0.iter().any(|item| &item.env == env)
     }
 
+    pub fn has_all_envs(&self, environments: &[LibraryTarget]) -> bool {
+        environments.iter().all(|env| self.has_env(env))
+    }
+
     pub fn add(&mut self, env: LibraryTarget, is_success: bool) {
         self.0.retain(|item| item.env != env);
         self.0.push(CppChecksItem { env, is_success });

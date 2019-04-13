@@ -155,21 +155,21 @@ pub type FfiGeneratorHook = dyn Fn(&CppDatabaseItem) -> Result<bool> + 'static;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerLibraryConfig {
-    crate_name: String,
-    lib_version: Option<String>,
+    pub crate_name: String,
+    pub lib_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerConfig {
-    target: Target,
-    libraries: Vec<WorkerLibraryConfig>,
+    pub target: Target,
+    pub libraries: Vec<WorkerLibraryConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClusterConfig {
-    queue_address: String,
-    protocol_version: u32,
-    workers: Vec<WorkerConfig>,
+    pub queue_address: String,
+    pub protocol_version: u32,
+    pub workers: Vec<WorkerConfig>,
 }
 
 /// The starting point of `cpp_to_rust` API.

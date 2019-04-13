@@ -1,7 +1,8 @@
-use crate::cpp_code_generator;
 use crate::cpp_ffi_data::CppFfiItem;
 use crate::database::CppFfiDatabaseItem;
 use crate::processor::ProcessorData;
+use crate::{cluster_api, cpp_code_generator};
+use itertools::Itertools;
 use log::{debug, trace};
 use rayon::iter::ParallelIterator;
 use rayon::slice::ParallelSliceMut;
@@ -119,17 +120,19 @@ enum SnippetContext {
 }
 
 #[derive(Debug, Clone)]
-struct Snippet {
+pub struct Snippet {
     code: String,
     context: SnippetContext,
     needs_moc: bool,
 }
 
 #[derive(Debug, Clone)]
-struct SnippetWithIndexes {
-    snippet: Snippet,
-    ffi_item_index: usize,
-    output: Option<CppLibBuilderOutput>,
+pub struct SnippetTask {
+    pub snippet: Snippet,
+    pub ffi_item_index: usize,
+    pub crate_name: String,
+    pub library_target: LibraryTarget,
+    pub output: Option<CppLibBuilderOutput>,
 }
 
 impl Snippet {
@@ -166,7 +169,7 @@ impl PreliminaryTest {
 }
 
 fn binary_check(
-    snippets: &mut [SnippetWithIndexes],
+    snippets: &mut [SnippetTask],
     data: &mut CppCheckerData,
     progress_bar: &ProgressBar,
 ) -> Result<()> {
@@ -308,34 +311,50 @@ impl CppChecker<'_, '_> {
     }
 
     fn run(&mut self) -> Result<()> {
-        let env = self.env();
-        self.data.current_database.add_environment(env.clone());
+        if self.data.config.cluster_config().is_some() {
+            self.run_cluster()
+        } else {
+            self.run_local()
+        }
+    }
 
-        let mut snippets = Vec::new();
-        for (ffi_item_index, ffi_item) in self.data.current_database.ffi_items().iter().enumerate()
-        {
-            if ffi_item.checks.has_env(&env) {
-                continue;
-            }
+    fn run_cluster(&mut self) -> Result<()> {
+        let cluster_config = self.data.config.cluster_config().unwrap();
+        let crate_name = self.data.current_database.crate_name().to_string();
 
-            match snippet_for_item(ffi_item, self.data.current_database.ffi_items()) {
-                Ok(snippet) => {
-                    snippets.push(SnippetWithIndexes {
-                        ffi_item_index,
-                        snippet,
-                        output: None,
-                    });
-                }
-                Err(err) => {
-                    debug!(
-                        "can't create snippet: {}: {:?}",
-                        ffi_item.item.short_text(),
-                        err
-                    );
-                }
-            }
+        let environments = cluster_config
+            .workers
+            .iter()
+            .flat_map(|worker| {
+                worker
+                    .libraries
+                    .iter()
+                    .filter(|lib| lib.crate_name == crate_name)
+                    .map(move |lib| LibraryTarget {
+                        target: worker.target.clone(),
+                        cpp_library_version: lib.lib_version.clone(),
+                    })
+            })
+            .collect_vec();
+
+        let mut snippets = self.create_tasks(&environments);
+        if snippets.is_empty() {
+            return Ok(());
         }
 
+        cluster_api::run_checks(cluster_config, &mut snippets)?;
+
+        self.save_results(snippets);
+
+        Ok(())
+    }
+
+    fn run_local(&mut self) -> Result<()> {
+        let env = self.env();
+
+        self.data.current_database.add_environment(env.clone());
+
+        let mut snippets = self.create_tasks(&[env]);
         if snippets.is_empty() {
             return Ok(());
         }
@@ -355,19 +374,65 @@ impl CppChecker<'_, '_> {
                 binary_check(chunk, &mut instance, &progress_bar)
             })
             .collect::<Result<_>>()?;
+        self.save_results(snippets);
 
+        Ok(())
+    }
+
+    fn create_tasks(&self, library_targets: &[LibraryTarget]) -> Vec<SnippetTask> {
+        let crate_name = self.data.current_database.crate_name().to_string();
+
+        let mut snippets = Vec::new();
+        for (ffi_item_index, ffi_item) in self.data.current_database.ffi_items().iter().enumerate()
+        {
+            if ffi_item.checks.has_all_envs(library_targets) {
+                continue;
+            }
+
+            match snippet_for_item(ffi_item, self.data.current_database.ffi_items()) {
+                Ok(snippet) => {
+                    for library_target in library_targets {
+                        if ffi_item.checks.has_env(library_target) {
+                            continue;
+                        }
+                        snippets.push(SnippetTask {
+                            ffi_item_index,
+                            snippet: snippet.clone(),
+                            crate_name: crate_name.clone(),
+                            library_target: library_target.clone(),
+                            output: None,
+                        });
+                    }
+                }
+                Err(err) => {
+                    debug!(
+                        "can't create snippet: {}: {:?}",
+                        ffi_item.item.short_text(),
+                        err
+                    );
+                }
+            }
+        }
+        snippets
+    }
+
+    fn save_results(&mut self, snippets: Vec<SnippetTask>) {
         for snippet in snippets {
             let ffi_item = &mut self.data.current_database.ffi_items_mut()[snippet.ffi_item_index];
-            let output = snippet.output.unwrap();
-            if output.is_success() {
-                debug!("success: {}", ffi_item.item.short_text());
+            if let Some(output) = snippet.output {
+                if output.is_success() {
+                    debug!("success: {}", ffi_item.item.short_text());
+                } else {
+                    debug!("error: {}: {:?}", ffi_item.item.short_text(), output);
+                }
+                ffi_item
+                    .checks
+                    .add(snippet.library_target, output.is_success());
             } else {
-                debug!("error: {}: {:?}", ffi_item.item.short_text(), output);
-                trace!("snippet: {:?}", snippet.snippet);
+                debug!("no output for item: {}", ffi_item.item.short_text());
             }
-            ffi_item.checks.add(env.clone(), output.is_success());
+            trace!("snippet: {:?}", snippet.snippet);
         }
-        Ok(())
     }
 
     fn run_tests(&mut self) -> Result<()> {

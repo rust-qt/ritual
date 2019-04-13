@@ -5,6 +5,7 @@
 //! for more information.
 
 pub mod cli;
+mod cluster_api;
 pub mod config;
 mod cpp_checker;
 mod cpp_checks;
