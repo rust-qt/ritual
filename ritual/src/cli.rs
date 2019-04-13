@@ -10,7 +10,7 @@ use flexi_logger::{Duplicate, LevelFilter, LogSpecification, Logger};
 use itertools::Itertools;
 use log::{error, info};
 use ritual_common::errors::{bail, err_msg, Result};
-use ritual_common::file_utils::{canonicalize, create_dir, load_toml, path_to_str};
+use ritual_common::file_utils::{canonicalize, create_dir, load_json, path_to_str};
 use ritual_common::target::current_target;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -94,7 +94,7 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
         let mut config = create_config(&crate_name)?;
 
         if let Some(cluster_config_path) = &options.cluster {
-            config.set_cluster_config(load_toml(cluster_config_path)?);
+            config.set_cluster_config(load_json(cluster_config_path)?);
         }
 
         was_any_action = true;
