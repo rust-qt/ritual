@@ -1,4 +1,5 @@
 use ritual::config::Config;
+use ritual::cpp_checker::{PreliminaryTest, Snippet};
 use ritual::cpp_data::{CppItem, CppPath};
 use ritual::cpp_ffi_data::CppFfiFunctionKind;
 use ritual::cpp_type::CppType;
@@ -197,5 +198,24 @@ pub fn core_config(config: &mut Config) -> Result<()> {
         }
         Ok(true)
     });
+
+    let tests = if config.crate_properties().name().starts_with("moqt") {
+        vec![PreliminaryTest::new(
+            "moqt_abs",
+            true,
+            Snippet::new_in_main("ritual_assert(moqt_abs(-2) == 2);", false),
+        )]
+    } else {
+        let code = format!(
+            "ritual_assert(QLibraryInfo::version().toString() == \"{}\");",
+            config.cpp_lib_version().unwrap()
+        );
+        vec![PreliminaryTest::new(
+            "qt_version",
+            true,
+            Snippet::new_in_main(code, false),
+        )]
+    };
+    config.add_cpp_checker_tests(tests);
     Ok(())
 }

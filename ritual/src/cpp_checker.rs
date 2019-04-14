@@ -137,14 +137,15 @@ pub struct SnippetTask {
 }
 
 impl Snippet {
-    fn new_in_main<S: Into<String>>(code: S, needs_moc: bool) -> Self {
+    pub fn new_in_main<S: Into<String>>(code: S, needs_moc: bool) -> Self {
         Snippet {
             code: code.into(),
             context: SnippetContext::Main,
             needs_moc,
         }
     }
-    fn new_global<S: Into<String>>(code: S, needs_moc: bool) -> Self {
+
+    pub fn new_global<S: Into<String>>(code: S, needs_moc: bool) -> Self {
         Snippet {
             code: code.into(),
             context: SnippetContext::Global,
@@ -153,14 +154,15 @@ impl Snippet {
     }
 }
 
-struct PreliminaryTest {
+#[derive(Debug, Clone)]
+pub struct PreliminaryTest {
     name: String,
     snippet: Snippet,
     expected: bool,
 }
 
 impl PreliminaryTest {
-    fn new(name: &str, expected: bool, snippet: Snippet) -> Self {
+    pub fn new(name: &str, expected: bool, snippet: Snippet) -> Self {
         Self {
             name: name.into(),
             expected,
@@ -303,6 +305,54 @@ impl InstanceStorage {
     }
 }
 
+fn builtin_tests() -> Vec<PreliminaryTest> {
+    vec![
+        PreliminaryTest::new(
+            "hello world",
+            true,
+            Snippet::new_in_main("std::cout << \"Hello world\\n\";", false),
+        ),
+        PreliminaryTest::new(
+            "correct assertion",
+            true,
+            Snippet::new_in_main("ritual_assert(2 + 2 == 4);", false),
+        ),
+        PreliminaryTest::new(
+            "type traits",
+            true,
+            Snippet::new_in_main(
+                "\
+                 class C1 {}; \n\
+                 enum E1 {};  \n\
+                 ritual_assert(std::is_class<C1>::value); \n\
+                 ritual_assert(!std::is_class<E1>::value); \n\
+                 ritual_assert(!std::is_enum<C1>::value); \n\
+                 ritual_assert(std::is_enum<E1>::value); \
+                 ritual_assert(sizeof(C1) > 0);\
+                 ritual_assert(sizeof(E1) > 0);\n\
+                 ",
+                false,
+            ),
+        ),
+        PreliminaryTest::new(
+            "incorrect assertion in fn",
+            true,
+            Snippet::new_global("int f1() { ritual_assert(2 + 2 == 5); return 1; }", false),
+        ),
+        PreliminaryTest::new("syntax error", false, Snippet::new_in_main("}", false)),
+        PreliminaryTest::new(
+            "incorrect assertion",
+            false,
+            Snippet::new_in_main("ritual_assert(2 + 2 == 5);", false),
+        ),
+        PreliminaryTest::new(
+            "status code 1",
+            false,
+            Snippet::new_in_main("return 1;", false),
+        ),
+    ]
+}
+
 impl CppChecker<'_, '_> {
     fn env(&self) -> LibraryTarget {
         LibraryTarget {
@@ -437,41 +487,10 @@ impl CppChecker<'_, '_> {
     }
 
     fn run_tests(&mut self) -> Result<()> {
-        let positive_tests = &[
-            PreliminaryTest::new(
-                "hello world",
-                true,
-                Snippet::new_in_main("std::cout << \"Hello world\\n\";", false),
-            ),
-            PreliminaryTest::new(
-                "correct assertion",
-                true,
-                Snippet::new_in_main("ritual_assert(2 + 2 == 4);", false),
-            ),
-            PreliminaryTest::new(
-                "type traits",
-                true,
-                Snippet::new_in_main(
-                    "\
-                     class C1 {}; \n\
-                     enum E1 {};  \n\
-                     ritual_assert(std::is_class<C1>::value); \n\
-                     ritual_assert(!std::is_class<E1>::value); \n\
-                     ritual_assert(!std::is_enum<C1>::value); \n\
-                     ritual_assert(std::is_enum<E1>::value); \
-                     ritual_assert(sizeof(C1) > 0);\
-                     ritual_assert(sizeof(E1) > 0);\n\
-                     ",
-                    false,
-                ),
-            ),
-            PreliminaryTest::new(
-                "incorrect assertion in fn",
-                true,
-                Snippet::new_global("int f1() { ritual_assert(2 + 2 == 5); return 1; }", false),
-            ),
-        ];
-        assert!(positive_tests.iter().all(|t| t.expected));
+        let mut tests = builtin_tests();
+        tests.extend(self.data.config.cpp_checker_tests().iter().cloned());
+
+        let positive_tests = tests.iter().filter(|test| test.expected).collect_vec();
 
         let mut instance = self.instance_provider.get("tests")?;
         let all_positive_output =
@@ -482,20 +501,7 @@ impl CppChecker<'_, '_> {
             }
         }
 
-        let negative_tests = &[
-            PreliminaryTest::new("syntax error", false, Snippet::new_in_main("}", false)),
-            PreliminaryTest::new(
-                "incorrect assertion",
-                false,
-                Snippet::new_in_main("ritual_assert(2 + 2 == 5);", false),
-            ),
-            PreliminaryTest::new(
-                "status code 1",
-                false,
-                Snippet::new_in_main("return 1;", false),
-            ),
-        ];
-        assert!(negative_tests.iter().all(|t| !t.expected));
+        let negative_tests = tests.iter().filter(|test| !test.expected).collect_vec();
 
         for test in negative_tests {
             check_preliminary_test(&mut instance, test)?;

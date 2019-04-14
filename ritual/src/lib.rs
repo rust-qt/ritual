@@ -7,7 +7,7 @@
 pub mod cli;
 mod cluster_api;
 pub mod config;
-mod cpp_checker;
+pub mod cpp_checker;
 mod cpp_checks;
 mod cpp_code_generator;
 pub mod cpp_data;

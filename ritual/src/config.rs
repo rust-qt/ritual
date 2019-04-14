@@ -1,5 +1,6 @@
 //! Interface for configuring and running the generator.
 
+use crate::cpp_checker::PreliminaryTest;
 use crate::cpp_data::CppPath;
 use crate::database::CppDatabaseItem;
 use crate::processor::{ProcessingSteps, ProcessorData};
@@ -195,6 +196,7 @@ pub struct Config {
     after_cpp_parser_hook: Option<Box<AfterCppParserHook>>,
     ffi_generator_hook: Option<Box<FfiGeneratorHook>>,
     cluster_config: Option<ClusterConfig>,
+    cpp_checker_tests: Vec<PreliminaryTest>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -226,6 +228,7 @@ impl Config {
             after_cpp_parser_hook: Default::default(),
             ffi_generator_hook: Default::default(),
             cluster_config: None,
+            cpp_checker_tests: Default::default(),
         }
     }
 
@@ -457,6 +460,14 @@ impl Config {
 
     pub fn cluster_config(&self) -> Option<&ClusterConfig> {
         self.cluster_config.as_ref()
+    }
+
+    pub fn add_cpp_checker_tests(&mut self, tests: Vec<PreliminaryTest>) {
+        self.cpp_checker_tests.extend(tests);
+    }
+
+    pub fn cpp_checker_tests(&self) -> &[PreliminaryTest] {
+        &self.cpp_checker_tests
     }
 }
 
