@@ -2,7 +2,7 @@ use flexi_logger::{LogSpecification, Logger};
 use itertools::Itertools;
 use log::LevelFilter;
 use log::{info, warn};
-use qt_ritual::lib_configs::create_config;
+use qt_ritual::lib_configs::{create_config, MOQT_INSTALL_DIR_ENV_VAR_NAME};
 use qt_ritual_common::all_crate_names;
 use ritual::cluster_api::{Client, GroupKey, TaskOutput};
 use ritual::cpp_checker::{LocalCppChecker, SnippetTask};
@@ -27,13 +27,17 @@ fn run() -> Result<()> {
         .unwrap_or_else(|e| panic!("Logger initialization failed: {}", e));
 
     let temp_dir = TempDir::new("qt_ritual_cluster_worker")?;
-    let supported_moqt_libs = ["moqt_core", "moqt_gui"].iter().map(|crate_name| {
-        let lib = GroupKey {
-            crate_name: crate_name.to_string(),
-            cpp_library_version: None,
-        };
-        (lib, None)
-    });
+    let moqt_present = env::var(MOQT_INSTALL_DIR_ENV_VAR_NAME).is_ok();
+    let supported_moqt_libs = ["moqt_core", "moqt_gui"]
+        .iter()
+        .filter(|_| moqt_present)
+        .map(|crate_name| {
+            let lib = GroupKey {
+                crate_name: crate_name.to_string(),
+                cpp_library_version: None,
+            };
+            (lib, None)
+        });
 
     let supported_qt_libs = env::vars()
         .filter(|(key, _value)| key.starts_with(QMAKE_PATH_VAR_PREFIX))
