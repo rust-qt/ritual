@@ -12,6 +12,10 @@ struct CppChecksItem {
 pub struct CppChecks(Vec<CppChecksItem>);
 
 impl CppChecks {
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
+
     pub fn has_env(&self, env: &LibraryTarget) -> bool {
         self.0.iter().any(|item| &item.env == env)
     }

@@ -169,6 +169,13 @@ impl Database {
         // TODO: deal with rust items that now have invalid index references
     }
 
+    pub fn clear_cpp_checks(&mut self) {
+        self.is_modified = true;
+        for item in &mut self.ffi_items {
+            item.checks.clear();
+        }
+    }
+
     pub fn crate_name(&self) -> &str {
         &self.crate_name
     }

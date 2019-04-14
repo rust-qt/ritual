@@ -55,7 +55,7 @@ fn snippet_for_item(
     }
 }
 
-struct CppCheckerInstance {
+pub struct CppCheckerInstance {
     main_cpp_path: PathBuf,
     crate_name: String,
     builder: CppLibBuilder,
@@ -63,7 +63,7 @@ struct CppCheckerInstance {
 }
 
 impl CppCheckerInstance {
-    fn check_snippets<'a>(
+    pub fn check_snippets<'a>(
         &mut self,
         snippets: impl Iterator<Item = &'a Snippet>,
     ) -> Result<CppLibBuilderOutput> {
@@ -128,7 +128,7 @@ impl CppCheckerInstance {
         Ok(())
     }
 
-    fn check_preliminary_tests(&mut self) -> Result<()> {
+    pub fn check_preliminary_tests(&mut self) -> Result<()> {
         let positive_tests = self
             .tests
             .iter()
@@ -155,6 +155,39 @@ impl CppCheckerInstance {
         }
         Ok(())
     }
+
+    pub fn binary_check<T>(
+        &mut self,
+        snippets: &mut [SnippetTask<T>],
+        progress_bar: Option<&ProgressBar>,
+    ) -> Result<()> {
+        if snippets.len() < 3 {
+            for snippet in &mut *snippets {
+                let output = self.check_snippets(iter::once(&snippet.snippet))?;
+                snippet.output = Some(output);
+                if let Some(progress_bar) = progress_bar {
+                    progress_bar.add(1);
+                }
+            }
+            return Ok(());
+        }
+
+        let output = self.check_snippets(snippets.iter().map(|s| &s.snippet))?;
+        if let CppLibBuilderOutput::Success = output {
+            for snippet in &mut *snippets {
+                snippet.output = Some(output.clone());
+            }
+            if let Some(progress_bar) = progress_bar {
+                progress_bar.add(snippets.len() as u64);
+            }
+        } else {
+            let split_point = snippets.len() / 2;
+            let (left, right) = snippets.split_at_mut(split_point);
+            self.binary_check(left, progress_bar)?;
+            self.binary_check(right, progress_bar)?;
+        }
+        Ok(())
+    }
 }
 
 struct CppChecker<'b, 'a: 'b> {
@@ -175,13 +208,19 @@ pub struct Snippet {
 }
 
 #[derive(Debug, Clone)]
-pub struct SnippetTask {
+pub struct SnippetTask<T> {
     pub snippet: Snippet,
+    pub output: Option<CppLibBuilderOutput>,
+    pub data: T,
+}
+
+pub struct SnippetTaskLocalData {
     pub ffi_item_index: usize,
     pub crate_name: String,
     pub library_target: LibraryTarget,
-    pub output: Option<CppLibBuilderOutput>,
 }
+
+pub type LocalSnippetTask = SnippetTask<SnippetTaskLocalData>;
 
 impl Snippet {
     pub fn new_in_main<S: Into<String>>(code: S, needs_moc: bool) -> Self {
@@ -218,37 +257,8 @@ impl PreliminaryTest {
     }
 }
 
-fn binary_check(
-    snippets: &mut [SnippetTask],
-    instance: &mut CppCheckerInstance,
-    progress_bar: &ProgressBar,
-) -> Result<()> {
-    if snippets.len() < 3 {
-        for snippet in &mut *snippets {
-            let output = instance.check_snippets(iter::once(&snippet.snippet))?;
-            snippet.output = Some(output);
-            progress_bar.add(1);
-        }
-        return Ok(());
-    }
-
-    let output = instance.check_snippets(snippets.iter().map(|s| &s.snippet))?;
-    if let CppLibBuilderOutput::Success = output {
-        for snippet in &mut *snippets {
-            snippet.output = Some(output.clone());
-        }
-        progress_bar.add(snippets.len() as u64);
-    } else {
-        let split_point = snippets.len() / 2;
-        let (left, right) = snippets.split_at_mut(split_point);
-        binary_check(left, instance, progress_bar)?;
-        binary_check(right, instance, progress_bar)?;
-    }
-    Ok(())
-}
-
 #[derive(Debug, Clone)]
-struct LocalCppChecker {
+pub struct LocalCppChecker {
     parent_path: PathBuf,
     include_directives: Vec<PathBuf>,
     crate_name: String,
@@ -276,7 +286,7 @@ impl LocalCppChecker {
         })
     }
 
-    fn get(&self, id: &str) -> Result<CppCheckerInstance> {
+    pub fn get(&self, id: &str) -> Result<CppCheckerInstance> {
         let root_path = self.parent_path.join(id);
         if root_path.exists() {
             remove_dir_all(&root_path)?;
@@ -479,7 +489,7 @@ impl CppChecker<'_, '_> {
                 let progress_bar = progress_bar.clone();
                 let instance = instances.current()?;
                 let mut instance = instance.lock().unwrap();
-                binary_check(chunk, &mut instance, &progress_bar)
+                instance.binary_check(chunk, Some(&progress_bar))
             })
             .collect::<Result<_>>()?;
         self.save_results(snippets);
@@ -487,7 +497,7 @@ impl CppChecker<'_, '_> {
         Ok(())
     }
 
-    fn create_tasks(&self, library_targets: &[LibraryTarget]) -> Vec<SnippetTask> {
+    fn create_tasks(&self, library_targets: &[LibraryTarget]) -> Vec<LocalSnippetTask> {
         let crate_name = self.data.current_database.crate_name().to_string();
 
         let mut snippets = Vec::new();
@@ -504,10 +514,12 @@ impl CppChecker<'_, '_> {
                             continue;
                         }
                         snippets.push(SnippetTask {
-                            ffi_item_index,
+                            data: SnippetTaskLocalData {
+                                ffi_item_index,
+                                crate_name: crate_name.clone(),
+                                library_target: library_target.clone(),
+                            },
                             snippet: snippet.clone(),
-                            crate_name: crate_name.clone(),
-                            library_target: library_target.clone(),
                             output: None,
                         });
                     }
@@ -524,9 +536,10 @@ impl CppChecker<'_, '_> {
         snippets
     }
 
-    fn save_results(&mut self, snippets: Vec<SnippetTask>) {
+    fn save_results(&mut self, snippets: Vec<LocalSnippetTask>) {
         for snippet in snippets {
-            let ffi_item = &mut self.data.current_database.ffi_items_mut()[snippet.ffi_item_index];
+            let ffi_item =
+                &mut self.data.current_database.ffi_items_mut()[snippet.data.ffi_item_index];
             if let Some(output) = snippet.output {
                 if output.is_success() {
                     debug!("success: {}", ffi_item.item.short_text());
@@ -535,7 +548,7 @@ impl CppChecker<'_, '_> {
                 }
                 ffi_item
                     .checks
-                    .add(snippet.library_target, output.is_success());
+                    .add(snippet.data.library_target, output.is_success());
             } else {
                 debug!("no output for item: {}", ffi_item.item.short_text());
             }

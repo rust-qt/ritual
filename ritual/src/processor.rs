@@ -143,6 +143,10 @@ impl Default for ProcessingSteps {
             data.current_database.clear_ffi();
             Ok(())
         });
+        s.add_custom("clear_cpp_checks", |data| {
+            data.current_database.clear_cpp_checks();
+            Ok(())
+        });
         s.add_custom("clear_rust_info", |data| {
             data.current_database.clear_rust_info();
             Ok(())
