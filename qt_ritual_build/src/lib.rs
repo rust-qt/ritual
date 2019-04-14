@@ -42,7 +42,7 @@ fn detect_closest_version(known: &[&str], current: &str) -> Result<Option<String
 
 /// Runs the build script.
 pub fn run_and_return(crate_name: &str) -> Result<()> {
-    let qt_config = get_full_build_config(crate_name)?;
+    let qt_config = get_full_build_config(crate_name, None)?;
 
     let mut config = Config::new()?;
     config.add_cmake_var(CMakeVar::new("RITUAL_QT", "1"));

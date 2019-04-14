@@ -16,14 +16,15 @@ use std::path::PathBuf;
 use std::process::Command;
 
 /// Makes a query to `qmake`.
-fn run_qmake_string_query(property: &str) -> Result<String> {
-    let result = get_command_output(Command::new("qmake").arg("-query").arg(property))?;
+fn run_qmake_string_query(property: &str, qmake_path: Option<&str>) -> Result<String> {
+    let command = qmake_path.unwrap_or("qmake");
+    let result = get_command_output(Command::new(command).arg("-query").arg(property))?;
     Ok(result.trim().to_string())
 }
 
 /// Makes a query to `qmake` and interprets its output as a path.
-fn run_qmake_query(property: &str) -> Result<PathBuf> {
-    Ok(PathBuf::from(run_qmake_string_query(property)?))
+fn run_qmake_query(property: &str, qmake_path: Option<&str>) -> Result<PathBuf> {
+    Ok(PathBuf::from(run_qmake_string_query(property, qmake_path)?))
 }
 
 /// Properties of a Qt installation
@@ -44,8 +45,11 @@ pub struct InstallationData {
 }
 
 /// Detects properties of current Qt installation using `qmake` command line utility.
-pub fn get_installation_data(crate_name: &str) -> Result<InstallationData> {
-    let qt_version = run_qmake_string_query("QT_VERSION")?;
+pub fn get_installation_data(
+    crate_name: &str,
+    qmake_path: Option<&str>,
+) -> Result<InstallationData> {
+    let qt_version = run_qmake_string_query("QT_VERSION", qmake_path)?;
     debug!("QT_VERSION = \"{}\"", qt_version);
 
     let qt_version_parsed = semver::Version::parse(&qt_version)?;
@@ -58,11 +62,11 @@ pub fn get_installation_data(crate_name: &str) -> Result<InstallationData> {
 
     debug!("Detecting Qt directories");
 
-    let root_include_path = run_qmake_query("QT_INSTALL_HEADERS")?;
+    let root_include_path = run_qmake_query("QT_INSTALL_HEADERS", qmake_path)?;
     debug!("QT_INSTALL_HEADERS = \"{}\"", root_include_path.display());
-    let lib_path = run_qmake_query("QT_INSTALL_LIBS")?;
+    let lib_path = run_qmake_query("QT_INSTALL_LIBS", qmake_path)?;
     debug!("QT_INSTALL_LIBS = \"{}\"", lib_path.display());
-    let docs_path = run_qmake_query("QT_INSTALL_DOCS")?;
+    let docs_path = run_qmake_query("QT_INSTALL_DOCS", qmake_path)?;
     debug!("QT_INSTALL_DOCS = \"{}\"", docs_path.display());
     let folder_name = lib_folder_name(crate_name);
     let dir = root_include_path.join(&folder_name);
@@ -102,8 +106,11 @@ pub struct FullBuildConfig {
     pub cpp_build_paths: CppBuildPaths,
 }
 
-pub fn get_full_build_config(crate_name: &str) -> Result<FullBuildConfig> {
-    let installation_data = get_installation_data(crate_name)?;
+pub fn get_full_build_config(
+    crate_name: &str,
+    qmake_path: Option<&str>,
+) -> Result<FullBuildConfig> {
+    let installation_data = get_installation_data(crate_name, qmake_path)?;
     let mut cpp_build_paths = CppBuildPaths::new();
     let mut cpp_build_config_data = CppBuildConfigData::new();
     {
@@ -121,7 +128,7 @@ pub fn get_full_build_config(crate_name: &str) -> Result<FullBuildConfig> {
 
         apply_installation_data(crate_name, &installation_data);
         for dep in lib_dependencies(crate_name)? {
-            let dep_data = get_installation_data(dep)?;
+            let dep_data = get_installation_data(dep, qmake_path)?;
             apply_installation_data(dep, &dep_data);
         }
     }

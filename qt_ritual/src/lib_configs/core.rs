@@ -206,15 +206,23 @@ pub fn core_config(config: &mut Config) -> Result<()> {
             Snippet::new_in_main("ritual_assert(moqt_abs(-2) == 2);", false),
         )]
     } else {
-        let code = format!(
+        let code1 = format!(
             "ritual_assert(QLibraryInfo::version().toString() == \"{}\");",
             config.cpp_lib_version().unwrap()
         );
-        vec![PreliminaryTest::new(
-            "qt_version",
+        let test1 = PreliminaryTest::new("qt_version_fn", true, Snippet::new_in_main(code1, false));
+
+        let code2 = format!(
+            "ritual_assert(strcmp(QT_VERSION_STR, \"{}\") == 0);",
+            config.cpp_lib_version().unwrap()
+        );
+        let test2 = PreliminaryTest::new(
+            "qt_version_define",
             true,
-            Snippet::new_in_main(code, false),
-        )]
+            Snippet::new_in_main(code2, false),
+        );
+
+        vec![test1, test2]
     };
     config.add_cpp_checker_tests(tests);
     Ok(())
