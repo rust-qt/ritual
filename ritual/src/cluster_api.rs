@@ -90,11 +90,12 @@ pub fn run_checks(config: &ClusterConfig, tasks: &mut [LocalSnippetTask]) -> Res
                 channel.basic_publish(
                     "",
                     &queue_name,
-                    true,
+                    false,
                     false,
                     BasicProperties::default(),
                     json,
                 )?;
+                std::thread::sleep(std::time::Duration::from_millis(300));
             }
         }
     }
@@ -183,7 +184,7 @@ impl Client {
                 self.output_channel.basic_publish(
                     "",
                     &queue_name,
-                    true,
+                    false,
                     false,
                     BasicProperties::default(),
                     json,
