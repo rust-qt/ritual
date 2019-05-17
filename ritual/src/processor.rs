@@ -7,12 +7,14 @@ use crate::{
 };
 use itertools::Itertools;
 use log::{error, info, trace};
+use regex::Regex;
 use ritual_common::env_var_names;
 use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use ritual_common::utils::{run_command, MapIfOk};
 use std::cmp::Ordering;
 use std::fmt;
 use std::iter::once;
+use std::ops::Bound;
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::{Duration, Instant};
@@ -301,41 +303,49 @@ pub fn process(
 
     let mut steps_result = Ok(());
 
-    for step_name in step_names {
+    let step_index = |name| {
+        config
+            .processing_steps()
+            .main_procedure
+            .iter()
+            .position(|s| s == &name)
+            .ok_or_else(|| format_err!("requested step not found: {}", name))
+    };
+
+    let step_ranges = step_names.iter().map_if_ok(|step_name| {
+        let range = parse_steps_spec(step_name)?;
+        let start_index = match range.0 {
+            Bound::Included(name) => step_index(name)?,
+            Bound::Excluded(name) => step_index(name)? + 1,
+            Bound::Unbounded => 0,
+        };
+        let end_index = match range.1 {
+            Bound::Included(name) => step_index(name)? + 1,
+            Bound::Excluded(name) => step_index(name)?,
+            Bound::Unbounded => config.processing_steps().main_procedure.len(),
+        };
+        let range = config
+            .processing_steps()
+            .main_procedure
+            .get(start_index..end_index)
+            .ok_or_else(|| err_msg("invalid steps range"))?;
+        if range.is_empty() {
+            bail!("empty steps range");
+        }
+        Ok(range)
+    })?;
+
+    for step_range in step_ranges {
         if steps_result.is_err() {
             break;
         }
 
-        let step_names = if step_name == "main" {
-            config.processing_steps().main_procedure.clone()
-        } else if step_name.starts_with("from:") {
-            let start_step = &step_name["from:".len()..];
-            let start_index = config
-                .processing_steps()
-                .main_procedure
-                .iter()
-                .position(|s| s == start_step)
-                .ok_or_else(|| format_err!("requested step not found: {}", start_step))?;
-            config.processing_steps().main_procedure[start_index..].to_vec()
-        } else if step_name.starts_with("until:") {
-            let end_step = &step_name["until:".len()..];
-            let end_index = config
-                .processing_steps()
-                .main_procedure
-                .iter()
-                .position(|s| s == end_step)
-                .ok_or_else(|| format_err!("requested step not found: {}", end_step))?;
-            config.processing_steps().main_procedure[..end_index].to_vec()
-        } else {
-            vec![step_name.to_string()]
-        };
-
-        for step_name in step_names {
+        for step_name in step_range {
             let step = if let Some(item) = config
                 .processing_steps()
                 .all_steps
                 .iter()
-                .find(|item| item.name == step_name)
+                .find(|item| &item.name == step_name)
             {
                 item
             } else {
@@ -385,4 +395,117 @@ pub fn process(
     workspace.put_crate(current_database);
 
     steps_result
+}
+
+fn parse_steps_spec(text: &str) -> Result<(Bound<String>, Bound<String>)> {
+    if text == "main" {
+        return Ok((Bound::Unbounded, Bound::Unbounded));
+    }
+
+    let re = Regex::new(r"^[[:word:]]+$").unwrap();
+    if re.is_match(text) {
+        return Ok((
+            Bound::Included(text.to_string()),
+            Bound::Included(text.to_string()),
+        ));
+    }
+
+    let re = Regex::new(r"^([\[\(])([[:word:]]*)\.\.([[:word:]]*)([\]\)])$").unwrap();
+    let captures = re
+        .captures(text)
+        .ok_or_else(|| err_msg("invalid step range"))?;
+
+    fn parse_bound(step: &str, bound_char: &str) -> Result<Bound<String>> {
+        Ok(match bound_char {
+            "[" | "]" => {
+                if step.is_empty() {
+                    Bound::Unbounded
+                } else {
+                    Bound::Included(step.to_string())
+                }
+            }
+            "(" | ")" => {
+                if step.is_empty() {
+                    bail!("invalid bound")
+                } else {
+                    Bound::Excluded(step.to_string())
+                }
+            }
+            _ => bail!("invalid bound"),
+        })
+    }
+
+    let from_bound = parse_bound(&captures[2], &captures[1])?;
+    let to_bound = parse_bound(&captures[3], &captures[4])?;
+    Ok((from_bound, to_bound))
+}
+
+#[test]
+fn test_parse_steps_spec() {
+    assert_eq!(
+        parse_steps_spec("main").unwrap(),
+        (Bound::Unbounded, Bound::Unbounded)
+    );
+    assert_eq!(
+        parse_steps_spec("t1").unwrap(),
+        (
+            Bound::Included("t1".to_string()),
+            Bound::Included("t1".to_string())
+        )
+    );
+    assert_eq!(
+        parse_steps_spec("[..]").unwrap(),
+        (Bound::Unbounded, Bound::Unbounded)
+    );
+    assert_eq!(
+        parse_steps_spec("[t1..]").unwrap(),
+        (Bound::Included("t1".to_string()), Bound::Unbounded)
+    );
+    assert_eq!(
+        parse_steps_spec("(t1..]").unwrap(),
+        (Bound::Excluded("t1".to_string()), Bound::Unbounded)
+    );
+    assert_eq!(
+        parse_steps_spec("[..t1)").unwrap(),
+        (Bound::Unbounded, Bound::Excluded("t1".to_string()))
+    );
+    assert_eq!(
+        parse_steps_spec("[..t1]").unwrap(),
+        (Bound::Unbounded, Bound::Included("t1".to_string()))
+    );
+    assert_eq!(
+        parse_steps_spec("[t1..t2]").unwrap(),
+        (
+            Bound::Included("t1".to_string()),
+            Bound::Included("t2".to_string())
+        )
+    );
+    assert_eq!(
+        parse_steps_spec("[t1..t2)").unwrap(),
+        (
+            Bound::Included("t1".to_string()),
+            Bound::Excluded("t2".to_string())
+        )
+    );
+    assert_eq!(
+        parse_steps_spec("(t1..t2]").unwrap(),
+        (
+            Bound::Excluded("t1".to_string()),
+            Bound::Included("t2".to_string())
+        )
+    );
+    assert_eq!(
+        parse_steps_spec("(t1..t2)").unwrap(),
+        (
+            Bound::Excluded("t1".to_string()),
+            Bound::Excluded("t2".to_string())
+        )
+    );
+
+    assert!(parse_steps_spec("(t1..)").is_err());
+    assert!(parse_steps_spec("[t1..)").is_err());
+    assert!(parse_steps_spec("(..t1)").is_err());
+    assert!(parse_steps_spec("(..t1]").is_err());
+    assert!(parse_steps_spec("(..)").is_err());
+    assert!(parse_steps_spec("[t1..t2[").is_err());
 }
