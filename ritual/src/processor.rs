@@ -313,6 +313,15 @@ pub fn process(
     };
 
     let step_ranges = step_names.iter().map_if_ok(|step_name| {
+        if config
+            .processing_steps()
+            .all_steps
+            .iter()
+            .any(|step| &step.name == step_name)
+        {
+            return Ok(vec![step_name.clone()]);
+        }
+
         let range = parse_steps_spec(step_name)?;
         let start_index = match range.0 {
             Bound::Included(name) => step_index(name)?,
@@ -328,7 +337,8 @@ pub fn process(
             .processing_steps()
             .main_procedure
             .get(start_index..end_index)
-            .ok_or_else(|| err_msg("invalid steps range"))?;
+            .ok_or_else(|| err_msg("invalid steps range"))?
+            .to_vec();
         if range.is_empty() {
             bail!("empty steps range");
         }
@@ -341,25 +351,12 @@ pub fn process(
         }
 
         for step_name in step_range {
-            let step = if let Some(item) = config
+            let step = config
                 .processing_steps()
                 .all_steps
                 .iter()
-                .find(|item| &item.name == step_name)
-            {
-                item
-            } else {
-                bail!(
-                    "Unknown operation: {}. Supported operations: main, {}.",
-                    step_name,
-                    config
-                        .processing_steps()
-                        .all_steps
-                        .iter()
-                        .map(|item| &item.name)
-                        .join(", ")
-                );
-            };
+                .find(|item| item.name == step_name)
+                .expect("step name must be valid (checked above)");
 
             info!("Running processing step: {}", &step.name);
 
