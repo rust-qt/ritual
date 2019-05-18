@@ -21,6 +21,7 @@ use regex::Regex;
 use ritual_common::env_var_names;
 use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use ritual_common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
+use ritual_common::target::{current_target, LibraryTarget};
 use std::collections::HashSet;
 use std::io::Write;
 use std::iter::once;
@@ -326,9 +327,16 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
 }
 
 pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
+    let current_target = LibraryTarget {
+        cpp_library_version: data.config.cpp_lib_version().map(ToString::to_string),
+        target: current_target(),
+    };
     for ffi_index in 0..data.current_database.ffi_items().len() {
         let ffi_item = &data.current_database.ffi_items()[ffi_index];
         if !ffi_item.is_source_item() {
+            continue;
+        }
+        if !ffi_item.checks.is_success(&current_target) {
             continue;
         }
         let code = ffi_item.source_item_cpp_code()?;

@@ -20,6 +20,13 @@ impl CppChecks {
         self.0.iter().any(|item| &item.env == env)
     }
 
+    pub fn is_success(&self, env: &LibraryTarget) -> bool {
+        self.0
+            .iter()
+            .find(|item| &item.env == env)
+            .map_or(false, |item| item.is_success)
+    }
+
     pub fn has_all_envs(&self, environments: &[LibraryTarget]) -> bool {
         environments.iter().all(|env| self.has_env(env))
     }
