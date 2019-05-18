@@ -221,8 +221,25 @@ pub fn core_config(config: &mut Config) -> Result<()> {
             true,
             Snippet::new_in_main(code2, false),
         );
+        let code3 = "
+            class Class1 : public QObject {
+            Q_OBJECT
+            public:
+                Class1() {
+                    emit signal1();
+                }
+            signals:
+                void signal1();
+            };
 
-        vec![test1, test2]
+            void x() {
+                Class1 c;
+            }
+        ";
+        let test3 =
+            PreliminaryTest::new("class_with_signal", true, Snippet::new_global(code3, true));
+
+        vec![test1, test2, test3]
     };
     config.add_cpp_checker_tests(tests);
     Ok(())
