@@ -1061,6 +1061,18 @@ impl State<'_, '_> {
 
     #[allow(clippy::useless_let_if_seq)]
     fn process_cpp_item(&self, cpp_item: &CppDatabaseItem) -> Result<Vec<RustItem>> {
+        if let Some(index) = cpp_item.source_ffi_item {
+            let ffi_item = self
+                .0
+                .current_database
+                .ffi_items()
+                .get(index)
+                .ok_or_else(|| err_msg("cpp item refers to invalid ffi item index"))?;
+            if !ffi_item.checks.any_success() {
+                bail!("cpp checks failed");
+            }
+        }
+
         match &cpp_item.item {
             CppItem::Namespace(path) => {
                 let rust_path = self.generate_rust_path(path, &NameType::Module)?;
