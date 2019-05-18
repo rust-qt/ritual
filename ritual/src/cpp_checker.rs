@@ -449,6 +449,10 @@ impl CppChecker<'_, '_> {
             })
             .collect_vec();
 
+        for env in &environments {
+            self.data.current_database.add_environment(env.clone());
+        }
+
         let mut snippets = self.create_tasks(&environments);
         if snippets.is_empty() {
             return Ok(());
