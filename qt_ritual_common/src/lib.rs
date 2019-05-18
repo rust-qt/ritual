@@ -8,6 +8,7 @@ use log::debug;
 use ritual_common::cpp_build_config::{
     CppBuildConfig, CppBuildConfigData, CppBuildPaths, CppLibraryType,
 };
+use ritual_common::cpp_lib_builder::CMakeVar;
 use ritual_common::errors::{bail, Result};
 use ritual_common::string_utils::CaseOperations;
 use ritual_common::target;
@@ -113,25 +114,26 @@ pub fn get_full_build_config(
     let installation_data = get_installation_data(crate_name, qmake_path)?;
     let mut cpp_build_paths = CppBuildPaths::new();
     let mut cpp_build_config_data = CppBuildConfigData::new();
-    {
-        let mut apply_installation_data = |name: &str, data: &InstallationData| {
-            cpp_build_paths.add_include_path(&data.root_include_path);
-            cpp_build_paths.add_include_path(&data.lib_include_path);
-            if data.is_framework {
-                cpp_build_paths.add_framework_path(&data.lib_path);
-                cpp_build_config_data.add_linked_framework(framework_name(name));
-            } else {
-                cpp_build_paths.add_lib_path(&data.lib_path);
-                cpp_build_config_data.add_linked_lib(real_lib_name(name));
-            }
-        };
 
-        apply_installation_data(crate_name, &installation_data);
-        for dep in lib_dependencies(crate_name)? {
-            let dep_data = get_installation_data(dep, qmake_path)?;
-            apply_installation_data(dep, &dep_data);
+    let mut apply_installation_data = |name: &str, data: &InstallationData| {
+        cpp_build_paths.add_include_path(&data.root_include_path);
+        cpp_build_paths.add_include_path(&data.lib_include_path);
+        if data.is_framework {
+            cpp_build_paths.add_framework_path(&data.lib_path);
+            cpp_build_config_data.add_linked_framework(framework_name(name));
+        } else {
+            cpp_build_paths.add_lib_path(&data.lib_path);
+            cpp_build_config_data.add_linked_lib(real_lib_name(name));
         }
+        cpp_build_config_data.add_cmake_var(CMakeVar::new("RITUAL_QT", "1"));
+    };
+
+    apply_installation_data(crate_name, &installation_data);
+    for dep in lib_dependencies(crate_name)? {
+        let dep_data = get_installation_data(dep, qmake_path)?;
+        apply_installation_data(dep, &dep_data);
     }
+
     let mut cpp_build_config = CppBuildConfig::new();
     cpp_build_config.add(target::Condition::True, cpp_build_config_data);
     {

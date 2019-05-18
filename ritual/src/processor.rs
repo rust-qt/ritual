@@ -5,7 +5,6 @@ use crate::{
     cpp_checker, cpp_ffi_generator, cpp_implicit_methods, cpp_omitting_arguments, cpp_parser,
     cpp_template_instantiator, crate_writer, rust_generator,
 };
-use itertools::Itertools;
 use log::{error, info, trace};
 use regex::Regex;
 use ritual_common::env_var_names;

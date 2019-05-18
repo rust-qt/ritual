@@ -1,5 +1,6 @@
 //! Types for configuring build script behavior.
 
+use crate::cpp_lib_builder::CMakeVar;
 use crate::errors::{bail, Result};
 use crate::target::{Condition, Target};
 use serde_derive::{Deserialize, Serialize};
@@ -50,6 +51,7 @@ pub struct CppBuildConfigData {
     linked_frameworks: Vec<String>,
     compiler_flags: Vec<String>,
     library_type: Option<CppLibraryType>,
+    cmake_vars: Vec<CMakeVar>,
 }
 
 impl CppBuildConfigData {
@@ -84,6 +86,10 @@ impl CppBuildConfigData {
         }
     }
 
+    pub fn add_cmake_var(&mut self, var: CMakeVar) {
+        self.cmake_vars.push(var);
+    }
+
     /// Sets library type. C++ wrapper is static by default.
     /// Shared library can be used to work around MSVC linker's limitations.
     pub fn set_library_type(&mut self, t: CppLibraryType) {
@@ -113,9 +119,8 @@ impl CppBuildConfigData {
     fn add_from(&mut self, other: &CppBuildConfigData) -> Result<()> {
         self.linked_libs.append(&mut other.linked_libs.clone());
         self.linked_frameworks
-            .append(&mut other.linked_frameworks.clone());
-        self.compiler_flags
-            .append(&mut other.compiler_flags.clone());
+            .extend_from_slice(&other.linked_frameworks);
+        self.compiler_flags.extend_from_slice(&other.compiler_flags);
         if self.library_type.is_some() {
             if other.library_type.is_some() && other.library_type != self.library_type {
                 bail!("conflicting library types specified");
@@ -123,7 +128,12 @@ impl CppBuildConfigData {
         } else {
             self.library_type = other.library_type;
         }
+        self.cmake_vars.extend_from_slice(&other.cmake_vars);
         Ok(())
+    }
+
+    pub fn cmake_vars(&self) -> &[CMakeVar] {
+        &self.cmake_vars
     }
 }
 

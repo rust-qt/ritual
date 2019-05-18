@@ -5,7 +5,6 @@
 
 use itertools::Itertools;
 use qt_ritual_common::get_full_build_config;
-use ritual_build::common::cpp_lib_builder::CMakeVar;
 use ritual_build::common::errors::{FancyUnwrap, Result};
 use ritual_build::common::target::current_target;
 use ritual_build::common::utils::MapIfOk;
@@ -45,7 +44,6 @@ pub fn run_and_return(crate_name: &str) -> Result<()> {
     let qt_config = get_full_build_config(crate_name, None)?;
 
     let mut config = Config::new()?;
-    config.add_cmake_var(CMakeVar::new("RITUAL_QT", "1"));
 
     let current_target = current_target();
     let known_library_versions = config

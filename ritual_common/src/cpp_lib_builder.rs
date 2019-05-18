@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// A CMake variable with a name and a value.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CMakeVar {
     pub name: String,
     pub value: String,
@@ -305,6 +305,7 @@ impl<'a, 'b> CMakeConfigData<'a, 'b> {
             "RITUAL_COMPILER_FLAGS",
             self.cpp_build_config_data.compiler_flags().join(" "),
         ));
+        cmake_vars.extend_from_slice(self.cpp_build_config_data.cmake_vars());
         Ok(cmake_vars)
     }
 }
