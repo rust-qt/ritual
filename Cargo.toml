@@ -9,3 +9,6 @@ members = [
     "qt_ritual_common",
     "qt_ritual_build",
 ]
+
+[patch.crates-io]
+amq-proto = { git = "https://github.com/P0ntiuS/rust-amq-proto.git", branch = "error-chain" }
