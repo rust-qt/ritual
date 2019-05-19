@@ -70,7 +70,7 @@ fn apply_instantiation_to_method(
     if new_method
         .all_involved_types()
         .iter()
-        .any(|t| t.is_or_contains_template_parameter())
+        .any(CppType::is_or_contains_template_parameter)
     {
         bail!(
             "extra template parameters left: {}",
@@ -109,23 +109,25 @@ pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
             };
             if let Some(template_arguments) = &path.last().template_arguments {
                 assert!(!template_arguments.is_empty());
-                if template_arguments.iter().all(|x| x.is_template_parameter()) {
+                if template_arguments
+                    .iter()
+                    .all(CppType::is_template_parameter)
+                {
                     for type1 in data
                         .current_database
                         .cpp_items()
                         .iter()
                         .filter_map(|item| item.item.as_type_ref())
                     {
-                        let is_suitable = type1.path.parent().ok() == path.parent().ok()
-                            && type1.path.last().name == path.last().name
-                            && type1.path.last().template_arguments.as_ref().map_or(
-                                false,
-                                |args| {
-                                    !args
-                                        .iter()
-                                        .all(|arg| arg.is_or_contains_template_parameter())
-                                },
-                            );
+                        let is_suitable =
+                            type1.path.parent().ok() == path.parent().ok()
+                                && type1.path.last().name == path.last().name
+                                && type1.path.last().template_arguments.as_ref().map_or(
+                                    false,
+                                    |args| {
+                                        !args.iter().all(CppType::is_or_contains_template_parameter)
+                                    },
+                                );
 
                         if is_suitable {
                             let nested_level =
@@ -188,7 +190,7 @@ pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> 
                 if let Some(template_arguments) = &path.last().template_arguments {
                     if !template_arguments
                         .iter()
-                        .any(|x| x.is_or_contains_template_parameter())
+                        .any(CppType::is_or_contains_template_parameter)
                     {
                         let is_in_database = data
                             .all_cpp_items()
@@ -228,7 +230,7 @@ pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> 
                         .template_arguments
                         .as_ref()
                         .map_or(false, |args| {
-                            args.iter().all(|arg| arg.is_template_parameter())
+                            args.iter().all(CppType::is_template_parameter)
                         })
             });
         if let Some(original_type) = original_type {

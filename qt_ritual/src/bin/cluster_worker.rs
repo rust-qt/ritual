@@ -67,12 +67,12 @@ fn run() -> Result<()> {
             lib.crate_name,
             lib.cpp_library_version
                 .as_ref()
-                .map(|s| s.as_str())
+                .map(String::as_str)
                 .unwrap_or("noversion")
         ));
         create_dir(&dir)?;
 
-        let qmake_path = qmake_path.as_ref().map(|s| s.as_str());
+        let qmake_path = qmake_path.as_ref().map(String::as_str);
         let config = create_config(&lib.crate_name, qmake_path)?;
         let checker = LocalCppChecker::new(dir, &config)?;
         let mut checker = checker.get("0")?;

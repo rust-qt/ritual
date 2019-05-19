@@ -251,13 +251,13 @@ impl CppType {
                     || type1
                         .arguments
                         .iter()
-                        .any(|arg| arg.is_or_contains_template_parameter())
+                        .any(CppType::is_or_contains_template_parameter)
             }
             CppType::Class(path) => path.items().iter().any(|item| {
                 if let Some(template_arguments) = &item.template_arguments {
                     template_arguments
                         .iter()
-                        .any(|arg| arg.is_or_contains_template_parameter())
+                        .any(CppType::is_or_contains_template_parameter)
                 } else {
                     false
                 }

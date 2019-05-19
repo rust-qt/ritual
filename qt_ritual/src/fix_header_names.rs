@@ -105,7 +105,7 @@ pub fn fix_header_names(data: &mut [CppDatabaseItem], headers_dir: &PathBuf) -> 
 
         if let DatabaseItemSource::CppParser { include_file, .. } = &mut item.source {
             let new_include_file =
-                map.real_to_fancy(include_file, class_name.as_ref().map(|s| s.as_str()));
+                map.real_to_fancy(include_file, class_name.as_ref().map(String::as_str));
             *include_file = new_include_file;
         }
     }

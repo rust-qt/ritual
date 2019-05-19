@@ -277,7 +277,7 @@ pub fn process(
     }
 
     let allow_load;
-    if step_names.get(0).map(|s| s.as_str()) == Some("discard") {
+    if step_names.get(0).map(String::as_str) == Some("discard") {
         allow_load = false;
         step_names = &step_names[1..];
     } else {

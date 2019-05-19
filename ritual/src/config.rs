@@ -327,7 +327,7 @@ impl Config {
     }
 
     pub fn cpp_lib_version(&self) -> Option<&str> {
-        self.cpp_lib_version.as_ref().map(|x| x.as_str())
+        self.cpp_lib_version.as_ref().map(String::as_str)
     }
 
     pub fn processing_steps(&self) -> &ProcessingSteps {

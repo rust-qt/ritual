@@ -927,7 +927,7 @@ impl State<'_, '_> {
                     .current_database
                     .rust_items()
                     .iter()
-                    .filter_map(|item| item.as_module_ref())
+                    .filter_map(RustDatabaseItem::as_module_ref)
                     .find(|module| module.kind == RustModuleKind::Ffi)
                     .ok_or_else(|| err_msg("ffi module not found"))?;
                 RustPathScope {
@@ -941,7 +941,7 @@ impl State<'_, '_> {
                     .current_database
                     .rust_items()
                     .iter()
-                    .filter_map(|item| item.as_module_ref())
+                    .filter_map(RustDatabaseItem::as_module_ref)
                     .find(|module| module.kind == RustModuleKind::SizedTypes)
                     .ok_or_else(|| err_msg("sized_types module not found"))?;
                 RustPathScope {
@@ -1373,7 +1373,7 @@ impl State<'_, '_> {
             .current_database
             .rust_items()
             .iter()
-            .filter_map(|item| item.as_module_ref())
+            .filter_map(RustDatabaseItem::as_module_ref)
             .any(|module| module.kind == kind)
         {
             let crate_name = self.0.config.crate_properties().name().to_string();

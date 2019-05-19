@@ -60,7 +60,7 @@ impl CMakeVar {
             name,
             paths
                 .into_iter()
-                .map_if_ok(|x| path_to_str(x.as_ref()).map(|x| x.to_string()))?,
+                .map_if_ok(|x| path_to_str(x.as_ref()).map(ToString::to_string))?,
         )
     }
 }

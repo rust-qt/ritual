@@ -174,14 +174,14 @@ impl CppPath {
         Ok(self
             .items
             .iter()
-            .map_if_ok(|item| item.to_cpp_code())?
+            .map_if_ok(CppPathItem::to_cpp_code)?
             .join("::"))
     }
 
     pub fn to_cpp_pseudo_code(&self) -> String {
         self.items
             .iter()
-            .map(|item| item.to_cpp_pseudo_code())
+            .map(CppPathItem::to_cpp_pseudo_code)
             .join("::")
     }
 
@@ -234,7 +234,7 @@ impl CppPath {
                     format!(
                         "{}_{}",
                         name,
-                        args.iter().map(|arg| arg.ascii_caption()).join("_")
+                        args.iter().map(CppType::ascii_caption).join("_")
                     )
                 } else {
                     name
@@ -328,7 +328,7 @@ impl CppPathItem {
             None => "".to_string(),
             Some(args) => format!(
                 "<{}>",
-                args.iter().map(|arg| arg.to_cpp_pseudo_code()).join(", ")
+                args.iter().map(CppType::to_cpp_pseudo_code).join(", ")
             ),
         };
         format!("{}{}", self.name, args)

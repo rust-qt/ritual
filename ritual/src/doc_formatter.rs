@@ -5,6 +5,7 @@
 
 use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFieldAccessorType};
 use crate::cpp_function::CppFunctionExternalDoc;
+use crate::cpp_type::CppType;
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_info::{
     RustEnumValue, RustFunction, RustFunctionKind, RustModule, RustModuleKind, RustQtReceiverType,
@@ -85,7 +86,7 @@ pub fn struct_doc(type1: &RustStruct) -> String {
                 let cpp_args = slot_wrapper
                     .cpp_arguments
                     .iter()
-                    .map(|t| t.to_cpp_pseudo_code())
+                    .map(CppType::to_cpp_pseudo_code)
                     .join(", ");
 
                 let rust_args = slot_wrapper
@@ -119,7 +120,7 @@ pub fn struct_doc(type1: &RustStruct) -> String {
             let cpp_args = slot_wrapper
                 .signal_arguments
                 .iter()
-                .map(|t| t.to_cpp_pseudo_code())
+                .map(CppType::to_cpp_pseudo_code)
                 .join(", ");
 
             format!("\

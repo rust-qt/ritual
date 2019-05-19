@@ -418,7 +418,7 @@ impl CppChecker<'_, '_> {
     fn env(&self) -> LibraryTarget {
         LibraryTarget {
             target: current_target(),
-            cpp_library_version: self.data.config.cpp_lib_version().map(|s| s.to_string()),
+            cpp_library_version: self.data.config.cpp_lib_version().map(ToString::to_string),
         }
     }
 

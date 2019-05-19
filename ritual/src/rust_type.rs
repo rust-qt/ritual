@@ -26,7 +26,7 @@ impl FromStr for RustPath {
         if parts.is_empty() {
             bail!("RustPath can't be empty");
         }
-        if parts.iter().any(|item| item.is_empty()) {
+        if parts.iter().any(String::is_empty) {
             bail!("RustPath item can't be empty");
         }
         Ok(RustPath { parts })
@@ -442,7 +442,7 @@ impl RustType {
     pub fn lifetime(&self) -> Option<&str> {
         if let RustType::PointerLike { kind, .. } = self {
             if let RustPointerLikeTypeKind::Reference { lifetime } = kind {
-                return lifetime.as_ref().map(|s| s.as_str());
+                return lifetime.as_ref().map(String::as_str);
             }
         }
         None
@@ -487,19 +487,19 @@ impl RustType {
                 generic_arguments, ..
             }) => {
                 if let Some(args) = generic_arguments {
-                    if args.iter().any(|arg| arg.is_unsafe_argument()) {
+                    if args.iter().any(RustType::is_unsafe_argument) {
                         return true;
                     }
                 }
                 false
             }
-            RustType::Tuple(types) => types.iter().any(|arg| arg.is_unsafe_argument()),
+            RustType::Tuple(types) => types.iter().any(RustType::is_unsafe_argument),
             RustType::FunctionPointer {
                 return_type,
                 arguments,
             } => {
                 return_type.is_unsafe_argument()
-                    || arguments.iter().any(|arg| arg.is_unsafe_argument())
+                    || arguments.iter().any(RustType::is_unsafe_argument)
             }
         }
     }

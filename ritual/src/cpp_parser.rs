@@ -265,7 +265,7 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
         if diagnostics.iter().any(should_print_error) {
             bail!(
                 "fatal clang error:\n{}",
-                diagnostics.iter().map(|d| d.to_string()).join("\n")
+                diagnostics.iter().map(ToString::to_string).join("\n")
             );
         }
     }
