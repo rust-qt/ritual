@@ -176,7 +176,7 @@ fn get_full_name_display(entity: Entity<'_>) -> String {
 #[cfg(test)]
 fn init_clang() -> Result<Clang> {
     use std;
-    for _ in 0..3000 {
+    for _ in 0..12000 {
         if let Ok(clang) = Clang::new() {
             return Ok(clang);
         }
