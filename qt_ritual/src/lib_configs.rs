@@ -37,7 +37,7 @@ fn empty_config(_config: &mut Config) -> Result<()> {
 }
 
 /// Executes the generator for a single Qt module with given configuration.
-pub fn create_config(crate_name: &str) -> Result<Config> {
+pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Config> {
     info!("Preparing generator config for crate: {}", crate_name);
     let mut crate_properties = CrateProperties::new(crate_name, versions::QT_OUTPUT_CRATES_VERSION);
     let mut custom_fields = toml::value::Table::new();
@@ -143,7 +143,7 @@ pub fn create_config(crate_name: &str) -> Result<Config> {
 
         let mut config = Config::new(crate_properties);
 
-        let qt_config = get_full_build_config(crate_name)?;
+        let qt_config = get_full_build_config(crate_name, qmake_path)?;
         config.set_cpp_build_config(qt_config.cpp_build_config);
         config.set_cpp_build_paths(qt_config.cpp_build_paths);
 
@@ -221,6 +221,6 @@ pub fn create_config(crate_name: &str) -> Result<Config> {
 pub fn global_config() -> GlobalConfig {
     let mut config = GlobalConfig::new();
     config.set_all_crate_names(all_crate_names().iter().map(|s| s.to_string()).collect());
-    config.set_create_config_hook(create_config);
+    config.set_create_config_hook(|crate_name| create_config(crate_name, None));
     config
 }

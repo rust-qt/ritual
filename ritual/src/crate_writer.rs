@@ -7,7 +7,7 @@ use pathdiff::diff_paths;
 use ritual_common::errors::{err_msg, Result};
 use ritual_common::file_utils::{
     copy_file, copy_recursively, create_dir, create_dir_all, create_file, path_to_str, read_dir,
-    remove_dir_all, remove_file, repo_dir_path, save_json, save_toml,
+    remove_dir_all, remove_file, repo_dir_path, save_json, save_toml_table,
 };
 use ritual_common::toml;
 use ritual_common::utils::{run_command, MapIfOk};
@@ -196,7 +196,7 @@ fn generate_crate_template(data: &mut ProcessorData<'_>) -> Result<()> {
             toml::Value::Table(data.config.crate_properties().custom_fields().clone()),
         )
     };
-    save_toml(output_path.join("Cargo.toml"), &cargo_toml_data)?;
+    save_toml_table(output_path.join("Cargo.toml"), &cargo_toml_data)?;
 
     if let Some(template_path) = &data.config.crate_template_path() {
         for item in read_dir(template_path)? {

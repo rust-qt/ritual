@@ -971,7 +971,7 @@ pub fn generate(
     let crate_root = database
         .items()
         .iter()
-        .filter_map(|item| item.as_module_ref())
+        .filter_map(RustDatabaseItem::as_module_ref)
         .find(|module| module.kind == RustModuleKind::CrateRoot)
         .ok_or_else(|| err_msg("crate root not found"))?;
 

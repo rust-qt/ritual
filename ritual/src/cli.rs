@@ -10,7 +10,7 @@ use flexi_logger::{Duplicate, LevelFilter, LogSpecification, Logger};
 use itertools::Itertools;
 use log::{error, info};
 use ritual_common::errors::{bail, err_msg, Result};
-use ritual_common::file_utils::{canonicalize, create_dir, path_to_str};
+use ritual_common::file_utils::{canonicalize, create_dir, load_json, path_to_str};
 use ritual_common::target::current_target;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -31,6 +31,9 @@ pub struct Options {
     #[structopt(short = "o", long = "operations", required = true)]
     /// Operations to perform
     pub operations: Vec<String>,
+    #[structopt(long = "cluster")]
+    /// Cluster configuration
+    pub cluster: Option<PathBuf>,
 }
 
 pub fn run_from_args(config: GlobalConfig) -> Result<()> {
@@ -88,7 +91,12 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
             .create_config_hook()
             .ok_or_else(|| err_msg("create_config_hook is missing"))?;
 
-        let config = create_config(&crate_name)?;
+        let mut config = create_config(&crate_name)?;
+
+        if let Some(cluster_config_path) = &options.cluster {
+            config.set_cluster_config(load_json(cluster_config_path)?);
+        }
+
         was_any_action = true;
         processor::process(&mut workspace, &config, &operations)?;
     }

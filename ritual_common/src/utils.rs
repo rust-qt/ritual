@@ -2,13 +2,14 @@
 
 use crate::errors::{bail, Result, ResultExt};
 use log::trace;
+use serde_derive::{Deserialize, Serialize};
 use std::collections::hash_map::{Entry, HashMap};
 use std::ffi::OsString;
 use std::fmt::{Debug, Display};
 use std::hash::{BuildHasher, Hash};
 use std::io::{stderr, stdout, Write};
 use std::path::PathBuf;
-use std::process::{Command, ExitStatus};
+use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::{env, iter, process};
 
@@ -57,16 +58,16 @@ pub fn run_command(command: &mut Command) -> Result<()> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CommandOutput {
-    pub status: ExitStatus,
+    pub status: i32,
     pub stdout: String,
     pub stderr: String,
 }
 
 impl CommandOutput {
     pub fn is_success(&self) -> bool {
-        self.status.success()
+        self.status == 0
     }
 }
 
@@ -82,7 +83,7 @@ pub fn run_command_and_capture_output(command: &mut Command) -> Result<CommandOu
     Ok(CommandOutput {
         stdout: String::from_utf8_lossy(&output.stdout).to_string(),
         stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-        status: output.status,
+        status: output.status.code().unwrap_or(-1),
     })
 }
 

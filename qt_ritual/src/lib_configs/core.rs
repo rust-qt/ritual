@@ -1,4 +1,5 @@
 use ritual::config::Config;
+use ritual::cpp_checker::{PreliminaryTest, Snippet};
 use ritual::cpp_data::{CppItem, CppPath};
 use ritual::cpp_ffi_data::CppFfiFunctionKind;
 use ritual::cpp_type::CppType;
@@ -197,5 +198,49 @@ pub fn core_config(config: &mut Config) -> Result<()> {
         }
         Ok(true)
     });
+
+    let tests = if config.crate_properties().name().starts_with("moqt") {
+        vec![PreliminaryTest::new(
+            "moqt_abs",
+            true,
+            Snippet::new_in_main("ritual_assert(moqt_abs(-2) == 2);", false),
+        )]
+    } else {
+        let code1 = format!(
+            "ritual_assert(QLibraryInfo::version().toString() == \"{}\");",
+            config.cpp_lib_version().unwrap()
+        );
+        let test1 = PreliminaryTest::new("qt_version_fn", true, Snippet::new_in_main(code1, false));
+
+        let code2 = format!(
+            "ritual_assert(strcmp(QT_VERSION_STR, \"{}\") == 0);",
+            config.cpp_lib_version().unwrap()
+        );
+        let test2 = PreliminaryTest::new(
+            "qt_version_define",
+            true,
+            Snippet::new_in_main(code2, false),
+        );
+        let code3 = "
+            class Class1 : public QObject {
+            Q_OBJECT
+            public:
+                Class1() {
+                    emit signal1();
+                }
+            signals:
+                void signal1();
+            };
+
+            void x() {
+                Class1 c;
+            }
+        ";
+        let test3 =
+            PreliminaryTest::new("class_with_signal", true, Snippet::new_global(code3, true));
+
+        vec![test1, test2, test3]
+    };
+    config.add_cpp_checker_tests(tests);
     Ok(())
 }

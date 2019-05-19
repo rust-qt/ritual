@@ -1,7 +1,9 @@
-use crate::cpp_code_generator;
+use crate::config::Config;
 use crate::cpp_ffi_data::CppFfiItem;
 use crate::database::CppFfiDatabaseItem;
 use crate::processor::ProcessorData;
+use crate::{cluster_api, cpp_code_generator};
+use itertools::Itertools;
 use log::{debug, trace};
 use rayon::iter::ParallelIterator;
 use rayon::slice::ParallelSliceMut;
@@ -15,6 +17,7 @@ use ritual_common::file_utils::{
 };
 use ritual_common::target::{current_target, LibraryTarget};
 use ritual_common::utils::{MapIfOk, ProgressBar};
+use serde_derive::{Deserialize, Serialize};
 use std::collections::{hash_map::Entry, HashMap};
 use std::io::Write;
 use std::path::PathBuf;
@@ -23,56 +26,7 @@ use std::thread::ThreadId;
 use std::time::Instant;
 use std::{iter, thread};
 
-const PARALLEL_CHUNKS: usize = 64;
-
-fn check_snippets<'a>(
-    data: &mut CppCheckerData,
-    snippets: impl Iterator<Item = &'a Snippet>,
-) -> Result<CppLibBuilderOutput> {
-    let mut any_needs_moc = false;
-
-    let mut file = create_file(&data.main_cpp_path)?;
-    writeln!(file, "#include \"utils.h\"")?;
-    writeln!(file)?;
-    let mut main_content = Vec::new();
-    for snippet in snippets {
-        if snippet.needs_moc {
-            any_needs_moc = true;
-        }
-        match snippet.context {
-            SnippetContext::Main => {
-                main_content.push(&snippet.code);
-            }
-            SnippetContext::Global => {
-                writeln!(file, "{}", snippet.code)?;
-                writeln!(file)?;
-            }
-        }
-    }
-
-    writeln!(file, "int main() {{")?;
-    for item in main_content {
-        writeln!(file, "{{")?;
-        writeln!(file, "{}", item)?;
-        writeln!(file, "}}")?;
-    }
-    writeln!(file, "}}")?;
-
-    if any_needs_moc && !data.crate_name.starts_with("moqt_") {
-        let stem = data
-            .main_cpp_path
-            .file_stem()
-            .ok_or_else(|| err_msg("failed to get file stem"))?;
-        writeln!(file, "#include \"{}.moc\"", os_str_to_str(stem)?)?;
-    }
-
-    drop(file);
-
-    let instant = Instant::now();
-    let result = data.builder.run();
-    trace!("cpp builder time: {:?}", instant.elapsed());
-    result
-}
+pub const CHUNK_SIZE: usize = 64;
 
 fn snippet_for_item(
     item: &CppFfiDatabaseItem,
@@ -101,46 +55,183 @@ fn snippet_for_item(
     }
 }
 
-struct CppCheckerData {
+pub struct CppCheckerInstance {
     main_cpp_path: PathBuf,
     crate_name: String,
     builder: CppLibBuilder,
+    tests: Vec<PreliminaryTest>,
+}
+
+impl CppCheckerInstance {
+    pub fn check_snippets<'a>(
+        &mut self,
+        snippets: impl Iterator<Item = &'a Snippet>,
+    ) -> Result<CppLibBuilderOutput> {
+        let mut any_needs_moc = false;
+
+        let mut file = create_file(&self.main_cpp_path)?;
+        writeln!(file, "#include \"utils.h\"")?;
+        writeln!(file)?;
+        let mut main_content = Vec::new();
+        for snippet in snippets {
+            if snippet.needs_moc {
+                any_needs_moc = true;
+            }
+            match snippet.context {
+                SnippetContext::Main => {
+                    main_content.push(&snippet.code);
+                }
+                SnippetContext::Global => {
+                    writeln!(file, "{}", snippet.code)?;
+                    writeln!(file)?;
+                }
+            }
+        }
+
+        writeln!(file, "int main() {{")?;
+        for item in main_content {
+            writeln!(file, "{{")?;
+            writeln!(file, "{}", item)?;
+            writeln!(file, "}}")?;
+        }
+        writeln!(file, "}}")?;
+
+        if any_needs_moc && !self.crate_name.starts_with("moqt_") {
+            let stem = self
+                .main_cpp_path
+                .file_stem()
+                .ok_or_else(|| err_msg("failed to get file stem"))?;
+            writeln!(file, "#include \"{}.moc\"", os_str_to_str(stem)?)?;
+        }
+
+        drop(file);
+
+        let instant = Instant::now();
+        let result = self.builder.run();
+        trace!("cpp builder time: {:?}", instant.elapsed());
+        result
+    }
+
+    fn check_preliminary_test(&mut self, test: &PreliminaryTest) -> Result<()> {
+        match self.check_snippets(iter::once(&test.snippet))? {
+            CppLibBuilderOutput::Success => {
+                if !test.expected {
+                    bail!("Nevative test ({}) succeeded", test.name);
+                }
+            }
+            CppLibBuilderOutput::Fail(output) => {
+                if test.expected {
+                    bail!("Positive test ({}) failed: {}", test.name, output.stderr);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn check_preliminary_tests(&mut self) -> Result<()> {
+        let positive_tests = self
+            .tests
+            .iter()
+            .filter(|test| test.expected)
+            .cloned()
+            .collect_vec();
+
+        let all_positive_output = self.check_snippets(positive_tests.iter().map(|t| &t.snippet))?;
+        if all_positive_output != CppLibBuilderOutput::Success {
+            for test in &positive_tests {
+                self.check_preliminary_test(test)?;
+            }
+        }
+
+        let negative_tests = self
+            .tests
+            .iter()
+            .filter(|test| !test.expected)
+            .cloned()
+            .collect_vec();
+
+        for test in &negative_tests {
+            self.check_preliminary_test(test)?;
+        }
+        Ok(())
+    }
+
+    pub fn binary_check<T>(
+        &mut self,
+        snippets: &mut [SnippetTask<T>],
+        progress_bar: Option<&ProgressBar>,
+    ) -> Result<()> {
+        if snippets.len() < 3 {
+            for snippet in &mut *snippets {
+                let output = self.check_snippets(iter::once(&snippet.snippet))?;
+                snippet.output = Some(output);
+                if let Some(progress_bar) = progress_bar {
+                    progress_bar.add(1);
+                }
+            }
+            return Ok(());
+        }
+
+        let output = self.check_snippets(snippets.iter().map(|s| &s.snippet))?;
+        if let CppLibBuilderOutput::Success = output {
+            for snippet in &mut *snippets {
+                snippet.output = Some(output.clone());
+            }
+            if let Some(progress_bar) = progress_bar {
+                progress_bar.add(snippets.len() as u64);
+            }
+        } else {
+            let split_point = snippets.len() / 2;
+            let (left, right) = snippets.split_at_mut(split_point);
+            self.binary_check(left, progress_bar)?;
+            self.binary_check(right, progress_bar)?;
+        }
+        Ok(())
+    }
 }
 
 struct CppChecker<'b, 'a: 'b> {
     data: &'b mut ProcessorData<'a>,
-    instance_provider: InstanceProvider,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 enum SnippetContext {
     Main,
     Global,
 }
 
-#[derive(Debug, Clone)]
-struct Snippet {
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Snippet {
     code: String,
     context: SnippetContext,
     needs_moc: bool,
 }
 
 #[derive(Debug, Clone)]
-struct SnippetWithIndexes {
-    snippet: Snippet,
-    ffi_item_index: usize,
-    output: Option<CppLibBuilderOutput>,
+pub struct SnippetTask<T> {
+    pub snippet: Snippet,
+    pub output: Option<CppLibBuilderOutput>,
+    pub data: T,
 }
 
+pub struct SnippetTaskLocalData {
+    pub ffi_item_index: usize,
+    pub crate_name: String,
+    pub library_target: LibraryTarget,
+}
+
+pub type LocalSnippetTask = SnippetTask<SnippetTaskLocalData>;
+
 impl Snippet {
-    fn new_in_main<S: Into<String>>(code: S, needs_moc: bool) -> Self {
+    pub fn new_in_main<S: Into<String>>(code: S, needs_moc: bool) -> Self {
         Snippet {
             code: code.into(),
             context: SnippetContext::Main,
             needs_moc,
         }
     }
-    fn new_global<S: Into<String>>(code: S, needs_moc: bool) -> Self {
+
+    pub fn new_global<S: Into<String>>(code: S, needs_moc: bool) -> Self {
         Snippet {
             code: code.into(),
             context: SnippetContext::Global,
@@ -149,14 +240,15 @@ impl Snippet {
     }
 }
 
-struct PreliminaryTest {
+#[derive(Debug, Clone)]
+pub struct PreliminaryTest {
     name: String,
     snippet: Snippet,
     expected: bool,
 }
 
 impl PreliminaryTest {
-    fn new(name: &str, expected: bool, snippet: Snippet) -> Self {
+    pub fn new(name: &str, expected: bool, snippet: Snippet) -> Self {
         Self {
             name: name.into(),
             expected,
@@ -165,62 +257,36 @@ impl PreliminaryTest {
     }
 }
 
-fn binary_check(
-    snippets: &mut [SnippetWithIndexes],
-    data: &mut CppCheckerData,
-    progress_bar: &ProgressBar,
-) -> Result<()> {
-    if snippets.len() < 3 {
-        for snippet in &mut *snippets {
-            let output = check_snippets(data, iter::once(&snippet.snippet))?;
-            snippet.output = Some(output);
-            progress_bar.add(1);
-        }
-        return Ok(());
-    }
-
-    let output = check_snippets(data, snippets.iter().map(|s| &s.snippet))?;
-    if let CppLibBuilderOutput::Success = output {
-        for snippet in &mut *snippets {
-            snippet.output = Some(output.clone());
-        }
-        progress_bar.add(snippets.len() as u64);
-    } else {
-        let split_point = snippets.len() / 2;
-        let (left, right) = snippets.split_at_mut(split_point);
-        binary_check(left, data, progress_bar)?;
-        binary_check(right, data, progress_bar)?;
-    }
-    Ok(())
-}
-
-fn check_preliminary_test(data: &mut CppCheckerData, test: &PreliminaryTest) -> Result<()> {
-    match check_snippets(data, iter::once(&test.snippet))? {
-        CppLibBuilderOutput::Success => {
-            if !test.expected {
-                bail!("Nevative test ({}) succeeded", test.name);
-            }
-        }
-        CppLibBuilderOutput::Fail(output) => {
-            if test.expected {
-                bail!("Positive test ({}) failed: {}", test.name, output.stderr);
-            }
-        }
-    }
-    Ok(())
-}
-
 #[derive(Debug, Clone)]
-struct InstanceProvider {
+pub struct LocalCppChecker {
     parent_path: PathBuf,
     include_directives: Vec<PathBuf>,
     crate_name: String,
     cpp_build_config: CppBuildConfigData,
     cpp_build_paths: CppBuildPaths,
+    tests: Vec<PreliminaryTest>,
 }
 
-impl InstanceProvider {
-    fn get(&self, id: &str) -> Result<CppCheckerData> {
+impl LocalCppChecker {
+    pub fn new(parent_path: impl Into<PathBuf>, config: &Config) -> Result<LocalCppChecker> {
+        let mut tests = builtin_tests();
+        tests.extend(config.cpp_checker_tests().iter().cloned());
+
+        Ok(LocalCppChecker {
+            parent_path: parent_path.into(),
+            include_directives: config.include_directives().to_vec(),
+            crate_name: config.crate_properties().name().to_string(),
+            cpp_build_paths: {
+                let mut data = config.cpp_build_paths().clone();
+                data.apply_env();
+                data
+            },
+            cpp_build_config: config.cpp_build_config().eval(&current_target())?,
+            tests,
+        })
+    }
+
+    pub fn get(&self, id: &str) -> Result<CppCheckerInstance> {
         let root_path = self.parent_path.join(id);
         if root_path.exists() {
             remove_dir_all(&root_path)?;
@@ -265,27 +331,28 @@ impl InstanceProvider {
             skip_cmake_after_first_run: true,
         };
 
-        Ok(CppCheckerData {
+        Ok(CppCheckerInstance {
             builder,
             main_cpp_path: src_path.join("main.cpp"),
             crate_name: self.crate_name.clone(),
+            tests: self.tests.clone(),
         })
     }
 }
 
 struct InstanceStorage {
-    instances: Arc<Mutex<HashMap<ThreadId, Arc<Mutex<CppCheckerData>>>>>,
-    provider: InstanceProvider,
+    instances: Arc<Mutex<HashMap<ThreadId, Arc<Mutex<CppCheckerInstance>>>>>,
+    provider: LocalCppChecker,
 }
 
 impl InstanceStorage {
-    fn new(provider: InstanceProvider) -> Self {
+    fn new(provider: LocalCppChecker) -> Self {
         Self {
             provider,
             instances: Default::default(),
         }
     }
-    fn current(&self) -> Result<Arc<Mutex<CppCheckerData>>> {
+    fn current(&self) -> Result<Arc<Mutex<CppCheckerInstance>>> {
         let mut instances = self.instances.lock().unwrap();
         let instances_len = instances.len();
         let instance = match instances.entry(thread::current().id()) {
@@ -299,32 +366,167 @@ impl InstanceStorage {
     }
 }
 
+fn builtin_tests() -> Vec<PreliminaryTest> {
+    vec![
+        PreliminaryTest::new(
+            "hello world",
+            true,
+            Snippet::new_in_main("std::cout << \"Hello world\\n\";", false),
+        ),
+        PreliminaryTest::new(
+            "correct assertion",
+            true,
+            Snippet::new_in_main("ritual_assert(2 + 2 == 4);", false),
+        ),
+        PreliminaryTest::new(
+            "type traits",
+            true,
+            Snippet::new_in_main(
+                "\
+                 class C1 {}; \n\
+                 enum E1 {};  \n\
+                 ritual_assert(std::is_class<C1>::value); \n\
+                 ritual_assert(!std::is_class<E1>::value); \n\
+                 ritual_assert(!std::is_enum<C1>::value); \n\
+                 ritual_assert(std::is_enum<E1>::value); \
+                 ritual_assert(sizeof(C1) > 0);\
+                 ritual_assert(sizeof(E1) > 0);\n\
+                 ",
+                false,
+            ),
+        ),
+        PreliminaryTest::new(
+            "incorrect assertion in fn",
+            true,
+            Snippet::new_global("int f1() { ritual_assert(2 + 2 == 5); return 1; }", false),
+        ),
+        PreliminaryTest::new("syntax error", false, Snippet::new_in_main("}", false)),
+        PreliminaryTest::new(
+            "incorrect assertion",
+            false,
+            Snippet::new_in_main("ritual_assert(2 + 2 == 5);", false),
+        ),
+        PreliminaryTest::new(
+            "status code 1",
+            false,
+            Snippet::new_in_main("return 1;", false),
+        ),
+    ]
+}
+
 impl CppChecker<'_, '_> {
     fn env(&self) -> LibraryTarget {
         LibraryTarget {
             target: current_target(),
-            cpp_library_version: self.data.config.cpp_lib_version().map(|s| s.to_string()),
+            cpp_library_version: self.data.config.cpp_lib_version().map(ToString::to_string),
         }
     }
 
     fn run(&mut self) -> Result<()> {
+        if self.data.config.cluster_config().is_some() {
+            self.run_cluster()
+        } else {
+            self.run_local()
+        }
+    }
+
+    fn run_cluster(&mut self) -> Result<()> {
+        let cluster_config = self.data.config.cluster_config().unwrap();
+        let crate_name = self.data.current_database.crate_name().to_string();
+
+        let environments = cluster_config
+            .workers
+            .iter()
+            .flat_map(|worker| {
+                worker
+                    .libraries
+                    .iter()
+                    .filter(|lib| lib.crate_name == crate_name)
+                    .map(move |lib| LibraryTarget {
+                        target: worker.target.clone(),
+                        cpp_library_version: lib.lib_version.clone(),
+                    })
+            })
+            .collect_vec();
+
+        for env in &environments {
+            self.data.current_database.add_environment(env.clone());
+        }
+
+        let mut snippets = self.create_tasks(&environments);
+        if snippets.is_empty() {
+            return Ok(());
+        }
+
+        cluster_api::run_checks(cluster_config, &mut snippets)?;
+
+        self.save_results(snippets);
+
+        Ok(())
+    }
+
+    fn run_local(&mut self) -> Result<()> {
+        let instance_provider = LocalCppChecker::new(
+            self.data.workspace.tmp_path().join("cpp_checker"),
+            &self.data.config,
+        )?;
+
         let env = self.env();
+
         self.data.current_database.add_environment(env.clone());
+
+        let mut snippets = self.create_tasks(&[env]);
+        if snippets.is_empty() {
+            return Ok(());
+        }
+
+        let mut instance = instance_provider.get("tests")?;
+        instance.check_preliminary_tests()?;
+
+        let progress_bar = ProgressBar::new(snippets.len() as u64, "Checking items");
+
+        let instances = InstanceStorage::new(instance_provider.clone());
+
+        snippets
+            .par_chunks_mut(CHUNK_SIZE)
+            .map(|chunk| {
+                let progress_bar = progress_bar.clone();
+                let instance = instances.current()?;
+                let mut instance = instance.lock().unwrap();
+                instance.binary_check(chunk, Some(&progress_bar))
+            })
+            .collect::<Result<_>>()?;
+        self.save_results(snippets);
+
+        Ok(())
+    }
+
+    fn create_tasks(&self, library_targets: &[LibraryTarget]) -> Vec<LocalSnippetTask> {
+        let crate_name = self.data.current_database.crate_name().to_string();
 
         let mut snippets = Vec::new();
         for (ffi_item_index, ffi_item) in self.data.current_database.ffi_items().iter().enumerate()
         {
-            if ffi_item.checks.has_env(&env) {
+            if ffi_item.checks.has_all_envs(library_targets) {
                 continue;
             }
 
             match snippet_for_item(ffi_item, self.data.current_database.ffi_items()) {
                 Ok(snippet) => {
-                    snippets.push(SnippetWithIndexes {
-                        ffi_item_index,
-                        snippet,
-                        output: None,
-                    });
+                    for library_target in library_targets {
+                        if ffi_item.checks.has_env(library_target) {
+                            continue;
+                        }
+                        snippets.push(SnippetTask {
+                            data: SnippetTaskLocalData {
+                                ffi_item_index,
+                                crate_name: crate_name.clone(),
+                                library_target: library_target.clone(),
+                            },
+                            snippet: snippet.clone(),
+                            output: None,
+                        });
+                    }
                 }
                 Err(err) => {
                     debug!(
@@ -335,128 +537,32 @@ impl CppChecker<'_, '_> {
                 }
             }
         }
-
-        if snippets.is_empty() {
-            return Ok(());
-        }
-
-        self.run_tests()?;
-
-        let progress_bar = ProgressBar::new(snippets.len() as u64, "Checking items");
-
-        let instances = InstanceStorage::new(self.instance_provider.clone());
-
         snippets
-            .par_chunks_mut(PARALLEL_CHUNKS)
-            .map(|chunk| {
-                let progress_bar = progress_bar.clone();
-                let instance = instances.current()?;
-                let mut instance = instance.lock().unwrap();
-                binary_check(chunk, &mut instance, &progress_bar)
-            })
-            .collect::<Result<_>>()?;
-
-        for snippet in snippets {
-            let ffi_item = &mut self.data.current_database.ffi_items_mut()[snippet.ffi_item_index];
-            let output = snippet.output.unwrap();
-            if output.is_success() {
-                debug!("success: {}", ffi_item.item.short_text());
-            } else {
-                debug!("error: {}: {:?}", ffi_item.item.short_text(), output);
-                trace!("snippet: {:?}", snippet.snippet);
-            }
-            ffi_item.checks.add(env.clone(), output.is_success());
-        }
-        Ok(())
     }
 
-    fn run_tests(&mut self) -> Result<()> {
-        let positive_tests = &[
-            PreliminaryTest::new(
-                "hello world",
-                true,
-                Snippet::new_in_main("std::cout << \"Hello world\\n\";", false),
-            ),
-            PreliminaryTest::new(
-                "correct assertion",
-                true,
-                Snippet::new_in_main("ritual_assert(2 + 2 == 4);", false),
-            ),
-            PreliminaryTest::new(
-                "type traits",
-                true,
-                Snippet::new_in_main(
-                    "\
-                     class C1 {}; \n\
-                     enum E1 {};  \n\
-                     ritual_assert(std::is_class<C1>::value); \n\
-                     ritual_assert(!std::is_class<E1>::value); \n\
-                     ritual_assert(!std::is_enum<C1>::value); \n\
-                     ritual_assert(std::is_enum<E1>::value); \
-                     ritual_assert(sizeof(C1) > 0);\
-                     ritual_assert(sizeof(E1) > 0);\n\
-                     ",
-                    false,
-                ),
-            ),
-            PreliminaryTest::new(
-                "incorrect assertion in fn",
-                true,
-                Snippet::new_global("int f1() { ritual_assert(2 + 2 == 5); return 1; }", false),
-            ),
-        ];
-        assert!(positive_tests.iter().all(|t| t.expected));
-
-        let mut instance = self.instance_provider.get("tests")?;
-        let all_positive_output =
-            check_snippets(&mut instance, positive_tests.iter().map(|t| &t.snippet))?;
-        if all_positive_output != CppLibBuilderOutput::Success {
-            for test in positive_tests {
-                check_preliminary_test(&mut instance, test)?;
+    fn save_results(&mut self, snippets: Vec<LocalSnippetTask>) {
+        for snippet in snippets {
+            let ffi_item =
+                &mut self.data.current_database.ffi_items_mut()[snippet.data.ffi_item_index];
+            if let Some(output) = snippet.output {
+                if output.is_success() {
+                    debug!("success: {}", ffi_item.item.short_text());
+                } else {
+                    debug!("error: {}: {:?}", ffi_item.item.short_text(), output);
+                }
+                ffi_item
+                    .checks
+                    .add(snippet.data.library_target, output.is_success());
+            } else {
+                debug!("no output for item: {}", ffi_item.item.short_text());
             }
+            trace!("snippet: {:?}", snippet.snippet);
         }
-
-        let negative_tests = &[
-            PreliminaryTest::new("syntax error", false, Snippet::new_in_main("}", false)),
-            PreliminaryTest::new(
-                "incorrect assertion",
-                false,
-                Snippet::new_in_main("ritual_assert(2 + 2 == 5);", false),
-            ),
-            PreliminaryTest::new(
-                "status code 1",
-                false,
-                Snippet::new_in_main("return 1;", false),
-            ),
-        ];
-        assert!(negative_tests.iter().all(|t| !t.expected));
-
-        for test in negative_tests {
-            check_preliminary_test(&mut instance, test)?;
-        }
-
-        Ok(())
     }
 }
 
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
-    let instance_provider = InstanceProvider {
-        parent_path: data.workspace.tmp_path().join("cpp_checker"),
-        include_directives: data.config.include_directives().to_vec(),
-        crate_name: data.current_database.crate_name().to_string(),
-        cpp_build_paths: {
-            let mut data = data.config.cpp_build_paths().clone();
-            data.apply_env();
-            data
-        },
-        cpp_build_config: data.config.cpp_build_config().eval(&current_target())?,
-    };
-    let mut checker = CppChecker {
-        data,
-        instance_provider,
-    };
-
+    let mut checker = CppChecker { data };
     checker.run()?;
-
     Ok(())
 }

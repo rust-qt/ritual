@@ -6,12 +6,13 @@ use crate::file_utils::{create_dir_all, file_to_string, path_to_str};
 use crate::target;
 use crate::utils::{run_command, run_command_and_capture_output, CommandOutput, MapIfOk};
 use itertools::Itertools;
+use serde_derive::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// A CMake variable with a name and a value.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CMakeVar {
     pub name: String,
     pub value: String,
@@ -59,7 +60,7 @@ impl CMakeVar {
             name,
             paths
                 .into_iter()
-                .map_if_ok(|x| path_to_str(x.as_ref()).map(|x| x.to_string()))?,
+                .map_if_ok(|x| path_to_str(x.as_ref()).map(ToString::to_string))?,
         )
     }
 }
@@ -93,7 +94,7 @@ pub struct CppLibBuilder {
     pub skip_cmake_after_first_run: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CppLibBuilderOutput {
     Success,
     Fail(CommandOutput),
@@ -304,6 +305,7 @@ impl<'a, 'b> CMakeConfigData<'a, 'b> {
             "RITUAL_COMPILER_FLAGS",
             self.cpp_build_config_data.compiler_flags().join(" "),
         ));
+        cmake_vars.extend_from_slice(self.cpp_build_config_data.cmake_vars());
         Ok(cmake_vars)
     }
 }

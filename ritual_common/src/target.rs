@@ -85,6 +85,7 @@ impl Target {
             "{:?}-{:?}-{:?}-{:?}",
             self.arch, self.os, self.family, self.env
         )
+        .to_lowercase()
     }
 }
 
@@ -290,7 +291,7 @@ impl Condition {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LibraryTarget {
     pub target: Target,
     pub cpp_library_version: Option<String>,

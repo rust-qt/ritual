@@ -32,7 +32,7 @@ pub fn print_trace(err: &failure::Error, log_level: Option<log::Level>) {
     }
     let backtrace = err.backtrace().to_string();
     if !backtrace.is_empty() {
-        if env::var("RUST_BACKTRACE").as_ref().map(|v| v.as_str()) == Ok("full") {
+        if env::var("RUST_BACKTRACE").as_ref().map(String::as_str) == Ok("full") {
             log_or_print!(log_level, "{}", backtrace);
         } else {
             log_or_print!(log_level, "Short backtrace:");

@@ -1,5 +1,6 @@
 //! Interface for configuring and running the generator.
 
+use crate::cpp_checker::PreliminaryTest;
 use crate::cpp_data::CppPath;
 use crate::database::CppDatabaseItem;
 use crate::processor::{ProcessingSteps, ProcessorData};
@@ -7,7 +8,9 @@ use crate::rust_info::{NameType, RustPathScope};
 use crate::rust_type::RustPath;
 use ritual_common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
 use ritual_common::errors::Result;
+use ritual_common::target::Target;
 use ritual_common::toml;
+use serde_derive::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// Information about an extra non-`cpp_to_rust`-based dependency.
@@ -151,6 +154,25 @@ pub type RustPathHook =
 pub type AfterCppParserHook = dyn Fn(&mut ProcessorData<'_>) -> Result<()> + 'static;
 pub type FfiGeneratorHook = dyn Fn(&CppDatabaseItem) -> Result<bool> + 'static;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkerLibraryConfig {
+    pub crate_name: String,
+    pub lib_version: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkerConfig {
+    pub target: Target,
+    pub libraries: Vec<WorkerLibraryConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClusterConfig {
+    pub queue_address: String,
+    pub protocol_version: u32,
+    pub workers: Vec<WorkerConfig>,
+}
+
 /// The starting point of `cpp_to_rust` API.
 /// Create a `Config` object, set its properties,
 /// add custom functions if necessary, and start
@@ -173,6 +195,8 @@ pub struct Config {
     rust_path_hook: Option<Box<RustPathHook>>,
     after_cpp_parser_hook: Option<Box<AfterCppParserHook>>,
     ffi_generator_hook: Option<Box<FfiGeneratorHook>>,
+    cluster_config: Option<ClusterConfig>,
+    cpp_checker_tests: Vec<PreliminaryTest>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -203,6 +227,8 @@ impl Config {
             rust_path_hook: Default::default(),
             after_cpp_parser_hook: Default::default(),
             ffi_generator_hook: Default::default(),
+            cluster_config: None,
+            cpp_checker_tests: Default::default(),
         }
     }
 
@@ -301,7 +327,7 @@ impl Config {
     }
 
     pub fn cpp_lib_version(&self) -> Option<&str> {
-        self.cpp_lib_version.as_ref().map(|x| x.as_str())
+        self.cpp_lib_version.as_ref().map(String::as_str)
     }
 
     pub fn processing_steps(&self) -> &ProcessingSteps {
@@ -426,6 +452,22 @@ impl Config {
 
     pub fn ffi_generator_hook(&self) -> Option<&FfiGeneratorHook> {
         self.ffi_generator_hook.as_ref().map(|b| &**b)
+    }
+
+    pub fn set_cluster_config(&mut self, cluster_config: ClusterConfig) {
+        self.cluster_config = Some(cluster_config);
+    }
+
+    pub fn cluster_config(&self) -> Option<&ClusterConfig> {
+        self.cluster_config.as_ref()
+    }
+
+    pub fn add_cpp_checker_tests(&mut self, tests: Vec<PreliminaryTest>) {
+        self.cpp_checker_tests.extend(tests);
+    }
+
+    pub fn cpp_checker_tests(&self) -> &[PreliminaryTest] {
+        &self.cpp_checker_tests
     }
 }
 

@@ -336,7 +336,7 @@ impl CppFfiItem {
                 slot_wrapper
                     .signal_arguments
                     .iter()
-                    .map(|arg| arg.to_cpp_pseudo_code())
+                    .map(CppType::to_cpp_pseudo_code)
                     .join(", ")
             ),
         }

@@ -38,7 +38,7 @@ pub fn detect_signal_argument_types(data: &mut ProcessorData<'_>) -> Result<Hash
     for t in &all_types {
         trace!(
             "* ({})",
-            t.iter().map(|x| x.to_cpp_pseudo_code()).join(", ")
+            t.iter().map(CppType::to_cpp_pseudo_code).join(", ")
         );
     }
 

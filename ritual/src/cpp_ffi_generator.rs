@@ -577,7 +577,7 @@ fn check_preconditions(item: &CppItem) -> Result<()> {
     if item
         .all_involved_types()
         .iter()
-        .any(|x| x.is_or_contains_template_parameter())
+        .any(CppType::is_or_contains_template_parameter)
     {
         bail!("item contains template parameter");
     }
