@@ -95,6 +95,7 @@ fn get_origin_location(entity: Entity<'_>) -> Result<CppOriginLocation> {
 /// Extract template argument declarations from a class or method definition `entity`.
 fn get_template_arguments(entity: Entity<'_>) -> Option<Vec<CppType>> {
     let mut nested_level = 0;
+    // TODO: this won't work if direct parent doesn't have args but its parent does
     if let Some(parent) = entity.get_semantic_parent() {
         if let Some(args) = get_template_arguments(parent) {
             let parent_nested_level = if let CppType::TemplateParameter {
@@ -126,6 +127,20 @@ fn get_template_arguments(entity: Entity<'_>) -> Option<Vec<CppType>> {
     } else {
         Some(args)
     }
+}
+
+fn get_context_template_args(entity: Entity<'_>) -> Vec<CppType> {
+    let mut current_entity = entity;
+    let mut args = Vec::new();
+    loop {
+        args.extend(get_template_arguments(current_entity).into_iter().flatten());
+        if let Some(parent) = current_entity.get_semantic_parent() {
+            current_entity = parent;
+        } else {
+            break;
+        }
+    }
+    args
 }
 
 fn get_path_item(entity: Entity<'_>) -> Result<CppPathItem> {
@@ -389,8 +404,7 @@ impl CppParser<'_, '_> {
         &self,
         type1: Option<Type<'_>>,
         string: Option<String>,
-        context_class: Option<Entity<'_>>,
-        context_method: Option<Entity<'_>>,
+        context_template_args: &[CppType],
     ) -> Result<CppType> {
         let template_class_regex = Regex::new(r"^([\w:]+)<(.+)>$")?;
         let (is_const, name) = if let Some(type1) = type1 {
@@ -425,8 +439,7 @@ impl CppParser<'_, '_> {
                                 match self.parse_unexposed_type(
                                     None,
                                     Some(arg.trim().to_string()),
-                                    context_class,
-                                    context_method,
+                                    context_template_args,
                                 ) {
                                     Ok(arg_type) => arg_types.push(arg_type),
                                     Err(msg) => {
@@ -471,19 +484,12 @@ impl CppParser<'_, '_> {
                 name: name.clone(),
             });
         }
-        if let Some(e) = context_method {
-            if let Some(args) = get_template_arguments(e) {
-                if let Some(arg) = args.iter().find(|t| t.to_cpp_pseudo_code() == name) {
-                    return Ok(arg.clone());
-                }
-            }
-        }
-        if let Some(e) = context_class {
-            if let Some(args) = get_template_arguments(e) {
-                if let Some(arg) = args.iter().find(|t| t.to_cpp_pseudo_code() == name) {
-                    return Ok(arg.clone());
-                }
-            }
+
+        if let Some(arg) = context_template_args
+            .iter()
+            .find(|t| t.to_cpp_pseudo_code() == name)
+        {
+            return Ok(arg.clone());
         }
 
         if name.ends_with(" *") {
@@ -491,8 +497,7 @@ impl CppParser<'_, '_> {
             let subtype = self.parse_unexposed_type(
                 None,
                 Some(remaining_name.to_string()),
-                context_class,
-                context_method,
+                context_template_args,
             )?;
             if let CppType::FunctionPointer(..) = subtype {
                 return Ok(subtype);
@@ -510,8 +515,7 @@ impl CppParser<'_, '_> {
             let subtype = self.parse_unexposed_type(
                 None,
                 Some(remaining_name.to_string()),
-                context_class,
-                context_method,
+                context_template_args,
             )?;
             return Ok(CppType::PointerLike {
                 kind: CppPointerLikeTypeKind::Reference,
@@ -565,8 +569,7 @@ impl CppParser<'_, '_> {
                     match self.parse_unexposed_type(
                         None,
                         Some(arg.trim().to_string()),
-                        context_class,
-                        context_method,
+                        context_template_args,
                     ) {
                         Ok(arg_type) => arg_types.push(arg_type),
                         Err(msg) => {
@@ -592,12 +595,7 @@ impl CppParser<'_, '_> {
     /// Parses type `type1`.
     /// Surrounding class and/or
     /// method may be specified in `context_class` and `context_method`.
-    fn parse_type(
-        &self,
-        type1: Type<'_>,
-        context_class: Option<Entity<'_>>,
-        context_method: Option<Entity<'_>>,
-    ) -> Result<CppType> {
+    fn parse_type(&self, type1: Type<'_>, context_template_args: &[CppType]) -> Result<CppType> {
         if type1.is_volatile_qualified() {
             bail!("Volatile type");
         }
@@ -610,8 +608,7 @@ impl CppParser<'_, '_> {
         }
         match type1.get_kind() {
             TypeKind::Typedef => {
-                let parsed =
-                    self.parse_type(type1.get_canonical_type(), context_class, context_method)?;
+                let parsed = self.parse_type(type1.get_canonical_type(), context_template_args)?;
                 if let CppType::BuiltInNumeric(..) = parsed {
                     let mut name = type1.get_display_name();
                     if name.starts_with("const ") {
@@ -692,11 +689,7 @@ impl CppParser<'_, '_> {
                                 match arg_type {
                                     None => bail!("Template argument is None"),
                                     Some(arg_type) => {
-                                        match self.parse_type(
-                                            arg_type,
-                                            context_class,
-                                            context_method,
-                                        ) {
+                                        match self.parse_type(arg_type, context_template_args) {
                                             Ok(parsed_type) => r.push(parsed_type),
                                             Err(msg) => {
                                                 bail!(
@@ -723,7 +716,7 @@ impl CppParser<'_, '_> {
                 let mut arguments = Vec::new();
                 if let Some(argument_types) = type1.get_argument_types() {
                     for arg_type in argument_types {
-                        match self.parse_type(arg_type, context_class, context_method) {
+                        match self.parse_type(arg_type, context_template_args) {
                             Ok(t) => arguments.push(t),
                             Err(msg) => {
                                 bail!(
@@ -741,7 +734,7 @@ impl CppParser<'_, '_> {
                     );
                 }
                 let return_type = if let Some(result_type) = type1.get_result_type() {
-                    match self.parse_type(result_type, context_class, context_method) {
+                    match self.parse_type(result_type, context_template_args) {
                         Ok(t) => Box::new(t),
                         Err(msg) => {
                             bail!(
@@ -765,48 +758,45 @@ impl CppParser<'_, '_> {
             }
             TypeKind::Pointer | TypeKind::LValueReference | TypeKind::RValueReference => {
                 match type1.get_pointee_type() {
-                    Some(pointee) => {
-                        match self.parse_type(pointee, context_class, context_method) {
-                            Ok(subtype) => {
-                                let original_type_indirection = match type1.get_kind() {
-                                    TypeKind::Pointer => CppPointerLikeTypeKind::Pointer,
-                                    TypeKind::LValueReference => CppPointerLikeTypeKind::Reference,
-                                    TypeKind::RValueReference => {
-                                        CppPointerLikeTypeKind::RValueReference
-                                    }
-                                    _ => unreachable!(),
-                                };
-
-                                if original_type_indirection == CppPointerLikeTypeKind::Pointer
-                                    && subtype.is_function_pointer()
-                                {
-                                    Ok(subtype)
-                                } else {
-                                    Ok(CppType::PointerLike {
-                                        kind: original_type_indirection,
-                                        is_const: pointee.is_const_qualified(),
-                                        target: Box::new(subtype),
-                                    })
+                    Some(pointee) => match self.parse_type(pointee, context_template_args) {
+                        Ok(subtype) => {
+                            let original_type_indirection = match type1.get_kind() {
+                                TypeKind::Pointer => CppPointerLikeTypeKind::Pointer,
+                                TypeKind::LValueReference => CppPointerLikeTypeKind::Reference,
+                                TypeKind::RValueReference => {
+                                    CppPointerLikeTypeKind::RValueReference
                                 }
+                                _ => unreachable!(),
+                            };
+
+                            if original_type_indirection == CppPointerLikeTypeKind::Pointer
+                                && subtype.is_function_pointer()
+                            {
+                                Ok(subtype)
+                            } else {
+                                Ok(CppType::PointerLike {
+                                    kind: original_type_indirection,
+                                    is_const: pointee.is_const_qualified(),
+                                    target: Box::new(subtype),
+                                })
                             }
-                            Err(msg) => Err(msg),
                         }
-                    }
+                        Err(msg) => Err(msg),
+                    },
                     None => bail!("can't get pointee type"),
                 }
             }
             TypeKind::Elaborated => {
-                self.parse_type(type1.get_canonical_type(), context_class, context_method)
+                self.parse_type(type1.get_canonical_type(), context_template_args)
             }
             TypeKind::Unexposed => {
                 let canonical = type1.get_canonical_type();
                 if canonical.get_kind() == TypeKind::Unexposed {
-                    self.parse_unexposed_type(Some(type1), None, context_class, context_method)
+                    self.parse_unexposed_type(Some(type1), None, context_template_args)
                 } else {
-                    let mut parsed_canonical =
-                        self.parse_type(canonical, context_class, context_method);
+                    let mut parsed_canonical = self.parse_type(canonical, context_template_args);
                     if let Ok(parsed_unexposed) =
-                        self.parse_unexposed_type(Some(type1), None, context_class, context_method)
+                        self.parse_unexposed_type(Some(type1), None, context_template_args)
                     {
                         if let CppType::Class(path) = parsed_unexposed {
                             if let Some(template_arguments_unexposed) =
@@ -913,11 +903,11 @@ impl CppParser<'_, '_> {
     /// Parses a function `entity`.
     #[allow(clippy::cyclomatic_complexity)]
     fn parse_function(&self, entity: Entity<'_>) -> Result<(CppFunction, DatabaseItemSource)> {
-        let (class_name, class_entity) = match entity.get_semantic_parent() {
+        let class_name = match entity.get_semantic_parent() {
             Some(p) => match p.get_kind() {
                 EntityKind::ClassDecl | EntityKind::ClassTemplate | EntityKind::StructDecl => {
                     match get_full_name(p) {
-                        Ok(class_name) => (Some(class_name), Some(p)),
+                        Ok(class_name) => Some(class_name),
                         Err(msg) => {
                             bail!(
                                 "function parent is a class but it doesn't have a name: {}",
@@ -929,9 +919,9 @@ impl CppParser<'_, '_> {
                 EntityKind::ClassTemplatePartialSpecialization => {
                     bail!("this function is part of a template partial specialization");;
                 }
-                _ => (None, None),
+                _ => None,
             },
-            None => (None, None),
+            None => None,
         };
 
         let return_type = if let Some(x) = entity.get_type() {
@@ -943,7 +933,8 @@ impl CppParser<'_, '_> {
         } else {
             bail!("failed to get function type: {:?}", entity);
         };
-        let return_type_parsed = match self.parse_type(return_type, class_entity, Some(entity)) {
+        let context_template_args = get_context_template_args(entity);
+        let return_type_parsed = match self.parse_type(return_type, &context_template_args) {
             Ok(x) => x,
             Err(msg) => {
                 bail!(
@@ -982,7 +973,7 @@ impl CppParser<'_, '_> {
                 continue;
             }
             let argument_type = self
-                .parse_type(clang_type, class_entity, Some(entity))
+                .parse_type(clang_type, &context_template_args)
                 .with_context(|_| {
                     format!(
                         "Can't parse argument type: {}: {}",
@@ -1267,7 +1258,7 @@ impl CppParser<'_, '_> {
             .get_type()
             .ok_or_else(|| err_msg("failed to get field type"))?;
         let field_type = self
-            .parse_type(field_clang_type, Some(entity), None)
+            .parse_type(field_clang_type, &get_context_template_args(entity))
             .with_context(|_| err_msg("failed to parse field type"))?;
         self.data.current_database.add_cpp_item(
             DatabaseItemSource::CppParser {
@@ -1338,7 +1329,10 @@ impl CppParser<'_, '_> {
             }
             if child.get_kind() == EntityKind::BaseSpecifier {
                 let base_type = self
-                    .parse_type(child.get_type().unwrap(), Some(entity), None)
+                    .parse_type(
+                        child.get_type().unwrap(),
+                        &get_context_template_args(entity),
+                    )
                     .with_context(|_| "Can't parse base class type")?;
                 if let CppType::Class(base_type) = &base_type {
                     self.data.current_database.add_cpp_item(
@@ -1546,9 +1540,11 @@ impl CppParser<'_, '_> {
             | EntityKind::ClassTemplate
             | EntityKind::ClassTemplatePartialSpecialization => {
                 if let Some(name) = entity.get_display_name() {
-                    if let Ok(parent_type) =
-                        self.parse_unexposed_type(None, Some(name.clone()), None, None)
-                    {
+                    if let Ok(parent_type) = self.parse_unexposed_type(
+                        None,
+                        Some(name.clone()),
+                        &get_context_template_args(entity),
+                    ) {
                         if let CppType::Class(path) = parent_type {
                             if let Some(template_arguments) = &path.last().template_arguments {
                                 if template_arguments
