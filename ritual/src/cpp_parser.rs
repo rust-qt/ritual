@@ -95,8 +95,9 @@ fn get_origin_location(entity: Entity<'_>) -> Result<CppOriginLocation> {
 /// Extract template argument declarations from a class or method definition `entity`.
 fn get_template_arguments(entity: Entity<'_>) -> Option<Vec<CppType>> {
     let mut nested_level = 0;
-    // TODO: this won't work if direct parent doesn't have args but its parent does
-    if let Some(parent) = entity.get_semantic_parent() {
+    let mut parent = entity;
+    while let Some(parent1) = parent.get_semantic_parent() {
+        parent = parent1;
         if let Some(args) = get_template_arguments(parent) {
             let parent_nested_level = if let CppType::TemplateParameter {
                 nested_level: level,
@@ -109,6 +110,7 @@ fn get_template_arguments(entity: Entity<'_>) -> Option<Vec<CppType>> {
             };
 
             nested_level = parent_nested_level + 1;
+            break;
         }
     }
     let args = entity
