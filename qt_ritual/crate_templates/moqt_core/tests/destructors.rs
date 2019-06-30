@@ -1,4 +1,4 @@
-use cpp_utils::{CppBox, CppDeletable, Ptr, StaticUpcast};
+use cpp_utils::{CppBox, CppDeletable, Ref, StaticUpcast};
 use moqt_core::{BaseHandle, HandleFactory};
 
 #[test]
@@ -29,7 +29,7 @@ fn virtual_destructors() {
         assert_eq!(factory.counter(), 5);
         drop(h1);
         assert_eq!(factory.counter(), 3);
-        let mut h2_base: Ptr<BaseHandle> = h2.static_upcast_mut();
+        let mut h2_base: Ref<BaseHandle> = h2.static_upcast_mut();
         h2_base.delete();
         assert_eq!(factory.counter(), 0);
 

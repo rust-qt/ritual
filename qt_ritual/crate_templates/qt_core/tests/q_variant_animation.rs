@@ -12,7 +12,7 @@ extern "C" fn value_changed(_data: *mut c_void, value: *const QVariant) {
 #[test]
 fn variant_animation() {
     QCoreApplication::create_and_exit(|app| unsafe {
-        let mut slot1 = RawSlotOfQVariantConstPtr::new();
+        let mut slot1 = RawSlotOfQVariantConstPtr::from_raw();
         slot1.set(Some(value_changed), Ptr::null());
 
         let mut animation = QVariantAnimation::new_0a();

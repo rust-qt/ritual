@@ -1,14 +1,11 @@
-use cpp_utils::{ConstPtr, Ptr};
-use moqt_core::{QCoreApplication, QCoreApplicationArgs, QString, SlotOfQStringConstPtr};
+use cpp_utils::ConstRef;
+use moqt_core::{QCoreApplication, QString, SlotOfQString};
 
 #[test]
 fn q_core_application() {
     unsafe {
-        let mut args = QCoreApplicationArgs::empty();
-        let (argc, argv) = args.get();
-        let obj1 = QCoreApplication::new_2a(Ptr::new(argc), Ptr::new(argv));
-
-        let slot = SlotOfQStringConstPtr::new(|_name: ConstPtr<QString>| ());
+        let obj1 = QCoreApplication::new();
+        let slot = SlotOfQString::new(|_name: ConstRef<QString>| ());
         obj1.app_name_changed().connect(&slot);
     }
 }

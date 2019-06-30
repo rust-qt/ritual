@@ -19,10 +19,10 @@ fn qvector_class() {
         let mut vec = QVectorOfBasicClassField::new();
         let mut f = BasicClassField::new();
         f.set(21);
-        vec.push(f.as_ptr());
+        vec.push(f.as_ref());
         let mut f = BasicClassField::new();
         f.set(24);
-        vec.push(f.as_ptr());
+        vec.push(f.as_ref());
         assert_eq!(vec.count(), 2);
         assert_eq!(vec.at(1).get(), 24);
     }

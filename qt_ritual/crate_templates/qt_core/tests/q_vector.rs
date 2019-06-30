@@ -5,9 +5,9 @@ use qt_core::QVectorOfInt;
 fn vector1() {
     unsafe {
         let mut vec = QVectorOfInt::new_0a();
-        vec.append_from_t(ConstPtr::new(&1));
-        vec.append_from_t(ConstPtr::new(&2));
-        vec.append_from_t(ConstPtr::new(&4));
+        vec.append_from_t(ConstPtr::from_raw(&1));
+        vec.append_from_t(ConstPtr::from_raw(&2));
+        vec.append_from_t(ConstPtr::from_raw(&4));
         assert_eq!(vec.count_0a(), 3);
         assert_eq!(*vec.at(0), 1);
         assert_eq!(*vec.at(1), 2);

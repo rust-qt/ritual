@@ -549,12 +549,17 @@ impl Generator<'_> {
                 wrap_unsafe(in_unsafe_context, &code)
             }
             RustToFfiTypeConversion::CppBoxToPtr => {
-                let code = format!("::cpp_utils::CppBox::from_raw({})", source_expr);
+                let code = format!(
+                    "::cpp_utils::CppBox::from_raw({}).expect(\"attempted to \
+                     construct a null CppBox\")",
+                    source_expr
+                );
                 wrap_unsafe(in_unsafe_context, &code)
             }
             RustToFfiTypeConversion::UtilsPtrToPtr { .. }
-            | RustToFfiTypeConversion::OptionUtilsPtrToPtr { .. } => {
-                let is_option = type1.conversion().is_option_utils_ptr_to_ptr();
+            | RustToFfiTypeConversion::UtilsRefToPtr { .. }
+            | RustToFfiTypeConversion::OptionUtilsRefToPtr { .. } => {
+                let is_option = type1.conversion().is_option_utils_ref_to_ptr();
 
                 let ptr_wrapper_type = if is_option {
                     type1
@@ -570,11 +575,16 @@ impl Generator<'_> {
                 };
                 let ptr_wrapper_path = &ptr_wrapper_type.as_common()?.path;
 
+                let need_unwrap = type1.conversion().is_utils_ref_to_ptr();
                 let code = format!(
-                    "{}::{}({})",
+                    "{}::from_raw({}){}",
                     self.rust_path_to_string(ptr_wrapper_path),
-                    if is_option { "new_option" } else { "new" },
                     source_expr,
+                    if need_unwrap {
+                        ".expect(\"attempted to construct a null Ref\")"
+                    } else {
+                        ""
+                    },
                 );
                 wrap_unsafe(in_unsafe_context, &code)
             }
@@ -615,12 +625,9 @@ impl Generator<'_> {
             let mut code = arg.name.clone();
             match arg.argument_type.conversion() {
                 RustToFfiTypeConversion::None => {}
-                RustToFfiTypeConversion::OptionUtilsPtrToPtr { .. } => {
-                    bail!("OptionRefToPtr is not supported here yet");
-                }
                 RustToFfiTypeConversion::RefToPtr { .. } => {
-                    if arg.argument_type.api_type().is_const()?
-                        && !arg.argument_type.ffi_type().is_const()?
+                    if arg.argument_type.api_type().is_const_pointer_like()?
+                        && !arg.argument_type.ffi_type().is_const_pointer_like()?
                     {
                         let mut intermediate_type = arg.argument_type.ffi_type().clone();
                         intermediate_type.set_const(true)?;
@@ -647,11 +654,15 @@ impl Generator<'_> {
                         self.rust_type_to_code(arg.argument_type.ffi_type())
                     );
                 }
-                RustToFfiTypeConversion::CppBoxToPtr
-                | RustToFfiTypeConversion::UtilsPtrToPtr { .. } => {
-                    let is_const = arg.argument_type.ffi_type().is_const_pointer_like()?;
-                    let method = if is_const { "as_ptr" } else { "as_mut_ptr" };
-                    code = format!("{}.{}()", code, method);
+                RustToFfiTypeConversion::CppBoxToPtr => {
+                    code = format!("{}.into_raw_ptr()", code);
+                }
+                RustToFfiTypeConversion::UtilsPtrToPtr { .. }
+                | RustToFfiTypeConversion::UtilsRefToPtr { .. } => {
+                    code = format!("{}.as_raw_ptr()", code);
+                }
+                RustToFfiTypeConversion::OptionUtilsRefToPtr { .. } => {
+                    bail!("OptionUtilsRefToPtr is not supported in argument position");
                 }
                 RustToFfiTypeConversion::QFlagsToUInt { .. } => {
                     code = format!("{}.to_int()", code);
@@ -806,7 +817,8 @@ impl Generator<'_> {
             RustFunctionKind::SignalOrSlotGetter { receiver_id, .. } => {
                 let path = &func.return_type.api_type().as_common()?.path;
                 let call = format!(
-                    "{}::new(::cpp_utils::ConstPtr::new(self as &{}), \
+                    "{}::new(::cpp_utils::ConstRef::from_raw(self as &{})\
+                     .expect(\"attempted to construct a null Ref\"), \
                      ::std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"))",
                     self.rust_path_to_string(&path),
                     self.rust_path_to_string(&self.qt_core_path().join("QObject")),

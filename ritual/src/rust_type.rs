@@ -133,8 +133,10 @@ pub enum RustToFfiTypeConversion {
     },
     /// `ConstPtr<T>` to `*const T` (or similar mutable type)
     UtilsPtrToPtr { force_api_is_const: Option<bool> },
-    /// `Option<ConstPtr<T>>` to `*const T` (or similar mutable types)
-    OptionUtilsPtrToPtr { force_api_is_const: Option<bool> },
+    /// `ConstRef<T>` to `*const T` (or similar mutable types)
+    UtilsRefToPtr { force_api_is_const: Option<bool> },
+    /// `Option<ConstRef<T>>` to `*const T` (or similar mutable types)
+    OptionUtilsRefToPtr { force_api_is_const: Option<bool> },
     /// `T` to `*const T` (or similar mutable type)
     ValueToPtr,
     /// `CppBox<T>` to `*mut T`
@@ -144,8 +146,16 @@ pub enum RustToFfiTypeConversion {
 }
 
 impl RustToFfiTypeConversion {
-    pub fn is_option_utils_ptr_to_ptr(&self) -> bool {
-        if let RustToFfiTypeConversion::OptionUtilsPtrToPtr { .. } = self {
+    pub fn is_option_utils_ref_to_ptr(&self) -> bool {
+        if let RustToFfiTypeConversion::OptionUtilsRefToPtr { .. } = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_utils_ref_to_ptr(&self) -> bool {
+        if let RustToFfiTypeConversion::UtilsRefToPtr { .. } = self {
             true
         } else {
             false
@@ -166,26 +176,46 @@ pub struct RustFinalType {
     conversion: RustToFfiTypeConversion,
 }
 
+fn utils_ptr(ffi_type: &RustType, force_api_is_const: Option<bool>) -> Result<RustType> {
+    let is_const = if let Some(v) = force_api_is_const {
+        v
+    } else {
+        ffi_type.is_const_pointer_like()?
+    };
+    let name = if is_const {
+        "cpp_utils::ConstPtr"
+    } else {
+        "cpp_utils::Ptr"
+    };
+
+    let target = ffi_type.pointer_like_to_target()?.clone();
+    Ok(RustType::Common(RustCommonType {
+        path: RustPath::from_good_str(name),
+        generic_arguments: Some(vec![target]),
+    }))
+}
+
+fn utils_ref(ffi_type: &RustType, force_api_is_const: Option<bool>) -> Result<RustType> {
+    let is_const = if let Some(v) = force_api_is_const {
+        v
+    } else {
+        ffi_type.is_const_pointer_like()?
+    };
+    let name = if is_const {
+        "cpp_utils::ConstRef"
+    } else {
+        "cpp_utils::Ref"
+    };
+
+    let target = ffi_type.pointer_like_to_target()?.clone();
+    Ok(RustType::Common(RustCommonType {
+        path: RustPath::from_good_str(name),
+        generic_arguments: Some(vec![target]),
+    }))
+}
+
 impl RustFinalType {
     pub fn new(ffi_type: RustType, api_to_ffi_conversion: RustToFfiTypeConversion) -> Result<Self> {
-        fn utils_ptr(ffi_type: &RustType, force_api_is_const: Option<bool>) -> Result<RustType> {
-            let is_const = if let Some(v) = force_api_is_const {
-                v
-            } else {
-                ffi_type.is_const_pointer_like()?
-            };
-            let name = if is_const {
-                "cpp_utils::ConstPtr"
-            } else {
-                "cpp_utils::Ptr"
-            };
-
-            let target = ffi_type.pointer_like_to_target()?.clone();
-            Ok(RustType::Common(RustCommonType {
-                path: RustPath::from_good_str(name),
-                generic_arguments: Some(vec![target]),
-            }))
-        }
         let api_type = match &api_to_ffi_conversion {
             RustToFfiTypeConversion::None => ffi_type.clone(),
             RustToFfiTypeConversion::RefToPtr {
@@ -211,8 +241,11 @@ impl RustFinalType {
             RustToFfiTypeConversion::UtilsPtrToPtr { force_api_is_const } => {
                 utils_ptr(&ffi_type, *force_api_is_const)?
             }
-            RustToFfiTypeConversion::OptionUtilsPtrToPtr { force_api_is_const } => {
-                RustType::new_option(utils_ptr(&ffi_type, *force_api_is_const)?)
+            RustToFfiTypeConversion::UtilsRefToPtr { force_api_is_const } => {
+                utils_ref(&ffi_type, *force_api_is_const)?
+            }
+            RustToFfiTypeConversion::OptionUtilsRefToPtr { force_api_is_const } => {
+                RustType::new_option(utils_ref(&ffi_type, *force_api_is_const)?)
             }
             RustToFfiTypeConversion::ValueToPtr => ffi_type.pointer_like_to_target()?,
             RustToFfiTypeConversion::CppBoxToPtr => {
@@ -365,6 +398,8 @@ impl RustType {
             }) => {
                 if path == &RustPath::from_good_str("cpp_utils::Ptr")
                     || path == &RustPath::from_good_str("cpp_utils::ConstPtr")
+                    || path == &RustPath::from_good_str("cpp_utils::Ref")
+                    || path == &RustPath::from_good_str("cpp_utils::ConstRef")
                     || path == &RustPath::from_good_str("cpp_utils::CppBox")
                 {
                     let arg = &generic_arguments.as_ref().unwrap()[0];
@@ -453,14 +488,6 @@ impl RustType {
             Ok(*is_const)
         } else {
             bail!("not a PointerLike type");
-        }
-    }
-
-    /// Returns true if the first indirection of the type is const.
-    pub fn is_const(&self) -> Result<bool> {
-        match self {
-            RustType::PointerLike { is_const, .. } => Ok(*is_const),
-            _ => bail!("not a PointerLike type"),
         }
     }
 
