@@ -66,7 +66,7 @@ impl QCoreApplicationArgs {
     fn from_real() -> QCoreApplicationArgs {
         // Qt doesn't use argc and argv on Windows anyway
         // TODO: check this
-        QCoreApplicationArgs::empty()
+        QCoreApplicationArgs::new(Vec::new())
     }
 }
 
