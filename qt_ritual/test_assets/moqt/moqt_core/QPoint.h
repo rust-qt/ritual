@@ -14,8 +14,14 @@ public:
     int y() const { return m_y; }
     void setX(int x) { m_x = x; }
     void setY(int y) { m_y = y; }
+
+    QPoint operator+(const QPoint& other);
 private:
     int m_x, m_y;
+
+    friend QPoint operator-(const QPoint& one, const QPoint& other);
 };
+
+MOQT_CORE_EXPORT QPoint operator-(const QPoint& one, const QPoint& other);
 
 #endif //QPOINT_H
