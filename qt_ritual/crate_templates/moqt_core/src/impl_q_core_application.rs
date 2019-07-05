@@ -1,4 +1,5 @@
 use crate::QCoreApplication;
+use cpp_utils::CppBox;
 use std::os::raw::{c_char, c_int};
 use std::process;
 
@@ -16,7 +17,7 @@ use std::process;
 /// `CoreApplication::create_and_exit` convenience function
 /// and similar functions in the other application types
 /// can be used instead of `CoreApplicationArgs`.
-pub struct QCoreApplicationArgs {
+struct QCoreApplicationArgs {
     _values: Vec<Vec<u8>>,
     argc: Box<c_int>,
     argv: Vec<*mut c_char>,
@@ -24,7 +25,7 @@ pub struct QCoreApplicationArgs {
 
 impl QCoreApplicationArgs {
     /// Creates an object containing `args`.
-    pub fn new(mut args: Vec<Vec<u8>>) -> QCoreApplicationArgs {
+    fn new(mut args: Vec<Vec<u8>>) -> QCoreApplicationArgs {
         for arg in &mut args {
             if !arg.ends_with(&[0]) {
                 arg.push(0);
@@ -39,16 +40,10 @@ impl QCoreApplicationArgs {
             _values: args,
         }
     }
-    /// Creates an object containing empty list of arguments.
-    /// Although this is the cheapest way to construct a `CoreApplicationArgs`
-    /// object, it's not clear whether Qt considers empty arguments list valid.
-    pub fn empty() -> QCoreApplicationArgs {
-        QCoreApplicationArgs::new(Vec::new())
-    }
 
     /// Returns `(argc, argv)` values in the form accepted by the application objects'
     /// constructors.
-    pub fn get(&mut self) -> (*mut c_int, *mut *mut c_char) {
+    fn get(&mut self) -> (*mut c_int, *mut *mut c_char) {
         let argc = self.argc.as_mut();
         let argv = self.argv.as_mut_ptr();
         (argc, argv)
@@ -58,7 +53,7 @@ impl QCoreApplicationArgs {
     /// Creates an object representing real arguments of the application.
     /// On Windows, this function uses empty argument list for performance reasons because
     /// Qt doesn't use `argc` and `argv` on Windows at all.
-    pub fn from_real() -> QCoreApplicationArgs {
+    fn from_real() -> QCoreApplicationArgs {
         use std::os::unix::ffi::OsStringExt;
 
         let args = std::env::args_os().map(|arg| arg.into_vec()).collect();
@@ -68,14 +63,25 @@ impl QCoreApplicationArgs {
     /// Creates an object representing real arguments of the application.
     /// On Windows, this function uses empty argument list for performance reasons because
     /// Qt doesn't use `argc` and `argv` on Windows at all.
-    pub fn from_real() -> QCoreApplicationArgs {
+    fn from_real() -> QCoreApplicationArgs {
         // Qt doesn't use argc and argv on Windows anyway
         // TODO: check this
-        QCoreApplicationArgs::empty()
+        QCoreApplicationArgs::new(Vec::new())
     }
 }
 
 impl QCoreApplication {
+    pub fn new() -> CppBox<Self> {
+        let mut args = QCoreApplicationArgs::from_real();
+        let (argc, argv) = args.get();
+        unsafe {
+            QCoreApplication::new_2a(
+                ::cpp_utils::Ref::from_raw(argc).unwrap(),
+                ::cpp_utils::Ptr::from_raw(argv),
+            )
+        }
+    }
+
     /// A convenience function for performing proper initialization and de-initialization of
     /// a Qt application.
     ///
@@ -97,13 +103,8 @@ impl QCoreApplication {
     /// ```
     pub fn create_and_exit<F: FnOnce(::cpp_utils::Ptr<QCoreApplication>) -> i32>(f: F) -> ! {
         let exit_code = {
-            let mut args = QCoreApplicationArgs::from_real();
-            let (argc, argv) = args.get();
             unsafe {
-                let mut app = QCoreApplication::new_2a(
-                    ::cpp_utils::Ptr::new(argc),
-                    ::cpp_utils::Ptr::new(argv),
-                );
+                let mut app = QCoreApplication::new();
                 f(app.as_mut_ptr())
             }
         }; // drop `app` and `args`

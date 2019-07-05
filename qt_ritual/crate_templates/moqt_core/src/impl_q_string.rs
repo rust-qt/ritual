@@ -15,7 +15,7 @@ impl QString {
         let slice = s.as_ref().as_bytes();
         unsafe {
             QString::from_utf8_2a(
-                ConstPtr::new(slice.as_ptr() as *const c_char),
+                ConstPtr::from_raw(slice.as_ptr() as *const c_char),
                 slice.len() as c_int,
             )
         }
@@ -26,7 +26,7 @@ impl QString {
         unsafe {
             let buf = self.to_utf8();
             let bytes = std::slice::from_raw_parts(
-                buf.const_data().as_ptr() as *const u8,
+                buf.const_data().as_raw_ptr() as *const u8,
                 buf.size() as usize,
             );
             std::str::from_utf8_unchecked(bytes).to_string()

@@ -620,6 +620,56 @@ fn template_class_method() {
 }
 
 #[test]
+fn template_parameter_level() {
+    let data = run_parser(
+        "
+        template<class U>
+        class X {
+            template<class T>
+            class MyVector {
+            public:
+                T get(int index);
+            };
+        };
+        ",
+    );
+    assert_eq!(
+        data.methods[0].return_type,
+        CppType::TemplateParameter {
+            nested_level: 1,
+            index: 0,
+            name: "T".into(),
+        }
+    );
+}
+
+#[test]
+fn template_parameter_level2() {
+    let data = run_parser(
+        "
+        template<class U>
+        class X {
+            class Y {
+                template<class T>
+                class MyVector {
+                public:
+                    T get(int index);
+                };
+            };
+        };
+        ",
+    );
+    assert_eq!(
+        data.methods[0].return_type,
+        CppType::TemplateParameter {
+            nested_level: 1,
+            index: 0,
+            name: "T".into(),
+        }
+    );
+}
+
+#[test]
 fn template_class_template_method() {
     let data = run_parser(
         "

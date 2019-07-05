@@ -254,7 +254,6 @@ impl State<'_, '_> {
         &self,
         cpp_ffi_type: &CppFfiType,
         argument_meaning: &CppFfiArgumentMeaning,
-        naming_mode: bool,
         allocation_place: ReturnValueAllocationPlace,
         checks: Option<&CppChecks>,
     ) -> Result<RustFinalType> {
@@ -262,9 +261,7 @@ impl State<'_, '_> {
         let mut api_to_ffi_conversion = RustToFfiTypeConversion::None;
         if let RustType::PointerLike { .. } = &rust_ffi_type {
             if let CppToFfiTypeConversion::ValueToPointer { .. } = cpp_ffi_type.conversion() {
-                if naming_mode {
-                    api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
-                } else if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
+                if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
                     match allocation_place {
                         ReturnValueAllocationPlace::Stack => {
                             api_to_ffi_conversion = RustToFfiTypeConversion::ValueToPtr;
@@ -279,7 +276,7 @@ impl State<'_, '_> {
                             if is_deletable {
                                 api_to_ffi_conversion = RustToFfiTypeConversion::CppBoxToPtr;
                             } else {
-                                api_to_ffi_conversion = RustToFfiTypeConversion::UtilsPtrToPtr {
+                                api_to_ffi_conversion = RustToFfiTypeConversion::UtilsRefToPtr {
                                     force_api_is_const: None,
                                 };
                             }
@@ -289,16 +286,10 @@ impl State<'_, '_> {
                         }
                     }
                 } else {
-                    if argument_meaning == &CppFfiArgumentMeaning::This {
-                        api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr {
-                            force_api_is_const: None,
-                            lifetime: None,
-                        };
-                    } else {
-                        api_to_ffi_conversion = RustToFfiTypeConversion::UtilsPtrToPtr {
-                            force_api_is_const: None,
-                        };
-                    }
+                    // argument passed by value is represented as a reference on Rust side
+                    api_to_ffi_conversion = RustToFfiTypeConversion::UtilsRefToPtr {
+                        force_api_is_const: None,
+                    };
                 }
             } else {
                 if argument_meaning == &CppFfiArgumentMeaning::This {
@@ -306,10 +297,19 @@ impl State<'_, '_> {
                         force_api_is_const: None,
                         lifetime: None,
                     };
-                } else if !naming_mode {
-                    api_to_ffi_conversion = RustToFfiTypeConversion::UtilsPtrToPtr {
-                        force_api_is_const: None,
-                    };
+                } else {
+                    api_to_ffi_conversion =
+                        if let CppToFfiTypeConversion::ReferenceToPointer { .. } =
+                            cpp_ffi_type.conversion()
+                        {
+                            RustToFfiTypeConversion::UtilsRefToPtr {
+                                force_api_is_const: None,
+                            }
+                        } else {
+                            RustToFfiTypeConversion::UtilsPtrToPtr {
+                                force_api_is_const: None,
+                            }
+                        };
                 }
             }
         }
@@ -393,10 +393,10 @@ impl State<'_, '_> {
     ) -> Result<UnnamedRustFunction> {
         let force_const = if is_const { Some(true) } else { None };
         let return_type_conversion = match cast {
-            CppCast::Dynamic | CppCast::QObject => RustToFfiTypeConversion::OptionUtilsPtrToPtr {
+            CppCast::Dynamic | CppCast::QObject => RustToFfiTypeConversion::OptionUtilsRefToPtr {
                 force_api_is_const: force_const,
             },
-            CppCast::Static { .. } => RustToFfiTypeConversion::UtilsPtrToPtr {
+            CppCast::Static { .. } => RustToFfiTypeConversion::UtilsRefToPtr {
                 force_api_is_const: force_const,
             },
         };
@@ -565,7 +565,6 @@ impl State<'_, '_> {
                 let arg_type = self.rust_final_type(
                     &arg.argument_type,
                     &arg.meaning,
-                    false,
                     function.allocation_place,
                     Some(checks),
                 )?;
@@ -593,7 +592,6 @@ impl State<'_, '_> {
                 self.rust_final_type(
                     &arg.argument_type,
                     &arg.meaning,
-                    false,
                     function.allocation_place,
                     Some(checks),
                 )?,
@@ -605,7 +603,6 @@ impl State<'_, '_> {
             let return_type = self.rust_final_type(
                 &function.return_type,
                 &CppFfiArgumentMeaning::ReturnValue,
-                false,
                 function.allocation_place,
                 Some(checks),
             )?;
@@ -842,7 +839,6 @@ impl State<'_, '_> {
             let rust_type = self.rust_final_type(
                 &ffi_type(arg, CppTypeRole::NotReturnType)?,
                 &CppFfiArgumentMeaning::Argument(0),
-                true,
                 ReturnValueAllocationPlace::NotApplicable,
                 None,
             )?;
@@ -873,7 +869,6 @@ impl State<'_, '_> {
                             let rust_type = self.rust_final_type(
                                 &ffi_type(type1, CppTypeRole::ReturnType)?,
                                 &CppFfiArgumentMeaning::ReturnValue,
-                                true,
                                 function.allocation_place,
                                 None,
                             )?;
@@ -1228,7 +1223,6 @@ impl State<'_, '_> {
                                     arg,
                                     // TODO: this is kind of a return type but not quite
                                     &CppFfiArgumentMeaning::Argument(0),
-                                    false,
                                     ReturnValueAllocationPlace::NotApplicable,
                                     Some(checks),
                                 )

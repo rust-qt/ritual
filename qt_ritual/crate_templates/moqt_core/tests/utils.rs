@@ -1,5 +1,4 @@
 use moqt_core::{moqt_abs, moqt_core_version};
-use std::ffi::CStr;
 
 #[test]
 fn abs() {
@@ -13,9 +12,8 @@ fn abs() {
 #[test]
 fn version() {
     unsafe {
-        // TODO: should return `CStr`
         let r = moqt_core_version();
-        let str = CStr::from_ptr(r.as_ptr()).to_str().unwrap();
+        let str = r.to_c_str().to_str().unwrap();
         assert_eq!(str, "0.0.1");
     }
 }
