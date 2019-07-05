@@ -1516,27 +1516,23 @@ impl CppParser<'_, '_> {
             | EntityKind::Constructor
             | EntityKind::Destructor
             | EntityKind::ConversionFunction
-            | EntityKind::FunctionTemplate => {
-                if entity.get_canonical_entity() == entity {
-                    match self.parse_function(entity) {
-                        Ok((r, info)) => {
-                            self.data.current_database.add_cpp_item(
-                                info,
-                                self.source_ffi_item,
-                                CppItem::Function(r),
-                            );
-                        }
-                        Err(error) => {
-                            debug!(
-                                "failed to parse function: {}: {}",
-                                get_full_name_display(entity),
-                                error
-                            );
-                            trace!("entity: {:?}", entity);
-                        }
-                    }
+            | EntityKind::FunctionTemplate => match self.parse_function(entity) {
+                Ok((r, info)) => {
+                    self.data.current_database.add_cpp_item(
+                        info,
+                        self.source_ffi_item,
+                        CppItem::Function(r),
+                    );
                 }
-            }
+                Err(error) => {
+                    debug!(
+                        "failed to parse function: {}: {}",
+                        get_full_name_display(entity),
+                        error
+                    );
+                    trace!("entity: {:?}", entity);
+                }
+            },
             EntityKind::StructDecl
             | EntityKind::ClassDecl
             | EntityKind::ClassTemplate
