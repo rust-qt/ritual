@@ -614,6 +614,7 @@ impl Generator<'_> {
                     source_expr
                 )
             }
+            RustToFfiTypeConversion::UnitToAnything => format!("let _ = {};", source_expr),
         };
         Ok(code1 + &code2)
     }
@@ -676,6 +677,9 @@ impl Generator<'_> {
                 }
                 RustToFfiTypeConversion::QFlagsToUInt { .. } => {
                     code = format!("{}.to_int()", code);
+                }
+                RustToFfiTypeConversion::UnitToAnything => {
+                    bail!("UnitToAnything is not possible to use in argument position");
                 }
             }
             final_args[arg.ffi_index] = Some(code);

@@ -143,6 +143,8 @@ pub enum RustToFfiTypeConversion {
     CppBoxToPtr,
     /// `qt_core::flags::Flags<T>` to `c_int`
     QFlagsToUInt { api_type: RustType },
+    /// `()` to any type
+    UnitToAnything,
 }
 
 impl RustToFfiTypeConversion {
@@ -256,6 +258,7 @@ impl RustFinalType {
                 })
             }
             RustToFfiTypeConversion::QFlagsToUInt { api_type } => api_type.clone(),
+            RustToFfiTypeConversion::UnitToAnything => RustType::unit(),
         };
         Ok(RustFinalType {
             api_type,

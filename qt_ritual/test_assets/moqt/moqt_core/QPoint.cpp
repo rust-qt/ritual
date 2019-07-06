@@ -7,6 +7,13 @@ QPoint QPoint::operator+(const QPoint& other) const {
     );
 }
 
+QPoint& QPoint::operator+=(const QPoint& other) {
+    m_x += other.m_x;
+    m_y += other.m_y;
+    return *this;
+}
+
+
 QPoint QPoint::operator*(const QPoint& other) {
     return QPoint(
         m_x * other.m_x,

@@ -424,21 +424,27 @@ impl State<'_, '_> {
         operator: &CppOperator,
         crate_name: &str,
     ) -> Result<RustTraitImpl> {
+        #[derive(Debug, PartialEq, Eq)]
+        enum OperatorKind {
+            Normal,
+            WithAssign,
+        }
+
         let trait_path;
         let function_name;
-        let is_self_const;
+        let kind;
         match operator {
             //            CppOperator::Conversion(_) => {},
             //            CppOperator::Assignment => {},
             CppOperator::Addition => {
                 trait_path = "std::ops::Add";
                 function_name = "add";
-                is_self_const = true;
+                kind = OperatorKind::Normal;
             }
             CppOperator::Subtraction => {
                 trait_path = "std::ops::Sub";
                 function_name = "sub";
-                is_self_const = true;
+                kind = OperatorKind::Normal;
             }
             //            CppOperator::UnaryPlus => {},
             //            CppOperator::UnaryMinus => {},
@@ -464,7 +470,11 @@ impl State<'_, '_> {
             //            CppOperator::BitwiseXor => {},
             //            CppOperator::BitwiseLeftShift => {},
             //            CppOperator::BitwiseRightShift => {},
-            //            CppOperator::AdditionAssignment => {},
+            CppOperator::AdditionAssignment => {
+                trait_path = "std::ops::AddAssign";
+                function_name = "add_assign";
+                kind = OperatorKind::WithAssign;
+            }
             //            CppOperator::SubtractionAssignment => {},
             //            CppOperator::MultiplicationAssignment => {},
             //            CppOperator::DivisionAssignment => {},
@@ -496,9 +506,19 @@ impl State<'_, '_> {
             .argument_type
             .api_type()
             .clone();
+
+        let is_self_const = match kind {
+            OperatorKind::Normal => true,
+            OperatorKind::WithAssign => false,
+        };
         if self_type.is_const_pointer_like()? != is_self_const {
             bail!("self constness mismatch");
         }
+
+        let target_type = match kind {
+            OperatorKind::Normal => self_type.clone(),
+            OperatorKind::WithAssign => self_type.pointer_like_to_target()?,
+        };
 
         let other_type = unnamed_function
             .arguments
@@ -517,22 +537,36 @@ impl State<'_, '_> {
             bail!("can't get parent for self type: {:?}", self_type);
         };
 
-        let output = RustTraitAssociatedType {
-            name: "Output".into(),
-            value: unnamed_function.return_type.api_type().clone(),
+        let associated_types = match kind {
+            OperatorKind::Normal => {
+                let output = RustTraitAssociatedType {
+                    name: "Output".into(),
+                    value: unnamed_function.return_type.api_type().clone(),
+                };
+
+                vec![output]
+            }
+            OperatorKind::WithAssign => Vec::new(),
         };
 
         let mut function = unnamed_function.with_path(trait_path.join(function_name));
         function.is_unsafe = false;
 
+        if kind == OperatorKind::WithAssign {
+            function.return_type = RustFinalType::new(
+                function.return_type.ffi_type().clone(),
+                RustToFfiTypeConversion::UnitToAnything,
+            )?;
+        }
+
         Ok(RustTraitImpl {
-            target_type: self_type,
+            target_type,
             parent_path,
             trait_type: RustType::Common(RustCommonType {
                 path: trait_path,
                 generic_arguments: Some(vec![other_type]),
             }),
-            associated_types: vec![output],
+            associated_types,
             functions: vec![function],
         })
     }

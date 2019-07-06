@@ -16,6 +16,7 @@ public:
     void setY(int y) { m_y = y; }
 
     QPoint operator+(const QPoint& other) const;
+    QPoint& operator+=(const QPoint& other);
 
     // bad operator (this is non-const)
     QPoint operator*(const QPoint& other);

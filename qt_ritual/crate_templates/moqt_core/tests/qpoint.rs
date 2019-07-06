@@ -46,8 +46,12 @@ fn operators() {
     unsafe {
         let a: CppBox<QPoint> = QPoint::new_2a(1, 2);
         let b: CppBox<QPoint> = QPoint::new_2a(3, 4);
-        let c: CppBox<QPoint> = &a + b.as_ref();
+        let mut c: CppBox<QPoint> = &a + b.as_ref();
         assert_eq!(c.x(), 4);
         assert_eq!(c.y(), 6);
+
+        c += a.as_ref();
+        assert_eq!(c.x(), 5);
+        assert_eq!(c.y(), 8);
     }
 }
