@@ -51,6 +51,7 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
     Logger::with(LogSpecification::default(LevelFilter::Trace).build())
         .log_to_file()
         .directory(path_to_str(&workspace.log_path())?)
+        .suppress_timestamp()
         .print_message()
         .duplicate_to_stderr(Duplicate::Info)
         .start()
