@@ -225,7 +225,12 @@ impl Generator<'_> {
             .expect("generator: too much pop_file");
     }
 
-    fn generate_item(&mut self, item: &RustDatabaseItem, database: &RustDatabase) -> Result<()> {
+    fn generate_item(
+        &mut self,
+        item: &RustDatabaseItem,
+        self_type: Option<&RustType>,
+        database: &RustDatabase,
+    ) -> Result<()> {
         let ffi_item = if let Some(index) = item.ffi_item_index {
             Some(
                 self.current_database
@@ -273,7 +278,7 @@ impl Generator<'_> {
             RustItem::EnumValue(value) => self.generate_enum_value(value),
             RustItem::TraitImpl(value) => self.generate_trait_impl(value, &condition_texts),
             RustItem::Function(value) => {
-                self.generate_rust_final_function(value, false, &condition_texts)
+                self.generate_rust_final_function(value, false, self_type, &condition_texts)
             }
             RustItem::FfiFunction(value) => self.generate_ffi_function(value, &condition_texts),
             RustItem::ExtraImpl(value) => self.generate_extra_impl(value, &condition_texts),
@@ -335,7 +340,7 @@ impl Generator<'_> {
             RustModuleKind::CrateRoot
             | RustModuleKind::CppNamespace
             | RustModuleKind::CppNestedType => {
-                self.generate_children(&module.path, database)?;
+                self.generate_children(&module.path, None, database)?;
             }
         }
 
@@ -349,7 +354,7 @@ impl Generator<'_> {
         if module.kind == RustModuleKind::Ffi {
             let path = self.output_src_path.join("ffi.in.rs");
             self.destination.push(create_file(&path)?);
-            self.generate_children(&module.path, database)?;
+            self.generate_children(&module.path, None, database)?;
             self.pop_file();
         }
 
@@ -450,8 +455,13 @@ impl Generator<'_> {
         }
 
         if database.children(&rust_struct.path).next().is_some() {
+            let struct_type = RustType::Common(RustCommonType {
+                path: rust_struct.path.clone(),
+                generic_arguments: None,
+            });
+
             writeln!(self, "impl {} {{", rust_struct.path.last())?;
-            self.generate_children(&rust_struct.path, database)?;
+            self.generate_children(&rust_struct.path, Some(&struct_type), database)?;
             writeln!(self, "}}")?;
             writeln!(self)?;
         }
@@ -738,61 +748,61 @@ impl Generator<'_> {
     }
 
     /// Generates Rust code for declaring a function's arguments.
-    fn arg_texts(&self, args: &[RustFunctionArgument], lifetime: Option<&String>) -> Vec<String> {
-        args.iter()
-            .map(|arg| {
-                if &arg.name == "self" {
-                    let self_type = match lifetime {
-                        Some(lifetime) => {
-                            arg.argument_type.api_type().with_lifetime(lifetime.clone())
-                        }
-                        None => arg.argument_type.api_type().clone(),
-                    };
-                    match &self_type {
-                        RustType::Common { .. } => "self".to_string(),
-                        RustType::PointerLike { kind, is_const, .. } => {
+    fn arg_texts(
+        &self,
+        args: &[RustFunctionArgument],
+        lifetime: Option<&String>,
+        self_type: Option<&RustType>,
+    ) -> Result<Vec<String>> {
+        args.iter().map_if_ok(|arg| {
+            if &arg.name == "self" {
+                let self_arg_type = match lifetime {
+                    Some(lifetime) => arg.argument_type.api_type().with_lifetime(lifetime.clone()),
+                    None => arg.argument_type.api_type().clone(),
+                };
+                let self_type = self_type.ok_or_else(|| {
+                    err_msg("self argument is present but no self_type is specified")
+                })?;
+                if self_type == &self_arg_type {
+                    return Ok("self".to_string());
+                } else if let Ok(self_arg_target) = self_arg_type.pointer_like_to_target() {
+                    if &self_arg_target == self_type {
+                        if let RustType::PointerLike { kind, is_const, .. } = &self_arg_type {
                             if let RustPointerLikeTypeKind::Reference { lifetime } = kind {
                                 let maybe_mut = if *is_const { "" } else { "mut " };
-                                match lifetime {
+                                let text = match lifetime {
                                     Some(lifetime) => format!("&'{} {}self", lifetime, maybe_mut),
                                     None => format!("&{}self", maybe_mut),
-                                }
-                            } else {
-                                panic!("invalid self argument type (indirection)");
-                            }
-                        }
-                        _ => {
-                            panic!("invalid self argument type (not Common)");
-                        }
-                    }
-                } else {
-                    let mut maybe_mut_declaration = "";
-                    if let RustType::Common { .. } = arg.argument_type.api_type() {
-                        if arg.argument_type.conversion() == &RustToFfiTypeConversion::ValueToPtr {
-                            if let RustType::PointerLike { is_const, .. } =
-                                &arg.argument_type.ffi_type()
-                            {
-                                if !*is_const {
-                                    maybe_mut_declaration = "mut ";
-                                }
+                                };
+                                return Ok(text);
                             }
                         }
                     }
-
-                    format!(
-                        "{}{}: {}",
-                        maybe_mut_declaration,
-                        arg.name,
-                        match lifetime {
-                            Some(lifetime) => self.rust_type_to_code(
-                                &arg.argument_type.api_type().with_lifetime(lifetime.clone())
-                            ),
-                            None => self.rust_type_to_code(arg.argument_type.api_type()),
-                        }
-                    )
                 }
-            })
-            .collect()
+            }
+            let mut maybe_mut_declaration = "";
+            if let RustType::Common { .. } = arg.argument_type.api_type() {
+                if arg.argument_type.conversion() == &RustToFfiTypeConversion::ValueToPtr {
+                    if let RustType::PointerLike { is_const, .. } = &arg.argument_type.ffi_type() {
+                        if !*is_const {
+                            maybe_mut_declaration = "mut ";
+                        }
+                    }
+                }
+            }
+
+            Ok(format!(
+                "{}{}: {}",
+                maybe_mut_declaration,
+                arg.name,
+                match lifetime {
+                    Some(lifetime) => self.rust_type_to_code(
+                        &arg.argument_type.api_type().with_lifetime(lifetime.clone())
+                    ),
+                    None => self.rust_type_to_code(arg.argument_type.api_type()),
+                }
+            ))
+        })
     }
 
     /// Generates complete code of a Rust wrapper function.
@@ -800,6 +810,7 @@ impl Generator<'_> {
         &mut self,
         func: &RustFunction,
         is_in_trait_context: bool,
+        self_type: Option<&RustType>,
         condition_texts: &ConditionTexts,
     ) -> Result<()> {
         let maybe_pub = if func.is_public && !is_in_trait_context {
@@ -861,14 +872,19 @@ impl Generator<'_> {
             maybe_unsafe = maybe_unsafe,
             lifetimes_text = lifetimes_text,
             name = func.path.last(),
-            args = self.arg_texts(&func.arguments, None).join(", "),
+            args = self.arg_texts(&func.arguments, None, self_type)?.join(", "),
             return_type = return_type_for_signature,
             body = body
         )?;
         Ok(())
     }
 
-    fn generate_children(&mut self, parent: &RustPath, database: &RustDatabase) -> Result<()> {
+    fn generate_children(
+        &mut self,
+        parent: &RustPath,
+        self_type: Option<&RustType>,
+        database: &RustDatabase,
+    ) -> Result<()> {
         if database
             .children(&parent)
             .any(|item| item.item.is_ffi_function())
@@ -878,7 +894,7 @@ impl Generator<'_> {
                 .children(&parent)
                 .filter(|item| item.item.is_ffi_function())
             {
-                self.generate_item(item, database)?;
+                self.generate_item(item, self_type, database)?;
             }
             writeln!(self, "}}\n")?;
         }
@@ -887,7 +903,7 @@ impl Generator<'_> {
             .children(&parent)
             .filter(|item| !item.item.is_ffi_function())
         {
-            self.generate_item(item, database)?;
+            self.generate_item(item, self_type, database)?;
         }
         Ok(())
     }
@@ -914,7 +930,12 @@ impl Generator<'_> {
         )?;
 
         for func in &trait1.functions {
-            self.generate_rust_final_function(func, true, &ConditionTexts::default())?;
+            self.generate_rust_final_function(
+                func,
+                true,
+                Some(&trait1.target_type),
+                &ConditionTexts::default(),
+            )?;
         }
 
         writeln!(self, "}}\n")?;
