@@ -79,6 +79,170 @@ enum ProcessedFfiItem {
     Function(FunctionWithDesiredPath),
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum OperatorKind {
+    Normal,
+    NormalUnary,
+    WithAssign,
+    PartialEq,
+}
+
+#[derive(Debug)]
+struct OperatorInfo {
+    trait_path: &'static str,
+    function_name: &'static str,
+    kind: OperatorKind,
+}
+
+impl OperatorInfo {
+    fn new(operator: &CppOperator) -> Result<OperatorInfo> {
+        let info = match operator {
+            CppOperator::Addition => OperatorInfo {
+                trait_path: "std::ops::Add",
+                function_name: "add",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::Subtraction => OperatorInfo {
+                trait_path: "std::ops::Sub",
+                function_name: "sub",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::UnaryMinus => OperatorInfo {
+                trait_path: "std::ops::Neg",
+                function_name: "neg",
+                kind: OperatorKind::NormalUnary,
+            },
+            CppOperator::Multiplication => OperatorInfo {
+                trait_path: "std::ops::Mul",
+                function_name: "mul",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::Division => OperatorInfo {
+                trait_path: "std::ops::Div",
+                function_name: "div",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::Modulo => OperatorInfo {
+                trait_path: "std::ops::Rem",
+                function_name: "rem",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::EqualTo => OperatorInfo {
+                trait_path: "std::cmp::PartialEq",
+                function_name: "eq",
+                kind: OperatorKind::PartialEq,
+            },
+            CppOperator::LogicalNot => OperatorInfo {
+                trait_path: "std::ops::Not",
+                function_name: "not",
+                kind: OperatorKind::NormalUnary,
+            },
+            CppOperator::BitwiseAnd => OperatorInfo {
+                trait_path: "std::ops::BitAnd",
+                function_name: "bitand",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::BitwiseOr => OperatorInfo {
+                trait_path: "std::ops::BitOr",
+                function_name: "bitor",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::BitwiseXor => OperatorInfo {
+                trait_path: "std::ops::BitXor",
+                function_name: "bitxor",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::BitwiseLeftShift => OperatorInfo {
+                trait_path: "std::ops::Shl",
+                function_name: "shl",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::BitwiseRightShift => OperatorInfo {
+                trait_path: "std::ops::Shr",
+                function_name: "shr",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::AdditionAssignment => OperatorInfo {
+                trait_path: "std::ops::AddAssign",
+                function_name: "add_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::SubtractionAssignment => OperatorInfo {
+                trait_path: "std::ops::SubAssign",
+                function_name: "sub_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::MultiplicationAssignment => OperatorInfo {
+                trait_path: "std::ops::MulAssign",
+                function_name: "mul_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::DivisionAssignment => OperatorInfo {
+                trait_path: "std::ops::DivAssign",
+                function_name: "div_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::ModuloAssignment => OperatorInfo {
+                trait_path: "std::ops::RemAssign",
+                function_name: "rem_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::BitwiseAndAssignment => OperatorInfo {
+                trait_path: "std::ops::BitAndAssign",
+                function_name: "bitand_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::BitwiseOrAssignment => OperatorInfo {
+                trait_path: "std::ops::BitOrAssign",
+                function_name: "bitor_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::BitwiseXorAssignment => OperatorInfo {
+                trait_path: "std::ops::BitXorAssign",
+                function_name: "bitxor_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::BitwiseLeftShiftAssignment => OperatorInfo {
+                trait_path: "std::ops::ShlAssign",
+                function_name: "shl_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::BitwiseRightShiftAssignment => OperatorInfo {
+                trait_path: "std::ops::ShrAssign",
+                function_name: "shr_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::Conversion(_)
+            | CppOperator::Assignment
+            | CppOperator::UnaryPlus
+            | CppOperator::PrefixIncrement
+            | CppOperator::PostfixIncrement
+            | CppOperator::PrefixDecrement
+            | CppOperator::PostfixDecrement
+            | CppOperator::NotEqualTo
+            | CppOperator::GreaterThan
+            | CppOperator::LessThan
+            | CppOperator::GreaterThanOrEqualTo
+            | CppOperator::LessThanOrEqualTo
+            | CppOperator::LogicalAnd
+            | CppOperator::LogicalOr
+            | CppOperator::BitwiseNot
+            | CppOperator::Subscript
+            | CppOperator::Indirection
+            | CppOperator::AddressOf
+            | CppOperator::StructureDereference
+            | CppOperator::PointerToMember
+            | CppOperator::FunctionCall
+            | CppOperator::Comma
+            | CppOperator::New
+            | CppOperator::NewArray
+            | CppOperator::Delete
+            | CppOperator::DeleteArray => bail!("unsupported operator: {:?}", operator),
+        };
+        Ok(info)
+    }
+}
+
 struct State<'b, 'a: 'b>(&'b mut ProcessorData<'a>);
 
 impl State<'_, '_> {
@@ -422,123 +586,60 @@ impl State<'_, '_> {
     fn process_operator(
         unnamed_function: UnnamedRustFunction,
         operator: &CppOperator,
-        crate_name: &str,
+        _crate_name: &str,
     ) -> Result<RustTraitImpl> {
-        #[derive(Debug, PartialEq, Eq)]
-        enum OperatorKind {
-            Normal,
-            WithAssign,
-        }
+        let operator_info = OperatorInfo::new(operator)?;
 
-        let trait_path;
-        let function_name;
-        let kind;
-        match operator {
-            //            CppOperator::Conversion(_) => {},
-            //            CppOperator::Assignment => {},
-            CppOperator::Addition => {
-                trait_path = "std::ops::Add";
-                function_name = "add";
-                kind = OperatorKind::Normal;
-            }
-            CppOperator::Subtraction => {
-                trait_path = "std::ops::Sub";
-                function_name = "sub";
-                kind = OperatorKind::Normal;
-            }
-            //            CppOperator::UnaryPlus => {},
-            //            CppOperator::UnaryMinus => {},
-            //            CppOperator::Multiplication => {},
-            //            CppOperator::Division => {},
-            //            CppOperator::Modulo => {},
-            //            CppOperator::PrefixIncrement => {},
-            //            CppOperator::PostfixIncrement => {},
-            //            CppOperator::PrefixDecrement => {},
-            //            CppOperator::PostfixDecrement => {},
-            //            CppOperator::EqualTo => {},
-            //            CppOperator::NotEqualTo => {},
-            //            CppOperator::GreaterThan => {},
-            //            CppOperator::LessThan => {},
-            //            CppOperator::GreaterThanOrEqualTo => {},
-            //            CppOperator::LessThanOrEqualTo => {},
-            //            CppOperator::LogicalNot => {},
-            //            CppOperator::LogicalAnd => {},
-            //            CppOperator::LogicalOr => {},
-            //            CppOperator::BitwiseNot => {},
-            //            CppOperator::BitwiseAnd => {},
-            //            CppOperator::BitwiseOr => {},
-            //            CppOperator::BitwiseXor => {},
-            //            CppOperator::BitwiseLeftShift => {},
-            //            CppOperator::BitwiseRightShift => {},
-            CppOperator::AdditionAssignment => {
-                trait_path = "std::ops::AddAssign";
-                function_name = "add_assign";
-                kind = OperatorKind::WithAssign;
-            }
-            //            CppOperator::SubtractionAssignment => {},
-            //            CppOperator::MultiplicationAssignment => {},
-            //            CppOperator::DivisionAssignment => {},
-            //            CppOperator::ModuloAssignment => {},
-            //            CppOperator::BitwiseAndAssignment => {},
-            //            CppOperator::BitwiseOrAssignment => {},
-            //            CppOperator::BitwiseXorAssignment => {},
-            //            CppOperator::BitwiseLeftShiftAssignment => {},
-            //            CppOperator::BitwiseRightShiftAssignment => {},
-            //            CppOperator::Subscript => {},
-            //            CppOperator::Indirection => {},
-            //            CppOperator::AddressOf => {},
-            //            CppOperator::StructureDereference => {},
-            //            CppOperator::PointerToMember => {},
-            //            CppOperator::FunctionCall => {},
-            //            CppOperator::Comma => {},
-            //            CppOperator::New => {},
-            //            CppOperator::NewArray => {},
-            //            CppOperator::Delete => {},
-            //            CppOperator::DeleteArray => {},
-            _ => bail!("unsupported operator: {:?}", operator),
-        }
-        let trait_path = RustPath::from_good_str(trait_path);
+        let trait_path = RustPath::from_good_str(operator_info.trait_path);
 
         let self_type = unnamed_function
             .arguments
             .get(0)
             .ok_or_else(|| err_msg("no arguments"))?
             .argument_type
-            .api_type()
+            .ffi_type()
             .clone();
 
-        let is_self_const = match kind {
-            OperatorKind::Normal => true,
+        let is_self_const = match operator_info.kind {
+            OperatorKind::Normal | OperatorKind::NormalUnary | OperatorKind::PartialEq => true,
             OperatorKind::WithAssign => false,
         };
         if self_type.is_const_pointer_like()? != is_self_const {
             bail!("self constness mismatch");
         }
 
-        let target_type = match kind {
-            OperatorKind::Normal => self_type.clone(),
-            OperatorKind::WithAssign => self_type.pointer_like_to_target()?,
+        let self_value_type = self_type.pointer_like_to_target()?;
+
+        let target_type = match operator_info.kind {
+            OperatorKind::Normal | OperatorKind::NormalUnary => {
+                RustType::new_reference(is_self_const, self_value_type.clone())
+            }
+            OperatorKind::WithAssign | OperatorKind::PartialEq => self_value_type.clone(),
         };
 
-        let other_type = unnamed_function
-            .arguments
-            .get(1)
-            .ok_or_else(|| err_msg("not enough arguments"))?
-            .argument_type
-            .api_type()
-            .clone();
+        let trait_args = if operator_info.kind == OperatorKind::NormalUnary {
+            None
+        } else {
+            let other_type = unnamed_function
+                .arguments
+                .get(1)
+                .ok_or_else(|| err_msg("not enough arguments"))?
+                .argument_type
+                .api_type()
+                .clone();
 
-        let parent_path = if let RustType::Common(RustCommonType { path, .. }) =
-            self_type.pointer_like_to_target()?
-        {
+            Some(vec![other_type])
+        };
+
+        let parent_path = if let RustType::Common(RustCommonType { path, .. }) = self_value_type {
             path.parent()
                 .expect("operator argument path must have parent")
         } else {
-            bail!("can't get parent for self type: {:?}", self_type);
+            bail!("can't get parent for self type: {:?}", self_value_type);
         };
 
-        let associated_types = match kind {
-            OperatorKind::Normal => {
+        let associated_types = match operator_info.kind {
+            OperatorKind::Normal | OperatorKind::NormalUnary => {
                 let output = RustTraitAssociatedType {
                     name: "Output".into(),
                     value: unnamed_function.return_type.api_type().clone(),
@@ -546,13 +647,23 @@ impl State<'_, '_> {
 
                 vec![output]
             }
-            OperatorKind::WithAssign => Vec::new(),
+            OperatorKind::WithAssign | OperatorKind::PartialEq => Vec::new(),
         };
 
-        let mut function = unnamed_function.with_path(trait_path.join(function_name));
+        let mut function = unnamed_function.with_path(trait_path.join(operator_info.function_name));
         function.is_unsafe = false;
+        function.arguments[0].argument_type = RustFinalType::new(
+            function.arguments[0].argument_type.ffi_type().clone(),
+            RustToFfiTypeConversion::RefToPtr {
+                force_api_is_const: None,
+                lifetime: None,
+            },
+        )?;
+        function.arguments[0].name = "self".to_string();
 
-        if kind == OperatorKind::WithAssign {
+        if operator_info.kind == OperatorKind::WithAssign
+            && function.return_type.api_type() != &RustType::unit()
+        {
             function.return_type = RustFinalType::new(
                 function.return_type.ffi_type().clone(),
                 RustToFfiTypeConversion::UnitToAnything,
@@ -564,7 +675,7 @@ impl State<'_, '_> {
             parent_path,
             trait_type: RustType::Common(RustCommonType {
                 path: trait_path,
-                generic_arguments: Some(vec![other_type]),
+                generic_arguments: trait_args,
             }),
             associated_types,
             functions: vec![function],

@@ -363,6 +363,14 @@ impl RustType {
         }
     }
 
+    pub fn new_reference(is_const: bool, target: RustType) -> Self {
+        RustType::PointerLike {
+            kind: RustPointerLikeTypeKind::Reference { lifetime: None },
+            is_const,
+            target: Box::new(target),
+        }
+    }
+
     pub fn new_option(target: RustType) -> Self {
         RustType::Common(RustCommonType {
             path: RustPath::from_good_str("std::option::Option"),

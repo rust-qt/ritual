@@ -13,6 +13,9 @@ QPoint& QPoint::operator+=(const QPoint& other) {
     return *this;
 }
 
+QPoint QPoint::operator-() const {
+    return QPoint(-m_x, -m_y);
+}
 
 QPoint QPoint::operator*(const QPoint& other) {
     return QPoint(
@@ -27,3 +30,7 @@ QPoint operator-(const QPoint& one, const QPoint& other) {
             one.m_y - other.m_y
     );
 }
+
+//bool operator==(const QPoint& one, const QPoint& other) {
+//    return one.x() == other.x() && one.y() == other.y();
+//}

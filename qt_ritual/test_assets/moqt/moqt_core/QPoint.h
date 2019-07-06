@@ -20,6 +20,9 @@ public:
 
     // bad operator (this is non-const)
     QPoint operator*(const QPoint& other);
+
+    QPoint operator-() const;
+
 private:
     int m_x, m_y;
 
@@ -27,5 +30,6 @@ private:
 };
 
 MOQT_CORE_EXPORT QPoint operator-(const QPoint& one, const QPoint& other);
+//MOQT_CORE_EXPORT bool operator==(const QPoint& one, const QPoint& other);
 
 #endif //QPOINT_H
