@@ -419,6 +419,176 @@ impl State<'_, '_> {
         Ok(unnamed_function)
     }
 
+    fn process_operator(
+        unnamed_function: UnnamedRustFunction,
+        operator: &CppOperator,
+        crate_name: &str,
+    ) -> Result<RustTraitImpl> {
+        let trait_path;
+        let function_name;
+        let is_self_const;
+        match operator {
+            //            CppOperator::Conversion(_) => {},
+            //            CppOperator::Assignment => {},
+            CppOperator::Addition => {
+                trait_path = "std::ops::Add";
+                function_name = "add";
+                is_self_const = true;
+            }
+            CppOperator::Subtraction => {
+                trait_path = "std::ops::Sub";
+                function_name = "sub";
+                is_self_const = true;
+            }
+            //            CppOperator::UnaryPlus => {},
+            //            CppOperator::UnaryMinus => {},
+            //            CppOperator::Multiplication => {},
+            //            CppOperator::Division => {},
+            //            CppOperator::Modulo => {},
+            //            CppOperator::PrefixIncrement => {},
+            //            CppOperator::PostfixIncrement => {},
+            //            CppOperator::PrefixDecrement => {},
+            //            CppOperator::PostfixDecrement => {},
+            //            CppOperator::EqualTo => {},
+            //            CppOperator::NotEqualTo => {},
+            //            CppOperator::GreaterThan => {},
+            //            CppOperator::LessThan => {},
+            //            CppOperator::GreaterThanOrEqualTo => {},
+            //            CppOperator::LessThanOrEqualTo => {},
+            //            CppOperator::LogicalNot => {},
+            //            CppOperator::LogicalAnd => {},
+            //            CppOperator::LogicalOr => {},
+            //            CppOperator::BitwiseNot => {},
+            //            CppOperator::BitwiseAnd => {},
+            //            CppOperator::BitwiseOr => {},
+            //            CppOperator::BitwiseXor => {},
+            //            CppOperator::BitwiseLeftShift => {},
+            //            CppOperator::BitwiseRightShift => {},
+            //            CppOperator::AdditionAssignment => {},
+            //            CppOperator::SubtractionAssignment => {},
+            //            CppOperator::MultiplicationAssignment => {},
+            //            CppOperator::DivisionAssignment => {},
+            //            CppOperator::ModuloAssignment => {},
+            //            CppOperator::BitwiseAndAssignment => {},
+            //            CppOperator::BitwiseOrAssignment => {},
+            //            CppOperator::BitwiseXorAssignment => {},
+            //            CppOperator::BitwiseLeftShiftAssignment => {},
+            //            CppOperator::BitwiseRightShiftAssignment => {},
+            //            CppOperator::Subscript => {},
+            //            CppOperator::Indirection => {},
+            //            CppOperator::AddressOf => {},
+            //            CppOperator::StructureDereference => {},
+            //            CppOperator::PointerToMember => {},
+            //            CppOperator::FunctionCall => {},
+            //            CppOperator::Comma => {},
+            //            CppOperator::New => {},
+            //            CppOperator::NewArray => {},
+            //            CppOperator::Delete => {},
+            //            CppOperator::DeleteArray => {},
+            _ => bail!("unsupported operator: {:?}", operator),
+        }
+        let trait_path = RustPath::from_good_str(trait_path);
+
+        let self_type = unnamed_function
+            .arguments
+            .get(0)
+            .ok_or_else(|| err_msg("no arguments"))?
+            .argument_type
+            .api_type()
+            .clone();
+        if self_type.is_const_pointer_like()? != is_self_const {
+            bail!("self constness mismatch");
+        }
+
+        let other_type = unnamed_function
+            .arguments
+            .get(1)
+            .ok_or_else(|| err_msg("not enough arguments"))?
+            .argument_type
+            .api_type()
+            .clone();
+
+        let parent_path = if let RustType::Common(RustCommonType { path, .. }) =
+            self_type.pointer_like_to_target()?
+        {
+            path.parent()
+                .expect("operator argument path must have parent")
+        } else {
+            bail!("can't get parent for self type: {:?}", self_type);
+        };
+
+        let output = RustTraitAssociatedType {
+            name: "Output".into(),
+            value: unnamed_function.return_type.api_type().clone(),
+        };
+
+        let mut function = unnamed_function.with_path(trait_path.join(function_name));
+        function.is_unsafe = false;
+
+        Ok(RustTraitImpl {
+            target_type: self_type,
+            parent_path,
+            trait_type: RustType::Common(RustCommonType {
+                path: trait_path,
+                generic_arguments: Some(vec![other_type]),
+            }),
+            associated_types: vec![output],
+            functions: vec![function],
+        })
+    }
+
+    fn process_destructor(
+        unnamed_function: UnnamedRustFunction,
+        allocation_place: ReturnValueAllocationPlace,
+    ) -> Result<RustTraitImpl> {
+        if unnamed_function.arguments.len() != 1 {
+            bail!("destructor must have one argument");
+        }
+        let target_type = unnamed_function.arguments[0]
+            .argument_type
+            .api_type()
+            .pointer_like_to_target()?;
+
+        let parent_path = if let RustType::Common(RustCommonType { path, .. }) = &target_type {
+            path.parent()
+                .expect("destructor argument path must have parent")
+        } else {
+            bail!("can't get parent for target type: {:?}", target_type);
+        };
+
+        let function_name;
+        let trait_path;
+        let is_unsafe;
+        match allocation_place {
+            ReturnValueAllocationPlace::Stack => {
+                function_name = "drop";
+                trait_path = RustPath::from_good_str("std::ops::Drop");
+                is_unsafe = false;
+            }
+            ReturnValueAllocationPlace::Heap => {
+                function_name = "delete";
+                trait_path = RustPath::from_good_str("cpp_utils::CppDeletable");
+                is_unsafe = true;
+            }
+            ReturnValueAllocationPlace::NotApplicable => {
+                bail!("invalid allocation_place for destructor");
+            }
+        }
+        let mut function = unnamed_function.with_path(trait_path.join(function_name));
+        function.is_unsafe = is_unsafe;
+
+        Ok(RustTraitImpl {
+            target_type,
+            parent_path,
+            trait_type: RustType::Common(RustCommonType {
+                path: trait_path,
+                generic_arguments: None,
+            }),
+            associated_types: Vec::new(),
+            functions: vec![function],
+        })
+    }
+
     fn process_cast(
         mut unnamed_function: UnnamedRustFunction,
         cast: &CppCast,
@@ -661,54 +831,8 @@ impl State<'_, '_> {
         } = &function.kind
         {
             if cpp_function.is_destructor() {
-                if arguments.len() != 1 {
-                    bail!("destructor must have one argument");
-                }
-                let target_type = arguments[0]
-                    .argument_type
-                    .api_type()
-                    .pointer_like_to_target()?;
-
-                let parent_path =
-                    if let RustType::Common(RustCommonType { path, .. }) = &target_type {
-                        path.parent()
-                            .expect("destructor argument path must have parent")
-                    } else {
-                        bail!("can't get parent for target type: {:?}", target_type);
-                    };
-
-                let function_name;
-                let trait_path;
-                let is_unsafe;
-                match function.allocation_place {
-                    ReturnValueAllocationPlace::Stack => {
-                        function_name = "drop";
-                        trait_path = RustPath::from_good_str("std::ops::Drop");
-                        is_unsafe = false;
-                    }
-                    ReturnValueAllocationPlace::Heap => {
-                        function_name = "delete";
-                        trait_path = RustPath::from_good_str("cpp_utils::CppDeletable");
-                        is_unsafe = true;
-                    }
-                    ReturnValueAllocationPlace::NotApplicable => {
-                        bail!("invalid allocation_place for destructor");
-                    }
-                }
-                let mut function = unnamed_function.with_path(trait_path.join(function_name));
-                function.is_unsafe = is_unsafe;
-
-                let rust_item = RustItem::TraitImpl(RustTraitImpl {
-                    target_type,
-                    parent_path,
-                    trait_type: RustType::Common(RustCommonType {
-                        path: trait_path,
-                        generic_arguments: None,
-                    }),
-                    associated_types: Vec::new(),
-                    functions: vec![function],
-                });
-                results.push(ProcessedFfiItem::Item(rust_item));
+                let item = State::process_destructor(unnamed_function, function.allocation_place)?;
+                results.push(ProcessedFfiItem::Item(RustItem::TraitImpl(item)));
                 return Ok(results);
             }
             if let Some(cast) = cast {
@@ -719,6 +843,23 @@ impl State<'_, '_> {
                         .map(|x| ProcessedFfiItem::Item(RustItem::TraitImpl(x))),
                 );
                 return Ok(results);
+            }
+            if let Some(operator) = &cpp_function.operator {
+                match State::process_operator(
+                    unnamed_function.clone(),
+                    operator,
+                    self.0.current_database.crate_name(),
+                ) {
+                    Ok(item) => {
+                        results.push(ProcessedFfiItem::Item(RustItem::TraitImpl(item)));
+                        return Ok(results);
+                    }
+                    Err(err) => {
+                        debug!("failed to convert operator to trait: {}", err);
+                        debug!("function: {:?}", function);
+                        debug!("rust function: {:?}", unnamed_function);
+                    }
+                }
             }
         }
 

@@ -16,5 +16,6 @@ pub use crate::ref_::{ConstRef, Ref};
 
 mod casts;
 mod cpp_box;
+mod ops;
 mod ptr;
 mod ref_;

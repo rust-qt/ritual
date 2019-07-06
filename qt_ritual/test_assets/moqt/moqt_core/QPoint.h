@@ -15,7 +15,10 @@ public:
     void setX(int x) { m_x = x; }
     void setY(int y) { m_y = y; }
 
-    QPoint operator+(const QPoint& other);
+    QPoint operator+(const QPoint& other) const;
+
+    // bad operator (this is non-const)
+    QPoint operator*(const QPoint& other);
 private:
     int m_x, m_y;
 
