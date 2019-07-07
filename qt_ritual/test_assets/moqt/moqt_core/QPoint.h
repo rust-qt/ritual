@@ -33,4 +33,12 @@ MOQT_CORE_EXPORT QPoint operator-(const QPoint& one, const QPoint& other);
 MOQT_CORE_EXPORT bool operator==(const QPoint& one, const QPoint& other);
 MOQT_CORE_EXPORT bool operator==(const char* one, const QPoint& other);
 
+MOQT_CORE_EXPORT bool operator==(const QPoint& one, int other);
+MOQT_CORE_EXPORT bool operator!=(const QPoint& one, int other);
+MOQT_CORE_EXPORT bool operator<(const QPoint& one, int other);
+MOQT_CORE_EXPORT bool operator<=(const QPoint& one, int other);
+MOQT_CORE_EXPORT bool operator>(const QPoint& one, int other);
+MOQT_CORE_EXPORT bool operator>=(const QPoint& one, int other);
+
+
 #endif //QPOINT_H
