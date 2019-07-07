@@ -586,7 +586,7 @@ impl State<'_, '_> {
     fn process_operator(
         unnamed_function: UnnamedRustFunction,
         operator: &CppOperator,
-        _crate_name: &str,
+        crate_name: &str,
     ) -> Result<RustTraitImpl> {
         let operator_info = OperatorInfo::new(operator)?;
 
@@ -632,10 +632,15 @@ impl State<'_, '_> {
         };
 
         let parent_path = if let RustType::Common(RustCommonType { path, .. }) = self_value_type {
-            path.parent()
-                .expect("operator argument path must have parent")
+            let type_crate_name = path
+                .crate_name()
+                .ok_or_else(|| err_msg("common type must have crate name"))?;
+            if type_crate_name != crate_name {
+                bail!("self type is outside current crate");
+            }
+            path.parent()?
         } else {
-            bail!("can't get parent for self type: {:?}", self_value_type);
+            bail!("self type is not Common");
         };
 
         let associated_types = match operator_info.kind {
