@@ -599,7 +599,7 @@ impl State<'_, '_> {
         Ok(unnamed_function)
     }
 
-    fn process_operator(
+    fn process_operator_as_trait_impl(
         unnamed_function: UnnamedRustFunction,
         operator: &CppOperator,
         crate_name: &str,
@@ -616,21 +616,18 @@ impl State<'_, '_> {
             .ffi_type()
             .clone();
 
+        let self_value_type = self_type.pointer_like_to_target()?;
+
         let is_self_const = match operator_info.kind {
             OperatorKind::Normal | OperatorKind::NormalUnary | OperatorKind::Comparison => true,
             OperatorKind::WithAssign => false,
         };
-        if self_type.is_const_pointer_like()? != is_self_const {
-            bail!("self constness mismatch");
-        }
-
-        let self_value_type = self_type.pointer_like_to_target()?;
 
         let target_type = match operator_info.kind {
             OperatorKind::Normal | OperatorKind::NormalUnary => {
                 RustType::new_reference(is_self_const, self_value_type.clone())
             }
-            OperatorKind::WithAssign | OperatorKind::PartialEq => self_value_type.clone(),
+            OperatorKind::WithAssign | OperatorKind::Comparison => self_value_type.clone(),
         };
 
         let trait_args = if operator_info.kind == OperatorKind::NormalUnary {
@@ -676,7 +673,7 @@ impl State<'_, '_> {
         function.arguments[0].argument_type = RustFinalType::new(
             function.arguments[0].argument_type.ffi_type().clone(),
             RustToFfiTypeConversion::RefToPtr {
-                force_api_is_const: None,
+                force_api_is_const: Some(is_self_const),
                 lifetime: None,
             },
         )?;
@@ -1019,7 +1016,7 @@ impl State<'_, '_> {
                 return Ok(results);
             }
             if let Some(operator) = &cpp_function.operator {
-                match State::process_operator(
+                match State::process_operator_as_trait_impl(
                     unnamed_function.clone(),
                     operator,
                     self.0.current_database.crate_name(),
