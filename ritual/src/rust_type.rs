@@ -33,6 +33,16 @@ impl FromStr for RustPath {
     }
 }
 
+impl PartialEq<&str> for RustPath {
+    fn eq(&self, str: &&str) -> bool {
+        let parts = str.split("::");
+        if self.parts.len() != parts.clone().count() {
+            return false;
+        }
+        self.parts.iter().zip(parts).all(|(a, b)| a == b)
+    }
+}
+
 impl RustPath {
     /// Creates new `RustPath` consisting of `parts`.
     pub fn from_parts(parts: Vec<String>) -> Self {
@@ -335,6 +345,80 @@ pub struct RustCommonType {
     pub generic_arguments: Option<Vec<RustType>>,
 }
 
+impl RustCommonType {
+    pub fn can_be_same_as(&self, other: &RustCommonType) -> bool {
+        let colliding: &[(&[&str], &[&str])] = &[
+            (
+                &[
+                    "std::os::raw::c_char",
+                    "std::os::raw::c_schar",
+                    "std::os::raw::c_short",
+                    "std::os::raw::c_int",
+                    "std::os::raw::c_long",
+                    "std::os::raw::c_longlong",
+                ],
+                &["u8", "u16", "u32", "u64"],
+            ),
+            (
+                &[
+                    "std::os::raw::c_char",
+                    "std::os::raw::c_uchar",
+                    "std::os::raw::c_ushort",
+                    "std::os::raw::c_uint",
+                    "std::os::raw::c_ulong",
+                    "std::os::raw::c_ulonglong",
+                ],
+                &["u8", "u16", "u32", "u64"],
+            ),
+            (
+                &["std::os::raw::c_float", "std::os::raw::c_double"],
+                &["f32", "f64"],
+            ),
+        ];
+
+        let self_args = self
+            .generic_arguments
+            .as_ref()
+            .into_iter()
+            .flat_map(|vec| vec.iter());
+        let other_args = other
+            .generic_arguments
+            .as_ref()
+            .into_iter()
+            .flat_map(|vec| vec.iter());
+        if self_args.clone().count() != other_args.clone().count() {
+            return false;
+        }
+        if !self_args.zip(other_args).all(|(a, b)| a.can_be_same_as(b)) {
+            return false;
+        }
+
+        if self.path == other.path {
+            return true;
+        }
+
+        for (ambiguous, concrete) in colliding {
+            if ambiguous.iter().any(|&s| self.path == s)
+                && ambiguous.iter().any(|&s| other.path == s)
+            {
+                return true;
+            }
+            if ambiguous.iter().any(|&s| self.path == s)
+                && concrete.iter().any(|&s| other.path == s)
+            {
+                return true;
+            }
+            if concrete.iter().any(|&s| self.path == s)
+                && ambiguous.iter().any(|&s| other.path == s)
+            {
+                return true;
+            }
+        }
+
+        false
+    }
+}
+
 /// A Rust type
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum RustType {
@@ -575,6 +659,66 @@ impl RustType {
             Ok(r)
         } else {
             bail!("expected common type, got {:?}", self)
+        }
+    }
+
+    pub fn can_be_same_as(&self, other: &RustType) -> bool {
+        match self {
+            RustType::Tuple(self_args) => {
+                if let RustType::Tuple(other_args) = other {
+                    self_args.len() == other_args.len()
+                        && self_args
+                            .iter()
+                            .zip(other_args)
+                            .all(|(a, b)| a.can_be_same_as(b))
+                } else {
+                    false
+                }
+            }
+            RustType::Common(self_type) => {
+                if let RustType::Common(other) = other {
+                    self_type.can_be_same_as(other)
+                } else {
+                    false
+                }
+            }
+            RustType::FunctionPointer {
+                return_type: self_return_type,
+                arguments: self_arguments,
+            } => {
+                if let RustType::FunctionPointer {
+                    return_type,
+                    arguments,
+                } = other
+                {
+                    self_return_type.can_be_same_as(return_type)
+                        && self_arguments.len() == arguments.len()
+                        && self_arguments
+                            .iter()
+                            .zip(arguments)
+                            .all(|(a, b)| a.can_be_same_as(b))
+                } else {
+                    false
+                }
+            }
+            RustType::PointerLike {
+                kind: self_kind,
+                is_const: self_is_const,
+                target: self_target,
+            } => {
+                if let RustType::PointerLike {
+                    kind,
+                    is_const,
+                    target,
+                } = other
+                {
+                    self_kind == kind
+                        && self_is_const == is_const
+                        && self_target.can_be_same_as(target)
+                } else {
+                    false
+                }
+            }
         }
     }
 }

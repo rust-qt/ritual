@@ -3,7 +3,7 @@ use crate::{
     CppBox, CppDeletable,
 };
 use std::cmp::{Ordering, PartialEq, PartialOrd};
-use std::ops::{Add, AddAssign};
+use std::ops::{Add, AddAssign, Shl};
 
 impl<'a, T: CppDeletable, U> Add<U> for &'a CppBox<T>
 where
@@ -13,6 +13,17 @@ where
 
     fn add(self, rhs: U) -> Self::Output {
         &**self + rhs
+    }
+}
+
+impl<'a, T: CppDeletable, U> Shl<U> for &'a CppBox<T>
+where
+    &'a T: Shl<U>,
+{
+    type Output = <&'a T as Shl<U>>::Output;
+
+    fn shl(self, rhs: U) -> Self::Output {
+        &**self << rhs
     }
 }
 

@@ -2,6 +2,7 @@
 #define QPOINT_H
 
 #include "moqt_core_exports.h"
+#include <cstdint>
 
 class MOQT_CORE_EXPORT QPoint {
 public:
@@ -40,5 +41,7 @@ MOQT_CORE_EXPORT bool operator<=(const QPoint& one, int other);
 MOQT_CORE_EXPORT bool operator>(const QPoint& one, int other);
 MOQT_CORE_EXPORT bool operator>=(const QPoint& one, int other);
 
+MOQT_CORE_EXPORT bool operator==(const QPoint& one, long long other);
+MOQT_CORE_EXPORT bool operator==(const QPoint& one, int64_t other);
 
 #endif //QPOINT_H

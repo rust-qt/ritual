@@ -30,6 +30,7 @@ use ritual_common::errors::{bail, err_msg, format_err, print_trace, Result};
 use ritual_common::string_utils::CaseOperations;
 use ritual_common::utils::MapIfOk;
 use std::collections::{BTreeMap, BTreeSet};
+use std::iter::Iterator;
 use std::ops::Deref;
 
 pub fn qt_core_path(crate_name: &str) -> RustPath {
@@ -256,6 +257,21 @@ impl OperatorInfo {
             | CppOperator::DeleteArray => bail!("unsupported operator: {:?}", operator),
         };
         Ok(info)
+    }
+}
+
+#[derive(Debug)]
+struct TraitTypes {
+    target_type: RustType,
+    trait_type: RustType,
+}
+
+impl From<&RustTraitImpl> for TraitTypes {
+    fn from(trait_impl: &RustTraitImpl) -> Self {
+        Self {
+            target_type: trait_impl.target_type.clone(),
+            trait_type: trait_impl.trait_type.clone(),
+        }
     }
 }
 
@@ -603,6 +619,7 @@ impl State<'_, '_> {
         unnamed_function: UnnamedRustFunction,
         operator: &CppOperator,
         crate_name: &str,
+        trait_types: &[TraitTypes],
     ) -> Result<RustTraitImpl> {
         let operator_info = OperatorInfo::new(operator)?;
 
@@ -643,6 +660,21 @@ impl State<'_, '_> {
 
             Some(vec![other_type])
         };
+
+        let trait_type = RustType::Common(RustCommonType {
+            path: trait_path.clone(),
+            generic_arguments: trait_args,
+        });
+
+        let has_conflict = trait_types.iter().any(|tt| {
+            tt.target_type.can_be_same_as(&target_type) && tt.trait_type.can_be_same_as(&trait_type)
+        });
+        if has_conflict {
+            bail!(
+                "potentially conflicting trait impl already exists: {:?}",
+                trait_types
+            );
+        }
 
         let parent_path = if let RustType::Common(RustCommonType { path, .. }) = self_value_type {
             let type_crate_name = path
@@ -699,10 +731,7 @@ impl State<'_, '_> {
         Ok(RustTraitImpl {
             target_type,
             parent_path,
-            trait_type: RustType::Common(RustCommonType {
-                path: trait_path,
-                generic_arguments: trait_args,
-            }),
+            trait_type,
             associated_types,
             functions: vec![function],
         })
@@ -893,6 +922,7 @@ impl State<'_, '_> {
         ffi_item_index: usize,
         function: &CppFfiFunction,
         checks: &CppChecks,
+        trait_types: &[TraitTypes],
     ) -> Result<Vec<ProcessedFfiItem>> {
         let rust_ffi_function = self.generate_ffi_function(&function)?;
         let ffi_function_path = rust_ffi_function.path.clone();
@@ -1016,10 +1046,14 @@ impl State<'_, '_> {
                 return Ok(results);
             }
             if let Some(operator) = &cpp_function.operator {
+                if operator == &CppOperator::NotEqualTo {
+                    bail!("NotEqualTo is not needed in public API because PartialEq is used");
+                }
                 match State::process_operator_as_trait_impl(
                     unnamed_function.clone(),
                     operator,
                     self.0.current_database.crate_name(),
+                    trait_types,
                 ) {
                     Ok(item) => {
                         results.push(ProcessedFfiItem::Item(RustItem::TraitImpl(item)));
@@ -1352,14 +1386,18 @@ impl State<'_, '_> {
         &self,
         ffi_item_index: usize,
         ffi_item: &CppFfiDatabaseItem,
+        trait_types: &[TraitTypes],
     ) -> Result<Vec<ProcessedFfiItem>> {
         if !ffi_item.checks.any_success() {
             bail!("cpp checks failed");
         }
         match &ffi_item.item {
-            CppFfiItem::Function(cpp_ffi_function) => {
-                self.process_rust_function(ffi_item_index, cpp_ffi_function, &ffi_item.checks)
-            }
+            CppFfiItem::Function(cpp_ffi_function) => self.process_rust_function(
+                ffi_item_index,
+                cpp_ffi_function,
+                &ffi_item.checks,
+                trait_types,
+            ),
             CppFfiItem::QtSlotWrapper(_) => {
                 bail!("slot wrappers do not need to be processed here");
             }
@@ -1769,17 +1807,35 @@ impl State<'_, '_> {
 
     fn process_ffi_items(&mut self) -> Result<BTreeMap<RustPath, Vec<FunctionWithDesiredPath>>> {
         let mut grouped_functions = BTreeMap::<_, Vec<_>>::new();
+        let mut trait_types = self
+            .0
+            .current_database
+            .rust_items()
+            .iter()
+            .filter_map(|item| {
+                if let RustItem::TraitImpl(trait_impl) = &item.item {
+                    Some(TraitTypes::from(trait_impl))
+                } else {
+                    None
+                }
+            })
+            .collect_vec();
+
         for ffi_item_index in 0..self.0.current_database.ffi_items().len() {
             let ffi_item = &self.0.current_database.ffi_items()[ffi_item_index];
             if ffi_item.is_rust_processed {
                 continue;
             }
-            match self.process_ffi_item(ffi_item_index, ffi_item) {
+            match self.process_ffi_item(ffi_item_index, ffi_item, &trait_types) {
                 Ok(results) => {
                     let ffi_item_text = ffi_item.item.short_text();
                     for item in results {
                         match item {
                             ProcessedFfiItem::Item(rust_item) => {
+                                if let RustItem::TraitImpl(trait_impl) = &rust_item {
+                                    trait_types.push(trait_impl.into());
+                                }
+
                                 let item = RustDatabaseItem {
                                     item: rust_item,
                                     cpp_item_index: None,
