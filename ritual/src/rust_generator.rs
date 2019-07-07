@@ -661,6 +661,14 @@ impl State<'_, '_> {
         )?;
         function.arguments[0].name = "self".to_string();
 
+        if operator_info.kind == OperatorKind::PartialEq {
+            let other_arg = &mut function.arguments[1].argument_type;
+            *other_arg = RustFinalType::new(
+                other_arg.ffi_type().clone(),
+                RustToFfiTypeConversion::RefTo(Box::new(other_arg.conversion().clone())),
+            )?;
+        }
+
         if operator_info.kind == OperatorKind::WithAssign
             && function.return_type.api_type() != &RustType::unit()
         {

@@ -615,8 +615,67 @@ impl Generator<'_> {
                 )
             }
             RustToFfiTypeConversion::UnitToAnything => format!("let _ = {};", source_expr),
+            RustToFfiTypeConversion::RefTo(conversion) => {
+                let intermediate =
+                    RustFinalType::new(type1.ffi_type().clone(), (**conversion).clone())?;
+                let expr = self.convert_type_from_ffi(
+                    &intermediate,
+                    source_expr,
+                    in_unsafe_context,
+                    false,
+                )?;
+                format!("&{}", expr)
+            }
         };
         Ok(code1 + &code2)
+    }
+
+    fn convert_type_to_ffi(&self, expr: &str, type1: &RustFinalType) -> Result<String> {
+        let code = match type1.conversion() {
+            RustToFfiTypeConversion::None => expr.to_string(),
+            RustToFfiTypeConversion::RefToPtr { .. } => {
+                if type1.api_type().is_const_pointer_like()?
+                    && !type1.ffi_type().is_const_pointer_like()?
+                {
+                    let mut intermediate_type = type1.ffi_type().clone();
+                    intermediate_type.set_const(true)?;
+                    format!(
+                        "{} as {} as {}",
+                        expr,
+                        self.rust_type_to_code(&intermediate_type),
+                        self.rust_type_to_code(type1.ffi_type())
+                    )
+                } else {
+                    format!("{} as {}", expr, self.rust_type_to_code(type1.ffi_type()))
+                }
+            }
+            RustToFfiTypeConversion::ValueToPtr => {
+                let is_const = type1.ffi_type().is_const_pointer_like()?;
+                format!(
+                    "{}{} as {}",
+                    if is_const { "&" } else { "&mut " },
+                    expr,
+                    self.rust_type_to_code(type1.ffi_type())
+                )
+            }
+            RustToFfiTypeConversion::CppBoxToPtr => format!("{}.into_raw_ptr()", expr),
+            RustToFfiTypeConversion::UtilsPtrToPtr { .. }
+            | RustToFfiTypeConversion::UtilsRefToPtr { .. } => format!("{}.as_raw_ptr()", expr),
+            RustToFfiTypeConversion::OptionUtilsRefToPtr { .. } => {
+                bail!("OptionUtilsRefToPtr is not supported in argument position");
+            }
+            RustToFfiTypeConversion::QFlagsToUInt { .. } => format!("{}.to_int()", expr),
+            RustToFfiTypeConversion::UnitToAnything => {
+                bail!("UnitToAnything is not possible to use in argument position");
+            }
+            RustToFfiTypeConversion::RefTo(conversion) => {
+                let intermediate =
+                    RustFinalType::new(type1.ffi_type().clone(), (**conversion).clone())?;
+                // TODO: ???
+                self.convert_type_to_ffi(expr, &intermediate)?
+            }
+        };
+        Ok(code)
     }
 
     /// Generates Rust code for calling an FFI function from a wrapper function.
@@ -633,55 +692,7 @@ impl Generator<'_> {
         final_args.resize(wrapper_data.cpp_ffi_function.arguments.len(), None);
         for arg in arguments {
             assert!(arg.ffi_index < final_args.len());
-            let mut code = arg.name.clone();
-            match arg.argument_type.conversion() {
-                RustToFfiTypeConversion::None => {}
-                RustToFfiTypeConversion::RefToPtr { .. } => {
-                    if arg.argument_type.api_type().is_const_pointer_like()?
-                        && !arg.argument_type.ffi_type().is_const_pointer_like()?
-                    {
-                        let mut intermediate_type = arg.argument_type.ffi_type().clone();
-                        intermediate_type.set_const(true)?;
-                        code = format!(
-                            "{} as {} as {}",
-                            code,
-                            self.rust_type_to_code(&intermediate_type),
-                            self.rust_type_to_code(arg.argument_type.ffi_type())
-                        );
-                    } else {
-                        code = format!(
-                            "{} as {}",
-                            code,
-                            self.rust_type_to_code(arg.argument_type.ffi_type())
-                        );
-                    }
-                }
-                RustToFfiTypeConversion::ValueToPtr => {
-                    let is_const = arg.argument_type.ffi_type().is_const_pointer_like()?;
-                    code = format!(
-                        "{}{} as {}",
-                        if is_const { "&" } else { "&mut " },
-                        code,
-                        self.rust_type_to_code(arg.argument_type.ffi_type())
-                    );
-                }
-                RustToFfiTypeConversion::CppBoxToPtr => {
-                    code = format!("{}.into_raw_ptr()", code);
-                }
-                RustToFfiTypeConversion::UtilsPtrToPtr { .. }
-                | RustToFfiTypeConversion::UtilsRefToPtr { .. } => {
-                    code = format!("{}.as_raw_ptr()", code);
-                }
-                RustToFfiTypeConversion::OptionUtilsRefToPtr { .. } => {
-                    bail!("OptionUtilsRefToPtr is not supported in argument position");
-                }
-                RustToFfiTypeConversion::QFlagsToUInt { .. } => {
-                    code = format!("{}.to_int()", code);
-                }
-                RustToFfiTypeConversion::UnitToAnything => {
-                    bail!("UnitToAnything is not possible to use in argument position");
-                }
-            }
+            let code = self.convert_type_to_ffi(&arg.name, &arg.argument_type)?;
             final_args[arg.ffi_index] = Some(code);
         }
 

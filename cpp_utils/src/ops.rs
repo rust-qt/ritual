@@ -1,4 +1,5 @@
 use crate::{CppBox, CppDeletable};
+use std::cmp::PartialEq;
 use std::ops::{Add, AddAssign};
 
 impl<'a, T: CppDeletable, U> Add<U> for &'a CppBox<T>
@@ -18,5 +19,14 @@ where
 {
     fn add_assign(&mut self, rhs: U) {
         **self += rhs;
+    }
+}
+
+impl<T: CppDeletable, U> PartialEq<U> for CppBox<T>
+where
+    T: PartialEq<U>,
+{
+    fn eq(&self, rhs: &U) -> bool {
+        &**self == rhs
     }
 }

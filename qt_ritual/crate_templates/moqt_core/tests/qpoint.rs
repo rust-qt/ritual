@@ -53,5 +53,8 @@ fn operators() {
         c += a.as_ref();
         assert_eq!(c.x(), 5);
         assert_eq!(c.y(), 8);
+
+        assert_eq!(c, QPoint::new_2a(5, 8).as_ref());
+        assert!(c != QPoint::new_2a(5, 9).as_ref());
     }
 }

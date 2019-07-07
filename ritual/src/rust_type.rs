@@ -145,6 +145,8 @@ pub enum RustToFfiTypeConversion {
     QFlagsToUInt { api_type: RustType },
     /// `()` to any type
     UnitToAnything,
+    /// Rust public type has an additional reference (`&`)
+    RefTo(Box<RustToFfiTypeConversion>),
 }
 
 impl RustToFfiTypeConversion {
@@ -259,6 +261,10 @@ impl RustFinalType {
             }
             RustToFfiTypeConversion::QFlagsToUInt { api_type } => api_type.clone(),
             RustToFfiTypeConversion::UnitToAnything => RustType::unit(),
+            RustToFfiTypeConversion::RefTo(conversion) => {
+                let intermediate = RustFinalType::new(ffi_type.clone(), (**conversion).clone())?;
+                RustType::new_reference(true, intermediate.api_type)
+            }
         };
         Ok(RustFinalType {
             api_type,
