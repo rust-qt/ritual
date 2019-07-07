@@ -90,7 +90,7 @@ impl QCoreApplication {
     /// returned by the closure. The closure should perform the initialization of the application
     /// and either return immediately or call `CoreApplication::exec()` and return its return value:
     /// ```no_run
-    /// use moqt_core::QCoreApplication;
+    /// use qt_core::QCoreApplication;
     ///
     /// fn main() {
     ///     QCoreApplication::create_and_exit(|app| {

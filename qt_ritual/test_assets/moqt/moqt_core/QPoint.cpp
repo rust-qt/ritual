@@ -34,3 +34,7 @@ QPoint operator-(const QPoint& one, const QPoint& other) {
 bool operator==(const QPoint& one, const QPoint& other) {
     return one.x() == other.x() && one.y() == other.y();
 }
+
+bool operator==(const char* one, const QPoint& other) {
+    return one != 0 && other.x() == other.y();
+}
