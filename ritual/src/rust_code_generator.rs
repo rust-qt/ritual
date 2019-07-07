@@ -671,8 +671,12 @@ impl Generator<'_> {
             RustToFfiTypeConversion::RefTo(conversion) => {
                 let intermediate =
                     RustFinalType::new(type1.ffi_type().clone(), (**conversion).clone())?;
-                // TODO: ???
-                self.convert_type_to_ffi(expr, &intermediate)?
+                let code = self.convert_type_to_ffi(expr, &intermediate)?;
+                if **conversion == RustToFfiTypeConversion::None {
+                    format!("*{}", code)
+                } else {
+                    code
+                }
             }
         };
         Ok(code)
