@@ -84,7 +84,7 @@ enum OperatorKind {
     Normal,
     NormalUnary,
     WithAssign,
-    PartialEq,
+    Comparison,
 }
 
 #[derive(Debug)]
@@ -130,7 +130,27 @@ impl OperatorInfo {
             CppOperator::EqualTo => OperatorInfo {
                 trait_path: "std::cmp::PartialEq",
                 function_name: "eq",
-                kind: OperatorKind::PartialEq,
+                kind: OperatorKind::Comparison,
+            },
+            CppOperator::GreaterThan => OperatorInfo {
+                trait_path: "cpp_utils::cmp::Gt",
+                function_name: "gt",
+                kind: OperatorKind::Comparison,
+            },
+            CppOperator::LessThan => OperatorInfo {
+                trait_path: "cpp_utils::cmp::Lt",
+                function_name: "lt",
+                kind: OperatorKind::Comparison,
+            },
+            CppOperator::GreaterThanOrEqualTo => OperatorInfo {
+                trait_path: "cpp_utils::cmp::Ge",
+                function_name: "ge",
+                kind: OperatorKind::Comparison,
+            },
+            CppOperator::LessThanOrEqualTo => OperatorInfo {
+                trait_path: "cpp_utils::cmp::Le",
+                function_name: "le",
+                kind: OperatorKind::Comparison,
             },
             CppOperator::LogicalNot => OperatorInfo {
                 trait_path: "std::ops::Not",
@@ -220,10 +240,6 @@ impl OperatorInfo {
             | CppOperator::PrefixDecrement
             | CppOperator::PostfixDecrement
             | CppOperator::NotEqualTo
-            | CppOperator::GreaterThan
-            | CppOperator::LessThan
-            | CppOperator::GreaterThanOrEqualTo
-            | CppOperator::LessThanOrEqualTo
             | CppOperator::LogicalAnd
             | CppOperator::LogicalOr
             | CppOperator::BitwiseNot
@@ -601,7 +617,7 @@ impl State<'_, '_> {
             .clone();
 
         let is_self_const = match operator_info.kind {
-            OperatorKind::Normal | OperatorKind::NormalUnary | OperatorKind::PartialEq => true,
+            OperatorKind::Normal | OperatorKind::NormalUnary | OperatorKind::Comparison => true,
             OperatorKind::WithAssign => false,
         };
         if self_type.is_const_pointer_like()? != is_self_const {
@@ -652,7 +668,7 @@ impl State<'_, '_> {
 
                 vec![output]
             }
-            OperatorKind::WithAssign | OperatorKind::PartialEq => Vec::new(),
+            OperatorKind::WithAssign | OperatorKind::Comparison => Vec::new(),
         };
 
         let mut function = unnamed_function.with_path(trait_path.join(operator_info.function_name));
@@ -666,7 +682,7 @@ impl State<'_, '_> {
         )?;
         function.arguments[0].name = "self".to_string();
 
-        if operator_info.kind == OperatorKind::PartialEq {
+        if operator_info.kind == OperatorKind::Comparison {
             let other_arg = &mut function.arguments[1].argument_type;
             *other_arg = RustFinalType::new(
                 other_arg.ffi_type().clone(),
