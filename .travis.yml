@@ -1,11 +1,12 @@
 __common: &common
     language: rust
-    rust: stable
+    rust: 1.34.2
+    script: scripts/ci/travis/run.bash
     cache:
         directories:
-        - $HOME/.cargo
-        - $HOME/.rustup
-        - $HOME/ritual_temp_test_dir
+#        - $HOME/.cargo
+#        - $HOME/.rustup
+#        - $HOME/ritual_temp_test_dir
         - target
 
 matrix:
@@ -13,10 +14,7 @@ matrix:
     -   <<: *common
         os: linux
         dist: trusty
-        script:
-        - sudo apt-get install llvm-3.8 libclang-3.8-dev --yes --force-yes
-        - scripts/ci/travis/run.bash
     -   <<: *common
         os: osx
-        script: scripts/ci/travis/run.bash
-
+    -   <<: *common
+        os: windows
