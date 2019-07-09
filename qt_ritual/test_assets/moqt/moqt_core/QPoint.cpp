@@ -58,9 +58,6 @@ bool operator>=(const QPoint& one, int other) {
     return one.x() >= other;
 }
 
-bool operator==(const QPoint& one, long long other) {
-    return false;
-}
 bool operator==(const QPoint& one, int64_t other) {
     return false;
 }
