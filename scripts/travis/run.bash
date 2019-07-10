@@ -25,12 +25,11 @@ cd "$TRAVIS_BUILD_DIR"
 rustup component add clippy
 rustup component add rustfmt
 
-# TODO: reverse, disable verbose
+cargo fmt -- --check
+cargo clippy --color=always --all-targets -- -D warnings
 
 if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
-cmd.exe /C '"C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" amd64 && cargo test --color=always -v'
+cmd.exe /C '"C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" amd64 && cargo test --color=always --release'
 else
-    cargo test --color=always -v
+    cargo test --color=always
 fi
-cargo clippy --color=always --all-targets -- -D warnings
-cargo fmt -- --check

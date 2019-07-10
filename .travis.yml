@@ -1,13 +1,11 @@
 __common: &common
     language: rust
     rust: 1.34.2
-    script: scripts/ci/travis/run.bash
+    script: scripts/travis/run.bash
     cache:
         directories:
-#        - $HOME/.cargo
-#        - $HOME/.rustup
-#        - $HOME/ritual_temp_test_dir
         - target
+        - $HOME/ritual_temp_test_dir/test_full_run/workspace/target
 
 matrix:
     include:
