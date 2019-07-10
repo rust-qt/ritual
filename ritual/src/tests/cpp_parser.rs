@@ -244,6 +244,20 @@ fn functions_with_class_arg() {
 }
 
 #[test]
+fn free_operator() {
+    let data = run_parser(
+        "
+        class QPoint {
+            friend QPoint operator-(const QPoint& one, const QPoint& other);
+        };
+        QPoint operator-(const QPoint& one, const QPoint& other);
+        ",
+    );
+
+    assert_eq!(data.methods.len(), 1);
+}
+
+#[test]
 fn func_with_unknown_type() {
     let data = run_parser(
         "

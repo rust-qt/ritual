@@ -30,6 +30,7 @@ use ritual_common::errors::{bail, err_msg, format_err, print_trace, Result};
 use ritual_common::string_utils::CaseOperations;
 use ritual_common::utils::MapIfOk;
 use std::collections::{BTreeMap, BTreeSet};
+use std::iter::Iterator;
 use std::ops::Deref;
 
 pub fn qt_core_path(crate_name: &str) -> RustPath {
@@ -77,6 +78,201 @@ struct FunctionWithDesiredPath {
 enum ProcessedFfiItem {
     Item(RustItem),
     Function(FunctionWithDesiredPath),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum OperatorKind {
+    Normal,
+    NormalUnary,
+    WithAssign,
+    Comparison,
+}
+
+#[derive(Debug)]
+struct OperatorInfo {
+    trait_path: &'static str,
+    function_name: &'static str,
+    kind: OperatorKind,
+}
+
+impl OperatorInfo {
+    fn new(operator: &CppOperator) -> Result<OperatorInfo> {
+        let info = match operator {
+            CppOperator::Addition => OperatorInfo {
+                trait_path: "std::ops::Add",
+                function_name: "add",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::Subtraction => OperatorInfo {
+                trait_path: "std::ops::Sub",
+                function_name: "sub",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::UnaryMinus => OperatorInfo {
+                trait_path: "std::ops::Neg",
+                function_name: "neg",
+                kind: OperatorKind::NormalUnary,
+            },
+            CppOperator::Multiplication => OperatorInfo {
+                trait_path: "std::ops::Mul",
+                function_name: "mul",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::Division => OperatorInfo {
+                trait_path: "std::ops::Div",
+                function_name: "div",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::Modulo => OperatorInfo {
+                trait_path: "std::ops::Rem",
+                function_name: "rem",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::EqualTo => OperatorInfo {
+                trait_path: "std::cmp::PartialEq",
+                function_name: "eq",
+                kind: OperatorKind::Comparison,
+            },
+            CppOperator::GreaterThan => OperatorInfo {
+                trait_path: "cpp_utils::cmp::Gt",
+                function_name: "gt",
+                kind: OperatorKind::Comparison,
+            },
+            CppOperator::LessThan => OperatorInfo {
+                trait_path: "cpp_utils::cmp::Lt",
+                function_name: "lt",
+                kind: OperatorKind::Comparison,
+            },
+            CppOperator::GreaterThanOrEqualTo => OperatorInfo {
+                trait_path: "cpp_utils::cmp::Ge",
+                function_name: "ge",
+                kind: OperatorKind::Comparison,
+            },
+            CppOperator::LessThanOrEqualTo => OperatorInfo {
+                trait_path: "cpp_utils::cmp::Le",
+                function_name: "le",
+                kind: OperatorKind::Comparison,
+            },
+            CppOperator::LogicalNot => OperatorInfo {
+                trait_path: "std::ops::Not",
+                function_name: "not",
+                kind: OperatorKind::NormalUnary,
+            },
+            CppOperator::BitwiseAnd => OperatorInfo {
+                trait_path: "std::ops::BitAnd",
+                function_name: "bitand",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::BitwiseOr => OperatorInfo {
+                trait_path: "std::ops::BitOr",
+                function_name: "bitor",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::BitwiseXor => OperatorInfo {
+                trait_path: "std::ops::BitXor",
+                function_name: "bitxor",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::BitwiseLeftShift => OperatorInfo {
+                trait_path: "std::ops::Shl",
+                function_name: "shl",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::BitwiseRightShift => OperatorInfo {
+                trait_path: "std::ops::Shr",
+                function_name: "shr",
+                kind: OperatorKind::Normal,
+            },
+            CppOperator::AdditionAssignment => OperatorInfo {
+                trait_path: "std::ops::AddAssign",
+                function_name: "add_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::SubtractionAssignment => OperatorInfo {
+                trait_path: "std::ops::SubAssign",
+                function_name: "sub_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::MultiplicationAssignment => OperatorInfo {
+                trait_path: "std::ops::MulAssign",
+                function_name: "mul_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::DivisionAssignment => OperatorInfo {
+                trait_path: "std::ops::DivAssign",
+                function_name: "div_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::ModuloAssignment => OperatorInfo {
+                trait_path: "std::ops::RemAssign",
+                function_name: "rem_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::BitwiseAndAssignment => OperatorInfo {
+                trait_path: "std::ops::BitAndAssign",
+                function_name: "bitand_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::BitwiseOrAssignment => OperatorInfo {
+                trait_path: "std::ops::BitOrAssign",
+                function_name: "bitor_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::BitwiseXorAssignment => OperatorInfo {
+                trait_path: "std::ops::BitXorAssign",
+                function_name: "bitxor_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::BitwiseLeftShiftAssignment => OperatorInfo {
+                trait_path: "std::ops::ShlAssign",
+                function_name: "shl_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::BitwiseRightShiftAssignment => OperatorInfo {
+                trait_path: "std::ops::ShrAssign",
+                function_name: "shr_assign",
+                kind: OperatorKind::WithAssign,
+            },
+            CppOperator::Conversion(_)
+            | CppOperator::Assignment
+            | CppOperator::UnaryPlus
+            | CppOperator::PrefixIncrement
+            | CppOperator::PostfixIncrement
+            | CppOperator::PrefixDecrement
+            | CppOperator::PostfixDecrement
+            | CppOperator::NotEqualTo
+            | CppOperator::LogicalAnd
+            | CppOperator::LogicalOr
+            | CppOperator::BitwiseNot
+            | CppOperator::Subscript
+            | CppOperator::Indirection
+            | CppOperator::AddressOf
+            | CppOperator::StructureDereference
+            | CppOperator::PointerToMember
+            | CppOperator::FunctionCall
+            | CppOperator::Comma
+            | CppOperator::New
+            | CppOperator::NewArray
+            | CppOperator::Delete
+            | CppOperator::DeleteArray => bail!("unsupported operator: {:?}", operator),
+        };
+        Ok(info)
+    }
+}
+
+#[derive(Debug)]
+struct TraitTypes {
+    target_type: RustType,
+    trait_type: RustType,
+}
+
+impl From<&RustTraitImpl> for TraitTypes {
+    fn from(trait_impl: &RustTraitImpl) -> Self {
+        Self {
+            target_type: trait_impl.target_type.clone(),
+            trait_type: trait_impl.trait_type.clone(),
+        }
+    }
 }
 
 struct State<'b, 'a: 'b>(&'b mut ProcessorData<'a>);
@@ -419,6 +615,180 @@ impl State<'_, '_> {
         Ok(unnamed_function)
     }
 
+    fn process_operator_as_trait_impl(
+        unnamed_function: UnnamedRustFunction,
+        operator: &CppOperator,
+        crate_name: &str,
+        trait_types: &[TraitTypes],
+    ) -> Result<RustTraitImpl> {
+        let operator_info = OperatorInfo::new(operator)?;
+
+        let trait_path = RustPath::from_good_str(operator_info.trait_path);
+
+        let self_type = unnamed_function
+            .arguments
+            .get(0)
+            .ok_or_else(|| err_msg("no arguments"))?
+            .argument_type
+            .ffi_type()
+            .clone();
+
+        let self_value_type = self_type.pointer_like_to_target()?;
+
+        let is_self_const = match operator_info.kind {
+            OperatorKind::Normal | OperatorKind::NormalUnary | OperatorKind::Comparison => true,
+            OperatorKind::WithAssign => false,
+        };
+
+        let target_type = match operator_info.kind {
+            OperatorKind::Normal | OperatorKind::NormalUnary => {
+                RustType::new_reference(is_self_const, self_value_type.clone())
+            }
+            OperatorKind::WithAssign | OperatorKind::Comparison => self_value_type.clone(),
+        };
+
+        let trait_args = if operator_info.kind == OperatorKind::NormalUnary {
+            None
+        } else {
+            let other_type = unnamed_function
+                .arguments
+                .get(1)
+                .ok_or_else(|| err_msg("not enough arguments"))?
+                .argument_type
+                .api_type()
+                .clone();
+
+            Some(vec![other_type])
+        };
+
+        let trait_type = RustType::Common(RustCommonType {
+            path: trait_path.clone(),
+            generic_arguments: trait_args,
+        });
+
+        let has_conflict = trait_types.iter().any(|tt| {
+            tt.target_type.can_be_same_as(&target_type) && tt.trait_type.can_be_same_as(&trait_type)
+        });
+        if has_conflict {
+            bail!(
+                "potentially conflicting trait impl already exists: {:?}",
+                trait_types
+            );
+        }
+
+        let parent_path = if let RustType::Common(RustCommonType { path, .. }) = self_value_type {
+            let type_crate_name = path
+                .crate_name()
+                .ok_or_else(|| err_msg("common type must have crate name"))?;
+            if type_crate_name != crate_name {
+                bail!("self type is outside current crate");
+            }
+            path.parent()?
+        } else {
+            bail!("self type is not Common");
+        };
+
+        let associated_types = match operator_info.kind {
+            OperatorKind::Normal | OperatorKind::NormalUnary => {
+                let output = RustTraitAssociatedType {
+                    name: "Output".into(),
+                    value: unnamed_function.return_type.api_type().clone(),
+                };
+
+                vec![output]
+            }
+            OperatorKind::WithAssign | OperatorKind::Comparison => Vec::new(),
+        };
+
+        let mut function = unnamed_function.with_path(trait_path.join(operator_info.function_name));
+        function.is_unsafe = false;
+        function.arguments[0].argument_type = RustFinalType::new(
+            function.arguments[0].argument_type.ffi_type().clone(),
+            RustToFfiTypeConversion::RefToPtr {
+                force_api_is_const: Some(is_self_const),
+                lifetime: None,
+            },
+        )?;
+        function.arguments[0].name = "self".to_string();
+
+        if operator_info.kind == OperatorKind::Comparison {
+            let other_arg = &mut function.arguments[1].argument_type;
+            *other_arg = RustFinalType::new(
+                other_arg.ffi_type().clone(),
+                RustToFfiTypeConversion::RefTo(Box::new(other_arg.conversion().clone())),
+            )?;
+        }
+
+        if operator_info.kind == OperatorKind::WithAssign
+            && function.return_type.api_type() != &RustType::unit()
+        {
+            function.return_type = RustFinalType::new(
+                function.return_type.ffi_type().clone(),
+                RustToFfiTypeConversion::UnitToAnything,
+            )?;
+        }
+
+        Ok(RustTraitImpl {
+            target_type,
+            parent_path,
+            trait_type,
+            associated_types,
+            functions: vec![function],
+        })
+    }
+
+    fn process_destructor(
+        unnamed_function: UnnamedRustFunction,
+        allocation_place: ReturnValueAllocationPlace,
+    ) -> Result<RustTraitImpl> {
+        if unnamed_function.arguments.len() != 1 {
+            bail!("destructor must have one argument");
+        }
+        let target_type = unnamed_function.arguments[0]
+            .argument_type
+            .api_type()
+            .pointer_like_to_target()?;
+
+        let parent_path = if let RustType::Common(RustCommonType { path, .. }) = &target_type {
+            path.parent()
+                .expect("destructor argument path must have parent")
+        } else {
+            bail!("can't get parent for target type: {:?}", target_type);
+        };
+
+        let function_name;
+        let trait_path;
+        let is_unsafe;
+        match allocation_place {
+            ReturnValueAllocationPlace::Stack => {
+                function_name = "drop";
+                trait_path = RustPath::from_good_str("std::ops::Drop");
+                is_unsafe = false;
+            }
+            ReturnValueAllocationPlace::Heap => {
+                function_name = "delete";
+                trait_path = RustPath::from_good_str("cpp_utils::CppDeletable");
+                is_unsafe = true;
+            }
+            ReturnValueAllocationPlace::NotApplicable => {
+                bail!("invalid allocation_place for destructor");
+            }
+        }
+        let mut function = unnamed_function.with_path(trait_path.join(function_name));
+        function.is_unsafe = is_unsafe;
+
+        Ok(RustTraitImpl {
+            target_type,
+            parent_path,
+            trait_type: RustType::Common(RustCommonType {
+                path: trait_path,
+                generic_arguments: None,
+            }),
+            associated_types: Vec::new(),
+            functions: vec![function],
+        })
+    }
+
     fn process_cast(
         mut unnamed_function: UnnamedRustFunction,
         cast: &CppCast,
@@ -552,6 +922,7 @@ impl State<'_, '_> {
         ffi_item_index: usize,
         function: &CppFfiFunction,
         checks: &CppChecks,
+        trait_types: &[TraitTypes],
     ) -> Result<Vec<ProcessedFfiItem>> {
         let rust_ffi_function = self.generate_ffi_function(&function)?;
         let ffi_function_path = rust_ffi_function.path.clone();
@@ -661,54 +1032,8 @@ impl State<'_, '_> {
         } = &function.kind
         {
             if cpp_function.is_destructor() {
-                if arguments.len() != 1 {
-                    bail!("destructor must have one argument");
-                }
-                let target_type = arguments[0]
-                    .argument_type
-                    .api_type()
-                    .pointer_like_to_target()?;
-
-                let parent_path =
-                    if let RustType::Common(RustCommonType { path, .. }) = &target_type {
-                        path.parent()
-                            .expect("destructor argument path must have parent")
-                    } else {
-                        bail!("can't get parent for target type: {:?}", target_type);
-                    };
-
-                let function_name;
-                let trait_path;
-                let is_unsafe;
-                match function.allocation_place {
-                    ReturnValueAllocationPlace::Stack => {
-                        function_name = "drop";
-                        trait_path = RustPath::from_good_str("std::ops::Drop");
-                        is_unsafe = false;
-                    }
-                    ReturnValueAllocationPlace::Heap => {
-                        function_name = "delete";
-                        trait_path = RustPath::from_good_str("cpp_utils::CppDeletable");
-                        is_unsafe = true;
-                    }
-                    ReturnValueAllocationPlace::NotApplicable => {
-                        bail!("invalid allocation_place for destructor");
-                    }
-                }
-                let mut function = unnamed_function.with_path(trait_path.join(function_name));
-                function.is_unsafe = is_unsafe;
-
-                let rust_item = RustItem::TraitImpl(RustTraitImpl {
-                    target_type,
-                    parent_path,
-                    trait_type: RustType::Common(RustCommonType {
-                        path: trait_path,
-                        generic_arguments: None,
-                    }),
-                    associated_types: Vec::new(),
-                    functions: vec![function],
-                });
-                results.push(ProcessedFfiItem::Item(rust_item));
+                let item = State::process_destructor(unnamed_function, function.allocation_place)?;
+                results.push(ProcessedFfiItem::Item(RustItem::TraitImpl(item)));
                 return Ok(results);
             }
             if let Some(cast) = cast {
@@ -719,6 +1044,27 @@ impl State<'_, '_> {
                         .map(|x| ProcessedFfiItem::Item(RustItem::TraitImpl(x))),
                 );
                 return Ok(results);
+            }
+            if let Some(operator) = &cpp_function.operator {
+                if operator == &CppOperator::NotEqualTo {
+                    bail!("NotEqualTo is not needed in public API because PartialEq is used");
+                }
+                match State::process_operator_as_trait_impl(
+                    unnamed_function.clone(),
+                    operator,
+                    self.0.current_database.crate_name(),
+                    trait_types,
+                ) {
+                    Ok(item) => {
+                        results.push(ProcessedFfiItem::Item(RustItem::TraitImpl(item)));
+                        return Ok(results);
+                    }
+                    Err(err) => {
+                        debug!("failed to convert operator to trait: {}", err);
+                        debug!("function: {:?}", function);
+                        debug!("rust function: {:?}", unnamed_function);
+                    }
+                }
             }
         }
 
@@ -1040,14 +1386,18 @@ impl State<'_, '_> {
         &self,
         ffi_item_index: usize,
         ffi_item: &CppFfiDatabaseItem,
+        trait_types: &[TraitTypes],
     ) -> Result<Vec<ProcessedFfiItem>> {
         if !ffi_item.checks.any_success() {
             bail!("cpp checks failed");
         }
         match &ffi_item.item {
-            CppFfiItem::Function(cpp_ffi_function) => {
-                self.process_rust_function(ffi_item_index, cpp_ffi_function, &ffi_item.checks)
-            }
+            CppFfiItem::Function(cpp_ffi_function) => self.process_rust_function(
+                ffi_item_index,
+                cpp_ffi_function,
+                &ffi_item.checks,
+                trait_types,
+            ),
             CppFfiItem::QtSlotWrapper(_) => {
                 bail!("slot wrappers do not need to be processed here");
             }
@@ -1457,17 +1807,35 @@ impl State<'_, '_> {
 
     fn process_ffi_items(&mut self) -> Result<BTreeMap<RustPath, Vec<FunctionWithDesiredPath>>> {
         let mut grouped_functions = BTreeMap::<_, Vec<_>>::new();
+        let mut trait_types = self
+            .0
+            .current_database
+            .rust_items()
+            .iter()
+            .filter_map(|item| {
+                if let RustItem::TraitImpl(trait_impl) = &item.item {
+                    Some(TraitTypes::from(trait_impl))
+                } else {
+                    None
+                }
+            })
+            .collect_vec();
+
         for ffi_item_index in 0..self.0.current_database.ffi_items().len() {
             let ffi_item = &self.0.current_database.ffi_items()[ffi_item_index];
             if ffi_item.is_rust_processed {
                 continue;
             }
-            match self.process_ffi_item(ffi_item_index, ffi_item) {
+            match self.process_ffi_item(ffi_item_index, ffi_item, &trait_types) {
                 Ok(results) => {
                     let ffi_item_text = ffi_item.item.short_text();
                     for item in results {
                         match item {
                             ProcessedFfiItem::Item(rust_item) => {
+                                if let RustItem::TraitImpl(trait_impl) = &rust_item {
+                                    trait_types.push(trait_impl.into());
+                                }
+
                                 let item = RustDatabaseItem {
                                     item: rust_item,
                                     cpp_item_index: None,

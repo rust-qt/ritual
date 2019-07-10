@@ -40,3 +40,29 @@ fn vec() {
         assert_eq!(vec[7].y(), 8);
     }
 }
+
+#[test]
+fn operators() {
+    unsafe {
+        let a: CppBox<QPoint> = QPoint::new_2a(1, 2);
+        let b: CppBox<QPoint> = QPoint::new_2a(3, 4);
+        let mut c: CppBox<QPoint> = &a + b.as_ref();
+        assert_eq!(c.x(), 4);
+        assert_eq!(c.y(), 6);
+
+        c += a.as_ref();
+        assert_eq!(c.x(), 5);
+        assert_eq!(c.y(), 8);
+
+        assert_eq!(c, QPoint::new_2a(5, 8).as_ref());
+        assert!(c != QPoint::new_2a(5, 9).as_ref());
+
+        assert!(c > 4);
+        assert!(c >= 4);
+        assert!(c < 9);
+        assert!(c <= 9);
+        assert!(c >= 5);
+        assert!(!(c > 9));
+        assert!(!(c < 4));
+    }
+}

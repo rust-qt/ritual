@@ -2,6 +2,7 @@
 #define QPOINT_H
 
 #include "moqt_core_exports.h"
+#include <cstdint>
 
 class MOQT_CORE_EXPORT QPoint {
 public:
@@ -14,8 +15,32 @@ public:
     int y() const { return m_y; }
     void setX(int x) { m_x = x; }
     void setY(int y) { m_y = y; }
+
+    QPoint operator+(const QPoint& other) const;
+    QPoint& operator+=(const QPoint& other);
+
+    // bad operator (this is non-const)
+    QPoint operator*(const QPoint& other);
+
+    QPoint operator-() const;
+
 private:
     int m_x, m_y;
+
+    friend MOQT_CORE_EXPORT QPoint operator-(const QPoint& one, const QPoint& other);
 };
+
+MOQT_CORE_EXPORT QPoint operator-(const QPoint& one, const QPoint& other);
+MOQT_CORE_EXPORT bool operator==(const QPoint& one, const QPoint& other);
+MOQT_CORE_EXPORT bool operator==(const char* one, const QPoint& other);
+
+MOQT_CORE_EXPORT bool operator==(const QPoint& one, int other);
+MOQT_CORE_EXPORT bool operator!=(const QPoint& one, int other);
+MOQT_CORE_EXPORT bool operator<(const QPoint& one, int other);
+MOQT_CORE_EXPORT bool operator<=(const QPoint& one, int other);
+MOQT_CORE_EXPORT bool operator>(const QPoint& one, int other);
+MOQT_CORE_EXPORT bool operator>=(const QPoint& one, int other);
+
+MOQT_CORE_EXPORT bool operator==(const QPoint& one, int64_t other);
 
 #endif //QPOINT_H

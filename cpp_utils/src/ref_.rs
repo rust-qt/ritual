@@ -28,6 +28,10 @@ impl<T> Ref<T> {
         ptr::NonNull::new(ptr).map(Ref)
     }
 
+    pub unsafe fn from_raw_ref(value: &mut T) -> Self {
+        Ref(value.into())
+    }
+
     pub unsafe fn from_raw_non_null(ptr: ptr::NonNull<T>) -> Self {
         Ref(ptr)
     }
@@ -75,6 +79,10 @@ impl<T> ConstRef<T> {
 
     pub unsafe fn from_raw(ptr: *const T) -> Option<Self> {
         ptr::NonNull::new(ptr as *mut T).map(ConstRef)
+    }
+
+    pub unsafe fn from_raw_ref(value: &T) -> Self {
+        ConstRef(ptr::NonNull::new(value as *const T as *mut T).unwrap())
     }
 
     pub unsafe fn from_raw_non_null(ptr: ptr::NonNull<T>) -> Self {

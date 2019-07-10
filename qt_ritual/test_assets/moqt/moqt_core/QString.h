@@ -12,6 +12,7 @@ public:
 class MOQT_CORE_EXPORT QString {
 public:
     static QString fromUtf8(const char *str, int size = -1);
+    static QString fromUtf8(const QByteArray& str);
     QByteArray toUtf8() const;
 };
 

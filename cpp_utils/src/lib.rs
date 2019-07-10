@@ -15,6 +15,8 @@ pub use crate::ptr::{ConstPtr, Ptr};
 pub use crate::ref_::{ConstRef, Ref};
 
 mod casts;
+pub mod cmp;
 mod cpp_box;
+mod ops;
 mod ptr;
 mod ref_;
