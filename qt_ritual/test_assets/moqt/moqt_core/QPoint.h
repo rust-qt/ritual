@@ -27,7 +27,7 @@ public:
 private:
     int m_x, m_y;
 
-    friend QPoint operator-(const QPoint& one, const QPoint& other);
+    friend MOQT_CORE_EXPORT QPoint operator-(const QPoint& one, const QPoint& other);
 };
 
 MOQT_CORE_EXPORT QPoint operator-(const QPoint& one, const QPoint& other);
