@@ -328,7 +328,7 @@ fn wrap_with_condition(code: &str, condition: &Condition) -> String {
 
 /// Generates a source file with the specified FFI methods.
 pub fn generate_cpp_file(
-    ffi_items: &[CppFfiDatabaseItem],
+    ffi_items: &[&CppFfiDatabaseItem],
     environments: &[LibraryTarget],
     file_path: &Path,
     global_header_name: &str,

@@ -2,7 +2,9 @@ use crate::cpp_code_generator;
 use crate::cpp_code_generator::generate_cpp_type_size_requester;
 use crate::processor::ProcessorData;
 use crate::rust_code_generator;
+use crate::rust_info::RustItem;
 use crate::versions;
+use itertools::Itertools;
 use pathdiff::diff_paths;
 use ritual_common::errors::{err_msg, Result};
 use ritual_common::file_utils::{
@@ -12,6 +14,7 @@ use ritual_common::file_utils::{
 use ritual_common::toml;
 use ritual_common::utils::{run_command, MapIfOk};
 use ritual_common::BuildScriptData;
+use std::collections::HashSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -104,6 +107,9 @@ fn generate_crate_template(data: &mut ProcessorData<'_>) -> Result<()> {
                 if local_path.is_none() || !data.workspace.config().write_dependencies_local_paths {
                     toml::Value::String(version.to_string())
                 } else {
+                    let path = diff_paths(&local_path.expect("checked above"), &output_path)
+                        .ok_or_else(|| err_msg("failed to get relative path to the dependency"))?;
+
                     toml::Value::Table({
                         let mut value = toml::value::Table::new();
                         value.insert(
@@ -112,9 +118,7 @@ fn generate_crate_template(data: &mut ProcessorData<'_>) -> Result<()> {
                         );
                         value.insert(
                             "path".to_string(),
-                            toml::Value::String(
-                                path_to_str(&local_path.expect("checked above"))?.to_string(),
-                            ),
+                            toml::Value::String(path_to_str(&path)?.to_string()),
                         );
                         value
                     })
@@ -279,8 +283,29 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         data.config.include_directives(),
     )?;
 
+    let used_ffi_functions = data
+        .current_database
+        .rust_items()
+        .iter()
+        .filter_map(|item| {
+            if let RustItem::FfiFunction(func) = &item.item {
+                Some(func.path.last())
+            } else {
+                None
+            }
+        })
+        .collect::<HashSet<&str>>();
+
     cpp_code_generator::generate_cpp_file(
-        data.current_database.ffi_items(),
+        &data
+            .current_database
+            .ffi_items()
+            .iter()
+            .filter(|item| {
+                !item.item.is_function()
+                    || used_ffi_functions.contains(item.path().last().name.as_str())
+            })
+            .collect_vec(),
         data.current_database.environments(),
         &c_lib_path.join("file1.cpp"),
         &global_header_name,
