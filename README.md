@@ -1,7 +1,6 @@
 # cpp_to_rust
 
-[![Linux + OS X](https://travis-ci.org/rust-qt/cpp_to_rust.svg?branch=master)](https://travis-ci.org/rust-qt/cpp_to_rust)
-[![Windows](https://ci.appveyor.com/api/projects/status/m4yo29j2f5wfu3w0/branch/master?svg=true)](https://ci.appveyor.com/project/Riateche/cpp-to-rust)
+[![Build Status](https://travis-ci.com/rust-qt/ritual.svg?branch=develop)](https://travis-ci.com/rust-qt/ritual/branches)
 
 `cpp_to_rust` allows to use C++ libraries from Rust. The main target of this project is Qt.
 
