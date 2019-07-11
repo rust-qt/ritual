@@ -232,6 +232,9 @@ fn build_crate(data: &mut ProcessorData<'_>) -> Result<()> {
         if cargo_cmd == &"doc" {
             command.env(env_var_names::RUSTDOC, "1");
         }
+        // if cargo_cmd == &"build" {
+        //     command.arg("-vv");
+        // }
         run_command(&mut command)?;
     }
     Ok(())
