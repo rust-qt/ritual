@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::cpp_checker::apply_blacklist_to_checks;
 use crate::database::{CppDatabaseItem, CppFfiDatabaseItem, Database};
 use crate::workspace::Workspace;
 use crate::{
@@ -148,6 +149,7 @@ impl Default for ProcessingSteps {
             data.current_database.clear_cpp_checks();
             Ok(())
         });
+        s.add_custom("apply_blacklist_to_checks", apply_blacklist_to_checks);
         s.add_custom("clear_rust_info", |data| {
             data.current_database.clear_rust_info();
             Ok(())

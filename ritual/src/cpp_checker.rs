@@ -1,5 +1,7 @@
 use crate::config::Config;
-use crate::cpp_ffi_data::CppFfiItem;
+use crate::cpp_data::CppPath;
+use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFfiItem};
+use crate::cpp_type::CppType;
 use crate::database::CppFfiDatabaseItem;
 use crate::processor::ProcessorData;
 use crate::{cluster_api, cpp_code_generator};
@@ -20,6 +22,7 @@ use ritual_common::utils::{MapIfOk, ProgressBar};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::{hash_map::Entry, HashMap};
 use std::io::Write;
+use std::iter::{once, IntoIterator};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread::ThreadId;
@@ -564,5 +567,58 @@ impl CppChecker<'_, '_> {
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut checker = CppChecker { data };
     checker.run()?;
+    Ok(())
+}
+
+fn type_paths(type1: &CppType) -> Vec<&CppPath> {
+    match type1 {
+        CppType::Void
+        | CppType::BuiltInNumeric(_)
+        | CppType::SpecificNumeric(_)
+        | CppType::PointerSizedInteger { .. }
+        | CppType::TemplateParameter { .. } => Vec::new(),
+        CppType::Enum { path } | CppType::Class(path) => vec![path],
+        CppType::FunctionPointer(function) => function
+            .arguments
+            .iter()
+            .chain(once(&*function.return_type))
+            .flat_map(|type1| type_paths(type1))
+            .collect(),
+        CppType::PointerLike { target, .. } => type_paths(target),
+    }
+}
+
+pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
+    if let Some(hook) = data.config.cpp_parser_path_hook() {
+        for item in data.current_database.ffi_items_mut() {
+            let (types, path) = match &item.item {
+                CppFfiItem::Function(function) => match &function.kind {
+                    CppFfiFunctionKind::Function { cpp_function, .. } => (
+                        cpp_function.all_involved_types(),
+                        Some(cpp_function.path.clone()),
+                    ),
+                    CppFfiFunctionKind::FieldAccessor { field, .. } => {
+                        (vec![field.field_type.clone()], Some(field.path.clone()))
+                    }
+                },
+                CppFfiItem::QtSlotWrapper(wrapper) => (wrapper.signal_arguments.clone(), None),
+            };
+
+            let any_blocked = types
+                .iter()
+                .flat_map(|type1| type_paths(type1))
+                .chain(path.as_ref())
+                .map_if_ok(|path| hook(path))?
+                .into_iter()
+                .any(|x| !x);
+
+            if any_blocked {
+                if item.checks.any_success() {
+                    log::info!("Checks are cleared for {}", item.item.short_text());
+                }
+                item.checks.clear();
+            }
+        }
+    }
     Ok(())
 }
