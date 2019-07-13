@@ -29,7 +29,7 @@ cargo fmt -- --check
 cargo clippy --color=always --all-targets -- -D warnings
 
 if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
-cmd.exe /C '"C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" amd64 && cargo test --color=always --release'
+cmd.exe /C '"C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" amd64 && cargo test --color=always --release -- --nocapture'
 else
-    cargo test --color=always
+    cargo test --color=always -- --nocapture
 fi
