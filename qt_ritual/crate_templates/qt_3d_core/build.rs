@@ -1,3 +1,3 @@
 fn main() {
-    qt_build_tools::run("3d_core")
+    qt_ritual_build::run("qt_3d_core")
 }

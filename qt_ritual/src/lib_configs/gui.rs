@@ -7,6 +7,7 @@ pub fn gui_config(config: &mut Config) -> Result<()> {
     config.set_cpp_parser_path_hook(|path| {
         let string = path.to_templateless_string();
         let blocked = &[
+            // internal
             "QAbstractOpenGLFunctionsPrivate",
             "QOpenGLFunctionsPrivate",
             "QOpenGLExtraFunctionsPrivate",

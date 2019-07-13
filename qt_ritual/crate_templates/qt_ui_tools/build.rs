@@ -1,3 +1,3 @@
 fn main() {
-    qt_build_tools::run("ui_tools")
+    qt_ritual_build::run("qt_ui_tools")
 }
