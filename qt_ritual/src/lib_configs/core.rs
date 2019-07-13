@@ -6,6 +6,7 @@ use ritual::cpp_type::CppType;
 use ritual::rust_info::{NameType, RustPathScope};
 use ritual::rust_type::RustPath;
 use ritual_common::errors::{bail, Result};
+use ritual_common::string_utils::CaseOperations;
 
 /// QtCore specific configuration.
 pub fn core_config(config: &mut Config) -> Result<()> {
@@ -177,6 +178,46 @@ pub fn core_config(config: &mut Config) -> Result<()> {
                             data.current_database.crate_name()
                         ))));
                     }
+                }
+
+                let q_text_stream_functions = &[
+                    "bin",
+                    "bom",
+                    "center",
+                    "dec",
+                    "endl",
+                    "fixed",
+                    "flush",
+                    "forcepoint",
+                    "forcesign",
+                    "hex",
+                    "left",
+                    "lowercasebase",
+                    "lowercasedigits",
+                    "noforcepoint",
+                    "noforcesign",
+                    "noshowbase",
+                    "oct",
+                    "reset",
+                    "right",
+                    "scientific",
+                    "showbase",
+                    "uppercasebase",
+                    "uppercasedigits",
+                    "ws",
+                    "qSetFieldWidth",
+                    "qSetPadChar",
+                    "qSetRealNumberPrecision",
+                ];
+
+                if cpp_function.path.items().len() == 1
+                    && q_text_stream_functions.contains(&cpp_function.path.items()[0].name.as_str())
+                {
+                    let path = RustPath::from_good_str(data.current_database.crate_name())
+                        .join("q_text_stream")
+                        .join(cpp_function.path.items()[0].name.to_snake_case());
+
+                    return Ok(Some(path));
                 }
             }
         }
