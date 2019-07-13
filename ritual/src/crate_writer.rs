@@ -2,16 +2,18 @@ use crate::cpp_code_generator;
 use crate::cpp_code_generator::generate_cpp_type_size_requester;
 use crate::processor::ProcessorData;
 use crate::rust_code_generator;
+use crate::rust_info::RustItem;
 use crate::versions;
-use pathdiff::diff_paths;
-use ritual_common::errors::{err_msg, Result};
+use itertools::Itertools;
+use ritual_common::errors::Result;
 use ritual_common::file_utils::{
-    copy_file, copy_recursively, create_dir, create_dir_all, create_file, path_to_str, read_dir,
-    remove_dir_all, remove_file, repo_dir_path, save_json, save_toml_table,
+    copy_file, copy_recursively, create_dir, create_dir_all, create_file, diff_paths, path_to_str,
+    read_dir, remove_dir_all, remove_file, repo_dir_path, save_json, save_toml_table,
 };
 use ritual_common::toml;
 use ritual_common::utils::{run_command, MapIfOk};
 use ritual_common::BuildScriptData;
+use std::collections::HashSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -104,6 +106,8 @@ fn generate_crate_template(data: &mut ProcessorData<'_>) -> Result<()> {
                 if local_path.is_none() || !data.workspace.config().write_dependencies_local_paths {
                     toml::Value::String(version.to_string())
                 } else {
+                    let path = diff_paths(&local_path.expect("checked above"), &output_path)?;
+
                     toml::Value::Table({
                         let mut value = toml::value::Table::new();
                         value.insert(
@@ -112,9 +116,7 @@ fn generate_crate_template(data: &mut ProcessorData<'_>) -> Result<()> {
                         );
                         value.insert(
                             "path".to_string(),
-                            toml::Value::String(
-                                path_to_str(&local_path.expect("checked above"))?.to_string(),
-                            ),
+                            toml::Value::String(path_to_str(&path)?.to_string()),
                         );
                         value
                     })
@@ -140,22 +142,19 @@ fn generate_crate_template(data: &mut ProcessorData<'_>) -> Result<()> {
                     )?,
                 );
                 for dep in data.dep_databases {
-                    let relative_path =
-                        diff_paths(&data.workspace.crate_path(dep.crate_name())?, &output_path)
-                            .ok_or_else(|| {
-                                err_msg("failed to get relative path to the dependency")
-                            })?;
-
                     table.insert(
                         dep.crate_name().to_string(),
-                        dep_value(&dep.crate_version(), Some(relative_path))?,
+                        dep_value(
+                            &dep.crate_version(),
+                            Some(data.workspace.crate_path(dep.crate_name())?),
+                        )?,
                     );
                 }
             }
             for dep in data.config.crate_properties().dependencies() {
                 table.insert(
                     dep.name().to_string(),
-                    dep_value(dep.version(), dep.local_path().cloned())?,
+                    dep_value(dep.version(), dep.local_path().map(PathBuf::from))?,
                 );
             }
             table
@@ -182,7 +181,7 @@ fn generate_crate_template(data: &mut ProcessorData<'_>) -> Result<()> {
             for dep in data.config.crate_properties().build_dependencies() {
                 table.insert(
                     dep.name().to_string(),
-                    dep_value(dep.version(), dep.local_path().cloned())?,
+                    dep_value(dep.version(), dep.local_path().map(PathBuf::from))?,
                 );
             }
             table
@@ -279,8 +278,29 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         data.config.include_directives(),
     )?;
 
+    let used_ffi_functions = data
+        .current_database
+        .rust_items()
+        .iter()
+        .filter_map(|item| {
+            if let RustItem::FfiFunction(func) = &item.item {
+                Some(func.path.last())
+            } else {
+                None
+            }
+        })
+        .collect::<HashSet<&str>>();
+
     cpp_code_generator::generate_cpp_file(
-        data.current_database.ffi_items(),
+        &data
+            .current_database
+            .ffi_items()
+            .iter()
+            .filter(|item| {
+                !item.item.is_function()
+                    || used_ffi_functions.contains(item.path().last().name.as_str())
+            })
+            .collect_vec(),
         data.current_database.environments(),
         &c_lib_path.join("file1.cpp"),
         &global_header_name,

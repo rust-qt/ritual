@@ -320,6 +320,14 @@ impl CppFfiItem {
         }
     }
 
+    pub fn is_function(&self) -> bool {
+        if let CppFfiItem::Function(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn is_slot_wrapper(&self) -> bool {
         if let CppFfiItem::QtSlotWrapper(_) = self {
             true

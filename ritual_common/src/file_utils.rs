@@ -1,6 +1,6 @@
 //! Various utilities for working with files
 
-use crate::errors::{bail, err_msg, Result, ResultExt};
+use crate::errors::{bail, err_msg, format_err, Result, ResultExt};
 use log::trace;
 use serde::de::DeserializeOwned;
 use std::ffi::{OsStr, OsString};
@@ -420,4 +420,9 @@ pub fn repo_dir_path(relative_path: &str) -> Result<PathBuf> {
         bail!("detected path does not exist: {}", result.display());
     }
     Ok(result)
+}
+
+pub fn diff_paths(path: &Path, base: &Path) -> Result<PathBuf> {
+    pathdiff::diff_paths(path, base)
+        .ok_or_else(|| format_err!("failed to get relative path to {:?} from {:?}", path, base))
 }

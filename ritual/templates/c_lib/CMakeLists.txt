@@ -4,6 +4,8 @@
 cmake_minimum_required(VERSION 3.0.0 FATAL_ERROR)
 project ({lib_name_lowercase})
 
+SET(CMAKE_VERBOSE_MAKEFILE ON)
+
 if(RITUAL_QT)
     set(CMAKE_AUTOMOC ON)
     find_package(Qt5Core CONFIG REQUIRED)
@@ -63,8 +65,16 @@ if(RITUAL_CPP_LIB_VERSION)
     add_definitions(-DRITUAL_CPP_LIB_VERSION=${{RITUAL_CPP_LIB_VERSION}})
 endif()
 
-if(${{CMAKE_COMPILER_IS_GNUCXX}})
-    set(CMAKE_CXX_FLAGS "${{CMAKE_CXX_FLAGS}} -Wall -Wextra -Werror=return-type")
+if ("${{CMAKE_CXX_COMPILER_ID}}" MATCHES "Clang")
+    set(CMAKE_CXX_FLAGS
+        "${{CMAKE_CXX_FLAGS}} -Wall -Wextra -Wno-deprecated-declarations -Werror=return-type")
+elseif ("${{CMAKE_CXX_COMPILER_ID}}" STREQUAL "GNU") # GCC
+    set(CMAKE_CXX_FLAGS
+        "${{CMAKE_CXX_FLAGS}} -Wall -Wextra -Wno-deprecated-declarations -Werror=return-type")
+elseif ("${{CMAKE_CXX_COMPILER_ID}}" STREQUAL "Intel")
+elseif ("${{CMAKE_CXX_COMPILER_ID}}" STREQUAL "MSVC")
+    # don't warn about deprecated items
+    set(CMAKE_CXX_FLAGS "${{CMAKE_CXX_FLAGS}} /wd4996")
 endif()
 
 if(RITUAL_COMPILER_FLAGS)

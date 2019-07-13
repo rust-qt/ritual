@@ -11,7 +11,7 @@ use ritual_common::errors::Result;
 use ritual_common::target::Target;
 use ritual_common::toml;
 use serde_derive::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Information about an extra non-`cpp_to_rust`-based dependency.
 #[derive(Default, Debug, Clone)]
@@ -31,8 +31,8 @@ impl CrateDependency {
         &self.version
     }
     /// Local path to the dependency (if present).
-    pub fn local_path(&self) -> Option<&PathBuf> {
-        self.local_path.as_ref()
+    pub fn local_path(&self) -> Option<&Path> {
+        self.local_path.as_ref().map(PathBuf::as_path)
     }
 }
 

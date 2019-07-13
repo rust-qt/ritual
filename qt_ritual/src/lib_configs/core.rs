@@ -148,6 +148,8 @@ pub fn core_config(config: &mut Config) -> Result<()> {
             "QConstOverload",
             // global functions that redirects to member functions
             "swap",
+            // is not cross-platform and is deprecated anyway
+            "QProcess::pid",
         ];
         if blocked.contains(&string.as_str()) {
             return Ok(false);

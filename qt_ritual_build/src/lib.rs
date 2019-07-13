@@ -6,7 +6,6 @@
 use itertools::Itertools;
 use qt_ritual_common::get_full_build_config;
 use ritual_build::common::errors::{FancyUnwrap, Result};
-use ritual_build::common::target::current_target;
 use ritual_build::common::utils::MapIfOk;
 use ritual_build::Config;
 use semver::Version;
@@ -45,11 +44,9 @@ pub fn run_and_return(crate_name: &str) -> Result<()> {
 
     let mut config = Config::new()?;
 
-    let current_target = current_target();
     let known_library_versions = config
         .known_targets()
         .iter()
-        .filter(|item| item.target == current_target)
         .map(|item| {
             item.cpp_library_version
                 .as_ref()
