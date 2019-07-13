@@ -719,13 +719,21 @@ impl State<'_, '_> {
             )?;
         }
 
-        if operator_info.kind == OperatorKind::WithAssign
-            && function.return_type.api_type() != &RustType::unit()
-        {
-            function.return_type = RustFinalType::new(
-                function.return_type.ffi_type().clone(),
-                RustToFfiTypeConversion::UnitToAnything,
-            )?;
+        match operator_info.kind {
+            OperatorKind::Normal | OperatorKind::NormalUnary => {}
+            OperatorKind::WithAssign => {
+                if function.return_type.api_type() != &RustType::unit() {
+                    function.return_type = RustFinalType::new(
+                        function.return_type.ffi_type().clone(),
+                        RustToFfiTypeConversion::UnitToAnything,
+                    )?;
+                }
+            }
+            OperatorKind::Comparison => {
+                if function.return_type.api_type() != &RustType::bool() {
+                    bail!("return type is not bool");
+                }
+            }
         }
 
         Ok(RustTraitImpl {

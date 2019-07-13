@@ -61,3 +61,7 @@ bool operator>=(const QPoint& one, int other) {
 bool operator==(const QPoint& one, int64_t other) {
     return false;
 }
+
+int operator==(const QPoint& one, float other) {
+    return 2;
+}

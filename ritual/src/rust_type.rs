@@ -445,6 +445,13 @@ impl RustType {
         RustType::Tuple(Vec::new())
     }
 
+    pub fn bool() -> Self {
+        RustType::Common(RustCommonType {
+            path: RustPath::from_good_str("bool"),
+            generic_arguments: None,
+        })
+    }
+
     pub fn new_pointer(is_const: bool, target: RustType) -> Self {
         RustType::PointerLike {
             kind: RustPointerLikeTypeKind::Pointer,
