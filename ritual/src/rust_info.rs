@@ -385,6 +385,7 @@ pub struct RustModuleDoc {
 pub enum RustModuleKind {
     CrateRoot,
     Ffi,
+    Ops,
     SizedTypes,
     CppNamespace,
     CppNestedType,
@@ -393,7 +394,7 @@ pub enum RustModuleKind {
 impl RustModuleKind {
     pub fn is_in_separate_file(self) -> bool {
         match self {
-            RustModuleKind::CrateRoot | RustModuleKind::CppNamespace => true,
+            RustModuleKind::CrateRoot | RustModuleKind::CppNamespace | RustModuleKind::Ops => true,
             RustModuleKind::Ffi | RustModuleKind::SizedTypes | RustModuleKind::CppNestedType => {
                 false
             }

@@ -1347,6 +1347,29 @@ impl State<'_, '_> {
             | NameType::ReceiverFunction { .. } => {
                 if let Ok(parent) = cpp_path.parent() {
                     self.get_path_scope(&parent, name_type)?
+                } else if let NameType::ApiFunction(cpp_function) = name_type {
+                    let is_operator = cpp_function
+                        .kind
+                        .cpp_function()
+                        .map_or(false, |f| f.is_operator());
+
+                    if is_operator {
+                        let ops_module = self
+                            .0
+                            .current_database
+                            .rust_items()
+                            .iter()
+                            .filter_map(RustDatabaseItem::as_module_ref)
+                            .find(|module| module.kind == RustModuleKind::Ops)
+                            .ok_or_else(|| err_msg("ops module not found"))?;
+
+                        RustPathScope {
+                            path: ops_module.path.clone(),
+                            prefix: None,
+                        }
+                    } else {
+                        self.default_path_scope()
+                    }
                 } else {
                     self.default_path_scope()
                 }
@@ -1770,6 +1793,7 @@ impl State<'_, '_> {
             let rust_path_parts = match kind {
                 RustModuleKind::CrateRoot => vec![crate_name],
                 RustModuleKind::Ffi => vec![crate_name, "__ffi".to_string()],
+                RustModuleKind::Ops => vec![crate_name, "ops".to_string()],
                 RustModuleKind::SizedTypes => vec![crate_name, "__sized_types".to_string()],
                 RustModuleKind::CppNamespace | RustModuleKind::CppNestedType => unreachable!(),
             };
@@ -1787,7 +1811,13 @@ impl State<'_, '_> {
 
             let rust_item = RustDatabaseItem {
                 item: RustItem::Module(RustModule {
-                    is_public: false,
+                    is_public: match kind {
+                        RustModuleKind::CrateRoot | RustModuleKind::Ops => true,
+                        RustModuleKind::Ffi | RustModuleKind::SizedTypes => false,
+                        RustModuleKind::CppNamespace | RustModuleKind::CppNestedType => {
+                            unreachable!()
+                        }
+                    },
                     path: rust_path,
                     doc: RustModuleDoc {
                         extra_doc: None,
@@ -2001,9 +2031,14 @@ impl State<'_, '_> {
 
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut state = State(data);
-    state.generate_special_module(RustModuleKind::CrateRoot)?;
-    state.generate_special_module(RustModuleKind::Ffi)?;
-    state.generate_special_module(RustModuleKind::SizedTypes)?;
+    for &module in &[
+        RustModuleKind::CrateRoot,
+        RustModuleKind::Ffi,
+        RustModuleKind::Ops,
+        RustModuleKind::SizedTypes,
+    ] {
+        state.generate_special_module(module)?;
+    }
     state.process_cpp_items()?;
     let grouped_functions = state.process_ffi_items()?;
     state.finalize_functions(grouped_functions)?;

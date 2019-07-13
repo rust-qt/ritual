@@ -338,6 +338,7 @@ impl Generator<'_> {
                 )?;
             }
             RustModuleKind::CrateRoot
+            | RustModuleKind::Ops
             | RustModuleKind::CppNamespace
             | RustModuleKind::CppNestedType => {
                 self.generate_children(&module.path, None, database)?;

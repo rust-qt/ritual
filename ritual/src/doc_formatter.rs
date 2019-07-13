@@ -32,6 +32,7 @@ pub fn module_doc(module: &RustModule) -> String {
             "Crate root".to_string()
         }
         RustModuleKind::Ffi => "Functions provided by the C++ wrapper library".into(),
+        RustModuleKind::Ops => "Functions that provide access to C++ operators".into(),
         RustModuleKind::SizedTypes => {
             "Types with the same size and alignment as corresponding C++ types".into()
         }
