@@ -120,6 +120,7 @@ pub fn core_config(config: &mut Config) -> Result<()> {
             "QLittleEndianStorageType",
             // works on overloading, can't be useful in Rust
             "Qt::qt_getEnumName",
+            "Qt::qt_getEnumMetaObject",
             // reimplemented in Rust
             "QFlag",
             "QIncompatibleFlag",
