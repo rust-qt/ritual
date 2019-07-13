@@ -50,7 +50,9 @@ fn build_cpp_lib() -> Result<TempTestDir> {
     let template_dir = temp_dir.path().join("template");
     create_dir_all(&build_dir)?;
     create_dir_all(&install_dir)?;
-    remove_dir_all(&template_dir)?;
+    if template_dir.exists() {
+        remove_dir_all(&template_dir)?;
+    }
     create_dir_all(&template_dir)?;
     CppLibBuilder {
         cmake_source_dir: cpp_lib_source_dir,
