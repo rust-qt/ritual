@@ -1022,7 +1022,7 @@ impl State<'_, '_> {
             }
         }
 
-        let unnamed_function = UnnamedRustFunction {
+        let mut unnamed_function = UnnamedRustFunction {
             is_public: true,
             arguments: arguments.clone(),
             return_type,
@@ -1080,6 +1080,44 @@ impl State<'_, '_> {
             CppFfiFunctionKind::Function { cpp_function, .. } => &cpp_function.path,
             CppFfiFunctionKind::FieldAccessor { field, .. } => &field.path,
         };
+
+        if let CppFfiFunctionKind::Function { cpp_function, .. } = &function.kind {
+            if cpp_function.is_operator() {
+                let arg0 = unnamed_function
+                    .arguments
+                    .get_mut(0)
+                    .ok_or_else(|| err_msg("no arguments"))?;
+
+                if arg0.name != "self" {
+                    if let Ok(type1) = arg0.argument_type.ffi_type().pointer_like_to_target() {
+                        if let RustType::Common(type1) = type1 {
+                            if type1.path.crate_name() == Some(self.0.current_database.crate_name())
+                            {
+                                arg0.name = "self".into();
+                                arg0.argument_type = RustFinalType::new(
+                                    arg0.argument_type.ffi_type().clone(),
+                                    RustToFfiTypeConversion::RefToPtr {
+                                        force_api_is_const: None,
+                                        lifetime: None,
+                                    },
+                                )?;
+
+                                let name = self
+                                    .special_function_rust_name(function, &type1.path)?
+                                    .ok_or_else(|| err_msg("operator must have special name"))?;
+                                results.push(ProcessedFfiItem::Function(FunctionWithDesiredPath {
+                                    function: unnamed_function,
+                                    desired_path: type1.path.join(name),
+                                    ffi_item_index,
+                                }));
+                                return Ok(results);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         let desired_path = self.generate_rust_path(cpp_path, NameType::ApiFunction(function))?;
         results.push(ProcessedFfiItem::Function(FunctionWithDesiredPath {
             function: unnamed_function,
