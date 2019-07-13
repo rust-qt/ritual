@@ -687,7 +687,7 @@ impl RustPathScope {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NameType<'a> {
     Type,
     EnumValue,
@@ -699,7 +699,7 @@ pub enum NameType<'a> {
     },
     SizedItem,
     QtSlotWrapper {
-        signal_arguments: Vec<CppType>,
+        signal_arguments: &'a [CppType],
         is_public: bool,
     },
 }

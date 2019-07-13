@@ -577,7 +577,7 @@ impl State<'_, '_> {
         }
         Ok(RustFFIFunction {
             return_type: self.ffi_type_to_rust_ffi_type(data.return_type.ffi_type())?,
-            path: self.generate_rust_path(&data.path, &NameType::FfiFunction)?,
+            path: self.generate_rust_path(&data.path, NameType::FfiFunction)?,
             arguments: args,
         })
     }
@@ -1080,7 +1080,7 @@ impl State<'_, '_> {
             CppFfiFunctionKind::Function { cpp_function, .. } => &cpp_function.path,
             CppFfiFunctionKind::FieldAccessor { field, .. } => &field.path,
         };
-        let desired_path = self.generate_rust_path(cpp_path, &NameType::ApiFunction(function))?;
+        let desired_path = self.generate_rust_path(cpp_path, NameType::ApiFunction(function))?;
         results.push(ProcessedFfiItem::Function(FunctionWithDesiredPath {
             function: unnamed_function,
             desired_path,
@@ -1120,7 +1120,7 @@ impl State<'_, '_> {
     fn get_path_scope(
         &self,
         parent_path: &CppPath,
-        name_type: &NameType<'_>,
+        name_type: NameType<'_>,
     ) -> Result<RustPathScope> {
         if let Some(hook) = self.0.config.rust_path_scope_hook() {
             if let Some(strategy) = hook(parent_path)? {
@@ -1263,7 +1263,7 @@ impl State<'_, '_> {
         }
     }
 
-    fn generate_rust_path(&self, cpp_path: &CppPath, name_type: &NameType<'_>) -> Result<RustPath> {
+    fn generate_rust_path(&self, cpp_path: &CppPath, name_type: NameType<'_>) -> Result<RustPath> {
         if let Some(hook) = self.0.config.rust_path_hook() {
             if let Some(path) = hook(cpp_path, name_type, &self.0)? {
                 return Ok(path);
@@ -1351,7 +1351,7 @@ impl State<'_, '_> {
                 signal_arguments,
                 is_public,
             } => {
-                let name = if *is_public { "Slot" } else { "RawSlot" };
+                let name = if is_public { "Slot" } else { "RawSlot" };
                 if signal_arguments.is_empty() {
                     name.to_string()
                 } else {
@@ -1361,7 +1361,7 @@ impl State<'_, '_> {
             }
         };
 
-        if name_type == &NameType::FfiFunction {
+        if name_type == NameType::FfiFunction {
             let rust_path = strategy.apply(&full_last_name);
             if self
                 .0
@@ -1376,7 +1376,7 @@ impl State<'_, '_> {
         }
 
         let sanitized_name =
-            sanitize_rust_identifier(&full_last_name, name_type == &NameType::Module);
+            sanitize_rust_identifier(&full_last_name, name_type == NameType::Module);
         let rust_path = strategy.apply(&sanitized_name);
 
         if name_type.is_api_function() {
@@ -1428,7 +1428,7 @@ impl State<'_, '_> {
 
         match &cpp_item.item {
             CppItem::Namespace(path) => {
-                let rust_path = self.generate_rust_path(path, &NameType::Module)?;
+                let rust_path = self.generate_rust_path(path, NameType::Module)?;
                 let rust_item = RustItem::Module(RustModule {
                     is_public: true,
                     path: rust_path,
@@ -1478,21 +1478,21 @@ impl State<'_, '_> {
 
                         let public_name_type = if let Some((wrapper, _)) = qt_slot_wrapper {
                             NameType::QtSlotWrapper {
-                                signal_arguments: wrapper.signal_arguments.clone(),
+                                signal_arguments: &wrapper.signal_arguments,
                                 is_public: false,
                             }
                         } else {
                             NameType::Type
                         };
 
-                        let public_path = self.generate_rust_path(&data.path, &public_name_type)?;
+                        let public_path = self.generate_rust_path(&data.path, public_name_type)?;
 
                         let mut rust_items = Vec::new();
 
                         let wrapper_kind;
                         if is_movable {
                             let internal_path =
-                                self.generate_rust_path(&data.path, &NameType::SizedItem)?;
+                                self.generate_rust_path(&data.path, NameType::SizedItem)?;
 
                             if internal_path == public_path {
                                 bail!(
@@ -1533,7 +1533,7 @@ impl State<'_, '_> {
                         rust_items.push(public_rust_item);
 
                         let nested_types_path =
-                            self.generate_rust_path(&data.path, &NameType::Module)?;
+                            self.generate_rust_path(&data.path, NameType::Module)?;
 
                         let nested_types_rust_item = RustItem::Module(RustModule {
                             is_public: true,
@@ -1570,8 +1570,8 @@ impl State<'_, '_> {
 
                             let closure_item_path = self.generate_rust_path(
                                 &data.path,
-                                &NameType::QtSlotWrapper {
-                                    signal_arguments: wrapper.signal_arguments.clone(),
+                                NameType::QtSlotWrapper {
+                                    signal_arguments: &wrapper.signal_arguments,
                                     is_public: true,
                                 },
                             )?;
@@ -1602,7 +1602,7 @@ impl State<'_, '_> {
                         Ok(rust_items)
                     }
                     CppTypeDeclarationKind::Enum => {
-                        let rust_path = self.generate_rust_path(&data.path, &NameType::Type)?;
+                        let rust_path = self.generate_rust_path(&data.path, NameType::Type)?;
                         let rust_item = RustItem::Struct(RustStruct {
                             extra_doc: None,
                             path: rust_path,
@@ -1622,7 +1622,7 @@ impl State<'_, '_> {
                 }
             }
             CppItem::EnumValue(value) => {
-                let rust_path = self.generate_rust_path(&value.path, &NameType::EnumValue)?;
+                let rust_path = self.generate_rust_path(&value.path, NameType::EnumValue)?;
 
                 let rust_item = RustItem::EnumValue(RustEnumValue {
                     path: rust_path,
@@ -1661,7 +1661,7 @@ impl State<'_, '_> {
 
                 let path = self.generate_rust_path(
                     &cpp_function.path,
-                    &NameType::ReceiverFunction { receiver_type },
+                    NameType::ReceiverFunction { receiver_type },
                 )?;
 
                 let class_type = self.find_wrapper_type(&cpp_function.path.parent()?)?;

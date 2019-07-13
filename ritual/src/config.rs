@@ -150,7 +150,7 @@ impl CrateProperties {
 
 pub type RustPathScopeHook = dyn Fn(&CppPath) -> Result<Option<RustPathScope>> + 'static;
 pub type RustPathHook =
-    dyn Fn(&CppPath, &NameType<'_>, &ProcessorData<'_>) -> Result<Option<RustPath>> + 'static;
+    dyn Fn(&CppPath, NameType<'_>, &ProcessorData<'_>) -> Result<Option<RustPath>> + 'static;
 pub type AfterCppParserHook = dyn Fn(&mut ProcessorData<'_>) -> Result<()> + 'static;
 pub type FfiGeneratorHook = dyn Fn(&CppDatabaseItem) -> Result<bool> + 'static;
 
@@ -423,7 +423,7 @@ impl Config {
 
     pub fn set_rust_path_hook(
         &mut self,
-        hook: impl Fn(&CppPath, &NameType<'_>, &ProcessorData<'_>) -> Result<Option<RustPath>> + 'static,
+        hook: impl Fn(&CppPath, NameType<'_>, &ProcessorData<'_>) -> Result<Option<RustPath>> + 'static,
     ) {
         self.rust_path_hook = Some(Box::new(hook));
     }
