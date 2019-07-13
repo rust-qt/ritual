@@ -20,7 +20,6 @@ select = "0.4.2"    # html parsing
 tempdir = "0.3.7"   # temporary directory creation
 derive_more = "0.13.0"
 itertools = "0.8.0"
-pathdiff = "0.1.0"
 log = "0.4.6"
 num_cpus = "1.9.0"
 rayon = "1.0.3"

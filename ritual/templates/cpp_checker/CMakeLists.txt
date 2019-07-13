@@ -4,7 +4,8 @@
 cmake_minimum_required(VERSION 3.0.0 FATAL_ERROR)
 project (cpp_checker)
 
-SET(CMAKE_VERBOSE_MAKEFILE ON)
+# uncomment to enable verbose output
+# SET(CMAKE_VERBOSE_MAKEFILE ON)
 
 if(RITUAL_QT)
     set(CMAKE_AUTOMOC ON)
