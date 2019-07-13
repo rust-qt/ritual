@@ -1,4 +1,4 @@
-#![allow(clippy::cyclomatic_complexity)]
+#![allow(clippy::cognitive_complexity)]
 
 //! Utility types and functions used by `cpp_to_rust_generator` and
 //! `cpp_to_rust_build_tools` crates.

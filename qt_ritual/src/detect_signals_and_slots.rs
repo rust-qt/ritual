@@ -42,7 +42,7 @@ struct Section {
 }
 
 /// Parses include files to detect which methods are signals or slots.
-#[allow(clippy::cyclomatic_complexity, clippy::collapsible_if)]
+#[allow(clippy::cognitive_complexity, clippy::collapsible_if)]
 pub fn detect_signals_and_slots(data: &mut ProcessorData<'_>) -> Result<()> {
     // TODO: only run if it's a new class or it has some new methods; don't change existing old methods
     let mut files = HashSet::new();

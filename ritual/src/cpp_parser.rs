@@ -192,7 +192,6 @@ fn get_full_name_display(entity: Entity<'_>) -> String {
 
 #[cfg(test)]
 fn init_clang() -> Result<Clang> {
-    use std;
     for _ in 0..12000 {
         if let Ok(clang) = Clang::new() {
             return Ok(clang);
@@ -401,7 +400,7 @@ impl CppParser<'_, '_> {
     /// and both may be specified at the same time.
     /// Surrounding class and/or
     /// method may be specified in `context_class` and `context_method`.
-    #[allow(clippy::cyclomatic_complexity)]
+    #[allow(clippy::cognitive_complexity)]
     fn parse_unexposed_type(
         &self,
         type1: Option<Type<'_>>,
@@ -903,7 +902,7 @@ impl CppParser<'_, '_> {
     }
 
     /// Parses a function `entity`.
-    #[allow(clippy::cyclomatic_complexity)]
+    #[allow(clippy::cognitive_complexity)]
     fn parse_function(&self, entity: Entity<'_>) -> Result<(CppFunction, DatabaseItemSource)> {
         let class_name = match entity.get_semantic_parent() {
             Some(p) => match p.get_kind() {
