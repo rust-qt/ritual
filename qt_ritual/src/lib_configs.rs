@@ -31,6 +31,7 @@ use self::widgets::widgets_config;
 use std::env;
 
 pub const MOQT_INSTALL_DIR_ENV_VAR_NAME: &str = "MOQT_INSTALL_DIR";
+pub const MOQT_TEMPLATE_DIR_ENV_VAR_NAME: &str = "MOQT_TEMPLATE_DIR";
 
 fn empty_config(_config: &mut Config) -> Result<()> {
     Ok(())
@@ -126,12 +127,13 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
         } else {
             config.add_cpp_parser_argument("-std=gnu++11");
         }
-        //    let cpp_config_data = CppBuildConfigData {
-        //      linked_libs: vec![crate_name.to_string()],
-        //      linked_frameworks: Vec::new(),
-        //
-        //    }
-        //...
+
+        let template_path =
+            PathBuf::from(env::var(MOQT_TEMPLATE_DIR_ENV_VAR_NAME).with_context(|_| {
+                format_err!("{} env var is missing", MOQT_TEMPLATE_DIR_ENV_VAR_NAME)
+            })?);
+        config.set_crate_template_path(template_path.join(&crate_name));
+
         config
     } else {
         crate_properties.remove_default_build_dependencies();
@@ -182,6 +184,9 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
         })?;
 
         config
+            .set_crate_template_path(repo_dir_path("qt_ritual/crate_templates")?.join(&crate_name));
+
+        config
     };
 
     config.set_after_cpp_parser_hook(detect_signals_and_slots);
@@ -190,8 +195,6 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
     for cpp_parser_stage in &["cpp_parser", "cpp_parser_stage2"] {
         steps.add_after(&[cpp_parser_stage], "add_slot_wrappers", add_slot_wrappers)?;
     }
-
-    config.set_crate_template_path(repo_dir_path("qt_ritual/crate_templates")?.join(&crate_name));
 
     let lib_config = match crate_name {
         "qt_core" => core_config,

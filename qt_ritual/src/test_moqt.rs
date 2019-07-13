@@ -1,11 +1,17 @@
-use crate::lib_configs::{global_config, MOQT_INSTALL_DIR_ENV_VAR_NAME};
+use crate::lib_configs::{
+    global_config, MOQT_INSTALL_DIR_ENV_VAR_NAME, MOQT_TEMPLATE_DIR_ENV_VAR_NAME,
+};
 use ritual::cli::{self, Options};
 use ritual_common::cpp_lib_builder::{BuildType, CppLibBuilder};
 use ritual_common::env_var_names;
 use ritual_common::errors::{FancyUnwrap, Result};
-use ritual_common::file_utils::{canonicalize, create_dir_all, repo_dir_path};
+use ritual_common::file_utils::{
+    canonicalize, copy_recursively, create_dir, create_dir_all, create_file, file_to_string,
+    read_dir, remove_dir_all, repo_dir_path,
+};
 use ritual_common::utils::add_env_path_item;
 use std::env;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -39,10 +45,13 @@ fn build_cpp_lib() -> Result<TempTestDir> {
     let cpp_lib_source_dir = repo_dir_path("qt_ritual/test_assets/moqt")?;
 
     let temp_dir = TempTestDir::new("test_full_run");
-    let build_dir = temp_dir.path().join("build/moqt_core");
+    let build_dir = temp_dir.path().join("build");
     let install_dir = temp_dir.path().join("install");
+    let template_dir = temp_dir.path().join("template");
     create_dir_all(&build_dir)?;
     create_dir_all(&install_dir)?;
+    remove_dir_all(&template_dir)?;
+    create_dir_all(&template_dir)?;
     CppLibBuilder {
         cmake_source_dir: cpp_lib_source_dir,
         build_dir,
@@ -56,6 +65,7 @@ fn build_cpp_lib() -> Result<TempTestDir> {
     }
     .run()?;
 
+    let repo_template_dir = repo_dir_path("qt_ritual/crate_templates")?;
     let add_env = |name, path: &Path| -> Result<()> {
         let value = add_env_path_item(name, vec![path.to_path_buf()])?;
         env::set_var(name, value);
@@ -66,6 +76,21 @@ fn build_cpp_lib() -> Result<TempTestDir> {
         let path = install_dir.join("include").join(lib);
         add_env("CPLUS_INCLUDE_PATH", &path)?;
         add_env("INCLUDE", &path)?; // for Windows
+
+        copy_recursively(&repo_template_dir.join(lib), &template_dir.join(lib))?;
+        let real_lib = lib.replace("mo", "");
+        let real_template_src_dir = repo_template_dir.join(&real_lib).join("src");
+        let template_src_dir = template_dir.join(&lib).join("src");
+        create_dir(&template_src_dir)?;
+        for item in read_dir(&real_template_src_dir)? {
+            let item = item?;
+            let content = file_to_string(item.path())?;
+            let new_content = content
+                .replace("qt_core", "moqt_core")
+                .replace("qt_gui", "moqt_gui");
+            let mut file = create_file(template_src_dir.join(item.file_name()))?;
+            write!(file, "{}", new_content)?;
+        }
     }
     let lib_path = install_dir.join("lib");
     add_env("LIBRARY_PATH", &lib_path)?;
@@ -74,6 +99,7 @@ fn build_cpp_lib() -> Result<TempTestDir> {
     add_env("PATH", &lib_path)?;
     add_env(env_var_names::LIBRARY_PATH, &lib_path)?;
     env::set_var(MOQT_INSTALL_DIR_ENV_VAR_NAME, &install_dir);
+    env::set_var(MOQT_TEMPLATE_DIR_ENV_VAR_NAME, &template_dir);
     Ok(temp_dir)
 }
 

@@ -17,7 +17,7 @@ use std::process;
 /// `CoreApplication::create_and_exit` convenience function
 /// and similar functions in the other application types
 /// can be used instead of `CoreApplicationArgs`.
-struct QCoreApplicationArgs {
+pub struct QCoreApplicationArgs {
     _values: Vec<Vec<u8>>,
     argc: Box<c_int>,
     argv: Vec<*mut c_char>,
@@ -25,7 +25,7 @@ struct QCoreApplicationArgs {
 
 impl QCoreApplicationArgs {
     /// Creates an object containing `args`.
-    fn new(mut args: Vec<Vec<u8>>) -> QCoreApplicationArgs {
+    pub fn new(mut args: Vec<Vec<u8>>) -> QCoreApplicationArgs {
         for arg in &mut args {
             if !arg.ends_with(&[0]) {
                 arg.push(0);
@@ -43,7 +43,7 @@ impl QCoreApplicationArgs {
 
     /// Returns `(argc, argv)` values in the form accepted by the application objects'
     /// constructors.
-    fn get(&mut self) -> (*mut c_int, *mut *mut c_char) {
+    pub fn get(&mut self) -> (*mut c_int, *mut *mut c_char) {
         let argc = self.argc.as_mut();
         let argv = self.argv.as_mut_ptr();
         (argc, argv)
@@ -53,7 +53,7 @@ impl QCoreApplicationArgs {
     /// Creates an object representing real arguments of the application.
     /// On Windows, this function uses empty argument list for performance reasons because
     /// Qt doesn't use `argc` and `argv` on Windows at all.
-    fn from_real() -> QCoreApplicationArgs {
+    pub fn from_real() -> QCoreApplicationArgs {
         use std::os::unix::ffi::OsStringExt;
 
         let args = std::env::args_os().map(|arg| arg.into_vec()).collect();
@@ -63,7 +63,7 @@ impl QCoreApplicationArgs {
     /// Creates an object representing real arguments of the application.
     /// On Windows, this function uses empty argument list for performance reasons because
     /// Qt doesn't use `argc` and `argv` on Windows at all.
-    fn from_real() -> QCoreApplicationArgs {
+    pub fn from_real() -> QCoreApplicationArgs {
         // Qt doesn't use argc and argv on Windows anyway
         // TODO: check this
         QCoreApplicationArgs::new(Vec::new())
