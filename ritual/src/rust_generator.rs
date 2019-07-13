@@ -1267,7 +1267,7 @@ impl State<'_, '_> {
                             Some(format!("to_{}", rust_type.api_type().caption(context)?))
                         }
                         CppOperator::Assignment => Some("copy_from".to_string()),
-                        _ => Some(format!("operator_{}", operator.ascii_name()?)),
+                        _ => Some(operator_function_name(operator)?.to_string()),
                     }
                 } else {
                     None
@@ -2056,6 +2056,65 @@ impl FunctionWithDesiredPath {
         let name = sanitize_rust_identifier(&name.to_snake_case(), false);
         Ok(self.desired_path.parent()?.join(name))
     }
+}
+
+/// Returns alphanumeric identifier for this operator
+/// used to name wrapper functions.
+fn operator_function_name(operator: &CppOperator) -> Result<&'static str> {
+    use self::CppOperator::*;
+    Ok(match operator {
+        Conversion(..) => {
+            bail!("operator_function_name: conversion operators are not supported");
+        }
+        Assignment => "set_from",
+        Addition => "add",
+        Subtraction => "sub",
+        UnaryPlus => "unary_plus",
+        UnaryMinus => "neg",
+        Multiplication => "mul",
+        Division => "div",
+        Modulo => "rem",
+        PrefixIncrement => "inc",
+        PostfixIncrement => "inc_postfix",
+        PrefixDecrement => "dec",
+        PostfixDecrement => "dec_postfix",
+        EqualTo => "eq",
+        NotEqualTo => "ne",
+        GreaterThan => "gt",
+        LessThan => "lt",
+        GreaterThanOrEqualTo => "ge",
+        LessThanOrEqualTo => "le",
+        LogicalNot => "not",
+        LogicalAnd => "and",
+        LogicalOr => "or",
+        BitwiseNot => "bit_not",
+        BitwiseAnd => "bit_and",
+        BitwiseOr => "bit_or",
+        BitwiseXor => "bit_xor",
+        BitwiseLeftShift => "shl",
+        BitwiseRightShift => "shr",
+        AdditionAssignment => "add_assign",
+        SubtractionAssignment => "sub_assign",
+        MultiplicationAssignment => "mul_assign",
+        DivisionAssignment => "div_assign",
+        ModuloAssignment => "rem_assign",
+        BitwiseAndAssignment => "bit_and_assign",
+        BitwiseOrAssignment => "bit_or_assign",
+        BitwiseXorAssignment => "bit_xor_assign",
+        BitwiseLeftShiftAssignment => "shl_assign",
+        BitwiseRightShiftAssignment => "shr_assign",
+        Subscript => "index",
+        Indirection => "indirection",
+        AddressOf => "address_of",
+        StructureDereference => "struct_deref",
+        PointerToMember => "ptr_to_member",
+        FunctionCall => "call",
+        Comma => "comma",
+        New => "new",
+        NewArray => "new_array",
+        Delete => "delete",
+        DeleteArray => "delete_array",
+    })
 }
 
 #[allow(dead_code)]

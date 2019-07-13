@@ -1,7 +1,6 @@
 //! Types for describing C++ operators
 
 use crate::cpp_type::CppType;
-use ritual_common::errors::{bail, Result};
 use serde_derive::{Deserialize, Serialize};
 
 /// Available types of C++ operators
@@ -199,65 +198,6 @@ impl CppOperator {
             Delete => oi("delete", 2),
             DeleteArray => oi("delete[]", 2),
         }
-    }
-
-    /// Returns alphanumeric identifier for this operator
-    /// used to name wrapper functions.
-    pub fn ascii_name(&self) -> Result<&'static str> {
-        use self::CppOperator::*;
-        Ok(match *self {
-            Conversion(..) => {
-                bail!("CppOperator::c_name: conversion operators are not supported");
-            }
-            Assignment => "assign",
-            Addition => "add",
-            Subtraction => "sub",
-            UnaryPlus => "unary_plus",
-            UnaryMinus => "neg",
-            Multiplication => "mul",
-            Division => "div",
-            Modulo => "rem",
-            PrefixIncrement => "inc",
-            PostfixIncrement => "inc_postfix",
-            PrefixDecrement => "dec",
-            PostfixDecrement => "dec_postfix",
-            EqualTo => "eq",
-            NotEqualTo => "neq",
-            GreaterThan => "gt",
-            LessThan => "lt",
-            GreaterThanOrEqualTo => "ge",
-            LessThanOrEqualTo => "le",
-            LogicalNot => "not",
-            LogicalAnd => "and",
-            LogicalOr => "or",
-            BitwiseNot => "bit_not",
-            BitwiseAnd => "bit_and",
-            BitwiseOr => "bit_or",
-            BitwiseXor => "bit_xor",
-            BitwiseLeftShift => "shl",
-            BitwiseRightShift => "shr",
-            AdditionAssignment => "add_assign",
-            SubtractionAssignment => "sub_assign",
-            MultiplicationAssignment => "mul_assign",
-            DivisionAssignment => "div_assign",
-            ModuloAssignment => "rem_assign",
-            BitwiseAndAssignment => "bit_and_assign",
-            BitwiseOrAssignment => "bit_or_assign",
-            BitwiseXorAssignment => "bit_xor_assign",
-            BitwiseLeftShiftAssignment => "shl_assign",
-            BitwiseRightShiftAssignment => "shr_assign",
-            Subscript => "index",
-            Indirection => "indirection",
-            AddressOf => "address_of",
-            StructureDereference => "struct_deref",
-            PointerToMember => "ptr_to_member",
-            FunctionCall => "call",
-            Comma => "comma",
-            New => "new",
-            NewArray => "new_array",
-            Delete => "delete",
-            DeleteArray => "delete_array",
-        })
     }
 
     /// Returns all existing operator kinds except for
