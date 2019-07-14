@@ -52,11 +52,13 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
         .log_to_file()
         .directory(path_to_str(&workspace.log_path())?)
         .suppress_timestamp()
+        .append()
         .print_message()
         .duplicate_to_stderr(Duplicate::Info)
         .start()
         .unwrap_or_else(|e| panic!("Logger initialization failed: {}", e));
 
+    info!("");
     info!("Workspace: {}", workspace_path.display());
     info!("Current target: {}", current_target().short_text());
 
