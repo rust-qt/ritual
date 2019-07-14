@@ -222,7 +222,7 @@ fn build_crate(data: &mut ProcessorData<'_>) -> Result<()> {
     let crate_name = data.config.crate_properties().name();
     //run_command(Command::new("cargo").arg("update").current_dir(path))?;
 
-    for cargo_cmd in &["build", "test", "doc"] {
+    for cargo_cmd in &["build", "doc", "test"] {
         let mut command = Command::new("cargo");
         command
             .arg(cargo_cmd)
