@@ -49,3 +49,11 @@ fn test_with_vectors() {
         assert_eq!(r, 2);
     }
 }
+
+#[test]
+fn reexport() {
+    use moqt_gui::moqt_core::QPoint;
+    unsafe {
+        let _ = QPoint::new_0a();
+    }
+}
