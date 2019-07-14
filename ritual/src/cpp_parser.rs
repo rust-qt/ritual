@@ -22,7 +22,6 @@ use ritual_common::env_var_names;
 use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use ritual_common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
 use ritual_common::target::{current_target, LibraryTarget};
-use std::collections::HashSet;
 use std::io::Write;
 use std::iter::once;
 use std::path::{Path, PathBuf};
@@ -288,39 +287,6 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
     let result = f(translation_unit);
     remove_file(&tmp_cpp_path)?;
     result
-}
-
-fn add_namespaces(data: &mut ProcessorData<'_>) -> Result<()> {
-    let mut namespaces = HashSet::new();
-    for item in data.current_database.cpp_items() {
-        let name = match &item.item {
-            CppItem::Type(t) => &t.path,
-            CppItem::Function(f) => &f.path,
-            _ => continue,
-        };
-
-        let mut namespace_name = match name.parent() {
-            Err(_) => continue,
-            Ok(parent) => parent,
-        };
-
-        namespaces.insert(namespace_name.clone());
-        while let Ok(r) = namespace_name.parent() {
-            namespaces.insert(r.clone());
-            namespace_name = r;
-        }
-    }
-    for item in data.current_database.cpp_items() {
-        if let CppItem::Type(t) = &item.item {
-            namespaces.remove(&t.path);
-        }
-    }
-    for name in namespaces {
-        let item = CppItem::Namespace(name);
-        data.current_database
-            .add_cpp_item(DatabaseItemSource::NamespaceInferring, None, item);
-    }
-    Ok(())
 }
 
 /// Runs the parser on specified data.
@@ -1439,7 +1405,6 @@ impl CppParser<'_, '_> {
         self.parse_types(entity)?;
         debug!("Parsing functions");
         self.parse_functions(entity)?;
-        add_namespaces(self.data)?;
         if let Some(hook) = self.data.config.after_cpp_parser_hook() {
             hook(self.data)?;
         }
@@ -1486,6 +1451,19 @@ impl CppParser<'_, '_> {
                     }
                 }
             }
+            EntityKind::Namespace => match get_full_name(entity) {
+                Ok(path) => {
+                    self.data.current_database.add_cpp_item(
+                        DatabaseItemSource::CppParser {
+                            include_file: self.entity_include_file(entity)?,
+                            origin_location: get_origin_location(entity).unwrap(),
+                        },
+                        self.source_ffi_item,
+                        CppItem::Namespace(path),
+                    );
+                }
+                Err(error) => debug!("failed to get namespace name: {}", error),
+            },
             _ => {}
         }
         match entity.get_kind() {
