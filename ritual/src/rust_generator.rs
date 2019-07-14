@@ -1942,6 +1942,7 @@ impl State<'_, '_> {
                         ffi_item.item.short_text(),
                         err
                     );
+                    print_trace(&err, Some(log::Level::Trace));
                 }
             }
         }
