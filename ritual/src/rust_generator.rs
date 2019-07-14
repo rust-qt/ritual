@@ -1780,8 +1780,37 @@ impl State<'_, '_> {
         }
     }
 
+    fn generate_crate_reexport(&mut self, crate_name: &str) -> Result<()> {
+        let path = RustPath::from_parts(vec![
+            self.0.config.crate_properties().name().to_string(),
+            crate_name.to_string(),
+        ]);
+
+        if self
+            .0
+            .current_database
+            .rust_database()
+            .find(&path)
+            .is_some()
+        {
+            // already created
+            return Ok(());
+        }
+
+        let rust_item = RustDatabaseItem {
+            item: RustItem::Reexport {
+                path,
+                target: RustPath::from_parts(vec![crate_name.to_string()]),
+            },
+            cpp_item_index: None,
+            ffi_item_index: None,
+        };
+        self.0.current_database.add_rust_item(rust_item);
+        Ok(())
+    }
+
     fn generate_special_module(&mut self, kind: RustModuleKind) -> Result<()> {
-        if !self
+        if self
             .0
             .current_database
             .rust_items()
@@ -1789,47 +1818,47 @@ impl State<'_, '_> {
             .filter_map(RustDatabaseItem::as_module_ref)
             .any(|module| module.kind == kind)
         {
-            let crate_name = self.0.config.crate_properties().name().to_string();
-            let rust_path_parts = match kind {
-                RustModuleKind::CrateRoot => vec![crate_name],
-                RustModuleKind::Ffi => vec![crate_name, "__ffi".to_string()],
-                RustModuleKind::Ops => vec![crate_name, "ops".to_string()],
-                RustModuleKind::SizedTypes => vec![crate_name, "__sized_types".to_string()],
-                RustModuleKind::CppNamespace | RustModuleKind::CppNestedType => unreachable!(),
-            };
-            let rust_path = RustPath::from_parts(rust_path_parts);
-
-            if self
-                .0
-                .current_database
-                .rust_database()
-                .find(&rust_path)
-                .is_some()
-            {
-                bail!("special module path already taken: {:?}", rust_path);
-            }
-
-            let rust_item = RustDatabaseItem {
-                item: RustItem::Module(RustModule {
-                    is_public: match kind {
-                        RustModuleKind::CrateRoot | RustModuleKind::Ops => true,
-                        RustModuleKind::Ffi | RustModuleKind::SizedTypes => false,
-                        RustModuleKind::CppNamespace | RustModuleKind::CppNestedType => {
-                            unreachable!()
-                        }
-                    },
-                    path: rust_path,
-                    doc: RustModuleDoc {
-                        extra_doc: None,
-                        cpp_path: None,
-                    },
-                    kind,
-                }),
-                cpp_item_index: None,
-                ffi_item_index: None,
-            };
-            self.0.current_database.add_rust_item(rust_item);
+            // already created
+            return Ok(());
         }
+        let crate_name = self.0.config.crate_properties().name().to_string();
+        let rust_path_parts = match kind {
+            RustModuleKind::CrateRoot => vec![crate_name],
+            RustModuleKind::Ffi => vec![crate_name, "__ffi".to_string()],
+            RustModuleKind::Ops => vec![crate_name, "ops".to_string()],
+            RustModuleKind::SizedTypes => vec![crate_name, "__sized_types".to_string()],
+            RustModuleKind::CppNamespace | RustModuleKind::CppNestedType => unreachable!(),
+        };
+        let rust_path = RustPath::from_parts(rust_path_parts);
+
+        if self
+            .0
+            .current_database
+            .rust_database()
+            .find(&rust_path)
+            .is_some()
+        {
+            bail!("special module path already taken: {:?}", rust_path);
+        }
+
+        let rust_item = RustDatabaseItem {
+            item: RustItem::Module(RustModule {
+                is_public: match kind {
+                    RustModuleKind::CrateRoot | RustModuleKind::Ops => true,
+                    RustModuleKind::Ffi | RustModuleKind::SizedTypes => false,
+                    RustModuleKind::CppNamespace | RustModuleKind::CppNestedType => unreachable!(),
+                },
+                path: rust_path,
+                doc: RustModuleDoc {
+                    extra_doc: None,
+                    cpp_path: None,
+                },
+                kind,
+            }),
+            cpp_item_index: None,
+            ffi_item_index: None,
+        };
+        self.0.current_database.add_rust_item(rust_item);
         Ok(())
     }
 
@@ -2040,6 +2069,18 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     ] {
         state.generate_special_module(module)?;
     }
+
+    state.generate_crate_reexport("cpp_utils")?;
+    let dependencies = state
+        .0
+        .dep_databases
+        .iter()
+        .map(|db| db.crate_name().to_string())
+        .collect_vec();
+    for crate_name in dependencies {
+        state.generate_crate_reexport(&crate_name)?;
+    }
+
     state.process_cpp_items()?;
     let grouped_functions = state.process_ffi_items()?;
     state.finalize_functions(grouped_functions)?;
