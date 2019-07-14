@@ -62,10 +62,6 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
     info!("Workspace: {}", workspace_path.display());
     info!("Current target: {}", current_target().short_text());
 
-    if let Some(local_paths) = options.local_paths {
-        workspace.set_write_dependencies_local_paths(local_paths)?;
-    }
-
     let mut was_any_action = false;
 
     let final_crates = if options.crates.iter().any(|x| *x == "all") {
@@ -98,6 +94,10 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
 
         if let Some(cluster_config_path) = &options.cluster {
             config.set_cluster_config(load_json(cluster_config_path)?);
+        }
+
+        if let Some(local_paths) = options.local_paths {
+            config.set_write_dependencies_local_paths(local_paths);
         }
 
         was_any_action = true;

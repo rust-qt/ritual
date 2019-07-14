@@ -8,7 +8,7 @@ use itertools::Itertools;
 use ritual_common::errors::Result;
 use ritual_common::file_utils::{
     copy_file, copy_recursively, create_dir, create_dir_all, create_file, diff_paths, path_to_str,
-    read_dir, remove_dir_all, remove_file, repo_dir_path, save_json, save_toml_table,
+    read_dir, remove_dir_all, repo_dir_path, save_json, save_toml_table,
 };
 use ritual_common::toml;
 use ritual_common::utils::{run_command, MapIfOk};
@@ -52,11 +52,7 @@ fn recursive_merge_toml(a: toml::Value, b: toml::Value) -> toml::Value {
 /// Generates `Cargo.toml` file and skeleton of the crate.
 /// If a crate template was supplied, files from it are
 /// copied to the output location.
-fn generate_crate_template(data: &mut ProcessorData<'_>) -> Result<()> {
-    let output_path = data
-        .workspace
-        .crate_path(data.config.crate_properties().name())?;
-
+fn generate_crate_template(data: &mut ProcessorData<'_>, output_path: &Path) -> Result<()> {
     let template_build_rs_path =
         data.config
             .crate_template_path()
@@ -103,7 +99,7 @@ fn generate_crate_template(data: &mut ProcessorData<'_>) -> Result<()> {
         });
         let dep_value = |version: &str, local_path: Option<PathBuf>| -> Result<toml::Value> {
             Ok(
-                if local_path.is_none() || !data.workspace.config().write_dependencies_local_paths {
+                if local_path.is_none() || !data.config.write_dependencies_local_paths() {
                     toml::Value::String(version.to_string())
                 } else {
                     let path = diff_paths(&local_path.expect("checked above"), &output_path)?;
@@ -134,7 +130,7 @@ fn generate_crate_template(data: &mut ProcessorData<'_>) -> Result<()> {
                     "cpp_utils".to_string(),
                     dep_value(
                         versions::CPP_UTILS_VERSION,
-                        if data.workspace.config().write_dependencies_local_paths {
+                        if data.config.write_dependencies_local_paths() {
                             Some(repo_dir_path("cpp_utils")?)
                         } else {
                             None
@@ -146,7 +142,7 @@ fn generate_crate_template(data: &mut ProcessorData<'_>) -> Result<()> {
                         dep.crate_name().to_string(),
                         dep_value(
                             &dep.crate_version(),
-                            Some(data.workspace.crate_path(dep.crate_name())?),
+                            Some(data.workspace.crate_path(dep.crate_name())),
                         )?,
                     );
                 }
@@ -170,7 +166,7 @@ fn generate_crate_template(data: &mut ProcessorData<'_>) -> Result<()> {
                     "ritual_build".to_string(),
                     dep_value(
                         versions::RITUAL_BUILD_VERSION,
-                        if data.workspace.config().write_dependencies_local_paths {
+                        if data.config.write_dependencies_local_paths() {
                             Some(repo_dir_path("ritual_build")?)
                         } else {
                             None
@@ -244,25 +240,14 @@ fn generate_c_lib_template(
 
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let crate_name = data.config.crate_properties().name();
-    let output_path = data.workspace.crate_path(crate_name)?;
+    let output_path = data.workspace.crate_path(crate_name);
 
-    for item in read_dir(&output_path)? {
-        let path = item?.path();
-        if path
-            == data
-                .workspace
-                .database_path(data.config.crate_properties().name())
-        {
-            continue;
-        }
-        if path.is_dir() {
-            remove_dir_all(&path)?;
-        } else {
-            remove_file(&path)?;
-        }
+    if output_path.exists() {
+        remove_dir_all(&output_path)?;
     }
 
-    generate_crate_template(data)?;
+    create_dir(&output_path)?;
+    generate_crate_template(data, &output_path)?;
     data.workspace.update_cargo_toml()?;
 
     let c_lib_path = output_path.join("c_lib");

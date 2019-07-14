@@ -2,7 +2,7 @@ use crate::database::Database;
 use log::info;
 use ritual_common::errors::{bail, Result};
 use ritual_common::file_utils::{
-    create_dir, create_dir_all, load_json, os_string_into_string, read_dir, remove_file, save_json,
+    create_dir_all, load_json, os_string_into_string, read_dir, remove_file, save_json,
     save_toml_table,
 };
 use ritual_common::toml;
@@ -10,9 +10,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
-pub struct WorkspaceConfig {
-    pub write_dependencies_local_paths: bool,
-}
+pub struct WorkspaceConfig {}
 
 /// Provides access to data stored in the user's project directory.
 /// The directory contains a subdirectory for each crate the user wants
@@ -32,9 +30,8 @@ fn config_path(path: &Path) -> PathBuf {
 
 fn database_path(workspace_path: &Path, crate_name: &str) -> PathBuf {
     workspace_path
-        .join("out")
-        .join(crate_name)
-        .join("database.json")
+        .join("db")
+        .join(format!("{}.json", crate_name))
 }
 
 impl Workspace {
@@ -43,7 +40,7 @@ impl Workspace {
             bail!("No such directory: {}", path.display());
         }
         let config_path = config_path(&path);
-        for &dir in &["tmp", "out", "log", "backup"] {
+        for &dir in &["tmp", "out", "log", "backup", "db"] {
             create_dir_all(path.join(dir))?;
         }
         let w = Workspace {
@@ -78,12 +75,8 @@ impl Workspace {
         self.path.join("log")
     }
 
-    pub fn crate_path(&self, crate_name: &str) -> Result<PathBuf> {
-        let path = self.path.join("out").join(crate_name);
-        if !path.exists() {
-            create_dir(&path)?;
-        }
-        Ok(path)
+    pub fn crate_path(&self, crate_name: &str) -> PathBuf {
+        self.path.join("out").join(crate_name)
     }
 
     // TODO: import published crates
@@ -130,8 +123,6 @@ impl Workspace {
             }
         }
         if allow_create {
-            // make sure crate dir exists
-            let _ = self.crate_path(crate_name)?;
             return Ok(Database::empty(crate_name));
         }
         bail!("can't get database");
@@ -139,18 +130,6 @@ impl Workspace {
 
     pub fn put_crate(&mut self, database: Database) {
         self.databases.push(database);
-    }
-
-    pub fn set_write_dependencies_local_paths(&mut self, value: bool) -> Result<()> {
-        if self.config.write_dependencies_local_paths == value {
-            return Ok(());
-        }
-        self.config.write_dependencies_local_paths = value;
-        self.save_config()
-    }
-
-    fn save_config(&self) -> Result<()> {
-        save_json(config_path(&self.path), &self.config, None)
     }
 
     fn database_backup_path(&self, crate_name: &str) -> PathBuf {

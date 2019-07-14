@@ -197,6 +197,7 @@ pub struct Config {
     ffi_generator_hook: Option<Box<FfiGeneratorHook>>,
     cluster_config: Option<ClusterConfig>,
     cpp_checker_tests: Vec<PreliminaryTest>,
+    write_dependencies_local_paths: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -229,6 +230,7 @@ impl Config {
             ffi_generator_hook: Default::default(),
             cluster_config: None,
             cpp_checker_tests: Default::default(),
+            write_dependencies_local_paths: true,
         }
     }
 
@@ -468,6 +470,14 @@ impl Config {
 
     pub fn cpp_checker_tests(&self) -> &[PreliminaryTest] {
         &self.cpp_checker_tests
+    }
+
+    pub fn set_write_dependencies_local_paths(&mut self, value: bool) {
+        self.write_dependencies_local_paths = value;
+    }
+
+    pub fn write_dependencies_local_paths(&self) -> bool {
+        self.write_dependencies_local_paths
     }
 }
 
