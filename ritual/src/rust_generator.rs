@@ -30,7 +30,7 @@ use ritual_common::errors::{bail, err_msg, format_err, print_trace, Result};
 use ritual_common::string_utils::CaseOperations;
 use ritual_common::utils::MapIfOk;
 use std::collections::{BTreeMap, BTreeSet};
-use std::iter::Iterator;
+use std::iter::{once, Iterator};
 use std::ops::Deref;
 
 pub fn qt_core_path(crate_name: &str) -> RustPath {
@@ -1130,8 +1130,12 @@ impl State<'_, '_> {
     fn find_rust_items(
         &self,
         cpp_path: &CppPath,
+        allow_dependencies: bool,
     ) -> Result<impl Iterator<Item = &RustDatabaseItem>> {
-        for db in self.0.all_databases() {
+        let databases = once(&self.0.current_database as &_)
+            .chain(self.0.dep_databases.iter().filter(|_| allow_dependencies));
+
+        for db in databases {
             if let Some(index) = db
                 .cpp_items()
                 .iter()
@@ -1148,7 +1152,7 @@ impl State<'_, '_> {
     }
 
     fn find_wrapper_type(&self, cpp_path: &CppPath) -> Result<&RustDatabaseItem> {
-        self.find_rust_items(cpp_path)?
+        self.find_rust_items(cpp_path, true)?
             .find(|item| item.item.is_wrapper_type())
             .ok_or_else(|| {
                 format_err!("no Rust type wrapper for {}", cpp_path.to_cpp_pseudo_code())
@@ -1180,7 +1184,7 @@ impl State<'_, '_> {
         };
 
         let rust_item = self
-            .find_rust_items(parent_path)?
+            .find_rust_items(parent_path, false)?
             .find(|item| {
                 (allow_wrapper_type && item.item.is_wrapper_type())
                     || (item.item.is_module() && !item.item.is_module_for_nested())
@@ -1200,18 +1204,8 @@ impl State<'_, '_> {
             )
         })?;
 
-        let mut rust_path = rust_path.clone();
-        let path_crate_name = rust_path
-            .crate_name()
-            .expect("rust item path must have crate name");
-        let current_crate_name = self.0.config.crate_properties().name();
-
-        if path_crate_name != current_crate_name {
-            rust_path.parts[0] = current_crate_name.to_string();
-        }
-
         Ok(RustPathScope {
-            path: rust_path,
+            path: rust_path.clone(),
             prefix: None,
         })
     }
@@ -1307,7 +1301,7 @@ impl State<'_, '_> {
                 return Ok(path);
             }
         }
-        let strategy = match name_type {
+        let scope = match name_type {
             NameType::FfiFunction => {
                 let ffi_module = self
                     .0
@@ -1380,21 +1374,21 @@ impl State<'_, '_> {
             NameType::SizedItem => cpp_path
                 .items()
                 .iter()
-                .map_if_ok(|item| self.cpp_path_item_to_name(item, &strategy.path))?
+                .map_if_ok(|item| self.cpp_path_item_to_name(item, &scope.path))?
                 .join("_"),
             NameType::ApiFunction(function) => {
                 let s = if let Some(last_name_override) =
-                    self.special_function_rust_name(function, &strategy.path)?
+                    self.special_function_rust_name(function, &scope.path)?
                 {
                     last_name_override.clone()
                 } else {
-                    self.cpp_path_item_to_name(cpp_path.last(), &strategy.path)?
+                    self.cpp_path_item_to_name(cpp_path.last(), &scope.path)?
                 };
                 s.to_snake_case()
             }
             NameType::ReceiverFunction { receiver_type } => {
                 let name = self
-                    .cpp_path_item_to_name(cpp_path.last(), &strategy.path)?
+                    .cpp_path_item_to_name(cpp_path.last(), &scope.path)?
                     .to_snake_case();
                 match receiver_type {
                     RustQtReceiverType::Signal => name,
@@ -1402,10 +1396,10 @@ impl State<'_, '_> {
                 }
             }
             NameType::Type | NameType::EnumValue => self
-                .cpp_path_item_to_name(&cpp_path.last(), &strategy.path)?
+                .cpp_path_item_to_name(&cpp_path.last(), &scope.path)?
                 .to_class_case(),
             NameType::Module => self
-                .cpp_path_item_to_name(&cpp_path.last(), &strategy.path)?
+                .cpp_path_item_to_name(&cpp_path.last(), &scope.path)?
                 .to_snake_case(),
             NameType::FfiFunction => cpp_path.last().name.clone(),
             NameType::QtSlotWrapper {
@@ -1416,14 +1410,14 @@ impl State<'_, '_> {
                 if signal_arguments.is_empty() {
                     name.to_string()
                 } else {
-                    let captions = self.type_list_caption(signal_arguments, &strategy.path)?;
+                    let captions = self.type_list_caption(signal_arguments, &scope.path)?;
                     format!("{}_Of_{}", name, captions).to_class_case()
                 }
             }
         };
 
         if name_type == NameType::FfiFunction {
-            let rust_path = strategy.apply(&full_last_name);
+            let rust_path = scope.apply(&full_last_name);
             if self
                 .0
                 .current_database
@@ -1438,7 +1432,7 @@ impl State<'_, '_> {
 
         let sanitized_name =
             sanitize_rust_identifier(&full_last_name, name_type == NameType::Module);
-        let rust_path = strategy.apply(&sanitized_name);
+        let rust_path = scope.apply(&sanitized_name);
 
         if name_type.is_api_function() {
             Ok(rust_path)
