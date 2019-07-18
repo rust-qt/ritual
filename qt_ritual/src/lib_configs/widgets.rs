@@ -5,7 +5,12 @@ use ritual_common::errors::Result;
 pub fn widgets_config(config: &mut Config) -> Result<()> {
     config.set_cpp_parser_path_hook(|path| {
         let string = path.to_templateless_string();
-        let blocked = &["QWidgetData", "QWidgetItemV2"];
+        let blocked = &[
+            //internal
+            "QWidgetData",
+            "QWidgetItemV2",
+            "QWidgetItemData",
+        ];
         if blocked.contains(&string.as_str()) {
             return Ok(false);
         }
