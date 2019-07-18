@@ -62,11 +62,8 @@ impl RustPath {
         if self.parts.is_empty() {
             panic!("RustPath can't be empty");
         }
-        if self.parts.len() > 1 {
-            Some(self.parts[0].as_str())
-        } else {
-            None
-        }
+        // TODO: forbid built-in types in RustPath
+        Some(self.parts[0].as_str())
     }
 
     /// Returns last component of the name.

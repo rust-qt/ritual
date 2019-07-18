@@ -6,7 +6,7 @@ use crate::cpp_function::CppFunctionExternalDoc;
 use crate::cpp_type::CppType;
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_type::{RustFinalType, RustPath, RustPointerLikeTypeKind, RustType};
-use ritual_common::errors::{bail, Result};
+use ritual_common::errors::{bail, format_err, Result};
 use ritual_common::string_utils::ends_with_digit;
 use serde_derive::{Deserialize, Serialize};
 
@@ -560,6 +560,14 @@ impl RustItem {
         }
     }
 
+    pub fn is_crate_root(&self) -> bool {
+        if let RustItem::Module(module) = self {
+            module.kind == RustModuleKind::CrateRoot
+        } else {
+            false
+        }
+    }
+
     pub fn short_text(&self) -> String {
         match self {
             RustItem::Module(data) => format!("mod {}", data.path.full_name(None)),
@@ -599,17 +607,20 @@ impl RustDatabaseItem {
             RustItem::TraitImpl(_) | RustItem::ExtraImpl(_) => None,
         }
     }
-    pub fn is_child_of(&self, parent: &RustPath) -> bool {
+
+    pub fn parent_path(&self) -> Result<RustPath> {
         match &self.item {
-            RustItem::TraitImpl(trait_impl) => &trait_impl.parent_path == parent,
-            RustItem::ExtraImpl(data) => &data.parent_path == parent,
-            _ => {
-                let path = self
-                    .path()
-                    .expect("item must have path because it's not a trait impl");
-                path.is_child_of(parent)
-            }
+            RustItem::TraitImpl(trait_impl) => Ok(trait_impl.parent_path.clone()),
+            RustItem::ExtraImpl(data) => Ok(data.parent_path.clone()),
+            _ => self
+                .path()
+                .expect("item must have path because it's not a trait impl")
+                .parent(),
         }
+    }
+
+    pub fn is_child_of(&self, parent: &RustPath) -> bool {
+        self.parent_path().ok().as_ref() == Some(parent)
     }
 
     pub fn as_module_ref(&self) -> Option<&RustModule> {
@@ -621,12 +632,20 @@ impl RustDatabaseItem {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustDatabase {
+    crate_name: String,
     items: Vec<RustDatabaseItem>,
 }
 
 impl RustDatabase {
+    pub fn new(crate_name: String) -> Self {
+        Self {
+            crate_name,
+            items: Vec::new(),
+        }
+    }
+
     pub fn find(&self, path: &RustPath) -> Option<&RustDatabaseItem> {
         self.items.iter().find(|item| item.path() == Some(path))
     }
@@ -642,8 +661,35 @@ impl RustDatabase {
         &self.items
     }
 
-    pub fn add_item(&mut self, item: RustDatabaseItem) {
+    pub fn add_item(&mut self, item: RustDatabaseItem) -> Result<()> {
+        if item.item.is_crate_root() {
+            let item_path = item.path().expect("crate root must have path");
+            let crate_name = item_path
+                .crate_name()
+                .expect("rust item path must have crate name");
+            if crate_name != self.crate_name {
+                bail!("can't add rust item with different crate name: {:?}", item);
+            }
+        } else {
+            let mut path = item
+                .parent_path()
+                .map_err(|_| format_err!("path has no parent for rust item: {:?}", item))?;
+            let crate_name = path
+                .crate_name()
+                .expect("rust item path must have crate name");
+            if crate_name != self.crate_name {
+                bail!("can't add rust item with different crate name: {:?}", item);
+            }
+            while path.parts.len() > 1 {
+                if self.find(&path).is_none() {
+                    bail!("unreachable path {:?} for rust item: {:?}", path, item);
+                }
+                path.parts.pop();
+            }
+        }
+
         self.items.push(item);
+        Ok(())
     }
 
     pub fn clear(&mut self) {

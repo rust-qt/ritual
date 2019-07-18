@@ -106,12 +106,13 @@ pub struct Database {
 
 impl Database {
     pub fn empty(crate_name: impl Into<String>) -> Self {
+        let crate_name = crate_name.into();
         Database {
-            crate_name: crate_name.into(),
+            crate_name: crate_name.clone(),
             crate_version: "0.0.0".into(),
             cpp_items: Vec::new(),
             ffi_items: Vec::new(),
-            rust_database: RustDatabase::default(),
+            rust_database: RustDatabase::new(crate_name),
             environments: Vec::new(),
             is_modified: true,
         }
@@ -230,9 +231,9 @@ impl Database {
         self.rust_database.items()
     }
 
-    pub fn add_rust_item(&mut self, item: RustDatabaseItem) {
+    pub fn add_rust_item(&mut self, item: RustDatabaseItem) -> Result<()> {
         self.is_modified = true;
-        self.rust_database.add_item(item);
+        self.rust_database.add_item(item)
     }
 
     pub fn clear_rust_info(&mut self) {

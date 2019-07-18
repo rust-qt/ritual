@@ -1805,7 +1805,7 @@ impl State<'_, '_> {
             cpp_item_index: None,
             ffi_item_index: None,
         };
-        self.0.current_database.add_rust_item(rust_item);
+        self.0.current_database.add_rust_item(rust_item)?;
         Ok(())
     }
 
@@ -1858,7 +1858,7 @@ impl State<'_, '_> {
             cpp_item_index: None,
             ffi_item_index: None,
         };
-        self.0.current_database.add_rust_item(rust_item);
+        self.0.current_database.add_rust_item(rust_item)?;
         Ok(())
     }
 
@@ -1884,7 +1884,7 @@ impl State<'_, '_> {
                             cpp_item_text
                         );
                         trace!("rust item data: {:?}", item);
-                        self.0.current_database.add_rust_item(item);
+                        self.0.current_database.add_rust_item(item)?;
                     }
                     self.0.current_database.cpp_items_mut()[cpp_item_index].is_rust_processed =
                         true;
@@ -1952,7 +1952,7 @@ impl State<'_, '_> {
                                     ffi_item_text
                                 );
                                 trace!("rust item data: {:?}", item);
-                                self.0.current_database.add_rust_item(item);
+                                self.0.current_database.add_rust_item(item)?;
                             }
                             ProcessedFfiItem::Function(function) => {
                                 let entry = grouped_functions
@@ -2052,7 +2052,7 @@ impl State<'_, '_> {
                 };
                 debug!("added rust item: {}", item.item.short_text(),);
                 trace!("rust item data: {:?}", item);
-                self.0.current_database.add_rust_item(item);
+                self.0.current_database.add_rust_item(item)?;
             }
         }
         Ok(())
