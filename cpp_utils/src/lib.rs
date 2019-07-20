@@ -1,5 +1,7 @@
 //! Various C++-related types and functions needed for the `ritual` project.
 //!
+//! See [README](https://github.com/rust-qt/ritual) of the repository root for more information.
+//!
 //! Pointer wrapper types:
 //!
 //! - `CppBox`: owned, non-null

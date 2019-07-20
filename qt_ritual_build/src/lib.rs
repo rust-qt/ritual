@@ -1,7 +1,9 @@
 //! Implementation of build script for all Qt crates
 //!
-//! See [README](https://github.com/rust-qt/cpp_to_rust)
-//! for more information.
+//! See [README](https://github.com/rust-qt/ritual) of the repository root for more information.
+//!
+//! The build script uses `qmake` available in `PATH` to determine paths to the Qt installation and passes them to
+//! [cpp_to_rust_build_tools](https://github.com/rust-qt/cpp_to_rust/tree/master/cpp_to_rust/cpp_to_rust_build_tools).
 
 use itertools::Itertools;
 use qt_ritual_common::get_full_build_config;

@@ -1,8 +1,6 @@
 //! Common utilities for the generator and the build script for Qt crates.
 //!
-//!
-//! See [README](https://github.com/rust-qt/cpp_to_rust)
-//! for more information.
+//! See [README](https://github.com/rust-qt/ritual) of the repository root for more information.
 
 use log::debug;
 use ritual_common::cpp_build_config::{

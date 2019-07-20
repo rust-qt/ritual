@@ -5,8 +5,7 @@
 //! use the same call to execute all operations normally
 //! or use `Config` type to change the build script's settings.
 //!
-//! See [README](https://github.com/rust-qt/cpp_to_rust)
-//! for more information.
+//! See [README](https://github.com/rust-qt/ritual) of the repository root for more information.
 
 use log::info;
 pub use ritual_common as common;
