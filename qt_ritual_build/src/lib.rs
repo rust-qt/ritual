@@ -64,7 +64,7 @@ pub fn run_and_return(crate_name: &str) -> Result<()> {
         ) {
             Ok(Some(version)) => {
                 println!(
-                    "cargo:warning=Current Qt version ({}) is unknown to {} crate. \
+                    "Current Qt version ({}) is unknown to {} crate. \
                      Using closest known version ({})",
                     qt_config.installation_data.qt_version, crate_name, version
                 );

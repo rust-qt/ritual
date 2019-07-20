@@ -107,13 +107,10 @@ impl Config {
             .contains(&current_target);
 
         if !is_known_target {
-            println!(
-                "cargo:warning=Current target is unknown: {}",
-                current_target.short_text()
-            );
-            println!("cargo:warning=Known targets:");
+            println!("Current target is unknown: {}", current_target.short_text());
+            println!("Known targets:");
             for target in &self.build_script_data.known_targets {
-                println!("cargo:warning=* {}", target.short_text());
+                println!("* {}", target.short_text());
             }
             // TODO: if the current version or target is unknown,
             //       emit a warning and set the closest known version instead
