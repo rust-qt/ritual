@@ -1,6 +1,6 @@
 # ritual
 
-[![Build Status](https://travis-ci.com/rust-qt/ritual.svg?branch=develop)](https://travis-ci.com/rust-qt/ritual/branches)
+[![Build Status](https://travis-ci.com/rust-qt/ritual.svg?branch=master)](https://travis-ci.com/rust-qt/ritual/branches)
 
 `ritual` allows to use C++ libraries from Rust. This project provides Rust bindings to Qt.
 
