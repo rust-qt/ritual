@@ -84,8 +84,8 @@ impl DocData {
                 docs_path.display()
             );
         }
-        let doc_file_name = if qt_crate_name.starts_with("3d_") {
-            "3d".to_string()
+        let doc_file_name = if qt_crate_name.starts_with("qt_3d_") {
+            "qt3d".to_string()
         } else {
             qt_crate_name.replace("_", "")
         };
