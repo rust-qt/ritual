@@ -2,7 +2,7 @@ use qt_gui::{qt_core::QPoint, QGuiApplication, QWindow};
 
 #[test]
 fn window1() {
-    QGuiApplication::create_and_exit(|_| unsafe {
+    QGuiApplication::init(|_| unsafe {
         let mut a = QWindow::new();
         let mut b = QWindow::new_from_parent(a.as_mut_ptr());
         let mut c = QWindow::new_from_parent(b.as_mut_ptr());

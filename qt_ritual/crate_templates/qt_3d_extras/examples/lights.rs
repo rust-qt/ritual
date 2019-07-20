@@ -174,7 +174,7 @@ fn main() {
         format.set_stencil_buffer_size(8);
         QSurfaceFormat::set_default_format(format.as_ref());
 
-        QGuiApplication::create_and_exit(|_| {
+        QGuiApplication::init(|_| {
             let mut window = Qt3DWindow::new_0a();
 
             let mut root = QEntity::new_0a();

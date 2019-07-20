@@ -1,20 +1,9 @@
 use crate::QGuiApplication;
-use cpp_utils::CppBox;
+use cpp_utils::{Ptr, Ref};
 use qt_core::QCoreApplicationArgs;
 use std::process;
 
 impl QGuiApplication {
-    pub fn new() -> CppBox<Self> {
-        let mut args = QCoreApplicationArgs::from_real();
-        let (argc, argv) = args.get();
-        unsafe {
-            QGuiApplication::new_2a(
-                ::cpp_utils::Ref::from_raw(argc).unwrap(),
-                ::cpp_utils::Ptr::from_raw(argv),
-            )
-        }
-    }
-
     /// A convenience function for performing proper initialization and de-initialization of
     /// a Qt application.
     ///
@@ -26,7 +15,7 @@ impl QGuiApplication {
     /// use qt_gui::QGuiApplication;
     ///
     /// fn main() {
-    ///     QGuiApplication::create_and_exit(|app| {
+    ///     QGuiApplication::init(|app| {
     ///         unsafe {
     ///             // initialization goes here
     ///             QGuiApplication::exec()
@@ -34,10 +23,13 @@ impl QGuiApplication {
     ///     })
     /// }
     /// ```
-    pub fn create_and_exit<F: FnOnce(::cpp_utils::Ptr<QGuiApplication>) -> i32>(f: F) -> ! {
+    pub fn init<F: FnOnce(::cpp_utils::Ptr<QGuiApplication>) -> i32>(f: F) -> ! {
         let exit_code = {
             unsafe {
-                let mut app = QGuiApplication::new();
+                let mut args = QCoreApplicationArgs::from_real();
+                let (argc, argv) = args.get();
+                let mut app =
+                    QGuiApplication::new_2a(Ref::from_raw(argc).unwrap(), Ptr::from_raw(argv));
                 f(app.as_mut_ptr())
             }
         }; // drop `app` and `args`

@@ -62,7 +62,7 @@ impl<'a> Form<'a> {
 }
 
 fn main() {
-    QApplication::create_and_exit(|_| unsafe {
+    QApplication::init(|_| unsafe {
         let _form = Form::new();
         QApplication::exec()
     })

@@ -3,9 +3,9 @@ use moqt_core::{QCoreApplication, QString, SlotOfQString};
 
 #[test]
 fn q_core_application() {
-    unsafe {
-        let obj1 = QCoreApplication::new();
+    QCoreApplication::init(|app| unsafe {
         let slot = SlotOfQString::new(|_name: ConstRef<QString>| ());
-        obj1.app_name_changed().connect(&slot);
-    }
+        app.app_name_changed().connect(&slot);
+        0
+    });
 }

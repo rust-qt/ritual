@@ -12,7 +12,7 @@ Qt requires an application object to be constructed at the beginning of the appl
 (Some classes may be used without it,
 The application object needs `argc` and `argv` available in `main` function in C++.
 It's a bit tricky to do it in Rust, where `argc` and `argv` are not available.
-`CoreApplication::create_and_exit` is a convenience function that performs proper
+`CoreApplication::init` is a convenience function that performs proper
 creation of the application object and terminates the process with the appropriate return code
 when the application exists:
 
@@ -21,7 +21,7 @@ extern crate qt_core;
 use qt_core::core_application::CoreApplication;
 
 fn main() {
-  CoreApplication::create_and_exit(|app| {
+  CoreApplication::init(|app| {
     // initialization goes here
     CoreApplication::exec()
   })
@@ -44,7 +44,7 @@ use qt_core::connection::Signal;
 use qt_core::slots::SlotVariantRef;
 
 fn main() {
-  CoreApplication::create_and_exit(|app| {
+  CoreApplication::init(|app| {
     let slot1 = SlotVariantRef::new(|value| {
       println!("value_changed: {}",
                value.to_string().to_std_string());

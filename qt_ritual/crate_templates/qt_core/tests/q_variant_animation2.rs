@@ -2,7 +2,7 @@ use qt_core::{QCoreApplication, QVariant, QVariantAnimation, SlotOfQVariant};
 
 #[test]
 fn variant_animation2() {
-    QCoreApplication::create_and_exit(|app| unsafe {
+    QCoreApplication::init(|app| unsafe {
         let slot1 = SlotOfQVariant::new(|value| {
             println!("value_changed: {}", value.to_string().to_std_string());
         });

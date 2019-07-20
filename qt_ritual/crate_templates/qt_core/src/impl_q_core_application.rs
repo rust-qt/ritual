@@ -1,5 +1,5 @@
 use crate::QCoreApplication;
-use cpp_utils::CppBox;
+use cpp_utils::{Ptr, Ref};
 use std::os::raw::{c_char, c_int};
 use std::process;
 
@@ -14,7 +14,7 @@ use std::process;
 /// `argc` and `argv`, and can be used to initialize Qt application objects.
 /// `CoreApplicationArgs` must live longer than the application object.
 ///
-/// `CoreApplication::create_and_exit` convenience function
+/// `CoreApplication::init` convenience function
 /// and similar functions in the other application types
 /// can be used instead of `CoreApplicationArgs`.
 pub struct QCoreApplicationArgs {
@@ -44,9 +44,7 @@ impl QCoreApplicationArgs {
     /// Returns `(argc, argv)` values in the form accepted by the application objects'
     /// constructors.
     pub fn get(&mut self) -> (*mut c_int, *mut *mut c_char) {
-        let argc = self.argc.as_mut();
-        let argv = self.argv.as_mut_ptr();
-        (argc, argv)
+        (self.argc.as_mut(), self.argv.as_mut_ptr())
     }
 
     #[cfg(unix)]
@@ -71,17 +69,6 @@ impl QCoreApplicationArgs {
 }
 
 impl QCoreApplication {
-    pub fn new() -> CppBox<Self> {
-        let mut args = QCoreApplicationArgs::from_real();
-        let (argc, argv) = args.get();
-        unsafe {
-            QCoreApplication::new_2a(
-                ::cpp_utils::Ref::from_raw(argc).unwrap(),
-                ::cpp_utils::Ptr::from_raw(argv),
-            )
-        }
-    }
-
     /// A convenience function for performing proper initialization and de-initialization of
     /// a Qt application.
     ///
@@ -93,7 +80,7 @@ impl QCoreApplication {
     /// use qt_core::QCoreApplication;
     ///
     /// fn main() {
-    ///     QCoreApplication::create_and_exit(|app| {
+    ///     QCoreApplication::init(|app| {
     ///         unsafe {
     ///             // initialization goes here
     ///             QCoreApplication::exec()
@@ -101,10 +88,13 @@ impl QCoreApplication {
     ///     })
     /// }
     /// ```
-    pub fn create_and_exit<F: FnOnce(::cpp_utils::Ptr<QCoreApplication>) -> i32>(f: F) -> ! {
+    pub fn init<F: FnOnce(::cpp_utils::Ptr<QCoreApplication>) -> i32>(f: F) -> ! {
         let exit_code = {
             unsafe {
-                let mut app = QCoreApplication::new();
+                let mut args = QCoreApplicationArgs::from_real();
+                let (argc, argv) = args.get();
+                let mut app =
+                    QCoreApplication::new_2a(Ref::from_raw(argc).unwrap(), Ptr::from_raw(argv));
                 f(app.as_mut_ptr())
             }
         }; // drop `app` and `args`
