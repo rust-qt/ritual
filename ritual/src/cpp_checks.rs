@@ -31,6 +31,13 @@ impl CppChecks {
         environments.iter().all(|env| self.has_env(env))
     }
 
+    pub fn successful_envs(&self) -> impl Iterator<Item = &LibraryTarget> {
+        self.0
+            .iter()
+            .filter(|item| item.is_success)
+            .map(|item| &item.env)
+    }
+
     pub fn add(&mut self, env: LibraryTarget, is_success: bool) {
         self.0.retain(|item| item.env != env);
         self.0.push(CppChecksItem { env, is_success });

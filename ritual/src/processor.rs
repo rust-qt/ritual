@@ -6,12 +6,14 @@ use crate::{
     cpp_checker, cpp_ffi_generator, cpp_implicit_methods, cpp_omitting_arguments, cpp_parser,
     cpp_template_instantiator, crate_writer, rust_generator,
 };
+use itertools::Itertools;
 use log::{error, info, trace};
 use regex::Regex;
 use ritual_common::env_var_names;
 use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use ritual_common::utils::{run_command, MapIfOk};
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::fmt;
 use std::iter::once;
 use std::ops::Bound;
@@ -154,6 +156,7 @@ impl Default for ProcessingSteps {
             data.current_database.clear_rust_info();
             Ok(())
         });
+        s.add_custom("show_non_portable", show_non_portable);
 
         //        s.add_custom(
         //            "suggest_allocation_places",
@@ -236,6 +239,28 @@ fn build_crate(data: &mut ProcessorData<'_>) -> Result<()> {
         //     command.arg("-vv");
         // }
         run_command(&mut command)?;
+    }
+    Ok(())
+}
+
+fn show_non_portable(data: &mut ProcessorData<'_>) -> Result<()> {
+    let all_envs = data.current_database.environments();
+    let mut results = HashMap::<_, Vec<_>>::new();
+    for item in data.current_database.ffi_items() {
+        if item.checks.any_success() && !item.checks.all_success(all_envs) {
+            let envs = item.checks.successful_envs().collect_vec();
+            let text = item.item.short_text();
+            results.entry(envs).or_default().push(text);
+        }
+    }
+    for (envs, texts) in results {
+        info!(
+            "envs: {}",
+            envs.iter().map(|env| format!("{:?}", env)).join(", ")
+        );
+        for text in texts {
+            info!("    {}", text);
+        }
     }
     Ok(())
 }
