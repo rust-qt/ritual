@@ -1,4 +1,4 @@
-use crate::{MutPtr, MutRef, Ptr, Ref};
+use crate::{DynamicCast, MutPtr, MutRef, Ptr, Ref, StaticDowncast, StaticUpcast};
 use std::ops::{Deref, DerefMut};
 use std::{fmt, mem, ptr};
 
@@ -74,6 +74,56 @@ impl<T: CppDeletable> CppBox<T> {
     pub unsafe fn as_mut_ref(&mut self) -> MutRef<T> {
         MutRef::from_raw_non_null(self.0)
     }
+
+    pub unsafe fn static_upcast<U>(&self) -> Ref<U>
+    where
+        T: StaticUpcast<U>,
+    {
+        StaticUpcast::static_upcast(self.as_ptr())
+            .as_ref()
+            .expect("StaticUpcast returned null on CppBox input")
+    }
+
+    pub unsafe fn static_downcast<U>(&self) -> Ref<U>
+    where
+        T: StaticDowncast<U>,
+    {
+        StaticDowncast::static_downcast(self.as_ptr())
+            .as_ref()
+            .expect("StaticDowncast returned null on CppBox input")
+    }
+
+    pub unsafe fn dynamic_cast<U>(&self) -> Option<Ref<U>>
+    where
+        T: DynamicCast<U>,
+    {
+        DynamicCast::dynamic_cast(self.as_ptr()).as_ref()
+    }
+
+    pub unsafe fn static_upcast_mut<U>(&mut self) -> MutRef<U>
+    where
+        T: StaticUpcast<U>,
+    {
+        StaticUpcast::static_upcast_mut(self.as_mut_ptr())
+            .as_mut_ref()
+            .expect("StaticUpcast returned null on CppBox input")
+    }
+
+    pub unsafe fn static_downcast_mut<U>(&mut self) -> MutRef<U>
+    where
+        T: StaticDowncast<U>,
+    {
+        StaticDowncast::static_downcast_mut(self.as_mut_ptr())
+            .as_mut_ref()
+            .expect("StaticDowncast returned null on CppBox input")
+    }
+
+    pub unsafe fn dynamic_cast_mut<U>(&mut self) -> Option<MutRef<U>>
+    where
+        T: DynamicCast<U>,
+    {
+        DynamicCast::dynamic_cast_mut(self.as_mut_ptr()).as_mut_ref()
+    }
 }
 
 impl<T: CppDeletable> CppBox<T> {
@@ -92,7 +142,7 @@ impl<T: CppDeletable> CppBox<T> {
     /// Use `CppBox::into_ptr` to unwrap the pointer before passing it to
     /// a function that takes ownership of the object.
     pub unsafe fn new(ptr: MutPtr<T>) -> Option<Self> {
-        Self::from_raw(ptr.as_raw_ptr())
+        Self::from_raw(ptr.as_mut_raw_ptr())
     }
 
     pub unsafe fn from_raw(ptr: *mut T) -> Option<Self> {

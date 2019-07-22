@@ -1,4 +1,4 @@
-use crate::{CppBox, CppDeletable, MutRef, Ref};
+use crate::{CppBox, CppDeletable, DynamicCast, MutRef, Ref, StaticDowncast, StaticUpcast};
 use std::ffi::CStr;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
@@ -30,8 +30,11 @@ impl<T> MutPtr<T> {
         MutPtr(std::ptr::null_mut())
     }
 
-    /// Returns mutable raw pointer to the value in the box.
-    pub fn as_raw_ptr(self) -> *mut T {
+    pub fn as_raw_ptr(self) -> *const T {
+        self.0
+    }
+
+    pub fn as_mut_raw_ptr(self) -> *mut T {
         self.0
     }
 
@@ -50,6 +53,48 @@ impl<T> MutPtr<T> {
     /// Returns true if the pointer is null.
     pub fn is_null(self) -> bool {
         self.0.is_null()
+    }
+
+    pub unsafe fn static_upcast<U>(self) -> Ptr<U>
+    where
+        T: StaticUpcast<U>,
+    {
+        StaticUpcast::static_upcast(self.as_ptr())
+    }
+
+    pub unsafe fn static_downcast<U>(self) -> Ptr<U>
+    where
+        T: StaticDowncast<U>,
+    {
+        StaticDowncast::static_downcast(self.as_ptr())
+    }
+
+    pub unsafe fn dynamic_cast<U>(self) -> Ptr<U>
+    where
+        T: DynamicCast<U>,
+    {
+        DynamicCast::dynamic_cast(self.as_ptr())
+    }
+
+    pub unsafe fn static_upcast_mut<U>(self) -> MutPtr<U>
+    where
+        T: StaticUpcast<U>,
+    {
+        StaticUpcast::static_upcast_mut(self)
+    }
+
+    pub unsafe fn static_downcast_mut<U>(self) -> MutPtr<U>
+    where
+        T: StaticDowncast<U>,
+    {
+        StaticDowncast::static_downcast_mut(self)
+    }
+
+    pub unsafe fn dynamic_cast_mut<U>(self) -> MutPtr<U>
+    where
+        T: DynamicCast<U>,
+    {
+        DynamicCast::dynamic_cast_mut(self)
     }
 }
 
@@ -122,6 +167,27 @@ impl<T> Ptr<T> {
     /// Returns true if the pointer is null.
     pub fn is_null(self) -> bool {
         self.0.is_null()
+    }
+
+    pub unsafe fn static_upcast<U>(self) -> Ptr<U>
+    where
+        T: StaticUpcast<U>,
+    {
+        StaticUpcast::static_upcast(self)
+    }
+
+    pub unsafe fn static_downcast<U>(self) -> Ptr<U>
+    where
+        T: StaticDowncast<U>,
+    {
+        StaticDowncast::static_downcast(self)
+    }
+
+    pub unsafe fn dynamic_cast<U>(self) -> Ptr<U>
+    where
+        T: DynamicCast<U>,
+    {
+        DynamicCast::dynamic_cast(self)
     }
 }
 

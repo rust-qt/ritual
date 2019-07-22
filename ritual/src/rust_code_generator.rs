@@ -670,7 +670,23 @@ impl Generator<'_> {
             }
             RustToFfiTypeConversion::CppBoxToPtr => format!("{}.into_raw_ptr()", expr),
             RustToFfiTypeConversion::UtilsPtrToPtr { .. }
-            | RustToFfiTypeConversion::UtilsRefToPtr { .. } => format!("{}.as_raw_ptr()", expr),
+            | RustToFfiTypeConversion::UtilsRefToPtr { .. } => {
+                let api_type_path = &type1.api_type().as_common()?.path;
+                let api_is_const = api_type_path == &RustPath::from_good_str("cpp_utils::Ptr")
+                    || api_type_path == &RustPath::from_good_str("cpp_utils::Ref");
+                let ffi_is_const = type1.ffi_type().is_const_pointer_like()?;
+                let call = if !api_is_const && !ffi_is_const {
+                    format!("{}.as_mut_raw_ptr()", expr)
+                } else {
+                    format!("{}.as_raw_ptr()", expr)
+                };
+
+                if api_is_const != ffi_is_const {
+                    format!("{} as {}", call, self.rust_type_to_code(type1.ffi_type()))
+                } else {
+                    call
+                }
+            }
             RustToFfiTypeConversion::OptionUtilsRefToPtr { .. } => {
                 bail!("OptionUtilsRefToPtr is not supported in argument position");
             }

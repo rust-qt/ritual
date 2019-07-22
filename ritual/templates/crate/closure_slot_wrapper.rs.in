@@ -43,8 +43,8 @@ impl<'a> {pub_type_name}<'a> {{
         }}
     }}
 
-    pub unsafe fn as_raw(&mut self) -> ::cpp_utils::MutPtr<{type_name}> {{
-        self.raw_slot.as_mut_ptr()
+    pub unsafe fn as_raw(&mut self) -> ::cpp_utils::MutRef<{type_name}> {{
+        self.raw_slot.as_mut_ref()
     }}
 }}
 

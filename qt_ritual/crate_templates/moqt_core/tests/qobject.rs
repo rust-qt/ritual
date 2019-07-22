@@ -1,4 +1,4 @@
-use cpp_utils::{MutPtr, MutRef, StaticUpcast};
+use cpp_utils::{MutPtr, MutRef};
 use moqt_core::{QObject, RawSlotOfInt, SlotOfInt};
 use std::cell::RefCell;
 use std::os::raw::{c_int, c_void};

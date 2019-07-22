@@ -1,4 +1,4 @@
-use crate::{MutPtr, Ptr};
+use crate::{DynamicCast, MutPtr, Ptr, StaticDowncast, StaticUpcast};
 use std::ops::{Deref, DerefMut};
 use std::{fmt, ptr};
 
@@ -21,7 +21,7 @@ impl<T> fmt::Debug for MutRef<T> {
 
 impl<T> MutRef<T> {
     pub unsafe fn new(ptr: MutPtr<T>) -> Option<Self> {
-        Self::from_raw(ptr.as_raw_ptr())
+        Self::from_raw(ptr.as_mut_raw_ptr())
     }
 
     pub unsafe fn from_raw(ptr: *mut T) -> Option<Self> {
@@ -41,12 +41,66 @@ impl<T> MutRef<T> {
     }
 
     pub unsafe fn as_mut_ptr(self) -> MutPtr<T> {
-        MutPtr::from_raw(self.as_raw_ptr())
+        MutPtr::from_raw(self.as_mut_raw_ptr())
     }
 
     /// Returns constant raw pointer to the value in the box.
-    pub fn as_raw_ptr(self) -> *mut T {
+    pub fn as_raw_ptr(self) -> *const T {
         self.0.as_ptr()
+    }
+
+    pub fn as_mut_raw_ptr(self) -> *mut T {
+        self.0.as_ptr()
+    }
+
+    pub unsafe fn static_upcast<U>(self) -> Ref<U>
+    where
+        T: StaticUpcast<U>,
+    {
+        StaticUpcast::static_upcast(self.as_ptr())
+            .as_ref()
+            .expect("StaticUpcast returned null on Ref input")
+    }
+
+    pub unsafe fn static_downcast<U>(self) -> Ref<U>
+    where
+        T: StaticDowncast<U>,
+    {
+        StaticDowncast::static_downcast(self.as_ptr())
+            .as_ref()
+            .expect("StaticDowncast returned null on Ref input")
+    }
+
+    pub unsafe fn dynamic_cast<U>(self) -> Option<Ref<U>>
+    where
+        T: DynamicCast<U>,
+    {
+        DynamicCast::dynamic_cast(self.as_ptr()).as_ref()
+    }
+
+    pub unsafe fn static_upcast_mut<U>(self) -> MutRef<U>
+    where
+        T: StaticUpcast<U>,
+    {
+        StaticUpcast::static_upcast_mut(self.as_mut_ptr())
+            .as_mut_ref()
+            .expect("StaticUpcast returned null on Ref input")
+    }
+
+    pub unsafe fn static_downcast_mut<U>(self) -> MutRef<U>
+    where
+        T: StaticDowncast<U>,
+    {
+        StaticDowncast::static_downcast_mut(self.as_mut_ptr())
+            .as_mut_ref()
+            .expect("StaticDowncast returned null on Ref input")
+    }
+
+    pub unsafe fn dynamic_cast_mut<U>(self) -> Option<MutRef<U>>
+    where
+        T: DynamicCast<U>,
+    {
+        DynamicCast::dynamic_cast_mut(self.as_mut_ptr()).as_mut_ref()
     }
 }
 
@@ -104,6 +158,31 @@ impl<T> Ref<T> {
     /// Returns constant raw pointer to the value in the box.
     pub fn as_raw_ptr(self) -> *const T {
         self.0.as_ptr()
+    }
+
+    pub unsafe fn static_upcast<U>(self) -> Ref<U>
+    where
+        T: StaticUpcast<U>,
+    {
+        StaticUpcast::static_upcast(self.as_ptr())
+            .as_ref()
+            .expect("StaticUpcast returned null on Ref input")
+    }
+
+    pub unsafe fn static_downcast<U>(self) -> Ref<U>
+    where
+        T: StaticDowncast<U>,
+    {
+        StaticDowncast::static_downcast(self.as_ptr())
+            .as_ref()
+            .expect("StaticDowncast returned null on Ref input")
+    }
+
+    pub unsafe fn dynamic_cast<U>(self) -> Option<Ref<U>>
+    where
+        T: DynamicCast<U>,
+    {
+        DynamicCast::dynamic_cast(self.as_ptr()).as_ref()
     }
 }
 

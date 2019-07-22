@@ -147,9 +147,9 @@ impl<SignalArguments> Signal<SignalArguments> {
         // TODO: meta_object::Connection should have operator bool()
 
         crate::QObject::connect_4a(
-            self.0.q_object.into(),
+            self.0.q_object.as_ptr(),
             Ptr::from_raw(self.0.receiver_id.as_ptr()),
-            receiver.q_object.into(),
+            receiver.q_object.as_ptr(),
             Ptr::from_raw(receiver.receiver_id.as_ptr()),
         )
     }

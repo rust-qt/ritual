@@ -1,4 +1,4 @@
-use cpp_utils::{CppBox, DynamicCast, MutRef, Ref, StaticDowncast, StaticUpcast};
+use cpp_utils::{CastInto, CppBox, MutRef, Ref};
 use moqt_core::{
     AbstractBaseClass1, BaseClass1, DerivedClass1, DerivedClass2, DerivedClass3, DerivedSubClass1,
 };
@@ -45,7 +45,9 @@ fn indirect_casts() {
     unsafe {
         let mut derived: CppBox<DerivedSubClass1> = DerivedSubClass1::new();
         let mut base: CppBox<BaseClass1> = BaseClass1::new();
-        //base.set_parent(derived.as_mut_ptr());
+        // TODO: `set_parent` should accept without `cast_into`
+        base.set_parent(derived.as_mut_ptr().cast_into());
+        base.set_parent((&mut derived).cast_into());
     }
 }
 

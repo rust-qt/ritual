@@ -16,7 +16,7 @@ fn basic_class() {
 
         assert!(v.int_pointer_field().is_null());
         let p = v.int_reference_field();
-        v.set_int_pointer_field(p.into());
+        v.set_int_pointer_field(p.as_mut_ptr());
         v.set_int_field(4);
         assert_eq!(*v.int_pointer_field(), 4);
 

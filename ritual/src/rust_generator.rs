@@ -584,21 +584,15 @@ impl State<'_, '_> {
 
     fn fix_cast_function(
         mut unnamed_function: UnnamedRustFunction,
-        cast: &CppCast,
+        _cast: &CppCast,
         is_const: bool,
     ) -> Result<UnnamedRustFunction> {
         let force_const = if is_const { Some(true) } else { None };
-        let return_type_conversion = match cast {
-            CppCast::Dynamic | CppCast::QObject => RustToFfiTypeConversion::OptionUtilsRefToPtr {
-                force_api_is_const: force_const,
-            },
-            CppCast::Static { .. } => RustToFfiTypeConversion::UtilsRefToPtr {
-                force_api_is_const: force_const,
-            },
-        };
         unnamed_function.return_type = RustFinalType::new(
             unnamed_function.return_type.ffi_type().clone(),
-            return_type_conversion,
+            RustToFfiTypeConversion::UtilsPtrToPtr {
+                force_api_is_const: force_const,
+            },
         )?;
 
         unnamed_function.arguments[0].argument_type = RustFinalType::new(
@@ -606,12 +600,11 @@ impl State<'_, '_> {
                 .argument_type
                 .ffi_type()
                 .clone(),
-            RustToFfiTypeConversion::RefToPtr {
+            RustToFfiTypeConversion::UtilsPtrToPtr {
                 force_api_is_const: force_const,
-                lifetime: None,
             },
         )?;
-        unnamed_function.arguments[0].name = "self".to_string();
+        //unnamed_function.arguments[0].name = "self".to_string();
         Ok(unnamed_function)
     }
 
@@ -875,7 +868,7 @@ impl State<'_, '_> {
         });
 
         if cast.is_first_static_cast() && !cast.is_unsafe_static_cast() {
-            let fix_return_type = |type1: &mut RustFinalType, is_const: bool| -> Result<()> {
+            let make_type_ref = |type1: &mut RustFinalType, is_const: bool| -> Result<()> {
                 *type1 = RustFinalType::new(
                     type1.ffi_type().clone(),
                     RustToFfiTypeConversion::RefToPtr {
@@ -889,7 +882,9 @@ impl State<'_, '_> {
             let deref_trait_path = RustPath::from_good_str("std::ops::Deref");
             let mut deref_function = fixed_function.with_path(deref_trait_path.join("deref"));
             deref_function.is_unsafe = false;
-            fix_return_type(&mut deref_function.return_type, true)?;
+            make_type_ref(&mut deref_function.return_type, true)?;
+            make_type_ref(&mut deref_function.arguments[0].argument_type, true)?;
+            deref_function.arguments[0].name = "self".into();
             results.push(RustTraitImpl {
                 target_type: target_type.clone(),
                 parent_path: parent_path.clone(),
@@ -908,7 +903,9 @@ impl State<'_, '_> {
             let mut deref_mut_function =
                 fixed_function_mut.with_path(deref_mut_trait_path.join("deref_mut"));
             deref_mut_function.is_unsafe = false;
-            fix_return_type(&mut deref_mut_function.return_type, false)?;
+            make_type_ref(&mut deref_mut_function.return_type, false)?;
+            make_type_ref(&mut deref_mut_function.arguments[0].argument_type, false)?;
+            deref_mut_function.arguments[0].name = "self".into();
             results.push(RustTraitImpl {
                 target_type,
                 parent_path,
