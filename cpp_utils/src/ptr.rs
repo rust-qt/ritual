@@ -35,6 +35,10 @@ impl<T> MutPtr<T> {
         self.0
     }
 
+    pub unsafe fn as_ptr(self) -> Ptr<T> {
+        Ptr::from_raw(self.0)
+    }
+
     pub unsafe fn as_ref(self) -> Option<Ref<T>> {
         Ref::from_raw(self.0)
     }
@@ -129,24 +133,6 @@ impl<T> Deref for Ptr<T> {
             panic!("attempted to deref a null Ptr<T>");
         }
         unsafe { &(*self.0) }
-    }
-}
-
-impl<T> From<MutPtr<T>> for Ptr<T> {
-    fn from(value: MutPtr<T>) -> Self {
-        Ptr(value.0)
-    }
-}
-
-impl<T> From<MutRef<T>> for MutPtr<T> {
-    fn from(value: MutRef<T>) -> Self {
-        MutPtr(value.as_raw_ptr())
-    }
-}
-
-impl<T> From<Ref<T>> for Ptr<T> {
-    fn from(value: Ref<T>) -> Self {
-        Ptr(value.as_raw_ptr())
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::{MutRef, Ref};
+use crate::{MutPtr, Ptr};
 
 /// Provides access to C++ `static_cast` conversion from derived class to base class.
 ///
@@ -19,23 +19,21 @@ use crate::{MutRef, Ref};
 /// so all calls of `static_cast` are wrapper in FFI functions.
 /// Still, `static_cast` is faster than casts with runtime checks on C++ side
 /// because runtime overhead of Rust wrapper functions is the same for all cast types.
-pub trait StaticUpcast<T> {
+pub trait StaticUpcast<T>: Sized {
     /// Convert type of a const reference.
-    unsafe fn static_upcast(&self) -> Ref<T>;
+    unsafe fn static_upcast(ptr: Ptr<Self>) -> Ptr<T>;
     /// Convert type of a mutable reference.
-    unsafe fn static_upcast_mut(&mut self) -> MutRef<T>;
+    unsafe fn static_upcast_mut(ptr: MutPtr<Self>) -> MutPtr<T>;
 }
 
-/// Converts type of a const pointer using `StaticCast` implementation of the type.
-/// If `ptr` is null, this function does nothing and returns null pointer.
-pub unsafe fn static_upcast<R, T: StaticUpcast<R>>(value: &T) -> Ref<R> {
-    value.static_upcast()
-}
+impl<T> StaticUpcast<T> for T {
+    unsafe fn static_upcast(ptr: Ptr<T>) -> Ptr<T> {
+        ptr
+    }
 
-/// Converts type of a mutable pointer using `StaticCast` implementation of the type.
-/// If `ptr` is null, this function does nothing and returns null pointer.
-pub unsafe fn static_upcast_mut<R, T: StaticUpcast<R>>(value: &mut T) -> MutRef<R> {
-    value.static_upcast_mut()
+    unsafe fn static_upcast_mut(ptr: MutPtr<T>) -> MutPtr<T> {
+        ptr
+    }
 }
 
 /// Provides access to C++ `static_cast` conversion from base class to derived class.
@@ -59,27 +57,11 @@ pub unsafe fn static_upcast_mut<R, T: StaticUpcast<R>>(value: &mut T) -> MutRef<
 /// so all calls of `static_cast` are wrapper in FFI functions.
 /// Still, `static_cast` is faster than casts with runtime checks on C++ side
 /// because runtime overhead of Rust wrapper functions is the same for all cast types.
-pub trait StaticDowncast<T> {
+pub trait StaticDowncast<T>: Sized {
     /// Convert type of a const reference.
-    unsafe fn static_downcast(&self) -> Ref<T>;
+    unsafe fn static_downcast(ptr: Ptr<Self>) -> Ptr<T>;
     /// Convert type of a mutable reference.
-    unsafe fn static_downcast_mut(&mut self) -> MutRef<T>;
-}
-
-/// Converts type of a const pointer using `UnsafeStaticCast` implementation of the type.
-/// `ptr` must be either a null pointer or a valid pointer to an instance of `R` class
-/// or a class derived from `R`.
-/// If `ptr` is null, this function does nothing and returns null pointer.
-pub unsafe fn static_downcast<R, T: StaticDowncast<R>>(value: &T) -> Ref<R> {
-    value.static_downcast()
-}
-
-/// Converts type of a mutable pointer using `UnsafeStaticCast` implementation of the type.
-/// `ptr` must be either a null pointer or a valid pointer to an instance of `R` class
-/// or a class derived from `R`.
-/// If `ptr` is null, this function does nothing and returns null pointer.
-pub unsafe fn static_downcast_mut<R, T: StaticDowncast<R>>(value: &mut T) -> MutRef<R> {
-    value.static_downcast_mut()
+    unsafe fn static_downcast_mut(ptr: MutPtr<Self>) -> MutPtr<T>;
 }
 
 /// Provides access to C++ `dynamic_cast` conversion.
@@ -96,31 +78,11 @@ pub unsafe fn static_downcast_mut<R, T: StaticDowncast<R>>(value: &mut T) -> Mut
 ///
 /// `dynamic_cast` and `dynamic_cast_mut` free functions can be used
 /// to convert pointer types.
-pub trait DynamicCast<T> {
+pub trait DynamicCast<T>: Sized {
     /// Convert type of a const reference.
     /// Returns `None` if `self` is not an instance of `T`.
-    unsafe fn dynamic_cast(&self) -> Option<Ref<T>>;
+    unsafe fn dynamic_cast(ptr: Ptr<Self>) -> Ptr<T>;
     /// Convert type of a mutable reference.
     /// Returns `None` if `self` is not an instance of `T`.
-    unsafe fn dynamic_cast_mut(&mut self) -> Option<MutRef<T>>;
-}
-
-/// Converts type of a const pointer using `DynamicCast` implementation of the type.
-/// `ptr` must be either a null pointer or a valid pointer to an instance of `T` class
-/// or a class derived from `T`.
-/// Returns null pointer if `ptr` does not point to an instance of `R` or an instance of
-/// a class derived from `R`.
-/// If `ptr` is null, this function does nothing and returns null pointer.
-
-pub unsafe fn dynamic_cast<R, T: DynamicCast<R>>(value: &T) -> Option<Ref<R>> {
-    value.dynamic_cast()
-}
-
-/// Converts type of a mutable pointer using `DynamicCast` implementation of the type.
-/// `ptr` must be either a null pointer or a valid pointer to an instance of `T` class
-/// or a class derived from `T`.
-/// Returns null pointer if `ptr` does not point to an instance of `R`.
-/// If `ptr` is null, this function does nothing and returns null pointer.
-pub unsafe fn dynamic_cast_mut<R, T: DynamicCast<R>>(value: &mut T) -> Option<MutRef<R>> {
-    value.dynamic_cast_mut()
+    unsafe fn dynamic_cast_mut(ptr: MutPtr<Self>) -> MutPtr<T>;
 }

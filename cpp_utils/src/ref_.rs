@@ -1,4 +1,4 @@
-use crate::MutPtr;
+use crate::{MutPtr, Ptr};
 use std::ops::{Deref, DerefMut};
 use std::{fmt, ptr};
 
@@ -34,6 +34,14 @@ impl<T> MutRef<T> {
 
     pub unsafe fn from_raw_non_null(ptr: ptr::NonNull<T>) -> Self {
         MutRef(ptr)
+    }
+
+    pub unsafe fn as_ptr(self) -> Ptr<T> {
+        Ptr::from_raw(self.as_raw_ptr())
+    }
+
+    pub unsafe fn as_mut_ptr(self) -> MutPtr<T> {
+        MutPtr::from_raw(self.as_raw_ptr())
     }
 
     /// Returns constant raw pointer to the value in the box.
@@ -89,6 +97,10 @@ impl<T> Ref<T> {
         Ref(ptr)
     }
 
+    pub unsafe fn as_ptr(self) -> Ptr<T> {
+        Ptr::from_raw(self.as_raw_ptr())
+    }
+
     /// Returns constant raw pointer to the value in the box.
     pub fn as_raw_ptr(self) -> *const T {
         self.0.as_ptr()
@@ -100,12 +112,6 @@ impl<T> Deref for Ref<T> {
 
     fn deref(&self) -> &T {
         unsafe { self.0.as_ref() }
-    }
-}
-
-impl<T> From<MutRef<T>> for Ref<T> {
-    fn from(value: MutRef<T>) -> Self {
-        Ref(value.0)
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::{MutPtr, MutRef, Ref};
+use crate::{MutPtr, MutRef, Ptr, Ref};
 use std::ops::{Deref, DerefMut};
 use std::{fmt, mem, ptr};
 
@@ -34,8 +34,8 @@ pub struct CppBox<T: CppDeletable>(ptr::NonNull<T>);
 
 impl<T: CppDeletable> CppBox<T> {
     /// Returns constant raw pointer to the value in the box.
-    pub unsafe fn as_ptr(&self) -> MutPtr<T> {
-        MutPtr::from_raw(self.0.as_ptr())
+    pub unsafe fn as_ptr(&self) -> Ptr<T> {
+        Ptr::from_raw(self.0.as_ptr())
     }
 
     /// Returns mutable raw pointer to the value in the box.
