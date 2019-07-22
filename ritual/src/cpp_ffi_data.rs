@@ -26,7 +26,7 @@ pub enum CppCast {
 
         /// Contains index of the base (e.g. 0 for the first base; always
         /// 0 if the class only has one base).
-        base_index: usize,
+        base_index: Option<usize>,
     },
     Dynamic,
     QObject,
@@ -49,7 +49,7 @@ impl CppCast {
     }
     pub fn is_first_static_cast(&self) -> bool {
         match self {
-            CppCast::Static { base_index, .. } => base_index == &0,
+            CppCast::Static { base_index, .. } => base_index.as_ref() == Some(&0),
             _ => false,
         }
     }

@@ -1,5 +1,7 @@
 use cpp_utils::{ConstRef, CppBox, DynamicCast, Ref, StaticDowncast, StaticUpcast};
-use moqt_core::{AbstractBaseClass1, BaseClass1, DerivedClass1, DerivedClass2, DerivedClass3};
+use moqt_core::{
+    AbstractBaseClass1, BaseClass1, DerivedClass1, DerivedClass2, DerivedClass3, DerivedSubClass1,
+};
 
 #[test]
 fn casts() {
@@ -27,6 +29,17 @@ fn casts() {
 
         let derived1: ConstRef<DerivedClass1> = base.static_downcast();
         assert_eq!(derived1.base_const_function(), 4);
+    }
+}
+
+#[test]
+fn indirect_casts() {
+    unsafe {
+        let mut derived: CppBox<DerivedSubClass1> = DerivedSubClass1::new();
+        assert_eq!(derived.base_function(), 1);
+
+        let mut base: Ref<BaseClass1> = derived.static_upcast_mut();
+        assert_eq!(base.base_function(), 2);
     }
 }
 

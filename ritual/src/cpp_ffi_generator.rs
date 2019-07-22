@@ -164,7 +164,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut name_provider = FfiNameProvider::new(data);
 
     for index in 0..data.current_database.cpp_items().len() {
-        let item = &mut data.current_database.cpp_items_mut()[index];
+        let item = &data.current_database.cpp_items()[index];
         if item.is_cpp_ffi_processed {
             trace!("cpp_data = {}; already processed", item.item.to_string());
             continue;
@@ -195,7 +195,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
             )
             .map(|v| v.into_iter().collect_vec()),
             CppItem::ClassBase(base) => {
-                generate_casts(base, item.source_ffi_item, &mut name_provider)
+                generate_casts(base, item.source_ffi_item, &data, &mut name_provider)
                     .map(|v| v.into_iter().collect_vec())
             }
             CppItem::Type(_) | CppItem::EnumValue(_) | CppItem::Namespace(_) => {
@@ -213,6 +213,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                 for item in &r {
                     trace!("* {:?}", item);
                 }
+                let item = &mut data.current_database.cpp_items_mut()[index];
                 item.is_cpp_ffi_processed = true;
                 data.current_database.add_ffi_items(r);
             }
@@ -269,8 +270,9 @@ fn create_cast_method(
 fn generate_casts_one(
     target_type: &CppPath,
     base_type: &CppPath,
-    direct_base_index: usize,
+    direct_base_index: Option<usize>,
     source_ffi_item: Option<usize>,
+    data: &ProcessorData<'_>,
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiDatabaseItem>> {
     let target_ptr_type = CppType::PointerLike {
@@ -312,6 +314,19 @@ fn generate_casts_one(
         name_provider,
     )?);
 
+    for item in data.all_cpp_items().filter_map(|i| i.item.as_base_ref()) {
+        if &item.derived_class_type == base_type {
+            new_methods.extend(generate_casts_one(
+                target_type,
+                &item.base_class_type,
+                None,
+                source_ffi_item,
+                data,
+                name_provider,
+            )?);
+        }
+    }
+
     Ok(new_methods)
 }
 
@@ -320,14 +335,15 @@ fn generate_casts_one(
 fn generate_casts(
     base: &CppBaseSpecifier,
     source_ffi_item: Option<usize>,
+    data: &ProcessorData<'_>,
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiDatabaseItem>> {
-    //log::status("Adding cast functions");
     generate_casts_one(
         &base.derived_class_type,
         &base.base_class_type,
-        base.base_index,
+        Some(base.base_index),
         source_ffi_item,
+        data,
         name_provider,
     )
 }
