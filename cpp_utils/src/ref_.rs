@@ -1,8 +1,61 @@
-use crate::{ConstPtr, Ptr};
+use crate::MutPtr;
 use std::ops::{Deref, DerefMut};
 use std::{fmt, ptr};
 
 #[derive(PartialEq, Eq)]
+pub struct MutRef<T>(ptr::NonNull<T>);
+
+impl<T> Clone for MutRef<T> {
+    fn clone(&self) -> Self {
+        MutRef(self.0)
+    }
+}
+
+impl<T> Copy for MutRef<T> {}
+
+impl<T> fmt::Debug for MutRef<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "MutRef({:?})", self.0)
+    }
+}
+
+impl<T> MutRef<T> {
+    pub unsafe fn new(ptr: MutPtr<T>) -> Option<Self> {
+        Self::from_raw(ptr.as_raw_ptr())
+    }
+
+    pub unsafe fn from_raw(ptr: *mut T) -> Option<Self> {
+        ptr::NonNull::new(ptr).map(MutRef)
+    }
+
+    pub unsafe fn from_raw_ref(value: &mut T) -> Self {
+        MutRef(value.into())
+    }
+
+    pub unsafe fn from_raw_non_null(ptr: ptr::NonNull<T>) -> Self {
+        MutRef(ptr)
+    }
+
+    /// Returns constant raw pointer to the value in the box.
+    pub fn as_raw_ptr(self) -> *mut T {
+        self.0.as_ptr()
+    }
+}
+
+impl<T> Deref for MutRef<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        unsafe { self.0.as_ref() }
+    }
+}
+
+impl<T> DerefMut for MutRef<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        unsafe { self.0.as_mut() }
+    }
+}
+
 pub struct Ref<T>(ptr::NonNull<T>);
 
 impl<T> Clone for Ref<T> {
@@ -20,16 +73,16 @@ impl<T> fmt::Debug for Ref<T> {
 }
 
 impl<T> Ref<T> {
-    pub unsafe fn new(ptr: Ptr<T>) -> Option<Self> {
+    pub unsafe fn new(ptr: MutPtr<T>) -> Option<Self> {
         Self::from_raw(ptr.as_raw_ptr())
     }
 
-    pub unsafe fn from_raw(ptr: *mut T) -> Option<Self> {
-        ptr::NonNull::new(ptr).map(Ref)
+    pub unsafe fn from_raw(ptr: *const T) -> Option<Self> {
+        ptr::NonNull::new(ptr as *mut T).map(Ref)
     }
 
-    pub unsafe fn from_raw_ref(value: &mut T) -> Self {
-        Ref(value.into())
+    pub unsafe fn from_raw_ref(value: &T) -> Self {
+        Ref(ptr::NonNull::new(value as *const T as *mut T).unwrap())
     }
 
     pub unsafe fn from_raw_non_null(ptr: ptr::NonNull<T>) -> Self {
@@ -37,7 +90,7 @@ impl<T> Ref<T> {
     }
 
     /// Returns constant raw pointer to the value in the box.
-    pub fn as_raw_ptr(self) -> *mut T {
+    pub fn as_raw_ptr(self) -> *const T {
         self.0.as_ptr()
     }
 }
@@ -50,62 +103,9 @@ impl<T> Deref for Ref<T> {
     }
 }
 
-impl<T> DerefMut for Ref<T> {
-    fn deref_mut(&mut self) -> &mut T {
-        unsafe { self.0.as_mut() }
-    }
-}
-
-pub struct ConstRef<T>(ptr::NonNull<T>);
-
-impl<T> Clone for ConstRef<T> {
-    fn clone(&self) -> Self {
-        ConstRef(self.0)
-    }
-}
-
-impl<T> Copy for ConstRef<T> {}
-
-impl<T> fmt::Debug for ConstRef<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ConstRef({:?})", self.0)
-    }
-}
-
-impl<T> ConstRef<T> {
-    pub unsafe fn new(ptr: ConstPtr<T>) -> Option<Self> {
-        Self::from_raw(ptr.as_raw_ptr())
-    }
-
-    pub unsafe fn from_raw(ptr: *const T) -> Option<Self> {
-        ptr::NonNull::new(ptr as *mut T).map(ConstRef)
-    }
-
-    pub unsafe fn from_raw_ref(value: &T) -> Self {
-        ConstRef(ptr::NonNull::new(value as *const T as *mut T).unwrap())
-    }
-
-    pub unsafe fn from_raw_non_null(ptr: ptr::NonNull<T>) -> Self {
-        ConstRef(ptr)
-    }
-
-    /// Returns constant raw pointer to the value in the box.
-    pub fn as_raw_ptr(self) -> *const T {
-        self.0.as_ptr()
-    }
-}
-
-impl<T> Deref for ConstRef<T> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        unsafe { self.0.as_ref() }
-    }
-}
-
-impl<T> From<Ref<T>> for ConstRef<T> {
-    fn from(value: Ref<T>) -> Self {
-        ConstRef(value.0)
+impl<T> From<MutRef<T>> for Ref<T> {
+    fn from(value: MutRef<T>) -> Self {
+        Ref(value.0)
     }
 }
 
@@ -113,7 +113,7 @@ impl<T> From<Ref<T>> for ConstRef<T> {
 fn ptr_deref() {
     let mut i = 42;
     unsafe {
-        let ptr: Ptr<i32> = Ptr::from_raw(&mut i as *mut i32);
+        let ptr: MutPtr<i32> = MutPtr::from_raw(&mut i as *mut i32);
         assert_eq!(*ptr, 42);
     }
 }

@@ -1,5 +1,5 @@
 use qt_widgets::{
-    cpp_utils::{CppBox, Ptr, StaticUpcast},
+    cpp_utils::{CppBox, MutPtr, StaticUpcast},
     qt_core::QString,
     qt_core::Slot,
     QApplication, QLineEdit, QMessageBox, QPushButton, QVBoxLayout, QWidget,
@@ -7,8 +7,8 @@ use qt_widgets::{
 
 struct Form<'a> {
     _widget: CppBox<QWidget>,
-    _button: Ptr<QPushButton>,
-    _line_edit: Ptr<QLineEdit>,
+    _button: MutPtr<QPushButton>,
+    _line_edit: MutPtr<QLineEdit>,
     button_clicked: Slot<'a>,
     line_edit_edited: Slot<'a>,
 }

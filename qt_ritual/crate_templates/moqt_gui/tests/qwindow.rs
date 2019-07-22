@@ -1,4 +1,4 @@
-use cpp_utils::{CppBox, Ptr};
+use cpp_utils::{CppBox, MutPtr};
 use moqt_core::{BasicClass, QPoint, QVectorOfInt};
 use moqt_gui::{get_window, QVectorOfQWindow, QWindow};
 
@@ -8,7 +8,7 @@ fn test_qwindow() {
         let mut window = QWindow::new();
         let mut object: CppBox<BasicClass> = window.get_basic_class();
         assert_eq!(object.foo(), 42);
-        let mut object_ptr: Ptr<BasicClass> = window.get_basic_class_ptr();
+        let mut object_ptr: MutPtr<BasicClass> = window.get_basic_class_ptr();
         assert_eq!(object_ptr.foo(), 43);
 
         let point: CppBox<QPoint> = window.pos();
@@ -24,7 +24,7 @@ fn test_qwindow() {
 #[test]
 fn test_get_window() {
     unsafe {
-        let window: Ptr<QWindow> = get_window();
+        let window: MutPtr<QWindow> = get_window();
         assert!(window.is_null());
     }
 }

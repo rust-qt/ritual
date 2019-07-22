@@ -26,7 +26,7 @@ impl<'a> {pub_type_name}<'a> {{
         unsafe {{
             self.raw_slot.set(
                 Some(callback),
-                ::cpp_utils::Ptr::from_raw(&mut*func_box as *mut Box<_> as *mut ::std::ffi::c_void)
+                ::cpp_utils::MutPtr::from_raw(&mut*func_box as *mut Box<_> as *mut ::std::ffi::c_void)
             );
         }}
         self.func = Some(func_box);
@@ -37,13 +37,13 @@ impl<'a> {pub_type_name}<'a> {{
     pub fn clear(&mut self) {{
         if self.func.is_some() {{
             unsafe {{
-                self.raw_slot.set(None, ::cpp_utils::Ptr::null());
+                self.raw_slot.set(None, ::cpp_utils::MutPtr::null());
             }}
             self.func = None;
         }}
     }}
 
-    pub unsafe fn as_raw(&mut self) -> ::cpp_utils::Ptr<{type_name}> {{
+    pub unsafe fn as_raw(&mut self) -> ::cpp_utils::MutPtr<{type_name}> {{
         self.raw_slot.as_mut_ptr()
     }}
 }}

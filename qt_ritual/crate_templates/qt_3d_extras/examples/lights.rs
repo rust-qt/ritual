@@ -11,9 +11,9 @@ use std::cell::*;
 
 fn setup_scene(root: &mut QEntity) -> Box<Fn() -> ()> {
     unsafe {
-        let mut scene = QEntity::new_1a(root.static_upcast_mut().into());
+        let mut scene = MutPtr(root.static_upcast_mut().into());
 
-        let mut sphere1 = QEntity::new_1a(scene.static_upcast_mut().into());
+        let mut sphere1 = MutPtr(scene.static_upcast_mut().into());
         let mut sphere1_mesh = QSphereMesh::new_0a();
         sphere1_mesh.set_radius(1.0);
         sphere1_mesh.set_rings(60);
@@ -45,7 +45,7 @@ fn setup_scene(root: &mut QEntity) -> Box<Fn() -> ()> {
         sphere1.add_component(sphere1_transform.into_ptr().static_upcast_mut().into());
         sphere1.into_raw_ptr();
 
-        let mut sphere2 = QEntity::new_1a(scene.static_upcast_mut().into());
+        let mut sphere2 = MutPtr(scene.static_upcast_mut().into());
         let mut sphere2_mesh = QSphereMesh::new_0a();
         sphere2_mesh.set_radius(1.0);
         sphere2_mesh.set_rings(60);
@@ -77,7 +77,7 @@ fn setup_scene(root: &mut QEntity) -> Box<Fn() -> ()> {
         sphere2.add_component(sphere2_transform.into_ptr().static_upcast_mut().into());
         sphere2.into_raw_ptr();
 
-        let mut plane = QEntity::new_1a(scene.static_upcast_mut().into());
+        let mut plane = MutPtr(scene.static_upcast_mut().into());
         plane.add_component(
             QPlaneMesh::new_0a()
                 .into_ptr()
@@ -119,7 +119,7 @@ fn setup_scene(root: &mut QEntity) -> Box<Fn() -> ()> {
                 .into(),
         );
 
-        let mut point_light_entity = QEntity::new_1a(scene.static_upcast_mut().into());
+        let mut point_light_entity = MutPtr(scene.static_upcast_mut().into());
         let mut point_light = QPointLight::new_0a();
         point_light.set_enabled(false);
         point_light.set_color(QColor::from_rgb_3a(0, 255, 0).as_ref());
@@ -135,7 +135,7 @@ fn setup_scene(root: &mut QEntity) -> Box<Fn() -> ()> {
             .add_component(point_light_transform.into_ptr().static_upcast_mut().into());
         point_light_entity.into_raw_ptr();
 
-        let mut spot_light_entity = QEntity::new_1a(scene.static_upcast_mut().into());
+        let mut spot_light_entity = MutPtr(scene.static_upcast_mut().into());
         let mut spot_light = QSpotLight::new_0a();
         spot_light.set_enabled(false);
         spot_light.set_color(QColor::from_rgb_3a(0, 0, 255).as_ref());
@@ -182,7 +182,7 @@ fn main() {
             let next_light_slot = Slot::new(activate_next_light.as_ref());
 
             let mut keyboard_device = QKeyboardDevice::new_1a(root.static_upcast_mut().into());
-            let mut handler = QEntity::new_1a(root.static_upcast_mut().into());
+            let mut handler = MutPtr(root.static_upcast_mut().into());
             let mut keyboard_handler = QKeyboardHandler::new_0a();
             keyboard_handler.set_source_device(keyboard_device.as_mut_ptr());
             keyboard_handler.set_focus(true);

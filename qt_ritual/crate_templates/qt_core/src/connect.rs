@@ -1,6 +1,6 @@
 use crate::q_meta_object::Connection;
 use crate::QObject;
-use cpp_utils::{ConstPtr, ConstRef, CppBox, CppDeletable, Ptr};
+use cpp_utils::{CppBox, CppDeletable, MutPtr, Ptr, Ref};
 use std::ffi::CStr;
 use std::fmt;
 use std::marker::PhantomData;
@@ -27,7 +27,7 @@ use std::marker::PhantomData;
 pub trait ArgumentsCompatible<T> {}
 
 pub struct Receiver<Arguments> {
-    q_object: ConstRef<QObject>,
+    q_object: Ref<QObject>,
     receiver_id: &'static CStr,
     _marker: PhantomData<Arguments>,
 }
@@ -53,7 +53,7 @@ impl<A> fmt::Debug for Receiver<A> {
 }
 
 impl<A> Receiver<A> {
-    pub fn new(q_object: ConstRef<QObject>, receiver_id: &'static CStr) -> Self {
+    pub fn new(q_object: Ref<QObject>, receiver_id: &'static CStr) -> Self {
         Self {
             q_object,
             receiver_id,
@@ -82,7 +82,7 @@ impl<A> fmt::Debug for Signal<A> {
 }
 
 impl<A> Signal<A> {
-    pub fn new(q_object: ConstRef<QObject>, receiver_id: &'static CStr) -> Self {
+    pub fn new(q_object: Ref<QObject>, receiver_id: &'static CStr) -> Self {
         Signal(Receiver::new(q_object, receiver_id))
     }
 }
@@ -106,7 +106,7 @@ impl<A> AsReceiver for Signal<A> {
     }
 }
 
-impl<T> AsReceiver for Ptr<T>
+impl<T> AsReceiver for MutPtr<T>
 where
     T: AsReceiver,
 {
@@ -116,7 +116,7 @@ where
     }
 }
 
-impl<T> AsReceiver for ConstRef<T>
+impl<T> AsReceiver for Ref<T>
 where
     T: AsReceiver,
 {
@@ -148,9 +148,9 @@ impl<SignalArguments> Signal<SignalArguments> {
 
         crate::QObject::connect_4a(
             self.0.q_object.into(),
-            ConstPtr::from_raw(self.0.receiver_id.as_ptr()),
+            Ptr::from_raw(self.0.receiver_id.as_ptr()),
             receiver.q_object.into(),
-            ConstPtr::from_raw(receiver.receiver_id.as_ptr()),
+            Ptr::from_raw(receiver.receiver_id.as_ptr()),
         )
     }
 }

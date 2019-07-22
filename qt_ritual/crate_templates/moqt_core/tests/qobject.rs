@@ -1,4 +1,4 @@
-use cpp_utils::{Ptr, Ref, StaticUpcast};
+use cpp_utils::{MutPtr, MutRef, StaticUpcast};
 use moqt_core::{QObject, RawSlotOfInt, SlotOfInt};
 use std::cell::RefCell;
 use std::os::raw::{c_int, c_void};
@@ -36,7 +36,7 @@ fn raw_slot() {
         }
 
         let mut obj = RawSlotOfInt::new();
-        obj.set(Some(hook), Ptr::from_raw(5 as *mut c_void));
+        obj.set(Some(hook), MutPtr::from_raw(5 as *mut c_void));
         assert!(!FLAG.load(Ordering::SeqCst));
         obj.custom_slot(7);
         assert!(FLAG.load(Ordering::SeqCst));
@@ -52,7 +52,7 @@ fn raw_slot_connect() {
 
         let args = QObject::next_connect_args();
         assert_eq!(args.sender().as_raw_ptr(), obj1.as_raw_ptr());
-        let slot_as_qobject: Ref<QObject> = slot.static_upcast_mut();
+        let slot_as_qobject: MutRef<QObject> = slot.static_upcast_mut();
         assert_eq!(args.receiver().as_raw_ptr(), slot_as_qobject.as_raw_ptr());
 
         let signal = args.signal().to_c_str().to_str().unwrap();
@@ -80,7 +80,7 @@ fn closure_slot_connect() {
         let signal = args.signal().to_c_str().to_str().unwrap();
         assert_eq!(signal, "2objectNameChanged(int)");
 
-        let slot_as_qobject: Ref<QObject> = slot.as_raw().static_upcast_mut();
+        let slot_as_qobject: MutRef<QObject> = slot.as_raw().static_upcast_mut();
         assert_eq!(args.receiver().as_raw_ptr(), slot_as_qobject.as_raw_ptr());
 
         let method = args.method().to_c_str().to_str().unwrap();

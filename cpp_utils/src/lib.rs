@@ -13,8 +13,8 @@ pub use crate::casts::{
     static_upcast_mut, DynamicCast, StaticDowncast, StaticUpcast,
 };
 pub use crate::cpp_box::{CppBox, CppDeletable};
-pub use crate::ptr::{ConstPtr, Ptr};
-pub use crate::ref_::{ConstRef, Ref};
+pub use crate::ptr::{MutPtr, Ptr};
+pub use crate::ref_::{MutRef, Ref};
 
 mod casts;
 pub mod cmp;

@@ -1,5 +1,5 @@
 use crate::QString;
-use cpp_utils::{ConstPtr, CppBox};
+use cpp_utils::{CppBox, Ptr};
 use std::os::raw::{c_char, c_int};
 
 /// Allows to convert Qt strings to `std` strings
@@ -15,7 +15,7 @@ impl QString {
         let slice = s.as_ref().as_bytes();
         unsafe {
             QString::from_utf8(
-                ConstPtr::from_raw(slice.as_ptr() as *const c_char),
+                Ptr::from_raw(slice.as_ptr() as *const c_char),
                 slice.len() as c_int,
             )
         }

@@ -1,4 +1,4 @@
-use cpp_utils::Ptr;
+use cpp_utils::MutPtr;
 use qt_core::{QCoreApplication, QVariant, QVariantAnimation, RawSlotOfQVariant};
 use std::ffi::c_void;
 
@@ -13,7 +13,7 @@ extern "C" fn value_changed(_data: *mut c_void, value: *const QVariant) {
 fn variant_animation() {
     QCoreApplication::init(|app| unsafe {
         let mut slot1 = RawSlotOfQVariant::new();
-        slot1.set(Some(value_changed), Ptr::null());
+        slot1.set(Some(value_changed), MutPtr::null());
 
         let mut animation = QVariantAnimation::new_0a();
         animation.value_changed().connect(&slot1);

@@ -138,11 +138,11 @@ pub enum RustToFfiTypeConversion {
         force_api_is_const: Option<bool>,
         lifetime: Option<String>,
     },
-    /// `ConstPtr<T>` to `*const T` (or similar mutable type)
+    /// `Ptr<T>` to `*const T` (or similar mutable type)
     UtilsPtrToPtr { force_api_is_const: Option<bool> },
-    /// `ConstRef<T>` to `*const T` (or similar mutable types)
+    /// `Ref<T>` to `*const T` (or similar mutable types)
     UtilsRefToPtr { force_api_is_const: Option<bool> },
-    /// `Option<ConstRef<T>>` to `*const T` (or similar mutable types)
+    /// `Option<Ref<T>>` to `*const T` (or similar mutable types)
     OptionUtilsRefToPtr { force_api_is_const: Option<bool> },
     /// `T` to `*const T` (or similar mutable type)
     ValueToPtr,
@@ -194,9 +194,9 @@ fn utils_ptr(ffi_type: &RustType, force_api_is_const: Option<bool>) -> Result<Ru
         ffi_type.is_const_pointer_like()?
     };
     let name = if is_const {
-        "cpp_utils::ConstPtr"
-    } else {
         "cpp_utils::Ptr"
+    } else {
+        "cpp_utils::MutPtr"
     };
 
     let target = ffi_type.pointer_like_to_target()?.clone();
@@ -213,9 +213,9 @@ fn utils_ref(ffi_type: &RustType, force_api_is_const: Option<bool>) -> Result<Ru
         ffi_type.is_const_pointer_like()?
     };
     let name = if is_const {
-        "cpp_utils::ConstRef"
-    } else {
         "cpp_utils::Ref"
+    } else {
+        "cpp_utils::MutRef"
     };
 
     let target = ffi_type.pointer_like_to_target()?.clone();
@@ -501,10 +501,10 @@ impl RustType {
                 path,
                 generic_arguments,
             }) => {
-                if path == &RustPath::from_good_str("cpp_utils::Ptr")
-                    || path == &RustPath::from_good_str("cpp_utils::ConstPtr")
+                if path == &RustPath::from_good_str("cpp_utils::MutPtr")
+                    || path == &RustPath::from_good_str("cpp_utils::Ptr")
                     || path == &RustPath::from_good_str("cpp_utils::Ref")
-                    || path == &RustPath::from_good_str("cpp_utils::ConstRef")
+                    || path == &RustPath::from_good_str("cpp_utils::MutRef")
                     || path == &RustPath::from_good_str("cpp_utils::CppBox")
                 {
                     let arg = &generic_arguments.as_ref().unwrap()[0];

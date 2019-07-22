@@ -857,7 +857,7 @@ impl Generator<'_> {
             RustFunctionKind::SignalOrSlotGetter { receiver_id, .. } => {
                 let path = &func.return_type.api_type().as_common()?.path;
                 let call = format!(
-                    "{}::new(::cpp_utils::ConstRef::from_raw(self as &{})\
+                    "{}::new(::cpp_utils::Ref::from_raw(self as &{})\
                      .expect(\"attempted to construct a null Ref\"), \
                      ::std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"))",
                     self.rust_path_to_string(&path),
