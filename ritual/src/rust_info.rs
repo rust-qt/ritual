@@ -368,7 +368,7 @@ pub struct RustTraitImpl {
     /// Type the trait is implemented for.
     pub target_type: RustType,
     /// Type of the trait.
-    pub trait_type: RustType,
+    pub trait_type: RustType, // TODO: RustCommonType?
     /// Values of associated types of the trait.
     pub associated_types: Vec<RustTraitAssociatedType>,
     /// Functions that implement the trait.

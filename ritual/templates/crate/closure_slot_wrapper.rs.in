@@ -37,7 +37,7 @@ impl<'a> {pub_type_name}<'a> {{
     pub fn clear(&mut self) {{
         if self.func.is_some() {{
             unsafe {{
-                self.raw_slot.set(None, ::cpp_utils::MutPtr::null());
+                self.raw_slot.set(None, ::cpp_utils::MutPtr::<::std::ffi::c_void>::null());
             }}
             self.func = None;
         }}

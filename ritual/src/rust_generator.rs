@@ -483,9 +483,11 @@ impl State<'_, '_> {
                     }
                 } else {
                     // argument passed by value is represented as a reference on Rust side
-                    api_to_ffi_conversion = RustToFfiTypeConversion::UtilsRefToPtr {
-                        force_api_is_const: None,
-                    };
+                    api_to_ffi_conversion = RustToFfiTypeConversion::ImplCastInto(Box::new(
+                        RustToFfiTypeConversion::UtilsRefToPtr {
+                            force_api_is_const: None,
+                        },
+                    ));
                 }
             } else {
                 if argument_meaning == &CppFfiArgumentMeaning::This {
@@ -493,7 +495,7 @@ impl State<'_, '_> {
                         force_api_is_const: None,
                         lifetime: None,
                     };
-                } else {
+                } else if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
                     api_to_ffi_conversion =
                         if let CppToFfiTypeConversion::ReferenceToPointer { .. } =
                             cpp_ffi_type.conversion()
@@ -505,6 +507,24 @@ impl State<'_, '_> {
                             RustToFfiTypeConversion::UtilsPtrToPtr {
                                 force_api_is_const: None,
                             }
+                        };
+                } else {
+                    // argument
+                    api_to_ffi_conversion =
+                        if let CppToFfiTypeConversion::ReferenceToPointer { .. } =
+                            cpp_ffi_type.conversion()
+                        {
+                            RustToFfiTypeConversion::ImplCastInto(Box::new(
+                                RustToFfiTypeConversion::UtilsRefToPtr {
+                                    force_api_is_const: None,
+                                },
+                            ))
+                        } else {
+                            RustToFfiTypeConversion::ImplCastInto(Box::new(
+                                RustToFfiTypeConversion::UtilsPtrToPtr {
+                                    force_api_is_const: None,
+                                },
+                            ))
                         };
                 }
             }
@@ -640,18 +660,25 @@ impl State<'_, '_> {
             OperatorKind::WithAssign | OperatorKind::Comparison => self_value_type.clone(),
         };
 
-        let trait_args = if operator_info.kind == OperatorKind::NormalUnary {
-            None
+        let trait_args;
+        let mut other_type;
+        if operator_info.kind == OperatorKind::NormalUnary {
+            trait_args = None;
+            other_type = None;
         } else {
-            let other_type = unnamed_function
+            let mut other_type1 = unnamed_function
                 .arguments
                 .get(1)
                 .ok_or_else(|| err_msg("not enough arguments"))?
                 .argument_type
-                .api_type()
                 .clone();
 
-            Some(vec![other_type])
+            if let RustToFfiTypeConversion::ImplCastInto(conversion) = other_type1.conversion() {
+                other_type1 =
+                    RustFinalType::new(other_type1.ffi_type().clone(), (**conversion).clone())?;
+            }
+            trait_args = Some(vec![other_type1.api_type().clone()]);
+            other_type = Some(other_type1);
         };
 
         let trait_type = RustType::Common(RustCommonType {
@@ -703,6 +730,9 @@ impl State<'_, '_> {
             },
         )?;
         function.arguments[0].name = "self".to_string();
+        if let Some(other_type) = other_type {
+            function.arguments[1].argument_type = other_type;
+        }
 
         if operator_info.kind == OperatorKind::Comparison {
             let other_arg = &mut function.arguments[1].argument_type;
@@ -1631,8 +1661,9 @@ impl State<'_, '_> {
                             let public_args = wrapper.arguments.iter().map_if_ok(|arg| {
                                 self.rust_final_type(
                                     arg,
-                                    // TODO: this is kind of a return type but not quite
-                                    &CppFfiArgumentMeaning::Argument(0),
+                                    // closure argument should be handled in the same way
+                                    // as return type (value is produced behind FFI)
+                                    &CppFfiArgumentMeaning::ReturnValue,
                                     ReturnValueAllocationPlace::NotApplicable,
                                     Some(checks),
                                 )

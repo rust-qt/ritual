@@ -101,6 +101,10 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: Option<&str>) -> S
                 format!(" -> {}", rust_type_to_code(return_type, current_crate))
             }
         ),
+        RustType::ImplTrait(trait_type) => format!(
+            "impl {}",
+            rust_type_to_code(&RustType::Common(trait_type.clone()), current_crate)
+        ),
     }
 }
 
@@ -636,6 +640,9 @@ impl Generator<'_> {
                 )?;
                 format!("&{}", expr)
             }
+            RustToFfiTypeConversion::ImplCastInto(_) => {
+                bail!("ImplCastInto is not convertable from FFI type");
+            }
         };
         Ok(code1 + &code2)
     }
@@ -703,6 +710,17 @@ impl Generator<'_> {
                 } else {
                     code
                 }
+            }
+            RustToFfiTypeConversion::ImplCastInto(conversion) => {
+                let intermediate =
+                    RustFinalType::new(type1.ffi_type().clone(), (**conversion).clone())?;
+
+                let intermediate_expr = format!(
+                    "::cpp_utils::CastInto::<{}>::cast_into({})",
+                    self.rust_type_to_code(&intermediate.api_type()),
+                    expr
+                );
+                self.convert_type_to_ffi(&intermediate_expr, &intermediate)?
             }
         };
         Ok(code)

@@ -139,21 +139,30 @@ pub enum RustToFfiTypeConversion {
         lifetime: Option<String>,
     },
     /// `Ptr<T>` to `*const T` (or similar mutable type)
-    UtilsPtrToPtr { force_api_is_const: Option<bool> },
+    UtilsPtrToPtr {
+        force_api_is_const: Option<bool>,
+    },
     /// `Ref<T>` to `*const T` (or similar mutable types)
-    UtilsRefToPtr { force_api_is_const: Option<bool> },
+    UtilsRefToPtr {
+        force_api_is_const: Option<bool>,
+    },
     /// `Option<Ref<T>>` to `*const T` (or similar mutable types)
-    OptionUtilsRefToPtr { force_api_is_const: Option<bool> },
+    OptionUtilsRefToPtr {
+        force_api_is_const: Option<bool>,
+    },
     /// `T` to `*const T` (or similar mutable type)
     ValueToPtr,
     /// `CppBox<T>` to `*mut T`
     CppBoxToPtr,
     /// `qt_core::flags::Flags<T>` to `c_int`
-    QFlagsToUInt { api_type: RustType },
+    QFlagsToUInt {
+        api_type: RustType,
+    },
     /// `()` to any type
     UnitToAnything,
     /// Rust public type has an additional reference (`&`)
     RefTo(Box<RustToFfiTypeConversion>),
+    ImplCastInto(Box<RustToFfiTypeConversion>),
 }
 
 impl RustToFfiTypeConversion {
@@ -271,6 +280,14 @@ impl RustFinalType {
             RustToFfiTypeConversion::RefTo(conversion) => {
                 let intermediate = RustFinalType::new(ffi_type.clone(), (**conversion).clone())?;
                 RustType::new_reference(true, intermediate.api_type)
+            }
+            RustToFfiTypeConversion::ImplCastInto(conversion) => {
+                let intermediate = RustFinalType::new(ffi_type.clone(), (**conversion).clone())?;
+                let trait_type = RustCommonType {
+                    path: RustPath::from_good_str("cpp_utils::CastInto"),
+                    generic_arguments: Some(vec![intermediate.api_type]),
+                };
+                RustType::ImplTrait(trait_type)
             }
         };
         Ok(RustFinalType {
@@ -434,6 +451,7 @@ pub enum RustType {
         is_const: bool,
         target: Box<RustType>,
     },
+    ImplTrait(RustCommonType),
 }
 
 impl RustType {
@@ -552,6 +570,18 @@ impl RustType {
                 name
             }
             RustType::FunctionPointer { .. } => "fn".to_string(),
+            RustType::ImplTrait(trait_type) => {
+                if trait_type.path == RustPath::from_good_str("cpp_utils::CastInto") {
+                    trait_type
+                        .generic_arguments
+                        .iter()
+                        .flatten()
+                        .map_if_ok(|x| x.caption(context))?
+                        .join("_")
+                } else {
+                    RustType::Common(trait_type.clone()).caption(context)?
+                }
+            }
         })
     }
 
@@ -633,6 +663,7 @@ impl RustType {
                 return_type.is_unsafe_argument()
                     || arguments.iter().any(RustType::is_unsafe_argument)
             }
+            RustType::ImplTrait(_) => true,
         }
     }
 
@@ -719,6 +750,13 @@ impl RustType {
                     self_kind == kind
                         && self_is_const == is_const
                         && self_target.can_be_same_as(target)
+                } else {
+                    false
+                }
+            }
+            RustType::ImplTrait(trait_type) => {
+                if let RustType::ImplTrait(other_trait_type) = other {
+                    trait_type.can_be_same_as(other_trait_type)
                 } else {
                     false
                 }
