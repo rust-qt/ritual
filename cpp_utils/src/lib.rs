@@ -11,7 +11,7 @@
 pub use crate::casts::{DynamicCast, StaticDowncast, StaticUpcast};
 pub use crate::convert::{CastFrom, CastInto};
 pub use crate::cpp_box::{CppBox, CppDeletable};
-pub use crate::ptr::{MutPtr, Ptr};
+pub use crate::ptr::{MutPtr, NullPtr, Ptr};
 pub use crate::ref_::{MutRef, Ref};
 
 mod casts;

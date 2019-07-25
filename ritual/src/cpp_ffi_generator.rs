@@ -209,13 +209,26 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                 debug!("failed to add FFI item: {}: {}", item.item, error);
             }
             Ok(r) => {
-                debug!("added FFI items (count: {}) for: {}", r.len(), item.item);
-                for item in &r {
-                    trace!("* {:?}", item);
+                let mut new_items = Vec::new();
+                for item in r {
+                    if data.current_database.add_ffi_item(item.clone()) {
+                        new_items.push(item);
+                    }
                 }
                 let item = &mut data.current_database.cpp_items_mut()[index];
                 item.is_cpp_ffi_processed = true;
-                data.current_database.add_ffi_items(r);
+                if new_items.is_empty() {
+                    debug!("no new FFI items for: {}", item.item);
+                } else {
+                    debug!(
+                        "added FFI items (count: {}) for: {}",
+                        new_items.len(),
+                        item.item
+                    );
+                    for item in &new_items {
+                        trace!("* {:?}", item);
+                    }
+                }
             }
         }
     }

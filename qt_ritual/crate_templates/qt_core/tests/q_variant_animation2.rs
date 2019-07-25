@@ -10,8 +10,8 @@ fn variant_animation2() {
         let mut animation = QVariantAnimation::new_0a();
         animation.value_changed().connect(&slot1);
         animation.finished().connect(app.slot_quit());
-        animation.set_start_value(QVariant::new7(1).as_ref());
-        animation.set_end_value(QVariant::new7(5).as_ref());
+        animation.set_start_value(&QVariant::from_int(1));
+        animation.set_end_value(&QVariant::from_int(5));
         animation.set_duration(5000);
         animation.start_0a();
         QCoreApplication::exec()

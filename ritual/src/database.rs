@@ -144,14 +144,17 @@ impl Database {
         &mut self.ffi_items
     }
 
-    pub fn add_ffi_item(&mut self, item: CppFfiDatabaseItem) {
+    pub fn add_ffi_item(&mut self, item: CppFfiDatabaseItem) -> bool {
         self.is_modified = true;
+        if self
+            .ffi_items
+            .iter()
+            .any(|i| i.item.is_cpp_item_same(&item.item))
+        {
+            return false;
+        }
         self.ffi_items.push(item);
-    }
-
-    pub fn add_ffi_items(&mut self, items: Vec<CppFfiDatabaseItem>) {
-        self.is_modified = true;
-        self.ffi_items.extend(items);
+        true
     }
 
     pub fn clear(&mut self) {
@@ -163,11 +166,15 @@ impl Database {
     pub fn clear_ffi(&mut self) {
         self.is_modified = true;
         self.ffi_items.clear();
+        self.force_ffi_processing();
+        self.cpp_items.retain(|item| item.source_ffi_item.is_none());
+        // TODO: deal with rust items that now have invalid index references
+    }
+
+    pub fn force_ffi_processing(&mut self) {
         for item in &mut self.cpp_items {
             item.is_cpp_ffi_processed = false;
         }
-        self.cpp_items.retain(|item| item.source_ffi_item.is_none());
-        // TODO: deal with rust items that now have invalid index references
     }
 
     pub fn clear_cpp_checks(&mut self) {

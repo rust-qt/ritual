@@ -1,4 +1,4 @@
-use cpp_utils::{CppBox, MutRef, Ref};
+use cpp_utils::{CppBox, MutRef, NullPtr, Ref};
 use moqt_core::{
     AbstractBaseClass1, BaseClass1, DerivedClass1, DerivedClass2, DerivedClass3, DerivedSubClass1,
 };
@@ -48,6 +48,7 @@ fn indirect_casts() {
         // TODO: `set_parent` should accept without `cast_into`
         base.set_parent(derived.as_mut_ptr());
         base.set_parent(&mut derived);
+        base.set_parent(NullPtr);
     }
 }
 

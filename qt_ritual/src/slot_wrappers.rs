@@ -69,9 +69,12 @@ pub fn add_slot_wrappers(data: &mut ProcessorData<'_>) -> Result<()> {
         } else {
             match generate_slot_wrapper(&arg_types, &mut name_provider) {
                 Ok(slot_wrapper) => {
-                    data.current_database
-                        .add_ffi_item(CppFfiDatabaseItem::from_qt_slot_wrapper(slot_wrapper, None));
-                    trace!("adding slot wrapper for args: ({})", arg_types_text);
+                    if data
+                        .current_database
+                        .add_ffi_item(CppFfiDatabaseItem::from_qt_slot_wrapper(slot_wrapper, None))
+                    {
+                        trace!("adding slot wrapper for args: ({})", arg_types_text);
+                    }
                 }
                 Err(err) => {
                     trace!(

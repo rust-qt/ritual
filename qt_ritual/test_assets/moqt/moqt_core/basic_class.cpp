@@ -58,3 +58,6 @@ BasicClass::operator QVector<int>() {
 QFlags<BasicClass::UpdateType> operator|(BasicClass::UpdateType f1, BasicClass::UpdateType f2) {
     return QFlags<BasicClass::UpdateType>(f1 | f2);
 }
+
+void BasicClass::setRef(const int& value) {
+}

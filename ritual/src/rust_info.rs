@@ -415,12 +415,18 @@ pub struct RustModule {
     pub kind: RustModuleKind,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RustTypeCaptionStrategy {
+    LastName,
+    Full,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct RustFunctionCaptionStrategy {
     pub mut_: bool,
     pub args_count: bool,
     pub arg_names: bool,
-    pub arg_types: bool,
+    pub arg_types: Option<RustTypeCaptionStrategy>,
     pub static_: bool,
 }
 
@@ -443,14 +449,24 @@ impl RustFunctionCaptionStrategy {
                 ..S::default()
             },
             S {
-                arg_names: true,
+                static_: true,
                 ..S::default()
             },
             S {
-                arg_types: true,
+                arg_types: Some(RustTypeCaptionStrategy::LastName),
                 ..S::default()
             },
             S {
+                arg_types: Some(RustTypeCaptionStrategy::LastName),
+                static_: true,
+                ..S::default()
+            },
+            S {
+                arg_types: Some(RustTypeCaptionStrategy::Full),
+                ..S::default()
+            },
+            S {
+                arg_types: Some(RustTypeCaptionStrategy::Full),
                 static_: true,
                 ..S::default()
             },
@@ -463,11 +479,6 @@ impl RustFunctionCaptionStrategy {
                 ..item.clone()
             });
         }
-
-        //        all.push(S {
-        //            index: true,
-        //            ..S::default()
-        //        });
 
         all
     }

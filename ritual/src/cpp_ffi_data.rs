@@ -84,11 +84,42 @@ impl CppFfiFunctionKind {
             None
         }
     }
+
     pub fn cpp_field(&self) -> Option<&CppClassField> {
         if let CppFfiFunctionKind::FieldAccessor { field, .. } = self {
             Some(field)
         } else {
             None
+        }
+    }
+
+    pub fn is_same(&self, other: &Self) -> bool {
+        match self {
+            CppFfiFunctionKind::Function { cpp_function, cast } => {
+                if let CppFfiFunctionKind::Function {
+                    cpp_function: other_cpp_function,
+                    cast: other_cast,
+                } = other
+                {
+                    cpp_function.is_same(other_cpp_function) && cast == other_cast
+                } else {
+                    false
+                }
+            }
+            CppFfiFunctionKind::FieldAccessor {
+                accessor_type,
+                field,
+            } => {
+                if let CppFfiFunctionKind::FieldAccessor {
+                    accessor_type: other_accessor_type,
+                    field: other_field,
+                } = other
+                {
+                    accessor_type == other_accessor_type && field.is_same(other_field)
+                } else {
+                    false
+                }
+            }
         }
     }
 }
@@ -347,6 +378,25 @@ impl CppFfiItem {
                     .map(CppType::to_cpp_pseudo_code)
                     .join(", ")
             ),
+        }
+    }
+
+    pub fn is_cpp_item_same(&self, other: &Self) -> bool {
+        match self {
+            CppFfiItem::Function(function) => {
+                if let CppFfiItem::Function(other_function) = other {
+                    function.kind.is_same(&other_function.kind)
+                } else {
+                    false
+                }
+            }
+            CppFfiItem::QtSlotWrapper(wrapper) => {
+                if let CppFfiItem::QtSlotWrapper(other_wrapper) = other {
+                    wrapper.signal_arguments == other_wrapper.signal_arguments
+                } else {
+                    false
+                }
+            }
         }
     }
 }

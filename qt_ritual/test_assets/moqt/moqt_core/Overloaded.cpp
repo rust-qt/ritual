@@ -13,3 +13,6 @@ int Overloaded::at(int index) const {
 }
 void Overloaded::setPos(int x, int y) {}
 void Overloaded::setPos(QPoint pos, bool flag) {}
+
+void Overloaded::match() {}
+void Overloaded::match(int x) {}

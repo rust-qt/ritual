@@ -18,7 +18,8 @@ use crate::rust_info::{
     RustFunctionCaptionStrategy, RustFunctionKind, RustFunctionSelfArgKind, RustItem, RustModule,
     RustModuleDoc, RustModuleKind, RustPathScope, RustQtReceiverType, RustQtSlotWrapper,
     RustRawSlotReceiver, RustStruct, RustStructKind, RustTraitAssociatedType, RustTraitImpl,
-    RustWrapperType, RustWrapperTypeDocData, RustWrapperTypeKind, UnnamedRustFunction,
+    RustTypeCaptionStrategy, RustWrapperType, RustWrapperTypeDocData, RustWrapperTypeKind,
+    UnnamedRustFunction,
 };
 use crate::rust_type::{
     RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
@@ -1255,7 +1256,11 @@ impl State<'_, '_> {
                 ReturnValueAllocationPlace::NotApplicable,
                 None,
             )?;
-            captions.push(rust_type.api_type().caption(context)?);
+            captions.push(
+                rust_type
+                    .api_type()
+                    .caption(context, RustTypeCaptionStrategy::LastName)?,
+            );
         }
         Ok(captions.join("_"))
     }
@@ -1285,7 +1290,12 @@ impl State<'_, '_> {
                                 function.allocation_place,
                                 None,
                             )?;
-                            Some(format!("to_{}", rust_type.api_type().caption(context)?))
+                            Some(format!(
+                                "to_{}",
+                                rust_type
+                                    .api_type()
+                                    .caption(context, RustTypeCaptionStrategy::LastName)?
+                            ))
                         }
                         CppOperator::Assignment => Some("copy_from".to_string()),
                         _ => Some(operator_function_name(operator)?.to_string()),
@@ -2043,7 +2053,7 @@ impl State<'_, '_> {
                     match self.try_caption_strategy(&functions, strategy) {
                         Ok(_) => {
                             trace!("  chosen strategy: {:?}", strategy);
-                            chosen_strategy = Some(strategy);
+                            chosen_strategy = Some(strategy.clone());
                             break;
                         }
                         Err(err) => {
@@ -2052,7 +2062,14 @@ impl State<'_, '_> {
                     }
                 }
                 if chosen_strategy.is_none() {
-                    trace!("  all strategies failed, indexes will be used");
+                    trace!("  all strategies failed, using default strategy");
+                    chosen_strategy = Some(RustFunctionCaptionStrategy {
+                        mut_: false,
+                        args_count: false,
+                        arg_names: false,
+                        arg_types: Some(RustTypeCaptionStrategy::LastName),
+                        static_: false,
+                    });
                 }
             }
 
@@ -2124,14 +2141,35 @@ impl FunctionWithDesiredPath {
         }
         if strategy.arg_names && !normal_args.is_empty() {
             let names = normal_args.iter().map(|arg| &arg.name).join("_");
-            suffix.push_str(&format!("_from_{}", names));
+            suffix.push_str(&format!("_{}", names));
         }
-        if strategy.arg_types && !normal_args.is_empty() {
-            let context = self.desired_path.parent()?;
-            let types = normal_args
-                .map_if_ok(|arg| arg.argument_type.api_type().caption(&context))?
-                .join("_");
-            suffix.push_str(&format!("_from_{}", types));
+        if let Some(type_strategy) = strategy.arg_types {
+            if !normal_args.is_empty() {
+                let context = self.desired_path.parent()?;
+
+                let mut types_with_counts = Vec::<(u32, &RustFinalType)>::new();
+                for t in normal_args {
+                    if let Some((count, type_)) = types_with_counts.last_mut() {
+                        if type_.api_type() == t.argument_type.api_type() {
+                            *count += 1;
+                            continue;
+                        }
+                    }
+                    types_with_counts.push((1, &t.argument_type));
+                }
+
+                let types = types_with_counts
+                    .map_if_ok(|(count, arg)| -> Result<String> {
+                        let text = arg.api_type().caption(&context, type_strategy)?;
+                        Ok(if count == 1 {
+                            text
+                        } else {
+                            format!("{}_{}", count, text)
+                        })
+                    })?
+                    .join("_");
+                suffix.push_str(&format!("_{}", types));
+            }
         }
         match self.function.self_arg_kind()? {
             RustFunctionSelfArgKind::ConstRef | RustFunctionSelfArgKind::Value => {}
@@ -2147,12 +2185,20 @@ impl FunctionWithDesiredPath {
             }
         }
 
-        if suffix.len() > 16 {
-            bail!("suffix is too long ({})", suffix.len());
-        }
-
-        let name = format!("{}_{}", self.desired_path.last(), suffix);
-        let name = sanitize_rust_identifier(&name.to_snake_case(), false);
+        let suffix = suffix.to_snake_case();
+        let name = if suffix.is_empty() {
+            self.desired_path.last().to_string()
+        } else if strategy.arg_types.is_some() && self.desired_path.last() == "new" {
+            format!("from_{}", suffix)
+        } else {
+            let delimiter = if self.desired_path.last().ends_with('_') {
+                ""
+            } else {
+                "_"
+            };
+            format!("{}{}{}", self.desired_path.last(), delimiter, suffix)
+        };
+        let name = sanitize_rust_identifier(&name, false);
         Ok(self.desired_path.parent()?.join(name))
     }
 }

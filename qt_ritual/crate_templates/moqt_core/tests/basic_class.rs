@@ -1,4 +1,4 @@
-use cpp_utils::MutRef;
+use cpp_utils::{MutRef, Ref};
 use moqt_core::basic_class::{inner_struct::InnerEnum, UpdateType};
 use moqt_core::{BasicClass, BasicClassField};
 
@@ -44,6 +44,8 @@ fn basic_class() {
         let mut converted = v.to_q_vector_of_int();
         assert_eq!(converted.count(), 1);
         assert_eq!(*converted.at(0), 7);
+
+        v.set_ref(Ref::from_raw_ref(&11));
     }
 }
 

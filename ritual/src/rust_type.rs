@@ -1,3 +1,4 @@
+use crate::rust_info::RustTypeCaptionStrategy;
 use itertools::Itertools;
 use ritual_common::errors::{bail, Error, Result};
 use ritual_common::string_utils::CaseOperations;
@@ -500,9 +501,12 @@ impl RustType {
 
     /// Returns alphanumeric description of this type
     /// for purposes of name disambiguation.
-    pub fn caption(&self, context: &RustPath) -> Result<String> {
+    pub fn caption(&self, context: &RustPath, strategy: RustTypeCaptionStrategy) -> Result<String> {
         Ok(match self {
-            RustType::Tuple(types) => types.iter().map_if_ok(|t| t.caption(context))?.join("_"),
+            RustType::Tuple(types) => types
+                .iter()
+                .map_if_ok(|t| t.caption(context, strategy))?
+                .join("_"),
             RustType::PointerLike {
                 kind,
                 is_const,
@@ -513,7 +517,12 @@ impl RustType {
                     RustPointerLikeTypeKind::Pointer => "_ptr",
                     RustPointerLikeTypeKind::Reference { .. } => "_ref",
                 };
-                format!("{}{}{}", target.caption(context)?, const_text, kind_text)
+                format!(
+                    "{}{}{}",
+                    target.caption(context, strategy)?,
+                    const_text,
+                    kind_text
+                )
             }
             RustType::Common(RustCommonType {
                 path,
@@ -526,7 +535,7 @@ impl RustType {
                     || path == &RustPath::from_good_str("cpp_utils::CppBox")
                 {
                     let arg = &generic_arguments.as_ref().unwrap()[0];
-                    return arg.caption(context);
+                    return arg.caption(context, strategy);
                 }
 
                 let mut name = if path.parts.len() == 1 {
@@ -539,6 +548,8 @@ impl RustType {
                         last
                     };
                     last.to_snake_case()
+                } else if strategy == RustTypeCaptionStrategy::LastName {
+                    path.last().to_string().to_snake_case()
                 } else {
                     let mut remaining_context: &[String] = &context.parts;
                     let parts: &[String] = &path.parts;
@@ -555,7 +566,7 @@ impl RustType {
                         }
                     }
                     if good_parts.is_empty() {
-                        path.last().to_string()
+                        path.last().to_string().to_snake_case()
                     } else {
                         good_parts.join("_")
                     }
@@ -564,7 +575,9 @@ impl RustType {
                     name = format!(
                         "{}_{}",
                         name,
-                        args.iter().map_if_ok(|x| x.caption(context))?.join("_")
+                        args.iter()
+                            .map_if_ok(|x| x.caption(context, strategy))?
+                            .join("_")
                     );
                 }
                 name
@@ -576,10 +589,10 @@ impl RustType {
                         .generic_arguments
                         .iter()
                         .flatten()
-                        .map_if_ok(|x| x.caption(context))?
+                        .map_if_ok(|x| x.caption(context, strategy))?
                         .join("_")
                 } else {
-                    RustType::Common(trait_type.clone()).caption(context)?
+                    RustType::Common(trait_type.clone()).caption(context, strategy)?
                 }
             }
         })

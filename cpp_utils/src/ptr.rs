@@ -208,6 +208,8 @@ impl Ptr<c_char> {
     }
 }
 
+pub struct NullPtr;
+
 #[test]
 fn ptr_deref() {
     let mut i = 42;

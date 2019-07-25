@@ -18,7 +18,9 @@ public:
 
     void setPos(int x, int y);
     void setPos(QPoint pos, bool flag);
-};
 
+    void match();
+    void match(int x);
+};
 
 #endif //OVERLOADED_H

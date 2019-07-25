@@ -1,3 +1,4 @@
+use crate::ptr::NullPtr;
 use crate::{CppBox, CppDeletable, MutPtr, MutRef, Ptr, Ref, StaticUpcast};
 
 /// Used to do value-to-value conversions while consuming the input value.
@@ -140,5 +141,17 @@ where
         StaticUpcast::static_upcast_mut(value.as_mut_ptr())
             .as_mut_ref()
             .expect("StaticUpcast returned null on Ref input")
+    }
+}
+
+impl<T> CastFrom<NullPtr> for Ptr<T> {
+    unsafe fn cast_from(_value: NullPtr) -> Self {
+        Self::null()
+    }
+}
+
+impl<T> CastFrom<NullPtr> for MutPtr<T> {
+    unsafe fn cast_from(_value: NullPtr) -> Self {
+        Self::null()
     }
 }

@@ -156,6 +156,10 @@ impl Default for ProcessingSteps {
             data.current_database.clear_rust_info();
             Ok(())
         });
+        s.add_custom("force_ffi_processing", |data| {
+            data.current_database.force_ffi_processing();
+            Ok(())
+        });
         s.add_custom("show_non_portable", show_non_portable);
 
         //        s.add_custom(
