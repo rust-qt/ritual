@@ -1,7 +1,5 @@
-use cpp_utils::{MutRef, Ref};
 use qt_core::{
-    ItemDataRole, QAbstractItemModel, QAbstractListModel, QAbstractTableModel, QString,
-    QStringList, QStringListModel,
+    ItemDataRole, QAbstractItemModel, QAbstractTableModel, QString, QStringList, QStringListModel,
 };
 
 #[test]
@@ -10,7 +8,7 @@ fn models_and_casts() {
         let mut string_list = QStringList::new();
         string_list.append_q_string(&QString::from_std_str("text1"));
         string_list.append_q_string(&QString::from_std_str("text2"));
-        let mut string_list_model = QStringListModel::from_q_string_list(&string_list);
+        let string_list_model = QStringListModel::from_q_string_list(&string_list);
         assert_eq!(string_list_model.row_count_0a(), 2);
         {
             let index = string_list_model.index_2a(0, 0);
