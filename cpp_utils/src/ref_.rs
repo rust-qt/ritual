@@ -2,7 +2,6 @@ use crate::{DynamicCast, MutPtr, Ptr, StaticDowncast, StaticUpcast};
 use std::ops::{Deref, DerefMut};
 use std::{fmt, ptr};
 
-#[derive(PartialEq, Eq)]
 pub struct MutRef<T>(ptr::NonNull<T>);
 
 impl<T> Clone for MutRef<T> {

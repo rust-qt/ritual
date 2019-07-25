@@ -4,7 +4,6 @@ use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::os::raw::c_char;
 
-#[derive(PartialEq, Eq)]
 pub struct MutPtr<T>(*mut T);
 
 impl<T> Clone for MutPtr<T> {
