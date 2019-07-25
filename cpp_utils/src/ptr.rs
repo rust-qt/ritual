@@ -124,6 +124,10 @@ impl<T> DerefMut for MutPtr<T> {
 }
 
 impl MutPtr<c_char> {
+    pub unsafe fn from_c_str(str: &CStr) -> Self {
+        Self::from_raw(str.as_ptr() as *mut c_char)
+    }
+
     pub unsafe fn to_c_str<'a>(self) -> &'a CStr {
         CStr::from_ptr(self.0)
     }
@@ -202,6 +206,10 @@ impl<T> Deref for Ptr<T> {
 }
 
 impl Ptr<c_char> {
+    pub unsafe fn from_c_str(str: &CStr) -> Self {
+        Self::from_raw(str.as_ptr())
+    }
+
     pub unsafe fn to_c_str<'a>(self) -> &'a CStr {
         CStr::from_ptr(self.0)
     }

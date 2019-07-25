@@ -1,5 +1,7 @@
 use crate::ptr::NullPtr;
 use crate::{CppBox, CppDeletable, MutPtr, MutRef, Ptr, Ref, StaticUpcast};
+use std::ffi::CStr;
+use std::os::raw::c_char;
 
 /// Used to do value-to-value conversions while consuming the input value.
 pub trait CastFrom<T>: Sized {
@@ -153,5 +155,17 @@ impl<T> CastFrom<NullPtr> for Ptr<T> {
 impl<T> CastFrom<NullPtr> for MutPtr<T> {
     unsafe fn cast_from(_value: NullPtr) -> Self {
         Self::null()
+    }
+}
+
+impl<'a> CastFrom<&'a CStr> for MutPtr<c_char> {
+    unsafe fn cast_from(value: &'a CStr) -> Self {
+        MutPtr::from_c_str(value)
+    }
+}
+
+impl<'a> CastFrom<&'a CStr> for Ptr<c_char> {
+    unsafe fn cast_from(value: &'a CStr) -> Self {
+        Ptr::from_c_str(value)
     }
 }
