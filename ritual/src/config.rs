@@ -1,8 +1,7 @@
 //! Interface for configuring and running the generator.
 
 use crate::cpp_checker::PreliminaryTest;
-use crate::cpp_data::CppPath;
-use crate::database::CppDatabaseItem;
+use crate::cpp_data::{CppItem, CppPath};
 use crate::processor::{ProcessingSteps, ProcessorData};
 use crate::rust_info::{NameType, RustPathScope};
 use crate::rust_type::RustPath;
@@ -152,7 +151,7 @@ pub type RustPathScopeHook = dyn Fn(&CppPath) -> Result<Option<RustPathScope>> +
 pub type RustPathHook =
     dyn Fn(&CppPath, NameType<'_>, &ProcessorData<'_>) -> Result<Option<RustPath>> + 'static;
 pub type AfterCppParserHook = dyn Fn(&mut ProcessorData<'_>) -> Result<()> + 'static;
-pub type FfiGeneratorHook = dyn Fn(&CppDatabaseItem) -> Result<bool> + 'static;
+pub type FfiGeneratorHook = dyn Fn(&CppItem) -> Result<bool> + 'static;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerLibraryConfig {
@@ -445,10 +444,7 @@ impl Config {
         self.after_cpp_parser_hook.as_ref().map(|b| &**b)
     }
 
-    pub fn set_ffi_generator_hook(
-        &mut self,
-        hook: impl Fn(&CppDatabaseItem) -> Result<bool> + 'static,
-    ) {
+    pub fn set_ffi_generator_hook(&mut self, hook: impl Fn(&CppItem) -> Result<bool> + 'static) {
         self.ffi_generator_hook = Some(Box::new(hook));
     }
 

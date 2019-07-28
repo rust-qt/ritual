@@ -174,7 +174,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
             continue;
         }
         if let Some(hook) = data.config.ffi_generator_hook() {
-            if !hook(item)? {
+            if !hook(&item.item)? {
                 trace!("skipping {} (by hook)", item.item);
                 continue;
             }
@@ -589,8 +589,13 @@ fn check_preconditions(item: &CppItem) -> Result<()> {
                     bail!("signals are excluded");
                 }
             }
-            if function.path.last().template_arguments.is_some() {
-                bail!("template functions are excluded");
+            if let Some(args) = &function.path.last().template_arguments {
+                if args
+                    .iter()
+                    .any(|arg| arg.is_or_contains_template_parameter())
+                {
+                    bail!("template functions are excluded");
+                }
             }
         }
         CppItem::ClassField(field) => {

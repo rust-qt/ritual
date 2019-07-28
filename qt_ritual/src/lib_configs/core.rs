@@ -225,7 +225,7 @@ pub fn core_config(config: &mut Config) -> Result<()> {
     });
 
     config.set_ffi_generator_hook(|item| {
-        if let CppItem::Function(function) = &item.item {
+        if let CppItem::Function(function) = &item {
             if let Ok(class_type) = function.class_type() {
                 let class_text = class_type.to_templateless_string();
                 if class_text == "QFlags" {
@@ -236,6 +236,13 @@ pub fn core_config(config: &mut Config) -> Result<()> {
                 if let CppType::Class(path) = &function.return_type {
                     if path.to_templateless_string() == "QFlags" {
                         return Ok(false);
+                    }
+                    if path.to_templateless_string() == "QDebug" && function.arguments.len() == 2 {
+                        if let CppType::Class(path2) = &function.arguments[1].argument_type {
+                            if path2.to_templateless_string() == "QFlags" {
+                                return Ok(false);
+                            }
+                        }
                     }
                 }
             }

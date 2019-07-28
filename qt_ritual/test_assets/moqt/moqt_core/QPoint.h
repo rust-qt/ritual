@@ -3,6 +3,7 @@
 
 #include "moqt_core_exports.h"
 #include <cstdint>
+#include "QVector.h"
 
 class MOQT_CORE_EXPORT QPoint {
 public:
@@ -44,5 +45,10 @@ MOQT_CORE_EXPORT bool operator>=(const QPoint& one, int other);
 MOQT_CORE_EXPORT bool operator==(const QPoint& one, int64_t other);
 
 MOQT_CORE_EXPORT int operator==(const QPoint& one, float other);
+
+template <typename T>
+inline QPoint operator<<(QPoint point, const QVector<T> &vec) {
+    return QPoint();
+}
 
 #endif //QPOINT_H

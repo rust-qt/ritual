@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::cpp_data::CppPath;
+use crate::cpp_data::{CppItem, CppPath};
 use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFfiItem};
 use crate::cpp_type::CppType;
 use crate::database::CppFfiDatabaseItem;
@@ -589,8 +589,35 @@ fn type_paths(type1: &CppType) -> Vec<&CppPath> {
 }
 
 pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
+    if let Some(hook) = data.config.ffi_generator_hook() {
+        for item in data.current_database.ffi_items_mut() {
+            if !item.checks.any_success() {
+                continue;
+            }
+            let allowed = if let CppFfiItem::Function(function) = &item.item {
+                match &function.kind {
+                    CppFfiFunctionKind::Function { cpp_function, .. } => {
+                        hook(&CppItem::Function(cpp_function.clone()))?
+                    }
+                    CppFfiFunctionKind::FieldAccessor { field, .. } => {
+                        hook(&CppItem::ClassField(field.clone()))?
+                    }
+                }
+            } else {
+                true
+            };
+            if !allowed {
+                log::info!("Checks are cleared for {}", item.item.short_text());
+                item.checks.clear();
+            }
+        }
+    }
+
     if let Some(hook) = data.config.cpp_parser_path_hook() {
         for item in data.current_database.ffi_items_mut() {
+            if !item.checks.any_success() {
+                continue;
+            }
             let (types, path) = match &item.item {
                 CppFfiItem::Function(function) => match &function.kind {
                     CppFfiFunctionKind::Function { cpp_function, .. } => (
@@ -613,9 +640,7 @@ pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
                 .any(|x| !x);
 
             if any_blocked {
-                if item.checks.any_success() {
-                    log::info!("Checks are cleared for {}", item.item.short_text());
-                }
+                log::info!("Checks are cleared for {}", item.item.short_text());
                 item.checks.clear();
             }
         }

@@ -1,5 +1,5 @@
 use cpp_utils::CppBox;
-use moqt_core::QPoint;
+use moqt_core::{QPoint, QVectorOfInt};
 
 #[test]
 fn create() {
@@ -64,5 +64,10 @@ fn operators() {
         assert!(c >= 5);
         assert!(!(c > 9));
         assert!(!(c < 4));
+
+        let mut vec = QVectorOfInt::new();
+        vec.push(10);
+        vec.push(12);
+        let _ = &b << vec.as_ref();
     }
 }
