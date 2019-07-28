@@ -1208,7 +1208,7 @@ impl State<'_, '_> {
                 return Ok(db
                     .rust_items()
                     .iter()
-                    .filter(move |item| item.cpp_item_index == Some(index)));
+                    .filter(move |item| item.item.cpp_item_index() == Some(index)));
             }
         }
 
@@ -1905,8 +1905,6 @@ impl State<'_, '_> {
                 target: RustPath::from_parts(vec![crate_name.to_string()]),
                 source,
             }),
-            cpp_item_index: None,
-            ffi_item_index: None,
         };
         self.0.current_database.add_rust_item(rust_item)?;
         Ok(())
@@ -1945,8 +1943,6 @@ impl State<'_, '_> {
                 },
                 kind: RustModuleKind::Special(kind),
             }),
-            cpp_item_index: None,
-            ffi_item_index: None,
         };
         self.0.current_database.add_rust_item(rust_item)?;
         Ok(())
@@ -1963,11 +1959,7 @@ impl State<'_, '_> {
                 if let Ok(rust_items) = self.process_cpp_item(cpp_item_index, cpp_item) {
                     let cpp_item_text = cpp_item.item.to_string();
                     for rust_item in rust_items {
-                        let item = RustDatabaseItem {
-                            item: rust_item,
-                            cpp_item_index: Some(cpp_item_index),
-                            ffi_item_index: None,
-                        };
+                        let item = RustDatabaseItem { item: rust_item };
                         debug!(
                             "added rust item: {} (cpp item: {})",
                             item.item.short_text(),
@@ -2031,11 +2023,7 @@ impl State<'_, '_> {
                                     trait_types.push(trait_impl.into());
                                 }
 
-                                let item = RustDatabaseItem {
-                                    item: rust_item,
-                                    cpp_item_index: None,
-                                    ffi_item_index: Some(ffi_item_index),
-                                };
+                                let item = RustDatabaseItem { item: rust_item };
                                 debug!(
                                     "added rust item: {} (ffi item: {})",
                                     item.item.short_text(),
@@ -2144,8 +2132,6 @@ impl State<'_, '_> {
                     .make_unique_path(&path);
                 let item = RustDatabaseItem {
                     item: RustItem::Function(function.function.with_path(final_path)),
-                    cpp_item_index: None,
-                    ffi_item_index: Some(function.ffi_item_index),
                 };
                 debug!("added rust item: {}", item.item.short_text(),);
                 trace!("rust item data: {:?}", item);

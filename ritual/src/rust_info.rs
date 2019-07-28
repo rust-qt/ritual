@@ -734,6 +734,47 @@ impl RustItem {
         }
     }
 
+    pub fn cpp_item_index(&self) -> Option<usize> {
+        match self {
+            RustItem::Module(data) => match &data.kind {
+                RustModuleKind::Special(_) => None,
+                RustModuleKind::CppNamespace { cpp_item_index } => Some(*cpp_item_index),
+                RustModuleKind::CppNestedTypes { cpp_item_index } => Some(*cpp_item_index),
+            },
+            RustItem::Struct(data) => match &data.kind {
+                RustStructKind::WrapperType(data) => Some(data.cpp_item_index),
+                RustStructKind::QtSlotWrapper(data) => Some(data.cpp_item_index),
+                RustStructKind::SizedType(data) => Some(data.cpp_item_index),
+            },
+            RustItem::EnumValue(data) => Some(data.cpp_item_index),
+            RustItem::ExtraImpl(data) => match &data.kind {
+                RustExtraImplKind::FlagEnum(data) => Some(data.cpp_item_index),
+                RustExtraImplKind::RawSlotReceiver(data) => Some(data.cpp_item_index),
+            },
+            RustItem::Function(data) => match &data.kind {
+                RustFunctionKind::FfiWrapper(_) => None,
+                RustFunctionKind::SignalOrSlotGetter(data) => Some(data.cpp_item_index),
+            },
+            RustItem::TraitImpl(_) | RustItem::FfiFunction(_) | RustItem::Reexport(_) => None,
+        }
+    }
+
+    pub fn ffi_item_index(&self) -> Option<usize> {
+        match self {
+            RustItem::TraitImpl(data) => Some(data.source.ffi_item_index),
+            RustItem::FfiFunction(data) => Some(data.ffi_item_index),
+            RustItem::Function(data) => match &data.kind {
+                RustFunctionKind::FfiWrapper(data) => Some(data.ffi_item_index),
+                RustFunctionKind::SignalOrSlotGetter(_) => None,
+            },
+            RustItem::Module(_)
+            | RustItem::Struct(_)
+            | RustItem::EnumValue(_)
+            | RustItem::ExtraImpl(_)
+            | RustItem::Reexport(_) => None,
+        }
+    }
+
     pub fn is_ffi_function(&self) -> bool {
         if let RustItem::FfiFunction(_) = self {
             true
@@ -815,10 +856,6 @@ impl RustItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustDatabaseItem {
     pub item: RustItem,
-
-    // TODO: remove this
-    pub cpp_item_index: Option<usize>,
-    pub ffi_item_index: Option<usize>,
 }
 
 impl RustDatabaseItem {

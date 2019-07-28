@@ -235,14 +235,14 @@ impl Generator<'_> {
         self_type: Option<&RustType>,
         database: &RustDatabase,
     ) -> Result<()> {
-        let ffi_item = if let Some(index) = item.ffi_item_index {
+        let ffi_item = if let Some(index) = item.item.ffi_item_index() {
             Some(
                 self.current_database
                     .ffi_items()
                     .get(index)
                     .ok_or_else(|| err_msg("rust item refers to invalid ffi item index"))?,
             )
-        } else if let Some(index) = item.cpp_item_index {
+        } else if let Some(index) = item.item.cpp_item_index() {
             let cpp_item = self
                 .current_database
                 .cpp_items()
