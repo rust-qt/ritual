@@ -1534,6 +1534,7 @@ impl State<'_, '_> {
                         parent_path: rust_type_path.parent()?,
                         kind: RustExtraImplKind::FlagEnum {
                             enum_path: rust_type_path.clone(),
+                            cpp_item_index,
                         },
                     });
                     return Ok(vec![rust_item]);
@@ -1650,6 +1651,7 @@ impl State<'_, '_> {
                     receiver_id,
                     target_path: public_path.clone(),
                     arguments: RustType::Tuple(arg_types),
+                    cpp_item_index,
                 }),
             });
             rust_items.push(impl_item);

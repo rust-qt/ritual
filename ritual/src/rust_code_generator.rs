@@ -1023,7 +1023,7 @@ impl Generator<'_> {
         condition_texts: &ConditionTexts,
     ) -> Result<()> {
         match &data.kind {
-            RustExtraImplKind::FlagEnum { enum_path } => {
+            RustExtraImplKind::FlagEnum { enum_path, .. } => {
                 let enum_path = self.rust_path_to_string(enum_path);
                 let qflags = self.rust_path_to_string(&self.qt_core_path().join("QFlags"));
 

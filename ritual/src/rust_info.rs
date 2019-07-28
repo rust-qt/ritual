@@ -536,11 +536,15 @@ pub struct RustRawSlotReceiver {
     pub target_path: RustPath,
     pub arguments: RustType,
     pub receiver_id: String,
+    pub cpp_item_index: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RustExtraImplKind {
-    FlagEnum { enum_path: RustPath },
+    FlagEnum {
+        enum_path: RustPath,
+        cpp_item_index: usize,
+    },
     RawSlotReceiver(RustRawSlotReceiver),
 }
 
