@@ -233,24 +233,19 @@ pub fn function_doc(function: &RustFunction) -> String {
                 }
             }
         }
-        RustFunctionKind::SignalOrSlotGetter {
-            receiver_type,
-            cpp_path,
-            cpp_doc,
-            ..
-        } => {
+        RustFunctionKind::SignalOrSlotGetter(getter) => {
             doc.push(format!(
                 "Returns an object representing a built-in Qt {signal} `{cpp_path}`.\n\n\
                  Return value of this function can be used for creating Qt connections using \
                  `qt_core::connection` API.",
-                signal = match receiver_type {
+                signal = match getter.receiver_type {
                     RustQtReceiverType::Signal => "signal",
                     RustQtReceiverType::Slot => "slot",
                 },
-                cpp_path = cpp_path.to_cpp_pseudo_code()
+                cpp_path = getter.cpp_path.to_cpp_pseudo_code()
             ));
 
-            if let Some(cpp_doc) = cpp_doc {
+            if let Some(cpp_doc) = &getter.cpp_doc {
                 doc.push(format_external_doc(cpp_doc));
             }
         }

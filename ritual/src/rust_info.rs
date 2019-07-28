@@ -107,6 +107,32 @@ impl RustStructKind {
             _ => false,
         }
     }
+
+    pub fn has_same_source(&self, other: &Self) -> bool {
+        match self {
+            RustStructKind::WrapperType(data) => {
+                if let RustStructKind::WrapperType(other) = other {
+                    data.cpp_item_index == other.cpp_item_index
+                } else {
+                    false
+                }
+            }
+            RustStructKind::QtSlotWrapper(data) => {
+                if let RustStructKind::QtSlotWrapper(other) = other {
+                    data.cpp_item_index == other.cpp_item_index
+                } else {
+                    false
+                }
+            }
+            RustStructKind::SizedType(data) => {
+                if let RustStructKind::SizedType(other) = other {
+                    data.cpp_item_index == other.cpp_item_index
+                } else {
+                    false
+                }
+            }
+        }
+    }
 }
 
 /// Exported information about a Rust wrapper type
@@ -164,30 +190,34 @@ pub struct RustFfiWrapperData {
     pub ffi_item_index: usize,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct RustSignalOrSlotGetter {
+    /// C++ name of the signal or slot
+    pub cpp_path: CppPath,
+    /// Type of the receiver.
+    pub receiver_type: RustQtReceiverType,
+    /// Identifier of the signal or slot for passing to `QObject::connect`.
+    pub receiver_id: String,
+
+    pub cpp_doc: Option<CppFunctionExternalDoc>,
+    pub cpp_item_index: usize,
+}
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum RustFunctionKind {
     FfiWrapper(RustFfiWrapperData),
-    SignalOrSlotGetter {
-        /// C++ name of the signal or slot
-        cpp_path: CppPath,
-        /// Type of the receiver.
-        receiver_type: RustQtReceiverType,
-        /// Identifier of the signal or slot for passing to `QObject::connect`.
-        receiver_id: String,
-
-        cpp_doc: Option<CppFunctionExternalDoc>,
-        cpp_item_index: usize,
-    },
+    SignalOrSlotGetter(RustSignalOrSlotGetter),
 }
 
 impl RustFunctionKind {
     pub fn short_text(&self) -> String {
         match self {
             RustFunctionKind::FfiWrapper(data) => data.cpp_ffi_function.short_text(),
-            RustFunctionKind::SignalOrSlotGetter { cpp_path, .. } => {
-                format!("SignalOrSlotGetter({}", cpp_path.to_cpp_pseudo_code())
-            }
+            RustFunctionKind::SignalOrSlotGetter(getter) => format!(
+                "SignalOrSlotGetter({}",
+                getter.cpp_path.to_cpp_pseudo_code()
+            ),
         }
     }
 }
@@ -554,12 +584,36 @@ pub struct RustRawSlotReceiver {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RustFlagEnumImpl {
+    pub enum_path: RustPath,
+    pub cpp_item_index: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RustExtraImplKind {
-    FlagEnum {
-        enum_path: RustPath,
-        cpp_item_index: usize,
-    },
+    FlagEnum(RustFlagEnumImpl),
     RawSlotReceiver(RustRawSlotReceiver),
+}
+
+impl RustExtraImplKind {
+    pub fn has_same_source(&self, other: &Self) -> bool {
+        match self {
+            RustExtraImplKind::FlagEnum(data) => {
+                if let RustExtraImplKind::FlagEnum(other) = other {
+                    data.cpp_item_index == other.cpp_item_index
+                } else {
+                    false
+                }
+            }
+            RustExtraImplKind::RawSlotReceiver(data) => {
+                if let RustExtraImplKind::RawSlotReceiver(other) = other {
+                    data.cpp_item_index == other.cpp_item_index
+                } else {
+                    false
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -594,6 +648,92 @@ pub enum RustItem {
 }
 
 impl RustItem {
+    pub fn has_same_source(&self, other: &Self) -> bool {
+        match self {
+            RustItem::Module(data) => {
+                if let RustItem::Module(other) = other {
+                    data.kind == other.kind
+                } else {
+                    false
+                }
+            }
+            RustItem::Struct(data) => {
+                if let RustItem::Struct(other) = other {
+                    data.kind.has_same_source(&other.kind)
+                } else {
+                    false
+                }
+            }
+            RustItem::EnumValue(data) => {
+                if let RustItem::EnumValue(other) = other {
+                    data.cpp_item_index == other.cpp_item_index
+                } else {
+                    false
+                }
+            }
+            RustItem::TraitImpl(data) => match other {
+                RustItem::TraitImpl(other) => data.source == other.source,
+                RustItem::Function(other) => {
+                    if let RustFunctionKind::FfiWrapper(other) = &other.kind {
+                        data.source.ffi_item_index == other.ffi_item_index
+                            && data.source.kind == RustTraitImplSourceKind::Normal
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            },
+            RustItem::ExtraImpl(data) => {
+                if let RustItem::ExtraImpl(other) = other {
+                    data.kind.has_same_source(&other.kind)
+                } else {
+                    false
+                }
+            }
+            RustItem::FfiFunction(data) => {
+                if let RustItem::FfiFunction(other) = other {
+                    data.ffi_item_index == other.ffi_item_index
+                } else {
+                    false
+                }
+            }
+            RustItem::Function(data) => match &data.kind {
+                RustFunctionKind::FfiWrapper(data) => match other {
+                    RustItem::TraitImpl(other) => {
+                        data.ffi_item_index == other.source.ffi_item_index
+                            && other.source.kind == RustTraitImplSourceKind::Normal
+                    }
+                    RustItem::Function(other) => {
+                        if let RustFunctionKind::FfiWrapper(other) = &other.kind {
+                            data.ffi_item_index == other.ffi_item_index
+                        } else {
+                            false
+                        }
+                    }
+                    _ => false,
+                },
+                RustFunctionKind::SignalOrSlotGetter(data) => {
+                    if let RustItem::Function(other) = other {
+                        if let RustFunctionKind::SignalOrSlotGetter(other) = &other.kind {
+                            data.cpp_item_index == other.cpp_item_index
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                }
+            },
+            RustItem::Reexport(data) => {
+                if let RustItem::Reexport(other) = other {
+                    data.source == other.source
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
     pub fn is_ffi_function(&self) -> bool {
         if let RustItem::FfiFunction(_) = self {
             true

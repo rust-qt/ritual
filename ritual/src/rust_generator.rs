@@ -14,13 +14,14 @@ use crate::database::{CppDatabaseItem, CppFfiDatabaseItem};
 use crate::processor::ProcessorData;
 use crate::rust_info::{
     NameType, RustDatabaseItem, RustEnumValue, RustEnumValueDoc, RustExtraImpl, RustExtraImplKind,
-    RustFFIArgument, RustFFIFunction, RustFfiWrapperData, RustFunction, RustFunctionArgument,
-    RustFunctionCaptionStrategy, RustFunctionKind, RustFunctionSelfArgKind, RustItem, RustModule,
-    RustModuleDoc, RustModuleKind, RustPathScope, RustQtReceiverType, RustQtSlotWrapper,
-    RustRawSlotReceiver, RustReexport, RustReexportSource, RustSizedType, RustSpecialModuleKind,
-    RustStruct, RustStructKind, RustTraitAssociatedType, RustTraitImpl, RustTraitImplSource,
-    RustTraitImplSourceKind, RustTypeCaptionStrategy, RustWrapperType, RustWrapperTypeDocData,
-    RustWrapperTypeKind, UnnamedRustFunction,
+    RustFFIArgument, RustFFIFunction, RustFfiWrapperData, RustFlagEnumImpl, RustFunction,
+    RustFunctionArgument, RustFunctionCaptionStrategy, RustFunctionKind, RustFunctionSelfArgKind,
+    RustItem, RustModule, RustModuleDoc, RustModuleKind, RustPathScope, RustQtReceiverType,
+    RustQtSlotWrapper, RustRawSlotReceiver, RustReexport, RustReexportSource,
+    RustSignalOrSlotGetter, RustSizedType, RustSpecialModuleKind, RustStruct, RustStructKind,
+    RustTraitAssociatedType, RustTraitImpl, RustTraitImplSource, RustTraitImplSourceKind,
+    RustTypeCaptionStrategy, RustWrapperType, RustWrapperTypeDocData, RustWrapperTypeKind,
+    UnnamedRustFunction,
 };
 use crate::rust_type::{
     RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
@@ -1561,10 +1562,10 @@ impl State<'_, '_> {
                     let rust_type_path = rust_type.path().expect("enum rust item must have path");
                     let rust_item = RustItem::ExtraImpl(RustExtraImpl {
                         parent_path: rust_type_path.parent()?,
-                        kind: RustExtraImplKind::FlagEnum {
+                        kind: RustExtraImplKind::FlagEnum(RustFlagEnumImpl {
                             enum_path: rust_type_path.clone(),
                             cpp_item_index,
-                        },
+                        }),
                     });
                     return Ok(vec![rust_item]);
                 }
@@ -1808,13 +1809,13 @@ impl State<'_, '_> {
                     return Ok(Vec::new());
                 }
                 let receiver_id = cpp_function.receiver_id()?;
-                let function_kind = RustFunctionKind::SignalOrSlotGetter {
+                let function_kind = RustFunctionKind::SignalOrSlotGetter(RustSignalOrSlotGetter {
                     cpp_path: cpp_function.path.clone(),
                     receiver_type,
                     receiver_id,
                     cpp_doc: cpp_function.doc.external_doc.clone(),
                     cpp_item_index,
-                };
+                });
 
                 let path = self.generate_rust_path(
                     &cpp_function.path,

@@ -890,7 +890,7 @@ impl Generator<'_> {
             RustFunctionKind::FfiWrapper(data) => {
                 self.generate_ffi_call(&func.arguments, &func.return_type, data, func.is_unsafe)?
             }
-            RustFunctionKind::SignalOrSlotGetter { receiver_id, .. } => {
+            RustFunctionKind::SignalOrSlotGetter(getter) => {
                 let path = &func.return_type.api_type().as_common()?.path;
                 let call = format!(
                     "{}::new(::cpp_utils::Ref::from_raw(self as &{})\
@@ -898,7 +898,7 @@ impl Generator<'_> {
                      ::std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"))",
                     self.rust_path_to_string(&path),
                     self.rust_path_to_string(&self.qt_core_path().join("QObject")),
-                    receiver_id
+                    getter.receiver_id
                 );
                 wrap_unsafe(func.is_unsafe, &call)
             }
@@ -1023,8 +1023,8 @@ impl Generator<'_> {
         condition_texts: &ConditionTexts,
     ) -> Result<()> {
         match &data.kind {
-            RustExtraImplKind::FlagEnum { enum_path, .. } => {
-                let enum_path = self.rust_path_to_string(enum_path);
+            RustExtraImplKind::FlagEnum(data) => {
+                let enum_path = self.rust_path_to_string(&data.enum_path);
                 let qflags = self.rust_path_to_string(&self.qt_core_path().join("QFlags"));
 
                 writeln!(
