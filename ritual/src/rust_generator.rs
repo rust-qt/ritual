@@ -32,7 +32,7 @@ use log::{debug, trace};
 use ritual_common::errors::{bail, err_msg, format_err, print_trace, Result};
 use ritual_common::string_utils::CaseOperations;
 use ritual_common::utils::MapIfOk;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::iter::{once, Iterator};
 use std::ops::Deref;
 
@@ -1933,13 +1933,15 @@ impl State<'_, '_> {
     }
 
     fn process_cpp_items(&mut self) -> Result<()> {
+        let mut processed_indexes = HashSet::new();
         loop {
             let mut any_processed = false;
             for cpp_item_index in 0..self.0.current_database.cpp_items().len() {
-                let cpp_item = &self.0.current_database.cpp_items()[cpp_item_index];
-                if cpp_item.is_rust_processed {
+                if processed_indexes.contains(&cpp_item_index) {
                     continue;
                 }
+
+                let cpp_item = &self.0.current_database.cpp_items()[cpp_item_index];
                 if let Ok(rust_items) = self.process_cpp_item(cpp_item_index, cpp_item) {
                     let cpp_item_text = cpp_item.item.to_string();
                     for rust_item in rust_items {
@@ -1952,8 +1954,7 @@ impl State<'_, '_> {
                         trace!("rust item data: {:?}", item);
                         self.0.current_database.add_rust_item(item)?;
                     }
-                    self.0.current_database.cpp_items_mut()[cpp_item_index].is_rust_processed =
-                        true;
+                    processed_indexes.insert(cpp_item_index);
                     any_processed = true;
                 }
             }
@@ -1964,10 +1965,6 @@ impl State<'_, '_> {
         }
 
         for (cpp_item_index, cpp_item) in self.0.current_database.cpp_items().iter().enumerate() {
-            if cpp_item.is_rust_processed {
-                continue;
-            }
-
             if let Err(err) = self.process_cpp_item(cpp_item_index, cpp_item) {
                 debug!("failed to process cpp item: {}: {}", &cpp_item.item, err);
                 print_trace(&err, Some(log::Level::Trace));
@@ -1994,9 +1991,6 @@ impl State<'_, '_> {
 
         for ffi_item_index in 0..self.0.current_database.ffi_items().len() {
             let ffi_item = &self.0.current_database.ffi_items()[ffi_item_index];
-            if ffi_item.is_rust_processed {
-                continue;
-            }
             match self.process_ffi_item(ffi_item_index, ffi_item, &trait_types) {
                 Ok(results) => {
                     let ffi_item_text = ffi_item.item.short_text();
@@ -2024,8 +2018,6 @@ impl State<'_, '_> {
                             }
                         }
                     }
-                    self.0.current_database.ffi_items_mut()[ffi_item_index].is_rust_processed =
-                        true;
                 }
                 Err(err) => {
                     debug!(

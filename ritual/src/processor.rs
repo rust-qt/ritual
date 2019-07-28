@@ -411,6 +411,8 @@ pub fn process(
             let elapsed = started_time.elapsed();
             trace!("Step '{}' completed in {:?}", step.name, elapsed);
 
+            current_database.report_counters();
+
             if elapsed > Duration::from_secs(15) {
                 workspace.save_database(&mut current_database)?;
             }

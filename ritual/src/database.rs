@@ -4,7 +4,7 @@ use crate::cpp_data::{CppItem, CppOriginLocation, CppPath};
 use crate::cpp_ffi_data::{CppFfiFunction, CppFfiItem, QtSlotWrapper};
 use crate::rust_info::RustDatabaseItem;
 use crate::rust_type::RustPath;
-use log::{debug, trace};
+use log::{debug, info, trace};
 use ritual_common::errors::{bail, format_err, Result};
 use ritual_common::string_utils::ends_with_digit;
 use ritual_common::target::LibraryTarget;
@@ -38,7 +38,6 @@ pub struct CppFfiDatabaseItem {
     pub item: CppFfiItem,
     pub source_ffi_item: Option<usize>,
     pub checks: CppChecks,
-    pub is_rust_processed: bool,
 }
 
 impl CppFfiDatabaseItem {
@@ -47,7 +46,6 @@ impl CppFfiDatabaseItem {
             item: CppFfiItem::Function(function),
             source_ffi_item,
             checks: CppChecks::default(),
-            is_rust_processed: false,
         }
     }
 
@@ -56,7 +54,6 @@ impl CppFfiDatabaseItem {
             item: CppFfiItem::QtSlotWrapper(wrapper),
             source_ffi_item,
             checks: CppChecks::default(),
-            is_rust_processed: false,
         }
     }
 
@@ -90,7 +87,6 @@ pub struct CppDatabaseItem {
     pub source: DatabaseItemSource,
     pub source_ffi_item: Option<usize>,
     pub is_cpp_ffi_processed: bool,
-    pub is_rust_processed: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -103,11 +99,18 @@ pub struct Data {
     environments: Vec<LibraryTarget>,
 }
 
+#[derive(Debug, Default)]
+pub struct Counters {
+    pub rust_items_added: u32,
+    pub rust_items_ignored: u32,
+}
+
 /// Represents all collected data related to a crate.
 #[derive(Debug)]
 pub struct Database {
     data: Data,
     is_modified: bool,
+    counters: Counters,
 }
 
 impl Database {
@@ -115,6 +118,7 @@ impl Database {
         Database {
             data,
             is_modified: false,
+            counters: Counters::default(),
         }
     }
 
@@ -134,6 +138,7 @@ impl Database {
                 environments: Vec::new(),
             },
             is_modified: true,
+            counters: Counters::default(),
         }
     }
 
@@ -246,7 +251,6 @@ impl Database {
             source,
             source_ffi_item,
             is_cpp_ffi_processed: false,
-            is_rust_processed: false,
         };
         trace!("cpp item data: {:?}", item);
         self.data.cpp_items.push(item);
@@ -256,12 +260,6 @@ impl Database {
     pub fn clear_rust_info(&mut self) {
         self.is_modified = true;
         self.data.rust_items.clear();
-        for item in &mut self.data.cpp_items {
-            item.is_rust_processed = false;
-        }
-        for item in &mut self.data.ffi_items {
-            item.is_rust_processed = false;
-        }
     }
 
     pub fn add_environment(&mut self, env: LibraryTarget) {
@@ -324,7 +322,18 @@ impl Database {
             }
         }
 
+        if self
+            .data
+            .rust_items
+            .iter()
+            .any(|other| other.item.has_same_source(&item.item))
+        {
+            self.counters.rust_items_ignored += 1;
+            return Ok(());
+        }
+
         self.data.rust_items.push(item);
+        self.counters.rust_items_added += 1;
         Ok(())
     }
 
@@ -351,5 +360,13 @@ impl Database {
             number = Some(number.unwrap_or(1) + 1);
         }
         // TODO: check for conflicts with types from crate template (how?)
+    }
+
+    pub fn report_counters(&mut self) {
+        trace!("counters: {:?}", self.counters);
+        if self.counters.rust_items_added > 0 {
+            info!("Rust items added: {}", self.counters.rust_items_added);
+        }
+        self.counters = Counters::default();
     }
 }
