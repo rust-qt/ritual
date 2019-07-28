@@ -525,6 +525,12 @@ pub struct RustExtraImpl {
     pub kind: RustExtraImplKind,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RustReexport {
+    pub path: RustPath,
+    pub target: RustPath,
+}
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RustItem {
@@ -535,7 +541,7 @@ pub enum RustItem {
     ExtraImpl(RustExtraImpl),
     FfiFunction(RustFFIFunction), // TODO: merge FfiFunction and Function
     Function(RustFunction),
-    Reexport { path: RustPath, target: RustPath },
+    Reexport(RustReexport),
 }
 
 impl RustItem {
@@ -592,9 +598,11 @@ impl RustItem {
             RustItem::ExtraImpl(data) => format!("extra impl {:?}", data.kind),
             RustItem::FfiFunction(data) => format!("ffi fn {}", data.path.full_name(None)),
             RustItem::Function(data) => format!("fn {}", data.path.full_name(None)),
-            RustItem::Reexport { path, target } => {
-                format!("use {} as {}", path.full_name(None), target.last())
-            }
+            RustItem::Reexport(data) => format!(
+                "use {} as {}",
+                data.path.full_name(None),
+                data.target.last()
+            ),
         }
     }
 }
@@ -614,7 +622,7 @@ impl RustDatabaseItem {
             RustItem::EnumValue(data) => Some(&data.path),
             RustItem::Function(data) => Some(&data.path),
             RustItem::FfiFunction(data) => Some(&data.path),
-            RustItem::Reexport { path, .. } => Some(path),
+            RustItem::Reexport(data) => Some(&data.path),
             RustItem::TraitImpl(_) | RustItem::ExtraImpl(_) => None,
         }
     }

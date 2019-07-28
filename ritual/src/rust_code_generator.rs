@@ -286,12 +286,12 @@ impl Generator<'_> {
             }
             RustItem::FfiFunction(value) => self.generate_ffi_function(value, &condition_texts),
             RustItem::ExtraImpl(value) => self.generate_extra_impl(value, &condition_texts),
-            RustItem::Reexport { path, target } => {
+            RustItem::Reexport(reexport) => {
                 writeln!(
                     self,
                     "pub use {} as {};",
-                    self.rust_path_to_string(target),
-                    path.last()
+                    self.rust_path_to_string(&reexport.target),
+                    reexport.path.last()
                 )?;
                 Ok(())
             }

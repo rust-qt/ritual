@@ -17,9 +17,9 @@ use crate::rust_info::{
     RustFFIArgument, RustFFIFunction, RustFfiWrapperData, RustFunction, RustFunctionArgument,
     RustFunctionCaptionStrategy, RustFunctionKind, RustFunctionSelfArgKind, RustItem, RustModule,
     RustModuleDoc, RustModuleKind, RustPathScope, RustQtReceiverType, RustQtSlotWrapper,
-    RustRawSlotReceiver, RustStruct, RustStructKind, RustTraitAssociatedType, RustTraitImpl,
-    RustTypeCaptionStrategy, RustWrapperType, RustWrapperTypeDocData, RustWrapperTypeKind,
-    UnnamedRustFunction,
+    RustRawSlotReceiver, RustReexport, RustStruct, RustStructKind, RustTraitAssociatedType,
+    RustTraitImpl, RustTypeCaptionStrategy, RustWrapperType, RustWrapperTypeDocData,
+    RustWrapperTypeKind, UnnamedRustFunction,
 };
 use crate::rust_type::{
     RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
@@ -1830,10 +1830,10 @@ impl State<'_, '_> {
         }
 
         let rust_item = RustDatabaseItem {
-            item: RustItem::Reexport {
+            item: RustItem::Reexport(RustReexport {
                 path,
                 target: RustPath::from_parts(vec![crate_name.to_string()]),
-            },
+            }),
             cpp_item_index: None,
             ffi_item_index: None,
         };
