@@ -14,14 +14,13 @@ use crate::database::{CppDatabaseItem, CppFfiDatabaseItem};
 use crate::processor::ProcessorData;
 use crate::rust_info::{
     NameType, RustDatabaseItem, RustEnumValue, RustEnumValueDoc, RustExtraImpl, RustExtraImplKind,
-    RustFFIArgument, RustFFIFunction, RustFfiWrapperData, RustFlagEnumImpl, RustFunction,
-    RustFunctionArgument, RustFunctionCaptionStrategy, RustFunctionKind, RustFunctionSelfArgKind,
-    RustItem, RustModule, RustModuleDoc, RustModuleKind, RustPathScope, RustQtReceiverType,
-    RustQtSlotWrapper, RustRawSlotReceiver, RustReexport, RustReexportSource,
-    RustSignalOrSlotGetter, RustSizedType, RustSpecialModuleKind, RustStruct, RustStructKind,
-    RustTraitAssociatedType, RustTraitImpl, RustTraitImplSource, RustTraitImplSourceKind,
-    RustTypeCaptionStrategy, RustWrapperType, RustWrapperTypeDocData, RustWrapperTypeKind,
-    UnnamedRustFunction,
+    RustFfiFunctionData, RustFfiWrapperData, RustFlagEnumImpl, RustFunction, RustFunctionArgument,
+    RustFunctionCaptionStrategy, RustFunctionKind, RustFunctionSelfArgKind, RustItem, RustModule,
+    RustModuleDoc, RustModuleKind, RustPathScope, RustQtReceiverType, RustQtSlotWrapper,
+    RustRawSlotReceiver, RustReexport, RustReexportSource, RustSignalOrSlotGetter, RustSizedType,
+    RustSpecialModuleKind, RustStruct, RustStructKind, RustTraitAssociatedType, RustTraitImpl,
+    RustTraitImplSource, RustTraitImplSourceKind, RustTypeCaptionStrategy, RustWrapperType,
+    RustWrapperTypeDocData, RustWrapperTypeKind, UnnamedRustFunction,
 };
 use crate::rust_type::{
     RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
@@ -593,20 +592,25 @@ impl State<'_, '_> {
         &self,
         ffi_item_index: usize,
         data: &CppFfiFunction,
-    ) -> Result<RustFFIFunction> {
+    ) -> Result<RustFunction> {
         let mut args = Vec::new();
-        for arg in &data.arguments {
+        for (ffi_index, arg) in data.arguments.iter().enumerate() {
             let rust_type = self.ffi_type_to_rust_ffi_type(arg.argument_type.ffi_type())?;
-            args.push(RustFFIArgument {
+            args.push(RustFunctionArgument {
                 name: sanitize_rust_identifier(&arg.name, false),
-                argument_type: rust_type,
+                argument_type: RustFinalType::new(rust_type, RustToFfiTypeConversion::None)?,
+                ffi_index,
             });
         }
-        Ok(RustFFIFunction {
-            return_type: self.ffi_type_to_rust_ffi_type(data.return_type.ffi_type())?,
+        let return_type = self.ffi_type_to_rust_ffi_type(data.return_type.ffi_type())?;
+        Ok(RustFunction {
+            is_public: true,
+            return_type: RustFinalType::new(return_type, RustToFfiTypeConversion::None)?,
             path: self.generate_rust_path(&data.path, NameType::FfiFunction)?,
+            kind: RustFunctionKind::FfiFunction(RustFfiFunctionData { ffi_item_index }),
             arguments: args,
-            ffi_item_index,
+            is_unsafe: false,
+            extra_doc: None,
         })
     }
 
@@ -992,7 +996,7 @@ impl State<'_, '_> {
     ) -> Result<Vec<ProcessedFfiItem>> {
         let rust_ffi_function = self.generate_ffi_function(ffi_item_index, &function)?;
         let ffi_function_path = rust_ffi_function.path.clone();
-        let mut results = vec![ProcessedFfiItem::Item(RustItem::FfiFunction(
+        let mut results = vec![ProcessedFfiItem::Item(RustItem::Function(
             rust_ffi_function,
         ))];
 

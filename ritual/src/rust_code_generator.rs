@@ -5,10 +5,9 @@ use crate::database::Database;
 use crate::doc_formatter;
 use crate::rust_generator::qt_core_path;
 use crate::rust_info::{
-    RustDatabaseItem, RustEnumValue, RustExtraImpl, RustExtraImplKind, RustFFIFunction,
-    RustFfiWrapperData, RustFunction, RustFunctionArgument, RustFunctionKind, RustItem, RustModule,
-    RustModuleKind, RustSpecialModuleKind, RustStruct, RustStructKind, RustTraitImpl,
-    RustWrapperTypeKind,
+    RustDatabaseItem, RustEnumValue, RustExtraImpl, RustExtraImplKind, RustFfiWrapperData,
+    RustFunction, RustFunctionArgument, RustFunctionKind, RustItem, RustModule, RustModuleKind,
+    RustSpecialModuleKind, RustStruct, RustStructKind, RustTraitImpl, RustWrapperTypeKind,
 };
 use crate::rust_type::{
     RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
@@ -281,9 +280,8 @@ impl Generator<'_> {
             RustItem::EnumValue(value) => self.generate_enum_value(value),
             RustItem::TraitImpl(value) => self.generate_trait_impl(value, &condition_texts),
             RustItem::Function(value) => {
-                self.generate_rust_final_function(value, false, self_type, &condition_texts)
+                self.generate_function(value, false, self_type, &condition_texts)
             }
-            RustItem::FfiFunction(value) => self.generate_ffi_function(value, &condition_texts),
             RustItem::ExtraImpl(value) => self.generate_extra_impl(value, &condition_texts),
             RustItem::Reexport(reexport) => {
                 writeln!(
@@ -516,27 +514,6 @@ impl Generator<'_> {
     // TODO: generate relative paths for better readability
     fn rust_path_to_string(&self, path: &RustPath) -> String {
         path.full_name(Some(&self.current_database.crate_name()))
-    }
-
-    /// Generates Rust code containing declaration of a FFI function `func`.
-    fn rust_ffi_function_to_code(&self, func: &RustFFIFunction) -> String {
-        let mut args = func.arguments.iter().map(|arg| {
-            format!(
-                "{}: {}",
-                arg.name,
-                self.rust_type_to_code(&arg.argument_type)
-            )
-        });
-        format!(
-            "  pub fn {}({}){};\n",
-            func.path.last(),
-            args.join(", "),
-            if func.return_type.is_unit() {
-                String::new()
-            } else {
-                format!(" -> {}", self.rust_type_to_code(&func.return_type))
-            }
-        )
     }
 
     /// Wraps `expression` of type `type1.rust_ffi_type` to convert
@@ -880,7 +857,7 @@ impl Generator<'_> {
     }
 
     /// Generates complete code of a Rust wrapper function.
-    fn generate_rust_final_function(
+    fn generate_function(
         &mut self,
         func: &RustFunction,
         is_in_trait_context: bool,
@@ -895,9 +872,12 @@ impl Generator<'_> {
         let maybe_unsafe = if func.is_unsafe { "unsafe " } else { "" };
 
         let body = match &func.kind {
-            RustFunctionKind::FfiWrapper(data) => {
-                self.generate_ffi_call(&func.arguments, &func.return_type, data, func.is_unsafe)?
-            }
+            RustFunctionKind::FfiWrapper(data) => Some(self.generate_ffi_call(
+                &func.arguments,
+                &func.return_type,
+                data,
+                func.is_unsafe,
+            )?),
             RustFunctionKind::SignalOrSlotGetter(getter) => {
                 let path = &func.return_type.api_type().as_common()?.path;
                 let call = format!(
@@ -908,8 +888,14 @@ impl Generator<'_> {
                     self.rust_path_to_string(&self.qt_core_path().join("QObject")),
                     getter.receiver_id
                 );
-                wrap_unsafe(func.is_unsafe, &call)
+                Some(wrap_unsafe(func.is_unsafe, &call))
             }
+            RustFunctionKind::FfiFunction(_) => None,
+        };
+
+        let maybe_body = match body {
+            None => ";".to_string(),
+            Some(text) => format!("{{\n{}\n}}", text),
         };
 
         let return_type_for_signature = if func.return_type.api_type().is_unit() {
@@ -937,8 +923,9 @@ impl Generator<'_> {
         let doc = doc_formatter::function_doc(&func) + &condition_texts.doc_text;
         writeln!(
             self,
-            "{doc}{condition}{maybe_pub}{maybe_unsafe}fn {name}{lifetimes_text}({args}){return_type} \
-             {{\n{body}}}\n\n",
+            "{doc}{condition}{maybe_pub}{maybe_unsafe} \
+             fn {name}{lifetimes_text}({args}){return_type} \
+             {maybe_body}\n\n",
             doc = format_doc(&doc),
             condition = condition_texts.attribute,
             maybe_pub = maybe_pub,
@@ -947,7 +934,7 @@ impl Generator<'_> {
             name = func.path.last(),
             args = self.arg_texts(&func.arguments, None, self_type)?.join(", "),
             return_type = return_type_for_signature,
-            body = body
+            maybe_body = maybe_body
         )?;
         Ok(())
     }
@@ -1001,7 +988,7 @@ impl Generator<'_> {
         )?;
 
         for func in &trait1.functions {
-            self.generate_rust_final_function(
+            self.generate_function(
                 func,
                 true,
                 Some(&trait1.target_type),
@@ -1010,16 +997,6 @@ impl Generator<'_> {
         }
 
         writeln!(self, "}}\n")?;
-        Ok(())
-    }
-
-    fn generate_ffi_function(
-        &mut self,
-        function: &RustFFIFunction,
-        condition_texts: &ConditionTexts,
-    ) -> Result<()> {
-        writeln!(self, "{}", condition_texts.attribute)?;
-        writeln!(self, "{}", self.rust_ffi_function_to_code(function))?;
         Ok(())
     }
 

@@ -268,8 +268,12 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         .rust_items()
         .iter()
         .filter_map(|item| {
-            if let RustItem::FfiFunction(func) = &item.item {
-                Some(func.path.last())
+            if let RustItem::Function(func) = &item.item {
+                if func.kind.is_ffi_function() {
+                    Some(func.path.last())
+                } else {
+                    None
+                }
             } else {
                 None
             }

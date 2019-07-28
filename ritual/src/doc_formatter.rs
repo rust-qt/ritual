@@ -249,6 +249,8 @@ pub fn function_doc(function: &RustFunction) -> String {
                 doc.push(format_external_doc(cpp_doc));
             }
         }
+        // FFI functions are private
+        RustFunctionKind::FfiFunction(_) => {}
     }
     // TODO: somehow handle docs for inherited methods (currently only for virtual functions).
 
