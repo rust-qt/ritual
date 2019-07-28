@@ -17,8 +17,8 @@ use crate::rust_info::{
     RustFFIArgument, RustFFIFunction, RustFfiWrapperData, RustFunction, RustFunctionArgument,
     RustFunctionCaptionStrategy, RustFunctionKind, RustFunctionSelfArgKind, RustItem, RustModule,
     RustModuleDoc, RustModuleKind, RustPathScope, RustQtReceiverType, RustQtSlotWrapper,
-    RustRawSlotReceiver, RustReexport, RustReexportSource, RustSpecialModuleKind, RustStruct,
-    RustStructKind, RustTraitAssociatedType, RustTraitImpl, RustTypeCaptionStrategy,
+    RustRawSlotReceiver, RustReexport, RustReexportSource, RustSizedType, RustSpecialModuleKind,
+    RustStruct, RustStructKind, RustTraitAssociatedType, RustTraitImpl, RustTypeCaptionStrategy,
     RustWrapperType, RustWrapperTypeDocData, RustWrapperTypeKind, UnnamedRustFunction,
 };
 use crate::rust_type::{
@@ -1581,7 +1581,10 @@ impl State<'_, '_> {
             let internal_rust_item = RustItem::Struct(RustStruct {
                 extra_doc: None,
                 path: internal_path.clone(),
-                kind: RustStructKind::SizedType(data.path.clone()),
+                kind: RustStructKind::SizedType(RustSizedType {
+                    cpp_path: data.path.clone(),
+                    cpp_item_index,
+                }),
                 is_public: true,
             });
 
@@ -1604,6 +1607,7 @@ impl State<'_, '_> {
                     raw_qt_slot_wrapper: None, // TODO: fix this
                 },
                 kind: wrapper_kind,
+                cpp_item_index,
             }),
             is_public: true,
         });
@@ -1669,6 +1673,7 @@ impl State<'_, '_> {
                     arguments: public_args,
                     signal_arguments: wrapper.signal_arguments.clone(),
                     raw_slot_wrapper: public_path,
+                    cpp_item_index,
                 }),
                 path: closure_item_path,
                 extra_doc: None,
@@ -1726,6 +1731,7 @@ impl State<'_, '_> {
                                 raw_qt_slot_wrapper: None,
                             },
                             kind: RustWrapperTypeKind::EnumWrapper,
+                            cpp_item_index,
                         }),
                         is_public: true,
                     });

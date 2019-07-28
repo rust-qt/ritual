@@ -387,8 +387,8 @@ pub fn generate_cpp_type_size_requester(
 
     for item in rust_database.items() {
         if let RustItem::Struct(data) = &item.item {
-            if let RustStructKind::SizedType(cpp_path) = &data.kind {
-                let cpp_path_code = cpp_path.to_cpp_code()?;
+            if let RustStructKind::SizedType(sized_type) = &data.kind {
+                let cpp_path_code = sized_type.cpp_path.to_cpp_code()?;
 
                 writeln!(
                     output,

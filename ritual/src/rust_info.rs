@@ -37,6 +37,7 @@ pub struct RustQtSlotWrapper {
     pub arguments: Vec<RustFinalType>,
     pub signal_arguments: Vec<CppType>,
     pub raw_slot_wrapper: RustPath,
+    pub cpp_item_index: usize,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -67,6 +68,7 @@ pub struct RustWrapperTypeDocData {
 pub struct RustWrapperType {
     pub doc_data: RustWrapperTypeDocData,
     pub kind: RustWrapperTypeKind,
+    pub cpp_item_index: usize,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -75,12 +77,18 @@ pub struct RustFfiClassTypeDoc {
     pub public_rust_path: RustPath,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct RustSizedType {
+    pub cpp_path: CppPath,
+    pub cpp_item_index: usize,
+}
+
 /// Information about a Rust type wrapper
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum RustStructKind {
     WrapperType(RustWrapperType),
     QtSlotWrapper(RustQtSlotWrapper),
-    SizedType(CppPath),
+    SizedType(RustSizedType),
 }
 
 impl RustStructKind {
