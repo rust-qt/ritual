@@ -233,9 +233,6 @@ pub fn function_doc(function: &RustFunction) -> String {
                 }
             }
         }
-        RustFunctionKind::CppDeletableImpl { .. } => {
-            // should not need doc because trait doc will be propagated
-        }
         RustFunctionKind::SignalOrSlotGetter {
             receiver_type,
             cpp_path,

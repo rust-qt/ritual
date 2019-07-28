@@ -587,7 +587,11 @@ impl State<'_, '_> {
     }
 
     /// Generates exact (FFI-compatible) Rust equivalent of `CppAndFfiMethod` object.
-    fn generate_ffi_function(&self, data: &CppFfiFunction) -> Result<RustFFIFunction> {
+    fn generate_ffi_function(
+        &self,
+        ffi_item_index: usize,
+        data: &CppFfiFunction,
+    ) -> Result<RustFFIFunction> {
         let mut args = Vec::new();
         for arg in &data.arguments {
             let rust_type = self.ffi_type_to_rust_ffi_type(arg.argument_type.ffi_type())?;
@@ -600,6 +604,7 @@ impl State<'_, '_> {
             return_type: self.ffi_type_to_rust_ffi_type(data.return_type.ffi_type())?,
             path: self.generate_rust_path(&data.path, NameType::FfiFunction)?,
             arguments: args,
+            ffi_item_index,
         })
     }
 
@@ -960,7 +965,7 @@ impl State<'_, '_> {
         checks: &CppChecks,
         trait_types: &[TraitTypes],
     ) -> Result<Vec<ProcessedFfiItem>> {
-        let rust_ffi_function = self.generate_ffi_function(&function)?;
+        let rust_ffi_function = self.generate_ffi_function(ffi_item_index, &function)?;
         let ffi_function_path = rust_ffi_function.path.clone();
         let mut results = vec![ProcessedFfiItem::Item(RustItem::FfiFunction(
             rust_ffi_function,
@@ -1058,6 +1063,7 @@ impl State<'_, '_> {
                 cpp_ffi_function: function.clone(),
                 ffi_function_path,
                 return_type_ffi_index: return_arg_index,
+                ffi_item_index,
             }),
             extra_doc: None,
             is_unsafe: true,
@@ -1750,6 +1756,7 @@ impl State<'_, '_> {
                         cpp_doc: value.doc.clone(),
                         extra_doc: None,
                     },
+                    cpp_item_index,
                 });
 
                 Ok(vec![rust_item])
@@ -1775,6 +1782,7 @@ impl State<'_, '_> {
                     receiver_type,
                     receiver_id,
                     cpp_doc: cpp_function.doc.external_doc.clone(),
+                    cpp_item_index,
                 };
 
                 let path = self.generate_rust_path(

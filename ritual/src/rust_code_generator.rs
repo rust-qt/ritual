@@ -890,7 +890,6 @@ impl Generator<'_> {
             RustFunctionKind::FfiWrapper(data) => {
                 self.generate_ffi_call(&func.arguments, &func.return_type, data, func.is_unsafe)?
             }
-            RustFunctionKind::CppDeletableImpl { deleter } => self.rust_path_to_string(deleter),
             RustFunctionKind::SignalOrSlotGetter { receiver_id, .. } => {
                 let path = &func.return_type.api_type().as_common()?.path;
                 let call = format!(

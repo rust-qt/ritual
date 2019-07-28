@@ -18,6 +18,7 @@ pub struct RustEnumValue {
     pub value: i64,
     /// Documentation of corresponding C++ variants
     pub doc: RustEnumValueDoc,
+    pub cpp_item_index: usize,
 }
 
 /// C++ documentation data for a enum variant
@@ -159,16 +160,14 @@ pub struct RustFfiWrapperData {
     /// Index of the FFI function argument used for acquiring the return value,
     /// if any. `None` if the return value is passed normally (as the return value
     /// of the FFI function).
-    pub return_type_ffi_index: Option<usize>,
+    pub return_type_ffi_index: Option<usize>, // TODO: why needed here?
+    pub ffi_item_index: usize,
 }
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum RustFunctionKind {
     FfiWrapper(RustFfiWrapperData),
-    CppDeletableImpl {
-        deleter: RustPath,
-    },
     SignalOrSlotGetter {
         /// C++ name of the signal or slot
         cpp_path: CppPath,
@@ -178,6 +177,7 @@ pub enum RustFunctionKind {
         receiver_id: String,
 
         cpp_doc: Option<CppFunctionExternalDoc>,
+        cpp_item_index: usize,
     },
 }
 
@@ -185,7 +185,6 @@ impl RustFunctionKind {
     pub fn short_text(&self) -> String {
         match self {
             RustFunctionKind::FfiWrapper(data) => data.cpp_ffi_function.short_text(),
-            RustFunctionKind::CppDeletableImpl { .. } => format!("{:?}", self),
             RustFunctionKind::SignalOrSlotGetter { cpp_path, .. } => {
                 format!("SignalOrSlotGetter({}", cpp_path.to_cpp_pseudo_code())
             }
@@ -529,6 +528,7 @@ pub struct RustFFIFunction {
     pub path: RustPath,
     /// Arguments of the function.
     pub arguments: Vec<RustFFIArgument>,
+    pub ffi_item_index: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
