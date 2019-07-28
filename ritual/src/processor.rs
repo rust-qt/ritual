@@ -418,11 +418,11 @@ pub fn process(
     }
 
     for database in dependent_cpp_crates {
-        workspace.put_crate(database);
+        workspace.put_database(database);
     }
 
     workspace.save_database(&mut current_database)?;
-    workspace.put_crate(current_database);
+    workspace.put_database(current_database);
 
     steps_result
 }

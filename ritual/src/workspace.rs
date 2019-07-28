@@ -119,7 +119,7 @@ impl Workspace {
             }
             let path = database_path(&self.path, crate_name);
             if path.exists() {
-                return load_json(path);
+                return Ok(Database::new(load_json(path)?));
             }
         }
         if allow_create {
@@ -128,7 +128,7 @@ impl Workspace {
         bail!("can't get database");
     }
 
-    pub fn put_crate(&mut self, database: Database) {
+    pub fn put_database(&mut self, database: Database) {
         self.databases.push(database);
     }
 
@@ -147,7 +147,7 @@ impl Workspace {
             let backup_path = self.database_backup_path(database.crate_name());
             save_json(
                 database_path(&self.path, database.crate_name()),
-                database,
+                database.data(),
                 Some(&backup_path),
             )?;
             database.set_saved();

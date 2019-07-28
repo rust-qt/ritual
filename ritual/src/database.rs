@@ -91,29 +91,46 @@ pub struct CppDatabaseItem {
     pub is_rust_processed: bool,
 }
 
-/// Represents all collected data related to a crate.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Database {
+pub struct Data {
     crate_name: String,
     crate_version: String,
     cpp_items: Vec<CppDatabaseItem>,
     ffi_items: Vec<CppFfiDatabaseItem>,
     rust_database: RustDatabase,
     environments: Vec<LibraryTarget>,
-    #[serde(skip)]
+}
+
+/// Represents all collected data related to a crate.
+#[derive(Debug)]
+pub struct Database {
+    data: Data,
     is_modified: bool,
 }
 
 impl Database {
+    pub fn new(data: Data) -> Database {
+        Database {
+            data,
+            is_modified: false,
+        }
+    }
+
+    pub fn data(&self) -> &Data {
+        &self.data
+    }
+
     pub fn empty(crate_name: impl Into<String>) -> Self {
         let crate_name = crate_name.into();
         Database {
-            crate_name: crate_name.clone(),
-            crate_version: "0.0.0".into(),
-            cpp_items: Vec::new(),
-            ffi_items: Vec::new(),
-            rust_database: RustDatabase::new(crate_name),
-            environments: Vec::new(),
+            data: Data {
+                crate_name: crate_name.clone(),
+                crate_version: "0.0.0".into(),
+                cpp_items: Vec::new(),
+                ffi_items: Vec::new(),
+                rust_database: RustDatabase::new(crate_name),
+                environments: Vec::new(),
+            },
             is_modified: true,
         }
     }
@@ -127,75 +144,78 @@ impl Database {
     }
 
     pub fn cpp_items(&self) -> &[CppDatabaseItem] {
-        &self.cpp_items
+        &self.data.cpp_items
     }
 
     pub fn cpp_items_mut(&mut self) -> &mut [CppDatabaseItem] {
         self.is_modified = true;
-        &mut self.cpp_items
+        &mut self.data.cpp_items
     }
 
     pub fn ffi_items(&self) -> &[CppFfiDatabaseItem] {
-        &self.ffi_items
+        &self.data.ffi_items
     }
 
     pub fn ffi_items_mut(&mut self) -> &mut [CppFfiDatabaseItem] {
         self.is_modified = true;
-        &mut self.ffi_items
+        &mut self.data.ffi_items
     }
 
     pub fn add_ffi_item(&mut self, item: CppFfiDatabaseItem) -> bool {
         self.is_modified = true;
         if self
+            .data
             .ffi_items
             .iter()
             .any(|i| i.item.is_cpp_item_same(&item.item))
         {
             return false;
         }
-        self.ffi_items.push(item);
+        self.data.ffi_items.push(item);
         true
     }
 
     pub fn clear(&mut self) {
         self.is_modified = true;
-        self.cpp_items.clear();
-        self.environments.clear();
+        self.data.cpp_items.clear();
+        self.data.environments.clear();
     }
 
     pub fn clear_ffi(&mut self) {
         self.is_modified = true;
-        self.ffi_items.clear();
+        self.data.ffi_items.clear();
         self.force_ffi_processing();
-        self.cpp_items.retain(|item| item.source_ffi_item.is_none());
+        self.data
+            .cpp_items
+            .retain(|item| item.source_ffi_item.is_none());
         // TODO: deal with rust items that now have invalid index references
     }
 
     pub fn force_ffi_processing(&mut self) {
-        for item in &mut self.cpp_items {
+        for item in &mut self.data.cpp_items {
             item.is_cpp_ffi_processed = false;
         }
     }
 
     pub fn clear_cpp_checks(&mut self) {
         self.is_modified = true;
-        for item in &mut self.ffi_items {
+        for item in &mut self.data.ffi_items {
             item.checks.clear();
         }
     }
 
     pub fn crate_name(&self) -> &str {
-        &self.crate_name
+        &self.data.crate_name
     }
 
     pub fn crate_version(&self) -> &str {
-        &self.crate_version
+        &self.data.crate_version
     }
 
     pub fn set_crate_version(&mut self, version: String) {
-        if self.crate_version != version {
+        if self.data.crate_version != version {
             self.is_modified = true;
-            self.crate_version = version;
+            self.data.crate_version = version;
         }
     }
 
@@ -206,6 +226,7 @@ impl Database {
         data: CppItem,
     ) -> bool {
         if let Some(item) = self
+            .data
             .cpp_items
             .iter_mut()
             .find(|item| item.item.is_same(&data))
@@ -226,42 +247,42 @@ impl Database {
             is_rust_processed: false,
         };
         trace!("cpp item data: {:?}", item);
-        self.cpp_items.push(item);
+        self.data.cpp_items.push(item);
         true
     }
 
     pub fn rust_database(&self) -> &RustDatabase {
-        &self.rust_database
+        &self.data.rust_database
     }
 
     pub fn rust_items(&self) -> &[RustDatabaseItem] {
-        self.rust_database.items()
+        self.data.rust_database.items()
     }
 
     pub fn add_rust_item(&mut self, item: RustDatabaseItem) -> Result<()> {
         self.is_modified = true;
-        self.rust_database.add_item(item)
+        self.data.rust_database.add_item(item)
     }
 
     pub fn clear_rust_info(&mut self) {
         self.is_modified = true;
-        self.rust_database.clear();
-        for item in &mut self.cpp_items {
+        self.data.rust_database.clear();
+        for item in &mut self.data.cpp_items {
             item.is_rust_processed = false;
         }
-        for item in &mut self.ffi_items {
+        for item in &mut self.data.ffi_items {
             item.is_rust_processed = false;
         }
     }
 
     pub fn add_environment(&mut self, env: LibraryTarget) {
-        if !self.environments.iter().any(|e| e == &env) {
+        if !self.data.environments.iter().any(|e| e == &env) {
             self.is_modified = true;
-            self.environments.push(env.clone());
+            self.data.environments.push(env.clone());
         }
     }
 
     pub fn environments(&self) -> &[LibraryTarget] {
-        &self.environments
+        &self.data.environments
     }
 }
