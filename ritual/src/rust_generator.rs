@@ -18,8 +18,9 @@ use crate::rust_info::{
     RustFunctionCaptionStrategy, RustFunctionKind, RustFunctionSelfArgKind, RustItem, RustModule,
     RustModuleDoc, RustModuleKind, RustPathScope, RustQtReceiverType, RustQtSlotWrapper,
     RustRawSlotReceiver, RustReexport, RustReexportSource, RustSizedType, RustSpecialModuleKind,
-    RustStruct, RustStructKind, RustTraitAssociatedType, RustTraitImpl, RustTypeCaptionStrategy,
-    RustWrapperType, RustWrapperTypeDocData, RustWrapperTypeKind, UnnamedRustFunction,
+    RustStruct, RustStructKind, RustTraitAssociatedType, RustTraitImpl, RustTraitImplSource,
+    RustTraitImplSourceKind, RustTypeCaptionStrategy, RustWrapperType, RustWrapperTypeDocData,
+    RustWrapperTypeKind, UnnamedRustFunction,
 };
 use crate::rust_type::{
     RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
@@ -635,6 +636,7 @@ impl State<'_, '_> {
     }
 
     fn process_operator_as_trait_impl(
+        ffi_item_index: usize,
         unnamed_function: UnnamedRustFunction,
         operator: &CppOperator,
         crate_name: &str,
@@ -771,10 +773,15 @@ impl State<'_, '_> {
             trait_type,
             associated_types,
             functions: vec![function],
+            source: RustTraitImplSource {
+                ffi_item_index,
+                kind: RustTraitImplSourceKind::Normal,
+            },
         })
     }
 
     fn process_destructor(
+        ffi_item_index: usize,
         unnamed_function: UnnamedRustFunction,
         allocation_place: ReturnValueAllocationPlace,
     ) -> Result<RustTraitImpl> {
@@ -823,10 +830,15 @@ impl State<'_, '_> {
             }),
             associated_types: Vec::new(),
             functions: vec![function],
+            source: RustTraitImplSource {
+                ffi_item_index,
+                kind: RustTraitImplSourceKind::Normal,
+            },
         })
     }
 
     fn process_cast(
+        ffi_item_index: usize,
         mut unnamed_function: UnnamedRustFunction,
         cast: &CppCast,
     ) -> Result<Vec<RustTraitImpl>> {
@@ -901,6 +913,10 @@ impl State<'_, '_> {
             }),
             associated_types: Vec::new(),
             functions: vec![cast_function, cast_function_mut],
+            source: RustTraitImplSource {
+                ffi_item_index,
+                kind: RustTraitImplSourceKind::Normal,
+            },
         });
 
         if cast.is_first_static_cast() && !cast.is_unsafe_static_cast() {
@@ -933,6 +949,10 @@ impl State<'_, '_> {
                     value: to_type_value,
                 }],
                 functions: vec![deref_function],
+                source: RustTraitImplSource {
+                    ffi_item_index,
+                    kind: RustTraitImplSourceKind::Deref,
+                },
             });
 
             let deref_mut_trait_path = RustPath::from_good_str("std::ops::DerefMut");
@@ -951,6 +971,10 @@ impl State<'_, '_> {
                 }),
                 associated_types: Vec::new(),
                 functions: vec![deref_mut_function],
+                source: RustTraitImplSource {
+                    ffi_item_index,
+                    kind: RustTraitImplSourceKind::DerefMut,
+                },
             });
         }
 
@@ -1074,12 +1098,16 @@ impl State<'_, '_> {
         } = &function.kind
         {
             if cpp_function.is_destructor() {
-                let item = State::process_destructor(unnamed_function, function.allocation_place)?;
+                let item = State::process_destructor(
+                    ffi_item_index,
+                    unnamed_function,
+                    function.allocation_place,
+                )?;
                 results.push(ProcessedFfiItem::Item(RustItem::TraitImpl(item)));
                 return Ok(results);
             }
             if let Some(cast) = cast {
-                let impls = State::process_cast(unnamed_function, cast)?;
+                let impls = State::process_cast(ffi_item_index, unnamed_function, cast)?;
                 results.extend(
                     impls
                         .into_iter()
@@ -1092,6 +1120,7 @@ impl State<'_, '_> {
                     bail!("NotEqualTo is not needed in public API because PartialEq is used");
                 }
                 match State::process_operator_as_trait_impl(
+                    ffi_item_index,
                     unnamed_function.clone(),
                     operator,
                     self.0.current_database.crate_name(),

@@ -368,6 +368,19 @@ pub struct RustTraitAssociatedType {
     pub value: RustType,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub enum RustTraitImplSourceKind {
+    Normal,
+    Deref,
+    DerefMut,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct RustTraitImplSource {
+    pub ffi_item_index: usize,
+    pub kind: RustTraitImplSourceKind,
+}
+
 /// Information about a trait implementation.
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustTraitImpl {
@@ -380,6 +393,7 @@ pub struct RustTraitImpl {
     pub associated_types: Vec<RustTraitAssociatedType>,
     /// Functions that implement the trait.
     pub functions: Vec<RustFunction>,
+    pub source: RustTraitImplSource,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
