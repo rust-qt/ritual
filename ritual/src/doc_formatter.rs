@@ -9,7 +9,7 @@ use crate::cpp_type::CppType;
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_info::{
     RustEnumValue, RustFunction, RustFunctionKind, RustModule, RustModuleKind, RustQtReceiverType,
-    RustStruct, RustStructKind, RustWrapperType,
+    RustSpecialModuleKind, RustStruct, RustStructKind, RustWrapperType,
 };
 use itertools::Itertools;
 
@@ -27,16 +27,18 @@ pub fn wrap_cpp_doc_block(html: &str) -> String {
 
 pub fn module_doc(module: &RustModule) -> String {
     let auto_doc = match module.kind {
-        RustModuleKind::CrateRoot => {
-            // TODO: generate some useful docs for crate root
-            "Crate root".to_string()
-        }
-        RustModuleKind::Ffi => "Functions provided by the C++ wrapper library".into(),
-        RustModuleKind::Ops => "Functions that provide access to C++ operators".into(),
-        RustModuleKind::SizedTypes => {
-            "Types with the same size and alignment as corresponding C++ types".into()
-        }
-        RustModuleKind::CppNamespace => {
+        RustModuleKind::Special(kind) => match kind {
+            RustSpecialModuleKind::CrateRoot => {
+                // TODO: generate some useful docs for crate root
+                "Crate root".to_string()
+            }
+            RustSpecialModuleKind::Ffi => "Functions provided by the C++ wrapper library".into(),
+            RustSpecialModuleKind::Ops => "Functions that provide access to C++ operators".into(),
+            RustSpecialModuleKind::SizedTypes => {
+                "Types with the same size and alignment as corresponding C++ types".into()
+            }
+        },
+        RustModuleKind::CppNamespace { .. } => {
             if let Some(path) = &module.doc.cpp_path {
                 let cpp_path_text = wrap_inline_cpp_code(&path.to_cpp_pseudo_code());
                 format!("C++ namespace: {}", cpp_path_text)
@@ -44,7 +46,7 @@ pub fn module_doc(module: &RustModule) -> String {
                 String::new()
             }
         }
-        RustModuleKind::CppNestedType => {
+        RustModuleKind::CppNestedTypes { .. } => {
             if let Some(path) = &module.doc.cpp_path {
                 let cpp_path_text = wrap_inline_cpp_code(&path.to_cpp_pseudo_code());
                 format!("C++ type: {}", cpp_path_text)

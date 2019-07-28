@@ -7,8 +7,8 @@ use crate::rust_generator::qt_core_path;
 use crate::rust_info::{
     RustDatabase, RustDatabaseItem, RustEnumValue, RustExtraImpl, RustExtraImplKind,
     RustFFIFunction, RustFfiWrapperData, RustFunction, RustFunctionArgument, RustFunctionKind,
-    RustItem, RustModule, RustModuleKind, RustStruct, RustStructKind, RustTraitImpl,
-    RustWrapperTypeKind,
+    RustItem, RustModule, RustModuleKind, RustSpecialModuleKind, RustStruct, RustStructKind,
+    RustTraitImpl, RustWrapperTypeKind,
 };
 use crate::rust_type::{
     RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
@@ -312,7 +312,7 @@ impl Generator<'_> {
         let vis = if module.is_public { "pub " } else { "" };
         let mut content_from_template = None;
         if module.kind.is_in_separate_file() {
-            if module.kind != RustModuleKind::CrateRoot {
+            if module.kind != RustModuleKind::Special(RustSpecialModuleKind::CrateRoot) {
                 writeln!(self, "{}mod {};", vis, module.path.last())?;
             }
             let path = self.module_path(&module.path, &self.output_src_path)?;
@@ -326,7 +326,10 @@ impl Generator<'_> {
                 }
             }
         } else {
-            assert_ne!(module.kind, RustModuleKind::CrateRoot);
+            assert_ne!(
+                module.kind,
+                RustModuleKind::Special(RustSpecialModuleKind::CrateRoot)
+            );
             writeln!(self, "{}mod {} {{", vis, module.path.last())?;
         }
 
@@ -341,19 +344,19 @@ impl Generator<'_> {
         }
 
         match module.kind {
-            RustModuleKind::Ffi => {
+            RustModuleKind::Special(RustSpecialModuleKind::Ffi) => {
                 writeln!(self, "include!(concat!(env!(\"OUT_DIR\"), \"/ffi.rs\"));")?;
             }
-            RustModuleKind::SizedTypes => {
+            RustModuleKind::Special(RustSpecialModuleKind::SizedTypes) => {
                 writeln!(
                     self,
                     "include!(concat!(env!(\"OUT_DIR\"), \"/sized_types.rs\"));"
                 )?;
             }
-            RustModuleKind::CrateRoot
-            | RustModuleKind::Ops
-            | RustModuleKind::CppNamespace
-            | RustModuleKind::CppNestedType => {
+            RustModuleKind::Special(RustSpecialModuleKind::CrateRoot)
+            | RustModuleKind::Special(RustSpecialModuleKind::Ops)
+            | RustModuleKind::CppNamespace { .. }
+            | RustModuleKind::CppNestedTypes { .. } => {
                 self.generate_children(&module.path, None, database)?;
             }
         }
@@ -365,7 +368,7 @@ impl Generator<'_> {
             writeln!(self, "}}")?;
         }
 
-        if module.kind == RustModuleKind::Ffi {
+        if module.kind == RustModuleKind::Special(RustSpecialModuleKind::Ffi) {
             let path = self.output_src_path.join("ffi.in.rs");
             self.destination.push(create_file(&path)?);
             self.generate_children(&module.path, None, database)?;
@@ -1068,7 +1071,7 @@ pub fn generate(
         .items()
         .iter()
         .filter_map(RustDatabaseItem::as_module_ref)
-        .find(|module| module.kind == RustModuleKind::CrateRoot)
+        .find(|module| module.kind == RustModuleKind::Special(RustSpecialModuleKind::CrateRoot))
         .ok_or_else(|| err_msg("crate root not found"))?;
 
     generator.generate_module(crate_root, database)?;

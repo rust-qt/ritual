@@ -382,22 +382,39 @@ pub struct RustModuleDoc {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
-pub enum RustModuleKind {
+pub enum RustSpecialModuleKind {
     CrateRoot,
     Ffi,
     Ops,
     SizedTypes,
-    CppNamespace,
-    CppNestedType,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
+pub enum RustModuleKind {
+    Special(RustSpecialModuleKind),
+    CppNamespace { cpp_item_index: usize },
+    CppNestedTypes { cpp_item_index: usize },
 }
 
 impl RustModuleKind {
     pub fn is_in_separate_file(self) -> bool {
         match self {
-            RustModuleKind::CrateRoot | RustModuleKind::CppNamespace | RustModuleKind::Ops => true,
-            RustModuleKind::Ffi | RustModuleKind::SizedTypes | RustModuleKind::CppNestedType => {
-                false
-            }
+            RustModuleKind::Special(kind) => match kind {
+                RustSpecialModuleKind::CrateRoot => true,
+                RustSpecialModuleKind::Ffi => false,
+                RustSpecialModuleKind::Ops => true,
+                RustSpecialModuleKind::SizedTypes => false,
+            },
+            RustModuleKind::CppNamespace { .. } => true,
+            RustModuleKind::CppNestedTypes { .. } => false,
+        }
+    }
+
+    pub fn is_cpp_nested_types(self) -> bool {
+        if let RustModuleKind::CppNestedTypes { .. } = self {
+            true
+        } else {
+            false
         }
     }
 }
@@ -525,10 +542,16 @@ pub struct RustExtraImpl {
     pub kind: RustExtraImplKind,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RustReexportSource {
+    DependencyCrate { crate_name: String },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustReexport {
     pub path: RustPath,
     pub target: RustPath,
+    pub source: RustReexportSource,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -571,7 +594,7 @@ impl RustItem {
 
     pub fn is_module_for_nested(&self) -> bool {
         if let RustItem::Module(module) = self {
-            module.kind == RustModuleKind::CppNestedType
+            module.kind.is_cpp_nested_types()
         } else {
             false
         }
@@ -579,7 +602,7 @@ impl RustItem {
 
     pub fn is_crate_root(&self) -> bool {
         if let RustItem::Module(module) = self {
-            module.kind == RustModuleKind::CrateRoot
+            module.kind == RustModuleKind::Special(RustSpecialModuleKind::CrateRoot)
         } else {
             false
         }
@@ -605,11 +628,29 @@ impl RustItem {
             ),
         }
     }
+
+    pub fn as_reexport_ref(&self) -> Option<&RustReexport> {
+        if let RustItem::Reexport(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_module_ref(&self) -> Option<&RustModule> {
+        if let RustItem::Module(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustDatabaseItem {
     pub item: RustItem,
+
+    // TODO: remove this
     pub cpp_item_index: Option<usize>,
     pub ffi_item_index: Option<usize>,
 }

@@ -1,5 +1,5 @@
 use crate::cpp_checks::CppChecks;
-use crate::cpp_data::{CppItem, CppPath, CppPathItem, CppTypeDeclarationKind};
+use crate::cpp_data::{CppItem, CppPath, CppPathItem, CppTypeDeclaration, CppTypeDeclarationKind};
 use crate::cpp_ffi_data::{
     CppCast, CppFfiArgumentMeaning, CppFfiFunction, CppFfiFunctionKind, CppFfiItem, CppFfiType,
     CppFieldAccessorType, CppToFfiTypeConversion,
@@ -17,9 +17,9 @@ use crate::rust_info::{
     RustFFIArgument, RustFFIFunction, RustFfiWrapperData, RustFunction, RustFunctionArgument,
     RustFunctionCaptionStrategy, RustFunctionKind, RustFunctionSelfArgKind, RustItem, RustModule,
     RustModuleDoc, RustModuleKind, RustPathScope, RustQtReceiverType, RustQtSlotWrapper,
-    RustRawSlotReceiver, RustReexport, RustStruct, RustStructKind, RustTraitAssociatedType,
-    RustTraitImpl, RustTypeCaptionStrategy, RustWrapperType, RustWrapperTypeDocData,
-    RustWrapperTypeKind, UnnamedRustFunction,
+    RustRawSlotReceiver, RustReexport, RustReexportSource, RustSpecialModuleKind, RustStruct,
+    RustStructKind, RustTraitAssociatedType, RustTraitImpl, RustTypeCaptionStrategy,
+    RustWrapperType, RustWrapperTypeDocData, RustWrapperTypeKind, UnnamedRustFunction,
 };
 use crate::rust_type::{
     RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
@@ -1346,7 +1346,9 @@ impl State<'_, '_> {
                     .rust_items()
                     .iter()
                     .filter_map(RustDatabaseItem::as_module_ref)
-                    .find(|module| module.kind == RustModuleKind::Ffi)
+                    .find(|module| {
+                        module.kind == RustModuleKind::Special(RustSpecialModuleKind::Ffi)
+                    })
                     .ok_or_else(|| err_msg("ffi module not found"))?;
                 RustPathScope {
                     path: ffi_module.path.clone(),
@@ -1360,7 +1362,9 @@ impl State<'_, '_> {
                     .rust_items()
                     .iter()
                     .filter_map(RustDatabaseItem::as_module_ref)
-                    .find(|module| module.kind == RustModuleKind::SizedTypes)
+                    .find(|module| {
+                        module.kind == RustModuleKind::Special(RustSpecialModuleKind::SizedTypes)
+                    })
                     .ok_or_else(|| err_msg("sized_types module not found"))?;
                 RustPathScope {
                     path: sized_module.path.clone(),
@@ -1391,7 +1395,9 @@ impl State<'_, '_> {
                             .rust_items()
                             .iter()
                             .filter_map(RustDatabaseItem::as_module_ref)
-                            .find(|module| module.kind == RustModuleKind::Ops)
+                            .find(|module| {
+                                module.kind == RustModuleKind::Special(RustSpecialModuleKind::Ops)
+                            })
                             .ok_or_else(|| err_msg("ops module not found"))?;
 
                         RustPathScope {
@@ -1505,7 +1511,179 @@ impl State<'_, '_> {
     }
 
     #[allow(clippy::useless_let_if_seq)]
-    fn process_cpp_item(&self, cpp_item: &CppDatabaseItem) -> Result<Vec<RustItem>> {
+    fn process_cpp_class(
+        &self,
+        cpp_item_index: usize,
+        source_ffi_item: Option<usize>,
+        data: &CppTypeDeclaration,
+    ) -> Result<Vec<RustItem>> {
+        // TODO: do something about `QUrlTwoFlags<T1, T2>`
+        if is_qflags(&data.path) {
+            let argument = &data.path.last().template_arguments.as_ref().unwrap()[0];
+            if !argument.is_template_parameter() {
+                if let CppType::Enum { path } = &argument {
+                    let rust_type = self.find_wrapper_type(path)?;
+                    let rust_type_path = rust_type.path().expect("enum rust item must have path");
+                    let rust_item = RustItem::ExtraImpl(RustExtraImpl {
+                        parent_path: rust_type_path.parent()?,
+                        kind: RustExtraImplKind::FlagEnum {
+                            enum_path: rust_type_path.clone(),
+                        },
+                    });
+                    return Ok(vec![rust_item]);
+                }
+            }
+        }
+
+        let mut qt_slot_wrapper = None;
+        if let Some(ffi_index) = source_ffi_item {
+            let ffi_item = self
+                .0
+                .current_database
+                .ffi_items()
+                .get(ffi_index)
+                .ok_or_else(|| err_msg("cpp item references invalid ffi index"))?;
+            if let CppFfiItem::QtSlotWrapper(wrapper) = &ffi_item.item {
+                qt_slot_wrapper = Some((wrapper, &ffi_item.checks));
+            }
+        }
+
+        let public_name_type = if let Some((wrapper, _)) = qt_slot_wrapper {
+            NameType::QtSlotWrapper {
+                signal_arguments: &wrapper.signal_arguments,
+                is_public: false,
+            }
+        } else {
+            NameType::Type
+        };
+
+        let public_path = self.generate_rust_path(&data.path, public_name_type)?;
+
+        let mut rust_items = Vec::new();
+
+        let is_movable = if let CppTypeDeclarationKind::Class { is_movable } = &data.kind {
+            *is_movable
+        } else {
+            unreachable!()
+        };
+
+        let wrapper_kind;
+        if is_movable {
+            let internal_path = self.generate_rust_path(&data.path, NameType::SizedItem)?;
+
+            if internal_path == public_path {
+                bail!(
+                    "internal path is the same as public path: {:?}",
+                    internal_path
+                );
+            }
+
+            let internal_rust_item = RustItem::Struct(RustStruct {
+                extra_doc: None,
+                path: internal_path.clone(),
+                kind: RustStructKind::SizedType(data.path.clone()),
+                is_public: true,
+            });
+
+            rust_items.push(internal_rust_item);
+
+            wrapper_kind = RustWrapperTypeKind::MovableClassWrapper {
+                sized_type_path: internal_path,
+            };
+        } else {
+            wrapper_kind = RustWrapperTypeKind::ImmovableClassWrapper;
+        }
+
+        let public_rust_item = RustItem::Struct(RustStruct {
+            extra_doc: None,
+            path: public_path.clone(),
+            kind: RustStructKind::WrapperType(RustWrapperType {
+                doc_data: RustWrapperTypeDocData {
+                    cpp_path: data.path.clone(),
+                    cpp_doc: data.doc.clone(),
+                    raw_qt_slot_wrapper: None, // TODO: fix this
+                },
+                kind: wrapper_kind,
+            }),
+            is_public: true,
+        });
+        rust_items.push(public_rust_item);
+
+        let nested_types_path = self.generate_rust_path(&data.path, NameType::Module)?;
+
+        let nested_types_rust_item = RustItem::Module(RustModule {
+            is_public: true,
+            path: nested_types_path,
+            doc: RustModuleDoc {
+                extra_doc: None,
+                cpp_path: Some(data.path.clone()),
+            },
+            kind: RustModuleKind::CppNestedTypes { cpp_item_index },
+        });
+        rust_items.push(nested_types_rust_item);
+
+        if let Some((wrapper, checks)) = qt_slot_wrapper {
+            let arg_types = wrapper
+                .arguments
+                .iter()
+                .map_if_ok(|t| self.ffi_type_to_rust_ffi_type(t.ffi_type()))?;
+
+            let receiver_id = CppFunction::receiver_id_from_data(
+                RustQtReceiverType::Slot,
+                "custom_slot",
+                &wrapper.signal_arguments,
+            )?;
+
+            let impl_item = RustItem::ExtraImpl(RustExtraImpl {
+                parent_path: public_path.parent()?,
+                kind: RustExtraImplKind::RawSlotReceiver(RustRawSlotReceiver {
+                    receiver_id,
+                    target_path: public_path.clone(),
+                    arguments: RustType::Tuple(arg_types),
+                }),
+            });
+            rust_items.push(impl_item);
+
+            let closure_item_path = self.generate_rust_path(
+                &data.path,
+                NameType::QtSlotWrapper {
+                    signal_arguments: &wrapper.signal_arguments,
+                    is_public: true,
+                },
+            )?;
+
+            let public_args = wrapper.arguments.iter().map_if_ok(|arg| {
+                self.rust_final_type(
+                    arg,
+                    // closure argument should be handled in the same way
+                    // as return type (value is produced behind FFI)
+                    &CppFfiArgumentMeaning::ReturnValue,
+                    ReturnValueAllocationPlace::NotApplicable,
+                    Some(checks),
+                )
+            })?;
+
+            let public_item = RustItem::Struct(RustStruct {
+                is_public: true,
+                kind: RustStructKind::QtSlotWrapper(RustQtSlotWrapper {
+                    arguments: public_args,
+                    signal_arguments: wrapper.signal_arguments.clone(),
+                    raw_slot_wrapper: public_path,
+                }),
+                path: closure_item_path,
+                extra_doc: None,
+            });
+            rust_items.push(public_item);
+        }
+
+        Ok(rust_items)
+    }
+
+    fn process_cpp_item(
+        &self,
+        cpp_item_index: usize,
+        cpp_item: &CppDatabaseItem,
+    ) -> Result<Vec<RustItem>> {
         if let Some(index) = cpp_item.source_ffi_item {
             let ffi_item = self
                 .0
@@ -1528,192 +1706,33 @@ impl State<'_, '_> {
                         extra_doc: None,
                         cpp_path: Some(path.clone()),
                     },
-                    kind: RustModuleKind::CppNamespace,
+                    kind: RustModuleKind::CppNamespace { cpp_item_index },
                 });
                 Ok(vec![rust_item])
             }
-            CppItem::Type(data) => {
-                match data.kind {
-                    CppTypeDeclarationKind::Class { is_movable } => {
-                        // TODO: do something about `QUrlTwoFlags<T1, T2>`
-                        if is_qflags(&data.path) {
-                            let argument =
-                                &data.path.last().template_arguments.as_ref().unwrap()[0];
-                            if !argument.is_template_parameter() {
-                                if let CppType::Enum { path } = &argument {
-                                    let rust_type = self.find_wrapper_type(path)?;
-                                    let rust_type_path =
-                                        rust_type.path().expect("enum rust item must have path");
-                                    let rust_item = RustItem::ExtraImpl(RustExtraImpl {
-                                        parent_path: rust_type_path.parent()?,
-                                        kind: RustExtraImplKind::FlagEnum {
-                                            enum_path: rust_type_path.clone(),
-                                        },
-                                    });
-                                    return Ok(vec![rust_item]);
-                                }
-                            }
-                        }
-
-                        let mut qt_slot_wrapper = None;
-                        if let Some(ffi_index) = cpp_item.source_ffi_item {
-                            let ffi_item = self
-                                .0
-                                .current_database
-                                .ffi_items()
-                                .get(ffi_index)
-                                .ok_or_else(|| err_msg("cpp item references invalid ffi index"))?;
-                            if let CppFfiItem::QtSlotWrapper(wrapper) = &ffi_item.item {
-                                qt_slot_wrapper = Some((wrapper, &ffi_item.checks));
-                            }
-                        }
-
-                        let public_name_type = if let Some((wrapper, _)) = qt_slot_wrapper {
-                            NameType::QtSlotWrapper {
-                                signal_arguments: &wrapper.signal_arguments,
-                                is_public: false,
-                            }
-                        } else {
-                            NameType::Type
-                        };
-
-                        let public_path = self.generate_rust_path(&data.path, public_name_type)?;
-
-                        let mut rust_items = Vec::new();
-
-                        let wrapper_kind;
-                        if is_movable {
-                            let internal_path =
-                                self.generate_rust_path(&data.path, NameType::SizedItem)?;
-
-                            if internal_path == public_path {
-                                bail!(
-                                    "internal path is the same as public path: {:?}",
-                                    internal_path
-                                );
-                            }
-
-                            let internal_rust_item = RustItem::Struct(RustStruct {
-                                extra_doc: None,
-                                path: internal_path.clone(),
-                                kind: RustStructKind::SizedType(data.path.clone()),
-                                is_public: true,
-                            });
-
-                            rust_items.push(internal_rust_item);
-
-                            wrapper_kind = RustWrapperTypeKind::MovableClassWrapper {
-                                sized_type_path: internal_path,
-                            };
-                        } else {
-                            wrapper_kind = RustWrapperTypeKind::ImmovableClassWrapper;
-                        }
-
-                        let public_rust_item = RustItem::Struct(RustStruct {
-                            extra_doc: None,
-                            path: public_path.clone(),
-                            kind: RustStructKind::WrapperType(RustWrapperType {
-                                doc_data: RustWrapperTypeDocData {
-                                    cpp_path: data.path.clone(),
-                                    cpp_doc: data.doc.clone(),
-                                    raw_qt_slot_wrapper: None, // TODO: fix this
-                                },
-                                kind: wrapper_kind,
-                            }),
-                            is_public: true,
-                        });
-                        rust_items.push(public_rust_item);
-
-                        let nested_types_path =
-                            self.generate_rust_path(&data.path, NameType::Module)?;
-
-                        let nested_types_rust_item = RustItem::Module(RustModule {
-                            is_public: true,
-                            path: nested_types_path,
-                            doc: RustModuleDoc {
-                                extra_doc: None,
-                                cpp_path: Some(data.path.clone()),
-                            },
-                            kind: RustModuleKind::CppNestedType,
-                        });
-                        rust_items.push(nested_types_rust_item);
-
-                        if let Some((wrapper, checks)) = qt_slot_wrapper {
-                            let arg_types = wrapper
-                                .arguments
-                                .iter()
-                                .map_if_ok(|t| self.ffi_type_to_rust_ffi_type(t.ffi_type()))?;
-
-                            let receiver_id = CppFunction::receiver_id_from_data(
-                                RustQtReceiverType::Slot,
-                                "custom_slot",
-                                &wrapper.signal_arguments,
-                            )?;
-
-                            let impl_item = RustItem::ExtraImpl(RustExtraImpl {
-                                parent_path: public_path.parent()?,
-                                kind: RustExtraImplKind::RawSlotReceiver(RustRawSlotReceiver {
-                                    receiver_id,
-                                    target_path: public_path.clone(),
-                                    arguments: RustType::Tuple(arg_types),
-                                }),
-                            });
-                            rust_items.push(impl_item);
-
-                            let closure_item_path = self.generate_rust_path(
-                                &data.path,
-                                NameType::QtSlotWrapper {
-                                    signal_arguments: &wrapper.signal_arguments,
-                                    is_public: true,
-                                },
-                            )?;
-
-                            let public_args = wrapper.arguments.iter().map_if_ok(|arg| {
-                                self.rust_final_type(
-                                    arg,
-                                    // closure argument should be handled in the same way
-                                    // as return type (value is produced behind FFI)
-                                    &CppFfiArgumentMeaning::ReturnValue,
-                                    ReturnValueAllocationPlace::NotApplicable,
-                                    Some(checks),
-                                )
-                            })?;
-
-                            let public_item = RustItem::Struct(RustStruct {
-                                is_public: true,
-                                kind: RustStructKind::QtSlotWrapper(RustQtSlotWrapper {
-                                    arguments: public_args,
-                                    signal_arguments: wrapper.signal_arguments.clone(),
-                                    raw_slot_wrapper: public_path,
-                                }),
-                                path: closure_item_path,
-                                extra_doc: None,
-                            });
-                            rust_items.push(public_item);
-                        }
-
-                        Ok(rust_items)
-                    }
-                    CppTypeDeclarationKind::Enum => {
-                        let rust_path = self.generate_rust_path(&data.path, NameType::Type)?;
-                        let rust_item = RustItem::Struct(RustStruct {
-                            extra_doc: None,
-                            path: rust_path,
-                            kind: RustStructKind::WrapperType(RustWrapperType {
-                                doc_data: RustWrapperTypeDocData {
-                                    cpp_path: data.path.clone(),
-                                    cpp_doc: data.doc.clone(),
-                                    raw_qt_slot_wrapper: None,
-                                },
-                                kind: RustWrapperTypeKind::EnumWrapper,
-                            }),
-                            is_public: true,
-                        });
-
-                        Ok(vec![rust_item])
-                    }
+            CppItem::Type(data) => match data.kind {
+                CppTypeDeclarationKind::Class { .. } => {
+                    self.process_cpp_class(cpp_item_index, cpp_item.source_ffi_item, data)
                 }
-            }
+                CppTypeDeclarationKind::Enum => {
+                    let rust_path = self.generate_rust_path(&data.path, NameType::Type)?;
+                    let rust_item = RustItem::Struct(RustStruct {
+                        extra_doc: None,
+                        path: rust_path,
+                        kind: RustStructKind::WrapperType(RustWrapperType {
+                            doc_data: RustWrapperTypeDocData {
+                                cpp_path: data.path.clone(),
+                                cpp_doc: data.doc.clone(),
+                                raw_qt_slot_wrapper: None,
+                            },
+                            kind: RustWrapperTypeKind::EnumWrapper,
+                        }),
+                        is_public: true,
+                    });
+
+                    Ok(vec![rust_item])
+                }
+            },
             CppItem::EnumValue(value) => {
                 let rust_path = self.generate_rust_path(&value.path, NameType::EnumValue)?;
 
@@ -1818,12 +1837,17 @@ impl State<'_, '_> {
             crate_name.to_string(),
         ]);
 
+        let source = RustReexportSource::DependencyCrate {
+            crate_name: crate_name.into(),
+        };
+
         if self
             .0
             .current_database
-            .rust_database()
-            .find(&path)
-            .is_some()
+            .rust_items()
+            .iter()
+            .filter_map(|item| item.item.as_reexport_ref())
+            .any(|item| item.source == source)
         {
             // already created
             return Ok(());
@@ -1833,6 +1857,7 @@ impl State<'_, '_> {
             item: RustItem::Reexport(RustReexport {
                 path,
                 target: RustPath::from_parts(vec![crate_name.to_string()]),
+                source,
             }),
             cpp_item_index: None,
             ffi_item_index: None,
@@ -1841,25 +1866,13 @@ impl State<'_, '_> {
         Ok(())
     }
 
-    fn generate_special_module(&mut self, kind: RustModuleKind) -> Result<()> {
-        if self
-            .0
-            .current_database
-            .rust_items()
-            .iter()
-            .filter_map(RustDatabaseItem::as_module_ref)
-            .any(|module| module.kind == kind)
-        {
-            // already created
-            return Ok(());
-        }
+    fn generate_special_module(&mut self, kind: RustSpecialModuleKind) -> Result<()> {
         let crate_name = self.0.config.crate_properties().name().to_string();
         let rust_path_parts = match kind {
-            RustModuleKind::CrateRoot => vec![crate_name],
-            RustModuleKind::Ffi => vec![crate_name, "__ffi".to_string()],
-            RustModuleKind::Ops => vec![crate_name, "ops".to_string()],
-            RustModuleKind::SizedTypes => vec![crate_name, "__sized_types".to_string()],
-            RustModuleKind::CppNamespace | RustModuleKind::CppNestedType => unreachable!(),
+            RustSpecialModuleKind::CrateRoot => vec![crate_name],
+            RustSpecialModuleKind::Ffi => vec![crate_name, "__ffi".to_string()],
+            RustSpecialModuleKind::Ops => vec![crate_name, "ops".to_string()],
+            RustSpecialModuleKind::SizedTypes => vec![crate_name, "__sized_types".to_string()],
         };
         let rust_path = RustPath::from_parts(rust_path_parts);
 
@@ -1876,16 +1889,15 @@ impl State<'_, '_> {
         let rust_item = RustDatabaseItem {
             item: RustItem::Module(RustModule {
                 is_public: match kind {
-                    RustModuleKind::CrateRoot | RustModuleKind::Ops => true,
-                    RustModuleKind::Ffi | RustModuleKind::SizedTypes => false,
-                    RustModuleKind::CppNamespace | RustModuleKind::CppNestedType => unreachable!(),
+                    RustSpecialModuleKind::CrateRoot | RustSpecialModuleKind::Ops => true,
+                    RustSpecialModuleKind::Ffi | RustSpecialModuleKind::SizedTypes => false,
                 },
                 path: rust_path,
                 doc: RustModuleDoc {
                     extra_doc: None,
                     cpp_path: None,
                 },
-                kind,
+                kind: RustModuleKind::Special(kind),
             }),
             cpp_item_index: None,
             ffi_item_index: None,
@@ -1902,7 +1914,7 @@ impl State<'_, '_> {
                 if cpp_item.is_rust_processed {
                     continue;
                 }
-                if let Ok(rust_items) = self.process_cpp_item(cpp_item) {
+                if let Ok(rust_items) = self.process_cpp_item(cpp_item_index, cpp_item) {
                     let cpp_item_text = cpp_item.item.to_string();
                     for rust_item in rust_items {
                         let item = RustDatabaseItem {
@@ -1929,12 +1941,12 @@ impl State<'_, '_> {
             }
         }
 
-        for cpp_item in self.0.current_database.cpp_items() {
+        for (cpp_item_index, cpp_item) in self.0.current_database.cpp_items().iter().enumerate() {
             if cpp_item.is_rust_processed {
                 continue;
             }
 
-            if let Err(err) = self.process_cpp_item(cpp_item) {
+            if let Err(err) = self.process_cpp_item(cpp_item_index, cpp_item) {
                 debug!("failed to process cpp item: {}: {}", &cpp_item.item, err);
                 print_trace(&err, Some(log::Level::Trace));
             }
@@ -2101,10 +2113,10 @@ impl State<'_, '_> {
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut state = State(data);
     for &module in &[
-        RustModuleKind::CrateRoot,
-        RustModuleKind::Ffi,
-        RustModuleKind::Ops,
-        RustModuleKind::SizedTypes,
+        RustSpecialModuleKind::CrateRoot,
+        RustSpecialModuleKind::Ffi,
+        RustSpecialModuleKind::Ops,
+        RustSpecialModuleKind::SizedTypes,
     ] {
         state.generate_special_module(module)?;
     }
