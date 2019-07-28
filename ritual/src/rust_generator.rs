@@ -1497,13 +1497,7 @@ impl State<'_, '_> {
 
         if name_type == NameType::FfiFunction {
             let rust_path = scope.apply(&full_last_name);
-            if self
-                .0
-                .current_database
-                .rust_database()
-                .find(&rust_path)
-                .is_some()
-            {
+            if self.0.current_database.find_rust_item(&rust_path).is_some() {
                 bail!("ffi function path already taken: {:?}", rust_path);
             }
             return Ok(rust_path);
@@ -1516,11 +1510,7 @@ impl State<'_, '_> {
         if name_type.is_api_function() {
             Ok(rust_path)
         } else {
-            Ok(self
-                .0
-                .current_database
-                .rust_database()
-                .make_unique_path(&rust_path))
+            Ok(self.0.current_database.make_unique_rust_path(&rust_path))
         }
     }
 
@@ -1920,13 +1910,7 @@ impl State<'_, '_> {
         };
         let rust_path = RustPath::from_parts(rust_path_parts);
 
-        if self
-            .0
-            .current_database
-            .rust_database()
-            .find(&rust_path)
-            .is_some()
-        {
+        if self.0.current_database.find_rust_item(&rust_path).is_some() {
             bail!("special module path already taken: {:?}", rust_path);
         }
 
@@ -2067,13 +2051,7 @@ impl State<'_, '_> {
             if paths.contains(&path) {
                 bail!("conflicting path: {:?}", path);
             }
-            if self
-                .0
-                .current_database
-                .rust_database()
-                .find(&path)
-                .is_some()
-            {
+            if self.0.current_database.find_rust_item(&path).is_some() {
                 bail!("path already taken by an existing item: {:?}", path);
             }
             paths.insert(path);
@@ -2125,11 +2103,7 @@ impl State<'_, '_> {
                 } else {
                     function.desired_path
                 };
-                let final_path = self
-                    .0
-                    .current_database
-                    .rust_database()
-                    .make_unique_path(&path);
+                let final_path = self.0.current_database.make_unique_rust_path(&path);
                 let item = RustDatabaseItem {
                     item: RustItem::Function(function.function.with_path(final_path)),
                 };

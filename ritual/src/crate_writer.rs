@@ -294,15 +294,13 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
 
     let file = create_file(c_lib_path.join("sized_types.cxx"))?;
     generate_cpp_type_size_requester(
-        data.current_database.rust_database(),
+        data.current_database.rust_items(),
         data.config.include_directives(),
         file,
     )?;
 
     rust_code_generator::generate(
-        data.config.crate_properties().name(),
         &data.current_database,
-        data.current_database.rust_database(),
         &output_path.join("src"),
         data.config.crate_template_path().map(|s| s.join("src")),
     )?;

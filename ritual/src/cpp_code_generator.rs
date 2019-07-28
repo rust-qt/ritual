@@ -8,7 +8,7 @@ use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
 use crate::database::CppFfiDatabaseItem;
-use crate::rust_info::{RustDatabase, RustItem, RustStructKind};
+use crate::rust_info::{RustDatabaseItem, RustItem, RustStructKind};
 use itertools::Itertools;
 use ritual_common::cpp_lib_builder::version_to_number;
 use ritual_common::errors::{bail, err_msg, Result};
@@ -376,7 +376,7 @@ pub fn generate_cpp_file(
 /// on the current platform and outputs the Rust code for `sized_types.rs` module
 /// to the standard output.
 pub fn generate_cpp_type_size_requester(
-    rust_database: &RustDatabase,
+    rust_items: &[RustDatabaseItem],
     include_directives: &[PathBuf],
     mut output: impl Write,
 ) -> Result<()> {
@@ -385,7 +385,7 @@ pub fn generate_cpp_type_size_requester(
     }
     writeln!(output, "#include <stdio.h>\n\nint main() {{")?;
 
-    for item in rust_database.items() {
+    for item in rust_items {
         if let RustItem::Struct(data) = &item.item {
             if let RustStructKind::SizedType(sized_type) = &data.kind {
                 let cpp_path_code = sized_type.cpp_path.to_cpp_code()?;

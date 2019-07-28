@@ -2,9 +2,11 @@ use crate::cpp_checks::CppChecks;
 use crate::cpp_code_generator;
 use crate::cpp_data::{CppItem, CppOriginLocation, CppPath};
 use crate::cpp_ffi_data::{CppFfiFunction, CppFfiItem, QtSlotWrapper};
-use crate::rust_info::{RustDatabase, RustDatabaseItem};
+use crate::rust_info::RustDatabaseItem;
+use crate::rust_type::RustPath;
 use log::{debug, trace};
-use ritual_common::errors::{bail, Result};
+use ritual_common::errors::{bail, format_err, Result};
+use ritual_common::string_utils::ends_with_digit;
 use ritual_common::target::LibraryTarget;
 use serde_derive::{Deserialize, Serialize};
 
@@ -97,7 +99,7 @@ pub struct Data {
     crate_version: String,
     cpp_items: Vec<CppDatabaseItem>,
     ffi_items: Vec<CppFfiDatabaseItem>,
-    rust_database: RustDatabase,
+    rust_items: Vec<RustDatabaseItem>,
     environments: Vec<LibraryTarget>,
 }
 
@@ -128,7 +130,7 @@ impl Database {
                 crate_version: "0.0.0".into(),
                 cpp_items: Vec::new(),
                 ffi_items: Vec::new(),
-                rust_database: RustDatabase::new(crate_name),
+                rust_items: Vec::new(),
                 environments: Vec::new(),
             },
             is_modified: true,
@@ -251,22 +253,9 @@ impl Database {
         true
     }
 
-    pub fn rust_database(&self) -> &RustDatabase {
-        &self.data.rust_database
-    }
-
-    pub fn rust_items(&self) -> &[RustDatabaseItem] {
-        self.data.rust_database.items()
-    }
-
-    pub fn add_rust_item(&mut self, item: RustDatabaseItem) -> Result<()> {
-        self.is_modified = true;
-        self.data.rust_database.add_item(item)
-    }
-
     pub fn clear_rust_info(&mut self) {
         self.is_modified = true;
-        self.data.rust_database.clear();
+        self.data.rust_items.clear();
         for item in &mut self.data.cpp_items {
             item.is_rust_processed = false;
         }
@@ -284,5 +273,83 @@ impl Database {
 
     pub fn environments(&self) -> &[LibraryTarget] {
         &self.data.environments
+    }
+
+    pub fn find_rust_item(&self, path: &RustPath) -> Option<&RustDatabaseItem> {
+        self.data
+            .rust_items
+            .iter()
+            .find(|item| item.path() == Some(path))
+    }
+
+    pub fn rust_children<'a>(
+        &'a self,
+        path: &'a RustPath,
+    ) -> impl Iterator<Item = &'a RustDatabaseItem> {
+        self.data
+            .rust_items
+            .iter()
+            .filter(move |item| item.is_child_of(path))
+    }
+
+    pub fn rust_items(&self) -> &[RustDatabaseItem] {
+        &self.data.rust_items
+    }
+
+    pub fn add_rust_item(&mut self, item: RustDatabaseItem) -> Result<()> {
+        self.is_modified = true;
+        if item.item.is_crate_root() {
+            let item_path = item.path().expect("crate root must have path");
+            let crate_name = item_path
+                .crate_name()
+                .expect("rust item path must have crate name");
+            if crate_name != self.data.crate_name {
+                bail!("can't add rust item with different crate name: {:?}", item);
+            }
+        } else {
+            let mut path = item
+                .parent_path()
+                .map_err(|_| format_err!("path has no parent for rust item: {:?}", item))?;
+            let crate_name = path
+                .crate_name()
+                .expect("rust item path must have crate name");
+            if crate_name != self.data.crate_name {
+                bail!("can't add rust item with different crate name: {:?}", item);
+            }
+            while path.parts.len() > 1 {
+                if self.find_rust_item(&path).is_none() {
+                    bail!("unreachable path {:?} for rust item: {:?}", path, item);
+                }
+                path.parts.pop();
+            }
+        }
+
+        self.data.rust_items.push(item);
+        Ok(())
+    }
+
+    pub fn make_unique_rust_path(&self, path: &RustPath) -> RustPath {
+        let mut number = None;
+        let mut path_try = path.clone();
+        loop {
+            if let Some(number) = number {
+                *path_try.last_mut() = format!(
+                    "{}{}{}",
+                    path.last(),
+                    if ends_with_digit(path.last()) {
+                        "_"
+                    } else {
+                        ""
+                    },
+                    number
+                );
+            }
+            if self.find_rust_item(&path_try).is_none() {
+                return path_try;
+            }
+
+            number = Some(number.unwrap_or(1) + 1);
+        }
+        // TODO: check for conflicts with types from crate template (how?)
     }
 }

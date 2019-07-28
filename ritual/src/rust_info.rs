@@ -6,8 +6,7 @@ use crate::cpp_function::CppFunctionExternalDoc;
 use crate::cpp_type::CppType;
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_type::{RustFinalType, RustPath, RustPointerLikeTypeKind, RustType};
-use ritual_common::errors::{bail, format_err, Result};
-use ritual_common::string_utils::ends_with_digit;
+use ritual_common::errors::{bail, Result};
 use serde_derive::{Deserialize, Serialize};
 
 /// One variant of a Rust enum
@@ -892,96 +891,6 @@ impl RustDatabaseItem {
         } else {
             None
         }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RustDatabase {
-    crate_name: String,
-    items: Vec<RustDatabaseItem>,
-}
-
-impl RustDatabase {
-    pub fn new(crate_name: String) -> Self {
-        Self {
-            crate_name,
-            items: Vec::new(),
-        }
-    }
-
-    pub fn find(&self, path: &RustPath) -> Option<&RustDatabaseItem> {
-        self.items.iter().find(|item| item.path() == Some(path))
-    }
-
-    pub fn children<'a>(
-        &'a self,
-        path: &'a RustPath,
-    ) -> impl Iterator<Item = &'a RustDatabaseItem> {
-        self.items.iter().filter(move |item| item.is_child_of(path))
-    }
-
-    pub fn items(&self) -> &[RustDatabaseItem] {
-        &self.items
-    }
-
-    pub fn add_item(&mut self, item: RustDatabaseItem) -> Result<()> {
-        if item.item.is_crate_root() {
-            let item_path = item.path().expect("crate root must have path");
-            let crate_name = item_path
-                .crate_name()
-                .expect("rust item path must have crate name");
-            if crate_name != self.crate_name {
-                bail!("can't add rust item with different crate name: {:?}", item);
-            }
-        } else {
-            let mut path = item
-                .parent_path()
-                .map_err(|_| format_err!("path has no parent for rust item: {:?}", item))?;
-            let crate_name = path
-                .crate_name()
-                .expect("rust item path must have crate name");
-            if crate_name != self.crate_name {
-                bail!("can't add rust item with different crate name: {:?}", item);
-            }
-            while path.parts.len() > 1 {
-                if self.find(&path).is_none() {
-                    bail!("unreachable path {:?} for rust item: {:?}", path, item);
-                }
-                path.parts.pop();
-            }
-        }
-
-        self.items.push(item);
-        Ok(())
-    }
-
-    pub fn clear(&mut self) {
-        self.items.clear();
-    }
-
-    pub fn make_unique_path(&self, path: &RustPath) -> RustPath {
-        let mut number = None;
-        let mut path_try = path.clone();
-        loop {
-            if let Some(number) = number {
-                *path_try.last_mut() = format!(
-                    "{}{}{}",
-                    path.last(),
-                    if ends_with_digit(path.last()) {
-                        "_"
-                    } else {
-                        ""
-                    },
-                    number
-                );
-            }
-            if self.find(&path_try).is_none() {
-                return path_try;
-            }
-
-            number = Some(number.unwrap_or(1) + 1);
-        }
-        // TODO: check for conflicts with types from crate template (how?)
     }
 }
 

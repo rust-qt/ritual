@@ -5,10 +5,10 @@ use crate::database::Database;
 use crate::doc_formatter;
 use crate::rust_generator::qt_core_path;
 use crate::rust_info::{
-    RustDatabase, RustDatabaseItem, RustEnumValue, RustExtraImpl, RustExtraImplKind,
-    RustFFIFunction, RustFfiWrapperData, RustFunction, RustFunctionArgument, RustFunctionKind,
-    RustItem, RustModule, RustModuleKind, RustSpecialModuleKind, RustStruct, RustStructKind,
-    RustTraitImpl, RustWrapperTypeKind,
+    RustDatabaseItem, RustEnumValue, RustExtraImpl, RustExtraImplKind, RustFFIFunction,
+    RustFfiWrapperData, RustFunction, RustFunctionArgument, RustFunctionKind, RustItem, RustModule,
+    RustModuleKind, RustSpecialModuleKind, RustStruct, RustStructKind, RustTraitImpl,
+    RustWrapperTypeKind,
 };
 use crate::rust_type::{
     RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
@@ -109,7 +109,6 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: Option<&str>) -> S
 }
 
 struct Generator<'a> {
-    crate_name: String,
     output_src_path: PathBuf,
     crate_template_src_path: Option<PathBuf>,
     destination: Vec<File<BufWriter<fs::File>>>,
@@ -200,7 +199,8 @@ impl Generator<'_> {
         let parts = &rust_path.parts;
 
         assert_eq!(
-            &parts[0], &self.crate_name,
+            &parts[0],
+            &self.current_database.crate_name(),
             "Generator::push_file expects path from this crate"
         );
 
@@ -233,7 +233,6 @@ impl Generator<'_> {
         &mut self,
         item: &RustDatabaseItem,
         self_type: Option<&RustType>,
-        database: &RustDatabase,
     ) -> Result<()> {
         let ffi_item = if let Some(index) = item.item.ffi_item_index() {
             Some(
@@ -277,8 +276,8 @@ impl Generator<'_> {
         }
 
         match &item.item {
-            RustItem::Module(module) => self.generate_module(module, database),
-            RustItem::Struct(data) => self.generate_struct(data, database, &condition_texts),
+            RustItem::Module(module) => self.generate_module(module),
+            RustItem::Struct(data) => self.generate_struct(data, &condition_texts),
             RustItem::EnumValue(value) => self.generate_enum_value(value),
             RustItem::TraitImpl(value) => self.generate_trait_impl(value, &condition_texts),
             RustItem::Function(value) => {
@@ -299,12 +298,17 @@ impl Generator<'_> {
     }
 
     fn rust_type_to_code(&self, rust_type: &RustType) -> String {
-        rust_type_to_code(rust_type, Some(&self.crate_name))
+        rust_type_to_code(rust_type, Some(&self.current_database.crate_name()))
     }
 
     #[allow(clippy::collapsible_if)]
-    fn generate_module(&mut self, module: &RustModule, database: &RustDatabase) -> Result<()> {
-        if database.children(&module.path).next().is_none() {
+    fn generate_module(&mut self, module: &RustModule) -> Result<()> {
+        if self
+            .current_database
+            .rust_children(&module.path)
+            .next()
+            .is_none()
+        {
             // skip empty module
             return Ok(());
         }
@@ -357,7 +361,7 @@ impl Generator<'_> {
             | RustModuleKind::Special(RustSpecialModuleKind::Ops)
             | RustModuleKind::CppNamespace { .. }
             | RustModuleKind::CppNestedTypes { .. } => {
-                self.generate_children(&module.path, None, database)?;
+                self.generate_children(&module.path, None)?;
             }
         }
 
@@ -371,7 +375,7 @@ impl Generator<'_> {
         if module.kind == RustModuleKind::Special(RustSpecialModuleKind::Ffi) {
             let path = self.output_src_path.join("ffi.in.rs");
             self.destination.push(create_file(&path)?);
-            self.generate_children(&module.path, None, database)?;
+            self.generate_children(&module.path, None)?;
             self.pop_file();
         }
 
@@ -379,12 +383,12 @@ impl Generator<'_> {
     }
 
     fn qt_core_path(&self) -> RustPath {
-        qt_core_path(&self.crate_name)
+        qt_core_path(&self.current_database.crate_name())
     }
 
     fn qt_core_prefix(&self) -> String {
         let qt_core_path = self.qt_core_path();
-        if qt_core_path.parts[0] == self.crate_name {
+        if qt_core_path.parts[0] == self.current_database.crate_name() {
             "crate".to_string()
         } else {
             format!("::{}", qt_core_path.parts[0])
@@ -394,7 +398,6 @@ impl Generator<'_> {
     fn generate_struct(
         &mut self,
         rust_struct: &RustStruct,
-        database: &RustDatabase,
         condition_texts: &ConditionTexts,
     ) -> Result<()> {
         let doc = doc_formatter::struct_doc(rust_struct) + &condition_texts.doc_text;
@@ -471,14 +474,19 @@ impl Generator<'_> {
             }
         }
 
-        if database.children(&rust_struct.path).next().is_some() {
+        if self
+            .current_database
+            .rust_children(&rust_struct.path)
+            .next()
+            .is_some()
+        {
             let struct_type = RustType::Common(RustCommonType {
                 path: rust_struct.path.clone(),
                 generic_arguments: None,
             });
 
             writeln!(self, "impl {} {{", rust_struct.path.last())?;
-            self.generate_children(&rust_struct.path, Some(&struct_type), database)?;
+            self.generate_children(&rust_struct.path, Some(&struct_type))?;
             writeln!(self, "}}")?;
             writeln!(self)?;
         }
@@ -507,7 +515,7 @@ impl Generator<'_> {
 
     // TODO: generate relative paths for better readability
     fn rust_path_to_string(&self, path: &RustPath) -> String {
-        path.full_name(Some(&self.crate_name))
+        path.full_name(Some(&self.current_database.crate_name()))
     }
 
     /// Generates Rust code containing declaration of a FFI function `func`.
@@ -944,31 +952,29 @@ impl Generator<'_> {
         Ok(())
     }
 
-    fn generate_children(
-        &mut self,
-        parent: &RustPath,
-        self_type: Option<&RustType>,
-        database: &RustDatabase,
-    ) -> Result<()> {
-        if database
-            .children(&parent)
+    fn generate_children(&mut self, parent: &RustPath, self_type: Option<&RustType>) -> Result<()> {
+        if self
+            .current_database
+            .rust_children(&parent)
             .any(|item| item.item.is_ffi_function())
         {
             writeln!(self, "extern \"C\" {{\n")?;
-            for item in database
-                .children(&parent)
+            for item in self
+                .current_database
+                .rust_children(&parent)
                 .filter(|item| item.item.is_ffi_function())
             {
-                self.generate_item(item, self_type, database)?;
+                self.generate_item(item, self_type)?;
             }
             writeln!(self, "}}\n")?;
         }
 
-        for item in database
-            .children(&parent)
+        for item in self
+            .current_database
+            .rust_children(&parent)
             .filter(|item| !item.item.is_ffi_function())
         {
-            self.generate_item(item, self_type, database)?;
+            self.generate_item(item, self_type)?;
         }
         Ok(())
     }
@@ -1052,27 +1058,25 @@ impl Generator<'_> {
 }
 
 pub fn generate(
-    crate_name: &str,
     current_database: &Database,
-    database: &RustDatabase,
     output_src_path: impl Into<PathBuf>,
     crate_template_src_path: Option<impl Into<PathBuf>>,
 ) -> Result<()> {
     let mut generator = Generator {
-        crate_name: crate_name.to_string(),
         destination: Vec::new(),
         output_src_path: output_src_path.into(),
         crate_template_src_path: crate_template_src_path.map(Into::into),
         current_database,
     };
 
-    let crate_root = database
-        .items()
+    let crate_root = generator
+        .current_database
+        .rust_items()
         .iter()
         .filter_map(RustDatabaseItem::as_module_ref)
         .find(|module| module.kind == RustModuleKind::Special(RustSpecialModuleKind::CrateRoot))
         .ok_or_else(|| err_msg("crate root not found"))?;
 
-    generator.generate_module(crate_root, database)?;
+    generator.generate_module(crate_root)?;
     Ok(())
 }
