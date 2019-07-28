@@ -22,6 +22,7 @@ pub enum DatabaseItemSource {
     TemplateInstantiation,
     NamespaceInferring,
     OmittingArguments,
+    Cast,
 }
 
 impl DatabaseItemSource {
@@ -86,7 +87,6 @@ pub struct CppDatabaseItem {
     pub item: CppItem,
     pub source: DatabaseItemSource,
     pub source_ffi_item: Option<usize>,
-    pub is_cpp_ffi_processed: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -101,8 +101,8 @@ pub struct Data {
 
 #[derive(Debug, Default)]
 pub struct Counters {
-    pub rust_items_added: u32,
-    pub rust_items_ignored: u32,
+    pub items_added: u32,
+    pub items_ignored: u32,
 }
 
 /// Represents all collected data related to a crate.
@@ -174,11 +174,13 @@ impl Database {
             .data
             .ffi_items
             .iter()
-            .any(|i| i.item.is_cpp_item_same(&item.item))
+            .any(|i| i.item.has_same_source(&item.item))
         {
+            self.counters.items_ignored += 1;
             return false;
         }
         self.data.ffi_items.push(item);
+        self.counters.items_added += 1;
         true
     }
 
@@ -191,17 +193,10 @@ impl Database {
     pub fn clear_ffi(&mut self) {
         self.is_modified = true;
         self.data.ffi_items.clear();
-        self.force_ffi_processing();
         self.data
             .cpp_items
             .retain(|item| item.source_ffi_item.is_none());
         // TODO: deal with rust items that now have invalid index references
-    }
-
-    pub fn force_ffi_processing(&mut self) {
-        for item in &mut self.data.cpp_items {
-            item.is_cpp_ffi_processed = false;
-        }
     }
 
     pub fn clear_cpp_checks(&mut self) {
@@ -242,6 +237,7 @@ impl Database {
             if source.is_parser() && !item.source.is_parser() {
                 item.source = source;
             }
+            self.counters.items_ignored += 1;
             return false;
         }
         self.is_modified = true;
@@ -250,10 +246,10 @@ impl Database {
             item: data,
             source,
             source_ffi_item,
-            is_cpp_ffi_processed: false,
         };
         trace!("cpp item data: {:?}", item);
         self.data.cpp_items.push(item);
+        self.counters.items_added += 1;
         true
     }
 
@@ -328,12 +324,12 @@ impl Database {
             .iter()
             .any(|other| other.item.has_same_source(&item.item))
         {
-            self.counters.rust_items_ignored += 1;
+            self.counters.items_ignored += 1;
             return Ok(());
         }
 
         self.data.rust_items.push(item);
-        self.counters.rust_items_added += 1;
+        self.counters.items_added += 1;
         Ok(())
     }
 
@@ -363,9 +359,15 @@ impl Database {
     }
 
     pub fn report_counters(&mut self) {
-        trace!("counters: {:?}", self.counters);
-        if self.counters.rust_items_added > 0 {
-            info!("Rust items added: {}", self.counters.rust_items_added);
+        if self.counters.items_added > 0 || self.counters.items_ignored > 0 {
+            if self.counters.items_ignored == 0 {
+                info!("Items added: {}", self.counters.items_added);
+            } else {
+                info!(
+                    "Items added: {}, ignored: {}",
+                    self.counters.items_added, self.counters.items_ignored
+                );
+            }
         }
         self.counters = Counters::default();
     }

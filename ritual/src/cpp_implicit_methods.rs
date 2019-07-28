@@ -37,6 +37,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                     return_type: CppType::Void,
                     arguments: vec![],
                     allows_variadic_arguments: false,
+                    cast: None,
                     declaration_code: None,
                     doc: CppFunctionDoc::default(),
                 };
@@ -61,6 +62,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                     arguments: vec![],
                     allows_variadic_arguments: false,
                     declaration_code: None,
+                    cast: None,
                     doc: CppFunctionDoc::default(),
                 };
                 methods.push((type1.source_ffi_item, default_constructor));
@@ -89,6 +91,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                     return_type: CppType::Void,
                     arguments: vec![copy_arg.clone()],
                     allows_variadic_arguments: false,
+                    cast: None,
                     declaration_code: None,
                     doc: CppFunctionDoc::default(),
                 };
@@ -112,6 +115,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                     return_type: CppType::new_reference(false, CppType::Class(class_path.clone())),
                     arguments: vec![copy_arg],
                     allows_variadic_arguments: false,
+                    cast: None,
                     declaration_code: None,
                     doc: CppFunctionDoc::default(),
                 };

@@ -116,7 +116,7 @@ fn test_moqt() {
             workspace,
             local_paths: Some(true),
             crates: vec!["moqt_core".into(), "moqt_gui".into()],
-            operations: vec!["discard".into(), "main".into()],
+            operations: vec!["discard".into(), "main".into(), "main".into()],
             cluster: None,
         },
         global_config(),

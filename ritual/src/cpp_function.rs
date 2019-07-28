@@ -1,6 +1,7 @@
 //! Types for handling information about C++ methods.
 
 use crate::cpp_data::{CppPath, CppVisibility};
+use crate::cpp_ffi_data::CppCast;
 pub use crate::cpp_operator::{CppOperator, CppOperatorInfo};
 use crate::cpp_type::{CppPointerLikeTypeKind, CppType};
 use crate::rust_info::RustQtReceiverType;
@@ -140,6 +141,7 @@ pub struct CppFunction {
     pub arguments: Vec<CppFunctionArgument>,
     /// Whether the argument list is terminated with "..."
     pub allows_variadic_arguments: bool,
+    pub cast: Option<CppCast>,
     /// C++ code of the method's declaration.
     /// None if the method was not explicitly declared.
     pub declaration_code: Option<String>,

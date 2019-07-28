@@ -3,8 +3,8 @@ use crate::cpp_checker::apply_blacklist_to_checks;
 use crate::database::{CppDatabaseItem, CppFfiDatabaseItem, Database};
 use crate::workspace::Workspace;
 use crate::{
-    cpp_checker, cpp_ffi_generator, cpp_implicit_methods, cpp_omitting_arguments, cpp_parser,
-    cpp_template_instantiator, crate_writer, rust_generator,
+    cpp_casts, cpp_checker, cpp_ffi_generator, cpp_implicit_methods, cpp_omitting_arguments,
+    cpp_parser, cpp_template_instantiator, crate_writer, rust_generator,
 };
 use itertools::Itertools;
 use log::{error, info, trace};
@@ -128,6 +128,7 @@ impl Default for ProcessingSteps {
                 &format!("omitting_arguments{}", suffix),
                 cpp_omitting_arguments::run,
             );
+            s.push(&format!("cpp_casts{}", suffix), cpp_casts::run);
             s.push(
                 &format!("cpp_ffi_generator{}", suffix),
                 cpp_ffi_generator::run,
@@ -154,10 +155,6 @@ impl Default for ProcessingSteps {
         s.add_custom("apply_blacklist_to_checks", apply_blacklist_to_checks);
         s.add_custom("clear_rust_info", |data| {
             data.current_database.clear_rust_info();
-            Ok(())
-        });
-        s.add_custom("force_ffi_processing", |data| {
-            data.current_database.force_ffi_processing();
             Ok(())
         });
         s.add_custom("show_non_portable", show_non_portable);

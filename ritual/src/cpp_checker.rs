@@ -6,7 +6,7 @@ use crate::database::CppFfiDatabaseItem;
 use crate::processor::ProcessorData;
 use crate::{cluster_api, cpp_code_generator};
 use itertools::Itertools;
-use log::{debug, trace};
+use log::{debug, error, info, trace};
 use rayon::iter::ParallelIterator;
 use rayon::slice::ParallelSliceMut;
 use ritual_common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
@@ -508,9 +508,12 @@ impl CppChecker<'_, '_> {
         let crate_name = self.data.current_database.crate_name().to_string();
 
         let mut snippets = Vec::new();
+        let mut old_items_count = 0;
+
         for (ffi_item_index, ffi_item) in self.data.current_database.ffi_items().iter().enumerate()
         {
             if ffi_item.checks.has_all_envs(library_targets) {
+                old_items_count += 1;
                 continue;
             }
 
@@ -540,27 +543,50 @@ impl CppChecker<'_, '_> {
                 }
             }
         }
+
+        if old_items_count == 0 {
+            info!("Checking {} items", snippets.len());
+        } else if snippets.is_empty() {
+            info!("Ignoring {} old items", old_items_count);
+        } else {
+            info!(
+                "Checking {} items, ignoring {} old items",
+                snippets.len(),
+                old_items_count
+            );
+        }
+
         snippets
     }
 
     fn save_results(&mut self, snippets: Vec<LocalSnippetTask>) {
+        let mut success_count = 0;
+        let mut error_count = 0;
+
         for snippet in snippets {
             let ffi_item =
                 &mut self.data.current_database.ffi_items_mut()[snippet.data.ffi_item_index];
             if let Some(output) = snippet.output {
                 if output.is_success() {
                     debug!("success: {}", ffi_item.item.short_text());
+                    success_count += 1;
                 } else {
                     debug!("error: {}: {:?}", ffi_item.item.short_text(), output);
+                    error_count += 1;
                 }
                 ffi_item
                     .checks
                     .add(snippet.data.library_target, output.is_success());
             } else {
-                debug!("no output for item: {}", ffi_item.item.short_text());
+                error!("no output for item: {}", ffi_item.item.short_text());
             }
             trace!("snippet: {:?}", snippet.snippet);
         }
+
+        info!(
+            "Success: {} items; error: {} items",
+            success_count, error_count
+        );
     }
 }
 

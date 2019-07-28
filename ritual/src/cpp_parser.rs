@@ -1155,6 +1155,7 @@ impl CppParser<'_, '_> {
                 arguments,
                 allows_variadic_arguments,
                 return_type: return_type_parsed,
+                cast: None,
                 declaration_code,
                 doc: CppFunctionDoc::default(),
             },

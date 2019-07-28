@@ -42,6 +42,7 @@ pub fn empty_regular_method() -> CppFunction {
         allows_variadic_arguments: false,
         operator: None,
         declaration_code: None,
+        cast: None,
     }
 }
 
@@ -171,9 +172,9 @@ fn argument_types_equal8() {
 fn to_ffi(function: &CppFunction, force_stack: Option<CppPath>) -> CppFfiFunction {
     let movable_types = force_stack.into_iter().collect_vec();
     crate::cpp_ffi_generator::to_ffi_method(
+        1,
         &CppFfiFunctionKind::Function {
             cpp_function: function.clone(),
-            cast: None,
         },
         &movable_types,
         &mut crate::cpp_ffi_generator::FfiNameProvider::testing(),
@@ -619,6 +620,7 @@ fn short_text1() {
         ],
         doc: Default::default(),
         allows_variadic_arguments: false,
+        cast: None,
         declaration_code: None,
     };
     assert_eq!(

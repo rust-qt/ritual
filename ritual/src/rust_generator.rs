@@ -1094,10 +1094,7 @@ impl State<'_, '_> {
             is_unsafe: true,
         };
 
-        if let CppFfiFunctionKind::Function {
-            cpp_function, cast, ..
-        } = &function.kind
-        {
+        if let CppFfiFunctionKind::Function { cpp_function, .. } = &function.kind {
             if cpp_function.is_destructor() {
                 let item = State::process_destructor(
                     ffi_item_index,
@@ -1107,7 +1104,7 @@ impl State<'_, '_> {
                 results.push(ProcessedFfiItem::Item(RustItem::TraitImpl(item)));
                 return Ok(results);
             }
-            if let Some(cast) = cast {
+            if let Some(cast) = &cpp_function.cast {
                 let impls = State::process_cast(ffi_item_index, unnamed_function, cast)?;
                 results.extend(
                     impls
@@ -1909,10 +1906,6 @@ impl State<'_, '_> {
             RustSpecialModuleKind::SizedTypes => vec![crate_name, "__sized_types".to_string()],
         };
         let rust_path = RustPath::from_parts(rust_path_parts);
-
-        if self.0.current_database.find_rust_item(&rust_path).is_some() {
-            bail!("special module path already taken: {:?}", rust_path);
-        }
 
         let rust_item = RustDatabaseItem {
             item: RustItem::Module(RustModule {

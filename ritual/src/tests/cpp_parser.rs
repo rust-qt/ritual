@@ -103,6 +103,7 @@ fn simple_func() {
             }],
             doc: Default::default(),
             allows_variadic_arguments: false,
+            cast: None,
             declaration_code: Some("int func1 ( int x )".to_string()),
         }
     );
@@ -133,6 +134,7 @@ fn simple_func_with_default_value() {
             }],
             doc: Default::default(),
             allows_variadic_arguments: false,
+            cast: None,
             declaration_code: Some("bool func1 ( int x = 42 )".to_string()),
         }
     );
@@ -198,6 +200,7 @@ fn functions_with_class_arg() {
             }],
             doc: Default::default(),
             allows_variadic_arguments: false,
+            cast: None,
             declaration_code: Some("bool func1 ( Magic x )".to_string()),
         }
     );
@@ -218,6 +221,7 @@ fn functions_with_class_arg() {
             }],
             doc: Default::default(),
             allows_variadic_arguments: false,
+            cast: None,
             declaration_code: Some("bool func1 ( Magic * x )".to_string()),
         }
     );
@@ -238,6 +242,7 @@ fn functions_with_class_arg() {
             }],
             doc: Default::default(),
             allows_variadic_arguments: false,
+            cast: None,
             declaration_code: Some("bool func2 ( const Magic & )".to_string()),
         }
     );
@@ -291,6 +296,7 @@ fn variadic_func() {
             }],
             doc: Default::default(),
             allows_variadic_arguments: true,
+            cast: None,
             declaration_code: Some("int my_printf ( const char * format , ... )".to_string()),
         }
     );
@@ -338,6 +344,7 @@ fn free_template_func() {
             }],
             doc: Default::default(),
             allows_variadic_arguments: false,
+            cast: None,
             declaration_code: Some("template < typename T > T abs ( T value )".to_string()),
         }
     );
@@ -379,6 +386,7 @@ fn free_func_operator_sub() {
                 ],
                 doc: Default::default(),
                 allows_variadic_arguments: false,
+                cast: None,
                 declaration_code: Some("C1 operator - ( C1 a , C1 b )".to_string()),
             }
         );
@@ -428,6 +436,7 @@ fn simple_class_method() {
             }],
             doc: Default::default(),
             allows_variadic_arguments: false,
+            cast: None,
             declaration_code: Some("int func1 ( int x )".to_string()),
         }
     );
@@ -616,6 +625,7 @@ fn template_class_method() {
             }],
             doc: Default::default(),
             allows_variadic_arguments: false,
+            cast: None,
             declaration_code: Some("T get ( int index )".to_string()),
         }
     );

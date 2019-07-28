@@ -18,7 +18,7 @@ pub enum CppFieldAccessorType {
     Setter,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub enum CppCast {
     Static {
         /// If true, this is an unsafe (from base to derived) `static_cast` wrapper.
@@ -60,12 +60,7 @@ impl CppCast {
 #[allow(clippy::large_enum_variant)]
 pub enum CppFfiFunctionKind {
     /// This is a real C++ function.
-    Function {
-        cpp_function: CppFunction,
-        /// If Some, this is an instance of `static_cast`, `dynamic_cast` or
-        /// `qobject_cast` function call.
-        cast: Option<CppCast>,
-    },
+    Function { cpp_function: CppFunction },
     /// This is a field accessor, i.e. a non-existing getter or setter
     /// method for a public field.
     FieldAccessor {
@@ -90,36 +85,6 @@ impl CppFfiFunctionKind {
             Some(field)
         } else {
             None
-        }
-    }
-
-    pub fn is_same(&self, other: &Self) -> bool {
-        match self {
-            CppFfiFunctionKind::Function { cpp_function, cast } => {
-                if let CppFfiFunctionKind::Function {
-                    cpp_function: other_cpp_function,
-                    cast: other_cast,
-                } = other
-                {
-                    cpp_function.is_same(other_cpp_function) && cast == other_cast
-                } else {
-                    false
-                }
-            }
-            CppFfiFunctionKind::FieldAccessor {
-                accessor_type,
-                field,
-            } => {
-                if let CppFfiFunctionKind::FieldAccessor {
-                    accessor_type: other_accessor_type,
-                    field: other_field,
-                } = other
-                {
-                    accessor_type == other_accessor_type && field.is_same(other_field)
-                } else {
-                    false
-                }
-            }
         }
     }
 }
@@ -213,6 +178,8 @@ pub struct CppFfiFunction {
     pub path: CppPath,
 
     pub kind: CppFfiFunctionKind,
+
+    pub cpp_item_index: usize,
 }
 
 impl CppFfiFunction {
@@ -251,6 +218,33 @@ impl CppFfiFunction {
                 field,
                 accessor_type,
             } => format!("FFI field {:?}: {}", accessor_type, field.short_text()),
+        }
+    }
+
+    pub fn has_same_source(&self, other: &Self) -> bool {
+        if self.cpp_item_index != other.cpp_item_index {
+            return false;
+        }
+
+        match &self.kind {
+            CppFfiFunctionKind::Function { .. } => {
+                if let CppFfiFunctionKind::Function { .. } = &other.kind {
+                    true
+                } else {
+                    false
+                }
+            }
+            CppFfiFunctionKind::FieldAccessor { accessor_type, .. } => {
+                if let CppFfiFunctionKind::FieldAccessor {
+                    accessor_type: other_accessor_type,
+                    ..
+                } = &other.kind
+                {
+                    accessor_type == other_accessor_type
+                } else {
+                    false
+                }
+            }
         }
     }
 }
@@ -381,11 +375,11 @@ impl CppFfiItem {
         }
     }
 
-    pub fn is_cpp_item_same(&self, other: &Self) -> bool {
+    pub fn has_same_source(&self, other: &Self) -> bool {
         match self {
             CppFfiItem::Function(function) => {
                 if let CppFfiItem::Function(other_function) = other {
-                    function.kind.is_same(&other_function.kind)
+                    function.has_same_source(other_function)
                 } else {
                     false
                 }
