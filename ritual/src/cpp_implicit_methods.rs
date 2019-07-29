@@ -4,7 +4,6 @@ use crate::cpp_function::{
 };
 use crate::cpp_operator::CppOperator;
 use crate::cpp_type::CppType;
-use crate::database::DatabaseItemSource;
 use crate::processor::ProcessorData;
 use ritual_common::errors::Result;
 
@@ -124,11 +123,8 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         }
     }
     for (source_ffi_item, method) in methods {
-        data.current_database.add_cpp_item(
-            DatabaseItemSource::ImplicitMethod,
-            source_ffi_item,
-            CppItem::Function(method),
-        );
+        data.current_database
+            .add_cpp_item(source_ffi_item, CppItem::Function(method));
     }
     Ok(())
 }

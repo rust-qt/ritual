@@ -2,7 +2,6 @@ use crate::cpp_data::{CppBaseSpecifier, CppItem, CppPath, CppPathItem};
 use crate::cpp_ffi_data::CppCast;
 use crate::cpp_function::{CppFunction, CppFunctionArgument, CppFunctionDoc};
 use crate::cpp_type::{CppPointerLikeTypeKind, CppType};
-use crate::database::DatabaseItemSource;
 use crate::processor::ProcessorData;
 use ritual_common::errors::Result;
 
@@ -110,8 +109,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         }
     }
     for (source_ffi_item, item) in results {
-        data.current_database
-            .add_cpp_item(DatabaseItemSource::Cast, source_ffi_item, item);
+        data.current_database.add_cpp_item(source_ffi_item, item);
     }
     Ok(())
 }

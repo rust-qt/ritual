@@ -123,7 +123,7 @@ pub fn suggest_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut data_map = HashMap::new();
 
     for item in data.current_database.cpp_items() {
-        if !item.source.is_parser() || item.source_ffi_item.is_some() {
+        if item.source_ffi_item.is_some() {
             continue;
         }
         if let CppItem::Type(type1) = &item.item {
@@ -141,7 +141,7 @@ pub fn suggest_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
     }
 
     for item in data.current_database.cpp_items() {
-        if !item.source.is_parser() || item.source_ffi_item.is_some() {
+        if item.source_ffi_item.is_some() {
             continue;
         }
         if let CppItem::Function(function) = &item.item {

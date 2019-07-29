@@ -1,6 +1,6 @@
 use crate::cpp_checks::CppChecks;
 use crate::cpp_code_generator;
-use crate::cpp_data::{CppItem, CppOriginLocation, CppPath};
+use crate::cpp_data::{CppItem, CppPath};
 use crate::cpp_ffi_data::{CppFfiFunction, CppFfiItem, QtSlotWrapper};
 use crate::rust_info::RustDatabaseItem;
 use crate::rust_type::RustPath;
@@ -9,30 +9,7 @@ use ritual_common::errors::{bail, format_err, Result};
 use ritual_common::string_utils::ends_with_digit;
 use ritual_common::target::LibraryTarget;
 use serde_derive::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DatabaseItemSource {
-    CppParser {
-        /// File name of the include file (without full path)
-        include_file: String,
-        /// Exact location of the declaration
-        origin_location: CppOriginLocation,
-    },
-    ImplicitMethod,
-    TemplateInstantiation,
-    NamespaceInferring,
-    OmittingArguments,
-    Cast,
-}
-
-impl DatabaseItemSource {
-    pub fn is_parser(&self) -> bool {
-        match *self {
-            DatabaseItemSource::CppParser { .. } => true,
-            _ => false,
-        }
-    }
-}
+use std::fmt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CppFfiDatabaseItem {
@@ -81,9 +58,18 @@ impl CppFfiDatabaseItem {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CppDatabaseItem {
+    pub id: CppItemId,
     pub item: CppItem,
-    pub source: DatabaseItemSource,
     pub source_ffi_item: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CppItemId(u32);
+
+impl fmt::Display for CppItemId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -94,6 +80,7 @@ pub struct Data {
     ffi_items: Vec<CppFfiDatabaseItem>,
     rust_items: Vec<RustDatabaseItem>,
     targets: Vec<LibraryTarget>,
+    next_id: u32,
 }
 
 #[derive(Debug, Default)]
@@ -133,6 +120,7 @@ impl Database {
                 ffi_items: Vec::new(),
                 rust_items: Vec::new(),
                 targets: Vec::new(),
+                next_id: 1,
             },
             is_modified: true,
             counters: Counters::default(),
@@ -154,6 +142,28 @@ impl Database {
     pub fn cpp_items_mut(&mut self) -> &mut [CppDatabaseItem] {
         self.is_modified = true;
         &mut self.data.cpp_items
+    }
+
+    pub fn cpp_item(&self, id: CppItemId) -> Result<&CppDatabaseItem> {
+        match self
+            .data
+            .cpp_items
+            .binary_search_by_key(&id, |item| item.id)
+        {
+            Ok(index) => Ok(&self.data.cpp_items[index]),
+            Err(_) => bail!("invalid cpp item id: {}", id),
+        }
+    }
+
+    pub fn cpp_item_mut(&mut self, id: CppItemId) -> Result<&mut CppDatabaseItem> {
+        match self
+            .data
+            .cpp_items
+            .binary_search_by_key(&id, |item| item.id)
+        {
+            Ok(index) => Ok(&mut self.data.cpp_items[index]),
+            Err(_) => bail!("invalid cpp item id: {}", id),
+        }
     }
 
     pub fn ffi_items(&self) -> &[CppFfiDatabaseItem] {
@@ -220,34 +230,31 @@ impl Database {
 
     pub fn add_cpp_item(
         &mut self,
-        source: DatabaseItemSource,
         source_ffi_item: Option<usize>,
         data: CppItem,
-    ) -> bool {
-        if let Some(item) = self
+    ) -> Option<CppItemId> {
+        if self
             .data
             .cpp_items
             .iter_mut()
-            .find(|item| item.item.is_same(&data))
+            .any(|item| item.item.is_same(&data))
         {
-            // parser data takes priority
-            if source.is_parser() && !item.source.is_parser() {
-                item.source = source;
-            }
             self.counters.items_ignored += 1;
-            return false;
+            return None;
         }
         self.is_modified = true;
-        debug!("added cpp item: {}, source: {:?}", data, source);
+        let id = CppItemId(self.data.next_id);
+        self.data.next_id += 1;
+        debug!("added cpp item #{}: {}", id, data);
         let item = CppDatabaseItem {
+            id,
             item: data,
-            source,
             source_ffi_item,
         };
         trace!("cpp item data: {:?}", item);
         self.data.cpp_items.push(item);
         self.counters.items_added += 1;
-        true
+        Some(id)
     }
 
     pub fn clear_rust_info(&mut self) {

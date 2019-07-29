@@ -1,7 +1,6 @@
 use crate::cpp_data::{CppItem, CppPath, CppPathItem};
 use crate::cpp_function::{CppFunction, CppFunctionArgument, CppOperator};
 use crate::cpp_type::CppType;
-use crate::database::DatabaseItemSource;
 use crate::processor::ProcessorData;
 use log::{debug, trace};
 use ritual_common::errors::{bail, err_msg, Result};
@@ -173,7 +172,6 @@ pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
     }
     for item in new_methods {
         data.current_database.add_cpp_item(
-            DatabaseItemSource::TemplateInstantiation,
             None, // TODO: what is the source ffi item?
             CppItem::Function(item),
         );
@@ -237,7 +235,6 @@ pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> 
             let mut new_type = original_type.clone();
             new_type.path = item;
             data.current_database.add_cpp_item(
-                DatabaseItemSource::TemplateInstantiation,
                 None, // TODO: what is the source ffi item?
                 CppItem::Type(new_type),
             );

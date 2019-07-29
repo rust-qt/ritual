@@ -2,7 +2,6 @@ mod detect_signal_argument_types;
 mod detect_signals_and_slots;
 mod doc_decoder;
 mod doc_parser;
-mod fix_header_names;
 pub mod lib_configs;
 mod slot_wrappers;
 mod versions;

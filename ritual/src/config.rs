@@ -2,6 +2,7 @@
 
 use crate::cpp_checker::PreliminaryTest;
 use crate::cpp_data::{CppItem, CppPath};
+use crate::cpp_parser::CppParserOutput;
 use crate::processor::{ProcessingSteps, ProcessorData};
 use crate::rust_info::{NameType, RustPathScope};
 use crate::rust_type::RustPath;
@@ -150,7 +151,8 @@ impl CrateProperties {
 pub type RustPathScopeHook = dyn Fn(&CppPath) -> Result<Option<RustPathScope>> + 'static;
 pub type RustPathHook =
     dyn Fn(&CppPath, NameType<'_>, &ProcessorData<'_>) -> Result<Option<RustPath>> + 'static;
-pub type AfterCppParserHook = dyn Fn(&mut ProcessorData<'_>) -> Result<()> + 'static;
+pub type AfterCppParserHook =
+    dyn Fn(&mut ProcessorData<'_>, &CppParserOutput) -> Result<()> + 'static;
 pub type FfiGeneratorHook = dyn Fn(&CppItem) -> Result<bool> + 'static;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -435,7 +437,7 @@ impl Config {
 
     pub fn set_after_cpp_parser_hook(
         &mut self,
-        hook: impl Fn(&mut ProcessorData<'_>) -> Result<()> + 'static,
+        hook: impl Fn(&mut ProcessorData<'_>, &CppParserOutput) -> Result<()> + 'static,
     ) {
         self.after_cpp_parser_hook = Some(Box::new(hook));
     }

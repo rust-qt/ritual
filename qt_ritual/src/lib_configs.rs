@@ -2,7 +2,6 @@
 
 use crate::detect_signals_and_slots::detect_signals_and_slots;
 use crate::doc_parser::parse_docs;
-use crate::fix_header_names::fix_header_names;
 use crate::slot_wrappers::add_slot_wrappers;
 use crate::versions;
 use log::info;
@@ -169,13 +168,7 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
         }
         //config.add_cpp_parser_blocked_name(CppName::from_one_part("qt_check_for_QGADGET_macro"));
 
-        let lib_include_path = qt_config.installation_data.lib_include_path.clone();
-
         let steps = config.processing_steps_mut();
-        steps.add_after(&["cpp_parser"], "qt_fix_header_names", move |data| {
-            fix_header_names(data.current_database.cpp_items_mut(), &lib_include_path)
-        })?;
-
         let crate_name_clone = crate_name.to_string();
         let docs_path = qt_config.installation_data.docs_path.clone();
 

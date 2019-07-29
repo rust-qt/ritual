@@ -1,5 +1,4 @@
 use crate::cpp_data::CppItem;
-use crate::database::DatabaseItemSource;
 use crate::processor::ProcessorData;
 use ritual_common::errors::Result;
 
@@ -23,11 +22,8 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     }
 
     for (function, source_ffi_item) in results {
-        data.current_database.add_cpp_item(
-            DatabaseItemSource::OmittingArguments,
-            source_ffi_item,
-            CppItem::Function(function),
-        );
+        data.current_database
+            .add_cpp_item(source_ffi_item, CppItem::Function(function));
     }
 
     Ok(())
