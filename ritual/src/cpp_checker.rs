@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::cpp_data::{CppItem, CppPath};
 use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFfiItem};
 use crate::cpp_type::CppType;
-use crate::database::CppFfiDatabaseItem;
+use crate::database::{CppFfiDatabaseItem, Database};
 use crate::processor::ProcessorData;
 use crate::{cluster_api, cpp_code_generator};
 use itertools::Itertools;
@@ -31,23 +31,36 @@ use std::{iter, thread};
 
 pub const CHUNK_SIZE: usize = 64;
 
-fn snippet_for_item(
-    item: &CppFfiDatabaseItem,
-    all_items: &[CppFfiDatabaseItem],
-) -> Result<Snippet> {
+fn snippet_for_item(item: &CppFfiDatabaseItem, database: &Database) -> Result<Snippet> {
     match &item.item {
         CppFfiItem::Function(cpp_ffi_function) => {
             let item_code = cpp_code_generator::function_implementation(cpp_ffi_function)?;
             let mut needs_moc = false;
-            let full_code = if let Some(index) = item.source_ffi_item {
-                let source_item = all_items
-                    .get(index)
+
+            let source_ffi_item = if let Some(cpp_item_index) = item.item.cpp_item_index() {
+                let cpp_item = database
+                    .cpp_items()
+                    .get(cpp_item_index)
                     .ok_or_else(|| err_msg("ffi item references invalid index"))?;
-                match &source_item.item {
-                    CppFfiItem::Function(_) => {}
-                    CppFfiItem::QtSlotWrapper(_) => needs_moc = true,
+                if let Some(index) = cpp_item.source_ffi_item {
+                    Some(
+                        database
+                            .ffi_items()
+                            .get(index)
+                            .ok_or_else(|| err_msg("cpp item references invalid index"))?,
+                    )
+                } else {
+                    None
                 }
-                let source_item_code = source_item.source_item_cpp_code()?;
+            } else {
+                None
+            };
+
+            let full_code = if let Some(source_ffi_item) = source_ffi_item {
+                if let CppFfiItem::QtSlotWrapper(_) = &source_ffi_item.item {
+                    needs_moc = true
+                }
+                let source_item_code = source_ffi_item.source_item_cpp_code()?;
                 format!("{}\n{}", source_item_code, item_code)
             } else {
                 item_code
@@ -517,7 +530,7 @@ impl CppChecker<'_, '_> {
                 continue;
             }
 
-            match snippet_for_item(ffi_item, self.data.current_database.ffi_items()) {
+            match snippet_for_item(ffi_item, &self.data.current_database) {
                 Ok(snippet) => {
                     for library_target in library_targets {
                         if ffi_item.checks.has_env(library_target) {

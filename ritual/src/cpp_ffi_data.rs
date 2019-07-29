@@ -393,4 +393,11 @@ impl CppFfiItem {
             }
         }
     }
+
+    pub fn cpp_item_index(&self) -> Option<usize> {
+        match self {
+            CppFfiItem::Function(function) => Some(function.cpp_item_index),
+            CppFfiItem::QtSlotWrapper(_) => None,
+        }
+    }
 }

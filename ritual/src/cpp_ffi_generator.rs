@@ -176,22 +176,14 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
             }
         }
         let result = match &item.item {
-            CppItem::Function(method) => generate_ffi_methods_for_method(
-                method,
-                &movable_types,
-                index,
-                item.source_ffi_item,
-                &mut name_provider,
-            )
-            .map(|v| v.into_iter().collect_vec()),
-            CppItem::ClassField(field) => generate_field_accessors(
-                field,
-                &movable_types,
-                index,
-                item.source_ffi_item,
-                &mut name_provider,
-            )
-            .map(|v| v.into_iter().collect_vec()),
+            CppItem::Function(method) => {
+                generate_ffi_methods_for_method(method, &movable_types, index, &mut name_provider)
+                    .map(|v| v.into_iter().collect_vec())
+            }
+            CppItem::ClassField(field) => {
+                generate_field_accessors(field, &movable_types, index, &mut name_provider)
+                    .map(|v| v.into_iter().collect_vec())
+            }
             CppItem::ClassBase(_)
             | CppItem::Type(_)
             | CppItem::EnumValue(_)
@@ -235,21 +227,17 @@ fn generate_ffi_methods_for_method(
     method: &CppFunction,
     movable_types: &[CppPath],
     cpp_item_index: usize,
-    source_ffi_item: Option<usize>,
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiDatabaseItem>> {
     let mut methods = Vec::new();
-    methods.push(CppFfiDatabaseItem::from_function(
-        to_ffi_method(
-            cpp_item_index,
-            &CppFfiFunctionKind::Function {
-                cpp_function: method.clone(),
-            },
-            movable_types,
-            name_provider,
-        )?,
-        source_ffi_item,
-    ));
+    methods.push(CppFfiDatabaseItem::from_function(to_ffi_method(
+        cpp_item_index,
+        &CppFfiFunctionKind::Function {
+            cpp_function: method.clone(),
+        },
+        movable_types,
+        name_provider,
+    )?));
 
     Ok(methods)
 }
@@ -418,7 +406,6 @@ fn generate_field_accessors(
     field: &CppClassField,
     movable_types: &[CppPath],
     cpp_item_index: usize,
-    source_ffi_item: Option<usize>,
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiDatabaseItem>> {
     let mut new_methods = Vec::new();
@@ -428,10 +415,7 @@ fn generate_field_accessors(
             accessor_type,
         };
         let ffi_function = to_ffi_method(cpp_item_index, &kind, movable_types, name_provider)?;
-        Ok(CppFfiDatabaseItem::from_function(
-            ffi_function,
-            source_ffi_item,
-        ))
+        Ok(CppFfiDatabaseItem::from_function(ffi_function))
     };
 
     if field.visibility == CppVisibility::Public {

@@ -37,23 +37,20 @@ impl DatabaseItemSource {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CppFfiDatabaseItem {
     pub item: CppFfiItem,
-    pub source_ffi_item: Option<usize>,
     pub checks: CppChecks,
 }
 
 impl CppFfiDatabaseItem {
-    pub fn from_function(function: CppFfiFunction, source_ffi_item: Option<usize>) -> Self {
+    pub fn from_function(function: CppFfiFunction) -> Self {
         CppFfiDatabaseItem {
             item: CppFfiItem::Function(function),
-            source_ffi_item,
             checks: CppChecks::default(),
         }
     }
 
-    pub fn from_qt_slot_wrapper(wrapper: QtSlotWrapper, source_ffi_item: Option<usize>) -> Self {
+    pub fn from_qt_slot_wrapper(wrapper: QtSlotWrapper) -> Self {
         CppFfiDatabaseItem {
             item: CppFfiItem::QtSlotWrapper(wrapper),
-            source_ffi_item,
             checks: CppChecks::default(),
         }
     }
@@ -96,7 +93,7 @@ pub struct Data {
     cpp_items: Vec<CppDatabaseItem>,
     ffi_items: Vec<CppFfiDatabaseItem>,
     rust_items: Vec<RustDatabaseItem>,
-    environments: Vec<LibraryTarget>,
+    targets: Vec<LibraryTarget>,
 }
 
 #[derive(Debug, Default)]
@@ -135,7 +132,7 @@ impl Database {
                 cpp_items: Vec::new(),
                 ffi_items: Vec::new(),
                 rust_items: Vec::new(),
-                environments: Vec::new(),
+                targets: Vec::new(),
             },
             is_modified: true,
             counters: Counters::default(),
@@ -187,7 +184,7 @@ impl Database {
     pub fn clear(&mut self) {
         self.is_modified = true;
         self.data.cpp_items.clear();
-        self.data.environments.clear();
+        self.data.targets.clear();
     }
 
     pub fn clear_ffi(&mut self) {
@@ -259,14 +256,14 @@ impl Database {
     }
 
     pub fn add_environment(&mut self, env: LibraryTarget) {
-        if !self.data.environments.iter().any(|e| e == &env) {
+        if !self.data.targets.iter().any(|e| e == &env) {
             self.is_modified = true;
-            self.data.environments.push(env.clone());
+            self.data.targets.push(env.clone());
         }
     }
 
     pub fn environments(&self) -> &[LibraryTarget] {
-        &self.data.environments
+        &self.data.targets
     }
 
     pub fn find_rust_item(&self, path: &RustPath) -> Option<&RustDatabaseItem> {
