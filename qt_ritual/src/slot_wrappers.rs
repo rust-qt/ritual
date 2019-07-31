@@ -4,7 +4,7 @@ use log::trace;
 use ritual::cpp_ffi_data::{CppFfiItem, QtSlotWrapper};
 use ritual::cpp_ffi_generator::{ffi_type, FfiNameProvider};
 use ritual::cpp_type::{CppFunctionPointerType, CppPointerLikeTypeKind, CppType, CppTypeRole};
-use ritual::database::{CppFfiDatabaseItem, Database};
+use ritual::database::Database;
 use ritual::processor::ProcessorData;
 use ritual_common::errors::Result;
 use ritual_common::utils::MapIfOk;
@@ -71,7 +71,7 @@ pub fn add_slot_wrappers(data: &mut ProcessorData<'_>) -> Result<()> {
                 Ok(slot_wrapper) => {
                     if data
                         .current_database
-                        .add_ffi_item(CppFfiDatabaseItem::from_qt_slot_wrapper(slot_wrapper))
+                        .add_ffi_item(CppFfiItem::QtSlotWrapper(slot_wrapper))
                     {
                         trace!("adding slot wrapper for args: ({})", arg_types_text);
                     }

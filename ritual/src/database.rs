@@ -1,7 +1,7 @@
 use crate::cpp_checks::CppChecks;
 use crate::cpp_code_generator;
 use crate::cpp_data::{CppItem, CppPath};
-use crate::cpp_ffi_data::{CppFfiFunction, CppFfiItem, QtSlotWrapper};
+use crate::cpp_ffi_data::CppFfiItem;
 use crate::rust_info::RustDatabaseItem;
 use crate::rust_type::RustPath;
 use log::{debug, info, trace};
@@ -13,25 +13,12 @@ use std::fmt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CppFfiDatabaseItem {
+    pub id: FfiItemId,
     pub item: CppFfiItem,
     pub checks: CppChecks,
 }
 
 impl CppFfiDatabaseItem {
-    pub fn from_function(function: CppFfiFunction) -> Self {
-        CppFfiDatabaseItem {
-            item: CppFfiItem::Function(function),
-            checks: CppChecks::default(),
-        }
-    }
-
-    pub fn from_qt_slot_wrapper(wrapper: QtSlotWrapper) -> Self {
-        CppFfiDatabaseItem {
-            item: CppFfiItem::QtSlotWrapper(wrapper),
-            checks: CppChecks::default(),
-        }
-    }
-
     pub fn path(&self) -> &CppPath {
         match &self.item {
             CppFfiItem::Function(f) => &f.path,
@@ -75,6 +62,21 @@ impl fmt::Display for CppItemId {
 impl CppItemId {
     pub fn from_u32(value: u32) -> Self {
         CppItemId(value)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct FfiItemId(u32);
+
+impl fmt::Display for FfiItemId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl FfiItemId {
+    pub fn from_u32(value: u32) -> Self {
+        FfiItemId(value)
     }
 }
 
@@ -185,18 +187,26 @@ impl Database {
         &mut self.data.ffi_items
     }
 
-    pub fn add_ffi_item(&mut self, item: CppFfiDatabaseItem) -> bool {
+    pub fn add_ffi_item(&mut self, item: CppFfiItem) -> bool {
         self.is_modified = true;
         if self
             .data
             .ffi_items
             .iter()
-            .any(|i| i.item.has_same_source(&item.item))
+            .any(|i| i.item.has_same_source(&item))
         {
             self.counters.items_ignored += 1;
             return false;
         }
-        self.data.ffi_items.push(item);
+
+        let id = FfiItemId(self.data.next_id);
+        self.data.next_id += 1;
+
+        self.data.ffi_items.push(CppFfiDatabaseItem {
+            id,
+            item,
+            checks: CppChecks::default(),
+        });
         self.counters.items_added += 1;
         true
     }

@@ -4,17 +4,17 @@ use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;
 use crate::cpp_data::CppTypeDeclarationKind;
 use crate::cpp_data::CppVisibility;
-use crate::cpp_ffi_data::CppFfiFunctionArgument;
 use crate::cpp_ffi_data::CppFfiType;
 use crate::cpp_ffi_data::{CppFfiArgumentMeaning, CppToFfiTypeConversion};
 use crate::cpp_ffi_data::{CppFfiFunction, CppFfiFunctionKind, CppFieldAccessorType};
+use crate::cpp_ffi_data::{CppFfiFunctionArgument, CppFfiItem};
 use crate::cpp_function::ReturnValueAllocationPlace;
 use crate::cpp_function::{CppFunction, CppFunctionArgument, CppFunctionKind};
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
 use crate::cpp_type::CppTypeRole;
 use crate::cpp_type::{is_qflags, CppFunctionPointerType};
-use crate::database::{CppFfiDatabaseItem, CppItemId};
+use crate::database::CppItemId;
 use crate::processor::ProcessorData;
 use itertools::Itertools;
 use log::{debug, trace};
@@ -233,9 +233,9 @@ fn generate_ffi_methods_for_method(
     movable_types: &[CppPath],
     cpp_item_id: CppItemId,
     name_provider: &mut FfiNameProvider,
-) -> Result<Vec<CppFfiDatabaseItem>> {
+) -> Result<Vec<CppFfiItem>> {
     let mut methods = Vec::new();
-    methods.push(CppFfiDatabaseItem::from_function(to_ffi_method(
+    methods.push(CppFfiItem::Function(to_ffi_method(
         cpp_item_id,
         &CppFfiFunctionKind::Function {
             cpp_function: method.clone(),
@@ -412,15 +412,15 @@ fn generate_field_accessors(
     movable_types: &[CppPath],
     cpp_item_id: CppItemId,
     name_provider: &mut FfiNameProvider,
-) -> Result<Vec<CppFfiDatabaseItem>> {
+) -> Result<Vec<CppFfiItem>> {
     let mut new_methods = Vec::new();
-    let mut create_method = |accessor_type| -> Result<CppFfiDatabaseItem> {
+    let mut create_method = |accessor_type| -> Result<CppFfiItem> {
         let kind = CppFfiFunctionKind::FieldAccessor {
             field: field.clone(),
             accessor_type,
         };
         let ffi_function = to_ffi_method(cpp_item_id, &kind, movable_types, name_provider)?;
-        Ok(CppFfiDatabaseItem::from_function(ffi_function))
+        Ok(CppFfiItem::Function(ffi_function))
     };
 
     if field.visibility == CppVisibility::Public {
