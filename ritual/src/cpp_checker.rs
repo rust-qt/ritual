@@ -37,11 +37,8 @@ fn snippet_for_item(item: &CppFfiDatabaseItem, database: &Database) -> Result<Sn
             let item_code = cpp_code_generator::function_implementation(cpp_ffi_function)?;
             let mut needs_moc = false;
 
-            let source_ffi_item = if let Some(cpp_item_index) = item.item.cpp_item_index() {
-                let cpp_item = database
-                    .cpp_items()
-                    .get(cpp_item_index)
-                    .ok_or_else(|| err_msg("ffi item references invalid index"))?;
+            let source_ffi_item = if let Some(cpp_item_id) = item.item.cpp_item_id() {
+                let cpp_item = database.cpp_item(cpp_item_id)?;
                 if let Some(index) = cpp_item.source_ffi_item {
                     Some(
                         database

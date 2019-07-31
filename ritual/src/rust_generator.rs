@@ -10,7 +10,7 @@ use crate::cpp_type::{
     is_qflags, CppBuiltInNumericType, CppFunctionPointerType, CppPointerLikeTypeKind,
     CppSpecificNumericType, CppSpecificNumericTypeKind, CppType, CppTypeRole,
 };
-use crate::database::{CppDatabaseItem, CppFfiDatabaseItem};
+use crate::database::{CppDatabaseItem, CppFfiDatabaseItem, CppItemId};
 use crate::processor::ProcessorData;
 use crate::rust_info::{
     NameType, RustDatabaseItem, RustEnumValue, RustEnumValueDoc, RustExtraImpl, RustExtraImplKind,
@@ -1201,15 +1201,15 @@ impl State<'_, '_> {
             .chain(self.0.dep_databases.iter().filter(|_| allow_dependencies));
 
         for db in databases {
-            if let Some(index) = db
+            if let Some(cpp_item) = db
                 .cpp_items()
                 .iter()
-                .position(|cpp_item| cpp_item.item.path() == Some(cpp_path))
+                .find(|cpp_item| cpp_item.item.path() == Some(cpp_path))
             {
                 return Ok(db
                     .rust_items()
                     .iter()
-                    .filter(move |item| item.item.cpp_item_index() == Some(index)));
+                    .filter(move |item| item.item.cpp_item_id() == Some(cpp_item.id)));
             }
         }
 
@@ -1540,7 +1540,7 @@ impl State<'_, '_> {
     #[allow(clippy::useless_let_if_seq)]
     fn process_cpp_class(
         &self,
-        cpp_item_index: usize,
+        cpp_item_id: CppItemId,
         source_ffi_item: Option<usize>,
         data: &CppTypeDeclaration,
     ) -> Result<Vec<RustItem>> {
@@ -1555,7 +1555,7 @@ impl State<'_, '_> {
                         parent_path: rust_type_path.parent()?,
                         kind: RustExtraImplKind::FlagEnum(RustFlagEnumImpl {
                             enum_path: rust_type_path.clone(),
-                            cpp_item_index,
+                            cpp_item_id,
                         }),
                     });
                     return Ok(vec![rust_item]);
@@ -1611,7 +1611,7 @@ impl State<'_, '_> {
                 path: internal_path.clone(),
                 kind: RustStructKind::SizedType(RustSizedType {
                     cpp_path: data.path.clone(),
-                    cpp_item_index,
+                    cpp_item_id,
                 }),
                 is_public: true,
             });
@@ -1635,7 +1635,7 @@ impl State<'_, '_> {
                     raw_qt_slot_wrapper: None, // TODO: fix this
                 },
                 kind: wrapper_kind,
-                cpp_item_index,
+                cpp_item_id,
             }),
             is_public: true,
         });
@@ -1650,7 +1650,7 @@ impl State<'_, '_> {
                 extra_doc: None,
                 cpp_path: Some(data.path.clone()),
             },
-            kind: RustModuleKind::CppNestedTypes { cpp_item_index },
+            kind: RustModuleKind::CppNestedTypes { cpp_item_id },
         });
         rust_items.push(nested_types_rust_item);
 
@@ -1672,7 +1672,7 @@ impl State<'_, '_> {
                     receiver_id,
                     target_path: public_path.clone(),
                     arguments: RustType::Tuple(arg_types),
-                    cpp_item_index,
+                    cpp_item_id,
                 }),
             });
             rust_items.push(impl_item);
@@ -1702,7 +1702,7 @@ impl State<'_, '_> {
                     arguments: public_args,
                     signal_arguments: wrapper.signal_arguments.clone(),
                     raw_slot_wrapper: public_path,
-                    cpp_item_index,
+                    cpp_item_id,
                 }),
                 path: closure_item_path,
                 extra_doc: None,
@@ -1713,11 +1713,7 @@ impl State<'_, '_> {
         Ok(rust_items)
     }
 
-    fn process_cpp_item(
-        &self,
-        cpp_item_index: usize,
-        cpp_item: &CppDatabaseItem,
-    ) -> Result<Vec<RustItem>> {
+    fn process_cpp_item(&self, cpp_item: &CppDatabaseItem) -> Result<Vec<RustItem>> {
         if let Some(index) = cpp_item.source_ffi_item {
             let ffi_item = self
                 .0
@@ -1740,13 +1736,15 @@ impl State<'_, '_> {
                         extra_doc: None,
                         cpp_path: Some(path.clone()),
                     },
-                    kind: RustModuleKind::CppNamespace { cpp_item_index },
+                    kind: RustModuleKind::CppNamespace {
+                        cpp_item_id: cpp_item.id,
+                    },
                 });
                 Ok(vec![rust_item])
             }
             CppItem::Type(data) => match data.kind {
                 CppTypeDeclarationKind::Class { .. } => {
-                    self.process_cpp_class(cpp_item_index, cpp_item.source_ffi_item, data)
+                    self.process_cpp_class(cpp_item.id, cpp_item.source_ffi_item, data)
                 }
                 CppTypeDeclarationKind::Enum => {
                     let rust_path = self.generate_rust_path(&data.path, NameType::Type)?;
@@ -1760,7 +1758,7 @@ impl State<'_, '_> {
                                 raw_qt_slot_wrapper: None,
                             },
                             kind: RustWrapperTypeKind::EnumWrapper,
-                            cpp_item_index,
+                            cpp_item_id: cpp_item.id,
                         }),
                         is_public: true,
                     });
@@ -1779,7 +1777,7 @@ impl State<'_, '_> {
                         cpp_doc: value.doc.clone(),
                         extra_doc: None,
                     },
-                    cpp_item_index,
+                    cpp_item_id: cpp_item.id,
                 });
 
                 Ok(vec![rust_item])
@@ -1805,7 +1803,7 @@ impl State<'_, '_> {
                     receiver_type,
                     receiver_id,
                     cpp_doc: cpp_function.doc.external_doc.clone(),
-                    cpp_item_index,
+                    cpp_item_id: cpp_item.id,
                 });
 
                 let path = self.generate_rust_path(
@@ -1930,16 +1928,17 @@ impl State<'_, '_> {
     }
 
     fn process_cpp_items(&mut self) -> Result<()> {
-        let mut processed_indexes = HashSet::new();
+        let mut processed_ids = HashSet::new();
+        let all_cpp_item_ids = self.0.current_database.cpp_item_ids().collect_vec();
         loop {
             let mut any_processed = false;
-            for cpp_item_index in 0..self.0.current_database.cpp_items().len() {
-                if processed_indexes.contains(&cpp_item_index) {
+            for &cpp_item_id in &all_cpp_item_ids {
+                if processed_ids.contains(&cpp_item_id) {
                     continue;
                 }
 
-                let cpp_item = &self.0.current_database.cpp_items()[cpp_item_index];
-                if let Ok(rust_items) = self.process_cpp_item(cpp_item_index, cpp_item) {
+                let cpp_item = &self.0.current_database.cpp_item(cpp_item_id)?;
+                if let Ok(rust_items) = self.process_cpp_item(cpp_item) {
                     let cpp_item_text = cpp_item.item.to_string();
                     for rust_item in rust_items {
                         let item = RustDatabaseItem { item: rust_item };
@@ -1951,7 +1950,7 @@ impl State<'_, '_> {
                         trace!("rust item data: {:?}", item);
                         self.0.current_database.add_rust_item(item)?;
                     }
-                    processed_indexes.insert(cpp_item_index);
+                    processed_ids.insert(cpp_item_id);
                     any_processed = true;
                 }
             }
@@ -1961,8 +1960,9 @@ impl State<'_, '_> {
             }
         }
 
-        for (cpp_item_index, cpp_item) in self.0.current_database.cpp_items().iter().enumerate() {
-            if let Err(err) = self.process_cpp_item(cpp_item_index, cpp_item) {
+        for cpp_item_id in all_cpp_item_ids {
+            let cpp_item = &self.0.current_database.cpp_item(cpp_item_id)?;
+            if let Err(err) = self.process_cpp_item(cpp_item) {
                 debug!("failed to process cpp item: {}: {}", &cpp_item.item, err);
                 print_trace(&err, Some(log::Level::Trace));
             }

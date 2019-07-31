@@ -240,12 +240,8 @@ impl Generator<'_> {
                     .get(index)
                     .ok_or_else(|| err_msg("rust item refers to invalid ffi item index"))?,
             )
-        } else if let Some(index) = item.item.cpp_item_index() {
-            let cpp_item = self
-                .current_database
-                .cpp_items()
-                .get(index)
-                .ok_or_else(|| err_msg("rust item refers to invalid cpp item index"))?;
+        } else if let Some(id) = item.item.cpp_item_id() {
+            let cpp_item = self.current_database.cpp_item(id)?;
             if let Some(index) = cpp_item.source_ffi_item {
                 Some(
                     self.current_database

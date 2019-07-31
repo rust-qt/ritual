@@ -4,6 +4,7 @@ use crate::cpp_data::{CppPath, CppTypeDoc};
 use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_function::CppFunctionExternalDoc;
 use crate::cpp_type::CppType;
+use crate::database::CppItemId;
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_type::{RustFinalType, RustPath, RustPointerLikeTypeKind, RustType};
 use ritual_common::errors::{bail, Result};
@@ -17,7 +18,7 @@ pub struct RustEnumValue {
     pub value: i64,
     /// Documentation of corresponding C++ variants
     pub doc: RustEnumValueDoc,
-    pub cpp_item_index: usize,
+    pub cpp_item_id: CppItemId,
 }
 
 /// C++ documentation data for a enum variant
@@ -37,7 +38,7 @@ pub struct RustQtSlotWrapper {
     pub arguments: Vec<RustFinalType>,
     pub signal_arguments: Vec<CppType>,
     pub raw_slot_wrapper: RustPath,
-    pub cpp_item_index: usize,
+    pub cpp_item_id: CppItemId,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -68,7 +69,7 @@ pub struct RustWrapperTypeDocData {
 pub struct RustWrapperType {
     pub doc_data: RustWrapperTypeDocData,
     pub kind: RustWrapperTypeKind,
-    pub cpp_item_index: usize,
+    pub cpp_item_id: CppItemId,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -80,7 +81,7 @@ pub struct RustFfiClassTypeDoc {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustSizedType {
     pub cpp_path: CppPath,
-    pub cpp_item_index: usize,
+    pub cpp_item_id: CppItemId,
 }
 
 /// Information about a Rust type wrapper
@@ -111,21 +112,21 @@ impl RustStructKind {
         match self {
             RustStructKind::WrapperType(data) => {
                 if let RustStructKind::WrapperType(other) = other {
-                    data.cpp_item_index == other.cpp_item_index
+                    data.cpp_item_id == other.cpp_item_id
                 } else {
                     false
                 }
             }
             RustStructKind::QtSlotWrapper(data) => {
                 if let RustStructKind::QtSlotWrapper(other) = other {
-                    data.cpp_item_index == other.cpp_item_index
+                    data.cpp_item_id == other.cpp_item_id
                 } else {
                     false
                 }
             }
             RustStructKind::SizedType(data) => {
                 if let RustStructKind::SizedType(other) = other {
-                    data.cpp_item_index == other.cpp_item_index
+                    data.cpp_item_id == other.cpp_item_id
                 } else {
                     false
                 }
@@ -199,7 +200,7 @@ pub struct RustSignalOrSlotGetter {
     pub receiver_id: String,
 
     pub cpp_doc: Option<CppFunctionExternalDoc>,
-    pub cpp_item_index: usize,
+    pub cpp_item_id: CppItemId,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -457,8 +458,8 @@ pub enum RustSpecialModuleKind {
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum RustModuleKind {
     Special(RustSpecialModuleKind),
-    CppNamespace { cpp_item_index: usize },
-    CppNestedTypes { cpp_item_index: usize },
+    CppNamespace { cpp_item_id: CppItemId },
+    CppNestedTypes { cpp_item_id: CppItemId },
 }
 
 impl RustModuleKind {
@@ -580,13 +581,13 @@ pub struct RustRawSlotReceiver {
     pub target_path: RustPath,
     pub arguments: RustType,
     pub receiver_id: String,
-    pub cpp_item_index: usize,
+    pub cpp_item_id: CppItemId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustFlagEnumImpl {
     pub enum_path: RustPath,
-    pub cpp_item_index: usize,
+    pub cpp_item_id: CppItemId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -600,14 +601,14 @@ impl RustExtraImplKind {
         match self {
             RustExtraImplKind::FlagEnum(data) => {
                 if let RustExtraImplKind::FlagEnum(other) = other {
-                    data.cpp_item_index == other.cpp_item_index
+                    data.cpp_item_id == other.cpp_item_id
                 } else {
                     false
                 }
             }
             RustExtraImplKind::RawSlotReceiver(data) => {
                 if let RustExtraImplKind::RawSlotReceiver(other) = other {
-                    data.cpp_item_index == other.cpp_item_index
+                    data.cpp_item_id == other.cpp_item_id
                 } else {
                     false
                 }
@@ -665,7 +666,7 @@ impl RustItem {
             }
             RustItem::EnumValue(data) => {
                 if let RustItem::EnumValue(other) = other {
-                    data.cpp_item_index == other.cpp_item_index
+                    data.cpp_item_id == other.cpp_item_id
                 } else {
                     false
                 }
@@ -707,7 +708,7 @@ impl RustItem {
                 RustFunctionKind::SignalOrSlotGetter(data) => {
                     if let RustItem::Function(other) = other {
                         if let RustFunctionKind::SignalOrSlotGetter(other) = &other.kind {
-                            data.cpp_item_index == other.cpp_item_index
+                            data.cpp_item_id == other.cpp_item_id
                         } else {
                             false
                         }
@@ -737,26 +738,26 @@ impl RustItem {
         }
     }
 
-    pub fn cpp_item_index(&self) -> Option<usize> {
+    pub fn cpp_item_id(&self) -> Option<CppItemId> {
         match self {
             RustItem::Module(data) => match &data.kind {
                 RustModuleKind::Special(_) => None,
-                RustModuleKind::CppNamespace { cpp_item_index } => Some(*cpp_item_index),
-                RustModuleKind::CppNestedTypes { cpp_item_index } => Some(*cpp_item_index),
+                RustModuleKind::CppNamespace { cpp_item_id } => Some(*cpp_item_id),
+                RustModuleKind::CppNestedTypes { cpp_item_id } => Some(*cpp_item_id),
             },
             RustItem::Struct(data) => match &data.kind {
-                RustStructKind::WrapperType(data) => Some(data.cpp_item_index),
-                RustStructKind::QtSlotWrapper(data) => Some(data.cpp_item_index),
-                RustStructKind::SizedType(data) => Some(data.cpp_item_index),
+                RustStructKind::WrapperType(data) => Some(data.cpp_item_id),
+                RustStructKind::QtSlotWrapper(data) => Some(data.cpp_item_id),
+                RustStructKind::SizedType(data) => Some(data.cpp_item_id),
             },
-            RustItem::EnumValue(data) => Some(data.cpp_item_index),
+            RustItem::EnumValue(data) => Some(data.cpp_item_id),
             RustItem::ExtraImpl(data) => match &data.kind {
-                RustExtraImplKind::FlagEnum(data) => Some(data.cpp_item_index),
-                RustExtraImplKind::RawSlotReceiver(data) => Some(data.cpp_item_index),
+                RustExtraImplKind::FlagEnum(data) => Some(data.cpp_item_id),
+                RustExtraImplKind::RawSlotReceiver(data) => Some(data.cpp_item_id),
             },
             RustItem::Function(data) => match &data.kind {
                 RustFunctionKind::FfiWrapper(_) | RustFunctionKind::FfiFunction(_) => None,
-                RustFunctionKind::SignalOrSlotGetter(data) => Some(data.cpp_item_index),
+                RustFunctionKind::SignalOrSlotGetter(data) => Some(data.cpp_item_id),
             },
             RustItem::TraitImpl(_) | RustItem::Reexport(_) => None,
         }

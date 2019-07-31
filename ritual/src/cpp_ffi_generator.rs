@@ -14,7 +14,7 @@ use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
 use crate::cpp_type::CppTypeRole;
 use crate::cpp_type::{is_qflags, CppFunctionPointerType};
-use crate::database::CppFfiDatabaseItem;
+use crate::database::{CppFfiDatabaseItem, CppItemId};
 use crate::processor::ProcessorData;
 use itertools::Itertools;
 use log::{debug, trace};
@@ -163,8 +163,10 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
 
     let mut name_provider = FfiNameProvider::new(data);
 
-    for index in 0..data.current_database.cpp_items().len() {
-        let item = &data.current_database.cpp_items()[index];
+    let all_cpp_item_ids = data.current_database.cpp_item_ids().collect_vec();
+
+    for cpp_item_id in all_cpp_item_ids {
+        let item = &data.current_database.cpp_item(cpp_item_id)?;
         if let Err(err) = check_preconditions(&item.item) {
             trace!("skipping {}: {}", item.item, err);
             continue;
@@ -176,12 +178,15 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
             }
         }
         let result = match &item.item {
-            CppItem::Function(method) => {
-                generate_ffi_methods_for_method(method, &movable_types, index, &mut name_provider)
-                    .map(|v| v.into_iter().collect_vec())
-            }
+            CppItem::Function(method) => generate_ffi_methods_for_method(
+                method,
+                &movable_types,
+                cpp_item_id,
+                &mut name_provider,
+            )
+            .map(|v| v.into_iter().collect_vec()),
             CppItem::ClassField(field) => {
-                generate_field_accessors(field, &movable_types, index, &mut name_provider)
+                generate_field_accessors(field, &movable_types, cpp_item_id, &mut name_provider)
                     .map(|v| v.into_iter().collect_vec())
             }
             CppItem::ClassBase(_)
@@ -204,7 +209,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                         new_items.push(item);
                     }
                 }
-                let item = &mut data.current_database.cpp_items_mut()[index];
+                let item = &mut data.current_database.cpp_item_mut(cpp_item_id)?;
                 if new_items.is_empty() {
                     debug!("no new FFI items for: {}", item.item);
                 } else {
@@ -226,12 +231,12 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
 fn generate_ffi_methods_for_method(
     method: &CppFunction,
     movable_types: &[CppPath],
-    cpp_item_index: usize,
+    cpp_item_id: CppItemId,
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiDatabaseItem>> {
     let mut methods = Vec::new();
     methods.push(CppFfiDatabaseItem::from_function(to_ffi_method(
-        cpp_item_index,
+        cpp_item_id,
         &CppFfiFunctionKind::Function {
             cpp_function: method.clone(),
         },
@@ -248,7 +253,7 @@ fn generate_ffi_methods_for_method(
 /// - adds "output" argument for return value if
 ///   the return value is stack-allocated.
 pub fn to_ffi_method(
-    cpp_item_index: usize,
+    cpp_item_id: CppItemId,
     kind: &CppFfiFunctionKind,
     movable_types: &[CppPath],
     name_provider: &mut FfiNameProvider,
@@ -276,7 +281,7 @@ pub fn to_ffi_method(
         path: name_provider.create_path(&ascii_caption),
         allocation_place: ReturnValueAllocationPlace::NotApplicable,
         kind: kind.clone(),
-        cpp_item_index,
+        cpp_item_id,
     };
 
     let this_arg_type = match &kind {
@@ -405,7 +410,7 @@ pub fn to_ffi_method(
 fn generate_field_accessors(
     field: &CppClassField,
     movable_types: &[CppPath],
-    cpp_item_index: usize,
+    cpp_item_id: CppItemId,
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiDatabaseItem>> {
     let mut new_methods = Vec::new();
@@ -414,7 +419,7 @@ fn generate_field_accessors(
             field: field.clone(),
             accessor_type,
         };
-        let ffi_function = to_ffi_method(cpp_item_index, &kind, movable_types, name_provider)?;
+        let ffi_function = to_ffi_method(cpp_item_id, &kind, movable_types, name_provider)?;
         Ok(CppFfiDatabaseItem::from_function(ffi_function))
     };
 

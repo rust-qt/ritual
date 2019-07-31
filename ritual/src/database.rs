@@ -72,6 +72,12 @@ impl fmt::Display for CppItemId {
     }
 }
 
+impl CppItemId {
+    pub fn from_u32(value: u32) -> Self {
+        CppItemId(value)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Data {
     crate_name: String,
@@ -137,6 +143,10 @@ impl Database {
 
     pub fn cpp_items(&self) -> &[CppDatabaseItem] {
         &self.data.cpp_items
+    }
+
+    pub fn cpp_item_ids<'a>(&'a self) -> impl Iterator<Item = CppItemId> + 'a {
+        self.data.cpp_items.iter().map(|item| item.id)
     }
 
     pub fn cpp_items_mut(&mut self) -> &mut [CppDatabaseItem] {

@@ -1,6 +1,7 @@
 use crate::cpp_data::{CppClassField, CppPath};
 use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
 use crate::cpp_type::{CppBuiltInNumericType, CppFunctionPointerType, CppType};
+use crate::database::CppItemId;
 use itertools::Itertools;
 use ritual_common::errors::Result;
 use serde_derive::{Deserialize, Serialize};
@@ -179,7 +180,7 @@ pub struct CppFfiFunction {
 
     pub kind: CppFfiFunctionKind,
 
-    pub cpp_item_index: usize,
+    pub cpp_item_id: CppItemId,
 }
 
 impl CppFfiFunction {
@@ -222,7 +223,7 @@ impl CppFfiFunction {
     }
 
     pub fn has_same_source(&self, other: &Self) -> bool {
-        if self.cpp_item_index != other.cpp_item_index {
+        if self.cpp_item_id != other.cpp_item_id {
             return false;
         }
 
@@ -394,9 +395,9 @@ impl CppFfiItem {
         }
     }
 
-    pub fn cpp_item_index(&self) -> Option<usize> {
+    pub fn cpp_item_id(&self) -> Option<CppItemId> {
         match self {
-            CppFfiItem::Function(function) => Some(function.cpp_item_index),
+            CppFfiItem::Function(function) => Some(function.cpp_item_id),
             CppFfiItem::QtSlotWrapper(_) => None,
         }
     }
