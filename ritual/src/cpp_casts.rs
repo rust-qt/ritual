@@ -109,7 +109,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         }
     }
     for (source_ffi_item, item) in results {
-        data.current_database.add_cpp_item(source_ffi_item, item);
+        data.current_database.add_cpp_item(source_ffi_item, item)?;
     }
     Ok(())
 }

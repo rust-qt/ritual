@@ -4,7 +4,7 @@ use crate::cpp_data::{CppPath, CppTypeDoc};
 use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_function::CppFunctionExternalDoc;
 use crate::cpp_type::CppType;
-use crate::database::{CppItemId, FfiItemId};
+use crate::database::{CppItemId, FfiItemId, RustItemId};
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_type::{RustFinalType, RustPath, RustPointerLikeTypeKind, RustType};
 use ritual_common::errors::{bail, Result};
@@ -648,6 +648,40 @@ pub enum RustItem {
 }
 
 impl RustItem {
+    pub fn path(&self) -> Option<&RustPath> {
+        match self {
+            RustItem::Module(data) => Some(&data.path),
+            RustItem::Struct(data) => Some(&data.path),
+            RustItem::EnumValue(data) => Some(&data.path),
+            RustItem::Function(data) => Some(&data.path),
+            RustItem::Reexport(data) => Some(&data.path),
+            RustItem::TraitImpl(_) | RustItem::ExtraImpl(_) => None,
+        }
+    }
+
+    pub fn parent_path(&self) -> Result<RustPath> {
+        match self {
+            RustItem::TraitImpl(trait_impl) => Ok(trait_impl.parent_path.clone()),
+            RustItem::ExtraImpl(data) => Ok(data.parent_path.clone()),
+            _ => self
+                .path()
+                .expect("item must have path because it's not a trait impl")
+                .parent(),
+        }
+    }
+
+    pub fn is_child_of(&self, parent: &RustPath) -> bool {
+        self.parent_path().ok().as_ref() == Some(parent)
+    }
+
+    pub fn as_module_ref(&self) -> Option<&RustModule> {
+        if let RustItem::Module(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+
     pub fn has_same_source(&self, other: &Self) -> bool {
         match self {
             RustItem::Module(data) => {
@@ -846,55 +880,12 @@ impl RustItem {
             None
         }
     }
-
-    pub fn as_module_ref(&self) -> Option<&RustModule> {
-        if let RustItem::Module(value) = self {
-            Some(value)
-        } else {
-            None
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustDatabaseItem {
+    pub id: RustItemId,
     pub item: RustItem,
-}
-
-impl RustDatabaseItem {
-    pub fn path(&self) -> Option<&RustPath> {
-        match &self.item {
-            RustItem::Module(data) => Some(&data.path),
-            RustItem::Struct(data) => Some(&data.path),
-            RustItem::EnumValue(data) => Some(&data.path),
-            RustItem::Function(data) => Some(&data.path),
-            RustItem::Reexport(data) => Some(&data.path),
-            RustItem::TraitImpl(_) | RustItem::ExtraImpl(_) => None,
-        }
-    }
-
-    pub fn parent_path(&self) -> Result<RustPath> {
-        match &self.item {
-            RustItem::TraitImpl(trait_impl) => Ok(trait_impl.parent_path.clone()),
-            RustItem::ExtraImpl(data) => Ok(data.parent_path.clone()),
-            _ => self
-                .path()
-                .expect("item must have path because it's not a trait impl")
-                .parent(),
-        }
-    }
-
-    pub fn is_child_of(&self, parent: &RustPath) -> bool {
-        self.parent_path().ok().as_ref() == Some(parent)
-    }
-
-    pub fn as_module_ref(&self) -> Option<&RustModule> {
-        if let RustItem::Module(data) = &self.item {
-            Some(data)
-        } else {
-            None
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -361,11 +361,11 @@ impl CppParser<'_, '_> {
         include_file: String,
         origin_location: CppOriginLocation,
         item: CppItem,
-    ) {
+    ) -> Result<()> {
         if let Some(id) = self
             .data
             .current_database
-            .add_cpp_item(self.source_ffi_item, item)
+            .add_cpp_item(self.source_ffi_item, item)?
         {
             self.output.0.push(CppParserOutputItem {
                 include_file,
@@ -373,6 +373,7 @@ impl CppParser<'_, '_> {
                 id,
             });
         }
+        Ok(())
     }
 
     /// Search for a C++ type information in the types found by the parser
@@ -1195,7 +1196,7 @@ impl CppParser<'_, '_> {
             self.entity_include_file(entity)?,
             get_origin_location(entity)?,
             CppItem::Function(function),
-        );
+        )?;
 
         Ok(())
     }
@@ -1218,7 +1219,7 @@ impl CppParser<'_, '_> {
                 path: enum_name.clone(),
                 doc: None,
             }),
-        );
+        )?;
         for child in entity.get_children() {
             if child.get_kind() == EntityKind::EnumConstantDecl {
                 let val = child
@@ -1236,7 +1237,7 @@ impl CppParser<'_, '_> {
                         value: val.0,
                         doc: None,
                     }),
-                );
+                )?;
             }
         }
         Ok(())
@@ -1270,7 +1271,7 @@ impl CppParser<'_, '_> {
                 is_static: entity.get_kind() == EntityKind::VarDecl,
                 doc: None,
             }),
-        );
+        )?;
 
         Ok(())
     }
@@ -1345,7 +1346,7 @@ impl CppParser<'_, '_> {
                             base_index: current_base_index,
                             derived_class_type: full_name.clone(),
                         }),
-                    );
+                    )?;
                     current_base_index += 1;
                 } else {
                     bail!("base type is not a class: {:?}", base_type);
@@ -1363,7 +1364,7 @@ impl CppParser<'_, '_> {
                 path: full_name,
                 doc: None,
             }),
-        );
+        )?;
         Ok(())
     }
 
@@ -1477,7 +1478,7 @@ impl CppParser<'_, '_> {
                         self.entity_include_file(entity)?,
                         get_origin_location(entity).unwrap(),
                         CppItem::Namespace(path),
-                    );
+                    )?;
                 }
                 Err(error) => debug!("failed to get namespace name: {}", error),
             },

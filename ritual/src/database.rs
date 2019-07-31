@@ -2,7 +2,7 @@ use crate::cpp_checks::CppChecks;
 use crate::cpp_code_generator;
 use crate::cpp_data::{CppItem, CppPath};
 use crate::cpp_ffi_data::CppFfiItem;
-use crate::rust_info::RustDatabaseItem;
+use crate::rust_info::{RustDatabaseItem, RustItem};
 use crate::rust_type::RustPath;
 use log::{debug, info, trace};
 use ritual_common::errors::{bail, format_err, Result};
@@ -77,6 +77,21 @@ impl fmt::Display for FfiItemId {
 impl FfiItemId {
     pub fn from_u32(value: u32) -> Self {
         FfiItemId(value)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct RustItemId(u32);
+
+impl fmt::Display for RustItemId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl RustItemId {
+    pub fn from_u32(value: u32) -> Self {
+        RustItemId(value)
     }
 }
 
@@ -213,7 +228,7 @@ impl Database {
         &mut self.data.ffi_items
     }
 
-    pub fn add_ffi_item(&mut self, item: CppFfiItem) -> bool {
+    pub fn add_ffi_item(&mut self, item: CppFfiItem) -> Result<Option<FfiItemId>> {
         self.is_modified = true;
         if self
             .data
@@ -222,19 +237,24 @@ impl Database {
             .any(|i| i.item.has_same_source(&item))
         {
             self.counters.items_ignored += 1;
-            return false;
+            return Ok(None);
         }
 
         let id = FfiItemId(self.data.next_id);
         self.data.next_id += 1;
 
+        debug!("added ffi item #{}: {}", id, item.short_text());
+        if let Some(id) = item.cpp_item_id() {
+            debug!("    for cpp item: {}", self.cpp_item(id)?.item);
+        }
+        trace!("    ffi item data: {:?}", item);
         self.data.ffi_items.push(CppFfiDatabaseItem {
             id,
             item,
             checks: CppChecks::default(),
         });
         self.counters.items_added += 1;
-        true
+        Ok(Some(id))
     }
 
     pub fn clear(&mut self) {
@@ -276,7 +296,7 @@ impl Database {
         &mut self,
         source_ffi_item: Option<FfiItemId>,
         data: CppItem,
-    ) -> Option<CppItemId> {
+    ) -> Result<Option<CppItemId>> {
         if self
             .data
             .cpp_items
@@ -284,7 +304,7 @@ impl Database {
             .any(|item| item.item.is_same(&data))
         {
             self.counters.items_ignored += 1;
-            return None;
+            return Ok(None);
         }
         self.is_modified = true;
         let id = CppItemId(self.data.next_id);
@@ -295,10 +315,10 @@ impl Database {
             item: data,
             source_id: source_ffi_item,
         };
-        trace!("cpp item data: {:?}", item);
+        trace!("    cpp item data: {:?}", item);
         self.data.cpp_items.push(item);
         self.counters.items_added += 1;
-        Some(id)
+        Ok(Some(id))
     }
 
     pub fn clear_rust_info(&mut self) {
@@ -321,7 +341,7 @@ impl Database {
         self.data
             .rust_items
             .iter()
-            .find(|item| item.path() == Some(path))
+            .find(|item| item.item.path() == Some(path))
     }
 
     pub fn rust_children<'a>(
@@ -331,16 +351,16 @@ impl Database {
         self.data
             .rust_items
             .iter()
-            .filter(move |item| item.is_child_of(path))
+            .filter(move |item| item.item.is_child_of(path))
     }
 
     pub fn rust_items(&self) -> &[RustDatabaseItem] {
         &self.data.rust_items
     }
 
-    pub fn add_rust_item(&mut self, item: RustDatabaseItem) -> Result<()> {
+    pub fn add_rust_item(&mut self, item: RustItem) -> Result<Option<RustItemId>> {
         self.is_modified = true;
-        if item.item.is_crate_root() {
+        if item.is_crate_root() {
             let item_path = item.path().expect("crate root must have path");
             let crate_name = item_path
                 .crate_name()
@@ -370,15 +390,26 @@ impl Database {
             .data
             .rust_items
             .iter()
-            .any(|other| other.item.has_same_source(&item.item))
+            .any(|other| other.item.has_same_source(&item))
         {
             self.counters.items_ignored += 1;
-            return Ok(());
+            return Ok(None);
         }
 
-        self.data.rust_items.push(item);
+        let id = RustItemId(self.data.next_id);
+        self.data.next_id += 1;
+
+        debug!("added rust item #{}: {}", id, item.short_text());
+        if let Some(id) = item.cpp_item_id() {
+            debug!("    for cpp item: {}", self.cpp_item(id)?.item);
+        }
+        if let Some(id) = item.ffi_item_id() {
+            debug!("    for ffi item: {}", self.ffi_item(id)?.item.short_text());
+        }
+        trace!("    rust item data: {:?}", item);
+        self.data.rust_items.push(RustDatabaseItem { id, item });
         self.counters.items_added += 1;
-        Ok(())
+        Ok(Some(id))
     }
 
     pub fn make_unique_rust_path(&self, path: &RustPath) -> RustPath {

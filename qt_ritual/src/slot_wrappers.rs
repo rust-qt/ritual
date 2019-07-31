@@ -69,10 +69,10 @@ pub fn add_slot_wrappers(data: &mut ProcessorData<'_>) -> Result<()> {
         } else {
             match generate_slot_wrapper(&arg_types, &mut name_provider) {
                 Ok(slot_wrapper) => {
-                    if data
+                    let id = data
                         .current_database
-                        .add_ffi_item(CppFfiItem::QtSlotWrapper(slot_wrapper))
-                    {
+                        .add_ffi_item(CppFfiItem::QtSlotWrapper(slot_wrapper))?;
+                    if id.is_some() {
                         trace!("adding slot wrapper for args: ({})", arg_types_text);
                     }
                 }

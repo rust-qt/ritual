@@ -1036,7 +1036,7 @@ pub fn generate(
         .current_database
         .rust_items()
         .iter()
-        .filter_map(RustDatabaseItem::as_module_ref)
+        .filter_map(|i| i.item.as_module_ref())
         .find(|module| module.kind == RustModuleKind::Special(RustSpecialModuleKind::CrateRoot))
         .ok_or_else(|| err_msg("crate root not found"))?;
 

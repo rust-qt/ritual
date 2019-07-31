@@ -174,7 +174,7 @@ pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
         data.current_database.add_cpp_item(
             None, // TODO: what is the source ffi item?
             CppItem::Function(item),
-        );
+        )?;
     }
     Ok(())
 }
@@ -237,7 +237,7 @@ pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> 
             data.current_database.add_cpp_item(
                 None, // TODO: what is the source ffi item?
                 CppItem::Type(new_type),
-            );
+            )?;
         } else {
             debug!(
                 "original type not found for instantiation: {}",

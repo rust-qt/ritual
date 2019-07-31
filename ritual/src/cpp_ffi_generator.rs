@@ -203,24 +203,8 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                 debug!("failed to add FFI item: {}: {}", item.item, error);
             }
             Ok(r) => {
-                let mut new_items = Vec::new();
                 for item in r {
-                    if data.current_database.add_ffi_item(item.clone()) {
-                        new_items.push(item);
-                    }
-                }
-                let item = &mut data.current_database.cpp_item_mut(cpp_item_id)?;
-                if new_items.is_empty() {
-                    debug!("no new FFI items for: {}", item.item);
-                } else {
-                    debug!(
-                        "added FFI items (count: {}) for: {}",
-                        new_items.len(),
-                        item.item
-                    );
-                    for item in &new_items {
-                        trace!("* {:?}", item);
-                    }
+                    data.current_database.add_ffi_item(item)?;
                 }
             }
         }

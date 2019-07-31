@@ -124,7 +124,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     }
     for (source_ffi_item, method) in methods {
         data.current_database
-            .add_cpp_item(source_ffi_item, CppItem::Function(method));
+            .add_cpp_item(source_ffi_item, CppItem::Function(method))?;
     }
     Ok(())
 }

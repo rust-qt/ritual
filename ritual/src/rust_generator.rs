@@ -368,6 +368,7 @@ impl State<'_, '_> {
             CppType::Enum { path } | CppType::Class(path) => {
                 let rust_item = self.find_wrapper_type(path)?;
                 let path = rust_item
+                    .item
                     .path()
                     .ok_or_else(|| err_msg("RustDatabaseItem for class has no path"))?
                     .clone();
@@ -572,7 +573,7 @@ impl State<'_, '_> {
             };
 
             let rust_enum_type = self.find_wrapper_type(enum_path)?;
-            let rust_enum_path = rust_enum_type.path().ok_or_else(|| {
+            let rust_enum_path = rust_enum_type.item.path().ok_or_else(|| {
                 format_err!(
                     "failed to get path from Rust enum type: {:?}",
                     rust_enum_type
@@ -1262,7 +1263,7 @@ impl State<'_, '_> {
                 )
             })?;
 
-        let rust_path = rust_item.path().ok_or_else(|| {
+        let rust_path = rust_item.item.path().ok_or_else(|| {
             format_err!(
                 "rust item doesn't have rust path (parent_path = {:?})",
                 parent_path
@@ -1382,7 +1383,7 @@ impl State<'_, '_> {
                     .current_database
                     .rust_items()
                     .iter()
-                    .filter_map(RustDatabaseItem::as_module_ref)
+                    .filter_map(|i| i.item.as_module_ref())
                     .find(|module| {
                         module.kind == RustModuleKind::Special(RustSpecialModuleKind::Ffi)
                     })
@@ -1398,7 +1399,7 @@ impl State<'_, '_> {
                     .current_database
                     .rust_items()
                     .iter()
-                    .filter_map(RustDatabaseItem::as_module_ref)
+                    .filter_map(|i| i.item.as_module_ref())
                     .find(|module| {
                         module.kind == RustModuleKind::Special(RustSpecialModuleKind::SizedTypes)
                     })
@@ -1431,7 +1432,7 @@ impl State<'_, '_> {
                             .current_database
                             .rust_items()
                             .iter()
-                            .filter_map(RustDatabaseItem::as_module_ref)
+                            .filter_map(|i| i.item.as_module_ref())
                             .find(|module| {
                                 module.kind == RustModuleKind::Special(RustSpecialModuleKind::Ops)
                             })
@@ -1546,7 +1547,10 @@ impl State<'_, '_> {
             if !argument.is_template_parameter() {
                 if let CppType::Enum { path } = &argument {
                     let rust_type = self.find_wrapper_type(path)?;
-                    let rust_type_path = rust_type.path().expect("enum rust item must have path");
+                    let rust_type_path = rust_type
+                        .item
+                        .path()
+                        .expect("enum rust item must have path");
                     let rust_item = RustItem::ExtraImpl(RustExtraImpl {
                         parent_path: rust_type_path.parent()?,
                         kind: RustExtraImplKind::FlagEnum(RustFlagEnumImpl {
@@ -1802,7 +1806,7 @@ impl State<'_, '_> {
                     kind: RustPointerLikeTypeKind::Reference { lifetime: None },
                     is_const: true,
                     target: Box::new(RustType::Common(RustCommonType {
-                        path: class_type.path().unwrap().clone(),
+                        path: class_type.item.path().unwrap().clone(),
                         generic_arguments: None,
                     })),
                 };
@@ -1874,13 +1878,11 @@ impl State<'_, '_> {
             return Ok(());
         }
 
-        let rust_item = RustDatabaseItem {
-            item: RustItem::Reexport(RustReexport {
-                path,
-                target: RustPath::from_parts(vec![crate_name.to_string()]),
-                source,
-            }),
-        };
+        let rust_item = RustItem::Reexport(RustReexport {
+            path,
+            source,
+            target: RustPath::from_parts(vec![crate_name.to_string()]),
+        });
         self.0.current_database.add_rust_item(rust_item)?;
         Ok(())
     }
@@ -1895,20 +1897,18 @@ impl State<'_, '_> {
         };
         let rust_path = RustPath::from_parts(rust_path_parts);
 
-        let rust_item = RustDatabaseItem {
-            item: RustItem::Module(RustModule {
-                is_public: match kind {
-                    RustSpecialModuleKind::CrateRoot | RustSpecialModuleKind::Ops => true,
-                    RustSpecialModuleKind::Ffi | RustSpecialModuleKind::SizedTypes => false,
-                },
-                path: rust_path,
-                doc: RustModuleDoc {
-                    extra_doc: None,
-                    cpp_path: None,
-                },
-                kind: RustModuleKind::Special(kind),
-            }),
-        };
+        let rust_item = RustItem::Module(RustModule {
+            is_public: match kind {
+                RustSpecialModuleKind::CrateRoot | RustSpecialModuleKind::Ops => true,
+                RustSpecialModuleKind::Ffi | RustSpecialModuleKind::SizedTypes => false,
+            },
+            path: rust_path,
+            doc: RustModuleDoc {
+                extra_doc: None,
+                cpp_path: None,
+            },
+            kind: RustModuleKind::Special(kind),
+        });
         self.0.current_database.add_rust_item(rust_item)?;
         Ok(())
     }
@@ -1925,16 +1925,8 @@ impl State<'_, '_> {
 
                 let cpp_item = &self.0.current_database.cpp_item(cpp_item_id)?;
                 if let Ok(rust_items) = self.process_cpp_item(cpp_item) {
-                    let cpp_item_text = cpp_item.item.to_string();
                     for rust_item in rust_items {
-                        let item = RustDatabaseItem { item: rust_item };
-                        debug!(
-                            "added rust item: {} (cpp item: {})",
-                            item.item.short_text(),
-                            cpp_item_text
-                        );
-                        trace!("rust item data: {:?}", item);
-                        self.0.current_database.add_rust_item(item)?;
+                        self.0.current_database.add_rust_item(rust_item)?;
                     }
                     processed_ids.insert(cpp_item_id);
                     any_processed = true;
@@ -1976,7 +1968,6 @@ impl State<'_, '_> {
             let ffi_item = self.0.current_database.ffi_item(ffi_item_id)?;
             match self.process_ffi_item(ffi_item, &trait_types) {
                 Ok(results) => {
-                    let ffi_item_text = ffi_item.item.short_text();
                     for item in results {
                         match item {
                             ProcessedFfiItem::Item(rust_item) => {
@@ -1984,14 +1975,7 @@ impl State<'_, '_> {
                                     trait_types.push(trait_impl.into());
                                 }
 
-                                let item = RustDatabaseItem { item: rust_item };
-                                debug!(
-                                    "added rust item: {} (ffi item: {})",
-                                    item.item.short_text(),
-                                    ffi_item_text
-                                );
-                                trace!("rust item data: {:?}", item);
-                                self.0.current_database.add_rust_item(item)?;
+                                self.0.current_database.add_rust_item(rust_item)?;
                             }
                             ProcessedFfiItem::Function(function) => {
                                 let entry = grouped_functions
@@ -2079,11 +2063,7 @@ impl State<'_, '_> {
                     function.desired_path
                 };
                 let final_path = self.0.current_database.make_unique_rust_path(&path);
-                let item = RustDatabaseItem {
-                    item: RustItem::Function(function.function.with_path(final_path)),
-                };
-                debug!("added rust item: {}", item.item.short_text(),);
-                trace!("rust item data: {:?}", item);
+                let item = RustItem::Function(function.function.with_path(final_path));
                 self.0.current_database.add_rust_item(item)?;
             }
         }
