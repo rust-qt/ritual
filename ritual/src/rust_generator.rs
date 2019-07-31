@@ -1,5 +1,5 @@
 use crate::cpp_checks::CppChecks;
-use crate::cpp_data::{CppItem, CppPath, CppPathItem, CppTypeDeclaration, CppTypeDeclarationKind};
+use crate::cpp_data::{CppItem, CppPath, CppPathItem, CppTypeDeclarationKind};
 use crate::cpp_ffi_data::{
     CppCast, CppFfiArgumentMeaning, CppFfiFunction, CppFfiFunctionKind, CppFfiItem, CppFfiType,
     CppFieldAccessorType, CppToFfiTypeConversion,
@@ -10,7 +10,7 @@ use crate::cpp_type::{
     is_qflags, CppBuiltInNumericType, CppFunctionPointerType, CppPointerLikeTypeKind,
     CppSpecificNumericType, CppSpecificNumericTypeKind, CppType, CppTypeRole,
 };
-use crate::database::{CppDatabaseItem, CppFfiDatabaseItem, CppItemId};
+use crate::database::{CppDatabaseItem, CppFfiDatabaseItem, FfiItemId};
 use crate::processor::ProcessorData;
 use crate::rust_info::{
     NameType, RustDatabaseItem, RustEnumValue, RustEnumValueDoc, RustExtraImpl, RustExtraImplKind,
@@ -74,7 +74,7 @@ fn sanitize_rust_identifier_test() {
 struct FunctionWithDesiredPath {
     function: UnnamedRustFunction,
     desired_path: RustPath,
-    ffi_item_index: usize,
+    ffi_item_id: FfiItemId,
 }
 
 enum ProcessedFfiItem {
@@ -590,7 +590,7 @@ impl State<'_, '_> {
     /// Generates exact (FFI-compatible) Rust equivalent of `CppAndFfiMethod` object.
     fn generate_ffi_function(
         &self,
-        ffi_item_index: usize,
+        ffi_item_id: FfiItemId,
         data: &CppFfiFunction,
     ) -> Result<RustFunction> {
         let mut args = Vec::new();
@@ -607,7 +607,7 @@ impl State<'_, '_> {
             is_public: true,
             return_type: RustFinalType::new(return_type, RustToFfiTypeConversion::None)?,
             path: self.generate_rust_path(&data.path, NameType::FfiFunction)?,
-            kind: RustFunctionKind::FfiFunction(RustFfiFunctionData { ffi_item_index }),
+            kind: RustFunctionKind::FfiFunction(RustFfiFunctionData { ffi_item_id }),
             arguments: args,
             is_unsafe: false,
             extra_doc: None,
@@ -641,7 +641,7 @@ impl State<'_, '_> {
     }
 
     fn process_operator_as_trait_impl(
-        ffi_item_index: usize,
+        ffi_item_id: FfiItemId,
         unnamed_function: UnnamedRustFunction,
         operator: &CppOperator,
         crate_name: &str,
@@ -779,14 +779,14 @@ impl State<'_, '_> {
             associated_types,
             functions: vec![function],
             source: RustTraitImplSource {
-                ffi_item_index,
+                ffi_item_id,
                 kind: RustTraitImplSourceKind::Normal,
             },
         })
     }
 
     fn process_destructor(
-        ffi_item_index: usize,
+        ffi_item_id: FfiItemId,
         unnamed_function: UnnamedRustFunction,
         allocation_place: ReturnValueAllocationPlace,
     ) -> Result<RustTraitImpl> {
@@ -836,14 +836,14 @@ impl State<'_, '_> {
             associated_types: Vec::new(),
             functions: vec![function],
             source: RustTraitImplSource {
-                ffi_item_index,
+                ffi_item_id,
                 kind: RustTraitImplSourceKind::Normal,
             },
         })
     }
 
     fn process_cast(
-        ffi_item_index: usize,
+        ffi_item_id: FfiItemId,
         mut unnamed_function: UnnamedRustFunction,
         cast: &CppCast,
     ) -> Result<Vec<RustTraitImpl>> {
@@ -919,7 +919,7 @@ impl State<'_, '_> {
             associated_types: Vec::new(),
             functions: vec![cast_function, cast_function_mut],
             source: RustTraitImplSource {
-                ffi_item_index,
+                ffi_item_id,
                 kind: RustTraitImplSourceKind::Normal,
             },
         });
@@ -955,7 +955,7 @@ impl State<'_, '_> {
                 }],
                 functions: vec![deref_function],
                 source: RustTraitImplSource {
-                    ffi_item_index,
+                    ffi_item_id,
                     kind: RustTraitImplSourceKind::Deref,
                 },
             });
@@ -977,7 +977,7 @@ impl State<'_, '_> {
                 associated_types: Vec::new(),
                 functions: vec![deref_mut_function],
                 source: RustTraitImplSource {
-                    ffi_item_index,
+                    ffi_item_id,
                     kind: RustTraitImplSourceKind::DerefMut,
                 },
             });
@@ -989,12 +989,12 @@ impl State<'_, '_> {
     /// Converts one function to a `RustSingleMethod`.
     fn process_rust_function(
         &self,
-        ffi_item_index: usize,
+        ffi_item_id: FfiItemId,
         function: &CppFfiFunction,
         checks: &CppChecks,
         trait_types: &[TraitTypes],
     ) -> Result<Vec<ProcessedFfiItem>> {
-        let rust_ffi_function = self.generate_ffi_function(ffi_item_index, &function)?;
+        let rust_ffi_function = self.generate_ffi_function(ffi_item_id, &function)?;
         let ffi_function_path = rust_ffi_function.path.clone();
         let mut results = vec![ProcessedFfiItem::Item(RustItem::Function(
             rust_ffi_function,
@@ -1092,7 +1092,7 @@ impl State<'_, '_> {
                 cpp_ffi_function: function.clone(),
                 ffi_function_path,
                 return_type_ffi_index: return_arg_index,
-                ffi_item_index,
+                ffi_item_id,
             }),
             extra_doc: None,
             is_unsafe: true,
@@ -1101,7 +1101,7 @@ impl State<'_, '_> {
         if let CppFfiFunctionKind::Function { cpp_function, .. } = &function.kind {
             if cpp_function.is_destructor() {
                 let item = State::process_destructor(
-                    ffi_item_index,
+                    ffi_item_id,
                     unnamed_function,
                     function.allocation_place,
                 )?;
@@ -1109,7 +1109,7 @@ impl State<'_, '_> {
                 return Ok(results);
             }
             if let Some(cast) = &cpp_function.cast {
-                let impls = State::process_cast(ffi_item_index, unnamed_function, cast)?;
+                let impls = State::process_cast(ffi_item_id, unnamed_function, cast)?;
                 results.extend(
                     impls
                         .into_iter()
@@ -1122,7 +1122,7 @@ impl State<'_, '_> {
                     bail!("NotEqualTo is not needed in public API because PartialEq is used");
                 }
                 match State::process_operator_as_trait_impl(
-                    ffi_item_index,
+                    ffi_item_id,
                     unnamed_function.clone(),
                     operator,
                     self.0.current_database.crate_name(),
@@ -1173,7 +1173,7 @@ impl State<'_, '_> {
                                 results.push(ProcessedFfiItem::Function(FunctionWithDesiredPath {
                                     function: unnamed_function,
                                     desired_path: type1.path.join(name),
-                                    ffi_item_index,
+                                    ffi_item_id,
                                 }));
                                 return Ok(results);
                             }
@@ -1187,7 +1187,7 @@ impl State<'_, '_> {
         results.push(ProcessedFfiItem::Function(FunctionWithDesiredPath {
             function: unnamed_function,
             desired_path,
-            ffi_item_index,
+            ffi_item_id,
         }));
         Ok(results)
     }
@@ -1517,7 +1517,6 @@ impl State<'_, '_> {
 
     fn process_ffi_item(
         &self,
-        ffi_item_index: usize,
         ffi_item: &CppFfiDatabaseItem,
         trait_types: &[TraitTypes],
     ) -> Result<Vec<ProcessedFfiItem>> {
@@ -1526,7 +1525,7 @@ impl State<'_, '_> {
         }
         match &ffi_item.item {
             CppFfiItem::Function(cpp_ffi_function) => self.process_rust_function(
-                ffi_item_index,
+                ffi_item.id,
                 cpp_ffi_function,
                 &ffi_item.checks,
                 trait_types,
@@ -1538,12 +1537,9 @@ impl State<'_, '_> {
     }
 
     #[allow(clippy::useless_let_if_seq)]
-    fn process_cpp_class(
-        &self,
-        cpp_item_id: CppItemId,
-        source_ffi_item: Option<usize>,
-        data: &CppTypeDeclaration,
-    ) -> Result<Vec<RustItem>> {
+    fn process_cpp_class(&self, item: &CppDatabaseItem) -> Result<Vec<RustItem>> {
+        let data = item.item.as_type_ref().expect("type expected");
+
         // TODO: do something about `QUrlTwoFlags<T1, T2>`
         if is_qflags(&data.path) {
             let argument = &data.path.last().template_arguments.as_ref().unwrap()[0];
@@ -1555,7 +1551,7 @@ impl State<'_, '_> {
                         parent_path: rust_type_path.parent()?,
                         kind: RustExtraImplKind::FlagEnum(RustFlagEnumImpl {
                             enum_path: rust_type_path.clone(),
-                            cpp_item_id,
+                            cpp_item_id: item.id,
                         }),
                     });
                     return Ok(vec![rust_item]);
@@ -1564,13 +1560,8 @@ impl State<'_, '_> {
         }
 
         let mut qt_slot_wrapper = None;
-        if let Some(ffi_index) = source_ffi_item {
-            let ffi_item = self
-                .0
-                .current_database
-                .ffi_items()
-                .get(ffi_index)
-                .ok_or_else(|| err_msg("cpp item references invalid ffi index"))?;
+        if let Some(source_ffi_item_id) = item.source_id {
+            let ffi_item = self.0.current_database.ffi_item(source_ffi_item_id)?;
             if let CppFfiItem::QtSlotWrapper(wrapper) = &ffi_item.item {
                 qt_slot_wrapper = Some((wrapper, &ffi_item.checks));
             }
@@ -1611,7 +1602,7 @@ impl State<'_, '_> {
                 path: internal_path.clone(),
                 kind: RustStructKind::SizedType(RustSizedType {
                     cpp_path: data.path.clone(),
-                    cpp_item_id,
+                    cpp_item_id: item.id,
                 }),
                 is_public: true,
             });
@@ -1635,7 +1626,7 @@ impl State<'_, '_> {
                     raw_qt_slot_wrapper: None, // TODO: fix this
                 },
                 kind: wrapper_kind,
-                cpp_item_id,
+                cpp_item_id: item.id,
             }),
             is_public: true,
         });
@@ -1650,7 +1641,9 @@ impl State<'_, '_> {
                 extra_doc: None,
                 cpp_path: Some(data.path.clone()),
             },
-            kind: RustModuleKind::CppNestedTypes { cpp_item_id },
+            kind: RustModuleKind::CppNestedTypes {
+                cpp_item_id: item.id,
+            },
         });
         rust_items.push(nested_types_rust_item);
 
@@ -1672,7 +1665,7 @@ impl State<'_, '_> {
                     receiver_id,
                     target_path: public_path.clone(),
                     arguments: RustType::Tuple(arg_types),
-                    cpp_item_id,
+                    cpp_item_id: item.id,
                 }),
             });
             rust_items.push(impl_item);
@@ -1702,7 +1695,7 @@ impl State<'_, '_> {
                     arguments: public_args,
                     signal_arguments: wrapper.signal_arguments.clone(),
                     raw_slot_wrapper: public_path,
-                    cpp_item_id,
+                    cpp_item_id: item.id,
                 }),
                 path: closure_item_path,
                 extra_doc: None,
@@ -1714,13 +1707,8 @@ impl State<'_, '_> {
     }
 
     fn process_cpp_item(&self, cpp_item: &CppDatabaseItem) -> Result<Vec<RustItem>> {
-        if let Some(index) = cpp_item.source_ffi_item {
-            let ffi_item = self
-                .0
-                .current_database
-                .ffi_items()
-                .get(index)
-                .ok_or_else(|| err_msg("cpp item refers to invalid ffi item index"))?;
+        if let Some(id) = cpp_item.source_id {
+            let ffi_item = self.0.current_database.ffi_item(id)?;
             if !ffi_item.checks.any_success() {
                 bail!("cpp checks failed");
             }
@@ -1743,9 +1731,7 @@ impl State<'_, '_> {
                 Ok(vec![rust_item])
             }
             CppItem::Type(data) => match data.kind {
-                CppTypeDeclarationKind::Class { .. } => {
-                    self.process_cpp_class(cpp_item.id, cpp_item.source_ffi_item, data)
-                }
+                CppTypeDeclarationKind::Class { .. } => self.process_cpp_class(cpp_item),
                 CppTypeDeclarationKind::Enum => {
                     let rust_path = self.generate_rust_path(&data.path, NameType::Type)?;
                     let rust_item = RustItem::Struct(RustStruct {
@@ -1986,9 +1972,9 @@ impl State<'_, '_> {
             })
             .collect_vec();
 
-        for ffi_item_index in 0..self.0.current_database.ffi_items().len() {
-            let ffi_item = &self.0.current_database.ffi_items()[ffi_item_index];
-            match self.process_ffi_item(ffi_item_index, ffi_item, &trait_types) {
+        for ffi_item_id in self.0.current_database.ffi_item_ids().collect_vec() {
+            let ffi_item = self.0.current_database.ffi_item(ffi_item_id)?;
+            match self.process_ffi_item(ffi_item, &trait_types) {
                 Ok(results) => {
                     let ffi_item_text = ffi_item.item.short_text();
                     for item in results {

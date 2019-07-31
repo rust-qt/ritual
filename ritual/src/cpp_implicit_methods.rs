@@ -40,7 +40,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                     declaration_code: None,
                     doc: CppFunctionDoc::default(),
                 };
-                methods.push((type1.source_ffi_item, destructor));
+                methods.push((type1.source_id, destructor));
 
                 let default_constructor = CppFunction {
                     path: declaration
@@ -64,7 +64,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                     cast: None,
                     doc: CppFunctionDoc::default(),
                 };
-                methods.push((type1.source_ffi_item, default_constructor));
+                methods.push((type1.source_id, default_constructor));
 
                 let copy_arg = CppFunctionArgument {
                     argument_type: CppType::new_reference(true, CppType::Class(class_path.clone())),
@@ -94,7 +94,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                     declaration_code: None,
                     doc: CppFunctionDoc::default(),
                 };
-                methods.push((type1.source_ffi_item, copy_constructor));
+                methods.push((type1.source_id, copy_constructor));
 
                 let assignment_operator = CppFunction {
                     path: declaration
@@ -118,7 +118,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                     declaration_code: None,
                     doc: CppFunctionDoc::default(),
                 };
-                methods.push((type1.source_ffi_item, assignment_operator));
+                methods.push((type1.source_id, assignment_operator));
             }
         }
     }

@@ -11,7 +11,7 @@ use crate::cpp_type::{
     CppBuiltInNumericType, CppFunctionPointerType, CppPointerLikeTypeKind, CppSpecificNumericType,
     CppSpecificNumericTypeKind, CppType,
 };
-use crate::database::CppItemId;
+use crate::database::{CppItemId, FfiItemId};
 use crate::processor::ProcessorData;
 use clang::diagnostic::{Diagnostic, Severity};
 use clang::*;
@@ -70,7 +70,7 @@ pub struct CppParserOutput(pub Vec<CppParserOutputItem>);
 struct CppParser<'b, 'a: 'b> {
     data: &'b mut ProcessorData<'a>,
     current_target_paths: Vec<PathBuf>,
-    source_ffi_item: Option<usize>,
+    source_ffi_item: Option<FfiItemId>,
     output: CppParserOutput,
 }
 
@@ -327,8 +327,8 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
         cpp_library_version: data.config.cpp_lib_version().map(ToString::to_string),
         target: current_target(),
     };
-    for ffi_index in 0..data.current_database.ffi_items().len() {
-        let ffi_item = &data.current_database.ffi_items()[ffi_index];
+    for ffi_item_id in data.current_database.ffi_item_ids().collect_vec() {
+        let ffi_item = data.current_database.ffi_item(ffi_item_id)?;
         if !ffi_item.is_source_item() {
             continue;
         }
@@ -338,7 +338,7 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
         let code = ffi_item.source_item_cpp_code()?;
         let mut parser = CppParser {
             current_target_paths: vec![data.workspace.tmp_path()],
-            source_ffi_item: Some(ffi_index),
+            source_ffi_item: Some(ffi_item_id),
             data,
             output: Default::default(),
         };

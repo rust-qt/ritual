@@ -47,7 +47,7 @@ impl CppFfiDatabaseItem {
 pub struct CppDatabaseItem {
     pub id: CppItemId,
     pub item: CppItem,
-    pub source_ffi_item: Option<usize>,
+    pub source_id: Option<FfiItemId>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -151,6 +151,10 @@ impl Database {
         self.data.cpp_items.iter().map(|item| item.id)
     }
 
+    pub fn ffi_item_ids<'a>(&'a self) -> impl Iterator<Item = FfiItemId> + 'a {
+        self.data.ffi_items.iter().map(|item| item.id)
+    }
+
     pub fn cpp_items_mut(&mut self) -> &mut [CppDatabaseItem] {
         self.is_modified = true;
         &mut self.data.cpp_items
@@ -175,6 +179,28 @@ impl Database {
         {
             Ok(index) => Ok(&mut self.data.cpp_items[index]),
             Err(_) => bail!("invalid cpp item id: {}", id),
+        }
+    }
+
+    pub fn ffi_item(&self, id: FfiItemId) -> Result<&CppFfiDatabaseItem> {
+        match self
+            .data
+            .ffi_items
+            .binary_search_by_key(&id, |item| item.id)
+        {
+            Ok(index) => Ok(&self.data.ffi_items[index]),
+            Err(_) => bail!("invalid ffi item id: {}", id),
+        }
+    }
+
+    pub fn ffi_item_mut(&mut self, id: FfiItemId) -> Result<&mut CppFfiDatabaseItem> {
+        match self
+            .data
+            .ffi_items
+            .binary_search_by_key(&id, |item| item.id)
+        {
+            Ok(index) => Ok(&mut self.data.ffi_items[index]),
+            Err(_) => bail!("invalid ffi item id: {}", id),
         }
     }
 
@@ -220,9 +246,7 @@ impl Database {
     pub fn clear_ffi(&mut self) {
         self.is_modified = true;
         self.data.ffi_items.clear();
-        self.data
-            .cpp_items
-            .retain(|item| item.source_ffi_item.is_none());
+        self.data.cpp_items.retain(|item| item.source_id.is_none());
         // TODO: deal with rust items that now have invalid index references
     }
 
@@ -250,7 +274,7 @@ impl Database {
 
     pub fn add_cpp_item(
         &mut self,
-        source_ffi_item: Option<usize>,
+        source_ffi_item: Option<FfiItemId>,
         data: CppItem,
     ) -> Option<CppItemId> {
         if self
@@ -269,7 +293,7 @@ impl Database {
         let item = CppDatabaseItem {
             id,
             item: data,
-            source_ffi_item,
+            source_id: source_ffi_item,
         };
         trace!("cpp item data: {:?}", item);
         self.data.cpp_items.push(item);

@@ -4,7 +4,7 @@ use crate::cpp_data::{CppPath, CppTypeDoc};
 use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_function::CppFunctionExternalDoc;
 use crate::cpp_type::CppType;
-use crate::database::CppItemId;
+use crate::database::{CppItemId, FfiItemId};
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_type::{RustFinalType, RustPath, RustPointerLikeTypeKind, RustType};
 use ritual_common::errors::{bail, Result};
@@ -187,7 +187,7 @@ pub struct RustFfiWrapperData {
     /// if any. `None` if the return value is passed normally (as the return value
     /// of the FFI function).
     pub return_type_ffi_index: Option<usize>, // TODO: why needed here?
-    pub ffi_item_index: usize,
+    pub ffi_item_id: FfiItemId,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -205,7 +205,7 @@ pub struct RustSignalOrSlotGetter {
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustFfiFunctionData {
-    pub ffi_item_index: usize,
+    pub ffi_item_id: FfiItemId,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -422,7 +422,7 @@ pub enum RustTraitImplSourceKind {
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustTraitImplSource {
-    pub ffi_item_index: usize,
+    pub ffi_item_id: FfiItemId,
     pub kind: RustTraitImplSourceKind,
 }
 
@@ -675,7 +675,7 @@ impl RustItem {
                 RustItem::TraitImpl(other) => data.source == other.source,
                 RustItem::Function(other) => {
                     if let RustFunctionKind::FfiWrapper(other) = &other.kind {
-                        data.source.ffi_item_index == other.ffi_item_index
+                        data.source.ffi_item_id == other.ffi_item_id
                             && data.source.kind == RustTraitImplSourceKind::Normal
                     } else {
                         false
@@ -693,12 +693,12 @@ impl RustItem {
             RustItem::Function(data) => match &data.kind {
                 RustFunctionKind::FfiWrapper(data) => match other {
                     RustItem::TraitImpl(other) => {
-                        data.ffi_item_index == other.source.ffi_item_index
+                        data.ffi_item_id == other.source.ffi_item_id
                             && other.source.kind == RustTraitImplSourceKind::Normal
                     }
                     RustItem::Function(other) => {
                         if let RustFunctionKind::FfiWrapper(other) = &other.kind {
-                            data.ffi_item_index == other.ffi_item_index
+                            data.ffi_item_id == other.ffi_item_id
                         } else {
                             false
                         }
@@ -719,7 +719,7 @@ impl RustItem {
                 RustFunctionKind::FfiFunction(data) => {
                     if let RustItem::Function(other) = other {
                         if let RustFunctionKind::FfiFunction(other) = &other.kind {
-                            data.ffi_item_index == other.ffi_item_index
+                            data.ffi_item_id == other.ffi_item_id
                         } else {
                             false
                         }
@@ -763,12 +763,12 @@ impl RustItem {
         }
     }
 
-    pub fn ffi_item_index(&self) -> Option<usize> {
+    pub fn ffi_item_id(&self) -> Option<FfiItemId> {
         match self {
-            RustItem::TraitImpl(data) => Some(data.source.ffi_item_index),
+            RustItem::TraitImpl(data) => Some(data.source.ffi_item_id),
             RustItem::Function(data) => match &data.kind {
-                RustFunctionKind::FfiWrapper(data) => Some(data.ffi_item_index),
-                RustFunctionKind::FfiFunction(data) => Some(data.ffi_item_index),
+                RustFunctionKind::FfiWrapper(data) => Some(data.ffi_item_id),
+                RustFunctionKind::FfiFunction(data) => Some(data.ffi_item_id),
                 RustFunctionKind::SignalOrSlotGetter(_) => None,
             },
             RustItem::Module(_)

@@ -104,7 +104,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     for item in data.current_database.cpp_items() {
         if let CppItem::ClassBase(base) = &item.item {
             for data in generate_casts(base, &data)? {
-                results.push((item.source_ffi_item, data));
+                results.push((item.source_id, data));
             }
         }
     }

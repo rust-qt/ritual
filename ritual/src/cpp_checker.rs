@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::cpp_data::{CppItem, CppPath};
 use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFfiItem};
 use crate::cpp_type::CppType;
-use crate::database::{CppFfiDatabaseItem, Database};
+use crate::database::{CppFfiDatabaseItem, Database, FfiItemId};
 use crate::processor::ProcessorData;
 use crate::{cluster_api, cpp_code_generator};
 use itertools::Itertools;
@@ -39,13 +39,8 @@ fn snippet_for_item(item: &CppFfiDatabaseItem, database: &Database) -> Result<Sn
 
             let source_ffi_item = if let Some(cpp_item_id) = item.item.cpp_item_id() {
                 let cpp_item = database.cpp_item(cpp_item_id)?;
-                if let Some(index) = cpp_item.source_ffi_item {
-                    Some(
-                        database
-                            .ffi_items()
-                            .get(index)
-                            .ok_or_else(|| err_msg("cpp item references invalid index"))?,
-                    )
+                if let Some(id) = cpp_item.source_id {
+                    Some(database.ffi_item(id)?)
                 } else {
                     None
                 }
@@ -228,7 +223,7 @@ pub struct SnippetTask<T> {
 }
 
 pub struct SnippetTaskLocalData {
-    pub ffi_item_index: usize,
+    pub ffi_item_id: FfiItemId,
     pub crate_name: String,
     pub library_target: LibraryTarget,
 }
@@ -473,7 +468,7 @@ impl CppChecker<'_, '_> {
 
         cluster_api::run_checks(cluster_config, &mut snippets)?;
 
-        self.save_results(snippets);
+        self.save_results(snippets)?;
 
         Ok(())
     }
@@ -509,7 +504,7 @@ impl CppChecker<'_, '_> {
                 instance.binary_check(chunk, Some(&progress_bar))
             })
             .collect::<Result<_>>()?;
-        self.save_results(snippets);
+        self.save_results(snippets)?;
 
         Ok(())
     }
@@ -520,8 +515,7 @@ impl CppChecker<'_, '_> {
         let mut snippets = Vec::new();
         let mut old_items_count = 0;
 
-        for (ffi_item_index, ffi_item) in self.data.current_database.ffi_items().iter().enumerate()
-        {
+        for ffi_item in self.data.current_database.ffi_items() {
             if ffi_item.checks.has_all_envs(library_targets) {
                 old_items_count += 1;
                 continue;
@@ -535,7 +529,7 @@ impl CppChecker<'_, '_> {
                         }
                         snippets.push(SnippetTask {
                             data: SnippetTaskLocalData {
-                                ffi_item_index,
+                                ffi_item_id: ffi_item.id,
                                 crate_name: crate_name.clone(),
                                 library_target: library_target.clone(),
                             },
@@ -569,13 +563,15 @@ impl CppChecker<'_, '_> {
         snippets
     }
 
-    fn save_results(&mut self, snippets: Vec<LocalSnippetTask>) {
+    fn save_results(&mut self, snippets: Vec<LocalSnippetTask>) -> Result<()> {
         let mut success_count = 0;
         let mut error_count = 0;
 
         for snippet in snippets {
-            let ffi_item =
-                &mut self.data.current_database.ffi_items_mut()[snippet.data.ffi_item_index];
+            let ffi_item = self
+                .data
+                .current_database
+                .ffi_item_mut(snippet.data.ffi_item_id)?;
             if let Some(output) = snippet.output {
                 if output.is_success() {
                     debug!("success: {}", ffi_item.item.short_text());
@@ -597,6 +593,8 @@ impl CppChecker<'_, '_> {
             "Success: {} items; error: {} items",
             success_count, error_count
         );
+
+        Ok(())
     }
 }
 

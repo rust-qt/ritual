@@ -233,22 +233,12 @@ impl Generator<'_> {
         item: &RustDatabaseItem,
         self_type: Option<&RustType>,
     ) -> Result<()> {
-        let ffi_item = if let Some(index) = item.item.ffi_item_index() {
-            Some(
-                self.current_database
-                    .ffi_items()
-                    .get(index)
-                    .ok_or_else(|| err_msg("rust item refers to invalid ffi item index"))?,
-            )
+        let ffi_item = if let Some(id) = item.item.ffi_item_id() {
+            Some(self.current_database.ffi_item(id)?)
         } else if let Some(id) = item.item.cpp_item_id() {
             let cpp_item = self.current_database.cpp_item(id)?;
-            if let Some(index) = cpp_item.source_ffi_item {
-                Some(
-                    self.current_database
-                        .ffi_items()
-                        .get(index)
-                        .ok_or_else(|| err_msg("cpp item refers to invalid ffi item index"))?,
-                )
+            if let Some(id) = cpp_item.source_id {
+                Some(self.current_database.ffi_item(id)?)
             } else {
                 None
             }
