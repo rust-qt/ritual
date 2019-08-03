@@ -1,12 +1,12 @@
 //! Types and functions used for Rust code generation.
 
 use crate::cpp_checks::Condition;
-use crate::database::Database;
+use crate::database::{Database, DbItem};
 use crate::doc_formatter;
 use crate::rust_generator::qt_core_path;
 use crate::rust_info::{
-    RustDatabaseItem, RustEnumValue, RustExtraImpl, RustExtraImplKind, RustFfiWrapperData,
-    RustFunction, RustFunctionArgument, RustFunctionKind, RustItem, RustModule, RustModuleKind,
+    RustEnumValue, RustExtraImpl, RustExtraImplKind, RustFfiWrapperData, RustFunction,
+    RustFunctionArgument, RustFunctionKind, RustItem, RustModule, RustModuleKind,
     RustSpecialModuleKind, RustStruct, RustStructKind, RustTraitImpl, RustWrapperTypeKind,
 };
 use crate::rust_type::{
@@ -230,25 +230,15 @@ impl Generator<'_> {
 
     fn generate_item(
         &mut self,
-        item: &RustDatabaseItem,
+        item: DbItem<&RustItem>,
         self_type: Option<&RustType>,
     ) -> Result<()> {
-        let ffi_item = if let Some(id) = item.item.ffi_item_id() {
-            Some(self.current_database.ffi_item(id)?)
-        } else if let Some(id) = item.item.cpp_item_id() {
-            let cpp_item = self.current_database.cpp_item(id)?;
-            if let Some(id) = cpp_item.source_id {
-                Some(self.current_database.ffi_item(id)?)
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        let ffi_item = self.current_database.source_ffi_item(item.id)?;
 
         let mut condition_texts = ConditionTexts::default();
         if let Some(ffi_item) = ffi_item {
             let condition = ffi_item
+                .item
                 .checks
                 .condition(self.current_database.environments());
             if condition != Condition::True {
@@ -876,7 +866,7 @@ impl Generator<'_> {
                 );
                 Some(wrap_unsafe(func.is_unsafe, &call))
             }
-            RustFunctionKind::FfiFunction(_) => None,
+            RustFunctionKind::FfiFunction => None,
         };
 
         let maybe_body = match body {
@@ -1035,7 +1025,6 @@ pub fn generate(
     let crate_root = generator
         .current_database
         .rust_items()
-        .iter()
         .filter_map(|i| i.item.as_module_ref())
         .find(|module| module.kind == RustModuleKind::Special(RustSpecialModuleKind::CrateRoot))
         .ok_or_else(|| err_msg("crate root not found"))?;

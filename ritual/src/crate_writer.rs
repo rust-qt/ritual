@@ -2,7 +2,6 @@ use crate::cpp_code_generator;
 use crate::cpp_code_generator::generate_cpp_type_size_requester;
 use crate::processor::ProcessorData;
 use crate::rust_code_generator;
-use crate::rust_info::RustItem;
 use crate::versions;
 use itertools::Itertools;
 use ritual_common::errors::Result;
@@ -266,28 +265,18 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let used_ffi_functions = data
         .current_database
         .rust_items()
-        .iter()
-        .filter_map(|item| {
-            if let RustItem::Function(func) = &item.item {
-                if func.kind.is_ffi_function() {
-                    Some(func.path.last())
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        })
+        .filter_map(|item| item.item.as_function_ref())
+        .filter(|item| item.kind.is_ffi_function())
+        .map(|item| item.path.last())
         .collect::<HashSet<&str>>();
 
     cpp_code_generator::generate_cpp_file(
         &data
             .current_database
             .ffi_items()
-            .iter()
             .filter(|item| {
-                !item.item.is_function()
-                    || used_ffi_functions.contains(item.path().last().name.as_str())
+                !item.item.item.is_function()
+                    || used_ffi_functions.contains(item.item.item.path().last().name.as_str())
             })
             .collect_vec(),
         data.current_database.environments(),
@@ -298,7 +287,11 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
 
     let file = create_file(c_lib_path.join("sized_types.cxx"))?;
     generate_cpp_type_size_requester(
-        data.current_database.rust_items(),
+        &data
+            .current_database
+            .rust_items()
+            .map(|i| i.item)
+            .collect_vec(),
         data.config.include_directives(),
         file,
     )?;

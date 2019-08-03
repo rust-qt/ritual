@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::cpp_data::{CppItem, CppPath};
 use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFfiItem};
 use crate::cpp_type::CppType;
-use crate::database::{CppFfiDatabaseItem, Database, FfiItemId};
+use crate::database::{CppFfiItemData, Database, DbItem, ItemId};
 use crate::processor::ProcessorData;
 use crate::{cluster_api, cpp_code_generator};
 use itertools::Itertools;
@@ -22,7 +22,7 @@ use ritual_common::utils::{MapIfOk, ProgressBar};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::{hash_map::Entry, HashMap};
 use std::io::Write;
-use std::iter::{once, IntoIterator};
+use std::iter::once;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread::ThreadId;
@@ -31,35 +31,29 @@ use std::{iter, thread};
 
 pub const CHUNK_SIZE: usize = 64;
 
-fn snippet_for_item(item: &CppFfiDatabaseItem, database: &Database) -> Result<Snippet> {
-    match &item.item {
+fn snippet_for_item(item: DbItem<&CppFfiItemData>, database: &Database) -> Result<Snippet> {
+    match &item.item.item {
         CppFfiItem::Function(cpp_ffi_function) => {
             let item_code = cpp_code_generator::function_implementation(cpp_ffi_function)?;
             let mut needs_moc = false;
 
-            let source_ffi_item = if let Some(cpp_item_id) = item.item.cpp_item_id() {
-                let cpp_item = database.cpp_item(cpp_item_id)?;
-                if let Some(id) = cpp_item.source_id {
-                    Some(database.ffi_item(id)?)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
+            let source_ffi_item = database.source_ffi_item(item.id)?;
 
             let full_code = if let Some(source_ffi_item) = source_ffi_item {
-                if let CppFfiItem::QtSlotWrapper(_) = &source_ffi_item.item {
+                if source_ffi_item.item.item.is_slot_wrapper() {
                     needs_moc = true
                 }
-                let source_item_code = source_ffi_item.source_item_cpp_code()?;
+                let source_item_code = source_ffi_item.item.item.source_item_cpp_code()?;
                 format!("{}\n{}", source_item_code, item_code)
             } else {
                 item_code
             };
             Ok(Snippet::new_global(full_code, needs_moc))
         }
-        CppFfiItem::QtSlotWrapper(_) => Ok(Snippet::new_global(item.source_item_cpp_code()?, true)),
+        CppFfiItem::QtSlotWrapper(_) => Ok(Snippet::new_global(
+            item.item.item.source_item_cpp_code()?,
+            true,
+        )),
     }
 }
 
@@ -223,7 +217,7 @@ pub struct SnippetTask<T> {
 }
 
 pub struct SnippetTaskLocalData {
-    pub ffi_item_id: FfiItemId,
+    pub ffi_item_id: ItemId,
     pub crate_name: String,
     pub library_target: LibraryTarget,
 }
@@ -516,7 +510,7 @@ impl CppChecker<'_, '_> {
         let mut old_items_count = 0;
 
         for ffi_item in self.data.current_database.ffi_items() {
-            if ffi_item.checks.has_all_envs(library_targets) {
+            if ffi_item.item.checks.has_all_envs(library_targets) {
                 old_items_count += 1;
                 continue;
             }
@@ -524,7 +518,7 @@ impl CppChecker<'_, '_> {
             match snippet_for_item(ffi_item, &self.data.current_database) {
                 Ok(snippet) => {
                     for library_target in library_targets {
-                        if ffi_item.checks.has_env(library_target) {
+                        if ffi_item.item.checks.has_env(library_target) {
                             continue;
                         }
                         snippets.push(SnippetTask {
@@ -541,7 +535,7 @@ impl CppChecker<'_, '_> {
                 Err(err) => {
                     debug!(
                         "can't create snippet: {}: {:?}",
-                        ffi_item.item.short_text(),
+                        ffi_item.item.item.short_text(),
                         err
                     );
                 }
@@ -574,17 +568,18 @@ impl CppChecker<'_, '_> {
                 .ffi_item_mut(snippet.data.ffi_item_id)?;
             if let Some(output) = snippet.output {
                 if output.is_success() {
-                    debug!("success: {}", ffi_item.item.short_text());
+                    debug!("success: {}", ffi_item.item.item.short_text());
                     success_count += 1;
                 } else {
-                    debug!("error: {}: {:?}", ffi_item.item.short_text(), output);
+                    debug!("error: {}: {:?}", ffi_item.item.item.short_text(), output);
                     error_count += 1;
                 }
                 ffi_item
+                    .item
                     .checks
                     .add(snippet.data.library_target, output.is_success());
             } else {
-                error!("no output for item: {}", ffi_item.item.short_text());
+                error!("no output for item: {}", ffi_item.item.item.short_text());
             }
             trace!("snippet: {:?}", snippet.snippet);
         }
@@ -625,10 +620,10 @@ fn type_paths(type1: &CppType) -> Vec<&CppPath> {
 pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
     if let Some(hook) = data.config.ffi_generator_hook() {
         for item in data.current_database.ffi_items_mut() {
-            if !item.checks.any_success() {
+            if !item.item.checks.any_success() {
                 continue;
             }
-            let allowed = if let CppFfiItem::Function(function) = &item.item {
+            let allowed = if let CppFfiItem::Function(function) = &item.item.item {
                 match &function.kind {
                     CppFfiFunctionKind::Function { cpp_function, .. } => {
                         hook(&CppItem::Function(cpp_function.clone()))?
@@ -641,18 +636,18 @@ pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
                 true
             };
             if !allowed {
-                log::info!("Checks are cleared for {}", item.item.short_text());
-                item.checks.clear();
+                log::info!("Checks are cleared for {}", item.item.item.short_text());
+                item.item.checks.clear();
             }
         }
     }
 
     if let Some(hook) = data.config.cpp_parser_path_hook() {
         for item in data.current_database.ffi_items_mut() {
-            if !item.checks.any_success() {
+            if !item.item.checks.any_success() {
                 continue;
             }
-            let (types, path) = match &item.item {
+            let (types, path) = match &item.item.item {
                 CppFfiItem::Function(function) => match &function.kind {
                     CppFfiFunctionKind::Function { cpp_function, .. } => (
                         cpp_function.all_involved_types(),
@@ -674,8 +669,8 @@ pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
                 .any(|x| !x);
 
             if any_blocked {
-                log::info!("Checks are cleared for {}", item.item.short_text());
-                item.checks.clear();
+                log::info!("Checks are cleared for {}", item.item.item.short_text());
+                item.item.checks.clear();
             }
         }
     }

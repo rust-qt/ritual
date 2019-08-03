@@ -47,37 +47,31 @@ fn run_parser(code: &'static str) -> ParserCppData {
     ParserCppData {
         types: database
             .cpp_items()
-            .iter()
             .filter_map(|item| item.item.as_type_ref())
             .cloned()
             .collect(),
         bases: database
             .cpp_items()
-            .iter()
             .filter_map(|item| item.item.as_base_ref())
             .cloned()
             .collect(),
         fields: database
             .cpp_items()
-            .iter()
             .filter_map(|item| item.item.as_field_ref())
             .cloned()
             .collect(),
         enum_values: database
             .cpp_items()
-            .iter()
             .filter_map(|item| item.item.as_enum_value_ref())
             .cloned()
             .collect(),
         methods: database
             .cpp_items()
-            .iter()
             .filter_map(|item| item.item.as_function_ref())
             .cloned()
             .collect(),
         namespaces: database
             .cpp_items()
-            .iter()
             .filter_map(|item| item.item.as_namespace_ref())
             .cloned()
             .collect(),

@@ -7,8 +7,8 @@ use crate::cpp_ffi_data::{CppFfiFunction, CppFfiItem};
 use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
-use crate::database::CppFfiDatabaseItem;
-use crate::rust_info::{RustDatabaseItem, RustItem, RustStructKind};
+use crate::database::{CppFfiItemData, DbItem};
+use crate::rust_info::{RustItem, RustStructKind};
 use itertools::Itertools;
 use ritual_common::cpp_lib_builder::version_to_number;
 use ritual_common::errors::{bail, err_msg, Result};
@@ -328,7 +328,7 @@ fn wrap_with_condition(code: &str, condition: &Condition) -> String {
 
 /// Generates a source file with the specified FFI methods.
 pub fn generate_cpp_file(
-    ffi_items: &[&CppFfiDatabaseItem],
+    ffi_items: &[DbItem<&CppFfiItemData>],
     environments: &[LibraryTarget],
     file_path: &Path,
     global_header_name: &str,
@@ -339,12 +339,12 @@ pub fn generate_cpp_file(
 
     let mut any_slot_wrappers = false;
     for ffi_item in ffi_items {
-        if !ffi_item.checks.any_success() {
+        if !ffi_item.item.checks.any_success() {
             continue;
         }
-        if let CppFfiItem::QtSlotWrapper(qt_slot_wrapper) = &ffi_item.item {
+        if let CppFfiItem::QtSlotWrapper(qt_slot_wrapper) = &ffi_item.item.item {
             any_slot_wrappers = true;
-            let condition = ffi_item.checks.condition(environments);
+            let condition = ffi_item.item.checks.condition(environments);
             let code = self::qt_slot_wrapper(qt_slot_wrapper)?;
             write!(cpp_file, "{}", wrap_with_condition(&code, &condition))?;
         }
@@ -352,11 +352,11 @@ pub fn generate_cpp_file(
 
     writeln!(cpp_file, "extern \"C\" {{")?;
     for ffi_item in ffi_items {
-        if !ffi_item.checks.any_success() {
+        if !ffi_item.item.checks.any_success() {
             continue;
         }
-        if let CppFfiItem::Function(cpp_ffi_function) = &ffi_item.item {
-            let condition = ffi_item.checks.condition(environments);
+        if let CppFfiItem::Function(cpp_ffi_function) = &ffi_item.item.item {
+            let condition = ffi_item.item.checks.condition(environments);
             let code = function_implementation(cpp_ffi_function)?;
             writeln!(cpp_file, "{}", wrap_with_condition(&code, &condition))?;
         }
@@ -376,7 +376,7 @@ pub fn generate_cpp_file(
 /// on the current platform and outputs the Rust code for `sized_types.rs` module
 /// to the standard output.
 pub fn generate_cpp_type_size_requester(
-    rust_items: &[RustDatabaseItem],
+    rust_items: &[&RustItem],
     include_directives: &[PathBuf],
     mut output: impl Write,
 ) -> Result<()> {
@@ -386,7 +386,7 @@ pub fn generate_cpp_type_size_requester(
     writeln!(output, "#include <stdio.h>\n\nint main() {{")?;
 
     for item in rust_items {
-        if let RustItem::Struct(data) = &item.item {
+        if let RustItem::Struct(data) = item {
             if let RustStructKind::SizedType(sized_type) = &data.kind {
                 let cpp_path_code = sized_type.cpp_path.to_cpp_code()?;
 

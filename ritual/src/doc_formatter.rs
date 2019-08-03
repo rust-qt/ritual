@@ -250,7 +250,7 @@ pub fn function_doc(function: &RustFunction) -> String {
             }
         }
         // FFI functions are private
-        RustFunctionKind::FfiFunction(_) => {}
+        RustFunctionKind::FfiFunction => {}
     }
     // TODO: somehow handle docs for inherited methods (currently only for virtual functions).
 

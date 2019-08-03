@@ -10,7 +10,6 @@ pub fn detect_signal_argument_types(data: &mut ProcessorData<'_>) -> Result<Hash
     for method in data
         .current_database
         .cpp_items()
-        .iter()
         .filter_map(|i| i.item.as_function_ref())
     {
         if let Some(method_info) = &method.member {

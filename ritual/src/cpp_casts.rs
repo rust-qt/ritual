@@ -2,6 +2,7 @@ use crate::cpp_data::{CppBaseSpecifier, CppItem, CppPath, CppPathItem};
 use crate::cpp_ffi_data::CppCast;
 use crate::cpp_function::{CppFunction, CppFunctionArgument, CppFunctionDoc};
 use crate::cpp_type::{CppPointerLikeTypeKind, CppType};
+use crate::database::ItemWithSource;
 use crate::processor::ProcessorData;
 use ritual_common::errors::Result;
 
@@ -101,15 +102,22 @@ fn generate_casts(base: &CppBaseSpecifier, data: &ProcessorData<'_>) -> Result<V
 
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut results = Vec::new();
-    for item in data.current_database.cpp_items() {
-        if let CppItem::ClassBase(base) = &item.item {
-            for data in generate_casts(base, &data)? {
-                results.push((item.source_id, data));
-            }
+    let bases = data
+        .current_database
+        .cpp_items()
+        .filter_map(|item| item.filter_map(|item| item.as_base_ref()));
+
+    for item in bases {
+        for value in generate_casts(item.item, &data)? {
+            results.push(ItemWithSource {
+                source_id: item.id,
+                value,
+            });
         }
     }
-    for (source_ffi_item, item) in results {
-        data.current_database.add_cpp_item(source_ffi_item, item)?;
+    for item in results {
+        data.current_database
+            .add_cpp_item(Some(item.source_id), item.value)?;
     }
     Ok(())
 }

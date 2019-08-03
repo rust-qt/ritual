@@ -11,7 +11,7 @@ use crate::cpp_type::{
     CppBuiltInNumericType, CppFunctionPointerType, CppPointerLikeTypeKind, CppSpecificNumericType,
     CppSpecificNumericTypeKind, CppType,
 };
-use crate::database::{CppItemId, FfiItemId};
+use crate::database::ItemId;
 use crate::processor::ProcessorData;
 use clang::diagnostic::{Diagnostic, Severity};
 use clang::*;
@@ -23,7 +23,6 @@ use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use ritual_common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
 use ritual_common::target::{current_target, LibraryTarget};
 use std::io::Write;
-use std::iter::once;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -55,7 +54,7 @@ fn convert_type_kind(kind: TypeKind) -> CppBuiltInNumericType {
 
 #[derive(Debug)]
 pub struct CppParserOutputItem {
-    pub id: CppItemId,
+    pub id: ItemId,
     /// File name of the include file (without full path)
     pub include_file: String,
     /// Exact location of the declaration
@@ -70,7 +69,7 @@ pub struct CppParserOutput(pub Vec<CppParserOutputItem>);
 struct CppParser<'b, 'a: 'b> {
     data: &'b mut ProcessorData<'a>,
     current_target_paths: Vec<PathBuf>,
-    source_id: Option<FfiItemId>,
+    source_id: Option<ItemId>,
     output: CppParserOutput,
 }
 
@@ -329,13 +328,13 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
     };
     for ffi_item_id in data.current_database.ffi_item_ids().collect_vec() {
         let ffi_item = data.current_database.ffi_item(ffi_item_id)?;
-        if !ffi_item.is_source_item() {
+        if !ffi_item.item.item.is_source_item() {
             continue;
         }
-        if !ffi_item.checks.is_success(&current_target) {
+        if !ffi_item.item.checks.is_success(&current_target) {
             continue;
         }
-        let code = ffi_item.source_item_cpp_code()?;
+        let code = ffi_item.item.item.source_item_cpp_code()?;
         let mut parser = CppParser {
             current_target_paths: vec![data.workspace.tmp_path()],
             source_id: Some(ffi_item_id),
@@ -382,18 +381,10 @@ impl CppParser<'_, '_> {
         &self,
         mut f: impl FnMut(&CppTypeDeclaration) -> bool,
     ) -> Option<&CppTypeDeclaration> {
-        let databases =
-            once(self.data.current_database as &_).chain(self.data.dep_databases.iter());
-        for database in databases {
-            for item in database.cpp_items() {
-                if let CppItem::Type(info) = &item.item {
-                    if f(info) {
-                        return Some(info);
-                    }
-                }
-            }
-        }
-        None
+        self.data
+            .all_cpp_items()
+            .filter_map(|item| item.item.as_type_ref())
+            .find(|i| f(i))
     }
 
     /// Attempts to parse an unexposed type, i.e. a type the used `clang` API

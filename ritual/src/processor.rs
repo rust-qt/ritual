@@ -1,6 +1,6 @@
 use crate::config::Config;
-use crate::cpp_checker::apply_blacklist_to_checks;
-use crate::database::{CppDatabaseItem, CppFfiDatabaseItem, Database};
+use crate::cpp_data::CppItem;
+use crate::database::{CppFfiItemData, Database, DbItem};
 use crate::workspace::Workspace;
 use crate::{
     cpp_casts, cpp_checker, cpp_ffi_generator, cpp_implicit_methods, cpp_omitting_arguments,
@@ -69,15 +69,15 @@ impl<'a> ProcessorData<'a> {
     pub fn all_databases(&self) -> impl Iterator<Item = &Database> {
         once(&self.current_database as &_).chain(self.dep_databases.iter())
     }
-    pub fn all_cpp_items(&self) -> impl Iterator<Item = &CppDatabaseItem> {
+    pub fn all_cpp_items(&self) -> impl Iterator<Item = DbItem<&CppItem>> {
         once(&self.current_database as &_)
             .chain(self.dep_databases.iter())
-            .flat_map(|d| d.cpp_items().iter())
+            .flat_map(|d| d.cpp_items())
     }
-    pub fn all_ffi_items(&self) -> impl Iterator<Item = &CppFfiDatabaseItem> {
+    pub fn all_ffi_items(&self) -> impl Iterator<Item = DbItem<&CppFfiItemData>> {
         once(&self.current_database as &_)
             .chain(self.dep_databases.iter())
-            .flat_map(|d| d.ffi_items().iter())
+            .flat_map(|d| d.ffi_items())
     }
 }
 
@@ -152,7 +152,6 @@ impl Default for ProcessingSteps {
             data.current_database.clear_cpp_checks();
             Ok(())
         });
-        s.add_custom("apply_blacklist_to_checks", apply_blacklist_to_checks);
         s.add_custom("clear_rust_info", |data| {
             data.current_database.clear_rust_info();
             Ok(())
@@ -248,9 +247,9 @@ fn show_non_portable(data: &mut ProcessorData<'_>) -> Result<()> {
     let all_envs = data.current_database.environments();
     let mut results = HashMap::<_, Vec<_>>::new();
     for item in data.current_database.ffi_items() {
-        if item.checks.any_success() && !item.checks.all_success(all_envs) {
-            let envs = item.checks.successful_envs().collect_vec();
-            let text = item.item.short_text();
+        if item.item.checks.any_success() && !item.item.checks.all_success(all_envs) {
+            let envs = item.item.checks.successful_envs().collect_vec();
+            let text = item.item.item.short_text();
             results.entry(envs).or_default().push(text);
         }
     }

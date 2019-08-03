@@ -7,7 +7,7 @@ use log::{debug, error, trace};
 use regex::Regex;
 use ritual::cpp_data::{CppItem, CppPath, CppTypeDoc, CppVisibility};
 use ritual::cpp_function::CppFunctionExternalDoc;
-use ritual::database::CppDatabaseItem;
+use ritual::database::DbItem;
 use ritual::processor::ProcessorData;
 use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use select::document::Document;
@@ -611,8 +611,11 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
 }
 
 /// Adds documentation from `data` to `cpp_methods`.
-fn find_methods_docs(items: &mut [CppDatabaseItem], data: &mut DocParser) -> Result<()> {
-    for item in items {
+fn find_methods_docs<'a>(
+    items: impl Iterator<Item = DbItem<&'a mut CppItem>>,
+    data: &mut DocParser,
+) -> Result<()> {
+    for mut item in items {
         if let CppItem::Function(cpp_method) = &mut item.item {
             if let Some(info) = &cpp_method.member {
                 if info.visibility == CppVisibility::Private {
@@ -673,7 +676,7 @@ pub fn parse_docs(
     let mut parser = DocParser::new(doc_data);
     find_methods_docs(data.current_database.cpp_items_mut(), &mut parser)?;
     let mut type_doc_cache = HashMap::new();
-    for item in data.current_database.cpp_items_mut() {
+    for mut item in data.current_database.cpp_items_mut() {
         let type_name = match &item.item {
             CppItem::Type(data) => data.path.clone(),
             CppItem::EnumValue(data) => data

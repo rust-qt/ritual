@@ -1,9 +1,9 @@
+use crate::cpp_code_generator;
 use crate::cpp_data::{CppClassField, CppPath};
 use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
 use crate::cpp_type::{CppBuiltInNumericType, CppFunctionPointerType, CppType};
-use crate::database::CppItemId;
 use itertools::Itertools;
-use ritual_common::errors::Result;
+use ritual_common::errors::{bail, Result};
 use serde_derive::{Deserialize, Serialize};
 
 /// Variation of a field accessor method
@@ -179,8 +179,6 @@ pub struct CppFfiFunction {
     pub path: CppPath,
 
     pub kind: CppFfiFunctionKind,
-
-    pub cpp_item_id: CppItemId,
 }
 
 impl CppFfiFunction {
@@ -222,11 +220,7 @@ impl CppFfiFunction {
         }
     }
 
-    pub fn has_same_source(&self, other: &Self) -> bool {
-        if self.cpp_item_id != other.cpp_item_id {
-            return false;
-        }
-
+    pub fn has_same_kind(&self, other: &Self) -> bool {
         match &self.kind {
             CppFfiFunctionKind::Function { .. } => {
                 if let CppFfiFunctionKind::Function { .. } = &other.kind {
@@ -376,11 +370,11 @@ impl CppFfiItem {
         }
     }
 
-    pub fn has_same_source(&self, other: &Self) -> bool {
+    pub fn has_same_kind(&self, other: &Self) -> bool {
         match self {
             CppFfiItem::Function(function) => {
                 if let CppFfiItem::Function(other_function) = other {
-                    function.has_same_source(other_function)
+                    function.has_same_kind(other_function)
                 } else {
                     false
                 }
@@ -395,10 +389,26 @@ impl CppFfiItem {
         }
     }
 
-    pub fn cpp_item_id(&self) -> Option<CppItemId> {
+    pub fn path(&self) -> &CppPath {
         match self {
-            CppFfiItem::Function(function) => Some(function.cpp_item_id),
-            CppFfiItem::QtSlotWrapper(_) => None,
+            CppFfiItem::Function(f) => &f.path,
+            CppFfiItem::QtSlotWrapper(s) => &s.class_path,
+        }
+    }
+
+    pub fn is_source_item(&self) -> bool {
+        match self {
+            CppFfiItem::Function(_) => false,
+            CppFfiItem::QtSlotWrapper(_) => true,
+        }
+    }
+
+    pub fn source_item_cpp_code(&self) -> Result<String> {
+        match self {
+            CppFfiItem::Function(_) => bail!("not a source item"),
+            CppFfiItem::QtSlotWrapper(slot_wrapper) => {
+                cpp_code_generator::qt_slot_wrapper(slot_wrapper)
+            }
         }
     }
 }

@@ -1,97 +1,153 @@
 use crate::cpp_checks::CppChecks;
-use crate::cpp_code_generator;
-use crate::cpp_data::{CppItem, CppPath};
+use crate::cpp_data::CppItem;
 use crate::cpp_ffi_data::CppFfiItem;
-use crate::rust_info::{RustDatabaseItem, RustItem};
+use crate::rust_info::RustItem;
 use crate::rust_type::RustPath;
 use log::{debug, info, trace};
-use ritual_common::errors::{bail, format_err, Result};
+use ritual_common::errors::{bail, err_msg, format_err, Result};
 use ritual_common::string_utils::ends_with_digit;
 use ritual_common::target::LibraryTarget;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CppFfiDatabaseItem {
-    pub id: FfiItemId,
+pub struct ItemWithSource<T> {
+    pub source_id: ItemId,
+    pub value: T,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct DbItem<T> {
+    pub id: ItemId,
+    pub source_id: Option<ItemId>,
+    pub item: T,
+}
+
+impl<T> DbItem<T> {
+    pub fn as_ref(&self) -> DbItem<&T> {
+        DbItem {
+            id: self.id,
+            source_id: self.source_id,
+            item: &self.item,
+        }
+    }
+
+    pub fn as_mut(&mut self) -> DbItem<&mut T> {
+        DbItem {
+            id: self.id,
+            source_id: self.source_id,
+            item: &mut self.item,
+        }
+    }
+
+    pub fn map<U, F>(self, mut func: F) -> DbItem<U>
+    where
+        F: FnMut(T) -> U,
+    {
+        DbItem {
+            id: self.id,
+            source_id: self.source_id,
+            item: func(self.item),
+        }
+    }
+
+    pub fn filter_map<U, F>(self, mut func: F) -> Option<DbItem<U>>
+    where
+        F: FnMut(T) -> Option<U>,
+    {
+        Some(DbItem {
+            id: self.id,
+            source_id: self.source_id,
+            item: func(self.item)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ItemId(u32);
+
+impl fmt::Display for ItemId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl ItemId {
+    pub fn from_u32(value: u32) -> Self {
+        ItemId(value)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CppFfiItemData {
+    // TODO: move checks to separate items
     pub item: CppFfiItem,
     pub checks: CppChecks,
 }
 
-impl CppFfiDatabaseItem {
-    pub fn path(&self) -> &CppPath {
-        match &self.item {
-            CppFfiItem::Function(f) => &f.path,
-            CppFfiItem::QtSlotWrapper(s) => &s.class_path,
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
+pub enum DatabaseItemData {
+    CppItem(CppItem),
+    FfiItem(CppFfiItemData),
+    RustItem(RustItem),
+}
+
+impl DatabaseItemData {
+    pub fn is_cpp_item(&self) -> bool {
+        if let DatabaseItemData::CppItem(_) = self {
+            true
+        } else {
+            false
         }
     }
-
-    pub fn is_source_item(&self) -> bool {
-        match &self.item {
-            CppFfiItem::Function(_) => false,
-            CppFfiItem::QtSlotWrapper(_) => true,
+    pub fn as_cpp_item(&self) -> Option<&CppItem> {
+        if let DatabaseItemData::CppItem(data) = self {
+            Some(data)
+        } else {
+            None
         }
     }
-
-    pub fn source_item_cpp_code(&self) -> Result<String> {
-        match &self.item {
-            CppFfiItem::Function(_) => bail!("not a source item"),
-            CppFfiItem::QtSlotWrapper(slot_wrapper) => {
-                cpp_code_generator::qt_slot_wrapper(slot_wrapper)
-            }
+    pub fn as_cpp_item_mut(&mut self) -> Option<&mut CppItem> {
+        if let DatabaseItemData::CppItem(data) = self {
+            Some(data)
+        } else {
+            None
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CppDatabaseItem {
-    pub id: CppItemId,
-    pub item: CppItem,
-    pub source_id: Option<FfiItemId>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct CppItemId(u32);
-
-impl fmt::Display for CppItemId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+    pub fn is_ffi_item(&self) -> bool {
+        if let DatabaseItemData::FfiItem(_) = self {
+            true
+        } else {
+            false
+        }
     }
-}
-
-impl CppItemId {
-    pub fn from_u32(value: u32) -> Self {
-        CppItemId(value)
+    pub fn as_ffi_item(&self) -> Option<&CppFfiItemData> {
+        if let DatabaseItemData::FfiItem(data) = self {
+            Some(data)
+        } else {
+            None
+        }
     }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct FfiItemId(u32);
-
-impl fmt::Display for FfiItemId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+    pub fn as_ffi_item_mut(&mut self) -> Option<&mut CppFfiItemData> {
+        if let DatabaseItemData::FfiItem(data) = self {
+            Some(data)
+        } else {
+            None
+        }
     }
-}
-
-impl FfiItemId {
-    pub fn from_u32(value: u32) -> Self {
-        FfiItemId(value)
+    pub fn is_rust_item(&self) -> bool {
+        if let DatabaseItemData::RustItem(_) = self {
+            true
+        } else {
+            false
+        }
     }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct RustItemId(u32);
-
-impl fmt::Display for RustItemId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl RustItemId {
-    pub fn from_u32(value: u32) -> Self {
-        RustItemId(value)
+    pub fn as_rust_item(&self) -> Option<&RustItem> {
+        if let DatabaseItemData::RustItem(data) = self {
+            Some(data)
+        } else {
+            None
+        }
     }
 }
 
@@ -99,9 +155,7 @@ impl RustItemId {
 pub struct Data {
     crate_name: String,
     crate_version: String,
-    cpp_items: Vec<CppDatabaseItem>,
-    ffi_items: Vec<CppFfiDatabaseItem>,
-    rust_items: Vec<RustDatabaseItem>,
+    items: Vec<DbItem<DatabaseItemData>>,
     targets: Vec<LibraryTarget>,
     next_id: u32,
 }
@@ -139,9 +193,7 @@ impl Database {
             data: Data {
                 crate_name: crate_name.clone(),
                 crate_version: "0.0.0".into(),
-                cpp_items: Vec::new(),
-                ffi_items: Vec::new(),
-                rust_items: Vec::new(),
+                items: Vec::new(),
                 targets: Vec::new(),
                 next_id: 1,
             },
@@ -158,100 +210,136 @@ impl Database {
         self.is_modified = false;
     }
 
-    pub fn cpp_items(&self) -> &[CppDatabaseItem] {
-        &self.data.cpp_items
+    pub fn items(&self) -> impl Iterator<Item = DbItem<&DatabaseItemData>> {
+        self.data.items.iter().map(|item| item.as_ref())
+    }
+    pub fn items_mut(&mut self) -> impl Iterator<Item = DbItem<&mut DatabaseItemData>> {
+        self.data.items.iter_mut().map(|item| item.as_mut())
+    }
+    pub fn cpp_items(&self) -> impl Iterator<Item = DbItem<&CppItem>> {
+        self.items()
+            .filter_map(|item| item.filter_map(|v| v.as_cpp_item()))
+    }
+    pub fn cpp_items_mut(&mut self) -> impl Iterator<Item = DbItem<&mut CppItem>> {
+        self.items_mut()
+            .filter_map(|item| item.filter_map(|v| v.as_cpp_item_mut()))
     }
 
-    pub fn cpp_item_ids<'a>(&'a self) -> impl Iterator<Item = CppItemId> + 'a {
-        self.data.cpp_items.iter().map(|item| item.id)
+    pub fn ffi_items(&self) -> impl Iterator<Item = DbItem<&CppFfiItemData>> {
+        self.items()
+            .filter_map(|item| item.filter_map(|v| v.as_ffi_item()))
+    }
+    pub fn ffi_items_mut(&mut self) -> impl Iterator<Item = DbItem<&mut CppFfiItemData>> {
+        self.items_mut()
+            .filter_map(|item| item.filter_map(|v| v.as_ffi_item_mut()))
     }
 
-    pub fn ffi_item_ids<'a>(&'a self) -> impl Iterator<Item = FfiItemId> + 'a {
-        self.data.ffi_items.iter().map(|item| item.id)
+    pub fn rust_items(&self) -> impl Iterator<Item = DbItem<&RustItem>> {
+        self.items()
+            .filter_map(|item| item.filter_map(|v| v.as_rust_item()))
     }
 
-    pub fn cpp_items_mut(&mut self) -> &mut [CppDatabaseItem] {
-        self.is_modified = true;
-        &mut self.data.cpp_items
+    pub fn cpp_item_ids<'a>(&'a self) -> impl Iterator<Item = ItemId> + 'a {
+        self.cpp_items().map(|item| item.id)
     }
 
-    pub fn cpp_item(&self, id: CppItemId) -> Result<&CppDatabaseItem> {
-        match self
-            .data
-            .cpp_items
-            .binary_search_by_key(&id, |item| item.id)
-        {
-            Ok(index) => Ok(&self.data.cpp_items[index]),
-            Err(_) => bail!("invalid cpp item id: {}", id),
+    pub fn ffi_item_ids<'a>(&'a self) -> impl Iterator<Item = ItemId> + 'a {
+        self.ffi_items().map(|item| item.id)
+    }
+
+    pub fn rust_item_ids<'a>(&'a self) -> impl Iterator<Item = ItemId> + 'a {
+        self.rust_items().map(|item| item.id)
+    }
+
+    pub fn item(&self, id: ItemId) -> Result<DbItem<&DatabaseItemData>> {
+        match self.data.items.binary_search_by_key(&id, |item| item.id) {
+            Ok(index) => Ok(self.data.items[index].as_ref()),
+            Err(_) => bail!("invalid item id: {}", id),
         }
     }
 
-    pub fn cpp_item_mut(&mut self, id: CppItemId) -> Result<&mut CppDatabaseItem> {
-        match self
-            .data
-            .cpp_items
-            .binary_search_by_key(&id, |item| item.id)
-        {
-            Ok(index) => Ok(&mut self.data.cpp_items[index]),
-            Err(_) => bail!("invalid cpp item id: {}", id),
+    // TODO: try to remove this
+    pub fn item_mut(&mut self, id: ItemId) -> Result<DbItem<&mut DatabaseItemData>> {
+        match self.data.items.binary_search_by_key(&id, |item| item.id) {
+            Ok(index) => {
+                self.is_modified = true;
+                Ok(self.data.items[index].as_mut())
+            }
+            Err(_) => bail!("invalid item id: {}", id),
         }
     }
 
-    pub fn ffi_item(&self, id: FfiItemId) -> Result<&CppFfiDatabaseItem> {
-        match self
-            .data
-            .ffi_items
-            .binary_search_by_key(&id, |item| item.id)
-        {
-            Ok(index) => Ok(&self.data.ffi_items[index]),
-            Err(_) => bail!("invalid ffi item id: {}", id),
+    pub fn cpp_item(&self, id: ItemId) -> Result<DbItem<&CppItem>> {
+        self.item(id)?
+            .filter_map(|v| v.as_cpp_item())
+            .ok_or_else(|| err_msg("not a cpp item"))
+    }
+
+    pub fn cpp_item_mut(&mut self, id: ItemId) -> Result<DbItem<&mut CppItem>> {
+        self.item_mut(id)?
+            .filter_map(|v| v.as_cpp_item_mut())
+            .ok_or_else(|| err_msg("not a cpp item"))
+    }
+
+    pub fn ffi_item(&self, id: ItemId) -> Result<DbItem<&CppFfiItemData>> {
+        self.item(id)?
+            .filter_map(|v| v.as_ffi_item())
+            .ok_or_else(|| err_msg("not a ffi item"))
+    }
+
+    pub fn ffi_item_mut(&mut self, id: ItemId) -> Result<DbItem<&mut CppFfiItemData>> {
+        self.item_mut(id)?
+            .filter_map(|v| v.as_ffi_item_mut())
+            .ok_or_else(|| err_msg("not a ffi item"))
+    }
+
+    pub fn rust_item(&self, id: ItemId) -> Result<DbItem<&RustItem>> {
+        self.item(id)?
+            .filter_map(|v| v.as_rust_item())
+            .ok_or_else(|| err_msg("not a rust item"))
+    }
+
+    pub fn source_ffi_item(&self, id: ItemId) -> Result<Option<DbItem<&CppFfiItemData>>> {
+        let mut current_item = self.item(id)?;
+        loop {
+            let new_id = if let Some(id) = current_item.source_id {
+                id
+            } else {
+                return Ok(None);
+            };
+            current_item = self.item(new_id)?;
+            if let Some(item) = current_item.filter_map(|i| i.as_ffi_item()) {
+                return Ok(Some(item));
+            }
         }
     }
 
-    pub fn ffi_item_mut(&mut self, id: FfiItemId) -> Result<&mut CppFfiDatabaseItem> {
-        match self
-            .data
-            .ffi_items
-            .binary_search_by_key(&id, |item| item.id)
-        {
-            Ok(index) => Ok(&mut self.data.ffi_items[index]),
-            Err(_) => bail!("invalid ffi item id: {}", id),
-        }
-    }
-
-    pub fn ffi_items(&self) -> &[CppFfiDatabaseItem] {
-        &self.data.ffi_items
-    }
-
-    pub fn ffi_items_mut(&mut self) -> &mut [CppFfiDatabaseItem] {
-        self.is_modified = true;
-        &mut self.data.ffi_items
-    }
-
-    pub fn add_ffi_item(&mut self, item: CppFfiItem) -> Result<Option<FfiItemId>> {
+    pub fn add_ffi_item(
+        &mut self,
+        source_id: Option<ItemId>,
+        item: CppFfiItem,
+    ) -> Result<Option<ItemId>> {
         self.is_modified = true;
         if self
-            .data
-            .ffi_items
-            .iter()
-            .any(|i| i.item.has_same_source(&item))
+            .ffi_items()
+            .any(|other| other.source_id == source_id && other.item.item.has_same_kind(&item))
         {
             self.counters.items_ignored += 1;
             return Ok(None);
         }
 
-        let id = FfiItemId(self.data.next_id);
+        let id = ItemId(self.data.next_id);
         self.data.next_id += 1;
 
         debug!("added ffi item #{}: {}", id, item.short_text());
-        if let Some(id) = item.cpp_item_id() {
-            debug!("    for cpp item: {}", self.cpp_item(id)?.item);
-        }
         trace!("    ffi item data: {:?}", item);
-        self.data.ffi_items.push(CppFfiDatabaseItem {
+        self.data.items.push(DbItem {
             id,
-            item,
-            checks: CppChecks::default(),
+            source_id,
+            item: DatabaseItemData::FfiItem(CppFfiItemData {
+                item,
+                checks: CppChecks::default(),
+            }),
         });
         self.counters.items_added += 1;
         Ok(Some(id))
@@ -259,21 +347,27 @@ impl Database {
 
     pub fn clear(&mut self) {
         self.is_modified = true;
-        self.data.cpp_items.clear();
+        self.data.items.clear();
         self.data.targets.clear();
     }
 
     pub fn clear_ffi(&mut self) {
         self.is_modified = true;
-        self.data.ffi_items.clear();
-        self.data.cpp_items.retain(|item| item.source_id.is_none());
-        // TODO: deal with rust items that now have invalid index references
+        self.data.items.retain(|item| !item.item.is_ffi_item());
+        self.collect_garbage();
+    }
+
+    fn collect_garbage(&mut self) {
+        // remove items with dead source
+        unimplemented!()
     }
 
     pub fn clear_cpp_checks(&mut self) {
         self.is_modified = true;
-        for item in &mut self.data.ffi_items {
-            item.checks.clear();
+        for item in &mut self.data.items {
+            if let Some(item) = item.item.as_ffi_item_mut() {
+                item.checks.clear();
+            }
         }
     }
 
@@ -294,36 +388,32 @@ impl Database {
 
     pub fn add_cpp_item(
         &mut self,
-        source_ffi_item: Option<FfiItemId>,
+        source_id: Option<ItemId>,
         data: CppItem,
-    ) -> Result<Option<CppItemId>> {
-        if self
-            .data
-            .cpp_items
-            .iter_mut()
-            .any(|item| item.item.is_same(&data))
-        {
+    ) -> Result<Option<ItemId>> {
+        if self.cpp_items().any(|item| item.item.is_same(&data)) {
             self.counters.items_ignored += 1;
             return Ok(None);
         }
         self.is_modified = true;
-        let id = CppItemId(self.data.next_id);
+        let id = ItemId(self.data.next_id);
         self.data.next_id += 1;
         debug!("added cpp item #{}: {}", id, data);
-        let item = CppDatabaseItem {
+        let item = DbItem {
             id,
-            item: data,
-            source_id: source_ffi_item,
+            source_id,
+            item: DatabaseItemData::CppItem(data),
         };
         trace!("    cpp item data: {:?}", item);
-        self.data.cpp_items.push(item);
+        self.data.items.push(item);
         self.counters.items_added += 1;
         Ok(Some(id))
     }
 
     pub fn clear_rust_info(&mut self) {
         self.is_modified = true;
-        self.data.rust_items.clear();
+        self.data.items.retain(|item| !item.item.is_rust_item());
+        self.collect_garbage();
     }
 
     pub fn add_environment(&mut self, env: LibraryTarget) {
@@ -337,28 +427,24 @@ impl Database {
         &self.data.targets
     }
 
-    pub fn find_rust_item(&self, path: &RustPath) -> Option<&RustDatabaseItem> {
-        self.data
-            .rust_items
-            .iter()
+    pub fn find_rust_item(&self, path: &RustPath) -> Option<DbItem<&RustItem>> {
+        self.rust_items()
             .find(|item| item.item.path() == Some(path))
     }
 
     pub fn rust_children<'a>(
         &'a self,
         path: &'a RustPath,
-    ) -> impl Iterator<Item = &'a RustDatabaseItem> {
-        self.data
-            .rust_items
-            .iter()
+    ) -> impl Iterator<Item = DbItem<&RustItem>> {
+        self.rust_items()
             .filter(move |item| item.item.is_child_of(path))
     }
 
-    pub fn rust_items(&self) -> &[RustDatabaseItem] {
-        &self.data.rust_items
-    }
-
-    pub fn add_rust_item(&mut self, item: RustItem) -> Result<Option<RustItemId>> {
+    pub fn add_rust_item(
+        &mut self,
+        source_id: Option<ItemId>,
+        item: RustItem,
+    ) -> Result<Option<ItemId>> {
         self.is_modified = true;
         if item.is_crate_root() {
             let item_path = item.path().expect("crate root must have path");
@@ -387,27 +473,23 @@ impl Database {
         }
 
         if self
-            .data
-            .rust_items
-            .iter()
-            .any(|other| other.item.has_same_source(&item))
+            .rust_items()
+            .any(|other| other.source_id == source_id && other.item.has_same_kind(&item))
         {
             self.counters.items_ignored += 1;
             return Ok(None);
         }
 
-        let id = RustItemId(self.data.next_id);
+        let id = ItemId(self.data.next_id);
         self.data.next_id += 1;
 
         debug!("added rust item #{}: {}", id, item.short_text());
-        if let Some(id) = item.cpp_item_id() {
-            debug!("    for cpp item: {}", self.cpp_item(id)?.item);
-        }
-        if let Some(id) = item.ffi_item_id() {
-            debug!("    for ffi item: {}", self.ffi_item(id)?.item.short_text());
-        }
         trace!("    rust item data: {:?}", item);
-        self.data.rust_items.push(RustDatabaseItem { id, item });
+        self.data.items.push(DbItem {
+            id,
+            source_id,
+            item: DatabaseItemData::RustItem(item),
+        });
         self.counters.items_added += 1;
         Ok(Some(id))
     }

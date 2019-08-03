@@ -121,7 +121,6 @@ pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
             for type1 in data
                 .current_database
                 .cpp_items()
-                .iter()
                 .filter_map(|item| item.item.as_type_ref())
             {
                 let is_suitable = type1.path.parent().ok() == path.parent().ok()

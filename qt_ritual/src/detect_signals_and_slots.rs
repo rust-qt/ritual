@@ -117,7 +117,7 @@ pub fn detect_signals_and_slots(
     }
 
     for item in &output.0 {
-        let cpp_item = data.current_database.cpp_item_mut(item.id)?;
+        let mut cpp_item = data.current_database.cpp_item_mut(item.id)?;
         if let CppItem::Function(method) = &mut cpp_item.item {
             let mut section_type = SectionType::Other;
             if let Ok(class_name) = method.class_type() {

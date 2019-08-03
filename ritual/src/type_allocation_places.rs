@@ -1,29 +1,12 @@
 #![allow(dead_code)]
 
 use crate::config::MovableTypesHookOutput;
-use crate::cpp_data::{CppItem, CppPath, CppTypeDeclarationKind};
+use crate::cpp_data::{CppItem, CppPath};
 use crate::cpp_type::{CppPointerLikeTypeKind, CppType};
 use crate::processor::ProcessorData;
 use log::{info, trace};
 use ritual_common::errors::Result;
 use std::collections::HashMap;
-
-pub fn set_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
-    if let Some(hook) = data.config.movable_types_hook() {
-        for type1 in data
-            .current_database
-            .cpp_items_mut()
-            .iter_mut()
-            .filter_map(|item| item.item.as_type_mut())
-        {
-            if let CppTypeDeclarationKind::Class { is_movable, .. } = &mut type1.kind {
-                *is_movable = hook(&type1.path)? == MovableTypesHookOutput::Movable;
-            }
-        }
-    }
-
-    Ok(())
-}
 
 #[derive(Default, Debug)]
 struct TypeStats {
