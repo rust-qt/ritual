@@ -93,11 +93,14 @@ fn apply_instantiation_to_method(
 /// methods of existing template classes and existing template methods.
 pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut new_methods = Vec::new();
-    for method in data
-        .all_cpp_items()
-        .filter_map(|item| item.item.as_function_ref())
-    {
-        for type1 in method.all_involved_types() {
+    for item in data.all_cpp_items() {
+        let function = if let Some(f) = item.item.as_function_ref() {
+            f
+        } else {
+            continue;
+        };
+
+        for type1 in function.all_involved_types() {
             let path = match &type1 {
                 CppType::Class(class_type) => class_type,
                 CppType::PointerLike { target, .. } => match &**target {
@@ -106,75 +109,72 @@ pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
                 },
                 _ => continue,
             };
-            if let Some(template_arguments) = &path.last().template_arguments {
-                assert!(!template_arguments.is_empty());
-                if template_arguments
-                    .iter()
-                    .all(CppType::is_template_parameter)
-                {
-                    for type1 in data
-                        .current_database
-                        .cpp_items()
-                        .iter()
-                        .filter_map(|item| item.item.as_type_ref())
-                    {
-                        let is_suitable =
-                            type1.path.parent().ok() == path.parent().ok()
-                                && type1.path.last().name == path.last().name
-                                && type1.path.last().template_arguments.as_ref().map_or(
-                                    false,
-                                    |args| {
-                                        !args.iter().all(CppType::is_or_contains_template_parameter)
-                                    },
-                                );
+            let template_arguments = if let Some(args) = &path.last().template_arguments {
+                args
+            } else {
+                continue;
+            };
+            assert!(!template_arguments.is_empty());
+            if !template_arguments.iter().all(|t| t.is_template_parameter()) {
+                continue;
+            }
+            for type1 in data
+                .current_database
+                .cpp_items()
+                .iter()
+                .filter_map(|item| item.item.as_type_ref())
+            {
+                let is_suitable = type1.path.parent().ok() == path.parent().ok()
+                    && type1.path.last().name == path.last().name
+                    && type1
+                        .path
+                        .last()
+                        .template_arguments
+                        .as_ref()
+                        .map_or(false, |args| {
+                            !args.iter().all(CppType::is_or_contains_template_parameter)
+                        });
 
-                        if is_suitable {
-                            let nested_level =
-                                if let CppType::TemplateParameter { nested_level, .. } =
-                                    template_arguments[0]
-                                {
-                                    nested_level
-                                } else {
-                                    bail!("only template parameters can be here");
-                                };
-                            trace!("method: {}", method.short_text());
-                            trace!(
-                                "found template instantiation: {}",
-                                type1.path.to_cpp_pseudo_code()
-                            );
-                            match apply_instantiation_to_method(method, nested_level, &type1.path) {
-                                Ok(method) => {
-                                    let mut ok = true;
-                                    for type1 in method.all_involved_types() {
-                                        match check_template_type(&data, &type1) {
-                                            Ok(_) => {}
-                                            Err(msg) => {
-                                                ok = false;
-                                                trace!(
-                                                    "method is not accepted: {}",
-                                                    method.short_text()
-                                                );
-                                                trace!("  {}", msg);
-                                            }
-                                        }
-                                    }
-                                    if ok {
-                                        new_methods.push(method);
-                                    }
+                if !is_suitable {
+                    continue;
+                }
+                let nested_level = if let CppType::TemplateParameter { nested_level, .. } =
+                    template_arguments[0]
+                {
+                    nested_level
+                } else {
+                    bail!("only template parameters can be here");
+                };
+                trace!("method: {}", function.short_text());
+                trace!(
+                    "found template instantiation: {}",
+                    type1.path.to_cpp_pseudo_code()
+                );
+                match apply_instantiation_to_method(function, nested_level, &type1.path) {
+                    Ok(method) => {
+                        let mut ok = true;
+                        for type1 in method.all_involved_types() {
+                            match check_template_type(&data, &type1) {
+                                Ok(_) => {}
+                                Err(msg) => {
+                                    ok = false;
+                                    trace!("method is not accepted: {}", method.short_text());
+                                    trace!("  {}", msg);
                                 }
-                                Err(msg) => trace!("failed: {}", msg),
                             }
                         }
+                        if ok {
+                            new_methods.push((method, item.source_id));
+                        }
                     }
+                    Err(msg) => trace!("failed: {}", msg),
                 }
             }
         }
     }
-    for item in new_methods {
-        data.current_database.add_cpp_item(
-            None, // TODO: what is the source ffi item?
-            CppItem::Function(item),
-        )?;
+    for (item, source_id) in new_methods {
+        data.current_database
+            .add_cpp_item(source_id, CppItem::Function(item))?;
     }
     Ok(())
 }

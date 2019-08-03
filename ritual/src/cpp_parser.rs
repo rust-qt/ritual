@@ -70,7 +70,7 @@ pub struct CppParserOutput(pub Vec<CppParserOutputItem>);
 struct CppParser<'b, 'a: 'b> {
     data: &'b mut ProcessorData<'a>,
     current_target_paths: Vec<PathBuf>,
-    source_ffi_item: Option<FfiItemId>,
+    source_id: Option<FfiItemId>,
     output: CppParserOutput,
 }
 
@@ -308,7 +308,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     debug!("Initializing clang");
     let mut parser = CppParser {
         current_target_paths: data.config.target_include_paths().to_vec(),
-        source_ffi_item: None,
+        source_id: None,
         data,
         output: Default::default(),
     };
@@ -338,7 +338,7 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
         let code = ffi_item.source_item_cpp_code()?;
         let mut parser = CppParser {
             current_target_paths: vec![data.workspace.tmp_path()],
-            source_ffi_item: Some(ffi_item_id),
+            source_id: Some(ffi_item_id),
             data,
             output: Default::default(),
         };
@@ -365,7 +365,7 @@ impl CppParser<'_, '_> {
         if let Some(id) = self
             .data
             .current_database
-            .add_cpp_item(self.source_ffi_item, item)?
+            .add_cpp_item(self.source_id, item)?
         {
             self.output.0.push(CppParserOutputItem {
                 include_file,
