@@ -70,14 +70,10 @@ impl<'a> ProcessorData<'a> {
         once(&self.current_database as &_).chain(self.dep_databases.iter())
     }
     pub fn all_cpp_items(&self) -> impl Iterator<Item = DbItem<&CppItem>> {
-        once(&self.current_database as &_)
-            .chain(self.dep_databases.iter())
-            .flat_map(|d| d.cpp_items())
+        self.all_databases().flat_map(|d| d.cpp_items())
     }
     pub fn all_ffi_items(&self) -> impl Iterator<Item = DbItem<&CppFfiItemData>> {
-        once(&self.current_database as &_)
-            .chain(self.dep_databases.iter())
-            .flat_map(|d| d.ffi_items())
+        self.all_databases().flat_map(|d| d.ffi_items())
     }
 }
 
@@ -145,15 +141,17 @@ impl Default for ProcessingSteps {
         s.push("build_crate", build_crate);
 
         s.add_custom("clear_ffi", |data| {
-            data.current_database.clear_ffi();
+            data.current_database.delete_items(|i| i.item.is_ffi_item());
             Ok(())
         });
         s.add_custom("clear_cpp_checks", |data| {
-            data.current_database.clear_cpp_checks();
+            data.current_database
+                .delete_items(|i| i.item.is_cpp_checks_item());
             Ok(())
         });
         s.add_custom("clear_rust_info", |data| {
-            data.current_database.clear_rust_info();
+            data.current_database
+                .delete_items(|i| i.item.is_rust_item());
             Ok(())
         });
         s.add_custom("show_non_portable", show_non_portable);
@@ -247,8 +245,9 @@ fn show_non_portable(data: &mut ProcessorData<'_>) -> Result<()> {
     let all_envs = data.current_database.environments();
     let mut results = HashMap::<_, Vec<_>>::new();
     for item in data.current_database.ffi_items() {
-        if item.item.checks.any_success() && !item.item.checks.all_success(all_envs) {
-            let envs = item.item.checks.successful_envs().collect_vec();
+        let checks = data.current_database.cpp_checks(item.id);
+        if checks.any_success() && !checks.all_success(all_envs) {
+            let envs = checks.successful_envs().cloned().collect_vec();
             let text = item.item.item.short_text();
             results.entry(envs).or_default().push(text);
         }

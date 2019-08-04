@@ -7,14 +7,14 @@ use crate::cpp_ffi_data::{CppFfiFunction, CppFfiItem};
 use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
-use crate::database::{CppFfiItemData, DbItem};
+use crate::database::Database;
 use crate::rust_info::{RustItem, RustStructKind};
 use itertools::Itertools;
 use ritual_common::cpp_lib_builder::version_to_number;
 use ritual_common::errors::{bail, err_msg, Result};
 use ritual_common::file_utils::{create_file, os_str_to_str, path_to_str};
-use ritual_common::target::LibraryTarget;
 use ritual_common::utils::MapIfOk;
+use std::collections::HashSet;
 use std::io::Write;
 use std::iter::once;
 use std::path::{Path, PathBuf};
@@ -328,42 +328,57 @@ fn wrap_with_condition(code: &str, condition: &Condition) -> String {
 
 /// Generates a source file with the specified FFI methods.
 pub fn generate_cpp_file(
-    ffi_items: &[DbItem<&CppFfiItemData>],
-    environments: &[LibraryTarget],
+    database: &Database,
     file_path: &Path,
     global_header_name: &str,
-    crate_name: &str,
 ) -> Result<()> {
     let mut cpp_file = create_file(file_path)?;
     writeln!(cpp_file, "#include \"{}\"", global_header_name)?;
 
+    let used_ffi_functions = database
+        .rust_items()
+        .filter_map(|item| item.item.as_function_ref())
+        .filter(|item| item.kind.is_ffi_function())
+        .map(|item| item.path.last())
+        .collect::<HashSet<&str>>();
+
+    let ffi_items = database
+        .ffi_items()
+        .filter(|item| {
+            !item.item.item.is_function()
+                || used_ffi_functions.contains(item.item.item.path().last().name.as_str())
+        })
+        .collect_vec();
+
     let mut any_slot_wrappers = false;
-    for ffi_item in ffi_items {
-        if !ffi_item.item.checks.any_success() {
+    for ffi_item in &ffi_items {
+        let checks = database.cpp_checks(ffi_item.id);
+        if !checks.any_success() {
             continue;
         }
         if let CppFfiItem::QtSlotWrapper(qt_slot_wrapper) = &ffi_item.item.item {
             any_slot_wrappers = true;
-            let condition = ffi_item.item.checks.condition(environments);
+            let condition = checks.condition(database.environments());
             let code = self::qt_slot_wrapper(qt_slot_wrapper)?;
             write!(cpp_file, "{}", wrap_with_condition(&code, &condition))?;
         }
     }
 
     writeln!(cpp_file, "extern \"C\" {{")?;
-    for ffi_item in ffi_items {
-        if !ffi_item.item.checks.any_success() {
+    for ffi_item in &ffi_items {
+        let checks = database.cpp_checks(ffi_item.id);
+        if !checks.any_success() {
             continue;
         }
         if let CppFfiItem::Function(cpp_ffi_function) = &ffi_item.item.item {
-            let condition = ffi_item.item.checks.condition(environments);
+            let condition = checks.condition(database.environments());
             let code = function_implementation(cpp_ffi_function)?;
             writeln!(cpp_file, "{}", wrap_with_condition(&code, &condition))?;
         }
     }
     writeln!(cpp_file, "}} // extern \"C\"")?;
 
-    if any_slot_wrappers && !crate_name.starts_with("moqt_") {
+    if any_slot_wrappers && !database.crate_name().starts_with("moqt_") {
         let stem = file_path
             .file_stem()
             .ok_or_else(|| err_msg("failed to get file stem"))?;

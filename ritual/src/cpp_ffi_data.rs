@@ -348,6 +348,14 @@ impl CppFfiItem {
         }
     }
 
+    pub fn as_slot_wrapper_ref(&self) -> Option<&QtSlotWrapper> {
+        if let CppFfiItem::QtSlotWrapper(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+
     pub fn is_slot_wrapper(&self) -> bool {
         if let CppFfiItem::QtSlotWrapper(_) = self {
             true

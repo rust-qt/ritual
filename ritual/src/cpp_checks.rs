@@ -3,7 +3,7 @@ use ritual_common::target::{Arch, Endian, Env, Family, LibraryTarget, PointerWid
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-struct CppChecksItem {
+pub struct CppChecksItem {
     pub env: LibraryTarget,
     pub is_success: bool,
 }
@@ -12,6 +12,10 @@ struct CppChecksItem {
 pub struct CppChecks(Vec<CppChecksItem>);
 
 impl CppChecks {
+    pub fn new(items: impl Iterator<Item = CppChecksItem>) -> Self {
+        Self(items.collect())
+    }
+
     pub fn clear(&mut self) {
         self.0.clear();
     }
@@ -36,11 +40,6 @@ impl CppChecks {
             .iter()
             .filter(|item| item.is_success)
             .map(|item| &item.env)
-    }
-
-    pub fn add(&mut self, env: LibraryTarget, is_success: bool) {
-        self.0.retain(|item| item.env != env);
-        self.0.push(CppChecksItem { env, is_success });
     }
 
     pub fn any_success(&self) -> bool {

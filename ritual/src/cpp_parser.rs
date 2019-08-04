@@ -331,7 +331,11 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
         if !ffi_item.item.item.is_source_item() {
             continue;
         }
-        if !ffi_item.item.checks.is_success(&current_target) {
+        if !data
+            .current_database
+            .cpp_checks(ffi_item_id)
+            .is_success(&current_target)
+        {
             continue;
         }
         let code = ffi_item.item.item.source_item_cpp_code()?;

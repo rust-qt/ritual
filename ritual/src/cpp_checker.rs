@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::cpp_checks::CppChecksItem;
 use crate::cpp_data::{CppItem, CppPath};
 use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFfiItem};
 use crate::cpp_type::CppType;
@@ -510,7 +511,8 @@ impl CppChecker<'_, '_> {
         let mut old_items_count = 0;
 
         for ffi_item in self.data.current_database.ffi_items() {
-            if ffi_item.item.checks.has_all_envs(library_targets) {
+            let checks = self.data.current_database.cpp_checks(ffi_item.id);
+            if checks.has_all_envs(library_targets) {
                 old_items_count += 1;
                 continue;
             }
@@ -518,7 +520,7 @@ impl CppChecker<'_, '_> {
             match snippet_for_item(ffi_item, &self.data.current_database) {
                 Ok(snippet) => {
                     for library_target in library_targets {
-                        if ffi_item.item.checks.has_env(library_target) {
+                        if checks.has_env(library_target) {
                             continue;
                         }
                         snippets.push(SnippetTask {
@@ -574,10 +576,14 @@ impl CppChecker<'_, '_> {
                     debug!("error: {}: {:?}", ffi_item.item.item.short_text(), output);
                     error_count += 1;
                 }
-                ffi_item
-                    .item
-                    .checks
-                    .add(snippet.data.library_target, output.is_success());
+                let ffi_item_id = ffi_item.id;
+                self.data.current_database.add_cpp_checks_item(
+                    ffi_item_id,
+                    CppChecksItem {
+                        env: snippet.data.library_target,
+                        is_success: output.is_success(),
+                    },
+                );
             } else {
                 error!("no output for item: {}", ffi_item.item.item.short_text());
             }
@@ -619,10 +625,13 @@ fn type_paths(type1: &CppType) -> Vec<&CppPath> {
 
 pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
     if let Some(hook) = data.config.ffi_generator_hook() {
-        for item in data.current_database.ffi_items_mut() {
-            if !item.item.checks.any_success() {
+        let ids = data.current_database.ffi_item_ids().collect_vec();
+        for id in ids {
+            let checks = data.current_database.cpp_checks(id);
+            if !checks.any_success() {
                 continue;
             }
+            let item = data.current_database.ffi_item(id)?;
             let allowed = if let CppFfiItem::Function(function) = &item.item.item {
                 match &function.kind {
                     CppFfiFunctionKind::Function { cpp_function, .. } => {
@@ -636,17 +645,20 @@ pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
                 true
             };
             if !allowed {
-                log::info!("Checks are cleared for {}", item.item.item.short_text());
-                item.item.checks.clear();
+                log::info!("Deleting item: {}", item.item.item.short_text());
+                data.current_database.delete_items(|i| i.id == id);
             }
         }
     }
 
     if let Some(hook) = data.config.cpp_parser_path_hook() {
-        for item in data.current_database.ffi_items_mut() {
-            if !item.item.checks.any_success() {
+        let ids = data.current_database.ffi_item_ids().collect_vec();
+        for id in ids {
+            let checks = data.current_database.cpp_checks(id);
+            if !checks.any_success() {
                 continue;
             }
+            let item = data.current_database.ffi_item(id)?;
             let (types, path) = match &item.item.item {
                 CppFfiItem::Function(function) => match &function.kind {
                     CppFfiFunctionKind::Function { cpp_function, .. } => (
@@ -669,8 +681,8 @@ pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
                 .any(|x| !x);
 
             if any_blocked {
-                log::info!("Checks are cleared for {}", item.item.item.short_text());
-                item.item.checks.clear();
+                log::info!("Deleting item: {}", item.item.item.short_text());
+                data.current_database.delete_items(|i| i.id == id);
             }
         }
     }

@@ -12,7 +12,6 @@ use ritual_common::file_utils::{
 use ritual_common::toml;
 use ritual_common::utils::{run_command, MapIfOk};
 use ritual_common::BuildScriptData;
-use std::collections::HashSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -262,27 +261,10 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         data.config.include_directives(),
     )?;
 
-    let used_ffi_functions = data
-        .current_database
-        .rust_items()
-        .filter_map(|item| item.item.as_function_ref())
-        .filter(|item| item.kind.is_ffi_function())
-        .map(|item| item.path.last())
-        .collect::<HashSet<&str>>();
-
     cpp_code_generator::generate_cpp_file(
-        &data
-            .current_database
-            .ffi_items()
-            .filter(|item| {
-                !item.item.item.is_function()
-                    || used_ffi_functions.contains(item.item.item.path().last().name.as_str())
-            })
-            .collect_vec(),
-        data.current_database.environments(),
+        &data.current_database,
         &c_lib_path.join("file1.cpp"),
         &global_header_name,
-        data.current_database.crate_name(),
     )?;
 
     let file = create_file(c_lib_path.join("sized_types.cxx"))?;

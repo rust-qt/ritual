@@ -1,4 +1,4 @@
-use crate::cpp_checks::CppChecks;
+use crate::cpp_checks::{CppChecks, CppChecksItem};
 use crate::cpp_data::CppItem;
 use crate::cpp_ffi_data::CppFfiItem;
 use crate::rust_info::RustItem;
@@ -81,7 +81,6 @@ impl ItemId {
 pub struct CppFfiItemData {
     // TODO: move checks to separate items
     pub item: CppFfiItem,
-    pub checks: CppChecks,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -89,6 +88,7 @@ pub struct CppFfiItemData {
 pub enum DatabaseItemData {
     CppItem(CppItem),
     FfiItem(CppFfiItemData),
+    CppChecksItem(CppChecksItem),
     RustItem(RustItem),
 }
 
@@ -144,6 +144,27 @@ impl DatabaseItemData {
     }
     pub fn as_rust_item(&self) -> Option<&RustItem> {
         if let DatabaseItemData::RustItem(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+    pub fn is_cpp_checks_item(&self) -> bool {
+        if let DatabaseItemData::CppChecksItem(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+    pub fn as_cpp_checks_item(&self) -> Option<&CppChecksItem> {
+        if let DatabaseItemData::CppChecksItem(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+    pub fn as_cpp_checks_item_mut(&mut self) -> Option<&mut CppChecksItem> {
+        if let DatabaseItemData::CppChecksItem(data) = self {
             Some(data)
         } else {
             None
@@ -336,10 +357,7 @@ impl Database {
         self.data.items.push(DbItem {
             id,
             source_id,
-            item: DatabaseItemData::FfiItem(CppFfiItemData {
-                item,
-                checks: CppChecks::default(),
-            }),
+            item: DatabaseItemData::FfiItem(CppFfiItemData { item }),
         });
         self.counters.items_added += 1;
         Ok(Some(id))
@@ -351,24 +369,9 @@ impl Database {
         self.data.targets.clear();
     }
 
-    pub fn clear_ffi(&mut self) {
-        self.is_modified = true;
-        self.data.items.retain(|item| !item.item.is_ffi_item());
-        self.collect_garbage();
-    }
-
     fn collect_garbage(&mut self) {
         // remove items with dead source
         unimplemented!()
-    }
-
-    pub fn clear_cpp_checks(&mut self) {
-        self.is_modified = true;
-        for item in &mut self.data.items {
-            if let Some(item) = item.item.as_ffi_item_mut() {
-                item.checks.clear();
-            }
-        }
     }
 
     pub fn crate_name(&self) -> &str {
@@ -531,5 +534,50 @@ impl Database {
             }
         }
         self.counters = Counters::default();
+    }
+
+    pub fn add_cpp_checks_item(&mut self, source_id: ItemId, item: CppChecksItem) -> ItemId {
+        // we can't use `self.items_mut()` because of borrow checker
+        if let Some(old_item) = self
+            .data
+            .items
+            .iter_mut()
+            .map(|item| item.as_mut())
+            .filter_map(|i| i.filter_map(|i| i.as_cpp_checks_item_mut()))
+            .find(|i| i.source_id == Some(source_id) && i.item.env == item.env)
+        {
+            if *old_item.item != item {
+                *old_item.item = item;
+                self.counters.items_added += 1;
+            } else {
+                self.counters.items_ignored += 1;
+            }
+            return old_item.id;
+        }
+
+        let id = ItemId(self.data.next_id);
+        self.data.next_id += 1;
+
+        self.data.items.push(DbItem {
+            id,
+            source_id: Some(source_id),
+            item: DatabaseItemData::CppChecksItem(item),
+        });
+        self.counters.items_added += 1;
+        id
+    }
+
+    pub fn cpp_checks(&self, source_id: ItemId) -> CppChecks {
+        let items = self
+            .items()
+            .filter_map(|i| i.filter_map(|i| i.as_cpp_checks_item()))
+            .filter(move |i| i.source_id == Some(source_id))
+            .map(|i| i.item.clone());
+        CppChecks::new(items)
+    }
+
+    pub fn delete_items(&mut self, mut function: impl FnMut(DbItem<&DatabaseItemData>) -> bool) {
+        self.data.items.retain(|i| !function(i.as_ref()));
+        self.collect_garbage();
     }
 }

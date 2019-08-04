@@ -237,9 +237,9 @@ impl Generator<'_> {
 
         let mut condition_texts = ConditionTexts::default();
         if let Some(ffi_item) = ffi_item {
-            let condition = ffi_item
-                .item
-                .checks
+            let condition = self
+                .current_database
+                .cpp_checks(ffi_item.id)
                 .condition(self.current_database.environments());
             if condition != Condition::True {
                 let expression = condition_expression(&condition);

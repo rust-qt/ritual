@@ -427,8 +427,16 @@ impl State<'_, '_> {
         } else {
             bail!("not a pointer to class");
         };
-        let found = self.0.all_ffi_items().any(|item| {
-            if !item.item.checks.is_always_success_for(checks) || item.item.checks.is_empty() {
+
+        let mut all_ffi_items = self.0.all_databases().flat_map(|db| {
+            db.ffi_items().map(move |item| {
+                let item_checks = db.cpp_checks(item.id);
+                (item, item_checks)
+            })
+        });
+
+        let found = all_ffi_items.any(|(item, item_checks)| {
+            if !item_checks.is_always_success_for(checks) || item_checks.is_empty() {
                 return false;
             }
             if let CppFfiItem::Function(func) = &item.item.item {
@@ -1493,14 +1501,12 @@ impl State<'_, '_> {
     fn process_ffi_item(
         &self,
         ffi_item: &CppFfiItemData,
+        checks: &CppChecks,
         trait_types: &[TraitTypes],
     ) -> Result<Vec<ProcessedFfiItem>> {
-        if !ffi_item.checks.any_success() {
-            bail!("cpp checks failed");
-        }
         match &ffi_item.item {
             CppFfiItem::Function(cpp_ffi_function) => {
-                self.process_rust_function(cpp_ffi_function, &ffi_item.checks, trait_types)
+                self.process_rust_function(cpp_ffi_function, checks, trait_types)
             }
             CppFfiItem::QtSlotWrapper(_) => {
                 bail!("slot wrappers do not need to be processed here");
@@ -1535,14 +1541,14 @@ impl State<'_, '_> {
 
         let mut qt_slot_wrapper = None;
         if let Some(source_ffi_item) = self.0.current_database.source_ffi_item(item.id)? {
-            if let CppFfiItem::QtSlotWrapper(wrapper) = &source_ffi_item.item.item {
-                qt_slot_wrapper = Some((wrapper, &source_ffi_item.item.checks));
+            if let Some(item) = source_ffi_item.filter_map(|i| i.item.as_slot_wrapper_ref()) {
+                qt_slot_wrapper = Some(item);
             }
         }
 
-        let public_name_type = if let Some((wrapper, _)) = qt_slot_wrapper {
+        let public_name_type = if let Some(wrapper) = qt_slot_wrapper {
             NameType::QtSlotWrapper {
-                signal_arguments: &wrapper.signal_arguments,
+                signal_arguments: &wrapper.item.signal_arguments,
                 is_public: false,
             }
         } else {
@@ -1616,8 +1622,9 @@ impl State<'_, '_> {
         });
         rust_items.push(nested_types_rust_item);
 
-        if let Some((wrapper, checks)) = qt_slot_wrapper {
+        if let Some(wrapper) = qt_slot_wrapper {
             let arg_types = wrapper
+                .item
                 .arguments
                 .iter()
                 .map_if_ok(|t| self.ffi_type_to_rust_ffi_type(t.ffi_type()))?;
@@ -1625,7 +1632,7 @@ impl State<'_, '_> {
             let receiver_id = CppFunction::receiver_id_from_data(
                 RustQtReceiverType::Slot,
                 "custom_slot",
-                &wrapper.signal_arguments,
+                &wrapper.item.signal_arguments,
             )?;
 
             let impl_item = RustItem::ExtraImpl(RustExtraImpl {
@@ -1641,19 +1648,20 @@ impl State<'_, '_> {
             let closure_item_path = self.generate_rust_path(
                 &data.path,
                 NameType::QtSlotWrapper {
-                    signal_arguments: &wrapper.signal_arguments,
+                    signal_arguments: &wrapper.item.signal_arguments,
                     is_public: true,
                 },
             )?;
 
-            let public_args = wrapper.arguments.iter().map_if_ok(|arg| {
+            let checks = self.0.current_database.cpp_checks(wrapper.id);
+            let public_args = wrapper.item.arguments.iter().map_if_ok(|arg| {
                 self.rust_final_type(
                     arg,
                     // closure argument should be handled in the same way
                     // as return type (value is produced behind FFI)
                     &CppFfiArgumentMeaning::ReturnValue,
                     ReturnValueAllocationPlace::NotApplicable,
-                    Some(checks),
+                    Some(&checks),
                 )
             })?;
 
@@ -1661,7 +1669,7 @@ impl State<'_, '_> {
                 is_public: true,
                 kind: RustStructKind::QtSlotWrapper(RustQtSlotWrapper {
                     arguments: public_args,
-                    signal_arguments: wrapper.signal_arguments.clone(),
+                    signal_arguments: wrapper.item.signal_arguments.clone(),
                     raw_slot_wrapper: public_path,
                 }),
                 path: closure_item_path,
@@ -1675,7 +1683,12 @@ impl State<'_, '_> {
 
     fn process_cpp_item(&self, cpp_item: DbItem<&CppItem>) -> Result<Vec<RustItem>> {
         if let Some(ffi_item) = self.0.current_database.source_ffi_item(cpp_item.id)? {
-            if !ffi_item.item.checks.any_success() {
+            if !self
+                .0
+                .current_database
+                .cpp_checks(ffi_item.id)
+                .any_success()
+            {
                 bail!("cpp checks failed");
             }
         }
@@ -1922,7 +1935,15 @@ impl State<'_, '_> {
 
         for ffi_item_id in self.0.current_database.ffi_item_ids().collect_vec() {
             let ffi_item = self.0.current_database.ffi_item(ffi_item_id)?;
-            match self.process_ffi_item(ffi_item.item, &trait_types) {
+            let checks = self.0.current_database.cpp_checks(ffi_item_id);
+            if !checks.any_success() {
+                debug!(
+                    "skipping ffi item with failed checks: {}",
+                    ffi_item.item.item.short_text(),
+                );
+                continue;
+            }
+            match self.process_ffi_item(ffi_item.item, &checks, &trait_types) {
                 Ok(results) => {
                     for item in results {
                         match item {
