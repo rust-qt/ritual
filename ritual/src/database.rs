@@ -78,16 +78,10 @@ impl ItemId {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CppFfiItemData {
-    // TODO: move checks to separate items
-    pub item: CppFfiItem,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum DatabaseItemData {
     CppItem(CppItem),
-    FfiItem(CppFfiItemData),
+    FfiItem(CppFfiItem),
     CppChecksItem(CppChecksItem),
     RustItem(RustItem),
 }
@@ -121,14 +115,14 @@ impl DatabaseItemData {
             false
         }
     }
-    pub fn as_ffi_item(&self) -> Option<&CppFfiItemData> {
+    pub fn as_ffi_item(&self) -> Option<&CppFfiItem> {
         if let DatabaseItemData::FfiItem(data) = self {
             Some(data)
         } else {
             None
         }
     }
-    pub fn as_ffi_item_mut(&mut self) -> Option<&mut CppFfiItemData> {
+    pub fn as_ffi_item_mut(&mut self) -> Option<&mut CppFfiItem> {
         if let DatabaseItemData::FfiItem(data) = self {
             Some(data)
         } else {
@@ -246,11 +240,11 @@ impl Database {
             .filter_map(|item| item.filter_map(|v| v.as_cpp_item_mut()))
     }
 
-    pub fn ffi_items(&self) -> impl Iterator<Item = DbItem<&CppFfiItemData>> {
+    pub fn ffi_items(&self) -> impl Iterator<Item = DbItem<&CppFfiItem>> {
         self.items()
             .filter_map(|item| item.filter_map(|v| v.as_ffi_item()))
     }
-    pub fn ffi_items_mut(&mut self) -> impl Iterator<Item = DbItem<&mut CppFfiItemData>> {
+    pub fn ffi_items_mut(&mut self) -> impl Iterator<Item = DbItem<&mut CppFfiItem>> {
         self.items_mut()
             .filter_map(|item| item.filter_map(|v| v.as_ffi_item_mut()))
     }
@@ -302,13 +296,13 @@ impl Database {
             .ok_or_else(|| err_msg("not a cpp item"))
     }
 
-    pub fn ffi_item(&self, id: ItemId) -> Result<DbItem<&CppFfiItemData>> {
+    pub fn ffi_item(&self, id: ItemId) -> Result<DbItem<&CppFfiItem>> {
         self.item(id)?
             .filter_map(|v| v.as_ffi_item())
             .ok_or_else(|| err_msg("not a ffi item"))
     }
 
-    pub fn ffi_item_mut(&mut self, id: ItemId) -> Result<DbItem<&mut CppFfiItemData>> {
+    pub fn ffi_item_mut(&mut self, id: ItemId) -> Result<DbItem<&mut CppFfiItem>> {
         self.item_mut(id)?
             .filter_map(|v| v.as_ffi_item_mut())
             .ok_or_else(|| err_msg("not a ffi item"))
@@ -320,7 +314,7 @@ impl Database {
             .ok_or_else(|| err_msg("not a rust item"))
     }
 
-    pub fn source_ffi_item(&self, id: ItemId) -> Result<Option<DbItem<&CppFfiItemData>>> {
+    pub fn source_ffi_item(&self, id: ItemId) -> Result<Option<DbItem<&CppFfiItem>>> {
         let mut current_item = self.item(id)?;
         loop {
             let new_id = if let Some(id) = current_item.source_id {
@@ -343,7 +337,7 @@ impl Database {
         self.is_modified = true;
         if self
             .ffi_items()
-            .any(|other| other.source_id == source_id && other.item.item.has_same_kind(&item))
+            .any(|other| other.source_id == source_id && other.item.has_same_kind(&item))
         {
             self.counters.items_ignored += 1;
             return Ok(None);
@@ -357,7 +351,7 @@ impl Database {
         self.data.items.push(DbItem {
             id,
             source_id,
-            item: DatabaseItemData::FfiItem(CppFfiItemData { item }),
+            item: DatabaseItemData::FfiItem(item),
         });
         self.counters.items_added += 1;
         Ok(Some(id))

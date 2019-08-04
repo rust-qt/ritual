@@ -328,7 +328,7 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
     };
     for ffi_item_id in data.current_database.ffi_item_ids().collect_vec() {
         let ffi_item = data.current_database.ffi_item(ffi_item_id)?;
-        if !ffi_item.item.item.is_source_item() {
+        if !ffi_item.item.is_source_item() {
             continue;
         }
         if !data
@@ -338,7 +338,7 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
         {
             continue;
         }
-        let code = ffi_item.item.item.source_item_cpp_code()?;
+        let code = ffi_item.item.source_item_cpp_code()?;
         let mut parser = CppParser {
             current_target_paths: vec![data.workspace.tmp_path()],
             source_id: Some(ffi_item_id),

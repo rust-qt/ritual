@@ -110,7 +110,7 @@ impl FfiNameProvider {
         let names = data
             .current_database
             .ffi_items()
-            .map(|f| f.item.item.path().to_cpp_code().unwrap())
+            .map(|f| f.item.path().to_cpp_code().unwrap())
             .collect();
 
         FfiNameProvider { prefix, names }

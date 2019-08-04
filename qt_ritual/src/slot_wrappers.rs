@@ -58,7 +58,7 @@ pub fn add_slot_wrappers(data: &mut ProcessorData<'_>) -> Result<()> {
             .all_databases()
             .flat_map(Database::ffi_items)
             .any(|ffi_item| {
-                if let CppFfiItem::QtSlotWrapper(data) = &ffi_item.item.item {
+                if let CppFfiItem::QtSlotWrapper(data) = &ffi_item.item {
                     data.signal_arguments == arg_types
                 } else {
                     false

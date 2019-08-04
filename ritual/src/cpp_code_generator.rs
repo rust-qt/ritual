@@ -345,8 +345,8 @@ pub fn generate_cpp_file(
     let ffi_items = database
         .ffi_items()
         .filter(|item| {
-            !item.item.item.is_function()
-                || used_ffi_functions.contains(item.item.item.path().last().name.as_str())
+            !item.item.is_function()
+                || used_ffi_functions.contains(item.item.path().last().name.as_str())
         })
         .collect_vec();
 
@@ -356,7 +356,7 @@ pub fn generate_cpp_file(
         if !checks.any_success() {
             continue;
         }
-        if let CppFfiItem::QtSlotWrapper(qt_slot_wrapper) = &ffi_item.item.item {
+        if let CppFfiItem::QtSlotWrapper(qt_slot_wrapper) = &ffi_item.item {
             any_slot_wrappers = true;
             let condition = checks.condition(database.environments());
             let code = self::qt_slot_wrapper(qt_slot_wrapper)?;
@@ -370,7 +370,7 @@ pub fn generate_cpp_file(
         if !checks.any_success() {
             continue;
         }
-        if let CppFfiItem::Function(cpp_ffi_function) = &ffi_item.item.item {
+        if let CppFfiItem::Function(cpp_ffi_function) = &ffi_item.item {
             let condition = checks.condition(database.environments());
             let code = function_implementation(cpp_ffi_function)?;
             writeln!(cpp_file, "{}", wrap_with_condition(&code, &condition))?;

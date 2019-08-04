@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::cpp_data::CppItem;
-use crate::database::{CppFfiItemData, Database, DbItem};
+use crate::cpp_ffi_data::CppFfiItem;
+use crate::database::{Database, DbItem};
 use crate::workspace::Workspace;
 use crate::{
     cpp_casts, cpp_checker, cpp_ffi_generator, cpp_implicit_methods, cpp_omitting_arguments,
@@ -72,7 +73,7 @@ impl<'a> ProcessorData<'a> {
     pub fn all_cpp_items(&self) -> impl Iterator<Item = DbItem<&CppItem>> {
         self.all_databases().flat_map(|d| d.cpp_items())
     }
-    pub fn all_ffi_items(&self) -> impl Iterator<Item = DbItem<&CppFfiItemData>> {
+    pub fn all_ffi_items(&self) -> impl Iterator<Item = DbItem<&CppFfiItem>> {
         self.all_databases().flat_map(|d| d.ffi_items())
     }
 }
@@ -248,7 +249,7 @@ fn show_non_portable(data: &mut ProcessorData<'_>) -> Result<()> {
         let checks = data.current_database.cpp_checks(item.id);
         if checks.any_success() && !checks.all_success(all_envs) {
             let envs = checks.successful_envs().cloned().collect_vec();
-            let text = item.item.item.short_text();
+            let text = item.item.short_text();
             results.entry(envs).or_default().push(text);
         }
     }

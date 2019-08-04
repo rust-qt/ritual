@@ -3,7 +3,7 @@ use crate::cpp_checks::CppChecksItem;
 use crate::cpp_data::{CppItem, CppPath};
 use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFfiItem};
 use crate::cpp_type::CppType;
-use crate::database::{CppFfiItemData, Database, DbItem, ItemId};
+use crate::database::{Database, DbItem, ItemId};
 use crate::processor::ProcessorData;
 use crate::{cluster_api, cpp_code_generator};
 use itertools::Itertools;
@@ -32,8 +32,8 @@ use std::{iter, thread};
 
 pub const CHUNK_SIZE: usize = 64;
 
-fn snippet_for_item(item: DbItem<&CppFfiItemData>, database: &Database) -> Result<Snippet> {
-    match &item.item.item {
+fn snippet_for_item(item: DbItem<&CppFfiItem>, database: &Database) -> Result<Snippet> {
+    match &item.item {
         CppFfiItem::Function(cpp_ffi_function) => {
             let item_code = cpp_code_generator::function_implementation(cpp_ffi_function)?;
             let mut needs_moc = false;
@@ -41,20 +41,19 @@ fn snippet_for_item(item: DbItem<&CppFfiItemData>, database: &Database) -> Resul
             let source_ffi_item = database.source_ffi_item(item.id)?;
 
             let full_code = if let Some(source_ffi_item) = source_ffi_item {
-                if source_ffi_item.item.item.is_slot_wrapper() {
+                if source_ffi_item.item.is_slot_wrapper() {
                     needs_moc = true
                 }
-                let source_item_code = source_ffi_item.item.item.source_item_cpp_code()?;
+                let source_item_code = source_ffi_item.item.source_item_cpp_code()?;
                 format!("{}\n{}", source_item_code, item_code)
             } else {
                 item_code
             };
             Ok(Snippet::new_global(full_code, needs_moc))
         }
-        CppFfiItem::QtSlotWrapper(_) => Ok(Snippet::new_global(
-            item.item.item.source_item_cpp_code()?,
-            true,
-        )),
+        CppFfiItem::QtSlotWrapper(_) => {
+            Ok(Snippet::new_global(item.item.source_item_cpp_code()?, true))
+        }
     }
 }
 
@@ -537,7 +536,7 @@ impl CppChecker<'_, '_> {
                 Err(err) => {
                     debug!(
                         "can't create snippet: {}: {:?}",
-                        ffi_item.item.item.short_text(),
+                        ffi_item.item.short_text(),
                         err
                     );
                 }
@@ -570,10 +569,10 @@ impl CppChecker<'_, '_> {
                 .ffi_item_mut(snippet.data.ffi_item_id)?;
             if let Some(output) = snippet.output {
                 if output.is_success() {
-                    debug!("success: {}", ffi_item.item.item.short_text());
+                    debug!("success: {}", ffi_item.item.short_text());
                     success_count += 1;
                 } else {
-                    debug!("error: {}: {:?}", ffi_item.item.item.short_text(), output);
+                    debug!("error: {}: {:?}", ffi_item.item.short_text(), output);
                     error_count += 1;
                 }
                 let ffi_item_id = ffi_item.id;
@@ -585,7 +584,7 @@ impl CppChecker<'_, '_> {
                     },
                 );
             } else {
-                error!("no output for item: {}", ffi_item.item.item.short_text());
+                error!("no output for item: {}", ffi_item.item.short_text());
             }
             trace!("snippet: {:?}", snippet.snippet);
         }
@@ -632,7 +631,7 @@ pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
                 continue;
             }
             let item = data.current_database.ffi_item(id)?;
-            let allowed = if let CppFfiItem::Function(function) = &item.item.item {
+            let allowed = if let CppFfiItem::Function(function) = &item.item {
                 match &function.kind {
                     CppFfiFunctionKind::Function { cpp_function, .. } => {
                         hook(&CppItem::Function(cpp_function.clone()))?
@@ -645,7 +644,7 @@ pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
                 true
             };
             if !allowed {
-                log::info!("Deleting item: {}", item.item.item.short_text());
+                log::info!("Deleting item: {}", item.item.short_text());
                 data.current_database.delete_items(|i| i.id == id);
             }
         }
@@ -659,7 +658,7 @@ pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
                 continue;
             }
             let item = data.current_database.ffi_item(id)?;
-            let (types, path) = match &item.item.item {
+            let (types, path) = match &item.item {
                 CppFfiItem::Function(function) => match &function.kind {
                     CppFfiFunctionKind::Function { cpp_function, .. } => (
                         cpp_function.all_involved_types(),
@@ -681,7 +680,7 @@ pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
                 .any(|x| !x);
 
             if any_blocked {
-                log::info!("Deleting item: {}", item.item.item.short_text());
+                log::info!("Deleting item: {}", item.item.short_text());
                 data.current_database.delete_items(|i| i.id == id);
             }
         }

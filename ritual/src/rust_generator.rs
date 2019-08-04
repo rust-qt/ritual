@@ -10,7 +10,7 @@ use crate::cpp_type::{
     is_qflags, CppBuiltInNumericType, CppFunctionPointerType, CppPointerLikeTypeKind,
     CppSpecificNumericType, CppSpecificNumericTypeKind, CppType, CppTypeRole,
 };
-use crate::database::{CppFfiItemData, DbItem, ItemWithSource};
+use crate::database::{DbItem, ItemWithSource};
 use crate::processor::ProcessorData;
 use crate::rust_info::{
     NameType, RustEnumValue, RustEnumValueDoc, RustExtraImpl, RustExtraImplKind,
@@ -439,7 +439,7 @@ impl State<'_, '_> {
             if !item_checks.is_always_success_for(checks) || item_checks.is_empty() {
                 return false;
             }
-            if let CppFfiItem::Function(func) = &item.item.item {
+            if let CppFfiItem::Function(func) = &item.item {
                 if let CppFfiFunctionKind::Function { cpp_function, .. } = &func.kind {
                     cpp_function.is_destructor()
                         && &cpp_function.class_type().unwrap() == class_path
@@ -1500,11 +1500,11 @@ impl State<'_, '_> {
 
     fn process_ffi_item(
         &self,
-        ffi_item: &CppFfiItemData,
+        ffi_item: &CppFfiItem,
         checks: &CppChecks,
         trait_types: &[TraitTypes],
     ) -> Result<Vec<ProcessedFfiItem>> {
-        match &ffi_item.item {
+        match ffi_item {
             CppFfiItem::Function(cpp_ffi_function) => {
                 self.process_rust_function(cpp_ffi_function, checks, trait_types)
             }
@@ -1541,7 +1541,7 @@ impl State<'_, '_> {
 
         let mut qt_slot_wrapper = None;
         if let Some(source_ffi_item) = self.0.current_database.source_ffi_item(item.id)? {
-            if let Some(item) = source_ffi_item.filter_map(|i| i.item.as_slot_wrapper_ref()) {
+            if let Some(item) = source_ffi_item.filter_map(|i| i.as_slot_wrapper_ref()) {
                 qt_slot_wrapper = Some(item);
             }
         }
@@ -1939,7 +1939,7 @@ impl State<'_, '_> {
             if !checks.any_success() {
                 debug!(
                     "skipping ffi item with failed checks: {}",
-                    ffi_item.item.item.short_text(),
+                    ffi_item.item.short_text(),
                 );
                 continue;
             }
@@ -1971,7 +1971,7 @@ impl State<'_, '_> {
                 Err(err) => {
                     debug!(
                         "failed to process ffi item: {}: {}",
-                        ffi_item.item.item.short_text(),
+                        ffi_item.item.short_text(),
                         err
                     );
                     print_trace(&err, Some(log::Level::Trace));
