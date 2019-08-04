@@ -5,11 +5,11 @@ use crate::doc_decoder::DocData;
 use itertools::Itertools;
 use log::{debug, error, trace};
 use regex::Regex;
-use ritual::cpp_data::{CppItem, CppPath, CppTypeDoc, CppVisibility};
-use ritual::cpp_function::CppFunctionExternalDoc;
-use ritual::database::DbItem;
+use ritual::cpp_data::{CppItem, CppPath};
+use ritual::cpp_function::CppFunction;
+use ritual::database::{Database, DocItem, ItemWithSource};
 use ritual::processor::ProcessorData;
-use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
+use ritual_common::errors::{bail, err_msg, format_err, Error, Result, ResultExt};
 use select::document::Document;
 use select::node::Node;
 use std::collections::{hash_map, HashMap, HashSet};
@@ -60,7 +60,7 @@ pub struct DocParser {
 
 #[derive(Debug)]
 struct DocForType {
-    type_doc: CppTypeDoc,
+    type_doc: DocItem,
     enum_variants_doc: Vec<DocForEnumVariant>,
 }
 
@@ -103,7 +103,7 @@ impl DocParser {
         name: &str,
         declaration1: &str,
         declaration2: &str,
-    ) -> Result<CppFunctionExternalDoc> {
+    ) -> Result<DocItem> {
         let mut name_parts = name.split("::").collect_vec();
         let anchor_override = if name_parts.len() >= 2
             && name_parts[name_parts.len() - 1] == name_parts[name_parts.len() - 2]
@@ -203,11 +203,11 @@ impl DocParser {
                         if item.html.find(|c| c != '\n').is_none() {
                             bail!("found empty documentation");
                         }
-                        return Ok(CppFunctionExternalDoc {
+                        return Ok(DocItem {
                             html: item.html.clone(),
-                            anchor: item.anchor.clone(),
+                            anchor: Some(item.anchor.clone()),
                             mismatched_declaration: None,
-                            url: format!("{}#{}", file_url, item.anchor),
+                            url: Some(format!("{}#{}", file_url, item.anchor)),
                             cross_references: item.cross_references.clone(),
                         });
                     }
@@ -225,11 +225,11 @@ impl DocParser {
                         if item.html.find(|c| c != '\n').is_none() {
                             bail!("found empty documentation");
                         }
-                        return Ok(CppFunctionExternalDoc {
+                        return Ok(DocItem {
                             html: item.html.clone(),
-                            anchor: item.anchor.clone(),
+                            anchor: Some(item.anchor.clone()),
                             mismatched_declaration: None,
-                            url: format!("{}#{}", file_url, item.anchor),
+                            url: Some(format!("{}#{}", file_url, item.anchor)),
                             cross_references: item.cross_references.clone(),
                         });
                     }
@@ -248,10 +248,10 @@ impl DocParser {
             if candidates[0].html.is_empty() {
                 bail!("found empty documentation");
             }
-            return Ok(CppFunctionExternalDoc {
+            return Ok(DocItem {
                 html: candidates[0].html.clone(),
-                anchor: candidates[0].anchor.clone(),
-                url: format!("{}#{}", file_url, candidates[0].anchor),
+                anchor: Some(candidates[0].anchor.clone()),
+                url: Some(format!("{}#{}", file_url, candidates[0].anchor)),
                 mismatched_declaration: Some(candidates[0].declarations[0].clone()),
                 cross_references: candidates[0].cross_references.clone(),
             });
@@ -283,10 +283,12 @@ impl DocParser {
                 (result.clone(), file_data.file_name.clone())
             };
             return Ok(DocForType {
-                type_doc: CppTypeDoc {
+                type_doc: DocItem {
                     html: result.html,
-                    url: format!("{}{}#{}", self.base_url, file_name, anchor),
+                    url: Some(format!("{}{}#{}", self.base_url, file_name, anchor)),
                     cross_references: result.cross_references,
+                    anchor: None,
+                    mismatched_declaration: None,
                 },
                 enum_variants_doc: result.enum_variants,
             });
@@ -324,10 +326,12 @@ impl DocParser {
         }
         let (html, cross_references) = process_html(&result, &self.base_url)?;
         Ok(DocForType {
-            type_doc: CppTypeDoc {
+            type_doc: DocItem {
                 html,
-                url,
+                url: Some(url),
                 cross_references: cross_references.into_iter().collect(),
+                anchor: None,
+                mismatched_declaration: None,
             },
             enum_variants_doc: Vec::new(),
         })
@@ -610,52 +614,64 @@ fn all_item_docs(doc: &Document, base_url: &str) -> Result<Vec<ItemDoc>> {
     Ok(results)
 }
 
+fn log_function_doc_error(function: &CppFunction, error: &Error) {
+    if function.member.is_some()
+        && (function.path.last().name == "tr"
+            || function.path.last().name == "trUtf8"
+            || function.path.last().name == "metaObject")
+    {
+        // no error message
+        // TODO: add docs from `QObject::*` for these methods
+    } else {
+        let templateless_path = function.path.to_templateless_string();
+        // undocumented but probably useful
+        let suppressed = [
+            // checks if Qt build is shared (?)
+            "qSharedBuild",
+        ];
+        if !suppressed.contains(&templateless_path.as_str()) {
+            trace!(
+                "Failed to get Qt documentation for method: {}: {}",
+                &function.short_text(),
+                error
+            );
+        }
+    }
+}
+
 /// Adds documentation from `data` to `cpp_methods`.
-fn find_methods_docs<'a>(
-    items: impl Iterator<Item = DbItem<&'a mut CppItem>>,
-    data: &mut DocParser,
-) -> Result<()> {
-    for mut item in items {
-        if let CppItem::Function(cpp_method) = &mut item.item {
-            if let Some(info) = &cpp_method.member {
-                if info.visibility == CppVisibility::Private {
-                    continue;
-                }
+fn find_methods_docs(database: &mut Database, data: &mut DocParser) -> Result<()> {
+    let mut new_items = Vec::new();
+
+    let functions = database
+        .cpp_items()
+        .filter_map(|item| item.filter_map(|item| item.as_function_ref()))
+        .filter(|item| !item.item.is_private());
+
+    for item in functions {
+        let declaration_code = if let Some(c) = &item.item.declaration_code {
+            c
+        } else {
+            continue;
+        };
+        match data.doc_for_method(
+            &item.item.path.doc_id(),
+            declaration_code,
+            &item.item.pseudo_declaration(),
+        ) {
+            Ok(doc) => {
+                new_items.push(ItemWithSource {
+                    source_id: item.id,
+                    value: doc,
+                });
             }
-            if let Some(declaration_code) = &cpp_method.declaration_code {
-                match data.doc_for_method(
-                    &cpp_method.path.doc_id(),
-                    declaration_code,
-                    &cpp_method.pseudo_declaration(),
-                ) {
-                    Ok(doc) => cpp_method.doc.external_doc = Some(doc),
-                    Err(msg) => {
-                        if cpp_method.member.is_some()
-                            && (cpp_method.path.last().name == "tr"
-                                || cpp_method.path.last().name == "trUtf8"
-                                || cpp_method.path.last().name == "metaObject")
-                        {
-                            // no error message
-                            // TODO: add docs from `QObject::*` for these methods
-                        } else {
-                            let templateless_path = cpp_method.path.to_templateless_string();
-                            // undocumented but probably useful
-                            let suppressed = [
-                                // checks if Qt build is shared (?)
-                                "qSharedBuild",
-                            ];
-                            if !suppressed.contains(&templateless_path.as_str()) {
-                                trace!(
-                                    "Failed to get Qt documentation for method: {}: {}",
-                                    &cpp_method.short_text(),
-                                    msg
-                                );
-                            }
-                        }
-                    }
-                }
+            Err(error) => {
+                log_function_doc_error(item.item, &error);
             }
         }
+    }
+    for item in new_items {
+        database.add_doc_item(item.source_id, item.value);
     }
     Ok(())
 }
@@ -674,8 +690,9 @@ pub fn parse_docs(
         }
     };
     let mut parser = DocParser::new(doc_data);
-    find_methods_docs(data.current_database.cpp_items_mut(), &mut parser)?;
+    find_methods_docs(data.current_database, &mut parser)?;
     let mut type_doc_cache = HashMap::new();
+    let mut new_items = Vec::new();
     for mut item in data.current_database.cpp_items_mut() {
         let type_name = match &item.item {
             CppItem::Type(data) => data.path.clone(),
@@ -701,8 +718,11 @@ pub fn parse_docs(
             .expect("type_doc_cache is guaranteed to have an entry here because we added it above");
         if let Ok(doc) = doc {
             match &mut item.item {
-                CppItem::Type(data) => {
-                    data.doc = Some(doc.type_doc.clone());
+                CppItem::Type(_) => {
+                    new_items.push(ItemWithSource {
+                        source_id: item.id,
+                        value: doc.type_doc.clone(),
+                    });
                 }
                 CppItem::EnumValue(data) => {
                     if let Some(r) = doc
@@ -728,6 +748,10 @@ pub fn parse_docs(
                 _ => unreachable!(),
             };
         }
+    }
+    for item in new_items {
+        data.current_database
+            .add_doc_item(item.source_id, item.value);
     }
     parser.report_unused_anchors();
     Ok(())

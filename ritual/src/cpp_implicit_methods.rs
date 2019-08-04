@@ -1,6 +1,6 @@
 use crate::cpp_data::{CppItem, CppPathItem, CppVisibility};
 use crate::cpp_function::{
-    CppFunction, CppFunctionArgument, CppFunctionDoc, CppFunctionKind, CppFunctionMemberData,
+    CppFunction, CppFunctionArgument, CppFunctionKind, CppFunctionMemberData,
 };
 use crate::cpp_operator::CppOperator;
 use crate::cpp_type::CppType;
@@ -45,7 +45,6 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                 allows_variadic_arguments: false,
                 cast: None,
                 declaration_code: None,
-                doc: CppFunctionDoc::default(),
             };
             methods.push(ItemWithSource {
                 source_id: type1.id,
@@ -73,7 +72,6 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                 allows_variadic_arguments: false,
                 declaration_code: None,
                 cast: None,
-                doc: CppFunctionDoc::default(),
             };
             methods.push(ItemWithSource {
                 source_id: type1.id,
@@ -107,7 +105,6 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                 allows_variadic_arguments: false,
                 cast: None,
                 declaration_code: None,
-                doc: CppFunctionDoc::default(),
             };
             methods.push(ItemWithSource {
                 source_id: type1.id,
@@ -135,7 +132,6 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                 allows_variadic_arguments: false,
                 cast: None,
                 declaration_code: None,
-                doc: CppFunctionDoc::default(),
             };
             methods.push(ItemWithSource {
                 source_id: type1.id,

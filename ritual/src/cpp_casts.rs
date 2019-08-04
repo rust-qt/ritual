@@ -1,6 +1,6 @@
 use crate::cpp_data::{CppBaseSpecifier, CppItem, CppPath, CppPathItem};
 use crate::cpp_ffi_data::CppCast;
-use crate::cpp_function::{CppFunction, CppFunctionArgument, CppFunctionDoc};
+use crate::cpp_function::{CppFunction, CppFunctionArgument};
 use crate::cpp_type::{CppPointerLikeTypeKind, CppType};
 use crate::database::ItemWithSource;
 use crate::processor::ProcessorData;
@@ -26,7 +26,6 @@ fn create_cast_method(cast: CppCast, from: &CppType, to: &CppType) -> Result<Cpp
         }],
         allows_variadic_arguments: false,
         declaration_code: None,
-        doc: CppFunctionDoc::default(),
         cast: Some(cast),
     };
     Ok(CppItem::Function(function))

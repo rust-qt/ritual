@@ -81,30 +81,6 @@ impl CppFunctionMemberData {
     }
 }
 
-/// C++ documentation for a method
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
-pub struct CppFunctionExternalDoc {
-    /// HTML anchor of this documentation entry
-    /// (used to detect duplicates)
-    pub anchor: String,
-    /// HTML content
-    pub html: String,
-    /// If the documentation parser couldn't find documentation for the exact same
-    /// method, it can still provide documentation entry for the closest match.
-    /// In this case, this field should contain C++ declaration of the found method.
-    pub mismatched_declaration: Option<String>,
-    /// Absolute URL to online documentation page for this method
-    pub url: String,
-    /// Absolute documentation URLs encountered in the content
-    pub cross_references: Vec<String>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize, Default)]
-pub struct CppFunctionDoc {
-    pub arguments_before_omitting: Option<Vec<CppFunctionArgument>>,
-    pub external_doc: Option<CppFunctionExternalDoc>,
-}
-
 /// Information about a C++ method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppFunction {
@@ -145,8 +121,6 @@ pub struct CppFunction {
     /// C++ code of the method's declaration.
     /// None if the method was not explicitly declared.
     pub declaration_code: Option<String>,
-    /// C++ documentation data for this method
-    pub doc: CppFunctionDoc,
 }
 
 /// Chosen type allocation place for the method

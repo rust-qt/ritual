@@ -1,4 +1,5 @@
 use crate::cpp_data::CppItem;
+use crate::database::ItemWithSource;
 use crate::processor::ProcessorData;
 use ritual_common::errors::Result;
 
@@ -17,15 +18,17 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                 if !arg.has_default_value {
                     break;
                 }
-                function_copy.doc.arguments_before_omitting = Some(function.arguments.clone());
-                results.push((function_copy.clone(), item.source_id));
+                results.push(ItemWithSource {
+                    value: function_copy.clone(),
+                    source_id: item.id,
+                });
             }
         }
     }
 
-    for (function, source_ffi_item) in results {
+    for item in results {
         data.current_database
-            .add_cpp_item(source_ffi_item, CppItem::Function(function))?;
+            .add_cpp_item(Some(item.source_id), CppItem::Function(item.value))?;
     }
 
     Ok(())

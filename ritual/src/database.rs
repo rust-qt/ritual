@@ -354,21 +354,6 @@ impl Database {
             .ok_or_else(|| err_msg("not a rust item"))
     }
 
-    pub fn source_ffi_item(&self, id: ItemId) -> Result<Option<DbItem<&CppFfiItem>>> {
-        let mut current_item = self.item(id)?;
-        loop {
-            let new_id = if let Some(id) = current_item.source_id {
-                id
-            } else {
-                return Ok(None);
-            };
-            current_item = self.item(new_id)?;
-            if let Some(item) = current_item.filter_map(|i| i.as_ffi_item()) {
-                return Ok(Some(item));
-            }
-        }
-    }
-
     pub fn add_ffi_item(
         &mut self,
         source_id: Option<ItemId>,
@@ -644,6 +629,52 @@ impl Database {
     pub fn delete_items(&mut self, mut function: impl FnMut(DbItem<&DatabaseItemData>) -> bool) {
         self.data.items.retain(|i| !function(i.as_ref()));
         self.collect_garbage();
+    }
+
+    pub fn source_cpp_item(&self, id: ItemId) -> Result<Option<DbItem<&CppItem>>> {
+        let mut current_item = self.item(id)?;
+        loop {
+            let new_id = if let Some(id) = current_item.source_id {
+                id
+            } else {
+                return Ok(None);
+            };
+            current_item = self.item(new_id)?;
+            if let Some(item) = current_item.filter_map(|i| i.as_cpp_item()) {
+                return Ok(Some(item));
+            }
+        }
+    }
+
+    pub fn original_cpp_item(&self, id: ItemId) -> Result<Option<DbItem<&CppItem>>> {
+        let mut current_item = self.item(id)?;
+        let mut last_cpp_item = None;
+        loop {
+            if let Some(item) = current_item.filter_map(|i| i.as_cpp_item()) {
+                last_cpp_item = Some(item);
+            }
+            let new_id = if let Some(id) = current_item.source_id {
+                id
+            } else {
+                return Ok(last_cpp_item);
+            };
+            current_item = self.item(new_id)?;
+        }
+    }
+
+    pub fn source_ffi_item(&self, id: ItemId) -> Result<Option<DbItem<&CppFfiItem>>> {
+        let mut current_item = self.item(id)?;
+        loop {
+            let new_id = if let Some(id) = current_item.source_id {
+                id
+            } else {
+                return Ok(None);
+            };
+            current_item = self.item(new_id)?;
+            if let Some(item) = current_item.filter_map(|i| i.as_ffi_item()) {
+                return Ok(Some(item));
+            }
+        }
     }
 
     pub fn find_doc_for(&self, id: ItemId) -> Result<Option<DbItem<&DocItem>>> {

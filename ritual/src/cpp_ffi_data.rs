@@ -198,20 +198,7 @@ impl CppFfiFunction {
     pub fn short_text(&self) -> String {
         match &self.kind {
             CppFfiFunctionKind::Function { cpp_function, .. } => {
-                let omitted_args_text =
-                    if let Some(args) = &cpp_function.doc.arguments_before_omitting {
-                        format!(
-                            " (omitted arguments: {})",
-                            args.len() - cpp_function.arguments.len()
-                        )
-                    } else {
-                        String::new()
-                    };
-                format!(
-                    "FFI function call{}: {}",
-                    omitted_args_text,
-                    cpp_function.short_text()
-                )
+                format!("FFI function call: {}", cpp_function.short_text())
             }
             CppFfiFunctionKind::FieldAccessor {
                 field,

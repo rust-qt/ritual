@@ -4,7 +4,7 @@ use crate::cpp_data::{
     CppPathItem, CppTypeDeclaration, CppTypeDeclarationKind, CppVisibility,
 };
 use crate::cpp_function::{
-    CppFunction, CppFunctionArgument, CppFunctionDoc, CppFunctionKind, CppFunctionMemberData,
+    CppFunction, CppFunctionArgument, CppFunctionKind, CppFunctionMemberData,
 };
 use crate::cpp_operator::CppOperator;
 use crate::cpp_type::{
@@ -1184,7 +1184,6 @@ impl CppParser<'_, '_> {
             return_type: return_type_parsed,
             cast: None,
             declaration_code,
-            doc: CppFunctionDoc::default(),
         };
 
         self.add_output(
@@ -1212,7 +1211,6 @@ impl CppParser<'_, '_> {
             CppItem::Type(CppTypeDeclaration {
                 kind: CppTypeDeclarationKind::Enum,
                 path: enum_name.clone(),
-                doc: None,
             }),
         )?;
         for child in entity.get_children() {
@@ -1357,7 +1355,6 @@ impl CppParser<'_, '_> {
             CppItem::Type(CppTypeDeclaration {
                 kind: CppTypeDeclarationKind::Class { is_movable: false },
                 path: full_name,
-                doc: None,
             }),
         )?;
         Ok(())

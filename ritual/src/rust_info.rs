@@ -1,8 +1,7 @@
 //! Types holding information about generates Rust API.
 
-use crate::cpp_data::{CppPath, CppTypeDoc};
+use crate::cpp_data::CppPath;
 use crate::cpp_ffi_data::CppFfiFunction;
-use crate::cpp_function::CppFunctionExternalDoc;
 use crate::cpp_type::CppType;
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_type::{RustFinalType, RustPath, RustPointerLikeTypeKind, RustType};
@@ -22,7 +21,6 @@ pub struct RustEnumValue {
 /// C++ documentation data for a enum variant
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustEnumValueDoc {
-    pub extra_doc: Option<String>,
     /// C++ path of the variant
     pub cpp_path: CppPath,
     /// HTML content
@@ -56,9 +54,6 @@ pub struct RustRawQtSlotWrapperDocData {
 pub struct RustWrapperTypeDocData {
     /// Corresponding C++ type (for generating docs).
     pub cpp_path: CppPath,
-    /// C++ documentation for this type
-    pub cpp_doc: Option<CppTypeDoc>,
-
     pub raw_qt_slot_wrapper: Option<RustRawQtSlotWrapperDocData>,
 }
 
@@ -133,9 +128,6 @@ impl RustStructKind {
 /// Exported information about a Rust wrapper type
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustStruct {
-    /// Additional documentation content that will appear before C++ documentation or any other
-    /// automatically generated content.
-    pub extra_doc: Option<String>,
     pub path: RustPath,
     /// Kind of the type and additional information.
     pub kind: RustStructKind,
@@ -192,8 +184,6 @@ pub struct RustSignalOrSlotGetter {
     pub receiver_type: RustQtReceiverType,
     /// Identifier of the signal or slot for passing to `QObject::connect`.
     pub receiver_id: String,
-
-    pub cpp_doc: Option<CppFunctionExternalDoc>,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -232,7 +222,6 @@ pub struct UnnamedRustFunction {
     pub kind: RustFunctionKind,
     pub arguments: Vec<RustFunctionArgument>,
     pub return_type: RustFinalType,
-    pub extra_doc: Option<String>,
 }
 
 impl UnnamedRustFunction {
@@ -244,7 +233,6 @@ impl UnnamedRustFunction {
             kind: self.kind,
             arguments: self.arguments,
             return_type: self.return_type,
-            extra_doc: self.extra_doc,
         }
     }
 
@@ -373,9 +361,6 @@ pub struct RustFunction {
     pub arguments: Vec<RustFunctionArgument>,
     /// C++ and Rust return types at all levels.
     pub return_type: RustFinalType,
-
-    /// Documentation data.
-    pub extra_doc: Option<String>,
 }
 
 /// Information about type of `self` argument of the function.
@@ -430,7 +415,6 @@ pub struct RustTraitImpl {
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustModuleDoc {
-    pub extra_doc: Option<String>,
     pub cpp_path: Option<CppPath>,
 }
 
@@ -666,6 +650,20 @@ impl RustItem {
             None
         }
     }
+    pub fn as_struct_ref(&self) -> Option<&RustStruct> {
+        if let RustItem::Struct(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+    pub fn as_enum_value_ref(&self) -> Option<&RustEnumValue> {
+        if let RustItem::EnumValue(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
     pub fn as_reexport_ref(&self) -> Option<&RustReexport> {
         if let RustItem::Reexport(value) = self {
             Some(value)
@@ -682,6 +680,13 @@ impl RustItem {
     }
     pub fn as_trait_impl_ref(&self) -> Option<&RustTraitImpl> {
         if let RustItem::TraitImpl(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    pub fn as_extra_impl_ref(&self) -> Option<&RustExtraImpl> {
+        if let RustItem::ExtraImpl(value) = self {
             Some(value)
         } else {
             None

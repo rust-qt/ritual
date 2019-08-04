@@ -251,14 +251,27 @@ impl Generator<'_> {
         }
 
         match &item.item {
-            RustItem::Module(module) => self.generate_module(module),
-            RustItem::Struct(data) => self.generate_struct(data, &condition_texts),
-            RustItem::EnumValue(value) => self.generate_enum_value(value),
-            RustItem::TraitImpl(value) => self.generate_trait_impl(value, &condition_texts),
-            RustItem::Function(value) => {
-                self.generate_function(value, false, self_type, &condition_texts)
+            RustItem::Module(_) => self.generate_module(item.map(|i| i.as_module_ref().unwrap())),
+            RustItem::Struct(_) => {
+                self.generate_struct(item.map(|i| i.as_struct_ref().unwrap()), &condition_texts)
             }
-            RustItem::ExtraImpl(value) => self.generate_extra_impl(value, &condition_texts),
+            RustItem::EnumValue(_) => {
+                self.generate_enum_value(item.map(|i| i.as_enum_value_ref().unwrap()))
+            }
+            RustItem::TraitImpl(_) => self.generate_trait_impl(
+                item.map(|i| i.as_trait_impl_ref().unwrap()),
+                &condition_texts,
+            ),
+            RustItem::Function(_) => self.generate_function(
+                item.map(|i| i.as_function_ref().unwrap()),
+                false,
+                self_type,
+                &condition_texts,
+            ),
+            RustItem::ExtraImpl(_) => self.generate_extra_impl(
+                item.map(|i| i.as_extra_impl_ref().unwrap()),
+                &condition_texts,
+            ),
             RustItem::Reexport(reexport) => {
                 writeln!(
                     self,
@@ -276,10 +289,10 @@ impl Generator<'_> {
     }
 
     #[allow(clippy::collapsible_if)]
-    fn generate_module(&mut self, module: &RustModule) -> Result<()> {
+    fn generate_module(&mut self, module: DbItem<&RustModule>) -> Result<()> {
         if self
             .current_database
-            .rust_children(&module.path)
+            .rust_children(&module.item.path)
             .next()
             .is_none()
         {
@@ -287,17 +300,17 @@ impl Generator<'_> {
             return Ok(());
         }
 
-        let vis = if module.is_public { "pub " } else { "" };
+        let vis = if module.item.is_public { "pub " } else { "" };
         let mut content_from_template = None;
-        if module.kind.is_in_separate_file() {
-            if module.kind != RustModuleKind::Special(RustSpecialModuleKind::CrateRoot) {
-                writeln!(self, "{}mod {};", vis, module.path.last())?;
+        if module.item.kind.is_in_separate_file() {
+            if module.item.kind != RustModuleKind::Special(RustSpecialModuleKind::CrateRoot) {
+                writeln!(self, "{}mod {};", vis, module.item.path.last())?;
             }
-            let path = self.module_path(&module.path, &self.output_src_path)?;
+            let path = self.module_path(&module.item.path, &self.output_src_path)?;
             self.push_file(&path)?;
 
             if let Some(crate_template_src_path) = &self.crate_template_src_path {
-                let template_path = self.module_path(&module.path, crate_template_src_path)?;
+                let template_path = self.module_path(&module.item.path, crate_template_src_path)?;
                 if template_path.exists() {
                     let content = file_to_string(template_path)?;
                     content_from_template = Some(content);
@@ -305,23 +318,26 @@ impl Generator<'_> {
             }
         } else {
             assert_ne!(
-                module.kind,
+                module.item.kind,
                 RustModuleKind::Special(RustSpecialModuleKind::CrateRoot)
             );
-            writeln!(self, "{}mod {} {{", vis, module.path.last())?;
+            writeln!(self, "{}mod {} {{", vis, module.item.path.last())?;
         }
 
         write!(
             self,
             "{}",
-            format_doc_extended(&doc_formatter::module_doc(module), true)
+            format_doc_extended(
+                &doc_formatter::module_doc(module, self.current_database)?,
+                true
+            )
         )?;
 
         if let Some(content) = content_from_template {
             writeln!(self, "{}", content)?;
         }
 
-        match module.kind {
+        match module.item.kind {
             RustModuleKind::Special(RustSpecialModuleKind::Ffi) => {
                 writeln!(self, "include!(concat!(env!(\"OUT_DIR\"), \"/ffi.rs\"));")?;
             }
@@ -335,21 +351,21 @@ impl Generator<'_> {
             | RustModuleKind::Special(RustSpecialModuleKind::Ops)
             | RustModuleKind::CppNamespace { .. }
             | RustModuleKind::CppNestedTypes { .. } => {
-                self.generate_children(&module.path, None)?;
+                self.generate_children(&module.item.path, None)?;
             }
         }
 
-        if module.kind.is_in_separate_file() {
+        if module.item.kind.is_in_separate_file() {
             self.pop_file();
         } else {
             // close `mod {}`
             writeln!(self, "}}")?;
         }
 
-        if module.kind == RustModuleKind::Special(RustSpecialModuleKind::Ffi) {
+        if module.item.kind == RustModuleKind::Special(RustSpecialModuleKind::Ffi) {
             let path = self.output_src_path.join("ffi.in.rs");
             self.destination.push(create_file(&path)?);
-            self.generate_children(&module.path, None)?;
+            self.generate_children(&module.item.path, None)?;
             self.pop_file();
         }
 
@@ -371,21 +387,26 @@ impl Generator<'_> {
 
     fn generate_struct(
         &mut self,
-        rust_struct: &RustStruct,
+        rust_struct: DbItem<&RustStruct>,
         condition_texts: &ConditionTexts,
     ) -> Result<()> {
-        let doc = doc_formatter::struct_doc(rust_struct) + &condition_texts.doc_text;
+        let doc = doc_formatter::struct_doc(rust_struct, self.current_database)?
+            + &condition_texts.doc_text;
         write!(self, "{}", format_doc(&doc))?;
 
-        let visibility = if rust_struct.is_public { "pub " } else { "" };
-        match &rust_struct.kind {
+        let visibility = if rust_struct.item.is_public {
+            "pub "
+        } else {
+            ""
+        };
+        match &rust_struct.item.kind {
             RustStructKind::WrapperType(wrapper) => match &wrapper.kind {
                 RustWrapperTypeKind::EnumWrapper => {
                     writeln!(
                         self,
                         include_str!("../templates/crate/enum_wrapper.rs.in"),
                         vis = visibility,
-                        name = rust_struct.path.last()
+                        name = rust_struct.item.path.last()
                     )?;
                 }
                 RustWrapperTypeKind::ImmovableClassWrapper => {
@@ -394,7 +415,7 @@ impl Generator<'_> {
                         self,
                         "{}struct {} {{ _unused: u8, }}",
                         visibility,
-                        rust_struct.path.last()
+                        rust_struct.item.path.last()
                     )?;
                 }
                 RustWrapperTypeKind::MovableClassWrapper { sized_type_path } => {
@@ -403,7 +424,7 @@ impl Generator<'_> {
                         self,
                         "{}struct {}({});",
                         visibility,
-                        rust_struct.path.last(),
+                        rust_struct.item.path.last(),
                         self.rust_path_to_string(sized_type_path),
                     )?;
                     writeln!(self)?;
@@ -436,7 +457,7 @@ impl Generator<'_> {
                     include_str!("../templates/crate/closure_slot_wrapper.rs.in"),
                     qt_core = self.qt_core_prefix(),
                     type_name = self.rust_path_to_string(&slot_wrapper.raw_slot_wrapper),
-                    pub_type_name = rust_struct.path.last(),
+                    pub_type_name = rust_struct.item.path.last(),
                     args = args,
                     func_args = func_args,
                     callback_args = callback_args,
@@ -450,17 +471,17 @@ impl Generator<'_> {
 
         if self
             .current_database
-            .rust_children(&rust_struct.path)
+            .rust_children(&rust_struct.item.path)
             .next()
             .is_some()
         {
             let struct_type = RustType::Common(RustCommonType {
-                path: rust_struct.path.clone(),
+                path: rust_struct.item.path.clone(),
                 generic_arguments: None,
             });
 
-            writeln!(self, "impl {} {{", rust_struct.path.last())?;
-            self.generate_children(&rust_struct.path, Some(&struct_type))?;
+            writeln!(self, "impl {} {{", rust_struct.item.path.last())?;
+            self.generate_children(&rust_struct.item.path, Some(&struct_type))?;
             writeln!(self, "}}")?;
             writeln!(self)?;
         }
@@ -468,21 +489,29 @@ impl Generator<'_> {
         Ok(())
     }
 
-    fn generate_enum_value(&mut self, value: &RustEnumValue) -> Result<()> {
+    fn generate_enum_value(&mut self, value: DbItem<&RustEnumValue>) -> Result<()> {
         write!(
             self,
             "{}",
-            format_doc(&doc_formatter::enum_value_doc(value))
+            format_doc(&doc_formatter::enum_value_doc(
+                value,
+                self.current_database
+            )?)
         )?;
-        let struct_path =
-            self.rust_path_to_string(&value.path.parent().expect("enum value must have parent"));
+        let struct_path = self.rust_path_to_string(
+            &value
+                .item
+                .path
+                .parent()
+                .expect("enum value must have parent"),
+        );
         writeln!(self, "#[allow(non_upper_case_globals)]")?;
         writeln!(
             self,
             "pub const {value_name}: {struct_path} = {struct_path}({value});",
-            value_name = value.path.last(),
+            value_name = value.item.path.last(),
             struct_path = struct_path,
-            value = value.value
+            value = value.item.value
         )?;
         Ok(())
     }
@@ -835,27 +864,27 @@ impl Generator<'_> {
     /// Generates complete code of a Rust wrapper function.
     fn generate_function(
         &mut self,
-        func: &RustFunction,
+        func: DbItem<&RustFunction>,
         is_in_trait_context: bool,
         self_type: Option<&RustType>,
         condition_texts: &ConditionTexts,
     ) -> Result<()> {
-        let maybe_pub = if func.is_public && !is_in_trait_context {
+        let maybe_pub = if func.item.is_public && !is_in_trait_context {
             "pub "
         } else {
             ""
         };
-        let maybe_unsafe = if func.is_unsafe { "unsafe " } else { "" };
+        let maybe_unsafe = if func.item.is_unsafe { "unsafe " } else { "" };
 
-        let body = match &func.kind {
+        let body = match &func.item.kind {
             RustFunctionKind::FfiWrapper(data) => Some(self.generate_ffi_call(
-                &func.arguments,
-                &func.return_type,
+                &func.item.arguments,
+                &func.item.return_type,
                 data,
-                func.is_unsafe,
+                func.item.is_unsafe,
             )?),
             RustFunctionKind::SignalOrSlotGetter(getter) => {
-                let path = &func.return_type.api_type().as_common()?.path;
+                let path = &func.item.return_type.api_type().as_common()?.path;
                 let call = format!(
                     "{}::new(::cpp_utils::Ref::from_raw(self as &{})\
                      .expect(\"attempted to construct a null Ref\"), \
@@ -864,7 +893,7 @@ impl Generator<'_> {
                     self.rust_path_to_string(&self.qt_core_path().join("QObject")),
                     getter.receiver_id
                 );
-                Some(wrap_unsafe(func.is_unsafe, &call))
+                Some(wrap_unsafe(func.item.is_unsafe, &call))
             }
             RustFunctionKind::FfiFunction => None,
         };
@@ -874,15 +903,16 @@ impl Generator<'_> {
             Some(text) => format!("{{\n{}\n}}", text),
         };
 
-        let return_type_for_signature = if func.return_type.api_type().is_unit() {
+        let return_type_for_signature = if func.item.return_type.api_type().is_unit() {
             String::new()
         } else {
             format!(
                 " -> {}",
-                self.rust_type_to_code(func.return_type.api_type())
+                self.rust_type_to_code(func.item.return_type.api_type())
             )
         };
         let all_lifetimes = func
+            .item
             .arguments
             .iter()
             .filter_map(|x| x.argument_type.api_type().lifetime())
@@ -896,7 +926,9 @@ impl Generator<'_> {
             )
         };
 
-        let doc = doc_formatter::function_doc(&func) + &condition_texts.doc_text;
+        // TODO: move condition texts to doc parser
+        let doc =
+            doc_formatter::function_doc(func, self.current_database)? + &condition_texts.doc_text;
         writeln!(
             self,
             "{doc}{condition}{maybe_pub}{maybe_unsafe} \
@@ -907,8 +939,10 @@ impl Generator<'_> {
             maybe_pub = maybe_pub,
             maybe_unsafe = maybe_unsafe,
             lifetimes_text = lifetimes_text,
-            name = func.path.last(),
-            args = self.arg_texts(&func.arguments, None, self_type)?.join(", "),
+            name = func.item.path.last(),
+            args = self
+                .arg_texts(&func.item.arguments, None, self_type)?
+                .join(", "),
             return_type = return_type_for_signature,
             maybe_body = maybe_body
         )?;
@@ -944,10 +978,11 @@ impl Generator<'_> {
 
     fn generate_trait_impl(
         &mut self,
-        trait1: &RustTraitImpl,
+        trait1: DbItem<&RustTraitImpl>,
         condition_texts: &ConditionTexts,
     ) -> Result<()> {
         let associated_types_text = trait1
+            .item
             .associated_types
             .iter()
             .map(|t| format!("type {} = {};", t.name, self.rust_type_to_code(&t.value)))
@@ -958,16 +993,16 @@ impl Generator<'_> {
             self,
             "{}impl {} for {} {{\n{}",
             condition_texts.attribute,
-            self.rust_type_to_code(&trait1.trait_type),
-            self.rust_type_to_code(&trait1.target_type),
+            self.rust_type_to_code(&trait1.item.trait_type),
+            self.rust_type_to_code(&trait1.item.target_type),
             associated_types_text,
         )?;
 
-        for func in &trait1.functions {
+        for func in &trait1.item.functions {
             self.generate_function(
-                func,
+                trait1.map(|_| func),
                 true,
-                Some(&trait1.target_type),
+                Some(&trait1.item.target_type),
                 &ConditionTexts::default(),
             )?;
         }
@@ -978,10 +1013,10 @@ impl Generator<'_> {
 
     fn generate_extra_impl(
         &mut self,
-        data: &RustExtraImpl,
+        data: DbItem<&RustExtraImpl>,
         condition_texts: &ConditionTexts,
     ) -> Result<()> {
-        match &data.kind {
+        match &data.item.kind {
             RustExtraImplKind::FlagEnum(data) => {
                 let enum_path = self.rust_path_to_string(&data.enum_path);
                 let qflags = self.rust_path_to_string(&self.qt_core_path().join("QFlags"));
@@ -1025,8 +1060,10 @@ pub fn generate(
     let crate_root = generator
         .current_database
         .rust_items()
-        .filter_map(|i| i.item.as_module_ref())
-        .find(|module| module.kind == RustModuleKind::Special(RustSpecialModuleKind::CrateRoot))
+        .filter_map(|i| i.filter_map(|i| i.as_module_ref()))
+        .find(|module| {
+            module.item.kind == RustModuleKind::Special(RustSpecialModuleKind::CrateRoot)
+        })
         .ok_or_else(|| err_msg("crate root not found"))?;
 
     generator.generate_module(crate_root)?;

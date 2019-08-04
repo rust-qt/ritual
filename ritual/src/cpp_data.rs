@@ -126,17 +126,6 @@ pub enum CppVisibility {
     Private,
 }
 
-/// C++ documentation for a type
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct CppTypeDoc {
-    /// HTML content
-    pub html: String,
-    /// Absolute URL to online documentation page for this type
-    pub url: String,
-    /// Absolute documentation URLs encountered in the content
-    pub cross_references: Vec<String>,
-}
-
 #[derive(PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppPathItem {
     pub name: String,
@@ -386,8 +375,6 @@ pub struct CppTypeDeclaration {
     /// Identifier, including namespaces and nested classes
     pub path: CppPath,
     pub kind: CppTypeDeclarationKind,
-    /// C++ documentation for the type
-    pub doc: Option<CppTypeDoc>,
 }
 
 impl CppTypeDeclaration {

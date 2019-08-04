@@ -614,7 +614,6 @@ impl State<'_, '_> {
             kind: RustFunctionKind::FfiFunction,
             arguments: args,
             is_unsafe: false,
-            extra_doc: None,
         };
         Ok(function)
     }
@@ -1089,7 +1088,6 @@ impl State<'_, '_> {
                 ffi_function_path,
                 return_type_ffi_index: return_arg_index,
             }),
-            extra_doc: None,
             is_unsafe: true,
         };
 
@@ -1577,7 +1575,6 @@ impl State<'_, '_> {
             }
 
             let internal_rust_item = RustItem::Struct(RustStruct {
-                extra_doc: None,
                 path: internal_path.clone(),
                 kind: RustStructKind::SizedType(RustSizedType {
                     cpp_path: data.path.clone(),
@@ -1595,12 +1592,10 @@ impl State<'_, '_> {
         }
 
         let public_rust_item = RustItem::Struct(RustStruct {
-            extra_doc: None,
             path: public_path.clone(),
             kind: RustStructKind::WrapperType(RustWrapperType {
                 doc_data: RustWrapperTypeDocData {
                     cpp_path: data.path.clone(),
-                    cpp_doc: data.doc.clone(),
                     raw_qt_slot_wrapper: None, // TODO: fix this
                 },
                 kind: wrapper_kind,
@@ -1615,7 +1610,6 @@ impl State<'_, '_> {
             is_public: true,
             path: nested_types_path,
             doc: RustModuleDoc {
-                extra_doc: None,
                 cpp_path: Some(data.path.clone()),
             },
             kind: RustModuleKind::CppNestedTypes,
@@ -1673,7 +1667,6 @@ impl State<'_, '_> {
                     raw_slot_wrapper: public_path,
                 }),
                 path: closure_item_path,
-                extra_doc: None,
             });
             rust_items.push(public_item);
         }
@@ -1700,7 +1693,6 @@ impl State<'_, '_> {
                     is_public: true,
                     path: rust_path,
                     doc: RustModuleDoc {
-                        extra_doc: None,
                         cpp_path: Some(path.clone()),
                     },
                     kind: RustModuleKind::CppNamespace,
@@ -1714,12 +1706,10 @@ impl State<'_, '_> {
                 CppTypeDeclarationKind::Enum => {
                     let rust_path = self.generate_rust_path(&data.path, NameType::Type)?;
                     let rust_item = RustItem::Struct(RustStruct {
-                        extra_doc: None,
                         path: rust_path,
                         kind: RustStructKind::WrapperType(RustWrapperType {
                             doc_data: RustWrapperTypeDocData {
                                 cpp_path: data.path.clone(),
-                                cpp_doc: data.doc.clone(),
                                 raw_qt_slot_wrapper: None,
                             },
                             kind: RustWrapperTypeKind::EnumWrapper,
@@ -1739,7 +1729,6 @@ impl State<'_, '_> {
                     doc: RustEnumValueDoc {
                         cpp_path: value.path.clone(),
                         cpp_doc: value.doc.clone(),
-                        extra_doc: None,
                     },
                 });
 
@@ -1757,15 +1746,24 @@ impl State<'_, '_> {
                 } else {
                     return Ok(Vec::new());
                 };
-                if cpp_function.doc.arguments_before_omitting.is_some() {
-                    return Ok(Vec::new());
+
+                let original_item = self
+                    .0
+                    .current_database
+                    .original_cpp_item(cpp_item.id)?
+                    .ok_or_else(|| err_msg("cpp item must have original cpp item"))?;
+
+                if let Some(original_function) = original_item.item.as_function_ref() {
+                    if original_function.arguments.len() != cpp_function.arguments.len() {
+                        return Ok(Vec::new());
+                    }
                 }
+
                 let receiver_id = cpp_function.receiver_id()?;
                 let function_kind = RustFunctionKind::SignalOrSlotGetter(RustSignalOrSlotGetter {
                     cpp_path: cpp_function.path.clone(),
                     receiver_type,
                     receiver_id,
-                    cpp_doc: cpp_function.doc.external_doc.clone(),
                 });
 
                 let path = self.generate_rust_path(
@@ -1817,7 +1815,6 @@ impl State<'_, '_> {
                         ffi_index: 42,
                     }],
                     return_type,
-                    extra_doc: None,
                 };
                 Ok(vec![RustItem::Function(rust_function)])
             }
@@ -1874,10 +1871,7 @@ impl State<'_, '_> {
                 RustSpecialModuleKind::Ffi | RustSpecialModuleKind::SizedTypes => false,
             },
             path: rust_path,
-            doc: RustModuleDoc {
-                extra_doc: None,
-                cpp_path: None,
-            },
+            doc: RustModuleDoc { cpp_path: None },
             kind: RustModuleKind::Special(kind),
         });
         self.0.current_database.add_rust_item(None, rust_item)?;
