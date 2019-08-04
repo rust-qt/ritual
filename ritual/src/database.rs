@@ -77,6 +77,24 @@ impl ItemId {
     }
 }
 
+/// C++ documentation for a method
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
+pub struct DocItem {
+    /// HTML anchor of this documentation entry
+    /// (used to detect duplicates)
+    pub anchor: Option<String>,
+    /// HTML content
+    pub html: String,
+    /// If the documentation parser couldn't find documentation for the exact same
+    /// method, it can still provide documentation entry for the closest match.
+    /// In this case, this field should contain C++ declaration of the found method.
+    pub mismatched_declaration: Option<String>,
+    /// Absolute URL to online documentation page for this method
+    pub url: Option<String>,
+    /// Absolute documentation URLs encountered in the content
+    pub cross_references: Vec<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum DatabaseItemData {
@@ -84,6 +102,7 @@ pub enum DatabaseItemData {
     FfiItem(CppFfiItem),
     CppChecksItem(CppChecksItem),
     RustItem(RustItem),
+    DocItem(DocItem),
 }
 
 impl DatabaseItemData {
@@ -159,6 +178,27 @@ impl DatabaseItemData {
     }
     pub fn as_cpp_checks_item_mut(&mut self) -> Option<&mut CppChecksItem> {
         if let DatabaseItemData::CppChecksItem(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+    pub fn is_doc_item(&self) -> bool {
+        if let DatabaseItemData::DocItem(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+    pub fn as_doc_item(&self) -> Option<&DocItem> {
+        if let DatabaseItemData::DocItem(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+    pub fn as_doc_item_mut(&mut self) -> Option<&mut DocItem> {
+        if let DatabaseItemData::DocItem(data) = self {
             Some(data)
         } else {
             None
@@ -561,6 +601,37 @@ impl Database {
         id
     }
 
+    pub fn add_doc_item(&mut self, source_id: ItemId, item: DocItem) -> ItemId {
+        // we can't use `self.items_mut()` because of borrow checker
+        if let Some(old_item) = self
+            .data
+            .items
+            .iter_mut()
+            .map(|item| item.as_mut())
+            .filter_map(|i| i.filter_map(|i| i.as_doc_item_mut()))
+            .find(|i| i.source_id == Some(source_id))
+        {
+            if *old_item.item != item {
+                *old_item.item = item;
+                self.counters.items_added += 1;
+            } else {
+                self.counters.items_ignored += 1;
+            }
+            return old_item.id;
+        }
+
+        let id = ItemId(self.data.next_id);
+        self.data.next_id += 1;
+
+        self.data.items.push(DbItem {
+            id,
+            source_id: Some(source_id),
+            item: DatabaseItemData::DocItem(item),
+        });
+        self.counters.items_added += 1;
+        id
+    }
+
     pub fn cpp_checks(&self, source_id: ItemId) -> CppChecks {
         let items = self
             .items()
@@ -573,5 +644,25 @@ impl Database {
     pub fn delete_items(&mut self, mut function: impl FnMut(DbItem<&DatabaseItemData>) -> bool) {
         self.data.items.retain(|i| !function(i.as_ref()));
         self.collect_garbage();
+    }
+
+    pub fn find_doc_for(&self, id: ItemId) -> Result<Option<DbItem<&DocItem>>> {
+        let mut current_item = self.item(id)?;
+        loop {
+            if let Some(doc) = self
+                .items()
+                .filter_map(|i| i.filter_map(|i| i.as_doc_item()))
+                .find(|i| i.source_id == Some(current_item.id))
+            {
+                return Ok(Some(doc));
+            }
+
+            let new_id = if let Some(id) = current_item.source_id {
+                id
+            } else {
+                return Ok(None);
+            };
+            current_item = self.item(new_id)?;
+        }
     }
 }
