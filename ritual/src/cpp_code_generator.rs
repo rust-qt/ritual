@@ -7,7 +7,7 @@ use crate::cpp_ffi_data::{CppFfiFunction, CppFfiItem};
 use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
-use crate::database::Database;
+use crate::database::DatabaseClient;
 use crate::rust_info::{RustItem, RustStructKind};
 use itertools::Itertools;
 use ritual_common::cpp_lib_builder::version_to_number;
@@ -328,7 +328,7 @@ fn wrap_with_condition(code: &str, condition: &Condition) -> String {
 
 /// Generates a source file with the specified FFI methods.
 pub fn generate_cpp_file(
-    database: &Database,
+    database: &DatabaseClient,
     file_path: &Path,
     global_header_name: &str,
 ) -> Result<()> {

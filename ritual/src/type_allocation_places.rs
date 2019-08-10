@@ -105,7 +105,7 @@ const MAX_ITEMS: usize = 10;
 pub fn suggest_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut data_map = HashMap::new();
 
-    for item in data.current_database.cpp_items() {
+    for item in data.db.cpp_items() {
         if item.source_id.is_some() {
             continue;
         }
@@ -123,7 +123,7 @@ pub fn suggest_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
         }
     }
 
-    for item in data.current_database.cpp_items() {
+    for item in data.db.cpp_items() {
         if item.source_id.is_some() {
             continue;
         }

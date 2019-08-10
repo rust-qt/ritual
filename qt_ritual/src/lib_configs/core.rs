@@ -175,7 +175,7 @@ pub fn core_config(config: &mut Config) -> Result<()> {
                     if arg == &qmetamethod_ref_type {
                         return Ok(Some(RustPath::from_good_str(&format!(
                             "{}::QObject::connect_by_meta_methods",
-                            data.current_database.crate_name()
+                            data.db.crate_name()
                         ))));
                     }
                 }
@@ -213,7 +213,7 @@ pub fn core_config(config: &mut Config) -> Result<()> {
                 if cpp_function.path.items().len() == 1
                     && q_text_stream_functions.contains(&cpp_function.path.items()[0].name.as_str())
                 {
-                    let path = RustPath::from_good_str(data.current_database.crate_name())
+                    let path = RustPath::from_good_str(data.db.crate_name())
                         .join("q_text_stream")
                         .join(cpp_function.path.items()[0].name.to_snake_case());
 

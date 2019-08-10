@@ -1,7 +1,5 @@
 use crate::config::Config;
-use crate::cpp_data::CppItem;
-use crate::cpp_ffi_data::CppFfiItem;
-use crate::database::{Database, DbItem};
+use crate::database::DatabaseClient;
 use crate::workspace::Workspace;
 use crate::{
     cpp_casts, cpp_checker, cpp_ffi_generator, cpp_implicit_methods, cpp_omitting_arguments,
@@ -16,7 +14,6 @@ use ritual_common::utils::{run_command, MapIfOk};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
-use std::iter::once;
 use std::ops::Bound;
 use std::path::PathBuf;
 use std::process::Command;
@@ -62,20 +59,7 @@ fn check_all_paths(config: &Config) -> Result<()> {
 pub struct ProcessorData<'a> {
     pub workspace: &'a mut Workspace,
     pub config: &'a Config,
-    pub current_database: &'a mut Database,
-    pub dep_databases: &'a [Database],
-}
-
-impl<'a> ProcessorData<'a> {
-    pub fn all_databases(&self) -> impl Iterator<Item = &Database> {
-        once(&self.current_database as &_).chain(self.dep_databases.iter())
-    }
-    pub fn all_cpp_items(&self) -> impl Iterator<Item = DbItem<&CppItem>> {
-        self.all_databases().flat_map(|d| d.cpp_items())
-    }
-    pub fn all_ffi_items(&self) -> impl Iterator<Item = DbItem<&CppFfiItem>> {
-        self.all_databases().flat_map(|d| d.ffi_items())
-    }
+    pub db: &'a mut DatabaseClient,
 }
 
 struct ProcessingStep {
@@ -142,17 +126,15 @@ impl Default for ProcessingSteps {
         s.push("build_crate", build_crate);
 
         s.add_custom("clear_ffi", |data| {
-            data.current_database.delete_items(|i| i.item.is_ffi_item());
+            data.db.delete_items(|i| i.item.is_ffi_item());
             Ok(())
         });
         s.add_custom("clear_cpp_checks", |data| {
-            data.current_database
-                .delete_items(|i| i.item.is_cpp_checks_item());
+            data.db.delete_items(|i| i.item.is_cpp_checks_item());
             Ok(())
         });
         s.add_custom("clear_rust_info", |data| {
-            data.current_database
-                .delete_items(|i| i.item.is_rust_item());
+            data.db.delete_items(|i| i.item.is_rust_item());
             Ok(())
         });
         s.add_custom("show_non_portable", show_non_portable);
@@ -243,10 +225,10 @@ fn build_crate(data: &mut ProcessorData<'_>) -> Result<()> {
 }
 
 fn show_non_portable(data: &mut ProcessorData<'_>) -> Result<()> {
-    let all_envs = data.current_database.environments();
+    let all_envs = data.db.environments();
     let mut results = HashMap::<_, Vec<_>>::new();
-    for item in data.current_database.ffi_items() {
-        let checks = data.current_database.cpp_checks(item.id);
+    for item in data.db.ffi_items() {
+        let checks = data.db.cpp_checks(item.id);
         if checks.any_success() && !checks.all_success(all_envs) {
             let envs = checks.successful_envs().cloned().collect_vec();
             let text = item.item.short_text();
@@ -312,21 +294,16 @@ pub fn process(
         step_names = &step_names[1..];
     } else {
         allow_load = true;
-        info!("Loading current crate data");
     }
 
     let mut current_database = workspace
-        .get_database(config.crate_properties().name(), allow_load, true)
+        .get_database_client(
+            config.crate_properties().name(),
+            config.dependent_cpp_crates().iter().map(|s| s.as_str()),
+            allow_load,
+            true,
+        )
         .with_context(|_| "failed to load current crate data")?;
-
-    if !config.dependent_cpp_crates().is_empty() {
-        info!("Loading dependencies");
-    }
-    let dependent_cpp_crates = config.dependent_cpp_crates().iter().map_if_ok(|name| {
-        workspace
-            .get_database(name, true, false)
-            .with_context(|_| "failed to load dependency")
-    })?;
 
     current_database.set_crate_version(config.crate_properties().version().to_string());
 
@@ -391,8 +368,7 @@ pub fn process(
 
             let mut data = ProcessorData {
                 workspace,
-                current_database: &mut current_database,
-                dep_databases: &dependent_cpp_crates,
+                db: &mut current_database,
                 config,
             };
 
@@ -415,12 +391,8 @@ pub fn process(
         }
     }
 
-    for database in dependent_cpp_crates {
-        workspace.put_database(database);
-    }
-
     workspace.save_database(&mut current_database)?;
-    workspace.put_database(current_database);
+    workspace.put_database_client(current_database);
 
     steps_result
 }

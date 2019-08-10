@@ -11,6 +11,7 @@ fn check_template_type(data: &ProcessorData<'_>, type1: &CppType) -> Result<()> 
         CppType::Class(path) => {
             if let Some(template_arguments) = &path.last().template_arguments {
                 let is_available = data
+                    .db
                     .all_cpp_items()
                     .filter_map(|i| i.item.as_type_ref())
                     .any(|inst| &inst.path == path);
@@ -93,7 +94,7 @@ fn apply_instantiation_to_method(
 /// methods of existing template classes and existing template methods.
 pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut new_methods = Vec::new();
-    for item in data.all_cpp_items() {
+    for item in data.db.all_cpp_items() {
         let function = if let Some(f) = item.item.as_function_ref() {
             f
         } else {
@@ -119,7 +120,7 @@ pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
                 continue;
             }
             for type1 in data
-                .current_database
+                .db
                 .cpp_items()
                 .filter_map(|item| item.item.as_type_ref())
             {
@@ -172,8 +173,7 @@ pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
         }
     }
     for (item, source_id) in new_methods {
-        data.current_database
-            .add_cpp_item(source_id, CppItem::Function(item))?;
+        data.db.add_cpp_item(source_id, CppItem::Function(item))?;
     }
     Ok(())
 }
@@ -190,6 +190,7 @@ pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> 
                         .any(CppType::is_or_contains_template_parameter)
                     {
                         let is_in_database = data
+                            .db
                             .all_cpp_items()
                             .filter_map(|item| item.item.as_type_ref())
                             .any(|i| &i.path == path);
@@ -210,13 +211,14 @@ pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> 
         }
     }
     let mut result = Vec::new();
-    for item in data.current_database.cpp_items() {
+    for item in data.db.cpp_items() {
         for type1 in item.item.all_involved_types() {
             check_type(&type1, &data, &mut result);
         }
     }
     for item in result {
         let original_type = data
+            .db
             .all_cpp_items()
             .filter_map(|x| x.item.as_type_ref())
             .find(|t| {
@@ -233,7 +235,7 @@ pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> 
         if let Some(original_type) = original_type {
             let mut new_type = original_type.clone();
             new_type.path = item;
-            data.current_database.add_cpp_item(
+            data.db.add_cpp_item(
                 None, // TODO: what is the source ffi item?
                 CppItem::Type(new_type),
             )?;

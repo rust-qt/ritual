@@ -1,7 +1,7 @@
 //! Types and functions used for Rust code generation.
 
 use crate::cpp_checks::Condition;
-use crate::database::{Database, DbItem};
+use crate::database::{DatabaseClient, DbItem};
 use crate::doc_formatter;
 use crate::rust_generator::qt_core_path;
 use crate::rust_info::{
@@ -111,7 +111,7 @@ struct Generator<'a> {
     output_src_path: PathBuf,
     crate_template_src_path: Option<PathBuf>,
     destination: Vec<File<BufWriter<fs::File>>>,
-    current_database: &'a Database,
+    current_database: &'a DatabaseClient,
 }
 
 impl Write for Generator<'_> {
@@ -1046,7 +1046,7 @@ impl Generator<'_> {
 }
 
 pub fn generate(
-    current_database: &Database,
+    current_database: &DatabaseClient,
     output_src_path: impl Into<PathBuf>,
     crate_template_src_path: Option<impl Into<PathBuf>>,
 ) -> Result<()> {

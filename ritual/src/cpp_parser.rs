@@ -326,16 +326,12 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
         cpp_library_version: data.config.cpp_lib_version().map(ToString::to_string),
         target: current_target(),
     };
-    for ffi_item_id in data.current_database.ffi_item_ids().collect_vec() {
-        let ffi_item = data.current_database.ffi_item(ffi_item_id)?;
+    for ffi_item_id in data.db.ffi_item_ids().collect_vec() {
+        let ffi_item = data.db.ffi_item(ffi_item_id)?;
         if !ffi_item.item.is_source_item() {
             continue;
         }
-        if !data
-            .current_database
-            .cpp_checks(ffi_item_id)
-            .is_success(&current_target)
-        {
+        if !data.db.cpp_checks(ffi_item_id).is_success(&current_target) {
             continue;
         }
         let code = ffi_item.item.source_item_cpp_code()?;
@@ -365,11 +361,7 @@ impl CppParser<'_, '_> {
         origin_location: CppOriginLocation,
         item: CppItem,
     ) -> Result<()> {
-        if let Some(id) = self
-            .data
-            .current_database
-            .add_cpp_item(self.source_id, item)?
-        {
+        if let Some(id) = self.data.db.add_cpp_item(self.source_id, item)? {
             self.output.0.push(CppParserOutputItem {
                 include_file,
                 origin_location,
@@ -386,6 +378,7 @@ impl CppParser<'_, '_> {
         mut f: impl FnMut(&CppTypeDeclaration) -> bool,
     ) -> Option<&CppTypeDeclaration> {
         self.data
+            .db
             .all_cpp_items()
             .filter_map(|item| item.item.as_type_ref())
             .find(|i| f(i))

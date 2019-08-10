@@ -5,7 +5,7 @@
 
 use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFieldAccessorType};
 use crate::cpp_type::CppType;
-use crate::database::{Database, DbItem, DocItem};
+use crate::database::{DatabaseClient, DbItem, DocItem};
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_info::{
     RustEnumValue, RustFunction, RustFunctionKind, RustModule, RustModuleKind, RustQtReceiverType,
@@ -27,7 +27,7 @@ pub fn wrap_cpp_doc_block(html: &str) -> String {
     )
 }
 
-pub fn module_doc(module: DbItem<&RustModule>, _database: &Database) -> Result<String> {
+pub fn module_doc(module: DbItem<&RustModule>, _database: &DatabaseClient) -> Result<String> {
     let mut output = String::new();
     match module.item.kind {
         RustModuleKind::Special(kind) => match kind {
@@ -64,7 +64,7 @@ pub fn module_doc(module: DbItem<&RustModule>, _database: &Database) -> Result<S
     Ok(output)
 }
 
-pub fn struct_doc(type1: DbItem<&RustStruct>, database: &Database) -> Result<String> {
+pub fn struct_doc(type1: DbItem<&RustStruct>, database: &DatabaseClient) -> Result<String> {
     let current_crate = database.crate_name();
 
     let mut output = String::new();
@@ -147,7 +147,7 @@ pub fn struct_doc(type1: DbItem<&RustStruct>, database: &Database) -> Result<Str
     Ok(output)
 }
 
-pub fn enum_value_doc(value: DbItem<&RustEnumValue>, database: &Database) -> Result<String> {
+pub fn enum_value_doc(value: DbItem<&RustEnumValue>, database: &DatabaseClient) -> Result<String> {
     let cpp_item = database
         .source_cpp_item(value.id)?
         .ok_or_else(|| err_msg("source cpp item not found"))?
@@ -192,7 +192,7 @@ fn format_doc_item(cpp_doc: &DocItem) -> String {
     output
 }
 
-pub fn function_doc(function: DbItem<&RustFunction>, database: &Database) -> Result<String> {
+pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) -> Result<String> {
     let mut output = String::new();
 
     match &function.item.kind {

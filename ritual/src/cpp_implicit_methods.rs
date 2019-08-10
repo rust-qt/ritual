@@ -15,7 +15,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut methods = Vec::new();
 
     let classes = data
-        .current_database
+        .db
         .cpp_items()
         .filter_map(|item| item.filter_map(|item| item.as_type_ref()))
         .filter(|item| item.item.kind.is_class());
@@ -140,7 +140,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         }
     }
     for item in methods {
-        data.current_database
+        data.db
             .add_cpp_item(Some(item.source_id), CppItem::Function(item.value))?;
     }
     Ok(())

@@ -5,7 +5,7 @@ use ritual_common::errors::Result;
 
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut results = Vec::new();
-    for item in data.current_database.cpp_items() {
+    for item in data.db.cpp_items() {
         let function = if let Some(f) = item.item.as_function_ref() {
             f
         } else {
@@ -27,7 +27,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     }
 
     for item in results {
-        data.current_database
+        data.db
             .add_cpp_item(Some(item.source_id), CppItem::Function(item.value))?;
     }
 

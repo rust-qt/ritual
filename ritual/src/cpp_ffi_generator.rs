@@ -108,7 +108,7 @@ impl FfiNameProvider {
     pub fn new(data: &ProcessorData<'_>) -> Self {
         let prefix = format!("ctr_{}_ffi", &data.config.crate_properties().name());
         let names = data
-            .current_database
+            .db
             .ffi_items()
             .map(|f| f.item.path().to_cpp_code().unwrap())
             .collect();
@@ -146,6 +146,7 @@ impl FfiNameProvider {
 /// Runs the FFI generator
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let movable_types = data
+        .db
         .all_cpp_items()
         .filter_map(|item| {
             if let CppItem::Type(type_data) = &item.item {
@@ -161,10 +162,10 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
 
     let mut name_provider = FfiNameProvider::new(data);
 
-    let all_cpp_item_ids = data.current_database.cpp_item_ids().collect_vec();
+    let all_cpp_item_ids = data.db.cpp_item_ids().collect_vec();
 
     for cpp_item_id in all_cpp_item_ids {
-        let item = data.current_database.cpp_item(cpp_item_id)?;
+        let item = data.db.cpp_item(cpp_item_id)?;
         if let Err(err) = check_preconditions(&item.item) {
             trace!("skipping {}: {}", item.item, err);
             continue;
@@ -200,8 +201,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
             Ok(r) => {
                 let source_id = item.id;
                 for new_item in r {
-                    data.current_database
-                        .add_ffi_item(Some(source_id), new_item)?;
+                    data.db.add_ffi_item(Some(source_id), new_item)?;
                 }
             }
         }

@@ -10,6 +10,7 @@ use ritual_common::errors::*;
 /// Checks if `class_name` types inherits `base_name` type directly or indirectly.
 pub fn inherits(class_name: &CppPath, base_name: &CppPath, data: &ProcessorData<'_>) -> bool {
     let bases = data
+        .db
         .all_cpp_items()
         .filter_map(|item| item.filter_map(|item| item.as_base_ref()))
         .map(|item| item.item);
@@ -29,6 +30,7 @@ pub fn inherits(class_name: &CppPath, base_name: &CppPath, data: &ProcessorData<
 
 fn detect_inherited_methods2(data: &ProcessorData<'_>) -> Result<Vec<CppFunction>> {
     let mut remaining_classes = data
+        .db
         .all_cpp_items()
         .filter_map(|item| item.item.as_base_ref())
         .filter(|b| b.visibility != CppVisibility::Private)
@@ -59,6 +61,7 @@ fn detect_inherited_methods2(data: &ProcessorData<'_>) -> Result<Vec<CppFunction
     for class in ordered_classes {
         trace!("Detecting inherited methods for {:?}\n", class);
         let methods = data
+            .db
             .all_cpp_items()
             .filter_map(|item| item.item.as_function_ref())
             .filter(|m| m.class_type().ok().as_ref() == Some(&class.base_class_type));

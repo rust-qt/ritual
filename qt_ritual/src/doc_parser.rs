@@ -7,7 +7,7 @@ use log::{debug, error, trace};
 use regex::Regex;
 use ritual::cpp_data::{CppItem, CppPath};
 use ritual::cpp_function::CppFunction;
-use ritual::database::{Database, DocItem, ItemWithSource};
+use ritual::database::{DatabaseClient, DocItem, ItemWithSource};
 use ritual::processor::ProcessorData;
 use ritual_common::errors::{bail, err_msg, format_err, Error, Result, ResultExt};
 use select::document::Document;
@@ -640,7 +640,7 @@ fn log_function_doc_error(function: &CppFunction, error: &Error) {
 }
 
 /// Adds documentation from `data` to `cpp_methods`.
-fn find_methods_docs(database: &mut Database, data: &mut DocParser) -> Result<()> {
+fn find_methods_docs(database: &mut DatabaseClient, data: &mut DocParser) -> Result<()> {
     let mut new_items = Vec::new();
 
     let functions = database
@@ -690,10 +690,10 @@ pub fn parse_docs(
         }
     };
     let mut parser = DocParser::new(doc_data);
-    find_methods_docs(data.current_database, &mut parser)?;
+    find_methods_docs(data.db, &mut parser)?;
     let mut type_doc_cache = HashMap::new();
     let mut new_items = Vec::new();
-    for mut item in data.current_database.cpp_items_mut() {
+    for mut item in data.db.cpp_items_mut() {
         let type_name = match &item.item {
             CppItem::Type(data) => data.path.clone(),
             CppItem::EnumValue(data) => data
@@ -750,8 +750,7 @@ pub fn parse_docs(
         }
     }
     for item in new_items {
-        data.current_database
-            .add_doc_item(item.source_id, item.value);
+        data.db.add_doc_item(item.source_id, item.value);
     }
     parser.report_unused_anchors();
     Ok(())

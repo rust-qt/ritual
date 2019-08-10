@@ -32,7 +32,7 @@ use ritual_common::errors::{bail, err_msg, format_err, print_trace, Result};
 use ritual_common::string_utils::CaseOperations;
 use ritual_common::utils::MapIfOk;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::iter::{once, Iterator};
+use std::iter::Iterator;
 use std::ops::Deref;
 
 pub fn qt_core_path(crate_name: &str) -> RustPath {
@@ -428,11 +428,9 @@ impl State<'_, '_> {
             bail!("not a pointer to class");
         };
 
-        let mut all_ffi_items = self.0.all_databases().flat_map(|db| {
-            db.ffi_items().map(move |item| {
-                let item_checks = db.cpp_checks(item.id);
-                (item, item_checks)
-            })
+        let mut all_ffi_items = self.0.db.all_ffi_items().map(move |item| {
+            let item_checks = self.0.db.cpp_checks(item.id);
+            (item, item_checks)
         });
 
         let found = all_ffi_items.any(|(item, item_checks)| {
@@ -1113,7 +1111,7 @@ impl State<'_, '_> {
                 match State::process_operator_as_trait_impl(
                     unnamed_function.clone(),
                     operator,
-                    self.0.current_database.crate_name(),
+                    self.0.db.crate_name(),
                     trait_types,
                 ) {
                     Ok(item) => {
@@ -1144,8 +1142,7 @@ impl State<'_, '_> {
                 if arg0.name != "self" {
                     if let Ok(type1) = arg0.argument_type.ffi_type().pointer_like_to_target() {
                         if let RustType::Common(type1) = type1 {
-                            if type1.path.crate_name() == Some(self.0.current_database.crate_name())
-                            {
+                            if type1.path.crate_name() == Some(self.0.db.crate_name()) {
                                 arg0.name = "self".into();
                                 arg0.argument_type = RustFinalType::new(
                                     arg0.argument_type.ffi_type().clone(),
@@ -1178,30 +1175,10 @@ impl State<'_, '_> {
         Ok(results)
     }
 
-    fn find_rust_items(
-        &self,
-        cpp_path: &CppPath,
-        allow_dependencies: bool,
-    ) -> Result<impl Iterator<Item = DbItem<&RustItem>>> {
-        let databases = once(&self.0.current_database as &_)
-            .chain(self.0.dep_databases.iter().filter(|_| allow_dependencies));
-
-        for db in databases {
-            if let Some(cpp_item) = db
-                .cpp_items()
-                .find(|cpp_item| cpp_item.item.path() == Some(cpp_path))
-            {
-                return Ok(db
-                    .rust_items()
-                    .filter(move |item| item.source_id == Some(cpp_item.id)));
-            }
-        }
-
-        bail!("unknown cpp path: {}", cpp_path.to_cpp_pseudo_code())
-    }
-
     fn find_wrapper_type(&self, cpp_path: &CppPath) -> Result<DbItem<&RustItem>> {
-        self.find_rust_items(cpp_path, true)?
+        self.0
+            .db
+            .find_rust_items(cpp_path, true)?
             .find(|item| item.item.is_wrapper_type())
             .ok_or_else(|| {
                 format_err!("no Rust type wrapper for {}", cpp_path.to_cpp_pseudo_code())
@@ -1233,6 +1210,8 @@ impl State<'_, '_> {
         };
 
         let rust_item = self
+            .0
+            .db
             .find_rust_items(parent_path, false)?
             .find(|item| {
                 (allow_wrapper_type && item.item.is_wrapper_type())
@@ -1363,7 +1342,7 @@ impl State<'_, '_> {
             NameType::FfiFunction => {
                 let ffi_module = self
                     .0
-                    .current_database
+                    .db
                     .rust_items()
                     .filter_map(|i| i.item.as_module_ref())
                     .find(|module| {
@@ -1378,7 +1357,7 @@ impl State<'_, '_> {
             NameType::SizedItem => {
                 let sized_module = self
                     .0
-                    .current_database
+                    .db
                     .rust_items()
                     .filter_map(|i| i.item.as_module_ref())
                     .find(|module| {
@@ -1410,7 +1389,7 @@ impl State<'_, '_> {
                     if is_operator {
                         let ops_module = self
                             .0
-                            .current_database
+                            .db
                             .rust_items()
                             .filter_map(|i| i.item.as_module_ref())
                             .find(|module| {
@@ -1479,7 +1458,7 @@ impl State<'_, '_> {
 
         if name_type == NameType::FfiFunction {
             let rust_path = scope.apply(&full_last_name);
-            if self.0.current_database.find_rust_item(&rust_path).is_some() {
+            if self.0.db.find_rust_item(&rust_path).is_some() {
                 bail!("ffi function path already taken: {:?}", rust_path);
             }
             return Ok(rust_path);
@@ -1492,7 +1471,7 @@ impl State<'_, '_> {
         if name_type.is_api_function() {
             Ok(rust_path)
         } else {
-            Ok(self.0.current_database.make_unique_rust_path(&rust_path))
+            Ok(self.0.db.make_unique_rust_path(&rust_path))
         }
     }
 
@@ -1538,7 +1517,7 @@ impl State<'_, '_> {
         }
 
         let mut qt_slot_wrapper = None;
-        if let Some(source_ffi_item) = self.0.current_database.source_ffi_item(item.id)? {
+        if let Some(source_ffi_item) = self.0.db.source_ffi_item(item.id)? {
             if let Some(item) = source_ffi_item.filter_map(|i| i.as_slot_wrapper_ref()) {
                 qt_slot_wrapper = Some(item);
             }
@@ -1647,7 +1626,7 @@ impl State<'_, '_> {
                 },
             )?;
 
-            let checks = self.0.current_database.cpp_checks(wrapper.id);
+            let checks = self.0.db.cpp_checks(wrapper.id);
             let public_args = wrapper.item.arguments.iter().map_if_ok(|arg| {
                 self.rust_final_type(
                     arg,
@@ -1675,13 +1654,8 @@ impl State<'_, '_> {
     }
 
     fn process_cpp_item(&self, cpp_item: DbItem<&CppItem>) -> Result<Vec<RustItem>> {
-        if let Some(ffi_item) = self.0.current_database.source_ffi_item(cpp_item.id)? {
-            if !self
-                .0
-                .current_database
-                .cpp_checks(ffi_item.id)
-                .any_success()
-            {
+        if let Some(ffi_item) = self.0.db.source_ffi_item(cpp_item.id)? {
+            if !self.0.db.cpp_checks(ffi_item.id).any_success() {
                 bail!("cpp checks failed");
             }
         }
@@ -1749,7 +1723,7 @@ impl State<'_, '_> {
 
                 let original_item = self
                     .0
-                    .current_database
+                    .db
                     .original_cpp_item(cpp_item.id)?
                     .ok_or_else(|| err_msg("cpp item must have original cpp item"))?;
 
@@ -1837,7 +1811,7 @@ impl State<'_, '_> {
 
         if self
             .0
-            .current_database
+            .db
             .rust_items()
             .filter_map(|item| item.item.as_reexport_ref())
             .any(|item| item.source == source)
@@ -1851,7 +1825,7 @@ impl State<'_, '_> {
             source,
             target: RustPath::from_parts(vec![crate_name.to_string()]),
         });
-        self.0.current_database.add_rust_item(None, rust_item)?;
+        self.0.db.add_rust_item(None, rust_item)?;
         Ok(())
     }
 
@@ -1874,13 +1848,13 @@ impl State<'_, '_> {
             doc: RustModuleDoc { cpp_path: None },
             kind: RustModuleKind::Special(kind),
         });
-        self.0.current_database.add_rust_item(None, rust_item)?;
+        self.0.db.add_rust_item(None, rust_item)?;
         Ok(())
     }
 
     fn process_cpp_items(&mut self) -> Result<()> {
         let mut processed_ids = HashSet::new();
-        let all_cpp_item_ids = self.0.current_database.cpp_item_ids().collect_vec();
+        let all_cpp_item_ids = self.0.db.cpp_item_ids().collect_vec();
         loop {
             let mut any_processed = false;
             for &cpp_item_id in &all_cpp_item_ids {
@@ -1888,12 +1862,10 @@ impl State<'_, '_> {
                     continue;
                 }
 
-                let cpp_item = self.0.current_database.cpp_item(cpp_item_id)?;
+                let cpp_item = self.0.db.cpp_item(cpp_item_id)?;
                 if let Ok(rust_items) = self.process_cpp_item(cpp_item) {
                     for rust_item in rust_items {
-                        self.0
-                            .current_database
-                            .add_rust_item(Some(cpp_item_id), rust_item)?;
+                        self.0.db.add_rust_item(Some(cpp_item_id), rust_item)?;
                     }
                     processed_ids.insert(cpp_item_id);
                     any_processed = true;
@@ -1906,7 +1878,7 @@ impl State<'_, '_> {
         }
 
         for cpp_item_id in all_cpp_item_ids {
-            let cpp_item = self.0.current_database.cpp_item(cpp_item_id)?;
+            let cpp_item = self.0.db.cpp_item(cpp_item_id)?;
             if let Err(err) = self.process_cpp_item(cpp_item) {
                 debug!("failed to process cpp item: {}: {}", &cpp_item.item, err);
                 print_trace(&err, Some(log::Level::Trace));
@@ -1921,15 +1893,15 @@ impl State<'_, '_> {
         let mut grouped_functions = BTreeMap::<_, Vec<_>>::new();
         let mut trait_types = self
             .0
-            .current_database
+            .db
             .rust_items()
             .filter_map(|item| item.item.as_trait_impl_ref())
             .map(TraitTypes::from)
             .collect_vec();
 
-        for ffi_item_id in self.0.current_database.ffi_item_ids().collect_vec() {
-            let ffi_item = self.0.current_database.ffi_item(ffi_item_id)?;
-            let checks = self.0.current_database.cpp_checks(ffi_item_id);
+        for ffi_item_id in self.0.db.ffi_item_ids().collect_vec() {
+            let ffi_item = self.0.db.ffi_item(ffi_item_id)?;
+            let checks = self.0.db.cpp_checks(ffi_item_id);
             if !checks.any_success() {
                 debug!(
                     "skipping ffi item with failed checks: {}",
@@ -1946,9 +1918,7 @@ impl State<'_, '_> {
                                     trait_types.push(trait_impl.into());
                                 }
 
-                                self.0
-                                    .current_database
-                                    .add_rust_item(Some(ffi_item_id), rust_item)?;
+                                self.0.db.add_rust_item(Some(ffi_item_id), rust_item)?;
                             }
                             ProcessedFfiItem::Function(function) => {
                                 let entry = grouped_functions
@@ -1986,7 +1956,7 @@ impl State<'_, '_> {
             if paths.contains(&path) {
                 bail!("conflicting path: {:?}", path);
             }
-            if self.0.current_database.find_rust_item(&path).is_some() {
+            if self.0.db.find_rust_item(&path).is_some() {
                 bail!("path already taken by an existing item: {:?}", path);
             }
             paths.insert(path);
@@ -2038,11 +2008,9 @@ impl State<'_, '_> {
                 } else {
                     function.value.desired_path
                 };
-                let final_path = self.0.current_database.make_unique_rust_path(&path);
+                let final_path = self.0.db.make_unique_rust_path(&path);
                 let item = RustItem::Function(function.value.function.with_path(final_path));
-                self.0
-                    .current_database
-                    .add_rust_item(Some(function.source_id), item)?;
+                self.0.db.add_rust_item(Some(function.source_id), item)?;
             }
         }
         Ok(())
@@ -2061,12 +2029,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     }
 
     state.generate_crate_reexport("cpp_utils")?;
-    let dependencies = state
-        .0
-        .dep_databases
-        .iter()
-        .map(|db| db.crate_name().to_string())
-        .collect_vec();
+    let dependencies = state.0.config.dependent_cpp_crates().to_vec();
     for crate_name in dependencies {
         state.generate_crate_reexport(&crate_name)?;
     }

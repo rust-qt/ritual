@@ -3,7 +3,7 @@ use crate::cpp_checks::CppChecksItem;
 use crate::cpp_data::{CppItem, CppPath};
 use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFfiItem};
 use crate::cpp_type::CppType;
-use crate::database::{Database, DbItem, ItemId};
+use crate::database::{DatabaseClient, DbItem, ItemId};
 use crate::processor::ProcessorData;
 use crate::{cluster_api, cpp_code_generator};
 use itertools::Itertools;
@@ -32,7 +32,7 @@ use std::{iter, thread};
 
 pub const CHUNK_SIZE: usize = 64;
 
-fn snippet_for_item(item: DbItem<&CppFfiItem>, database: &Database) -> Result<Snippet> {
+fn snippet_for_item(item: DbItem<&CppFfiItem>, database: &DatabaseClient) -> Result<Snippet> {
     match &item.item {
         CppFfiItem::Function(cpp_ffi_function) => {
             let item_code = cpp_code_generator::function_implementation(cpp_ffi_function)?;
@@ -434,7 +434,7 @@ impl CppChecker<'_, '_> {
 
     fn run_cluster(&mut self) -> Result<()> {
         let cluster_config = self.data.config.cluster_config().unwrap();
-        let crate_name = self.data.current_database.crate_name().to_string();
+        let crate_name = self.data.db.crate_name().to_string();
 
         let environments = cluster_config
             .workers
@@ -452,7 +452,7 @@ impl CppChecker<'_, '_> {
             .collect_vec();
 
         for env in &environments {
-            self.data.current_database.add_environment(env.clone());
+            self.data.db.add_environment(env.clone());
         }
 
         let mut snippets = self.create_tasks(&environments);
@@ -475,7 +475,7 @@ impl CppChecker<'_, '_> {
 
         let env = self.env();
 
-        self.data.current_database.add_environment(env.clone());
+        self.data.db.add_environment(env.clone());
 
         let mut snippets = self.create_tasks(&[env]);
         if snippets.is_empty() {
@@ -504,19 +504,19 @@ impl CppChecker<'_, '_> {
     }
 
     fn create_tasks(&self, library_targets: &[LibraryTarget]) -> Vec<LocalSnippetTask> {
-        let crate_name = self.data.current_database.crate_name().to_string();
+        let crate_name = self.data.db.crate_name().to_string();
 
         let mut snippets = Vec::new();
         let mut old_items_count = 0;
 
-        for ffi_item in self.data.current_database.ffi_items() {
-            let checks = self.data.current_database.cpp_checks(ffi_item.id);
+        for ffi_item in self.data.db.ffi_items() {
+            let checks = self.data.db.cpp_checks(ffi_item.id);
             if checks.has_all_envs(library_targets) {
                 old_items_count += 1;
                 continue;
             }
 
-            match snippet_for_item(ffi_item, &self.data.current_database) {
+            match snippet_for_item(ffi_item, &self.data.db) {
                 Ok(snippet) => {
                     for library_target in library_targets {
                         if checks.has_env(library_target) {
@@ -563,10 +563,7 @@ impl CppChecker<'_, '_> {
         let mut error_count = 0;
 
         for snippet in snippets {
-            let ffi_item = self
-                .data
-                .current_database
-                .ffi_item_mut(snippet.data.ffi_item_id)?;
+            let ffi_item = self.data.db.ffi_item_mut(snippet.data.ffi_item_id)?;
             if let Some(output) = snippet.output {
                 if output.is_success() {
                     debug!("success: {}", ffi_item.item.short_text());
@@ -576,7 +573,7 @@ impl CppChecker<'_, '_> {
                     error_count += 1;
                 }
                 let ffi_item_id = ffi_item.id;
-                self.data.current_database.add_cpp_checks_item(
+                self.data.db.add_cpp_checks_item(
                     ffi_item_id,
                     CppChecksItem {
                         env: snippet.data.library_target,
@@ -624,13 +621,13 @@ fn type_paths(type1: &CppType) -> Vec<&CppPath> {
 
 pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
     if let Some(hook) = data.config.ffi_generator_hook() {
-        let ids = data.current_database.ffi_item_ids().collect_vec();
+        let ids = data.db.ffi_item_ids().collect_vec();
         for id in ids {
-            let checks = data.current_database.cpp_checks(id);
+            let checks = data.db.cpp_checks(id);
             if !checks.any_success() {
                 continue;
             }
-            let item = data.current_database.ffi_item(id)?;
+            let item = data.db.ffi_item(id)?;
             let allowed = if let CppFfiItem::Function(function) = &item.item {
                 match &function.kind {
                     CppFfiFunctionKind::Function { cpp_function, .. } => {
@@ -645,19 +642,19 @@ pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
             };
             if !allowed {
                 log::info!("Deleting item: {}", item.item.short_text());
-                data.current_database.delete_items(|i| i.id == id);
+                data.db.delete_items(|i| i.id == id);
             }
         }
     }
 
     if let Some(hook) = data.config.cpp_parser_path_hook() {
-        let ids = data.current_database.ffi_item_ids().collect_vec();
+        let ids = data.db.ffi_item_ids().collect_vec();
         for id in ids {
-            let checks = data.current_database.cpp_checks(id);
+            let checks = data.db.cpp_checks(id);
             if !checks.any_success() {
                 continue;
             }
-            let item = data.current_database.ffi_item(id)?;
+            let item = data.db.ffi_item(id)?;
             let (types, path) = match &item.item {
                 CppFfiItem::Function(function) => match &function.kind {
                     CppFfiFunctionKind::Function { cpp_function, .. } => (
@@ -681,7 +678,7 @@ pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
 
             if any_blocked {
                 log::info!("Deleting item: {}", item.item.short_text());
-                data.current_database.delete_items(|i| i.id == id);
+                data.db.delete_items(|i| i.id == id);
             }
         }
     }

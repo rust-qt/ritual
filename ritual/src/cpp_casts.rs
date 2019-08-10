@@ -74,7 +74,7 @@ fn generate_casts_one(
         &target_ptr_type,
     )?);
 
-    for item in data.all_cpp_items().filter_map(|i| i.item.as_base_ref()) {
+    for item in data.db.all_cpp_items().filter_map(|i| i.item.as_base_ref()) {
         if &item.derived_class_type == base_type {
             new_methods.extend(generate_casts_one(
                 target_type,
@@ -102,7 +102,7 @@ fn generate_casts(base: &CppBaseSpecifier, data: &ProcessorData<'_>) -> Result<V
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut results = Vec::new();
     let bases = data
-        .current_database
+        .db
         .cpp_items()
         .filter_map(|item| item.filter_map(|item| item.as_base_ref()));
 
@@ -115,8 +115,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         }
     }
     for item in results {
-        data.current_database
-            .add_cpp_item(Some(item.source_id), item.value)?;
+        data.db.add_cpp_item(Some(item.source_id), item.value)?;
     }
     Ok(())
 }
