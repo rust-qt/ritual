@@ -660,10 +660,7 @@ fn find_methods_docs(database: &mut DatabaseClient, data: &mut DocParser) -> Res
             &item.item.pseudo_declaration(),
         ) {
             Ok(doc) => {
-                new_items.push(ItemWithSource {
-                    source_id: item.id,
-                    value: doc,
-                });
+                new_items.push(ItemWithSource::new(&item.id, doc));
             }
             Err(error) => {
                 log_function_doc_error(item.item, &error);
@@ -719,10 +716,7 @@ pub fn parse_docs(
         if let Ok(doc) = doc {
             match &mut item.item {
                 CppItem::Type(_) => {
-                    new_items.push(ItemWithSource {
-                        source_id: item.id,
-                        value: doc.type_doc.clone(),
-                    });
+                    new_items.push(ItemWithSource::new(&item.id, doc.type_doc.clone()));
                 }
                 CppItem::EnumValue(data) => {
                     if let Some(r) = doc

@@ -108,10 +108,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
 
     for item in bases {
         for value in generate_casts(item.item, &data)? {
-            results.push(ItemWithSource {
-                source_id: item.id,
-                value,
-            });
+            results.push(ItemWithSource::new(&item.id, value));
         }
     }
     for item in results {

@@ -18,10 +18,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                 if !arg.has_default_value {
                     break;
                 }
-                results.push(ItemWithSource {
-                    value: function_copy.clone(),
-                    source_id: item.id,
-                });
+                results.push(ItemWithSource::new(&item.id, function_copy.clone()));
             }
         }
     }

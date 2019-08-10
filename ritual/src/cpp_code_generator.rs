@@ -352,7 +352,7 @@ pub fn generate_cpp_file(
 
     let mut any_slot_wrappers = false;
     for ffi_item in &ffi_items {
-        let checks = database.cpp_checks(ffi_item.id);
+        let checks = database.cpp_checks(&ffi_item.id);
         if !checks.any_success() {
             continue;
         }
@@ -366,7 +366,7 @@ pub fn generate_cpp_file(
 
     writeln!(cpp_file, "extern \"C\" {{")?;
     for ffi_item in &ffi_items {
-        let checks = database.cpp_checks(ffi_item.id);
+        let checks = database.cpp_checks(&ffi_item.id);
         if !checks.any_success() {
             continue;
         }

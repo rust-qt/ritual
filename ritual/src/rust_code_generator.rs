@@ -233,13 +233,13 @@ impl Generator<'_> {
         item: DbItem<&RustItem>,
         self_type: Option<&RustType>,
     ) -> Result<()> {
-        let ffi_item = self.current_database.source_ffi_item(item.id)?;
+        let ffi_item = self.current_database.source_ffi_item(&item.id)?;
 
         let mut condition_texts = ConditionTexts::default();
         if let Some(ffi_item) = ffi_item {
             let condition = self
                 .current_database
-                .cpp_checks(ffi_item.id)
+                .cpp_checks(&ffi_item.id)
                 .condition(self.current_database.environments());
             if condition != Condition::True {
                 let expression = condition_expression(&condition);
@@ -328,7 +328,7 @@ impl Generator<'_> {
             self,
             "{}",
             format_doc_extended(
-                &doc_formatter::module_doc(module, self.current_database)?,
+                &doc_formatter::module_doc(module.clone(), self.current_database)?,
                 true
             )
         )?;
@@ -390,7 +390,7 @@ impl Generator<'_> {
         rust_struct: DbItem<&RustStruct>,
         condition_texts: &ConditionTexts,
     ) -> Result<()> {
-        let doc = doc_formatter::struct_doc(rust_struct, self.current_database)?
+        let doc = doc_formatter::struct_doc(rust_struct.clone(), self.current_database)?
             + &condition_texts.doc_text;
         write!(self, "{}", format_doc(&doc))?;
 
@@ -494,7 +494,7 @@ impl Generator<'_> {
             self,
             "{}",
             format_doc(&doc_formatter::enum_value_doc(
-                value,
+                value.clone(),
                 self.current_database
             )?)
         )?;
@@ -927,8 +927,8 @@ impl Generator<'_> {
         };
 
         // TODO: move condition texts to doc parser
-        let doc =
-            doc_formatter::function_doc(func, self.current_database)? + &condition_texts.doc_text;
+        let doc = doc_formatter::function_doc(func.clone(), self.current_database)?
+            + &condition_texts.doc_text;
         writeln!(
             self,
             "{doc}{condition}{maybe_pub}{maybe_unsafe} \
@@ -978,10 +978,10 @@ impl Generator<'_> {
 
     fn generate_trait_impl(
         &mut self,
-        trait1: DbItem<&RustTraitImpl>,
+        trait_impl: DbItem<&RustTraitImpl>,
         condition_texts: &ConditionTexts,
     ) -> Result<()> {
-        let associated_types_text = trait1
+        let associated_types_text = trait_impl
             .item
             .associated_types
             .iter()
@@ -993,16 +993,16 @@ impl Generator<'_> {
             self,
             "{}impl {} for {} {{\n{}",
             condition_texts.attribute,
-            self.rust_type_to_code(&trait1.item.trait_type),
-            self.rust_type_to_code(&trait1.item.target_type),
+            self.rust_type_to_code(&trait_impl.item.trait_type),
+            self.rust_type_to_code(&trait_impl.item.target_type),
             associated_types_text,
         )?;
 
-        for func in &trait1.item.functions {
+        for func in &trait_impl.item.functions {
             self.generate_function(
-                trait1.map(|_| func),
+                trait_impl.clone().map(|_| func),
                 true,
-                Some(&trait1.item.target_type),
+                Some(&trait_impl.item.target_type),
                 &ConditionTexts::default(),
             )?;
         }

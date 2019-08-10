@@ -228,7 +228,7 @@ fn show_non_portable(data: &mut ProcessorData<'_>) -> Result<()> {
     let all_envs = data.db.environments();
     let mut results = HashMap::<_, Vec<_>>::new();
     for item in data.db.ffi_items() {
-        let checks = data.db.cpp_checks(item.id);
+        let checks = data.db.cpp_checks(&item.id);
         if checks.any_success() && !checks.all_success(all_envs) {
             let envs = checks.successful_envs().cloned().collect_vec();
             let text = item.item.short_text();

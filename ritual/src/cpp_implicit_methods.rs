@@ -46,10 +46,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                 cast: None,
                 declaration_code: None,
             };
-            methods.push(ItemWithSource {
-                source_id: type1.id,
-                value: destructor,
-            });
+            methods.push(ItemWithSource::new(&type1.id, destructor));
 
             let default_constructor = CppFunction {
                 path: type1
@@ -73,10 +70,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                 declaration_code: None,
                 cast: None,
             };
-            methods.push(ItemWithSource {
-                source_id: type1.id,
-                value: default_constructor,
-            });
+            methods.push(ItemWithSource::new(&type1.id, default_constructor));
 
             let copy_arg = CppFunctionArgument {
                 argument_type: CppType::new_reference(true, CppType::Class(class_path.clone())),
@@ -106,10 +100,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                 cast: None,
                 declaration_code: None,
             };
-            methods.push(ItemWithSource {
-                source_id: type1.id,
-                value: copy_constructor,
-            });
+            methods.push(ItemWithSource::new(&type1.id, copy_constructor));
 
             let assignment_operator = CppFunction {
                 path: type1
@@ -133,10 +124,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                 cast: None,
                 declaration_code: None,
             };
-            methods.push(ItemWithSource {
-                source_id: type1.id,
-                value: assignment_operator,
-            });
+            methods.push(ItemWithSource::new(&type1.id, assignment_operator));
         }
     }
     for item in methods {

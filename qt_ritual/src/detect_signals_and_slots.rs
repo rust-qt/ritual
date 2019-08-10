@@ -52,7 +52,7 @@ pub fn detect_signals_and_slots(
 
     let qobject_path = CppPath::from_good_str("QObject");
     for item in &output.0 {
-        let cpp_item = data.db.cpp_item(item.id)?;
+        let cpp_item = data.db.cpp_item(&item.id)?;
 
         if let CppItem::Type(type1) = &cpp_item.item {
             if type1.kind.is_class() {
@@ -103,7 +103,7 @@ pub fn detect_signals_and_slots(
 
     let mut sections_per_class = HashMap::new();
     for item in &output.0 {
-        let cpp_item = data.db.cpp_item(item.id)?;
+        let cpp_item = data.db.cpp_item(&item.id)?;
 
         if let CppItem::Type(type1) = &cpp_item.item {
             if let Some(sections) = sections.get(&item.origin_location.include_file_path) {
@@ -117,7 +117,7 @@ pub fn detect_signals_and_slots(
     }
 
     for item in &output.0 {
-        let mut cpp_item = data.db.cpp_item_mut(item.id)?;
+        let mut cpp_item = data.db.cpp_item_mut(&item.id)?;
         if let CppItem::Function(method) = &mut cpp_item.item {
             let mut section_type = SectionType::Other;
             if let Ok(class_name) = method.class_type() {

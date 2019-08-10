@@ -165,7 +165,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     let all_cpp_item_ids = data.db.cpp_item_ids().collect_vec();
 
     for cpp_item_id in all_cpp_item_ids {
-        let item = data.db.cpp_item(cpp_item_id)?;
+        let item = data.db.cpp_item(&cpp_item_id)?;
         if let Err(err) = check_preconditions(&item.item) {
             trace!("skipping {}: {}", item.item, err);
             continue;
@@ -201,7 +201,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
             Ok(r) => {
                 let source_id = item.id;
                 for new_item in r {
-                    data.db.add_ffi_item(Some(source_id), new_item)?;
+                    data.db.add_ffi_item(Some(source_id.clone()), new_item)?;
                 }
             }
         }

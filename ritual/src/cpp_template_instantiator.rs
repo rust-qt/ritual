@@ -164,7 +164,7 @@ pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
                             }
                         }
                         if ok {
-                            new_methods.push((method, item.source_id));
+                            new_methods.push((method, item.source_id.clone()));
                         }
                     }
                     Err(msg) => trace!("failed: {}", msg),

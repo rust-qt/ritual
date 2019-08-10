@@ -327,11 +327,11 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
         target: current_target(),
     };
     for ffi_item_id in data.db.ffi_item_ids().collect_vec() {
-        let ffi_item = data.db.ffi_item(ffi_item_id)?;
+        let ffi_item = data.db.ffi_item(&ffi_item_id)?;
         if !ffi_item.item.is_source_item() {
             continue;
         }
-        if !data.db.cpp_checks(ffi_item_id).is_success(&current_target) {
+        if !data.db.cpp_checks(&ffi_item_id).is_success(&current_target) {
             continue;
         }
         let code = ffi_item.item.source_item_cpp_code()?;
@@ -361,7 +361,7 @@ impl CppParser<'_, '_> {
         origin_location: CppOriginLocation,
         item: CppItem,
     ) -> Result<()> {
-        if let Some(id) = self.data.db.add_cpp_item(self.source_id, item)? {
+        if let Some(id) = self.data.db.add_cpp_item(self.source_id.clone(), item)? {
             self.output.0.push(CppParserOutputItem {
                 include_file,
                 origin_location,

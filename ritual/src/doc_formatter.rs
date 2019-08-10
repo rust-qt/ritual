@@ -141,7 +141,7 @@ pub fn struct_doc(type1: DbItem<&RustStruct>, database: &DatabaseClient) -> Resu
         RustStructKind::SizedType(_) => {}
     };
 
-    if let Some(doc_item) = database.find_doc_for(type1.id)? {
+    if let Some(doc_item) = database.find_doc_for(&type1.id)? {
         write!(output, "{}", format_doc_item(doc_item.item))?;
     }
     Ok(output)
@@ -149,7 +149,7 @@ pub fn struct_doc(type1: DbItem<&RustStruct>, database: &DatabaseClient) -> Resu
 
 pub fn enum_value_doc(value: DbItem<&RustEnumValue>, database: &DatabaseClient) -> Result<String> {
     let cpp_item = database
-        .source_cpp_item(value.id)?
+        .source_cpp_item(&value.id)?
         .ok_or_else(|| err_msg("source cpp item not found"))?
         .item
         .as_enum_value_ref()
@@ -163,7 +163,7 @@ pub fn enum_value_doc(value: DbItem<&RustEnumValue>, database: &DatabaseClient) 
             value.item.value
         ))
     );
-    if let Some(doc_item) = database.find_doc_for(value.id)? {
+    if let Some(doc_item) = database.find_doc_for(&value.id)? {
         doc = format!("{} ({})", doc_item.item.html, doc);
     }
     Ok(doc)
@@ -257,7 +257,7 @@ pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) 
         RustFunctionKind::FfiFunction => {}
     }
     // TODO: somehow handle docs for inherited methods (currently only for virtual functions).
-    if let Some(doc_item) = database.find_doc_for(function.id)? {
+    if let Some(doc_item) = database.find_doc_for(&function.id)? {
         write!(output, "{}", format_doc_item(doc_item.item))?;
     }
     Ok(output)

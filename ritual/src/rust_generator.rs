@@ -421,6 +421,10 @@ impl State<'_, '_> {
     }
 
     fn is_type_deletable(&self, ffi_type: &CppType, checks: &CppChecks) -> Result<bool> {
+        debug!(
+            "is_type_deletable(ffi_type={:?}, checks={:?}",
+            ffi_type, checks
+        );
         let class_type = ffi_type.pointer_like_to_target()?;
         let class_path = if let CppType::Class(path) = class_type {
             path
@@ -428,27 +432,39 @@ impl State<'_, '_> {
             bail!("not a pointer to class");
         };
 
-        let mut all_ffi_items = self.0.db.all_ffi_items().map(move |item| {
-            let item_checks = self.0.db.cpp_checks(item.id);
-            (item, item_checks)
-        });
+        let destructor = if let Some(r) = self
+            .0
+            .db
+            .all_cpp_items()
+            .filter_map(|item| item.filter_map(|item| item.as_function_ref()))
+            .find(|f| f.item.is_destructor() && &f.item.class_type().unwrap() == class_path)
+        {
+            r
+        } else {
+            debug!("    not deletable (destructor not found)");
+            return Ok(false);
+        };
 
-        let found = all_ffi_items.any(|(item, item_checks)| {
-            if !item_checks.is_always_success_for(checks) || item_checks.is_empty() {
-                return false;
-            }
-            if let CppFfiItem::Function(func) = &item.item {
-                if let CppFfiFunctionKind::Function { cpp_function, .. } = &func.kind {
-                    cpp_function.is_destructor()
-                        && &cpp_function.class_type().unwrap() == class_path
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        });
-        Ok(found)
+        let ffi_item = if let Some(r) = self
+            .0
+            .db
+            .all_ffi_items()
+            .find(|i| i.source_id.as_ref() == Some(&destructor.id))
+        {
+            r
+        } else {
+            debug!("    not deletable (ffi item for destructor not found)");
+            return Ok(false);
+        };
+
+        let destructor_checks = self.0.db.cpp_checks(&ffi_item.id);
+        debug!("    destructor checks: {:?}", destructor_checks);
+
+        let is_deletable =
+            !destructor_checks.is_empty() && destructor_checks.is_always_success_for(checks);
+
+        debug!("    is_type_deletable = {}", is_deletable);
+        Ok(is_deletable)
     }
 
     /// Generates `CompleteType` from `CppFfiType`, adding
@@ -1178,7 +1194,7 @@ impl State<'_, '_> {
     fn find_wrapper_type(&self, cpp_path: &CppPath) -> Result<DbItem<&RustItem>> {
         self.0
             .db
-            .find_rust_items(cpp_path, true)?
+            .find_rust_items_for_cpp_path(cpp_path, true)?
             .find(|item| item.item.is_wrapper_type())
             .ok_or_else(|| {
                 format_err!("no Rust type wrapper for {}", cpp_path.to_cpp_pseudo_code())
@@ -1212,7 +1228,7 @@ impl State<'_, '_> {
         let rust_item = self
             .0
             .db
-            .find_rust_items(parent_path, false)?
+            .find_rust_items_for_cpp_path(parent_path, false)?
             .find(|item| {
                 (allow_wrapper_type && item.item.is_wrapper_type())
                     || (item.item.is_module() && !item.item.is_module_for_nested())
@@ -1517,13 +1533,13 @@ impl State<'_, '_> {
         }
 
         let mut qt_slot_wrapper = None;
-        if let Some(source_ffi_item) = self.0.db.source_ffi_item(item.id)? {
+        if let Some(source_ffi_item) = self.0.db.source_ffi_item(&item.id)? {
             if let Some(item) = source_ffi_item.filter_map(|i| i.as_slot_wrapper_ref()) {
                 qt_slot_wrapper = Some(item);
             }
         }
 
-        let public_name_type = if let Some(wrapper) = qt_slot_wrapper {
+        let public_name_type = if let Some(wrapper) = &qt_slot_wrapper {
             NameType::QtSlotWrapper {
                 signal_arguments: &wrapper.item.signal_arguments,
                 is_public: false,
@@ -1626,7 +1642,7 @@ impl State<'_, '_> {
                 },
             )?;
 
-            let checks = self.0.db.cpp_checks(wrapper.id);
+            let checks = self.0.db.cpp_checks(&wrapper.id);
             let public_args = wrapper.item.arguments.iter().map_if_ok(|arg| {
                 self.rust_final_type(
                     arg,
@@ -1654,8 +1670,8 @@ impl State<'_, '_> {
     }
 
     fn process_cpp_item(&self, cpp_item: DbItem<&CppItem>) -> Result<Vec<RustItem>> {
-        if let Some(ffi_item) = self.0.db.source_ffi_item(cpp_item.id)? {
-            if !self.0.db.cpp_checks(ffi_item.id).any_success() {
+        if let Some(ffi_item) = self.0.db.source_ffi_item(&cpp_item.id)? {
+            if !self.0.db.cpp_checks(&ffi_item.id).any_success() {
                 bail!("cpp checks failed");
             }
         }
@@ -1724,7 +1740,7 @@ impl State<'_, '_> {
                 let original_item = self
                     .0
                     .db
-                    .original_cpp_item(cpp_item.id)?
+                    .original_cpp_item(&cpp_item.id)?
                     .ok_or_else(|| err_msg("cpp item must have original cpp item"))?;
 
                 if let Some(original_function) = original_item.item.as_function_ref() {
@@ -1857,15 +1873,17 @@ impl State<'_, '_> {
         let all_cpp_item_ids = self.0.db.cpp_item_ids().collect_vec();
         loop {
             let mut any_processed = false;
-            for &cpp_item_id in &all_cpp_item_ids {
+            for cpp_item_id in all_cpp_item_ids.clone() {
                 if processed_ids.contains(&cpp_item_id) {
                     continue;
                 }
 
-                let cpp_item = self.0.db.cpp_item(cpp_item_id)?;
+                let cpp_item = self.0.db.cpp_item(&cpp_item_id)?;
                 if let Ok(rust_items) = self.process_cpp_item(cpp_item) {
                     for rust_item in rust_items {
-                        self.0.db.add_rust_item(Some(cpp_item_id), rust_item)?;
+                        self.0
+                            .db
+                            .add_rust_item(Some(cpp_item_id.clone()), rust_item)?;
                     }
                     processed_ids.insert(cpp_item_id);
                     any_processed = true;
@@ -1878,8 +1896,8 @@ impl State<'_, '_> {
         }
 
         for cpp_item_id in all_cpp_item_ids {
-            let cpp_item = self.0.db.cpp_item(cpp_item_id)?;
-            if let Err(err) = self.process_cpp_item(cpp_item) {
+            let cpp_item = self.0.db.cpp_item(&cpp_item_id)?;
+            if let Err(err) = self.process_cpp_item(cpp_item.clone()) {
                 debug!("failed to process cpp item: {}: {}", &cpp_item.item, err);
                 print_trace(&err, Some(log::Level::Trace));
             }
@@ -1900,8 +1918,8 @@ impl State<'_, '_> {
             .collect_vec();
 
         for ffi_item_id in self.0.db.ffi_item_ids().collect_vec() {
-            let ffi_item = self.0.db.ffi_item(ffi_item_id)?;
-            let checks = self.0.db.cpp_checks(ffi_item_id);
+            let ffi_item = self.0.db.ffi_item(&ffi_item_id)?;
+            let checks = self.0.db.cpp_checks(&ffi_item_id);
             if !checks.any_success() {
                 debug!(
                     "skipping ffi item with failed checks: {}",
@@ -1918,16 +1936,15 @@ impl State<'_, '_> {
                                     trait_types.push(trait_impl.into());
                                 }
 
-                                self.0.db.add_rust_item(Some(ffi_item_id), rust_item)?;
+                                self.0
+                                    .db
+                                    .add_rust_item(Some(ffi_item_id.clone()), rust_item)?;
                             }
                             ProcessedFfiItem::Function(function) => {
                                 let entry = grouped_functions
                                     .entry(function.desired_path.clone())
                                     .or_default();
-                                entry.push(ItemWithSource {
-                                    source_id: ffi_item_id,
-                                    value: function,
-                                });
+                                entry.push(ItemWithSource::new(&ffi_item_id, function));
                             }
                         }
                     }
