@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::database::DatabaseClient;
+use crate::database::{DatabaseClient, ItemId};
 use crate::workspace::Workspace;
 use crate::{
     cpp_casts, cpp_checker, cpp_ffi_generator, cpp_implicit_methods, cpp_omitting_arguments,
@@ -280,6 +280,7 @@ pub fn process(
     workspace: &mut Workspace,
     config: &Config,
     mut step_names: &[String],
+    trace_item_id: Option<&ItemId>,
 ) -> Result<()> {
     info!("Processing crate: {}", config.crate_properties().name());
     check_all_paths(&config)?;
@@ -306,6 +307,11 @@ pub fn process(
         .with_context(|_| "failed to load current crate data")?;
 
     current_database.set_crate_version(config.crate_properties().version().to_string());
+
+    if let Some(trace_item_id) = trace_item_id {
+        current_database.print_item_trace(trace_item_id)?;
+        return Ok(());
+    }
 
     let mut steps_result = Ok(());
 

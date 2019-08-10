@@ -193,16 +193,24 @@ fn format_doc_item(cpp_doc: &DocItem) -> String {
 }
 
 pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) -> Result<String> {
+    let cpp_item = database
+        .source_cpp_item(&function.id)?
+        .ok_or_else(|| err_msg("source cpp item not found"))?
+        .item;
+
     let mut output = String::new();
 
     match &function.item.kind {
         RustFunctionKind::FfiWrapper(data) => {
             match &data.cpp_ffi_function.kind {
-                CppFfiFunctionKind::Function { cpp_function, .. } => {
+                CppFfiFunctionKind::Function => {
+                    let cpp_item = cpp_item
+                        .as_function_ref()
+                        .ok_or_else(|| err_msg("invalid source cpp item type"))?;
                     write!(
                         output,
                         "Calls C++ function: {}\n\n",
-                        wrap_inline_cpp_code(&cpp_function.short_text())
+                        wrap_inline_cpp_code(&cpp_item.short_text())
                     )?;
 
                     // TODO: detect omitted arguments using source_id
@@ -216,11 +224,11 @@ pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) 
                         ));
                     }*/
                 }
-                CppFfiFunctionKind::FieldAccessor {
-                    field,
-                    accessor_type,
-                } => {
-                    let field_text = wrap_inline_cpp_code(&field.short_text());
+                CppFfiFunctionKind::FieldAccessor { accessor_type } => {
+                    let cpp_item = cpp_item
+                        .as_field_ref()
+                        .ok_or_else(|| err_msg("invalid source cpp item type"))?;
+                    let field_text = wrap_inline_cpp_code(&cpp_item.short_text());
                     match *accessor_type {
                         CppFieldAccessorType::CopyGetter | CppFieldAccessorType::ConstRefGetter => {
                             write!(output, "Returns the value of C++ field: {}", field_text)?;

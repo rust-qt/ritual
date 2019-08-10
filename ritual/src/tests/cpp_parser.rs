@@ -41,7 +41,7 @@ fn run_parser(code: &'static str) -> ParserCppData {
     config.add_include_directive(include_name);
     config.set_cpp_build_paths(paths);
 
-    processor::process(&mut workspace, &config, &["cpp_parser".into()]).unwrap();
+    processor::process(&mut workspace, &config, &["cpp_parser".into()], None).unwrap();
 
     let database = workspace
         .get_database_client("A", iter::empty(), true, false)

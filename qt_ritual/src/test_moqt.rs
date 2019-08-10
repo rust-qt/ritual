@@ -41,7 +41,7 @@ impl TempTestDir {
     }
 }
 
-fn build_cpp_lib() -> Result<TempTestDir> {
+fn build_moqt() -> Result<TempTestDir> {
     let cpp_lib_source_dir = repo_dir_path("qt_ritual/test_assets/moqt")?;
 
     let temp_dir = TempTestDir::new("test_full_run");
@@ -107,7 +107,7 @@ fn build_cpp_lib() -> Result<TempTestDir> {
 
 #[test]
 fn test_moqt() {
-    let temp_dir = build_cpp_lib().fancy_unwrap();
+    let temp_dir = build_moqt().fancy_unwrap();
     let workspace = temp_dir.path().join("workspace");
     create_dir_all(&workspace).unwrap();
 
@@ -118,6 +118,7 @@ fn test_moqt() {
             crates: vec!["moqt_core".into(), "moqt_gui".into()],
             operations: vec!["discard".into(), "main".into()],
             cluster: None,
+            trace: None,
         },
         global_config(),
     )

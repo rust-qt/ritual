@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::cpp_checks::CppChecksItem;
-use crate::cpp_data::{CppItem, CppPath};
-use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFfiItem};
+use crate::cpp_data::CppPath;
+use crate::cpp_ffi_data::CppFfiItem;
 use crate::cpp_type::CppType;
 use crate::database::{DatabaseClient, DbItem, ItemId};
 use crate::processor::ProcessorData;
@@ -34,8 +34,9 @@ pub const CHUNK_SIZE: usize = 64;
 
 fn snippet_for_item(item: DbItem<&CppFfiItem>, database: &DatabaseClient) -> Result<Snippet> {
     match &item.item {
-        CppFfiItem::Function(cpp_ffi_function) => {
-            let item_code = cpp_code_generator::function_implementation(cpp_ffi_function)?;
+        CppFfiItem::Function(_) => {
+            let item = item.map(|item| item.as_function_ref().unwrap());
+            let item_code = cpp_code_generator::function_implementation(database, item.clone())?;
             let mut needs_moc = false;
 
             let source_ffi_item = database.source_ffi_item(&item.id)?;
@@ -44,16 +45,17 @@ fn snippet_for_item(item: DbItem<&CppFfiItem>, database: &DatabaseClient) -> Res
                 if source_ffi_item.item.is_slot_wrapper() {
                     needs_moc = true
                 }
-                let source_item_code = source_ffi_item.item.source_item_cpp_code()?;
+                let source_item_code = source_ffi_item.item.source_item_cpp_code(database)?;
                 format!("{}\n{}", source_item_code, item_code)
             } else {
                 item_code
             };
             Ok(Snippet::new_global(full_code, needs_moc))
         }
-        CppFfiItem::QtSlotWrapper(_) => {
-            Ok(Snippet::new_global(item.item.source_item_cpp_code()?, true))
-        }
+        CppFfiItem::QtSlotWrapper(_) => Ok(Snippet::new_global(
+            item.item.source_item_cpp_code(database)?,
+            true,
+        )),
     }
 }
 
@@ -619,68 +621,41 @@ fn type_paths(type1: &CppType) -> Vec<&CppPath> {
     }
 }
 
-pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
-    if let Some(hook) = data.config.ffi_generator_hook() {
-        let ids = data.db.ffi_item_ids().collect_vec();
-        for id in ids {
-            let checks = data.db.cpp_checks(&id);
-            if !checks.any_success() {
-                continue;
-            }
-            let item = data.db.ffi_item(&id)?;
-            let allowed = if let CppFfiItem::Function(function) = &item.item {
-                match &function.kind {
-                    CppFfiFunctionKind::Function { cpp_function, .. } => {
-                        hook(&CppItem::Function(cpp_function.clone()))?
-                    }
-                    CppFfiFunctionKind::FieldAccessor { field, .. } => {
-                        hook(&CppItem::ClassField(field.clone()))?
-                    }
-                }
-            } else {
-                true
-            };
-            if !allowed {
-                log::info!("Deleting item: {}", item.item.short_text());
-                data.db.delete_items(|i| i.id == id);
-            }
-        }
-    }
-
+pub fn delete_blacklisted_items(data: &mut ProcessorData<'_>) -> Result<()> {
     if let Some(hook) = data.config.cpp_parser_path_hook() {
-        let ids = data.db.ffi_item_ids().collect_vec();
-        for id in ids {
-            let checks = data.db.cpp_checks(&id);
-            if !checks.any_success() {
-                continue;
-            }
-            let item = data.db.ffi_item(&id)?;
-            let (types, path) = match &item.item {
-                CppFfiItem::Function(function) => match &function.kind {
-                    CppFfiFunctionKind::Function { cpp_function, .. } => (
-                        cpp_function.all_involved_types(),
-                        Some(cpp_function.path.clone()),
-                    ),
-                    CppFfiFunctionKind::FieldAccessor { field, .. } => {
-                        (vec![field.field_type.clone()], Some(field.path.clone()))
-                    }
-                },
-                CppFfiItem::QtSlotWrapper(wrapper) => (wrapper.signal_arguments.clone(), None),
-            };
-
-            let any_blocked = types
+        let mut bad_cpp_item_ids = Vec::new();
+        for cpp_item in data.db.cpp_items() {
+            let all_types = cpp_item.item.all_involved_types();
+            let paths = all_types
                 .iter()
                 .flat_map(|type1| type_paths(type1))
-                .chain(path.as_ref())
-                .map_if_ok(|path| hook(path))?
-                .into_iter()
-                .any(|x| !x);
-
-            if any_blocked {
-                log::info!("Deleting item: {}", item.item.short_text());
-                data.db.delete_items(|i| i.id == id);
+                .chain(cpp_item.item.path());
+            for path in paths {
+                if !hook(path)? {
+                    bad_cpp_item_ids.push(cpp_item.id);
+                    break;
+                }
             }
         }
+        data.db
+            .delete_items(|item| bad_cpp_item_ids.contains(&item.id));
     }
+
+    if let Some(hook) = data.config.ffi_generator_hook() {
+        let mut bad_cpp_item_ids = Vec::new();
+        for cpp_item in data.db.cpp_items() {
+            if !hook(&cpp_item.item)? {
+                bad_cpp_item_ids.push(cpp_item.id);
+            }
+        }
+        data.db.delete_items(|item| {
+            item.item.is_ffi_item()
+                && item
+                    .source_id
+                    .as_ref()
+                    .map_or(false, |source_id| bad_cpp_item_ids.contains(source_id))
+        });
+    }
+
     Ok(())
 }

@@ -5,7 +5,7 @@ use ritual::cpp_ffi_data::CppFfiFunctionKind;
 use ritual::cpp_type::CppType;
 use ritual::rust_info::{NameType, RustPathScope};
 use ritual::rust_type::RustPath;
-use ritual_common::errors::{bail, Result};
+use ritual_common::errors::{bail, err_msg, Result};
 use ritual_common::string_utils::CaseOperations;
 
 /// QtCore specific configuration.
@@ -166,7 +166,15 @@ pub fn core_config(config: &mut Config) -> Result<()> {
         CppType::new_reference(true, CppType::Class(CppPath::from_good_str("QMetaMethod")));
     config.set_rust_path_hook(move |_path, name_type, data| {
         if let NameType::ApiFunction(function) = name_type {
-            if let CppFfiFunctionKind::Function { cpp_function, .. } = &function.kind {
+            if let CppFfiFunctionKind::Function = &function.item.kind {
+                let cpp_function = data
+                    .db
+                    .source_cpp_item(&function.id)?
+                    .ok_or_else(|| err_msg("source cpp item not found"))?
+                    .item
+                    .as_function_ref()
+                    .ok_or_else(|| err_msg("invalid source cpp item type"))?;
+
                 if cpp_function.path == connect_path && cpp_function.arguments.len() >= 3 {
                     if !cpp_function.is_static_member() {
                         bail!("non-static QObject::connect is blacklisted");

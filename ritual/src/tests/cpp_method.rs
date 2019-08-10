@@ -1,5 +1,6 @@
 use crate::cpp_data::*;
 use crate::cpp_ffi_data::*;
+use crate::cpp_ffi_generator::NewFfiFunctionKind;
 use crate::cpp_function::*;
 use crate::cpp_type::*;
 use itertools::Itertools;
@@ -171,7 +172,7 @@ fn argument_types_equal8() {
 fn to_ffi(function: &CppFunction, force_stack: Option<CppPath>) -> CppFfiFunction {
     let movable_types = force_stack.into_iter().collect_vec();
     crate::cpp_ffi_generator::to_ffi_method(
-        &CppFfiFunctionKind::Function {
+        NewFfiFunctionKind::Function {
             cpp_function: function.clone(),
         },
         &movable_types,

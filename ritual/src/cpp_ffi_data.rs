@@ -1,7 +1,8 @@
 use crate::cpp_code_generator;
-use crate::cpp_data::{CppClassField, CppPath};
-use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
+use crate::cpp_data::CppPath;
+use crate::cpp_function::ReturnValueAllocationPlace;
 use crate::cpp_type::{CppBuiltInNumericType, CppFunctionPointerType, CppType};
+use crate::database::DatabaseClient;
 use itertools::Itertools;
 use ritual_common::errors::{bail, Result};
 use serde_derive::{Deserialize, Serialize};
@@ -61,33 +62,13 @@ impl CppCast {
 #[allow(clippy::large_enum_variant)]
 pub enum CppFfiFunctionKind {
     /// This is a real C++ function.
-    Function { cpp_function: CppFunction },
+    Function,
     /// This is a field accessor, i.e. a non-existing getter or setter
     /// method for a public field.
     FieldAccessor {
         /// Type of the accessor
         accessor_type: CppFieldAccessorType,
-        // /// Name of the C++ field
-        field: CppClassField,
     },
-}
-
-impl CppFfiFunctionKind {
-    pub fn cpp_function(&self) -> Option<&CppFunction> {
-        if let CppFfiFunctionKind::Function { cpp_function, .. } = self {
-            Some(cpp_function)
-        } else {
-            None
-        }
-    }
-
-    pub fn cpp_field(&self) -> Option<&CppClassField> {
-        if let CppFfiFunctionKind::FieldAccessor { field, .. } = self {
-            Some(field)
-        } else {
-            None
-        }
-    }
 }
 
 /// Relation between original C++ method's argument value
@@ -195,18 +176,6 @@ impl CppFfiFunction {
         })
     }
 
-    pub fn short_text(&self) -> String {
-        match &self.kind {
-            CppFfiFunctionKind::Function { cpp_function, .. } => {
-                format!("FFI function call: {}", cpp_function.short_text())
-            }
-            CppFfiFunctionKind::FieldAccessor {
-                field,
-                accessor_type,
-            } => format!("FFI field {:?}: {}", accessor_type, field.short_text()),
-        }
-    }
-
     pub fn has_same_kind(&self, other: &Self) -> bool {
         match &self.kind {
             CppFfiFunctionKind::Function { .. } => {
@@ -306,9 +275,6 @@ pub struct QtSlotWrapper {
     pub arguments: Vec<CppFfiType>,
     /// The function pointer type accepted by this wrapper
     pub function_type: CppFunctionPointerType,
-    // /// String identifier passed to `QObject::connect` function to
-    // /// specify the object's slot.
-    //pub receiver_id: String,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -353,7 +319,7 @@ impl CppFfiItem {
 
     pub fn short_text(&self) -> String {
         match self {
-            CppFfiItem::Function(function) => function.short_text(),
+            CppFfiItem::Function(function) => function.path.to_cpp_pseudo_code(),
             CppFfiItem::QtSlotWrapper(slot_wrapper) => format!(
                 "slot wrapper for ({})",
                 slot_wrapper
@@ -398,11 +364,11 @@ impl CppFfiItem {
         }
     }
 
-    pub fn source_item_cpp_code(&self) -> Result<String> {
+    pub fn source_item_cpp_code(&self, db: &DatabaseClient) -> Result<String> {
         match self {
             CppFfiItem::Function(_) => bail!("not a source item"),
             CppFfiItem::QtSlotWrapper(slot_wrapper) => {
-                cpp_code_generator::qt_slot_wrapper(slot_wrapper)
+                cpp_code_generator::qt_slot_wrapper(db, slot_wrapper)
             }
         }
     }

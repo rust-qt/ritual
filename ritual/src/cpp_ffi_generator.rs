@@ -203,7 +203,7 @@ fn generate_ffi_methods_for_method(
 ) -> Result<Vec<CppFfiItem>> {
     let mut methods = Vec::new();
     methods.push(CppFfiItem::Function(to_ffi_method(
-        &CppFfiFunctionKind::Function {
+        NewFfiFunctionKind::Function {
             cpp_function: method.clone(),
         },
         movable_types,
@@ -213,19 +213,29 @@ fn generate_ffi_methods_for_method(
     Ok(methods)
 }
 
+pub enum NewFfiFunctionKind {
+    Function {
+        cpp_function: CppFunction,
+    },
+    FieldAccessor {
+        accessor_type: CppFieldAccessorType,
+        field: CppClassField,
+    },
+}
+
 /// Creates FFI function signature for this function:
 /// - converts all types to FFI types;
 /// - adds "this" argument explicitly if present;
 /// - adds "output" argument for return value if
 ///   the return value is stack-allocated.
 pub fn to_ffi_method(
-    kind: &CppFfiFunctionKind,
+    kind: NewFfiFunctionKind,
     movable_types: &[CppPath],
     name_provider: &mut FfiNameProvider,
 ) -> Result<CppFfiFunction> {
     let ascii_caption = match &kind {
-        CppFfiFunctionKind::Function { cpp_function, .. } => cpp_function.path.ascii_caption(),
-        CppFfiFunctionKind::FieldAccessor {
+        NewFfiFunctionKind::Function { cpp_function, .. } => cpp_function.path.ascii_caption(),
+        NewFfiFunctionKind::FieldAccessor {
             field,
             accessor_type,
         } => {
@@ -245,18 +255,23 @@ pub fn to_ffi_method(
         return_type: CppFfiType::void(),
         path: name_provider.create_path(&ascii_caption),
         allocation_place: ReturnValueAllocationPlace::NotApplicable,
-        kind: kind.clone(),
+        kind: match kind {
+            NewFfiFunctionKind::Function { .. } => CppFfiFunctionKind::Function,
+            NewFfiFunctionKind::FieldAccessor { accessor_type, .. } => {
+                CppFfiFunctionKind::FieldAccessor { accessor_type }
+            }
+        },
     };
 
     let this_arg_type = match &kind {
-        CppFfiFunctionKind::Function { cpp_function, .. } => match &cpp_function.member {
+        NewFfiFunctionKind::Function { cpp_function, .. } => match &cpp_function.member {
             Some(info) if !info.is_static && info.kind != CppFunctionKind::Constructor => {
                 let class_type = CppType::Class(cpp_function.class_type().unwrap());
                 Some(CppType::new_pointer(info.is_const, class_type))
             }
             _ => None,
         },
-        CppFfiFunctionKind::FieldAccessor {
+        NewFfiFunctionKind::FieldAccessor {
             field,
             accessor_type,
         } => {
@@ -282,7 +297,7 @@ pub fn to_ffi_method(
     }
 
     let normal_args = match &kind {
-        CppFfiFunctionKind::Function { cpp_function, .. } => {
+        NewFfiFunctionKind::Function { cpp_function, .. } => {
             if cpp_function.allows_variadic_arguments {
                 bail!("Variable arguments are not supported");
             }
@@ -299,7 +314,7 @@ pub fn to_ffi_method(
             }
             cpp_function.arguments.clone()
         }
-        CppFfiFunctionKind::FieldAccessor {
+        NewFfiFunctionKind::FieldAccessor {
             field,
             accessor_type,
         } => {
@@ -326,13 +341,13 @@ pub fn to_ffi_method(
     }
 
     let real_return_type = match &kind {
-        CppFfiFunctionKind::Function { cpp_function, .. } => match &cpp_function.member {
+        NewFfiFunctionKind::Function { cpp_function, .. } => match &cpp_function.member {
             Some(info) if info.kind.is_constructor() => {
                 CppType::Class(cpp_function.class_type().unwrap())
             }
             _ => cpp_function.return_type.clone(),
         },
-        CppFfiFunctionKind::FieldAccessor {
+        NewFfiFunctionKind::FieldAccessor {
             field,
             accessor_type,
         } => match *accessor_type {
@@ -378,11 +393,11 @@ fn generate_field_accessors(
 ) -> Result<Vec<CppFfiItem>> {
     let mut new_methods = Vec::new();
     let mut create_method = |accessor_type| -> Result<CppFfiItem> {
-        let kind = CppFfiFunctionKind::FieldAccessor {
+        let kind = NewFfiFunctionKind::FieldAccessor {
             field: field.clone(),
             accessor_type,
         };
-        let ffi_function = to_ffi_method(&kind, movable_types, name_provider)?;
+        let ffi_function = to_ffi_method(kind, movable_types, name_provider)?;
         Ok(CppFfiItem::Function(ffi_function))
     };
 

@@ -3,7 +3,6 @@ use crate::cpp_code_generator::generate_cpp_type_size_requester;
 use crate::processor::ProcessorData;
 use crate::rust_code_generator;
 use crate::versions;
-use itertools::Itertools;
 use ritual_common::errors::Result;
 use ritual_common::file_utils::{
     copy_file, copy_recursively, create_dir, create_dir_all, create_file, diff_paths, path_to_str,
@@ -268,11 +267,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     )?;
 
     let file = create_file(c_lib_path.join("sized_types.cxx"))?;
-    generate_cpp_type_size_requester(
-        &data.db.rust_items().map(|i| i.item).collect_vec(),
-        data.config.include_directives(),
-        file,
-    )?;
+    generate_cpp_type_size_requester(data.db, data.config.include_directives(), file)?;
 
     rust_code_generator::generate(
         &data.db,

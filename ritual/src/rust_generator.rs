@@ -999,10 +999,11 @@ impl State<'_, '_> {
     /// Converts one function to a `RustSingleMethod`.
     fn process_rust_function(
         &self,
-        function: &CppFfiFunction,
+        item: DbItem<&CppFfiFunction>,
         checks: &CppChecks,
         trait_types: &[TraitTypes],
     ) -> Result<Vec<ProcessedFfiItem>> {
+        let function = item.item;
         let rust_ffi_function = self.generate_ffi_function(&function)?;
         let ffi_function_path = rust_ffi_function.path.clone();
         let mut results = vec![ProcessedFfiItem::Item(RustItem::Function(
@@ -1083,7 +1084,7 @@ impl State<'_, '_> {
                     debug!(
                         "Method returns a reference but doesn't receive a reference. \
                          Assuming static lifetime of return value: {}",
-                        function.short_text()
+                        function.path.to_cpp_pseudo_code()
                     );
                     "static".to_string()
                 } else {
@@ -1105,7 +1106,18 @@ impl State<'_, '_> {
             is_unsafe: true,
         };
 
-        if let CppFfiFunctionKind::Function { cpp_function, .. } = &function.kind {
+        let cpp_item = self
+            .0
+            .db
+            .source_cpp_item(&item.id)?
+            .ok_or_else(|| err_msg("source cpp item not found"))?
+            .item;
+
+        if let CppFfiFunctionKind::Function = &function.kind {
+            let cpp_function = cpp_item
+                .as_function_ref()
+                .ok_or_else(|| err_msg("invalid source cpp item type"))?;
+
             if cpp_function.is_destructor() {
                 let item = State::process_destructor(unnamed_function, function.allocation_place)?;
                 results.push(ProcessedFfiItem::Item(RustItem::TraitImpl(item)));
@@ -1143,12 +1155,15 @@ impl State<'_, '_> {
             }
         }
 
-        let cpp_path = match &function.kind {
-            CppFfiFunctionKind::Function { cpp_function, .. } => &cpp_function.path,
-            CppFfiFunctionKind::FieldAccessor { field, .. } => &field.path,
-        };
+        let cpp_path = cpp_item
+            .path()
+            .ok_or_else(|| err_msg("cpp item (function or field) expected to have a path"))?;
 
-        if let CppFfiFunctionKind::Function { cpp_function, .. } = &function.kind {
+        if let CppFfiFunctionKind::Function = &function.kind {
+            let cpp_function = cpp_item
+                .as_function_ref()
+                .ok_or_else(|| err_msg("invalid source cpp item type"))?;
+
             if cpp_function.is_operator() {
                 let arg0 = unnamed_function
                     .arguments
@@ -1169,7 +1184,7 @@ impl State<'_, '_> {
                                 )?;
 
                                 let name = self
-                                    .special_function_rust_name(function, &type1.path)?
+                                    .special_function_rust_name(item.clone(), &type1.path)?
                                     .ok_or_else(|| err_msg("operator must have special name"))?;
                                 results.push(ProcessedFfiItem::Function(FunctionWithDesiredPath {
                                     function: unnamed_function,
@@ -1183,7 +1198,7 @@ impl State<'_, '_> {
             }
         }
 
-        let desired_path = self.generate_rust_path(cpp_path, NameType::ApiFunction(function))?;
+        let desired_path = self.generate_rust_path(cpp_path, NameType::ApiFunction(item))?;
         results.push(ProcessedFfiItem::Function(FunctionWithDesiredPath {
             function: unnamed_function,
             desired_path,
@@ -1286,11 +1301,23 @@ impl State<'_, '_> {
     /// modules.
     fn special_function_rust_name(
         &self,
-        function: &CppFfiFunction,
+        item: DbItem<&CppFfiFunction>,
         context: &RustPath,
     ) -> Result<Option<String>> {
+        let function = item.item;
+        let cpp_item = self
+            .0
+            .db
+            .source_cpp_item(&item.id)?
+            .ok_or_else(|| err_msg("source cpp item not found"))?
+            .item;
+
         let r = match &function.kind {
-            CppFfiFunctionKind::Function { cpp_function, .. } => {
+            CppFfiFunctionKind::Function => {
+                let cpp_function = cpp_item
+                    .as_function_ref()
+                    .ok_or_else(|| err_msg("invalid source cpp item type"))?;
+
                 if cpp_function.is_constructor() {
                     if cpp_function.is_copy_constructor() {
                         Some("new_copy".to_string())
@@ -1320,10 +1347,11 @@ impl State<'_, '_> {
                     None
                 }
             }
-            CppFfiFunctionKind::FieldAccessor {
-                accessor_type,
-                field,
-            } => {
+            CppFfiFunctionKind::FieldAccessor { accessor_type } => {
+                let field = cpp_item
+                    .as_field_ref()
+                    .ok_or_else(|| err_msg("invalid source cpp item type"))?;
+
                 let name = &field.path.last().name;
                 let function_name = match accessor_type {
                     CppFieldAccessorType::CopyGetter | CppFieldAccessorType::ConstRefGetter => {
@@ -1350,11 +1378,11 @@ impl State<'_, '_> {
 
     fn generate_rust_path(&self, cpp_path: &CppPath, name_type: NameType<'_>) -> Result<RustPath> {
         if let Some(hook) = self.0.config.rust_path_hook() {
-            if let Some(path) = hook(cpp_path, name_type, &self.0)? {
+            if let Some(path) = hook(cpp_path, name_type.clone(), &self.0)? {
                 return Ok(path);
             }
         }
-        let scope = match name_type {
+        let scope = match &name_type {
             NameType::FfiFunction => {
                 let ffi_module = self
                     .0
@@ -1395,11 +1423,17 @@ impl State<'_, '_> {
             | NameType::ApiFunction { .. }
             | NameType::ReceiverFunction { .. } => {
                 if let Ok(parent) = cpp_path.parent() {
-                    self.get_path_scope(&parent, name_type)?
-                } else if let NameType::ApiFunction(cpp_function) = name_type {
-                    let is_operator = cpp_function
-                        .kind
-                        .cpp_function()
+                    self.get_path_scope(&parent, name_type.clone())?
+                } else if let NameType::ApiFunction(item) = &name_type {
+                    let cpp_item = self
+                        .0
+                        .db
+                        .source_cpp_item(&item.id)?
+                        .ok_or_else(|| err_msg("source cpp item not found"))?
+                        .item;
+
+                    let is_operator = cpp_item
+                        .as_function_ref()
                         .map_or(false, |f| f.is_operator());
 
                     if is_operator {
@@ -1426,7 +1460,7 @@ impl State<'_, '_> {
             }
         };
 
-        let full_last_name = match name_type {
+        let full_last_name = match &name_type {
             NameType::SizedItem => cpp_path
                 .items()
                 .iter()
@@ -1434,7 +1468,7 @@ impl State<'_, '_> {
                 .join("_"),
             NameType::ApiFunction(function) => {
                 let s = if let Some(last_name_override) =
-                    self.special_function_rust_name(function, &scope.path)?
+                    self.special_function_rust_name(function.clone(), &scope.path)?
                 {
                     last_name_override.clone()
                 } else {
@@ -1462,7 +1496,7 @@ impl State<'_, '_> {
                 signal_arguments,
                 is_public,
             } => {
-                let name = if is_public { "Slot" } else { "RawSlot" };
+                let name = if *is_public { "Slot" } else { "RawSlot" };
                 if signal_arguments.is_empty() {
                     name.to_string()
                 } else {
@@ -1493,14 +1527,16 @@ impl State<'_, '_> {
 
     fn process_ffi_item(
         &self,
-        ffi_item: &CppFfiItem,
+        ffi_item: DbItem<&CppFfiItem>,
         checks: &CppChecks,
         trait_types: &[TraitTypes],
     ) -> Result<Vec<ProcessedFfiItem>> {
-        match ffi_item {
-            CppFfiItem::Function(cpp_ffi_function) => {
-                self.process_rust_function(cpp_ffi_function, checks, trait_types)
-            }
+        match ffi_item.item {
+            CppFfiItem::Function(_) => self.process_rust_function(
+                ffi_item.map(|i| i.as_function_ref().unwrap()),
+                checks,
+                trait_types,
+            ),
             CppFfiItem::QtSlotWrapper(_) => {
                 bail!("slot wrappers do not need to be processed here");
             }
@@ -1919,7 +1955,7 @@ impl State<'_, '_> {
                 );
                 continue;
             }
-            match self.process_ffi_item(ffi_item.item, &checks, &trait_types) {
+            match self.process_ffi_item(ffi_item.clone(), &checks, &trait_types) {
                 Ok(results) => {
                     for item in results {
                         match item {

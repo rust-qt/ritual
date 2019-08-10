@@ -4,6 +4,7 @@
 //! for more information.
 
 use crate::config::GlobalConfig;
+use crate::database::ItemId;
 use crate::processor;
 use crate::workspace::Workspace;
 use flexi_logger::{Duplicate, LevelFilter, LogSpecification, Logger};
@@ -34,6 +35,9 @@ pub struct Options {
     #[structopt(long = "cluster")]
     /// Cluster configuration
     pub cluster: Option<PathBuf>,
+    #[structopt(long = "trace")]
+    /// ID of item to trace
+    pub trace: Option<String>,
 }
 
 pub fn run_from_args(config: GlobalConfig) -> Result<()> {
@@ -85,6 +89,20 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
         return Ok(());
     }
 
+    let trace_item_id = if let Some(text) = options.trace {
+        let mut parts = text.split('#');
+        let crate_name = parts
+            .next()
+            .ok_or_else(|| err_msg("invalid id format for trace"))?;
+        let id = parts
+            .next()
+            .ok_or_else(|| err_msg("invalid id format for trace"))?
+            .parse()?;
+        Some(ItemId::new(crate_name.to_string(), id))
+    } else {
+        None
+    };
+
     for crate_name in &final_crates {
         let create_config = config
             .create_config_hook()
@@ -101,7 +119,7 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
         }
 
         was_any_action = true;
-        processor::process(&mut workspace, &config, &operations)?;
+        processor::process(&mut workspace, &config, &operations, trace_item_id.as_ref())?;
     }
 
     //workspace.save_data()?;

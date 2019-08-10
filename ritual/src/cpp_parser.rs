@@ -334,7 +334,7 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
         if !data.db.cpp_checks(&ffi_item_id).is_success(&current_target) {
             continue;
         }
-        let code = ffi_item.item.source_item_cpp_code()?;
+        let code = ffi_item.item.source_item_cpp_code(data.db)?;
         let mut parser = CppParser {
             current_target_paths: vec![data.workspace.tmp_path()],
             source_id: Some(ffi_item_id),

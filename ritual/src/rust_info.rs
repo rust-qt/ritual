@@ -3,6 +3,7 @@
 use crate::cpp_data::CppPath;
 use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_type::CppType;
+use crate::database::DbItem;
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_type::{RustFinalType, RustPath, RustPointerLikeTypeKind, RustType};
 use ritual_common::errors::{bail, Result};
@@ -186,7 +187,7 @@ pub enum RustFunctionKind {
 impl RustFunctionKind {
     pub fn short_text(&self) -> String {
         match self {
-            RustFunctionKind::FfiWrapper(data) => data.cpp_ffi_function.short_text(),
+            RustFunctionKind::FfiWrapper(data) => data.cpp_ffi_function.path.to_cpp_pseudo_code(),
             RustFunctionKind::SignalOrSlotGetter(getter) => format!(
                 "SignalOrSlotGetter({}",
                 getter.cpp_path.to_cpp_pseudo_code()
@@ -848,13 +849,13 @@ impl RustPathScope {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NameType<'a> {
     Type,
     EnumValue,
     Module,
     FfiFunction,
-    ApiFunction(&'a CppFfiFunction),
+    ApiFunction(DbItem<&'a CppFfiFunction>),
     ReceiverFunction {
         receiver_type: RustQtReceiverType,
     },

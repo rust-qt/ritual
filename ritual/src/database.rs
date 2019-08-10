@@ -3,7 +3,7 @@ use crate::cpp_data::{CppItem, CppPath};
 use crate::cpp_ffi_data::CppFfiItem;
 use crate::rust_info::RustItem;
 use crate::rust_type::RustPath;
-use log::{debug, info, trace};
+use log::{debug, error, info, trace};
 use ritual_common::errors::{bail, err_msg, format_err, Result};
 use ritual_common::string_utils::ends_with_digit;
 use ritual_common::target::LibraryTarget;
@@ -26,7 +26,7 @@ impl<T> ItemWithSource<T> {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DbItem<T> {
     pub id: ItemId,
     pub source_id: Option<ItemId>,
@@ -77,6 +77,12 @@ impl<T> DbItem<T> {
 pub struct ItemId {
     crate_name: String,
     id: u32,
+}
+
+impl ItemId {
+    pub fn new(crate_name: String, id: u32) -> Self {
+        Self { crate_name, id }
+    }
 }
 
 impl fmt::Display for ItemId {
@@ -774,5 +780,44 @@ impl DatabaseClient {
 
     pub fn dependency_version(&self, crate_name: &str) -> Result<&str> {
         Ok(&self.database(crate_name)?.crate_version)
+    }
+
+    pub fn print_item_trace(&self, item_id: &ItemId) -> Result<()> {
+        info!("Sources:");
+        let mut sources = Vec::new();
+        let mut item = self.item(item_id)?;
+        loop {
+            sources.push(item.clone());
+            if let Some(source_id) = &item.source_id {
+                match self.item(source_id) {
+                    Ok(i) => {
+                        item = i;
+                    }
+                    Err(err) => {
+                        error!("source is missing: {}", err);
+                        break;
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+        for source in sources.iter().rev() {
+            info!("{:?}", source);
+        }
+        info!("Children:");
+        self.print_item_children(item_id);
+        Ok(())
+    }
+
+    fn print_item_children(&self, item_id: &ItemId) {
+        let children = self
+            .all_items()
+            .filter(|item| item.source_id.as_ref() == Some(item_id));
+
+        for child in children {
+            info!("{:?}", child);
+            self.print_item_children(&child.id);
+        }
     }
 }
