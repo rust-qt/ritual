@@ -366,15 +366,10 @@ pub struct RustTraitAssociatedType {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum RustTraitImplSourceKind {
+pub enum RustTraitImplExtraKind {
     Normal,
     Deref,
     DerefMut,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct RustTraitImplSource {
-    pub kind: RustTraitImplSourceKind,
 }
 
 /// Information about a trait implementation.
@@ -389,7 +384,7 @@ pub struct RustTraitImpl {
     pub associated_types: Vec<RustTraitAssociatedType>,
     /// Functions that implement the trait.
     pub functions: Vec<RustFunction>,
-    pub source: RustTraitImplSource,
+    pub extra_kind: RustTraitImplExtraKind,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
@@ -687,10 +682,10 @@ impl RustItem {
                 }
             }
             RustItem::TraitImpl(data) => match other {
-                RustItem::TraitImpl(other) => data.source == other.source,
+                RustItem::TraitImpl(other) => data.extra_kind == other.extra_kind,
                 RustItem::Function(other) => {
                     if let RustFunctionKind::FfiWrapper(_) = &other.kind {
-                        data.source.kind == RustTraitImplSourceKind::Normal
+                        data.extra_kind == RustTraitImplExtraKind::Normal
                     } else {
                         false
                     }
@@ -707,7 +702,7 @@ impl RustItem {
             RustItem::Function(data) => match &data.kind {
                 RustFunctionKind::FfiWrapper(_) => match other {
                     RustItem::TraitImpl(other) => {
-                        other.source.kind == RustTraitImplSourceKind::Normal
+                        other.extra_kind == RustTraitImplExtraKind::Normal
                     }
                     RustItem::Function(other) => {
                         if let RustFunctionKind::FfiWrapper(_) = &other.kind {

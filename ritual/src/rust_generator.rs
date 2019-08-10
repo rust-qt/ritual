@@ -18,8 +18,8 @@ use crate::rust_info::{
     RustFunctionKind, RustFunctionSelfArgKind, RustItem, RustModule, RustModuleKind, RustPathScope,
     RustQtReceiverType, RustQtSlotWrapper, RustRawSlotReceiver, RustReexport, RustReexportSource,
     RustSignalOrSlotGetter, RustSizedType, RustSpecialModuleKind, RustStruct, RustStructKind,
-    RustTraitAssociatedType, RustTraitImpl, RustTraitImplSource, RustTraitImplSourceKind,
-    RustTypeCaptionStrategy, RustWrapperTypeKind, UnnamedRustFunction,
+    RustTraitAssociatedType, RustTraitImpl, RustTraitImplExtraKind, RustTypeCaptionStrategy,
+    RustWrapperTypeKind, UnnamedRustFunction,
 };
 use crate::rust_type::{
     RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
@@ -794,9 +794,7 @@ impl State<'_, '_> {
             trait_type,
             associated_types,
             functions: vec![function],
-            source: RustTraitImplSource {
-                kind: RustTraitImplSourceKind::Normal,
-            },
+            extra_kind: RustTraitImplExtraKind::Normal,
         })
     }
 
@@ -849,9 +847,7 @@ impl State<'_, '_> {
             },
             associated_types: Vec::new(),
             functions: vec![function],
-            source: RustTraitImplSource {
-                kind: RustTraitImplSourceKind::Normal,
-            },
+            extra_kind: RustTraitImplExtraKind::Normal,
         })
     }
 
@@ -930,9 +926,7 @@ impl State<'_, '_> {
             },
             associated_types: Vec::new(),
             functions: vec![cast_function, cast_function_mut],
-            source: RustTraitImplSource {
-                kind: RustTraitImplSourceKind::Normal,
-            },
+            extra_kind: RustTraitImplExtraKind::Normal,
         });
 
         if cast.is_first_static_cast() && !cast.is_unsafe_static_cast() {
@@ -965,9 +959,7 @@ impl State<'_, '_> {
                     value: to_type_value,
                 }],
                 functions: vec![deref_function],
-                source: RustTraitImplSource {
-                    kind: RustTraitImplSourceKind::Deref,
-                },
+                extra_kind: RustTraitImplExtraKind::Deref,
             });
 
             let deref_mut_trait_path = RustPath::from_good_str("std::ops::DerefMut");
@@ -986,9 +978,7 @@ impl State<'_, '_> {
                 },
                 associated_types: Vec::new(),
                 functions: vec![deref_mut_function],
-                source: RustTraitImplSource {
-                    kind: RustTraitImplSourceKind::DerefMut,
-                },
+                extra_kind: RustTraitImplExtraKind::DerefMut,
             });
         }
 
