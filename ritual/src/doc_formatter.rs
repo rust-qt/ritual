@@ -6,10 +6,9 @@
 use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFieldAccessorType};
 use crate::cpp_type::CppType;
 use crate::database::{DatabaseClient, DbItem, DocItem};
-use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_info::{
     RustEnumValue, RustFunction, RustFunctionKind, RustModule, RustModuleKind, RustQtReceiverType,
-    RustSpecialModuleKind, RustStruct, RustStructKind, RustWrapperType,
+    RustSpecialModuleKind, RustStruct, RustStructKind,
 };
 use itertools::Itertools;
 use ritual_common::errors::{err_msg, Result};
@@ -27,7 +26,7 @@ pub fn wrap_cpp_doc_block(html: &str) -> String {
     )
 }
 
-pub fn module_doc(module: DbItem<&RustModule>, _database: &DatabaseClient) -> Result<String> {
+pub fn module_doc(module: DbItem<&RustModule>, database: &DatabaseClient) -> Result<String> {
     let mut output = String::new();
     match module.item.kind {
         RustModuleKind::Special(kind) => match kind {
@@ -49,29 +48,45 @@ pub fn module_doc(module: DbItem<&RustModule>, _database: &DatabaseClient) -> Re
             }
         },
         RustModuleKind::CppNamespace { .. } => {
-            if let Some(path) = &module.item.doc.cpp_path {
-                let cpp_path_text = wrap_inline_cpp_code(&path.to_cpp_pseudo_code());
-                write!(output, "C++ namespace: {}", cpp_path_text)?;
-            }
+            let cpp_item = database
+                .source_cpp_item(&module.id)?
+                .ok_or_else(|| err_msg("source cpp item not found"))?
+                .item
+                .as_namespace_ref()
+                .ok_or_else(|| err_msg("invalid source cpp item type"))?;
+
+            let cpp_path_text = wrap_inline_cpp_code(&cpp_item.path.to_cpp_pseudo_code());
+            write!(output, "C++ namespace: {}", cpp_path_text)?;
         }
         RustModuleKind::CppNestedTypes { .. } => {
-            if let Some(path) = &module.item.doc.cpp_path {
-                let cpp_path_text = wrap_inline_cpp_code(&path.to_cpp_pseudo_code());
-                write!(output, "C++ type: {}", cpp_path_text)?;
-            }
+            let cpp_item = database
+                .source_cpp_item(&module.id)?
+                .ok_or_else(|| err_msg("source cpp item not found"))?
+                .item
+                .as_type_ref()
+                .ok_or_else(|| err_msg("invalid source cpp item type"))?;
+
+            let cpp_path_text = wrap_inline_cpp_code(&cpp_item.path.to_cpp_pseudo_code());
+            write!(output, "C++ type: {}", cpp_path_text)?;
         }
     };
     Ok(output)
 }
 
 pub fn struct_doc(type1: DbItem<&RustStruct>, database: &DatabaseClient) -> Result<String> {
-    let current_crate = database.crate_name();
-
     let mut output = String::new();
 
     match &type1.item.kind {
-        RustStructKind::WrapperType(RustWrapperType { doc_data, .. }) => {
-            let cpp_type_code = doc_data.cpp_path.to_cpp_pseudo_code();
+        RustStructKind::WrapperType(_) => {
+            let cpp_item = database
+                .source_cpp_item(&type1.id)?
+                .ok_or_else(|| err_msg("source cpp item not found"))?;
+
+            let cpp_type_code = cpp_item
+                .item
+                .path()
+                .ok_or_else(|| err_msg("cpp item expected to have path"))?
+                .to_cpp_pseudo_code();
             write!(
                 output,
                 "Type corresponding to C++ type: {}.\n\n\
@@ -80,38 +95,35 @@ pub fn struct_doc(type1: DbItem<&RustStruct>, database: &DatabaseClient) -> Resu
             )?;
             // TODO: add description based on the wrapper kind (enum, immovable/movable class)
 
-            if let Some(slot_wrapper) = &doc_data.raw_qt_slot_wrapper {
-                let cpp_args = slot_wrapper
-                    .cpp_arguments
-                    .iter()
-                    .map(CppType::to_cpp_pseudo_code)
-                    .join(", ");
+            if let Some(source_ffi_item) = database.source_ffi_item(&cpp_item.id)? {
+                if let Some(slot_wrapper) = source_ffi_item.filter_map(|i| i.as_slot_wrapper_ref())
+                {
+                    let cpp_args = slot_wrapper
+                        .item
+                        .signal_arguments
+                        .iter()
+                        .map(CppType::to_cpp_pseudo_code)
+                        .join(", ");
 
-                let rust_args = slot_wrapper
-                    .rust_arguments
-                    .iter()
-                    .map(|t| rust_type_to_code(t.api_type(), Some(current_crate)))
-                    .join(", ");
+                    // TODO: print Rust argument types
 
-                write!(
-                    output,
-                    "Allows to bind Qt signals with arguments `({rust_args})` to a \
+                    // TODO: find public wrapper path
+                    // Use `{public_type_name}` to bind signals to a Rust closure instead.\n\n
+                    write!(
+                        output,
+                        "Allows to bind Qt signals with arguments `({cpp_args})` to a \
            Rust extern function.\n\n\
            Corresponding C++ argument types: ({cpp_args}).\n\n
-           Use `{public_type_name}` to bind signals to a Rust closure instead.\n\n\
            Create an object using `new()` and bind your function and payload using `set()`. \
            The function will receive the payload as its first arguments, and the rest of arguments \
            will be values passed through the Qt connection system. Use \
            `connect()` method of a `qt_core::connection::Signal` object to connect the signal \
            to this slot. The callback function will be executed each time the slot is invoked \
            until source signals are disconnected or the slot object is destroyed.\n\n\
-           If `set()` was not called, slot invokation has no effect.",
-                    rust_args = rust_args,
-                    cpp_args = cpp_args,
-                    public_type_name = slot_wrapper
-                        .public_wrapper_path
-                        .full_name(Some(current_crate)),
-                )?;
+           If `set()` was not called, slot invocation has no effect.",
+                        cpp_args = cpp_args,
+                    )?;
+                }
             }
         }
         RustStructKind::QtSlotWrapper(slot_wrapper) => {

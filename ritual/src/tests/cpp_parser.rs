@@ -76,7 +76,7 @@ fn run_parser(code: &'static str) -> ParserCppData {
         namespaces: database
             .cpp_items()
             .filter_map(|item| item.item.as_namespace_ref())
-            .cloned()
+            .map(|ns| ns.path.clone())
             .collect(),
     }
 }

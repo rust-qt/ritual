@@ -41,19 +41,6 @@ pub struct RustRawQtSlotWrapperDocData {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct RustWrapperTypeDocData {
-    /// Corresponding C++ type (for generating docs).
-    pub cpp_path: CppPath,
-    pub raw_qt_slot_wrapper: Option<RustRawQtSlotWrapperDocData>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct RustWrapperType {
-    pub doc_data: RustWrapperTypeDocData,
-    pub kind: RustWrapperTypeKind,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustFfiClassTypeDoc {
     pub cpp_path: CppPath,
     pub public_rust_path: RustPath,
@@ -67,7 +54,7 @@ pub struct RustSizedType {
 /// Information about a Rust type wrapper
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum RustStructKind {
-    WrapperType(RustWrapperType),
+    WrapperType(RustWrapperTypeKind),
     QtSlotWrapper(RustQtSlotWrapper),
     SizedType(RustSizedType),
 }
@@ -403,11 +390,6 @@ pub struct RustTraitImpl {
     pub source: RustTraitImplSource,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct RustModuleDoc {
-    pub cpp_path: Option<CppPath>,
-}
-
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum RustSpecialModuleKind {
     CrateRoot,
@@ -450,12 +432,8 @@ impl RustModuleKind {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustModule {
     pub is_public: bool,
-
     /// Path to the module.
     pub path: RustPath,
-    /// Markdown content of Rust documentation for this module.
-    pub doc: RustModuleDoc,
-
     pub kind: RustModuleKind,
 }
 

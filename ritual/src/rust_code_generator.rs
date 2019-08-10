@@ -400,7 +400,7 @@ impl Generator<'_> {
             ""
         };
         match &rust_struct.item.kind {
-            RustStructKind::WrapperType(wrapper) => match &wrapper.kind {
+            RustStructKind::WrapperType(kind) => match kind {
                 RustWrapperTypeKind::EnumWrapper => {
                     writeln!(
                         self,

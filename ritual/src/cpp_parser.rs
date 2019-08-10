@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::cpp_data::{
-    CppBaseSpecifier, CppClassField, CppEnumValue, CppItem, CppOriginLocation, CppPath,
-    CppPathItem, CppTypeDeclaration, CppTypeDeclarationKind, CppVisibility,
+    CppBaseSpecifier, CppClassField, CppEnumValue, CppItem, CppNamespace, CppOriginLocation,
+    CppPath, CppPathItem, CppTypeDeclaration, CppTypeDeclarationKind, CppVisibility,
 };
 use crate::cpp_function::{
     CppFunction, CppFunctionArgument, CppFunctionKind, CppFunctionMemberData,
@@ -1460,7 +1460,7 @@ impl CppParser<'_, '_> {
                     self.add_output(
                         self.entity_include_file(entity)?,
                         get_origin_location(entity).unwrap(),
-                        CppItem::Namespace(path),
+                        CppItem::Namespace(CppNamespace { path }),
                     )?;
                 }
                 Err(error) => debug!("failed to get namespace name: {}", error),

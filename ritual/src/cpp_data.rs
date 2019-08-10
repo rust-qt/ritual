@@ -394,9 +394,14 @@ impl CppTypeDeclarationKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CppNamespace {
+    pub path: CppPath,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum CppItem {
-    Namespace(CppPath),
+    Namespace(CppNamespace),
     Type(CppTypeDeclaration),
     EnumValue(CppEnumValue),
     Function(CppFunction),
@@ -456,7 +461,7 @@ impl CppItem {
 
     pub fn path(&self) -> Option<&CppPath> {
         let path = match self {
-            CppItem::Namespace(data) => data,
+            CppItem::Namespace(data) => &data.path,
             CppItem::Type(data) => &data.path,
             CppItem::EnumValue(data) => &data.path,
             CppItem::Function(data) => &data.path,
@@ -494,7 +499,7 @@ impl CppItem {
         }
     }
 
-    pub fn as_namespace_ref(&self) -> Option<&CppPath> {
+    pub fn as_namespace_ref(&self) -> Option<&CppNamespace> {
         if let CppItem::Namespace(data) = self {
             Some(data)
         } else {
@@ -552,7 +557,9 @@ impl CppItem {
 impl fmt::Display for CppItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
-            CppItem::Namespace(path) => format!("namespace {}", path.to_cpp_pseudo_code()),
+            CppItem::Namespace(namespace) => {
+                format!("namespace {}", namespace.path.to_cpp_pseudo_code())
+            }
             CppItem::Type(type1) => match type1.kind {
                 CppTypeDeclarationKind::Enum => format!("enum {}", type1.path.to_cpp_pseudo_code()),
                 CppTypeDeclarationKind::Class { .. } => {

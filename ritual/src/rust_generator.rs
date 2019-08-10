@@ -15,12 +15,11 @@ use crate::processor::ProcessorData;
 use crate::rust_info::{
     NameType, RustEnumValue, RustExtraImpl, RustExtraImplKind, RustFfiWrapperData,
     RustFlagEnumImpl, RustFunction, RustFunctionArgument, RustFunctionCaptionStrategy,
-    RustFunctionKind, RustFunctionSelfArgKind, RustItem, RustModule, RustModuleDoc, RustModuleKind,
-    RustPathScope, RustQtReceiverType, RustQtSlotWrapper, RustRawSlotReceiver, RustReexport,
-    RustReexportSource, RustSignalOrSlotGetter, RustSizedType, RustSpecialModuleKind, RustStruct,
-    RustStructKind, RustTraitAssociatedType, RustTraitImpl, RustTraitImplSource,
-    RustTraitImplSourceKind, RustTypeCaptionStrategy, RustWrapperType, RustWrapperTypeDocData,
-    RustWrapperTypeKind, UnnamedRustFunction,
+    RustFunctionKind, RustFunctionSelfArgKind, RustItem, RustModule, RustModuleKind, RustPathScope,
+    RustQtReceiverType, RustQtSlotWrapper, RustRawSlotReceiver, RustReexport, RustReexportSource,
+    RustSignalOrSlotGetter, RustSizedType, RustSpecialModuleKind, RustStruct, RustStructKind,
+    RustTraitAssociatedType, RustTraitImpl, RustTraitImplSource, RustTraitImplSourceKind,
+    RustTypeCaptionStrategy, RustWrapperTypeKind, UnnamedRustFunction,
 };
 use crate::rust_type::{
     RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
@@ -1620,13 +1619,7 @@ impl State<'_, '_> {
 
         let public_rust_item = RustItem::Struct(RustStruct {
             path: public_path.clone(),
-            kind: RustStructKind::WrapperType(RustWrapperType {
-                doc_data: RustWrapperTypeDocData {
-                    cpp_path: data.path.clone(),
-                    raw_qt_slot_wrapper: None, // TODO: fix this
-                },
-                kind: wrapper_kind,
-            }),
+            kind: RustStructKind::WrapperType(wrapper_kind),
             is_public: true,
         });
         rust_items.push(public_rust_item);
@@ -1636,9 +1629,6 @@ impl State<'_, '_> {
         let nested_types_rust_item = RustItem::Module(RustModule {
             is_public: true,
             path: nested_types_path,
-            doc: RustModuleDoc {
-                cpp_path: Some(data.path.clone()),
-            },
             kind: RustModuleKind::CppNestedTypes,
         });
         rust_items.push(nested_types_rust_item);
@@ -1709,14 +1699,11 @@ impl State<'_, '_> {
         }
 
         match &cpp_item.item {
-            CppItem::Namespace(path) => {
-                let rust_path = self.generate_rust_path(path, NameType::Module)?;
+            CppItem::Namespace(namespace) => {
+                let rust_path = self.generate_rust_path(&namespace.path, NameType::Module)?;
                 let rust_item = RustItem::Module(RustModule {
                     is_public: true,
                     path: rust_path,
-                    doc: RustModuleDoc {
-                        cpp_path: Some(path.clone()),
-                    },
                     kind: RustModuleKind::CppNamespace,
                 });
                 Ok(vec![rust_item])
@@ -1729,13 +1716,7 @@ impl State<'_, '_> {
                     let rust_path = self.generate_rust_path(&data.path, NameType::Type)?;
                     let rust_item = RustItem::Struct(RustStruct {
                         path: rust_path,
-                        kind: RustStructKind::WrapperType(RustWrapperType {
-                            doc_data: RustWrapperTypeDocData {
-                                cpp_path: data.path.clone(),
-                                raw_qt_slot_wrapper: None,
-                            },
-                            kind: RustWrapperTypeKind::EnumWrapper,
-                        }),
+                        kind: RustStructKind::WrapperType(RustWrapperTypeKind::EnumWrapper),
                         is_public: true,
                     });
 
@@ -1889,7 +1870,6 @@ impl State<'_, '_> {
                 RustSpecialModuleKind::Ffi | RustSpecialModuleKind::SizedTypes => false,
             },
             path: rust_path,
-            doc: RustModuleDoc { cpp_path: None },
             kind: RustModuleKind::Special(kind),
         });
         self.0.db.add_rust_item(None, rust_item)?;
