@@ -7,12 +7,9 @@ use serde_derive::{Deserialize, Serialize};
 use std::str::FromStr;
 
 /// Rust identifier. Represented by
-/// a vector of name parts. For a regular name,
-/// first part is name of the crate,
+/// a vector of name parts. First part is name of the crate,
 /// last part is own name of the entity,
 /// and intermediate names are module names.
-/// Built-in types are represented
-/// by a single vector item, like `vec!["i32"]`.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct RustPath {
     /// Parts of the name
@@ -63,7 +60,6 @@ impl RustPath {
         if self.parts.is_empty() {
             panic!("RustPath can't be empty");
         }
-        // TODO: forbid built-in types in RustPath
         Some(self.parts[0].as_str())
     }
 
@@ -93,12 +89,7 @@ impl RustPath {
             }
         }
 
-        // TODO: 1-part path can theoretically point to a crate instead of a built-in type
-        if self.parts.len() == 1 {
-            self.parts[0].to_string()
-        } else {
-            format!("::{}", self.parts.join("::"))
-        }
+        format!("::{}", self.parts.join("::"))
     }
 
     /// Returns true if `other` is nested within `self`.
@@ -360,37 +351,61 @@ pub struct RustCommonType {
     pub generic_arguments: Option<Vec<RustType>>,
 }
 
+pub fn paths_can_be_same<T1, T2>(one: &T1, other: &T2) -> bool
+where
+    T1: for<'a> PartialEq<&'a str> + PartialEq<T2>,
+    T2: for<'a> PartialEq<&'a str>,
+{
+    let colliding: &[(&[&str], &[&str])] = &[
+        (
+            &[
+                "std::os::raw::c_char",
+                "std::os::raw::c_schar",
+                "std::os::raw::c_short",
+                "std::os::raw::c_int",
+                "std::os::raw::c_long",
+                "std::os::raw::c_longlong",
+            ],
+            &["u8", "u16", "u32", "u64"],
+        ),
+        (
+            &[
+                "std::os::raw::c_char",
+                "std::os::raw::c_uchar",
+                "std::os::raw::c_ushort",
+                "std::os::raw::c_uint",
+                "std::os::raw::c_ulong",
+                "std::os::raw::c_ulonglong",
+            ],
+            &["u8", "u16", "u32", "u64"],
+        ),
+        (
+            &["std::os::raw::c_float", "std::os::raw::c_double"],
+            &["f32", "f64"],
+        ),
+    ];
+
+    if one == other {
+        return true;
+    }
+
+    for (ambiguous, concrete) in colliding {
+        if ambiguous.iter().any(|s| one == s) && ambiguous.iter().any(|s| other == s) {
+            return true;
+        }
+        if ambiguous.iter().any(|s| one == s) && concrete.iter().any(|s| other == s) {
+            return true;
+        }
+        if concrete.iter().any(|s| one == s) && ambiguous.iter().any(|s| other == s) {
+            return true;
+        }
+    }
+
+    false
+}
+
 impl RustCommonType {
     pub fn can_be_same_as(&self, other: &RustCommonType) -> bool {
-        let colliding: &[(&[&str], &[&str])] = &[
-            (
-                &[
-                    "std::os::raw::c_char",
-                    "std::os::raw::c_schar",
-                    "std::os::raw::c_short",
-                    "std::os::raw::c_int",
-                    "std::os::raw::c_long",
-                    "std::os::raw::c_longlong",
-                ],
-                &["u8", "u16", "u32", "u64"],
-            ),
-            (
-                &[
-                    "std::os::raw::c_char",
-                    "std::os::raw::c_uchar",
-                    "std::os::raw::c_ushort",
-                    "std::os::raw::c_uint",
-                    "std::os::raw::c_ulong",
-                    "std::os::raw::c_ulonglong",
-                ],
-                &["u8", "u16", "u32", "u64"],
-            ),
-            (
-                &["std::os::raw::c_float", "std::os::raw::c_double"],
-                &["f32", "f64"],
-            ),
-        ];
-
         let self_args = self
             .generic_arguments
             .as_ref()
@@ -408,29 +423,7 @@ impl RustCommonType {
             return false;
         }
 
-        if self.path == other.path {
-            return true;
-        }
-
-        for (ambiguous, concrete) in colliding {
-            if ambiguous.iter().any(|&s| self.path == s)
-                && ambiguous.iter().any(|&s| other.path == s)
-            {
-                return true;
-            }
-            if ambiguous.iter().any(|&s| self.path == s)
-                && concrete.iter().any(|&s| other.path == s)
-            {
-                return true;
-            }
-            if concrete.iter().any(|&s| self.path == s)
-                && ambiguous.iter().any(|&s| other.path == s)
-            {
-                return true;
-            }
-        }
-
-        false
+        paths_can_be_same(&self.path, &other.path)
     }
 }
 
@@ -438,7 +431,9 @@ impl RustCommonType {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum RustType {
     Tuple(Vec<RustType>),
-    /// A numeric, enum or struct type with some indirection
+    /// Primitive built-in type (`i32`, `str`, etc.)
+    Primitive(String),
+    /// A type specified by path with possible generic arguments
     Common(RustCommonType),
     /// A function pointer type.
     FunctionPointer {
@@ -462,10 +457,7 @@ impl RustType {
     }
 
     pub fn bool() -> Self {
-        RustType::Common(RustCommonType {
-            path: RustPath::from_good_str("bool"),
-            generic_arguments: None,
-        })
+        RustType::Primitive("bool".into())
     }
 
     pub fn new_pointer(is_const: bool, target: RustType) -> Self {
@@ -507,6 +499,7 @@ impl RustType {
                 .iter()
                 .map_if_ok(|t| t.caption(context, strategy))?
                 .join("_"),
+            RustType::Primitive(type1) => type1.to_string(),
             RustType::PointerLike {
                 kind,
                 is_const,
@@ -658,6 +651,7 @@ impl RustType {
             RustType::PointerLike { kind, target, .. } => {
                 kind.is_pointer() || target.is_unsafe_argument()
             }
+            RustType::Primitive(_) => false,
             RustType::Common(RustCommonType {
                 generic_arguments, ..
             }) => {
@@ -723,13 +717,22 @@ impl RustType {
                     false
                 }
             }
-            RustType::Common(self_type) => {
-                if let RustType::Common(other) = other {
-                    self_type.can_be_same_as(other)
-                } else {
-                    false
+            RustType::Common(self_type) => match other {
+                RustType::Common(other_type) => self_type.can_be_same_as(other_type),
+                RustType::Primitive(other_type) => {
+                    self_type.generic_arguments.is_none()
+                        && paths_can_be_same(&self_type.path, &other_type.as_str())
                 }
-            }
+                _ => false,
+            },
+            RustType::Primitive(type1) => match other {
+                RustType::Primitive(other_type) => type1 == other_type,
+                RustType::Common(other_type) => {
+                    other_type.generic_arguments.is_none()
+                        && paths_can_be_same(&other_type.path, &type1.as_str())
+                }
+                _ => false,
+            },
             RustType::FunctionPointer {
                 return_type: self_return_type,
                 arguments: self_arguments,

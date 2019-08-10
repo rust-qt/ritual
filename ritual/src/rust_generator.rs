@@ -309,9 +309,9 @@ impl State<'_, '_> {
             CppType::Void => RustType::unit(),
 
             CppType::BuiltInNumeric(numeric) => {
-                let rust_path = if numeric == &CppBuiltInNumericType::Bool {
+                if numeric == &CppBuiltInNumericType::Bool {
                     // TODO: bool may not be safe for FFI
-                    RustPath::from_good_str("bool")
+                    RustType::bool()
                 } else {
                     let own_name = match *numeric {
                         CppBuiltInNumericType::Bool => unreachable!(),
@@ -330,13 +330,12 @@ impl State<'_, '_> {
                         CppBuiltInNumericType::Double => "c_double",
                         _ => bail!("unsupported numeric type: {:?}", numeric),
                     };
-                    RustPath::from_good_str("std::os::raw").join(own_name)
-                };
-
-                RustType::Common(RustCommonType {
-                    path: rust_path,
-                    generic_arguments: None,
-                })
+                    let path = RustPath::from_good_str("std::os::raw").join(own_name);
+                    RustType::Common(RustCommonType {
+                        path,
+                        generic_arguments: None,
+                    })
+                }
             }
             CppType::SpecificNumeric(CppSpecificNumericType { bits, kind, .. }) => {
                 let letter = match kind {
@@ -349,19 +348,12 @@ impl State<'_, '_> {
                     }
                     CppSpecificNumericTypeKind::FloatingPoint => "f",
                 };
-                let path = RustPath::from_good_str(&format!("{}{}", letter, bits));
-
-                RustType::Common(RustCommonType {
-                    path,
-                    generic_arguments: None,
-                })
+                let name = format!("{}{}", letter, bits);
+                RustType::Primitive(name)
             }
             CppType::PointerSizedInteger { is_signed, .. } => {
                 let name = if *is_signed { "isize" } else { "usize" };
-                RustType::Common(RustCommonType {
-                    path: RustPath::from_good_str(name),
-                    generic_arguments: None,
-                })
+                RustType::Primitive(name.into())
             }
             CppType::Enum { path } | CppType::Class(path) => {
                 let rust_item = self.find_wrapper_type(path)?;
@@ -715,14 +707,21 @@ impl State<'_, '_> {
             generic_arguments: trait_args,
         };
 
-        let has_conflict = trait_types.iter().any(|tt| {
+        let conflict = trait_types.iter().find(|tt| {
             tt.target_type.can_be_same_as(&target_type) && tt.trait_type.can_be_same_as(&trait_type)
         });
-        if has_conflict {
-            bail!(
-                "potentially conflicting trait impl already exists: {:?}",
-                trait_types
-            );
+        if let Some(conflict) = conflict {
+            if conflict.target_type == target_type && conflict.trait_type == trait_type {
+                bail!("this trait implementation already exists: {:?}", conflict);
+            } else {
+                bail!(
+                    "can't add impl {:?} for {:?} because potentially conflicting trait impl \
+                     already exists: {:?}",
+                    trait_type,
+                    target_type,
+                    conflict
+                );
+            }
         }
 
         let parent_path = if let RustType::Common(RustCommonType { path, .. }) = self_value_type {

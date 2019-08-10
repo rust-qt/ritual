@@ -58,6 +58,7 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: Option<&str>) -> S
                 .join("");
             format!("({})", types_text)
         }
+        RustType::Primitive(type1) => type1.to_string(),
         RustType::PointerLike {
             kind,
             target,
