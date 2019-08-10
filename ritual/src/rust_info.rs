@@ -145,14 +145,11 @@ pub enum RustQtReceiverType {
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustFfiWrapperData {
-    /// C++ method corresponding to this variant.
-    pub cpp_ffi_function: CppFfiFunction,
-
     pub ffi_function_path: RustPath,
     /// Index of the FFI function argument used for acquiring the return value,
     /// if any. `None` if the return value is passed normally (as the return value
     /// of the FFI function).
-    pub return_type_ffi_index: Option<usize>, // TODO: why needed here?
+    pub return_type_ffi_index: Option<usize>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -176,7 +173,9 @@ pub enum RustFunctionKind {
 impl RustFunctionKind {
     pub fn short_text(&self) -> String {
         match self {
-            RustFunctionKind::FfiWrapper(data) => data.cpp_ffi_function.path.to_cpp_pseudo_code(),
+            RustFunctionKind::FfiWrapper(data) => {
+                format!("FfiWrapper({})", data.ffi_function_path.last())
+            }
             RustFunctionKind::SignalOrSlotGetter(getter) => format!(
                 "SignalOrSlotGetter({}",
                 getter.cpp_path.to_cpp_pseudo_code()

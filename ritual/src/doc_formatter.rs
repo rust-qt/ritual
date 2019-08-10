@@ -213,8 +213,15 @@ pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) 
     let mut output = String::new();
 
     match &function.item.kind {
-        RustFunctionKind::FfiWrapper(data) => {
-            match &data.cpp_ffi_function.kind {
+        RustFunctionKind::FfiWrapper(_) => {
+            let cpp_ffi_function = database
+                .source_ffi_item(&function.id)?
+                .ok_or_else(|| err_msg("source cpp item not found"))?
+                .item
+                .as_function_ref()
+                .ok_or_else(|| err_msg("invalid source ffi item type"))?;
+
+            match &cpp_ffi_function.kind {
                 CppFfiFunctionKind::Function => {
                     let cpp_item = cpp_item
                         .as_function_ref()

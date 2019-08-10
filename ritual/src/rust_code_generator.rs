@@ -735,10 +735,9 @@ impl Generator<'_> {
         in_unsafe_context: bool,
     ) -> Result<String> {
         let mut final_args = Vec::new();
-        final_args.resize(wrapper_data.cpp_ffi_function.arguments.len(), None);
         for arg in arguments {
-            assert!(arg.ffi_index < final_args.len());
             let code = self.convert_type_to_ffi(&arg.name, &arg.argument_type)?;
+            final_args.resize(arg.ffi_index + 1, None);
             final_args[arg.ffi_index] = Some(code);
         }
 
@@ -777,7 +776,8 @@ impl Generator<'_> {
                 t = struct_name,
                 e = expr
             ));
-            final_args[*i as usize] = Some(format!("&mut {}", return_var_name));
+            final_args.resize(*i + 1, None);
+            final_args[*i] = Some(format!("&mut {}", return_var_name));
             maybe_result_var_name = Some(return_var_name);
         }
         let final_args = final_args

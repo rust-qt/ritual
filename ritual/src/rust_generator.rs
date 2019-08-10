@@ -1088,7 +1088,6 @@ impl State<'_, '_> {
             arguments: arguments.clone(),
             return_type,
             kind: RustFunctionKind::FfiWrapper(RustFfiWrapperData {
-                cpp_ffi_function: function.clone(),
                 ffi_function_path,
                 return_type_ffi_index: return_arg_index,
             }),
