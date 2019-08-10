@@ -729,7 +729,16 @@ pub fn parse_docs(
                             data.path.to_cpp_pseudo_code(),
                             r.html,
                         );
-                        data.doc = Some(r.html.clone());
+                        new_items.push(ItemWithSource::new(
+                            &item.id,
+                            DocItem {
+                                anchor: None,
+                                html: r.html.clone(),
+                                mismatched_declaration: None,
+                                url: None,
+                                cross_references: vec![],
+                            },
+                        ));
                         parser.mark_enum_variant_used(&data.unscoped_path().doc_id());
                     } else {
                         debug!(

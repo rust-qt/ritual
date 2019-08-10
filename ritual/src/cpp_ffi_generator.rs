@@ -2,7 +2,6 @@ use crate::cpp_data::CppClassField;
 use crate::cpp_data::CppItem;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;
-use crate::cpp_data::CppTypeDeclarationKind;
 use crate::cpp_data::CppVisibility;
 use crate::cpp_ffi_data::CppFfiType;
 use crate::cpp_ffi_data::{CppFfiArgumentMeaning, CppToFfiTypeConversion};
@@ -145,20 +144,8 @@ impl FfiNameProvider {
 
 /// Runs the FFI generator
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
-    let movable_types = data
-        .db
-        .all_cpp_items()
-        .filter_map(|item| {
-            if let CppItem::Type(type_data) = &item.item {
-                if let CppTypeDeclarationKind::Class { is_movable } = type_data.kind {
-                    if is_movable {
-                        return Some(type_data.path.clone());
-                    }
-                }
-            }
-            None
-        })
-        .collect_vec();
+    // movable types are not supported for now
+    let movable_types = Vec::new();
 
     let mut name_provider = FfiNameProvider::new(data);
 

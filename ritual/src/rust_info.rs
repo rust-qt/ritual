@@ -14,17 +14,6 @@ pub struct RustEnumValue {
     pub path: RustPath,
     /// Corresponding value
     pub value: i64,
-    /// Documentation of corresponding C++ variants
-    pub doc: RustEnumValueDoc,
-}
-
-/// C++ documentation data for a enum variant
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct RustEnumValueDoc {
-    /// C++ path of the variant
-    pub cpp_path: CppPath,
-    /// HTML content
-    pub cpp_doc: Option<String>,
 }
 
 /// Information about a Qt slot wrapper on Rust side

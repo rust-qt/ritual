@@ -17,8 +17,6 @@ pub struct CppEnumValue {
     pub path: CppPath,
     /// Corresponding value
     pub value: i64,
-    /// C++ documentation for this item in HTML
-    pub doc: Option<String>,
 }
 
 impl CppEnumValue {
@@ -42,7 +40,6 @@ fn unscoped_path_should_work() {
         let v = CppEnumValue {
             path: CppPath::from_good_str(path),
             value: 0,
-            doc: None,
         };
         assert_eq!(v.unscoped_path(), CppPath::from_good_str(result));
     }
@@ -50,8 +47,6 @@ fn unscoped_path_should_work() {
     check("A::B::C::D", "A::B::D");
     check("A::B", "B");
 }
-
-pub type CppClassFieldDoc = ();
 
 /// Member field of a C++ class declaration
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
@@ -62,8 +57,6 @@ pub struct CppClassField {
     /// Visibility
     pub visibility: CppVisibility,
     pub is_static: bool,
-
-    pub doc: Option<CppClassFieldDoc>,
 }
 
 impl CppClassField {
@@ -366,7 +359,7 @@ impl fmt::Debug for CppPathItem {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum CppTypeDeclarationKind {
     Enum,
-    Class { is_movable: bool },
+    Class,
 }
 
 /// Information about a C++ type declaration

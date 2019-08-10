@@ -13,14 +13,14 @@ use crate::cpp_type::{
 use crate::database::{DbItem, ItemWithSource};
 use crate::processor::ProcessorData;
 use crate::rust_info::{
-    NameType, RustEnumValue, RustEnumValueDoc, RustExtraImpl, RustExtraImplKind,
-    RustFfiWrapperData, RustFlagEnumImpl, RustFunction, RustFunctionArgument,
-    RustFunctionCaptionStrategy, RustFunctionKind, RustFunctionSelfArgKind, RustItem, RustModule,
-    RustModuleDoc, RustModuleKind, RustPathScope, RustQtReceiverType, RustQtSlotWrapper,
-    RustRawSlotReceiver, RustReexport, RustReexportSource, RustSignalOrSlotGetter, RustSizedType,
-    RustSpecialModuleKind, RustStruct, RustStructKind, RustTraitAssociatedType, RustTraitImpl,
-    RustTraitImplSource, RustTraitImplSourceKind, RustTypeCaptionStrategy, RustWrapperType,
-    RustWrapperTypeDocData, RustWrapperTypeKind, UnnamedRustFunction,
+    NameType, RustEnumValue, RustExtraImpl, RustExtraImplKind, RustFfiWrapperData,
+    RustFlagEnumImpl, RustFunction, RustFunctionArgument, RustFunctionCaptionStrategy,
+    RustFunctionKind, RustFunctionSelfArgKind, RustItem, RustModule, RustModuleDoc, RustModuleKind,
+    RustPathScope, RustQtReceiverType, RustQtSlotWrapper, RustRawSlotReceiver, RustReexport,
+    RustReexportSource, RustSignalOrSlotGetter, RustSizedType, RustSpecialModuleKind, RustStruct,
+    RustStructKind, RustTraitAssociatedType, RustTraitImpl, RustTraitImplSource,
+    RustTraitImplSourceKind, RustTypeCaptionStrategy, RustWrapperType, RustWrapperTypeDocData,
+    RustWrapperTypeKind, UnnamedRustFunction,
 };
 use crate::rust_type::{
     RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
@@ -1552,11 +1552,7 @@ impl State<'_, '_> {
 
         let mut rust_items = Vec::new();
 
-        let is_movable = if let CppTypeDeclarationKind::Class { is_movable } = &data.kind {
-            *is_movable
-        } else {
-            unreachable!()
-        };
+        let is_movable = false;
 
         let wrapper_kind;
         if is_movable {
@@ -1716,10 +1712,6 @@ impl State<'_, '_> {
                 let rust_item = RustItem::EnumValue(RustEnumValue {
                     path: rust_path,
                     value: value.value,
-                    doc: RustEnumValueDoc {
-                        cpp_path: value.path.clone(),
-                        cpp_doc: value.doc.clone(),
-                    },
                 });
 
                 Ok(vec![rust_item])

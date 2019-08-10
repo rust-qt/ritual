@@ -1221,7 +1221,6 @@ impl CppParser<'_, '_> {
                     CppItem::EnumValue(CppEnumValue {
                         path: enum_name.join(CppPathItem::from_good_str(&value_name)),
                         value: val.0,
-                        doc: None,
                     }),
                 )?;
             }
@@ -1255,7 +1254,6 @@ impl CppParser<'_, '_> {
                     Accessibility::Private => CppVisibility::Private,
                 },
                 is_static: entity.get_kind() == EntityKind::VarDecl,
-                doc: None,
             }),
         )?;
 
@@ -1346,7 +1344,7 @@ impl CppParser<'_, '_> {
             include_file,
             get_origin_location(entity).unwrap(),
             CppItem::Type(CppTypeDeclaration {
-                kind: CppTypeDeclarationKind::Class { is_movable: false },
+                kind: CppTypeDeclarationKind::Class,
                 path: full_name,
             }),
         )?;

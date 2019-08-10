@@ -757,12 +757,10 @@ fn simple_enum() {
         vec![
             CppEnumValue {
                 value: 0,
-                doc: None,
                 path: CppPath::from_good_str("Enum1::Good"),
             },
             CppEnumValue {
                 value: 1,
-                doc: None,
                 path: CppPath::from_good_str("Enum1::Bad"),
             },
         ]
@@ -790,17 +788,14 @@ fn simple_enum2() {
         vec![
             CppEnumValue {
                 value: 1,
-                doc: None,
                 path: CppPath::from_good_str("ns1::Enum1::Good"),
             },
             CppEnumValue {
                 value: 2,
-                doc: None,
                 path: CppPath::from_good_str("ns1::Enum1::Bad"),
             },
             CppEnumValue {
                 value: 3,
-                doc: None,
                 path: CppPath::from_good_str("ns1::Enum1::Questionable"),
             },
         ]
