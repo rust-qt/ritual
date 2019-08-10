@@ -263,7 +263,7 @@ impl OperatorInfo {
 #[derive(Debug)]
 struct TraitTypes {
     target_type: RustType,
-    trait_type: RustType,
+    trait_type: RustCommonType,
 }
 
 impl From<&RustTraitImpl> for TraitTypes {
@@ -710,10 +710,10 @@ impl State<'_, '_> {
             other_type = Some(other_type1);
         };
 
-        let trait_type = RustType::Common(RustCommonType {
+        let trait_type = RustCommonType {
             path: trait_path.clone(),
             generic_arguments: trait_args,
-        });
+        };
 
         let has_conflict = trait_types.iter().any(|tt| {
             tt.target_type.can_be_same_as(&target_type) && tt.trait_type.can_be_same_as(&trait_type)
@@ -843,10 +843,10 @@ impl State<'_, '_> {
         Ok(RustTraitImpl {
             target_type,
             parent_path,
-            trait_type: RustType::Common(RustCommonType {
+            trait_type: RustCommonType {
                 path: trait_path,
                 generic_arguments: None,
-            }),
+            },
             associated_types: Vec::new(),
             functions: vec![function],
             source: RustTraitImplSource {
@@ -924,10 +924,10 @@ impl State<'_, '_> {
         results.push(RustTraitImpl {
             target_type: target_type.clone(),
             parent_path: parent_path.clone(),
-            trait_type: RustType::Common(RustCommonType {
+            trait_type: RustCommonType {
                 path: trait_path,
                 generic_arguments: Some(vec![to_type_value.clone()]),
-            }),
+            },
             associated_types: Vec::new(),
             functions: vec![cast_function, cast_function_mut],
             source: RustTraitImplSource {
@@ -956,10 +956,10 @@ impl State<'_, '_> {
             results.push(RustTraitImpl {
                 target_type: target_type.clone(),
                 parent_path: parent_path.clone(),
-                trait_type: RustType::Common(RustCommonType {
+                trait_type: RustCommonType {
                     path: deref_trait_path,
                     generic_arguments: None,
-                }),
+                },
                 associated_types: vec![RustTraitAssociatedType {
                     name: "Target".to_string(),
                     value: to_type_value,
@@ -980,10 +980,10 @@ impl State<'_, '_> {
             results.push(RustTraitImpl {
                 target_type,
                 parent_path,
-                trait_type: RustType::Common(RustCommonType {
+                trait_type: RustCommonType {
                     path: deref_mut_trait_path,
                     generic_arguments: None,
-                }),
+                },
                 associated_types: Vec::new(),
                 functions: vec![deref_mut_function],
                 source: RustTraitImplSource {

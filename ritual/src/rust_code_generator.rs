@@ -18,6 +18,7 @@ use ritual_common::errors::{bail, err_msg, Result};
 use ritual_common::file_utils::{create_dir_all, create_file, file_to_string, File};
 use ritual_common::string_utils::trim_slice;
 use ritual_common::utils::MapIfOk;
+use std::fmt::Write as _;
 use std::fs;
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -29,6 +30,21 @@ fn wrap_unsafe(in_unsafe_context: bool, content: &str) -> String {
         ("unsafe { ", " }")
     };
     format!("{}{}{}", unsafe_start, content, unsafe_end)
+}
+
+pub fn rust_common_type_to_code(rust_type: &RustCommonType, current_crate: Option<&str>) -> String {
+    let mut code = rust_type.path.full_name(current_crate);
+    if let Some(args) = &rust_type.generic_arguments {
+        write!(
+            code,
+            "<{}>",
+            args.iter()
+                .map(|x| rust_type_to_code(x, current_crate))
+                .join(", ",)
+        )
+        .unwrap();
+    }
+    code
 }
 
 /// Generates Rust code representing type `rust_type` inside crate `crate_name`.
@@ -69,22 +85,7 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: Option<&str>) -> S
                 }
             }
         }
-        RustType::Common(RustCommonType {
-            path,
-            generic_arguments,
-        }) => {
-            let mut code = path.full_name(current_crate);
-            if let Some(args) = generic_arguments {
-                code = format!(
-                    "{}<{}>",
-                    code,
-                    args.iter()
-                        .map(|x| rust_type_to_code(x, current_crate))
-                        .join(", ",)
-                );
-            }
-            code
-        }
+        RustType::Common(common) => rust_common_type_to_code(common, current_crate),
         RustType::FunctionPointer {
             return_type,
             arguments,
@@ -102,7 +103,7 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: Option<&str>) -> S
         ),
         RustType::ImplTrait(trait_type) => format!(
             "impl {}",
-            rust_type_to_code(&RustType::Common(trait_type.clone()), current_crate)
+            rust_common_type_to_code(trait_type, current_crate)
         ),
     }
 }
@@ -286,6 +287,10 @@ impl Generator<'_> {
 
     fn rust_type_to_code(&self, rust_type: &RustType) -> String {
         rust_type_to_code(rust_type, Some(&self.current_database.crate_name()))
+    }
+
+    fn rust_common_type_to_code(&self, rust_type: &RustCommonType) -> String {
+        rust_common_type_to_code(rust_type, Some(&self.current_database.crate_name()))
     }
 
     #[allow(clippy::collapsible_if)]
@@ -993,7 +998,7 @@ impl Generator<'_> {
             self,
             "{}impl {} for {} {{\n{}",
             condition_texts.attribute,
-            self.rust_type_to_code(&trait_impl.item.trait_type),
+            self.rust_common_type_to_code(&trait_impl.item.trait_type),
             self.rust_type_to_code(&trait_impl.item.target_type),
             associated_types_text,
         )?;

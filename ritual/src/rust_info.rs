@@ -4,8 +4,10 @@ use crate::cpp_data::CppPath;
 use crate::cpp_ffi_data::CppFfiFunction;
 use crate::cpp_type::CppType;
 use crate::database::DbItem;
-use crate::rust_code_generator::rust_type_to_code;
-use crate::rust_type::{RustFinalType, RustPath, RustPointerLikeTypeKind, RustType};
+use crate::rust_code_generator::{rust_common_type_to_code, rust_type_to_code};
+use crate::rust_type::{
+    RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustType,
+};
 use ritual_common::errors::{bail, Result};
 use serde_derive::{Deserialize, Serialize};
 
@@ -382,7 +384,7 @@ pub struct RustTraitImpl {
     /// Type the trait is implemented for.
     pub target_type: RustType,
     /// Type of the trait.
-    pub trait_type: RustType, // TODO: RustCommonType?
+    pub trait_type: RustCommonType,
     /// Values of associated types of the trait.
     pub associated_types: Vec<RustTraitAssociatedType>,
     /// Functions that implement the trait.
@@ -796,7 +798,7 @@ impl RustItem {
             RustItem::EnumValue(data) => format!("enum value {}", data.path.full_name(None)),
             RustItem::TraitImpl(data) => format!(
                 "impl {} for {}",
-                rust_type_to_code(&data.trait_type, None),
+                rust_common_type_to_code(&data.trait_type, None),
                 rust_type_to_code(&data.target_type, None)
             ),
             RustItem::ExtraImpl(data) => format!("extra impl {:?}", data.kind),
