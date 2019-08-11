@@ -380,11 +380,11 @@ impl Generator<'_> {
 
         let mut any_slot_wrappers = false;
         for ffi_item in &ffi_items {
-            let checks = self.0.cpp_checks(&ffi_item.id);
-            if !checks.any_success() {
-                continue;
-            }
             if let CppFfiItem::QtSlotWrapper(qt_slot_wrapper) = &ffi_item.item {
+                let checks = self.0.cpp_checks(&ffi_item.id);
+                if !checks.any_success() {
+                    continue;
+                }
                 any_slot_wrappers = true;
                 let condition = checks.condition(self.0.environments());
                 let code = self.qt_slot_wrapper(qt_slot_wrapper)?;
@@ -394,11 +394,11 @@ impl Generator<'_> {
 
         writeln!(cpp_file, "extern \"C\" {{")?;
         for ffi_item in &ffi_items {
-            let checks = self.0.cpp_checks(&ffi_item.id);
-            if !checks.any_success() {
-                continue;
-            }
             if let Some(item) = ffi_item.clone().filter_map(|item| item.as_function_ref()) {
+                let checks = self.0.cpp_checks(&ffi_item.id);
+                if !checks.any_success() {
+                    continue;
+                }
                 let condition = checks.condition(self.0.environments());
                 let code = self.function_implementation(item)?;
                 writeln!(cpp_file, "{}", self.wrap_with_condition(&code, &condition))?;
