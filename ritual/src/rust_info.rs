@@ -90,6 +90,12 @@ impl RustStructKind {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RustRawQtSlotWrapperData {
+    pub arguments: Vec<RustType>,
+    pub closure_wrapper: RustPath,
+}
+
 /// Exported information about a Rust wrapper type
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustStruct {
@@ -98,6 +104,8 @@ pub struct RustStruct {
     pub kind: RustStructKind,
     /// Indicates whether this type is public
     pub is_public: bool,
+
+    pub raw_slot_wrapper_data: Option<RustRawQtSlotWrapperData>,
 }
 
 /// Location of a Rust method.
@@ -722,22 +730,6 @@ impl RustItem {
         }
     }
 
-    pub fn is_ffi_function(&self) -> bool {
-        if let RustItem::Function(function) = self {
-            function.kind.is_ffi_function()
-        } else {
-            false
-        }
-    }
-
-    pub fn is_wrapper_type(&self) -> bool {
-        if let RustItem::Struct(data) = self {
-            data.kind.is_wrapper_type()
-        } else {
-            false
-        }
-    }
-
     pub fn is_module(&self) -> bool {
         if let RustItem::Module(_) = self {
             true
@@ -745,7 +737,27 @@ impl RustItem {
             false
         }
     }
-
+    pub fn is_trait_impl(&self) -> bool {
+        if let RustItem::TraitImpl(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+    pub fn is_ffi_function(&self) -> bool {
+        if let RustItem::Function(function) = self {
+            function.kind.is_ffi_function()
+        } else {
+            false
+        }
+    }
+    pub fn is_wrapper_type(&self) -> bool {
+        if let RustItem::Struct(data) = self {
+            data.kind.is_wrapper_type()
+        } else {
+            false
+        }
+    }
     pub fn is_module_for_nested(&self) -> bool {
         if let RustItem::Module(module) = self {
             module.kind.is_cpp_nested_types()

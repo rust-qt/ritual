@@ -154,7 +154,7 @@ fn format_doc_extended(doc: &str, is_outer: bool) -> String {
         return String::new();
     }
     let prefix = if is_outer { "//! " } else { "/// " };
-    let lines = doc.split('\n').collect_vec();
+    let lines = doc.trim().split('\n').collect_vec();
     let lines = trim_slice(&lines, |x| x.is_empty());
     if lines.is_empty() {
         return String::new();

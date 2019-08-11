@@ -16,10 +16,10 @@ use crate::rust_info::{
     NameType, RustEnumValue, RustExtraImpl, RustExtraImplKind, RustFfiWrapperData,
     RustFlagEnumImpl, RustFunction, RustFunctionArgument, RustFunctionCaptionStrategy,
     RustFunctionKind, RustFunctionSelfArgKind, RustItem, RustModule, RustModuleKind, RustPathScope,
-    RustQtReceiverType, RustQtSlotWrapper, RustRawSlotReceiver, RustReexport, RustReexportSource,
-    RustSignalOrSlotGetter, RustSizedType, RustSpecialModuleKind, RustStruct, RustStructKind,
-    RustTraitAssociatedType, RustTraitImpl, RustTraitImplExtraKind, RustTypeCaptionStrategy,
-    RustWrapperTypeKind, UnnamedRustFunction,
+    RustQtReceiverType, RustQtSlotWrapper, RustRawQtSlotWrapperData, RustRawSlotReceiver,
+    RustReexport, RustReexportSource, RustSignalOrSlotGetter, RustSizedType, RustSpecialModuleKind,
+    RustStruct, RustStructKind, RustTraitAssociatedType, RustTraitImpl, RustTraitImplExtraKind,
+    RustTypeCaptionStrategy, RustWrapperTypeKind, UnnamedRustFunction,
 };
 use crate::rust_type::{
     RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
@@ -1587,6 +1587,7 @@ impl State<'_, '_> {
                     cpp_path: data.path.clone(),
                 }),
                 is_public: true,
+                raw_slot_wrapper_data: None,
             });
 
             rust_items.push(internal_rust_item);
@@ -1598,13 +1599,6 @@ impl State<'_, '_> {
             wrapper_kind = RustWrapperTypeKind::ImmovableClassWrapper;
         }
 
-        let public_rust_item = RustItem::Struct(RustStruct {
-            path: public_path.clone(),
-            kind: RustStructKind::WrapperType(wrapper_kind),
-            is_public: true,
-        });
-        rust_items.push(public_rust_item);
-
         let nested_types_path = self.generate_rust_path(&data.path, NameType::Module)?;
 
         let nested_types_rust_item = RustItem::Module(RustModule {
@@ -1614,6 +1608,7 @@ impl State<'_, '_> {
         });
         rust_items.push(nested_types_rust_item);
 
+        let raw_slot_wrapper_data;
         if let Some(wrapper) = qt_slot_wrapper {
             let arg_types = wrapper
                 .item
@@ -1632,7 +1627,7 @@ impl State<'_, '_> {
                 kind: RustExtraImplKind::RawSlotReceiver(RustRawSlotReceiver {
                     receiver_id,
                     target_path: public_path.clone(),
-                    arguments: RustType::Tuple(arg_types),
+                    arguments: RustType::Tuple(arg_types.clone()),
                 }),
             });
             rust_items.push(impl_item);
@@ -1661,13 +1656,28 @@ impl State<'_, '_> {
                 is_public: true,
                 kind: RustStructKind::QtSlotWrapper(RustQtSlotWrapper {
                     arguments: public_args,
-                    raw_slot_wrapper: public_path,
+                    raw_slot_wrapper: public_path.clone(),
                 }),
-                path: closure_item_path,
+                path: closure_item_path.clone(),
+                raw_slot_wrapper_data: None,
             });
             rust_items.push(public_item);
+
+            raw_slot_wrapper_data = Some(RustRawQtSlotWrapperData {
+                arguments: arg_types,
+                closure_wrapper: closure_item_path,
+            });
+        } else {
+            raw_slot_wrapper_data = None;
         }
 
+        let public_rust_item = RustItem::Struct(RustStruct {
+            path: public_path,
+            kind: RustStructKind::WrapperType(wrapper_kind),
+            is_public: true,
+            raw_slot_wrapper_data,
+        });
+        rust_items.push(public_rust_item);
         Ok(rust_items)
     }
 
@@ -1698,6 +1708,7 @@ impl State<'_, '_> {
                         path: rust_path,
                         kind: RustStructKind::WrapperType(RustWrapperTypeKind::EnumWrapper),
                         is_public: true,
+                        raw_slot_wrapper_data: None,
                     });
 
                     Ok(vec![rust_item])
@@ -1725,6 +1736,17 @@ impl State<'_, '_> {
                 } else {
                     return Ok(Vec::new());
                 };
+
+                let has_source_slot_wrapper = self
+                    .0
+                    .db
+                    .source_ffi_item(&cpp_item.id)?
+                    .map_or(false, |item| item.item.is_slot_wrapper());
+                if has_source_slot_wrapper {
+                    // no need to add slot accessors because
+                    // `AsReceiver` is implemented directly on structs
+                    return Ok(Vec::new());
+                }
 
                 let original_item = self
                     .0

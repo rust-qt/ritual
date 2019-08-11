@@ -32,7 +32,7 @@ impl<'a> {pub_type_name}<'a> {{
         self.func = Some(func_box);
     }}
 
-    /// Drops the previously set closure, if any. After this, slot invokation will have no effect
+    /// Drops the previously set closure, if any. After this, slot invocation will have no effect
     /// until a new closure is set.
     pub fn clear(&mut self) {{
         if self.func.is_some() {{

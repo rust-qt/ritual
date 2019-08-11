@@ -6,12 +6,13 @@
 use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFieldAccessorType};
 use crate::cpp_type::CppType;
 use crate::database::{DatabaseClient, DbItem, DocItem};
+use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_info::{
     RustEnumValue, RustFunction, RustFunctionKind, RustModule, RustModuleKind, RustQtReceiverType,
-    RustSpecialModuleKind, RustStruct, RustStructKind,
+    RustSpecialModuleKind, RustStruct, RustStructKind, RustWrapperTypeKind,
 };
 use itertools::Itertools;
-use ritual_common::errors::{err_msg, Result};
+use ritual_common::errors::{bail, err_msg, Result};
 use std::fmt::Write;
 
 pub fn wrap_inline_cpp_code(code: &str) -> String {
@@ -73,11 +74,28 @@ pub fn module_doc(module: DbItem<&RustModule>, database: &DatabaseClient) -> Res
     Ok(output)
 }
 
+fn first_phrase(html: &str) -> &str {
+    if let Some(index) = html.find("</p>") {
+        return &html[..index + "</p>".len()];
+    }
+    if let Some(index) = html.find('.') {
+        return &html[..=index];
+    }
+    html
+}
+
 pub fn struct_doc(type1: DbItem<&RustStruct>, database: &DatabaseClient) -> Result<String> {
     let mut output = String::new();
 
+    let doc_item = database.find_doc_for(&type1.id)?;
+    if let Some(doc_item) = &doc_item {
+        if !doc_item.item.html.is_empty() {
+            writeln!(output, "{}\n", first_phrase(&doc_item.item.html))?;
+        }
+    }
+
     match &type1.item.kind {
-        RustStructKind::WrapperType(_) => {
+        RustStructKind::WrapperType(kind) => {
             let cpp_item = database
                 .source_cpp_item(&type1.id)?
                 .ok_or_else(|| err_msg("source cpp item not found"))?;
@@ -87,84 +105,156 @@ pub fn struct_doc(type1: DbItem<&RustStruct>, database: &DatabaseClient) -> Resu
                 .path()
                 .ok_or_else(|| err_msg("cpp item expected to have path"))?
                 .to_cpp_pseudo_code();
-            write!(
-                output,
-                "Type corresponding to C++ type: {}.\n\n\
-                 This type can only be used behind a pointer or reference.",
-                wrap_inline_cpp_code(&cpp_type_code)
-            )?;
-            // TODO: add description based on the wrapper kind (enum, immovable/movable class)
 
-            if let Some(source_ffi_item) = database.source_ffi_item(&cpp_item.id)? {
-                if let Some(slot_wrapper) = source_ffi_item.filter_map(|i| i.as_slot_wrapper_ref())
-                {
-                    let cpp_args = slot_wrapper
+            match kind {
+                RustWrapperTypeKind::EnumWrapper => {
+                    writeln!(
+                        output,
+                        "C++ enum: {}.\n",
+                        wrap_inline_cpp_code(&cpp_type_code)
+                    )?;
+                }
+                RustWrapperTypeKind::ImmovableClassWrapper => {
+                    writeln!(
+                        output,
+                        "C++ class: {}.\n",
+                        wrap_inline_cpp_code(&cpp_type_code)
+                    )?;
+                }
+                RustWrapperTypeKind::MovableClassWrapper { .. } => {
+                    // not supported now
+                }
+            }
+
+            if let Some(raw_slot_wrapper) = &type1.item.raw_slot_wrapper_data {
+                output.clear(); // remove irrelevant C++ type name
+                writeln!(
+                    output,
+                    "Binds a Qt signal with {} to a Rust extern function.\n",
+                    if raw_slot_wrapper.arguments.is_empty() {
+                        "no arguments".to_string()
+                    } else {
+                        format!(
+                            "arguments `{}`",
+                            raw_slot_wrapper
+                                .arguments
+                                .iter()
+                                .map(|arg| rust_type_to_code(arg, Some(database.crate_name())))
+                                .join(",")
+                        )
+                    }
+                )?;
+
+                writeln!(
+                    output,
+                    "It's recommended to use `{}` instead \
+                     because it provides a more high-level API.\n",
+                    raw_slot_wrapper.closure_wrapper.last()
+                )?;
+
+                let ffi_item = database
+                    .source_ffi_item(&cpp_item.id)?
+                    .ok_or_else(|| err_msg("source ffi item not found"))?
+                    .filter_map(|i| i.as_slot_wrapper_ref())
+                    .ok_or_else(|| err_msg("invalid source ffi item type"))?;
+
+                if !ffi_item.item.signal_arguments.is_empty() {
+                    let cpp_args = ffi_item
                         .item
                         .signal_arguments
                         .iter()
                         .map(CppType::to_cpp_pseudo_code)
                         .join(", ");
-
-                    // TODO: print Rust argument types
-
-                    // TODO: find public wrapper path
-                    // Use `{public_type_name}` to bind signals to a Rust closure instead.\n\n
-                    write!(
+                    writeln!(
                         output,
-                        "Allows to bind Qt signals with arguments `({cpp_args})` to a \
-           Rust extern function.\n\n\
-           Corresponding C++ argument types: ({cpp_args}).\n\n
-           Create an object using `new()` and bind your function and payload using `set()`. \
-           The function will receive the payload as its first arguments, and the rest of arguments \
-           will be values passed through the Qt connection system. Use \
-           `connect()` method of a `qt_core::connection::Signal` object to connect the signal \
-           to this slot. The callback function will be executed each time the slot is invoked \
-           until source signals are disconnected or the slot object is destroyed.\n\n\
-           If `set()` was not called, slot invocation has no effect.",
-                        cpp_args = cpp_args,
+                        "Corresponding C++ argument types: ({}).\n",
+                        wrap_inline_cpp_code(&cpp_args)
                     )?;
                 }
+
+                writeln!(
+                    output,
+                    "Create an object using `new()` \
+                     and bind your function and payload using `set()`. \
+                     The function will receive the payload as its first arguments, \
+                     and the rest of arguments will be values passed \
+                     through the Qt connection system. \
+                     Use `connect()` method of a `qt_core::Signal` object \
+                     to connect the signal to this slot. \
+                     The callback function will be executed each time the slot is invoked \
+                     until source signals are disconnected or the slot object is destroyed.\n\n\
+                     If `set()` was not called, slot invocation has no effect.\n"
+                )?;
             }
         }
-        RustStructKind::QtSlotWrapper(_) => {
+        RustStructKind::QtSlotWrapper(wrapper) => {
             let cpp_item = database
                 .source_cpp_item(&type1.id)?
                 .ok_or_else(|| err_msg("source cpp item not found"))?;
 
-            let slot_wrapper = database
+            let ffi_item = database
                 .source_ffi_item(&cpp_item.id)?
                 .ok_or_else(|| err_msg("source ffi item not found"))?
                 .item
                 .as_slot_wrapper_ref()
                 .ok_or_else(|| err_msg("invalid source ffi item type"))?;
 
-            let cpp_args = slot_wrapper
-                .signal_arguments
-                .iter()
-                .map(CppType::to_cpp_pseudo_code)
-                .join(", ");
+            writeln!(
+                output,
+                "Binds a Qt signal with {} to a Rust closure.\n",
+                if wrapper.arguments.is_empty() {
+                    "no arguments".to_string()
+                } else {
+                    format!(
+                        "arguments `{}`",
+                        wrapper
+                            .arguments
+                            .iter()
+                            .map(|arg| rust_type_to_code(
+                                arg.api_type(),
+                                Some(database.crate_name())
+                            ))
+                            .join(",")
+                    )
+                }
+            )?;
 
-            write!(output, "\
-                Allows to bind Qt signals with arguments `({cpp_args})` to a Rust closure. \
-                \
-                Create an object using `new()` and bind your closure using `set()`.\
-                The closure will be called with the signal's arguments when the slot is invoked.\
-                Use `connect()` method of a `qt_core::connection::Signal` object to connect the signal\
-                to this slot. The closure will be executed each time the slot is invoked\
-                until source signals are disconnected or the slot object is destroyed.\
-                The slot object takes ownership of the passed closure. If `set()` is called again,\
-                previously set closure is dropped. Make sure that the slot object does not outlive\
-                objects referenced by the closure.\
-                If `set()` was not called, slot invokation has no effect.\
-            ",
-                    cpp_args = cpp_args
+            if !ffi_item.signal_arguments.is_empty() {
+                let cpp_args = ffi_item
+                    .signal_arguments
+                    .iter()
+                    .map(CppType::to_cpp_pseudo_code)
+                    .join(", ");
+                writeln!(
+                    output,
+                    "Corresponding C++ argument types: ({}).\n",
+                    wrap_inline_cpp_code(&cpp_args)
+                )?;
+            }
+
+            writeln!(
+                output,
+                "Create an object using `new()` \
+                 and bind your closure using `set()`. \
+                 The closure will be called with the signal's arguments \
+                 when the slot is invoked. \
+                 Use `connect()` method of a `qt_core::Signal` object to connect \
+                 the signal to this slot. The closure will be executed each time \
+                 the slot is invoked until source signals are disconnected \
+                 or the slot object is destroyed. \n\n\
+                 The slot object takes ownership of the passed closure. \
+                 If `set()` is called again, \
+                 previously set closure is dropped. \
+                 Make sure that the slot object does not outlive \
+                 objects referenced by the closure. \n\n\
+                 If `set()` was not called, slot invocation has no effect.\n"
             )?;
         }
         // private struct, no doc needed
         RustStructKind::SizedType(_) => {}
     };
 
-    if let Some(doc_item) = database.find_doc_for(&type1.id)? {
+    if let Some(doc_item) = doc_item {
         write!(output, "{}", format_doc_item(doc_item.item))?;
     }
     Ok(output)
@@ -209,19 +299,64 @@ fn format_doc_item(cpp_doc: &DocItem) -> String {
             wrap_inline_cpp_code(declaration)
         )
     } else {
-        format_maybe_link(&cpp_doc.url, "C++ documentation")
+        format!("{}:", format_maybe_link(&cpp_doc.url, "C++ documentation"))
     };
-    write!(output, " {}", wrap_cpp_doc_block(&cpp_doc.html)).unwrap();
+    write!(output, "{}", wrap_cpp_doc_block(&cpp_doc.html)).unwrap();
     output
 }
 
 pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) -> Result<String> {
     let cpp_item = database
         .source_cpp_item(&function.id)?
-        .ok_or_else(|| err_msg("source cpp item not found"))?
-        .item;
+        .ok_or_else(|| err_msg("source cpp item not found"))?;
+
+    let is_trait_impl = database
+        .item(&function.id)?
+        .item
+        .as_rust_item()
+        .ok_or_else(|| err_msg("invalid item type"))?
+        .is_trait_impl();
+
+    let has_source_slot_wrapper = database
+        .source_ffi_item(&cpp_item.id)?
+        .map_or(false, |item| item.item.is_slot_wrapper());
 
     let mut output = String::new();
+
+    if has_source_slot_wrapper
+        && function.item.kind != RustFunctionKind::FfiFunction
+        && !is_trait_impl
+    {
+        match function.item.path.last() {
+            "custom_slot" => {
+                writeln!(
+                    output,
+                    "Calls the slot directly, invoking the assigned handler (if any).\n"
+                )?;
+            }
+            "new" => {
+                writeln!(output, "Creates a new object.\n")?;
+            }
+            "set" => {
+                writeln!(output, "Assigns `func` as the signal handler.\n")?;
+                writeln!(
+                    output,
+                    "`func` will be called each time a connected signal is emitted. \
+                     Any previously assigned function will be deregistered. \
+                     Passing `None` will deregister the handler without setting a new one.\n"
+                )?;
+            }
+            other => bail!("unknown slot wrapper method: {}", other),
+        }
+        return Ok(output);
+    }
+
+    let doc_item = database.find_doc_for(&function.id)?;
+    if let Some(doc_item) = &doc_item {
+        if !doc_item.item.html.is_empty() {
+            writeln!(output, "{}\n", first_phrase(&doc_item.item.html))?;
+        }
+    }
 
     match &function.item.kind {
         RustFunctionKind::FfiWrapper(_) => {
@@ -235,11 +370,12 @@ pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) 
             match &cpp_ffi_function.kind {
                 CppFfiFunctionKind::Function => {
                     let cpp_item = cpp_item
+                        .item
                         .as_function_ref()
                         .ok_or_else(|| err_msg("invalid source cpp item type"))?;
                     write!(
                         output,
-                        "Calls C++ function: {}\n\n",
+                        "Calls C++ function: {}.\n\n",
                         wrap_inline_cpp_code(&cpp_item.short_text())
                     )?;
 
@@ -256,38 +392,42 @@ pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) 
                 }
                 CppFfiFunctionKind::FieldAccessor { accessor_type } => {
                     let cpp_item = cpp_item
+                        .item
                         .as_field_ref()
                         .ok_or_else(|| err_msg("invalid source cpp item type"))?;
-                    let field_text = wrap_inline_cpp_code(&cpp_item.short_text());
+                    let field_text =
+                        wrap_inline_cpp_code(&cpp_item.path.last().to_cpp_pseudo_code());
                     match *accessor_type {
-                        CppFieldAccessorType::CopyGetter | CppFieldAccessorType::ConstRefGetter => {
-                            write!(output, "Returns the value of C++ field: {}", field_text)?;
+                        CppFieldAccessorType::CopyGetter => {
+                            write!(output, "Returns the value of the {} field.", field_text)?;
+                        }
+                        CppFieldAccessorType::ConstRefGetter => {
+                            write!(output, "Returns a reference to the {} field.", field_text)?;
                         }
                         CppFieldAccessorType::MutRefGetter => {
                             write!(
                                 output,
-                                "Returns a mutable reference to the C++ field: {}",
+                                "Returns a mutable reference to the {} field.",
                                 field_text
                             )?;
                         }
                         CppFieldAccessorType::Setter => {
-                            write!(output, "Sets the value of the C++ field: {}", field_text)?;
+                            write!(output, "Sets the value of the {} field.", field_text)?;
                         }
                     };
-                    // TODO: add C++ docs of fields
                 }
             }
         }
         RustFunctionKind::SignalOrSlotGetter(getter) => {
             let cpp_item = cpp_item
+                .item
                 .as_function_ref()
                 .ok_or_else(|| err_msg("invalid source cpp item type"))?;
 
-            write!(
+            writeln!(
                 output,
-                "Returns an object representing a built-in Qt {signal} `{cpp_path}`.\n\n\
-                 Return value of this function can be used for creating Qt connections using \
-                 `qt_core::connection` API.",
+                "Returns a built-in Qt {signal} `{cpp_path}` that can be passed to \
+                 `qt_core::Signal::connect`.\n",
                 signal = match getter.receiver_type {
                     RustQtReceiverType::Signal => "signal",
                     RustQtReceiverType::Slot => "slot",
@@ -298,7 +438,6 @@ pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) 
         // FFI functions are private
         RustFunctionKind::FfiFunction => {}
     }
-    // TODO: somehow handle docs for inherited methods (currently only for virtual functions).
     if let Some(doc_item) = database.find_doc_for(&function.id)? {
         write!(output, "{}", format_doc_item(doc_item.item))?;
     }
