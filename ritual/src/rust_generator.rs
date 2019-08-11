@@ -1018,34 +1018,30 @@ impl State<'_, '_> {
                 });
             }
         }
-        let (mut return_type, return_arg_index) = if let Some((arg_index, arg)) = function
+        let mut return_type = if let Some(arg) = function
             .arguments
             .iter()
-            .enumerate()
-            .find(|&(_arg_index, arg)| arg.meaning == CppFfiArgumentMeaning::ReturnValue)
+            .find(|arg| arg.meaning == CppFfiArgumentMeaning::ReturnValue)
         {
             // an argument has return value meaning, so
             // FFI return type must be void
             assert_eq!(function.return_type, CppFfiType::void());
-            (
-                self.rust_final_type(
-                    &arg.argument_type,
-                    &arg.meaning,
-                    function.allocation_place,
-                    Some(checks),
-                )?,
-                Some(arg_index),
-            )
+
+            self.rust_final_type(
+                &arg.argument_type,
+                &arg.meaning,
+                function.allocation_place,
+                Some(checks),
+            )?
         } else {
             // none of the arguments has return value meaning,
             // so FFI return value must be used
-            let return_type = self.rust_final_type(
+            self.rust_final_type(
                 &function.return_type,
                 &CppFfiArgumentMeaning::ReturnValue,
                 function.allocation_place,
                 Some(checks),
-            )?;
-            (return_type, None)
+            )?
         };
         if return_type.api_type().is_ref() && return_type.api_type().lifetime().is_none() {
             let mut found = false;
@@ -1086,10 +1082,7 @@ impl State<'_, '_> {
             is_public: true,
             arguments: arguments.clone(),
             return_type,
-            kind: RustFunctionKind::FfiWrapper(RustFfiWrapperData {
-                ffi_function_path,
-                return_type_ffi_index: return_arg_index,
-            }),
+            kind: RustFunctionKind::FfiWrapper(RustFfiWrapperData { ffi_function_path }),
             is_unsafe: true,
         };
 
@@ -1668,7 +1661,6 @@ impl State<'_, '_> {
                 is_public: true,
                 kind: RustStructKind::QtSlotWrapper(RustQtSlotWrapper {
                     arguments: public_args,
-                    signal_arguments: wrapper.item.signal_arguments.clone(),
                     raw_slot_wrapper: public_path,
                 }),
                 path: closure_item_path,
@@ -1748,7 +1740,6 @@ impl State<'_, '_> {
 
                 let receiver_id = cpp_function.receiver_id()?;
                 let function_kind = RustFunctionKind::SignalOrSlotGetter(RustSignalOrSlotGetter {
-                    cpp_path: cpp_function.path.clone(),
                     receiver_type,
                     receiver_id,
                 });

@@ -1,7 +1,8 @@
 //! Types and functions used for Rust code generation.
 
 use crate::cpp_checks::Condition;
-use crate::database::{DatabaseClient, DbItem};
+use crate::cpp_ffi_data::CppFfiArgumentMeaning;
+use crate::database::{DatabaseClient, DbItem, ItemId};
 use crate::doc_formatter;
 use crate::rust_generator::qt_core_path;
 use crate::rust_info::{
@@ -730,6 +731,7 @@ impl Generator<'_> {
     /// an `unsafe` block.
     fn generate_ffi_call(
         &self,
+        id: &ItemId,
         arguments: &[RustFunctionArgument],
         return_type: &RustFinalType,
         wrapper_data: &RustFfiWrapperData,
@@ -744,7 +746,23 @@ impl Generator<'_> {
 
         let mut result = Vec::new();
         let mut maybe_result_var_name = None;
-        if let Some(i) = &wrapper_data.return_type_ffi_index {
+
+        let ffi_item = self
+            .current_database
+            .source_ffi_item(id)?
+            .ok_or_else(|| err_msg("source ffi item not found"))?
+            .item
+            .as_function_ref()
+            .ok_or_else(|| err_msg("invalid source ffi item type"))?;
+
+        let return_type_ffi_index = ffi_item
+            .arguments
+            .iter()
+            .enumerate()
+            .find(|(_arg_index, arg)| arg.meaning == CppFfiArgumentMeaning::ReturnValue)
+            .map(|(index, _arg)| index);
+
+        if let Some(i) = return_type_ffi_index {
             let mut return_var_name = "object".to_string();
             let mut ii = 1;
             while arguments.iter().any(|x| x.name == return_var_name) {
@@ -777,8 +795,8 @@ impl Generator<'_> {
                 t = struct_name,
                 e = expr
             ));
-            final_args.resize(*i + 1, None);
-            final_args[*i] = Some(format!("&mut {}", return_var_name));
+            final_args.resize(i + 1, None);
+            final_args[i] = Some(format!("&mut {}", return_var_name));
             maybe_result_var_name = Some(return_var_name);
         }
         let final_args = final_args
@@ -884,6 +902,7 @@ impl Generator<'_> {
 
         let body = match &func.item.kind {
             RustFunctionKind::FfiWrapper(data) => Some(self.generate_ffi_call(
+                &func.id,
                 &func.item.arguments,
                 &func.item.return_type,
                 data,

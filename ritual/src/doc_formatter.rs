@@ -126,7 +126,18 @@ pub fn struct_doc(type1: DbItem<&RustStruct>, database: &DatabaseClient) -> Resu
                 }
             }
         }
-        RustStructKind::QtSlotWrapper(slot_wrapper) => {
+        RustStructKind::QtSlotWrapper(_) => {
+            let cpp_item = database
+                .source_cpp_item(&type1.id)?
+                .ok_or_else(|| err_msg("source cpp item not found"))?;
+
+            let slot_wrapper = database
+                .source_ffi_item(&cpp_item.id)?
+                .ok_or_else(|| err_msg("source ffi item not found"))?
+                .item
+                .as_slot_wrapper_ref()
+                .ok_or_else(|| err_msg("invalid source ffi item type"))?;
+
             let cpp_args = slot_wrapper
                 .signal_arguments
                 .iter()
@@ -268,6 +279,10 @@ pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) 
             }
         }
         RustFunctionKind::SignalOrSlotGetter(getter) => {
+            let cpp_item = cpp_item
+                .as_function_ref()
+                .ok_or_else(|| err_msg("invalid source cpp item type"))?;
+
             write!(
                 output,
                 "Returns an object representing a built-in Qt {signal} `{cpp_path}`.\n\n\
@@ -277,7 +292,7 @@ pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) 
                     RustQtReceiverType::Signal => "signal",
                     RustQtReceiverType::Slot => "slot",
                 },
-                cpp_path = getter.cpp_path.to_cpp_pseudo_code()
+                cpp_path = cpp_item.path.to_cpp_pseudo_code()
             )?;
         }
         // FFI functions are private

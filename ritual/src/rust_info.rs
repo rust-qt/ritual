@@ -24,7 +24,6 @@ pub struct RustEnumValue {
 pub struct RustQtSlotWrapper {
     /// Argument types of the slot
     pub arguments: Vec<RustFinalType>,
-    pub signal_arguments: Vec<CppType>,
     pub raw_slot_wrapper: RustPath,
 }
 
@@ -33,19 +32,6 @@ pub enum RustWrapperTypeKind {
     EnumWrapper,
     ImmovableClassWrapper,
     MovableClassWrapper { sized_type_path: RustPath },
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct RustRawQtSlotWrapperDocData {
-    pub public_wrapper_path: RustPath,
-    pub rust_arguments: Vec<RustFinalType>,
-    pub cpp_arguments: Vec<CppType>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct RustFfiClassTypeDoc {
-    pub cpp_path: CppPath,
-    pub public_rust_path: RustPath,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -146,16 +132,10 @@ pub enum RustQtReceiverType {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustFfiWrapperData {
     pub ffi_function_path: RustPath,
-    /// Index of the FFI function argument used for acquiring the return value,
-    /// if any. `None` if the return value is passed normally (as the return value
-    /// of the FFI function).
-    pub return_type_ffi_index: Option<usize>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustSignalOrSlotGetter {
-    /// C++ name of the signal or slot
-    pub cpp_path: CppPath,
     /// Type of the receiver.
     pub receiver_type: RustQtReceiverType,
     /// Identifier of the signal or slot for passing to `QObject::connect`.
@@ -176,10 +156,7 @@ impl RustFunctionKind {
             RustFunctionKind::FfiWrapper(data) => {
                 format!("FfiWrapper({})", data.ffi_function_path.last())
             }
-            RustFunctionKind::SignalOrSlotGetter(getter) => format!(
-                "SignalOrSlotGetter({}",
-                getter.cpp_path.to_cpp_pseudo_code()
-            ),
+            RustFunctionKind::SignalOrSlotGetter(_) => "SignalOrSlotGetter".to_string(),
             RustFunctionKind::FfiFunction => "FfiFunction".to_string(),
         }
     }
