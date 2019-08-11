@@ -623,6 +623,6 @@ fn short_text1() {
     };
     assert_eq!(
         method.short_text(),
-        "protected int Class1::method1(int arg1, double arg2 = ?) const"
+        "protected int Class1::method1(int arg1, double arg2 = …) const"
     );
 }
