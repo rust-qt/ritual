@@ -59,6 +59,21 @@ fn apply_instantiation_to_method(
     new_method.return_type = method.return_type.instantiate(nested_level1, inst_args)?;
 
     new_method.path = new_method.path.instantiate(nested_level1, inst_args)?;
+    if let Some(args) = &new_method.path.last().template_arguments {
+        if args
+            .iter()
+            .any(|arg| arg.is_or_contains_template_parameter())
+        {
+            bail!(
+                "extra template parameters left: {}",
+                new_method.short_text()
+            );
+        }
+        // explicitly specifying template arguments sometimes causes compiler errors,
+        // so we prefer to get them inferred
+        new_method.path.last_mut().template_arguments = None;
+    }
+
     let mut conversion_type = None;
     if let Some(operator) = &mut new_method.operator {
         if let CppOperator::Conversion(cpp_type) = operator {
