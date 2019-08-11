@@ -11,6 +11,7 @@ use ritual_common::ReadOnly;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt;
 use std::iter::once;
+use std::sync::Arc;
 
 pub struct ItemWithSource<T> {
     pub source_id: ItemId,
@@ -75,13 +76,16 @@ impl<T> DbItem<T> {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ItemId {
-    crate_name: String,
+    crate_name: Arc<String>,
     id: u32,
 }
 
 impl ItemId {
     pub fn new(crate_name: String, id: u32) -> Self {
-        Self { crate_name, id }
+        Self {
+            crate_name: Arc::new(crate_name),
+            id,
+        }
     }
 }
 
@@ -222,7 +226,7 @@ impl DatabaseItemData {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Database {
-    crate_name: String,
+    crate_name: Arc<String>,
     crate_version: String,
     items: Vec<DbItem<DatabaseItemData>>,
     targets: Vec<LibraryTarget>,
@@ -232,7 +236,7 @@ pub struct Database {
 impl Database {
     pub fn empty(crate_name: String) -> Self {
         Database {
-            crate_name,
+            crate_name: Arc::new(crate_name),
             crate_version: "0.0.0".into(),
             items: Vec::new(),
             targets: Vec::new(),
@@ -362,7 +366,7 @@ impl DatabaseClient {
 
     // TODO: try to remove this
     pub fn item_mut(&mut self, id: &ItemId) -> Result<DbItem<&mut DatabaseItemData>> {
-        if id.crate_name != self.crate_name() {
+        if *id.crate_name != self.crate_name() {
             bail!("can't modify item of dependency");
         }
         self.is_modified = true;
@@ -515,7 +519,7 @@ impl DatabaseClient {
             let crate_name = item_path
                 .crate_name()
                 .expect("rust item path must have crate name");
-            if crate_name != self.current_database.crate_name {
+            if crate_name != *self.current_database.crate_name {
                 bail!("can't add rust item with different crate name: {:?}", item);
             }
         } else {
@@ -525,7 +529,7 @@ impl DatabaseClient {
             let crate_name = path
                 .crate_name()
                 .expect("rust item path must have crate name");
-            if crate_name != self.current_database.crate_name {
+            if crate_name != *self.current_database.crate_name {
                 bail!("can't add rust item with different crate name: {:?}", item);
             }
             while path.parts.len() > 1 {
@@ -778,7 +782,7 @@ impl DatabaseClient {
 
     fn database(&self, crate_name: &str) -> Result<&Database> {
         self.all_databases()
-            .find(|db| db.crate_name == crate_name)
+            .find(|db| *db.crate_name == crate_name)
             .ok_or_else(|| format_err!("no database found for crate: {}", crate_name))
     }
 
