@@ -297,7 +297,7 @@ impl CppFunction {
                     arg.argument_type.to_cpp_pseudo_code(),
                     arg.name,
                     if arg.has_default_value {
-                        " = ?".to_string()
+                        " = …".to_string()
                     } else {
                         String::new()
                     }

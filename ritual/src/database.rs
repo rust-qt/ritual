@@ -355,19 +355,23 @@ impl DatabaseClient {
     pub fn item(&self, id: &ItemId) -> Result<DbItem<&DatabaseItemData>> {
         let db = self.database(&id.crate_name)?;
         match db.items.binary_search_by_key(&id, |item| &item.id) {
-            Ok(index) => Ok(self.current_database.items[index].as_ref()),
+            Ok(index) => Ok(db.items[index].as_ref()),
             Err(_) => bail!("invalid item id: {}", id),
         }
     }
 
     // TODO: try to remove this
     pub fn item_mut(&mut self, id: &ItemId) -> Result<DbItem<&mut DatabaseItemData>> {
-        let db = self.database(&id.crate_name)?;
-        match db.items.binary_search_by_key(&id, |item| &item.id) {
-            Ok(index) => {
-                self.is_modified = true;
-                Ok(self.current_database.items[index].as_mut())
-            }
+        if id.crate_name != self.crate_name() {
+            bail!("can't modify item of dependency");
+        }
+        self.is_modified = true;
+        match self
+            .current_database
+            .items
+            .binary_search_by_key(&id, |item| &item.id)
+        {
+            Ok(index) => Ok(self.current_database.items[index].as_mut()),
             Err(_) => bail!("invalid item id: {}", id),
         }
     }

@@ -1,6 +1,7 @@
 use crate::cpp_data::{CppItem, CppPath, CppPathItem};
 use crate::cpp_function::{CppFunction, CppFunctionArgument, CppOperator};
 use crate::cpp_type::CppType;
+use crate::database::ItemWithSource;
 use crate::processor::ProcessorData;
 use log::{debug, trace};
 use ritual_common::errors::{bail, err_msg, Result};
@@ -179,7 +180,7 @@ pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
                             }
                         }
                         if ok {
-                            new_methods.push((method, item.source_id.clone()));
+                            new_methods.push(ItemWithSource::new(&item.id, method));
                         }
                     }
                     Err(msg) => trace!("failed: {}", msg),
@@ -187,8 +188,11 @@ pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
             }
         }
     }
-    for (item, source_id) in new_methods {
-        data.db.add_cpp_item(source_id, CppItem::Function(item))?;
+    for new_method in new_methods {
+        data.db.add_cpp_item(
+            Some(new_method.source_id),
+            CppItem::Function(new_method.item),
+        )?;
     }
     Ok(())
 }
@@ -235,8 +239,9 @@ pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> 
         let original_type = data
             .db
             .all_cpp_items()
-            .filter_map(|x| x.item.as_type_ref())
+            .filter_map(|x| x.filter_map(|item| item.as_type_ref()))
             .find(|t| {
+                let t = &t.item;
                 t.path.parent().ok() == item.parent().ok()
                     && t.path.last().name == item.last().name
                     && t.path
@@ -248,12 +253,11 @@ pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> 
                         })
             });
         if let Some(original_type) = original_type {
-            let mut new_type = original_type.clone();
+            let mut new_type = original_type.item.clone();
             new_type.path = item;
-            data.db.add_cpp_item(
-                None, // TODO: what is the source ffi item?
-                CppItem::Type(new_type),
-            )?;
+            let source_id = original_type.id.clone();
+            data.db
+                .add_cpp_item(Some(source_id), CppItem::Type(new_type))?;
         } else {
             debug!(
                 "original type not found for instantiation: {}",
