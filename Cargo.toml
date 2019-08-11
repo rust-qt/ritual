@@ -12,3 +12,6 @@ members = [
 
 [patch.crates-io]
 amq-proto = { git = "https://github.com/P0ntiuS/rust-amq-proto.git", branch = "error-chain" }
+
+[profile.release]
+debug = true

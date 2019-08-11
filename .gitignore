@@ -10,3 +10,4 @@ Cargo.lock
 .vagrant
 vagrant/local_settings.yml
 *.log
+perf.data*
