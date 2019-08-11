@@ -188,7 +188,7 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
         config
     };
 
-    config.set_after_cpp_parser_hook(detect_signals_and_slots);
+    config.add_after_cpp_parser_hook(detect_signals_and_slots);
 
     let steps = config.processing_steps_mut();
     for cpp_parser_stage in &["cpp_parser", "cpp_parser_stage2"] {

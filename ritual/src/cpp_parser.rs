@@ -1409,7 +1409,7 @@ impl CppParser<'_, '_> {
         self.parse_types(entity)?;
         debug!("Parsing functions");
         self.parse_functions(entity)?;
-        if let Some(hook) = self.data.config.after_cpp_parser_hook() {
+        for hook in self.data.config.after_cpp_parser_hooks() {
             hook(self.data, &self.output)?;
         }
         Ok(())
