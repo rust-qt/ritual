@@ -2,6 +2,7 @@
 //! for reading Qt documentation.
 
 use crate::doc_decoder::DocData;
+use crate::mock_doc_parser::MockDocParser;
 use itertools::Itertools;
 use log::{debug, error, trace};
 use regex::Regex;
@@ -40,6 +41,7 @@ pub struct ItemDoc {
 }
 
 /// Documentation data found in one document.
+#[derive(Debug)]
 struct FileData {
     /// Content of the HTML document.
     document: Document,
@@ -50,6 +52,7 @@ struct FileData {
 }
 
 /// Documentation parser.
+#[derive(Debug)]
 pub struct DocParser {
     doc_data: DocData,
     file_data: HashMap<i32, FileData>,
@@ -59,9 +62,9 @@ pub struct DocParser {
 // TODO: support public field docs
 
 #[derive(Debug)]
-struct DocForType {
-    type_doc: DocItem,
-    enum_variants_doc: Vec<DocForEnumVariant>,
+pub struct DocForType {
+    pub type_doc: DocItem,
+    pub enum_variants_doc: Vec<DocForEnumVariant>,
 }
 
 impl DocParser {
@@ -639,14 +642,59 @@ fn log_function_doc_error(function: &CppFunction, error: &Error) {
     }
 }
 
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
+enum DocParserOrMock {
+    Real(DocParser),
+    Mock(MockDocParser),
+}
+
+impl DocParserOrMock {
+    fn doc_for_method(
+        &mut self,
+        name: &str,
+        declaration1: &str,
+        declaration2: &str,
+    ) -> Result<DocItem> {
+        match self {
+            DocParserOrMock::Real(parser) => {
+                parser.doc_for_method(name, declaration1, declaration2)
+            }
+            DocParserOrMock::Mock(parser) => {
+                parser.doc_for_method(name, declaration1, declaration2)
+            }
+        }
+    }
+
+    fn doc_for_type(&mut self, path: &CppPath) -> Result<DocForType> {
+        match self {
+            DocParserOrMock::Real(parser) => parser.doc_for_type(path),
+            DocParserOrMock::Mock(parser) => parser.doc_for_type(path),
+        }
+    }
+
+    fn mark_enum_variant_used(&mut self, full_name: &str) {
+        if let DocParserOrMock::Real(parser) = self {
+            parser.mark_enum_variant_used(full_name);
+        }
+    }
+
+    fn report_unused_anchors(&mut self) {
+        if let DocParserOrMock::Real(parser) = self {
+            parser.report_unused_anchors();
+        }
+    }
+}
+
 /// Adds documentation from `data` to `cpp_methods`.
-fn find_methods_docs(database: &mut DatabaseClient, data: &mut DocParser) -> Result<()> {
+fn find_methods_docs(database: &mut DatabaseClient, data: &mut DocParserOrMock) -> Result<()> {
     let mut new_items = Vec::new();
 
     let functions = database
         .cpp_items()
         .filter_map(|item| item.filter_map(|item| item.as_function_ref()))
-        .filter(|item| !item.item.is_private());
+        .filter(|item| !item.item.is_private())
+        .filter(|item| item.source_id.is_none());
 
     for item in functions {
         let declaration_code = if let Some(c) = &item.item.declaration_code {
@@ -678,19 +726,27 @@ pub fn parse_docs(
     qt_crate_name: &str,
     docs_path: &Path,
 ) -> Result<()> {
-    // TODO: only run on new database items?
-    let doc_data = match DocData::new(&qt_crate_name, &docs_path) {
-        Ok(doc_data) => doc_data,
-        Err(err) => {
-            error!("Failed to get Qt documentation: {}", err);
-            return Ok(());
-        }
+    let mut parser = if qt_crate_name.starts_with("moqt_") {
+        DocParserOrMock::Mock(MockDocParser)
+    } else {
+        let doc_data = match DocData::new(&qt_crate_name, &docs_path) {
+            Ok(doc_data) => doc_data,
+            Err(err) => {
+                error!("Failed to get Qt documentation: {}", err);
+                return Ok(());
+            }
+        };
+        let parser = DocParser::new(doc_data);
+        DocParserOrMock::Real(parser)
     };
-    let mut parser = DocParser::new(doc_data);
     find_methods_docs(data.db, &mut parser)?;
     let mut type_doc_cache = HashMap::new();
     let mut new_items = Vec::new();
     for mut item in data.db.cpp_items_mut() {
+        if item.source_id.is_some() {
+            continue;
+        }
+
         let type_name = match &item.item {
             CppItem::Type(data) => data.path.clone(),
             CppItem::EnumValue(data) => data

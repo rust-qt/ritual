@@ -14,7 +14,7 @@ use ritual_common::errors::{bail, format_err, Result, ResultExt};
 use ritual_common::file_utils::repo_dir_path;
 use ritual_common::target;
 use ritual_common::toml;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 mod _3d;
 mod core;
@@ -132,6 +132,12 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
                 format_err!("{} env var is missing", MOQT_TEMPLATE_DIR_ENV_VAR_NAME)
             })?);
         config.set_crate_template_path(template_path.join(&crate_name));
+
+        let steps = config.processing_steps_mut();
+        let crate_name_clone = crate_name.to_string();
+        steps.add_after(&["cpp_parser"], "qt_doc_parser", move |data| {
+            parse_docs(data, &crate_name_clone, &Path::new("."))
+        })?;
 
         config
     } else {
