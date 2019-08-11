@@ -307,11 +307,11 @@ fn free_template_func() {
     assert_eq!(data.methods.len(), 1);
     let abs_item = CppPathItem {
         name: "abs".into(),
-        template_arguments: Some(vec![CppType::TemplateParameter {
+        template_arguments: Some(vec![CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 0,
             index: 0,
             name: "T".into(),
-        }]),
+        })]),
     };
     assert_eq!(
         data.methods[0],
@@ -319,18 +319,18 @@ fn free_template_func() {
             path: CppPath::from_item(abs_item.clone()),
             member: None,
             operator: None,
-            return_type: CppType::TemplateParameter {
+            return_type: CppType::TemplateParameter(CppTemplateParameter {
                 nested_level: 0,
                 index: 0,
                 name: "T".into(),
-            },
+            }),
             arguments: vec![CppFunctionArgument {
                 name: "value".to_string(),
-                argument_type: CppType::TemplateParameter {
+                argument_type: CppType::TemplateParameter(CppTemplateParameter {
                     nested_level: 0,
                     index: 0,
                     name: "T".into(),
-                },
+                }),
                 has_default_value: false,
             }],
             allows_variadic_arguments: false,
@@ -530,16 +530,16 @@ fn advanced_class_methods() {
     let func6_item = CppPathItem {
         name: "func6".to_string(),
         template_arguments: Some(vec![
-            CppType::TemplateParameter {
+            CppType::TemplateParameter(CppTemplateParameter {
                 nested_level: 0,
                 index: 0,
                 name: "K".into(),
-            },
-            CppType::TemplateParameter {
+            }),
+            CppType::TemplateParameter(CppTemplateParameter {
                 nested_level: 0,
                 index: 1,
                 name: "V".into(),
-            },
+            }),
         ]),
     };
     assert_eq!(
@@ -549,11 +549,11 @@ fn advanced_class_methods() {
     assert_eq!(data.methods[7].arguments.len(), 1);
     assert_eq!(
         data.methods[7].arguments[0].argument_type,
-        CppType::TemplateParameter {
+        CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 0,
             index: 1,
             name: "V".into(),
-        },
+        }),
     );
 }
 
@@ -573,11 +573,11 @@ fn template_class_method() {
     assert_eq!(data.types.len(), 1);
     let my_vector_item = CppPathItem {
         name: "MyVector".into(),
-        template_arguments: Some(vec![CppType::TemplateParameter {
+        template_arguments: Some(vec![CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 0,
             index: 0,
             name: "T".into(),
-        }]),
+        })]),
     };
     let my_vector_path = CppPath::from_item(my_vector_item.clone());
     assert_eq!(data.types[0].path, my_vector_path);
@@ -601,11 +601,11 @@ fn template_class_method() {
                 is_slot: false,
             }),
             operator: None,
-            return_type: CppType::TemplateParameter {
+            return_type: CppType::TemplateParameter(CppTemplateParameter {
                 nested_level: 0,
                 index: 0,
                 name: "T".into(),
-            },
+            }),
             arguments: vec![CppFunctionArgument {
                 name: "index".to_string(),
                 argument_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
@@ -646,11 +646,11 @@ fn template_parameter_level() {
     );
     assert_eq!(
         data.methods[0].return_type,
-        CppType::TemplateParameter {
+        CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 1,
             index: 0,
             name: "T".into(),
-        }
+        })
     );
 }
 
@@ -672,11 +672,11 @@ fn template_parameter_level2() {
     );
     assert_eq!(
         data.methods[0].return_type,
-        CppType::TemplateParameter {
+        CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 1,
             index: 0,
             name: "T".into(),
-        }
+        })
     );
 }
 
@@ -696,11 +696,11 @@ fn template_class_template_method() {
     );
     let vector_item = CppPathItem {
         name: "MyVector".to_string(),
-        template_arguments: Some(vec![CppType::TemplateParameter {
+        template_arguments: Some(vec![CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 0,
             index: 0,
             name: "T".into(),
-        }]),
+        })]),
     };
     assert_eq!(
         data.methods[0].path,
@@ -708,21 +708,21 @@ fn template_class_template_method() {
             vector_item.clone(),
             CppPathItem {
                 name: "get_f".into(),
-                template_arguments: Some(vec![CppType::TemplateParameter {
+                template_arguments: Some(vec![CppType::TemplateParameter(CppTemplateParameter {
                     nested_level: 1,
                     index: 0,
                     name: "F".into(),
-                }])
+                })])
             }
         ])
     );
     assert_eq!(
         data.methods[0].return_type,
-        CppType::TemplateParameter {
+        CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 1,
             index: 0,
             name: "F".into(),
-        },
+        }),
     );
 
     assert_eq!(
@@ -731,11 +731,11 @@ fn template_class_template_method() {
     );
     assert_eq!(
         data.methods[1].return_type,
-        CppType::TemplateParameter {
+        CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 0,
             index: 0,
             name: "T".into(),
-        },
+        }),
     );
 }
 
@@ -1069,22 +1069,22 @@ fn template_class_with_base() {
     assert_eq!(data.types.len(), 2);
     let c1_item = CppPathItem {
         name: "C1".to_string(),
-        template_arguments: Some(vec![CppType::TemplateParameter {
+        template_arguments: Some(vec![CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 0,
             index: 0,
             name: "T".into(),
-        }]),
+        })]),
     };
     assert_eq!(data.types[0].path, CppPath::from_item(c1_item));
     assert!(data.types[0].kind.is_class());
 
     let c2_item = CppPathItem {
         name: "C2".to_string(),
-        template_arguments: Some(vec![CppType::TemplateParameter {
+        template_arguments: Some(vec![CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 0,
             index: 0,
             name: "T".into(),
-        }]),
+        })]),
     };
     assert_eq!(data.types[1].path, CppPath::from_item(c2_item));
     assert!(data.types[1].kind.is_class());

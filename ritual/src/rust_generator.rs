@@ -1347,10 +1347,19 @@ impl State<'_, '_> {
         Ok(r)
     }
 
-    fn cpp_path_item_to_name(&self, item: &CppPathItem, context: &RustPath) -> Result<String> {
+    fn cpp_path_item_to_name(
+        &self,
+        item: &CppPathItem,
+        context: &RustPath,
+        name_type: &NameType<'_>,
+    ) -> Result<String> {
         if let Some(template_arguments) = &item.template_arguments {
             let captions = self.type_list_caption(template_arguments, context)?;
-            Ok(format!("{}_of_{}", item.name, captions))
+            if name_type.is_api_function() {
+                Ok(format!("{}_{}", item.name, captions))
+            } else {
+                Ok(format!("{}_of_{}", item.name, captions))
+            }
         } else {
             Ok(item.name.clone())
         }
@@ -1444,7 +1453,7 @@ impl State<'_, '_> {
             NameType::SizedItem => cpp_path
                 .items()
                 .iter()
-                .map_if_ok(|item| self.cpp_path_item_to_name(item, &scope.path))?
+                .map_if_ok(|item| self.cpp_path_item_to_name(item, &scope.path, &name_type))?
                 .join("_"),
             NameType::ApiFunction(function) => {
                 let s = if let Some(last_name_override) =
@@ -1452,13 +1461,13 @@ impl State<'_, '_> {
                 {
                     last_name_override.clone()
                 } else {
-                    self.cpp_path_item_to_name(cpp_path.last(), &scope.path)?
+                    self.cpp_path_item_to_name(cpp_path.last(), &scope.path, &name_type)?
                 };
                 s.to_snake_case()
             }
             NameType::ReceiverFunction { receiver_type } => {
                 let name = self
-                    .cpp_path_item_to_name(cpp_path.last(), &scope.path)?
+                    .cpp_path_item_to_name(cpp_path.last(), &scope.path, &name_type)?
                     .to_snake_case();
                 match receiver_type {
                     RustQtReceiverType::Signal => name,
@@ -1466,10 +1475,10 @@ impl State<'_, '_> {
                 }
             }
             NameType::Type | NameType::EnumValue => self
-                .cpp_path_item_to_name(&cpp_path.last(), &scope.path)?
+                .cpp_path_item_to_name(&cpp_path.last(), &scope.path, &name_type)?
                 .to_class_case(),
             NameType::Module => self
-                .cpp_path_item_to_name(&cpp_path.last(), &scope.path)?
+                .cpp_path_item_to_name(&cpp_path.last(), &scope.path, &name_type)?
                 .to_snake_case(),
             NameType::FfiFunction => cpp_path.last().name.clone(),
             NameType::QtSlotWrapper {

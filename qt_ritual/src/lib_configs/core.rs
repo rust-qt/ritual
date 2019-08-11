@@ -2,7 +2,10 @@ use ritual::config::Config;
 use ritual::cpp_checker::{PreliminaryTest, Snippet};
 use ritual::cpp_data::{CppItem, CppPath};
 use ritual::cpp_ffi_data::CppFfiFunctionKind;
+use ritual::cpp_parser::CppParserOutput;
+use ritual::cpp_template_instantiator::instantiate_function;
 use ritual::cpp_type::CppType;
+use ritual::processor::ProcessorData;
 use ritual::rust_info::{NameType, RustPathScope};
 use ritual::rust_type::RustPath;
 use ritual_common::errors::{bail, err_msg, Result};
@@ -301,5 +304,29 @@ pub fn core_config(config: &mut Config) -> Result<()> {
         vec![test1, test2, test3]
     };
     config.add_cpp_checker_tests(tests);
+
+    config.add_after_cpp_parser_hook(add_find_child_methods);
+    Ok(())
+}
+
+pub fn add_find_child_methods(
+    data: &mut ProcessorData<'_>,
+    output: &CppParserOutput,
+) -> Result<()> {
+    for item in &output.0 {
+        let cpp_item = data.db.cpp_item(&item.id)?;
+        let function = if let Some(f) = cpp_item.item.as_function_ref() {
+            f
+        } else {
+            continue;
+        };
+        let path = function.path.to_templateless_string();
+        if path == "QObject::findChild" || path == "QObject::findChildren" {
+            let t = CppType::new_pointer(false, CppType::Class(CppPath::from_good_str("QObject")));
+            let new_function = instantiate_function(function, 0, &[t])?;
+            data.db
+                .add_cpp_item(Some(item.id.clone()), CppItem::Function(new_function))?;
+        }
+    }
     Ok(())
 }

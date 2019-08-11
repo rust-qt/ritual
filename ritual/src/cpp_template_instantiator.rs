@@ -32,34 +32,27 @@ fn check_template_type(data: &ProcessorData<'_>, type1: &CppType) -> Result<()> 
     Ok(())
 }
 
-/// Tries to apply each of `template_instantiations` to `method`.
+/// Tries to apply each of `template_instantiations` to `function`.
 /// Only types at the specified `nested_level` are replaced.
 /// Returns `Err` if any of `template_instantiations` is incompatible
-/// with the method.
-fn apply_instantiation_to_method(
-    method: &CppFunction,
-    nested_level1: usize,
-    template_instantiation: &CppPath,
+/// with the function.
+pub fn instantiate_function(
+    function: &CppFunction,
+    nested_level: usize,
+    arguments: &[CppType],
 ) -> Result<CppFunction> {
-    let mut new_method = method.clone();
-
-    let inst_args = template_instantiation
-        .last()
-        .template_arguments
-        .as_ref()
-        .ok_or_else(|| err_msg("template instantiation must have template arguments"))?;
-
+    let mut new_method = function.clone();
     new_method.arguments.clear();
-    for arg in &method.arguments {
+    for arg in &function.arguments {
         new_method.arguments.push(CppFunctionArgument {
             name: arg.name.clone(),
             has_default_value: arg.has_default_value,
-            argument_type: arg.argument_type.instantiate(nested_level1, inst_args)?,
+            argument_type: arg.argument_type.instantiate(nested_level, arguments)?,
         });
     }
-    new_method.return_type = method.return_type.instantiate(nested_level1, inst_args)?;
+    new_method.return_type = function.return_type.instantiate(nested_level, arguments)?;
 
-    new_method.path = new_method.path.instantiate(nested_level1, inst_args)?;
+    new_method.path = new_method.path.instantiate(nested_level, arguments)?;
     if let Some(args) = &new_method.path.last().template_arguments {
         if args
             .iter()
@@ -70,15 +63,17 @@ fn apply_instantiation_to_method(
                 new_method.short_text()
             );
         }
-        // explicitly specifying template arguments sometimes causes compiler errors,
-        // so we prefer to get them inferred
-        new_method.path.last_mut().template_arguments = None;
+        if function.can_infer_template_arguments() {
+            // explicitly specifying template arguments sometimes causes compiler errors,
+            // so we prefer to get them inferred
+            new_method.path.last_mut().template_arguments = None;
+        }
     }
 
     let mut conversion_type = None;
     if let Some(operator) = &mut new_method.operator {
         if let CppOperator::Conversion(cpp_type) = operator {
-            let r = cpp_type.instantiate(nested_level1, inst_args)?;
+            let r = cpp_type.instantiate(nested_level, arguments)?;
             *cpp_type = r.clone();
             conversion_type = Some(r);
         }
@@ -154,10 +149,9 @@ pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
                 if !is_suitable {
                     continue;
                 }
-                let nested_level = if let CppType::TemplateParameter { nested_level, .. } =
-                    template_arguments[0]
+                let nested_level = if let CppType::TemplateParameter(param) = &template_arguments[0]
                 {
-                    nested_level
+                    param.nested_level
                 } else {
                     bail!("only template parameters can be here");
                 };
@@ -166,7 +160,15 @@ pub fn instantiate_templates(data: &mut ProcessorData<'_>) -> Result<()> {
                     "found template instantiation: {}",
                     type1.path.to_cpp_pseudo_code()
                 );
-                match apply_instantiation_to_method(function, nested_level, &type1.path) {
+                let arguments = type1
+                    .path
+                    .last()
+                    .template_arguments
+                    .as_ref()
+                    .ok_or_else(|| {
+                        err_msg("template instantiation must have template arguments")
+                    })?;
+                match instantiate_function(function, nested_level, arguments) {
                     Ok(method) => {
                         let mut ok = true;
                         for type1 in method.all_involved_types() {

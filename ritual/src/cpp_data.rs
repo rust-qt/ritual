@@ -2,7 +2,7 @@
 
 use crate::cpp_function::CppFunction;
 pub use crate::cpp_operator::CppOperator;
-use crate::cpp_type::CppType;
+use crate::cpp_type::{CppTemplateParameter, CppType};
 use itertools::Itertools;
 use ritual_common::errors::{bail, ensure, Error, Result};
 use ritual_common::utils::MapIfOk;
@@ -259,10 +259,12 @@ impl CppPath {
         for item in &mut path.items {
             if let Some(args) = &mut item.template_arguments {
                 *args = (0..args.len())
-                    .map(|index| CppType::TemplateParameter {
-                        nested_level,
-                        index,
-                        name: format!("T{}_{}", nested_level, index),
+                    .map(|index| {
+                        CppType::TemplateParameter(CppTemplateParameter {
+                            nested_level,
+                            index,
+                            name: format!("T{}_{}", nested_level, index),
+                        })
                     })
                     .collect();
                 nested_level += 1;

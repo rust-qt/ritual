@@ -429,4 +429,21 @@ impl CppFunction {
         }
         result
     }
+
+    pub fn can_infer_template_arguments(&self) -> bool {
+        if let Some(args) = &self.path.last().template_arguments {
+            for t in args {
+                if let CppType::TemplateParameter(param) = t {
+                    if !self
+                        .arguments
+                        .iter()
+                        .any(|arg| arg.argument_type.contains_template_parameter(param))
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
+    }
 }

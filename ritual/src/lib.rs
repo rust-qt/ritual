@@ -20,7 +20,7 @@ mod cpp_inheritance; // TODO: deal with inheritance for subclassing support
 mod cpp_omitting_arguments;
 mod cpp_operator;
 pub mod cpp_parser;
-mod cpp_template_instantiator;
+pub mod cpp_template_instantiator;
 pub mod cpp_type;
 mod crate_writer;
 pub mod database;

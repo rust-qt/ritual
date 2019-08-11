@@ -9,7 +9,7 @@ use crate::cpp_function::{
 use crate::cpp_operator::CppOperator;
 use crate::cpp_type::{
     CppBuiltInNumericType, CppFunctionPointerType, CppPointerLikeTypeKind, CppSpecificNumericType,
-    CppSpecificNumericTypeKind, CppType,
+    CppSpecificNumericTypeKind, CppTemplateParameter, CppType,
 };
 use crate::database::ItemId;
 use crate::processor::ProcessorData;
@@ -110,12 +110,8 @@ fn get_template_arguments(entity: Entity<'_>) -> Option<Vec<CppType>> {
     while let Some(parent1) = parent.get_semantic_parent() {
         parent = parent1;
         if let Some(args) = get_template_arguments(parent) {
-            let parent_nested_level = if let CppType::TemplateParameter {
-                nested_level: level,
-                ..
-            } = args[0]
-            {
-                level
+            let parent_nested_level = if let CppType::TemplateParameter(param) = &args[0] {
+                param.nested_level
             } else {
                 panic!("this value should always be a template parameter")
             };
@@ -129,10 +125,12 @@ fn get_template_arguments(entity: Entity<'_>) -> Option<Vec<CppType>> {
         .into_iter()
         .filter(|c| c.get_kind() == EntityKind::TemplateTypeParameter)
         .enumerate()
-        .map(|(i, c)| CppType::TemplateParameter {
-            name: c.get_name().unwrap_or_else(|| format!("Type{}", i + 1)),
-            index: i,
-            nested_level,
+        .map(|(i, c)| {
+            CppType::TemplateParameter(CppTemplateParameter {
+                name: c.get_name().unwrap_or_else(|| format!("Type{}", i + 1)),
+                index: i,
+                nested_level,
+            })
         })
         .collect_vec();
     if args.is_empty() {
@@ -464,7 +462,7 @@ impl CppParser<'_, '_> {
             if matches.len() < 3 {
                 bail!("invalid matches len in regexp");
             }
-            return Ok(CppType::TemplateParameter {
+            return Ok(CppType::TemplateParameter(CppTemplateParameter {
                 nested_level: matches[1].parse::<usize>().with_context(|_| {
                     "encountered not a number while parsing type-parameter-X-X"
                 })?,
@@ -472,7 +470,7 @@ impl CppParser<'_, '_> {
                     "encountered not a number while parsing type-parameter-X-X"
                 })?,
                 name: name.clone(),
-            });
+            }));
         }
 
         if let Some(arg) = context_template_args
