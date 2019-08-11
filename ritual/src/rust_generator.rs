@@ -1978,7 +1978,7 @@ impl State<'_, '_> {
     ) -> Result<()> {
         let mut paths = BTreeSet::new();
         for function in functions {
-            let path = function.value.apply_strategy(strategy)?;
+            let path = function.item.apply_strategy(strategy)?;
             if paths.contains(&path) {
                 bail!("conflicting path: {:?}", path);
             }
@@ -2002,7 +2002,7 @@ impl State<'_, '_> {
             if functions.len() > 1 {
                 trace!("choosing caption strategy for:");
                 for function in &functions {
-                    trace!("* {}", function.value.function.kind.short_text());
+                    trace!("* {}", function.item.function.kind.short_text());
                 }
                 for strategy in &all_strategies {
                     match self.try_caption_strategy(&functions, strategy) {
@@ -2030,12 +2030,12 @@ impl State<'_, '_> {
 
             for function in functions {
                 let path = if let Some(strategy) = &chosen_strategy {
-                    function.value.apply_strategy(strategy).unwrap()
+                    function.item.apply_strategy(strategy).unwrap()
                 } else {
-                    function.value.desired_path
+                    function.item.desired_path
                 };
                 let final_path = self.0.db.make_unique_rust_path(&path);
-                let item = RustItem::Function(function.value.function.with_path(final_path));
+                let item = RustItem::Function(function.item.function.with_path(final_path));
                 self.0.db.add_rust_item(Some(function.source_id), item)?;
             }
         }

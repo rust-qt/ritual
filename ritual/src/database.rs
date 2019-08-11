@@ -14,14 +14,14 @@ use std::iter::once;
 
 pub struct ItemWithSource<T> {
     pub source_id: ItemId,
-    pub value: T,
+    pub item: T,
 }
 
 impl<T> ItemWithSource<T> {
-    pub fn new(source_id: &ItemId, value: T) -> Self {
+    pub fn new(source_id: &ItemId, item: T) -> Self {
         Self {
             source_id: source_id.clone(),
-            value,
+            item,
         }
     }
 }

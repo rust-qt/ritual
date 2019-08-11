@@ -716,7 +716,7 @@ fn find_methods_docs(database: &mut DatabaseClient, data: &mut DocParserOrMock) 
         }
     }
     for item in new_items {
-        database.add_doc_item(item.source_id, item.value);
+        database.add_doc_item(item.source_id, item.item);
     }
     Ok(())
 }
@@ -809,7 +809,7 @@ pub fn parse_docs(
         }
     }
     for item in new_items {
-        data.db.add_doc_item(item.source_id, item.value);
+        data.db.add_doc_item(item.source_id, item.item);
     }
     parser.report_unused_anchors();
     Ok(())
