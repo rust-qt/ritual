@@ -346,6 +346,10 @@ pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) 
                      Passing `None` will deregister the handler without setting a new one.\n"
                 )?;
             }
+            "meta_object" | "qt_metacall" | "qt_metacast" | "static_meta_object" | "tr"
+            | "tr_utf8" => {
+                // TODO: document or blacklist these methods for all Qt classes
+            }
             other => bail!("unknown slot wrapper method: {}", other),
         }
         return Ok(output);
