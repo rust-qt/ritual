@@ -1,4 +1,4 @@
-use crate::database::{Database, DatabaseClient};
+use crate::database::{Database, DatabaseClient, IndexedDatabase};
 use log::info;
 use ritual_common::errors::{bail, Result};
 use ritual_common::file_utils::{
@@ -22,7 +22,7 @@ pub struct WorkspaceConfig {}
 pub struct Workspace {
     path: PathBuf,
     config: WorkspaceConfig,
-    databases: Vec<Database>,
+    databases: Vec<IndexedDatabase>,
 }
 
 fn config_path(path: &Path) -> PathBuf {
@@ -82,10 +82,10 @@ impl Workspace {
 
     // TODO: import published crates
 
-    fn take_loaded_crate(&mut self, crate_name: &str) -> Option<Database> {
+    fn take_loaded_crate(&mut self, crate_name: &str) -> Option<IndexedDatabase> {
         self.databases
             .iter()
-            .position(|d| d.crate_name() == crate_name)
+            .position(|d| d.database().crate_name() == crate_name)
             .and_then(|i| Some(self.databases.swap_remove(i)))
     }
     /*
@@ -100,7 +100,8 @@ impl Workspace {
     }*/
 
     pub fn delete_database_if_exists(&mut self, crate_name: &str) -> Result<()> {
-        self.databases.retain(|d| d.crate_name() != crate_name);
+        self.databases
+            .retain(|d| d.database().crate_name() != crate_name);
         let path = database_path(&self.path, crate_name);
         if path.exists() {
             remove_file(path)?;
@@ -113,7 +114,7 @@ impl Workspace {
         crate_name: &str,
         allow_load: bool,
         allow_create: bool,
-    ) -> Result<Database> {
+    ) -> Result<IndexedDatabase> {
         if allow_load {
             if let Some(r) = self.take_loaded_crate(crate_name) {
                 return Ok(r);
@@ -121,11 +122,13 @@ impl Workspace {
             let path = database_path(&self.path, crate_name);
             if path.exists() {
                 info!("Loading database for {}", crate_name);
-                return Ok(load_json(path)?);
+                let db = load_json(path)?;
+                return Ok(IndexedDatabase::new(db));
             }
         }
         if allow_create {
-            return Ok(Database::empty(crate_name.into()));
+            let db = Database::empty(crate_name.into());
+            return Ok(IndexedDatabase::new(db));
         }
         bail!("can't get database");
     }

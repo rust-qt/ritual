@@ -448,7 +448,7 @@ impl State<'_, '_> {
             return Ok(false);
         };
 
-        let destructor_checks = self.0.db.cpp_checks(&ffi_item.id);
+        let destructor_checks = self.0.db.cpp_checks(&ffi_item.id)?;
         debug!("    destructor checks: {:?}", destructor_checks);
 
         let is_deletable =
@@ -1649,7 +1649,7 @@ impl State<'_, '_> {
                 },
             )?;
 
-            let checks = self.0.db.cpp_checks(&wrapper.id);
+            let checks = self.0.db.cpp_checks(&wrapper.id)?;
             let public_args = wrapper.item.arguments.iter().map_if_ok(|arg| {
                 self.rust_final_type(
                     arg,
@@ -1692,7 +1692,7 @@ impl State<'_, '_> {
 
     fn process_cpp_item(&self, cpp_item: DbItem<&CppItem>) -> Result<Vec<RustItem>> {
         if let Some(ffi_item) = self.0.db.source_ffi_item(&cpp_item.id)? {
-            if !self.0.db.cpp_checks(&ffi_item.id).any_success() {
+            if !self.0.db.cpp_checks(&ffi_item.id)?.any_success() {
                 bail!("cpp checks failed");
             }
         }
@@ -1937,7 +1937,7 @@ impl State<'_, '_> {
 
         for ffi_item_id in self.0.db.ffi_item_ids().collect_vec() {
             let ffi_item = self.0.db.ffi_item(&ffi_item_id)?;
-            let checks = self.0.db.cpp_checks(&ffi_item_id);
+            let checks = self.0.db.cpp_checks(&ffi_item_id)?;
             if !checks.any_success() {
                 debug!(
                     "skipping ffi item with failed checks: {}",

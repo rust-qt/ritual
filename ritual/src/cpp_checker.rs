@@ -457,7 +457,7 @@ impl CppChecker<'_, '_> {
             self.data.db.add_environment(env.clone());
         }
 
-        let mut snippets = self.create_tasks(&environments);
+        let mut snippets = self.create_tasks(&environments)?;
         if snippets.is_empty() {
             return Ok(());
         }
@@ -479,7 +479,7 @@ impl CppChecker<'_, '_> {
 
         self.data.db.add_environment(env.clone());
 
-        let mut snippets = self.create_tasks(&[env]);
+        let mut snippets = self.create_tasks(&[env])?;
         if snippets.is_empty() {
             return Ok(());
         }
@@ -505,14 +505,14 @@ impl CppChecker<'_, '_> {
         Ok(())
     }
 
-    fn create_tasks(&self, library_targets: &[LibraryTarget]) -> Vec<LocalSnippetTask> {
+    fn create_tasks(&self, library_targets: &[LibraryTarget]) -> Result<Vec<LocalSnippetTask>> {
         let crate_name = self.data.db.crate_name().to_string();
 
         let mut snippets = Vec::new();
         let mut old_items_count = 0;
 
         for ffi_item in self.data.db.ffi_items() {
-            let checks = self.data.db.cpp_checks(&ffi_item.id);
+            let checks = self.data.db.cpp_checks(&ffi_item.id)?;
             if checks.has_all_envs(library_targets) {
                 old_items_count += 1;
                 continue;
@@ -557,7 +557,7 @@ impl CppChecker<'_, '_> {
             );
         }
 
-        snippets
+        Ok(snippets)
     }
 
     fn save_results(&mut self, snippets: Vec<LocalSnippetTask>) -> Result<()> {

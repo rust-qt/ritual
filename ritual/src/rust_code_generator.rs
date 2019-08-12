@@ -242,7 +242,7 @@ impl Generator<'_> {
         if let Some(ffi_item) = ffi_item {
             let condition = self
                 .current_database
-                .cpp_checks(&ffi_item.id)
+                .cpp_checks(&ffi_item.id)?
                 .condition(self.current_database.environments());
             if condition != Condition::True {
                 let expression = condition_expression(&condition);
