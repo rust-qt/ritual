@@ -588,8 +588,19 @@ impl RustItem {
         }
     }
 
+    pub fn parent_path_parts(&self) -> Result<&[String]> {
+        match self {
+            RustItem::TraitImpl(trait_impl) => Ok(trait_impl.parent_path.parts()),
+            RustItem::ExtraImpl(data) => Ok(data.parent_path.parts()),
+            _ => self
+                .path()
+                .expect("item must have path because it's not a trait impl")
+                .parent_parts(),
+        }
+    }
+
     pub fn is_child_of(&self, parent: &RustPath) -> bool {
-        self.parent_path().ok().as_ref() == Some(parent)
+        self.parent_path_parts().ok() == Some(parent.parts())
     }
 
     pub fn as_module_ref(&self) -> Option<&RustModule> {

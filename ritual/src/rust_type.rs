@@ -117,6 +117,18 @@ impl RustPath {
             bail!("failed to get parent path for {:?}", self)
         }
     }
+
+    pub fn parent_parts(&self) -> Result<&[String]> {
+        if self.parts.len() > 1 {
+            Ok(&self.parts[..self.parts.len() - 1])
+        } else {
+            bail!("failed to get parent path for {:?}", self)
+        }
+    }
+
+    pub fn parts(&self) -> &[String] {
+        &self.parts
+    }
 }
 
 /// Conversion from public Rust API type to
