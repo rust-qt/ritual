@@ -84,6 +84,7 @@ enum ProcessedFfiItem {
 enum OperatorKind {
     Normal,
     NormalUnary,
+    MutableUnary,
     WithAssign,
     Comparison,
 }
@@ -233,10 +234,19 @@ impl OperatorInfo {
                 function_name: "shr_assign",
                 kind: OperatorKind::WithAssign,
             },
+            CppOperator::PrefixIncrement => OperatorInfo {
+                trait_path: "cpp_utils::ops::Increment",
+                function_name: "inc",
+                kind: OperatorKind::MutableUnary,
+            },
+            CppOperator::Indirection => OperatorInfo {
+                trait_path: "cpp_utils::ops::Indirection",
+                function_name: "indirection",
+                kind: OperatorKind::NormalUnary,
+            },
             CppOperator::Conversion(_)
             | CppOperator::Assignment
             | CppOperator::UnaryPlus
-            | CppOperator::PrefixIncrement
             | CppOperator::PostfixIncrement
             | CppOperator::PrefixDecrement
             | CppOperator::PostfixDecrement
@@ -245,7 +255,6 @@ impl OperatorInfo {
             | CppOperator::LogicalOr
             | CppOperator::BitwiseNot
             | CppOperator::Subscript
-            | CppOperator::Indirection
             | CppOperator::AddressOf
             | CppOperator::StructureDereference
             | CppOperator::PointerToMember
@@ -671,11 +680,11 @@ impl State<'_, '_> {
 
         let is_self_const = match operator_info.kind {
             OperatorKind::Normal | OperatorKind::NormalUnary | OperatorKind::Comparison => true,
-            OperatorKind::WithAssign => false,
+            OperatorKind::WithAssign | OperatorKind::MutableUnary => false,
         };
 
         let target_type = match operator_info.kind {
-            OperatorKind::Normal | OperatorKind::NormalUnary => {
+            OperatorKind::Normal | OperatorKind::NormalUnary | OperatorKind::MutableUnary => {
                 RustType::new_reference(is_self_const, self_value_type.clone())
             }
             OperatorKind::WithAssign | OperatorKind::Comparison => self_value_type.clone(),
@@ -683,7 +692,9 @@ impl State<'_, '_> {
 
         let trait_args;
         let mut other_type;
-        if operator_info.kind == OperatorKind::NormalUnary {
+        if operator_info.kind == OperatorKind::NormalUnary
+            || operator_info.kind == OperatorKind::MutableUnary
+        {
             trait_args = None;
             other_type = None;
         } else {
@@ -737,7 +748,7 @@ impl State<'_, '_> {
         };
 
         let associated_types = match operator_info.kind {
-            OperatorKind::Normal | OperatorKind::NormalUnary => {
+            OperatorKind::Normal | OperatorKind::NormalUnary | OperatorKind::MutableUnary => {
                 let output = RustTraitAssociatedType {
                     name: "Output".into(),
                     value: unnamed_function.return_type.api_type().clone(),
@@ -771,7 +782,7 @@ impl State<'_, '_> {
         }
 
         match operator_info.kind {
-            OperatorKind::Normal | OperatorKind::NormalUnary => {}
+            OperatorKind::Normal | OperatorKind::NormalUnary | OperatorKind::MutableUnary => {}
             OperatorKind::WithAssign => {
                 if function.return_type.api_type() != &RustType::unit() {
                     function.return_type = RustFinalType::new(
