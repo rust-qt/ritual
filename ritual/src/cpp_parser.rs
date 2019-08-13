@@ -1289,11 +1289,6 @@ impl CppParser<'_, '_> {
         } else if template_arguments.is_some() {
             bail!("unexpected template arguments");
         }
-        if let Some(parent) = entity.get_semantic_parent() {
-            if get_template_arguments(parent).is_some() {
-                bail!("Types nested into template types are not supported");
-            }
-        }
         let mut current_base_index = 0;
         for child in entity.get_children() {
             if child.get_kind() == EntityKind::FieldDecl || child.get_kind() == EntityKind::VarDecl

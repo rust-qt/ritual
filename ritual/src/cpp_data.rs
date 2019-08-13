@@ -358,14 +358,14 @@ impl fmt::Debug for CppPathItem {
 }
 
 /// Information about a C++ type declaration
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Hash)]
 pub enum CppTypeDeclarationKind {
     Enum,
     Class,
 }
 
 /// Information about a C++ type declaration
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Hash)]
 pub struct CppTypeDeclaration {
     /// Identifier, including namespaces and nested classes
     pub path: CppPath,

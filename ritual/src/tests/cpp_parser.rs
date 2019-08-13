@@ -570,7 +570,7 @@ fn template_class_method() {
         };
         ",
     );
-    assert_eq!(data.types.len(), 1);
+    assert_eq!(data.types.len(), 2);
     let my_vector_item = CppPathItem {
         name: "MyVector".into(),
         template_arguments: Some(vec![CppType::TemplateParameter(CppTemplateParameter {
@@ -582,6 +582,12 @@ fn template_class_method() {
     let my_vector_path = CppPath::from_item(my_vector_item.clone());
     assert_eq!(data.types[0].path, my_vector_path);
     assert!(data.types[0].kind.is_class());
+
+    assert_eq!(
+        data.types[1].path,
+        my_vector_path.join(CppPathItem::from_good_str("Iterator"))
+    );
+    assert!(data.types[1].kind.is_class());
 
     assert!(data.bases.is_empty());
     assert!(data.fields.is_empty());
