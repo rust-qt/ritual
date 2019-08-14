@@ -8,8 +8,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 #[test]
 fn qobject() {
     unsafe {
-        let mut obj1 = QObject::new_0a();
-        let mut obj2 = QObject::new_0a();
+        let obj1 = QObject::new_0a();
+        let obj2 = QObject::new_0a();
         obj1.destroyed().connect(obj2.slot_delete_later());
 
         let args = QObject::next_connect_args();
@@ -46,7 +46,7 @@ fn raw_slot() {
 #[test]
 fn raw_slot_connect() {
     unsafe {
-        let mut obj1 = QObject::new_0a();
+        let obj1 = QObject::new_0a();
         let mut slot = RawSlotOfInt::new();
         obj1.object_name_changed().connect(&slot);
 
@@ -66,7 +66,7 @@ fn raw_slot_connect() {
 #[test]
 fn closure_slot_connect() {
     unsafe {
-        let mut obj1 = QObject::new_0a();
+        let obj1 = QObject::new_0a();
         let counter = Rc::new(RefCell::new(0));
         let counter_handle = Rc::clone(&counter);
         let mut slot = SlotOfInt::new(move |arg| {

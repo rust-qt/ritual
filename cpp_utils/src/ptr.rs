@@ -1,3 +1,4 @@
+use crate::ops::{Begin, BeginMut, End, EndMut};
 use crate::{CppBox, CppDeletable, DynamicCast, MutRef, Ref, StaticDowncast, StaticUpcast};
 use std::ffi::CStr;
 use std::fmt;
@@ -95,6 +96,46 @@ impl<T> MutPtr<T> {
     {
         DynamicCast::dynamic_cast_mut(self)
     }
+
+    pub unsafe fn begin(self) -> <&'static T as Begin>::Output
+    where
+        for<'a> &'a T: Begin,
+    {
+        if self.0.is_null() {
+            panic!("attempted to deref a null MutPtr<T>");
+        }
+        (*self.as_raw_ptr()).begin()
+    }
+
+    pub unsafe fn begin_mut(self) -> <&'static mut T as BeginMut>::Output
+    where
+        for<'a> &'a mut T: BeginMut,
+    {
+        if self.0.is_null() {
+            panic!("attempted to deref a null MutPtr<T>");
+        }
+        (*self.as_mut_raw_ptr()).begin_mut()
+    }
+
+    pub unsafe fn end(self) -> <&'static T as End>::Output
+    where
+        for<'a> &'a T: End,
+    {
+        if self.0.is_null() {
+            panic!("attempted to deref a null MutPtr<T>");
+        }
+        (*self.as_raw_ptr()).end()
+    }
+
+    pub unsafe fn end_mut(self) -> <&'static mut T as EndMut>::Output
+    where
+        for<'a> &'a mut T: EndMut,
+    {
+        if self.0.is_null() {
+            panic!("attempted to deref a null MutPtr<T>");
+        }
+        (*self.as_mut_raw_ptr()).end_mut()
+    }
 }
 
 impl<T: CppDeletable> MutPtr<T> {
@@ -191,6 +232,26 @@ impl<T> Ptr<T> {
         T: DynamicCast<U>,
     {
         DynamicCast::dynamic_cast(self)
+    }
+
+    pub unsafe fn begin(self) -> <&'static T as Begin>::Output
+    where
+        for<'a> &'a T: Begin,
+    {
+        if self.0.is_null() {
+            panic!("attempted to deref a null Ptr<T>");
+        }
+        (*self.as_raw_ptr()).begin()
+    }
+
+    pub unsafe fn end(self) -> <&'static T as End>::Output
+    where
+        for<'a> &'a T: End,
+    {
+        if self.0.is_null() {
+            panic!("attempted to deref a null Ptr<T>");
+        }
+        (*self.as_raw_ptr()).end()
     }
 }
 

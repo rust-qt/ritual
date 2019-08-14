@@ -39,9 +39,15 @@ fn qvector_iter() {
         vec.push(14);
         vec.push(16);
 
-        let collected: Vec<c_int> = cpp_iter(vec.begin(), vec.end())
+        let collected: Vec<c_int> = cpp_iter(vec.begin_mut(), vec.end_mut())
             .map(|mut_ref| *mut_ref)
             .collect();
         assert_eq!(collected, [10, 12, 14, 16]);
+
+        let reversed: Vec<c_int> = cpp_iter(vec.begin_mut(), vec.end_mut())
+            .map(|mut_ref| *mut_ref)
+            .rev()
+            .collect();
+        assert_eq!(reversed, [16, 14, 12, 10]);
     }
 }

@@ -89,6 +89,50 @@ enum OperatorKind {
     Comparison,
 }
 
+enum SpecialFunction {
+    Begin,
+    BeginMut,
+    End,
+    EndMut,
+}
+
+enum OperatorOrSpecialFunction<'a> {
+    Operator(&'a CppOperator),
+    SpecialFunction(SpecialFunction),
+}
+
+impl<'a> OperatorOrSpecialFunction<'a> {
+    fn get(function: &'a CppFunction) -> Option<OperatorOrSpecialFunction<'a>> {
+        if let Some(operator) = &function.operator {
+            return Some(OperatorOrSpecialFunction::Operator(operator));
+        }
+        if let Some(member) = &function.member {
+            if !member.is_static && function.path.last().template_arguments.is_none() {
+                match function.path.last().name.as_str() {
+                    "begin" => {
+                        let func = if member.is_const {
+                            SpecialFunction::Begin
+                        } else {
+                            SpecialFunction::BeginMut
+                        };
+                        return Some(OperatorOrSpecialFunction::SpecialFunction(func));
+                    }
+                    "end" => {
+                        let func = if member.is_const {
+                            SpecialFunction::End
+                        } else {
+                            SpecialFunction::EndMut
+                        };
+                        return Some(OperatorOrSpecialFunction::SpecialFunction(func));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        None
+    }
+}
+
 #[derive(Debug)]
 struct OperatorInfo {
     trait_path: &'static str,
@@ -97,173 +141,201 @@ struct OperatorInfo {
 }
 
 impl OperatorInfo {
-    fn new(operator: &CppOperator) -> Result<OperatorInfo> {
+    fn new(operator: OperatorOrSpecialFunction<'_>) -> Result<OperatorInfo> {
         let info = match operator {
-            CppOperator::Addition => OperatorInfo {
-                trait_path: "std::ops::Add",
-                function_name: "add",
-                kind: OperatorKind::Normal,
+            OperatorOrSpecialFunction::Operator(operator) => match operator {
+                CppOperator::Addition => OperatorInfo {
+                    trait_path: "std::ops::Add",
+                    function_name: "add",
+                    kind: OperatorKind::Normal,
+                },
+                CppOperator::Subtraction => OperatorInfo {
+                    trait_path: "std::ops::Sub",
+                    function_name: "sub",
+                    kind: OperatorKind::Normal,
+                },
+                CppOperator::UnaryMinus => OperatorInfo {
+                    trait_path: "std::ops::Neg",
+                    function_name: "neg",
+                    kind: OperatorKind::NormalUnary,
+                },
+                CppOperator::Multiplication => OperatorInfo {
+                    trait_path: "std::ops::Mul",
+                    function_name: "mul",
+                    kind: OperatorKind::Normal,
+                },
+                CppOperator::Division => OperatorInfo {
+                    trait_path: "std::ops::Div",
+                    function_name: "div",
+                    kind: OperatorKind::Normal,
+                },
+                CppOperator::Modulo => OperatorInfo {
+                    trait_path: "std::ops::Rem",
+                    function_name: "rem",
+                    kind: OperatorKind::Normal,
+                },
+                CppOperator::EqualTo => OperatorInfo {
+                    trait_path: "std::cmp::PartialEq",
+                    function_name: "eq",
+                    kind: OperatorKind::Comparison,
+                },
+                CppOperator::GreaterThan => OperatorInfo {
+                    trait_path: "cpp_utils::cmp::Gt",
+                    function_name: "gt",
+                    kind: OperatorKind::Comparison,
+                },
+                CppOperator::LessThan => OperatorInfo {
+                    trait_path: "cpp_utils::cmp::Lt",
+                    function_name: "lt",
+                    kind: OperatorKind::Comparison,
+                },
+                CppOperator::GreaterThanOrEqualTo => OperatorInfo {
+                    trait_path: "cpp_utils::cmp::Ge",
+                    function_name: "ge",
+                    kind: OperatorKind::Comparison,
+                },
+                CppOperator::LessThanOrEqualTo => OperatorInfo {
+                    trait_path: "cpp_utils::cmp::Le",
+                    function_name: "le",
+                    kind: OperatorKind::Comparison,
+                },
+                CppOperator::LogicalNot => OperatorInfo {
+                    trait_path: "std::ops::Not",
+                    function_name: "not",
+                    kind: OperatorKind::NormalUnary,
+                },
+                CppOperator::BitwiseAnd => OperatorInfo {
+                    trait_path: "std::ops::BitAnd",
+                    function_name: "bitand",
+                    kind: OperatorKind::Normal,
+                },
+                CppOperator::BitwiseOr => OperatorInfo {
+                    trait_path: "std::ops::BitOr",
+                    function_name: "bitor",
+                    kind: OperatorKind::Normal,
+                },
+                CppOperator::BitwiseXor => OperatorInfo {
+                    trait_path: "std::ops::BitXor",
+                    function_name: "bitxor",
+                    kind: OperatorKind::Normal,
+                },
+                CppOperator::BitwiseLeftShift => OperatorInfo {
+                    trait_path: "std::ops::Shl",
+                    function_name: "shl",
+                    kind: OperatorKind::Normal,
+                },
+                CppOperator::BitwiseRightShift => OperatorInfo {
+                    trait_path: "std::ops::Shr",
+                    function_name: "shr",
+                    kind: OperatorKind::Normal,
+                },
+                CppOperator::AdditionAssignment => OperatorInfo {
+                    trait_path: "std::ops::AddAssign",
+                    function_name: "add_assign",
+                    kind: OperatorKind::WithAssign,
+                },
+                CppOperator::SubtractionAssignment => OperatorInfo {
+                    trait_path: "std::ops::SubAssign",
+                    function_name: "sub_assign",
+                    kind: OperatorKind::WithAssign,
+                },
+                CppOperator::MultiplicationAssignment => OperatorInfo {
+                    trait_path: "std::ops::MulAssign",
+                    function_name: "mul_assign",
+                    kind: OperatorKind::WithAssign,
+                },
+                CppOperator::DivisionAssignment => OperatorInfo {
+                    trait_path: "std::ops::DivAssign",
+                    function_name: "div_assign",
+                    kind: OperatorKind::WithAssign,
+                },
+                CppOperator::ModuloAssignment => OperatorInfo {
+                    trait_path: "std::ops::RemAssign",
+                    function_name: "rem_assign",
+                    kind: OperatorKind::WithAssign,
+                },
+                CppOperator::BitwiseAndAssignment => OperatorInfo {
+                    trait_path: "std::ops::BitAndAssign",
+                    function_name: "bitand_assign",
+                    kind: OperatorKind::WithAssign,
+                },
+                CppOperator::BitwiseOrAssignment => OperatorInfo {
+                    trait_path: "std::ops::BitOrAssign",
+                    function_name: "bitor_assign",
+                    kind: OperatorKind::WithAssign,
+                },
+                CppOperator::BitwiseXorAssignment => OperatorInfo {
+                    trait_path: "std::ops::BitXorAssign",
+                    function_name: "bitxor_assign",
+                    kind: OperatorKind::WithAssign,
+                },
+                CppOperator::BitwiseLeftShiftAssignment => OperatorInfo {
+                    trait_path: "std::ops::ShlAssign",
+                    function_name: "shl_assign",
+                    kind: OperatorKind::WithAssign,
+                },
+                CppOperator::BitwiseRightShiftAssignment => OperatorInfo {
+                    trait_path: "std::ops::ShrAssign",
+                    function_name: "shr_assign",
+                    kind: OperatorKind::WithAssign,
+                },
+                CppOperator::PrefixIncrement => OperatorInfo {
+                    trait_path: "cpp_utils::ops::Increment",
+                    function_name: "inc",
+                    kind: OperatorKind::MutableUnary,
+                },
+                CppOperator::PrefixDecrement => OperatorInfo {
+                    trait_path: "cpp_utils::ops::Decrement",
+                    function_name: "dec",
+                    kind: OperatorKind::MutableUnary,
+                },
+                CppOperator::Indirection => OperatorInfo {
+                    trait_path: "cpp_utils::ops::Indirection",
+                    function_name: "indirection",
+                    kind: OperatorKind::NormalUnary,
+                },
+                CppOperator::Conversion(_)
+                | CppOperator::Assignment
+                | CppOperator::UnaryPlus
+                | CppOperator::PostfixIncrement
+                | CppOperator::PostfixDecrement
+                | CppOperator::NotEqualTo
+                | CppOperator::LogicalAnd
+                | CppOperator::LogicalOr
+                | CppOperator::BitwiseNot
+                | CppOperator::Subscript
+                | CppOperator::AddressOf
+                | CppOperator::StructureDereference
+                | CppOperator::PointerToMember
+                | CppOperator::FunctionCall
+                | CppOperator::Comma
+                | CppOperator::New
+                | CppOperator::NewArray
+                | CppOperator::Delete
+                | CppOperator::DeleteArray => bail!("unsupported operator: {:?}", operator),
             },
-            CppOperator::Subtraction => OperatorInfo {
-                trait_path: "std::ops::Sub",
-                function_name: "sub",
-                kind: OperatorKind::Normal,
+            OperatorOrSpecialFunction::SpecialFunction(func) => match func {
+                SpecialFunction::Begin => OperatorInfo {
+                    trait_path: "cpp_utils::ops::Begin",
+                    function_name: "begin",
+                    kind: OperatorKind::NormalUnary,
+                },
+                SpecialFunction::BeginMut => OperatorInfo {
+                    trait_path: "cpp_utils::ops::BeginMut",
+                    function_name: "begin_mut",
+                    kind: OperatorKind::MutableUnary,
+                },
+                SpecialFunction::End => OperatorInfo {
+                    trait_path: "cpp_utils::ops::End",
+                    function_name: "end",
+                    kind: OperatorKind::NormalUnary,
+                },
+                SpecialFunction::EndMut => OperatorInfo {
+                    trait_path: "cpp_utils::ops::EndMut",
+                    function_name: "end_mut",
+                    kind: OperatorKind::MutableUnary,
+                },
             },
-            CppOperator::UnaryMinus => OperatorInfo {
-                trait_path: "std::ops::Neg",
-                function_name: "neg",
-                kind: OperatorKind::NormalUnary,
-            },
-            CppOperator::Multiplication => OperatorInfo {
-                trait_path: "std::ops::Mul",
-                function_name: "mul",
-                kind: OperatorKind::Normal,
-            },
-            CppOperator::Division => OperatorInfo {
-                trait_path: "std::ops::Div",
-                function_name: "div",
-                kind: OperatorKind::Normal,
-            },
-            CppOperator::Modulo => OperatorInfo {
-                trait_path: "std::ops::Rem",
-                function_name: "rem",
-                kind: OperatorKind::Normal,
-            },
-            CppOperator::EqualTo => OperatorInfo {
-                trait_path: "std::cmp::PartialEq",
-                function_name: "eq",
-                kind: OperatorKind::Comparison,
-            },
-            CppOperator::GreaterThan => OperatorInfo {
-                trait_path: "cpp_utils::cmp::Gt",
-                function_name: "gt",
-                kind: OperatorKind::Comparison,
-            },
-            CppOperator::LessThan => OperatorInfo {
-                trait_path: "cpp_utils::cmp::Lt",
-                function_name: "lt",
-                kind: OperatorKind::Comparison,
-            },
-            CppOperator::GreaterThanOrEqualTo => OperatorInfo {
-                trait_path: "cpp_utils::cmp::Ge",
-                function_name: "ge",
-                kind: OperatorKind::Comparison,
-            },
-            CppOperator::LessThanOrEqualTo => OperatorInfo {
-                trait_path: "cpp_utils::cmp::Le",
-                function_name: "le",
-                kind: OperatorKind::Comparison,
-            },
-            CppOperator::LogicalNot => OperatorInfo {
-                trait_path: "std::ops::Not",
-                function_name: "not",
-                kind: OperatorKind::NormalUnary,
-            },
-            CppOperator::BitwiseAnd => OperatorInfo {
-                trait_path: "std::ops::BitAnd",
-                function_name: "bitand",
-                kind: OperatorKind::Normal,
-            },
-            CppOperator::BitwiseOr => OperatorInfo {
-                trait_path: "std::ops::BitOr",
-                function_name: "bitor",
-                kind: OperatorKind::Normal,
-            },
-            CppOperator::BitwiseXor => OperatorInfo {
-                trait_path: "std::ops::BitXor",
-                function_name: "bitxor",
-                kind: OperatorKind::Normal,
-            },
-            CppOperator::BitwiseLeftShift => OperatorInfo {
-                trait_path: "std::ops::Shl",
-                function_name: "shl",
-                kind: OperatorKind::Normal,
-            },
-            CppOperator::BitwiseRightShift => OperatorInfo {
-                trait_path: "std::ops::Shr",
-                function_name: "shr",
-                kind: OperatorKind::Normal,
-            },
-            CppOperator::AdditionAssignment => OperatorInfo {
-                trait_path: "std::ops::AddAssign",
-                function_name: "add_assign",
-                kind: OperatorKind::WithAssign,
-            },
-            CppOperator::SubtractionAssignment => OperatorInfo {
-                trait_path: "std::ops::SubAssign",
-                function_name: "sub_assign",
-                kind: OperatorKind::WithAssign,
-            },
-            CppOperator::MultiplicationAssignment => OperatorInfo {
-                trait_path: "std::ops::MulAssign",
-                function_name: "mul_assign",
-                kind: OperatorKind::WithAssign,
-            },
-            CppOperator::DivisionAssignment => OperatorInfo {
-                trait_path: "std::ops::DivAssign",
-                function_name: "div_assign",
-                kind: OperatorKind::WithAssign,
-            },
-            CppOperator::ModuloAssignment => OperatorInfo {
-                trait_path: "std::ops::RemAssign",
-                function_name: "rem_assign",
-                kind: OperatorKind::WithAssign,
-            },
-            CppOperator::BitwiseAndAssignment => OperatorInfo {
-                trait_path: "std::ops::BitAndAssign",
-                function_name: "bitand_assign",
-                kind: OperatorKind::WithAssign,
-            },
-            CppOperator::BitwiseOrAssignment => OperatorInfo {
-                trait_path: "std::ops::BitOrAssign",
-                function_name: "bitor_assign",
-                kind: OperatorKind::WithAssign,
-            },
-            CppOperator::BitwiseXorAssignment => OperatorInfo {
-                trait_path: "std::ops::BitXorAssign",
-                function_name: "bitxor_assign",
-                kind: OperatorKind::WithAssign,
-            },
-            CppOperator::BitwiseLeftShiftAssignment => OperatorInfo {
-                trait_path: "std::ops::ShlAssign",
-                function_name: "shl_assign",
-                kind: OperatorKind::WithAssign,
-            },
-            CppOperator::BitwiseRightShiftAssignment => OperatorInfo {
-                trait_path: "std::ops::ShrAssign",
-                function_name: "shr_assign",
-                kind: OperatorKind::WithAssign,
-            },
-            CppOperator::PrefixIncrement => OperatorInfo {
-                trait_path: "cpp_utils::ops::Increment",
-                function_name: "inc",
-                kind: OperatorKind::MutableUnary,
-            },
-            CppOperator::Indirection => OperatorInfo {
-                trait_path: "cpp_utils::ops::Indirection",
-                function_name: "indirection",
-                kind: OperatorKind::NormalUnary,
-            },
-            CppOperator::Conversion(_)
-            | CppOperator::Assignment
-            | CppOperator::UnaryPlus
-            | CppOperator::PostfixIncrement
-            | CppOperator::PrefixDecrement
-            | CppOperator::PostfixDecrement
-            | CppOperator::NotEqualTo
-            | CppOperator::LogicalAnd
-            | CppOperator::LogicalOr
-            | CppOperator::BitwiseNot
-            | CppOperator::Subscript
-            | CppOperator::AddressOf
-            | CppOperator::StructureDereference
-            | CppOperator::PointerToMember
-            | CppOperator::FunctionCall
-            | CppOperator::Comma
-            | CppOperator::New
-            | CppOperator::NewArray
-            | CppOperator::Delete
-            | CppOperator::DeleteArray => bail!("unsupported operator: {:?}", operator),
         };
         Ok(info)
     }
@@ -660,7 +732,7 @@ impl State<'_, '_> {
 
     fn process_operator_as_trait_impl(
         unnamed_function: UnnamedRustFunction,
-        operator: &CppOperator,
+        operator: OperatorOrSpecialFunction<'_>,
         crate_name: &str,
         trait_types: &[TraitTypes],
     ) -> Result<RustTraitImpl> {
@@ -1123,10 +1195,10 @@ impl State<'_, '_> {
                 );
                 return Ok(results);
             }
-            if let Some(operator) = &cpp_function.operator {
-                if operator == &CppOperator::NotEqualTo {
-                    bail!("NotEqualTo is not needed in public API because PartialEq is used");
-                }
+            if cpp_function.operator.as_ref() == Some(&CppOperator::NotEqualTo) {
+                bail!("NotEqualTo is not needed in public API because PartialEq is used");
+            }
+            if let Some(operator) = OperatorOrSpecialFunction::get(cpp_function) {
                 match State::process_operator_as_trait_impl(
                     unnamed_function.clone(),
                     operator,

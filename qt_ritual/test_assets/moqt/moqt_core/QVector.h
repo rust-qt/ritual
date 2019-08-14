@@ -40,6 +40,9 @@ public:
         void operator++() {
             m_pos++;
         }
+        void operator--() {
+            m_pos--;
+        }
 
     private:
         Iterator(T* pos) : m_pos(pos) {}

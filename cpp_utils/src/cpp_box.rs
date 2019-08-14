@@ -1,3 +1,4 @@
+use crate::ops::{Begin, BeginMut, End, EndMut};
 use crate::{DynamicCast, MutPtr, MutRef, Ptr, Ref, StaticDowncast, StaticUpcast};
 use std::ops::{Deref, DerefMut};
 use std::{fmt, mem, ptr};
@@ -43,8 +44,12 @@ impl<T: CppDeletable> CppBox<T> {
         MutPtr::from_raw(self.0.as_ptr())
     }
 
-    pub unsafe fn as_raw_ptr(&mut self) -> *mut T {
+    pub unsafe fn as_mut_raw_ptr(&mut self) -> *mut T {
         self.0.as_ptr()
+    }
+
+    pub unsafe fn as_raw_ptr(&self) -> *const T {
+        self.0.as_ptr() as *const T
     }
 
     /// Returns the pointer to the content and destroys the box.
@@ -123,6 +128,34 @@ impl<T: CppDeletable> CppBox<T> {
         T: DynamicCast<U>,
     {
         DynamicCast::dynamic_cast_mut(self.as_mut_ptr()).as_mut_ref()
+    }
+
+    pub unsafe fn begin(&self) -> <&'static T as Begin>::Output
+    where
+        for<'a> &'a T: Begin,
+    {
+        (*self.as_raw_ptr()).begin()
+    }
+
+    pub unsafe fn begin_mut(&mut self) -> <&'static mut T as BeginMut>::Output
+    where
+        for<'a> &'a mut T: BeginMut,
+    {
+        (*self.as_mut_raw_ptr()).begin_mut()
+    }
+
+    pub unsafe fn end(&self) -> <&'static T as End>::Output
+    where
+        for<'a> &'a T: End,
+    {
+        (*self.as_raw_ptr()).end()
+    }
+
+    pub unsafe fn end_mut(&mut self) -> <&'static mut T as EndMut>::Output
+    where
+        for<'a> &'a mut T: EndMut,
+    {
+        (*self.as_mut_raw_ptr()).end_mut()
     }
 }
 
