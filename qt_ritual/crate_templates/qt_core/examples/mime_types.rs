@@ -1,13 +1,13 @@
-use qt_core::{q_debug, QCoreApplication, QListOfQString};
+use qt_core::{q_debug, qdebug, QCoreApplication, QListOfQString};
 
 fn main() {
     QCoreApplication::init(|_app| unsafe {
         let arguments = QCoreApplication::arguments();
         let arguments = arguments.static_upcast::<QListOfQString>();
-        let _ = q_debug!() << arguments;
+        println!("arguments: {:?}", qdebug(arguments));
 
         for arg in arguments {
-            let _ = q_debug!() << arg;
+            println!("argument: {:?}", qdebug(arg));
         }
         0
     })
