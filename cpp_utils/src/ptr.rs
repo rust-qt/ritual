@@ -1,9 +1,9 @@
 use crate::ops::{Begin, BeginMut, End, EndMut};
 use crate::{CppBox, CppDeletable, DynamicCast, MutRef, Ref, StaticDowncast, StaticUpcast};
 use std::ffi::CStr;
-use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::os::raw::c_char;
+use std::{fmt, mem, slice};
 
 pub struct MutPtr<T>(*mut T);
 
@@ -136,6 +136,28 @@ impl<T> MutPtr<T> {
         }
         (*self.as_mut_raw_ptr()).end_mut()
     }
+
+    pub unsafe fn as_slice<'a, T1>(self) -> &'a [T1]
+    where
+        T: 'static,
+        &'static T: Begin<Output = Ptr<T1>> + End<Output = Ptr<T1>>,
+    {
+        let begin = self.begin().as_raw_ptr();
+        let end = self.end().as_raw_ptr();
+        let count = (end as usize).saturating_sub(begin as usize) / mem::size_of::<T1>();
+        slice::from_raw_parts(begin, count)
+    }
+
+    pub unsafe fn as_mut_slice<'a, T1>(self) -> &'a mut [T1]
+    where
+        T: 'static,
+        &'static mut T: BeginMut<Output = MutPtr<T1>> + EndMut<Output = MutPtr<T1>>,
+    {
+        let begin = self.begin_mut().as_mut_raw_ptr();
+        let end = self.end_mut().as_mut_raw_ptr();
+        let count = (end as usize).saturating_sub(begin as usize) / mem::size_of::<T1>();
+        slice::from_raw_parts_mut(begin, count)
+    }
 }
 
 impl<T: CppDeletable> MutPtr<T> {
@@ -252,6 +274,17 @@ impl<T> Ptr<T> {
             panic!("attempted to deref a null Ptr<T>");
         }
         (*self.as_raw_ptr()).end()
+    }
+
+    pub unsafe fn as_slice<'a, T1>(self) -> &'a [T1]
+    where
+        T: 'static,
+        &'static T: Begin<Output = Ptr<T1>> + End<Output = Ptr<T1>>,
+    {
+        let begin = self.begin().as_raw_ptr();
+        let end = self.end().as_raw_ptr();
+        let count = (end as usize).saturating_sub(begin as usize) / mem::size_of::<T1>();
+        slice::from_raw_parts(begin, count)
     }
 }
 

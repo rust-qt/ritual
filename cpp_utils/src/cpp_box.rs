@@ -1,7 +1,7 @@
 use crate::ops::{Begin, BeginMut, End, EndMut};
 use crate::{DynamicCast, MutPtr, MutRef, Ptr, Ref, StaticDowncast, StaticUpcast};
 use std::ops::{Deref, DerefMut};
-use std::{fmt, mem, ptr};
+use std::{fmt, mem, ptr, slice};
 
 /// Indicates that the type can be put into a CppBox.
 ///
@@ -156,6 +156,28 @@ impl<T: CppDeletable> CppBox<T> {
         &'static mut T: EndMut,
     {
         (*self.as_mut_raw_ptr()).end_mut()
+    }
+
+    pub unsafe fn as_slice<'a, T1>(&'a self) -> &'a [T1]
+    where
+        T: 'static,
+        &'static T: Begin<Output = Ptr<T1>> + End<Output = Ptr<T1>>,
+    {
+        let begin = self.begin().as_raw_ptr();
+        let end = self.end().as_raw_ptr();
+        let count = (end as usize).saturating_sub(begin as usize) / mem::size_of::<T1>();
+        slice::from_raw_parts(begin, count)
+    }
+
+    pub unsafe fn as_mut_slice<'a, T1>(&'a mut self) -> &'a mut [T1]
+    where
+        T: 'static,
+        &'static mut T: BeginMut<Output = MutPtr<T1>> + EndMut<Output = MutPtr<T1>>,
+    {
+        let begin = self.begin_mut().as_mut_raw_ptr();
+        let end = self.end_mut().as_mut_raw_ptr();
+        let count = (end as usize).saturating_sub(begin as usize) / mem::size_of::<T1>();
+        slice::from_raw_parts_mut(begin, count)
     }
 }
 

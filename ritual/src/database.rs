@@ -9,7 +9,7 @@ use ritual_common::string_utils::ends_with_digit;
 use ritual_common::target::LibraryTarget;
 use ritual_common::ReadOnly;
 use serde_derive::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::iter::once;
 use std::sync::Arc;
@@ -298,6 +298,7 @@ impl IndexedDatabase {
     }
 
     fn refresh(&mut self) {
+        self.source_id_to_index.clear();
         for (index, item) in self.db.items.iter().enumerate() {
             self.source_id_to_index
                 .entry(item.source_id.clone())
@@ -330,6 +331,7 @@ impl IndexedDatabase {
 pub struct Counters {
     pub items_added: u32,
     pub items_ignored: u32,
+    pub items_deleted: u32,
 }
 
 /// Represents all collected data related to a crate.
@@ -652,6 +654,9 @@ impl DatabaseClient {
                 );
             }
         }
+        if self.counters.items_deleted > 0 {
+            info!("Items deleted: {}", self.counters.items_deleted);
+        }
         self.counters = Counters::default();
     }
 
@@ -711,12 +716,42 @@ impl DatabaseClient {
     }
 
     pub fn delete_items(&mut self, mut function: impl FnMut(DbItem<&DatabaseItemData>) -> bool) {
-        self.current_database
-            .db
-            .items
-            .retain(|i| !function(i.as_ref()));
+        let mut ids = HashSet::new();
+        let mut items_deleted = 0;
+        self.current_database.db.items.retain(|i| {
+            let result = !function(i.as_ref());
+            if !result {
+                ids.insert(i.id.clone());
+                items_deleted += 1;
+            }
+            result
+        });
+        self.counters.items_deleted += items_deleted;
+        self.delete_children(ids);
         self.current_database.refresh();
-        // TODO: collect garbage
+    }
+
+    fn delete_children(&mut self, mut ids: HashSet<ItemId>) {
+        let mut items_deleted = 0;
+        loop {
+            let mut new_ids = HashSet::new();
+            self.current_database.db.items.retain(|i| {
+                let result = i
+                    .source_id
+                    .as_ref()
+                    .map_or(true, |source_id| !ids.contains(source_id));
+                if !result {
+                    new_ids.insert(i.id.clone());
+                    items_deleted += 1;
+                }
+                result
+            });
+            if new_ids.is_empty() {
+                break;
+            }
+            ids = new_ids;
+        }
+        self.counters.items_deleted += items_deleted;
     }
 
     pub fn source_cpp_item(&self, id: &ItemId) -> Result<Option<DbItem<&CppItem>>> {
