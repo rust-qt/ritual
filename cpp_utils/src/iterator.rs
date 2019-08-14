@@ -1,5 +1,5 @@
-use crate::ops::{Decrement, Increment, Indirection};
-use crate::{CppBox, CppDeletable, Ref};
+use crate::ops::{Begin, BeginMut, Decrement, End, EndMut, Increment, Indirection};
+use crate::{CppBox, CppDeletable, MutPtr, MutRef, Ptr, Ref};
 
 pub struct CppIterator<T1, T2>
 where
@@ -63,5 +63,107 @@ where
                 Some(value)
             }
         }
+    }
+}
+
+impl<T, T1, T2> IntoIterator for Ptr<T>
+where
+    T: 'static,
+    &'static T: Begin<Output = CppBox<T1>> + End<Output = CppBox<T2>>,
+    T1: CppDeletable + PartialEq<Ref<T2>> + 'static,
+    T2: CppDeletable,
+    &'static T1: Indirection,
+    &'static mut T1: Increment,
+{
+    type Item = <&'static T1 as Indirection>::Output;
+    type IntoIter = CppIterator<T1, T2>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        unsafe { cpp_iter(self.begin(), self.end()) }
+    }
+}
+
+impl<T, T1, T2> IntoIterator for MutPtr<T>
+where
+    T: 'static,
+    &'static mut T: BeginMut<Output = CppBox<T1>> + EndMut<Output = CppBox<T2>>,
+    T1: CppDeletable + PartialEq<Ref<T2>> + 'static,
+    T2: CppDeletable,
+    &'static T1: Indirection,
+    &'static mut T1: Increment,
+{
+    type Item = <&'static T1 as Indirection>::Output;
+    type IntoIter = CppIterator<T1, T2>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        unsafe { cpp_iter(self.begin_mut(), self.end_mut()) }
+    }
+}
+
+impl<T, T1, T2> IntoIterator for Ref<T>
+where
+    T: 'static,
+    &'static T: Begin<Output = CppBox<T1>> + End<Output = CppBox<T2>>,
+    T1: CppDeletable + PartialEq<Ref<T2>> + 'static,
+    T2: CppDeletable,
+    &'static T1: Indirection,
+    &'static mut T1: Increment,
+{
+    type Item = <&'static T1 as Indirection>::Output;
+    type IntoIter = CppIterator<T1, T2>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        unsafe { cpp_iter(self.begin(), self.end()) }
+    }
+}
+
+impl<T, T1, T2> IntoIterator for MutRef<T>
+where
+    T: 'static,
+    &'static mut T: BeginMut<Output = CppBox<T1>> + EndMut<Output = CppBox<T2>>,
+    T1: CppDeletable + PartialEq<Ref<T2>> + 'static,
+    T2: CppDeletable,
+    &'static T1: Indirection,
+    &'static mut T1: Increment,
+{
+    type Item = <&'static T1 as Indirection>::Output;
+    type IntoIter = CppIterator<T1, T2>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        unsafe { cpp_iter(self.begin_mut(), self.end_mut()) }
+    }
+}
+
+impl<'a, T, T1, T2> IntoIterator for &'a CppBox<T>
+where
+    T: CppDeletable + 'static,
+    &'static T: Begin<Output = CppBox<T1>> + End<Output = CppBox<T2>>,
+    T1: CppDeletable + PartialEq<Ref<T2>> + 'static,
+    T2: CppDeletable,
+    &'static T1: Indirection,
+    &'static mut T1: Increment,
+{
+    type Item = <&'static T1 as Indirection>::Output;
+    type IntoIter = CppIterator<T1, T2>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        unsafe { cpp_iter(self.begin(), self.end()) }
+    }
+}
+
+impl<'a, T, T1, T2> IntoIterator for &'a mut CppBox<T>
+where
+    T: CppDeletable + 'static,
+    &'static mut T: BeginMut<Output = CppBox<T1>> + EndMut<Output = CppBox<T2>>,
+    T1: CppDeletable + PartialEq<Ref<T2>> + 'static,
+    T2: CppDeletable,
+    &'static T1: Indirection,
+    &'static mut T1: Increment,
+{
+    type Item = <&'static T1 as Indirection>::Output;
+    type IntoIter = CppIterator<T1, T2>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        unsafe { cpp_iter(self.begin_mut(), self.end_mut()) }
     }
 }

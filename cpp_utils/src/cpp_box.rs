@@ -132,28 +132,28 @@ impl<T: CppDeletable> CppBox<T> {
 
     pub unsafe fn begin(&self) -> <&'static T as Begin>::Output
     where
-        for<'a> &'a T: Begin,
+        &'static T: Begin,
     {
         (*self.as_raw_ptr()).begin()
     }
 
     pub unsafe fn begin_mut(&mut self) -> <&'static mut T as BeginMut>::Output
     where
-        for<'a> &'a mut T: BeginMut,
+        &'static mut T: BeginMut,
     {
         (*self.as_mut_raw_ptr()).begin_mut()
     }
 
     pub unsafe fn end(&self) -> <&'static T as End>::Output
     where
-        for<'a> &'a T: End,
+        &'static T: End,
     {
         (*self.as_raw_ptr()).end()
     }
 
     pub unsafe fn end_mut(&mut self) -> <&'static mut T as EndMut>::Output
     where
-        for<'a> &'a mut T: EndMut,
+        &'static mut T: EndMut,
     {
         (*self.as_mut_raw_ptr()).end_mut()
     }

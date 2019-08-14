@@ -49,5 +49,12 @@ fn qvector_iter() {
             .rev()
             .collect();
         assert_eq!(reversed, [16, 14, 12, 10]);
+
+        for x in &mut vec {
+            let _ = *x;
+        }
+        for x in vec.as_mut_ptr() {
+            let _ = *x;
+        }
     }
 }
