@@ -1,4 +1,4 @@
-use qt_core::{q_debug, qdebug, QCoreApplication, QListOfQString};
+use qt_core::{qdebug, QCoreApplication, QListOfQString};
 
 fn main() {
     QCoreApplication::init(|_app| unsafe {

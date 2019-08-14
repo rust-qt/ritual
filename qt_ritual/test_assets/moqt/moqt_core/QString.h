@@ -9,6 +9,15 @@ public:
     int size() const;
 };
 
+class QString;
+
+class MOQT_CORE_EXPORT QDebug {
+public:
+    QDebug() {}
+    QDebug(QString*) {}
+    QDebug(int) {}
+};
+
 class MOQT_CORE_EXPORT QString {
 public:
     static QString fromUtf8(const char *str, int size = -1);
