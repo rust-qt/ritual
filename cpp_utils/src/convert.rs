@@ -169,3 +169,30 @@ impl<'a> CastFrom<&'a CStr> for Ptr<c_char> {
         Ptr::from_c_str(value)
     }
 }
+
+impl<T, U> CastFrom<*const U> for Ptr<T>
+where
+    U: StaticUpcast<T>,
+{
+    unsafe fn cast_from(value: *const U) -> Self {
+        Self::cast_from(Ptr::from_raw(value))
+    }
+}
+
+impl<T, U> CastFrom<*mut U> for Ptr<T>
+where
+    U: StaticUpcast<T>,
+{
+    unsafe fn cast_from(value: *mut U) -> Self {
+        Self::cast_from(Ptr::from_raw(value as *const U))
+    }
+}
+
+impl<T, U> CastFrom<*mut U> for MutPtr<T>
+where
+    U: StaticUpcast<T>,
+{
+    unsafe fn cast_from(value: *mut U) -> Self {
+        Self::cast_from(MutPtr::from_raw(value))
+    }
+}
