@@ -359,6 +359,30 @@ impl From<&RustTraitImpl> for TraitTypes {
     }
 }
 
+fn check_trait_impl_uniqueness(
+    trait_types: &[TraitTypes],
+    target_type: &RustType,
+    trait_type: &RustCommonType,
+) -> Result<()> {
+    let conflict = trait_types.iter().find(|tt| {
+        tt.target_type.can_be_same_as(target_type) && tt.trait_type.can_be_same_as(trait_type)
+    });
+    if let Some(conflict) = conflict {
+        if &conflict.target_type == target_type && &conflict.trait_type == trait_type {
+            bail!("this trait implementation already exists: {:?}", conflict);
+        } else {
+            bail!(
+                "can't add impl {:?} for {:?} because potentially conflicting trait impl \
+                 already exists: {:?}",
+                trait_type,
+                target_type,
+                conflict
+            );
+        }
+    }
+    Ok(())
+}
+
 struct State<'b, 'a: 'b> {
     data: &'b mut ProcessorData<'a>,
     special_module_paths: HashMap<RustSpecialModuleKind, RustPath>,
@@ -797,22 +821,7 @@ impl State<'_, '_> {
             generic_arguments: trait_args,
         };
 
-        let conflict = trait_types.iter().find(|tt| {
-            tt.target_type.can_be_same_as(&target_type) && tt.trait_type.can_be_same_as(&trait_type)
-        });
-        if let Some(conflict) = conflict {
-            if conflict.target_type == target_type && conflict.trait_type == trait_type {
-                bail!("this trait implementation already exists: {:?}", conflict);
-            } else {
-                bail!(
-                    "can't add impl {:?} for {:?} because potentially conflicting trait impl \
-                     already exists: {:?}",
-                    trait_type,
-                    target_type,
-                    conflict
-                );
-            }
-        }
+        check_trait_impl_uniqueness(trait_types, &target_type, &trait_type)?;
 
         let parent_path = if let RustType::Common(RustCommonType { path, .. }) = self_value_type {
             let type_crate_name = path
@@ -943,6 +952,7 @@ impl State<'_, '_> {
     fn process_cast(
         mut unnamed_function: UnnamedRustFunction,
         cast: &CppCast,
+        trait_types: &[TraitTypes],
     ) -> Result<Vec<RustTraitImpl>> {
         let mut results = Vec::new();
         let args = &unnamed_function.arguments;
@@ -1031,44 +1041,53 @@ impl State<'_, '_> {
             };
 
             let deref_trait_path = RustPath::from_good_str("std::ops::Deref");
-            let mut deref_function = fixed_function.with_path(deref_trait_path.join("deref"));
-            deref_function.is_unsafe = false;
-            make_type_ref(&mut deref_function.return_type, true)?;
-            make_type_ref(&mut deref_function.arguments[0].argument_type, true)?;
-            deref_function.arguments[0].name = "self".into();
-            results.push(RustTraitImpl {
-                target_type: target_type.clone(),
-                parent_path: parent_path.clone(),
-                trait_type: RustCommonType {
-                    path: deref_trait_path,
-                    generic_arguments: None,
-                },
-                associated_types: vec![RustTraitAssociatedType {
-                    name: "Target".to_string(),
-                    value: to_type_value,
-                }],
-                functions: vec![deref_function],
-                extra_kind: RustTraitImplExtraKind::Deref,
-            });
+            let deref_trait_type = RustCommonType {
+                path: deref_trait_path.clone(),
+                generic_arguments: None,
+            };
+            match check_trait_impl_uniqueness(trait_types, &target_type, &deref_trait_type) {
+                Ok(_) => {
+                    let mut deref_function =
+                        fixed_function.with_path(deref_trait_path.join("deref"));
+                    deref_function.is_unsafe = false;
+                    make_type_ref(&mut deref_function.return_type, true)?;
+                    make_type_ref(&mut deref_function.arguments[0].argument_type, true)?;
+                    deref_function.arguments[0].name = "self".into();
+                    results.push(RustTraitImpl {
+                        target_type: target_type.clone(),
+                        parent_path: parent_path.clone(),
+                        trait_type: deref_trait_type,
+                        associated_types: vec![RustTraitAssociatedType {
+                            name: "Target".to_string(),
+                            value: to_type_value,
+                        }],
+                        functions: vec![deref_function],
+                        extra_kind: RustTraitImplExtraKind::Deref,
+                    });
 
-            let deref_mut_trait_path = RustPath::from_good_str("std::ops::DerefMut");
-            let mut deref_mut_function =
-                fixed_function_mut.with_path(deref_mut_trait_path.join("deref_mut"));
-            deref_mut_function.is_unsafe = false;
-            make_type_ref(&mut deref_mut_function.return_type, false)?;
-            make_type_ref(&mut deref_mut_function.arguments[0].argument_type, false)?;
-            deref_mut_function.arguments[0].name = "self".into();
-            results.push(RustTraitImpl {
-                target_type,
-                parent_path,
-                trait_type: RustCommonType {
-                    path: deref_mut_trait_path,
-                    generic_arguments: None,
-                },
-                associated_types: Vec::new(),
-                functions: vec![deref_mut_function],
-                extra_kind: RustTraitImplExtraKind::DerefMut,
-            });
+                    let deref_mut_trait_path = RustPath::from_good_str("std::ops::DerefMut");
+                    let mut deref_mut_function =
+                        fixed_function_mut.with_path(deref_mut_trait_path.join("deref_mut"));
+                    deref_mut_function.is_unsafe = false;
+                    make_type_ref(&mut deref_mut_function.return_type, false)?;
+                    make_type_ref(&mut deref_mut_function.arguments[0].argument_type, false)?;
+                    deref_mut_function.arguments[0].name = "self".into();
+                    results.push(RustTraitImpl {
+                        target_type,
+                        parent_path,
+                        trait_type: RustCommonType {
+                            path: deref_mut_trait_path,
+                            generic_arguments: None,
+                        },
+                        associated_types: Vec::new(),
+                        functions: vec![deref_mut_function],
+                        extra_kind: RustTraitImplExtraKind::DerefMut,
+                    });
+                }
+                Err(err) => {
+                    debug!("not implementing Deref: {}", err);
+                }
+            }
         }
 
         Ok(results)
@@ -1194,7 +1213,7 @@ impl State<'_, '_> {
                 return Ok(results);
             }
             if let Some(cast) = &cpp_function.cast {
-                let impls = State::process_cast(unnamed_function, cast)?;
+                let impls = State::process_cast(unnamed_function, cast, trait_types)?;
                 results.extend(
                     impls
                         .into_iter()
