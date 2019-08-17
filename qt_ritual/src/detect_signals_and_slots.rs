@@ -120,7 +120,7 @@ pub fn detect_signals_and_slots(
         let mut cpp_item = data.db.cpp_item_mut(&item.id)?;
         if let CppItem::Function(method) = &mut cpp_item.item {
             let mut section_type = SectionType::Other;
-            if let Ok(class_name) = method.class_type() {
+            if let Ok(class_name) = method.class_path() {
                 if let Some(sections) = sections_per_class.get(&class_name) {
                     let matching_sections = sections
                         .clone()

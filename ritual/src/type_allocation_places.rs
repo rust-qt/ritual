@@ -137,7 +137,7 @@ pub fn suggest_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
             }
             check_type(&function.return_type, false, &mut data_map, &item_text);
             if function.is_virtual() {
-                let type1 = function.class_type()?;
+                let type1 = function.class_path()?;
                 let good_path = type1.deinstantiate();
                 if let Some(stats) = data_map.get_mut(&good_path) {
                     if stats.virtual_functions.len() < MAX_ITEMS {

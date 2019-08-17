@@ -64,7 +64,7 @@ fn detect_inherited_methods2(data: &ProcessorData<'_>) -> Result<Vec<CppFunction
             .db
             .all_cpp_items()
             .filter_map(|item| item.item.as_function_ref())
-            .filter(|m| m.class_type().ok().as_ref() == Some(&class.base_class_type));
+            .filter(|m| m.class_path_parts().ok() == Some(class.base_class_type.items()));
 
         for method in methods {
             let mut new_method = (*method).clone();

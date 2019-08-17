@@ -225,14 +225,14 @@ impl Generator<'_> {
                             format!(
                                 "new({}) {}",
                                 arg.name,
-                                cpp_function.class_type()?.to_cpp_code()?
+                                cpp_function.class_path()?.to_cpp_code()?
                             )
                         } else {
                             bail!("return value argument not found\n{:?}", method);
                         }
                     }
                     ReturnValueAllocationPlace::Heap => {
-                        format!("new {}", cpp_function.class_type()?.to_cpp_code()?)
+                        format!("new {}", cpp_function.class_path()?.to_cpp_code()?)
                     }
                     ReturnValueAllocationPlace::NotApplicable => {
                         bail!("NotApplicable in constructor");

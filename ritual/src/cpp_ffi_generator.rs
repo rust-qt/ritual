@@ -266,7 +266,7 @@ pub fn to_ffi_method(
     let this_arg_type = match &kind {
         NewFfiFunctionKind::Function { cpp_function, .. } => match &cpp_function.member {
             Some(info) if !info.is_static && info.kind != CppFunctionKind::Constructor => {
-                let class_type = CppType::Class(cpp_function.class_type().unwrap());
+                let class_type = CppType::Class(cpp_function.class_path().unwrap());
                 Some(CppType::new_pointer(info.is_const, class_type))
             }
             _ => None,
@@ -305,7 +305,7 @@ pub fn to_ffi_method(
             if cpp_function.is_destructor() {
                 // destructor doesn't have a return type that needs special handling,
                 // but its `allocation_place` must match `allocation_place` of the type's constructor
-                let class_type = &cpp_function.class_type().unwrap();
+                let class_type = &cpp_function.class_path().unwrap();
                 r.allocation_place = if movable_types.iter().any(|t| t == class_type) {
                     ReturnValueAllocationPlace::Stack
                 } else {
@@ -343,7 +343,7 @@ pub fn to_ffi_method(
     let real_return_type = match &kind {
         NewFfiFunctionKind::Function { cpp_function, .. } => match &cpp_function.member {
             Some(info) if info.kind.is_constructor() => {
-                CppType::Class(cpp_function.class_type().unwrap())
+                CppType::Class(cpp_function.class_path().unwrap())
             }
             _ => cpp_function.return_type.clone(),
         },

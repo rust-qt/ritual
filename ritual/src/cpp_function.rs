@@ -1,6 +1,6 @@
 //! Types for handling information about C++ methods.
 
-use crate::cpp_data::{CppPath, CppVisibility};
+use crate::cpp_data::{CppPath, CppPathItem, CppVisibility};
 use crate::cpp_ffi_data::CppCast;
 pub use crate::cpp_operator::{CppOperator, CppOperatorInfo};
 use crate::cpp_type::{CppPointerLikeTypeKind, CppType};
@@ -193,9 +193,19 @@ impl CppFunction {
             && self.argument_types_equal(other)
     }
 
-    pub fn class_type(&self) -> Result<CppPath> {
+    pub fn class_path(&self) -> Result<CppPath> {
         if self.member.is_some() {
             Ok(self.path.parent().with_context(|_| {
+                err_msg("CppFunction is a class member but its path is not nested.")
+            })?)
+        } else {
+            bail!("not a member function")
+        }
+    }
+
+    pub fn class_path_parts(&self) -> Result<&[CppPathItem]> {
+        if self.member.is_some() {
+            Ok(self.path.parent_parts().with_context(|_| {
                 err_msg("CppFunction is a class member but its path is not nested.")
             })?)
         } else {
@@ -327,7 +337,7 @@ impl CppFunction {
         if self.arguments.len() != 1 {
             return false;
         }
-        let arg = CppType::new_reference(true, CppType::Class(self.class_type().unwrap()));
+        let arg = CppType::new_reference(true, CppType::Class(self.class_path().unwrap()));
         arg == self.arguments[0].argument_type
     }
 
@@ -416,7 +426,7 @@ impl CppFunction {
             result.push(CppType::PointerLike {
                 is_const: class_membership.is_const,
                 kind: CppPointerLikeTypeKind::Pointer,
-                target: Box::new(CppType::Class(self.class_type().unwrap())),
+                target: Box::new(CppType::Class(self.class_path().unwrap())),
             });
         }
         for t in self.arguments.iter().map(|x| x.argument_type.clone()) {

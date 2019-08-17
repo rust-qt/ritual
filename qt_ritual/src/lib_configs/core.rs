@@ -237,7 +237,7 @@ pub fn core_config(config: &mut Config) -> Result<()> {
 
     config.set_ffi_generator_hook(|item| {
         if let CppItem::Function(function) = &item {
-            if let Ok(class_type) = function.class_type() {
+            if let Ok(class_type) = function.class_path() {
                 let class_text = class_type.to_templateless_string();
                 if class_text == "QFlags" {
                     return Ok(false);

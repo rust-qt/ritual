@@ -515,8 +515,9 @@ impl State<'_, '_> {
             .db
             .all_cpp_items()
             .filter_map(|item| item.filter_map(|item| item.as_function_ref()))
-            .find(|f| f.item.is_destructor() && &f.item.class_type().unwrap() == class_path)
-        {
+            .find(|f| {
+                f.item.is_destructor() && f.item.class_path_parts().unwrap() == class_path.items()
+            }) {
             r
         } else {
             debug!("    not deletable (destructor not found)");

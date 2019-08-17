@@ -122,7 +122,7 @@ fn find_suitable_template_arguments<'a>(
                     db.cpp_items()
                         .filter_map(|item| item.item.as_type_ref())
                         .filter(|type1| {
-                            type1.path.parent().ok() == current_path.parent().ok()
+                            type1.path.parent_parts().ok() == current_path.parent_parts().ok()
                                 && type1.path.last().name == current_path.last().name
                                 && type1.path.last().template_arguments.as_ref().map_or(
                                     false,
@@ -329,7 +329,7 @@ pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> 
             .filter_map(|x| x.filter_map(|item| item.as_type_ref()))
             .find(|t| {
                 let t = &t.item;
-                t.path.parent().ok() == item.parent().ok()
+                t.path.parent_parts().ok() == item.parent_parts().ok()
                     && t.path.last().name == item.last().name
                     && t.path
                         .last()

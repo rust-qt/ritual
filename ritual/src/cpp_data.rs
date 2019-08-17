@@ -195,6 +195,14 @@ impl CppPath {
         }
     }
 
+    pub fn parent_parts(&self) -> Result<&[CppPathItem]> {
+        if self.items.len() > 1 {
+            Ok(&self.items[..self.items.len() - 1])
+        } else {
+            bail!("failed to get parent path for {:?}", self)
+        }
+    }
+
     pub fn ascii_caption(&self) -> String {
         self.items
             .iter()
