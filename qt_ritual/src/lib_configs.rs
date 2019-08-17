@@ -205,6 +205,7 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
         "qt_3d_logic" => logic_3d_config,
         "qt_3d_extras" => extras_3d_config,
         "qt_ui_tools" => empty_config,
+        "qt_charts" => empty_config,
         "moqt_core" => core_config,
         "moqt_gui" => gui_config,
         _ => bail!("Unknown crate name: {}", crate_name),

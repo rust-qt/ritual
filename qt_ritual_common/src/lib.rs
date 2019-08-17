@@ -196,6 +196,7 @@ pub fn all_crate_names() -> &'static [&'static str] {
         "qt_3d_input",
         "qt_3d_logic",
         "qt_3d_extras",
+        "qt_charts",
     ]
 }
 
@@ -215,7 +216,7 @@ pub fn lib_dependencies(crate_name: &str) -> Result<&'static [&'static str]> {
             "qt_3d_input",
             "qt_3d_logic",
         ],
-        "qt_ui_tools" => &["qt_core", "qt_gui", "qt_widgets"],
+        "qt_ui_tools" | "qt_charts" => &["qt_core", "qt_gui", "qt_widgets"],
         "moqt_core" => &[],
         "moqt_gui" => &["moqt_core"],
         _ => bail!("Unknown crate name: {}", crate_name),
