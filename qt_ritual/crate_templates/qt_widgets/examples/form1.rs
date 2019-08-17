@@ -1,5 +1,5 @@
 use qt_widgets::{
-    cpp_utils::{CppBox, MutPtr, StaticUpcast},
+    cpp_utils::{CppBox, MutPtr},
     qt_core::QString,
     qt_core::Slot,
     QApplication, QLineEdit, QMessageBox, QPushButton, QVBoxLayout, QWidget,
@@ -17,42 +17,37 @@ impl<'a> Form<'a> {
     fn new() -> Form<'a> {
         unsafe {
             let mut widget = QWidget::new_0a();
-            let mut layout = QVBoxLayout::new_1a(widget.as_mut_ptr());
-            let mut line_edit = QLineEdit::new3();
+            let mut layout = QVBoxLayout::new_1a(&mut widget).into_ptr();
+            let mut line_edit = QLineEdit::new();
 
-            layout.add_widget(line_edit.static_upcast_mut().into());
-
+            layout.add_widget(&mut line_edit);
             let line_edit = line_edit.into_ptr();
-            let mut button = QPushButton::new5(QString::from_std_str("Start").as_ref());
+
+            let mut button = QPushButton::from_q_string(&QString::from_std_str("Start"));
             button.set_enabled(false);
 
-            layout.add_widget(button.static_upcast_mut().static_upcast_mut().into());
+            layout.add_widget(&mut button);
+            let mut button = button.into_ptr();
 
-            let button = button.into_ptr();
-            layout.into_ptr();
             widget.show();
-
-            let mut button1 = button;
-            let line_edit1 = line_edit;
-            let widget1 = widget.as_mut_ptr();
+            let widget_ptr = widget.as_mut_ptr();
 
             let form = Form {
-                _widget: widget,
-                _button: button,
-                _line_edit: line_edit,
                 button_clicked: Slot::new(move || {
-                    let text = line_edit1.text();
-                    QMessageBox::information6(
-                        widget1,
-                        QString::from_std_str("My title").as_ref(),
-                        QString::from_std_str("Text: \"%1\". Congratulations!")
-                            .arg56(text.as_ref())
-                            .as_ref(),
+                    let text = line_edit.text();
+                    QMessageBox::information_q_widget2_q_string(
+                        widget_ptr,
+                        &QString::from_std_str("My title"),
+                        &QString::from_std_str("Text: \"%1\". Congratulations!")
+                            .arg_q_string(&text),
                     );
                 }),
                 line_edit_edited: Slot::new(move || {
-                    button1.set_enabled(!line_edit1.text().is_empty());
+                    button.set_enabled(!line_edit.text().is_empty());
                 }),
+                _widget: widget,
+                _button: button,
+                _line_edit: line_edit,
             };
             button.clicked().connect(&form.button_clicked);
             line_edit.text_edited().connect(&form.line_edit_edited);
