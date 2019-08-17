@@ -30,7 +30,7 @@ use log::{debug, trace};
 use ritual_common::errors::{bail, err_msg, format_err, print_trace, Result};
 use ritual_common::string_utils::CaseOperations;
 use ritual_common::utils::MapIfOk;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::iter::Iterator;
 use std::ops::Deref;
 
@@ -361,6 +361,7 @@ impl From<&RustTraitImpl> for TraitTypes {
 
 struct State<'b, 'a: 'b> {
     data: &'b mut ProcessorData<'a>,
+    special_module_paths: HashMap<RustSpecialModuleKind, RustPath>,
 }
 
 impl State<'_, '_> {
@@ -1460,36 +1461,14 @@ impl State<'_, '_> {
             }
         }
         let scope = match &name_type {
-            NameType::FfiFunction => {
-                let ffi_module = self
-                    .data
-                    .db
-                    .rust_items()
-                    .filter_map(|i| i.item.as_module_ref())
-                    .find(|module| {
-                        module.kind == RustModuleKind::Special(RustSpecialModuleKind::Ffi)
-                    })
-                    .ok_or_else(|| err_msg("ffi module not found"))?;
-                RustPathScope {
-                    path: ffi_module.path.clone(),
-                    prefix: None,
-                }
-            }
-            NameType::SizedItem => {
-                let sized_module = self
-                    .data
-                    .db
-                    .rust_items()
-                    .filter_map(|i| i.item.as_module_ref())
-                    .find(|module| {
-                        module.kind == RustModuleKind::Special(RustSpecialModuleKind::SizedTypes)
-                    })
-                    .ok_or_else(|| err_msg("sized_types module not found"))?;
-                RustPathScope {
-                    path: sized_module.path.clone(),
-                    prefix: None,
-                }
-            }
+            NameType::FfiFunction => RustPathScope {
+                path: self.special_module_paths[&RustSpecialModuleKind::Ffi].clone(),
+                prefix: None,
+            },
+            NameType::SizedItem => RustPathScope {
+                path: self.special_module_paths[&RustSpecialModuleKind::SizedTypes].clone(),
+                prefix: None,
+            },
             NameType::QtSlotWrapper { .. } => {
                 // crate root
                 self.default_path_scope()
@@ -1514,18 +1493,8 @@ impl State<'_, '_> {
                         .map_or(false, |f| f.is_operator());
 
                     if is_operator {
-                        let ops_module = self
-                            .data
-                            .db
-                            .rust_items()
-                            .filter_map(|i| i.item.as_module_ref())
-                            .find(|module| {
-                                module.kind == RustModuleKind::Special(RustSpecialModuleKind::Ops)
-                            })
-                            .ok_or_else(|| err_msg("ops module not found"))?;
-
                         RustPathScope {
-                            path: ops_module.path.clone(),
+                            path: self.special_module_paths[&RustSpecialModuleKind::Ops].clone(),
                             prefix: None,
                         }
                     } else {
@@ -1967,10 +1936,23 @@ impl State<'_, '_> {
                 RustSpecialModuleKind::CrateRoot | RustSpecialModuleKind::Ops => true,
                 RustSpecialModuleKind::Ffi | RustSpecialModuleKind::SizedTypes => false,
             },
-            path: rust_path,
+            path: rust_path.clone(),
             kind: RustModuleKind::Special(kind),
         });
-        self.data.db.add_rust_item(None, rust_item)?;
+        let new_id = self.data.db.add_rust_item(None, rust_item)?;
+        let real_path = if new_id.is_some() {
+            rust_path
+        } else {
+            self.data
+                .db
+                .rust_items()
+                .filter_map(|i| i.item.as_module_ref())
+                .find(|module| module.kind == RustModuleKind::Special(kind))
+                .ok_or_else(|| err_msg("add failed but module not found"))?
+                .path
+                .clone()
+        };
+        self.special_module_paths.insert(kind, real_path);
         Ok(())
     }
 
@@ -2141,7 +2123,10 @@ impl State<'_, '_> {
 }
 
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
-    let mut state = State { data };
+    let mut state = State {
+        data,
+        special_module_paths: HashMap::new(),
+    };
     for &module in &[
         RustSpecialModuleKind::CrateRoot,
         RustSpecialModuleKind::Ffi,
