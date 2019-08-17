@@ -1,19 +1,11 @@
-use cpp_utils::NullPtr;
-use qt_core::{QCoreApplication, QVariant, QVariantAnimation, RawSlotOfQVariant};
-use std::ffi::c_void;
-
-extern "C" fn value_changed(_data: *mut c_void, value: *const QVariant) {
-    unsafe {
-        let value = value.as_ref().expect("value must not be null");
-        println!("value_changed: {}", value.to_string().to_std_string());
-    }
-}
+use qt_core::{QCoreApplication, QVariant, QVariantAnimation, SlotOfQVariant};
 
 #[test]
-fn variant_animation() {
+fn variant_animation2() {
     QCoreApplication::init(|app| unsafe {
-        let mut slot1 = RawSlotOfQVariant::new();
-        slot1.set(Some(value_changed), NullPtr);
+        let slot1 = SlotOfQVariant::new(|value| {
+            println!("value_changed: {}", value.to_string().to_std_string());
+        });
 
         let mut animation = QVariantAnimation::new_0a();
         animation.value_changed().connect(&slot1);
