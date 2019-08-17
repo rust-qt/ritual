@@ -359,7 +359,9 @@ impl From<&RustTraitImpl> for TraitTypes {
     }
 }
 
-struct State<'b, 'a: 'b>(&'b mut ProcessorData<'a>);
+struct State<'b, 'a: 'b> {
+    data: &'b mut ProcessorData<'a>,
+}
 
 impl State<'_, '_> {
     /// Converts `CppType` to its exact Rust equivalent (FFI-compatible)
@@ -480,7 +482,7 @@ impl State<'_, '_> {
     }
 
     fn qt_core_path(&self) -> RustPath {
-        qt_core_path(self.0.config.crate_properties().name())
+        qt_core_path(self.data.config.crate_properties().name())
     }
 
     fn create_qflags(&self, arg: &RustPath) -> RustType {
@@ -508,7 +510,7 @@ impl State<'_, '_> {
         };
 
         let destructor = if let Some(r) = self
-            .0
+            .data
             .db
             .all_cpp_items()
             .filter_map(|item| item.filter_map(|item| item.as_function_ref()))
@@ -521,7 +523,7 @@ impl State<'_, '_> {
         };
 
         let ffi_item = if let Some(r) = self
-            .0
+            .data
             .db
             .all_ffi_items()
             .find(|i| i.source_id.as_ref() == Some(&destructor.id))
@@ -532,7 +534,7 @@ impl State<'_, '_> {
             return Ok(false);
         };
 
-        let destructor_checks = self.0.db.cpp_checks(&ffi_item.id)?;
+        let destructor_checks = self.data.db.cpp_checks(&ffi_item.id)?;
         debug!("    destructor checks: {:?}", destructor_checks);
 
         let is_deletable =
@@ -1173,7 +1175,7 @@ impl State<'_, '_> {
         };
 
         let cpp_item = self
-            .0
+            .data
             .db
             .source_cpp_item(&item.id)?
             .ok_or_else(|| err_msg("source cpp item not found"))?
@@ -1205,7 +1207,7 @@ impl State<'_, '_> {
                 match State::process_operator_as_trait_impl(
                     unnamed_function.clone(),
                     operator,
-                    self.0.db.crate_name(),
+                    self.data.db.crate_name(),
                     trait_types,
                 ) {
                     Ok(item) => {
@@ -1239,7 +1241,7 @@ impl State<'_, '_> {
                 if arg0.name != "self" {
                     if let Ok(type1) = arg0.argument_type.ffi_type().pointer_like_to_target() {
                         if let RustType::Common(type1) = type1 {
-                            if type1.path.crate_name() == Some(self.0.db.crate_name()) {
+                            if type1.path.crate_name() == Some(self.data.db.crate_name()) {
                                 arg0.name = "self".into();
                                 arg0.argument_type = RustFinalType::new(
                                     arg0.argument_type.ffi_type().clone(),
@@ -1273,7 +1275,7 @@ impl State<'_, '_> {
     }
 
     fn find_wrapper_type(&self, cpp_path: &CppPath) -> Result<DbItem<&RustItem>> {
-        self.0
+        self.data
             .db
             .find_rust_items_for_cpp_path(cpp_path, true)?
             .find(|item| item.item.is_wrapper_type())
@@ -1287,7 +1289,7 @@ impl State<'_, '_> {
         parent_path: &CppPath,
         name_type: NameType<'_>,
     ) -> Result<RustPathScope> {
-        if let Some(hook) = self.0.config.rust_path_scope_hook() {
+        if let Some(hook) = self.data.config.rust_path_scope_hook() {
             if let Some(strategy) = hook(parent_path)? {
                 return Ok(strategy);
             }
@@ -1307,7 +1309,7 @@ impl State<'_, '_> {
         };
 
         let rust_item = self
-            .0
+            .data
             .db
             .find_rust_items_for_cpp_path(parent_path, false)?
             .find(|item| {
@@ -1338,7 +1340,7 @@ impl State<'_, '_> {
     fn default_path_scope(&self) -> RustPathScope {
         RustPathScope {
             path: RustPath {
-                parts: vec![self.0.config.crate_properties().name().into()],
+                parts: vec![self.data.config.crate_properties().name().into()],
             },
             prefix: None,
         }
@@ -1372,7 +1374,7 @@ impl State<'_, '_> {
     ) -> Result<Option<String>> {
         let function = item.item;
         let cpp_item = self
-            .0
+            .data
             .db
             .source_cpp_item(&item.id)?
             .ok_or_else(|| err_msg("source cpp item not found"))?
@@ -1452,15 +1454,15 @@ impl State<'_, '_> {
     }
 
     fn generate_rust_path(&self, cpp_path: &CppPath, name_type: NameType<'_>) -> Result<RustPath> {
-        if let Some(hook) = self.0.config.rust_path_hook() {
-            if let Some(path) = hook(cpp_path, name_type.clone(), &self.0)? {
+        if let Some(hook) = self.data.config.rust_path_hook() {
+            if let Some(path) = hook(cpp_path, name_type.clone(), &self.data)? {
                 return Ok(path);
             }
         }
         let scope = match &name_type {
             NameType::FfiFunction => {
                 let ffi_module = self
-                    .0
+                    .data
                     .db
                     .rust_items()
                     .filter_map(|i| i.item.as_module_ref())
@@ -1475,7 +1477,7 @@ impl State<'_, '_> {
             }
             NameType::SizedItem => {
                 let sized_module = self
-                    .0
+                    .data
                     .db
                     .rust_items()
                     .filter_map(|i| i.item.as_module_ref())
@@ -1501,7 +1503,7 @@ impl State<'_, '_> {
                     self.get_path_scope(&parent, name_type.clone())?
                 } else if let NameType::ApiFunction(item) = &name_type {
                     let cpp_item = self
-                        .0
+                        .data
                         .db
                         .source_cpp_item(&item.id)?
                         .ok_or_else(|| err_msg("source cpp item not found"))?
@@ -1513,7 +1515,7 @@ impl State<'_, '_> {
 
                     if is_operator {
                         let ops_module = self
-                            .0
+                            .data
                             .db
                             .rust_items()
                             .filter_map(|i| i.item.as_module_ref())
@@ -1583,7 +1585,7 @@ impl State<'_, '_> {
 
         if name_type == NameType::FfiFunction {
             let rust_path = scope.apply(&full_last_name);
-            if self.0.db.find_rust_item(&rust_path).is_some() {
+            if self.data.db.find_rust_item(&rust_path).is_some() {
                 bail!("ffi function path already taken: {:?}", rust_path);
             }
             return Ok(rust_path);
@@ -1596,7 +1598,7 @@ impl State<'_, '_> {
         if name_type.is_api_function() {
             Ok(rust_path)
         } else {
-            Ok(self.0.db.make_unique_rust_path(&rust_path))
+            Ok(self.data.db.make_unique_rust_path(&rust_path))
         }
     }
 
@@ -1644,7 +1646,7 @@ impl State<'_, '_> {
         }
 
         let mut qt_slot_wrapper = None;
-        if let Some(source_ffi_item) = self.0.db.source_ffi_item(&item.id)? {
+        if let Some(source_ffi_item) = self.data.db.source_ffi_item(&item.id)? {
             if let Some(item) = source_ffi_item.filter_map(|i| i.as_slot_wrapper_ref()) {
                 qt_slot_wrapper = Some(item);
             }
@@ -1735,7 +1737,7 @@ impl State<'_, '_> {
                 },
             )?;
 
-            let checks = self.0.db.cpp_checks(&wrapper.id)?;
+            let checks = self.data.db.cpp_checks(&wrapper.id)?;
             let public_args = wrapper.item.arguments.iter().map_if_ok(|arg| {
                 self.rust_final_type(
                     arg,
@@ -1777,8 +1779,8 @@ impl State<'_, '_> {
     }
 
     fn process_cpp_item(&self, cpp_item: DbItem<&CppItem>) -> Result<Vec<RustItem>> {
-        if let Some(ffi_item) = self.0.db.source_ffi_item(&cpp_item.id)? {
-            if !self.0.db.cpp_checks(&ffi_item.id)?.any_success() {
+        if let Some(ffi_item) = self.data.db.source_ffi_item(&cpp_item.id)? {
+            if !self.data.db.cpp_checks(&ffi_item.id)?.any_success() {
                 bail!("cpp checks failed");
             }
         }
@@ -1833,7 +1835,7 @@ impl State<'_, '_> {
                 };
 
                 let has_source_slot_wrapper = self
-                    .0
+                    .data
                     .db
                     .source_ffi_item(&cpp_item.id)?
                     .map_or(false, |item| item.item.is_slot_wrapper());
@@ -1844,7 +1846,7 @@ impl State<'_, '_> {
                 }
 
                 let original_item = self
-                    .0
+                    .data
                     .db
                     .original_cpp_item(&cpp_item.id)?
                     .ok_or_else(|| err_msg("cpp item must have original cpp item"))?;
@@ -1922,7 +1924,7 @@ impl State<'_, '_> {
 
     fn generate_crate_reexport(&mut self, crate_name: &str) -> Result<()> {
         let path = RustPath::from_parts(vec![
-            self.0.config.crate_properties().name().to_string(),
+            self.data.config.crate_properties().name().to_string(),
             crate_name.to_string(),
         ]);
 
@@ -1931,7 +1933,7 @@ impl State<'_, '_> {
         };
 
         if self
-            .0
+            .data
             .db
             .rust_items()
             .filter_map(|item| item.item.as_reexport_ref())
@@ -1946,12 +1948,12 @@ impl State<'_, '_> {
             source,
             target: RustPath::from_parts(vec![crate_name.to_string()]),
         });
-        self.0.db.add_rust_item(None, rust_item)?;
+        self.data.db.add_rust_item(None, rust_item)?;
         Ok(())
     }
 
     fn generate_special_module(&mut self, kind: RustSpecialModuleKind) -> Result<()> {
-        let crate_name = self.0.config.crate_properties().name().to_string();
+        let crate_name = self.data.config.crate_properties().name().to_string();
         let rust_path_parts = match kind {
             RustSpecialModuleKind::CrateRoot => vec![crate_name],
             RustSpecialModuleKind::Ffi => vec![crate_name, "__ffi".to_string()],
@@ -1968,13 +1970,13 @@ impl State<'_, '_> {
             path: rust_path,
             kind: RustModuleKind::Special(kind),
         });
-        self.0.db.add_rust_item(None, rust_item)?;
+        self.data.db.add_rust_item(None, rust_item)?;
         Ok(())
     }
 
     fn process_cpp_items(&mut self) -> Result<()> {
         let mut processed_ids = HashSet::new();
-        let all_cpp_item_ids = self.0.db.cpp_item_ids().collect_vec();
+        let all_cpp_item_ids = self.data.db.cpp_item_ids().collect_vec();
         loop {
             let mut any_processed = false;
             for cpp_item_id in all_cpp_item_ids.clone() {
@@ -1982,10 +1984,10 @@ impl State<'_, '_> {
                     continue;
                 }
 
-                let cpp_item = self.0.db.cpp_item(&cpp_item_id)?;
+                let cpp_item = self.data.db.cpp_item(&cpp_item_id)?;
                 if let Ok(rust_items) = self.process_cpp_item(cpp_item) {
                     for rust_item in rust_items {
-                        self.0
+                        self.data
                             .db
                             .add_rust_item(Some(cpp_item_id.clone()), rust_item)?;
                     }
@@ -2000,7 +2002,7 @@ impl State<'_, '_> {
         }
 
         for cpp_item_id in all_cpp_item_ids {
-            let cpp_item = self.0.db.cpp_item(&cpp_item_id)?;
+            let cpp_item = self.data.db.cpp_item(&cpp_item_id)?;
             if let Err(err) = self.process_cpp_item(cpp_item.clone()) {
                 debug!("failed to process cpp item: {}: {}", &cpp_item.item, err);
                 print_trace(&err, Some(log::Level::Trace));
@@ -2014,16 +2016,16 @@ impl State<'_, '_> {
     ) -> Result<BTreeMap<RustPath, Vec<ItemWithSource<FunctionWithDesiredPath>>>> {
         let mut grouped_functions = BTreeMap::<_, Vec<_>>::new();
         let mut trait_types = self
-            .0
+            .data
             .db
             .rust_items()
             .filter_map(|item| item.item.as_trait_impl_ref())
             .map(TraitTypes::from)
             .collect_vec();
 
-        for ffi_item_id in self.0.db.ffi_item_ids().collect_vec() {
-            let ffi_item = self.0.db.ffi_item(&ffi_item_id)?;
-            let checks = self.0.db.cpp_checks(&ffi_item_id)?;
+        for ffi_item_id in self.data.db.ffi_item_ids().collect_vec() {
+            let ffi_item = self.data.db.ffi_item(&ffi_item_id)?;
+            let checks = self.data.db.cpp_checks(&ffi_item_id)?;
             if !checks.any_success() {
                 debug!(
                     "skipping ffi item with failed checks: {}",
@@ -2040,7 +2042,7 @@ impl State<'_, '_> {
                                     trait_types.push(trait_impl.into());
                                 }
 
-                                self.0
+                                self.data
                                     .db
                                     .add_rust_item(Some(ffi_item_id.clone()), rust_item)?;
                             }
@@ -2077,7 +2079,7 @@ impl State<'_, '_> {
             if paths.contains(&path) {
                 bail!("conflicting path: {:?}", path);
             }
-            if self.0.db.find_rust_item(&path).is_some() {
+            if self.data.db.find_rust_item(&path).is_some() {
                 bail!("path already taken by an existing item: {:?}", path);
             }
             paths.insert(path);
@@ -2129,9 +2131,9 @@ impl State<'_, '_> {
                 } else {
                     function.item.desired_path
                 };
-                let final_path = self.0.db.make_unique_rust_path(&path);
+                let final_path = self.data.db.make_unique_rust_path(&path);
                 let item = RustItem::Function(function.item.function.with_path(final_path));
-                self.0.db.add_rust_item(Some(function.source_id), item)?;
+                self.data.db.add_rust_item(Some(function.source_id), item)?;
             }
         }
         Ok(())
@@ -2139,7 +2141,7 @@ impl State<'_, '_> {
 }
 
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
-    let mut state = State(data);
+    let mut state = State { data };
     for &module in &[
         RustSpecialModuleKind::CrateRoot,
         RustSpecialModuleKind::Ffi,
@@ -2150,7 +2152,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     }
 
     state.generate_crate_reexport("cpp_utils")?;
-    let dependencies = state.0.config.dependent_cpp_crates().to_vec();
+    let dependencies = state.data.config.dependent_cpp_crates().to_vec();
     for crate_name in dependencies {
         state.generate_crate_reexport(&crate_name)?;
     }
