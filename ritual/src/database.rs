@@ -281,6 +281,8 @@ impl Database {
 pub struct IndexedDatabase {
     db: Database,
     source_id_to_index: HashMap<Option<ItemId>, Vec<usize>>,
+    cpp_path_to_index: HashMap<CppPath, Vec<usize>>,
+    rust_path_to_index: HashMap<RustPath, usize>,
 }
 
 impl IndexedDatabase {
@@ -288,6 +290,8 @@ impl IndexedDatabase {
         let mut value = Self {
             db,
             source_id_to_index: HashMap::new(),
+            cpp_path_to_index: HashMap::new(),
+            rust_path_to_index: HashMap::new(),
         };
         value.refresh();
         value
@@ -299,11 +303,22 @@ impl IndexedDatabase {
 
     fn refresh(&mut self) {
         self.source_id_to_index.clear();
+        self.cpp_path_to_index.clear();
+        self.rust_path_to_index.clear();
         for (index, item) in self.db.items.iter().enumerate() {
             self.source_id_to_index
                 .entry(item.source_id.clone())
                 .or_default()
                 .push(index);
+            if let Some(path) = item.item.as_rust_item().and_then(|item| item.path()) {
+                self.rust_path_to_index.insert(path.clone(), index);
+            }
+            if let Some(path) = item.item.as_cpp_item().and_then(|item| item.path()) {
+                self.cpp_path_to_index
+                    .entry(path.clone())
+                    .or_default()
+                    .push(index);
+            }
         }
     }
 
@@ -313,6 +328,15 @@ impl IndexedDatabase {
             .entry(item.source_id.clone())
             .or_default()
             .push(index);
+        if let Some(path) = item.item.as_rust_item().and_then(|item| item.path()) {
+            self.rust_path_to_index.insert(path.clone(), index);
+        }
+        if let Some(path) = item.item.as_cpp_item().and_then(|item| item.path()) {
+            self.cpp_path_to_index
+                .entry(path.clone())
+                .or_default()
+                .push(index);
+        }
         self.db.items.push(item);
     }
 
@@ -324,6 +348,27 @@ impl IndexedDatabase {
             .get(source_id)
             .into_iter()
             .flat_map(move |ids| ids.iter().map(move |&id| self.db.items[id].as_ref()))
+    }
+
+    fn filter_by_cpp_path(&self, path: &CppPath) -> impl Iterator<Item = DbItem<&CppItem>> {
+        self.cpp_path_to_index
+            .get(path)
+            .into_iter()
+            .flat_map(move |ids| {
+                ids.iter().map(move |&id| {
+                    self.db.items[id]
+                        .as_ref()
+                        .map(|item| item.as_cpp_item().expect("invalid db index"))
+                })
+            })
+    }
+
+    fn find_rust_item(&self, path: &RustPath) -> Option<DbItem<&RustItem>> {
+        self.rust_path_to_index.get(path).map(|&index| {
+            self.db.items[index]
+                .as_ref()
+                .map(|item| item.as_rust_item().expect("invalid db index"))
+        })
     }
 }
 
@@ -551,8 +596,7 @@ impl DatabaseClient {
     }
 
     pub fn find_rust_item(&self, path: &RustPath) -> Option<DbItem<&RustItem>> {
-        self.rust_items()
-            .find(|item| item.item.path() == Some(path))
+        self.current_database.find_rust_item(path)
     }
 
     pub fn rust_children<'a>(
@@ -842,11 +886,7 @@ impl DatabaseClient {
             .chain(self.dependencies.iter().filter(|_| allow_dependencies));
 
         for db in databases {
-            if let Some(cpp_item) = db
-                .db
-                .cpp_items()
-                .find(|cpp_item| cpp_item.item.path() == Some(cpp_path))
-            {
+            if let Some(cpp_item) = db.filter_by_cpp_path(cpp_path).next() {
                 return Ok(db
                     .filter_by_source(&Some(cpp_item.id.clone()))
                     .filter_map(|item| item.filter_map(|item| item.as_rust_item())));
