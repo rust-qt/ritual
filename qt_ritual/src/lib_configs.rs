@@ -17,6 +17,7 @@ use ritual_common::toml;
 use std::path::{Path, PathBuf};
 
 mod _3d;
+mod charts;
 mod core;
 mod gui;
 mod widgets;
@@ -24,9 +25,7 @@ mod widgets;
 use self::_3d::{
     core_3d_config, extras_3d_config, input_3d_config, logic_3d_config, render_3d_config,
 };
-use self::core::core_config;
-use self::gui::gui_config;
-use self::widgets::widgets_config;
+use self::{charts::charts_config, core::core_config, gui::gui_config, widgets::widgets_config};
 use std::env;
 
 pub const MOQT_INSTALL_DIR_ENV_VAR_NAME: &str = "MOQT_INSTALL_DIR";
@@ -205,7 +204,7 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
         "qt_3d_logic" => logic_3d_config,
         "qt_3d_extras" => extras_3d_config,
         "qt_ui_tools" => empty_config,
-        "qt_charts" => empty_config,
+        "qt_charts" => charts_config,
         "moqt_core" => core_config,
         "moqt_gui" => gui_config,
         _ => bail!("Unknown crate name: {}", crate_name),
