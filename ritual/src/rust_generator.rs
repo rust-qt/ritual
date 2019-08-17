@@ -107,7 +107,10 @@ impl<'a> OperatorOrSpecialFunction<'a> {
             return Some(OperatorOrSpecialFunction::Operator(operator));
         }
         if let Some(member) = &function.member {
-            if !member.is_static && function.path.last().template_arguments.is_none() {
+            if !member.is_static
+                && function.arguments.is_empty()
+                && function.path.last().template_arguments.is_none()
+            {
                 match function.path.last().name.as_str() {
                     "begin" => {
                         let func = if member.is_const {
