@@ -1,6 +1,6 @@
 use qt_ui_tools::{
-    cpp_utils::{CppBox, StaticUpcast},
-    qt_core::{q_io_device::OpenModeFlag, QFile, QString, Slot},
+    cpp_utils::CppBox,
+    qt_core::{QBuffer, QByteArray, Slot},
     qt_widgets::{QApplication, QWidget},
     QUiLoader,
 };
@@ -13,14 +13,12 @@ struct Form<'a> {
 impl<'a> Form<'a> {
     fn new() -> Form<'a> {
         unsafe {
-            let path = concat!(env!("CARGO_MANIFEST_DIR"), "/examples/form1.ui");
-            let mut file = QFile::new2(QString::from_std_str(path).as_ref());
-            assert!(file.open(OpenModeFlag::ReadOnly.into()));
-
+            let form_data =
+                include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/examples/form1.ui"));
+            let mut byte_array = QByteArray::from_slice(form_data);
+            let mut buffer = QBuffer::from_q_byte_array(&mut byte_array);
             let mut ui_loader = QUiLoader::new_0a();
-            let mut widget =
-                CppBox::new(ui_loader.load_1a(file.static_upcast_mut().static_upcast_mut().into()))
-                    .expect("load failed");
+            let mut widget = CppBox::new(ui_loader.load_1a(&mut buffer)).expect("load failed");
             widget.show();
 
             let form = Form {
