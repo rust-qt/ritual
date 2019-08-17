@@ -1,5 +1,6 @@
 mod connect;
 mod impl_arguments_compatible;
+mod impl_q_byte_array;
 mod impl_q_core_application;
 mod impl_q_string;
 mod q_debug_shim;
