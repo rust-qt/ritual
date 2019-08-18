@@ -124,4 +124,4 @@ for name in os.listdir(current_dir):
         print('Configuring Qt installation in {}'.format(dir))
         config_file = os.path.join(dir, 'bin', 'qt.conf')
         with open(config_file, 'w') as file:
-            file.write("[Paths]\nPrefix = ..\nDocumentation=../../Docs/Qt-{}".format(name))
+            file.write("[Paths]\nPrefix=..\nDocumentation=../../Docs/Qt-{}".format(name))
