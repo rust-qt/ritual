@@ -212,7 +212,8 @@ fn build_crate(data: &mut ProcessorData<'_>) -> Result<()> {
             .arg(cargo_cmd)
             .arg("-p")
             .arg(crate_name)
-            .current_dir(path);
+            .current_dir(path)
+            .env_remove("CARGO_TARGET_DIR");
         if cargo_cmd == &"doc" {
             command.env(env_var_names::RUSTDOC, "1");
         }
