@@ -53,10 +53,43 @@ def install_dir(dir, modules):
         install(file_url, module)
 
 version = sys.argv[1]
+minor_version = int(version.split('.')[1])
+
+if sys.argv[2] == '--docs':
+    the_os = 'linux_x64' # any existing OS will suffice
+    print('Installing docs for Qt {}'.format(version))
+    version_uglified = version.replace('.', '')
+    if minor_version >= 13:
+        modules = [
+            'qtcore', 'qtgui', 'qtwidgets', 'qtuitools', 'qtgamepad', 'qt3d',
+            'qtquickcontrols', 'qtquickcontrols1', 'qtmultimedia', 'qtwebview',
+            'qtwebsockets', 'qtwebchannel', 'qtsvg', 'qtspeech', 'qtserialport', 'qtserialbus',
+            'qtscxml', 'qtremoteobjects', 'qtlocation', 'qtimageformats',
+            'qtgraphicaleffects', 'qtqml'
+        ]
+    else:
+        modules = ['qt-everywhere-documentation']
+    install_dir(
+        'qt5_{0}_src_doc_examples/qt.qt5.{0}.doc/'.format(version_uglified),
+        modules
+    )
+    install_dir(
+        'qt5_{0}_src_doc_examples/qt.qt5.{0}.doc.qtwebengine/'.format(version_uglified),
+        ['qtwebengine']
+    )
+    install_dir(
+        'qt5_{0}_src_doc_examples/qt.qt5.{0}.doc.qtcharts/'.format(version_uglified),
+        ['qtcharts']
+    )
+    install_dir(
+        'qt5_{0}_src_doc_examples/qt.qt5.{0}.doc.qtdatavis3d/'.format(version_uglified),
+        ['qtdatavisualization']
+    )
+    sys.exit(0)
+
 the_os = sys.argv[2]
 compiler = sys.argv[3]
 
-minor_version = int(version.split('.')[1])
 print('Installing Qt {}'.format(version))
 version_uglified = version.replace('.', '')
 modules = [
@@ -91,42 +124,7 @@ install_dir(
     ['qtdatavis3d']
 )
 
-minor_version = int(version.split('.')[1])
-print('Installing docs for Qt {}'.format(version))
-version_uglified = version.replace('.', '')
-if minor_version >= 13:
-    modules = [
-        'qtcore', 'qtgui', 'qtwidgets', 'qtuitools', 'qtgamepad', 'qt3d',
-        'qtquickcontrols', 'qtquickcontrols1', 'qtmultimedia', 'qtwebview',
-        'qtwebsockets', 'qtwebchannel', 'qtsvg', 'qtspeech', 'qtserialport', 'qtserialbus',
-        'qtscxml', 'qtremoteobjects', 'qtlocation', 'qtimageformats',
-        'qtgraphicaleffects', 'qtqml'
-    ]
-else:
-    modules = ['qt-everywhere-documentation']
-install_dir(
-    'qt5_{0}_src_doc_examples/qt.qt5.{0}.doc/'.format(version_uglified),
-    modules
-)
-install_dir(
-    'qt5_{0}_src_doc_examples/qt.qt5.{0}.doc.qtwebengine/'.format(version_uglified),
-    ['qtwebengine']
-)
-install_dir(
-    'qt5_{0}_src_doc_examples/qt.qt5.{0}.doc.qtcharts/'.format(version_uglified),
-    ['qtcharts']
-)
-install_dir(
-    'qt5_{0}_src_doc_examples/qt.qt5.{0}.doc.qtdatavis3d/'.format(version_uglified),
-    ['qtdatavisualization']
-)
-
 current_dir = os.getcwd()
-# qt_dir = os.path.join(current_dir, version, compiler)
-# print('Configuring Qt installation in {}'.format(qt_dir))
-# config_file = os.path.join(qt_dir, 'bin', 'qt.conf')
-# with open(config_file, 'w') as file:
-#     file.write("[Paths]\nPrefix=..\nDocumentation=../../Docs/Qt-{}".format(version))
 
 for name in os.listdir(current_dir):
     if name == 'Docs': continue
