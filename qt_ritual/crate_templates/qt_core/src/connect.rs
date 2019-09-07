@@ -53,7 +53,7 @@ impl<A> fmt::Debug for Receiver<A> {
 }
 
 impl<A> Receiver<A> {
-    pub fn new(q_object: impl CastInto<Ref<QObject>>, receiver_id: &'static CStr) -> Self {
+    pub unsafe fn new(q_object: impl CastInto<Ref<QObject>>, receiver_id: &'static CStr) -> Self {
         Self {
             q_object: q_object.cast_into(),
             receiver_id,
@@ -82,7 +82,7 @@ impl<A> fmt::Debug for Signal<A> {
 }
 
 impl<A> Signal<A> {
-    pub fn new(q_object: impl CastInto<Ref<QObject>>, receiver_id: &'static CStr) -> Self {
+    pub unsafe fn new(q_object: impl CastInto<Ref<QObject>>, receiver_id: &'static CStr) -> Self {
         Signal(Receiver::new(q_object, receiver_id))
     }
 }

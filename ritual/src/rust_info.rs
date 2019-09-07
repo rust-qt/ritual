@@ -176,6 +176,14 @@ impl RustFunctionKind {
             false
         }
     }
+
+    pub fn is_signal_or_slot_getter(&self) -> bool {
+        if let RustFunctionKind::SignalOrSlotGetter(_) = self {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

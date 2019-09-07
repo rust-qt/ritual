@@ -15,7 +15,7 @@ use crate::rust_type::{
     RustType,
 };
 use itertools::Itertools;
-use ritual_common::errors::{bail, err_msg, Result};
+use ritual_common::errors::{bail, err_msg, format_err, Result};
 use ritual_common::file_utils::{create_dir_all, create_file, file_to_string, File};
 use ritual_common::string_utils::trim_slice;
 use ritual_common::utils::MapIfOk;
@@ -236,9 +236,54 @@ impl Generator<'_> {
         item: DbItem<&RustItem>,
         self_type: Option<&RustType>,
     ) -> Result<()> {
-        let ffi_item = self.current_database.source_ffi_item(&item.id)?;
+        let mut item_for_condition = item.clone();
+        if let RustItem::Function(function) = &item.item {
+            if function.kind.is_signal_or_slot_getter() {
+                // find static cast from self to QObject
+                let target_type = function
+                    .arguments
+                    .get(0)
+                    .ok_or_else(|| err_msg("slot getter must have self argument"))?
+                    .argument_type
+                    .api_type()
+                    .pointer_like_to_target()
+                    .map_err(|_| err_msg("slot getter must have ref self argument"))?;
+
+                let q_object = RustType::Common(RustCommonType {
+                    path: self.qt_core_path().join("QObject"),
+                    generic_arguments: None,
+                });
+                if target_type != q_object {
+                    let trait_type = RustCommonType {
+                        path: RustPath::from_good_str("cpp_utils::StaticUpcast"),
+                        generic_arguments: Some(vec![q_object]),
+                    };
+                    item_for_condition = self
+                        .current_database
+                        .rust_items()
+                        .find(|item| {
+                            item.item.as_trait_impl_ref().map_or(false, |item| {
+                                item.target_type == target_type && item.trait_type == trait_type
+                            })
+                        })
+                        .ok_or_else(|| {
+                            format_err!(
+                                "can't find static cast corresponding to \
+                                 slot getter: target_type = {:?}, trait_type = {:?}",
+                                target_type,
+                                trait_type
+                            )
+                        })?;
+                }
+            }
+        }
+
+        let ffi_item = self
+            .current_database
+            .source_ffi_item(&item_for_condition.id)?;
 
         let mut condition_texts = ConditionTexts::default();
+
         if let Some(ffi_item) = ffi_item {
             let condition = self
                 .current_database
